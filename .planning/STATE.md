@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 35
 current_phase_name: Messaging & AI Compose
 status: executing
-stopped_at: Completed 35-02-PLAN.md
-last_updated: "2026-09-13T15:53:15.000Z"
+stopped_at: Completed 35-03-PLAN.md
+last_updated: "2026-09-13T16:16:38.000Z"
 last_activity: 2026-09-13
-last_activity_desc: Completed 35-02 (migration 028 compose message-mode + DAO + backup allowlist)
-state_head: 6c670b6f4b337c9934e6e3151e81ec84044097ac
+last_activity_desc: "Completed 35-03 (Text/Email delivery logic: mode-aware compose-logic + no-destination fallback + mailto subject/body handoff + setContactMethodPrimary)"
+state_head: c7e469a
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 137
-  completed_plans: 129
+  completed_plans: 130
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -37,14 +37,14 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 35 (Messaging & AI Compose) — EXECUTING
-Plan: 35-02 complete (3 of 9 plans done: 35-01, 35-05, 35-02)
-Status: 35-02 committed — migration 028 landed (TARGET_VERSION 27→28), compose-mode DAO + backup allowlist
+Plan: 35-03 complete (4 of 9 plans done: 35-01, 35-05, 35-02, 35-03)
+Status: 35-03 committed — mode-aware compose-logic (probe-pending Text-only, Email transmittable while SMS unknown, preferred-then-fallback, no-destination usable), encoded mailto subject/body handoff (contract preserved), setContactMethodPrimary writer. COMP-02/03/04 substrate delivered; user-facing wiring lands in 35-07 (requirements left unchecked, mirroring 35-02's COMP-02 treatment).
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-13 — Completed 35-02 (migration 028 compose message-mode; DAO accessors + backup allowlist)
+Last activity: 2026-09-13 — Completed 35-03 (Text/Email delivery logic: compose-logic mode gate + no-destination fallback; mailto subject/body handoff; setContactMethodPrimary)
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: End-of-phase Pixel UAT for Phase 34 (see 34-08-SUMMARY coverage), then verify/close the phase.
 
@@ -278,6 +278,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 34 P08 | 9min | 3 tasks | 1 files |
 | Phase 35 P35-01 | 9min | 4 tasks | 6 files |
 | Phase 35 P05 | 7min | 3 tasks | 5 files |
+| Phase 35 P03 | 11min | 4 tasks | 6 files |
 
 ## Accumulated Context
 
