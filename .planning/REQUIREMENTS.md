@@ -249,11 +249,11 @@ category's phase (see Traceability).
 - [x] **COMP-06**: The Compose-attached confirmation coexists with the durable assist lifecycle (ADR-070/071): the app-global banner and pending sheet remain, a dismissal path exists, and the interaction stamps at handoff time
 - [x] **COMP-07**: Compose session state (body, subject, mode, destination, Message Focus) survives in-app navigation and ordinary backgrounding but is not a durable draft — no drafts table, no backup contract
 - [x] **COMP-08**: User can open Things to Remember Research as a sibling full-screen side — a compact read-only projection of only populated conversation-relevant knowledge, excluding operational metadata, with no add/edit actions
-- [ ] **COMP-09**: Compose honors three AI states: AI Off removes every AI affordance; AI On + Ready exposes them; AI On + Needs Attention shows a restrained repair notice instead of silently hiding AI; manual composition and Research work fully in every state
+- [x] **COMP-09**: Compose honors three AI states: AI Off removes every AI affordance; AI On + Ready exposes them; AI On + Needs Attention shows a restrained repair notice instead of silently hiding AI; manual composition and Research work fully in every state
 - [x] **COMP-10**: AI consumes only preauthorized Contact Knowledge with no per-generation authorization review; Off Limits items render in a distinct Avoid presentation, are never sent to AI in any form (not as positive context, not as avoidance constraints — ADR-107/D-14 reverses ADR-078's off-limits egress), and can never be Message Focus
 - [x] **COMP-11**: User can mark up to three AI-authorized research items Add to AI ("Added ✓") as session-only Message Focus shown compactly on the Compose side; Add to AI never grants permission
-- [ ] **COMP-12**: One adaptive AI action shows Draft with AI (empty editor) or Rewrite with AI (existing text); each request returns three unlabeled varied suggestions on a non-destructive review surface; the editor changes only on explicit "Choose this"; Try Again replaces the set
-- [ ] **COMP-13**: AI generation is cancellable and failure-safe — the manual draft is preserved with concise recovery, and Compose never becomes a provider-troubleshooting surface
+- [x] **COMP-12**: One adaptive AI action shows Draft with AI (empty editor) or Rewrite with AI (existing text); each request returns three unlabeled varied suggestions on a non-destructive review surface; the editor changes only on explicit "Choose this"; Try Again replaces the set
+- [x] **COMP-13**: AI generation is cancellable and failure-safe — the manual draft is preserved with concise recovery, and Compose never becomes a provider-troubleshooting surface
 - [ ] **COMP-14**: Compose is deep-link-ready and origin-aware; completing a send/log returns toward the origin without leaving a finished draft in Back history
 
 ### AICFG — AI Configuration & Prompting (Phase 36)

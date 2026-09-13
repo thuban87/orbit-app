@@ -39,3 +39,10 @@ Only #2 remains open; #1 is fixed.
 - **Failure:** `src/components/orrery/orrery-controls-render.test.tsx` — `SyntaxError: Unexpected token 'typeof'` (transform-level; the suite reports 0 tests / fails to load). Same pre-existing failure logged under 35-02 and 35-04.
 - **Out of scope:** 35-06 touched only compose-research-read / compose-session-store / profile-knowledge-read / ComposeResearchScreen — none referenced by this orrery (Phase 30) suite. `tsc --noEmit` clean; `check:colors` passes; the full suite is otherwise **3371 passing, 355/356 suites green**.
 - **Action:** none taken here (scope boundary). Reconcile with the Phase 30 cleanup.
+
+## [35-08] Pre-existing unrelated test failure — orrery-controls-render.test.tsx
+
+- **Discovered during:** 35-08 overall verification (full `npm test`).
+- **Failure:** `src/components/orrery/orrery-controls-render.test.tsx` — `SyntaxError: Unexpected token 'typeof'` (transform-level; the suite fails to load). Same pre-existing Phase-30 failure logged under 35-02 / 35-04 / 35-06; the file existed unchanged at the pre-plan commit `6e985b4`.
+- **Out of scope:** 35-08 touched only `src/ai/prompt-template.ts(.test)`, `src/screens/ComposeScreen.tsx`, `src/logic/ai-availability.ts(.test)` — none referenced by this orrery (Phase 30) suite. `tsc --noEmit` clean; `check:colors` passes; the full suite is otherwise **3384 passing, 355/356 suites green**.
+- **Action:** none taken here (scope boundary). Reconcile with the Phase 30 cleanup.
