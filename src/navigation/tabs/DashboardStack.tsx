@@ -17,15 +17,13 @@ import { GroupLogScreen } from "@/screens/GroupLogScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
+import { MemoryScreen } from "@/screens/MemoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
-import {
-  MemoryPlaceholderScreen,
-  UpdateContactPlaceholderScreen,
-} from "@/screens/placeholders/FabActionPlaceholders";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
 import { UnboundContactsScreen } from "@/screens/UnboundContactsScreen";
+import { UpdateContactScreen } from "@/screens/UpdateContactScreen";
 import type { DashboardStackParamList } from "../types";
 
 const Stack = createNativeStackNavigator<DashboardStackParamList>();
@@ -44,11 +42,8 @@ export function DashboardStack() {
       />
       <Stack.Screen name="LogContact" component={LogInteractionScreen} />
       <Stack.Screen name="GroupLog" component={GroupLogScreen} />
-      <Stack.Screen
-        name="UpdateContact"
-        component={UpdateContactPlaceholderScreen}
-      />
-      <Stack.Screen name="Memory" component={MemoryPlaceholderScreen} />
+      <Stack.Screen name="UpdateContact" component={UpdateContactScreen} />
+      <Stack.Screen name="Memory" component={MemoryScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
       <Stack.Screen
         name="ThingsToRemember"
