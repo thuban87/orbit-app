@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 35
 current_phase_name: Messaging & AI Compose
 status: executing
-stopped_at: Completed 35-04-PLAN.md
-last_updated: "2026-09-13T16:39:34.429Z"
+stopped_at: Completed 35-06-PLAN.md
+last_updated: "2026-09-13T16:57:10.000Z"
 last_activity: 2026-09-13
-last_activity_desc: "Completed 35-03 (Text/Email delivery logic: mode-aware compose-logic + no-destination fallback + mailto subject/body handoff + setContactMethodPrimary)"
-state_head: eda5414a496acccf9fc85db4247a31dee5669792
+last_activity_desc: "Completed 35-06 (read-only Things-to-Remember Research side: normalized ResearchItem projection with per-source Add-to-AI eligibility + Off Limits Avoid group; session-only Message Focus ≤3 in compose-session-store; narrow readPopulatedCustomFields export)"
+state_head: a886895
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 137
-  completed_plans: 131
+  completed_plans: 132
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -37,14 +37,14 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 35 (Messaging & AI Compose) — EXECUTING
-Plan: 35-03 complete (4 of 9 plans done: 35-01, 35-05, 35-02, 35-03)
-Status: 35-03 committed — mode-aware compose-logic (probe-pending Text-only, Email transmittable while SMS unknown, preferred-then-fallback, no-destination usable), encoded mailto subject/body handoff (contract preserved), setContactMethodPrimary writer. COMP-02/03/04 substrate delivered; user-facing wiring lands in 35-07 (requirements left unchecked, mirroring 35-02's COMP-02 treatment).
+Plan: 35-06 complete (6 of 9 plans done: 35-01, 35-05, 35-02, 35-03, 35-04, 35-06)
+Status: 35-06 committed — read-only Things-to-Remember Research side. New compose-research-read normalizes memories/custom-fields/first-class/Key People/current-state/off-limits into a ResearchItem view model with per-source Add-to-AI eligibility (memory allow_ai, custom-field share_with_ai; else false) + an Off Limits Avoid group (never Add-to-AI, D-14/ADR-107). Narrow readPopulatedCustomFields export added to profile-knowledge-read (A2). compose-session-store extended with session-only messageFocus[] (≤3, deduped/capped/append-ordered, guards on validated ResearchItem). New read-only ComposeResearchScreen (no editor UI, no re-derived eligibility). COMP-08/COMP-11 delivered; nav + Compose-side "Message focus · N" (E4) entry land in 35-09. Wave 2 now fully complete; next is Wave 3 (35-07).
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-13 — Completed 35-03 (Text/Email delivery logic: compose-logic mode gate + no-destination fallback; mailto subject/body handoff; setContactMethodPrimary)
+Last activity: 2026-09-13 — Completed 35-06 (read-only Research projection + session-only Message Focus; ResearchItem view model with per-source Add-to-AI eligibility + Off Limits Avoid group)
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: End-of-phase Pixel UAT for Phase 34 (see 34-08-SUMMARY coverage), then verify/close the phase.
 
@@ -280,6 +280,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 35 P05 | 7min | 3 tasks | 5 files |
 | Phase 35 P03 | 11min | 4 tasks | 6 files |
 | Phase 35 P35-04 | 13min | 4 tasks | 7 files |
+| Phase 35 P35-06 | 13min | 4 tasks | 7 files |
 
 ## Accumulated Context
 

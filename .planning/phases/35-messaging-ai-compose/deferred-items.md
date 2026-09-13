@@ -26,3 +26,10 @@ regressions from 35-02.
 - **Out of scope:** 35-04 touched only `src/logic/ai-*` (7 files). This orrery/Skia component (Phase 30) is untouched by this plan; project-wide `tsc --noEmit` is clean and all 3358 other tests pass. STATE.md already flags Phase 30 as dirty/unreconciled ("30-orrery-systems still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently").
 - **Possible contributor (NOT mine to change):** an inherited uncommitted `M tsconfig.json` edit was present at session start; if vitest's transform reads it, that could be implicated. Left untouched (not a 35-04 change).
 - **Action:** none taken here (scope boundary). Reconcile with the Phase 30 cleanup.
+
+## [35-06] Pre-existing unrelated test failure — orrery-controls-render.test.tsx
+
+- **Discovered during:** 35-06 overall verification (full `npx vitest run`).
+- **Failure:** `src/components/orrery/orrery-controls-render.test.tsx` — `SyntaxError: Unexpected token 'typeof'` (transform-level; the suite reports 0 tests / fails to load). Same pre-existing failure logged under 35-02 and 35-04.
+- **Out of scope:** 35-06 touched only compose-research-read / compose-session-store / profile-knowledge-read / ComposeResearchScreen — none referenced by this orrery (Phase 30) suite. `tsc --noEmit` clean; `check:colors` passes; the full suite is otherwise **3371 passing, 355/356 suites green**.
+- **Action:** none taken here (scope boundary). Reconcile with the Phase 30 cleanup.
