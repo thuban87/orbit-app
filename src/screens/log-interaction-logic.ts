@@ -30,8 +30,9 @@
  * pulls react-native into the vitest env. It builds NO SQL and performs NO write —
  * `recordTouchpoint` is the single recency chokepoint (ADR-010/024/071).
  */
-import { coerceAllowAi } from "@/components/touchpoint-refine-logic";
+
 import type { TouchpointRefineValue } from "@/components/TouchpointRefineForm";
+import { coerceAllowAi } from "@/components/touchpoint-refine-logic";
 import type {
   DefaultInteractionChannel,
   RememberedInteractionChannel,
