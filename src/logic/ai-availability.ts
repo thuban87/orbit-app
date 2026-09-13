@@ -51,3 +51,42 @@ export function computeAiAvailability(
   if (input.provider === "none") return "off";
   return input.hasCredential ? "ready" : "needs-attention";
 }
+
+/**
+ * The affordance posture the Compose screen renders for a given availability
+ * state (COMP-09 / D-07, UI-SPEC E6). Manual composition and Research are usable
+ * in EVERY state — AI availability never gates them. Only the AI actions
+ * (Draft / Rewrite / Add-to-AI / Message Focus) change:
+ *
+ *   - `off`             → no AI affordance at all (manual + Research only).
+ *   - `ready`           → the AI actions are exposed.
+ *   - `needs-attention` → a restrained "AI needs attention" repair notice
+ *                         REPLACES the AI actions. It does NOT silently hide AI
+ *                         (`repairNotice` is shown) and does NOT restore the AI
+ *                         actions (`showAiActions` stays false). The notice
+ *                         routes toward the existing AI settings surface (D-12);
+ *                         Compose is never a provider-troubleshooting surface.
+ */
+export interface AiAffordancePosture {
+  /** Manual composition is usable — ALWAYS true. */
+  readonly manualComposition: boolean;
+  /** Research (Things to Remember) is usable — ALWAYS true. */
+  readonly research: boolean;
+  /** Whether the AI actions are exposed (Ready only). */
+  readonly showAiActions: boolean;
+  /** Whether the restrained repair notice is shown (Needs-Attention only). */
+  readonly repairNotice: boolean;
+}
+
+/** Map an availability state to its screen affordance posture (pure). */
+export function selectAiAffordance(
+  availability: AiAvailability,
+): AiAffordancePosture {
+  return {
+    // Manual composition and Research are never gated by AI availability.
+    manualComposition: true,
+    research: true,
+    showAiActions: availability === "ready",
+    repairNotice: availability === "needs-attention",
+  };
+}
