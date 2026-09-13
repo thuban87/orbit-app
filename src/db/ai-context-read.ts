@@ -152,6 +152,46 @@ async function readInteractionAggregates(
 }
 
 /**
+ * The gated recent-interaction-note branch of the closed egress projection
+ * (ADR-078, unchanged by ADR-107). Reads the notes of the contact's three most
+ * recent interactions and carries a note ONLY where that interaction's
+ * `allow_ai = 1` — the durable per-interaction gate added in migration 025,
+ * default OFF. Newest-first (occurred_at DESC, id DESC); blank/whitespace-only
+ * notes are minimized away.
+ *
+ * Group Notes — the Phase 33 event-level shared record — live in the SEPARATE
+ * `group_events` table and are DELIBERATELY never read here, so they can never
+ * be carried under any `allow_ai` value (D-08). Only `interactions.note` (the
+ * per-interaction note) is read, `contactId` is the sole `?`-bound value, and
+ * only static column names are literal text. Pure read — no transaction.
+ */
+async function readGatedRecentInteractionNotes(
+  exec: SqlExecutor,
+  contactId: number,
+): Promise<string[]> {
+  const rows = await exec.getAllAsync<{ note: string | null; allow_ai: number }>(
+    `SELECT note, allow_ai
+       FROM interactions
+      WHERE contact_id = ?
+      ORDER BY occurred_at DESC, id DESC
+      LIMIT 3`,
+    [contactId],
+  );
+  const out: string[] = [];
+  for (const r of rows) {
+    // Gate on the explicit per-interaction permission, then drop blanks.
+    if (r.allow_ai !== 1) {
+      continue;
+    }
+    if (r.note === null || r.note.trim() === "") {
+      continue;
+    }
+    out.push(r.note);
+  }
+  return out;
+}
+
+/**
  * Read the live, opted-in custom field values for a contact: only
  * non-quarantined defs flagged `share_with_ai=1`, resolved through the validated
  * `col_name` boundary and displayed by label. Null / blank values are simply
@@ -287,6 +327,13 @@ export async function readPromptContext(
   // excludes source='ai', while migration 017 leaves no such fuel rows to read.
   const sharedMemories = await readSharedMemories(exec, contactId);
 
+  // (6) Gated recent-interaction notes (allow_ai=1 only), carry-only until Phase
+  //     36 renders them (D-13). Off Limits is carried in no shape (D-14/ADR-107).
+  const gatedRecentInteractionNotes = await readGatedRecentInteractionNotes(
+    exec,
+    contactId,
+  );
+
   return {
     contactName: identity.name,
     category: identity.categoryName ?? "",
@@ -298,5 +345,6 @@ export async function readPromptContext(
     newestChannel: aggregates.newestChannel,
     sharedFields,
     sharedMemories,
+    gatedRecentInteractionNotes,
   };
 }
