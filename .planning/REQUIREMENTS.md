@@ -254,7 +254,7 @@ category's phase (see Traceability).
 - [x] **COMP-11**: User can mark up to three AI-authorized research items Add to AI ("Added ✓") as session-only Message Focus shown compactly on the Compose side; Add to AI never grants permission
 - [x] **COMP-12**: One adaptive AI action shows Draft with AI (empty editor) or Rewrite with AI (existing text); each request returns three unlabeled varied suggestions on a non-destructive review surface; the editor changes only on explicit "Choose this"; Try Again replaces the set
 - [x] **COMP-13**: AI generation is cancellable and failure-safe — the manual draft is preserved with concise recovery, and Compose never becomes a provider-troubleshooting surface
-- [ ] **COMP-14**: Compose is deep-link-ready and origin-aware; completing a send/log returns toward the origin without leaving a finished draft in Back history
+- [x] **COMP-14**: Compose is deep-link-ready and origin-aware; completing a send/log returns toward the origin without leaving a finished draft in Back history
 
 ### AICFG — AI Configuration & Prompting (Phase 36)
 

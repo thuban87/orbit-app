@@ -861,7 +861,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 35-09-PLAN.md — ComposeScreen integration: Research entry + Message Focus display + origin-aware return + retire AI-intent plumbing
+- [x] 35-09-PLAN.md — ComposeScreen integration: Research entry + Message Focus display + origin-aware return + retire AI-intent plumbing
 
 **UI hint**: yes
 
@@ -949,7 +949,7 @@ Plans:
 | 32. Interaction History & Insights | 8/8 | In Progress|  |
 | 33. Group Interaction Logging | 7/7 | Complete | 2026-09-12 (physical-Pixel UAT passed; release APK built on droid) |
 | 34. Rapid Capture & Update Flows | 8/8 | Complete | 2026-09-13 |
-| 35. Messaging & AI Compose | 8/9 | In Progress|  |
+| 35. Messaging & AI Compose | 9/9 | Complete |  |
 | 36. AI Configuration & Prompting | 0/TBD | Not started | - |
 | 37. Settings & Personalization | 0/TBD | Deferred planning | - |
 | 38. Your Week | 0/TBD | Deferred planning | - |

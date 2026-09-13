@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 35
 current_phase_name: Messaging & AI Compose
 status: executing
-stopped_at: Completed 35-08-PLAN.md
-last_updated: "2026-09-13T17:36:00.000Z"
+stopped_at: Completed 35-09-PLAN.md
+last_updated: "2026-09-13T18:00:00.000Z"
 last_activity: 2026-09-13
-last_activity_desc: "Completed 35-08 (AI re-wired into the mode-aware ComposeScreen: resolvePrompt gains a bounded/delimited Rewrite sourceDraft param (§P-411, egress unwidened); adaptive Draft/Rewrite action + generateVariants fan-out with per-call variantTemperature; non-destructive three-suggestion review surface (Choose this / Try Again / Cancel + Rewrite keep-original); three availability states sourced from an on-focus credential-PRESENCE read fed to computeAiAvailability; re-created sanitized error-code→line mapping. COMP-09/12/13 closed at the screen level)"
-state_head: a886895
+last_activity_desc: "Completed 35-09 (final Compose expansion: registered the ComposeResearch route in both stacks + param lists via a plain-prop route adapter; Compose-side 'Things to Remember · N' session-preserving entry + compact 'Message focus · N' summary (hidden when empty, Off Limits structurally excluded); origin-aware return driven by the pure composeExitDisposition table — confirmed-log clears the session + removes the finished route, Back preserves + returns toward origin, ContactProfileScreen passes origin:'profile' popping back to Profile from either stack; retired the requestAiSuggestion consume-once AI-intent plumbing + its module + orphaned test. COMP-08/10/11/14 closed. Phase 35 plan set complete 9/9 — origin-aware Back-stack behaviour is Pixel phase-gate UAT)"
+state_head: bfa33cb
 progress:
   total_phases: 21
   completed_phases: 9
   total_plans: 137
-  completed_plans: 133
+  completed_plans: 134
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
