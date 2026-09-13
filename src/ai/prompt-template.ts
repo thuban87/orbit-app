@@ -138,10 +138,18 @@ function qualityLine(ctx: PromptContext): string {
  * string. Applies the documented limits, discloses truncation by category
  * without retaining omitted content, and returns a DEEPLY FROZEN `ResolvedPrompt`
  * whose `prompt` / `inspectorDisplay` / `payload` are the same string instance.
+ *
+ * `sourceDraft` is the OPTIONAL Rewrite path (HIGH-3 / §P-411): when present and
+ * non-blank the caller's own draft is rendered as a bounded, fence-neutralized
+ * `MESSAGE TO REWRITE` DATA block with a minimal rewrite instruction, so the
+ * model reworks that message instead of starting fresh. It is a resolvePrompt
+ * PARAM, never a `PromptContext` field — it does not widen the contact-data
+ * allowlist. Absent/blank → the Draft prompt is byte-identical to today.
  */
 export function resolvePrompt(
   template: string,
   context: PromptContext,
+  sourceDraft?: string,
 ): ResolvedPrompt {
   const truncations: TruncationNotice[] = [];
 
@@ -227,15 +235,62 @@ export function resolvePrompt(
     "===== END DATA: CONTACT CONTEXT =====",
   ].join("\n");
 
-  const scaffold = [
-    STATIC_INSTRUCTION,
-    "",
-    contactBlock,
+  // (Rewrite / HIGH-3 / §P-411) An OPTIONAL user-authored draft. When present and
+  // non-blank this is a REWRITE request: the draft rides in its own fenced DATA
+  // block and a single minimal instruction line tells the model to rewrite THAT
+  // message (preserve intent) rather than invent an unrelated new one. It is the
+  // user's OWN composition — same injection controls as contact data
+  // (sanitizeValue fence-neutralize + PER_VALUE_LIMIT code-point bound), but it is
+  // NOT contact-data egress and is NOT a PromptContext field. Both the block AND
+  // its instruction line JOIN THE SCAFFOLD below so their cost is measured into
+  // `baseCount` and reserved against TOTAL_LIMIT BEFORE the shared-field loop —
+  // never appended after it, where the final hard-trim could sever the block's
+  // closing fence or drop the instruction (review MEDIUM #6). Blank / absent →
+  // the Draft prompt is byte-identical to before (no block, no instruction line).
+  let rewriteInstruction: string | null = null;
+  let rewriteBlock: string | null = null;
+  if (sourceDraft !== undefined && sourceDraft.trim() !== "") {
+    const [boundedDraft, draftTrimmed] = trimToCodePoints(
+      sanitizeValue(sourceDraft),
+      PER_VALUE_LIMIT,
+    );
+    if (draftTrimmed) {
+      truncations.push({
+        category: "message to rewrite",
+        detail: `trimmed to ${PER_VALUE_LIMIT} code points`,
+      });
+    }
+    rewriteInstruction = [
+      "A message the user has already drafted is provided below as the MESSAGE TO",
+      "REWRITE data. Rewrite that message: keep its core intent and meaning and",
+      "the user's voice, and do not write an unrelated new message.",
+    ].join("\n");
+    rewriteBlock = [
+      "===== DATA: MESSAGE TO REWRITE =====",
+      boundedDraft,
+      "===== END DATA: MESSAGE TO REWRITE =====",
+    ].join("\n");
+  }
+
+  // Assemble the scaffold. The rewrite instruction (right after the static
+  // instruction) and the rewrite DATA block (a distinct block after the contact
+  // block) are conditional; when absent the joined string is IDENTICAL to the
+  // pre-change Draft scaffold, preserving byte-identity.
+  const scaffoldParts: string[] = [STATIC_INSTRUCTION];
+  if (rewriteInstruction !== null) {
+    scaffoldParts.push("", rewriteInstruction);
+  }
+  scaffoldParts.push("", contactBlock);
+  if (rewriteBlock !== null) {
+    scaffoldParts.push("", rewriteBlock);
+  }
+  scaffoldParts.push(
     "",
     "===== DATA: USER STYLE NOTE =====",
     styleNote,
     "===== END DATA: USER STYLE NOTE =====",
-  ].join("\n");
+  );
+  const scaffold = scaffoldParts.join("\n");
 
   // Budget the shared fields against whatever the scaffold leaves under 6,000.
   const scaffoldWithoutFields = scaffold.replace(FIELD_MARKER, NONE_AVAILABLE);
