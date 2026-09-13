@@ -797,10 +797,10 @@ Plans:
 
 **Canonical refs**: docs/dossier/milestone-2/phase-13-rapid-capture-update-flows-dossier.md; docs/dossier/milestone-2/planning-notes/phase-13-planning-notes.md
 **Schema**: shared interactions migration with Phase 32 — Tone, channel, duration, Allow AI (owning phase decided once at plan time; verify head+1 at plan time)
-**Plans**: 1/8 plans executed across 3 waves
+**Plans**: 2/8 plans executed across 3 waves
 **Wave 1**
 
-- [ ] 34-01-PLAN.md — Default Interaction Channel data layer: migration 027 (app_settings only) + DAO + declare-only backup portability (CAPT-11)
+- [x] 34-01-PLAN.md — Default Interaction Channel data layer: migration 027 (app_settings only) + DAO + declare-only backup portability (CAPT-11)
 - [x] 34-02-PLAN.md — D-11 Memory-type displayName swap + CAPT-15 vocabulary satisfied-by-dependency verification (no new migration)
 - [ ] 34-03-PLAN.md — streamlined three-section Add Contact + Show More enrichment (atomic create) + AccordionSection primitive & validation interface (CAPT-01/02/03/14)
 
@@ -922,7 +922,7 @@ Plans:
 | 31.1 App-Wide System Backgrounds | 4/4 | In Progress|  |
 | 32. Interaction History & Insights | 8/8 | In Progress|  |
 | 33. Group Interaction Logging | 7/7 | Complete | 2026-09-12 (physical-Pixel UAT passed; release APK built on droid) |
-| 34. Rapid Capture & Update Flows | 1/8 | In Progress|  |
+| 34. Rapid Capture & Update Flows | 2/8 | In Progress|  |
 | 35. Messaging & AI Compose | 0/TBD | Not started | - |
 | 36. AI Configuration & Prompting | 0/TBD | Not started | - |
 | 37. Settings & Personalization | 0/TBD | Deferred planning | - |

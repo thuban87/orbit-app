@@ -1,16 +1,18 @@
 # Phase 34 — Deferred / Out-of-Scope Items
 
-Discoveries logged during execution that are NOT caused by the current plan's
-changes and are therefore out of scope (per executor SCOPE BOUNDARY).
+Discovered during execution; NOT fixed (pre-existing or unrelated to the current plan's changes).
 
-## From 34-02 execution (2026-09-12)
+## 34-01
 
-- **Pre-existing test-suite LOAD failure — `src/components/orrery/orrery-controls-render.test.tsx`.**
-  `npx vitest run` reports `SyntaxError: Unexpected token 'typeof'` while
-  transforming this file (line 13: `...(await original<typeof import("react")>())`).
-  This is a transform/syntax issue in the vitest pipeline, not a failed
-  assertion. The file is unmodified by 34-02 (last touched in commit `5d38954`,
-  Phase 29-11) and is unrelated to the memory-registry / interaction-vocabulary /
-  ai-context-read files this plan changes. All 3160 individual tests pass; only
-  this one suite fails to load. Left for a dedicated fix (likely a vitest/esbuild
-  transform config for generic call-type-arguments in `.test.tsx`).
+- **[pre-existing] `src/db/database.ts` biome findings.** `biome check src/db/database.ts` reports an
+  unused import (`INTERACTION_HISTORY_SCHEMA_VERSION` from migration 025) and an `organizeImports`
+  sort warning on the migration-import block (`profile-presentation` sorted before `025/026`). Both are
+  present identically on HEAD (verified via `git show HEAD:src/db/database.ts`), predate this plan, and
+  are not introduced by the migration 027 registration. No git pre-commit hook runs biome, so this is
+  not a commit gate. Left untouched per the executor scope boundary.
+
+- **[pre-existing] `src/components/orrery/orrery-controls-render.test.tsx` fails to load** with
+  `SyntaxError: Unexpected token 'typeof'` (a vitest/esbuild transform error, no tests run). Verified
+  identical at the pre-work commit `df0393a`, so it predates plan 34-01 and is unrelated to the
+  migration-027 / DAO / backup work. Not touched. Likely tied to the open Phase 30 orrery review items
+  (STATE.md notes dirty 30-REVIEW files). Should be triaged with that Phase 30 reconciliation.
