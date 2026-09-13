@@ -94,19 +94,17 @@ export type DashboardStackParamList = {
   UnboundContacts: undefined;
   /**
    * The entry-agnostic compose surface (CMP-01/02/03). Params are SERIALIZABLE
-   * ONLY — a bare `contactId` plus the optional Phase-14 AI intent flag, NO
-   * callback params (native-stack serialization + deep-link safety). The screen
-   * self-fetches header + fuel + SMS capability from the id alone, so Phase 11
-   * (notification), Phase 12 (widget), and Phase 14 (AI) can open it with just a
-   * contact id and no wiring. Registered additively; `initialRouteName` stays
-   * `Home` and every existing route is untouched.
+   * ONLY — a bare `contactId` plus the optional origin, NO callback params
+   * (native-stack serialization + deep-link safety). The screen self-fetches
+   * header + fuel + SMS capability from the id alone, so Phase 11 (notification)
+   * and Phase 12 (widget) can open it with just a contact id and no wiring.
+   * Registered additively; `initialRouteName` stays `Home` and every existing
+   * route is untouched.
    *
-   * `requestAiSuggestion` (Plan 14-05) is a SERIALIZABLE primitive the profile
-   * "AI draft" entry sets to `true` so Compose auto-starts one suggestion on
-   * focus. It is CONSUMED-ONCE: Compose clears it (`setParams`) before dispatch,
-   * so a focus reload / re-render cannot repeat the (potentially billable)
-   * request (T-14-16). Absent/`undefined` is the ordinary "opened to compose"
-   * case — no suggestion is auto-started.
+   * The retired consume-once AI-intent param (Plan 14-05, Trip-Wire 4) was REMOVED
+   * in Plan 35-09: Phase 31 removed the Profile AI-draft entry, and AI now starts
+   * only from the in-Compose adaptive Draft/Rewrite action (Plan 35-08) — never
+   * auto-started from a route param.
    *
    * `origin` (Plan 35-09, COMP-14) is an OPTIONAL serializable primitive naming
    * the launch context so a completed send/log or Back returns toward it — the
@@ -115,7 +113,6 @@ export type DashboardStackParamList = {
    */
   Compose: {
     contactId: number;
-    requestAiSuggestion?: boolean;
     origin?: ComposeOrigin;
   };
   /**
@@ -196,7 +193,6 @@ export type OrreryStackParamList = {
   };
   Compose: {
     contactId: number;
-    requestAiSuggestion?: boolean;
     origin?: ComposeOrigin;
   };
   /** The read-only Things to Remember Research sibling of Compose — registered
