@@ -14,7 +14,30 @@ type ReachOutInput = {
   assistEnabled: boolean;
   now: string;
   messageBody?: string;
+  /**
+   * Optional email Subject. Carried into the `mailto` query string (encoded) for
+   * the email arm ONLY; ignored by the text/call arms. Empty → the `subject`
+   * query param is omitted entirely.
+   */
+  subject?: string;
 };
+
+/**
+ * Build the email handoff URL, carrying the composed Subject + Body through an
+ * encoded `mailto` query string. Both values are `encodeURIComponent`-escaped so
+ * `&`, `#`, newlines, and other reserved characters can never break out of the
+ * query string or inject extra params (T-35-04). Empty params are omitted so a
+ * bare recipient stays `mailto:<endpoint>`. No-dependency path: mailto via
+ * `Linking.openURL`, never a native mail-composer package (that richer composer
+ * stays a deferred owner opt-in; none is installed here).
+ */
+function buildMailtoUrl(endpoint: string, subject: string, body: string): string {
+  const params: string[] = [];
+  if (subject) params.push(`subject=${encodeURIComponent(subject)}`);
+  if (body) params.push(`body=${encodeURIComponent(body)}`);
+  const query = params.length > 0 ? `?${params.join("&")}` : "";
+  return `mailto:${endpoint}${query}`;
+}
 
 const HANDOFF_ERROR_COPY: Record<
   InteractionAssistChannel,
@@ -63,6 +86,7 @@ export async function performReachOut(
     assistEnabled,
     now,
     messageBody = "",
+    subject = "",
   }: ReachOutInput,
 ): Promise<ReachOutOutcome> {
   const assistUid = assistEnabled
@@ -77,10 +101,12 @@ export async function performReachOut(
   try {
     if (channel === "text") {
       await SMS.sendSMSAsync(endpoint, messageBody);
+    } else if (channel === "call") {
+      await Linking.openURL(`tel:${endpoint}`);
     } else {
-      await Linking.openURL(
-        `${channel === "call" ? "tel" : "mailto"}:${endpoint}`,
-      );
+      // Email: carry the composed Subject + Body via an encoded mailto query
+      // string (no-dependency Linking path). Text arm byte-unchanged above.
+      await Linking.openURL(buildMailtoUrl(endpoint, subject, messageBody));
     }
   } catch {
     if (assistUid) {

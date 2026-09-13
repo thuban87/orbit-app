@@ -103,6 +103,61 @@ describe("performReachOut", () => {
     expect(outcome).toEqual({ handoffStarted: false, assistUid: null });
   });
 
+  it("email arm carries the encoded subject + body via a mailto query string and returns the structured outcome (COMP-04, T-35-04)", async () => {
+    const events: string[] = [];
+    mocks.createPendingAssist.mockImplementation(async () => {
+      events.push("create");
+      return "assist-1";
+    });
+    mocks.openURL.mockImplementation(async () => {
+      events.push("launch");
+      return true;
+    });
+
+    const outcome = await performReachOut(exec, {
+      ...input,
+      channel: "email",
+      endpoint: "person@example.com",
+      subject: "Hi & bye",
+      messageBody: "line1\nline2",
+    });
+
+    // The assist row is stamped BEFORE the OS handoff.
+    expect(events).toEqual(["create", "launch"]);
+    // Subject and body are encodeURIComponent-escaped so `&`, newlines, etc.
+    // cannot break out of / inject into the query string (T-35-04).
+    expect(mocks.openURL).toHaveBeenCalledWith(
+      "mailto:person@example.com?subject=Hi%20%26%20bye&body=line1%0Aline2",
+    );
+    expect(mocks.markAssistFailed).not.toHaveBeenCalled();
+    expect(mocks.alert).not.toHaveBeenCalled();
+    // The plan-35-01 return contract is preserved on the email arm.
+    expect(outcome).toEqual({ handoffStarted: true, assistUid: "assist-1" });
+  });
+
+  it("email arm omits empty query params — a bare recipient stays mailto:<endpoint>", async () => {
+    await performReachOut(exec, {
+      ...input,
+      channel: "email",
+      endpoint: "person@example.com",
+    });
+
+    expect(mocks.openURL).toHaveBeenCalledWith("mailto:person@example.com");
+  });
+
+  it("email arm carries a subject with no body (body param omitted)", async () => {
+    await performReachOut(exec, {
+      ...input,
+      channel: "email",
+      endpoint: "person@example.com",
+      subject: "Just the subject",
+    });
+
+    expect(mocks.openURL).toHaveBeenCalledWith(
+      "mailto:person@example.com?subject=Just%20the%20subject",
+    );
+  });
+
   it("launches without creating or failing an assist when assist is disabled", async () => {
     const outcome = await performReachOut(exec, {
       ...input,
