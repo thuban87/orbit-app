@@ -15,9 +15,9 @@ import { ImportCompleteScreen } from "@/screens/ImportCompleteScreen";
 import { ImportProgressScreen } from "@/screens/ImportProgressScreen";
 import { ImportReviewScreen } from "@/screens/ImportReviewScreen";
 import { LegacyContactPickerScreen } from "@/screens/LegacyContactPickerScreen";
+import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
-import { LogContactPlaceholderScreen } from "@/screens/placeholders/FabActionPlaceholders";
 import { ReconcileCompleteScreen } from "@/screens/ReconcileCompleteScreen";
 import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
@@ -62,7 +62,7 @@ export function SettingsStack() {
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
       {/* Detailed-log route (HIST-15): a Settings-originated (Archived -> Profile)
           empty-date "Log interaction" must resolve here. */}
-      <Stack.Screen name="LogContact" component={LogContactPlaceholderScreen} />
+      <Stack.Screen name="LogContact" component={LogInteractionScreen} />
       {/* Knowledge-change edit routes (review cycle-2 HIGH): the History
           detail-sheet's knowledge-change edit reuses ContactProfileScreen's nav
           to ThingsToRemember; register both here (parallel to Dashboard/Orrery)

@@ -10,10 +10,10 @@ import { EditGroupEventScreen } from "@/screens/EditGroupEventScreen";
 import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
 import { EditParticipantScreen } from "@/screens/EditParticipantScreen";
 import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
+import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
-import { LogContactPlaceholderScreen } from "@/screens/placeholders/FabActionPlaceholders";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
@@ -55,7 +55,7 @@ export function OrreryStack() {
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
       {/* Detailed-log route (HIST-15): an Orrery-originated empty-date "Log
           interaction" must resolve here, not throw on an unregistered route. */}
-      <Stack.Screen name="LogContact" component={LogContactPlaceholderScreen} />
+      <Stack.Screen name="LogContact" component={LogInteractionScreen} />
       <Stack.Screen
         name="ThingsToRemember"
         component={ThingsToRememberScreen}

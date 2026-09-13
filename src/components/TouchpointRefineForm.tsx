@@ -21,7 +21,7 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { Picker } from "@react-native-picker/picker";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import {
   Pressable,
   StyleSheet,
@@ -103,6 +103,29 @@ interface TouchpointRefineFormProps {
   visibleFields?: ReadonlyArray<TouchpointRefineField>;
   /** Optional caller-specific copy for the inline future-date validation. */
   futureDateMessage?: string;
+  /**
+   * Optional scoped Channel option set. DEFAULTS to the internal five-entry
+   * `CHANNEL_OPTIONS` so every existing consumer (Edit Interaction, Group Log)
+   * keeps rendering all five — legacy `other`/`unspecified` rows stay representable.
+   * The ordinary Log Interaction surface passes only the three canonical channels
+   * (Message/Call/In Person) to satisfy CAPT-08 without editing the global constant.
+   */
+  channelOptions?: ReadonlyArray<{ value: string; label: string }>;
+  /**
+   * Optional progressive-disclosure allow-list. DEFAULTS to empty → every visible
+   * field renders inline exactly as before (no Phase-32 regression). Any VISIBLE
+   * field listed here renders inside a single collapsed "More Options" disclosure
+   * instead of inline — the mechanism that delivers CAPT-07's "Duration under More
+   * Options" when LogInteractionScreen passes `moreOptionsFields={["duration"]}`.
+   */
+  moreOptionsFields?: ReadonlyArray<TouchpointRefineField>;
+  /**
+   * Optional helper caption rendered beneath the Allow AI toggle. DEFAULTS to
+   * undefined → no caption, so Edit Interaction / Group Log surfaces are visually
+   * unchanged. LogInteractionScreen passes the D-04 consent copy ("Let AI use this
+   * note's text. Off by default.").
+   */
+  allowAiCaption?: string;
 }
 
 export type TouchpointRefineField =
@@ -115,7 +138,12 @@ export type TouchpointRefineField =
   | "duration"
   | "allowAi";
 
-const ALL_FIELDS: ReadonlySet<TouchpointRefineField> = new Set([
+/**
+ * The canonical top-to-bottom field order. Both the inline render and the "More
+ * Options" disclosure iterate this so a deferred field keeps its natural position
+ * relative to the others (a field is never reordered by being deferred).
+ */
+const FIELD_ORDER: readonly TouchpointRefineField[] = [
   "datetime",
   "channel",
   "direction",
@@ -124,7 +152,9 @@ const ALL_FIELDS: ReadonlySet<TouchpointRefineField> = new Set([
   "note",
   "duration",
   "allowAi",
-]);
+];
+
+const ALL_FIELDS: ReadonlySet<TouchpointRefineField> = new Set(FIELD_ORDER);
 
 export function TouchpointRefineForm({
   value,
@@ -133,6 +163,9 @@ export function TouchpointRefineForm({
   testID = "touchpoint-refine",
   visibleFields,
   futureDateMessage = FUTURE_DATETIME_MESSAGE,
+  channelOptions,
+  moreOptionsFields,
+  allowAiCaption,
 }: TouchpointRefineFormProps) {
   const { colors } = useTheme();
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -141,10 +174,22 @@ export function TouchpointRefineForm({
   // dialogs are sequential — the combine happens only after the time is chosen).
   const [pendingDate, setPendingDate] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Whether the "More Options" disclosure is expanded. Defaults collapsed, so a
+  // deferred field (e.g. Duration) is ABSENT until the user expands it (CAPT-07).
+  const [showMore, setShowMore] = useState(false);
   // Raw text of the Custom-duration entry (minutes). The persisted seconds live on
   // `value.duration`; this only backs the free-text field while the user types.
   const [customMinutes, setCustomMinutes] = useState("");
   const fields = visibleFields ? new Set(visibleFields) : ALL_FIELDS;
+  // Channel options default to the internal five entries (legacy representable).
+  const channels = channelOptions ?? CHANNEL_OPTIONS;
+  // Fields deferred to the "More Options" disclosure; empty = everything inline.
+  const moreSet = moreOptionsFields ? new Set(moreOptionsFields) : null;
+  const showInline = (field: TouchpointRefineField): boolean =>
+    fields.has(field) && !(moreSet?.has(field) ?? false);
+  const deferredFields = moreSet
+    ? FIELD_ORDER.filter((field) => fields.has(field) && moreSet.has(field))
+    : [];
 
   // Seed both dialogs from the stored occurred_at, preserving time-of-day.
   const seed = parseLocalDateTime(value.occurredAt);
@@ -190,273 +235,317 @@ export function TouchpointRefineForm({
     set("occurredAt", combined);
   }
 
-  return (
-    <View testID={testID} style={styles.form}>
-      {/* Date + time */}
-      {fields.has("datetime") ? (
-        <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Date & time
-          </Text>
-          <Pressable
-            testID={`${testID}-datetime`}
-            accessibilityRole="button"
-            accessibilityLabel="Correct date and time"
-            onPress={openDateTime}
-            style={[
-              styles.control,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={{ color: colors.textPrimary }}>
-              {value.occurredAt}
+  // Render one field's markup by name. Both the inline pass and the "More
+  // Options" disclosure call this, so a deferred field is byte-identical to its
+  // inline form — deferral changes only WHERE it renders, never WHAT.
+  function renderField(field: TouchpointRefineField) {
+    switch (field) {
+      case "datetime":
+        return (
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Date & time
             </Text>
-          </Pressable>
-          {error ? (
-            <Text
-              testID={`${testID}-error`}
-              accessibilityLabel={error}
-              style={[styles.error, { color: colors.danger }]}
-            >
-              {error}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      {/* Channel */}
-      {fields.has("channel") ? (
-        <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Channel
-          </Text>
-          <View
-            style={[
-              styles.control,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Picker
-              testID={`${testID}-channel`}
-              accessibilityLabel="Channel"
-              selectedValue={value.channel}
-              onValueChange={(v) => set("channel", String(v))}
-              dropdownIconColor={colors.textSecondary}
-              style={{ color: colors.textPrimary }}
-            >
-              {CHANNEL_OPTIONS.map((o) => (
-                <Picker.Item key={o.value} label={o.label} value={o.value} />
-              ))}
-            </Picker>
-          </View>
-        </View>
-      ) : null}
-
-      {/* Direction */}
-      {fields.has("direction") ? (
-        <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Direction
-          </Text>
-          <View
-            style={[
-              styles.control,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Picker
-              testID={`${testID}-direction`}
-              accessibilityLabel="Direction"
-              selectedValue={value.direction ?? ""}
-              onValueChange={(v) =>
-                set("direction", v === "" ? null : String(v))
-              }
-              dropdownIconColor={colors.textSecondary}
-              style={{ color: colors.textPrimary }}
-            >
-              <Picker.Item label="No selection" value="" />
-              {DIRECTION_OPTIONS.map((o) => (
-                <Picker.Item key={o} label={o} value={o} />
-              ))}
-            </Picker>
-          </View>
-        </View>
-      ) : null}
-
-      {/* Connected */}
-      {fields.has("connected") ? (
-        <View style={[styles.field, styles.toggleRow]}>
-          <Text style={[styles.label, { color: colors.textPrimary }]}>
-            Connected
-          </Text>
-          <Switch
-            testID={`${testID}-connected`}
-            accessibilityLabel="Connected"
-            value={value.connected === 1}
-            onValueChange={(v) => set("connected", v ? 1 : 0)}
-            trackColor={{ false: colors.border, true: colors.accent }}
-            thumbColor={colors.surfaceElevated}
-          />
-        </View>
-      ) : null}
-
-      {/* Tone */}
-      {fields.has("tone") ? (
-        <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Tone
-          </Text>
-          <View
-            style={[
-              styles.control,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Picker
-              testID={`${testID}-tone`}
-              accessibilityLabel="Tone"
-              selectedValue={value.quality ?? ""}
-              onValueChange={(v) => set("quality", v === "" ? null : String(v))}
-              dropdownIconColor={colors.textSecondary}
-              style={{ color: colors.textPrimary }}
-            >
-              <Picker.Item label="No selection" value="" />
-              {TONE_OPTIONS.map((o) => (
-                <Picker.Item key={o} label={o} value={o} />
-              ))}
-            </Picker>
-          </View>
-        </View>
-      ) : null}
-
-      {/* Note */}
-      {fields.has("note") ? (
-        <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Note
-          </Text>
-          <TextInput
-            testID={`${testID}-note`}
-            accessibilityLabel="Note"
-            value={value.note ?? ""}
-            onChangeText={(t) => set("note", t === "" ? null : t)}
-            multiline
-            placeholder="Add a detail"
-            placeholderTextColor={colors.textSecondary}
-            style={[
-              styles.control,
-              styles.noteInput,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
-          />
-        </View>
-      ) : null}
-
-      {/* Duration (optional; descriptive only — never feeds Status/Gravity/Intensity) */}
-      {fields.has("duration") ? (
-        <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Duration
-          </Text>
-          <View style={styles.chipRow}>
-            {DURATION_PRESETS.map((preset) => {
-              const selected = value.duration === preset.seconds;
-              return (
-                <Pressable
-                  key={preset.label}
-                  testID={`${testID}-duration-${preset.label}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Duration ${preset.label}`}
-                  accessibilityState={{ selected }}
-                  onPress={() => {
-                    setCustomMinutes("");
-                    set("duration", preset.seconds);
-                  }}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: selected ? colors.accent : colors.border,
-                    },
-                  ]}
-                >
-                  <Text style={{ color: colors.textPrimary }}>
-                    {preset.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
             <Pressable
-              testID={`${testID}-duration-none`}
+              testID={`${testID}-datetime`}
               accessibilityRole="button"
-              accessibilityLabel="Duration none"
-              accessibilityState={{ selected: value.duration === null }}
-              onPress={() => {
-                setCustomMinutes("");
-                set("duration", null);
-              }}
+              accessibilityLabel="Correct date and time"
+              onPress={openDateTime}
               style={[
-                styles.chip,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor:
-                    value.duration === null ? colors.accent : colors.border,
-                },
+                styles.control,
+                { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
             >
-              <Text style={{ color: colors.textPrimary }}>None</Text>
+              <Text style={{ color: colors.textPrimary }}>
+                {value.occurredAt}
+              </Text>
             </Pressable>
+            {error ? (
+              <Text
+                testID={`${testID}-error`}
+                accessibilityLabel={error}
+                style={[styles.error, { color: colors.danger }]}
+              >
+                {error}
+              </Text>
+            ) : null}
           </View>
-          <TextInput
-            testID={`${testID}-duration-custom`}
-            accessibilityLabel="Custom duration in minutes"
-            value={customMinutes}
-            onChangeText={(t) => {
-              setCustomMinutes(t);
-              // parseCustomDurationMinutes returns null for empty/invalid/out-of-range
-              // (the "none" outcome), so an in-progress or bad entry never persists a
-              // 0 or an out-of-bound duration.
-              set("duration", parseCustomDurationMinutes(t));
-            }}
-            keyboardType="number-pad"
-            placeholder="Custom (minutes)"
-            placeholderTextColor={colors.textSecondary}
-            style={[
-              styles.control,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
-          />
-          <Text
-            testID={`${testID}-duration-label`}
-            style={[styles.hint, { color: colors.textSecondary }]}
-          >
-            {formatDurationLabel(value.duration)}
-          </Text>
-        </View>
-      ) : null}
+        );
+      case "channel":
+        return (
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Channel
+            </Text>
+            <View
+              style={[
+                styles.control,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Picker
+                testID={`${testID}-channel`}
+                accessibilityLabel="Channel"
+                selectedValue={value.channel}
+                onValueChange={(v) => set("channel", String(v))}
+                dropdownIconColor={colors.textSecondary}
+                style={{ color: colors.textPrimary }}
+              >
+                {channels.map((o) => (
+                  <Picker.Item key={o.value} label={o.label} value={o.value} />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        );
+      case "direction":
+        return (
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Direction
+            </Text>
+            <View
+              style={[
+                styles.control,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Picker
+                testID={`${testID}-direction`}
+                accessibilityLabel="Direction"
+                selectedValue={value.direction ?? ""}
+                onValueChange={(v) =>
+                  set("direction", v === "" ? null : String(v))
+                }
+                dropdownIconColor={colors.textSecondary}
+                style={{ color: colors.textPrimary }}
+              >
+                <Picker.Item label="No selection" value="" />
+                {DIRECTION_OPTIONS.map((o) => (
+                  <Picker.Item key={o} label={o} value={o} />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        );
+      case "connected":
+        return (
+          <View style={[styles.field, styles.toggleRow]}>
+            <Text style={[styles.label, { color: colors.textPrimary }]}>
+              Connected
+            </Text>
+            <Switch
+              testID={`${testID}-connected`}
+              accessibilityLabel="Connected"
+              value={value.connected === 1}
+              onValueChange={(v) => set("connected", v ? 1 : 0)}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surfaceElevated}
+            />
+          </View>
+        );
+      case "tone":
+        return (
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Tone
+            </Text>
+            <View
+              style={[
+                styles.control,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Picker
+                testID={`${testID}-tone`}
+                accessibilityLabel="Tone"
+                selectedValue={value.quality ?? ""}
+                onValueChange={(v) =>
+                  set("quality", v === "" ? null : String(v))
+                }
+                dropdownIconColor={colors.textSecondary}
+                style={{ color: colors.textPrimary }}
+              >
+                <Picker.Item label="No selection" value="" />
+                {TONE_OPTIONS.map((o) => (
+                  <Picker.Item key={o} label={o} value={o} />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        );
+      case "note":
+        return (
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Note
+            </Text>
+            <TextInput
+              testID={`${testID}-note`}
+              accessibilityLabel="Note"
+              value={value.note ?? ""}
+              onChangeText={(t) => set("note", t === "" ? null : t)}
+              multiline
+              placeholder="Add a detail"
+              placeholderTextColor={colors.textSecondary}
+              style={[
+                styles.control,
+                styles.noteInput,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
+            />
+          </View>
+        );
+      case "duration":
+        // Optional; descriptive only — never feeds Status/Gravity/Intensity.
+        return (
+          <View style={styles.field}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Duration
+            </Text>
+            <View style={styles.chipRow}>
+              {DURATION_PRESETS.map((preset) => {
+                const selected = value.duration === preset.seconds;
+                return (
+                  <Pressable
+                    key={preset.label}
+                    testID={`${testID}-duration-${preset.label}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Duration ${preset.label}`}
+                    accessibilityState={{ selected }}
+                    onPress={() => {
+                      setCustomMinutes("");
+                      set("duration", preset.seconds);
+                    }}
+                    style={[
+                      styles.chip,
+                      {
+                        backgroundColor: colors.surface,
+                        borderColor: selected ? colors.accent : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={{ color: colors.textPrimary }}>
+                      {preset.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+              <Pressable
+                testID={`${testID}-duration-none`}
+                accessibilityRole="button"
+                accessibilityLabel="Duration none"
+                accessibilityState={{ selected: value.duration === null }}
+                onPress={() => {
+                  setCustomMinutes("");
+                  set("duration", null);
+                }}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor:
+                      value.duration === null ? colors.accent : colors.border,
+                  },
+                ]}
+              >
+                <Text style={{ color: colors.textPrimary }}>None</Text>
+              </Pressable>
+            </View>
+            <TextInput
+              testID={`${testID}-duration-custom`}
+              accessibilityLabel="Custom duration in minutes"
+              value={customMinutes}
+              onChangeText={(t) => {
+                setCustomMinutes(t);
+                // parseCustomDurationMinutes returns null for empty/invalid/out-of-range
+                // (the "none" outcome), so an in-progress or bad entry never persists a
+                // 0 or an out-of-bound duration.
+                set("duration", parseCustomDurationMinutes(t));
+              }}
+              keyboardType="number-pad"
+              placeholder="Custom (minutes)"
+              placeholderTextColor={colors.textSecondary}
+              style={[
+                styles.control,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
+            />
+            <Text
+              testID={`${testID}-duration-label`}
+              style={[styles.hint, { color: colors.textSecondary }]}
+            >
+              {formatDurationLabel(value.duration)}
+            </Text>
+          </View>
+        );
+      case "allowAi":
+        // Per-interaction egress gate; defaults OFF — D-04.
+        return (
+          <View style={styles.field}>
+            <View style={styles.toggleRow}>
+              <Text style={[styles.label, { color: colors.textPrimary }]}>
+                Allow AI
+              </Text>
+              <Switch
+                testID={`${testID}-allow-ai`}
+                accessibilityLabel="Allow AI"
+                value={value.allowAi === 1}
+                onValueChange={(v) => set("allowAi", coerceAllowAi(v))}
+                trackColor={{ false: colors.border, true: colors.accent }}
+                thumbColor={colors.surfaceElevated}
+              />
+            </View>
+            {allowAiCaption ? (
+              <Text
+                testID={`${testID}-allow-ai-caption`}
+                style={[styles.hint, { color: colors.textSecondary }]}
+              >
+                {allowAiCaption}
+              </Text>
+            ) : null}
+          </View>
+        );
+      default:
+        return null;
+    }
+  }
 
-      {/* Allow AI (per-interaction egress gate; defaults OFF — D-04) */}
-      {fields.has("allowAi") ? (
-        <View style={[styles.field, styles.toggleRow]}>
-          <Text style={[styles.label, { color: colors.textPrimary }]}>
-            Allow AI
-          </Text>
-          <Switch
-            testID={`${testID}-allow-ai`}
-            accessibilityLabel="Allow AI"
-            value={value.allowAi === 1}
-            onValueChange={(v) => set("allowAi", coerceAllowAi(v))}
-            trackColor={{ false: colors.border, true: colors.accent }}
-            thumbColor={colors.surfaceElevated}
-          />
+  return (
+    <View testID={testID} style={styles.form}>
+      {FIELD_ORDER.filter(showInline).map((field) => (
+        <Fragment key={field}>{renderField(field)}</Fragment>
+      ))}
+
+      {/* More Options disclosure — a self-contained, form-owned toggle. Defaults
+          collapsed, so deferred fields are absent until the user expands it. */}
+      {deferredFields.length > 0 ? (
+        <View style={styles.field}>
+          <Pressable
+            testID={`${testID}-more-options`}
+            accessibilityRole="button"
+            accessibilityLabel="More Options"
+            accessibilityState={{ expanded: showMore }}
+            onPress={() => setShowMore((prev) => !prev)}
+            style={styles.moreToggle}
+          >
+            <Text style={[styles.moreLabel, { color: colors.accentText }]}>
+              {showMore ? "Hide options" : "More Options"}
+            </Text>
+          </Pressable>
+          {showMore
+            ? deferredFields.map((field) => (
+                <Fragment key={field}>{renderField(field)}</Fragment>
+              ))
+            : null}
         </View>
       ) : null}
 
@@ -517,6 +606,14 @@ const styles = StyleSheet.create({
   },
   hint: {
     fontSize: 13,
+  },
+  moreToggle: {
+    minHeight: 44,
+    justifyContent: "center",
+  },
+  moreLabel: {
+    fontSize: 15,
+    fontWeight: "600",
   },
   noteInput: {
     minHeight: 88,

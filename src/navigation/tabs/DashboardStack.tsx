@@ -15,10 +15,10 @@ import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
 import { GroupEventsScreen } from "@/screens/GroupEventsScreen";
 import { GroupLogScreen } from "@/screens/GroupLogScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
+import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import {
-  LogContactPlaceholderScreen,
   MemoryPlaceholderScreen,
   UpdateContactPlaceholderScreen,
 } from "@/screens/placeholders/FabActionPlaceholders";
@@ -42,7 +42,7 @@ export function DashboardStack() {
         name="GroupEventDetail"
         component={GroupEventDetailScreen}
       />
-      <Stack.Screen name="LogContact" component={LogContactPlaceholderScreen} />
+      <Stack.Screen name="LogContact" component={LogInteractionScreen} />
       <Stack.Screen name="GroupLog" component={GroupLogScreen} />
       <Stack.Screen
         name="UpdateContact"
