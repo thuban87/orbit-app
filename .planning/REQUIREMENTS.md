@@ -229,14 +229,14 @@ category's phase (see Traceability).
 - [ ] **CAPT-04**: Edit Contact exposes the complete record as direct-access top-level accordion sections without nesting Things-to-Remember subdomains
 - [ ] **CAPT-05**: Quick Log stays immediate/current-time with truthful feedback and Undo; its success feedback offers Add Note → a small post-log editor saving an Interaction Note or Create Memory Instead (never both), optionally followed by Edit Memory
 - [ ] **CAPT-06**: The full Memory creation/editing experience lives in Update Contact's Memory editor, with type selected inside and less-common metadata behind More Options
-- [ ] **CAPT-07**: Detailed Log Interaction exposes date/time (default now, freely backdateable with no age warnings), Channel, Direction, Connected where meaningful, optional Tone, Note, and Allow AI, with Duration under More Options
-- [ ] **CAPT-08**: The Channel chooser offers exactly Message / Call / In Person; Direction defaults Outbound for Message/Call and Mutual for In Person; Connected defaults Yes and is hidden for In Person
-- [ ] **CAPT-09**: Tone offers Positive / Neutral / Negative, optional, defaulting null — an omitted Tone is never treated as Neutral
-- [ ] **CAPT-10**: The per-interaction Allow AI toggle sits with the Note field, defaults OFF (initialized from Phase 36's new-items-only type default), survives save, and stays editable
+- [x] **CAPT-07**: Detailed Log Interaction exposes date/time (default now, freely backdateable with no age warnings), Channel, Direction, Connected where meaningful, optional Tone, Note, and Allow AI, with Duration under More Options
+- [x] **CAPT-08**: The Channel chooser offers exactly Message / Call / In Person; Direction defaults Outbound for Message/Call and Mutual for In Person; Connected defaults Yes and is hidden for In Person
+- [x] **CAPT-09**: Tone offers Positive / Neutral / Negative, optional, defaulting null — an omitted Tone is never treated as Neutral
+- [x] **CAPT-10**: The per-interaction Allow AI toggle sits with the Note field, defaults OFF (initialized from Phase 36's new-items-only type default), survives save, and stays editable
 - [x] **CAPT-11**: A Default Interaction Channel preference (Remember Last Choice factory / Message / Call / In Person) governs ordinary logging only; Remember Last Choice updates only after a successful ordinary save; Group Log is exempt
 - [ ] **CAPT-12**: Update Contact opens a compact chooser (Last Talked About, Key People, Current Location, Memory, Off Limits, Contact Method, Contact Frequency, custom fields by name) that returns to the chooser after each save until Done; Category stays Edit-Contact scope
-- [ ] **CAPT-13**: Quick Log, Log Interaction, and Update Contact preselect the contact when the invoking context identifies one; History-originated logging prefills that day
-- [ ] **CAPT-14**: Failed saves preserve form state and never show completion; validation errors reveal and focus the relevant accordion; unchanged forms exit without confirmation _(Add-Contact slice done in 34-03: pure resolveErrorSection + reveal-and-focus; Edit Contact 34-08 + Quick Log slices remain)_
+- [x] **CAPT-13**: Quick Log, Log Interaction, and Update Contact preselect the contact when the invoking context identifies one; History-originated logging prefills that day
+- [x] **CAPT-14**: Failed saves preserve form state and never show completion; validation errors reveal and focus the relevant accordion; unchanged forms exit without confirmation _(Add-Contact slice done in 34-03: pure resolveErrorSection + reveal-and-focus; Edit Contact 34-08 + Quick Log slices remain)_
 - [x] **CAPT-15**: The legacy interaction vocabulary migrates: quality → Tone values and six-value channel → Message/Call/In Person, with legacy values kept representable and every literal consumer updated in the same change
 
 ### COMP — Messaging & AI Compose (Phase 35)

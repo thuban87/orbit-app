@@ -16,3 +16,15 @@ Discovered during execution; NOT fixed (pre-existing or unrelated to the current
   identical at the pre-work commit `df0393a`, so it predates plan 34-01 and is unrelated to the
   migration-027 / DAO / backup work. Not touched. Likely tied to the open Phase 30 orrery review items
   (STATE.md notes dirty 30-REVIEW files). Should be triaged with that Phase 30 reconciliation.
+
+## 34-04
+
+- **[pre-existing] `src/components/orrery/orrery-controls-render.test.tsx` still fails to load**
+  (`SyntaxError: Unexpected token 'typeof'`, "0 test" collected) — the SAME failure 34-01 recorded
+  above, re-confirmed out of scope for 34-04:
+  - The suite imports NONE of 34-04's changed modules (TouchpointRefineForm, log-interaction-logic,
+    LogInteractionScreen, app-settings-dao, recency-dao, the three navigation stacks).
+  - The file is not modified by 34-04 and fails identically in isolation (not a parallel-transform flake).
+  - The rest of the suite is green (3225 tests pass; the 22 new log-interaction-logic cases included).
+  Belongs to the Phase 30 orrery area (note the pre-existing dirty `.planning/phases/30-*` +
+  `tsconfig.json` working-tree files at session start). Left untouched — triage with Phase 30.
