@@ -786,6 +786,14 @@ export function ComposeScreen({
       if (outcome.handoffStarted) {
         await persistRememberedMode();
       }
+    } catch (err) {
+      // performReachOut runs createPendingAssist OUTSIDE its own try/catch, and
+      // getAppSettings/persistRememberedMode can throw too — without this catch a
+      // failure here is a silent unhandled rejection with no user feedback (WR-02).
+      // Surface it like the sibling onCopy/launchMethod handlers rather than
+      // swallowing it; the finally still releases the sending latch.
+      Logger.error(LOG_SCOPE, "failed to transmit draft", err);
+      Alert.alert("Couldn't send", "Please try again.");
     } finally {
       setSending(false);
     }
