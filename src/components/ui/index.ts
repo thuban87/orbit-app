@@ -2,6 +2,10 @@
  * `@/components/ui` barrel — the shared UI primitives (THEME-07/THEME-10).
  * Logic-free re-exports so consuming phases import primitives from one seam.
  */
+export {
+  AccordionSection,
+  type AccordionSectionProps,
+} from "./AccordionSection";
 export { AppText, type AppTextProps } from "./AppText";
 export {
   Button,

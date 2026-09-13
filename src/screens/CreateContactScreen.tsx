@@ -43,6 +43,7 @@ import {
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
+import { AccordionSection, AppText } from "@/components/ui";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { isDuplicateName, listCategories } from "@/db/contact-read";
@@ -110,6 +111,17 @@ export function CreateContactScreen({
   // Custom-block value map, keyed by col_name.
   const [values, setValues] = useState<Record<string, string | null>>({});
   const [saving, setSaving] = useState(false);
+
+  // CONTROLLED accordion disclosure. Identity opens by default (the fewest-taps
+  // create path); the parent owns which sections are open so a blocked Save can
+  // reveal the erroring section (CAPT-14, Task 4). Advanced enrichment lives
+  // behind Show More (Task 3).
+  const [expandedSections, setExpandedSections] = useState<
+    Record<string, boolean>
+  >({ identity: true, relationship: false, methods: false });
+  const setSectionExpanded = useCallback((sectionId: string, next: boolean) => {
+    setExpandedSections((prev) => ({ ...prev, [sectionId]: next }));
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -206,38 +218,70 @@ export function CreateContactScreen({
           onPress={() => navigation.goBack()}
           style={[styles.backBtn, { borderColor: colors.border }]}
         >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
+          <AppText role="label" style={{ color: colors.textSecondary }}>
+            Back
+          </AppText>
         </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
-        >
+        <AppText role="display" accessibilityRole="header">
           New contact
-        </Text>
+        </AppText>
       </View>
 
-      {/* -- Fixed block: Name → Category → lifecycle → cadence → methods -- */}
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Name
-        </Text>
-        <TextInput
-          testID="create-contact-name"
-          accessibilityLabel="Name"
-          value={name}
-          onChangeText={setName}
-          placeholder="Their name"
-          placeholderTextColor={colors.textSecondary}
-          style={[
-            styles.input,
-            {
-              color: colors.textPrimary,
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          ]}
-        />
-      </View>
+      {/* -- Identity section (Name + Category) — open by default (CAPT-01). -- */}
+      <AccordionSection
+        sectionId="identity"
+        title="Identity"
+        expanded={expandedSections.identity}
+        onExpandedChange={(next) => setSectionExpanded("identity", next)}
+      >
+        <View style={styles.field}>
+          <AppText role="label" style={{ color: colors.textSecondary }}>
+            Name
+          </AppText>
+          <TextInput
+            testID="create-contact-name"
+            accessibilityLabel="Name"
+            value={name}
+            onChangeText={setName}
+            placeholder="Their name"
+            placeholderTextColor={colors.textSecondary}
+            style={[
+              styles.input,
+              {
+                color: colors.textPrimary,
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          />
+        </View>
+
+        <View style={styles.field}>
+          <AppText role="label" style={{ color: colors.textSecondary }}>
+            Category
+          </AppText>
+          <View
+            style={[
+              styles.pickerShell,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Picker
+              testID="create-contact-category"
+              accessibilityLabel="Category"
+              selectedValue={categoryId ?? -1}
+              onValueChange={(v) => setCategoryId(v === -1 ? null : Number(v))}
+              dropdownIconColor={colors.textSecondary}
+              style={{ color: colors.textPrimary }}
+            >
+              <Picker.Item label="No category" value={-1} />
+              {categories.map((c) => (
+                <Picker.Item key={c.id} label={c.name} value={c.id} />
+              ))}
+            </Picker>
+          </View>
+        </View>
+      </AccordionSection>
 
       <View style={styles.field}>
         <Text style={[styles.label, { color: colors.textSecondary }]}>
@@ -288,31 +332,6 @@ export function CreateContactScreen({
         </Text>
       </View>
 
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Category
-        </Text>
-        <View
-          style={[
-            styles.pickerShell,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Picker
-            testID="create-contact-category"
-            accessibilityLabel="Category"
-            selectedValue={categoryId ?? -1}
-            onValueChange={(v) => setCategoryId(v === -1 ? null : Number(v))}
-            dropdownIconColor={colors.textSecondary}
-            style={{ color: colors.textPrimary }}
-          >
-            <Picker.Item label="No category" value={-1} />
-            {categories.map((c) => (
-              <Picker.Item key={c.id} label={c.name} value={c.id} />
-            ))}
-          </Picker>
-        </View>
-      </View>
       {trackingEnabled ? (
         <View style={styles.field}>
           <Text style={[styles.label, { color: colors.textSecondary }]}>
