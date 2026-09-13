@@ -29,7 +29,20 @@
  * Pure: same inputs → same output; no I/O; never throws.
  */
 
+import type {
+  DefaultMessageMode,
+  RememberedMessageMode,
+} from "@/db/app-settings-dao";
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
+
+/**
+ * A concrete compose message mode — the transport the user is composing for.
+ * Aliased to the DAO's `RememberedMessageMode` ('text' | 'email') so the pure
+ * logic layer and the migration-028 preference share ONE vocabulary and cannot
+ * drift. The 'remember' sentinel is NOT a mode — it is resolved to one of these
+ * by `effectiveMode` before any control resolution.
+ */
+export type MessageMode = RememberedMessageMode;
 
 /** The compose Send/Copy control state this gate resolves. */
 export interface ComposeControls {
@@ -71,21 +84,21 @@ export function actionablePrimaryPhoneDestination(
 export function resolveComposeControls(
   hasPhone: boolean,
   smsAvailable: boolean | null,
+  mode: MessageMode = "text",
+  hasEmail = false,
 ): ComposeControls {
-  // (0) Probe pending (capability UNKNOWN): Send hidden, Copy sole primary, no
-  // helper. add-number is knowable now, so it tracks `!hasPhone`.
-  if (smsAvailable === null) {
-    return {
-      send: "hidden",
-      copyEmphasis: "primary",
-      addNumber: !hasPhone,
-      smsUnavailableHelper: false,
-    };
-  }
+  // Resolve the mode ACTUALLY usable after preferred-then-fallback: the preferred
+  // mode wins when it has a destination; otherwise the alternate mode is used; when
+  // NEITHER exists there is no usable mode. This subsumes the old top-level
+  // `!hasPhone` branch — a numberless Text request with no email is `null` here.
+  const usable = resolveUsableMode(mode, hasPhone, hasEmail);
 
-  // (1) No number: SMS capability is irrelevant — Copy is the sole primary and an
-  // add-number affordance appears. Checked FIRST so a missing number always wins.
-  if (!hasPhone) {
+  // No usable destination in EITHER mode: Transmit unavailable, Copy the sole
+  // primary, and an establish-a-primary affordance. Drafting + Copy stay usable —
+  // this is a degraded-but-usable state, never a thrown error (T-35-11). With
+  // `mode='text'`/`hasEmail=false` this is byte-identical to the wave-1 no-phone
+  // row (`addNumber: true`), so the 2-arg call is preserved (H1).
+  if (usable === null) {
     return {
       send: "hidden",
       copyEmphasis: "primary",
@@ -94,7 +107,36 @@ export function resolveComposeControls(
     };
   }
 
-  // (2) Number present but the device can't text: Send hidden, Copy promoted, and a
+  // EMAIL is transmittable whenever an actionable primary email exists. The SMS
+  // probe — including the `=== null` probe-pending branch — does NOT gate Email
+  // (mailto via Linking has no expo-sms dependency and is assumed available), so
+  // Email has no probe-pending state and never shows the SMS-unavailable helper
+  // (HIGH-2). Send filled-accent (shown), Copy demoted to secondary.
+  if (usable === "email") {
+    return {
+      send: "shown",
+      copyEmphasis: "secondary",
+      addNumber: false,
+      smsUnavailableHelper: false,
+    };
+  }
+
+  // usable === "text": a phone destination is guaranteed (resolveUsableMode only
+  // returns "text" when `hasPhone`), so the SMS probe alone decides among the
+  // remaining rows — the same explicit precedence the wave-1 gate used.
+
+  // (a) Probe pending (SMS capability UNKNOWN, Text only): Send hidden, Copy sole
+  // primary, no helper — no wrong-state flash while the probe resolves.
+  if (smsAvailable === null) {
+    return {
+      send: "hidden",
+      copyEmphasis: "primary",
+      addNumber: false,
+      smsUnavailableHelper: false,
+    };
+  }
+
+  // (b) Phone present but the device can't text: Send hidden, Copy promoted, and a
   // helper line explains why Send is absent.
   if (!smsAvailable) {
     return {
@@ -105,7 +147,7 @@ export function resolveComposeControls(
     };
   }
 
-  // (3) Number present and the device can text: both controls — Send filled-accent
+  // (c) Phone present and the device can text: both controls — Send filled-accent
   // (shown), Copy demoted to accent-outline (secondary).
   return {
     send: "shown",
@@ -113,4 +155,57 @@ export function resolveComposeControls(
     addNumber: false,
     smsUnavailableHelper: false,
   };
+}
+
+/** The mode actually usable after fallback, or `null` when no destination exists. */
+export type UsableMode = MessageMode | null;
+
+/**
+ * Resolve the compose mode ACTUALLY usable given which destinations exist. The
+ * PREFERRED mode wins when it has a destination; otherwise the alternate mode is
+ * used when IT has one; when NEITHER phone nor email exists there is no usable
+ * mode (`null`). Pure: same inputs → same output; never throws.
+ *
+ * The screen consumes this to pick the phone-vs-email destination and to gate the
+ * Subject affordance (Email only) — capability arithmetic never leaks into the
+ * screen (WR-02).
+ */
+export function resolveUsableMode(
+  mode: MessageMode,
+  hasPhone: boolean,
+  hasEmail: boolean,
+): UsableMode {
+  if (mode === "text") {
+    if (hasPhone) return "text";
+    return hasEmail ? "email" : null;
+  }
+  // mode === "email"
+  if (hasEmail) return "email";
+  return hasPhone ? "text" : null;
+}
+
+/**
+ * Resolve the effective compose mode from the stored default. The `remember`
+ * sentinel resolves to the remembered concrete mode; a fixed default is used
+ * verbatim. Pure; never throws. (COMP-02: equality is over the fixed lowercase
+ * token set, never a free-text/locale-sensitive comparison.)
+ */
+export function effectiveMode(
+  defaultMode: DefaultMessageMode,
+  remembered: RememberedMessageMode,
+): MessageMode {
+  return defaultMode === "remember" ? remembered : defaultMode;
+}
+
+/**
+ * The remembered mode advances ONLY on a commit (Transmit or Copy) — never on an
+ * ad-hoc in-session mode switch. Returns the ad-hoc mode when `committed`, else
+ * the current remembered value unchanged. Pure; never throws. (COMP-02)
+ */
+export function nextRememberedMode(
+  current: RememberedMessageMode,
+  adHocMode: RememberedMessageMode,
+  committed: boolean,
+): RememberedMessageMode {
+  return committed ? adHocMode : current;
 }
