@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 34
 current_phase_name: Rapid Capture & Update Flows
 status: executing
-stopped_at: Completed 34-06-PLAN.md
-last_updated: "2026-09-13T03:16:00.000Z"
+stopped_at: Completed 34-07-PLAN.md
+last_updated: "2026-09-13T03:45:00.000Z"
 last_activity: 2026-09-13
-last_activity_desc: Executed 34-06 (post-log Note/Memory capture — Add Note secondary action on the Quick Log success snackbar opens PostLogNoteEditor saving an Interaction Note OR a basic Memory via the pure resolvePostLogSave; immediate-write/Undo/single-flight preserved; CAPT-13 preselection confirmed)
-state_head: 7fd3b02
+last_activity_desc: Executed 34-07 (Update Contact chooser + full Memory editor — filled the UpdateContact and Memory placeholder routes. Registry-driven chooser (built-ins + applicable named custom fields + generic Custom Fields, never Category, never empty) returns to itself after each independent inner save until Done; focused editors per row compose canonical controls + DAO wrappers; current-state rows persist via setCurrentStateValue (no interaction, never last_contact); MemoryScreen composes the shipped MemoryEditor for create + edit-in-place with edit-only AI wired from the real provider setting; preselection + failure-safety; node-tested pure chooser-logic. CAPT-06/12/13/14)
+state_head: 0eebdf8
 progress:
   total_phases: 21
   completed_phases: 8
   total_plans: 128
-  completed_plans: 124
+  completed_plans: 125
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -37,16 +37,16 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 34 (Rapid Capture & Update Flows) — EXECUTING
-Plan: 7 of 8 (34-01, 34-02, 34-03, 34-04, 34-05, 34-06 complete)
-Status: Ready to execute Plan 34-07
+Plan: 8 of 8 (34-01…34-07 complete)
+Status: Ready to execute Plan 34-08 (last plan in the phase)
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-13 — Executed 34-06 (post-log Note/Memory capture for Quick Log, CAPT-05/13). New pure resolvePostLogSave owns the Note-XOR-Memory branch (node-tested); snackbar gains an additive optional secondaryAction; runQuickLog's success snackbar offers Add Note beside Undo bound to the created interactionId; PostLogNoteEditor (own save guard, missing-interaction handling) saves an Interaction Note OR a basic Memory keyed by DEFAULT_MEMORY_TYPE_KEY, with Edit Memory into the full MemoryEditor; wired from HomeScreen + UniversalFab. Immediate-write/Undo/single-flight/channel:'unspecified' all preserved.
+Last activity: 2026-09-13 — Executed 34-07 (Update Contact chooser + full Memory editor, CAPT-06/12/13/14). Filled both placeholder routes. New node-tested pure update-contact-chooser-logic.ts owns row assembly (built-ins from the Contact Knowledge registry + applicability-filtered named custom fields + always-present generic Custom Fields, never Category, never empty) and the repeated-update session selector. UpdateContactScreen routes each row to a focused editor composing the canonical control + DAO wrapper; each inner save persists independently and returns to the chooser with the same contact + "Updated" cue; Done exits. Last Talked About / Current Location persist via setCurrentStateValue (current_state — no interaction, never last_contact), NOT TriStateLastSpoke. MemoryScreen composes the shipped MemoryEditor for create + edit-in-place (contactId-only route, no memoryId), edit-only AI control wired from getAppSettings().aiProvider, create posture registry-default OFF. Preselection + ContactPicker fallback; failure-safe inner saves. Off Limits uses a focused off_limits-scoped fuel editor; Contact Frequency reuses setProfileContactFrequency (cadence-only, §AB).
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
-Next: Execute Plan 34-07 — /gsd-execute-phase 34
+Next: Execute Plan 34-08 — /gsd-execute-phase 34
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
