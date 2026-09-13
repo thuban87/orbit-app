@@ -56,6 +56,7 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { beginInFlight, endInFlight } from "@/utils/single-flight";
 import {
   applyChannelChange,
   buildLogInteractionInput,
@@ -98,6 +99,11 @@ export function LogInteractionScreen({
   // Once the user explicitly overrides Direction, a channel change must not
   // re-fight it (CAPT-08 §R/§S). A ref so it never triggers a re-render.
   const userOverrodeDirection = useRef(false);
+  // Synchronous single-flight guard (review WR-01): `saving` state is async, so a
+  // fast double-tap can pass the guard twice and record TWO interactions. This
+  // ref flips in the same tick and is the real write-once guarantee; `saving`
+  // stays for the disabled/UI affordance.
+  const savingRef = useRef(false);
 
   // Seed the form Channel from the Default Interaction Channel preference. Pure
   // on-device SQLite read — no network on this read path (local-first). Renders
@@ -166,63 +172,70 @@ export function LogInteractionScreen({
   }, []);
 
   async function handleSave() {
-    if (!value || contactId === null || saving) return;
+    if (!value || contactId === null) return;
+    // Claim the in-flight slot synchronously; a second tap in the same tick bails
+    // before it can record a duplicate interaction (review WR-01).
+    if (!beginInFlight(savingRef)) return;
     setSaving(true);
     setSaveError(null);
 
     const writeNow = localDateTime();
     try {
-      // The SOLE recency writer — one transaction, future-date guard, recompute.
-      // The interaction is the source of truth from this point on.
-      await recordTouchpoint(
-        getExecutor(),
-        buildLogInteractionInput(value, {
-          contactId,
-          uid: newUid(),
-          now: writeNow,
-        }),
-      );
-    } catch (err) {
-      // Interaction save failed: preserve the full form state, surface the locked
-      // error + Retry, never complete / never navigate (CAPT-14).
-      Logger.error(LOG_SCOPE, "failed to record interaction", err);
-      setSaveError(SAVE_FAILED_MESSAGE);
-      setSaving(false);
-      return;
-    }
-
-    // Interaction is durably saved. Best-effort remembered-channel write — a
-    // SEPARATE transaction, only on a successful ordinary save (D-09). A failure
-    // here is logged and swallowed: it never rolls back the saved interaction,
-    // never becomes a save error, and never blocks navigation (Review MEDIUM 34-04).
-    if (
-      shouldUpdateRemembered({ saveSucceeded: true, isGroupLog: false }) &&
-      (REMEMBERED_INTERACTION_CHANNELS as readonly string[]).includes(
-        value.channel,
-      )
-    ) {
       try {
-        await updateAppSettings(
+        // The SOLE recency writer — one transaction, future-date guard, recompute.
+        // The interaction is the source of truth from this point on.
+        await recordTouchpoint(
           getExecutor(),
-          {
-            rememberedInteractionChannel:
-              value.channel as RememberedInteractionChannel,
-          },
-          localDateTime(),
+          buildLogInteractionInput(value, {
+            contactId,
+            uid: newUid(),
+            now: writeNow,
+          }),
         );
       } catch (err) {
-        Logger.error(
-          LOG_SCOPE,
-          "remembered-channel write failed (ignored)",
-          err,
-        );
+        // Interaction save failed: preserve the full form state, surface the
+        // locked error + Retry, never complete / never navigate (CAPT-14).
+        Logger.error(LOG_SCOPE, "failed to record interaction", err);
+        setSaveError(SAVE_FAILED_MESSAGE);
+        setSaving(false);
+        return;
       }
-    }
 
-    // Committed: nudge the widget; derived consumers recompute on their next
-    // focused read. Return to the origin-aware caller (Profile).
-    notifyWidgetDataChanged();
-    navigation.goBack();
+      // Interaction is durably saved. Best-effort remembered-channel write — a
+      // SEPARATE transaction, only on a successful ordinary save (D-09). A failure
+      // here is logged and swallowed: it never rolls back the saved interaction,
+      // never becomes a save error, and never blocks navigation (Review MEDIUM 34-04).
+      if (
+        shouldUpdateRemembered({ saveSucceeded: true, isGroupLog: false }) &&
+        (REMEMBERED_INTERACTION_CHANNELS as readonly string[]).includes(
+          value.channel,
+        )
+      ) {
+        try {
+          await updateAppSettings(
+            getExecutor(),
+            {
+              rememberedInteractionChannel:
+                value.channel as RememberedInteractionChannel,
+            },
+            localDateTime(),
+          );
+        } catch (err) {
+          Logger.error(
+            LOG_SCOPE,
+            "remembered-channel write failed (ignored)",
+            err,
+          );
+        }
+      }
+
+      // Committed: nudge the widget; derived consumers recompute on their next
+      // focused read. Return to the origin-aware caller (Profile).
+      notifyWidgetDataChanged();
+      navigation.goBack();
+    } finally {
+      endInFlight(savingRef);
+    }
   }
 
   // No preselected contact: the picker resolves one; dismiss returns to caller.
