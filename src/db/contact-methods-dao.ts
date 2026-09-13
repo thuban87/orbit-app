@@ -294,6 +294,78 @@ export async function applyContactMethodDiffCore(
     : { status: "saved", methods };
 }
 
+/**
+ * Establish a single method as the primary of its type — the lightweight Compose
+ * "establish missing primary" picker writer (HIGH-7). Purpose-built because the
+ * diff writers (`applyContactMethodDiff`/`Core`) demand the whole seeded/current
+ * method set and handle tombstones/normalization/ordering, which is wrong for a
+ * one-field primary swap.
+ *
+ * ONE write transaction, DETERMINISTIC order PRE-READ/VALIDATE → CLEAR → PROMOTE
+ * (A3), so the statement-immediate partial-unique index
+ * `idx_contact_methods_primary_type (contact_id, method_type) WHERE is_primary=1`
+ * (009-contact-method-normalization.ts:235) is never transiently violated:
+ *
+ *  (1) PRE-READ the target by `id AND contact_id AND method_type`. A foreign id,
+ *      unknown id, or a `methodType` that disagrees with the row's stored
+ *      `method_type` (e.g. an email method id passed with methodType:'phone')
+ *      matches no row → throw BEFORE any write, so no prior primary is orphaned.
+ *      Already-primary is a true no-op (no write, no data_revision bump).
+ *  (2) CLEAR the prior `is_primary=1` of that exact `(contactId, methodType)`
+ *      BEFORE the promote — a promote-before-clear would trip the index.
+ *  (3) PROMOTE the validated target; assert EXACTLY ONE row changed (a concurrent
+ *      delete between pre-read and promote → 0 rows → throw/rollback, leaving the
+ *      prior primary intact rather than a type with no primary).
+ *
+ * data_revision is bumped once on a real swap, matching the diff path.
+ */
+export function setContactMethodPrimary(
+  exec: SqlExecutor,
+  params: {
+    contactId: number;
+    methodId: number;
+    methodType: ContactMethodType;
+    now: string;
+  },
+): Promise<void> {
+  const { contactId, methodId, methodType, now } = params;
+  return inWriteTransaction(exec, async () => {
+    // (1) PRE-READ / VALIDATE — a foreign id, unknown id, or a methodType that
+    // disagrees with the row's stored method_type matches no row → NO write.
+    const target = await exec.getFirstAsync<{ is_primary: number }>(
+      "SELECT is_primary FROM contact_methods WHERE id = ? AND contact_id = ? AND method_type = ?",
+      [methodId, contactId, methodType],
+    );
+    if (!target) {
+      throw new Error(
+        `setContactMethodPrimary: no ${methodType} method id=${methodId} for contactId=${contactId}`,
+      );
+    }
+    // Already primary: leave state unchanged, do not bump data_revision.
+    if (target.is_primary === 1) return;
+
+    // (2) CLEAR the prior primary of this exact (contactId, methodType) FIRST.
+    await exec.runAsync(
+      "UPDATE contact_methods SET is_primary = 0, modified_at = ? WHERE contact_id = ? AND method_type = ? AND is_primary = 1",
+      [now, contactId, methodType],
+    );
+
+    // (3) PROMOTE the validated target; assert exactly one row changed.
+    const promoted = await exec.runAsync(
+      "UPDATE contact_methods SET is_primary = 1, modified_at = ? WHERE id = ? AND contact_id = ? AND method_type = ?",
+      [now, methodId, contactId, methodType],
+    );
+    assertOneChange(
+      "setContactMethodPrimary",
+      methodId,
+      contactId,
+      promoted.changes,
+    );
+
+    await bumpDataRevisionCore(exec);
+  });
+}
+
 /** Standalone transaction-owning wrapper for an editor-only method save. */
 export function applyContactMethodDiff(
   exec: SqlExecutor,
