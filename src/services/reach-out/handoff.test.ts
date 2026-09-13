@@ -158,6 +158,23 @@ describe("performReachOut", () => {
     );
   });
 
+  it("email arm neutralizes a query-injecting recipient so it cannot override the Subject (WR-01)", async () => {
+    // EMAIL_RE admits `?`/`&`/`#` in the local part, so an imported address like
+    // this would otherwise inject `subject=x` and win over the composed Subject.
+    await performReachOut(exec, {
+      ...input,
+      channel: "email",
+      endpoint: "bob?subject=x@example.com",
+      subject: "Real subject",
+    });
+
+    // The recipient's `?`/`=` are percent-encoded; the single `@` is preserved,
+    // so the composed `subject=Real%20subject` is the only query param.
+    expect(mocks.openURL).toHaveBeenCalledWith(
+      "mailto:bob%3Fsubject%3Dx@example.com?subject=Real%20subject",
+    );
+  });
+
   it("launches without creating or failing an assist when assist is disabled", async () => {
     const outcome = await performReachOut(exec, {
       ...input,

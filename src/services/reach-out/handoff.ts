@@ -23,11 +23,32 @@ type ReachOutInput = {
 };
 
 /**
+ * Percent-encode a `mailto` recipient so the address itself can never open or
+ * pollute the query string. `EMAIL_RE` admits `?`, `&`, and `#` in the local
+ * part, so a stored/imported address like `bob?subject=x@example.com` would
+ * otherwise inject a `subject=` param and override the composed Subject (WR-01).
+ * The single `@` separating local part from domain is preserved (both sides are
+ * encoded independently); EMAIL_RE guarantees exactly one `@`, and lastIndexOf
+ * is defensive for anything that slipped past it. Encoding — rather than
+ * rejecting — keeps a malformed address a working (if literal) recipient instead
+ * of a silent no-op.
+ */
+function encodeMailtoRecipient(endpoint: string): string {
+  const at = endpoint.lastIndexOf("@");
+  if (at === -1) return encodeURIComponent(endpoint);
+  return `${encodeURIComponent(endpoint.slice(0, at))}@${encodeURIComponent(
+    endpoint.slice(at + 1),
+  )}`;
+}
+
+/**
  * Build the email handoff URL, carrying the composed Subject + Body through an
- * encoded `mailto` query string. Both values are `encodeURIComponent`-escaped so
- * `&`, `#`, newlines, and other reserved characters can never break out of the
- * query string or inject extra params (T-35-04). Empty params are omitted so a
- * bare recipient stays `mailto:<endpoint>`. No-dependency path: mailto via
+ * encoded `mailto` query string. The recipient, subject, and body are ALL
+ * `encodeURIComponent`-escaped (the recipient via `encodeMailtoRecipient`, which
+ * preserves its single `@`) so `?`, `&`, `#`, newlines, and other reserved
+ * characters in ANY of the three can never break out of the query string or
+ * inject extra params (T-35-04, WR-01). Empty params are omitted so a bare
+ * recipient stays `mailto:<encoded-endpoint>`. No-dependency path: mailto via
  * `Linking.openURL`, never a native mail-composer package (that richer composer
  * stays a deferred owner opt-in; none is installed here).
  */
@@ -36,7 +57,7 @@ function buildMailtoUrl(endpoint: string, subject: string, body: string): string
   if (subject) params.push(`subject=${encodeURIComponent(subject)}`);
   if (body) params.push(`body=${encodeURIComponent(body)}`);
   const query = params.length > 0 ? `?${params.join("&")}` : "";
-  return `mailto:${endpoint}${query}`;
+  return `mailto:${encodeMailtoRecipient(endpoint)}${query}`;
 }
 
 const HANDOFF_ERROR_COPY: Record<
