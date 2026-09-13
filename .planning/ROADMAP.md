@@ -881,16 +881,17 @@ Plans:
 **Canonical refs**: docs/dossier/milestone-2/phase-16-ai-configuration-prompting-dossier.md; docs/dossier/milestone-2/planning-notes/phase-16-planning-notes.md
 **Schema**: AI configuration tables/columns, then the **final backup wire-format bump as the phase's last plan** (now v5 — v4 landed early in 24.1; see migration-ordering amendment; verify head+1 and the current `BACKUP_FORMAT_VERSION` on disk at plan time)
 **Consumes from Phase 24.2** (deferred code cleanup, planner-noted 2026-09-04): remove the now-inert legacy AI-proposed-fuel confirm path retired by ADR-081 — `confirmFuel`/`confirmFuelCore` (fuel-dao.ts:214/297; :297 verified on disk, not :282), the FuelEditor AI-unconfirmed render + Confirm/Dismiss control, and the no-op `onConfirm` wiring in CreateContactScreen/EditContactScreen. NOTE (verified on disk at plan time): `confirmFuel` is NOT wired in ContactProfileScreen (the :70/705 refs are unrelated state) — it is consumed by Create/EditContactScreen. 24.2 landed the data + ADR half (migration 017 removed all `source='ai'` rows; ADR-081 supersedes ADR-030) but left the inert UI in place for this phase to delete.
-**Plans**: 8 plans (5 waves)
+**Plans**: 9 plans (5 waves) — 36-09 (Settings AI hub + navigation) added in the cross-AI review pass to close review HIGH #2 (new AI screens were route-less/unreachable) + own the unowned AICFG-01 master-toggle UI; runs in wave 5 parallel to the FINAL backup plan 36-08 (no shared files)
 Plans:
-- [ ] 36-01-PLAN.md — TRACER: migration 029 (AI-config schema) + AiProviderId reshape + master toggle + multi-connection + availability, direct-BYOK lane end-to-end (AICFG-01/02/03/05)
-- [ ] 36-02-PLAN.md — OpenRouter lane: OAuth PKCE browser-auth + model catalog + live pricing (AICFG-04)
-- [ ] 36-03-PLAN.md — Prompt assembly: render carry-only egress (shared memories + gated notes, NO off-limits/ADR-107) + Adjust + retire legacy AI-fuel confirm (AICFG-08/09/15/17)
-- [ ] 36-04-PLAN.md — Central AI permission manager: type defaults + review + bulk disable/impact-gated enable (AICFG-10)
+- [ ] 36-01-PLAN.md — TRACER: migration 029 (AI-config schema) + AiProviderId reshape + master toggle + multi-connection + availability + ComposeScreen generation PROMOTED to the active connection, direct-BYOK lane end-to-end (AICFG-01/02/03/05)
+- [ ] 36-02-PLAN.md — OpenRouter lane: OAuth PKCE browser-auth (+ anti-CSRF state/strict callback) + model catalog + live pricing (AICFG-04)
+- [ ] 36-03-PLAN.md — Prompt assembly: render carry-only egress (shared memories + gated notes, NO off-limits/ADR-107, no artificial ceiling) + Adjust + retire legacy AI-fuel confirm (AICFG-08/09/15/17)
+- [ ] 36-04-PLAN.md — Central AI permission manager + new-item defaults wired to the creation writers (AICFG-10)
 - [ ] 36-05-PLAN.md — Three-lane connection & model UI + Needs Attention/repair (AICFG-02/03/05/15)
-- [ ] 36-06-PLAN.md — Writing Style + Personalization Context (paste/import) + token/context/cost estimate, explicit overflow (AICFG-06/07)
+- [ ] 36-06-PLAN.md — Writing Style + Personalization Context (paste/import) + token/context/cost estimate vs real model capacity, explicit overflow (AICFG-06/07)
 - [ ] 36-07-PLAN.md — Transparency (first-use disclosure + Preview + Compose review) + failure categories + sanitized diagnostics (AICFG-11/12/13/14)
-- [ ] 36-08-PLAN.md — FINAL: backup wire-format v5 bump + full milestone entity/preference serialization + restore validation/orphan-repair (AICFG-16/17)
+- [ ] 36-08-PLAN.md — FINAL: backup wire-format v5 bump + full milestone entity/preference serialization + RESTORE-side ingest/reconciliation/orphan-repair (AICFG-16/17)
+- [ ] 36-09-PLAN.md — Settings AI hub: master toggle + AI-off simplified state + register/route the five AI screens (reachability) (AICFG-01)
 **UI hint**: yes
 
 ### Phase 37: Settings & Personalization
