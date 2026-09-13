@@ -57,7 +57,7 @@ import { Avatar } from "@/components/Avatar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
-import { getAppSettings } from "@/db/app-settings-dao";
+import { getAppSettings, updateAppSettings } from "@/db/app-settings-dao";
 import { listActionablePrimaryMethods } from "@/db/contact-methods-read";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -65,6 +65,8 @@ import { markAssistLogged } from "@/db/interaction-assist-dao";
 import {
   actionablePrimaryPhoneDestination,
   type ComposeControls,
+  effectiveMode,
+  nextRememberedMode,
   resolveComposeControls,
 } from "@/logic/compose-logic";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
@@ -122,6 +124,7 @@ export function ComposeScreen({
   const body = useComposeSession((s) => s.body);
   const mode = useComposeSession((s) => s.mode);
   const setBody = useComposeSession((s) => s.setBody);
+  const setMode = useComposeSession((s) => s.setMode);
   const startSession = useComposeSession((s) => s.startSession);
   const clearSession = useComposeSession((s) => s.clearSession);
 
@@ -142,6 +145,11 @@ export function ComposeScreen({
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      // Whether THIS focus begins a brand-new session (a different contact than
+      // the store currently holds). Captured BEFORE startSession so the mode is
+      // seeded from the durable preference on a fresh start ONLY — an in-app
+      // return to the SAME contact preserves the in-session mode (COMP-02).
+      const freshSession = useComposeSession.getState().contactId !== contactId;
       // Begin (or resume) the session for this contact — a no-op for the same
       // contact, so an in-app return preserves the in-progress draft (COMP-07).
       startSession(contactId);
@@ -151,12 +159,25 @@ export function ComposeScreen({
       const exec = getExecutor();
       void (async () => {
         try {
-          const [row, actionableMethods] = await Promise.all([
+          const [row, actionableMethods, settings] = await Promise.all([
             getContactHeader(exec, contactId),
             listActionablePrimaryMethods(exec, contactId),
+            getAppSettings(exec),
           ]);
           if (cancelled) {
             return;
+          }
+          // Seed the session mode from the durable preference on a FRESH session
+          // only (COMP-02). effectiveMode resolves the 'remember' sentinel to the
+          // last remembered concrete mode; a fixed default is used verbatim. This
+          // is a local SQLite read — the render path never blocks on network.
+          if (freshSession) {
+            setMode(
+              effectiveMode(
+                settings.defaultMessageMode,
+                settings.rememberedMessageMode,
+              ),
+            );
           }
           // A stale/deleted OR archived contact — exit to the dashboard, never
           // render a Compose surface. Archiving must hide the contact everywhere,
@@ -207,7 +228,7 @@ export function ComposeScreen({
       return () => {
         cancelled = true;
       };
-    }, [contactId, goHome, startSession]),
+    }, [contactId, goHome, startSession, setMode]),
   );
 
   // Android hardware/system Back → dashboard too (consume the event so
@@ -231,6 +252,37 @@ export function ComposeScreen({
       }
     };
   }, []);
+
+  // Advance the durable "remembered" compose mode — persisted ONLY on a commit
+  // (a successful Transmit or Copy), NEVER on an ad-hoc in-session switch
+  // (COMP-02). nextRememberedMode(current, adHoc, committed=true) returns the
+  // ad-hoc (session) mode; we write it only when it actually changed. The local
+  // SQLite write is wrapped so a persistence failure never breaks the commit.
+  // Declared ABOVE its Transmit/Copy callers so no forward reference exists.
+  const persistRememberedMode = useCallback(async () => {
+    try {
+      const exec = getExecutor();
+      const settings = await getAppSettings(exec);
+      const next = nextRememberedMode(settings.rememberedMessageMode, mode, true);
+      if (next !== settings.rememberedMessageMode) {
+        await updateAppSettings(
+          exec,
+          { rememberedMessageMode: next },
+          localDateTime(),
+        );
+      }
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to persist remembered mode", err);
+    }
+  }, [mode]);
+
+  // Ad-hoc per-session mode switch (COMP-02). Flips the session mode ONLY — it
+  // must NOT write the durable preference (that advances on a commit via
+  // persistRememberedMode). 'Make this an email' in Text, 'Make this a text' in
+  // Email.
+  const onSwitchMode = useCallback(() => {
+    setMode(mode === "email" ? "text" : "email");
+  }, [mode, setMode]);
 
   // Transmit — in-flight latched (A3). Returns early while a handoff is open and
   // when there is no phone, then opens the OS SMS composer pre-filled. The channel
@@ -262,10 +314,21 @@ export function ComposeScreen({
       if (outcome.handoffStarted && outcome.assistUid !== null) {
         setConfirm({ assistUid: outcome.assistUid });
       }
+      // A started handoff is a commit — advance the remembered mode (COMP-02).
+      if (outcome.handoffStarted) {
+        await persistRememberedMode();
+      }
     } finally {
       setSending(false);
     }
-  }, [sending, header?.actionablePhone, contactId, mode, body]);
+  }, [
+    sending,
+    header?.actionablePhone,
+    contactId,
+    mode,
+    body,
+    persistRememberedMode,
+  ]);
 
   // Copy — the guaranteed handoff, NEVER gated by `sending`, NEVER opens the
   // confirmation panel. On success show a transient "Message copied" for ~2s.
@@ -280,11 +343,13 @@ export function ComposeScreen({
         setCopied(false);
         copyTimer.current = null;
       }, 2000);
+      // Copy is a commit — advance the remembered mode (COMP-02).
+      await persistRememberedMode();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to copy draft", err);
       Alert.alert("Couldn't copy", "Please try again.");
     }
-  }, [body]);
+  }, [body, persistRememberedMode]);
 
   // "Yes, log interaction" — log THIS assist through the sole recency writer at
   // its handoff_at (markAssistLogged reused UNCHANGED, D-06). connected=1 matches
@@ -408,6 +473,20 @@ export function ComposeScreen({
               fontFamily: "Inter-Regular",
             },
           ]}
+        />
+      </View>
+
+      {/* Ad-hoc mode switch (COMP-02) — flips the session mode ONLY (never the
+          durable preference), tertiary accentText link tone. */}
+      <View style={styles.affordance}>
+        <Button
+          testID="compose-mode-switch"
+          role="tertiary"
+          label={mode === "email" ? "Make this a text" : "Make this an email"}
+          accessibilityLabel={
+            mode === "email" ? "Make this a text" : "Make this an email"
+          }
+          onPress={onSwitchMode}
         />
       </View>
 
