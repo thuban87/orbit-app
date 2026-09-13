@@ -216,7 +216,8 @@ describe("readPromptContext — allowlist projection (H1)", () => {
     expect((await readPromptContext(exec, c, NOW)).sharedMemories).toEqual([]);
     await exec.runAsync("UPDATE memories SET allow_ai = 1 WHERE id = ?", [memoryId]);
     expect((await readPromptContext(exec, c, NOW)).sharedMemories).toEqual([
-      { label: "General", value: "MEMORY_EGRESS_MARKER" },
+      // D-11 (34-02): the general Memory type now labels as "Memory" (was "General").
+      { label: "Memory", value: "MEMORY_EGRESS_MARKER" },
     ]);
   });
 

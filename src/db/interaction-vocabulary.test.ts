@@ -66,3 +66,53 @@ describe("interaction vocabulary — channel remap", () => {
     });
   });
 });
+
+// CAPT-15 (D-06/D-07): the vocabulary migration and every consumer shipped in
+// Phase 32 (migration 025). This phase authors NO second interactions migration;
+// it asserts the round-trip integrity by CODE so a regression is caught here, not
+// on an unreachable on-device database. See scripts/audit-interaction-vocabulary.sh
+// for the paired straggler scan.
+describe("CAPT-15 legacy-vocabulary round-trip integrity", () => {
+  it("maps every legacy quality to its Tone value and preserves NULL as NULL", () => {
+    const qualityCases: ReadonlyArray<
+      [string | null | undefined, string | null | undefined]
+    > = [
+      ["good", "Positive"],
+      ["fine", "Neutral"],
+      ["hard", "Negative"],
+      // NULL Tone (unset) is preserved, NEVER coerced to Neutral (D-08).
+      [null, null],
+      [undefined, undefined],
+      // Already-migrated Tone values are stable under a re-run.
+      ["Positive", "Positive"],
+      ["Neutral", "Neutral"],
+      ["Negative", "Negative"],
+    ];
+    for (const [input, expected] of qualityCases) {
+      expect(remapLegacyQuality(input)).toBe(expected);
+    }
+  });
+
+  it("collapses legacy channels to labels and keeps other/unspecified representable", () => {
+    const channelCases: ReadonlyArray<
+      [string | null | undefined, string | null | undefined]
+    > = [
+      ["text", "Message"],
+      ["email", "Message"],
+      ["call", "Call"],
+      ["in-person", "In Person"],
+      // Legacy-representable pass-through values are NOT destroyed (CAPT-15 edge).
+      ["other", "other"],
+      ["unspecified", "unspecified"],
+      [null, null],
+      [undefined, undefined],
+      // Already-migrated labels are stable under a re-run.
+      ["Message", "Message"],
+      ["Call", "Call"],
+      ["In Person", "In Person"],
+    ];
+    for (const [input, expected] of channelCases) {
+      expect(remapLegacyChannel(input)).toBe(expected);
+    }
+  });
+});
