@@ -177,6 +177,22 @@ describe("resolvePrompt — bounded immutable construction", () => {
     expect(seen[2]).toBe(resolved.prompt);
   });
 
+  it("carries but NEVER serializes the gated recent-interaction-note shape (D-13; Phase 36 owns rendering)", () => {
+    // A PromptContext may CARRY the ADR-078 gated-note shape (added in 35-05),
+    // but resolvePrompt serializes context fields EXPLICITLY and never spreads
+    // the context — so a carried-but-unrendered field must not reach the wire.
+    // This fence fails loudly if a future edit starts serializing it before
+    // Phase 36 owns the rendering.
+    const sentinel = "GATED_NOTE_SENTINEL_MUST_NOT_SERIALIZE";
+    const resolved = resolvePrompt(
+      "Keep it warm.",
+      baseContext({ gatedRecentInteractionNotes: [sentinel] }),
+    );
+    expect(resolved.prompt).not.toContain(sentinel);
+    expect(resolved.inspectorDisplay).not.toContain(sentinel);
+    expect(resolved.payload).not.toContain(sentinel);
+  });
+
   it("resolves unknown / absent context slots to 'None available', never an error", () => {
     const resolved = resolvePrompt(
       "",
