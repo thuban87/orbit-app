@@ -4,11 +4,14 @@ import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import {
   type BuildCreateInputDeps,
   buildCreateInput,
+  collectBlockingErrors,
   coordinateBoundToggle,
   coordinateCadenceSelection,
+  CREATE_SECTION_FIELD_MAP,
   type CreateFormState,
   canSave,
   firstInteractionOccurredAt,
+  resolveErrorSection,
 } from "./create-contact-logic";
 
 const NOW = "2026-08-15 14:30:00";
@@ -282,5 +285,68 @@ describe("buildCreateInput", () => {
     expect(out.currentStateEntries).toEqual([
       { fieldKey: "current_location", value: "Berlin" },
     ]);
+  });
+});
+
+describe("resolveErrorSection (CAPT-14 reveal-and-focus target)", () => {
+  it("returns null when there are no blocking errors", () => {
+    expect(resolveErrorSection([], CREATE_SECTION_FIELD_MAP)).toBeNull();
+  });
+
+  it("maps a name error to the Identity section id", () => {
+    expect(
+      resolveErrorSection([{ field: "name" }], CREATE_SECTION_FIELD_MAP),
+    ).toBe("identity");
+  });
+
+  it("maps an invalid email to the Contact Methods section id", () => {
+    expect(
+      resolveErrorSection([{ field: "email" }], CREATE_SECTION_FIELD_MAP),
+    ).toBe("methods");
+  });
+
+  it("returns the section of the FIRST blocking error (deterministic order)", () => {
+    expect(
+      resolveErrorSection(
+        [{ field: "frequency" }, { field: "name" }],
+        CREATE_SECTION_FIELD_MAP,
+      ),
+    ).toBe("relationship");
+  });
+
+  it("skips an unmapped field and resolves the next mapped one", () => {
+    expect(
+      resolveErrorSection(
+        [{ field: "mystery" }, { field: "name" }],
+        CREATE_SECTION_FIELD_MAP,
+      ),
+    ).toBe("identity");
+  });
+});
+
+describe("collectBlockingErrors (Add Contact)", () => {
+  it("is empty for a valid name-only form", () => {
+    expect(collectBlockingErrors(state())).toEqual([]);
+  });
+
+  it("flags an empty/whitespace name in the Identity section", () => {
+    const errors = collectBlockingErrors(state({ name: "  " }));
+    expect(errors.some((e) => e.field === "name")).toBe(true);
+    expect(resolveErrorSection(errors, CREATE_SECTION_FIELD_MAP)).toBe(
+      "identity",
+    );
+  });
+
+  it("flags an invalid cadence only while Bound (Relationship Basics)", () => {
+    const bound = collectBlockingErrors(
+      state({ trackingEnabled: true, intervalValid: false }),
+    );
+    expect(bound.some((e) => e.field === "frequency")).toBe(true);
+    // Unbound never blocks Save on cadence.
+    expect(
+      collectBlockingErrors(
+        state({ trackingEnabled: false, intervalValid: false }),
+      ),
+    ).toEqual([]);
   });
 });
