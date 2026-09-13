@@ -17,9 +17,11 @@ beforeEach(() => {
 });
 
 describe("migration 027 — default interaction channel preference", () => {
-  it("bumps the schema head to 27 via the version const", () => {
+  it("pins migration 027's own version const to 27 (TARGET_VERSION has since advanced)", () => {
     expect(DEFAULT_INTERACTION_CHANNEL_SCHEMA_VERSION).toBe(27);
-    expect(TARGET_VERSION).toBe(27);
+    // TARGET_VERSION now points past 027 (migration 028 landed in Phase 35); the
+    // current head is asserted by the newest migration's own test.
+    expect(TARGET_VERSION).toBeGreaterThanOrEqual(27);
   });
 
   it("adds both app_settings columns with seeded defaults on a long forward jump (v20 → v27)", async () => {

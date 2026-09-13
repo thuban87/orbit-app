@@ -180,6 +180,39 @@ export function assertRememberedInteractionChannel(
 }
 
 /**
+ * The Compose default message mode vocabulary (COMP-02, migration 028). `remember`
+ * is the sentinel meaning "use the last chosen mode"; `text` and `email` are the
+ * two concrete compose channels. This tuple drives `default_message_mode` and its
+ * CHECK constraint. The remembered value is always a CONCRETE mode (never the
+ * 'remember' sentinel), so its own type is this tuple minus `remember`.
+ */
+export const MESSAGE_MODES = ["remember", "text", "email"] as const;
+export type DefaultMessageMode = (typeof MESSAGE_MODES)[number];
+
+/** The concrete modes a remembered value can hold — no 'remember' sentinel. */
+export type RememberedMessageMode = "text" | "email";
+
+/**
+ * Throw unless `v` is a known message mode (incl. the 'remember' sentinel). This
+ * is the single write-time guard for BOTH default_message_mode and
+ * remembered_message_mode: default_message_mode has a matching DB CHECK as a
+ * defense-in-depth backstop, while remembered_message_mode has NO DB CHECK by
+ * design — assertMessageMode is its only guard, applied before the UPDATE opens.
+ * remembered_message_mode's own TS type (RememberedMessageMode) excludes the
+ * 'remember' sentinel at compile time; callers only ever persist a concrete mode.
+ */
+export function assertMessageMode(field: string, v: unknown): void {
+  if (
+    typeof v !== "string" ||
+    !(MESSAGE_MODES as readonly string[]).includes(v)
+  ) {
+    throw new Error(
+      `updateAppSettings: ${field} must be one of remember/text/email, got ${String(v)}`,
+    );
+  }
+}
+
+/**
  * The app-level notification settings, one row (id=1). Toggles are 0/1
  * integers; hours are 0-23 integers. This is the shape the scheduler reads and
  * the Settings UI edits.
@@ -282,6 +315,19 @@ export interface AppSettings {
    * a concrete channel; updated ONLY on a successful ordinary (non-group) save.
    */
   rememberedInteractionChannel: RememberedInteractionChannel;
+
+  // --- Compose default message mode (Phase 35, migration 028, COMP-02) ------
+  /**
+   * Compose default message mode preference. NOT NULL, defaults 'remember' (the
+   * sentinel that reads `rememberedMessageMode`); a fixed selection stores its
+   * own mode literal ('text' | 'email').
+   */
+  defaultMessageMode: DefaultMessageMode;
+  /**
+   * Last chosen concrete compose mode. NOT NULL, defaults 'text'. Always a
+   * concrete mode ('text' | 'email'), never the 'remember' sentinel.
+   */
+  rememberedMessageMode: RememberedMessageMode;
 
   // --- Optional-AI non-secret settings (Phase 14, AI-01) --------------------
   // NO API KEY LIVES HERE — provider credentials are SecureStore-only
@@ -413,6 +459,15 @@ export interface PortableSettingsSnapshot {
   // BACKUP_FORMAT_VERSION.
   defaultInteractionChannel?: DefaultInteractionChannel;
   rememberedInteractionChannel?: RememberedInteractionChannel;
+  // --- Compose message-mode keys (Phase 35, COMP-02 / D-03) — writable NOW, ---
+  // EMISSION DEFERRED. Same declare-only shape as the channel-default keys above:
+  // declared OPTIONAL so they enter `AppSettingsPatch` (writable via
+  // updateAppSettings) AND so a getPortableSettingsSnapshot return that OMITS
+  // them still typechecks. Emission in the snapshot SELECT/return is DEFERRED to
+  // Phase 36 (D-03). Do NOT add these to getPortableSettingsSnapshot this phase
+  // and do NOT bump BACKUP_FORMAT_VERSION.
+  defaultMessageMode?: DefaultMessageMode;
+  rememberedMessageMode?: RememberedMessageMode;
   modifiedAt: string;
 }
 
@@ -485,7 +540,9 @@ type WritableSettingsKey =
   | "historyLens"
   | "historyCycleCount"
   | "defaultInteractionChannel"
-  | "rememberedInteractionChannel";
+  | "rememberedInteractionChannel"
+  | "defaultMessageMode"
+  | "rememberedMessageMode";
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
@@ -524,6 +581,8 @@ interface AppSettingsRow {
   history_cycle_count: number;
   default_interaction_channel: string;
   remembered_interaction_channel: string;
+  default_message_mode: string;
+  remembered_message_mode: string;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -620,6 +679,8 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   historyCycleCount: "history_cycle_count",
   defaultInteractionChannel: "default_interaction_channel",
   rememberedInteractionChannel: "remembered_interaction_channel",
+  defaultMessageMode: "default_message_mode",
+  rememberedMessageMode: "remembered_message_mode",
 };
 
 /** The saved setting is authoritative; device region is used only when it is absent. */
@@ -652,6 +713,7 @@ export async function getAppSettings(
             profile_layout_template_uid, profile_background_template_uid,
             history_lens, history_cycle_count,
             default_interaction_channel, remembered_interaction_channel,
+            default_message_mode, remembered_message_mode,
             orrery_density, orrery_satellites_enabled, orrery_last_system,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
@@ -721,6 +783,10 @@ export async function getAppSettings(
       row.default_interaction_channel as DefaultInteractionChannel,
     rememberedInteractionChannel:
       row.remembered_interaction_channel as RememberedInteractionChannel,
+    // Compose message mode (migration 028). NOT NULL columns; the cast is a
+    // read-shape convenience — validation is on WRITE via assertMessageMode.
+    defaultMessageMode: row.default_message_mode as DefaultMessageMode,
+    rememberedMessageMode: row.remembered_message_mode as RememberedMessageMode,
     // AI non-secret settings. The column default is `'none'`; the cast is a
     // read-shape convenience (validation on WRITE guarantees a known id).
     aiProvider: row.ai_provider as AiProviderId,
@@ -1140,6 +1206,12 @@ function validateAppSettingsPatch(patch: AppSettingsPatch): void {
       "rememberedInteractionChannel",
       patch.rememberedInteractionChannel,
     );
+  }
+  if (patch.defaultMessageMode !== undefined) {
+    assertMessageMode("defaultMessageMode", patch.defaultMessageMode);
+  }
+  if (patch.rememberedMessageMode !== undefined) {
+    assertMessageMode("rememberedMessageMode", patch.rememberedMessageMode);
   }
   if (patch.phoneRegionOverride !== undefined) {
     assertPhoneRegionOverride("phoneRegionOverride", patch.phoneRegionOverride);

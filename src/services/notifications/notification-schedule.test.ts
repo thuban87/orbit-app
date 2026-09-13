@@ -45,6 +45,7 @@ import { migration023 } from "@/db/migrations/023-orrery-system-selection-revisi
 import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { migration027 } from "@/db/migrations/027-default-interaction-channel";
+import { migration028 } from "@/db/migrations/028-compose-message-mode";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -122,8 +123,9 @@ beforeEach(async () => {
       migration025,
       migration026,
       migration027,
+      migration028,
     ],
-    27,
+    28,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
   __resetExpo();

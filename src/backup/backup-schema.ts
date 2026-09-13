@@ -201,6 +201,15 @@ export const PORTABLE_SETTINGS_KEYS = new Set([
   // is unchanged this phase — emission + the format bump are Phase 36.
   "defaultInteractionChannel",
   "rememberedInteractionChannel",
+  // Phase 35 (declare-only, COMP-02 / D-03): the durable Compose default message
+  // mode preference and its remembered value are accepted for restore only so a
+  // future backup that CARRIES them validates. These are the camelCase MANIFEST
+  // keys (matching COLUMN_OF's key side and the restore cast to AppSettingsPatch)
+  // — NOT the snake_case SQLite column names. getPortableSettingsSnapshot does NOT
+  // emit them and BACKUP_FORMAT_VERSION is unchanged this phase — emission + the
+  // format bump are Phase 36.
+  "defaultMessageMode",
+  "rememberedMessageMode",
 ]);
 
 const SECRET_SHAPED_KEY =

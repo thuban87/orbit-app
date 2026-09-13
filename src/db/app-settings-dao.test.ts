@@ -26,6 +26,7 @@ import {
   assertAccentId,
   assertBackgroundId,
   assertDefaultInteractionChannel,
+  assertMessageMode,
   assertOrreryLastSystem,
   assertPhoneRegionOverride,
   assertRememberedInteractionChannel,
@@ -35,6 +36,7 @@ import {
   DEFAULT_INTERACTION_CHANNELS,
   getAppSettings,
   getPortableSettingsSnapshot,
+  MESSAGE_MODES,
   recordAutomaticBackupHealthCore,
   resolveEffectivePhoneRegion,
   SELF_SUN_COLOUR_RE,
@@ -68,6 +70,7 @@ import { migration023 } from "@/db/migrations/023-orrery-system-selection-revisi
 import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { migration027 } from "@/db/migrations/027-default-interaction-channel";
+import { migration028 } from "@/db/migrations/028-compose-message-mode";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
@@ -142,8 +145,9 @@ async function migrateToV5(): Promise<void> {
       migration025,
       migration026,
       migration027,
+      migration028,
     ],
-    27,
+    28,
     { now: NOW, newUid },
   );
 }
@@ -213,6 +217,15 @@ const HISTORY_DEFAULTS = {
 const CHANNEL_DEFAULTS = {
   defaultInteractionChannel: "remember" as const,
   rememberedInteractionChannel: "Message" as const,
+};
+
+/**
+ * Migration-028 compose message-mode defaults (COMP-02): the preference seeds
+ * 'remember' (Remember Last Choice), the remembered value seeds 'text'.
+ */
+const MESSAGE_MODE_DEFAULTS = {
+  defaultMessageMode: "remember" as const,
+  rememberedMessageMode: "text" as const,
 };
 
 type KeysOverlap<A, B> = Extract<keyof A, keyof B>;
@@ -362,6 +375,8 @@ describe("app-settings-dao — read", () => {
       ...HISTORY_DEFAULTS,
       // Default interaction channel seeds 'remember' / 'Message' (migration 027, CAPT-11).
       ...CHANNEL_DEFAULTS,
+      // Compose message mode seeds 'remember' / 'text' (migration 028, COMP-02).
+      ...MESSAGE_MODE_DEFAULTS,
       // AI starts disabled: provider `none`, empty config, acks 0 (AI-01).
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -524,6 +539,8 @@ describe("app-settings-dao — validated write", () => {
       ...HISTORY_DEFAULTS,
       // Channel-default fields untouched by this patch — still the seeded defaults.
       ...CHANNEL_DEFAULTS,
+      // Message-mode fields untouched by this patch — still the seeded defaults.
+      ...MESSAGE_MODE_DEFAULTS,
       // AI fields untouched by this patch — still the disabled defaults.
       ...AI_DEFAULTS,
       ...BACKUP_DEFAULTS,
@@ -1586,5 +1603,73 @@ describe("app-settings-dao — default interaction channel (migration 027, CAPT-
     const snapshot = await getPortableSettingsSnapshot(exec);
     expect(snapshot).not.toHaveProperty("defaultInteractionChannel");
     expect(snapshot).not.toHaveProperty("rememberedInteractionChannel");
+  });
+});
+
+describe("app-settings-dao — compose message mode (migration 028, COMP-02)", () => {
+  beforeEach(async () => {
+    await migrateToV5();
+  });
+
+  it("getAppSettings returns the seeded message-mode defaults ('remember' / 'text')", async () => {
+    const settings = await getAppSettings(exec);
+    expect(settings.defaultMessageMode).toBe("remember");
+    expect(settings.rememberedMessageMode).toBe("text");
+  });
+
+  it("round-trips a written default message mode via updateAppSettings", async () => {
+    await updateAppSettings(exec, { defaultMessageMode: "email" }, LATER);
+    expect((await getAppSettings(exec)).defaultMessageMode).toBe("email");
+  });
+
+  it("round-trips a written remembered message mode via updateAppSettings", async () => {
+    await updateAppSettings(exec, { rememberedMessageMode: "email" }, LATER);
+    expect((await getAppSettings(exec)).rememberedMessageMode).toBe("email");
+  });
+
+  it("exposes the full message-mode vocabulary as a tuple (remember + text + email)", () => {
+    expect([...MESSAGE_MODES]).toEqual(["remember", "text", "email"]);
+  });
+
+  it("accepts every message-mode literal including the 'remember' sentinel", () => {
+    for (const value of ["remember", "text", "email"]) {
+      expect(() =>
+        assertMessageMode("defaultMessageMode", value),
+      ).not.toThrow();
+    }
+  });
+
+  it("rejects an out-of-vocabulary message mode", () => {
+    expect(() => assertMessageMode("defaultMessageMode", "sms")).toThrow();
+    expect(() => assertMessageMode("defaultMessageMode", "Text")).toThrow();
+  });
+
+  it("rejects an out-of-vocabulary value before writing, leaving the row unchanged (updateAppSettings guard)", async () => {
+    await expect(
+      (async () =>
+        updateAppSettings(
+          exec,
+          { defaultMessageMode: "unexpected" as never },
+          LATER,
+        ))(),
+    ).rejects.toThrow();
+    // The write never opened — the preference stays at its seeded default.
+    expect((await getAppSettings(exec)).defaultMessageMode).toBe("remember");
+  });
+
+  it("does not emit the message-mode keys through the portable snapshot (Phase 36 owns emission)", async () => {
+    await updateAppSettings(
+      exec,
+      { defaultMessageMode: "email", rememberedMessageMode: "email" },
+      LATER,
+    );
+    const snapshot = await getPortableSettingsSnapshot(exec);
+    expect(snapshot).not.toHaveProperty("defaultMessageMode");
+    expect(snapshot).not.toHaveProperty("rememberedMessageMode");
+  });
+
+  it("allowlists both message-mode keys in PORTABLE_SETTINGS_KEYS (accepted for restore)", () => {
+    expect(PORTABLE_SETTINGS_KEYS.has("defaultMessageMode")).toBe(true);
+    expect(PORTABLE_SETTINGS_KEYS.has("rememberedMessageMode")).toBe(true);
   });
 });
