@@ -36,6 +36,7 @@ import {
 } from "@/db/contacts-dao";
 import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { listMemoriesForContact } from "@/db/memories-read";
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
 import { inWriteTransaction } from "@/db/transaction";
@@ -947,6 +948,151 @@ describe("updateContactFull — custom values compose without deadlock (Pitfall 
     );
     expect(cleared).toEqual({ uid: row?.uid, value: null });
     expect(await totalValueRows()).toBe(1);
+  });
+});
+
+// =============================================================================
+// Plan 34-05 Task 1 — updateContactFull persists Memories (CAPT-04, dossier §E):
+// round-trip (add/edit/delete via listMemoriesForContact), atomic rollback, and
+// the exactly-once data_revision bump (sole-bumper contract).
+// =============================================================================
+
+describe("updateContactFull — Memories knowledge subdomain (CAPT-04, §E)", () => {
+  async function makeContact(name = "Mem Owner"): Promise<number> {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name,
+      intervalDays: 14,
+      now: NOW,
+    });
+    return contactId;
+  }
+
+  function baseEdit(contactId: number, name = "Mem Owner") {
+    return {
+      id: contactId,
+      name,
+      intervalDays: 14,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: EDIT_NOW,
+    };
+  }
+
+  it("ADDS a memory via updateContactFull that round-trips through listMemoriesForContact", async () => {
+    const contactId = await makeContact();
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      memories: { add: [{ type: "general", value: "Loves hiking" }] },
+    });
+
+    const rows = await listMemoriesForContact(exec, contactId);
+    expect(rows.map((r) => r.value)).toEqual(["Loves hiking"]);
+  });
+
+  it("EDITS an existing memory in place (no duplicate) via the edit list", async () => {
+    const contactId = await makeContact();
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      memories: { add: [{ type: "general", value: "original" }] },
+    });
+    const [seeded] = await listMemoriesForContact(exec, contactId);
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:05:00",
+      memories: { edit: [{ id: seeded.id, value: "updated" }] },
+    });
+
+    const rows = await listMemoriesForContact(exec, contactId);
+    expect(rows).toHaveLength(1); // edited in place — no duplicate
+    expect(rows[0].id).toBe(seeded.id);
+    expect(rows[0].value).toBe("updated");
+  });
+
+  it("DELETES a memory via the delete list (soft-delete leaves it off the live read)", async () => {
+    const contactId = await makeContact();
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      memories: { add: [{ type: "general", value: "to remove" }] },
+    });
+    const [seeded] = await listMemoriesForContact(exec, contactId);
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      now: "2026-08-15 10:06:00",
+      memories: { delete: [{ id: seeded.id }] },
+    });
+
+    expect(await listMemoriesForContact(exec, contactId)).toEqual([]);
+  });
+
+  it("ROLLS BACK the whole edit (metadata + memory) when a mid-transaction memory write throws", async () => {
+    const contactId = await makeContact("Original");
+
+    await expect(
+      updateContactFull(exec, {
+        ...baseEdit(contactId, "Changed"),
+        // An unregistered memory type throws inside addMemoryCore AFTER the
+        // metadata UPDATE — the whole transaction must roll back.
+        memories: { add: [{ type: "not-a-real-type", value: "x" }] },
+      }),
+    ).rejects.toThrow();
+
+    // Metadata unchanged AND no partial memory rows.
+    expect(await name(contactId)).toBe("Original");
+    expect(await listMemoriesForContact(exec, contactId)).toEqual([]);
+    expect(
+      await exec.getFirstAsync<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM memories WHERE contact_id = ?",
+        [contactId],
+      ),
+    ).toEqual({ n: 0 });
+  });
+
+  it("bumps data_revision EXACTLY once for a knowledge-only edit with unchanged method drafts", async () => {
+    const contactId = await makeContact();
+    const before = await readDataRevision(exec);
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      // Empty method drafts = supplied-but-unchanged; the method sub-writer would
+      // NOT bump, so the aggregate must own the single bump.
+      methodDrafts: [],
+      methodNormalization: { effectivePhoneRegion: "US" },
+      memories: { add: [{ type: "general", value: "one field" }] },
+    });
+
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("bumps data_revision EXACTLY once for an edit that ALSO changes methods (no double-bump)", async () => {
+    const contactId = await makeContact();
+    const before = await readDataRevision(exec);
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      methodDrafts: [{ uid: uid(), type: "phone", value: "312 555 9000" }],
+      methodNormalization: { effectivePhoneRegion: "US" },
+      memories: { add: [{ type: "general", value: "also a field" }] },
+    });
+
+    expect(await readDataRevision(exec)).toBe(before + 1);
+  });
+
+  it("opens EXACTLY ONE transaction (one BEGIN) for the composed edit", async () => {
+    const contactId = await makeContact();
+    const spy = vi.spyOn(exec, "execAsync");
+
+    await updateContactFull(exec, {
+      ...baseEdit(contactId),
+      memories: { add: [{ type: "general", value: "single txn" }] },
+    });
+
+    const begins = spy.mock.calls.filter(([sql]) => sql === "BEGIN").length;
+    expect(begins).toBe(1);
+    spy.mockRestore();
   });
 });
 

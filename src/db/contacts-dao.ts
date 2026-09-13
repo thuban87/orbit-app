@@ -67,7 +67,13 @@ import {
   upsertValueCore,
 } from "@/db/field-values-dao";
 import { addFuelCore, type NewFuelItem } from "@/db/fuel-dao";
-import { addMemoryCore, type NewMemoryInput } from "@/db/memories-dao";
+import {
+  addMemoryCore,
+  deleteMemoryCore,
+  editMemoryCore,
+  type EditMemoryInput,
+  type NewMemoryInput,
+} from "@/db/memories-dao";
 import {
   addRelationshipCore,
   type NewRelationshipInput,
@@ -374,6 +380,40 @@ export async function createContactFullCore(
 //     as a direct last_contact write. A future occurredAt is rejected pre-transaction.
 // =============================================================================
 
+// =============================================================================
+// EDIT-PATH KNOWLEDGE DIFF CONTRACT (CAPT-04, dossier §E) — the SINGLE pinned
+// shape for the five editable knowledge subdomains.
+//
+// The LOGIC layer (edit-contact-logic.buildEditInput) computes explicit
+// `{ add, edit, delete }` lists keyed by a row-identity `id` from seed-vs-draft;
+// `updateContactFull` APPLIES those lists inside its single metadata transaction
+// (adds via add*Core, edits via edit*Core, deletes via delete*Core) and NEVER
+// re-diffs. There is no "diff shape OR lists" ambiguity across the task boundary
+// (Review cycle-3 LOW). Current-state (Last Talked About / Current Location) is a
+// per-field value list, not a collection diff.
+// =============================================================================
+
+/** A soft-identity reference to one existing knowledge row to delete by row id. */
+export interface KnowledgeDeleteRef {
+  id: number;
+}
+
+/**
+ * An add/edit/delete diff for a COLLECTION knowledge subdomain (Memories, Key
+ * People/Relationships, Off Limits). `add` elements are the create-path semantic
+ * shape (framework fields injected by the DAO); `edit` elements carry the row
+ * `id` + the patched fields; `delete` elements carry the row `id`. Every list is
+ * optional; an omitted/empty diff writes nothing for that subdomain.
+ */
+export interface KnowledgeCollectionDiff<TAdd, TEdit> {
+  add?: TAdd[];
+  edit?: TEdit[];
+  delete?: KnowledgeDeleteRef[];
+}
+
+/** An edit patch to one existing Memory (row `id` + patched fields). */
+export type EditMemoryPatch = Omit<EditMemoryInput, "contactId" | "now">;
+
 /** The edit payload — the mutable `contacts` columns + custom values + optional first-touch. */
 export interface UpdateContactFullInput {
   /** The contact to edit. */
@@ -403,6 +443,15 @@ export interface UpdateContactFullInput {
    * NULL` (never-contacted). For an already-contacted contact it throws (rollback).
    */
   firstInteraction?: FirstInteractionInput;
+  /**
+   * Knowledge-subdomain edit diffs (CAPT-04, dossier §E) — each OPTIONAL; omitting
+   * all preserves the lean metadata+custom-values edit path. Every supplied diff is
+   * applied INSIDE the single metadata transaction (ADR-016) via composed exec-scoped
+   * `*Core` writers, so an interrupted edit rolls back the contact AND all knowledge
+   * rows (never a partial contact or orphan). `updateContactFull` is the SOLE
+   * `data_revision` bumper for the composed edit.
+   */
+  memories?: KnowledgeCollectionDiff<CreateMemoryInput, EditMemoryPatch>;
 }
 
 /**
@@ -476,6 +525,41 @@ export async function setContactFrequencyCore(
     throw new Error(
       `setContactFrequencyCore: no contact matched id=${id} (changed ${result.changes})`,
     );
+  }
+}
+
+/**
+ * Apply the knowledge-subdomain edit diffs INSIDE the caller's already-open
+ * metadata transaction (ADR-016). Composes ONLY the exec-scoped `*Core` writers —
+ * never the mutexed wrappers (non-reentrant mutex). A throw in any writer rolls the
+ * whole edit back with the contact metadata. NON-mutexed: call only inside an open
+ * `inWriteTransaction`.
+ *
+ *   • Collections apply the pre-computed `{ add, edit, delete }` lists — the DAO
+ *     never re-diffs.
+ *   • NO `data_revision` bump here — `updateContactFull` owns the single bump.
+ *
+ * (34-05 Task 2 extends this with Key People/Relationships, Last Talked About,
+ * Current Location, and Off Limits.)
+ */
+async function applyKnowledgeDiffsCore(
+  exec: SqlExecutor,
+  contactId: number,
+  input: UpdateContactFullInput,
+): Promise<void> {
+  const now = input.now;
+
+  // --- Memories -------------------------------------------------------------
+  if (input.memories) {
+    for (const add of input.memories.add ?? []) {
+      await addMemoryCore(exec, { ...add, contactId, createdAt: now, now });
+    }
+    for (const patch of input.memories.edit ?? []) {
+      await editMemoryCore(exec, { ...patch, contactId, now });
+    }
+    for (const ref of input.memories.delete ?? []) {
+      await deleteMemoryCore(exec, { id: ref.id, contactId, now });
+    }
   }
 }
 
@@ -603,6 +687,11 @@ export function updateContactFull(
     ) {
       await recomputeLastContactCore(exec, input.id, input.now);
     }
+    // Knowledge-subdomain edits (CAPT-04, dossier §E) — composed INSIDE this same
+    // metadata transaction so an interrupted edit rolls back the contact AND every
+    // knowledge row. No bump here; updateContactFull owns the single bump below.
+    await applyKnowledgeDiffsCore(exec, input.id, input);
+
     const methodSaveResult =
       input.methodDrafts === undefined
         ? null
@@ -614,8 +703,16 @@ export function updateContactFull(
             now: input.now,
             effectivePhoneRegion:
               input.methodNormalization?.effectivePhoneRegion ?? null,
+            // The aggregate owns the single bump (below); suppress the sub-bump so a
+            // knowledge-only / unchanged-method edit still advances data_revision by
+            // exactly 1 and no path double-bumps (Review cycle-3 MEDIUM).
+            bumpRevision: false,
           });
-    if (methodSaveResult === null) await bumpDataRevisionCore(exec);
+    // updateContactFull is the SOLE data_revision bumper for the composed edit: the
+    // metadata UPDATE is always a change, and the method core ran with its bump
+    // suppressed — so a knowledge-only edit and an unchanged-method edit both advance
+    // backup-freshness by EXACTLY 1, and no path double-bumps.
+    await bumpDataRevisionCore(exec);
     return { methods: methodSaveResult?.methods ?? [], methodSaveResult };
   });
 }
