@@ -328,3 +328,92 @@ describe("interaction assist write DAO", () => {
     ).toEqual({ last_contact: null });
   });
 });
+
+/**
+ * Phase-35 coexistence invariants (D-04/D-05/D-06, Trip-Wire 1 & 2). The Compose
+ * "Did you send it?" panel REUSES this DAO unchanged; these tests fail loudly if a
+ * future edit tries to restamp the interaction at confirmation time, strip the
+ * transport→vocabulary remap, or turn dismissal into a logging path. There is NO
+ * production change to interaction-assist-dao.ts — the panel only calls the DAO.
+ */
+describe("phase-35 confirmation-coexistence invariants", () => {
+  it("stamps the logged interaction at the assist handoff_at, NEVER at confirmation time (Trip-Wire 1)", async () => {
+    const contactId = await contact();
+    const handoffAt = "2026-08-31 11:00:00";
+    const confirmationNow = "2026-08-31 12:34:56"; // distinct from handoff_at
+    const assistUid = await createPendingAssist(exec, {
+      contactId,
+      channel: "text",
+      endpointValue: "+15551234567",
+      now: handoffAt,
+    });
+
+    // The Compose panel's "Yes, log interaction" call shape.
+    await markAssistLogged(exec, {
+      assistUid,
+      connected: 1,
+      now: confirmationNow,
+    });
+
+    const row = await exec.getFirstAsync<{ occurred_at: string }>(
+      "SELECT occurred_at FROM interactions WHERE contact_id = ?",
+      [contactId],
+    );
+    expect(row).toEqual({ occurred_at: handoffAt });
+    expect(row?.occurred_at).not.toBe(confirmationNow);
+    // Recency reconciles to the handoff time, not the confirmation time.
+    expect(
+      await exec.getFirstAsync<{ last_contact: string | null }>(
+        "SELECT last_contact FROM contacts WHERE id = ?",
+        [contactId],
+      ),
+    ).toEqual({ last_contact: handoffAt });
+  });
+
+  it("logs a 'text' assist as the remapped 'Message' vocabulary channel (Trip-Wire 2, D-06)", async () => {
+    const contactId = await contact();
+    const assistUid = await createPendingAssist(exec, {
+      contactId,
+      channel: "text",
+      endpointValue: "+15551234567",
+      now: "2026-08-31 11:00:00",
+    });
+
+    await markAssistLogged(exec, { assistUid, connected: 1, now: NOW });
+
+    // interactions.channel carries the MIGRATED label, never the retired 'text'.
+    expect(
+      await exec.getFirstAsync<{ channel: string }>(
+        "SELECT channel FROM interactions WHERE contact_id = ?",
+        [contactId],
+      ),
+    ).toEqual({ channel: "Message" });
+  });
+
+  it("markAssistDismissed ('Don't log') records ZERO interaction rows (D-05)", async () => {
+    const contactId = await contact();
+    const assistUid = await createPendingAssist(exec, {
+      contactId,
+      channel: "text",
+      endpointValue: "+15551234567",
+      now: "2026-08-31 11:00:00",
+    });
+
+    await markAssistDismissed(exec, { assistUid, now: NOW });
+
+    expect(await exec.getAllAsync("SELECT id FROM interactions")).toEqual([]);
+    expect(
+      await exec.getFirstAsync<{ status: string }>(
+        "SELECT status FROM interaction_assists WHERE uid = ?",
+        [assistUid],
+      ),
+    ).toEqual({ status: "dismissed" });
+    // last_contact is untouched by a dismissal — no recency write occurred.
+    expect(
+      await exec.getFirstAsync<{ last_contact: string | null }>(
+        "SELECT last_contact FROM contacts WHERE id = ?",
+        [contactId],
+      ),
+    ).toEqual({ last_contact: null });
+  });
+});
