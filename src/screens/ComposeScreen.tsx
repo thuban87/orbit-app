@@ -53,11 +53,23 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { loadCachedCatalog } from "@/ai/model-catalog-cache";
+import type { ModelCatalog } from "@/ai/model-catalog-filter";
+import { createFileCatalogStorage } from "@/ai/model-catalog-storage";
+import { resolveActiveCatalog, SEED_CATALOG } from "@/ai/model-registry";
+import { resolvePrompt } from "@/ai/prompt-template";
+import type { ResolvedPrompt } from "@/ai/prompt-types";
+import { resolveMaxOutputTokens } from "@/ai/token-budget";
 import { Avatar } from "@/components/Avatar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
-import { getAppSettings, updateAppSettings } from "@/db/app-settings-dao";
+import { readPromptContext } from "@/db/ai-context-read";
+import {
+  type AppSettings,
+  getAppSettings,
+  updateAppSettings,
+} from "@/db/app-settings-dao";
 import {
   type ContactMethodRow,
   setContactMethodPrimary,
@@ -71,6 +83,14 @@ import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { markAssistLogged } from "@/db/interaction-assist-dao";
 import {
+  generateVariants,
+  variantTemperature,
+} from "@/logic/ai-generate-variants";
+import {
+  AiSuggestionLifecycle,
+  type AiSuggestionState,
+} from "@/logic/ai-suggestion-logic";
+import {
   actionablePrimaryPhoneDestination,
   type ComposeControls,
   effectiveMode,
@@ -82,6 +102,7 @@ import {
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import type { RootStackScreenProps, TabParamList } from "@/navigation/types";
+import { AiError, AiService } from "@/services/AiService";
 import { performReachOut } from "@/services/reach-out/handoff";
 import { useComposeSession } from "@/stores/compose-session-store";
 import { useTheme } from "@/theme";
@@ -90,6 +111,19 @@ import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "compose";
+
+/**
+ * The BASE generation temperature (AI-SPEC §4 — a single-number tuning surface).
+ * 0.7 for a warm-but-focused draft. Unlike the pre-35-01 single fixed value, this
+ * is now only the BASE: each of the three fan-out calls derives a DISTINCT
+ * per-variant temperature from it via `variantTemperature`, so the three
+ * suggestions are meaningfully varied by a deliberate lever (COMP-12 / D-12),
+ * not by incidental model nondeterminism.
+ */
+const AI_TEMPERATURE_BASE = 0.7;
+
+/** The number of suggestions the review surface always shows (ADR-079). */
+const AI_VARIANT_COUNT = 3;
 
 /** The compose surface's explicit state machine (A1). */
 type ScreenState = "loading" | "ready" | "missing" | "error";
@@ -146,6 +180,33 @@ export function ComposeScreen({
   const [confirm, setConfirm] = useState<{ assistUid: string } | null>(null);
   const [logging, setLogging] = useState(false);
 
+  // ── AI (re-wired against the reshaped lifecycle, plan 35-04; plan 35-01 removed
+  // the ENTIRE prior AI wiring so everything here is RE-CREATED, not reused). ──
+  // The lifecycle's view-state (idle → resolving/loading → review | error).
+  const [aiState, setAiState] = useState<AiSuggestionState>({ status: "idle" });
+  // Provisional AI-affordance gate (Task 2). Task 4 replaces it with the
+  // three-state availability adapter (computeAiAvailability) + credential sourcing.
+  const [aiProviderConfigured, setAiProviderConfigured] = useState(false);
+  // Latest loaded AI settings (provider/model/template), via ref so the lifecycle
+  // deps always read the current values without re-creating the lifecycle.
+  const settingsRef = useRef<AppSettings | null>(null);
+  // The one AiService instance (holds the four provider adapters; refreshed per
+  // request from the live settings).
+  const serviceRef = useRef<AiService | null>(null);
+  if (serviceRef.current === null) {
+    serviceRef.current = new AiService();
+  }
+  // The active model catalog (cache-overrides-seed) — its per-model `limits`
+  // supply Anthropic's REQUIRED `max_tokens` (14-11). Seed is the offline default;
+  // the cached catalog (if any) is loaded best-effort on focus below.
+  const catalogRef = useRef<ModelCatalog>(SEED_CATALOG);
+  // Live focus + mount facts for the lifecycle's stale-guard (isActive).
+  const focusedRef = useRef(false);
+  const mountedRef = useRef(true);
+  // A ref mirror of the editor body so the lifecycle deps (isEditorEmpty /
+  // getEditorBody) never read a stale closure over the store value.
+  const bodyRef = useRef("");
+
   // Session draft state (survives nav/background, not relaunch — COMP-07 / D-10).
   const body = useComposeSession((s) => s.body);
   const subject = useComposeSession((s) => s.subject);
@@ -167,6 +228,110 @@ export function ComposeScreen({
     [navigation],
   );
 
+  // Mirror the editor body into a ref so the lifecycle's isEditorEmpty /
+  // getEditorBody deps always read the CURRENT body (never a stale closure).
+  useEffect(() => {
+    bodyRef.current = body;
+  }, [body]);
+
+  // Mount fact for the lifecycle stale-guard (focus fact is set in the focus
+  // effect). Mounted true by default; flipped false on unmount so a resolving/
+  // loading completion after teardown can never mutate the editor.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Build the ONE lifecycle instance (its deps read the refs above). Created
+  // lazily on first render; every dep is INJECTED so the whole flow is the
+  // node-tested lifecycle from plan 35-04 — this screen only supplies effects.
+  const lifecycleRef = useRef<AiSuggestionLifecycle | null>(null);
+  if (lifecycleRef.current === null) {
+    lifecycleRef.current = new AiSuggestionLifecycle({
+      // Resolve the ONE immutable prompt for this request. For a Rewrite the
+      // lifecycle passes the current editor body as `sourceDraft`, which rides the
+      // Task-1 bounded/delimited MESSAGE TO REWRITE path — NEVER raw-concatenated.
+      // For a Draft `sourceDraft` is undefined and the prompt is byte-identical to
+      // today. The closed PromptContext egress projection (readPromptContext) is
+      // unchanged; sourceDraft is a resolvePrompt param, not a context field.
+      resolvePrompt: async (sourceDraft?: string): Promise<ResolvedPrompt> => {
+        const exec = getExecutor();
+        const context = await readPromptContext(exec, contactId);
+        const template = settingsRef.current?.aiPromptTemplate ?? "";
+        return resolvePrompt(template, context, sourceDraft);
+      },
+      // The provider fan-out (COMP-12 / HIGH-3). Three independently-cancellable
+      // calls under the lifecycle's ONE shared signal via generateVariants. The
+      // per-call `generateOne` is an ADAPTER over provider.generate (which takes a
+      // GenerationInput, not (prompt, signal)) — it BUILDS the GenerationInput and
+      // applies a DISTINCT per-variant temperature (variantTemperature) so the
+      // three suggestions are deliberately varied. RE-CREATED here (35-01 deleted
+      // the prior adapter): refresh providers from live settings, select the
+      // active provider + model, and resolve the per-provider max_tokens from the
+      // catalog (dropping it would silently break Anthropic's required max_tokens).
+      generate: (prompt, signal): Promise<readonly string[]> => {
+        const s = settingsRef.current;
+        const service = serviceRef.current;
+        if (!s || !service) throw new AiError("not_configured");
+        service.refreshProviders(s);
+        const provider = service.getActiveProvider(s);
+        if (!provider) throw new AiError("not_configured");
+        const model = s.aiProvider === "custom" ? s.aiCustomModel : s.aiModel;
+        // 14-11: only Anthropic sends max_tokens (its API requires one), set to
+        // the selected model's OWN catalog maximum; OpenAI/Gemini omit it so the
+        // model default applies. Visible length is bounded by AiService's
+        // 1,200-code-point post-parse trim, not here.
+        const maxOutputTokens = resolveMaxOutputTokens(
+          s.aiProvider,
+          model,
+          catalogRef.current,
+        );
+        const generateOne = (
+          p: ResolvedPrompt,
+          sig: AbortSignal,
+          variantIndex: number,
+        ): Promise<string> =>
+          provider.generate({
+            resolvedPrompt: p,
+            model,
+            temperature: variantTemperature(
+              AI_TEMPERATURE_BASE,
+              variantIndex,
+              AI_VARIANT_COUNT,
+            ),
+            maxOutputTokens,
+            signal: sig,
+          });
+        return generateVariants(
+          generateOne,
+          prompt,
+          signal,
+          AI_VARIANT_COUNT,
+        );
+      },
+      // Apply a chosen suggestion to the editor — the ONLY editor mutation the AI
+      // flow performs (chooseSuggestion is the sole write; ADR-079 T-35-18).
+      applyDraft: (text: string): void => {
+        bodyRef.current = text;
+        setBody(text);
+      },
+      // Empty editor → Draft (no sourceDraft); non-empty → Rewrite.
+      isEditorEmpty: (): boolean => bodyRef.current.trim().length === 0,
+      getEditorBody: (): string => bodyRef.current,
+      createController: (): AbortController => new AbortController(),
+      setTimer: (fn, ms) => setTimeout(fn, ms),
+      clearTimer: (handle) =>
+        clearTimeout(handle as ReturnType<typeof setTimeout>),
+      isActive: (): boolean => focusedRef.current && mountedRef.current,
+      // Sanitized code only — never raw provider detail (T-35-03 / T-14-05).
+      sanitizeError: (err): string =>
+        err instanceof AiError ? err.code : "unknown",
+      onChange: (next): void => setAiState(next),
+    });
+  }
+
   // Self-fetch on EVERY focus (first mount AND every return). B1: reset the state
   // machine at the START so a re-focus can't flash the prior SMS result against
   // the fresh pending probe; a `cancelled` flag stops a superseded focus's
@@ -174,6 +339,7 @@ export function ComposeScreen({
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
+      focusedRef.current = true;
       // Whether THIS focus begins a brand-new session (a different contact than
       // the store currently holds). Captured BEFORE startSession so the mode is
       // seeded from the durable preference on a fresh start ONLY — an in-app
@@ -196,6 +362,22 @@ export function ComposeScreen({
           if (cancelled) {
             return;
           }
+          // Publish the AI settings for the lifecycle deps (provider/model/
+          // template read via settingsRef inside resolvePrompt/generate).
+          settingsRef.current = settings;
+          // Best-effort refresh of the active model catalog (cache-overrides-seed)
+          // so Anthropic's required max_tokens uses the freshest per-model max.
+          // Non-blocking + failure-tolerant — the seed default already works, and
+          // this never sits on the render path.
+          void loadCachedCatalog(createFileCatalogStorage())
+            .then((cached) => {
+              if (!cancelled) catalogRef.current = resolveActiveCatalog(cached);
+            })
+            .catch(() => undefined);
+          // Provisional AI-affordance gate (provider configured at all). Task 4
+          // replaces this with the three-state availability adapter + credential
+          // presence sourcing.
+          setAiProviderConfigured(settings.aiProvider !== "none");
           // Resolve the EFFECTIVE actionable primary for BOTH types from the same
           // loaded groups (one read serves resolution AND the picker decision).
           const primaries = selectActionablePrimaryMethods(methodGroups);
@@ -259,6 +441,11 @@ export function ComposeScreen({
 
       return () => {
         cancelled = true;
+        // Blur / contactId change / unmount — drop the focus fact and dispose the
+        // lifecycle so an in-flight resolving/loading request is aborted and the
+        // AI view-state can never be stranded (or mutate the editor after teardown).
+        focusedRef.current = false;
+        lifecycleRef.current?.dispose();
       };
     }, [contactId, goHome, startSession, setMode]),
   );
@@ -372,6 +559,34 @@ export function ComposeScreen({
   const onSwitchMode = useCallback(() => {
     setMode(mode === "email" ? "text" : "email");
   }, [mode, setMode]);
+
+  // The single adaptive AI action (COMP-12 / D-09). A DELIBERATE invocation only —
+  // begin() is NEVER called from a focus/mount effect, so AI never auto-starts on
+  // open and never auto-writes. Empty editor → Draft, non-empty → Rewrite; the
+  // lifecycle decides via the injected isEditorEmpty and carries the body as the
+  // bounded sourceDraft on Rewrite.
+  const onAiAction = useCallback(() => {
+    void lifecycleRef.current?.begin();
+  }, []);
+
+  // Cancel an in-flight generation (Cancel on the pending/review surface) — aborts
+  // the lifecycle's sole controller and returns to idle, leaving the manual draft
+  // untouched (COMP-13, failure-safe).
+  const onAiCancel = useCallback(() => {
+    lifecycleRef.current?.cancel();
+  }, []);
+
+  // Try Again — a fresh begin() that REPLACES the whole suggestion set (never an
+  // automatic retry; ADR-079 §S).
+  const onAiRetry = useCallback(() => {
+    void lifecycleRef.current?.retry();
+  }, []);
+
+  // Choose this — apply exactly one reviewed suggestion to the editor. This is the
+  // ONLY path that mutates the editor from the AI flow (ADR-079 / T-35-18).
+  const onAiChoose = useCallback((index: number) => {
+    lifecycleRef.current?.chooseSuggestion(index);
+  }, []);
 
   // Transmit — in-flight latched (A3). Returns early while a handoff is open and
   // when no destination resolves. The channel + endpoint derive from the USABLE
@@ -548,6 +763,11 @@ export function ComposeScreen({
   );
   const copyPrimary = controls.copyEmphasis === "primary";
 
+  // Adaptive AI action copy (COMP-12 / D-09): Draft on an empty editor, Rewrite
+  // when it holds meaningful text. Emptiness drives the injected isEditorEmpty too.
+  const aiActionLabel =
+    body.trim().length === 0 ? "Draft with AI" : "Rewrite with AI";
+
   // The mode actually usable after preferred-then-fallback drives which type the
   // establish-primary picker targets (COMP-03).
   const usable = resolveUsableMode(mode, hasPhone, hasEmail);
@@ -671,6 +891,22 @@ export function ComposeScreen({
           onPress={onSwitchMode}
         />
       </View>
+
+      {/* Adaptive AI action (COMP-12 / D-09) — a single primary action that reads
+          'Draft with AI' on an empty editor and 'Rewrite with AI' when it holds
+          meaningful text. Rendered only when AI is configured and nothing is in
+          flight (idle). It NEVER auto-starts; begin() runs only on this tap. */}
+      {aiProviderConfigured && aiState.status === "idle" ? (
+        <View style={styles.affordance}>
+          <Button
+            testID="compose-ai-action"
+            role="primary"
+            label={aiActionLabel}
+            accessibilityLabel={aiActionLabel}
+            onPress={onAiAction}
+          />
+        </View>
+      ) : null}
 
       {/* SMS-unavailable helper (phone present, device can't text). */}
       {controls.smsUnavailableHelper ? (
