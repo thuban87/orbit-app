@@ -57,10 +57,11 @@ import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
 import { useTheme } from "@/theme";
-import { FREQUENCY_DAYS } from "@/types";
 import { Logger } from "@/utils/logger";
 import {
   buildCreateInput,
+  coordinateBoundToggle,
+  coordinateCadenceSelection,
   type CreateFormState,
   canSave,
 } from "./create-contact-logic";
@@ -95,11 +96,13 @@ export function CreateContactScreen({
   // Fixed-block state.
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
-  const [intervalDays, setIntervalDays] = useState<number | null>(
-    FREQUENCY_DAYS.Monthly,
-  );
+  // A contact created without touching cadence is Unbound (trackingEnabled=false)
+  // with no cadence (intervalDays=null) — NOT the prior Monthly + Bound default
+  // (CAPT-03, dossier §F). Unbound never gates Save on cadence, so intervalValid
+  // starts true. Binding turns the gate on via coordinateBoundToggle.
+  const [intervalDays, setIntervalDays] = useState<number | null>(null);
   const [intervalValid, setIntervalValid] = useState(true);
-  const [trackingEnabled, setTrackingEnabled] = useState(true);
+  const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [lastSpoke, setLastSpoke] = useState<LastSpokeValue>({ kind: "today" });
   const [methods, setMethods] = useState<MethodGroups>(() => ({
     phone: [emptyMethodDraft("phone", newUid())],
@@ -283,79 +286,99 @@ export function CreateContactScreen({
         </View>
       </AccordionSection>
 
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Orbit participation
-        </Text>
-        <View style={styles.lifecycleChoices}>
-          {([true, false] as const).map((enabled) => {
-            const selected = trackingEnabled === enabled;
-            const label = enabled ? "Bound" : "Unbound";
-            return (
-              <Pressable
-                key={label}
-                testID={`create-contact-${label.toLowerCase()}`}
-                accessibilityRole="button"
-                accessibilityLabel={label}
-                accessibilityState={{ selected }}
-                onPress={() => {
-                  setTrackingEnabled(enabled);
-                  if (enabled && intervalDays === null)
-                    setIntervalDays(FREQUENCY_DAYS.Monthly);
-                  if (!enabled) setIntervalDays(null);
-                  setIntervalValid(true);
-                }}
-                style={[
-                  styles.lifecycleChoice,
-                  {
-                    borderColor: selected ? colors.accent : colors.border,
-                    backgroundColor: selected ? colors.accent : colors.surface,
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color: selected ? colors.background : colors.textPrimary,
-                    fontWeight: "600",
-                  }}
-                >
-                  {label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <Text style={[styles.helper, { color: colors.textSecondary }]}>
-          {trackingEnabled
-            ? "Bound contacts appear in your active orbit and receive cadence reminders."
-            : "Unbound contacts keep their details and history without active cadence reminders."}
-        </Text>
-      </View>
-
-      {trackingEnabled ? (
+      {/* -- Relationship Basics: last-spoke + cadence/Bound coordination. -- */}
+      <AccordionSection
+        sectionId="relationship"
+        title="Relationship Basics"
+        expanded={expandedSections.relationship}
+        onExpandedChange={(next) => setSectionExpanded("relationship", next)}
+      >
         <View style={styles.field}>
-          <Text style={[styles.label, { color: colors.textSecondary }]}>
-            Frequency
-          </Text>
-          <FrequencyPicker
-            testID="create-contact-frequency"
-            value={intervalDays ?? FREQUENCY_DAYS.Monthly}
-            onChange={setIntervalDays}
-            onValidityChange={setIntervalValid}
+          <AppText role="label" style={{ color: colors.textSecondary }}>
+            Last spoke
+          </AppText>
+          <TriStateLastSpoke
+            testID="create-contact-last-spoke"
+            value={lastSpoke}
+            onChange={setLastSpoke}
           />
         </View>
-      ) : null}
 
-      <View style={styles.field}>
-        <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Last spoke
-        </Text>
-        <TriStateLastSpoke
-          testID="create-contact-last-spoke"
-          value={lastSpoke}
-          onChange={setLastSpoke}
-        />
-      </View>
+        <View style={styles.field}>
+          <AppText role="label" style={{ color: colors.textSecondary }}>
+            Orbit participation
+          </AppText>
+          <View style={styles.lifecycleChoices}>
+            {([true, false] as const).map((enabled) => {
+              const selected = trackingEnabled === enabled;
+              const label = enabled ? "Bound" : "Unbound";
+              return (
+                <Pressable
+                  key={label}
+                  testID={`create-contact-${label.toLowerCase()}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  accessibilityState={{ selected }}
+                  onPress={() => {
+                    // Coordinate cadence + Bound as one unit (CAPT-03): binding
+                    // with no cadence gates Save until a valid interval is picked;
+                    // unbinding retains any interval as dormant.
+                    const next = coordinateBoundToggle(
+                      { intervalDays },
+                      enabled,
+                    );
+                    setTrackingEnabled(next.trackingEnabled);
+                    setIntervalDays(next.intervalDays);
+                    setIntervalValid(next.intervalValid);
+                  }}
+                  style={[
+                    styles.lifecycleChoice,
+                    {
+                      borderColor: selected ? colors.accent : colors.border,
+                      backgroundColor: selected
+                        ? colors.accent
+                        : colors.surface,
+                    },
+                  ]}
+                >
+                  <AppText
+                    role="label"
+                    style={{
+                      color: selected ? colors.onAccent : colors.textPrimary,
+                    }}
+                  >
+                    {label}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+          <AppText role="caption" style={{ color: colors.textSecondary }}>
+            {trackingEnabled
+              ? "Bound contacts appear in your active orbit and receive cadence reminders."
+              : "Unbound contacts keep their details and history without active cadence reminders."}
+          </AppText>
+        </View>
+
+        {trackingEnabled ? (
+          <View style={styles.field}>
+            <AppText role="label" style={{ color: colors.textSecondary }}>
+              Frequency
+            </AppText>
+            <FrequencyPicker
+              testID="create-contact-frequency"
+              value={intervalDays ?? 0}
+              onChange={(v) => {
+                // Selecting a cadence turns Bound on (CAPT-03).
+                const next = coordinateCadenceSelection(v);
+                setTrackingEnabled(next.trackingEnabled);
+                setIntervalDays(next.intervalDays);
+              }}
+              onValidityChange={setIntervalValid}
+            />
+          </View>
+        ) : null}
+      </AccordionSection>
 
       <View style={styles.field}>
         <ContactMethodsEditor

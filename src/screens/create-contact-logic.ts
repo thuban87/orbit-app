@@ -32,7 +32,10 @@ import type { CreateContactFullInput } from "@/db/contacts-dao";
 export interface CreateFormState {
   name: string;
   categoryId: number | null;
-  /** The FrequencyPicker's emitted interval_days (defaults to Monthly = 30). */
+  /**
+   * The FrequencyPicker's emitted interval_days. `null` = no cadence assigned
+   * (the Unbound resting state); a positive integer once a cadence is picked.
+   */
   intervalDays: number | null;
   /** The FrequencyPicker's validity — false blocks Save. */
   intervalValid: boolean;
@@ -66,6 +69,62 @@ export function canSave(state: CreateFormState): boolean {
     state.name.trim().length > 0 &&
     (state.trackingEnabled === false || state.intervalValid)
   );
+}
+
+/** The cadence-related slice of form state coordinated as one unit (CAPT-03). */
+export interface CadenceFormFields {
+  trackingEnabled: boolean;
+  intervalDays: number | null;
+  intervalValid: boolean;
+}
+
+/**
+ * Coordinate the Bound/Unbound toggle with the optional cadence (CAPT-03,
+ * dossier §F; ADR-062 re-verified on disk — `tracking_enabled` is the flag and
+ * `contacts_prevent_cadence_clear` forbids nulling an assigned cadence).
+ *
+ *   • Unbound retains any interval as a DORMANT cadence — Unbound is NEVER
+ *     modelled as `interval_days = null` — and never blocks Save on cadence.
+ *   • Bound requires a positive-integer cadence: a dormant cadence rebinds valid,
+ *     but binding with no (or a non-positive) cadence leaves `intervalValid`
+ *     false so Save stays gated until the user picks a valid interval.
+ */
+export function coordinateBoundToggle(
+  current: Pick<CreateFormState, "intervalDays">,
+  bound: boolean,
+): CadenceFormFields {
+  if (!bound) {
+    return {
+      trackingEnabled: false,
+      intervalDays: current.intervalDays,
+      intervalValid: true,
+    };
+  }
+  const hasCadence =
+    current.intervalDays !== null &&
+    Number.isInteger(current.intervalDays) &&
+    current.intervalDays > 0;
+  return {
+    trackingEnabled: true,
+    intervalDays: current.intervalDays,
+    intervalValid: hasCadence,
+  };
+}
+
+/**
+ * Selecting a cadence turns Bound on (CAPT-03). `FrequencyPicker.onChange` only
+ * emits a positive-integer interval (never on an invalid entry — its custom-entry
+ * validity is reported separately through `onValidityChange`), so a value that
+ * reaches here is a valid cadence that binds the contact.
+ */
+export function coordinateCadenceSelection(
+  intervalDays: number,
+): CadenceFormFields {
+  return {
+    trackingEnabled: true,
+    intervalDays,
+    intervalValid: true,
+  };
 }
 
 /**
