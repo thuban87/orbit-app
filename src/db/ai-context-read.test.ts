@@ -88,7 +88,14 @@ describe("readPromptContext — Group Notes are structurally unreachable", () =>
     expect(child).not.toBeNull();
     for (const allowAi of [0, 1]) {
       await exec.runAsync("UPDATE interactions SET allow_ai = ? WHERE id = ?", [allowAi, child?.id]);
-      expect(JSON.stringify(await readPromptContext(exec, contactId, NOW))).not.toContain("GROUP_NOTE_EGRESS_FORBIDDEN");
+      const ctx = await readPromptContext(exec, contactId, NOW);
+      // The event-level Group Note is structurally unreachable (the projection
+      // never reads group_events) at either Allow-AI setting — including the new
+      // gated recent-interaction-note shape (D-08 / ADR-078, unchanged by D-14).
+      expect(JSON.stringify(ctx)).not.toContain("GROUP_NOTE_EGRESS_FORBIDDEN");
+      expect(ctx.gatedRecentInteractionNotes ?? []).not.toContain(
+        "GROUP_NOTE_EGRESS_FORBIDDEN",
+      );
     }
   });
 });
@@ -555,6 +562,123 @@ describe("readPromptContext — allowlist projection (H1)", () => {
       trailingAvgGapDays: null,
     });
     expect(JSON.stringify(ctx)).not.toMatch(/RAW_|FORMATTED_|CANONICAL_/);
+  });
+});
+
+describe("readPromptContext — gated recent-interaction notes (ADR-078 carry, D-08/D-13; off-limits closed by D-14/ADR-107)", () => {
+  it("carries a recent-interaction note ONLY when that interaction's allow_ai=1", async () => {
+    const c = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-08-10 10:00:00",
+      channel: "Message",
+      direction: "outbound",
+      connected: 1,
+      note: "GATED_NOTE_MARKER",
+      now: NOW,
+    });
+
+    // allow_ai defaults OFF (migration 025) → the note is NOT carried.
+    expect(
+      (await readPromptContext(exec, c, NOW)).gatedRecentInteractionNotes,
+    ).toEqual([]);
+
+    // Flip the per-interaction gate ON → the note is carried.
+    await exec.runAsync("UPDATE interactions SET allow_ai = 1 WHERE id = ?", [
+      interactionId,
+    ]);
+    expect(
+      (await readPromptContext(exec, c, NOW)).gatedRecentInteractionNotes,
+    ).toEqual(["GATED_NOTE_MARKER"]);
+  });
+
+  it("returns an empty (not null) collection when there are no eligible notes", async () => {
+    const c = await makeContact();
+    const ctx = await readPromptContext(exec, c, NOW);
+    expect(ctx.gatedRecentInteractionNotes).toEqual([]);
+  });
+
+  it("omits a blank / whitespace-only note even when allow_ai=1 (less data, no disclosure)", async () => {
+    const c = await makeContact();
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-08-10 10:00:00",
+      channel: "Message",
+      connected: 1,
+      note: "   ",
+      now: NOW,
+    });
+    await exec.runAsync("UPDATE interactions SET allow_ai = 1 WHERE id = ?", [
+      interactionId,
+    ]);
+    expect(
+      (await readPromptContext(exec, c, NOW)).gatedRecentInteractionNotes,
+    ).toEqual([]);
+  });
+
+  it("orders carried notes newest-first and bounds to the three most recent interactions", async () => {
+    const c = await makeContact();
+    // Four eligible interactions; the oldest must fall outside the 3-most-recent window.
+    const specs = [
+      { at: "2026-08-01 10:00:00", note: "OLDEST" },
+      { at: "2026-08-05 10:00:00", note: "THIRD" },
+      { at: "2026-08-09 10:00:00", note: "SECOND" },
+      { at: "2026-08-12 10:00:00", note: "NEWEST" },
+    ];
+    for (const s of specs) {
+      const { interactionId } = await recordTouchpoint(exec, {
+        contactId: c,
+        uid: uid(),
+        occurredAt: s.at,
+        channel: "Message",
+        connected: 1,
+        note: s.note,
+        now: NOW,
+      });
+      await exec.runAsync("UPDATE interactions SET allow_ai = 1 WHERE id = ?", [
+        interactionId,
+      ]);
+    }
+    const ctx = await readPromptContext(exec, c, NOW);
+    expect(ctx.gatedRecentInteractionNotes).toEqual([
+      "NEWEST",
+      "SECOND",
+      "THIRD",
+    ]);
+  });
+
+  it("never carries an Off Limits value in ANY AI-facing shape, including the gated notes (D-14 / ADR-107)", async () => {
+    const c = await makeContact();
+    await addFuel(exec, {
+      uid: uid(),
+      contactId: c,
+      kind: "off_limits",
+      text: "OFFLIMITS_NEVER_AI",
+      createdAt: NOW,
+      source: "user",
+      now: NOW,
+    });
+    // An allow_ai=1 interaction never turns an off-limits value into a carried note.
+    const { interactionId } = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-08-10 10:00:00",
+      channel: "Message",
+      connected: 1,
+      note: "ordinary note",
+      now: NOW,
+    });
+    await exec.runAsync("UPDATE interactions SET allow_ai = 1 WHERE id = ?", [
+      interactionId,
+    ]);
+
+    const ctx = await readPromptContext(exec, c, NOW);
+    // Off Limits appears in NEITHER the positive fuel projection NOR the gated
+    // notes NOR any other AI-facing shape.
+    expect(JSON.stringify(ctx)).not.toContain("OFFLIMITS_NEVER_AI");
+    expect(ctx.gatedRecentInteractionNotes).toEqual(["ordinary note"]);
   });
 });
 
