@@ -78,7 +78,10 @@ describe("registered migration chain", () => {
     expect(
       MIGRATIONS.filter((migration) => migration.version === 27),
     ).toHaveLength(1);
-    expect(TARGET_VERSION).toBe(27);
+    expect(
+      MIGRATIONS.filter((migration) => migration.version === 28),
+    ).toHaveLength(1);
+    expect(TARGET_VERSION).toBe(28);
     expect(
       await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
     ).toEqual({
@@ -111,9 +114,24 @@ describe("registered migration chain", () => {
       "history_cycle_count",
       "default_interaction_channel",
       "remembered_interaction_channel",
+      "default_message_mode",
+      "remembered_message_mode",
     ]) {
       expect(appSettingsCols.has(col)).toBe(true);
     }
+    // Migration 028's two compose-mode columns land on the singleton row with
+    // their NOT NULL defaults after the full v0→v28 chain (no data loss).
+    expect(
+      await exec.getFirstAsync<{
+        default_message_mode: string;
+        remembered_message_mode: string;
+      }>(
+        "SELECT default_message_mode, remembered_message_mode FROM app_settings WHERE id = 1",
+      ),
+    ).toEqual({
+      default_message_mode: "remember",
+      remembered_message_mode: "text",
+    });
     // Migration 025's two new interaction columns are present after the full chain.
     const interactionCols = new Set(
       (
