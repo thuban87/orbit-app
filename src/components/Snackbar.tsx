@@ -35,6 +35,21 @@ export function Snackbar() {
             {snackbar.action.label}
           </Text>
         </Pressable>
+        {snackbar.secondaryAction ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={snackbar.secondaryAction.accessibilityLabel}
+            onPress={() => {
+              dismiss();
+              snackbar.secondaryAction?.onPress();
+            }}
+            style={styles.action}
+          >
+            <Text style={[styles.actionLabel, { color: colors.accent }]}>
+              {snackbar.secondaryAction.label}
+            </Text>
+          </Pressable>
+        ) : null}
       </View>
     </View>
   );
