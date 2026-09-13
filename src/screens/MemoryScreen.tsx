@@ -24,7 +24,7 @@
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
   type MemoryDraft,
@@ -48,6 +48,7 @@ import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
+import { beginInFlight, endInFlight } from "@/utils/single-flight";
 
 const LOG_SCOPE = "memory-screen";
 
@@ -62,8 +63,11 @@ export function MemoryScreen({
   // must reflect the actual global posture, never a hardcoded stub (cycle-4 #4).
   const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
   // Single-flight guard: block a second concurrent write while one is in flight
-  // so a double-tap cannot create a duplicate Memory (CAPT-06 idempotency).
+  // so a double-tap cannot create a duplicate Memory (CAPT-06 idempotency). The
+  // React `saving` state is async and cannot close the double-tap window on its
+  // own (review WR-03); `savingRef` flips synchronously and is the real guard.
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
   // A successful inner Save returns to the Update Contact chooser (dossier §AA).
   // Navigating is deferred to an effect (not fired inside the async save
   // handler) so MemoryEditor finishes its own close() before this screen
@@ -118,7 +122,9 @@ export function MemoryScreen({
     });
 
   const add = async (draft: MemoryDraft): Promise<boolean> => {
-    if (contactId === null || saving) return false;
+    if (contactId === null) return false;
+    // Claim the slot synchronously — a double-tap must not INSERT twice (WR-03).
+    if (!beginInFlight(savingRef)) return false;
     setSaving(true);
     try {
       const now = localDateTime();
@@ -136,11 +142,13 @@ export function MemoryScreen({
       return false;
     } finally {
       setSaving(false);
+      endInFlight(savingRef);
     }
   };
 
   const edit = async (id: number, patch: MemoryEditPatch): Promise<boolean> => {
-    if (contactId === null || saving) return false;
+    if (contactId === null) return false;
+    if (!beginInFlight(savingRef)) return false;
     setSaving(true);
     try {
       await editMemory(getExecutor(), {
@@ -157,6 +165,7 @@ export function MemoryScreen({
       return false;
     } finally {
       setSaving(false);
+      endInFlight(savingRef);
     }
   };
 

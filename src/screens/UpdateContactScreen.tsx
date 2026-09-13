@@ -23,7 +23,13 @@
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { useFocusEffect } from "@react-navigation/native";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   Pressable,
   ScrollView,
@@ -89,6 +95,7 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
+import { beginInFlight, endInFlight } from "@/utils/single-flight";
 import {
   buildChooserRows,
   type ChooserRow,
@@ -197,6 +204,7 @@ function CurrentStateFocusedEditor({
   const [current, setCurrent] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -214,7 +222,9 @@ function CurrentStateFocusedEditor({
 
   const save = async () => {
     const trimmed = value.trim();
-    if (!trimmed || saving) return;
+    if (!trimmed) return;
+    // Synchronous single-flight guard — a double-tap must not write twice (WR-03).
+    if (!beginInFlight(savingRef)) return;
     setSaving(true);
     setError(false);
     try {
@@ -230,6 +240,7 @@ function CurrentStateFocusedEditor({
       setError(true);
     } finally {
       setSaving(false);
+      endInFlight(savingRef);
     }
   };
 
@@ -274,6 +285,9 @@ function KeyPeopleFocusedEditor({
 }) {
   const [items, setItems] = useState<RelationshipRow[]>([]);
   const [savedTick, setSavedTick] = useState(0);
+  // Synchronous single-flight guard so a double-tap cannot INSERT a duplicate
+  // relationship (WR-03); shared with edit for consistency.
+  const savingRef = useRef(false);
 
   const load = useCallback(async () => {
     const rows = await listRelationshipsForContact(getExecutor(), contactId);
@@ -292,6 +306,7 @@ function KeyPeopleFocusedEditor({
   }, [savedTick, onSaved]);
 
   const add = async (draft: RelationshipDraft): Promise<boolean> => {
+    if (!beginInFlight(savingRef)) return false;
     try {
       const now = localDateTime();
       await addRelationship(getExecutor(), {
@@ -305,12 +320,15 @@ function KeyPeopleFocusedEditor({
     } catch (cause) {
       Logger.error(LOG_SCOPE, "failed to add relationship", cause);
       return false;
+    } finally {
+      endInFlight(savingRef);
     }
   };
   const edit = async (
     id: number,
     draft: RelationshipDraft,
   ): Promise<boolean> => {
+    if (!beginInFlight(savingRef)) return false;
     try {
       await editRelationship(getExecutor(), {
         id,
@@ -323,6 +341,8 @@ function KeyPeopleFocusedEditor({
     } catch (cause) {
       Logger.error(LOG_SCOPE, "failed to edit relationship", cause);
       return false;
+    } finally {
+      endInFlight(savingRef);
     }
   };
   const restore = (id: number) =>
@@ -387,6 +407,7 @@ function OffLimitsFocusedEditor({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const load = useCallback(async () => {
     const rows = await listFuelForEditor(getExecutor(), contactId);
@@ -401,7 +422,10 @@ function OffLimitsFocusedEditor({
 
   const save = async () => {
     const trimmed = draft.trim();
-    if (!trimmed || saving) return;
+    if (!trimmed) return;
+    // The add branch mints a fresh newUid() per call, so UNIQUE cannot catch a
+    // double-tap duplicate — the synchronous ref guard is what prevents it (WR-03).
+    if (!beginInFlight(savingRef)) return;
     setSaving(true);
     setError(false);
     try {
@@ -431,6 +455,7 @@ function OffLimitsFocusedEditor({
       setError(true);
     } finally {
       setSaving(false);
+      endInFlight(savingRef);
     }
   };
 
@@ -514,6 +539,7 @@ function ContactMethodFocusedEditor({
   const [region, setRegion] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -546,7 +572,7 @@ function ContactMethodFocusedEditor({
   }, [contactId]);
 
   const save = async () => {
-    if (saving) return;
+    if (!beginInFlight(savingRef)) return;
     setSaving(true);
     setError(false);
     try {
@@ -563,6 +589,7 @@ function ContactMethodFocusedEditor({
       setError(true);
     } finally {
       setSaving(false);
+      endInFlight(savingRef);
     }
   };
 
@@ -600,6 +627,7 @@ function ContactFrequencyFocusedEditor({
   const [valid, setValid] = useState(true);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -617,7 +645,8 @@ function ContactFrequencyFocusedEditor({
   }, [contactId]);
 
   const save = async () => {
-    if (saving || !valid) return;
+    if (!valid) return;
+    if (!beginInFlight(savingRef)) return;
     setSaving(true);
     setError(false);
     try {
@@ -632,6 +661,7 @@ function ContactFrequencyFocusedEditor({
       setError(true);
     } finally {
       setSaving(false);
+      endInFlight(savingRef);
     }
   };
 
@@ -666,6 +696,7 @@ function CustomFieldFocusedEditor({
   const [value, setValue] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -682,7 +713,7 @@ function CustomFieldFocusedEditor({
   }, [contactId, def]);
 
   const save = async () => {
-    if (saving) return;
+    if (!beginInFlight(savingRef)) return;
     setSaving(true);
     setError(false);
     try {
@@ -700,6 +731,7 @@ function CustomFieldFocusedEditor({
       setError(true);
     } finally {
       setSaving(false);
+      endInFlight(savingRef);
     }
   };
 
