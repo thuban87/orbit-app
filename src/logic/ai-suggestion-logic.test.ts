@@ -15,6 +15,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { ResolvedPrompt } from "@/ai/prompt-types";
+import { generateVariants } from "@/logic/ai-generate-variants";
 import {
   AI_REQUEST_TIMEOUT_MS,
   type AiSuggestionDeps,
@@ -295,6 +296,46 @@ describe("AiSuggestionLifecycle — non-stale failure aborts the controller (HIG
     expect(capturedSignal).not.toBeNull();
     expect((capturedSignal as unknown as AbortSignal).aborted).toBe(true);
     // The manual draft is preserved and a code-only error is surfaced.
+    expect(h.deps.applyDraft).not.toHaveBeenCalled();
+    expect(h.lifecycle.getState()).toEqual({
+      status: "error",
+      code: "network",
+    });
+  });
+});
+
+describe("AiSuggestionLifecycle — fan-out sibling cancellation end-to-end (HIGH-2)", () => {
+  it("cancels the in-flight siblings when one fan-out call rejects", async () => {
+    // Wire `generate` to the REAL generateVariants fan-out. The 2nd call rejects;
+    // the 1st and 3rd never settle (still in flight). The lifecycle must abort its
+    // controller on the propagated rejection, so the siblings' shared signal — the
+    // exact one each generateOne captured — becomes aborted (no orphaned egress).
+    const capturedSignals: AbortSignal[] = [];
+    const recordingGenerateOne = vi.fn(
+      (_p: ResolvedPrompt, signal: AbortSignal, index: number) => {
+        capturedSignals[index] = signal;
+        if (index === 1) return Promise.reject({ code: "network" });
+        return new Promise<string>(() => {
+          /* still in flight */
+        });
+      },
+    );
+    const h = makeHarness(
+      {},
+      {
+        editorEmpty: true,
+        generate: vi.fn((prompt, signal) =>
+          generateVariants(recordingGenerateOne, prompt, signal, 3),
+        ),
+      },
+    );
+
+    await h.lifecycle.begin();
+
+    expect(recordingGenerateOne).toHaveBeenCalledTimes(3);
+    // Sibling calls 0 and 2 observe the abort the lifecycle performed (HIGH-2).
+    expect(capturedSignals[0].aborted).toBe(true);
+    expect(capturedSignals[2].aborted).toBe(true);
     expect(h.deps.applyDraft).not.toHaveBeenCalled();
     expect(h.lifecycle.getState()).toEqual({
       status: "error",
