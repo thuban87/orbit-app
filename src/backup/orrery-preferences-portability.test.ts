@@ -19,6 +19,13 @@ vi.mock("@/services/photos/photo-storage", () => ({
   restorePendingRelPath: vi.fn(),
   stageRestorePendingBase64: vi.fn(),
 }));
+vi.mock("@/services/photos/background-storage", () => ({
+  backgroundDerivativeRelPath: (uid: string) => `profile-backgrounds/${uid}.jpg`,
+  deleteBackgroundRestorePending: vi.fn(),
+  persistBackgroundDerivative: vi.fn(),
+  resolveBackgroundRestorePendingUri: (uid: string) => `file:///pending/${uid}.jpg`,
+  stageBackgroundRestorePendingBase64: vi.fn(),
+}));
 
 import { parseBackupManifest } from "@/backup/backup-schema";
 import { buildExportManifest } from "@/backup/export-manifest";
@@ -87,6 +94,9 @@ describe("Orrery preferences portability boundary", () => {
   it.each(["merge", "replace-all"] as const)(
     "preserves existing choices when optional keys are absent in %s",
     async (mode) => {
+      delete manifest.appSettings.orreryDensity;
+      delete manifest.appSettings.orrerySatellitesEnabled;
+      delete manifest.appSettings.orreryLastSystem;
       const patch = {
         orreryDensity: "compact" as const,
         orrerySatellitesEnabled: 1 as const,
@@ -123,7 +133,7 @@ describe("Orrery preferences portability boundary", () => {
     manifest.appSettings[key] = "forbidden";
     expect(() => parseBackupManifest(manifest)).toThrow();
   });
-  it("keeps current snapshot/export omission and format4 after preferences are saved", async () => {
+  it("exports portable Orrery preferences while omitting device-local state", async () => {
     await updateAppSettings(
       exec,
       {
@@ -140,15 +150,17 @@ describe("Orrery preferences portability boundary", () => {
     });
     expect(BACKUP_FORMAT_VERSION).toBe(5);
     expect(exported.backupFormatVersion).toBe(5);
-    for (const key of [
-      "orreryDensity",
-      "orrerySatellitesEnabled",
-      "orreryLastSystem",
-      "camera",
-      "focus",
-      "apiKey",
-      "backupFolderUri",
-    ]) {
+    expect(portable).toMatchObject({
+      orreryDensity: "compact",
+      orrerySatellitesEnabled: 1,
+      orreryLastSystem: "category:private-choice",
+    });
+    expect(exported.appSettings).toMatchObject({
+      orreryDensity: "compact",
+      orrerySatellitesEnabled: 1,
+      orreryLastSystem: "category:private-choice",
+    });
+    for (const key of ["camera", "focus", "apiKey", "backupFolderUri"]) {
       expect(portable).not.toHaveProperty(key);
       expect(exported.appSettings).not.toHaveProperty(key);
     }

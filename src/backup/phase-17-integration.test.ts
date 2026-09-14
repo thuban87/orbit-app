@@ -14,6 +14,13 @@ vi.mock("@/services/photos/photo-storage", () => ({
   restorePendingRelPath: (target: { kind: string; uid?: string }, session: string) => `avatars/_restore_pending/${target.kind}-${target.uid ?? "profile"}-${session}.jpg`,
   stageRestorePendingBase64: async () => {},
 }));
+vi.mock("@/services/photos/background-storage", () => ({
+  backgroundDerivativeRelPath: (uid: string) => `profile-backgrounds/${uid}.jpg`,
+  deleteBackgroundRestorePending: () => {},
+  persistBackgroundDerivative: async () => {},
+  resolveBackgroundRestorePendingUri: (uid: string) => `file:///pending/${uid}.jpg`,
+  stageBackgroundRestorePendingBase64: async () => {},
+}));
 vi.mock("@/services/notifications/notification-schedule", () => ({ reconcileSchedule: async () => {} }));
 vi.mock("@/services/notifications/digest-schedule", () => ({ reconcileDigestSchedule: async () => {} }));
 

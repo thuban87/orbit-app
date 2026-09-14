@@ -56,6 +56,13 @@ import { createOrrerySessionStore } from "@/stores/orrery-session-store";
 import { createOrrerySystemStore } from "@/stores/orrery-system-store";
 
 vi.mock("expo-sqlite", () => ({}));
+vi.mock("@/services/photos/background-storage", () => ({
+  backgroundDerivativeRelPath: (uid: string) => `profile-backgrounds/${uid}.jpg`,
+  deleteBackgroundRestorePending: () => {},
+  persistBackgroundDerivative: async () => {},
+  resolveBackgroundRestorePendingUri: (uid: string) => `file:///pending/${uid}.jpg`,
+  stageBackgroundRestorePendingBase64: async () => {},
+}));
 vi.mock("@/services/notifications/notification-schedule", () => ({
   reconcileSchedule: async () => {},
 }));
@@ -590,15 +597,13 @@ describe("Orrery production exploration integration", () => {
       exportedAt: NOW,
       readPhotoBase64: vi.fn(),
     });
-    for (const key of [
-      "orreryDensity",
-      "orrerySatellitesEnabled",
-      "orreryLastSystem",
-      "camera",
-      "pose",
-      "focus",
-      "sunContactId",
-    ])
+    expect(manifest.appSettings).toMatchObject({
+      orreryDensity: "compact",
+      orrerySatellitesEnabled: 1,
+      orreryLastSystem: "builtin:favorites",
+      sunContactUid: parent.uid,
+    });
+    for (const key of ["camera", "pose", "focus", "sunContactId"])
       expect(manifest.appSettings).not.toHaveProperty(key);
     expect(manifest.backupFormatVersion).toBe(5);
     await deleteRelationship(exec, { id, contactId: parent.id, now: LATER });
