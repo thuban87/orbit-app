@@ -19,25 +19,29 @@ import { Pressable, ScrollView, StyleSheet, Text } from "react-native";
 import type { DashboardFilter } from "@/db/dashboard-read";
 import { useTheme } from "@/theme";
 
-export interface FilterChip {
+export interface FilterChip<Key extends string = DashboardFilter> {
   /** The filter key — mirrors `DashboardFilter`; drives the testID + onSelect. */
-  key: DashboardFilter;
+  key: Key;
   /** The chip's display label. */
   label: string;
   /** An optional count rendered in parentheses (snoozed / favourites). */
   count?: number;
 }
 
-export interface FilterChipRowProps {
+export interface FilterChipRowProps<Key extends string = DashboardFilter> {
   /** The chips to render, in order (the parent composes categories/batteries in). */
-  chips: FilterChip[];
+  chips: FilterChip<Key>[];
   /** The single active filter key. */
-  active: DashboardFilter;
+  active: Key;
   /** Called with the tapped chip's key — the parent owns the active state. */
-  onSelect: (key: DashboardFilter) => void;
+  onSelect: (key: Key) => void;
 }
 
-export function FilterChipRow({ chips, active, onSelect }: FilterChipRowProps) {
+export function FilterChipRow<Key extends string>({
+  chips,
+  active,
+  onSelect,
+}: FilterChipRowProps<Key>) {
   const { colors } = useTheme();
 
   return (
