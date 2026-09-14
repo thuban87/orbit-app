@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildAiEnabledPatch, deriveAiHubState } from "./settings-ai-hub-logic";
+import {
+  buildAiEnabledPatch,
+  computeAiHubAvailability,
+  deriveAiHubState,
+} from "./settings-ai-hub-logic";
 
 describe("settings AI hub", () => {
   it("collapses AI off to preservation guidance without needs-attention", () => {
@@ -48,5 +52,52 @@ describe("settings AI hub", () => {
     expect(buildAiEnabledPatch(true)).toEqual({ aiEnabled: 1 });
     expect(buildAiEnabledPatch(true)).toEqual(buildAiEnabledPatch(true));
     expect(Object.keys(buildAiEnabledPatch(false))).toEqual(["aiEnabled"]);
+  });
+
+  it("reports needs-attention for dangling pointers, missing credentials, and unavailable exact models", () => {
+    const connection = {
+      lane: "openrouter" as const,
+      model: "vendor/model",
+      customEndpoint: "",
+    };
+    const catalogModel = {
+      id: "vendor/model",
+      name: "Model",
+      contextLength: 128_000,
+      pricing: {},
+    };
+
+    expect(
+      computeAiHubAvailability({
+        aiEnabled: true,
+        activeConnection: null,
+        hasCredential: true,
+        openRouterModels: [catalogModel],
+      }),
+    ).toBe("needs-attention");
+    expect(
+      computeAiHubAvailability({
+        aiEnabled: true,
+        activeConnection: connection,
+        hasCredential: false,
+        openRouterModels: [catalogModel],
+      }),
+    ).toBe("needs-attention");
+    expect(
+      computeAiHubAvailability({
+        aiEnabled: true,
+        activeConnection: connection,
+        hasCredential: true,
+        openRouterModels: [],
+      }),
+    ).toBe("needs-attention");
+    expect(
+      computeAiHubAvailability({
+        aiEnabled: true,
+        activeConnection: connection,
+        hasCredential: true,
+        openRouterModels: [catalogModel],
+      }),
+    ).toBe("ready");
   });
 });

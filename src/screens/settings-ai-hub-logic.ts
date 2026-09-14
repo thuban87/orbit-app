@@ -1,5 +1,11 @@
+import type { OpenRouterModel } from "@/ai/openrouter-catalog";
+import type { ResolvedAiConnection } from "@/db/ai-connections-dao";
 import type { AppSettingsPatch } from "@/db/app-settings-dao";
-import type { AiAvailability } from "@/logic/ai-availability";
+import {
+  type AiAvailability,
+  computeAiAvailability,
+  isSelectedConnectionModelAvailable,
+} from "@/logic/ai-availability";
 
 export type AiHubSection =
   | { readonly label: "Connection"; readonly route: "AIConnection" }
@@ -69,4 +75,23 @@ export function deriveAiHubState(
 /** The master control is deliberately incapable of mutating saved AI config. */
 export function buildAiEnabledPatch(enabled: boolean): AppSettingsPatch {
   return { aiEnabled: enabled ? 1 : 0 };
+}
+
+/** Build the hub's readiness from the same complete snapshot Compose uses. */
+export function computeAiHubAvailability(input: {
+  readonly aiEnabled: boolean;
+  readonly activeConnection: ResolvedAiConnection | null;
+  readonly hasCredential: boolean;
+  readonly openRouterModels: readonly OpenRouterModel[];
+}): AiAvailability {
+  return computeAiAvailability({
+    aiEnabled: input.aiEnabled,
+    activeConnection: input.activeConnection?.lane ?? null,
+    hasCredential: input.hasCredential,
+    selectedModel: input.activeConnection?.model ?? "",
+    modelAvailable: isSelectedConnectionModelAvailable(
+      input.activeConnection,
+      input.openRouterModels,
+    ),
+  });
 }

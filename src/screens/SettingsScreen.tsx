@@ -3,6 +3,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { File, Paths } from "expo-file-system";
 import { getCountries } from "libphonenumber-js";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -20,10 +21,12 @@ import {
   View,
 } from "react-native";
 import { requestPinWidget } from "react-native-android-widget";
+import { loadCachedOpenRouterCatalog } from "@/ai/openrouter-catalog";
 import { AIFirstUseDisclosure } from "@/components/AIFirstUseDisclosure";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
 import { ShellAppBar } from "@/components/ShellAppBar";
+import { resolveActiveAiConnection } from "@/db/ai-connections-dao";
 import {
   type AppSettings,
   type AppSettingsPatch,
@@ -36,9 +39,11 @@ import { getExecutor, localDateTime } from "@/db/database";
 import { getProfile } from "@/db/profile-dao";
 import { getNewestPendingReconcileSessionId } from "@/db/reconcile-session-read";
 import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
+import { readCredentialPresence } from "@/logic/ai-availability";
 import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
+import { aiKeyStore } from "@/services/ai-key-store";
 import { getDeviceRegion } from "@/services/device-region";
 import type { ResumableReconcile } from "@/services/import/reconcile-resume-sweep";
 import { startContactImport } from "@/services/import/start-contact-import";
@@ -72,7 +77,10 @@ import type {
 import { Logger } from "@/utils/logger";
 import { pickContacts } from "../../modules/orbit-contact-picker";
 import { pinResultCopy } from "./settings-add-widget";
-import { deriveAiHubState } from "./settings-ai-hub-logic";
+import {
+  computeAiHubAvailability,
+  deriveAiHubState,
+} from "./settings-ai-hub-logic";
 import { phoneRegionValueLabel } from "./settings-lifecycle-logic";
 import { phoneRegionOverridePatch } from "./settings-region-logic";
 import { contactImportMode } from "./use-contact-import-mode";
@@ -301,14 +309,10 @@ export function SettingsScreen() {
   const hydrateAiConfig = useAiConfigStore((state) => state.hydrate);
   const setAiEnabled = useAiConfigStore((state) => state.setAiEnabled);
   const [aiHubError, setAiHubError] = useState<string | null>(null);
-  const aiHubState = deriveAiHubState(
-    aiEnabled,
-    aiEnabled
-      ? activeAiConnection === null
-        ? "needs-attention"
-        : "ready"
-      : "off",
-  );
+  const [aiAvailability, setAiAvailability] = useState<
+    "off" | "ready" | "needs-attention"
+  >("off");
+  const aiHubState = deriveAiHubState(aiEnabled, aiAvailability);
 
   // "Your orbit" section (ORR-05 / relocated ORR-06). `selfSunColour` is the raw
   // stored self-star hex or NULL; NULL resolves to `starPalette[0]` (gold) at
@@ -390,16 +394,51 @@ export function SettingsScreen() {
     }
   }, []);
 
+  const reloadAiAvailability = useCallback(async () => {
+    const exec = getExecutor();
+    await hydrateAiConfig(exec);
+    const config = useAiConfigStore.getState();
+    const connection = await resolveActiveAiConnection(exec);
+    const hasCredential = await readCredentialPresence(
+      connection?.lane ?? "none",
+      (lane) => aiKeyStore.getKey(lane),
+    );
+    const openRouterCatalog =
+      connection?.lane === "openrouter"
+        ? await loadCachedOpenRouterCatalog({
+            async read() {
+              const file = new File(
+                Paths.document,
+                "ai",
+                "openrouter-model-catalog.json",
+              );
+              return file.exists ? file.text() : null;
+            },
+            async write() {
+              // Settings hub reads the model cache; picker owns refresh writes.
+            },
+          })
+        : null;
+    setAiAvailability(
+      computeAiHubAvailability({
+        aiEnabled: config.aiEnabled,
+        activeConnection: connection,
+        hasCredential,
+        openRouterModels: openRouterCatalog?.models ?? [],
+      }),
+    );
+  }, [hydrateAiConfig]);
+
   useFocusEffect(
     useCallback(() => {
       void reloadProfile();
       void reloadNotifications();
       void reloadOrbit();
-      void hydrateAiConfig(getExecutor()).catch((error) => {
+      void reloadAiAvailability().catch((error) => {
         Logger.error(LOG_SCOPE, "failed to load AI configuration", error);
         setAiHubError("Couldn't load AI settings. Please try again.");
       });
-    }, [hydrateAiConfig, reloadProfile, reloadNotifications, reloadOrbit]),
+    }, [reloadAiAvailability, reloadProfile, reloadNotifications, reloadOrbit]),
   );
 
   // M6: persist the tapped star token through the same try/catch + Logger.error
@@ -614,12 +653,13 @@ export function SettingsScreen() {
       setAiHubError(null);
       try {
         await setAiEnabled(getExecutor(), enabled);
+        await reloadAiAvailability();
       } catch (error) {
         Logger.error(LOG_SCOPE, "failed to update AI master state", error);
         setAiHubError("Couldn't update AI settings. Please try again.");
       }
     },
-    [setAiEnabled],
+    [reloadAiAvailability, setAiEnabled],
   );
 
   return (
