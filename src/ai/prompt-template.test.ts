@@ -8,7 +8,6 @@
  * handed by strict reference identity to every consumer.
  */
 import { describe, expect, it } from "vitest";
-import type { PromptContext } from "@/ai/prompt-types";
 import {
   DEFAULT_STYLE_NOTE,
   MAX_RANKED_FUEL,
@@ -18,6 +17,7 @@ import {
   TEMPLATE_LIMIT,
   TOTAL_LIMIT,
 } from "@/ai/prompt-template";
+import type { PromptContext } from "@/ai/prompt-types";
 
 function baseContext(overrides: Partial<PromptContext> = {}): PromptContext {
   return {
@@ -147,7 +147,10 @@ describe("resolvePrompt — bounded immutable construction", () => {
       label: `Field${i}`,
       value: "y".repeat(PER_VALUE_LIMIT),
     }));
-    const resolved = resolvePrompt("T".repeat(TEMPLATE_LIMIT), baseContext({ sharedFields }));
+    const resolved = resolvePrompt(
+      "T".repeat(TEMPLATE_LIMIT),
+      baseContext({ sharedFields }),
+    );
     expect(cp(resolved.prompt)).toBeLessThanOrEqual(TOTAL_LIMIT);
     const notice = resolved.truncations.find(
       (t) => t.category === "shared details",
@@ -270,7 +273,9 @@ describe("resolvePrompt — bounded immutable construction", () => {
         gatedRecentInteractionNotes: [forged],
       }),
     );
-    expect(occurrences(resolved.prompt, "===== END DATA: SHARED MEMORY 1 =====")).toBe(1);
+    expect(
+      occurrences(resolved.prompt, "===== END DATA: SHARED MEMORY 1 ====="),
+    ).toBe(1);
     expect(resolved.prompt).not.toContain("_TAIL");
     expect(
       resolved.truncations.some((notice) =>
@@ -306,7 +311,9 @@ function occurrences(haystack: string, needle: string): number {
 describe("resolvePrompt — bounded Rewrite source-draft (HIGH-3 / §P-411)", () => {
   it("produces the byte-identical Draft prompt when no sourceDraft is passed (or a blank one)", () => {
     const ctx = baseContext({
-      rankedFuel: [{ text: "Talked about the trip", kind: "topic", ageDays: 2 }],
+      rankedFuel: [
+        { text: "Talked about the trip", kind: "topic", ageDays: 2 },
+      ],
       sharedFields: [{ label: "Note", value: "Loves hiking" }],
     });
     const draftOnly = resolvePrompt("Keep it warm.", ctx);
@@ -319,7 +326,9 @@ describe("resolvePrompt — bounded Rewrite source-draft (HIGH-3 / §P-411)", ()
     // No rewrite block and no rewrite-instruction line leak into a Draft prompt.
     expect(draftOnly.prompt).not.toContain(REWRITE_OPEN);
     expect(draftOnly.prompt).not.toContain("MESSAGE TO REWRITE");
-    expect(draftOnly.prompt.toLowerCase()).not.toContain("rewrite that message");
+    expect(draftOnly.prompt.toLowerCase()).not.toContain(
+      "rewrite that message",
+    );
   });
 
   it("includes exactly one fenced MESSAGE TO REWRITE block with the draft plus the rewrite instruction", () => {
@@ -390,8 +399,14 @@ describe("resolvePrompt — bounded Rewrite source-draft (HIGH-3 / §P-411)", ()
     expect(cp(resolved.prompt)).toBeLessThanOrEqual(TOTAL_LIMIT);
     // Every DATA block keeps BOTH fences (balanced open/close, exactly one each).
     for (const [open, close] of [
-      ["===== DATA: CONTACT CONTEXT =====", "===== END DATA: CONTACT CONTEXT ====="],
-      ["===== DATA: USER STYLE NOTE =====", "===== END DATA: USER STYLE NOTE ====="],
+      [
+        "===== DATA: CONTACT CONTEXT =====",
+        "===== END DATA: CONTACT CONTEXT =====",
+      ],
+      [
+        "===== DATA: USER STYLE NOTE =====",
+        "===== END DATA: USER STYLE NOTE =====",
+      ],
       [REWRITE_OPEN, REWRITE_CLOSE],
     ] as const) {
       expect(occurrences(resolved.prompt, open)).toBe(1);
@@ -400,8 +415,8 @@ describe("resolvePrompt — bounded Rewrite source-draft (HIGH-3 / §P-411)", ()
     // The rewrite-instruction line survived (not severed by the hard-trim).
     expect(resolved.prompt.toLowerCase()).toContain("rewrite that message");
     // The blunt end hard-trim never fired (it would have severed a fence).
-    expect(
-      resolved.truncations.some((t) => t.category === "prompt"),
-    ).toBe(false);
+    expect(resolved.truncations.some((t) => t.category === "prompt")).toBe(
+      false,
+    );
   });
 });

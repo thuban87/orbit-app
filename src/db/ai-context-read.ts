@@ -169,7 +169,10 @@ async function readGatedRecentInteractionNotes(
   exec: SqlExecutor,
   contactId: number,
 ): Promise<string[]> {
-  const rows = await exec.getAllAsync<{ note: string | null; allow_ai: number }>(
+  const rows = await exec.getAllAsync<{
+    note: string | null;
+    allow_ai: number;
+  }>(
     `SELECT note, allow_ai
        FROM interactions
       WHERE contact_id = ?
@@ -327,8 +330,8 @@ export async function readPromptContext(
   // excludes source='ai', while migration 017 leaves no such fuel rows to read.
   const sharedMemories = await readSharedMemories(exec, contactId);
 
-  // (6) Gated recent-interaction notes (allow_ai=1 only), carry-only until Phase
-  //     36 renders them (D-13). Off Limits is carried in no shape (D-14/ADR-107).
+  // (6) Gated recent-interaction notes (allow_ai=1 only), rendered by the sole
+  //     prompt builder. Off Limits is carried in no shape (D-14/ADR-107).
   const gatedRecentInteractionNotes = await readGatedRecentInteractionNotes(
     exec,
     contactId,

@@ -131,8 +131,8 @@ export interface PromptContext {
   /** Live, opted-in custom field values keyed by display label. */
   readonly sharedFields: ReadonlyArray<SharedFieldValue>;
   /**
-   * Live Memories explicitly opted into AI egress. Optional while Phase 36
-   * owns their final prompt-string serialization; the read boundary always
+   * Live Memories explicitly opted into AI egress. Each entry is serialized by
+   * `resolvePrompt` in its own bounded DATA block; the read boundary always
    * supplies an array.
    */
   readonly sharedMemories?: ReadonlyArray<SharedFieldValue>;
@@ -143,13 +143,10 @@ export interface PromptContext {
    * blank/absent notes minimized away; Group Notes (the event-level shared
    * record in `group_events`) are NEVER read and so can never appear here.
    *
-   * CARRY-ONLY UNTIL PHASE 36 (D-13): adding this field does NOT transmit it.
-   * `resolvePrompt` (prompt-template.ts) serializes context fields explicitly —
-   * it never spreads the context — so a carried-but-unrendered field crosses no
-   * boundary; Phase 36 owns the prompt-template rendering/transmission. Off
-   * Limits is carried in NO shape here, positive OR negative (D-14 / ADR-107).
-   * Optional while Phase 36 owns final serialization; the read boundary always
-   * supplies an array.
+   * `resolvePrompt` serializes each included note in its own bounded DATA block.
+   * It still serializes context fields explicitly — never by spreading the
+   * context — and Off Limits is carried in NO shape here, positive OR negative
+   * (D-14 / ADR-107). The read boundary always supplies an array.
    */
   readonly gatedRecentInteractionNotes?: ReadonlyArray<string>;
 }

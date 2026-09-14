@@ -17,11 +17,13 @@
  *   the instruction. Injection-shaped fuel or field values therefore render as
  *   delimited data and cannot alter the static instruction.
  *
- *   Determinism + bounds (AI-SPEC §4): template ≤ 2,000 code points, ≤ 8 ranked
- *   fuel entries in rank order, each human-entered value ≤ 300 code points, whole
- *   prompt ≤ 6,000 code points — counted with `Array.from`, never UTF-16
- *   `.length`. Truncation is disclosed by CATEGORY only; omitted content is never
- *   retained. This module is node-pure (no expo / react-native import).
+ *   Determinism + bounds: template ≤ 2,000 code points, ≤ 8 ranked fuel entries
+ *   in rank order, and each human-entered value ≤ 300 code points — counted with
+ *   `Array.from`, never UTF-16 `.length`. AI-permitted memories and gated notes
+ *   are never dropped to fit the legacy shared-field budget; the selected
+ *   model's real context window is the only total-capacity constraint (AICFG-07).
+ *   Truncation is disclosed by CATEGORY only; omitted content is never retained.
+ *   This module is node-pure (no expo / react-native import).
  * =============================================================================
  */
 import type {
@@ -34,7 +36,7 @@ import type {
 
 /** Max code points of the user-editable style template. */
 export const TEMPLATE_LIMIT = 2_000;
-/** Max code points of the whole resolved prompt. */
+/** Legacy budget retained for shared fields until Plan 36-06 retires it. */
 export const TOTAL_LIMIT = 6_000;
 /** Max code points of a single human-entered value (fuel text / field value). */
 export const PER_VALUE_LIMIT = 300;
@@ -129,6 +131,74 @@ function qualityLine(ctx: PromptContext): string {
     return NONE_AVAILABLE;
   }
   return `good ${good}, fine ${fine}, hard ${hard}`;
+}
+
+/**
+ * Bound and fence-neutralize one human-authored value, recording only a safe
+ * category/count disclosure when trimming occurs.
+ */
+function boundedDataValue(
+  raw: string,
+  category: string,
+  truncations: TruncationNotice[],
+): string {
+  const [value, trimmed] = trimToCodePoints(
+    sanitizeValue(raw),
+    PER_VALUE_LIMIT,
+  );
+  if (trimmed) {
+    truncations.push({
+      category,
+      detail: `trimmed to ${PER_VALUE_LIMIT} code points`,
+    });
+  }
+  return value;
+}
+
+/** Render every permitted memory as its own stable, non-merging DATA block. */
+function sharedMemoryBlocks(
+  context: PromptContext,
+  truncations: TruncationNotice[],
+): string[] {
+  return (context.sharedMemories ?? []).map((memory, index) => {
+    const ordinal = index + 1;
+    const label = boundedDataValue(
+      memory.label,
+      `shared memory ${ordinal} label`,
+      truncations,
+    );
+    const value = boundedDataValue(
+      memory.value,
+      `shared memory ${ordinal}`,
+      truncations,
+    );
+    return [
+      `===== DATA: SHARED MEMORY ${ordinal} =====`,
+      `Label: ${label || NONE_AVAILABLE}`,
+      `Value: ${value || NONE_AVAILABLE}`,
+      `===== END DATA: SHARED MEMORY ${ordinal} =====`,
+    ].join("\n");
+  });
+}
+
+/** Render every permission-gated interaction note in its own stable DATA block. */
+function recentInteractionNoteBlocks(
+  context: PromptContext,
+  truncations: TruncationNotice[],
+): string[] {
+  return (context.gatedRecentInteractionNotes ?? []).map((note, index) => {
+    const ordinal = index + 1;
+    const value = boundedDataValue(
+      note,
+      `recent interaction note ${ordinal}`,
+      truncations,
+    );
+    return [
+      `===== DATA: RECENT INTERACTION NOTE ${ordinal} =====`,
+      value || NONE_AVAILABLE,
+      `===== END DATA: RECENT INTERACTION NOTE ${ordinal} =====`,
+    ].join("\n");
+  });
 }
 
 /**
@@ -272,15 +342,26 @@ export function resolvePrompt(
     ].join("\n");
   }
 
-  // Assemble the scaffold. The rewrite instruction (right after the static
-  // instruction) and the rewrite DATA block (a distinct block after the contact
-  // block) are conditional; when absent the joined string is IDENTICAL to the
-  // pre-change Draft scaffold, preserving byte-identity.
+  // Render the newly transmitted allowlist branches before assembly. Each item
+  // owns a complete DATA fence, so equal/adjacent values can never merge across
+  // a boundary. They are conditionally appended and are never fed through the
+  // legacy TOTAL_LIMIT omission loop: every permitted item survives.
+  const memoryBlocks = sharedMemoryBlocks(context, truncations);
+  const noteBlocks = recentInteractionNoteBlocks(context, truncations);
+
+  // Assemble the scaffold. Every optional section adds nothing when absent, so
+  // the no-memory/no-note Draft scaffold stays byte-identical.
   const scaffoldParts: string[] = [STATIC_INSTRUCTION];
   if (rewriteInstruction !== null) {
     scaffoldParts.push("", rewriteInstruction);
   }
   scaffoldParts.push("", contactBlock);
+  for (const block of memoryBlocks) {
+    scaffoldParts.push("", block);
+  }
+  for (const block of noteBlocks) {
+    scaffoldParts.push("", block);
+  }
   if (rewriteBlock !== null) {
     scaffoldParts.push("", rewriteBlock);
   }
@@ -319,18 +400,7 @@ export function resolvePrompt(
 
   const fieldsBlock =
     includedFields.length > 0 ? includedFields.join("\n") : NONE_AVAILABLE;
-  let prompt = scaffold.replace(FIELD_MARKER, fieldsBlock);
-
-  // Final safety net: if the scaffold itself exceeds the total budget (degenerate
-  // input), hard-trim and disclose it. Normal inputs never reach this.
-  const [hardBounded, hardTrimmed] = trimToCodePoints(prompt, TOTAL_LIMIT);
-  if (hardTrimmed) {
-    prompt = hardBounded;
-    truncations.push({
-      category: "prompt",
-      detail: `hard-trimmed to ${TOTAL_LIMIT} code points`,
-    });
-  }
+  const prompt = scaffold.replace(FIELD_MARKER, fieldsBlock);
 
   // One immutable object; the same string instance is prompt / inspector / payload.
   const frozenTruncations: ReadonlyArray<TruncationNotice> = Object.freeze(
