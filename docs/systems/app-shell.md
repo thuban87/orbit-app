@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 28-dashboard-card-view
+**Updated by phase:** 30-orrery-systems
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -30,6 +30,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | Notification gate | `src/navigation/notification-gate.tsx` | Converts warm and cold local-notification responses into ready-gated actions or navigation. |
 | Widget gate | `src/navigation/widget-linking.ts` | Converts narrowly accepted widget `orbit://` links into ready-gated Dashboard-rooted resets. |
 | Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, live Appearance controls, self-photo, sun controls, and non-secret AI configuration. |
+| Systems workflow | `src/screens/SystemsManagementScreen.tsx`, `src/screens/SystemBuilderScreen.tsx` | Provides one management destination and one focused authoring workflow from both the Orrery and Settings stacks. |
 | Theme contract | `src/theme/` | Defines four semantic palettes, curated accents, typography and motion tokens, local background/surface primitives, and their sole palette values. |
 | Interaction primitives | `src/components/icons/`, `src/components/ui/` | Provides semantic icons, non-colour status glyphs, scalable text, and shared action/overlay contracts. |
 
@@ -56,6 +57,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
 | `src/screens/DigestScreen.tsx` | Provides the live weekly retrospective destination with its own themed Back chrome. |
 | `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including live Theme/Mode/Accent controls, AI configuration, self-photo, self-star, and sun-centre entries. |
+| `src/screens/SystemsManagementScreen.tsx` | Provides the shared flat System catalog and guarded management actions from either owning stack. |
+| `src/screens/SystemBuilderScreen.tsx` | Provides the focused custom-definition and immutable-base override workflow with discard protection. |
 | `src/screens/LegacyContactPickerScreen.tsx` | Provides the typed API-36-and-below custom contact-picker route and permission-recovery views. |
 | `src/services/import/start-contact-import.ts` | Selects one SDK-routed import acquisition path for dashboard and Settings entry points. |
 | `src/screens/ImportReviewScreen.tsx` | Provides the typed selected-contact review route and explicit duplicate choices. |
@@ -84,6 +87,13 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 2. A retap on the active tab dismisses the top shell transient first; a subsequent retap pops that tab to its root. Focused workflows and an open software keyboard hide the tab bar and universal FAB.
 3. `ShellAppBar` and Android Back resolve a shell transient before ordinary stack navigation. Dashboard control panels register a dismiss callback as that transient; completed edits replace or focus their destination so Back never replays a finished workflow.
 4. `reset-intents.ts` expresses notification, widget, Compose, import, reconcile, merge, and other external fallbacks as nested Dashboard-tab states. An in-app Profile Back instead remains origin-aware through its owning stack.
+
+### Managing Orrery Systems
+
+1. Both `OrreryStack` and `SettingsStack` register `SystemsManagement` and `SystemBuilder` with the same serializable route contracts. The Orrery switcher and Settings therefore reach the same management behavior without crossing a callback or contact snapshot through navigation state.
+2. Management opens the builder with either a custom System UID or an immutable built-in/Category `systemRef`. Custom definitions may change their name and rules; generated bases expose only membership overrides.
+3. The builder is an opaque focused route with its own decorative canvas. Meaningful changes use the shared `useDiscardKeepGuard`, and the tab bar/FAB stay out of the workflow.
+4. A newly committed custom System publishes its last-active preference only after the DAO transaction and settings hydration succeed. Editing a non-active System returns without changing the Orrery selection.
 
 ### Capturing from any browse surface
 
@@ -313,6 +323,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 24. **Do not hydrate theme after navigation mounts.** A first main frame in the wrong saved palette is a visual regression; only the neutral pre-ready splash may precede theme hydration.
 25. **Do not bypass semantic visual seams.** New screens use token roles, semantic icon names, scalable text, and shared action/overlay primitives; they do not add raw colour or base-family icon imports.
 26. **Keep contact-knowledge routes typed in both profile stacks.** Dashboard and Orrery Profile must expose the same serializable destinations; do not move Memory content into route parameters.
+27. **Register the System builder in both owning stacks.** Systems Management is reachable from Orrery and Settings; an Orrery-only builder route leaves Settings-origin Create/Edit actions unresolved.
+28. **System route parameters are identities, not drafts.** Pass only `systemUid` or `systemRef`; the builder rereads local definitions and owns unsaved state in memory.
 27. **Root header labels must fail closed to icon-only.** Do not wrap, shrink, or independently hide a co-equal Dashboard destination when measured text no longer fits.
 28. **A disabled overflow entry must not close its menu.** Select Contacts is a visible future capability, not a no-op route or a hidden item.
 29. **Keep Archived registered in both owning stacks.** It is one screen with two deliberate entry paths; replacing either route with a duplicate breaks origin-aware Back behavior.
@@ -369,3 +381,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 26 | Added measured Dashboard header fallback, fixed overflow behavior, transient-aware controls, and shared child chrome for Archived and Unbound routes. |
 | 2026-09-02 | 27 | Shared the Quick Log command and existing Dashboard Profile/Edit routing with accessible List gesture actions. |
 | 2026-09-02 | 28 | Enabled Select Contacts, added selection-first Back behavior, and defined the serializable Group Log participant handoff. |
+| 2026-09-02 | 30 | Added dual-stack Systems Management and System Builder routes with shared focused-workflow and selection-publication contracts. |
