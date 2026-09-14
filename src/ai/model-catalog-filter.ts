@@ -64,6 +64,11 @@ export interface ModelCatalog {
   readonly generatedAt: string;
   readonly models: Record<CatalogProvider, readonly string[]>;
   readonly limits: Record<CatalogProvider, Readonly<Record<string, number>>>;
+  /** Selected model's published prompt/context capacity when LiteLLM supplies it. */
+  readonly contextWindows?: Record<
+    CatalogProvider,
+    Readonly<Record<string, number>>
+  >;
 }
 
 /** The subset of a LiteLLM entry this module reads (all other fields ignored). */
@@ -75,6 +80,8 @@ interface LiteLLMEntry {
   readonly max_output_tokens?: unknown;
   /** Legacy alias LiteLLM still emits alongside `max_output_tokens`. */
   readonly max_tokens?: unknown;
+  /** Maximum prompt/context tokens accepted by the model. */
+  readonly max_input_tokens?: unknown;
 }
 
 /**
@@ -173,12 +180,26 @@ export function filterLiteLLMCatalog(
   // Each bare id's own max output ceiling, first-seen wins (mirrors `dedupe`),
   // keyed lowercase so the surviving-casing lookup is stable.
   const maxByLower = new Map<string, number>();
+  const contextByLower = new Map<string, number>();
 
   const recordMax = (bare: string, entry: LiteLLMEntry): void => {
     const key = bare.toLowerCase();
     if (maxByLower.has(key)) return; // first-seen wins, matching dedupe
     const max = readMaxOutput(entry);
     if (max !== null) maxByLower.set(key, max);
+  };
+
+  const recordContext = (bare: string, entry: LiteLLMEntry): void => {
+    const value = entry.max_input_tokens;
+    const key = bare.toLowerCase();
+    if (
+      !contextByLower.has(key) &&
+      typeof value === "number" &&
+      Number.isFinite(value) &&
+      value > 0
+    ) {
+      contextByLower.set(key, value);
+    }
   };
 
   if (raw && typeof raw === "object") {
@@ -195,10 +216,12 @@ export function filterLiteLLMCatalog(
         const bare = stripPrefix(id);
         openai.push(bare);
         recordMax(bare, entry);
+        recordContext(bare, entry);
       } else if (provider === "anthropic") {
         const bare = stripPrefix(id);
         anthropic.push(bare);
         recordMax(bare, entry);
+        recordContext(bare, entry);
       } else if (
         typeof provider === "string" &&
         GEMINI_SOURCES.includes(provider)
@@ -207,6 +230,7 @@ export function filterLiteLLMCatalog(
         if (/^gemini/i.test(bare)) {
           geminiBuf.push([GEMINI_SOURCES.indexOf(provider), bare]);
           recordMax(bare, entry);
+          recordContext(bare, entry);
         }
       }
     }
@@ -231,6 +255,11 @@ export function filterLiteLLMCatalog(
       openai: limitsFor(models.openai, maxByLower),
       anthropic: limitsFor(models.anthropic, maxByLower),
       google: limitsFor(models.google, maxByLower),
+    },
+    contextWindows: {
+      openai: limitsFor(models.openai, contextByLower),
+      anthropic: limitsFor(models.anthropic, contextByLower),
+      google: limitsFor(models.google, contextByLower),
     },
   };
 }

@@ -220,6 +220,24 @@ export function updatePersonalizationSectionBody(
   });
 }
 
+/** Rename and edit one section atomically for the combined screen editor. */
+export function updatePersonalizationSection(
+  exec: SqlExecutor,
+  input: { uid: string; title: string; body: string; now: string },
+): Promise<void> {
+  const title = normalizeTitle(input.title);
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      `UPDATE personalization_sections
+          SET title = ?, body = ?, modified_at = ?
+        WHERE uid = ?`,
+      [title, input.body, input.now, input.uid],
+    );
+    assertOneChange("updatePersonalizationSection", result.changes);
+    await bumpDataRevisionCore(exec);
+  });
+}
+
 export function setPersonalizationSectionEnabled(
   exec: SqlExecutor,
   uid: string,

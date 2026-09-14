@@ -37,6 +37,7 @@ const RAW = {
     mode: "chat",
     litellm_provider: "openai",
     max_output_tokens: 16384,
+    max_input_tokens: 272000,
   },
   "ft:gpt-4o-2024-08-06": { mode: "chat", litellm_provider: "openai" },
   "dall-e-3": { mode: "image_generation", litellm_provider: "openai" },
@@ -143,6 +144,11 @@ describe("filterLiteLLMCatalog — mode/provider/deprecation mapping", () => {
   it("omits a limit for a model that declares neither max field", () => {
     // The gemini fixtures carry no max fields, so no limit is recorded for them.
     expect(cat.limits.google["gemini-2.5-flash"]).toBeUndefined();
+  });
+
+  it("carries the published selected-model input/context capacity separately", () => {
+    expect(cat.contextWindows?.openai["gpt-5.4-mini"]).toBe(272000);
+    expect(cat.contextWindows?.anthropic["claude-sonnet-5"]).toBeUndefined();
   });
 
   it("de-duplicates case-insensitively, preserving first-seen id casing", () => {
