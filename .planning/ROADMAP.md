@@ -881,8 +881,11 @@ Plans:
 **Canonical refs**: docs/dossier/milestone-2/phase-16-ai-configuration-prompting-dossier.md; docs/dossier/milestone-2/planning-notes/phase-16-planning-notes.md
 **Schema**: AI configuration tables/columns, then the **final backup wire-format bump as the phase's last plan** (now v5 — v4 landed early in 24.1; see migration-ordering amendment; verify head+1 and the current `BACKUP_FORMAT_VERSION` on disk at plan time)
 **Consumes from Phase 24.2** (deferred code cleanup, planner-noted 2026-09-04): remove the now-inert legacy AI-proposed-fuel confirm path retired by ADR-081 — `confirmFuel`/`confirmFuelCore` (fuel-dao.ts:214/297; :297 verified on disk, not :282), the FuelEditor AI-unconfirmed render + Confirm/Dismiss control, and the no-op `onConfirm` wiring in CreateContactScreen/EditContactScreen. NOTE (verified on disk at plan time): `confirmFuel` is NOT wired in ContactProfileScreen (the :70/705 refs are unrelated state) — it is consumed by Create/EditContactScreen. 24.2 landed the data + ADR half (migration 017 removed all `source='ai'` rows; ADR-081 supersedes ADR-030) but left the inert UI in place for this phase to delete.
-**Plans**: 10/10 plans executed (6 waves) — 36-10 closes the verifier-found AICFG-08 Message Focus payload gap; automated verification is complete and seven device/visual checks remain in 36-UAT.md
+**Plans**: 11/11 plans executed (7 waves) — 36-10 closes the verifier-found AICFG-08 Message Focus payload gap; 36-11 closes the OpenRouter callback gap; automated verification and all seven device/visual checks are complete
 Plans:
+
+- [x] 36-11-PLAN.md
+
 **Wave 1**
 
 - [x] 36-01-PLAN.md — TRACER: migration 029 (AI-config schema) + AiProviderId reshape + master toggle + multi-connection + availability + ComposeScreen generation PROMOTED to the active connection, direct-BYOK lane end-to-end (AICFG-01/02/03/05)
@@ -979,7 +982,7 @@ Plans:
 | 33. Group Interaction Logging | 7/7 | Complete | 2026-09-12 (physical-Pixel UAT passed; release APK built on droid) |
 | 34. Rapid Capture & Update Flows | 8/8 | Complete | 2026-09-13 |
 | 35. Messaging & AI Compose | 9/9 | Complete |  |
-| 36. AI Configuration & Prompting | 9/9 | In Progress|  |
+| 36. AI Configuration & Prompting | 11/11 | Complete | 2026-09-14 |
 | 37. Settings & Personalization | 0/TBD | Deferred planning | - |
 | 38. Your Week | 0/TBD | Deferred planning | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
