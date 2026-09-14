@@ -7,9 +7,53 @@ import {
   type AiAvailability,
   computeAiAvailability,
   isCredentialFailure,
+  isSelectedConnectionModelAvailable,
   readCredentialPresence,
   selectAiAffordance,
 } from "@/logic/ai-availability";
+
+describe("isSelectedConnectionModelAvailable — exact OpenRouter model", () => {
+  const model = {
+    id: "vendor/model-a",
+    name: "Model A",
+    contextLength: 128_000,
+    pricing: {},
+  };
+
+  it("accepts only the exact selected OpenRouter id present in the loaded catalog", () => {
+    expect(
+      isSelectedConnectionModelAvailable(
+        { lane: "openrouter", model: model.id, customEndpoint: "" },
+        [model],
+      ),
+    ).toBe(true);
+    expect(
+      isSelectedConnectionModelAvailable(
+        { lane: "openrouter", model: "vendor/missing", customEndpoint: "" },
+        [model],
+      ),
+    ).toBe(false);
+  });
+
+  it("preserves manual non-blank model ids for direct and custom connections", () => {
+    expect(
+      isSelectedConnectionModelAvailable(
+        { lane: "openai", model: "manual-model", customEndpoint: "" },
+        [],
+      ),
+    ).toBe(true);
+    expect(
+      isSelectedConnectionModelAvailable(
+        {
+          lane: "custom",
+          model: "manual-model",
+          customEndpoint: "https://example.com",
+        },
+        [],
+      ),
+    ).toBe(true);
+  });
+});
 
 describe("computeAiAvailability — three-state derivation (D-12)", () => {
   const readyInput = {

@@ -44,6 +44,7 @@
 import { type NavigationProp, useFocusEffect } from "@react-navigation/native";
 import * as Clipboard from "expo-clipboard";
 import Constants from "expo-constants";
+import { File, Paths } from "expo-file-system";
 import * as SMS from "expo-sms";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -59,6 +60,10 @@ import { loadCachedCatalog } from "@/ai/model-catalog-cache";
 import type { ModelCatalog } from "@/ai/model-catalog-filter";
 import { createFileCatalogStorage } from "@/ai/model-catalog-storage";
 import { resolveActiveCatalog, SEED_CATALOG } from "@/ai/model-registry";
+import {
+  loadCachedOpenRouterCatalog,
+  type OpenRouterModel,
+} from "@/ai/openrouter-catalog";
 import { resolvePrompt } from "@/ai/prompt-template";
 import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import { resolveMaxOutputTokens } from "@/ai/token-budget";
@@ -98,6 +103,7 @@ import {
   type AiAvailability,
   computeAiAvailability,
   isCredentialFailure,
+  isSelectedConnectionModelAvailable,
   readCredentialPresence,
   selectAiAffordance,
 } from "@/logic/ai-availability";
@@ -215,16 +221,6 @@ function truncateMethodValue(value: string): string {
 }
 
 /** Resolve adapter usability without substituting a different selected model. */
-function isConnectionModelAvailable(
-  connection: ResolvedAiConnection | null,
-): boolean {
-  if (!connection || connection.model.trim() === "") return false;
-  // OpenRouter's adapter is intentionally deferred to Plan 36-05. Direct BYOK
-  // model ids remain free-text capable: the LiteLLM catalog is advisory, not an
-  // allowlist, so a non-catalog model must not be rejected here.
-  return connection.lane !== "openrouter";
-}
-
 export function ComposeScreen({
   navigation,
   route,
@@ -302,6 +298,7 @@ export function ComposeScreen({
   // supply Anthropic's REQUIRED `max_tokens` (14-11). Seed is the offline default;
   // the cached catalog (if any) is loaded best-effort on focus below.
   const catalogRef = useRef<ModelCatalog>(SEED_CATALOG);
+  const openRouterModelsRef = useRef<readonly OpenRouterModel[]>([]);
   // Live focus + mount facts for the lifecycle's stale-guard (isActive).
   const focusedRef = useRef(false);
   const mountedRef = useRef(true);
@@ -595,7 +592,30 @@ export function ComposeScreen({
           settingsRef.current = settings;
           activeConnectionRef.current = connection;
           setActiveConnection(connection);
-          setModelAvailable(isConnectionModelAvailable(connection));
+          const cachedOpenRouterCatalog =
+            connection?.lane === "openrouter"
+              ? await loadCachedOpenRouterCatalog({
+                  async read() {
+                    const file = new File(
+                      Paths.document,
+                      "ai",
+                      "openrouter-model-catalog.json",
+                    );
+                    return file.exists ? file.text() : null;
+                  },
+                  async write() {
+                    // Compose only reads the cache. Catalog refresh remains an
+                    // explicit/settings-owned operation.
+                  },
+                })
+              : null;
+          openRouterModelsRef.current = cachedOpenRouterCatalog?.models ?? [];
+          setModelAvailable(
+            isSelectedConnectionModelAvailable(
+              connection,
+              openRouterModelsRef.current,
+            ),
+          );
           // Best-effort refresh of the active model catalog (cache-overrides-seed)
           // so Anthropic's required max_tokens uses the freshest per-model max.
           // Non-blocking + failure-tolerant — the seed default already works, and
@@ -604,7 +624,12 @@ export function ComposeScreen({
             .then((cached) => {
               if (!cancelled) {
                 catalogRef.current = resolveActiveCatalog(cached);
-                setModelAvailable(isConnectionModelAvailable(connection));
+                setModelAvailable(
+                  isSelectedConnectionModelAvailable(
+                    connection,
+                    openRouterModelsRef.current,
+                  ),
+                );
               }
             })
             .catch(() => undefined);

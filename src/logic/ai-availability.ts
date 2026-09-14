@@ -19,6 +19,8 @@
  *
  * NODE-PURE: no UI-runtime import.
  */
+import type { OpenRouterModel } from "@/ai/openrouter-catalog";
+import type { ResolvedAiConnection } from "@/db/ai-connections-dao";
 import type { AiErrorCode } from "@/services/AiService";
 import type { AiCloudProviderId, AiProviderId } from "@/services/ai-types";
 
@@ -60,6 +62,21 @@ export function computeAiAvailability(
     return "needs-attention";
   }
   return "ready";
+}
+
+/**
+ * Validate the exact remembered model for the active connection. OpenRouter's
+ * catalog is authoritative: a missing id needs attention and is never silently
+ * replaced. Direct-provider and Custom model ids retain their documented manual
+ * entry escape hatch, so any non-blank id remains usable there.
+ */
+export function isSelectedConnectionModelAvailable(
+  connection: ResolvedAiConnection | null,
+  openRouterModels: readonly OpenRouterModel[],
+): boolean {
+  if (!connection || connection.model.trim() === "") return false;
+  if (connection.lane !== "openrouter") return true;
+  return openRouterModels.some((model) => model.id === connection.model);
 }
 
 /**
