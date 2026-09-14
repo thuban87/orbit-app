@@ -25,6 +25,7 @@ import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
   connectionCardState,
+  CustomCredentialCompensationError,
   removeLaneCredential,
   saveCustomConnection,
   saveDirectCredential,
@@ -173,7 +174,9 @@ export function AIConnectionScreen({
     try {
       const result = await saveCustomConnection(
         {
+          getKey: (provider) => aiKeyStore.getKey(provider),
           setKey: (provider, key) => aiKeyStore.setKey(provider, key),
+          deleteKey: (provider) => aiKeyStore.deleteKey(provider),
           persistConnection: async (input) => {
             await upsertAiConnection(getExecutor(), {
               lane: "custom",
@@ -196,7 +199,9 @@ export function AIConnectionScreen({
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to configure custom connection", caught);
       setError(
-        "Couldn't save that endpoint. Your previous connection is still active.",
+        caught instanceof CustomCredentialCompensationError
+          ? caught.message
+          : "Couldn't save that endpoint. Your previous connection is still active.",
       );
     } finally {
       setPending(null);

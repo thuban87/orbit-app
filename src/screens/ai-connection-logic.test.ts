@@ -8,6 +8,7 @@ import {
   repairForAvailability,
   saveCustomConnection,
   saveDirectCredential,
+  CustomCredentialCompensationError,
 } from "@/screens/ai-connection-logic";
 
 describe("AI connection switching", () => {
@@ -51,9 +52,11 @@ describe("credential boundary and endpoint guard", () => {
 
   it("validates a custom URL before writing either config or credential", async () => {
     const setKey = vi.fn(async () => undefined);
+    const getKey = vi.fn(async () => null);
+    const deleteKey = vi.fn(async () => undefined);
     const persistConnection = vi.fn(async () => undefined);
     const invalid = await saveCustomConnection(
-      { setKey, persistConnection },
+      { setKey, getKey, deleteKey, persistConnection },
       {
         endpoint: "http://127.0.0.1/v1",
         credential: "secret",
@@ -65,7 +68,7 @@ describe("credential boundary and endpoint guard", () => {
     expect(persistConnection).not.toHaveBeenCalled();
 
     const valid = await saveCustomConnection(
-      { setKey, persistConnection },
+      { setKey, getKey, deleteKey, persistConnection },
       {
         endpoint: "https://api.example.com/v1",
         credential: "secret",
@@ -78,6 +81,75 @@ describe("credential boundary and endpoint guard", () => {
       endpoint: "https://api.example.com/v1",
       model: "hosted-model",
     });
+  });
+
+  it("restores the previous custom credential when metadata persistence fails", async () => {
+    const setKey = vi.fn(async () => undefined);
+    const persistError = new Error("sqlite failed");
+    await expect(
+      saveCustomConnection(
+        {
+          getKey: vi.fn(async () => "old-secret"),
+          setKey,
+          deleteKey: vi.fn(async () => undefined),
+          persistConnection: vi.fn(async () => {
+            throw persistError;
+          }),
+        },
+        {
+          endpoint: "https://new.example.com/v1",
+          credential: "new-secret",
+          model: "new-model",
+        },
+      ),
+    ).rejects.toBe(persistError);
+    expect(setKey).toHaveBeenNthCalledWith(1, "custom", "new-secret");
+    expect(setKey).toHaveBeenNthCalledWith(2, "custom", "old-secret");
+  });
+
+  it("deletes a newly staged credential when there was no previous key", async () => {
+    const deleteKey = vi.fn(async () => undefined);
+    await expect(
+      saveCustomConnection(
+        {
+          getKey: vi.fn(async () => null),
+          setKey: vi.fn(async () => undefined),
+          deleteKey,
+          persistConnection: vi.fn(async () => {
+            throw new Error("sqlite failed");
+          }),
+        },
+        {
+          endpoint: "https://new.example.com/v1",
+          credential: "new-secret",
+          model: "new-model",
+        },
+      ),
+    ).rejects.toThrow("sqlite failed");
+    expect(deleteKey).toHaveBeenCalledWith("custom");
+  });
+
+  it("raises an explicit hard error if credential compensation also fails", async () => {
+    await expect(
+      saveCustomConnection(
+        {
+          getKey: vi.fn(async () => "old-secret"),
+          setKey: vi
+            .fn()
+            .mockResolvedValueOnce(undefined)
+            .mockRejectedValueOnce(new Error("restore failed")),
+          deleteKey: vi.fn(async () => undefined),
+          persistConnection: vi.fn(async () => {
+            throw new Error("sqlite failed");
+          }),
+        },
+        {
+          endpoint: "https://new.example.com/v1",
+          credential: "new-secret",
+          model: "new-model",
+        },
+      ),
+    ).rejects.toBeInstanceOf(CustomCredentialCompensationError);
   });
 
   it("removes only the requested lane credential", async () => {

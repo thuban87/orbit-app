@@ -59,6 +59,10 @@ interface KeyWriter {
   setKey(provider: AiCloudProviderId, key: string): Promise<void>;
 }
 
+interface KeyReader {
+  getKey(provider: AiCloudProviderId): Promise<string | null>;
+}
+
 interface KeyDeleter {
   deleteKey(provider: AiCloudProviderId): Promise<void>;
 }
@@ -86,8 +90,20 @@ export interface CustomConnectionInput {
   readonly model: string;
 }
 
-export interface CustomConnectionDeps extends KeyWriter {
+export interface CustomConnectionDeps
+  extends KeyWriter,
+    KeyReader,
+    KeyDeleter {
   persistConnection(input: { endpoint: string; model: string }): Promise<void>;
+}
+
+export class CustomCredentialCompensationError extends Error {
+  constructor() {
+    super(
+      "Credential recovery failed. Remove the Custom Endpoint credential before trying again.",
+    );
+    this.name = "CustomCredentialCompensationError";
+  }
 }
 
 export type SaveCustomConnectionResult =
@@ -107,8 +123,27 @@ export async function saveCustomConnection(
   const model = input.model.trim();
   if (model === "") return { ok: false, reason: "Enter a model id." };
   const credential = input.credential.trim();
-  if (credential !== "") await deps.setKey("custom", credential);
-  await deps.persistConnection({ endpoint: validation.url, model });
+  if (credential === "") {
+    await deps.persistConnection({ endpoint: validation.url, model });
+    return { ok: true };
+  }
+
+  const previousCredential = await deps.getKey("custom");
+  await deps.setKey("custom", credential);
+  try {
+    await deps.persistConnection({ endpoint: validation.url, model });
+  } catch (persistError) {
+    try {
+      if (previousCredential === null) {
+        await deps.deleteKey("custom");
+      } else {
+        await deps.setKey("custom", previousCredential);
+      }
+    } catch {
+      throw new CustomCredentialCompensationError();
+    }
+    throw persistError;
+  }
   return { ok: true };
 }
 
