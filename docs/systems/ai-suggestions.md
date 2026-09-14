@@ -1,7 +1,7 @@
 # AI Suggestions
 
-**Last updated:** 2026-08-27
-**Updated by phase:** 18.2-bound-unbound-lifecycle
+**Last updated:** 2026-09-02
+**Updated by phase:** 31-profile-experience
 **Owners:** `src/services/AiService.ts`, `src/services/ai-key-store.ts`, `src/ai/`, `src/db/ai-context-read.ts`, `src/db/app-settings-dao.ts`, `src/logic/ai-suggestion-logic.ts`, `src/screens/SettingsScreen.tsx`, `src/screens/ComposeScreen.tsx`
 
 ## Purpose
@@ -62,7 +62,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 
 ### Resolving and sending a suggestion
 
-1. Compose accepts a direct request or consumes the profile's serializable AI intent once, then asks `readPromptContext()` for the allowed local facts.
+1. Compose owns every AI invocation. Profile reaches it through Message with contact identity only; the user then explicitly chooses Draft with AI or Rewrite with AI.
 2. `resolvePrompt()` bounds and freezes one `ResolvedPrompt`; its inspection, acknowledgement, and provider payload strings are identical.
 3. On a provider's first request, Compose displays the exact contact-specific prompt and persists acknowledgement before egress. A declined or failed acknowledgement starts no network request.
 4. `AiSuggestionLifecycle` owns the sole controller and 20-second timeout. It invalidates stale work on cancellation, unmount, configuration change, or a superseding request.
@@ -93,6 +93,8 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 - **ADR-053:** Local-First LiteLLM AI Model Catalog — provides seed/cache model selection and explicit refresh.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — permits explicit Unbound assistance without proactive cadence evaluation.
 - **ADR-081:** Retire AI-Proposed Fuel for Explicit Per-Item Permission — replaces provenance-based proposal eligibility with default-off Memory permission.
+- **ADR-079:** On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation — removes the direct Profile AI entry and keeps invocation inside Compose.
+- **ADR-109:** Fixed-Hero Semantic Profile Composition and Focused Accessible Editors — applies the Compose-only boundary to the rebuilt Profile Hero and overflow.
 
 ## Gotchas
 
@@ -121,3 +123,4 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | 2026-08-18 | 14 | Created optional BYO-key AI suggestions, the protected egress boundary, Compose draft flow, and local-first model catalog. |
 | 2026-08-27 | 18.2 | Kept explicit Unbound AI available with neutral intensity and no normalized-method egress. |
 | 2026-09-03 | 24.2 | Added a default-off, SQL-gated Memory eligibility projection while deferring prompt serialization to Phase 36. |
+| 2026-09-02 | 31 | Removed the direct Profile AI-draft entry; Message is the sole Profile route into Compose-owned invocation. |
