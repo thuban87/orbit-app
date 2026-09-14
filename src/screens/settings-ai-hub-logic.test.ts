@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  buildAiEnabledPatch,
-  deriveAiHubState,
-} from "./settings-ai-hub-logic";
+import { buildAiEnabledPatch, deriveAiHubState } from "./settings-ai-hub-logic";
 
 describe("settings AI hub", () => {
   it("collapses AI off to preservation guidance without needs-attention", () => {

@@ -1,8 +1,9 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: `role` is Orbit's visual/typography domain prop.
 import * as DocumentPicker from "expo-document-picker";
 import { Directory, File, Paths } from "expo-file-system";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  type LayoutChangeEvent,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -128,10 +129,12 @@ function importedTitle(name: string): string {
 
 export interface AIPersonalizationScreenProps {
   onBack: () => void;
+  focus?: "writing-style" | "personalization";
 }
 
 export function AIPersonalizationScreen({
   onBack,
+  focus,
 }: AIPersonalizationScreenProps) {
   const { colors } = useTheme();
   const [style, setStyle] = useState<WritingStyle>(DEFAULT_STYLE);
@@ -158,6 +161,21 @@ export function AIPersonalizationScreen({
   const [deleteUid, setDeleteUid] = useState<string | null>(null);
   const storage = useMemo(createOpenRouterStorage, []);
   const directStorage = useMemo(createFileCatalogStorage, []);
+  const scrollRef = useRef<ScrollView>(null);
+
+  const scrollToFocusedSection = useCallback(
+    (
+      section: "writing-style" | "personalization",
+      event: LayoutChangeEvent,
+    ) => {
+      if (focus !== section) return;
+      scrollRef.current?.scrollTo({
+        y: Math.max(0, event.nativeEvent.layout.y - SPACING.base),
+        animated: false,
+      });
+    },
+    [focus],
+  );
 
   const load = useCallback(async () => {
     const exec = getExecutor();
@@ -392,10 +410,14 @@ export function AIPersonalizationScreen({
         </AppText>
       </View>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.section}>
+        <View
+          style={styles.section}
+          onLayout={(event) => scrollToFocusedSection("writing-style", event)}
+        >
           <AppText role="heading">Writing Style</AppText>
           <StyleRow
             label="Tone"
@@ -470,7 +492,10 @@ export function AIPersonalizationScreen({
           />
         </View>
 
-        <View style={styles.section}>
+        <View
+          style={styles.section}
+          onLayout={(event) => scrollToFocusedSection("personalization", event)}
+        >
           <View style={styles.sectionHeadingRow}>
             <AppText role="heading">Personalization Context</AppText>
             <Button

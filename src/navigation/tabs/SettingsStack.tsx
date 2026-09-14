@@ -1,11 +1,11 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { MergeImpactSummary } from "@/components/MergeImpactSummary";
-import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
 import { AIConnectionScreen } from "@/screens/AIConnectionScreen";
 import { AIModelPickerScreen } from "@/screens/AIModelPickerScreen";
 import { AIPermissionsScreen } from "@/screens/AIPermissionsScreen";
 import { AIPersonalizationScreen } from "@/screens/AIPersonalizationScreen";
 import { AIPreviewScreen } from "@/screens/AIPreviewScreen";
+import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
 import { BulkImportSetupScreen } from "@/screens/BulkImportSetupScreen";
 import { BulkReviewScreen } from "@/screens/BulkReviewScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
@@ -72,8 +72,14 @@ function AIModelPickerRoute({
 
 function AIPersonalizationRoute({
   navigation,
+  route,
 }: SettingsScreenProps<"AIPersonalization">) {
-  return <AIPersonalizationScreen onBack={() => navigation.goBack()} />;
+  return (
+    <AIPersonalizationScreen
+      focus={route.params?.focus}
+      onBack={() => navigation.goBack()}
+    />
+  );
 }
 
 function AIPermissionsRoute({

@@ -62,8 +62,8 @@ import { resolveActiveCatalog, SEED_CATALOG } from "@/ai/model-registry";
 import { resolvePrompt } from "@/ai/prompt-template";
 import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import { resolveMaxOutputTokens } from "@/ai/token-budget";
-import { Avatar } from "@/components/Avatar";
 import { AIComposeContextReview } from "@/components/AIComposeContextReview";
+import { Avatar } from "@/components/Avatar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
@@ -875,7 +875,9 @@ export function ComposeScreen({
   // Needs-Attention repair route — send the user to the EXISTING AI settings
   // surface (interim per D-12). Compose is never a provider-troubleshooting screen.
   const onOpenAiSettings = useCallback(() => {
-    navigation.navigate("Settings");
+    navigation
+      .getParent<NavigationProp<TabParamList>>()
+      ?.navigate("SettingsTab", { screen: "AIConnection" });
   }, [navigation]);
 
   // Transmit — in-flight latched (A3). Returns early while a handoff is open and

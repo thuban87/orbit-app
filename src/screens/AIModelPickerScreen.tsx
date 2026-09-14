@@ -33,6 +33,7 @@ import {
 } from "@/db/ai-connections-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { AiCloudProviderId } from "@/services/ai-types";
+import { useAiConfigStore } from "@/stores/ai-config-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -143,6 +144,7 @@ export function AIModelPickerScreen({
     try {
       await setRememberedModel(getExecutor(), lane, trimmed, localDateTime());
       await activateAiConnection(getExecutor(), lane, localDateTime());
+      await useAiConfigStore.getState().hydrate(getExecutor());
       onSelected?.(trimmed);
       onBack();
     } catch (caught) {
