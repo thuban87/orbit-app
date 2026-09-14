@@ -1,7 +1,7 @@
 # Status Engine
 
-**Last updated:** 2026-08-27
-**Updated by phase:** 18.2-bound-unbound-lifecycle
+**Last updated:** 2026-09-02
+**Updated by phase:** 31-profile-experience
 **Owners:** `src/db/status.ts`, `src/db/contact-status-read.ts`, `src/db/queries.ts`, `src/db/recency-dao.ts`
 
 ## Purpose
@@ -81,7 +81,11 @@ Status is a query-time projection over the contacts and interactions schema; no 
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — accepts bounded widget staleness without persisting status.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — makes lifecycle and non-null cadence prerequisites for status.
 
+- **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — guards nullable cadence and leaves Status derived from its established inputs.
+
 ## Gotchas
+
+1. **Profile never fabricates cadence.** Unbound Status is `Not tracked`; its activity view uses a separately labelled current-calendar-month window rather than changing status arithmetic.
 
 1. **Convert only the current time to local date.** `last_contact` is stored as a local wall-clock string; converting it with `localtime` again day-shifts late-night values.
 2. **Apply the never-contacted predicate.** The raw status CASE is not a substitute for `last_contact IS NOT NULL` in normal-population reads.
@@ -104,3 +108,4 @@ Status is a query-time projection over the contacts and interactions schema; no 
 | 2026-08-15 | 06 | Added rogue reason reads and Rarely-responds query-time status behavior. |
 | 2026-08-16 | 12 | Added the shared dashboard/widget status-ring vocabulary and refresh-bounded widget presentation. |
 | 2026-08-27 | 18.2 | Required Bound positive-cadence state for all status and progress projections. |
+| 2026-09-02 | 31 | Added truthful Profile explanations and guarded Bound/Unbound relationship presentation without a new Health score. |
