@@ -1,17 +1,22 @@
 ---
 phase: 36
-cycle: 4
+cycle: 5
 reviewers: [codex, claude]
-reviewed_at: 2026-09-14T02:20:00Z
+reviewed_at: 2026-09-13T22:20:00Z
 plans_reviewed: [36-01-PLAN.md, 36-02-PLAN.md, 36-03-PLAN.md, 36-04-PLAN.md, 36-05-PLAN.md, 36-06-PLAN.md, 36-07-PLAN.md, 36-08-PLAN.md, 36-09-PLAN.md]
 models:
-  codex: "gpt-5.6-terra (codex-cli 0.154.0, reasoning=low)"
+  codex: "gpt-5.6-terra (codex-cli 0.154.0, reasoning=high)"
   claude: "claude-opus-4-8 (read-only subagent lane)"
 model_sources:
   codex: "banner"
   claude: "subagent-lane"
 review_notes:
-  - "CYCLE 4 (confirmation cycle — verifies the C3 HIGH-C fix). This file accumulates history: the Cycle 4 review is at the top; Cycles 3/2/1 are preserved verbatim below, unchanged. `cycle_summary` reflects the CURRENT (cycle 4) unresolved counts; `cycle3_summary`/`cycle2_summary`/`cycle1_summary` record prior cycles."
+  - "CYCLE 5 (confirmation cycle — verifies the C4 HIGH fix). This file accumulates history: the Cycle 5 review is at the top; Cycles 4/3/2/1 are preserved verbatim below, unchanged. `cycle_summary` reflects the CURRENT (cycle 5) unresolved counts; `cycle4_summary`/`cycle3_summary`/`cycle2_summary`/`cycle1_summary` record prior cycles."
+  - "CYCLE 5 RESULT: NOT converged. `current_high=1 current_actionable=1`. The C4 HIGH (background bytes routed through `restore_photo_journal`, forcing a migration that would reverse D-03/36-01) is FULLY RESOLVED by the c9462dc redesign — all three lanes agree the journal route is gone, migration 008's CHECK is untouched (008-restore-photo-journal.ts:8), and migration 029 remains the phase's only migration. The C4 MEDIUM (avatars-scoped duplicate persist/guard) is FULLY RESOLVED — 36-08 names `persistBackgroundDerivative` + `registerBackgroundReconcileSweep` and removed photo-relative-path.ts/photo-storage.ts from its write set. BUT codex (gpt-5.6-terra, reasoning=high) found a NEW HIGH the redesign left open, verified against code by the orchestrator: a crash-consistency gap on the same irreversible v5 surface (see below). This is the classic 'closed the migration-reversal HIGH, opened a durability HIGH in its place' outcome."
+  - "The Claude read-only-subagent lane and the orchestrator's first pass both returned high=0/actionable=0 — but they verified only NECESSARY conditions (the named exports exist in background-storage.ts/background-reconcile-sweep.ts; the migration is preserved). Codex at reasoning=high traced the SUFFICIENT condition — the crash-safe DB↔filesystem ordering invariant — and found it unbacked. Per CLAUDE.md 'review the code, not the diff' and the data-layer-correctness mandate, the orchestrator re-verified codex's finding against restore-apply.ts:298/324/330-331 and background-reconcile-sweep.ts:20/31-35 and COUNTS it. This is the adversarial value of cross-AI review working as intended (cf. the project's 'eight diff-scoped reviews missed what one subsystem audit found' lesson)."
+  - "NEW HIGH (36-08 Task 4, codex; orchestrator-verified): the redesign asserts the D-14 invariant 'a committed `profile_background_templates` row always has a durable file / never a broken row' (36-08:273,277), but provides no migration-free mechanism that guarantees it across the 'DB transaction COMMITTED, process dies before/mid background persist' window. The avatar flow it mirrors is crash-safe ONLY because it (a) stages bytes into a recovery namespace before the txn (restore-apply.ts:298), (b) writes a durable JOURNAL row inside the txn (:324), and (c) finalizes post-commit with the journal as re-drivable evidence (:330-331). The background redesign deliberately has NO journal (correct — a `background` journal kind needs a table-rebuild migration that WOULD reverse D-03) and the named recovery, `registerBackgroundReconcileSweep`, only reconciles `.tmp`/`.bak` sidecars and LOGS missing-file rows (background-reconcile-sweep.ts:20,31-35) — it neither retains the base64 nor recreates the file. If persist is post-commit (as the mirrored `persistPhoto` dep is), a crash in that window commits a row pointing at a nonexistent file, unrecoverable, in the phase's single IRREVERSIBLE plan (v5 + migration 029)."
+  - "NOT a [RECORDED-DECISION COLLISION]: the fix is migration-free and does NOT reverse D-03/36-01 or weaken D-14 — it STRENGTHENS D-14 enforcement. The plan must specify a migration-free crash-safe ORDERING (persist the durable canonical file BEFORE the row commits, so a post-commit crash cannot orphan the reference and a pre-commit crash rolls the row back for the sweep to prune) OR migration-free durable evidence analogous to the avatar staging+journal (base64 retained in a restore-pending namespace re-driven by a background finalize sweep) — plus tests for the four crash windows codex enumerates (crash before SQL commit; after commit before FS replacement; after old→bak before tmp→canonical; rollback after a staged replacement). This is a planner-fixable completeness gap, NOT an owner escalation. CAVEAT for the planner: do NOT 'fix' it by adding a migration or a `background` journal kind — either reverses 36-01's owner-accepted single-migration-029 shape and becomes an owner decision."
+  - "NEW ACTIONABLE MEDIUM (36-01 Task 2, codex; orchestrator-verified): the checkpoint offers a sanctioned `approve-retire-ack` option (36-01:172-176 — retire `acknowledgeProvider`, omit `ai_ack_openrouter`, per ADR-079's own invitation). Task 2's ACTION is correctly conditional on that choice (36-01:210), but its `<done>` (36-01:214: 'openrouter is a first-class provider id across ... the ack never-switch ...') and `<acceptance_criteria>` (36-01:217: 'The `acknowledgeProvider` `never` default is unreachable ... with an `openrouter` case present') are hardcoded to the `approve-with-ack` path. Selecting the valid `approve-retire-ack` option makes those acceptance criteria impossible to satisfy (there is no `acknowledgeProvider` to make exhaustive). Fix: make 36-01 Task 2's `<done>` and `<acceptance_criteria>` conditional on the checkpoint selection, mirroring the already-conditional `<action>`."
   - "The Claude lane ran as a read-only Claude subagent (not the built-in `claude -p` CLI lane), per the project's known Write-permission gap in that lane (MEMORY: claude-reviewer-via-subagent). It received the same source-grounding prompt and had full repo read access. Codex ran as a direct `codex exec` invocation (reasoning=low)."
   - "HIGH-C (v5 omitted Profile-presentation entities + background bytes) is now SPLIT by the confirmation: the PRESENTATION-ENTITY half is FULLY RESOLVED — 36-08 serializes AND restores profile_contact_presentation/profile_category_presentation, and the orchestrator verified every schema claim against src/db/migrations/profile-presentation.ts (neither table has its own uid; PK is contact_id/category_id; layout_template_uid/background_template_uid are already-portable TEXT template-uid FKs; idMap supports contacts+categories at restore-apply.ts:87; readParentUid at reconciliation.ts:227 lacks the category_id alias exactly as 36-08:234 says it will add; a different-rowid roundtrip test is mandated). D-14 is honored, NOT reversed; credentials excluded (ADR-049); no AI-egress boundary widened."
   - "NEW HIGH found by BOTH lanes independently with identical code evidence: the D-14 background-BYTES restore path in 36-08 Task 4 routes finalization through `restore_photo_journal`, whose SHIPPED CHECK constraint (src/db/migrations/008-restore-photo-journal.ts:8 — target_kind IN 'contact','profile','customField') will raise a constraint violation on an INSERT of a 'background' kind, aborting restore of any backup carrying a custom background. Fixing it as the plan implies (extend the DAO union) is insufficient — SQLite cannot ALTER a CHECK, so it needs a table-rebuild migration that is NOT in 36-08's files_modified, NOT in Task 4's action, and NOT covered by the Task-5 completeness checkpoint. This is a data-availability defect (T-36-33/T-36-34) in the phase's single IRREVERSIBLE plan."
@@ -21,7 +26,143 @@ review_notes:
 cycle1_summary: "current_high=6 current_actionable=9"
 cycle2_summary: "current_high=2 current_actionable=6"
 cycle3_summary: "current_high=1 current_actionable=0"
+cycle4_summary: "current_high=1 current_actionable=1"
 cycle_summary: "current_high=1 current_actionable=1"
+---
+
+# Cross-AI Plan Review — Phase 36 "AI Configuration & Prompting" — CYCLE 5 (CONFIRMATION)
+
+Cycle 5 is the confirmation cycle for the C4 sole HIGH (the D-14 background-BYTES restore path that
+cycle 4 found routed through `restore_photo_journal`, whose migration-008 CHECK forbids a `background`
+target_kind — fixing it via a migration would have reversed 36-01's owner-accepted single-migration-029
+decision, D-03). Between C4 and C5, **36-08 Task 4 was REDESIGNED** (commit `c9462dc`) to route
+background-byte restore through the EXISTING shipped background subsystem (`background-storage.ts` +
+`background-reconcile-sweep.ts`) — migration-free, no `restore_photo_journal` change. This cycle reviews
+the CURRENT 9 plans on disk and counts only concerns UNRESOLVED now. Two grounded lanes ran — **codex**
+(`codex exec`, gpt-5.6-terra, reasoning=high) and a **Claude read-only subagent** (the built-in `claude -p`
+lane is skipped for the known Write-permission gap, MEMORY: claude-reviewer-via-subagent) — and the
+orchestrator independently verified every claim against the code on disk (`background-storage.ts`,
+`background-reconcile-sweep.ts`, `photo-storage.ts`, `restore-apply.ts`, migration `008`, `share-export.ts`,
+`backup-schema.ts`, and 36-01/36-08 plan text). Cycles 4/3/2/1 are preserved verbatim below the dividers.
+
+## Cycle 5 Consensus Summary
+
+**Result: NOT converged. `current_high=1 current_actionable=1`.** The C4 HIGH and the C4 MEDIUM are BOTH
+fully resolved by the redesign, but codex (reasoning=high) surfaced a NEW HIGH the redesign left open on the
+same irreversible surface, plus a NEW actionable MEDIUM in 36-01. Both were re-verified against the actual
+code/plan by the orchestrator and are counted.
+
+- **C4 HIGH — background-byte restore rerouted migration-free: FULLY RESOLVED (all three lanes agree).**
+  `restore_photo_journal` is no longer on the background path; migration 008's shipped CHECK
+  (`008-restore-photo-journal.ts:8` — `target_kind IN ('contact','profile','customField')`) is untouched;
+  no `background` journal row is written anywhere (`grep` across `src/` returns zero); migration 029 remains
+  the phase's ONLY migration (no 030+ referenced in any of the 9 plans). The named subsystem exports all
+  exist and can carry the route: `background-storage.ts` `SAFE_BACKGROUND_RELATIVE`:7,
+  `backgroundDerivativeRelPath`:43 (uid-derived `profile-backgrounds/<uid>.jpg`), `persistBackgroundDerivative`:88
+  (crash-safe copy→tmp/old→bak/tmp→dest swap serialized via `enqueueWrite`), `resolveBackgroundUri`:62;
+  `background-reconcile-sweep.ts` `registerBackgroundReconcileSweep`:40. The base64 decode idiom to mirror
+  exists (`photo-storage.ts` `stageRestorePendingBase64`:245). D-03/36-01 preserved.
+
+- **C4 MEDIUM — background-aware persist/reconciler, no avatars duplicates: FULLY RESOLVED.** 36-08 names
+  `persistBackgroundDerivative` + `registerBackgroundReconcileSweep` and removed the avatars-scoped duplicate
+  edits — `photo-relative-path.ts` and `photo-storage.ts` are NOT in Task 4's write set (36-08:282); the
+  avatars guards stay untouched.
+
+- **NEW HIGH — crash-consistency gap in 36-08 Task 4 (codex; orchestrator-verified). NOT converged.** The
+  redesign asserts a committed `profile_background_templates` row always has its durable file (D-14), but the
+  named recovery (`registerBackgroundReconcileSweep`) only reconciles `.tmp`/`.bak` sidecars and LOGS missing
+  files (`background-reconcile-sweep.ts:20,31-35`) — it cannot recreate a file in the "DB committed, crash
+  before persist" window, and the plan neither mandates persist-before-commit ordering nor supplies
+  migration-free durable evidence. The avatar flow it mirrors is safe only via its staging-namespace +
+  in-transaction journal (`restore-apply.ts:298,324,330-331`), and the background flow deliberately (and
+  correctly) has no journal. In the phase's single IRREVERSIBLE plan this is a data-availability HIGH. Fix is
+  migration-free (see review_notes) — NOT a recorded-decision collision, NOT an owner escalation.
+
+- **NEW ACTIONABLE MEDIUM — 36-01 Task 2 checkpoint contradiction (codex; orchestrator-verified).** Task 2's
+  `<action>` is conditional on the `approve-with-ack` vs `approve-retire-ack` checkpoint (36-01:210), but its
+  `<done>` (:214) and `<acceptance_criteria>` (:217) hardcode the ack-never-switch path, making the sanctioned
+  `approve-retire-ack` option (:172-176) impossible to accept. Fix: make Task 2's done/acceptance conditional
+  on the checkpoint, mirroring the action.
+
+- **Cross-cutting (all lanes agree): no regressions.** D-13 (OpenRouter OAuth `state` required, rejected
+  before code exchange) honored; D-14 honored (not reversed); ADR-049 (credentials excluded from backup)
+  honored; ADR-051/ADR-107 (custom-endpoint egress / Off-Limits & Group-Notes exclusion) not widened;
+  background bytes are backup-preserved USER DATA, not AI egress. Format bumps v4→v5 with a `4:` upgrader as
+  expected (types.ts currently 4). Advisory source-grounding/fact-drift pass (not counted): no
+  `toISOString().split('T')[0]` reintroduced; custom-field normalized storage (migration 006/ADR-001)
+  untouched.
+
+### Divergent Views
+
+The Claude read-only-subagent lane returned `high=0 actionable=0`, as did the orchestrator's first pass —
+both verified the named exports exist and the migration is preserved (necessary conditions) but did not
+rigorously trace the crash-safe ordering invariant (the sufficient condition). Codex at reasoning=high did,
+and the orchestrator re-verified codex's HIGH and MEDIUM against the actual code/plan before counting them.
+Where a rigorously source-grounded finding on the data layer's irreversible surface conflicts with two lanes
+that checked only necessary conditions, the project's "review the code, not the diff" mandate resolves it in
+favor of the verified finding.
+
+---
+
+## Codex Review (cycle 5)
+
+_Model: gpt-5.6-terra (codex-cli 0.154.0, reasoning=high). Source-grounded `codex exec`, read-only sandbox._
+
+## Re-review verdict
+
+Two unresolved concerns remain: one HIGH in 36-08's redesigned background-byte restore, and one MEDIUM conditional-checkpoint contradiction in 36-01. No new AI-egress or credential-boundary regression found.
+
+### Prior review findings status
+
+| Prior concern | Status now |
+|---|---|
+| C4 HIGH — background bytes incorrectly routed through `restore_photo_journal` | **PARTIALLY RESOLVED (codex framing).** The redesign correctly avoids the journal and migration, but does not yet establish crash-safe DB↔filesystem atomicity. _(Orchestrator: the C4 HIGH *as filed* — journal route forcing a migration reversal — is FULLY RESOLVED; codex re-scoped the residual to the crash-consistency gap, counted below as a NEW HIGH.)_ |
+| C4 MEDIUM — background path used avatar-scoped guards/persist | **FULLY RESOLVED.** 36-08 now names the correct background subsystem and removes avatar files from its write set. |
+| OpenRouter generation adapter gap | **FULLY RESOLVED in plan** (36-05 registers an OpenRouter adapter). |
+| Route-less AI screens / unowned master-toggle UI | **FULLY RESOLVED in plan** (36-09 owns routes, reachability, UI). |
+| Missing creation-writer permission defaults | **FULLY RESOLVED in plan** (36-04 enumerates all writers). |
+| Fixed prompt ceiling / stale tests | **FULLY RESOLVED in plan** (36-03/06 retire the product ceiling + stale assertions). |
+| Missing profile-presentation entities in v5 | **PARTIALLY RESOLVED.** Entity/UID mapping comprehensive; image-byte persistence subject to the HIGH below. |
+| D-13 OAuth `state` downgrade | **FULLY RESOLVED in plan** (missing/mismatched state rejected before exchange). |
+
+### 36-01 — AI configuration tracer
+
+- **MEDIUM:** The checkpoint permits retiring `acknowledgeProvider` and omitting `ai_ack_openrouter`, but the same plan still makes an OpenRouter `acknowledgeProvider` case mandatory in its done criteria and artifact list ([36-01-PLAN.md:172](.), [:210](.), [:214-217](.)). Selecting the valid "retire ack" option makes acceptance impossible. **Suggestion:** make all acknowledgement references conditional on the selected checkpoint option; for the retire path, require removal of its callers/tests instead.
+
+### 36-02 OAuth/catalog, 36-03 egress, 36-04 permissions, 36-05 connection UI/adapter, 36-06 personalization, 36-07 transparency, 36-09 hub/nav
+
+No remaining concerns (verified against ADR-049 credential boundary, ADR-051 public-HTTPS egress, ADR-107 Off-Limits exclusion). Suggestions retained: keep the device-only OAuth redirect UAT (36-02); keep the negative payload tests for disabled notes / Group Notes (36-03); keep per-category default tests (36-04); keep the missing-key adapter assertion (36-05); keep model-window overflow as a generation blocker (36-06); keep the negative serialized-content diagnostic test (36-07).
+
+### 36-08 — final v5 backup bump
+
+**Strengths:** C4 MEDIUM fully resolved (reuses the real background subsystem — `background-storage.ts:7,43,83`); the existing replacement protocol is the desired tmp→bak→canonical swap; the reconcile sweep is genuinely background-aware and registered as a launch hook (`background-reconcile-sweep.ts:15,40`); C4's forbidden route is gone (`008-restore-photo-journal.ts:3` still permits only contact/profile/customField; plan forbids adding `background`); UID-based relationship mapping is sound; credentials remain excluded (ADR-049).
+
+- **HIGH:** The new design has no durable restore intent/evidence tying a committed `profile_background_templates` row to its image write. The existing avatar flow stages bytes before the transaction, creates a durable journal row inside the transaction, and only then finalizes post-commit (`restore-apply.ts:298,324,330-332`). The redesigned task says to mirror the optional post-commit persistence dependency, but prohibits the only existing durable journal (`36-08-PLAN.md:272,273`). The proposed launch sweep cannot repair the failure window "DB committed, process dies before background persistence begins": it reconciles sidecars, then merely logs missing referenced files; it does not retain base64 or recreate the file (`background-reconcile-sweep.ts:20,31-35`). This violates the plan's claim that a committed row always has a durable file. This is NOT a recommendation to add a migration or `background` journal target (either would collide with D-03); the plan needs a migration-free, crash-safe ordering/recovery design with durable evidence, plus tests for the DB-commit-before-persist window.
+
+  **Suggestion (v5 checkpoint gate):** specify and test exact restore ordering for background bytes — (1) crash before SQL commit; (2) crash after SQL commit before FS replacement; (3) crash after old→bak before tmp→canonical; (4) rollback after a staged replacement — and reject v5 until each preserves either the prior or incoming valid background, never a committed broken reference. **Risk: High until closed; v5 is irreversible.**
+
+### Cross-cutting (codex)
+
+D-13 honored (matching `state`, no PKCE-only fallback). D-14 honored in scope (presentation entities, UID remapping, background bytes included; the residual is durable crash recovery, not omission). ADR-049 honored (no credentials in `app_settings`/manifest/portable settings). ADR-051/ADR-107 honored (no widened custom-endpoint egress; no Off-Limits/Group-Notes transmission). Migration discipline honored (code ends at 28; 029 the only Phase-36 SQLite migration).
+
+---
+
+## Claude Review (cycle 5)
+
+_Claude read-only subagent lane (claude-opus-4-8), full repo read access, same source-grounding prompt._
+
+**C4 HIGH — background-byte restore rerouted migration-free: FULLY RESOLVED.** Migration 008 CHECK untouched (`008-restore-photo-journal.ts:8`); `grep` for `'background'` near `target_kind`/`journal` across `src/` returns zero. No new migration in 36-08 (`files_modified` has no `src/db/migrations/` entry; on-disk migrations run 001–028 + already-shipped `profile-presentation.ts`). Named subsystem exists and can carry the route: `background-storage.ts` `SAFE_BACKGROUND_RELATIVE`:7, `backgroundDerivativeRelPath`:43-51 (uid validated), `persistBackgroundDerivative`:88-130 (crash-safe swap serialized via `enqueueWrite`), `resolveBackgroundUri`:62; `background-reconcile-sweep.ts` `registerBackgroundReconcileSweep`:40 (reconciles sidecars, flags missing durable files :31-36). Base64 idiom to mirror exists (`photo-storage.ts:245-253`). `profile_background_templates` has its own uid (`profile-presentation.ts:29`) + `image_path CHECK(GLOB 'profile-backgrounds/*')`.
+
+**C4 MEDIUM — background-aware, no avatars duplicates: FULLY RESOLVED.** `files_modified` lists only `background-storage.ts` (+test) and `share-export.ts`; does NOT list `photo-relative-path.ts`, `photo-storage.ts`, migration 008, or any `restore_photo_journal` edit; `background-reconcile-sweep.ts` reused as-is. Plan names `persistBackgroundDerivative` + `registerBackgroundReconcileSweep` (36-08:122,273,366).
+
+**New concerns from the redesign — NONE at HIGH or MEDIUM (Claude-lane assessment).** share-export namespace dispatch routes `profile-backgrounds/` through `resolveBackgroundUri` and keeps `avatars/` on `resolvePhotoUri`; prefixes disjoint (`photo-storage.ts:54` vs `profile-backgrounds/`); `resolvePhotoUri` not broadened (`share-export.ts:35-37` avatars-only today). Path traversal: restore writes to `backgroundDerivativeRelPath(uid)` (uid-validated), not a manifest path; `assertBackgroundRelative` + DB CHECK guard it. backup-schema base64 validation: `validBase64` already exists (`backup-schema.ts:321`), background field is a direct extension.
+
+_Orchestrator note: the Claude lane and the orchestrator's first pass returned high=0/actionable=0; codex's crash-consistency HIGH (which the Claude lane did not trace) was re-verified against `restore-apply.ts:298/324/330-331` + `background-reconcile-sweep.ts:20/31-35` and is the counted divergence._
+
+**Regression / recorded-decision check.** D-14 honored not reversed; D-03/36-01 single-migration-029 preserved (no migration in 36-08); D-13 untouched by this redesign; ADR-049 credentials excluded / ADR-051/107 not widened (background bytes = backup-preserved user data, not AI egress). `restore-apply.ts:201` interactions INSERT gaps (Task 3 addresses); `RestoreApplyDependencies:28-38` has the optional deps the new `persistBackground` dep mirrors.
+
+**LANE_SUMMARY (Claude lane): high=0 actionable=0.**
+
 ---
 
 # Cross-AI Plan Review — Phase 36 "AI Configuration & Prompting" — CYCLE 4 (CONFIRMATION)
