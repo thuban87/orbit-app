@@ -109,10 +109,9 @@ describe("personalization-dao — ordered local sections", () => {
     ]);
 
     await deletePersonalizationSection(exec, first.uid);
-    expect((await listPersonalizationSections(exec)).map((row) => row.uid)).toEqual([
-      third.uid,
-      second.uid,
-    ]);
+    expect(
+      (await listPersonalizationSections(exec)).map((row) => row.uid),
+    ).toEqual([third.uid, second.uid]);
   });
 
   it("rejects incomplete, duplicate, or unknown reorder inventories", async () => {
@@ -137,10 +136,9 @@ describe("personalization-dao — ordered local sections", () => {
       reorderPersonalizationSections(exec, [first.uid, "missing"], LATER),
     ).rejects.toThrow(/unknown/i);
 
-    expect((await listPersonalizationSections(exec)).map((row) => row.uid)).toEqual([
-      first.uid,
-      second.uid,
-    ]);
+    expect(
+      (await listPersonalizationSections(exec)).map((row) => row.uid),
+    ).toEqual([first.uid, second.uid]);
   });
 
   it("copies imported text into editable records without retaining a source reference", async () => {
@@ -179,8 +177,8 @@ describe("personalization-dao — ordered local sections", () => {
     await expect(
       renamePersonalizationSection(exec, "missing", "Nope", LATER),
     ).rejects.toThrow(/expected one changed row/i);
-    await expect(
-      deletePersonalizationSection(exec, "missing"),
-    ).rejects.toThrow(/expected one changed row/i);
+    await expect(deletePersonalizationSection(exec, "missing")).rejects.toThrow(
+      /expected one changed row/i,
+    );
   });
 });
