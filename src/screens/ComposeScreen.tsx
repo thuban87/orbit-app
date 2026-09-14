@@ -63,6 +63,7 @@ import { resolvePrompt } from "@/ai/prompt-template";
 import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import { resolveMaxOutputTokens } from "@/ai/token-budget";
 import { Avatar } from "@/components/Avatar";
+import { AIComposeContextReview } from "@/components/AIComposeContextReview";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
@@ -258,6 +259,9 @@ export function ComposeScreen({
   // The lifecycle's view-state (idle → resolving/loading → review | error).
   const [aiState, setAiState] = useState<AiSuggestionState>({ status: "idle" });
   const [aiDetailsOpen, setAiDetailsOpen] = useState(false);
+  const [aiContextReviewOpen, setAiContextReviewOpen] = useState(false);
+  const [resolvedForReview, setResolvedForReview] =
+    useState<ResolvedPrompt | null>(null);
   // Ephemeral Adjust state: component/session memory only. It never enters the
   // app-settings DAO, personalization DAO, backup, or any durable store.
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -547,6 +551,7 @@ export function ComposeScreen({
           diagnostic,
         };
       },
+      onPromptResolved: (prompt): void => setResolvedForReview(prompt),
       onChange: (next): void => setAiState(next),
     });
   }
@@ -828,6 +833,8 @@ export function ComposeScreen({
   // bounded sourceDraft on Rewrite.
   const onAiAction = useCallback(() => {
     setAiDetailsOpen(false);
+    setAiContextReviewOpen(false);
+    setResolvedForReview(null);
     void lifecycleRef.current?.begin();
   }, []);
 
@@ -836,12 +843,16 @@ export function ComposeScreen({
   // untouched (COMP-13, failure-safe).
   const onAiCancel = useCallback(() => {
     setAiDetailsOpen(false);
+    setAiContextReviewOpen(false);
+    setResolvedForReview(null);
     lifecycleRef.current?.cancel();
   }, []);
 
   // Try Again — a fresh begin() that REPLACES the whole suggestion set (never an
   // automatic retry; ADR-079 §S).
   const onAiRetry = useCallback(() => {
+    setAiContextReviewOpen(false);
+    setResolvedForReview(null);
     void lifecycleRef.current?.retry();
   }, []);
 
@@ -1532,6 +1543,26 @@ export function ComposeScreen({
               onPress={onAiRetry}
             />
           </View>
+        </View>
+      ) : null}
+
+      {aiState.status !== "idle" &&
+      resolvedForReview !== null &&
+      promptContextRef.current !== null ? (
+        <View style={styles.affordance}>
+          <Button
+            testID="compose-ai-context-review-open"
+            role="tertiary"
+            label="Review what is shared"
+            accessibilityLabel="Review contact information shared with AI"
+            onPress={() => setAiContextReviewOpen(true)}
+          />
+          <AIComposeContextReview
+            visible={aiContextReviewOpen}
+            resolved={resolvedForReview}
+            context={promptContextRef.current}
+            onDismiss={() => setAiContextReviewOpen(false)}
+          />
         </View>
       ) : null}
 

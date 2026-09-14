@@ -26,7 +26,11 @@ import {
   validateCustomEndpoint,
 } from "@/ai/custom-endpoint";
 import { filterToFrontier, type ModelScope } from "@/ai/model-registry";
-import type { ResolvedPrompt, TruncationNotice } from "@/ai/prompt-types";
+import type {
+  PromptContext,
+  ResolvedPrompt,
+  TruncationNotice,
+} from "@/ai/prompt-types";
 import type { AppSettingsPatch } from "@/db/app-settings-dao";
 import type { ModelDiscovery } from "@/services/AiService";
 import type { AiProviderId } from "@/services/ai-types";
@@ -166,6 +170,116 @@ export function buildInspectorViewState(
   return {
     display: resolved.inspectorDisplay,
     truncations: resolved.truncations,
+  };
+}
+
+export interface PromptPreviewSection {
+  readonly title: string;
+  /** An exact contiguous substring of the resolved payload. */
+  readonly content: string;
+}
+
+export interface WholePromptPreview {
+  /** Exact resolved payload; the screen never reserializes it. */
+  readonly display: string;
+  /** Same string reference for the optional raw view. */
+  readonly raw: string;
+  /** Readable grouping made only from exact contiguous payload substrings. */
+  readonly sections: ReadonlyArray<PromptPreviewSection>;
+  readonly truncations: ReadonlyArray<TruncationNotice>;
+}
+
+/** Split a resolved prompt for readability without changing its canonical bytes. */
+function readablePromptSections(prompt: string): PromptPreviewSection[] {
+  const blockPattern =
+    /^===== DATA: ([^\n=]+) =====\n[\s\S]*?^===== END DATA: \1 =====$/gm;
+  const sections: PromptPreviewSection[] = [];
+  let cursor = 0;
+  for (const match of prompt.matchAll(blockPattern)) {
+    const index = match.index;
+    if (index > cursor) {
+      const instructions = prompt.slice(cursor, index).trim();
+      if (instructions) {
+        sections.push({
+          title:
+            sections.length === 0
+              ? "Orbit instructions and output contract"
+              : "Placement instructions",
+          content: instructions,
+        });
+      }
+    }
+    sections.push({
+      title: match[1] ?? "Prompt data",
+      content: match[0],
+    });
+    cursor = index + match[0].length;
+  }
+  const tail = prompt.slice(cursor).trim();
+  if (tail) {
+    sections.push({ title: "Output contract", content: tail });
+  }
+  return sections;
+}
+
+/** Settings whole-prompt preview: canonical bytes plus readable exact slices. */
+export function buildWholePromptPreview(
+  resolved: ResolvedPrompt,
+): WholePromptPreview {
+  return {
+    display: resolved.inspectorDisplay,
+    raw: resolved.payload,
+    sections: Object.freeze(readablePromptSections(resolved.payload)),
+    truncations: resolved.truncations,
+  };
+}
+
+export interface ContactPromptReview {
+  readonly heading: string;
+  /** Contact-only exact prompt blocks joined for display; never global sections. */
+  readonly display: string;
+  readonly blocks: ReadonlyArray<string>;
+  readonly itemCount: number;
+  readonly emptyMessage: string | null;
+}
+
+/** Count independently permitted contact items; base aggregate context is not a permission item. */
+export function countContactPromptItems(context: PromptContext): number {
+  return (
+    context.rankedFuel.length +
+    context.sharedFields.length +
+    (context.sharedMemories?.length ?? 0) +
+    (context.gatedRecentInteractionNotes?.length ?? 0)
+  );
+}
+
+/**
+ * Compose contact review. Every displayed block is extracted byte-for-byte from
+ * the same resolved object sent by the adapter. Global style, personalization,
+ * system instructions, rewrite text, and adjustment guidance are excluded.
+ */
+export function buildContactPromptReview(
+  resolved: ResolvedPrompt,
+  context: PromptContext,
+): ContactPromptReview {
+  const contactBlockPattern =
+    /^===== DATA: (CONTACT CONTEXT|SHARED MEMORY \d+|RECENT INTERACTION NOTE \d+) =====\n[\s\S]*?^===== END DATA: \1 =====$/gm;
+  const blocks = Object.freeze(
+    Array.from(
+      resolved.payload.matchAll(contactBlockPattern),
+      (match) => match[0],
+    ),
+  );
+  const itemCount = countContactPromptItems(context);
+  return {
+    heading: `Sharing ${itemCount} ${itemCount === 1 ? "item" : "items"} with AI about ${context.contactName}`,
+    display: blocks.join("\n\n"),
+    blocks,
+    itemCount,
+    emptyMessage:
+      itemCount === 0
+        ? "No AI-permitted contact items are shared. The base contact context shown below is still included."
+        : null,
   };
 }
 

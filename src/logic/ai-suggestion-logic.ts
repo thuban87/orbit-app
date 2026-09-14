@@ -166,6 +166,8 @@ export interface AiSuggestionDeps {
   ) => AiSuggestionFailureDetails;
   /** Future observability seam. Receives only the strict allowlisted event. */
   readonly onDiagnostic?: (event: AiDiagnosticEvent) => void;
+  /** Observe the exact object that is about to egress (transparency UI only). */
+  readonly onPromptResolved?: (prompt: ResolvedPrompt) => void;
   /** Monotonic-enough clock used only for sanitized request duration. */
   readonly now?: () => number;
   /** Surface each state transition to the screen. */
@@ -285,6 +287,7 @@ export class AiSuggestionLifecycle {
     if (token !== this.gen || !this.deps.isActive()) return;
 
     // No ack gate (D-09/ADR-079): go straight to egress with this prompt.
+    this.deps.onPromptResolved?.(prompt);
     await this.egress(prompt, token);
   }
 

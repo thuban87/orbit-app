@@ -15,8 +15,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { ResolvedPrompt } from "@/ai/prompt-types";
-import { generateVariants } from "@/logic/ai-generate-variants";
 import type { AiDiagnosticEvent } from "@/logic/ai-diagnostics";
+import { generateVariants } from "@/logic/ai-generate-variants";
 import {
   AI_REQUEST_TIMEOUT_MS,
   type AiSuggestionDeps,
@@ -530,10 +530,12 @@ describe("AiSuggestionLifecycle — stale completion + explicit retry", () => {
 describe("AiSuggestionLifecycle — one immutable prompt reaches generate (M1)", () => {
   it("hands the SAME ResolvedPrompt reference the resolver produced to generate", async () => {
     const prompt = makePrompt("IDENTITY BODY");
-    const h = makeHarness({}, { prompt, editorEmpty: true });
+    const onPromptResolved = vi.fn();
+    const h = makeHarness({ onPromptResolved }, { prompt, editorEmpty: true });
     await h.lifecycle.begin();
 
     expect(h.deps.resolvePrompt).toHaveBeenCalledTimes(1);
+    expect(onPromptResolved).toHaveBeenCalledWith(prompt);
     expect(h.deps.generate.mock.calls[0][0]).toBe(prompt);
     expect(h.deps.generate.mock.calls[0][0].payload).toBe(prompt.payload);
   });
