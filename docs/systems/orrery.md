@@ -2,9 +2,9 @@
 
 **Last updated:** 2026-09-02
 
-**Updated by phase:** 29-orrery-camera-scale-exploration
+**Updated by phase:** 30-orrery-systems
 
-**Evidence:** automated implementation and SQLite/controller tests; native acceptance remains pending in [29-NATIVE-CHECKLIST](../../.planning/phases/29-orrery-camera-scale-exploration/29-NATIVE-CHECKLIST.md).
+**Evidence:** automated implementation/SQLite/controller tests plus physical-Pixel authoring, management, accessibility and switch-choreography acceptance recorded in [30-UAT](../../.planning/phases/30-orrery-systems/30-UAT.md) and [30-12-DEVICE](../../.planning/phases/30-orrery-systems/30-12-DEVICE.md).
 
 ## Purpose and governing decisions
 
@@ -19,6 +19,9 @@ ADR-104 defines the durable preference boundary and live System scope. ADR-105 l
 | Owner | Contract |
 |---|---|
 | `src/db/orrery-system-read.ts` | `readOrrerySystemSnapshot(exec, system)` owns one coherent read transaction; `readOrrerySystemSnapshotCore(ro, system)` composes settings, profile/sun, categories, members, complete contacted order and ID/UID fingerprints. |
+| `src/db/systems-dao.ts` | Sole transactional writer for custom definitions, rule rows, manual overrides, visibility/order preferences, duplication, deletion and UID-stable Undo. |
+| `src/logic/system-rule-resolver.ts` | Resolves custom rules with canonical Dashboard predicates, a post-query Gravity pass and dynamic include/exclude overrides; invalid rows remain identifiable broken rules. |
+| `src/db/systems-catalog-read.ts`, `src/db/systems-members-read.ts` | Read the ordered visible catalog, bounded live counts and member-editor populations. |
 | `src/logic/orrery-system-logic.ts` | `buildOrrerySystemWhere(system)` supplies closed, bound predicates shared by member reads and the narrow action probe. Category identity is UID, never name. Dashboard predicate semantics are reused without its store/query state. |
 | `src/db/orrery-impact-read.ts` | `readOrreryImpactInputsCore(ro, ids)` reads complete history in deduplicated chunks of 256 inside the scene snapshot. No nested mutex, writes or per-contact query loop. |
 | `src/services/orrery-scene.ts` | `loadOrreryScene(exec, generation = 0, system = ALL_CONTACTS_SYSTEM)` computes canonical Gravity and world geometry after the snapshot releases. Returns preferences, System snapshot, contacts, world, extent, Gravity and sun presentation. |
@@ -26,6 +29,7 @@ ADR-104 defines the durable preference boundary and live System scope. ADR-105 l
 | `src/logic/orrery-camera-logic.ts`, `orrery-frame.ts` | Bounded projection/inverse, readable Home and arbitrary body framing; one sampled/interpolated frame feeds rings, billboards, labels, hit targets and reorder preview. |
 | `src/components/orrery/use-orrery-camera.ts` | Screen-owned shared pose/input/recovery controller and production gesture builders. Only discrete intents cross to JS. |
 | `src/components/orrery/OrreryWorld.tsx` | Keyed resources, transitions, semantic visibility and the current projected frame. Sun/contact body root Groups are consecutive native siblings using animated depth and paint-valued opacity layers. No wrapper separates the depth batch. |
+| `src/components/orrery/use-orrery-switch-runtime.ts` | Screen-owned SharedValue runtime that preserves the displayed switch sample across canvas unmount, lifecycle pause and transition re-targeting. |
 | `src/db/orrery-action-read.ts`, `src/logic/orrery-focus-logic.ts` | `readOrreryContactTargetValidation(exec, system, target)` freshly validates ID/UID/member/global-sun under one snapshot; `createOrreryFocusController` checks action and scene generations around each await. |
 | `src/stores/orrery-system-store.ts` | Requested versus successful System identity, A→B→A generations, inert retained refresh errors, typed missing-category result, retry and successful-selection persistence. |
 | `src/stores/orrery-preferences-store.ts` | Serialized commit-before-publish choices, failed-read protection, no-op saves and retry intent. |
@@ -33,6 +37,7 @@ ADR-104 defines the durable preference boundary and live System scope. ADR-105 l
 | `src/db/ring-seq-dao.ts` | `commitRingReorder(exec, request, now, isCurrent?)` validates lock-time population/order/sun/identities, merges only visible slots, then preserves uniqueness/count/scoped-update guards. |
 | `src/db/orrery-satellites-read.ts`, `src/logic/orrery-satellite-logic.ts` | Current unlinked visible relationship rows belonging to selected System members; subordinate moon placement and discriminated context-only actions. |
 | `src/screens/OrreryScreen.tsx` | Local reloads, measured viewport/obstacles, action cancellation, modal versus nonmodal controls, session departure and clock-subtree mounting. |
+| `src/screens/SystemBuilderScreen.tsx`, `src/screens/SystemsManagementScreen.tsx` | Own the focused custom-System authoring HUD and the conventional cross-stack management surface. |
 
 The earlier `listOrbitingContacts` read stays Bound/contacted/live and sun-excluded. Its dense read order continues to support guarded persistence; explicit All/Not widening occurs in the System reader, never by changing that default.
 
@@ -45,6 +50,16 @@ Never-contacted status and progress remain null, with fixed neutral north placem
 The globally configured contact sun is resolved independently of selected membership using ADR-047's live Bound fallback. A missing, archived or Unbound saved occupant renders self without deleting the saved setting; requalification restores it. Merge retargets the saved sun to the surviving contact; purge clears it. A qualifying contact sun appears once in members/companion and once as the central body, never as another orbiting body.
 
 A sun excluded by Favorites or Category still has global contact focus/Profile actions. Ordinary member actions require fresh membership; contact-sun actions require the same fresh resolved global ID/UID. Mixed ambiguity preserves System order and appends a nonmember sun once. That sun never adds a companion row. Under owner ruling D-11, it also receives no Orrery satellite moons or relationship context until it qualifies as a member again; satellite On/semantic rules then apply normally.
+
+## Custom Systems and membership
+
+A custom System is a live Orrery-only view, not a frozen contact list or Dashboard query-state snapshot. Migration 022 stores custom definitions in `systems`, one closed rule value per `system_rules` row, ref-keyed manual membership in `system_overrides`, and cross-kind order/visibility state in `system_prefs`. Built-in and Category bases remain generated and immutable; their user-authored overrides and preferences use the same stable `system_ref` representation as custom Systems.
+
+Rules use OR within a family and AND across families. Category, Favourite, Needs Attention, Social Battery, Contact Frequency, Not Contacted and Snoozed reuse canonical Dashboard predicate semantics; Gravity remains a post-query TypeScript filter. Manual inclusions add eligible active contacts outside the rule result. Exclusions suppress current rule matches and become semantically inert once a contact stops matching; an intentional definition save prunes those stale rows so a nominal read never writes.
+
+A missing Category UID stays stored as a broken rule. The resolver omits that predicate, continues resolving every valid rule and manual inclusion, and exposes a stable needs-attention diagnostic. A missing custom-System reference is distinct from a valid empty System and safely falls back to All Contacts.
+
+`SystemBuilderScreen` authors rules and overrides over its own inert decorative canvas. Manage Members uses a searchable virtualized grid, while Preview expands unsaved member IDs through a coherent local snapshot and the canonical world derivation without production photos or labels. `SystemsManagementScreen` provides create/edit/duplicate, guarded rename, reorder, built-in/Category visibility, override reset, and contact-safe custom deletion with a short-lived UID-stable Undo.
 
 ## World, camera and interaction
 
@@ -64,6 +79,8 @@ Migration 021 adds `app_settings.orrery_density` (balanced), `orrery_satellites_
 
 `AppSettings` requires the three preferences; `PortableSettingsSnapshot` and backup acceptance allow them optionally. Current `getPortableSettingsSnapshot`/format-4 exports intentionally do not emit them. Both restore modes preserve an existing preference when the incoming key is omitted. Phase 36 owns coordinated emission/version changes. No camera, pose or focus is stored in SQLite, AsyncStorage or export.
 
+Migration 023 adds `app_settings.orrery_system_selection_revision`. Explicit selections advance it, including a deliberate re-selection of All Contacts. Delete records the fallback revision, and Undo restores the prior active custom System only if both the fallback token and revision remain current; a newer user selection always wins.
+
 Profile departure captures the settled UI-thread pose once. Genuine Profile Back restores bounded pose and surviving ID/UID focus for the same System; the dismissed group panel does not reopen. Background alone preserves the session. Fresh tab/route visit clears it. Generations reject stale scene, satellite, target and departure completions; cancellation prevents later publication/navigation without aborting another transaction.
 
 ## Guarded rank persistence
@@ -79,6 +96,14 @@ Only unlinked, nondeleted, visible structured Relationships on current member pa
 The modal Contacts in this System sheet provides photo/fallback, health, named Gravity and separate Focus in Orrery/Open Profile actions in exact member order, plus qualifying parent relationship context. The floating Contacts here group remains nonmodal and keeps the world and Recenter available. Measured shell tabs/FAB/HUD/feedback are shared framing exclusions. Dropdown/sheet dismissal restores trigger focus; Back/tab-retap consumes the top transient before navigation.
 
 Initial loading, empty membership, read failure, retained refresh failure, missing Category, preference failure, reorder failure and satellite failure have separate treatments. A failed optional relationship read does not erase contact identity. `OrreryCanvas` remains the only ambient Skia clock owner; blur/background unmounts its subtree. Every ambient consumer reads live Reduced Motion on the render loop. React state is used for discrete data/UI updates, never animation frames.
+
+## System switching
+
+The ordered switcher pins All Contacts, omits hidden Systems, and shows progressively resolved live counts. Empty and broken Systems remain selectable and use different icon shapes, visible text and accessibility labels; customized generated Systems also expose a non-severity overrides indicator.
+
+A genuine System change sends the destination to canonical Home framing while retaining a focused contact that survives in both memberships. The screen-owned runtime classifies retained, leaving and entering bodies by stable key, then samples accelerate, shed, capture and settle stages on the Reanimated/Skia path. Membership turnover controls whole-turn impulse and radial displacement. One sampled world remains authoritative for rings, bodies, labels, visibility and hit targets, and re-targeting starts from the exact displayed sample rather than stale source geometry.
+
+Blur or backgrounding holds the current progress and unmounts the canvas consumer; remount resumes from that sample. Reduced Motion replaces rotational peel/capture with a short direct reposition treatment. Persistence-only Zustand publications are not scene changes and cannot prematurely settle an active transition.
 
 ## Snapshot contention and Phase 40 handoff
 
@@ -99,11 +124,11 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 
 ## Deferred seams and evidence limits
 
-- Phase 30 owns custom System authoring/manual-hybrid membership and polished spin/shedding/capture switching.
 - Phase 36 owns portable preference emission and coordinated backup compatibility/versioning.
 - Phase 37 owns Category CRUD and deletion fallout; this consumer uses actual UID records and explicit missing-category recovery.
 - Phase 40 owns final camera/density/neighbor, long-history/photo contention, device GPU, gesture and accessibility calibration. Rich social graphs remain deferred.
-- Native E1–E9 visual/layout, TalkBack/switch-control, gesture/haptic, depth and motion checks remain pending. The end-of-phase human verification workflow must resolve its native obligations before claiming phase verification complete; this document adds no device action or approval checkpoint to automated execution.
+- Phase 30's authoring, management, largest-text and switch-choreography checks passed on the physical Pixel. Phase 40 still owns final high-count performance, camera/density and broader accessibility calibration.
+- **System Undo has a narrow purge/merge race.** If an override contact is permanently purged or absorbed between System deletion and the six-second Undo action, the snapshotted local contact ID no longer satisfies the foreign key. Restore currently rolls back rather than restoring the definition with only surviving overrides; this remains an open review warning.
 
 ## Changelog
 
@@ -114,3 +139,4 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 | 2026-09-02 | 22 | Added post-Quick-Log projection refresh. |
 | 2026-09-02 | 23 | Added live Reduced Motion for ambient consumers. |
 | 2026-09-02 | 29 | Replaced dual-view rendering with canonical world/camera/Systems; added preferences, sessions, guarded filtered ordering, relationship moons, and ADR-104–106 decision records. |
+| 2026-09-02 | 30 | Added migration-backed custom Systems, rule and override resolution, authoring/management/preview surfaces, revision-guarded selection, and owner-approved staged switching. |
