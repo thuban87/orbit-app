@@ -34,6 +34,7 @@ import type { AiProviderId } from "@/services/ai-types";
 /** Human-facing provider names (view-state only; ids stay the stored source). */
 const PROVIDER_NAMES: Record<AiProviderId, string> = {
   none: "None",
+  openrouter: "OpenRouter",
   openai: "OpenAI",
   anthropic: "Anthropic",
   google: "Google Gemini",

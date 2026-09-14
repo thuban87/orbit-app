@@ -34,7 +34,6 @@ import {
 } from "@/logic/dashboard-query-logic";
 import {
   AI_PROVIDER_IDS,
-  type AiCloudProviderId,
   type AiProviderId,
 } from "@/services/ai-types";
 import {
@@ -362,10 +361,9 @@ export interface AppSettings {
   /** User prompt-template override. Empty = use the built-in default. */
   aiPromptTemplate: string;
   /**
-   * Per-provider egress acknowledgement flags. READABLE here but NOT writable
-   * through the generic patch (they are absent from `COLUMN_OF`): only Plan 05's
-   * dedicated `acknowledgeProvider` writer may set them to 1 (C3-H3a), and
-   * changing the Custom endpoint resets `aiAckCustom` to 0 (C3-H3b).
+   * Legacy per-provider egress acknowledgement flags. ADR-079 retired their
+   * writer and generation no longer reads them. They remain readable only for
+   * forward-schema compatibility and absent from the generic patch.
    */
   aiAckOpenai: 0 | 1;
   aiAckAnthropic: 0 | 1;
@@ -512,9 +510,8 @@ export interface BackupBookkeepingPatch {
 
 /**
  * The settings keys writable through the generic `updateAppSettings` patch. The
- * four `aiAck*` fields are DELIBERATELY excluded (C3-H3a) — they are read via
- * `AppSettings` but set only by Plan 05's `acknowledgeProvider`; an ack key that
- * appears in a generic patch is silently dropped (never reaches SQL).
+ * four legacy `aiAck*` fields are DELIBERATELY excluded: ADR-079 retired their
+ * writer, and an ack key in a generic patch never reaches SQL.
  */
 type WritableSettingsKey =
   | "orreryDensity"
@@ -1426,66 +1423,4 @@ export async function recordAutomaticBackupHealthCore(
       `recordAutomaticBackupHealthCore: expected to update the id=1 row, changed ${result.changes}`,
     );
   }
-}
-
-/**
- * Persist the FIRST-SEND acknowledgement for ONE provider (H5 / C2-H3). This is
- * the H5 carve-out and the SOLE writer of any `ai_ack_*` column — the four ack
- * flags are DELIBERATELY absent from `COLUMN_OF`, so the generic patch can never
- * reach them (C3-H3a); only this narrow writer sets one to 1.
- *
- * The provider→column mapping is a FIXED allowlist `switch` over the closed
- * `AiCloudProviderId` union: the column name is one of four SOURCE CONSTANTS,
- * never interpolated from runtime data, so no unknown/forged id can select or
- * synthesize a column (the `never` default is a compile-time exhaustiveness lock
- * and a runtime guard). One `inWriteTransaction`, a `?`-bound single-column
- * UPDATE + `modified_at` bump, and a `changes===1` loud-failure guard (a bad row
- * count throws → rollback), mirroring the favourites/field-defs writer idiom.
- *
- * The Compose caller (Plan 05) `await`s this and only AFTER it RESOLVES may it
- * create the AbortController / call `AiService.generate` — egress is ordered
- * strictly after a durable ack (C2-H3). Writes ONLY `app_settings`; never a
- * contact / interaction / fuel / `last_contact` column (DATA-04 intact).
- */
-export function acknowledgeProvider(
-  exec: SqlExecutor,
-  provider: AiCloudProviderId,
-  now: string,
-): Promise<void> {
-  let column: string;
-  switch (provider) {
-    case "openai":
-      column = "ai_ack_openai";
-      break;
-    case "anthropic":
-      column = "ai_ack_anthropic";
-      break;
-    case "google":
-      column = "ai_ack_google";
-      break;
-    case "custom":
-      column = "ai_ack_custom";
-      break;
-    default: {
-      // Exhaustiveness lock: a new provider id must extend this allowlist here,
-      // never fall through to a generic/interpolated column write.
-      const _exhaustive: never = provider;
-      throw new Error(
-        `acknowledgeProvider: unknown provider ${String(_exhaustive)}`,
-      );
-    }
-  }
-
-  return inWriteTransaction(exec, async () => {
-    const result = await exec.runAsync(
-      `UPDATE app_settings SET ${column} = 1, modified_at = ? WHERE id = 1`,
-      [now],
-    );
-    if (result.changes !== 1) {
-      throw new Error(
-        `acknowledgeProvider: expected to update the id=1 row, changed ${result.changes}`,
-      );
-    }
-    await bumpDataRevisionCore(exec);
-  });
 }

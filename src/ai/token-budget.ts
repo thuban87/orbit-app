@@ -53,7 +53,8 @@ export const CUSTOM_MAX_OUTPUT = 8192;
  * to OMIT any output cap. Pure and deterministic; no I/O.
  *
  *   - anthropic → the model's own catalog maximum (high fallback when absent);
- *   - openai / google → `undefined` (the adapter omits the field → default);
+ *   - openrouter / openai / google → `undefined` (the OpenAI-compatible
+ *     adapter omits the field → provider/model default);
  *   - custom → a high non-binding default;
  *   - none → `undefined` (generation disabled).
  */
@@ -68,7 +69,7 @@ export function resolveMaxOutputTokens(
     case "custom":
       return CUSTOM_MAX_OUTPUT;
     default:
-      // openai / google → no cap (provider / model default, dynamic thinking);
+      // openrouter / openai / google → no cap (provider/model default);
       // none → generation disabled, no request built.
       return undefined;
   }

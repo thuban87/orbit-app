@@ -22,6 +22,7 @@
  */
 export type AiProviderId =
   | "none"
+  | "openrouter"
   | "openai"
   | "anthropic"
   | "google"
@@ -34,6 +35,7 @@ export type AiProviderId =
  */
 export const AI_PROVIDER_IDS = [
   "none",
+  "openrouter",
   "openai",
   "anthropic",
   "google",
