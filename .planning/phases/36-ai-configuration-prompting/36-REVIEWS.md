@@ -1,22 +1,226 @@
 ---
 phase: 36
-cycle: 2
+cycle: 3
 reviewers: [codex, claude]
-reviewed_at: 2026-09-14T00:10:50Z
+reviewed_at: 2026-09-14T00:53:34Z
 plans_reviewed: [36-01-PLAN.md, 36-02-PLAN.md, 36-03-PLAN.md, 36-04-PLAN.md, 36-05-PLAN.md, 36-06-PLAN.md, 36-07-PLAN.md, 36-08-PLAN.md, 36-09-PLAN.md]
 models:
-  codex: "gpt-5.6 (codex-cli 0.154.0, reasoning=low)"
+  codex: "gpt-5.6-terra (codex-cli 0.154.0, reasoning=low)"
   claude: "claude-opus-4-8 (read-only subagent lane)"
 model_sources:
   codex: "banner"
   claude: "subagent-lane"
 review_notes:
-  - "CYCLE 2 of the convergence loop. This file accumulates history: the Cycle 2 review is at the top; the Cycle 1 review is preserved below unchanged. `cycle_summary` reflects the CURRENT (cycle 2) unresolved counts; `cycle1_summary` records the prior cycle."
+  - "CYCLE 3 (FINAL convergence cycle). This file accumulates history: the Cycle 3 review is at the top; Cycle 2 and Cycle 1 are preserved verbatim below, unchanged. `cycle_summary` reflects the CURRENT (cycle 3) unresolved counts; `cycle2_summary`/`cycle1_summary` record the prior cycles."
   - "The Claude lane ran as a read-only Claude subagent (not the built-in `claude -p` CLI lane), per the project's known Write-permission gap in that lane (MEMORY: claude-reviewer-via-subagent). It received the same source-grounding prompt and had full repo read access."
-  - "A source-grounding + cross-artifact fact-drift pass was run (advisory; see Cycle 2 Verification coverage). Advisory drift does NOT count toward HIGH/actionable. src/ is unchanged since cycle 1 (git-verified), so cycle-1 grounding still holds; the one cycle-1 MISSING (model-registry path) is now FIXED in 36-05 (src/ai/model-registry.ts)."
-  - "The orchestrator independently verified EVERY cycle-2 finding from both lanes against the code on disk before counting: the OpenRouter generation-adapter ownership gap (AiService.refreshProviders registers only openai/anthropic/google/custom; 36-05 does not own AiService.ts), the OAuth optional-state posture, the integer-FK remap surfaces (022-orrery-systems.ts), the UI-SPEC six-vs-five section count, and the prompt-template.test.ts TOTAL_LIMIT ceiling assertions."
+  - "The orchestrator independently verified EVERY finding from both lanes against the code on disk before counting: the two cycle-2 HIGHs (OpenRouter adapter now owned by 36-05 Task 4 with providers.set('openrouter',…) registered in refreshProviders; strict OAuth `state` in 36-02 per owner D-13), all six cycle-2 actionables (36-08 FK↔UID aliases + different-rowid restore test; 36-09 six sections; 36-01 migration-029 Writing Style DEFAULT/CHECK + ai_active_connection=lane; 36-06/36-03 stale prompt-template.test.ts :145/:151/:304 named; 36-03 /15 dropped; 36-06 :20-24 header comment), AND the newly-raised HIGH-C (v5 backup omits the Profile-presentation entity tables profile_category_presentation/profile_contact_presentation + background image bytes)."
+  - "A source-grounding + cross-artifact fact-drift pass was run (advisory; excluded from HIGH/actionable counts). All cycle-2 fixes verified landed in current PLAN.md content; owner decision D-13 (strict OAuth state) implemented faithfully and NOT reversed."
+  - "HIGH-C is NOT a recorded-decision reversal: the recorded decisions (docs/systems/profile.md:82 'Phase 36 owns the eventual Profile presentation backup-wire decision'; docs/systems/backup-restore.md:150 + 31-02-SUMMARY.md:140 'Profile entities and background bytes remain device-local pending the coordinated backup format decision'; 31-RESEARCH.md:19 D-07 'decide explicitly … whether it belongs in the backup') ASSIGN this decision to Phase 36. 36-08 leaves it undischarged. Raising HIGH-C ENFORCES the deferral; it does not reverse a decision. The in-vs-out call has an owner/product dimension and the fix lands in the IRREVERSIBLE v5 format — routed to planner (make 36-08 explicit) + owner (whether these belong in backup at all)."
 cycle1_summary: "current_high=6 current_actionable=9"
-cycle_summary: "current_high=2 current_actionable=6"
+cycle2_summary: "current_high=2 current_actionable=6"
+cycle_summary: "current_high=1 current_actionable=0"
+---
+
+# Cross-AI Plan Review — Phase 36 "AI Configuration & Prompting" — CYCLE 3 (FINAL)
+
+Cycle 3 reviews the current 9 plan files on disk after the cycle-2→3 revision that (a) applied owner
+decision D-13 (OAuth `state` REQUIRED, not conditional), (b) assigned the OpenRouter generation adapter
+to 36-05 Task 4, and (c) incorporated all six cycle-2 actionables. Assessment is of the CURRENT state of
+the 9 plans; only concerns that REMAIN UNRESOLVED now are counted. Cycles 2 and 1 are preserved verbatim
+below the dividers.
+
+## Cycle 3 Consensus Summary
+
+**Both cycle-2 HIGHs and all six cycle-2 actionables are FULLY RESOLVED, verified against the code on
+disk by both grounded lanes and the orchestrator.** The revision is faithful and executor-visible (every
+fix lands in task / acceptance-criteria / verify text, not just prose):
+
+- **HIGH-A (OpenRouter generation adapter) — FULLY RESOLVED.** 36-05 `files_modified` now includes
+  `src/services/AiService.ts` (`36-05-PLAN.md:15`) and Task 4 (`:171-193`) registers
+  `providers.set("openrouter", …)` in `refreshProviders` (base `https://openrouter.ai/api/v1`, key
+  `orbit.ai.key.openrouter`), test-asserting an active openrouter connection resolves to the adapter (not
+  null). Orchestrator-verified against disk: `AiService.ts:573-593` currently registers only
+  openai/anthropic/google/custom and `getActiveProvider` (`:599-602`) reads legacy `settings.aiProvider`
+  — the gap was real; 36-05 (map entry) + 36-01 (connection-aware resolver) together close it.
+- **HIGH-B / owner D-13 (strict OAuth `state`) — FULLY RESOLVED, faithful, NOT reversed.** 36-02 (`:29`,
+  Task 1 `:117-118`, `:122`, `:130-131`, threat rows `:180`/`:182`) REQUIRES a matching echoed `state`;
+  a MISSING or MISMATCHED `state` is rejected **before** code exchange, with no PKCE-only fallback, and a
+  non-echoing provider fails the connect + escalates to the owner rather than silently loosening. This is
+  exactly `36-CONTEXT.md:33` D-13. The orchestrator did NOT reopen the posture.
+- **Six actionables (a–f) — ALL FULLY RESOLVED:** (a) 36-08 projects `systemUid`/`contactUid`/
+  `groupEventUid` and mandates a DIFFERENT-rowid destination roundtrip test (`36-08-PLAN.md:45-46`,
+  `:166`, `:172`, `:180`); (b) 36-09 enumerates six distinct entries with `sections.length === 6`
+  (`36-09-PLAN.md:35`, `:135`, `:144`); (c) 36-01 pins the migration-029 Writing Style DEFAULT/CHECK
+  literals and fixes `ai_active_connection` = lane (`36-01-PLAN.md:154-161`, `:198-200`); (d) 36-06 Task 2
+  owns the `prompt-template.test.ts:145/:151/:304` rewrite and 36-03 references it (`36-06:129/:137/:148`,
+  `36-03:123`); (e) 36-03 frontmatter is `[AICFG-08, AICFG-09]` with `/15` dropped (`36-03:18`, `:44`);
+  (f) 36-06 updates the stale `prompt-template.ts:20-24` header comment (`36-06:137`, `:149`).
+
+**Privacy/local-first core preserved (verified):** no `toISOString().split('T')[0]` reintroduced;
+custom-field normalized storage (migration 006/ADR-001) untouched (029 is additive; 36-01 forbids touching
+custom value columns); ADR-107 off-limits excluded from egress, Group Notes never transmitted, `allow_ai`
+gate honored; egress not widened beyond the owner-decided OpenRouter host; migration 029 = head+1 (disk
+head 028); all 9 plans cite canonical AICFG IDs; AICFG-01…17 coverage complete.
+
+**Where cycle 3 is NOT yet clean — one NEW HIGH (codex; orchestrator-verified):**
+
+### Cycle 3 Agreed / Verified Concerns
+
+- **[HIGH-C — Codex; orchestrator-verified] The irreversible v5 backup (36-08) omits the Profile-
+  presentation ENTITY tables and background image bytes — an undischarged, explicitly-Phase-36-owned
+  backup-wire decision.** 36-08 serializes the profile *template* tables `profile_layout_templates` and
+  `profile_background_templates` (`36-08-PLAN.md:40`, `:145`) but includes **no** export/validation/
+  restore/roundtrip for `profile_category_presentation` (category→template/background assignments,
+  `src/db/migrations/profile-presentation.ts:40`) or `profile_contact_presentation` (per-contact template
+  assignment, `freeform_layout_json`, `background_template_uid`, `collapse_json`, `:51`). Both are LIVE
+  writers (`src/db/profile-presentation-dao.ts:49`,`:312`,`:368`) holding durable per-contact/per-category
+  user configuration; both are milestone-2 entities (added in Phase 31, commit `bb766f4 feat(31-01)`).
+  A grep of 36-08 for these table names, `collapse_json`, `freeform_layout`, or the two
+  `app_settings.profile_*_template_uid` pointer columns returns nothing. Separately, a
+  `profile_background_templates` row stores only an app-private `image_path`
+  (`profile-presentation.ts:27-35`), not the bytes; contact photos are staged as `photoBase64`
+  (`export-manifest.ts:47-58`,`:159-167`; validated `backup-schema.ts:791-804`), but 36-08 has zero
+  photo/asset/staged/image handling — so a restored install gets a `profile_background_templates` row
+  pointing at a nonexistent file (a broken background). Consequence in the IRREVERSIBLE v5 format: a
+  restored install keeps the template *library* but loses every contact/category template & background
+  ASSIGNMENT, all freeform layouts, all collapse state, and every custom background image — permanently
+  (a second retroactive format bump is impossible per `36-08-PLAN.md:192`). This is exactly the
+  "serialized-but-not-restored / incomplete v5" defect 36-08's own bar forbids, and AICFG-17 requires
+  "serializing every entity … the milestone added." **This is NOT a recorded-decision reversal — it
+  ENFORCES one:** `docs/systems/profile.md:82` records "Phase 36 owns the eventual Profile presentation
+  backup-wire decision," and `docs/systems/backup-restore.md:150` + `31-02-SUMMARY.md:140` +
+  `31-RESEARCH.md:19` (D-07) record that these entities and background bytes were deliberately held
+  outside format 4 "pending the coordinated backup format decision" (= Phase 36). 36-08 leaves that
+  decision undischarged. **Orchestrator disposition (not closed):** planner must make 36-08 explicit —
+  either (i) add export + validation + restore + parent-before-child UID remap (category→categories,
+  contact→contacts) for both presentation tables, stage the background image bytes via the established
+  photo pattern, and add a different-rowid destination roundtrip test; or (ii) explicitly and coherently
+  decide these stay device-local (which then also reopens whether the template tables should ship). Because
+  the fix is irreversible and the in-vs-out call is partly product/owner (D-07 open question: "whether
+  collapsed state is durable and belongs in the backup"), the in-vs-out axis is an OWNER decision; the
+  planner owns making the plan explicit either way. Carried as an unresolved HIGH for cycle 3.
+
+### Cycle 3 Divergent Views
+- **Overall readiness:** Codex rates the set HIGH risk / not-ready (the v5 Profile-presentation omission);
+  Claude rates it LOW residual risk (all cycle-2 items closed; only two non-blocking LOWs). The lanes did
+  not disagree on any single fact about the cycle-2 fixes — each simply went deep where the other did not:
+  codex ran a full milestone-2 table-completeness sweep of the irreversible v5 surface and found the
+  omission; Claude verified the entities 36-08 named (all correct) and the test-contract/traceability but
+  did not enumerate the full milestone-2 table set. The orchestrator ran the completeness sweep itself:
+  among all milestone-2 new tables (systems/system_rules/system_overrides/system_prefs, group_events,
+  ai_connections, personalization_sections, and the four profile-presentation tables), 36-08 serializes
+  nine and omits exactly `profile_category_presentation` + `profile_contact_presentation` — codex's finding
+  is precise and bounded (no other omissions), so the orchestrator carries HIGH-C.
+- **Claude LOWs (NOT counted as actionable — already incorporated/informational):** the parent-before-
+  child restore ordering is already stated + test-guarded in 36-08 (`:166`,`:172`,`:180`); the CONTEXT
+  "v4" text is a doc-sync the plan already flags as stale (`36-08:98`) — owner-awareness, not a plan
+  change.
+
+## Cycle 3 — Verification coverage (source-grounding, advisory — excluded from HIGH/actionable counts)
+
+Orchestrator verified against the code on disk (not the plan text or a diff):
+- `src/services/AiService.ts:569-602` — provider map registers only 4 adapters; `getActiveProvider` reads
+  legacy `settings.aiProvider`. Confirms HIGH-A's gap is real and 36-05 Task 4 + 36-01 own the fix.
+- `36-02-PLAN.md` strict-`state` language matches owner D-13 (`36-CONTEXT.md:33`) verbatim in intent;
+  D-13 NOT reversed.
+- `src/db/migrations/022-orrery-systems.ts:23,38` — integer FKs (`system_id`,`contact_id`) need remap;
+  `system_ref`/`system_prefs.system_ref` are TEXT (36-08 correctly excludes). `restore-apply.ts` interactions
+  INSERT currently omits duration/allow_ai/group_event_id and forces allow_ai=0 (36-08's premise confirmed).
+- Migration head on disk = 028 → migration 029 = head+1 (correct). `BACKUP_FORMAT_VERSION` 4→5 correct.
+- All 9 plan frontmatters cite canonical `AICFG-*` IDs; no non-canonical IDs.
+- HIGH-C: `profile-presentation.ts` creates 4 tables; DAO is a live writer of both presentation tables;
+  git shows Phase-31 (milestone-2) origin; 36-08 has zero coverage of the two presentation tables or the
+  background image bytes; recorded decisions (`profile.md:82`, `backup-restore.md:150`, `31-02-SUMMARY.md:140`,
+  `31-RESEARCH.md:19`) assign the decision to Phase 36 — so HIGH-C enforces, not reverses.
+
+---
+
+## Cycle 3 — Codex Review (verbatim)
+
+## Summary
+
+Cycle 3 is substantially converged: all eight Cycle-2 findings are resolved in the current plans, including strict OAuth state validation and a real OpenRouter generation adapter. One new HIGH backup-format completeness gap remains in 36-08, so the phase is not yet ready for final approval.
+
+## Cycle-2 fixes — verdicts
+
+| Finding | Verdict | Evidence |
+|---|---|---|
+| HIGH-A: OpenRouter adapter owner | FULLY RESOLVED | 36-05 Task 4 explicitly owns `AiService.refreshProviders`, registers `openrouter`, uses `https://openrouter.ai/api/v1`, and tests active-lane generation: [36-05-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-05-PLAN.md:172). This closes the current code’s real gap: [AiService.ts](/home/bwales/projects/orbit-app/src/services/AiService.ts:599) currently resolves only the legacy provider. |
+| HIGH-B: required OAuth `state` | FULLY RESOLVED | 36-02 requires matching echoed state and explicitly rejects missing or mismatched state before exchange: [36-02-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-02-PLAN.md:29), [36-02-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-02-PLAN.md:122). This faithfully implements D-13. |
+| (a) FK↔UID aliases and different-rowid test | FULLY RESOLVED | 36-08 specifies `systemUid`, `contactUid`, and `groupEventUid` export aliases plus destination-ID reconstruction and different-rowid tests: [36-08-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-08-PLAN.md:45), [36-08-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-08-PLAN.md:175). These address real INTEGER FKs in [022-orrery-systems.ts](/home/bwales/projects/orbit-app/src/db/migrations/022-orrery-systems.ts:23) and [026-group-events-schema.ts](/home/bwales/projects/orbit-app/src/db/migrations/026-group-events-schema.ts:32). |
+| (b) Five vs. six Settings sections | FULLY RESOLVED | 36-09 enumerates six entries, keeping Writing Style and Personalization Context separate routes into the same screen: [36-09-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-09-PLAN.md:35), [36-09-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-09-PLAN.md:135). |
+| (c) Migration-029 literals and active-pointer identity | FULLY RESOLVED | Exact irreversible DEFAULT/CHECK tokens are pinned: [36-01-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-01-PLAN.md:154). The pointer is explicitly a lane, not row UID, with a dangling-pointer Needs Attention rule: [36-01-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-01-PLAN.md:161). |
+| (d) Stale prompt-template ceiling tests | FULLY RESOLVED | 36-03 identifies the old assertions and assigns their rewrite to 36-06: [36-03-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-03-PLAN.md:123). 36-06 owns the rewrite and acceptance test: [36-06-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-06-PLAN.md:137). |
+| (e) Stale `/15` requirement label | FULLY RESOLVED | 36-03 now correctly identifies the fuel cleanup as dossier §AK and reserves AICFG-17 for 36-08’s backup bump: [36-03-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-03-PLAN.md:44). |
+| (f) Stale determinism header | FULLY RESOLVED | 36-06 explicitly requires replacing the obsolete fixed-ceiling header: [36-06-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-06-PLAN.md:129), [36-06-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-06-PLAN.md:149). |
+
+All nine plans use canonical `AICFG-*` IDs in frontmatter.
+
+## Concerns
+
+- **HIGH — newly raised: v5 omits the actual Profile presentation state and background assets.** 36-08 promises a complete milestone backup but serializes only `profile_layout_templates` and `profile_background_templates`: [36-08-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-08-PLAN.md:40), [36-08-PLAN.md](/home/bwales/projects/orbit-app/.planning/phases/36-ai-configuration-prompting/36-08-PLAN.md:145).
+
+  The actual assignment and per-contact presentation state live in two further tables absent from every 36-08 entity list/task/acceptance criterion:
+
+  - `profile_category_presentation` carries category layout/background assignments: [profile-presentation.ts](/home/bwales/projects/orbit-app/src/db/migrations/profile-presentation.ts:40).
+  - `profile_contact_presentation` carries contact template assignment, freeform layout, background assignment, and `collapse_json`: [profile-presentation.ts](/home/bwales/projects/orbit-app/src/db/migrations/profile-presentation.ts:51).
+  - Those are live writers, not dead schema; collapse state is persisted through the contact-presentation table: [profile-presentation-dao.ts](/home/bwales/projects/orbit-app/src/db/profile-presentation-dao.ts:49), and category assignments are written there too: [profile-presentation-dao.ts](/home/bwales/projects/orbit-app/src/db/profile-presentation-dao.ts:306).
+
+  Additionally, a background-template row stores only an app-private `image_path`, not the image data: [profile-presentation.ts](/home/bwales/projects/orbit-app/src/db/migrations/profile-presentation.ts:27). Exporting that path alone produces a broken background on a restored install.
+
+  36-08 must add export, validation, restore, and roundtrip coverage for both presentation tables, mapping their category/contact FKs through portable UIDs. It must also serialize/restore the background image bytes using the established staged-photo pattern, then test restoration into a different-rowid destination. Otherwise v5 permanently loses milestone Profile assignments, freeform layouts, collapse state, and custom backgrounds.
+
+## Risk assessment
+
+**HIGH** until that 36-08 omission is fixed. The rest of the phase is well-specified, but the closing v5 wire format is irreversible and presently cannot preserve all milestone entities it claims to cover.
+
+---
+
+## Cycle 3 — Claude Review (verbatim, read-only subagent lane)
+
+## Summary
+
+Cycle 3 is **ready** (Claude lane's verdict). All nine PLAN.md files on disk are unusually well-grounded — every file:line reference spot-checked against the actual source is accurate (the stale test assertions at `prompt-template.test.ts:145/:151/:304`, the governor at `prompt-template.ts:298-318`, the hard-trim at `:324-333`, the header comment at `:20-24`, the orrery FK shapes in migration 022, the `export-manifest.ts:207-208` tombstone filter, the `restore-apply.ts:50-52/:201` structures, and the `reconciliation.ts` `parentFields` pattern all match disk exactly). Both cycle-2 HIGHs are fully closed with concrete owner-file ownership, and all six actionables are written into task/acceptance/verify text (visible to the executor, not just prose). D-13 (strict OAuth `state`) is faithfully implemented, not reversed. The one irreversible plan (36-08, v5 backup) correctly identifies which FKs are integer rowids needing UID remap vs. already-portable TEXT, and mandates a different-rowid destination roundtrip test. This lane found no HIGH or MEDIUM remaining concern. *(Orchestrator note: this lane verified the entities 36-08 names, but did not independently enumerate the full milestone-2 table set; the codex lane's newly-raised HIGH-C — two omitted Profile-presentation tables — is outside what this lane checked and is carried by the orchestrator. See Cycle 3 Consensus.)*
+
+## Cycle-2 fixes — verdicts
+
+**HIGH-A (OpenRouter generation adapter owner) — FULLY RESOLVED.**
+36-05 owns `src/services/AiService.ts` (`36-05-PLAN.md:15` files_modified) and Task 4 (`:171-193`) registers `providers.set("openrouter", …)` in `refreshProviders`, base `https://openrouter.ai/api/v1`, key `orbit.ai.key.openrouter`, with acceptance criteria that grep the registration and test that an active openrouter connection resolves to the adapter (not null) (`:187-190`). Verified against disk: current `refreshProviders` (`AiService.ts:573-593`) registers only openai/anthropic/google/custom — the gap is real, and the map is `Map<AiCloudProviderId,…>` so `openrouter` (added to the union by 36-01) typechecks as a key. No user-reachable window resolves to `undefined`: the openrouter lane can't be activated until 36-02 (wave 2) + 36-05 (wave 3) both land.
+
+**HIGH-B / D-13 (strict OAuth state) — FULLY RESOLVED, faithful (no reversal).**
+36-02 Task 1 (`36-02-PLAN.md:117`, `:122`, `:130-131`) requires an always-sent in-memory `state`, rejects a MISSING or MISMATCHED `state` **before** code exchange with no PKCE-only fallback, tests missing and mismatched as **distinct** cases, and escalates to the owner (not silently loosens) if the Pixel spike finds OpenRouter doesn't echo `state`. Faithful implementation of the recorded owner decision (CONTEXT `D-13`, `36-CONTEXT.md:33`) — not reopened or counted as a concern.
+
+**(a) 36-08 FK↔UID aliases + different-rowid roundtrip — FULLY RESOLVED.**
+`36-08-PLAN.md:45` projects `system_rules.system_id`→`systemUid`, `system_overrides.contact_id`→`contactUid`, `interactions.group_event_id`→`groupEventUid`, rebuilt against the destination DB; `:46` and Task 3 (`:172`, acceptance `:180`) mandate seeding the destination with DIFFERENT integer ids and asserting resolution by UID. Verified on disk: migration 022 shows integer FKs needing remap, while `system_ref`/`system_prefs.system_ref` are TEXT (correctly excluded). The `reconciliation.ts` `parentFields` remap pattern and the existing `contactUid` JOIN in `export-manifest.ts` confirm the plan extends a proven mechanism.
+
+**(b) 36-09 six sections — FULLY RESOLVED.**
+`36-09-PLAN.md:35` and Task 2 (`:135`, acceptance `:144`) enumerate SIX ordered entries and assert `sections.length === 6` with Writing Style + Personalization Context as two distinct entries both routing to `AIPersonalization` (focus param).
+
+**(c) 36-01 migration-029 Writing Style DEFAULT/CHECK pinned + active-pointer identity — FULLY RESOLVED.**
+`36-01-PLAN.md:154-159` pins exact DEFAULT+CHECK vocab for all three Writing Style enum columns + freeform; `:161` fixes `ai_active_connection` as storing the **lane** (not row uid), keyed off `UNIQUE(lane)`, empty/dangling → Needs Attention. Task-1 acceptance (`:198-200`) tests one assertion per default + CHECK rejection. Verified 029 = head+1 (disk head is `COMPOSE_MESSAGE_MODE_SCHEMA_VERSION = 28`); none of these columns pre-exist (additive).
+
+**(d) 36-06/36-03 stale test ceiling assertions named — FULLY RESOLVED.**
+Both plans name `prompt-template.test.ts:145` (the `"never exceeds the 6000 code-point total…"` title), `:151`, and `:304` for rewrite (`36-06:129/:137/:148`, `36-03:123`). Confirmed on disk these are exactly the stale lines. 36-06 owns the rewrite; 36-03 references it and avoids adding a new ceiling-dependent assertion.
+
+**(e) 36-03 stale `/15` requirement mislabel — FULLY RESOLVED.**
+36-03 frontmatter is now `[AICFG-08, AICFG-09]` (`36-03-PLAN.md:18`); the old `AICFG-08/09/15/17` label is gone, and `:44` explicitly clarifies AICFG-17 is 36-08's. AICFG-15 is correctly carried by 36-05/36-08.
+
+**(f) 36-06 stale determinism header comment — FULLY RESOLVED.**
+`36-06-PLAN.md:137` and acceptance `:149` require updating `prompt-template.ts:20-24`. Verified on disk that `:20-24` is exactly the stale AI-SPEC §4 note.
+
+## Concerns
+
+No HIGH or MEDIUM concerns from this lane. Two low-priority observations, neither blocking:
+
+- **LOW (execution watch-item, not a plan defect):** 36-08 restore correctness depends on parent-before-child ordering in `restore-apply.ts` `entities[]` — `group_events` must restore before the pre-existing `interactions` entry, and `systems` before `system_rules`. The plan states this requirement explicitly (`36-08-PLAN.md:166`, `:172`) and its different-rowid roundtrip acceptance test (`:180`) fails if the order is wrong, so it is specified and test-guarded.
+- **LOW (informational, already acknowledged):** CONTEXT `D-03`/`D-03b`/`D-12` still say "v4", but 36-08 explicitly calls this text stale and pins the on-disk target to v5 (`36-08-PLAN.md:98`), matching disk. Correct, not a reversal.
+
+Independent checks all pass: migration 029 = head+1; backup v4→v5 bump correct; no `toISOString().split('T')[0]` reintroduced; custom-field normalized storage (migration 006/ADR-001) untouched; local-first egress not widened beyond the owner-decided OpenRouter host; all 17 AICFG requirements are canonical and every plan cites its AICFG IDs.
+
+## Risk Assessment
+
+**LOW** (this lane). The two cycle-2 HIGHs are closed with real file ownership and test-backed acceptance criteria; all six actionables are baked into executable task/acceptance/verify text; D-13 is implemented, not reversed. No recorded-decision collisions from this lane's checks.
+
 ---
 
 # Cross-AI Plan Review — Phase 36 "AI Configuration & Prompting" — CYCLE 2
