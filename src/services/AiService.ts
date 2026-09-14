@@ -1,8 +1,8 @@
 /**
  * AI Service — neutral, bounded, cancellable provider adapters (Phase 14, AI-01).
  *
- * Four BYO-key providers: OpenAI, Anthropic, Google (Gemini) on raw `fetch` to
- * their FIXED public hosts, and a user-controlled Custom HTTPS endpoint routed
+ * Five BYO-connection providers: OpenRouter, OpenAI, Anthropic, and Google
+ * (Gemini) on raw `fetch` to their FIXED public hosts, plus a user-controlled Custom HTTPS endpoint routed
  * through the Plan 07 native `secureCustomFetch` transport (see Task 2). Every
  * adapter implements the narrow {@link AiProvider} contract — `listModels()` for
  * advisory discovery and `generate(input)` for one unary draft.
@@ -232,20 +232,47 @@ function extractIdList(data: unknown, key = "data"): string[] {
 
 // ─── OpenAI adapter ─────────────────────────────────────────────
 
-const OPENAI_CHAT_URL = "https://api.openai.com/v1/chat/completions";
-const OPENAI_MODELS_URL = "https://api.openai.com/v1/models";
+const OPENAI_BASE_URL = "https://api.openai.com/v1";
+const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+
+interface OpenAiCompatibleConfig {
+  readonly id: "openai" | "openrouter";
+  readonly name: string;
+  readonly baseUrl: string;
+}
+
+const OPENAI_CONFIG: OpenAiCompatibleConfig = {
+  id: "openai",
+  name: "OpenAI",
+  baseUrl: OPENAI_BASE_URL,
+};
+
+const OPENROUTER_CONFIG: OpenAiCompatibleConfig = {
+  id: "openrouter",
+  name: "OpenRouter",
+  baseUrl: OPENROUTER_BASE_URL,
+};
 
 /** OpenAI — `Authorization: Bearer` header, chat-completions API. */
 export class OpenAiProvider implements AiProvider {
-  readonly id = "openai" as const;
-  readonly name = "OpenAI";
-  constructor(private readonly getKey: KeyAccessor) {}
+  readonly id: "openai" | "openrouter";
+  readonly name: string;
+  private readonly baseUrl: string;
+
+  constructor(
+    private readonly getKey: KeyAccessor,
+    config: OpenAiCompatibleConfig = OPENAI_CONFIG,
+  ) {
+    this.id = config.id;
+    this.name = config.name;
+    this.baseUrl = config.baseUrl;
+  }
 
   async listModels(signal?: AbortSignal): Promise<ModelDiscovery> {
     const key = await this.getKey();
     if (!key) return { kind: "manual" };
     try {
-      const res = await fetch(OPENAI_MODELS_URL, {
+      const res = await fetch(`${this.baseUrl}/models`, {
         headers: { Authorization: `Bearer ${key}` },
         signal,
       });
@@ -274,7 +301,7 @@ export class OpenAiProvider implements AiProvider {
 
     let response: Response;
     try {
-      response = await fetch(OPENAI_CHAT_URL, {
+      response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -565,7 +592,7 @@ export class CustomProvider implements AiProvider {
 // ─── AiService orchestrator ─────────────────────────────────────
 
 /**
- * Builds and holds the four provider adapters. `refreshProviders` injects a
+ * Builds and holds the five provider adapters. `refreshProviders` injects a
  * provider-scoped key ACCESSOR into each adapter (C3-M2) — it never reads or
  * retains a key value; the accessor is invoked inside `generate`/networked
  * `listModels` immediately before the request. The Compose caller owns the
@@ -581,6 +608,13 @@ export class AiService {
     this.providers.set(
       "openai",
       new OpenAiProvider(() => this.keyStore.getKey("openai")),
+    );
+    this.providers.set(
+      "openrouter",
+      new OpenAiProvider(
+        () => this.keyStore.getKey("openrouter"),
+        OPENROUTER_CONFIG,
+      ),
     );
     this.providers.set(
       "anthropic",

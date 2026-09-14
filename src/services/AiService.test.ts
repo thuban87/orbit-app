@@ -551,7 +551,11 @@ describe("OpenRouter OpenAI-compatible generation adapter", () => {
     expect(provider).not.toBeNull();
     await expect(
       provider?.generate(
-        inputFor("exact-router-payload", new AbortController().signal, "vendor/model"),
+        inputFor(
+          "exact-router-payload",
+          new AbortController().signal,
+          "vendor/model",
+        ),
       ),
     ).resolves.toBe("router-text");
     expect(fetchMock).toHaveBeenCalledWith(
