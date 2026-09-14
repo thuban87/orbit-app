@@ -32,6 +32,7 @@ import { migration016 } from "@/db/migrations/016-contact-knowledge";
 import { migration017 } from "@/db/migrations/017-knowledge-egress-datamove";
 import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { migration026 } from "@/db/migrations/026-group-events-schema";
+import { migration029 } from "@/db/migrations/029-ai-configuration";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
@@ -70,11 +71,16 @@ beforeEach(async () => {
     11,
     { now: NOW, newUid: uid, defaultPhoneRegion: "US" },
   );
-  await runMigrations(exec, [migration016, migration017, migration025, migration026], 26, {
-    now: NOW,
-    newUid: uid,
-    defaultPhoneRegion: "US",
-  });
+  await runMigrations(
+    exec,
+    [migration016, migration017, migration025, migration026, migration029],
+    29,
+    {
+      now: NOW,
+      newUid: uid,
+      defaultPhoneRegion: "US",
+    },
+  );
 });
 
 describe("readPromptContext — Group Notes are structurally unreachable", () => {
