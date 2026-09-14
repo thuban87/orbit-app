@@ -1,7 +1,7 @@
 # Widget
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 28-dashboard-card-view
+**Updated by phase:** 31-profile-experience
 **Owners:** `src/services/widget/`, `src/navigation/widget-linking.ts`, `src/services/widget/widget-quick-action-guard.ts`, `plugins/withWidgetBootReceiver.js`
 
 ## Purpose
@@ -97,7 +97,11 @@ The widget owns no table, migration, or per-instance state. It reads the Dashboa
 - **ADR-093:** Scoped Composable Dashboard Population and Filter Model — makes the Widget a Dashboard population consumer.
 - **ADR-103:** Atomic Composed Dashboard Bulk Mutations — requires one post-commit widget refresh for a committed Dashboard batch.
 
+- **ADR-109:** Fixed-Hero Semantic Profile Composition and Focused Accessible Editors — retains the consumed-once Profile entry while rebuilding the screen controller.
+
 ## Gotchas
+
+1. **Reach Out is consume-once at Profile.** The `openReachOut` parameter is cleared before the router opens so focus reloads and later ordinary Profile visits cannot replay it.
 
 1. **Never pass `file://` or network image sources to RemoteViews.** The widget encodes a local master to base64 `data:` and falls back to initials when encoding fails.
 2. **Never re-derive status or reorder tiles.** The Dashboard projection already supplies nullable status and Default order; changing either can misstate never-contacted people or restore a retired rank concept.
@@ -131,3 +135,4 @@ The widget owns no table, migration, or per-instance state. It reads the Dashboa
 | 2026-09-02 | 22 | Re-expressed accepted widget-link and missing-contact fallback routes as nested Dashboard-tab states. |
 | 2026-09-02 | 25 | Repointed tiles to Favorites population Default order and made the favourites deep link safely reset Home. |
 | 2026-09-02 | 28 | Documented one post-commit refresh for Dashboard bulk batches. |
+| 2026-09-02 | 31 | Verified and restored consumed-once widget Reach Out handling through the rebuilt Profile controller. |
