@@ -4,7 +4,7 @@
 
 Orbit evolves its on-device SQLite schema with ordered TypeScript migrations rather than SQL files or a remote database. Use this process when changing durable SQLite structure: it keeps one version step atomic, testable with node-side SQLite, and safe to retry after a failure.
 
-## Architecture (Phases 02, 11, 16, 17, 18.1, 24.2)
+## Architecture (Phases 02, 11, 16, 17, 18.1, 24.2, 31)
 
 The bootstrap opens `orbit.db`, sets connection PRAGMAs before opening a transaction, then calls the migration runner. The runner reads `PRAGMA user_version`, sorts pending steps, and commits each step's DDL and version bump together.
 
@@ -40,6 +40,7 @@ try {
 10. **`PRAGMA user_version`** — records the last fully committed step.
 11. **`src/db/migrations/017-knowledge-egress-datamove.ts`** — data-move example: copy every source row, re-read and prove its mapped destination, then remove the source inside the runner-owned transaction.
 12. **`src/db/migrations/018-custom-field-scope-history.ts`** — additive columns/table example that leaves a prior normalized current-value invariant intact.
+13. **`src/db/migrations/profile-presentation.ts`** — exported-version example: one module owns both migration 024 and the `TARGET_VERSION` value imported by the registry.
 
 ## File Locations
 
@@ -61,6 +62,7 @@ try {
 | `src/db/migrations/010-contact-method-label.ts` | Forward-only nullable method-label addition. |
 | `src/db/migrations/017-knowledge-egress-datamove.ts` | Verified copy-then-remove fuel-to-Memory data move. |
 | `src/db/migrations/018-custom-field-scope-history.ts` | Additive custom-field metadata and retained-value history. |
+| `src/db/migrations/profile-presentation.ts` | Independent Profile presentation entities and exported schema-version constant. |
 | `src/db/migrations/full-chain.test.ts` | Runs the shared registered migration chain to the imported target version. |
 | `src/db/app-settings-dao.test.ts` | Migration-002 defaults and validated settings-write coverage. |
 | `src/db/__testkit__/node-sqlite.ts` | In-memory SQLite adapter for migration tests. |
@@ -83,7 +85,7 @@ try {
    };
    ```
 
-3. **Register the migration** in the exported `MIGRATIONS` list in `src/db/database.ts`, and advance `TARGET_VERSION` to the same integer. The runner performs the transaction and `user_version` bump; do not add a second transaction or manually update `user_version` in the migration.
+3. **Register the migration** in the exported `MIGRATIONS` list in `src/db/database.ts`, and advance `TARGET_VERSION` to the same integer. When one feature owns the new head, export its schema version beside the migration and import that constant as `TARGET_VERSION`, as Profile presentation does. The runner performs the transaction and `user_version` bump; do not add a second transaction or manually update `user_version` in the migration.
 
 4. **Add an in-memory test** beside the migration. Open the fixture from `src/db/__testkit__/node-sqlite.ts`, run the real migration runner, and assert the schema/data result plus retry safety for a throwing step where relevant. For a representation conversion or data move, map every source row to a newly inserted destination, re-read each destination to prove the important values, then remove sources only after every proof passes. Test source-byte preservation, complete destination coverage, and an unchanged source database after a classified failure.
 
@@ -121,10 +123,12 @@ try {
 
 7. **Treating equal row counts as a data-move proof.** Duplicate sources can mask a dropped row. Retain a source-to-destination mapping and re-read every destination before deleting any source.
 
+8. **Repeating a literal head version across the feature.** Derive head+1 from the live registry immediately before implementation and single-source the accepted version from the migration module.
+
 ## Smoke Test
 
 ```bash
-npx vitest run src/db/migrations/runner.test.ts src/db/migrations/full-chain.test.ts src/db/migrations/006-normalize-custom-field-values.test.ts src/db/migrations/017-knowledge-egress-datamove.test.ts src/db/migrations/018-custom-field-scope-history.test.ts
+npx vitest run src/db/migrations/runner.test.ts src/db/migrations/full-chain.test.ts src/db/migrations/006-normalize-custom-field-values.test.ts src/db/migrations/017-knowledge-egress-datamove.test.ts src/db/migrations/018-custom-field-scope-history.test.ts src/db/migrations/profile-presentation.test.ts
 ```
 
 Expected: the runner and full-chain suites reach the registered target, while representation conversion, verified data moves, and additive schema history checks pass.
