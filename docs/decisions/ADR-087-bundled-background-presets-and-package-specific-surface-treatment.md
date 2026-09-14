@@ -49,4 +49,4 @@ The system ships a local, curated background-slot library with a None/Solid opti
 - `assets/backgrounds/README.md` — records local asset provenance and declared brightness bounds.
 
 **Depends on:** ADR-006 (Theme-Token Architecture)
-**Required by:** _None._
+**Required by:** ADR-112 (App-Owned Profile Background Derivatives and Launch Reconciliation)

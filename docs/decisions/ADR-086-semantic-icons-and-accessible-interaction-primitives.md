@@ -51,4 +51,4 @@ The system uses semantic typography roles, a swappable icon registry, and one sh
 - `src/components/ui/overlay-base.tsx` — centralizes scrim, Back, focus, and dismissability behavior for overlays.
 
 **Depends on:** ADR-006 (Theme-Token Architecture)
-**Required by:** ADR-101 (Avatar-First Accessible Dashboard Card Renderer)
+**Required by:** ADR-101 (Avatar-First Accessible Dashboard Card Renderer); ADR-109 (Fixed-Hero Semantic Profile Composition and Focused Accessible Editors)

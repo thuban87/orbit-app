@@ -50,4 +50,4 @@ The system uses an additive `custom_field_value_history` table for prior raw val
 - `src/db/field-parsers.ts` — supplies the exhaustive, permissive ten-type parser map.
 
 **Depends on:** ADR-001 (Normalized Custom-Field Values); ADR-014 (Read-Time Custom-Field Type Semantics and a Single Sort Expression)
-**Required by:** _None._
+**Required by:** ADR-110 (Coherent Local Profile Snapshot and Source-Owned Knowledge Projection)

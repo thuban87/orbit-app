@@ -53,4 +53,4 @@ First successful AI setup shows a lightweight disclosure naming the active conne
 - `src/db/app-settings-dao.ts` — its `ai_ack_*` acknowledgement columns become unused; removal is a plan-phase choice.
 
 **Depends on:** ADR-078 (Negative-Constraint Off Limits and Gated Recent-Interaction AI Context); ADR-049 (BYO-Key AI Configuration and Credential Boundary)
-**Required by:** _None._
+**Required by:** ADR-109 (Fixed-Hero Semantic Profile Composition and Focused Accessible Editors)
