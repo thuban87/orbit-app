@@ -60,7 +60,7 @@ class OrbitOpenRouterLoopbackModuleTest {
   @Test fun `early callback is retained and cancel timeout and restart release ownership`() {
     val early = LoopbackAttempt.start("early", 5_000)
     assertEquals(303, responseCode("${early.baseUrl}?code=x&state=early"))
-    assertEquals("${early.baseUrl}?code=x&state=early", early.result.get().callbackUrl)
+    assertEquals("${early.baseUrl}?state=early&code=x", early.result.get().callbackUrl)
     val cancelled = LoopbackAttempt.start("cancel", 5_000)
     cancelled.cancel(ERR_CANCELLED)
     assertTrue(cancelled.result.isCompletedExceptionally)
