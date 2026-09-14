@@ -87,19 +87,29 @@ describe("readPromptContext — Group Notes are structurally unreachable", () =>
   it("never egresses a group note at either Allow-AI setting", async () => {
     const contactId = await makeContact();
     const { groupEventId } = await createGroupEvent(exec, {
-      uid: uid(), title: "Dinner", occurredAt: NOW, now: NOW,
-      groupNote: "GROUP_NOTE_EGRESS_FORBIDDEN", participants: [{ contactId, uid: uid(), note: "CHILD_NOTE" }],
+      uid: uid(),
+      title: "Dinner",
+      occurredAt: NOW,
+      now: NOW,
+      groupNote: "GROUP_NOTE_EGRESS_FORBIDDEN",
+      participants: [{ contactId, uid: uid(), note: "CHILD_NOTE" }],
     });
-    const child = await exec.getFirstAsync<{ id: number }>("SELECT id FROM interactions WHERE group_event_id = ?", [groupEventId]);
+    const child = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM interactions WHERE group_event_id = ?",
+      [groupEventId],
+    );
     expect(child).not.toBeNull();
     for (const allowAi of [0, 1]) {
-      await exec.runAsync("UPDATE interactions SET allow_ai = ? WHERE id = ?", [allowAi, child?.id]);
+      await exec.runAsync("UPDATE interactions SET allow_ai = ? WHERE id = ?", [
+        allowAi,
+        child?.id,
+      ]);
       const ctx = await readPromptContext(exec, contactId, NOW);
       // The event-level Group Note is structurally unreachable (the projection
       // never reads group_events) at either Allow-AI setting — including the new
       // gated recent-interaction-note shape (D-08 / ADR-078, unchanged by D-14).
       expect(JSON.stringify(ctx)).not.toContain("GROUP_NOTE_EGRESS_FORBIDDEN");
-      expect(ctx.gatedRecentInteractionNotes ?? []).not.toContain(
+      expect(JSON.stringify(ctx.recentInteractions ?? [])).not.toContain(
         "GROUP_NOTE_EGRESS_FORBIDDEN",
       );
     }
@@ -587,22 +597,35 @@ describe("readPromptContext — gated recent-interaction notes (ADR-078 carry, D
 
     // allow_ai defaults OFF (migration 025) → the note is NOT carried.
     expect(
-      (await readPromptContext(exec, c, NOW)).gatedRecentInteractionNotes,
-    ).toEqual([]);
+      (await readPromptContext(exec, c, NOW)).recentInteractions,
+    ).toEqual([
+      {
+        occurredAt: "2026-08-10 10:00:00",
+        channel: "Message",
+        tone: null,
+      },
+    ]);
 
     // Flip the per-interaction gate ON → the note is carried.
     await exec.runAsync("UPDATE interactions SET allow_ai = 1 WHERE id = ?", [
       interactionId,
     ]);
     expect(
-      (await readPromptContext(exec, c, NOW)).gatedRecentInteractionNotes,
-    ).toEqual(["GATED_NOTE_MARKER"]);
+      (await readPromptContext(exec, c, NOW)).recentInteractions,
+    ).toEqual([
+      {
+        occurredAt: "2026-08-10 10:00:00",
+        channel: "Message",
+        tone: null,
+        note: "GATED_NOTE_MARKER",
+      },
+    ]);
   });
 
   it("returns an empty (not null) collection when there are no eligible notes", async () => {
     const c = await makeContact();
     const ctx = await readPromptContext(exec, c, NOW);
-    expect(ctx.gatedRecentInteractionNotes).toEqual([]);
+    expect(ctx.recentInteractions).toEqual([]);
   });
 
   it("omits a blank / whitespace-only note even when allow_ai=1 (less data, no disclosure)", async () => {
@@ -620,8 +643,14 @@ describe("readPromptContext — gated recent-interaction notes (ADR-078 carry, D
       interactionId,
     ]);
     expect(
-      (await readPromptContext(exec, c, NOW)).gatedRecentInteractionNotes,
-    ).toEqual([]);
+      (await readPromptContext(exec, c, NOW)).recentInteractions,
+    ).toEqual([
+      {
+        occurredAt: "2026-08-10 10:00:00",
+        channel: "Message",
+        tone: null,
+      },
+    ]);
   });
 
   it("orders carried notes newest-first and bounds to the three most recent interactions", async () => {
@@ -648,10 +677,25 @@ describe("readPromptContext — gated recent-interaction notes (ADR-078 carry, D
       ]);
     }
     const ctx = await readPromptContext(exec, c, NOW);
-    expect(ctx.gatedRecentInteractionNotes).toEqual([
-      "NEWEST",
-      "SECOND",
-      "THIRD",
+    expect(ctx.recentInteractions).toEqual([
+      {
+        occurredAt: "2026-08-12 10:00:00",
+        channel: "Message",
+        tone: null,
+        note: "NEWEST",
+      },
+      {
+        occurredAt: "2026-08-09 10:00:00",
+        channel: "Message",
+        tone: null,
+        note: "SECOND",
+      },
+      {
+        occurredAt: "2026-08-05 10:00:00",
+        channel: "Message",
+        tone: null,
+        note: "THIRD",
+      },
     ]);
   });
 
@@ -684,7 +728,14 @@ describe("readPromptContext — gated recent-interaction notes (ADR-078 carry, D
     // Off Limits appears in NEITHER the positive fuel projection NOR the gated
     // notes NOR any other AI-facing shape.
     expect(JSON.stringify(ctx)).not.toContain("OFFLIMITS_NEVER_AI");
-    expect(ctx.gatedRecentInteractionNotes).toEqual(["ordinary note"]);
+    expect(ctx.recentInteractions).toEqual([
+      {
+        occurredAt: "2026-08-10 10:00:00",
+        channel: "Message",
+        tone: null,
+        note: "ordinary note",
+      },
+    ]);
   });
 });
 

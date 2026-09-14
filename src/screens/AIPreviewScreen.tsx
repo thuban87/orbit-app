@@ -38,7 +38,7 @@ const EMPTY_PREVIEW_CONTEXT: PromptContext = {
   newestChannel: "unspecified",
   sharedFields: [],
   sharedMemories: [],
-  gatedRecentInteractionNotes: [],
+  recentInteractions: [],
 };
 
 interface PreviewState {

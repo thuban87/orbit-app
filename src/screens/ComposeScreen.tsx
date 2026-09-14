@@ -521,7 +521,7 @@ export function ComposeScreen({
           ? context.rankedFuel.length +
             context.sharedFields.length +
             (context.sharedMemories?.length ?? 0) +
-            (context.gatedRecentInteractionNotes?.length ?? 0)
+            (context.recentInteractions?.length ?? 0)
           : 0;
         const diagnostic = buildAiDiagnostic({
           operation,

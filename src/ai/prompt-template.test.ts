@@ -253,24 +253,35 @@ describe("resolvePrompt — bounded immutable construction", () => {
           { label: "Current interest", value: duplicate },
           { label: "Upcoming", value: "Gallery opening" },
         ],
-        gatedRecentInteractionNotes: [duplicate, "Planning a fall visit"],
+        recentInteractions: [
+          {
+            occurredAt: "2026-09-02 10:00:00",
+            channel: "Message",
+            tone: "Positive",
+            note: duplicate,
+          },
+          {
+            occurredAt: "2026-08-28 18:30:00",
+            channel: "Call",
+            tone: null,
+            note: "Planning a fall visit",
+          },
+        ],
       }),
     );
 
     expect(resolved.prompt).toContain("===== DATA: SHARED MEMORY 1 =====");
     expect(resolved.prompt).toContain("===== END DATA: SHARED MEMORY 2 =====");
+    expect(resolved.prompt).toContain("===== DATA: RECENT INTERACTION 1 =====");
     expect(resolved.prompt).toContain(
-      "===== DATA: RECENT INTERACTION NOTE 1 =====",
-    );
-    expect(resolved.prompt).toContain(
-      "===== END DATA: RECENT INTERACTION NOTE 2 =====",
+      "===== END DATA: RECENT INTERACTION 2 =====",
     );
     expect(occurrences(resolved.prompt, duplicate)).toBe(2);
     expect(resolved.prompt.indexOf("SHARED MEMORY 1")).toBeLessThan(
       resolved.prompt.indexOf("SHARED MEMORY 2"),
     );
     expect(resolved.prompt.indexOf("SHARED MEMORY 2")).toBeLessThan(
-      resolved.prompt.indexOf("RECENT INTERACTION NOTE 1"),
+      resolved.prompt.indexOf("RECENT INTERACTION 1"),
     );
     expect(resolved.prompt).toBe(resolved.inspectorDisplay);
     expect(resolved.prompt).toBe(resolved.payload);
@@ -280,11 +291,11 @@ describe("resolvePrompt — bounded immutable construction", () => {
     const absent = resolvePrompt("Keep it warm.", baseContext());
     const empty = resolvePrompt(
       "Keep it warm.",
-      baseContext({ sharedMemories: [], gatedRecentInteractionNotes: [] }),
+      baseContext({ sharedMemories: [], recentInteractions: [] }),
     );
     expect(empty.prompt).toBe(absent.prompt);
     expect(empty.prompt).not.toContain("SHARED MEMORY");
-    expect(empty.prompt).not.toContain("RECENT INTERACTION NOTE");
+    expect(empty.prompt).not.toContain("RECENT INTERACTION");
   });
 
   it("never serializes unexpected Off Limits or Group Notes shapes", () => {
@@ -305,20 +316,22 @@ describe("resolvePrompt — bounded immutable construction", () => {
       label: `Memory ${index}`,
       value: `MEMORY_${index}_${"m".repeat(PER_VALUE_LIMIT)}`,
     }));
-    const gatedRecentInteractionNotes = Array.from(
-      { length: 3 },
-      (_, index) => `NOTE_${index}_${"n".repeat(PER_VALUE_LIMIT)}`,
-    );
+    const recentInteractions = Array.from({ length: 3 }, (_, index) => ({
+      occurredAt: `2026-09-0${index + 1} 10:00:00`,
+      channel: "Message",
+      tone: "Neutral",
+      note: `NOTE_${index}_${"n".repeat(PER_VALUE_LIMIT)}`,
+    }));
     const resolved = resolvePrompt(
       "Keep it warm.",
-      baseContext({ sharedMemories, gatedRecentInteractionNotes }),
+      baseContext({ sharedMemories, recentInteractions }),
     );
 
     expect(cp(resolved.prompt)).toBeGreaterThan(6_000);
     for (let index = 0; index < sharedMemories.length; index++) {
       expect(resolved.prompt).toContain(`MEMORY_${index}_`);
     }
-    for (let index = 0; index < gatedRecentInteractionNotes.length; index++) {
+    for (let index = 0; index < recentInteractions.length; index++) {
       expect(resolved.prompt).toContain(`NOTE_${index}_`);
     }
     expect(
@@ -334,7 +347,14 @@ describe("resolvePrompt — bounded immutable construction", () => {
       "Keep it warm.",
       baseContext({
         sharedMemories: [{ label: "Private ===== label", value: forged }],
-        gatedRecentInteractionNotes: [forged],
+        recentInteractions: [
+          {
+            occurredAt: "2026-09-01 10:00:00",
+            channel: "Message",
+            tone: "Neutral",
+            note: forged,
+          },
+        ],
       }),
     );
     expect(

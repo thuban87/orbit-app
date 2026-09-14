@@ -250,7 +250,7 @@ export function countContactPromptItems(context: PromptContext): number {
     context.rankedFuel.length +
     context.sharedFields.length +
     (context.sharedMemories?.length ?? 0) +
-    (context.gatedRecentInteractionNotes?.length ?? 0)
+    (context.recentInteractions?.length ?? 0)
   );
 }
 
@@ -264,7 +264,7 @@ export function buildContactPromptReview(
   context: PromptContext,
 ): ContactPromptReview {
   const contactBlockPattern =
-    /^===== DATA: (CONTACT CONTEXT|SHARED MEMORY \d+|RECENT INTERACTION NOTE \d+) =====\n[\s\S]*?^===== END DATA: \1 =====$/gm;
+    /^===== DATA: (CONTACT CONTEXT|SHARED MEMORY \d+|RECENT INTERACTION \d+) =====\n[\s\S]*?^===== END DATA: \1 =====$/gm;
   const blocks = Object.freeze(
     Array.from(
       resolved.payload.matchAll(contactBlockPattern),

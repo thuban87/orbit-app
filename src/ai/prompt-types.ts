@@ -95,6 +95,15 @@ export interface SharedFieldValue {
   readonly value: string;
 }
 
+/** The bounded latest-three interaction projection approved by ADR-078. */
+export interface RecentInteractionContext {
+  readonly occurredAt: string;
+  readonly channel: string;
+  readonly tone: string | null;
+  /** Present only when this interaction's per-row Allow AI gate is enabled. */
+  readonly note?: string;
+}
+
 /** Structured, durable user-authored voice controls for prompt personalization. */
 export interface PromptWritingStyle {
   readonly tone: "casual" | "balanced" | "polished" | "custom";
@@ -152,18 +161,11 @@ export interface PromptContext {
    */
   readonly sharedMemories?: ReadonlyArray<SharedFieldValue>;
   /**
-   * Notes from the contact's three most recent interactions, carried ONLY where
-   * that interaction's `interactions.allow_ai = 1` (the per-interaction gate
-   * added in migration 025 — ADR-078, unchanged by ADR-107). Newest-first,
-   * blank/absent notes minimized away; Group Notes (the event-level shared
-   * record in `group_events`) are NEVER read and so can never appear here.
-   *
-   * `resolvePrompt` serializes each included note in its own bounded DATA block.
-   * It still serializes context fields explicitly — never by spreading the
-   * context — and Off Limits is carried in NO shape here, positive OR negative
-   * (D-14 / ADR-107). The read boundary always supplies an array.
+   * The newest three interactions. Date/time, channel, and Tone are always
+   * carried; `note` exists only when that row's `allow_ai=1`. Group Notes are
+   * never read. Each row is serialized explicitly in its own bounded DATA block.
    */
-  readonly gatedRecentInteractionNotes?: ReadonlyArray<string>;
+  readonly recentInteractions?: ReadonlyArray<RecentInteractionContext>;
   /** Durable global Writing Style. When present it supersedes the legacy note. */
   readonly writingStyle?: PromptWritingStyle;
   /** Global context sections; only enabled rows are serialized by resolvePrompt. */

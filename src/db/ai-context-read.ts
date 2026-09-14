@@ -30,6 +30,7 @@ import type {
   PromptContext,
   QualityAggregate,
   RankedFuelEntry,
+  RecentInteractionContext,
   SharedFieldValue,
 } from "@/ai/prompt-types";
 import { listDefs } from "@/db/field-defs-dao";
@@ -152,12 +153,10 @@ async function readInteractionAggregates(
 }
 
 /**
- * The gated recent-interaction-note branch of the closed egress projection
- * (ADR-078, unchanged by ADR-107). Reads the notes of the contact's three most
- * recent interactions and carries a note ONLY where that interaction's
- * `allow_ai = 1` — the durable per-interaction gate added in migration 025,
- * default OFF. Newest-first (occurred_at DESC, id DESC); blank/whitespace-only
- * notes are minimized away.
+ * The structured recent-interaction branch of the closed egress projection
+ * (ADR-078, unchanged by ADR-107). Always carries the compact date/time,
+ * channel, and Tone for the contact's three newest rows. A note is added ONLY
+ * where that row's `allow_ai = 1`; blank notes are minimized away.
  *
  * Group Notes — the Phase 33 event-level shared record — live in the SEPARATE
  * `group_events` table and are DELIBERATELY never read here, so they can never
@@ -165,33 +164,34 @@ async function readInteractionAggregates(
  * per-interaction note) is read, `contactId` is the sole `?`-bound value, and
  * only static column names are literal text. Pure read — no transaction.
  */
-async function readGatedRecentInteractionNotes(
+async function readRecentInteractions(
   exec: SqlExecutor,
   contactId: number,
-): Promise<string[]> {
+): Promise<RecentInteractionContext[]> {
   const rows = await exec.getAllAsync<{
+    occurred_at: string;
+    channel: string;
+    quality: string | null;
     note: string | null;
     allow_ai: number;
   }>(
-    `SELECT note, allow_ai
+    `SELECT occurred_at, channel, quality, note, allow_ai
        FROM interactions
       WHERE contact_id = ?
       ORDER BY occurred_at DESC, id DESC
       LIMIT 3`,
     [contactId],
   );
-  const out: string[] = [];
-  for (const r of rows) {
-    // Gate on the explicit per-interaction permission, then drop blanks.
-    if (r.allow_ai !== 1) {
-      continue;
-    }
-    if (r.note === null || r.note.trim() === "") {
-      continue;
-    }
-    out.push(r.note);
-  }
-  return out;
+  return rows.map((row) => {
+    const projection: RecentInteractionContext = {
+      occurredAt: row.occurred_at,
+      channel: row.channel,
+      tone: row.quality,
+    };
+    return row.allow_ai === 1 && row.note?.trim()
+      ? { ...projection, note: row.note }
+      : projection;
+  });
 }
 
 /**
@@ -332,10 +332,7 @@ export async function readPromptContext(
 
   // (6) Gated recent-interaction notes (allow_ai=1 only), rendered by the sole
   //     prompt builder. Off Limits is carried in no shape (D-14/ADR-107).
-  const gatedRecentInteractionNotes = await readGatedRecentInteractionNotes(
-    exec,
-    contactId,
-  );
+  const recentInteractions = await readRecentInteractions(exec, contactId);
 
   return {
     contactName: identity.name,
@@ -348,6 +345,6 @@ export async function readPromptContext(
     newestChannel: aggregates.newestChannel,
     sharedFields,
     sharedMemories,
-    gatedRecentInteractionNotes,
+    recentInteractions,
   };
 }

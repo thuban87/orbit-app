@@ -40,7 +40,7 @@ const EMPTY_CONTEXT: PromptContext = {
   newestChannel: "unspecified",
   sharedFields: [],
   sharedMemories: [],
-  gatedRecentInteractionNotes: [],
+  recentInteractions: [],
 };
 
 function frozenPrompt(text: string): ResolvedPrompt {
@@ -217,7 +217,14 @@ describe("whole-system and contact-specific prompt previews", () => {
       rankedFuel: [{ text: "Garden plans", kind: "interest", ageDays: 2 }],
       sharedFields: [{ label: "City", value: "Madison" }],
       sharedMemories: [{ label: "Trip", value: "Coast" }],
-      gatedRecentInteractionNotes: ["Talked about tomatoes"],
+      recentInteractions: [
+        {
+          occurredAt: "2026-09-01 10:00:00",
+          channel: "Message",
+          tone: "Positive",
+          note: "Talked about tomatoes",
+        },
+      ],
       writingStyle: {
         tone: "casual",
         length: "concise",

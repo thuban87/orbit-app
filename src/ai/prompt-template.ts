@@ -176,21 +176,41 @@ function sharedMemoryBlocks(
 }
 
 /** Render every permission-gated interaction note in its own stable DATA block. */
-function recentInteractionNoteBlocks(
+function recentInteractionBlocks(
   context: PromptContext,
   truncations: TruncationNotice[],
 ): string[] {
-  return (context.gatedRecentInteractionNotes ?? []).map((note, index) => {
+  return (context.recentInteractions ?? []).map((interaction, index) => {
     const ordinal = index + 1;
-    const value = boundedDataValue(
-      note,
+    const occurredAt = boundedDataValue(
+      interaction.occurredAt,
+      `recent interaction ${ordinal} date/time`,
+      truncations,
+    );
+    const channel = boundedDataValue(
+      interaction.channel,
+      `recent interaction ${ordinal} channel`,
+      truncations,
+    );
+    const tone = boundedDataValue(
+      interaction.tone ?? "",
+      `recent interaction ${ordinal} tone`,
+      truncations,
+    );
+    const note = boundedDataValue(
+      interaction.note ?? "",
       `recent interaction note ${ordinal}`,
       truncations,
     );
     return [
-      `===== DATA: RECENT INTERACTION NOTE ${ordinal} =====`,
-      value || NONE_AVAILABLE,
-      `===== END DATA: RECENT INTERACTION NOTE ${ordinal} =====`,
+      `===== DATA: RECENT INTERACTION ${ordinal} =====`,
+      `Date/time: ${occurredAt || NONE_AVAILABLE}`,
+      `Channel: ${channel || NONE_AVAILABLE}`,
+      `Tone: ${tone || NONE_AVAILABLE}`,
+      ...(interaction.note === undefined
+        ? []
+        : [`Note: ${note || NONE_AVAILABLE}`]),
+      `===== END DATA: RECENT INTERACTION ${ordinal} =====`,
     ].join("\n");
   });
 }
@@ -428,7 +448,7 @@ export function resolvePrompt(
   // owns a complete DATA fence, so equal/adjacent values can never merge across
   // a boundary. They are conditionally appended; every permitted item survives.
   const memoryBlocks = sharedMemoryBlocks(context, truncations);
-  const noteBlocks = recentInteractionNoteBlocks(context, truncations);
+  const interactionBlocks = recentInteractionBlocks(context, truncations);
   const structuredStyle = writingStyleBlock(context, truncations);
   const globalContextBlocks = personalizationBlocks(context, truncations);
 
@@ -445,7 +465,7 @@ export function resolvePrompt(
   for (const block of memoryBlocks) {
     scaffoldParts.push("", block);
   }
-  for (const block of noteBlocks) {
+  for (const block of interactionBlocks) {
     scaffoldParts.push("", block);
   }
   if (structuredStyle !== null) {
