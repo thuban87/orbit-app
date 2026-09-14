@@ -296,6 +296,33 @@ function withoutDerivedFields(
   return mergeable;
 }
 
+/** Lane is the durable schema identity; a merge keeps the destination UID. */
+function normalizeAiConnectionIdentity(
+  input: ReconcileEntityInput,
+): ReconcileEntityInput {
+  if (input.entityType !== "ai_connections") return input;
+
+  const localUidByLane = new Map<string, string>();
+  for (const row of input.localRows) {
+    if (typeof row.lane !== "string") continue;
+    if (localUidByLane.has(row.lane)) {
+      throw new Error(`duplicate local AI connection lane: ${row.lane}`);
+    }
+    localUidByLane.set(row.lane, row.uid);
+  }
+  const incomingLanes = new Set<string>();
+  const incomingRows = input.incomingRows.map((row) => {
+    if (typeof row.lane !== "string") return row;
+    if (incomingLanes.has(row.lane)) {
+      throw new Error(`duplicate incoming AI connection lane: ${row.lane}`);
+    }
+    incomingLanes.add(row.lane);
+    const localUid = localUidByLane.get(row.lane);
+    return localUid && localUid !== row.uid ? { ...row, uid: localUid } : row;
+  });
+  return { ...input, incomingRows };
+}
+
 function pairKey(row: ReconciliationRow): string | undefined {
   const contactUid = readParentUid(row, "contact_id");
   const fieldDefUid = readParentUid(row, "field_def_id");
@@ -346,11 +373,13 @@ function incompatibleRows(
  * Pure two-sided UID reconciliation. Parent callers run first, then provide
  * survivor sets for child calls; this function never maps UIDs to local IDs.
  */
-export function reconcileEntity(input: ReconcileEntityInput): ReconciliationResult {
+export function reconcileEntity(rawInput: ReconcileEntityInput): ReconciliationResult {
+  assertUniqueRows(rawInput.localRows, "local rows");
+  assertUniqueRows(rawInput.incomingRows, "incoming rows");
+  const input = normalizeAiConnectionIdentity(rawInput);
   const localTombstones = input.localTombstones ?? [];
   const incomingTombstones = input.incomingTombstones ?? [];
-  assertUniqueRows(input.localRows, "local rows");
-  assertUniqueRows(input.incomingRows, "incoming rows");
+  assertUniqueRows(input.incomingRows, "lane-normalized incoming rows");
   assertUniqueTombstones(localTombstones, "local tombstones");
   assertUniqueTombstones(incomingTombstones, "incoming tombstones");
 

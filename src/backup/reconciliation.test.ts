@@ -61,6 +61,28 @@ describe("reconciliation", () => {
     ).not.toHaveProperty("last_contact");
   });
 
+  it.each([
+    ["incoming", old, newer, "incoming-model", "update"],
+    ["local", newer, old, "local-model", "retain"],
+  ] as const)(
+    "reconciles a same-lane AI connection by lane when %s metadata is newer",
+    (_winner, localModifiedAt, incomingModifiedAt, expectedModel, expectedKind) => {
+      const result = reconcileEntity({
+        entityType: "ai_connections",
+        localRows: [row("local-uid", localModifiedAt, { lane: "openai", rememberedModel: "local-model" })],
+        incomingRows: [row("incoming-uid", incomingModifiedAt, { lane: "openai", rememberedModel: "incoming-model" })],
+      });
+      expect(result.actions).toEqual([
+        expect.objectContaining({
+          kind: expectedKind,
+          uid: "local-uid",
+          row: expect.objectContaining({ uid: "local-uid", lane: "openai", rememberedModel: expectedModel }),
+        }),
+      ]);
+      expect(result.survivors).toEqual(new Set(["local-uid"]));
+    },
+  );
+
   it("blocks every mandatory contact child and both custom-field-value parents when a parent did not survive", () => {
     expect(
       reconcileEntity({

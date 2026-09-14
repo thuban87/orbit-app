@@ -228,6 +228,77 @@ beforeEach(() => {
     },
   );
 
+  it.each([
+    [
+      "incoming",
+      "2026-08-24 10:00:00",
+      "2026-08-24 10:00:01",
+      "incoming-model",
+    ],
+    [
+      "local",
+      "2026-08-24 10:00:01",
+      "2026-08-24 10:00:00",
+      "local-model",
+    ],
+  ] as const)(
+    "merges distinct AI connection UIDs for one lane when %s metadata is newer",
+    async (_winner, localModifiedAt, incomingModifiedAt, expectedModel) => {
+      const source = await db();
+      await source.runAsync(
+        "INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)",
+        [
+          "incoming-connection",
+          "openai",
+          "incoming-model",
+          "",
+          "",
+          incomingModifiedAt,
+          incomingModifiedAt,
+          incomingModifiedAt,
+        ],
+      );
+      const manifest = await buildExportManifest(source, {
+        exportedAt: NOW,
+        readPhotoBase64: async () => "",
+      });
+
+      const destination = await db();
+      await destination.runAsync(
+        "INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)",
+        [
+          "local-connection",
+          "openai",
+          "local-model",
+          "",
+          "",
+          localModifiedAt,
+          localModifiedAt,
+          localModifiedAt,
+        ],
+      );
+
+      await expect(
+        applyRestore(destination, manifest, "merge"),
+      ).resolves.toMatchObject({ status: "applied" });
+      await expect(
+        destination.getAllAsync<{
+          uid: string;
+          lane: string;
+          model: string;
+        }>(
+          "SELECT uid,lane,remembered_model AS model FROM ai_connections ORDER BY lane",
+        ),
+      ).resolves.toEqual([
+        {
+          uid: "local-connection",
+          lane: "openai",
+          model: expectedModel,
+        },
+      ]);
+    },
+  );
+
   it("applies a Group Event tombstone and preserves an orphaned member as contact history", async () => {
     const source = await db();
     const contact = await source.runAsync("INSERT INTO contacts(uid,name,interval_days,created_at,modified_at) VALUES(?,?,?,?,?)", ["orphan-contact", "Ada", 7, NOW, NOW]);
