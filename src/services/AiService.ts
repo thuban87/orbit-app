@@ -77,8 +77,15 @@ export type KeyAccessor = () => Promise<string | null>;
  * `AiKeyStore` so a fake can be injected in tests without the native module.
  */
 export interface AiKeyStoreLike {
-  getKey(provider: AiCloudProviderId): Promise<string | null>;
-  setKey(provider: AiCloudProviderId, key: string): Promise<void>;
+  getKey(
+    provider: AiCloudProviderId,
+    customEndpoint?: string,
+  ): Promise<string | null>;
+  setKey(
+    provider: AiCloudProviderId,
+    key: string,
+    customEndpoint?: string,
+  ): Promise<void>;
   deleteKey(provider: AiCloudProviderId): Promise<void>;
 }
 
@@ -635,7 +642,7 @@ export class AiService {
     this.providers.set(
       "custom",
       new CustomProvider(connection.customEndpoint, () =>
-        this.keyStore.getKey("custom"),
+        this.keyStore.getKey("custom", connection.customEndpoint),
       ),
     );
   }

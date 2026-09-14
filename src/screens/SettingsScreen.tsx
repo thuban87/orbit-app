@@ -401,7 +401,11 @@ export function SettingsScreen() {
     const connection = await resolveActiveAiConnection(exec);
     const hasCredential = await readCredentialPresence(
       connection?.lane ?? "none",
-      (lane) => aiKeyStore.getKey(lane),
+      (lane) =>
+        aiKeyStore.getKey(
+          lane,
+          lane === "custom" ? connection?.customEndpoint : undefined,
+        ),
     );
     const openRouterCatalog =
       connection?.lane === "openrouter"

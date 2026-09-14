@@ -32,6 +32,11 @@ vi.mock("@/ai/secure-fetch", () => {
   };
 });
 
+import { readCredentialPresence } from "@/logic/ai-availability";
+import {
+  CustomCredentialCompensationError,
+  saveCustomConnection,
+} from "@/screens/ai-connection-logic";
 import {
   AiError,
   type AiKeyStoreLike,
@@ -44,6 +49,11 @@ import {
   OpenAiProvider,
   parseSuggestionOutput,
 } from "@/services/AiService";
+import {
+  createAiKeyStore,
+  keyItemName,
+  type SecureKeyBackend,
+} from "@/services/ai-key-store";
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -537,6 +547,78 @@ describe("key accessor is invoked at call time, not during refreshProviders (C3-
       p.generate(inputFor("hi", new AbortController().signal)),
     ).rejects.toMatchObject({ code: "not_configured" });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("Custom credential endpoint binding", () => {
+  it("fails closed after SQLite and compensation failures", async () => {
+    const items = new Map<string, string>();
+    let customWrites = 0;
+    const backend: SecureKeyBackend = {
+      async getItemAsync(key) {
+        return items.get(key) ?? null;
+      },
+      async setItemAsync(key, value) {
+        if (key === keyItemName("custom")) {
+          customWrites += 1;
+          if (customWrites === 3) throw new Error("compensation failed");
+        }
+        items.set(key, value);
+      },
+      async deleteItemAsync(key) {
+        items.delete(key);
+      },
+    };
+    const keyStore = createAiKeyStore(backend);
+    const oldEndpoint = "https://old.example.com/v1";
+    await keyStore.setKey("custom", "old-secret", oldEndpoint);
+
+    await expect(
+      saveCustomConnection(
+        {
+          ...keyStore,
+          async persistConnection() {
+            throw new Error("sqlite failed");
+          },
+        },
+        {
+          endpoint: "https://new.example.com/v1",
+          previousEndpoint: oldEndpoint,
+          credential: "new-secret",
+          model: "new-model",
+        },
+      ),
+    ).rejects.toBeInstanceOf(CustomCredentialCompensationError);
+
+    await expect(keyStore.getKey("custom", oldEndpoint)).resolves.toBeNull();
+    await expect(
+      readCredentialPresence("custom", (provider) =>
+        keyStore.getKey(provider, oldEndpoint),
+      ),
+    ).resolves.toBe(false);
+
+    secureCustomFetchMock.mockResolvedValueOnce({
+      status: 200,
+      ok: true,
+      bodyText: '{"choices":[{"message":{"content":"keyless-ok"}}]}',
+    });
+    const service = new AiService(keyStore);
+    const oldConnection = {
+      lane: "custom" as const,
+      customEndpoint: oldEndpoint,
+    };
+    service.refreshProviders(oldConnection);
+    await expect(
+      service
+        .getActiveProvider(oldConnection)
+        ?.generate(inputFor("hello", new AbortController().signal)),
+    ).resolves.toBe("keyless-ok");
+    expect(secureCustomFetchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: oldEndpoint,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
   });
 });
 

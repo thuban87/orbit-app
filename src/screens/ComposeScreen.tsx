@@ -56,11 +56,11 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { loadCachedCatalog } from "@/ai/model-catalog-cache";
 import {
   assertPromptFitsContext,
   PromptContextOverflowError,
 } from "@/ai/context-estimate";
+import { loadCachedCatalog } from "@/ai/model-catalog-cache";
 import type { ModelCatalog } from "@/ai/model-catalog-filter";
 import { createFileCatalogStorage } from "@/ai/model-catalog-storage";
 import { resolveActiveCatalog, SEED_CATALOG } from "@/ai/model-registry";
@@ -670,7 +670,10 @@ export function ComposeScreen({
           // narrows 'none' out BEFORE any getKey call (A4). Guarded by `cancelled`.
           setCredentialFailed(false);
           void readCredentialPresence(connection?.lane ?? "none", (p) =>
-            aiKeyStore.getKey(p),
+            aiKeyStore.getKey(
+              p,
+              p === "custom" ? connection?.customEndpoint : undefined,
+            ),
           )
             .then((present) => {
               if (!cancelled) setCredentialPresent(present);

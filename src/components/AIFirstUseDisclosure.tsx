@@ -43,13 +43,14 @@ export function AIFirstUseDisclosure() {
       return;
     }
     const exec = getExecutor();
-    void Promise.all([
-      getAppSettings(exec),
-      resolveActiveAiConnection(exec),
-      aiKeyStore.getKey(activeLane),
-    ])
-      .then(([settings, connection, credential]) => {
+    void Promise.all([getAppSettings(exec), resolveActiveAiConnection(exec)])
+      .then(async ([settings, connection]) => {
         if (cancelled || connection === null) return;
+        const credential = await aiKeyStore.getKey(
+          activeLane,
+          activeLane === "custom" ? connection.customEndpoint : undefined,
+        );
+        if (cancelled) return;
         const show = shouldShowFirstUseDisclosure({
           aiEnabled,
           connection,

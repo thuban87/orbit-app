@@ -21,6 +21,8 @@
  * clears on Android uninstall) is an ORDINARY reconfiguration state, surfaced as
  * `null`, never an error.
  */
+
+import { validateCustomEndpoint } from "@/ai/custom-endpoint";
 import type { AiCloudProviderId } from "@/services/ai-types";
 
 /** The namespaced SecureStore item prefix; one item per cloud provider. */
@@ -45,11 +47,59 @@ export interface SecureKeyBackend {
 /** The provider-scoped repository surface. No bulk/all-keys accessor exists. */
 export interface AiKeyStore {
   /** Read one provider's key, or `null` if unset/cleared (not an error). */
-  getKey(provider: AiCloudProviderId): Promise<string | null>;
+  getKey(
+    provider: AiCloudProviderId,
+    customEndpoint?: string,
+  ): Promise<string | null>;
   /** Store one provider's key in its own namespaced SecureStore item. */
-  setKey(provider: AiCloudProviderId, key: string): Promise<void>;
+  setKey(
+    provider: AiCloudProviderId,
+    key: string,
+    customEndpoint?: string,
+  ): Promise<void>;
   /** Remove one provider's key. Idempotent — deleting a missing key is fine. */
   deleteKey(provider: AiCloudProviderId): Promise<void>;
+}
+
+interface BoundCustomCredential {
+  readonly version: 1;
+  readonly endpoint: string;
+  readonly credential: string;
+}
+
+function normalizeCustomEndpoint(raw: string | undefined): string | null {
+  if (raw === undefined) return null;
+  const validation = validateCustomEndpoint(raw);
+  if (!validation.ok || validation.url === "") return null;
+  return new URL(validation.url).href;
+}
+
+function parseBoundCustomCredential(raw: string): BoundCustomCredential | null {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "version" in parsed &&
+      parsed.version === 1 &&
+      "endpoint" in parsed &&
+      typeof parsed.endpoint === "string" &&
+      "credential" in parsed &&
+      typeof parsed.credential === "string"
+    ) {
+      return parsed as BoundCustomCredential;
+    }
+  } catch {
+    // A pre-Phase-36 plaintext value is a legacy credential, handled below.
+  }
+  return null;
+}
+
+function encodeBoundCustomCredential(
+  endpoint: string,
+  credential: string,
+): string {
+  return JSON.stringify({ version: 1, endpoint, credential });
 }
 
 /**
@@ -83,17 +133,55 @@ export function createAiKeyStore(
   backend: SecureKeyBackend = nativeSecureStoreBackend,
 ): AiKeyStore {
   return {
-    async getKey(provider: AiCloudProviderId): Promise<string | null> {
+    async getKey(
+      provider: AiCloudProviderId,
+      customEndpoint?: string,
+    ): Promise<string | null> {
       try {
-        return await backend.getItemAsync(keyItemName(provider));
+        const stored = await backend.getItemAsync(keyItemName(provider));
+        if (provider !== "custom" || stored === null) return stored;
+
+        const endpoint = normalizeCustomEndpoint(customEndpoint);
+        if (endpoint === null) return null;
+        const bound = parseBoundCustomCredential(stored);
+        if (bound !== null) {
+          return bound.endpoint === endpoint ? bound.credential : null;
+        }
+
+        // Legacy Custom keys predate endpoint binding. Bind the plaintext key
+        // to the currently persisted, already-validated endpoint on first read.
+        // If the durable upgrade fails, fail closed instead of returning an
+        // unbound secret that could later be paired with a different endpoint.
+        await backend.setItemAsync(
+          keyItemName(provider),
+          encodeBoundCustomCredential(endpoint, stored),
+        );
+        return stored;
       } catch {
         // A read failure (item absent, keystore reset on uninstall) is an
         // ordinary "not configured" state — degrade to null, never throw.
         return null;
       }
     },
-    async setKey(provider: AiCloudProviderId, key: string): Promise<void> {
-      await backend.setItemAsync(keyItemName(provider), key);
+    async setKey(
+      provider: AiCloudProviderId,
+      key: string,
+      customEndpoint?: string,
+    ): Promise<void> {
+      if (provider !== "custom") {
+        await backend.setItemAsync(keyItemName(provider), key);
+        return;
+      }
+      const endpoint = normalizeCustomEndpoint(customEndpoint);
+      if (endpoint === null) {
+        throw new Error(
+          "A valid Custom endpoint is required to store a credential.",
+        );
+      }
+      await backend.setItemAsync(
+        keyItemName(provider),
+        encodeBoundCustomCredential(endpoint, key),
+      );
     },
     async deleteKey(provider: AiCloudProviderId): Promise<void> {
       await backend.deleteItemAsync(keyItemName(provider));

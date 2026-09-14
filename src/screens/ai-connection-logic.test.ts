@@ -2,13 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 import type { AiAvailabilityInput } from "@/logic/ai-availability";
 import {
   beginConnectionSetup,
+  CustomCredentialCompensationError,
   connectionCardState,
   finishConnectionSetup,
   removeLaneCredential,
   repairForAvailability,
   saveCustomConnection,
   saveDirectCredential,
-  CustomCredentialCompensationError,
 } from "@/screens/ai-connection-logic";
 
 describe("AI connection switching", () => {
@@ -59,6 +59,7 @@ describe("credential boundary and endpoint guard", () => {
       { setKey, getKey, deleteKey, persistConnection },
       {
         endpoint: "http://127.0.0.1/v1",
+        previousEndpoint: "",
         credential: "secret",
         model: "local",
       },
@@ -71,12 +72,17 @@ describe("credential boundary and endpoint guard", () => {
       { setKey, getKey, deleteKey, persistConnection },
       {
         endpoint: "https://api.example.com/v1",
+        previousEndpoint: "",
         credential: "secret",
         model: "hosted-model",
       },
     );
     expect(valid).toEqual({ ok: true });
-    expect(setKey).toHaveBeenCalledWith("custom", "secret");
+    expect(setKey).toHaveBeenCalledWith(
+      "custom",
+      "secret",
+      "https://api.example.com/v1",
+    );
     expect(persistConnection).toHaveBeenCalledWith({
       endpoint: "https://api.example.com/v1",
       model: "hosted-model",
@@ -98,13 +104,24 @@ describe("credential boundary and endpoint guard", () => {
         },
         {
           endpoint: "https://new.example.com/v1",
+          previousEndpoint: "https://old.example.com/v1",
           credential: "new-secret",
           model: "new-model",
         },
       ),
     ).rejects.toBe(persistError);
-    expect(setKey).toHaveBeenNthCalledWith(1, "custom", "new-secret");
-    expect(setKey).toHaveBeenNthCalledWith(2, "custom", "old-secret");
+    expect(setKey).toHaveBeenNthCalledWith(
+      1,
+      "custom",
+      "new-secret",
+      "https://new.example.com/v1",
+    );
+    expect(setKey).toHaveBeenNthCalledWith(
+      2,
+      "custom",
+      "old-secret",
+      "https://old.example.com/v1",
+    );
   });
 
   it("deletes a newly staged credential when there was no previous key", async () => {
@@ -121,6 +138,7 @@ describe("credential boundary and endpoint guard", () => {
         },
         {
           endpoint: "https://new.example.com/v1",
+          previousEndpoint: "https://old.example.com/v1",
           credential: "new-secret",
           model: "new-model",
         },
@@ -145,6 +163,7 @@ describe("credential boundary and endpoint guard", () => {
         },
         {
           endpoint: "https://new.example.com/v1",
+          previousEndpoint: "https://old.example.com/v1",
           credential: "new-secret",
           model: "new-model",
         },

@@ -59,17 +59,59 @@ describe("ai-key-store — provider isolation", () => {
     await store.setKey("openai", "k-openai");
     await store.setKey("anthropic", "k-anthropic");
     await store.setKey("google", "k-google");
-    await store.setKey("custom", "k-custom");
+    await store.setKey("custom", "k-custom", "https://custom.example.com/v1");
     expect(await store.getKey("openai")).toBe("k-openai");
     expect(await store.getKey("anthropic")).toBe("k-anthropic");
     expect(await store.getKey("google")).toBe("k-google");
-    expect(await store.getKey("custom")).toBe("k-custom");
+    expect(await store.getKey("custom", "https://custom.example.com/v1")).toBe(
+      "k-custom",
+    );
   });
 
   it("exposes no bulk/all-keys accessor on the repository surface", () => {
     const store = createAiKeyStore(backend);
     const keys = Object.keys(store);
     expect(keys.sort()).toEqual(["deleteKey", "getKey", "setKey"]);
+  });
+
+  it("returns a Custom credential only for its normalized bound endpoint", async () => {
+    const store = createAiKeyStore(backend);
+    await store.setKey(
+      "custom",
+      "bound-secret",
+      " HTTPS://API.EXAMPLE.COM:443/v1 ",
+    );
+
+    await expect(
+      store.getKey("custom", "https://api.example.com/v1"),
+    ).resolves.toBe("bound-secret");
+    await expect(
+      store.getKey("custom", "https://other.example.com/v1"),
+    ).resolves.toBeNull();
+    await expect(store.getKey("custom")).resolves.toBeNull();
+  });
+
+  it("durably binds a legacy plaintext Custom key on first safe read", async () => {
+    backend.store.set(keyItemName("custom"), "legacy-secret");
+    const store = createAiKeyStore(backend);
+
+    await expect(
+      store.getKey("custom", "https://old.example.com/v1"),
+    ).resolves.toBe("legacy-secret");
+    expect(backend.store.get(keyItemName("custom"))).not.toBe("legacy-secret");
+    await expect(
+      store.getKey("custom", "https://new.example.com/v1"),
+    ).resolves.toBeNull();
+  });
+
+  it("fails closed when a legacy key cannot be durably endpoint-bound", async () => {
+    backend.store.set(keyItemName("custom"), "legacy-secret");
+    backend.setItemAsync = vi.fn().mockRejectedValue(new Error("write failed"));
+    const store = createAiKeyStore(backend);
+
+    await expect(
+      store.getKey("custom", "https://old.example.com/v1"),
+    ).resolves.toBeNull();
   });
 });
 

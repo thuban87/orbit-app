@@ -56,11 +56,18 @@ export function connectionCardState(
 }
 
 interface KeyWriter {
-  setKey(provider: AiCloudProviderId, key: string): Promise<void>;
+  setKey(
+    provider: AiCloudProviderId,
+    key: string,
+    customEndpoint?: string,
+  ): Promise<void>;
 }
 
 interface KeyReader {
-  getKey(provider: AiCloudProviderId): Promise<string | null>;
+  getKey(
+    provider: AiCloudProviderId,
+    customEndpoint?: string,
+  ): Promise<string | null>;
 }
 
 interface KeyDeleter {
@@ -86,14 +93,12 @@ export function removeLaneCredential(
 
 export interface CustomConnectionInput {
   readonly endpoint: string;
+  readonly previousEndpoint: string;
   readonly credential: string;
   readonly model: string;
 }
 
-export interface CustomConnectionDeps
-  extends KeyWriter,
-    KeyReader,
-    KeyDeleter {
+export interface CustomConnectionDeps extends KeyWriter, KeyReader, KeyDeleter {
   persistConnection(input: { endpoint: string; model: string }): Promise<void>;
 }
 
@@ -124,12 +129,18 @@ export async function saveCustomConnection(
   if (model === "") return { ok: false, reason: "Enter a model id." };
   const credential = input.credential.trim();
   if (credential === "") {
+    // Reading first safely upgrades any legacy plaintext key into an endpoint-
+    // bound credential. It therefore cannot silently follow an endpoint edit.
+    await deps.getKey("custom", input.previousEndpoint);
     await deps.persistConnection({ endpoint: validation.url, model });
     return { ok: true };
   }
 
-  const previousCredential = await deps.getKey("custom");
-  await deps.setKey("custom", credential);
+  const previousCredential = await deps.getKey(
+    "custom",
+    input.previousEndpoint,
+  );
+  await deps.setKey("custom", credential, validation.url);
   try {
     await deps.persistConnection({ endpoint: validation.url, model });
   } catch (persistError) {
@@ -137,7 +148,7 @@ export async function saveCustomConnection(
       if (previousCredential === null) {
         await deps.deleteKey("custom");
       } else {
-        await deps.setKey("custom", previousCredential);
+        await deps.setKey("custom", previousCredential, input.previousEndpoint);
       }
     } catch {
       throw new CustomCredentialCompensationError();

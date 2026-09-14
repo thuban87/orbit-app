@@ -24,8 +24,8 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
-  connectionCardState,
   CustomCredentialCompensationError,
+  connectionCardState,
   removeLaneCredential,
   saveCustomConnection,
   saveDirectCredential,
@@ -174,8 +174,10 @@ export function AIConnectionScreen({
     try {
       const result = await saveCustomConnection(
         {
-          getKey: (provider) => aiKeyStore.getKey(provider),
-          setKey: (provider, key) => aiKeyStore.setKey(provider, key),
+          getKey: (provider, customEndpoint) =>
+            aiKeyStore.getKey(provider, customEndpoint),
+          setKey: (provider, key, customEndpoint) =>
+            aiKeyStore.setKey(provider, key, customEndpoint),
           deleteKey: (provider) => aiKeyStore.deleteKey(provider),
           persistConnection: async (input) => {
             await upsertAiConnection(getExecutor(), {
@@ -187,7 +189,12 @@ export function AIConnectionScreen({
             });
           },
         },
-        { endpoint, credential: customCredential, model: customModel },
+        {
+          endpoint,
+          previousEndpoint: byLane.get("custom")?.customEndpoint ?? "",
+          credential: customCredential,
+          model: customModel,
+        },
       );
       if (!result.ok) {
         setError(result.reason);
