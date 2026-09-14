@@ -1,22 +1,194 @@
 ---
 phase: 36
+cycle: 2
 reviewers: [codex, claude]
-reviewed_at: 2026-09-13T23:08:53Z
-plans_reviewed: [36-01-PLAN.md, 36-02-PLAN.md, 36-03-PLAN.md, 36-04-PLAN.md, 36-05-PLAN.md, 36-06-PLAN.md, 36-07-PLAN.md, 36-08-PLAN.md]
+reviewed_at: 2026-09-14T00:10:50Z
+plans_reviewed: [36-01-PLAN.md, 36-02-PLAN.md, 36-03-PLAN.md, 36-04-PLAN.md, 36-05-PLAN.md, 36-06-PLAN.md, 36-07-PLAN.md, 36-08-PLAN.md, 36-09-PLAN.md]
 models:
-  codex: "gpt-5.6-terra (reasoning=low)"
-  claude: "claude-opus (read-only subagent lane)"
+  codex: "gpt-5.6 (codex-cli 0.154.0, reasoning=low)"
+  claude: "claude-opus-4-8 (read-only subagent lane)"
 model_sources:
   codex: "banner"
   claude: "subagent-lane"
 review_notes:
+  - "CYCLE 2 of the convergence loop. This file accumulates history: the Cycle 2 review is at the top; the Cycle 1 review is preserved below unchanged. `cycle_summary` reflects the CURRENT (cycle 2) unresolved counts; `cycle1_summary` records the prior cycle."
   - "The Claude lane ran as a read-only Claude subagent (not the built-in `claude -p` CLI lane), per the project's known Write-permission gap in that lane (MEMORY: claude-reviewer-via-subagent). It received the same source-grounding prompt and had full repo read access."
-  - "A source-grounding + cross-artifact fact-drift pass was also run (advisory; see Verification coverage). Its findings do NOT count toward the HIGH or actionable counts."
-  - "The orchestrator independently verified the load-bearing egress/privacy claims (ADR-107 off-limits exclusion, allow_ai gate, backup v5/credential exclusion) and the highest-impact structural findings (restore-apply / navigation / permission-writer / generation-path file ownership) against the code on disk."
-cycle_summary: "current_high=6 current_actionable=9"
+  - "A source-grounding + cross-artifact fact-drift pass was run (advisory; see Cycle 2 Verification coverage). Advisory drift does NOT count toward HIGH/actionable. src/ is unchanged since cycle 1 (git-verified), so cycle-1 grounding still holds; the one cycle-1 MISSING (model-registry path) is now FIXED in 36-05 (src/ai/model-registry.ts)."
+  - "The orchestrator independently verified EVERY cycle-2 finding from both lanes against the code on disk before counting: the OpenRouter generation-adapter ownership gap (AiService.refreshProviders registers only openai/anthropic/google/custom; 36-05 does not own AiService.ts), the OAuth optional-state posture, the integer-FK remap surfaces (022-orrery-systems.ts), the UI-SPEC six-vs-five section count, and the prompt-template.test.ts TOTAL_LIMIT ceiling assertions."
+cycle1_summary: "current_high=6 current_actionable=9"
+cycle_summary: "current_high=2 current_actionable=6"
 ---
 
-# Cross-AI Plan Review — Phase 36 "AI Configuration & Prompting"
+# Cross-AI Plan Review — Phase 36 "AI Configuration & Prompting" — CYCLE 2
+
+Cycle 2 reviews the REVISED 8 plans plus the new 9th plan (36-09, Settings AI hub + nav) added in
+response to cycle 1's 6 HIGH / 9 actionable. Assessment is of the CURRENT state of the 9 plan files on
+disk; only concerns that REMAIN UNRESOLVED after the cycle-1 revisions are counted. The Cycle 1 review is
+preserved verbatim below the divider.
+
+## Cycle 2 Consensus Summary
+
+**The revision is strong and materially closes cycle 1.** Both grounded lanes independently agree — and
+the orchestrator verified against disk — that **all 6 cycle-1 HIGHs are addressed** and **all cycle-1
+actionables (a–j) are incorporated into the current PLAN.md files**:
+
+- **HIGH-1 (generation path):** 36-01 now owns `ComposeScreen.tsx` + `AiService.ts` and PROMOTES generation off legacy `AiSettings.aiProvider`/`aiModel`/`aiCustomModel` to the active-connection resolver, with a grep acceptance gate and the 5-input `computeAiAvailability` reshape owned in lockstep. FULLY RESOLVED **for the direct-BYOK lane** (see new HIGH-A for the OpenRouter lane).
+- **HIGH-2 (routing):** new plan 36-09 owns `navigation/types.ts` + `SettingsStack.tsx` + `SettingsScreen.tsx`, registers all five AI screens with entry points, and retires the legacy inline provider UI. FULLY RESOLVED.
+- **HIGH-3 (restore):** 36-08 now owns `restore-apply.ts` + `reconciliation.ts`; extends the interactions restore INSERT with `duration`/`allow_ai`/`group_event_id`, removes the group_event tombstone filter, and carries Phase 33 orphan-repair. FULLY RESOLVED (one MEDIUM refinement below).
+- **HIGH-4 (permission writers):** 36-04 now owns `memories-dao.ts`/`recency-dao.ts`/`field-ddl.ts` + the creation forms and routes every writer through a single `resolveNewItemAiDefault`; the registry→column reconciliation is behavior-preserving (all `MEMORY_TYPE_REGISTRY` entries are `aiDefault:false`). FULLY RESOLVED.
+- **HIGH-5 (context ceiling):** 36-03 and 36-06 are reconciled to the identical contract — retire `TOTAL_LIMIT` as the context ceiling, keep `PER_VALUE_LIMIT` as a per-value abuse bound, block only on the selected model's real `context_length` via `context-estimate`, surface overflow explicitly. FULLY RESOLVED in design (one MEDIUM test-contract refinement below).
+- **HIGH-6 (OAuth):** 36-02 now generates an in-memory anti-CSRF `state`, validates the exact `orbit://openrouter-auth` callback, rejects foreign scheme/host/params, consumes the code once. Cycle-1 ask satisfied (see new HIGH-B for the residual posture question).
+
+**Privacy core preserved (both lanes + orchestrator, verified against code):** ADR-107 off-limits has no shape in the egress path; `ai-context-read.ts:183` gates notes on `allow_ai===1`; Group Notes deliberately never read; credentials SecureStore-only and screened from backup; `group_events.group_note` is backed up as user data but never enters AI egress (correctly not conflated). **No recorded-decision collisions.** Migration 029 = head+1 (disk head 028); `BACKUP_FORMAT_VERSION` 4→5 correct.
+
+**Where cycle 2 is NOT yet clean:** the two lanes surfaced *complementary* residual gaps (each caught what the other missed; the orchestrator verified all of them):
+
+### Cycle 2 Agreed / Verified Concerns
+
+- **[HIGH-A — Codex; orchestrator-verified] The OpenRouter generation adapter has no owner.** 36-01 adds `openrouter` to `AiProviderId`/`AiCloudProviderId` but scopes its generation promotion to the direct-BYOK lane and defers the OpenRouter adapter to Plan 05 (`36-01-PLAN.md:225`). But `36-05` `files_modified` (`:7-14`) is screens/logic/components only — it does **not** own `src/services/AiService.ts`, whose `refreshProviders` registers only `openai`/`anthropic`/`google`/`custom` (`AiService.ts:573-591`) and whose `getActiveProvider` only reads that map (`:599-602`). No plan registers an OpenRouter provider adapter. Result: an activated OpenRouter connection (the *recommended* lane) resolves to no provider at generation time — a tsc-green, `Map.get`-returns-`undefined`, "green config / broken generation" defect, the exact class HIGH-1's promotion was meant to eliminate. This is a residual of HIGH-1 for the OpenRouter lane, sitting in an ownership gap between 36-01 and 36-05.
+- **[HIGH-B — Codex; owner security-posture decision] The OAuth anti-CSRF `state` is validated only "when echoed."** 36-02 (`:28-29`, Task 1 `:117-118`) generates and appends `state` but treats a provider that does not echo it as acceptable, relying on PKCE + exact-callback + one-time consumption as the effective controls in that fallback. PKCE binds code↔verifier and is the primary CSRF defense for native public clients, so the disposition is defensible — but codex flags it by name as a security downgrade at the only new browser-to-app ingress, and **risk/security posture is the owner's bucket**. Per this project's rules (a reviewer flagging a control weakened *by name* is an escalation trigger, not a finding to close), the orchestrator does **not** close it: it is carried as a PARTIALLY-RESOLVED HIGH for an explicit owner decision — require a matching echoed `state` before exchange (stop at the device spike for an owner call if OpenRouter cannot echo it), or ratify PKCE-primary-with-conditional-state as the accepted posture.
+- **[MEDIUM — Codex; orchestrator-verified] v5 restore lacks an explicit UID↔local-ID mapping contract for the new FK-bearing entities.** `system_rules.system_id` (`022-orrery-systems.ts:22`) and `system_overrides.contact_id` (`:36`) are INTEGER FKs to `systems.id`/`contacts.id`; `interactions.group_event_id` is an INTEGER FK. The existing restore only works because each dependency is projected as a UID and remapped via a local-id map (`restore-apply.ts:187-205`). 36-08 gives the generic `parentFields` mechanism and directs reading the FK shapes (`:168`) but does not pin the `systemUid`/`contactUid` wire aliases for the systems tables, and its roundtrip tests do not mandate a **different-rowid destination** — a same-fixture roundtrip hides a wrong integer-FK remap in an irreversible format.
+- **[MEDIUM — Codex; orchestrator-verified] 36-09 promises "six sections" but enumerates five.** UI-SPEC Surface #1 (owner-ratified) lists six DISTINCT entries — Connection · Model · **Writing Style · Personalization Context** · AI Data Permissions · Preview (`36-UI-SPEC.md:106`). 36-09 repeatedly says "six-section" but its entry list combines Writing Style + Personalization Context into one (`36-09-PLAN.md:38,135,153`), totaling five — and an acceptance test asserting "six entries" would be impossible. Reconcile: either split into six entry rows (both Writing Style and Personalization targeting `AIPersonalizationScreen` anchors) or correct the count/tests to five with the owner's assent.
+- **[MEDIUM — Codex; orchestrator-verified] Migration 029 (irreversible) leaves the Writing Style SQL defaults and the active-pointer identity unspecified.** 36-01 (`:152`, `:179`) says the three Writing Style columns are "TEXT NOT NULL DEFAULT with CHECK vocabularies" without pinning the literal DEFAULT values (UI-SPEC implies Balanced/Normal/Balanced) or the exact CHECK enums, and never states whether `ai_active_connection` stores the connection UID or the lane — which determines restore correctness. A forward-only migration should not leave an executor to infer irreversible literals; pin all three defaults + CHECK vocabularies and the pointer identity before the checkpoint, with a migration test per default and a pointer roundtrip.
+- **[MEDIUM — Claude; orchestrator-verified] Existing `prompt-template.test.ts` ceiling assertions will break the gate when `TOTAL_LIMIT` is retired, and neither 36-03 nor 36-06 names them.** `prompt-template.test.ts:145` ("never exceeds the 6000 code-point total and drops overflow fields in order"), `:151` and `:304` (`expect(cp(resolved.prompt)).toBeLessThanOrEqual(TOTAL_LIMIT)`) become false once the omission governor is retired to preserve permitted context. Both plans own `prompt-template.test.ts` and say "write RED tests first," but neither enumerates these specific stale assertions — this is precisely the documented "orphaned-test-consumer build-breaker" (recurred 4× in P35; vitest-passing ≠ tsc-clean). Name `:145/:151/:304` for rewrite in 36-06 Task 2 (referenced from 36-03 Task 1) so the two "must-agree" plans also agree on the test contract.
+- **[LOW — Claude; orchestrator-verified] Residual RESEARCH-numbering mislabel in 36-03 truths.** `36-03-PLAN.md:29` and `:32` cite `(AICFG-08/15)`; the frontmatter `requirements: [AICFG-08, AICFG-09]` (the enforced channel) is correct, but AICFG-15 is "credentials stay in SecureStore (ADR-049)" — unrelated to prompt serialization. The `/15` is a stale RESEARCH-vs-REQUIREMENTS remnant from the cycle-1 divergence set (11/12/15/16/17). Drop `/15` (leave AICFG-08; likely meant 08/09). No other plan carries a residual mislabel — 36-05's AICFG-15 refs are legitimately about SecureStore.
+- **[LOW — Claude; orchestrator-verified] Stale determinism doc in `prompt-template.ts:20-24`** ("whole prompt ≤ 6,000 code points … Truncation disclosed by CATEGORY", AI-SPEC §4) becomes misleading once the ceiling is retired. Add a header-comment update to 36-06 Task 2. (The related hard-trim `:324-333` disposition is already explicitly named in 36-06 Task 2 — no gap there.)
+
+### Cycle 2 Divergent Views
+- **Overall readiness:** Codex rates the current set HIGH risk / not-ready (OpenRouter adapter gap + OAuth posture); Claude rates it LOW residual risk (design gaps closed; only the orphaned-test MEDIUM + two LOW nits remain). The lanes did not disagree on any single fact — each simply went deep where the other did not: codex on the cross-module integration/security surfaces, Claude on the test-contract + traceability. The orchestrator verified every finding from both lanes against disk and carries the union.
+- **Informational (NOT counted):** REQUIREMENTS.md AICFG-17 (`:277`) still says the format "bumps to v4"; on-disk `BACKUP_FORMAT_VERSION` is already 4, so 36-08 correctly targets v5 and documents the stale text. The plan is right; REQUIREMENTS.md is the stale artifact — a doc-sync for the owner's awareness, not a plan change.
+
+## Cycle 2 — Codex Review (verbatim)
+
+# Phase 36 plan review — cycle 2
+
+## Summary
+
+**Not ready to execute.** The revision substantively resolves the prior generation-promotion, route-ownership, restore-ownership, new-item-default, context-ceiling, disclosure-persistence, curation, accessibility, and fuel-cleanup findings. Two high-severity gaps remain: OpenRouter can be configured but has no planned executable provider adapter, and the proposed OAuth flow accepts a callback with no CSRF state. Two medium implementation-contract gaps should also be fixed before the one-way migration/backup checkpoints.
+
+I reviewed the code on disk, including the active Compose/AiService path, prompt egress read/build path, every current `group_events` writer, migrations for the newly backed-up tables, and backup export/reconciliation/restore. The graph query command could not run in this sandbox because `tsx` could not create its IPC pipe; this review therefore relies on the code and ADRs directly.
+
+## Strengths
+
+- **Cycle-1 HIGH-1 is addressed in the plan.** Plan 01 explicitly promotes Compose generation away from legacy `AiSettings` and requires the active-connection resolver in both Compose and `AiService` (36-01-PLAN.md:222-225), targeting the live legacy reads at ComposeScreen.tsx:385-400 and AiService.ts:573-602.
+- **Cycle-1 HIGH-2 is addressed in scope.** Plan 09 now owns typed registration plus Settings entry points for all five new screens (36-09-PLAN.md:110-123), rather than leaving the currently closed `SettingsStack` (SettingsStack.tsx:45-102) unchanged.
+- **Cycle-1 HIGH-3 is addressed in scope.** Plan 08 now owns the actual `restore-apply` and reconciliation extensions (36-08-PLAN.md:161-178), covering the real omission in the current interaction restore writer, which drops `duration`/`group_event_id` and forces `allow_ai=0` (restore-apply.ts:190-201).
+- **Cycle-1 HIGH-4 is addressed in scope.** Plan 04 names every current creation seam: memories-dao.ts:106-127, recency-dao.ts:235-252, field-ddl.ts:64-100, and the Phase-36 seam log-interaction-logic.ts:142-149.
+- **Cycle-1 HIGH-5 is addressed.** Plans 03 and 06 consistently retire the fixed `TOTAL_LIMIT` as a total-context governor and require explicit model-window overflow, correcting the live logic at prompt-template.ts:295-333.
+- **Cycle-1 disclosure, curation, reorder-accessibility, tombstone, ACK-column, and narrowly scoped `onConfirm` points are all materially addressed.** Off Limits remains excluded from the egress shape as ADR-107 requires; the existing reader already keeps Group Notes out (ai-context-read.ts:154-191).
+
+## Concerns
+
+### HIGH — OpenRouter is still not wired to a generation adapter
+
+Plan 05 promises that activating OpenRouter sends generation through an OpenAI-compatible adapter (36-05-PLAN.md:62-67), but its complete `files_modified` list contains UI/logic/component files only (36-05-PLAN.md:7-14). Plan 02 implements OAuth and catalog only; it also does not own `AiService`. The only live adapter registry is `AiService`, and it currently creates only `openai`, `anthropic`, `google`, and `custom` providers (AiService.ts:573-593), while `getActiveProvider` only retrieves that map (AiService.ts:599-602). Adding `openrouter` to `AiProviderId` in 36-01 without an adapter leaves a successfully configured active lane with no provider at generation time — the same "green configuration, broken generation" class the generation-promotion revision was meant to eliminate.
+
+**Suggestion:** Add `src/services/AiService.ts` and an adapter test to 36-05 (or a dedicated dependent plan): OpenRouter base URL, headers, credential lookup by `openrouter`, provider-map registration, model forwarding, cancellation/error mapping, and a test that an active OpenRouter connection invokes that adapter.
+
+### HIGH — callback validation still accepts a state-less callback
+
+The plan validates `state` only "when present," and explicitly treats a provider that does not echo state as acceptable (36-02-PLAN.md:28-29). That does not resolve login-CSRF: a malicious `orbit://openrouter-auth?code=...` callback has the exact scheme/host but no binding to the initiating browser session. PKCE binds a code to the verifier; it does not prove the callback belongs to this authorization attempt when the callback omits `state`. This is a security posture issue at the only new browser-auth ingress; it is not safe to silently downgrade the stated anti-CSRF control based on an unverified device observation.
+
+**Suggestion:** Make a matching echoed `state` mandatory before code exchange. If OpenRouter truly cannot echo state, stop at the device spike and obtain an owner decision for a different documented provider-supported binding/flow; do not ship the claimed anti-CSRF control as optional.
+
+### MEDIUM — v5 restore lacks an explicit UID-to-local-ID mapping contract for its FK-bearing entities
+
+Plan 08 says to add generic projections/upserts "in the correct parent/child order" (36-08-PLAN.md:168), but never specifies the necessary wire aliases and ID maps. Several proposed tables do not store portable foreign keys: `system_rules.system_id` → `systems.id` (022-orrery-systems.ts:19-28); `system_overrides.contact_id` → `contacts.id` (022-orrery-systems.ts:33-42); `interactions.group_event_id` (026-group-events-schema.ts:31-39). The current restore works only because each dependency is projected as a UID and remapped through a local ID map (restore-apply.ts:187-205). Raw source integer IDs will be wrong on a destination database, and a roundtrip into the same fixture can hide this.
+
+**Suggestion:** Spell out `systemUid`, `contactUid`, `groupEventUid` in export types/SELECTs; rebuild local integer IDs from destination UIDs on restore; test merge and replace-all into a destination deliberately seeded with different rowids; include order/repair behavior when a referenced UID is absent.
+
+### MEDIUM — Plan 09 promises six management sections but implements five
+
+The owner-ratified UI contract requires six distinct entries: Connection, Model, Writing Style, Personalization Context, AI Data Permissions, Preview (36-UI-SPEC.md:102-106). Plan 09 repeatedly calls its hierarchy six sections, but its listed entries combine Writing Style and Personalization and total five (36-09-PLAN.md:33-38, 135, 153).
+
+**Suggestion:** Either add separate Writing Style and Personalization Context entries targeting anchors in `AIPersonalizationScreen`, or correct the product/UI contract through the owner. Do not leave impossible "six entry" assertions/tests that actually validate five.
+
+### MEDIUM — migration 029 does not state the irreversible Writing Style defaults or the active-pointer identity
+
+The one-way checkpoint calls for a "complete" schema but leaves the three Writing Style SQL defaults unspecified (36-01-PLAN.md:152); Task 1 repeats the omission (36-01-PLAN.md:179). The UI contract supplies the intended defaults — Balanced / Normal / Balanced (36-06-PLAN.md:29) — but a forward-only migration should not make an executor infer literal enum/default values. It likewise never says whether `ai_active_connection` stores the connection UID or lane; restore correctness requires an unambiguous identity.
+
+**Suggestion:** Before the checkpoint, pin all three SQL `DEFAULT` values + exact `CHECK` vocabularies, specify `ai_active_connection = ai_connections.uid` (or another exact immutable identity), and add a migration test for each default and a pointer roundtrip.
+
+## Risk assessment
+
+The remaining risk is **high**. The OpenRouter gap affects the recommended connection lane's core generation path, and the optional-state OAuth callback admits a security downgrade at the browser-to-app boundary. The restore mapping gap matters because v5 is an irreversible portable format: source SQLite integer identifiers must never enter a manifest as portable relationships. The egress boundary itself is otherwise well protected: ADR-107's Off Limits exclusion is retained, Group Notes remain structurally absent, SecureStore remains the sole credential boundary, and the no-silent-truncation contract is now consistent.
+
+## Suggested disposition
+
+Revise plans 02, 05, 08, 09, and the migration-029 checkpoint details; then rerun convergence. The prior cycle's actionable items that are explicitly covered above should remain marked resolved rather than re-raised.
+
+---
+
+## Cycle 2 — Claude Review (verbatim, read-only subagent lane)
+
+# Phase 36 Plan Review — Cycle 2 (Adversarial Cross-AI)
+
+## Summary
+
+The revision is strong. All six cycle-1 HIGH findings are addressed in the current plan set, and all ten actionable items are closed. I verified every HIGH against the actual code on disk (not the plan text): the plans' `path:line` references are accurate, the newly-claimed file ownerships are real, and the privacy core is preserved. Migration numbering (029 = head+1, TARGET_VERSION 28) and backup format (v4 on disk → v5 target) are correct. **No recorded-decision collisions.** Remaining issues are one MEDIUM (an orphaned-test hazard spanning two plans, matching a documented recurring failure mode here) and two LOW doc/label nits.
+
+## Cycle-1 HIGH findings — verdicts
+
+**HIGH-1 — FULLY RESOLVED.** 36-01 lists `ComposeScreen.tsx` + `AiService.ts`; Task 3 rewires `generate` off legacy `AiSettings.aiProvider`/`aiModel`/`aiCustomModel` to an active-connection resolver + grep gate. Code confirms legacy state: ComposeScreen.tsx:390/:392/:398/:494; AiService.ts:599-601, :589. Call site ComposeScreen.tsx:937; ai-availability.ts:49 still 2-input, so the 5-input reshape is real and owned.
+
+**HIGH-2 — FULLY RESOLVED.** 36-09 owns `navigation/types.ts`/`SettingsStack.tsx`/`SettingsScreen.tsx`; registers all five routes + entry points, retires the inline provider UI (SettingsScreen.tsx:321+). wave 5, depends correct.
+
+**HIGH-3 — FULLY RESOLVED.** 36-08 lists `restore-apply.ts`+`reconciliation.ts`; Task 3 owns restore, Task 2 removes tombstone filter. Code confirms restore-apply.ts:50/:201, export-manifest.ts:208/:110. Fail-closed `allow_ai=0` for legacy manifests retained.
+
+**HIGH-4 — FULLY RESOLVED.** 36-04 lists writers + forms; Task 3 routes each through `resolveNewItemAiDefault`. Code confirms memories-dao.ts:126, log-interaction-logic.ts:147, field-ddl.ts:79, recency-dao.ts:251. Verified moot worry: all three `MEMORY_TYPE_REGISTRY` entries are `aiDefault:false` — reconciliation behavior-preserving.
+
+**HIGH-5 — RESOLVED in design; one MEDIUM test-gap (below).** 36-03 and 36-06 state the identical contract and cross-reference. Code confirms prompt-template.ts:38/:40/:298-318/:324-333. Not a recorded-decision collision: AICFG-07 is a `[DECIDED]` dossier requirement superseding the AI-SPEC §4 bound; retiring the ceiling executes it.
+
+**HIGH-6 — RESOLVED at plan level (no code yet).** `openrouter-oauth.ts` absent on disk. 36-02 Task 1 requires generated in-memory `state`, `type==='success'`, exact `orbit://openrouter-auth`, foreign/param rejection, `state` equality when echoed, one-time consumption, verifier+state cleared; node-pure unit-tested validator, device-UAT for state-echo. Comprehensive; no residual gap at plan level. [Orchestrator note: codex escalates the "when echoed" conditional as HIGH-B — carried for owner.]
+
+## Actionable items (a–j) — all resolved
+
+(a) `ai_first_use_disclosed` in migration 029, excluded from `PORTABLE_SETTINGS_KEYS`. (b) zero-connection + one-active pointer integrity in DAO tests (dangling → needs-attention). (c) curation named source `src/ai/model-registry.ts`. (d) accessible reorder Move up/down. (e) `package-lock.json` in 36-02. (f) `ComposeScreen.tsx` in 36-01. (g) group_event tombstone + roundtrip test. (h) AINeedsAttention/Compose ownership clarified. (i) dead `ai_ack_openrouter` keep-vs-retire at checkpoint (neither reverses ADR-079). (j) `onConfirm` strictly scoped to FuelEditor. ✓ all.
+
+## Strengths (verified)
+
+- **Privacy core intact.** ai-context-read.ts:183 gates notes on `allow_ai===1`; :163-164 never reads `group_events`; off_limits excluded from fuel. prompt-types.ts carries only `sharedMemories`(:138) + `gatedRecentInteractionNotes`(:154), no off-limits field. ADR-107 Accepted, supersedes ADR-078 partially — 36-03 framing matches verbatim.
+- **Irreversibility discipline.** Both one-way changes behind blocking-human checkpoints.
+- **TS→SQL blind-spot handled correctly.** 36-04 and 36-08 enumerate table writers by grep rather than trusting the graph.
+
+## Concerns
+
+**MEDIUM — [NEW] Existing `prompt-template.test.ts` ceiling assertions will break the tsc/vitest gate when TOTAL_LIMIT is retired; neither 36-03 nor 36-06 names them.** :151 and :304 both `expect(cp(resolved.prompt)).toBeLessThanOrEqual(TOTAL_LIMIT)` after driving 60/80 over-budget shared fields; :145 is titled "…drops overflow fields in order." Once 36-06 retires the :298-318 governor, these become false and the file-level gate fails — precisely the "orphaned test-consumer build-breaker" (recurred 4× in P35). **PLAN change needed:** name prompt-template.test.ts:145/151/304 to rewrite in 36-06 Task 2 (referenced from 36-03 Task 1) so the two "must agree" plans agree on the test contract.
+
+**LOW — [NEW] Residual RESEARCH-numbering mislabel in 36-03 truths.** 36-03-PLAN.md:29 and :32 cite `(AICFG-08/15)`. Frontmatter `[AICFG-08, AICFG-09]` is correct, but AICFG-15 is SecureStore credentials — unrelated to prompt serialization. Drop `/15`. No other plan carries a residual mislabel (36-05 AICFG-15 refs are legitimate SecureStore; 36-07 [11-14], 36-08 [16,17] correct).
+
+**LOW — [NEW] Stale determinism doc in `prompt-template.ts:20-24`** ("whole prompt ≤ 6,000 code points … Truncation disclosed by CATEGORY", AI-SPEC §4) becomes misleading once the governor is retired. Update the header in 36-06 Task 2. (Hard-trim :324-333 disposition already named in 36-06 Task 2 — no gap.)
+
+**INFORMATIONAL (not a collision).** REQUIREMENTS.md AICFG-17 (:277) still says "bumps to v4"; on-disk `BACKUP_FORMAT_VERSION` is already 4, so 36-08 correctly targets v5 and documents the divergence. Doc-sync for the owner, not a plan change.
+
+## Risk Assessment
+
+**Low residual risk** [from this lane]. The design-level gaps that made cycle 1 dangerous are all closed and confirmed against code; privacy invariants preserved and test-gated. Remaining execution-time risk is the MEDIUM orphaned-test hazard (catchable but historically recurs when not named). No recorded-decision collision. [Orchestrator note: codex's deeper integration/security pass surfaced HIGH-A/HIGH-B, which this lane did not reach; the orchestrator verified both against disk and carries the union.]
+
+---
+
+## Cycle 2 — Verification coverage (source-grounding, advisory — excluded from HIGH/actionable counts)
+
+`git status` confirms **no `src/` file changed since cycle 1** (only `.planning/` + `tsconfig.json`), so the cycle-1 source-grounding table below (VERIFIED 41 / MISSING 1 / AMBIGUOUS 2 / UNCHECKABLE ~24) still holds. Cycle-2 deltas:
+
+| Claim (cycle-2) | Plan | Classification | Evidence |
+|---|---|---|---|
+| `src/ai/model-registry.ts` curated set (was cycle-1 MISSING at `src/services/model-registry.ts`) | 05 | **FIXED / VERIFIED** | 36-05 read_first now cites `src/ai/model-registry.ts` and notes `src/services/model-registry.ts` does not exist. |
+| `AiService.refreshProviders` registers only openai/anthropic/google/custom; no openrouter | 01, 05 | VERIFIED | AiService.ts:573-591 `providers.set(...)` ×4; :599-602 `getActiveProvider` reads the map. Basis of cycle-2 HIGH-A. |
+| `system_rules.system_id` / `system_overrides.contact_id` INTEGER FKs | 08 | VERIFIED | 022-orrery-systems.ts `system_id INTEGER NOT NULL REFERENCES systems(id)`, `contact_id INTEGER NOT NULL REFERENCES contacts(id)`. Basis of cycle-2 MEDIUM (FK remap). |
+| UI-SPEC Surface #1 lists SIX distinct sections | 09 | VERIFIED | 36-UI-SPEC.md:106 enumerates six; 36-09 enumerates five. Basis of cycle-2 MEDIUM (six-vs-five). |
+| `prompt-template.test.ts` asserts `<= TOTAL_LIMIT` at :151/:304; "drops overflow fields" at :145 | 03, 06 | VERIFIED | grep confirms all three assertions. Basis of cycle-2 MEDIUM (orphaned-test). |
+| 36-03 truths cite `(AICFG-08/15)` while frontmatter is `[08,09]` | 03 | VERIFIED (mislabel) | 36-03-PLAN.md:29,:32. Basis of cycle-2 LOW (mislabel). |
+| All plans cite canonical AICFG-01..17 (frontmatter `requirements:`) | 01-09 | VERIFIED | frontmatter IDs ⊆ REQUIREMENTS.md AICFG-01..17; 36-03 retagged to [08,09]; no non-existent IDs. Residual prose `/15` in 36-03 is the only mislabel. |
+| migration head+1 = 029 (`TARGET_VERSION`=28); `BACKUP_FORMAT_VERSION` 4 → v5 | 01, 08 | VERIFIED (unchanged) | database.ts head 028; src/backup/types.ts:14 = 4. |
+| REQUIREMENTS.md AICFG-17 text says "bumps to v4" | 08 | INFORMATIONAL drift | REQUIREMENTS.md:277; 36-08 correctly targets v5 and flags the stale text. Doc-sync (owner), not a plan finding. |
+
+**Cycle-2 source-grounding summary: all cycle-2 findings independently VERIFIED against disk; the cycle-1 MISSING (model-registry path) is now FIXED. Advisory — excluded from HIGH/actionable counts.**
+
+---
+---
+
+# Cross-AI Plan Review — Phase 36 "AI Configuration & Prompting" (CYCLE 1 — preserved below, historical)
 
 Phase 36 is the milestone's AI-configuration phase and touches the app's **only** off-device egress path (the optional AI-suggestion feature). Reviews below are source-grounded against the code on disk per "review the code, not the diff."
 
