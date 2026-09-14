@@ -1,7 +1,7 @@
 # Contact Knowledge
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 28-dashboard-card-view
+**Updated by phase:** 31-profile-experience
 **Owners:** `src/db/memory-registry.ts`, `src/db/memories-dao.ts`, `src/db/memories-read.ts`, `src/db/relationships-dao.ts`, `src/db/relationships-read.ts`, `src/db/current-state-history-dao.ts`, `src/db/current-state-history-read.ts`, `src/db/first-class-knowledge-read.ts`, `src/db/knowledge-search-read.ts`, `src/db/dashboard-knowledge-read.ts`, `src/services/knowledge-search.ts`, `src/services/memory-trash-sweep.ts`
 
 ## Purpose
@@ -145,7 +145,11 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **ADR-100:** Relevance-First, Visibility-Safe Dashboard List Search — preserves only safe knowledge in List search explanations and snippets.
 - **ADR-101:** Avatar-First Accessible Dashboard Card Renderer — reuses the same bounded candidates and semantic search descriptors for compact Card context.
 
+- **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — lets Profile shape compact knowledge while each source retains its writer and permission semantics.
+
 ## Gotchas
+
+1. **Profile presentation does not change source semantics.** The coherent Profile snapshot may cap, group, or hide a card, but edits and durable visibility stay with the owning Memory, relationship, current-state, custom-field, or fuel workflow.
 
 1. **Memory types are not user-created records.** A user-labelled Custom item is allowed; a user-writable type set would reverse ADR-028.
 2. **Memory AI permission is explicit.** Visibility, provenance, and type are not egress permission; only the SQL eligibility predicate may admit an opted-in live row.
@@ -179,3 +183,4 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | 2026-09-02 | 25 | Added eligible-ID-scoped semantic search provenance, matching, and highlight offsets for Dashboard consumption. |
 | 2026-09-02 | 27 | Added bounded visibility-safe candidates for deterministic List context and tightened List search presentation boundaries. |
 | 2026-09-02 | 28 | Reused bounded candidates and shared descriptors for compact Card View context and search presentation. |
+| 2026-09-02 | 31 | Added typed source-owned knowledge projections to one coherent Profile snapshot, including explicit local-only Off Limits presentation. |
