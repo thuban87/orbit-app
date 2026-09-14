@@ -117,5 +117,10 @@
 // NOTE: ADR-0105 [ACCEPTED] Scoped Relationship Satellites for System-Member Context
 // NOTE: ADR-0106 [ACCEPTED] Derived Orrery Gravity Visual Mass and Accessible Context
 // NOTE: ADR-0107 [ACCEPTED] Off Limits Excluded from All AI Egress
+// NOTE: ADR-0108 [ACCEPTED] Durable Independent-Axis Profile Presentation and Inheritance
+// NOTE: ADR-0109 [ACCEPTED] Fixed-Hero Semantic Profile Composition and Focused Accessible Editors
+// NOTE: ADR-0110 [ACCEPTED] Coherent Local Profile Snapshot and Source-Owned Knowledge Projection
+// NOTE: ADR-0111 [ACCEPTED] Cadence-Guarded Profile Metrics and Composed Relationship Actions
+// NOTE: ADR-0112 [ACCEPTED] App-Owned Profile Background Derivatives and Launch Reconciliation
 
-export const ADR_COUNT = 107;
+export const ADR_COUNT = 112;

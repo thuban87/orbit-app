@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 24 of
-  107 ADRs are superseded in whole or in part.
+  112 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -138,3 +138,8 @@ not something you can pattern-match against.
 | 105 | Scoped Relationship Satellites for System-Member Context | Accepted | 29-orrery-camera-scale-exploration | — | — | — | 4 | `src/components/orrery`, `src/db`, `src/logic` |
 | 106 | Derived Orrery Gravity Visual Mass and Accessible Context | Accepted | 29-orrery-camera-scale-exploration | ADR-027 (partial — profile-only presentation and rejected Orrery encoding clauses) | — | — | 5 | `src/components/orrery`, `src/db`, `src/logic` +1 |
 | 107 | Off Limits Excluded from All AI Egress | Accepted | 35-messaging-ai-compose | ADR-078 (partial — Off Limits AI egress only; ADR-078's gated recent-interaction-note carry and absolute Group Notes ban remain in force) | — | — | 5 | `src/ai`, `src/db`, `src/screens` |
+| 108 | Durable Independent-Axis Profile Presentation and Inheritance | Accepted | 31-profile-experience | — | — | — | 10 | `src/db`, `src/db/migrations`, `src/profile` |
+| 109 | Fixed-Hero Semantic Profile Composition and Focused Accessible Editors | Accepted | 31-profile-experience | — | — | — | 10 | `src/components/profile`, `src/components/ui`, `src/navigation` +2 |
+| 110 | Coherent Local Profile Snapshot and Source-Owned Knowledge Projection | Accepted | 31-profile-experience | — | — | — | 10 | `src/components/profile`, `src/db`, `src/profile` |
+| 111 | Cadence-Guarded Profile Metrics and Composed Relationship Actions | Accepted | 31-profile-experience | — | — | — | 8 | `src/components/profile`, `src/db`, `src/profile` +1 |
+| 112 | App-Owned Profile Background Derivatives and Launch Reconciliation | Accepted | 31-profile-experience | — | — | — | 9 | `assets/backgrounds`, `src/components/profile`, `src/components/ui` +2 |
