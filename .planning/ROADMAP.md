@@ -881,11 +881,11 @@ Plans:
 **Canonical refs**: docs/dossier/milestone-2/phase-16-ai-configuration-prompting-dossier.md; docs/dossier/milestone-2/planning-notes/phase-16-planning-notes.md
 **Schema**: AI configuration tables/columns, then the **final backup wire-format bump as the phase's last plan** (now v5 — v4 landed early in 24.1; see migration-ordering amendment; verify head+1 and the current `BACKUP_FORMAT_VERSION` on disk at plan time)
 **Consumes from Phase 24.2** (deferred code cleanup, planner-noted 2026-09-04): remove the now-inert legacy AI-proposed-fuel confirm path retired by ADR-081 — `confirmFuel`/`confirmFuelCore` (fuel-dao.ts:214/297; :297 verified on disk, not :282), the FuelEditor AI-unconfirmed render + Confirm/Dismiss control, and the no-op `onConfirm` wiring in CreateContactScreen/EditContactScreen. NOTE (verified on disk at plan time): `confirmFuel` is NOT wired in ContactProfileScreen (the :70/705 refs are unrelated state) — it is consumed by Create/EditContactScreen. 24.2 landed the data + ADR half (migration 017 removed all `source='ai'` rows; ADR-081 supersedes ADR-030) but left the inert UI in place for this phase to delete.
-**Plans**: 9 plans (5 waves) — 36-09 (Settings AI hub + navigation) added in the cross-AI review pass to close review HIGH #2 (new AI screens were route-less/unreachable) + own the unowned AICFG-01 master-toggle UI; runs in wave 5 parallel to the FINAL backup plan 36-08 (no shared files)
+**Plans**: 1/9 plans executed (5 waves) — 36-09 (Settings AI hub + navigation) added in the cross-AI review pass to close review HIGH #2 (new AI screens were route-less/unreachable) + own the unowned AICFG-01 master-toggle UI; runs in wave 5 parallel to the FINAL backup plan 36-08 (no shared files)
 Plans:
 **Wave 1**
 
-- [ ] 36-01-PLAN.md — TRACER: migration 029 (AI-config schema) + AiProviderId reshape + master toggle + multi-connection + availability + ComposeScreen generation PROMOTED to the active connection, direct-BYOK lane end-to-end (AICFG-01/02/03/05)
+- [x] 36-01-PLAN.md — TRACER: migration 029 (AI-config schema) + AiProviderId reshape + master toggle + multi-connection + availability + ComposeScreen generation PROMOTED to the active connection, direct-BYOK lane end-to-end (AICFG-01/02/03/05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -975,7 +975,7 @@ Plans:
 | 33. Group Interaction Logging | 7/7 | Complete | 2026-09-12 (physical-Pixel UAT passed; release APK built on droid) |
 | 34. Rapid Capture & Update Flows | 8/8 | Complete | 2026-09-13 |
 | 35. Messaging & AI Compose | 9/9 | Complete |  |
-| 36. AI Configuration & Prompting | 0/TBD | Not started | - |
+| 36. AI Configuration & Prompting | 1/9 | In Progress|  |
 | 37. Settings & Personalization | 0/TBD | Deferred planning | - |
 | 38. Your Week | 0/TBD | Deferred planning | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |

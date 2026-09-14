@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 36
-current_phase_name: ai-configuration-prompting
+current_phase_name: AI Configuration & Prompting
 status: executing
-stopped_at: Phase 36 UI-SPEC approved
-last_updated: "2026-09-14T04:07:17.994Z"
+stopped_at: Completed 36-01-PLAN.md
+last_updated: "2026-09-14T05:58:15.285Z"
 last_activity: 2026-09-13
-last_activity_desc: Phase 35 complete, transitioned to Phase 36
-state_head: 1f0e4035338a4feeb04a7d9d5ddc6746b61290db
+last_activity_desc: Phase 36 execution started
+state_head: 1c3a3c35731e95d597c85407a26296611548860a
 progress:
   total_phases: 21
   completed_phases: 10
   total_plans: 146
-  completed_plans: 135
+  completed_plans: 136
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -32,20 +32,20 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 36 — AI Configuration & Prompting (ready to plan; Phase 35 complete)
+**Current focus:** Phase 36 — AI Configuration & Prompting
 
 ## Current Position
 
-Phase: 36 (ai-configuration-prompting) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
+Phase: 36 (AI Configuration & Prompting) — EXECUTING
+Plan: 2 of 9
+Status: Executing Phase 36
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-13 — Phase 35 complete, transitioned to Phase 36
+Last activity: 2026-09-13 — Phase 36 execution started
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: End-of-phase Pixel UAT for Phase 34 (see 34-08-SUMMARY coverage), then verify/close the phase.
 
@@ -283,6 +283,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 35 P03 | 11min | 4 tasks | 6 files |
 | Phase 35 P35-04 | 13min | 4 tasks | 7 files |
 | Phase 35 P35-06 | 13min | 4 tasks | 7 files |
+| Phase 36 P01 | 1h 43m | 4 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -619,6 +620,9 @@ Foundational decisions affecting current work:
 - [Phase 34]: 34-01 channel keys are declare-only backup portable (camelCase MANIFEST keys, validated at restore boundary, not emitted) — Phase 36 owns emission + format bump
 - [Phase 35]: [35-04] AI lifecycle reshaped to ADR-079 three-suggestion contract (review:{suggestions: readonly string[]}), single-suggestion confirm-replace retired; ack gate removed cleanly (D-09), DAO ai_ack_* writer left forward-only; HIGH-2 egress-failure aborts controller before nulling so fan-out siblings cancel.
 - [Phase 35]: [35-04] Three-suggestion MECHANISM = node-pure generateVariants fan-out (3 single-draft calls under one signal) + variantTemperature variation lever; AiService single-draft provider contract untouched (Phase 36 owns provider layer). ai-availability adapter is provisional D-12, stable interface Compose consumes.
+- [Phase 36]: 36-01: Owner selected approve-retire-ack; migration 029 omits ai_ack_openrouter and acknowledgeProvider is retired under ADR-079.
+- [Phase 36]: 36-01: ai_active_connection stores a lane natural key; empty or dangling pointers resolve to Needs Attention with no silent substitution.
+- [Phase 36]: 36-01: OpenRouter uses the OpenAI-compatible no-output-cap default until a model-specific cap is supplied.
 
 ### Pending Todos
 
@@ -685,11 +689,11 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-13T21:06:14.504Z
-**Stopped at:** Phase 36 UI-SPEC approved
+**Last session:** 2026-09-14T05:58:10.648Z
+**Stopped at:** Completed 36-01-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** .planning/phases/36-ai-configuration-prompting/36-UI-SPEC.md
+**Resume file:** None
 are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
