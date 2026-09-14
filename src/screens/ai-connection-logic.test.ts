@@ -4,8 +4,8 @@ import {
   beginConnectionSetup,
   connectionCardState,
   finishConnectionSetup,
-  repairForAvailability,
   removeLaneCredential,
+  repairForAvailability,
   saveCustomConnection,
   saveDirectCredential,
 } from "@/screens/ai-connection-logic";
@@ -20,9 +20,9 @@ describe("AI connection switching", () => {
   it("keeps the prior lane active until setup succeeds", () => {
     const pending = beginConnectionSetup(initial, "anthropic");
     expect(pending.activeLane).toBe("openai");
-    expect(finishConnectionSetup(pending, "anthropic", false, "claude")).toEqual(
-      initial,
-    );
+    expect(
+      finishConnectionSetup(pending, "anthropic", false, "claude"),
+    ).toEqual(initial);
     expect(
       finishConnectionSetup(pending, "anthropic", true, "claude"),
     ).toMatchObject({
@@ -97,14 +97,21 @@ describe("Needs Attention repair mapping", () => {
   };
 
   it("maps each cause to an explicit repair without substitution", () => {
-    expect(repairForAvailability({ ...ready, hasCredential: false }, "expired"))
-      .toMatchObject({ action: "reconnect", label: "Reconnect" });
-    expect(repairForAvailability({ ...ready, hasCredential: false }, "invalid-key"))
-      .toMatchObject({ action: "replace-key", label: "Replace key" });
-    expect(repairForAvailability({ ...ready, modelAvailable: false }, null))
-      .toMatchObject({ action: "choose-model", label: "Choose another model" });
-    expect(repairForAvailability({ ...ready, activeConnection: null }, null))
-      .toMatchObject({ action: "change-connection", label: "Change AI connection" });
+    expect(
+      repairForAvailability({ ...ready, hasCredential: false }, "expired"),
+    ).toMatchObject({ action: "reconnect", label: "Reconnect" });
+    expect(
+      repairForAvailability({ ...ready, hasCredential: false }, "invalid-key"),
+    ).toMatchObject({ action: "replace-key", label: "Replace key" });
+    expect(
+      repairForAvailability({ ...ready, modelAvailable: false }, null),
+    ).toMatchObject({ action: "choose-model", label: "Choose another model" });
+    expect(
+      repairForAvailability({ ...ready, activeConnection: null }, null),
+    ).toMatchObject({
+      action: "change-connection",
+      label: "Change AI connection",
+    });
     expect(repairForAvailability(ready, null)).toBeNull();
   });
 });
