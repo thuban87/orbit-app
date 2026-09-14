@@ -236,6 +236,9 @@ describe("whole-system and contact-specific prompt previews", () => {
     };
     const resolved = resolvePrompt("", context);
     const review = buildContactPromptReview(resolved, context);
+    const whole = buildWholePromptPreview(resolved);
+    expect(whole.display).toContain("PRIVATE GLOBAL STYLE");
+    expect(whole.display).toContain("PRIVATE GLOBAL PERSONALIZATION");
     expect(review.heading).toBe("Sharing 4 items with AI about Casey");
     expect(review.display).toContain("Garden plans");
     expect(review.display).toContain("Madison");
