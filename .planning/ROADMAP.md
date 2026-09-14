@@ -154,6 +154,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 35: Messaging & AI Compose** - Compose-first drafting workspace, Text/Email transmit handoff, Research side, three-suggestion AI review (completed 2026-09-13; goal ACHIEVED — verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel) + 3 warnings, ALL fixed; one Wave-1 cross-plan regression (35-05→006 test) caught and fixed. On-device: migration 028 proven at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk). 3391 tests pass, tsc/colors clean. AiService.ts untouched all phase — AI egress not widened)
 - [ ] **Phase 36: AI Configuration & Prompting** - Three connection lanes, prompt personalization, permission manager, and the final backup format bump (v5 — v4 landed early in 24.1)
 - [ ] **Phase 37: Settings & Personalization** - Navigation-first Settings directory (hub + per-concept category screens) replacing the 2,168-line monolith; surfaces already-persisted preferences, dual-homes Data & Backup, reserves the Categories IA slot — no schema/format change (planned 2026-09-14: 8 plans, 8 waves)
+- [ ] **Phase 37.1: Category Management** (INSERTED) - Category CRUD (create/rename/delete) over the read-only `categories` table + the deletion-cascade fallout to Orrery Systems, custom-System rules, Profile category assignments, and backup; consumes the route name/IA slot Phase 37 reserves (D-03, owner-approved 2026-09-14 to schedule now, before Phase 38)
 - [ ] **Phase 38: Your Week** - DEFERRED PLANNING — relocated birthday presentation, Group Event rollups, heatmap-aggregation reuse
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
@@ -964,9 +965,21 @@ Plans:
 
 - [ ] 37-08-PLAN.md — About Orbit (§K) + widget utility row (§L) + monolith retirement + D-06 no-schema/format-change confirmation
 
-**Roadmap follow-up owed (D-03):** a future **Category Management** phase (category CRUD + deletion cascade to Orrery Systems, custom-System rules, Profile assignments, backup) is an unscheduled dependency surfaced during Phase 37 planning. Raise with the owner to schedule it; Phase 37 only reserves the route name/IA slot.
+**Roadmap follow-up (D-03) — SCHEDULED as Phase 37.1 (INSERTED, owner-approved 2026-09-14):** the **Category Management** phase (category CRUD + deletion cascade to Orrery Systems, custom-System rules, Profile assignments, backup) surfaced during Phase 37 planning is now scheduled to run immediately after Phase 37, before Phase 38. Phase 37 reserves only the route name/IA slot; 37.1 builds the manager and the cascade.
 
 **UI hint**: yes
+
+### Phase 37.1: Category Management (INSERTED)
+
+**Goal:** Build category CRUD (create / rename / delete) over the `categories` table — read-only since migration 001 (4 seeded rows, zero runtime CRUD writers) — and handle the deletion-cascade fallout across every consumer: Orrery Systems, custom-System rules, Profile category assignments, and backup. Consumes the `CategoryManagement` route name / IA slot Phase 37 reserves under Contacts & Relationships → Relationship Structure.
+**Depends on:** Phase 37 (consumes the reserved Categories route + IA slot)
+**Requirements**: TBD — deferred to planning
+**Scope source:** D-03 in `.planning/phases/37-settings-personalization/37-CONTEXT.md` (owner-confirmed 2026-09-14). Deletion cascade must be designed against a destructive, forward-only, irreversible-in-production SQLite migration (no remote DB access; `field_history`-style snapshot discipline where a destructive op removes dependent rows).
+**Canonical refs**: `.planning/phases/37-settings-personalization/37-CONTEXT.md` (D-03), the `categories` table (migration 001), Orrery Systems + custom-System rules + Profile category assignment + backup writers.
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 37.1 to break down)
 
 ### Phase 38: Your Week
 
