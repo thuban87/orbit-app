@@ -287,6 +287,7 @@ export async function connectOpenRouter(
   let state = "";
   let attemptId = "";
   let consumed = false;
+  let removeAbortListener: (() => void) | undefined;
   try {
     if (deps.signal?.aborted) throw new OpenRouterConnectionError();
     const attempt = await generateOpenRouterPkce(crypto);
@@ -302,7 +303,20 @@ export async function connectOpenRouter(
       callbackUrl: started.callbackUrl,
     });
 
-    const browserResult = await opener(authUrl, OPENROUTER_WAKE_URI);
+    let browserResultPromise = opener(authUrl, OPENROUTER_WAKE_URI);
+    if (deps.signal) {
+      const abortPromise = new Promise<never>((_, reject) => {
+        const onAbort = () => {
+          void loopback.cancelAttempt(attemptId).catch(() => undefined);
+          reject(new OpenRouterConnectionError());
+        };
+        deps.signal?.addEventListener("abort", onAbort, { once: true });
+        removeAbortListener = () =>
+          deps.signal?.removeEventListener("abort", onAbort);
+      });
+      browserResultPromise = Promise.race([browserResultPromise, abortPromise]);
+    }
+    const browserResult = await browserResultPromise;
     if (!validateWake(browserResult) || deps.signal?.aborted) {
       throw new OpenRouterConnectionError();
     }
@@ -337,6 +351,7 @@ export async function connectOpenRouter(
     // Collapse native/network/parser failures before AIConnectionScreen logging.
     throw new OpenRouterConnectionError();
   } finally {
+    removeAbortListener?.();
     if (attemptId !== "") {
       try {
         await loopback.cancelAttempt(attemptId);

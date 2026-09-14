@@ -22,9 +22,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 internal const val APP_WAKE_URI = "orbit://openrouter-auth"
 internal const val ERR_CANCELLED = "ERR_CANCELLED"
-private const val ERR_ACTIVE_ATTEMPT = "ERR_ACTIVE_ATTEMPT"
+internal const val ERR_ACTIVE_ATTEMPT = "ERR_ACTIVE_ATTEMPT"
 private const val ERR_INVALID_ATTEMPT = "ERR_INVALID_ATTEMPT"
-private const val ERR_ALREADY_AWAITED = "ERR_ALREADY_AWAITED"
+internal const val ERR_ALREADY_AWAITED = "ERR_ALREADY_AWAITED"
 private const val ERR_TIMEOUT = "ERR_TIMEOUT"
 private const val ERR_TRANSPORT = "ERR_TRANSPORT"
 private const val CALLBACK_PATH = "/openrouter-auth"
@@ -184,21 +184,52 @@ internal class LoopbackAttempt private constructor(
   }
 }
 
-class OrbitOpenRouterLoopbackModule : Module() {
-  private val lock = Any()
+/** Synchronized single-attempt ownership, isolated for real JVM race tests. */
+internal class LoopbackAttemptOwner {
   private var active: LoopbackAttempt? = null
+
+  @Synchronized fun start(state: String, timeoutMs: Long): LoopbackAttempt {
+    if (active != null) throw LoopbackFailure(ERR_ACTIVE_ATTEMPT)
+    return LoopbackAttempt.start(state, timeoutMs).also { active = it }
+  }
+
+  @Synchronized fun claim(attemptId: String): LoopbackAttempt {
+    val attempt = active?.takeIf { it.attemptId == attemptId }
+      ?: throw LoopbackFailure(ERR_INVALID_ATTEMPT)
+    if (!attempt.claimAwait()) throw LoopbackFailure(ERR_ALREADY_AWAITED)
+    return attempt
+  }
+
+  @Synchronized fun release(attempt: LoopbackAttempt) {
+    if (active === attempt) active = null
+  }
+
+  @Synchronized fun cancel(attemptId: String): LoopbackAttempt? {
+    val attempt = active?.takeIf { it.attemptId == attemptId } ?: return null
+    active = null
+    attempt.cancel(ERR_CANCELLED)
+    return attempt
+  }
+
+  @Synchronized fun destroy(): LoopbackAttempt? {
+    val attempt = active
+    active = null
+    attempt?.cancel(ERR_CANCELLED)
+    return attempt
+  }
+}
+
+class OrbitOpenRouterLoopbackModule : Module() {
+  private val owner = LoopbackAttemptOwner()
 
   override fun definition() = ModuleDefinition {
     Name("OrbitOpenRouterLoopback")
 
     AsyncFunction("startAttempt") { state: String, timeoutMs: Long, promise: Promise ->
       try {
-        val attempt = synchronized(lock) {
-          if (active != null) throw LoopbackFailure(ERR_ACTIVE_ATTEMPT)
-          LoopbackAttempt.start(state, timeoutMs).also { active = it }
-        }
+        val attempt = owner.start(state, timeoutMs)
         attempt.result.whenComplete { _, error ->
-          if (error != null) synchronized(lock) { if (active === attempt) active = null }
+          if (error != null) owner.release(attempt)
         }
         promise.resolve(mapOf("attemptId" to attempt.attemptId, "callbackUrl" to attempt.callbackUrl))
       } catch (failure: LoopbackFailure) {
@@ -209,17 +240,14 @@ class OrbitOpenRouterLoopbackModule : Module() {
     }
 
     AsyncFunction("awaitCallback") { attemptId: String, promise: Promise ->
-      val attempt = synchronized(lock) { active?.takeIf { it.attemptId == attemptId } }
-      if (attempt == null) {
-        promise.reject(ERR_INVALID_ATTEMPT, "OpenRouter connection failed.", null)
-        return@AsyncFunction
-      }
-      if (!attempt.claimAwait()) {
-        promise.reject(ERR_ALREADY_AWAITED, "OpenRouter connection failed.", null)
+      val attempt = try {
+        owner.claim(attemptId)
+      } catch (failure: LoopbackFailure) {
+        promise.reject(failure.stableCode, "OpenRouter connection failed.", null)
         return@AsyncFunction
       }
       attempt.result.whenComplete { callback, error ->
-        synchronized(lock) { if (active === attempt) active = null }
+        owner.release(attempt)
         if (error != null || callback == null) {
           val code = (error?.cause as? LoopbackFailure)?.stableCode
             ?: (error as? LoopbackFailure)?.stableCode ?: ERR_TRANSPORT
@@ -231,15 +259,11 @@ class OrbitOpenRouterLoopbackModule : Module() {
     }
 
     AsyncFunction("cancelAttempt") { attemptId: String ->
-      val attempt = synchronized(lock) {
-        active?.takeIf { it.attemptId == attemptId }?.also { active = null }
-      }
-      attempt?.cancel(ERR_CANCELLED)
+      owner.cancel(attemptId)
     }
 
     OnDestroy {
-      val attempt = synchronized(lock) { active.also { active = null } }
-      attempt?.cancel(ERR_CANCELLED)
+      owner.destroy()
     }
   }
 }

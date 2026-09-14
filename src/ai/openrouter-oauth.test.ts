@@ -8,6 +8,7 @@ import {
   OPENROUTER_KEY_EXCHANGE_URL,
   OPENROUTER_WAKE_URI,
   type OpenRouterBrowserOpener,
+  type OpenRouterBrowserResult,
   type OpenRouterCrypto,
   type OpenRouterFetch,
   type OpenRouterLoopback,
@@ -263,10 +264,12 @@ describe("OpenRouter connect", () => {
   it("cancels native work immediately when the caller aborts during Chrome", async () => {
     const loopback = loopbackPort();
     const controller = new AbortController();
-    let finishBrowser: ((result: { type: string; url: string }) => void) | undefined;
+    let finishBrowser:
+      | ((result: { type: string; url: string }) => void)
+      | undefined;
     const opener: OpenRouterBrowserOpener = vi.fn(
       () =>
-        new Promise((resolve) => {
+        new Promise<OpenRouterBrowserResult>((resolve) => {
           finishBrowser = resolve;
         }),
     );
