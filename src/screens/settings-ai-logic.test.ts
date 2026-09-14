@@ -18,7 +18,9 @@ import {
   buildInspectorViewState,
   buildProviderAckViewState,
   buildWholePromptPreview,
+  describeAiDataPath,
   discoverModelsForField,
+  shouldShowFirstUseDisclosure,
   validateEndpointForSave,
 } from "@/screens/settings-ai-logic";
 
@@ -280,5 +282,66 @@ describe("whole-system and contact-specific prompt previews", () => {
     });
     expect(views).not.toContain("sk-PRIVATE-CREDENTIAL");
     expect(views).not.toContain("PRIVATE-API-KEY");
+  });
+});
+
+describe("first-use AI disclosure", () => {
+  it("names OpenRouter plus the selected model's underlying provider", () => {
+    expect(
+      describeAiDataPath({
+        lane: "openrouter",
+        model: "anthropic/claude-sonnet",
+        customEndpoint: "",
+      }),
+    ).toBe("OpenRouter and Anthropic");
+  });
+
+  it("names a direct provider and a configured custom endpoint", () => {
+    expect(
+      describeAiDataPath({
+        lane: "google",
+        model: "gemini-pro",
+        customEndpoint: "",
+      }),
+    ).toBe("Google Gemini");
+    expect(
+      describeAiDataPath({
+        lane: "custom",
+        model: "custom-model",
+        customEndpoint: "https://ai.example.com/v1",
+      }),
+    ).toBe("your configured custom endpoint (ai.example.com)");
+  });
+
+  it("shows only after successful local setup and only until acknowledged", () => {
+    const connection = {
+      lane: "openai" as const,
+      model: "gpt-test",
+      customEndpoint: "",
+    };
+    expect(
+      shouldShowFirstUseDisclosure({
+        aiEnabled: true,
+        connection,
+        credentialPresent: true,
+        disclosed: false,
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowFirstUseDisclosure({
+        aiEnabled: true,
+        connection,
+        credentialPresent: false,
+        disclosed: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldShowFirstUseDisclosure({
+        aiEnabled: true,
+        connection,
+        credentialPresent: true,
+        disclosed: true,
+      }),
+    ).toBe(false);
   });
 });
