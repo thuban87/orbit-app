@@ -36,7 +36,7 @@ class OrbitOpenRouterLoopbackModuleTest {
     assertEquals(400, responseCode("${attempt.baseUrl}?code=x&state=wrong"))
     assertFalse(attempt.result.isDone)
     assertEquals(303, responseCode("${attempt.baseUrl}?code=x&state=expected"))
-    assertEquals("${attempt.baseUrl}?code=x&state=expected", attempt.result.get().callbackUrl)
+    assertEquals("${attempt.baseUrl}?state=expected&code=x", attempt.result.get().callbackUrl)
     assertRefusesConnections(attempt.port)
   }
 

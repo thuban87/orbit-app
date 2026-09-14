@@ -1,10 +1,8 @@
 /**
- * OpenRouter browser authorization — PKCE S256 + strict custom-scheme callback.
- *
- * The authorization code, verifier, and anti-CSRF state exist only in this
- * function's memory for one attempt. The resulting API key crosses exactly one
- * storage boundary: ai-key-store → SecureStore (`orbit.ai.key.openrouter`).
- * No value in this flow is logged or written to SQLite / AsyncStorage.
+ * OpenRouter browser authorization — PKCE S256 plus a temporary loopback
+ * callback. OpenRouter receives only the dynamic 127.0.0.1 URL. The custom
+ * scheme is a credential-free wake signal after native validation succeeds.
+ * Attempt material stays in memory; only the returned key reaches SecureStore.
  */
 import { aiKeyStore } from "@/services/ai-key-store";
 import type { AiCloudProviderId } from "@/services/ai-types";
@@ -12,7 +10,9 @@ import type { AiCloudProviderId } from "@/services/ai-types";
 export const OPENROUTER_AUTH_URL = "https://openrouter.ai/auth";
 export const OPENROUTER_KEY_EXCHANGE_URL =
   "https://openrouter.ai/api/v1/auth/keys";
-export const OPENROUTER_REDIRECT_URI = "orbit://openrouter-auth";
+export const OPENROUTER_WAKE_URI = "orbit://openrouter-auth";
+/** Owner-tunable maximum lifetime for one browser authorization attempt. */
+export const OPENROUTER_ATTEMPT_TIMEOUT_MS = 120_000;
 
 const PKCE_RANDOM_BYTES = 32;
 const STATE_RANDOM_BYTES = 24;
@@ -53,6 +53,24 @@ export type OpenRouterBrowserOpener = (
   redirectUrl: string,
 ) => Promise<OpenRouterBrowserResult>;
 
+export interface OpenRouterLoopbackStart {
+  readonly attemptId: string;
+  readonly callbackUrl: string;
+}
+
+export interface OpenRouterLoopbackResult {
+  readonly callbackUrl: string;
+}
+
+export interface OpenRouterLoopback {
+  startAttempt(
+    state: string,
+    timeoutMs: number,
+  ): Promise<OpenRouterLoopbackStart>;
+  awaitCallback(attemptId: string): Promise<OpenRouterLoopbackResult>;
+  cancelAttempt(attemptId: string): Promise<void>;
+}
+
 export interface OpenRouterExchangeResponse {
   readonly ok: boolean;
   readonly status: number;
@@ -71,6 +89,7 @@ export type OpenRouterFetch = (
 
 export interface ConnectOpenRouterDeps {
   readonly crypto?: OpenRouterCrypto;
+  readonly loopback?: OpenRouterLoopback;
   readonly opener?: OpenRouterBrowserOpener;
   readonly fetchImpl?: OpenRouterFetch;
   readonly setKey?: (provider: AiCloudProviderId, key: string) => Promise<void>;
@@ -80,7 +99,6 @@ export interface ConnectOpenRouterDeps {
 const BASE64_ALPHABET =
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-/** Encode bytes without Buffer/btoa so Hermes and node use identical logic. */
 function bytesToBase64(bytes: Uint8Array): string {
   let result = "";
   for (let index = 0; index < bytes.length; index += 3) {
@@ -112,7 +130,9 @@ const nativeCrypto: OpenRouterCrypto = {
     return crypto.digestStringAsync(
       crypto.CryptoDigestAlgorithm.SHA256,
       input,
-      { encoding: crypto.CryptoEncoding.BASE64 },
+      {
+        encoding: crypto.CryptoEncoding.BASE64,
+      },
     );
   },
 };
@@ -125,9 +145,30 @@ const nativeBrowserOpener: OpenRouterBrowserOpener = async (
   return browser.openAuthSessionAsync(authUrl, redirectUrl);
 };
 
+const nativeLoopback: OpenRouterLoopback = {
+  async startAttempt(state, timeoutMs) {
+    const module = await import("../../modules/orbit-openrouter-loopback");
+    return module.startAttempt(state, timeoutMs);
+  },
+  async awaitCallback(attemptId) {
+    const module = await import("../../modules/orbit-openrouter-loopback");
+    return module.awaitCallback(attemptId);
+  },
+  async cancelAttempt(attemptId) {
+    const module = await import("../../modules/orbit-openrouter-loopback");
+    await module.cancelAttempt(attemptId);
+  },
+};
+
 const nativeFetch: OpenRouterFetch = async (url, init) => fetch(url, init);
 
-/** Generate one in-memory PKCE verifier/challenge and anti-CSRF state pair. */
+export class OpenRouterConnectionError extends Error {
+  constructor() {
+    super("openrouter_connection_failed");
+    this.name = "OpenRouterConnectionError";
+  }
+}
+
 export async function generateOpenRouterPkce(
   crypto: OpenRouterCrypto = nativeCrypto,
 ): Promise<OpenRouterPkce> {
@@ -141,23 +182,19 @@ export async function generateOpenRouterPkce(
   return { verifier, challenge, state };
 }
 
-/** Build the non-standard OpenRouter PKCE authorization URL. */
+/** Build OpenRouter's request around the already-bound dynamic callback. */
 export function buildOpenRouterAuthUrl(input: {
   challenge: string;
-  state: string;
+  callbackUrl: string;
 }): string {
   const url = new URL(OPENROUTER_AUTH_URL);
-  url.searchParams.set("callback_url", OPENROUTER_REDIRECT_URI);
+  url.searchParams.set("callback_url", input.callbackUrl);
   url.searchParams.set("code_challenge", input.challenge);
   url.searchParams.set("code_challenge_method", "S256");
-  url.searchParams.set("state", input.state);
   return url.toString();
 }
 
-/**
- * Pure callback gate. It validates destination and the complete parameter set,
- * then validates state, and only then returns the one-time authorization code.
- */
+/** Independently validate the native callback before exposing its code. */
 export function validateOpenRouterCallback(
   callbackUrl: string,
   expectedRedirect: string,
@@ -176,9 +213,13 @@ export function validateOpenRouterCallback(
   }
 
   if (
+    callback.protocol !== "http:" ||
     callback.protocol !== expected.protocol ||
+    callback.hostname !== "127.0.0.1" ||
     callback.hostname !== expected.hostname ||
+    callback.port === "" ||
     callback.port !== expected.port ||
+    callback.pathname !== "/openrouter-auth" ||
     callback.pathname !== expected.pathname ||
     callback.username !== "" ||
     callback.password !== "" ||
@@ -206,17 +247,37 @@ export function validateOpenRouterCallback(
   return { ok: true, code: codes[0] };
 }
 
+function validateWake(result: OpenRouterBrowserResult): boolean {
+  if (result.type !== "success" || typeof result.url !== "string") return false;
+  try {
+    const wake = new URL(result.url);
+    const expected = new URL(OPENROUTER_WAKE_URI);
+    return (
+      wake.protocol === expected.protocol &&
+      wake.hostname === expected.hostname &&
+      wake.pathname === expected.pathname &&
+      wake.search === "" &&
+      wake.hash === "" &&
+      wake.username === "" &&
+      wake.password === ""
+    );
+  } catch {
+    return false;
+  }
+}
+
 function keyFromExchangePayload(payload: unknown): string | null {
   if (!payload || typeof payload !== "object") return null;
   const key = (payload as { key?: unknown }).key;
   return typeof key === "string" && key.length > 0 ? key : null;
 }
 
-/** Run one browser attempt, exchange its validated code, and store the API key. */
+/** Run one browser attempt, then exchange and persist only its validated key. */
 export async function connectOpenRouter(
   deps: ConnectOpenRouterDeps = {},
 ): Promise<{ connected: true }> {
   const crypto = deps.crypto ?? nativeCrypto;
+  const loopback = deps.loopback ?? nativeLoopback;
   const opener = deps.opener ?? nativeBrowserOpener;
   const fetchImpl = deps.fetchImpl ?? nativeFetch;
   const setKey =
@@ -224,28 +285,37 @@ export async function connectOpenRouter(
 
   let verifier = "";
   let state = "";
+  let attemptId = "";
   let consumed = false;
   try {
+    if (deps.signal?.aborted) throw new OpenRouterConnectionError();
     const attempt = await generateOpenRouterPkce(crypto);
     verifier = attempt.verifier;
     state = attempt.state;
-    const authUrl = buildOpenRouterAuthUrl(attempt);
-    const result = await opener(authUrl, OPENROUTER_REDIRECT_URI);
-    if (result.type !== "success" || typeof result.url !== "string") {
-      throw new Error("OpenRouter authorization was not completed");
+    const started = await loopback.startAttempt(
+      state,
+      OPENROUTER_ATTEMPT_TIMEOUT_MS,
+    );
+    attemptId = started.attemptId;
+    const authUrl = buildOpenRouterAuthUrl({
+      challenge: attempt.challenge,
+      callbackUrl: started.callbackUrl,
+    });
+
+    const browserResult = await opener(authUrl, OPENROUTER_WAKE_URI);
+    if (!validateWake(browserResult) || deps.signal?.aborted) {
+      throw new OpenRouterConnectionError();
     }
 
+    // awaitCallback supports the valid callback arriving before this waiter.
+    const nativeResult = await loopback.awaitCallback(attemptId);
     const validated = validateOpenRouterCallback(
-      result.url,
-      OPENROUTER_REDIRECT_URI,
+      nativeResult.callbackUrl,
+      started.callbackUrl,
       state,
       consumed,
     );
-    if (!validated.ok) {
-      throw new Error(
-        `OpenRouter authorization callback was rejected (${validated.reason})`,
-      );
-    }
+    if (!validated.ok) throw new OpenRouterConnectionError();
     consumed = true;
 
     const response = await fetchImpl(OPENROUTER_KEY_EXCHANGE_URL, {
@@ -258,21 +328,25 @@ export async function connectOpenRouter(
       }),
       ...(deps.signal ? { signal: deps.signal } : {}),
     });
-    if (!response.ok) {
-      throw new Error(
-        `OpenRouter key exchange failed (HTTP ${response.status})`,
-      );
-    }
+    if (!response.ok) throw new OpenRouterConnectionError();
     const key = keyFromExchangePayload(await response.json());
-    if (key === null) {
-      throw new Error("OpenRouter key exchange returned an invalid response");
-    }
+    if (key === null) throw new OpenRouterConnectionError();
     await setKey("openrouter", key);
     return { connected: true };
+  } catch {
+    // Collapse native/network/parser failures before AIConnectionScreen logging.
+    throw new OpenRouterConnectionError();
   } finally {
-    // Explicitly release attempt-only material on every success/failure path.
+    if (attemptId !== "") {
+      try {
+        await loopback.cancelAttempt(attemptId);
+      } catch {
+        // Cleanup is best effort and must not replace the sanitized flow result.
+      }
+    }
     verifier = "";
     state = "";
+    attemptId = "";
     consumed = true;
   }
 }
