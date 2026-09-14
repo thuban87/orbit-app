@@ -2,9 +2,9 @@
 schema_version: 1
 open_count: 60
 waived_count: 0
-fixed_count: 10
-total_count: 70
-last_updated: 2026-09-14T08:19:39.433Z
+fixed_count: 12
+total_count: 72
+last_updated: 2026-09-14T09:26:16.345Z
 ---
 
 # Broken Windows Ledger
@@ -85,6 +85,8 @@ last_updated: 2026-09-14T08:19:39.433Z
 | 68 | 36 | deviation | src/ai/model-catalog-filter.ts |  | Preserved direct-model max_input_tokens for selected-window estimates | fixed |  | 2026-09-14T08:19:18.547Z | 2026-09-14T08:19:39.255Z |
 | 69 | 36 | deviation | src/backup/phase-17-integration.test.ts |  | Classified personalization deletion as non-mergeable until Plan 36-08 backup v5 | fixed |  | 2026-09-14T08:19:18.727Z | 2026-09-14T08:19:39.433Z |
 | 70 | 36 | unrun-verify | src/components/orrery/orrery-controls-render.test.tsx |  | Full suite cannot collect the pre-existing Phase 30 Orrery render test; all other 3465 tests pass | open |  | 2026-09-14T08:19:18.951Z |  |
+| 71 | 36 | deviation | src/backup/backup-schema.ts |  | Preserved Group Event interaction follow-state semantics in the v5 backup inventory | fixed |  | 2026-09-14T09:25:13.286Z | 2026-09-14T09:26:16.160Z |
+| 72 | 36 | deviation | src/backup/orrery-preferences-portability.test.ts |  | Updated composed restore test boundaries for the v5 background persistence dependency | fixed |  | 2026-09-14T09:25:13.472Z | 2026-09-14T09:26:16.345Z |
 
 ````json
 [
@@ -927,6 +929,30 @@ last_updated: 2026-09-14T08:19:39.433Z
     "reason": "",
     "recorded_at": "2026-09-14T08:19:18.951Z",
     "resolved_at": null
+  },
+  {
+    "id": 71,
+    "kind": "deviation",
+    "phase": "36",
+    "file": "src/backup/backup-schema.ts",
+    "line": null,
+    "description": "Preserved Group Event interaction follow-state semantics in the v5 backup inventory",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-09-14T09:25:13.286Z",
+    "resolved_at": "2026-09-14T09:26:16.160Z"
+  },
+  {
+    "id": 72,
+    "kind": "deviation",
+    "phase": "36",
+    "file": "src/backup/orrery-preferences-portability.test.ts",
+    "line": null,
+    "description": "Updated composed restore test boundaries for the v5 background persistence dependency",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-09-14T09:25:13.472Z",
+    "resolved_at": "2026-09-14T09:26:16.345Z"
   }
 ]
 ````

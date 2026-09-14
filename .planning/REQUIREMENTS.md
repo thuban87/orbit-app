@@ -273,8 +273,8 @@ category's phase (see Traceability).
 - [x] **AICFG-13**: Generation failures translate to human-readable categories with optional details, preserving Compose state, never failing over silently
 - [x] **AICFG-14**: AI failures emit sanitized structured diagnostics carrying only safe metadata — never contact data, notes, prompts, personalization, credentials, or generated output (a seam for later Sentry wiring, not an installation)
 - [x] **AICFG-15**: API keys and credential material stay in secure storage only (ADR-049) — never in app settings or the backup
-- [ ] **AICFG-16**: Backup/restore preserves nonsecret AI personalization, configuration, and permissions while excluding all credentials; a restored install never falsely appears Ready
-- [ ] **AICFG-17**: The backup wire format bumps to v5 as this phase's FINAL plan (v4 landed early in 24.1 per the migration-ordering amendment) — after all other milestone schema — serializing every entity and portable preference the milestone added, with restore validation and orphan repair (including Phase 33's Group Event rules) and a decided restore-compat behavior for every retired key
+- [x] **AICFG-16**: Backup/restore preserves nonsecret AI personalization, configuration, and permissions while excluding all credentials; a restored install never falsely appears Ready
+- [x] **AICFG-17**: The backup wire format bumps to v5 as this phase's FINAL plan (v4 landed early in 24.1 per the migration-ordering amendment) — after all other milestone schema — serializing every entity and portable preference the milestone added, with restore validation and orphan repair (including Phase 33's Group Event rules) and a decided restore-compat behavior for every retired key
 
 ## Deferred-planning phases (no requirements yet)
 
