@@ -57,6 +57,10 @@ import {
   View,
 } from "react-native";
 import { loadCachedCatalog } from "@/ai/model-catalog-cache";
+import {
+  assertPromptFitsContext,
+  PromptContextOverflowError,
+} from "@/ai/context-estimate";
 import type { ModelCatalog } from "@/ai/model-catalog-filter";
 import { createFileCatalogStorage } from "@/ai/model-catalog-storage";
 import { resolveActiveCatalog, SEED_CATALOG } from "@/ai/model-registry";
@@ -465,6 +469,25 @@ export function ComposeScreen({
         const provider = service.getActiveProvider(connection);
         if (!provider) throw new AiError("not_configured");
         const model = connection.model;
+        const openRouterModel = openRouterModelsRef.current.find(
+          (candidate) => candidate.id === model,
+        );
+        const contextWindowTokens =
+          connection.lane === "openai" ||
+          connection.lane === "anthropic" ||
+          connection.lane === "google"
+            ? (catalogRef.current.contextWindows?.[connection.lane]?.[model] ??
+              null)
+            : null;
+        // Validate the exact immutable payload and selected catalog row at the
+        // final local boundary before any provider egress.
+        assertPromptFitsContext({
+          prompt: prompt.payload,
+          connection: connection.lane,
+          model,
+          contextWindowTokens,
+          openRouterModel,
+        });
         // 14-11: only Anthropic sends max_tokens (its API requires one), set to
         // the selected model's OWN catalog maximum; OpenAI/Gemini omit it so the
         // model default applies. Visible length is bounded by AiService's
@@ -508,7 +531,11 @@ export function ComposeScreen({
       isActive: (): boolean => focusedRef.current && mountedRef.current,
       // Sanitized code only — never raw provider detail (T-35-03 / T-14-05).
       sanitizeError: (err): string =>
-        err instanceof AiError ? err.code : "unknown",
+        err instanceof PromptContextOverflowError
+          ? "context_too_large"
+          : err instanceof AiError
+            ? err.code
+            : "unknown",
       getFailureDetails: (err, operation, elapsedMs) => {
         const connection = activeConnectionRef.current;
         // A request cannot legitimately reach egress without a resolved
@@ -544,7 +571,10 @@ export function ComposeScreen({
                 ? "unknown"
                 : String(classified.status),
           category: classified.category,
-          message: failureMessage(classified.category),
+          message:
+            err instanceof PromptContextOverflowError
+              ? err.notice.detail
+              : failureMessage(classified.category),
           diagnostic,
         };
       },

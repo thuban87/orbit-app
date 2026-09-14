@@ -1,11 +1,38 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  assertPromptFitsContext,
   COST_ESTIMATE_UNAVAILABLE,
   estimatePromptContext,
 } from "@/ai/context-estimate";
 
 describe("context-estimate — selected model capacity and input price", () => {
+  it("blocks a known overflow before provider egress and preserves recovery choices", () => {
+    let egressed = false;
+    expect(() => {
+      assertPromptFitsContext({
+        prompt: "x".repeat(401),
+        connection: "openai",
+        model: "small-model",
+        contextWindowTokens: 100,
+      });
+      egressed = true;
+    }).toThrow(/context_too_large/);
+    expect(egressed).toBe(false);
+
+    try {
+      assertPromptFitsContext({
+        prompt: "x".repeat(401),
+        connection: "openai",
+        model: "small-model",
+        contextWindowTokens: 100,
+      });
+    } catch (error) {
+      const detail = (error as { notice?: { detail?: string } }).notice?.detail;
+      expect(detail).toContain("Reduce or turn off some context");
+      expect(detail).toContain("choose a larger-context model");
+    }
+  });
   it("uses the selected OpenRouter model's real context window and input price", () => {
     const estimate = estimatePromptContext({
       prompt: "x".repeat(4_000),

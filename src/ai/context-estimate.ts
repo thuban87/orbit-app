@@ -31,6 +31,18 @@ export interface PromptContextEstimate {
   readonly costMessage: string | null;
 }
 
+/** Local, sanitized signal that a known model capacity forbids provider egress. */
+export class PromptContextOverflowError extends Error {
+  readonly code = "context_too_large";
+  readonly notice: TruncationNotice;
+
+  constructor(notice: TruncationNotice) {
+    super("context_too_large");
+    this.name = "PromptContextOverflowError";
+    this.notice = notice;
+  }
+}
+
 /** A deterministic local approximation: four Unicode code points per token. */
 export function estimateInputTokens(prompt: string): number {
   return prompt.length === 0 ? 0 : Math.ceil(Array.from(prompt).length / 4);
@@ -95,4 +107,15 @@ export function estimatePromptContext(
     estimatedInputCostUsd,
     costMessage,
   });
+}
+
+/** Return the estimate or throw before egress when known capacity is exceeded. */
+export function assertPromptFitsContext(
+  input: PromptContextEstimateInput,
+): PromptContextEstimate {
+  const estimate = estimatePromptContext(input);
+  if (estimate.overflow && estimate.overflowNotice) {
+    throw new PromptContextOverflowError(estimate.overflowNotice);
+  }
+  return estimate;
 }
