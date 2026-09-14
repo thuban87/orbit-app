@@ -19,9 +19,10 @@
  * the pre-flight + applyTypeChange flow).
  *
  * A live `FieldValueInput` preview renders the currently-selected type so the
- * owner can see the field's input at the --to 3 gate; the photo type shows the
- * deferred Plan-06 placeholder. Every colour resolves through
- * `useTheme().colors.*` — there is no colour literal here (CLAUDE.md).
+ * owner can see the field's input at the --to 3 gate. Edit-only capabilities
+ * that require contact identity remain unavailable in the create preview.
+ * Every colour resolves through `useTheme().colors.*` — there is no colour
+ * literal here (CLAUDE.md).
  */
 import { useMemo, useState } from "react";
 import {
