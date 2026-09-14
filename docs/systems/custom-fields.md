@@ -1,7 +1,7 @@
 # Custom Fields
 
-**Last updated:** 2026-08-24
-**Updated by phase:** 17-backup-export-restore
+**Last updated:** 2026-09-02
+**Updated by phase:** 31-profile-experience
 **Owners:** `src/db/field-defs-dao.ts`, `src/db/field-values-dao.ts`, `src/db/field-ddl.ts`, `src/db/field-type-change.ts`, `src/db/field-parsers.ts`, `src/db/field-sort.ts`, `src/services/field-sweep.ts`
 
 ## Purpose
@@ -158,7 +158,11 @@ Migration 006 stores current values as normalized rows. Field type determines in
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — exports definitions and current normalized values, not history.
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — retains prior values separately while preserving current-pair integrity.
 
+- **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — preserves typed values, grouping, invalid states, and retained history in Profile.
+
 ## Gotchas
+
+1. **Profile grouping is presentation only.** It formats all ten field types and exposes retained history without flattening `field_group`, changing raw TEXT, or introducing another layout nesting level.
 
 1. **Do not use `col_name` as SQL syntax.** It is compatibility metadata; normalized reads bind identifiers and values through literal-table queries.
 2. **The pair constraint is intentional.** `uid UNIQUE` and `UNIQUE(contact_id, field_def_id)` protect normalized row identity; complete coverage comes from migration/creation seeding and UPSERT self-heal.
@@ -196,3 +200,4 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | 2026-08-24 | 16 | Replaced dynamic columns with normalized uid-bearing value pairs through migration 006. |
 | 2026-08-24 | 17 | Added permanent-delete tombstones and whole-file restore validation for normalized field data. |
 | 2026-09-03 | 24.2 | Added ten typed inputs, additive scope/history/group metadata, and portable retained-value history. |
+| 2026-09-02 | 31 | Added typed grouped custom-field and retained-history consumption to the coherent Profile snapshot. |
