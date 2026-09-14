@@ -348,6 +348,8 @@ export interface AppSettings {
   aiEnabled: 0 | 1;
   /** Active connection lane, or the empty string when none is selected. */
   aiActiveConnection: string;
+  /** Device-local one-time transparency disclosure marker; never portable. */
+  aiFirstUseDisclosed: 0 | 1;
 
   // --- Optional-AI non-secret settings (Phase 14, AI-01) --------------------
   // NO API KEY LIVES HERE — provider credentials are SecureStore-only
@@ -608,6 +610,7 @@ interface AppSettingsRow {
   remembered_message_mode: string;
   ai_enabled: number;
   ai_active_connection: string;
+  ai_first_use_disclosed: number;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -742,7 +745,7 @@ export async function getAppSettings(
             history_lens, history_cycle_count,
             default_interaction_channel, remembered_interaction_channel,
             default_message_mode, remembered_message_mode,
-            ai_enabled, ai_active_connection,
+            ai_enabled, ai_active_connection, ai_first_use_disclosed,
             orrery_density, orrery_satellites_enabled, orrery_last_system,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
@@ -818,6 +821,7 @@ export async function getAppSettings(
     rememberedMessageMode: row.remembered_message_mode as RememberedMessageMode,
     aiEnabled: (row.ai_enabled ? 1 : 0) as 0 | 1,
     aiActiveConnection: row.ai_active_connection,
+    aiFirstUseDisclosed: (row.ai_first_use_disclosed ? 1 : 0) as 0 | 1,
     // AI non-secret settings. The column default is `'none'`; the cast is a
     // read-shape convenience (validation on WRITE guarantees a known id).
     aiProvider: row.ai_provider as AiProviderId,
@@ -1295,6 +1299,24 @@ export function updateAppSettings(
   return inWriteTransaction(exec, async () => {
     await updateAppSettingsCore(exec, patch, now);
     await bumpDataRevisionCore(exec);
+  });
+}
+
+/**
+ * Persist the device-local first-use disclosure marker. It deliberately bypasses
+ * the portable settings patch and data revision: restore must re-disclose after
+ * the user reconnects a credential on the new device (ADR-049 / ADR-079).
+ */
+export function markAiFirstUseDisclosed(exec: SqlExecutor): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      "UPDATE app_settings SET ai_first_use_disclosed = 1 WHERE id = 1",
+    );
+    if (result.changes !== 1) {
+      throw new Error(
+        `markAiFirstUseDisclosed: expected one changed row, got ${result.changes}`,
+      );
+    }
   });
 }
 

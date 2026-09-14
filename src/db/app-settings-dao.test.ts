@@ -37,6 +37,7 @@ import {
   getAppSettings,
   getPortableSettingsSnapshot,
   MESSAGE_MODES,
+  markAiFirstUseDisclosed,
   recordAutomaticBackupHealthCore,
   resolveEffectivePhoneRegion,
   SELF_SUN_COLOUR_RE,
@@ -158,6 +159,7 @@ async function migrateToV5(): Promise<void> {
 const AI_DEFAULTS = {
   aiEnabled: 0 as const,
   aiActiveConnection: "",
+  aiFirstUseDisclosed: 0 as const,
   aiProvider: "none" as const,
   aiModel: "",
   aiCustomEndpoint: "",
@@ -168,6 +170,20 @@ const AI_DEFAULTS = {
   aiAckGoogle: 0 as const,
   aiAckCustom: 0 as const,
 };
+
+describe("device-local AI first-use disclosure", () => {
+  beforeEach(async () => {
+    exec = nodeSqliteExecutor(openTestDb());
+    await migrateToV5();
+  });
+
+  it("reads the migration default and persists the marker outside portable settings", async () => {
+    expect((await getAppSettings(exec)).aiFirstUseDisclosed).toBe(0);
+    await markAiFirstUseDisclosed(exec);
+    expect((await getAppSettings(exec)).aiFirstUseDisclosed).toBe(1);
+    expect(PORTABLE_SETTINGS_KEYS.has("aiFirstUseDisclosed")).toBe(false);
+  });
+});
 
 /** Migration-015 theme defaults, for splicing into full-object expectations. */
 const THEME_DEFAULTS = {

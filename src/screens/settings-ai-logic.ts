@@ -31,6 +31,7 @@ import type {
   ResolvedPrompt,
   TruncationNotice,
 } from "@/ai/prompt-types";
+import type { ResolvedAiConnection } from "@/db/ai-connections-dao";
 import type { AppSettingsPatch } from "@/db/app-settings-dao";
 import type { ModelDiscovery } from "@/services/AiService";
 import type { AiProviderId } from "@/services/ai-types";
@@ -317,4 +318,63 @@ export function buildProviderAckViewState(
 /** The provider display name for a given id (view-state helper). */
 export function providerDisplayName(provider: AiProviderId): string {
   return PROVIDER_NAMES[provider];
+}
+
+const MODEL_PROVIDER_NAMES: Readonly<Record<string, string>> = {
+  anthropic: "Anthropic",
+  google: "Google",
+  meta: "Meta",
+  microsoft: "Microsoft",
+  mistralai: "Mistral AI",
+  openai: "OpenAI",
+  qwen: "Qwen",
+};
+
+/** Name the real outbound route without ever including a credential or URL path. */
+export function describeAiDataPath(connection: ResolvedAiConnection): string {
+  if (connection.lane === "openrouter") {
+    const owner = connection.model.split("/", 1)[0]?.trim().toLowerCase();
+    const provider = owner
+      ? (MODEL_PROVIDER_NAMES[owner] ??
+        `${owner.charAt(0).toUpperCase()}${owner.slice(1)}`)
+      : "the selected model provider";
+    return `OpenRouter and ${provider}`;
+  }
+  if (connection.lane === "custom") {
+    try {
+      const hostname = new URL(connection.customEndpoint).hostname;
+      return hostname
+        ? `your configured custom endpoint (${hostname})`
+        : "your configured custom endpoint";
+    } catch {
+      return "your configured custom endpoint";
+    }
+  }
+  return PROVIDER_NAMES[connection.lane];
+}
+
+export interface FirstUseDisclosureInput {
+  readonly aiEnabled: boolean;
+  readonly connection: ResolvedAiConnection | null;
+  readonly credentialPresent: boolean;
+  readonly disclosed: boolean;
+}
+
+/** First successful setup only; this is disclosure policy, never a generation gate. */
+export function shouldShowFirstUseDisclosure(
+  input: FirstUseDisclosureInput,
+): boolean {
+  if (!input.aiEnabled || input.disclosed || input.connection === null) {
+    return false;
+  }
+  if (input.connection.model.trim() === "") return false;
+  if (
+    input.connection.lane === "custom" &&
+    input.connection.customEndpoint.trim() === ""
+  ) {
+    return false;
+  }
+  // Custom endpoints may intentionally be unauthenticated; all hosted lanes
+  // require their local SecureStore credential to establish successful setup.
+  return input.connection.lane === "custom" || input.credentialPresent;
 }
