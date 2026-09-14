@@ -1,7 +1,7 @@
 # Contact Methods
 
-**Last updated:** 2026-08-31
-**Updated by phase:** 21-interaction-assist-reach-out
+**Last updated:** 2026-09-02
+**Updated by phase:** 31-profile-experience
 **Owners:** `src/db/contact-methods-dao.ts`, `src/db/contact-methods-read.ts`, `src/logic/contact-method-normalization.ts`, `src/screens/ComposeScreen.tsx`, `src/logic/compose-logic.ts`
 
 ## Purpose
@@ -76,7 +76,7 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 
 ### Turning an AI suggestion into a draft
 
-1. Compose can be opened with a profile-originated `requestAiSuggestion` intent, which it consumes once after loading the live contact.
+1. Profile opens Compose with contact identity only. Any Draft with AI action is invoked inside Compose under ADR-079; Profile carries no AI-request intent.
 2. The AI lifecycle reads only approved context, resolves one immutable prompt, and displays it before a provider's first request. A durable acknowledgement completes before the request begins.
 3. One lifecycle owns the abort controller and timeout. Cancel, navigation, configuration changes, and stale completion leave the editor unchanged; a failed request offers only deliberate retry.
 4. A returned suggestion fills an empty draft. If a local draft already has text, Compose asks before replacement, then retains the normal user-controlled Send and Copy handoffs.
@@ -125,7 +125,11 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — deduplicates compatible methods and requires a choice for competing primaries.
 - **ADR-072:** Shared Actionable Reach Out Router with Native Channel Handoff — reuses the actionable-primary selection and routes Compose Send through the shared handoff without a send-time interaction write.
 
+- **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — composes normalized method reads into one local Profile snapshot.
+
 ## Gotchas
+
+1. **Message and Call are separate capabilities.** Email can make Message available but never Call; Profile consumes DAO actionability and keeps either unavailable control visible with its reason.
 
 1. **Do not construct an `sms:` URI.** `expo-sms` performs native recipient/body marshalling; a hand-built URI can corrupt the draft and has unreliable capability detection.
 2. **Compose is not a touchpoint.** Do not write an interaction or `last_contact` after Send or Copy because Android cannot reliably confirm that the user sent the message. Send now creates a pending Interaction Assist and hands off; the interaction is written only if the user later confirms the assist banner.
@@ -163,3 +167,4 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 | 2026-08-26 | 19 | Added canonical source-method evidence and transactional import provenance. |
 | 2026-08-26 | 20 | Added canonical reconciliation comparison and explicit primary-method merge resolution. |
 | 2026-08-31 | 21 | Compose Send routes through the shared `performReachOut` (pending assist, no send-time interaction); the actionable-primary selection is reused by the Reach Out router. |
+| 2026-09-02 | 31 | Added snapshot-compatible Profile method reads, separate Message/Call capability, and Compose-only AI invocation. |
