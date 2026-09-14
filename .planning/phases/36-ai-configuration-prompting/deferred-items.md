@@ -1,3 +1,5 @@
 # Deferred Items
 
 - **Pre-existing Phase 30 test failure:** the optional repository-wide `npm test -- --run` check on 2026-09-14 completed with 3,399 passing tests and one failed suite, `src/components/orrery/orrery-controls-render.test.tsx`, which fails during collection with `SyntaxError: Unexpected token 'typeof'`. Phase 36 Plan 03 does not touch the Orrery subsystem; the existing dirty Phase 30 review files and `tsconfig.json` were preserved unchanged. The Phase 36 targeted suites, TypeScript check, and color check all pass.
+
+- **Plan 36-04 confirmation:** the repository-wide `npm test` check on 2026-09-14 again found the same pre-existing Phase 30 collection failure in `src/components/orrery/orrery-controls-render.test.tsx` (`SyntaxError: Unexpected token 'typeof'`). It passed 3,410 tests before the one Plan-36 fixture regression was corrected in `dc71fd8`; the complete focused permission/egress set then passed 114/114. The Orrery suite imports none of Plan 36-04's modules and remains outside this plan; the dirty Phase 30 review files and `tsconfig.json` remain untouched.
