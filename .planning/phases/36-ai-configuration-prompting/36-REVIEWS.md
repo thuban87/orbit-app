@@ -1,8 +1,8 @@
 ---
 phase: 36
-cycle: 3
+cycle: 4
 reviewers: [codex, claude]
-reviewed_at: 2026-09-14T00:53:34Z
+reviewed_at: 2026-09-14T02:20:00Z
 plans_reviewed: [36-01-PLAN.md, 36-02-PLAN.md, 36-03-PLAN.md, 36-04-PLAN.md, 36-05-PLAN.md, 36-06-PLAN.md, 36-07-PLAN.md, 36-08-PLAN.md, 36-09-PLAN.md]
 models:
   codex: "gpt-5.6-terra (codex-cli 0.154.0, reasoning=low)"
@@ -11,14 +11,192 @@ model_sources:
   codex: "banner"
   claude: "subagent-lane"
 review_notes:
-  - "CYCLE 3 (FINAL convergence cycle). This file accumulates history: the Cycle 3 review is at the top; Cycle 2 and Cycle 1 are preserved verbatim below, unchanged. `cycle_summary` reflects the CURRENT (cycle 3) unresolved counts; `cycle2_summary`/`cycle1_summary` record the prior cycles."
-  - "The Claude lane ran as a read-only Claude subagent (not the built-in `claude -p` CLI lane), per the project's known Write-permission gap in that lane (MEMORY: claude-reviewer-via-subagent). It received the same source-grounding prompt and had full repo read access."
-  - "The orchestrator independently verified EVERY finding from both lanes against the code on disk before counting: the two cycle-2 HIGHs (OpenRouter adapter now owned by 36-05 Task 4 with providers.set('openrouter',…) registered in refreshProviders; strict OAuth `state` in 36-02 per owner D-13), all six cycle-2 actionables (36-08 FK↔UID aliases + different-rowid restore test; 36-09 six sections; 36-01 migration-029 Writing Style DEFAULT/CHECK + ai_active_connection=lane; 36-06/36-03 stale prompt-template.test.ts :145/:151/:304 named; 36-03 /15 dropped; 36-06 :20-24 header comment), AND the newly-raised HIGH-C (v5 backup omits the Profile-presentation entity tables profile_category_presentation/profile_contact_presentation + background image bytes)."
-  - "A source-grounding + cross-artifact fact-drift pass was run (advisory; excluded from HIGH/actionable counts). All cycle-2 fixes verified landed in current PLAN.md content; owner decision D-13 (strict OAuth state) implemented faithfully and NOT reversed."
-  - "HIGH-C is NOT a recorded-decision reversal: the recorded decisions (docs/systems/profile.md:82 'Phase 36 owns the eventual Profile presentation backup-wire decision'; docs/systems/backup-restore.md:150 + 31-02-SUMMARY.md:140 'Profile entities and background bytes remain device-local pending the coordinated backup format decision'; 31-RESEARCH.md:19 D-07 'decide explicitly … whether it belongs in the backup') ASSIGN this decision to Phase 36. 36-08 leaves it undischarged. Raising HIGH-C ENFORCES the deferral; it does not reverse a decision. The in-vs-out call has an owner/product dimension and the fix lands in the IRREVERSIBLE v5 format — routed to planner (make 36-08 explicit) + owner (whether these belong in backup at all)."
+  - "CYCLE 4 (confirmation cycle — verifies the C3 HIGH-C fix). This file accumulates history: the Cycle 4 review is at the top; Cycles 3/2/1 are preserved verbatim below, unchanged. `cycle_summary` reflects the CURRENT (cycle 4) unresolved counts; `cycle3_summary`/`cycle2_summary`/`cycle1_summary` record prior cycles."
+  - "The Claude lane ran as a read-only Claude subagent (not the built-in `claude -p` CLI lane), per the project's known Write-permission gap in that lane (MEMORY: claude-reviewer-via-subagent). It received the same source-grounding prompt and had full repo read access. Codex ran as a direct `codex exec` invocation (reasoning=low)."
+  - "HIGH-C (v5 omitted Profile-presentation entities + background bytes) is now SPLIT by the confirmation: the PRESENTATION-ENTITY half is FULLY RESOLVED — 36-08 serializes AND restores profile_contact_presentation/profile_category_presentation, and the orchestrator verified every schema claim against src/db/migrations/profile-presentation.ts (neither table has its own uid; PK is contact_id/category_id; layout_template_uid/background_template_uid are already-portable TEXT template-uid FKs; idMap supports contacts+categories at restore-apply.ts:87; readParentUid at reconciliation.ts:227 lacks the category_id alias exactly as 36-08:234 says it will add; a different-rowid roundtrip test is mandated). D-14 is honored, NOT reversed; credentials excluded (ADR-049); no AI-egress boundary widened."
+  - "NEW HIGH found by BOTH lanes independently with identical code evidence: the D-14 background-BYTES restore path in 36-08 Task 4 routes finalization through `restore_photo_journal`, whose SHIPPED CHECK constraint (src/db/migrations/008-restore-photo-journal.ts:8 — target_kind IN 'contact','profile','customField') will raise a constraint violation on an INSERT of a 'background' kind, aborting restore of any backup carrying a custom background. Fixing it as the plan implies (extend the DAO union) is insufficient — SQLite cannot ALTER a CHECK, so it needs a table-rebuild migration that is NOT in 36-08's files_modified, NOT in Task 4's action, and NOT covered by the Task-5 completeness checkpoint. This is a data-availability defect (T-36-33/T-36-34) in the phase's single IRREVERSIBLE plan."
+  - "Orchestrator code investigation (beyond both lanes): a COMPLETE, SHIPPED background subsystem already exists and neither the plan nor the two reviewers connected it — src/services/photos/background-storage.ts provides SAFE_BACKGROUND_RELATIVE (:7, an already-hardened profile-backgrounds/ guard), backgroundDerivativeRelPath (:43, the uid-derived canonical path), persistBackgroundDerivative (:88, the crash-safe tmp/bak swap), and src/services/photos/background-reconcile-sweep.ts registers a ready-gated LAUNCH sweep that reconciles interrupted background writes AND flags template rows whose durable file is missing. Routing v5 background-byte restore through THIS subsystem needs NO new migration and NO restore-photo-journal change — it honors BOTH D-14 (backgrounds included) AND 36-01's recorded single-migration-029 decision (no further PRAGMA migration). This is the recommended remediation; it also removes duplication the plan would otherwise create (a second profile-backgrounds/ guard in photo-relative-path.ts + a second persist in photo-storage.ts, which the photo-relative-path.ts header explicitly bans)."
+  - "NOT a recorded-decision collision (contra codex's [RECORDED-DECISION COLLISION] tag): codex assumed the ONLY fix is a new migration (which WOULD collide with 36-01). Because the migration-free existing-subsystem path preserves BOTH 36-01 and D-14, no decision is reversed and no owner escalation is required — this is a planner-fixable completeness+reuse gap. Enforcing a recorded decision is a planner call. CAVEAT for the planner: IF the redesign cannot avoid a new migration, adding one reverses 36-01's owner-accepted single-migration-029 shape and becomes an owner decision — do not add a migration silently."
+  - "A source-grounding + cross-artifact fact-drift pass was run (advisory; excluded from counts). Confirmed: no toISOString().split('T')[0] reintroduced (36-02:142 mandates formatLocalDate()); custom-field normalized storage (migration 006/ADR-001) untouched; ai_connections serialized without credential columns. LOW/informational (not counted): 36-08:224 read_first attributes profile_*_templates to 'migration 029' — they actually live in profile-presentation.ts (SCHEMA_VERSION 24); harmless since the same read_first also cites profile-presentation.ts directly."
 cycle1_summary: "current_high=6 current_actionable=9"
 cycle2_summary: "current_high=2 current_actionable=6"
-cycle_summary: "current_high=1 current_actionable=0"
+cycle3_summary: "current_high=1 current_actionable=0"
+cycle_summary: "current_high=1 current_actionable=1"
+---
+
+# Cross-AI Plan Review — Phase 36 "AI Configuration & Prompting" — CYCLE 4 (CONFIRMATION)
+
+Cycle 4 is the confirmation cycle for the C3 sole remaining HIGH (HIGH-C). Between C3 and C4 the owner
+decided **D-14** (include Profile presentation + background bytes fully in the irreversible v5 backup) and
+**36-08 was revised** (commit `90c9784`) to implement it. This cycle reviews the CURRENT 9 plans on disk
+and counts only concerns UNRESOLVED now. Both grounded lanes (codex direct + Claude read-only subagent) and
+the orchestrator verified every claim against the code on disk (`profile-presentation.ts`, the DAOs,
+`export-manifest.ts`, `restore-apply.ts`, `reconciliation.ts`, `photo-relative-path.ts`, migration `008`,
+and the `background-storage.ts` / `background-reconcile-sweep.ts` subsystem). Cycles 3/2/1 are preserved
+verbatim below the dividers.
+
+## Cycle 4 Consensus Summary
+
+**Result: NOT converged. `current_high=1 current_actionable=1`.** The C3 HIGH-C fix landed the harder half
+cleanly but exposed a smaller, real restore-plumbing gap on the same irreversible surface.
+
+- **HIGH-C — Presentation-entity half: FULLY RESOLVED.** 36-08 now serializes AND restores
+  `profile_contact_presentation` and `profile_category_presentation` (per-contact/per-category template
+  assignments, `freeform_layout_json`, `collapse_json`). Every schema claim the planner makes is verified
+  TRUE against `src/db/migrations/profile-presentation.ts`: neither table has its own `uid` (PK is
+  `contact_id`/`category_id` at :41/:52 → portable identity is the parent uid); `layout_template_uid` /
+  `background_template_uid` are already-portable TEXT FKs to `*_templates.uid` (:43-46, :54-63), emitted and
+  restored verbatim with no integer remap; `idMap` already supports both parent tables
+  (`restore-apply.ts:87`); `readParentUid` lacks the `category_id→categoryUid` alias exactly as 36-08:234
+  says it will add (`reconciliation.ts:227-236`); and a **different-rowid destination roundtrip test** is
+  mandated (36-08:238, :251). The `profile-backgrounds/` path guard (T-36-35) is well-specified and
+  traversal-safe. D-14 is honored (not reversed); credentials excluded (ADR-049); no AI-egress boundary
+  widened.
+
+- **NEW HIGH — Background-BYTES restore path is blocked by a shipped CHECK constraint (both lanes agree).**
+  36-08 Task 4 (:261, acceptance :268) finalizes restored background bytes **via the `restore_photo_journal`**,
+  extending only the DAO's TypeScript target-kind union. But the shipped table
+  (`src/db/migrations/008-restore-photo-journal.ts:8`) has
+  `CHECK(target_kind IN ('contact','profile','customField'))`. An `INSERT … target_kind='background'`
+  raises a constraint violation inside the restore transaction, aborting restore of any backup carrying a
+  custom background — the incomplete-v5 / data-availability failure T-36-33/T-36-34 forbid, in the phase's
+  single IRREVERSIBLE plan. SQLite cannot `ALTER` a CHECK, so the true fix needs a table-rebuild migration
+  that is absent from `files_modified` (:331 lists the DAO but no migration), absent from Task 4's action,
+  and outside the Task-5 completeness checkpoint (scoped to the wire-format bump). The plan author inspected
+  the avatars-scoped path guards but did not surface the `target_kind` CHECK.
+
+- **Recommended remediation (orchestrator, verified against code): route background-byte restore through the
+  EXISTING background subsystem, not the restore-photo journal.** `src/services/photos/background-storage.ts`
+  already provides `SAFE_BACKGROUND_RELATIVE` (:7), `backgroundDerivativeRelPath(templateUid)` (:43), and the
+  crash-safe `persistBackgroundDerivative` (:88); `src/services/photos/background-reconcile-sweep.ts` already
+  registers a ready-gated launch sweep that recovers interrupted background writes and flags template rows
+  whose durable file is missing. This path needs **no new migration** and **no restore-photo-journal change**,
+  honoring BOTH D-14 and 36-01's recorded single-migration-029 decision — and it avoids the guard/persist
+  DUPLICATION Task 4 would otherwise introduce (a second `profile-backgrounds/` guard in
+  `photo-relative-path.ts` + a second persist in `photo-storage.ts`; the `photo-relative-path.ts` header
+  explicitly bans duplicating that guard).
+
+## Cycle 4 Agreed / Verified Concerns
+
+- **[HIGH — carried to replan]** Background-byte restore in 36-08 Task 4 is not executable as written
+  (`restore_photo_journal` CHECK at `008:8` blocks a `background` kind; required table-rebuild migration is
+  out of scope; the finalize sweep `restore-photo-finalize-sweep.ts:20-33` handles only contact/profile/
+  customField and is not in `files_modified`). Both lanes independently. **Remediation:** redesign Task 4 to
+  restore background bytes through the existing `background-storage.ts` / `background-reconcile-sweep.ts`
+  subsystem (migration-free), reuse `SAFE_BACKGROUND_RELATIVE`/`backgroundDerivativeRelPath`/
+  `persistBackgroundDerivative`, and DROP the plan's new duplicate guard + duplicate persist + journal route.
+- **[ACTIONABLE MEDIUM]** Even setting the CHECK aside, Task 4's background crash-recovery/persist path is
+  avatars-scoped and under-enumerated: `persistMaster`/`assertSafeRelative` (`photo-storage.ts`) and the
+  restore-pending launch sweep (`listRestorePendingPhotos`/`resolveRestorePendingUri`) are `avatars/`-only, so
+  a mid-stage crash on a `profile-backgrounds/` file has no sweep consumer and the finalize would assert on an
+  avatars path. **PLAN.md change:** 36-08 Task 4 must name a background-aware persist + launch-sweep
+  reconciler — satisfied for free by the recommended remediation (the existing background subsystem already
+  provides both). Shares a root cause with the HIGH; listed separately because the current plan text names
+  neither deliverable.
+
+## Cycle 4 Divergent Views
+
+- **Collision framing.** Codex tagged the new HIGH `[RECORDED-DECISION COLLISION]` (migration 029 single-shape
+  vs a journal migration D-14 needs). Claude explicitly did NOT tag a collision. Orchestrator adjudication:
+  **not a collision** — codex assumed the only fix is a new migration; the migration-free existing-subsystem
+  path preserves BOTH 36-01 and D-14, so no decision dies and no owner escalation is required. CAVEAT: if the
+  redesign somehow cannot avoid a migration, adding one reverses 36-01's owner-accepted single-migration-029
+  shape and becomes an owner decision — the planner must not add a migration silently.
+- **Actionable count.** Codex reported `current_actionable=0`; Claude reported `=1` (the avatars-scoped
+  crash-recovery MEDIUM). Orchestrator sides with Claude (verified against `photo-storage.ts`): the MEDIUM is a
+  real, separable deliverable absent from the current plan. Recorded `current_actionable=1`.
+
+## Cycle 4 — Verification coverage (source-grounding, advisory — excluded from HIGH/actionable counts)
+
+- Verified TRUE against code: presentation schema shapes (`profile-presentation.ts:40-70`); `idMap`
+  contacts+categories (`restore-apply.ts:87`); missing `category_id` alias (`reconciliation.ts:227-236`);
+  `withPhoto`/`readPhotoBase64` base64 idiom (`export-manifest.ts:44-62`); the shipped journal CHECK
+  (`008-restore-photo-journal.ts:8`); the existing background subsystem
+  (`background-storage.ts:7/43/88`, `background-reconcile-sweep.ts`).
+- Fact-drift (advisory): `36-08:224` read_first attributes `profile_*_templates` to "migration 029" — they
+  live in `profile-presentation.ts` (`PROFILE_PRESENTATION_SCHEMA_VERSION = 24`); harmless (same read_first
+  also cites `profile-presentation.ts`). `idMap`'s type union does not yet include `systems`/`group_events`;
+  covered by the general "extend restore machinery" instruction and enforced by `tsc`.
+- No local-first / privacy regression: no `toISOString().split('T')[0]` reintroduced (36-02:142 mandates
+  `formatLocalDate()`); custom-field normalized storage (migration 006 / ADR-001) untouched; D-14 honored,
+  not reversed; credentials never enter the backup.
+
+## Cycle 4 — Codex Review (verbatim)
+
+# Phase 36, Cycle 4 — Cross-AI Plan Review
+
+## Summary
+
+HIGH-C's original omission is genuinely closed in scope: 36-08 now emits and restores both parent-keyed Profile-presentation entities and serializes/re-hydrates background bytes. The schema and restore assumptions behind that design are correct. However, the new background-byte recovery path introduces one new HIGH: the existing restore-photo journal cannot represent a background target in its shipped SQLite schema, and the plan does not include the migration or recovery-finalizer changes needed to make its promised crash-safe journal path executable.
+
+## HIGH-C verdict
+
+**FULLY RESOLVED.** The current plan explicitly exports `profile_contact_presentation` and `profile_category_presentation` with their parent UIDs, assignments, freeform layout, and collapse state (36-08-PLAN.md:204); restores them with parent-before-child destination-ID lookup and mandates a different-rowid roundtrip (36-08-PLAN.md:232, 36-08-PLAN.md:238). That matches the live schema: `contact_id`/`category_id` are each table's primary key, with no row `uid` (profile-presentation.ts:40, profile-presentation.ts:51); both template columns are already TEXT FKs to template `uid` columns (profile-presentation.ts:43, :54, :62). Current `idMap` already supports both parent tables (restore-apply.ts:87), and the plan correctly identifies the absent `category_id` alias in `readParentUid` (reconciliation.ts:227, 36-08-PLAN.md:234).
+
+For bytes, Task 4 requires base64 manifest content, a canonical UID-derived destination path, and a restore roundtrip that checks resulting bytes rather than retaining `image_path` alone (36-08-PLAN.md:261, :267). This properly follows the existing export pattern, which reads source bytes rather than exporting a path (export-manifest.ts:44).
+
+## New-surface findings
+
+- **HIGH — [RECORDED-DECISION COLLISION] D-14's crash-safe background restoration cannot be implemented by the specified files.** The plan says to add a `background` journal target kind only in `restore-photo-journal-dao.ts` when staging/finalizing bytes (36-08-PLAN.md:261), but the shipped table has a SQLite `CHECK` limited to `contact`, `profile`, and `customField` (008-restore-photo-journal.ts:4). Changing the TypeScript union alone will make the journal insert fail. Further, the launch recovery consumer recognizes only those three kinds and always uses the avatars-only pending/persist helpers (restore-photo-finalize-sweep.ts:20, :67); it is not among 36-08's modified files (36-08-PLAN.md:7). A post-commit failure therefore has no specified background-aware recovery path.
+
+  This is a recorded-decision collision because the necessary repair is a new forward migration (or a separately durable, background-aware journal) plus an update to the finalizer, while 36-01 records the owner-accepted constraint that migration 029 is the complete Phase-36 schema with no later PRAGMA migration (36-01-PLAN.md:161). Leaving that constraint intact makes D-14's required staged/journaled background-byte restore fail; adding the migration weakens that recorded "no further migration" half. The owner must decide the schema-boundary change before execution. This is not a reason to omit background bytes: that would instead reverse D-14's inclusion requirement.
+
+  The proposed path guard itself is directionally correct: Task 4 requires a separate anchored `profile-backgrounds/` guard rejecting traversal, backslashes, absolute paths, and NULs, and uses a UID-derived canonical target rather than a manifest path (36-08-PLAN.md:261). It is coherent with the current schema's narrower prefix/backslash/traversal checks (profile-presentation.ts:31). The live background subsystem already demonstrates the needed exact `.jpg` UID allowlist and crash-safe swap (background-storage.ts:42, :88); the plan should integrate that subsystem/recovery contract rather than leave a second, incomplete journal route.
+
+## Concerns
+
+None beyond the HIGH above.
+
+Credentials remain excluded: 36-08 requires `ai_connections` without credential columns (36-08-PLAN.md:229), consistent with ADR-049's SecureStore-only boundary (ADR-049:23). It also correctly treats `group_note` and background bytes as backup-preserved user data, separately excluding them from AI egress (36-08-PLAN.md:204, :261). The regression sweep found no plan that reopens normalized custom-field storage, and the catalog plan explicitly requires `formatLocalDate()` rather than the UTC split idiom (36-02-PLAN.md:142).
+
+## Risk assessment
+
+**HIGH until the background journal/recovery design is reconciled with the schema-boundary decision.** The normal export/import path is well specified, but the v5 format is irreversible and a failed background finalization would either fail the restore or strand its staged bytes without a runnable recovery path. All other checked D-14, credential, egress, custom-field, and local-date constraints remain preserved.
+
+CYCLE_SUMMARY: current_high=1 current_actionable=0
+
+---
+
+## Cycle 4 — Claude Review (verbatim, read-only subagent lane)
+
+## Summary
+
+HIGH-C (the C3 finding that v5 omitted Profile-presentation entities + background bytes) is **substantially closed at the data-modeling level** — the plan now serializes and restores both presentation tables and stages background bytes, and every schema claim it makes checks out against `src/db/migrations/profile-presentation.ts`. **However, the D-14 background-bytes fix introduces one NEW HIGH that the plan does not resolve:** routing background image bytes through the `restore_photo_journal` (Task 4's stated mechanism) collides with a CHECK constraint on the already-shipped migration 008 that the plan author did not detect. As written, executing Task 4 either aborts the restore of any backup containing a custom background, or forces an unplanned, un-checkpointed irreversible schema migration. D-14 is honored (not reversed); credentials remain excluded; no recorded-decision collision.
+
+## HIGH-C verdict: **PARTIALLY RESOLVED**
+
+The presentation-entity half is fully resolved; the background-bytes half has an unresolved restore-path blocker.
+
+Schema claims verified TRUE against `src/db/migrations/profile-presentation.ts`:
+- **(a) Neither presentation table has its own `uid`; PK is the parent id.** Confirmed: `profile_category_presentation.category_id INTEGER PRIMARY KEY` (line 41), `profile_contact_presentation.contact_id INTEGER PRIMARY KEY` (line 52). Portable identity = parent uid.
+- **(b) `layout_template_uid`/`background_template_uid` are already-portable TEXT referencing `*_templates.uid`.** Confirmed (lines 43-46, 54-63). Emitting/restoring verbatim with no integer remap is correct.
+- **Column lists match exactly** — contact table carries `freeform_layout_json` + `collapse_json`, category table does not (lines 40-70). The plan's stated SELECT columns are accurate, not from memory.
+- **`idMap` supports contacts + categories** — confirmed `restore-apply.ts:87`.
+- **`readParentUid` needs the `category_id→categoryUid` alias** — confirmed: `reconciliation.ts:228-233` maps `contact_id→contactUid` but has NO `category_id` entry. The plan correctly adds it.
+- **Restore does parent-before-child remap + a different-rowid destination roundtrip test is mandated** — present in Task 3 behavior/action/acceptance (36-08-PLAN.md:232, 238, 251).
+- The mutual-exclusion `CHECK(layout_template_uid IS NULL OR freeform_layout_json IS NULL)` (line 69) and `collapse_json NOT NULL DEFAULT '{}'` (line 64) are satisfied by the upsert-all-columns-from-`excluded` idiom.
+
+Merge-safety cross-check: because the plan sets `tombstoneEntity: null` for both presentation entities, `reconcileEntity` produces a `delete` action ONLY when a tombstone exists, so `deleteActions`' `DELETE FROM ${table} WHERE uid=?` (`restore-apply.ts:169`) — which would fail on these uid-less tables — is never invoked for them. Correct but fragile; holds only as long as `tombstoneEntity` stays null.
+
+## New-surface findings (T-36-35 guard + background staging)
+
+- **The `profile-backgrounds/` path guard is well-specified and coherent.** Mirrors `SAFE_RELATIVE` (`photo-relative-path.ts:22`), rejects `..`/backslash/absolute/null by construction, derives the canonical path from the template's portable uid (never manifest-supplied), and is stricter than the schema's `image_path GLOB 'profile-backgrounds/*'` CHECK (`profile-presentation.ts:32-35`). **T-36-35 traversal safety is adequately addressed.**
+- **Background bytes staged as base64 like `photoBase64`** — export via the `withPhoto`/`readPhotoBase64` idiom (`export-manifest.ts:44-62, 157-173`) with an unreadable source raising the content-free `BackupPhotoUnreadableError`. Correct.
+
+## Concerns (unresolved only)
+
+**HIGH — Background restore through `restore_photo_journal` is blocked by a shipped CHECK constraint; the required migration is unplanned.** `008-restore-photo-journal.ts:8` defines `target_kind TEXT NOT NULL CHECK(target_kind IN ('contact', 'profile', 'customField'))`. Migration 008 is long shipped (`TARGET_VERSION` = 28; never edit a shipped migration). Task 4 (36-08-PLAN.md:261) says to finalize "via the restore-photo journal (extend `restore-photo-journal-dao.ts` with a `background` target kind … if the existing journal shape cannot carry it)" and acceptance :268 mandates the journal path. The plan treats this as a TypeScript-type question — but the blocker is the SQL CHECK on the shipped table: an `INSERT ... target_kind='background'` (`restore-photo-journal-dao.ts:18-24`) raises a constraint violation inside the restore transaction, aborting the entire restore of any backup that contains a custom background image. That is exactly the incomplete-v5 / data-availability failure T-36-33/T-36-34 forbid, in the phase's single irreversible plan. Resolving it requires a NEW forward-only migration that rebuilds `restore_photo_journal` (SQLite cannot ALTER a CHECK) to widen `target_kind` — a second irreversible schema one-way door absent from `files_modified`, absent from Task 4's action, and not covered by the Task-5 completeness checkpoint. *(No recorded-decision reversal — not tagged as a collision.)*
+
+**MEDIUM — Background restore-pending crash recovery + persist path are avatars-scoped and not enumerated for the new namespace.** The journal-based recovery reuses `persistMaster` (`photo-storage.ts:391-395`, which calls `assertSafeRelative` → avatars-only), and the launch orphan sweep enumerates only `avatars/_restore_pending/` via `listRestorePendingPhotos` (`photo-storage.ts:263-274`) and `resolveRestorePendingUri` (`:358-364`, avatars-only). Task 4 adds a `profile-backgrounds/`-scoped staging guard and staging helpers, but does not enumerate a background-aware launch-sweep lister/reconciler or a background-aware persist for the post-crash finalize path. A restore interrupted mid-background-staging would leave an orphan with no sweep consumer, and the post-commit/launch finalize would hit `assertSafeRelative` on a `profile-backgrounds/` path. Same avatars-scoping cluster as the HIGH; should be enumerated explicitly.
+
+**LOW (informational, not counted)** — Task 3 read_first (36-08-PLAN.md:224) attributes `profile_layout_templates`/`profile_background_templates` shapes to "migration 029"; those tables live in `profile-presentation.ts` (`SCHEMA_VERSION = 24`). Harmless (same read_first also cites `profile-presentation.ts`). `idMap`'s type union (`restore-apply.ts:87`) does not yet include `"systems"`/`"group_events"`; covered by the general "extend restore machinery" instruction and enforced by `tsc`.
+
+## Risk Assessment
+
+The presentation-entity modeling is sound and every load-bearing schema claim is verified true against the code — that half of HIGH-C is genuinely closed. The residual risk is concentrated entirely in the background-image restore filesystem plumbing, which reuses machinery (`restore_photo_journal`, `persistMaster`, the launch sweep) hard-wired to three target kinds and the `avatars/` namespace; the shipped `target_kind` CHECK turns this from an omission into a hard runtime blocker in an irreversible plan. No credential/egress boundary is widened; D-14 is honored, not reversed.
+
+CYCLE_SUMMARY: current_high=1 current_actionable=1
+
 ---
 
 # Cross-AI Plan Review — Phase 36 "AI Configuration & Prompting" — CYCLE 3 (FINAL)
