@@ -1,7 +1,7 @@
 # Interaction Log
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 28-dashboard-card-view
+**Updated by phase:** 31-profile-experience
 **Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`, `src/services/quick-log-command.ts`, `src/db/bulk-actions-dao.ts`
 
 ## Purpose
@@ -154,7 +154,13 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — includes interaction history in full-state exports.
 - **ADR-103:** Atomic Composed Dashboard Bulk Mutations — preserves recency and immutable-event invariants in Dashboard batch work.
 
+- **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — supplies bounded history and impact inputs inside one read snapshot.
+- **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — defines the Bound interval and Unbound local-month Profile views.
+
 ## Gotchas
+
+1. **Keep the Phase 31 History read bounded.** The Profile snapshot renders only the latest few entries behind `interaction-history`; Phase 32 owns the complete timeline and insights renderer.
+2. **Unbound activity is not cadence-relative.** Profile Intensity uses the current local calendar month and labels it `This month` when active cadence is unavailable.
 
 1. **Use local wall-clock strings.** Never convert a user-entered interaction time through `toISOString()`; it can change the recorded day.
 2. **Do not add a second recency writer.** Every touchpoint mutation must recompute through `recency-dao`.
@@ -192,3 +198,4 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 | 2026-09-02 | 22 | Added shell Quick Log as a guarded consumer of the existing canonical insert/delete paths. |
 | 2026-09-02 | 27 | Extracted the shared Quick Log command for Dashboard List gestures while retaining commit-only feedback and the sole recency writer. |
 | 2026-09-02 | 28 | Added atomic Dashboard batch logging, receipt-scoped Undo, and archive event fan-out through composed cores. |
+| 2026-09-02 | 31 | Added snapshot-compatible impact reads, bounded interim Profile history, and the shared no-cadence calendar-month activity contract. |
