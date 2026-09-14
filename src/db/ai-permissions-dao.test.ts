@@ -5,6 +5,7 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
+  type AiPermissionRef,
   bulkDisableAiPermissions,
   bulkEnableAiPermissions,
   getAiPermissionDefaults,
@@ -13,7 +14,6 @@ import {
   resolveNewItemAiDefault,
   setAiPermissionDefault,
   summarizeAiPermissionItems,
-  type AiPermissionRef,
 } from "@/db/ai-permissions-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
@@ -103,7 +103,9 @@ describe("AI permissions DAO", () => {
     await setAiPermissionDefault(exec, "memory", 1, NOW);
 
     await expect(resolveNewItemAiDefault(exec, "memory")).resolves.toBe(1);
-    await expect(resolveNewItemAiDefault(exec, "interaction-note")).resolves.toBe(0);
+    await expect(
+      resolveNewItemAiDefault(exec, "interaction-note"),
+    ).resolves.toBe(0);
     await expect(
       exec.getFirstAsync("SELECT allow_ai FROM memories WHERE id = ?", [
         seeded.disabledMemoryId,
@@ -126,7 +128,9 @@ describe("AI permissions DAO", () => {
     await seedReviewRows();
     const all = await listAiPermissionItems(exec, {});
 
-    expect(all.map((item) => [item.contactName, item.category, item.label])).toEqual([
+    expect(
+      all.map((item) => [item.contactName, item.category, item.label]),
+    ).toEqual([
       ["Alex", "memory", "Memory"],
       ["Alex", "interaction-note", "Interaction note"],
       ["Alex", "custom-field", "Favorite constellation"],
@@ -141,13 +145,18 @@ describe("AI permissions DAO", () => {
     expect(
       await listAiPermissionItems(exec, { category: "interaction-note" }),
     ).toHaveLength(1);
-    expect(await listAiPermissionItems(exec, { contactQuery: "BLA" })).toHaveLength(2);
+    expect(
+      await listAiPermissionItems(exec, { contactQuery: "BLA" }),
+    ).toHaveLength(2);
   });
 
   it("counts distinct contacts once when they appear under multiple types", async () => {
     await seedReviewRows();
     const enabled = await listAiPermissionItems(exec, { enabledOnly: true });
-    expect(summarizeAiPermissionItems(enabled)).toEqual({ contacts: 2, items: 4 });
+    expect(summarizeAiPermissionItems(enabled)).toEqual({
+      contacts: 2,
+      items: 4,
+    });
   });
 
   it("bulk enables and disables explicit selections inside one logical write", async () => {
@@ -165,7 +174,9 @@ describe("AI permissions DAO", () => {
       contacts: 2,
       items: 3,
     });
-    await expect(bulkEnableAiPermissions(exec, selection, NOW)).resolves.toEqual({
+    await expect(
+      bulkEnableAiPermissions(exec, selection, NOW),
+    ).resolves.toEqual({
       contacts: 2,
       items: 3,
     });
@@ -175,9 +186,11 @@ describe("AI permissions DAO", () => {
       ]),
     ).resolves.toEqual({ allow_ai: 1 });
     await expect(
-      bulkDisableAiPermissions(exec, [
-        { category: "interaction-note", id: seeded.noteId },
-      ], NOW),
+      bulkDisableAiPermissions(
+        exec,
+        [{ category: "interaction-note", id: seeded.noteId }],
+        NOW,
+      ),
     ).resolves.toEqual({ contacts: 1, items: 1 });
     await expect(bulkEnableAiPermissions(exec, [], NOW)).rejects.toThrow(
       /explicit selection/,
@@ -185,7 +198,10 @@ describe("AI permissions DAO", () => {
   });
 
   it("contains no query path for excluded information stores", () => {
-    const source = readFileSync(new URL("./ai-permissions-dao.ts", import.meta.url), "utf8");
+    const source = readFileSync(
+      new URL("./ai-permissions-dao.ts", import.meta.url),
+      "utf8",
+    );
     expect(source).not.toMatch(/\bfuel\b|off_limits|group_events/i);
     expect(source).not.toMatch(/enableAll|disableAll/);
   });
