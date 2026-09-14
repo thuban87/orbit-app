@@ -66,6 +66,17 @@ export interface BackupManifest {
   relationships: Record<string, unknown>[];
   currentStateEntries: Record<string, unknown>[];
   customFieldValueHistory: Record<string, unknown>[];
+  systems: Record<string, unknown>[];
+  systemRules: Record<string, unknown>[];
+  systemOverrides: Record<string, unknown>[];
+  systemPrefs: Record<string, unknown>[];
+  profileLayoutTemplates: Record<string, unknown>[];
+  profileBackgroundTemplates: Record<string, unknown>[];
+  aiConnections: Record<string, unknown>[];
+  personalizationSections: Record<string, unknown>[];
+  groupEvents: Record<string, unknown>[];
+  profileContactPresentation: Record<string, unknown>[];
+  profileCategoryPresentation: Record<string, unknown>[];
   tombstones: Array<{ entityType: string; entityUid: string; deletedAt: string }>;
 }
 

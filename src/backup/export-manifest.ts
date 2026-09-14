@@ -86,6 +86,17 @@ async function readManifest(
     relationships,
     currentStateEntries,
     customFieldValueHistory,
+    systems,
+    systemRules,
+    systemOverrides,
+    systemPrefs,
+    profileLayoutTemplates,
+    profileBackgroundTemplates,
+    aiConnections,
+    personalizationSections,
+    groupEvents,
+    profileContactPresentation,
+    profileCategoryPresentation,
     tombstones,
   ] = await Promise.all([
     ro.getAllAsync<Record<string, unknown>>(
@@ -107,7 +118,7 @@ async function readManifest(
       "SELECT p.uid, m.uid AS methodUid, l.uid AS externalContactLinkUid, p.source_method_id AS sourceMethodId, p.created_at AS createdAt, p.modified_at AS modifiedAt FROM contact_method_provenance p JOIN contact_methods m ON m.id = p.method_id LEFT JOIN external_contact_links l ON l.id = p.external_contact_link_id ORDER BY p.uid",
     ),
     ro.getAllAsync<Record<string, unknown>>(
-      "SELECT i.uid, c.uid AS contactUid, i.occurred_at AS occurredAt, i.recorded_at AS recordedAt, i.channel, i.direction, i.connected, i.quality, i.note, i.source, i.modified_at AS modifiedAt FROM interactions i JOIN contacts c ON c.id = i.contact_id ORDER BY i.uid",
+      "SELECT i.uid, c.uid AS contactUid, ge.uid AS groupEventUid, i.occurred_at AS occurredAt, i.recorded_at AS recordedAt, i.channel, i.direction, i.connected, i.quality, i.note, i.duration, i.allow_ai AS allowAi, i.ge_follow_channel AS geFollowChannel, i.ge_follow_quality AS geFollowQuality, i.ge_follow_duration AS geFollowDuration, i.source, i.modified_at AS modifiedAt FROM interactions i JOIN contacts c ON c.id = i.contact_id LEFT JOIN group_events ge ON ge.id = i.group_event_id ORDER BY i.uid",
     ),
     ro.getAllAsync<Record<string, unknown>>(
       "SELECT e.uid, c.uid AS contactUid, e.type, e.occurred_at AS occurredAt, e.detail, e.recorded_at AS recordedAt, e.modified_at AS modifiedAt FROM events e JOIN contacts c ON c.id = e.contact_id ORDER BY e.uid",
@@ -135,6 +146,39 @@ async function readManifest(
     ),
     ro.getAllAsync<Record<string, unknown>>(
       "SELECT h.uid,c.uid AS contactUid,d.uid AS fieldDefUid,h.value,h.created_at AS createdAt,h.created_at AS modifiedAt FROM custom_field_value_history h JOIN contacts c ON c.id=h.contact_id JOIN custom_field_defs d ON d.id=h.field_def_id ORDER BY h.uid",
+    ),
+    ro.getAllAsync<Record<string, unknown>>(
+      "SELECT uid,name,created_at AS createdAt,modified_at AS modifiedAt FROM systems ORDER BY uid",
+    ),
+    ro.getAllAsync<Record<string, unknown>>(
+      "SELECT r.uid,s.uid AS systemUid,r.family,r.value,r.created_at AS createdAt,r.created_at AS modifiedAt FROM system_rules r JOIN systems s ON s.id=r.system_id ORDER BY r.uid",
+    ),
+    ro.getAllAsync<Record<string, unknown>>(
+      "SELECT o.uid,o.system_ref AS systemRef,c.uid AS contactUid,o.mode,o.created_at AS createdAt,o.created_at AS modifiedAt FROM system_overrides o JOIN contacts c ON c.id=o.contact_id ORDER BY o.uid",
+    ),
+    ro.getAllAsync<Record<string, unknown>>(
+      "SELECT uid,system_ref AS systemRef,display_order AS displayOrder,hidden,created_at AS createdAt,modified_at AS modifiedAt FROM system_prefs ORDER BY uid",
+    ),
+    ro.getAllAsync<Record<string, unknown>>(
+      "SELECT uid,name,layout_json AS layoutJson,created_at AS createdAt,modified_at AS modifiedAt FROM profile_layout_templates ORDER BY uid",
+    ),
+    ro.getAllAsync<Record<string, unknown>>(
+      "SELECT uid,name,image_path AS imagePath,created_at AS createdAt,modified_at AS modifiedAt FROM profile_background_templates ORDER BY uid",
+    ),
+    ro.getAllAsync<Record<string, unknown>>(
+      "SELECT uid,lane,remembered_model AS rememberedModel,custom_endpoint AS customEndpoint,custom_model AS customModel,configured_at AS configuredAt,created_at AS createdAt,modified_at AS modifiedAt FROM ai_connections ORDER BY uid",
+    ),
+    ro.getAllAsync<Record<string, unknown>>(
+      "SELECT uid,title,body,enabled,display_order AS displayOrder,created_at AS createdAt,modified_at AS modifiedAt FROM personalization_sections ORDER BY uid",
+    ),
+    ro.getAllAsync<Record<string, unknown>>(
+      "SELECT uid,title,occurred_at AS occurredAt,channel,quality,duration,group_note AS groupNote,created_at AS createdAt,modified_at AS modifiedAt FROM group_events ORDER BY uid",
+    ),
+    ro.getAllAsync<Record<string, unknown>>(
+      "SELECT c.uid AS contactUid,p.layout_template_uid AS layoutTemplateUid,p.freeform_layout_json AS freeformLayoutJson,p.background_template_uid AS backgroundTemplateUid,p.collapse_json AS collapseJson,p.created_at AS createdAt,p.modified_at AS modifiedAt FROM profile_contact_presentation p JOIN contacts c ON c.id=p.contact_id ORDER BY c.uid",
+    ),
+    ro.getAllAsync<Record<string, unknown>>(
+      "SELECT c.uid AS categoryUid,p.layout_template_uid AS layoutTemplateUid,p.background_template_uid AS backgroundTemplateUid,p.created_at AS createdAt,p.modified_at AS modifiedAt FROM profile_category_presentation p JOIN categories c ON c.id=p.category_id ORDER BY c.uid",
     ),
     ro.getAllAsync<{
       entity_type: string;
@@ -201,12 +245,18 @@ async function readManifest(
     relationships,
     currentStateEntries,
     customFieldValueHistory,
-    // TEMPORARY Phase-33 compatibility boundary: format 4 cannot represent a
-    // Group Event tombstone yet. Keep it durable locally; Phase 36 replaces this
-    // guard when its wire entity, validation, reconciliation, and restore land.
-    tombstones: tombstones
-      .filter((row) => row.entity_type !== "group_event")
-      .map((row) => ({
+    systems,
+    systemRules,
+    systemOverrides,
+    systemPrefs,
+    profileLayoutTemplates,
+    profileBackgroundTemplates,
+    aiConnections,
+    personalizationSections,
+    groupEvents,
+    profileContactPresentation,
+    profileCategoryPresentation,
+    tombstones: tombstones.map((row) => ({
         entityType: row.entity_type,
         entityUid: row.entity_uid,
         deletedAt: row.deleted_at,

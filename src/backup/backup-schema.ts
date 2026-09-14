@@ -240,6 +240,7 @@ const TOMBSTONE_ENTITY_TYPES = new Set([
   "memory",
   "relationship",
   "current_state_entry",
+  "group_event",
 ]);
 
 function assertPortableSettings(
@@ -413,9 +414,76 @@ function validate(manifest: RawManifest): BackupManifest {
     manifest.customFieldValueHistory ?? [],
     "customFieldValueHistory",
   );
+  const newArrays = {
+    systems: array(manifest.systems ?? [], "systems"),
+    systemRules: array(manifest.systemRules ?? [], "systemRules"),
+    systemOverrides: array(manifest.systemOverrides ?? [], "systemOverrides"),
+    systemPrefs: array(manifest.systemPrefs ?? [], "systemPrefs"),
+    profileLayoutTemplates: array(
+      manifest.profileLayoutTemplates ?? [],
+      "profileLayoutTemplates",
+    ),
+    profileBackgroundTemplates: array(
+      manifest.profileBackgroundTemplates ?? [],
+      "profileBackgroundTemplates",
+    ),
+    aiConnections: array(manifest.aiConnections ?? [], "aiConnections"),
+    personalizationSections: array(
+      manifest.personalizationSections ?? [],
+      "personalizationSections",
+    ),
+    groupEvents: array(manifest.groupEvents ?? [], "groupEvents"),
+    profileContactPresentation: array(
+      manifest.profileContactPresentation ?? [],
+      "profileContactPresentation",
+    ),
+    profileCategoryPresentation: array(
+      manifest.profileCategoryPresentation ?? [],
+      "profileCategoryPresentation",
+    ),
+  };
   const contacts = uidSet(arrays.contacts, "contacts");
   const categories = uidSet(arrays.categories, "categories");
   const defs = uidSet(arrays.customFieldDefs, "customFieldDefs");
+  const systems = uidSet(newArrays.systems, "systems");
+  const groupEvents = uidSet(newArrays.groupEvents, "groupEvents");
+  for (const key of [
+    "systemRules",
+    "systemOverrides",
+    "systemPrefs",
+    "profileLayoutTemplates",
+    "profileBackgroundTemplates",
+    "aiConnections",
+    "personalizationSections",
+  ] as const)
+    uidSet(newArrays[key], key);
+  const contactPresentation = new Set<string>();
+  for (const row of newArrays.profileContactPresentation) {
+    if (typeof row.contactUid !== "string" || contactPresentation.has(row.contactUid))
+      fail("profileContactPresentation has an invalid or duplicate contactUid");
+    contactPresentation.add(row.contactUid);
+  }
+  const categoryPresentation = new Set<string>();
+  for (const row of newArrays.profileCategoryPresentation) {
+    if (typeof row.categoryUid !== "string" || categoryPresentation.has(row.categoryUid))
+      fail("profileCategoryPresentation has an invalid or duplicate categoryUid");
+    categoryPresentation.add(row.categoryUid);
+  }
+  for (const row of newArrays.systemRules)
+    if (typeof row.systemUid !== "string" || !systems.has(row.systemUid))
+      fail("systemRules has an unknown System UID");
+  for (const row of newArrays.systemOverrides)
+    if (typeof row.contactUid !== "string" || !contacts.has(row.contactUid))
+      fail("systemOverrides has an unknown contact UID");
+  for (const row of arrays.interactions)
+    if (row.groupEventUid != null && (typeof row.groupEventUid !== "string" || !groupEvents.has(row.groupEventUid)))
+      fail("interactions has an unknown Group Event UID");
+  for (const row of newArrays.profileContactPresentation)
+    if (!contacts.has(row.contactUid as string))
+      fail("profileContactPresentation has an unknown contact UID");
+  for (const row of newArrays.profileCategoryPresentation)
+    if (!categories.has(row.categoryUid as string))
+      fail("profileCategoryPresentation has an unknown category UID");
   // Validate the fields the scope-aware restore now branches on (WR-01): a
   // malformed `scope` in a hand-edited backup must not silently bypass
   // assertCompleteIncomingPairs, and a non-string/non-flag value must fail as a
@@ -836,6 +904,7 @@ function validate(manifest: RawManifest): BackupManifest {
     relationships: arrays.relationships,
     currentStateEntries: arrays.currentStateEntries,
     customFieldValueHistory,
+    ...newArrays,
     tombstones,
   };
 }

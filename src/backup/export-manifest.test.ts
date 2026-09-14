@@ -17,7 +17,7 @@ const NOW = "2026-08-25 12:00:00";
 
 describe("buildExportManifest", () => {
   it.each(["dissolve", "delete"] as const)(
-    "keeps a local Group Event tombstone but omits it from the format-4 export after %s",
+    "carries a local Group Event tombstone after %s",
     async (action) => {
       let count = 0;
       const exec = nodeSqliteExecutor(openTestDb());
@@ -58,8 +58,11 @@ describe("buildExportManifest", () => {
         readPhotoBase64: async () => "AQID",
       });
       expect(manifest.backupFormatVersion).toBe(4);
-      expect(manifest.tombstones).not.toContainEqual(
-        expect.objectContaining({ entityType: "group_event" }),
+      expect(manifest.tombstones).toContainEqual(
+        expect.objectContaining({
+          entityType: "group_event",
+          entityUid: "group-parent",
+        }),
       );
       if (action === "delete") {
         expect(manifest.tombstones).toContainEqual(
@@ -72,7 +75,7 @@ describe("buildExportManifest", () => {
     },
   );
 
-  it("pins the format-4 portable-settings wire shape before Phase 36", async () => {
+  it("emits the complete portable-settings wire shape", async () => {
     let count = 0;
     const exec = nodeSqliteExecutor(openTestDb());
     await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
@@ -88,31 +91,17 @@ describe("buildExportManifest", () => {
     // D-06 trip-wire: Phase 36 owns the coordinated wire change to v5.
     expect(BACKUP_FORMAT_VERSION).toBe(4);
     expect(manifest.backupFormatVersion).toBe(4);
-    expect(Object.keys(manifest.appSettings).sort()).toEqual([
-      "aiCustomEndpoint",
-      "aiCustomModel",
-      "aiModel",
-      "aiPromptTemplate",
-      "aiProvider",
-      "backupIntervalDays",
-      "backupRetentionDays",
-      "birthdayEnabled",
-      "birthdayUnboundEnabled",
-      "decayEnabled",
-      "deliveryHour",
-      "digestEnabled",
-      "includeUnboundNeverContacted",
-      "interactionAssistEnabled",
-      "lockscreenPublic",
-      "modifiedAt",
-      "notificationsEnabled",
-      "phoneRegionOverride",
-      "quietEndHour",
-      "quietStartHour",
-      "selfSunColour",
-      "sunContactUid",
-    ]);
-    expect(manifest.appSettings).not.toHaveProperty("orreryLastSystem");
+    expect(manifest.appSettings).toMatchObject({
+      orreryLastSystem: "builtin:all-contacts",
+      themePackage: "galaxy",
+      dashboardViewMode: "list",
+      profileLayoutTemplateUid: null,
+      historyLens: "cycles",
+      defaultInteractionChannel: "remember",
+      defaultMessageMode: "remember",
+      aiEnabled: 0,
+      aiDefaultInteractionNoteAllow: 0,
+    });
   });
 
   it("emits the migrated interaction vocabulary from a post-migration DB without a source change (D-06)", async () => {
@@ -162,6 +151,43 @@ describe("buildExportManifest", () => {
     ]);
     // Phase 36 owns the format bump; this guard keeps it unchanged this phase.
     expect(BACKUP_FORMAT_VERSION).toBe(4);
+  });
+
+  it("serializes the v5 entity inventory with portable parent UIDs", async () => {
+    const exec = nodeSqliteExecutor(openTestDb());
+    let count = 0;
+    await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+      now: NOW,
+      newUid: () => `uid-${++count}`,
+    });
+    await exec.runAsync("INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)", ["cat-a", "Friends", 1, NOW, NOW]);
+    const category = await exec.getFirstAsync<{ id: number }>("SELECT id FROM categories WHERE uid='cat-a'");
+    await exec.runAsync("INSERT INTO contacts(uid,name,category_id,interval_days,created_at,modified_at) VALUES(?,?,?,?,?,?)", ["contact-a", "Ada", category!.id, 7, NOW, NOW]);
+    const contact = await exec.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid='contact-a'");
+    await exec.runAsync("INSERT INTO systems(uid,name,created_at,modified_at) VALUES(?,?,?,?)", ["system-a", "Inner", NOW, NOW]);
+    const system = await exec.getFirstAsync<{ id: number }>("SELECT id FROM systems WHERE uid='system-a'");
+    await exec.runAsync("INSERT INTO system_rules(uid,system_id,family,value,created_at) VALUES(?,?,?,?,?)", ["rule-a", system!.id, "favorite", "on", NOW]);
+    await exec.runAsync("INSERT INTO system_overrides(uid,system_ref,contact_id,mode,created_at) VALUES(?,?,?,?,?)", ["override-a", "custom:system-a", contact!.id, "include", NOW]);
+    await exec.runAsync("INSERT INTO system_prefs(uid,system_ref,display_order,hidden,created_at,modified_at) VALUES(?,?,?,?,?,?)", ["pref-a", "custom:system-a", 2, 0, NOW, NOW]);
+    await exec.runAsync("INSERT INTO profile_layout_templates(uid,name,layout_json,created_at,modified_at) VALUES(?,?,?,?,?)", ["layout-a", "Layout", '{"version":1,"sections":[]}', NOW, NOW]);
+    await exec.runAsync("INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)", ["background-a", "Background", "profile-backgrounds/background-a.jpg", NOW, NOW]);
+    await exec.runAsync("INSERT INTO profile_contact_presentation(contact_id,layout_template_uid,background_template_uid,collapse_json,created_at,modified_at) VALUES(?,?,?,?,?,?)", [contact!.id, "layout-a", "background-a", '{"notes":true}', NOW, NOW]);
+    await exec.runAsync("INSERT INTO profile_category_presentation(category_id,layout_template_uid,background_template_uid,created_at,modified_at) VALUES(?,?,?,?,?)", [category!.id, "layout-a", "background-a", NOW, NOW]);
+    await exec.runAsync("INSERT INTO group_events(uid,title,occurred_at,channel,quality,duration,group_note,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?,?)", ["group-a", "Dinner", NOW, "In Person", "warm", 90, "Private context", NOW, NOW]);
+    const group = await exec.getFirstAsync<{ id: number }>("SELECT id FROM group_events WHERE uid='group-a'");
+    await exec.runAsync("INSERT INTO interactions(uid,contact_id,occurred_at,recorded_at,channel,duration,allow_ai,group_event_id,ge_follow_channel,source,modified_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)", ["interaction-a", contact!.id, NOW, NOW, "In Person", 90, 1, group!.id, 1, "manual", NOW]);
+    await exec.runAsync("INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)", ["connection-a", "custom", "local", "https://example.invalid/v1", "model", NOW, NOW, NOW]);
+    await exec.runAsync("INSERT INTO personalization_sections(uid,title,body,enabled,display_order,created_at,modified_at) VALUES(?,?,?,?,?,?,?)", ["section-a", "Me", "Context", 1, 0, NOW, NOW]);
+
+    const manifest = await buildExportManifest(exec, { exportedAt: NOW, readPhotoBase64: async () => "AQID" });
+    expect(manifest.systemRules[0]).toMatchObject({ systemUid: "system-a" });
+    expect(manifest.systemOverrides[0]).toMatchObject({ contactUid: "contact-a" });
+    expect(manifest.groupEvents[0]).toMatchObject({ uid: "group-a", groupNote: "Private context" });
+    expect(manifest.interactions[0]).toMatchObject({ groupEventUid: "group-a", duration: 90, allowAi: 1, geFollowChannel: 1 });
+    expect(manifest.profileContactPresentation[0]).toMatchObject({ contactUid: "contact-a", layoutTemplateUid: "layout-a", backgroundTemplateUid: "background-a", collapseJson: '{"notes":true}' });
+    expect(manifest.profileCategoryPresentation[0]).toMatchObject({ categoryUid: "cat-a", layoutTemplateUid: "layout-a" });
+    expect(manifest.aiConnections[0]).not.toHaveProperty("credential");
+    expect(manifest.personalizationSections).toHaveLength(1);
   });
 
   it("exports full portable state with bytes and never local paths or backup bookkeeping", async () => {
@@ -366,7 +392,7 @@ describe("buildExportManifest", () => {
     ]);
   });
 
-  it("omits all seven Phase-23 theme keys from a format-3 export's appSettings (deferral guard, REVIEWS 23-01 HIGH)", async () => {
+  it("emits all seven Phase-23 theme keys", async () => {
     // The theme keys are allowlisted + DAO-writable this phase, but their
     // EMISSION from getPortableSettingsSnapshot is deferred to Phase 36 so the
     // format-3 wire stays byte-identical — export-manifest spreads `...portable`
@@ -392,7 +418,7 @@ describe("buildExportManifest", () => {
       "galaxyBackground",
       "standardBackground",
     ]) {
-      expect(manifest.appSettings).not.toHaveProperty(key);
+      expect(manifest.appSettings).toHaveProperty(key);
     }
   });
 
