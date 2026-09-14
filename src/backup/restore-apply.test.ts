@@ -16,16 +16,16 @@ const backgroundMocks = vi.hoisted(() => ({
 }));
 vi.mock("@/services/photos/background-storage", () => ({
   backgroundDerivativeRelPath: (uid: string) => `profile-backgrounds/${uid}.jpg`,
-  resolveBackgroundRestorePendingUri: (uid: string) =>
-    `file:///doc/profile-backgrounds/_restore_pending/${uid}.jpg`,
+  resolveBackgroundRestorePendingUri: (relative: string) =>
+    `file:///doc/${relative}`,
   stageBackgroundRestorePendingBase64: async (base64: string, uid: string) => {
     backgroundMocks.staged.push([base64, uid]);
   },
   persistBackgroundDerivative: async (source: string, destination: string) => {
     backgroundMocks.persisted.push([source, destination]);
   },
-  deleteBackgroundRestorePending: (uid: string) => {
-    backgroundMocks.deleted.push(uid);
+  deleteBackgroundRestorePending: (relative: string) => {
+    backgroundMocks.deleted.push(relative);
   },
 }));
 vi.mock("@/services/photos/photo-storage", () => ({
@@ -94,6 +94,7 @@ import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { migration027 } from "@/db/migrations/027-default-interaction-channel";
 import { migration028 } from "@/db/migrations/028-compose-message-mode";
 import { migration029 } from "@/db/migrations/029-ai-configuration";
+import { migration030 } from "@/db/migrations/030-restore-background-journal";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import { readOrrerySystemSnapshot } from "@/db/orrery-system-read";
@@ -149,8 +150,9 @@ async function db(): Promise<SqlExecutor> {
       migration027,
       migration028,
       migration029,
+      migration030,
     ],
-    29,
+    30,
     { now: NOW, newUid },
   );
   return exec;
@@ -214,10 +216,13 @@ beforeEach(() => {
       expect(computeAiAvailability({ aiEnabled: restoredAi!.enabled === 1, activeConnection: restoredAi!.active, hasCredential: false, selectedModel: "remembered", modelAvailable: true }))
         .toBe("needs-attention");
       expect(backgroundMocks.staged).toContainEqual(["AQID", "portable-background"]);
-      expect(backgroundMocks.persisted).toContainEqual([
-        "file:///doc/profile-backgrounds/_restore_pending/portable-background.jpg",
+      expect(backgroundMocks.persisted).toHaveLength(1);
+      expect(backgroundMocks.persisted[0]?.[0]).toMatch(
+        /^file:\/\/\/doc\/profile-backgrounds\/_restore_pending\/portable-background\/[A-Za-z0-9_-]+\.jpg$/,
+      );
+      expect(backgroundMocks.persisted[0]?.[1]).toBe(
         "profile-backgrounds/portable-background.jpg",
-      ]);
+      );
       expect(await destination.getFirstAsync("SELECT image_path AS imagePath FROM profile_background_templates WHERE uid='portable-background'"))
         .toEqual({ imagePath: "profile-backgrounds/portable-background.jpg" });
     },

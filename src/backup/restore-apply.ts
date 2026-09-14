@@ -9,6 +9,10 @@ import { getPortableSettingsSnapshot, updateAppSettingsCore, type AppSettingsPat
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { remapLegacyChannel, remapLegacyQuality } from "@/db/interaction-vocabulary";
 import { recomputeLastContactCore } from "@/db/recency-dao";
+import {
+  deleteBackgroundJournalEntry,
+  insertBackgroundJournalEntryCore,
+} from "@/db/restore-background-journal-dao";
 import { deleteJournalEntryCore, insertJournalEntryCore, type RestorePhotoJournalEntry } from "@/db/restore-photo-journal-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -37,9 +41,9 @@ export interface RestoreApplyDependencies {
   createVerifiedPreRestoreSnapshot?: () => Promise<PreRestoreSnapshotResult>;
   stagePhoto?: (base64: string, relative: string) => Promise<void>;
   persistPhoto?: (sourceUri: string, canonicalRelativePath: string) => Promise<unknown>;
-  stageBackground?: (base64: string, templateUid: string) => Promise<unknown>;
+  stageBackground?: (base64: string, templateUid: string, sessionToken: string) => Promise<unknown>;
   persistBackground?: (sourceUri: string, canonicalRelativePath: string) => Promise<unknown>;
-  deleteStagedBackground?: (templateUid: string) => void;
+  deleteStagedBackground?: (relativePath: string) => void;
   deleteCanonicalPhoto?: (canonicalRelativePath: string) => void;
   canonicalPhotoExists?: (canonicalRelativePath: string) => boolean;
   reconcileNotificationSchedule?: () => Promise<void>;
@@ -56,7 +60,12 @@ type Plan = Record<MergeableEntityType, ReconciliationAction[]>;
 type PhotoTarget = RestorePendingTarget & { valueUid?: string; fieldDefUid?: string };
 type FinalizeCandidate = { target: PhotoTarget; relativePath: string };
 type DeleteCandidate = { target: PhotoTarget; canonicalRelativePath: string; clearReference: boolean };
-type BackgroundFinalizeCandidate = { uid: string; canonicalRelativePath: string };
+type BackgroundFinalizeCandidate = {
+  uid: string;
+  modifiedAt: string;
+  pendingRelativePath: string;
+  canonicalRelativePath: string;
+};
 
 const entities: readonly MergeableEntityType[] = ["categories", "profile", "contacts", "custom_field_defs", "systems", "profile_layout_templates", "profile_background_templates", "ai_connections", "personalization_sections", "group_events", "system_rules", "system_overrides", "system_prefs", "contact_methods", "external_contact_links", "contact_method_provenance", "interactions", "events", "fuel", "contact_links", "custom_field_values", "custom_field_value_history", "memories", "relationships", "current_state_entries", "profile_contact_presentation", "profile_category_presentation"];
 const tableOf: Record<MergeableEntityType, string> = Object.fromEntries(entities.map((entity) => [entity, entity])) as Record<MergeableEntityType, string>;
@@ -292,15 +301,18 @@ async function stageCandidates(exec: SqlExecutor, plan: Plan, session: string, s
 }
 async function stageBackgroundCandidates(
   plan: Plan,
+  sessionToken: string,
   stage: NonNullable<RestoreApplyDependencies["stageBackground"]>,
 ): Promise<BackgroundFinalizeCandidate[]> {
   const candidates: BackgroundFinalizeCandidate[] = [];
   for (const action of writes(plan, "profile_background_templates")) {
     const row = action.row!;
     if (typeof row.imageBase64 !== "string") continue;
-    await stage(row.imageBase64, row.uid);
+    await stage(row.imageBase64, row.uid, sessionToken);
     candidates.push({
       uid: row.uid,
+      modifiedAt: String(row.modified_at),
+      pendingRelativePath: `profile-backgrounds/_restore_pending/${row.uid}/${sessionToken}.jpg`,
       canonicalRelativePath: backgroundDerivativeRelPath(row.uid),
     });
   }
@@ -366,9 +378,11 @@ export async function applyRestore(exec: SqlExecutor, manifest: BackupManifest, 
   const totals = entities.reduce((out, entity) => { for (const action of plan[entity]) out[action.kind] += 1; return out; }, { insert: 0, update: 0, retain: 0, delete: 0, blocked: 0 });
   const applySettings = mode === "replace-all" || (manifest.appSettings.modifiedAt as string) > settings.modifiedAt;
   if (totals.insert + totals.update + totals.delete === 0 && !applySettings) return { status: "applied", mode, inserted: 0, updated: 0, retained: totals.retain, deleted: 0, blocked: totals.blocked, photosNeedingAttention: 0, photoCleanupPending: 0, scheduleResyncPending: false, preRestoreSnapshotCreated };
-  const candidates = await stageCandidates(exec, plan, deps.sessionToken ?? newUid(), deps.stagePhoto ?? stageRestorePendingBase64);
+  const restoreSessionToken = deps.sessionToken ?? newUid();
+  const candidates = await stageCandidates(exec, plan, restoreSessionToken, deps.stagePhoto ?? stageRestorePendingBase64);
   const backgroundCandidates = await stageBackgroundCandidates(
     plan,
+    restoreSessionToken,
     deps.stageBackground ?? stageBackgroundRestorePendingBase64,
   );
   await inWriteTransaction(exec, async () => {
@@ -399,6 +413,15 @@ export async function applyRestore(exec: SqlExecutor, manifest: BackupManifest, 
     for (const candidate of candidates.finalize) { const canonical = await canonicalFor(exec,candidate.target); if (!canonical) throw new Error("restore photo target disappeared before commit"); await writePhotoReference(exec,candidate.target,canonical); await insertJournalEntryCore(exec,entry("finalize",candidate.relativePath,candidate.target,canonical,manifest.metadata.exportedAt)); }
     for (const candidate of candidates.deletes) if (candidate.clearReference) await writePhotoReference(exec,candidate.target,null);
     for (const candidate of candidates.deletes) await insertJournalEntryCore(exec,entry("delete",`delete:${candidate.canonicalRelativePath}`,candidate.target,candidate.canonicalRelativePath,manifest.metadata.exportedAt));
+    for (const candidate of backgroundCandidates) {
+      await insertBackgroundJournalEntryCore(exec, {
+        relativePath: candidate.pendingRelativePath,
+        templateUid: candidate.uid,
+        templateModifiedAt: candidate.modifiedAt,
+        canonicalRelativePath: candidate.canonicalRelativePath,
+        createdAt: manifest.metadata.exportedAt,
+      });
+    }
     if (applySettings) { const uid = manifest.appSettings.sunContactUid; const sun = typeof uid === "string" && survivors.contacts?.has(uid) ? contacts.get(uid) ?? null : null; const patch = Object.fromEntries(Object.entries(manifest.appSettings).filter(([key]) => key !== "modifiedAt" && key !== "sunContactUid")) as AppSettingsPatch; await updateAppSettingsCore(exec,{ ...patch, sunContactId: sun },manifest.appSettings.modifiedAt as string); }
     await bumpDataRevisionCore(exec);
   });
@@ -409,10 +432,11 @@ export async function applyRestore(exec: SqlExecutor, manifest: BackupManifest, 
   for (const candidate of backgroundCandidates) {
     try {
       await persistBackground(
-        resolveBackgroundRestorePendingUri(candidate.uid),
+        resolveBackgroundRestorePendingUri(candidate.pendingRelativePath),
         candidate.canonicalRelativePath,
       );
-      deleteStagedBackground(candidate.uid);
+      deleteStagedBackground(candidate.pendingRelativePath);
+      await deleteBackgroundJournalEntry(exec, candidate.pendingRelativePath);
     } catch {
       photosNeedingAttention += 1;
     }

@@ -9,7 +9,7 @@ const SAFE_BACKGROUND_RELATIVE = /^profile-backgrounds\/[A-Za-z0-9_-]+\.jpg$/;
 const SAFE_BACKGROUND_SIDECAR =
   /^profile-backgrounds\/[A-Za-z0-9_-]+\.jpg\.(?:tmp|bak)$/;
 const SAFE_BACKGROUND_RESTORE_PENDING =
-  /^profile-backgrounds\/_restore_pending\/[A-Za-z0-9_-]+\.jpg$/;
+  /^profile-backgrounds\/_restore_pending\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.jpg$/;
 
 const writeTails = new Map<string, Promise<void>>();
 
@@ -77,13 +77,16 @@ function assertBackgroundRestorePendingRelative(relative: string): void {
 }
 
 /** Durable uid-keyed evidence for a post-commit background persist. */
-export function backgroundRestorePendingRelPath(templateUid: string): string {
+export function backgroundRestorePendingRelPath(
+  templateUid: string,
+  sessionToken: string,
+): string {
   backgroundDerivativeRelPath(templateUid);
-  return `${BACKGROUND_RESTORE_PENDING_DIR}/${templateUid}.jpg`;
+  backgroundDerivativeRelPath(sessionToken);
+  return `${BACKGROUND_RESTORE_PENDING_DIR}/${templateUid}/${sessionToken}.jpg`;
 }
 
-export function resolveBackgroundRestorePendingUri(templateUid: string): string {
-  const relative = backgroundRestorePendingRelPath(templateUid);
+export function resolveBackgroundRestorePendingUri(relative: string): string {
   assertBackgroundRestorePendingRelative(relative);
   return `${Paths.document.uri.endsWith("/") ? Paths.document.uri : `${Paths.document.uri}/`}${relative}`;
 }
@@ -91,9 +94,14 @@ export function resolveBackgroundRestorePendingUri(templateUid: string): string 
 export async function stageBackgroundRestorePendingBase64(
   base64: string,
   templateUid: string,
+  sessionToken: string,
 ): Promise<string> {
-  const relative = backgroundRestorePendingRelPath(templateUid);
-  new Directory(Paths.document, BACKGROUND_RESTORE_PENDING_DIR).create({
+  const relative = backgroundRestorePendingRelPath(templateUid, sessionToken);
+  new Directory(
+    Paths.document,
+    BACKGROUND_RESTORE_PENDING_DIR,
+    templateUid,
+  ).create({
     intermediates: true,
     idempotent: true,
   });
@@ -106,24 +114,35 @@ export async function stageBackgroundRestorePendingBase64(
 }
 
 export function listBackgroundRestorePendingEntries(): Array<{
-  uid: string;
   relative: string;
 }> {
-  const directory = new Directory(Paths.document, BACKGROUND_RESTORE_PENDING_DIR);
+  const directory = new Directory(
+    Paths.document,
+    BACKGROUND_RESTORE_PENDING_DIR,
+  );
   if (!directory.exists) return [];
-  return directory
-    .list()
-    .map((entry) => entry.name)
-    .filter((name) => /^[A-Za-z0-9_-]+\.jpg$/.test(name))
-    .sort()
-    .map((name) => ({
-      uid: name.slice(0, -".jpg".length),
-      relative: `${BACKGROUND_RESTORE_PENDING_DIR}/${name}`,
-    }));
+  const pending: Array<{ relative: string }> = [];
+  for (const templateDirectory of directory.list()) {
+    if (
+      !(templateDirectory instanceof Directory) ||
+      !/^[A-Za-z0-9_-]+$/.test(templateDirectory.name)
+    ) {
+      continue;
+    }
+    for (const entry of templateDirectory.list()) {
+      if (entry instanceof File && /^[A-Za-z0-9_-]+\.jpg$/.test(entry.name)) {
+        pending.push({
+          relative: `${BACKGROUND_RESTORE_PENDING_DIR}/${templateDirectory.name}/${entry.name}`,
+        });
+      }
+    }
+  }
+  return pending.sort((left, right) =>
+    left.relative.localeCompare(right.relative),
+  );
 }
 
-export function deleteBackgroundRestorePending(templateUid: string): void {
-  const relative = backgroundRestorePendingRelPath(templateUid);
+export function deleteBackgroundRestorePending(relative: string): void {
   assertBackgroundRestorePendingRelative(relative);
   new File(Paths.document, relative).delete();
 }

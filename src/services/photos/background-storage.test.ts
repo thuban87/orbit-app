@@ -59,19 +59,25 @@ vi.mock("expo-file-system", () => {
     constructor(...parts: unknown[]) {
       this.uri = uri(parts);
     }
+    get name() {
+      return this.uri.split("/").at(-1) ?? "";
+    }
     create() {}
     get exists() {
       return true;
     }
     list() {
       const prefix = `${this.uri}/`;
-      return [...h.exists]
-        .filter(
-          (entry) =>
-            entry.startsWith(prefix) &&
-            !entry.slice(prefix.length).includes("/"),
-        )
-        .map((entry) => ({ name: entry.slice(prefix.length) }));
+      const children = new Map<string, "file" | "directory">();
+      for (const entry of h.exists) {
+        if (!entry.startsWith(prefix)) continue;
+        const remainder = entry.slice(prefix.length);
+        const [name, ...rest] = remainder.split("/");
+        children.set(name, rest.length > 0 ? "directory" : "file");
+      }
+      return [...children].map(([name, kind]) =>
+        kind === "directory" ? new Directory(this, name) : new File(this, name),
+      );
     }
   }
   return { Directory, File, Paths: { document: { uri: "file:///doc" } } };
@@ -96,13 +102,17 @@ beforeEach(() => {
 
 describe("background storage", () => {
   it("stages decoded bytes in the uid-keyed restore-pending namespace", async () => {
-    const relative = await stageBackgroundRestorePendingBase64("AQID", "background_1");
-    expect(relative).toBe(backgroundRestorePendingRelPath("background_1"));
+    const relative = await stageBackgroundRestorePendingBase64(
+      "AQID",
+      "background_1",
+      "session_1",
+    );
+    expect(relative).toBe(
+      backgroundRestorePendingRelPath("background_1", "session_1"),
+    );
     expect([...h.bytes.get(`file:///doc/${relative}`)!]).toEqual([1, 2, 3]);
-    expect(listBackgroundRestorePendingEntries()).toEqual([
-      { uid: "background_1", relative },
-    ]);
-    deleteBackgroundRestorePending("background_1");
+    expect(listBackgroundRestorePendingEntries()).toEqual([{ relative }]);
+    deleteBackgroundRestorePending(relative);
     expect(h.exists.has(`file:///doc/${relative}`)).toBe(false);
   });
 

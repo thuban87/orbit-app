@@ -45,17 +45,15 @@ import { migration020 } from "@/db/migrations/020-dashboard-swipe-pref";
 import { migration021 } from "@/db/migrations/021-orrery-preferences";
 import { migration022 } from "@/db/migrations/022-orrery-systems";
 import { migration023 } from "@/db/migrations/023-orrery-system-selection-revision";
-import {
-  INTERACTION_HISTORY_SCHEMA_VERSION,
-  migration025,
-} from "@/db/migrations/025-interaction-history-schema";
+import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { migration027 } from "@/db/migrations/027-default-interaction-channel";
 import { migration028 } from "@/db/migrations/028-compose-message-mode";
+import { migration029 } from "@/db/migrations/029-ai-configuration";
 import {
-  AI_CONFIGURATION_SCHEMA_VERSION,
-  migration029,
-} from "@/db/migrations/029-ai-configuration";
+  migration030,
+  RESTORE_BACKGROUND_JOURNAL_SCHEMA_VERSION,
+} from "@/db/migrations/030-restore-background-journal";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import type { Migration, SqlExecutor } from "@/db/types";
@@ -67,7 +65,7 @@ import { formatLocalDate } from "@/utils/dates";
 /** Milliseconds a busy connection waits before erroring (concurrent headless access). */
 export const BUSY_TIMEOUT_MS = 5000;
 /** The schema version this build expects; the runner migrates up to this. */
-export const TARGET_VERSION = AI_CONFIGURATION_SCHEMA_VERSION;
+export const TARGET_VERSION = RESTORE_BACKGROUND_JOURNAL_SCHEMA_VERSION;
 
 /** The one authoritative migration registration list, shared by bootstrap and tests. */
 export const MIGRATIONS: Migration[] = [
@@ -100,6 +98,7 @@ export const MIGRATIONS: Migration[] = [
   migration027,
   migration028,
   migration029,
+  migration030,
 ];
 
 const DATABASE_NAME = "orbit.db";

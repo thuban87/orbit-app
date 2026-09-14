@@ -1,8 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
   entries: [] as string[],
   pending: [] as Array<{ uid: string; relative: string }>,
+  journals: [] as Array<{
+    relativePath: string;
+    templateUid: string;
+    templateModifiedAt: string;
+    canonicalRelativePath: string;
+    createdAt: string;
+  }>,
   bytes: new Map<string, string>(),
   operations: [] as string[],
 }));
@@ -13,12 +20,17 @@ vi.mock("expo-file-system", () => ({
   Paths: { document: { uri: "file:///doc" } },
 }));
 vi.mock("@/services/photos/background-storage", () => ({
-  reconcileBackgroundDir: (entries: string[]): Array<Record<string, string>> => {
+  reconcileBackgroundDir: (
+    entries: string[],
+  ): Array<Record<string, string>> => {
     const present = new Set(entries);
     const actions: Array<Record<string, string>> = [];
     for (const entry of entries) {
       if (entry.endsWith(".jpg.tmp")) {
-        actions.push({ kind: "deleteTmp", relative: `profile-backgrounds/${entry}` });
+        actions.push({
+          kind: "deleteTmp",
+          relative: `profile-backgrounds/${entry}`,
+        });
         continue;
       }
       if (!entry.endsWith(".jpg.bak")) continue;
@@ -26,30 +38,49 @@ vi.mock("@/services/photos/background-storage", () => ({
       actions.push(
         present.has(canonical)
           ? { kind: "deleteBak", relative: `profile-backgrounds/${entry}` }
-          : { kind: "restoreBak", from: `profile-backgrounds/${entry}`, to: `profile-backgrounds/${canonical}` },
+          : {
+              kind: "restoreBak",
+              from: `profile-backgrounds/${entry}`,
+              to: `profile-backgrounds/${canonical}`,
+            },
       );
     }
     return actions;
   },
   listBackgroundStorageEntries: () => [...h.entries],
   listBackgroundRestorePendingEntries: () => [...h.pending],
-  backgroundDerivativeRelPath: (uid: string) => `profile-backgrounds/${uid}.jpg`,
-  resolveBackgroundRestorePendingUri: (uid: string) => `pending:${uid}`,
+  backgroundDerivativeRelPath: (uid: string) =>
+    `profile-backgrounds/${uid}.jpg`,
+  resolveBackgroundRestorePendingUri: (relative: string) =>
+    `pending:${relative}`,
   persistBackgroundDerivative: async (source: string, destination: string) => {
     h.operations.push(`persist ${source} -> ${destination}`);
     h.bytes.set(destination, h.bytes.get(source)!);
   },
-  deleteBackgroundRestorePending: (uid: string) => {
-    h.operations.push(`deletePending ${uid}`);
-    h.pending = h.pending.filter((entry) => entry.uid !== uid);
+  deleteBackgroundRestorePending: (relative: string) => {
+    h.operations.push(`deletePending ${relative}`);
+    h.pending = h.pending.filter((entry) => entry.relative !== relative);
   },
   deleteBackgroundDerivative: (relative: string) => {
     h.operations.push(`deleteCanonical ${relative}`);
     h.bytes.delete(relative);
   },
-  applyBackgroundReconcileAction: async (action: { kind: string; from?: string; to?: string; relative?: string }) => {
+  applyBackgroundReconcileAction: async (action: {
+    kind: string;
+    from?: string;
+    to?: string;
+    relative?: string;
+  }) => {
     h.operations.push(action.kind);
-    if (action.kind === "restoreBak") h.bytes.set(action.to!, h.bytes.get(action.from!)!);
+    if (action.kind === "restoreBak")
+      h.bytes.set(action.to!, h.bytes.get(action.from!)!);
+  },
+}));
+vi.mock("@/db/restore-background-journal-dao", () => ({
+  listBackgroundJournalEntries: async () => [...h.journals],
+  deleteBackgroundJournalEntry: async (_exec: unknown, relative: string) => {
+    h.operations.push(`deleteJournal ${relative}`);
+    h.journals = h.journals.filter((entry) => entry.relativePath !== relative);
   },
 }));
 
@@ -58,14 +89,32 @@ import { runBackgroundReconciliation } from "./background-reconcile-sweep";
 
 function execFor(uids: string[]) {
   return {
-    getAllAsync: async () =>
-      uids.map((uid) => ({ uid, imagePath: `profile-backgrounds/${uid}.jpg` })),
+    getAllAsync: async (sql: string) =>
+      uids.map((uid) => ({
+        uid,
+        imagePath: `profile-backgrounds/${uid}.jpg`,
+        ...(sql.includes("modified_at") ? { modifiedAt: "v1" } : {}),
+      })),
   } as never;
 }
 
 function pending(uid: string, bytes: string) {
-  h.pending = [{ uid, relative: `profile-backgrounds/_restore_pending/${uid}.jpg` }];
-  h.bytes.set(`pending:${uid}`, bytes);
+  const relative = `profile-backgrounds/_restore_pending/${uid}/session.jpg`;
+  h.pending = [{ uid, relative }];
+  h.bytes.set(`pending:${relative}`, bytes);
+  return relative;
+}
+
+function commitPending(uid: string, relative: string) {
+  h.journals = [
+    {
+      relativePath: relative,
+      templateUid: uid,
+      templateModifiedAt: "v1",
+      canonicalRelativePath: `profile-backgrounds/${uid}.jpg`,
+      createdAt: "now",
+    },
+  ];
 }
 
 describe("background launch reconciliation plan", () => {
@@ -112,64 +161,89 @@ describe("background launch reconciliation plan", () => {
   });
 });
 
+beforeEach(() => {
+  h.journals = [];
+});
+
 describe("background restore-pending crash recovery", () => {
   it.each([
     ["insert after commit", false],
     ["same-uid replacement after commit", true],
-  ] as const)("re-drives incoming bytes for %s even when canonical exists=%s", async (_label, existing) => {
-    h.entries = existing ? ["same.jpg"] : [];
-    h.pending = [];
-    h.bytes = new Map(existing ? [["profile-backgrounds/same.jpg", "OLD"]] : []);
-    h.operations = [];
-    pending("same", "NEW");
-    await runBackgroundReconciliation(execFor(["same"]));
-    expect(h.bytes.get("profile-backgrounds/same.jpg")).toBe("NEW");
-    expect(h.pending).toEqual([]);
-    expect(h.operations).toContain("persist pending:same -> profile-backgrounds/same.jpg");
-  });
+  ] as const)(
+    "re-drives incoming bytes for %s even when canonical exists=%s",
+    async (_label, existing) => {
+      h.entries = existing ? ["same.jpg"] : [];
+      h.pending = [];
+      h.bytes = new Map(
+        existing ? [["profile-backgrounds/same.jpg", "OLD"]] : [],
+      );
+      h.operations = [];
+      const relative = pending("same", "NEW");
+      commitPending("same", relative);
+      await runBackgroundReconciliation(execFor(["same"]));
+      expect(h.bytes.get("profile-backgrounds/same.jpg")).toBe("NEW");
+      expect(h.pending).toEqual([]);
+      expect(h.operations).toContain(
+        `persist pending:${relative} -> profile-backgrounds/same.jpg`,
+      );
+    },
+  );
 
   it.each([
     ["rolled-back insert", undefined],
     ["unrelated canonical remains byte-identical", "KEEP"],
-  ] as const)("prunes staged bytes with no committed row: %s", async (_label, unrelated) => {
-    h.entries = unrelated ? ["other.jpg"] : [];
-    h.pending = [];
-    h.bytes = new Map(unrelated ? [["profile-backgrounds/other.jpg", unrelated]] : []);
-    h.operations = [];
-    pending("rolled-back", "NEW");
-    await runBackgroundReconciliation(execFor(unrelated ? ["other"] : []));
-    expect(h.pending).toEqual([]);
-    expect(h.bytes.get("profile-backgrounds/other.jpg")).toBe(unrelated);
-    expect(h.bytes.has("profile-backgrounds/rolled-back.jpg")).toBe(false);
-  });
+  ] as const)(
+    "prunes staged bytes with no committed row: %s",
+    async (_label, unrelated) => {
+      h.entries = unrelated ? ["other.jpg"] : [];
+      h.pending = [];
+      h.bytes = new Map(
+        unrelated ? [["profile-backgrounds/other.jpg", unrelated]] : [],
+      );
+      h.operations = [];
+      h.journals = [];
+      pending("rolled-back", "NEW");
+      await runBackgroundReconciliation(execFor(unrelated ? ["other"] : []));
+      expect(h.pending).toEqual([]);
+      expect(h.bytes.get("profile-backgrounds/other.jpg")).toBe(unrelated);
+      expect(h.bytes.has("profile-backgrounds/rolled-back.jpg")).toBe(false);
+    },
+  );
 
   it.each([
     ["fresh insert", false],
     ["same-uid replacement", true],
-  ] as const)("runs staged re-drive after a mid-swap %s", async (_label, replacement) => {
-    h.entries = replacement
-      ? ["same.jpg.tmp", "same.jpg.bak"]
-      : ["same.jpg.tmp"];
-    h.pending = [];
-    h.bytes = new Map([["profile-backgrounds/same.jpg.tmp", "NEW"]]);
-    if (replacement) h.bytes.set("profile-backgrounds/same.jpg.bak", "OLD");
-    h.operations = [];
-    pending("same", "NEW");
-    await runBackgroundReconciliation(execFor(["same"]));
-    expect(h.operations.indexOf(replacement ? "restoreBak" : "deleteTmp")).toBeLessThan(
-      h.operations.findIndex((item) => item.startsWith("persist ")),
-    );
-    expect(h.bytes.get("profile-backgrounds/same.jpg")).toBe("NEW");
-  });
+  ] as const)(
+    "runs staged re-drive after a mid-swap %s",
+    async (_label, replacement) => {
+      h.entries = replacement
+        ? ["same.jpg.tmp", "same.jpg.bak"]
+        : ["same.jpg.tmp"];
+      h.pending = [];
+      h.bytes = new Map([["profile-backgrounds/same.jpg.tmp", "NEW"]]);
+      if (replacement) h.bytes.set("profile-backgrounds/same.jpg.bak", "OLD");
+      h.operations = [];
+      const relative = pending("same", "NEW");
+      commitPending("same", relative);
+      await runBackgroundReconciliation(execFor(["same"]));
+      expect(
+        h.operations.indexOf(replacement ? "restoreBak" : "deleteTmp"),
+      ).toBeLessThan(
+        h.operations.findIndex((item) => item.startsWith("persist ")),
+      );
+      expect(h.bytes.get("profile-backgrounds/same.jpg")).toBe("NEW");
+    },
+  );
 
-  it("treats a staged same-uid rollback as an owed atomic replacement", async () => {
+  it("deletes staged same-uid rollback bytes without overwriting the committed image", async () => {
     h.entries = ["same.jpg"];
     h.pending = [];
     h.bytes = new Map([["profile-backgrounds/same.jpg", "OLD"]]);
     h.operations = [];
+    h.journals = [];
     pending("same", "NEW");
     await runBackgroundReconciliation(execFor(["same"]));
-    expect(h.bytes.get("profile-backgrounds/same.jpg")).toBe("NEW");
+    expect(h.bytes.get("profile-backgrounds/same.jpg")).toBe("OLD");
     expect(h.pending).toEqual([]);
   });
 
@@ -178,7 +252,8 @@ describe("background restore-pending crash recovery", () => {
     h.pending = [];
     h.bytes = new Map([["profile-backgrounds/same.jpg", "NEW"]]);
     h.operations = [];
-    pending("same", "NEW");
+    const relative = pending("same", "NEW");
+    commitPending("same", relative);
     await runBackgroundReconciliation(execFor(["same"]));
     expect(h.bytes.get("profile-backgrounds/same.jpg")).toBe("NEW");
     expect(h.pending).toEqual([]);
