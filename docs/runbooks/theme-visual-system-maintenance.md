@@ -4,7 +4,7 @@
 
 Use this process when adding a curated accent, bundled background slot, semantic theme token, or a complete theme package. It preserves Orbit's local-only appearance system, durable option-ID settings, token-only colour rule, and contrast/accessibility checks.
 
-## Architecture (Phase 23)
+## Architecture (Phases 23, 31)
 
 `app_settings` stores a package plus per-package mode, accent ID, and background ID. `ThemeProvider` resolves the active package and OS appearance, then applies a curated accent tone at render time. Palette hex values live only under `src/theme/`; screens receive resolved semantic tokens through `useTheme()`.
 
@@ -49,13 +49,15 @@ Use this process when adding a curated accent, bundled background slot, semantic
 
 5. **Add local background assets deliberately.** Put the bundled `.webp` in `assets/backgrounds/`, add its lazy `require()` slot and stable package order, then add a provenance row with its declared brightest pixel in `assets/backgrounds/README.md`. `none` stays asset-free and resolves to the solid theme background.
 
+   For replacement art, review the complete slot family together, retain each stable ID/package mapping, transcode only the approved source into its existing production filename, and measure the final WebP against the declared brightness ceiling. If it exceeds the ceiling, remaster the art or re-prove the bound and compositing together.
+
 6. **Validate durable-settings scope.** Do not edit migration 015. A new persisted setting requires a new forward migration, typed DAO validation, the `PORTABLE_SETTINGS_KEYS` allowlist, and an explicit decision about the backup-format projection. Storing a hex value in SQLite is prohibited; store an ID or NULL.
 
 7. **Preserve accessibility seams.** New icons use `src/components/icons/icon-registry.ts`; status meaning needs an existing or new non-colour cue; Skia ambient motion reads `useReducedMotionShared()` inside a worklet and never uses per-frame React state.
 
 ## What You Don't Need to Change
 
-- Do not add a network, CDN, download, or user-upload path for backgrounds.
+- Do not add a network, CDN, or downloadable-pack path for bundled backgrounds. Profile's explicitly invoked local image workflow is separate: it stores a bounded app-owned derivative and never changes the bundled slot manifest.
 - Do not edit a shipped migration or replace `app_settings` with AsyncStorage.
 - Do not add a full custom Orbit icon family merely to add one semantic icon.
 - Do not mount `BackgroundHost`, `GlassSurface`, or `StatusGlyph` in unrelated legacy screens without the owning renderer phase.
@@ -70,6 +72,8 @@ Use this process when adding a curated accent, bundled background slot, semantic
 
 4. **Reduced motion has multiple consumers.** Gating only an obvious canvas effect can leave another shared-clock effect animating.
 
+5. **A review PNG is not a production asset.** Approval establishes visual direction; the shipped WebP still needs stable-slot, brightest-region, composited-contrast, and physical-device checks.
+
 ## Smoke Test
 
 ```bash
@@ -80,4 +84,4 @@ npx tsc --noEmit
 
 Expected: theme tests pass, the colour gate finds no literals outside `src/theme/`, and TypeScript is clean.
 
-For a background change, also inspect every Galaxy asset's brightest region on a physical device with text over the rendered surface. For a live-motion change, toggle the OS reduced-motion preference while the affected Skia surface is visible.
+For a bundled background change, also inspect every affected Galaxy and Standard asset's brightest region on a physical device with text over the rendered surface. Confirm its stable slot ID still selects the intended file. For a live-motion change, toggle the OS reduced-motion preference while the affected Skia surface is visible.
