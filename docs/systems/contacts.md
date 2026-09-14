@@ -1,7 +1,7 @@
 # Contacts
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 28-dashboard-card-view
+**Updated by phase:** 31-profile-experience
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`, `src/db/snooze-dao.ts`, `src/db/bulk-actions-dao.ts`
 
 ## Purpose
@@ -158,7 +158,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 ### Starting an AI draft from the profile
 
-1. Profile reads ordinary app settings alongside the contact header and shows its additive AI draft entry only when a provider is configured.
+1. Profile has no direct AI-draft action. Message opens Compose with contact identity only; Compose owns every optional Draft with AI invocation under ADR-079.
 2. The entry navigates to Compose with `{ contactId, requestAiSuggestion: true }`; it passes no contact snapshot, prompt, credential, or callback.
 3. Compose consumes the intent and owns all generation state. AI generation, acknowledgement, and draft replacement never write `contacts`, `interactions`, `fuel`, or `last_contact`.
 
@@ -227,6 +227,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-043:** Static Globally Mirrored Favourites Widget — reuses one guarded favourite-rank list for every widget instance.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — refreshes the widget after committed contact-visible changes.
 - **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — adds a configured-provider profile entry while retaining the contact-write boundary.
+- **ADR-108:** Durable Independent-Axis Profile Presentation and Inheritance — makes individual and bulk Category changes preserve explicit contact presentation while inherited axes fall through.
+- **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — keeps Profile Frequency and Snooze on public contact-owned writers.
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — governs deletion evidence, seeded identities, and UID merge behavior.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — exports contact state through the portable manifest.
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — requires explicit conflict review, atomic child consolidation, and retirement of the absorbed identity.
@@ -250,7 +252,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 12. **Keep snooze dates local.** `snooze_until` is already a local bare date; parse or render it as UTC and near-midnight users see the wrong day.
 13. **Mute does not hide a contact.** `reminders_off` suppresses decay scheduling only; Dashboard, status, and birthday behavior remain otherwise unchanged.
 14. **Publish widget refresh only after a successful mutation.** A failed favourite mark/clear, archive, restore, or metadata save must not advertise a state that SQLite did not commit.
-15. **The AI profile entry is not a contact action.** It routes serializable identity only; Compose may generate an editable draft but must not record recency or a touchpoint.
+15. **Profile does not invoke AI directly.** Message routes serializable contact identity to Compose; drafting still must not record recency or a touchpoint.
+16. **Never materialize Category presentation.** Category changes preserve explicit contact overrides and let inherited layout/background resolve through the new Category or global/factory fallback.
 16. **Use `createContactFull()` for production creation.** It is the path that seeds the complete custom-field pair matrix; the exported recency test helper writes no custom values.
 17. **A hard delete must write its tombstone first.** Purge captures every mergeable child UID in its existing transaction; transient `field_history` remains excluded.
 18. **`last_contact` is derived.** Restore recomputes it from interactions and never lets an imported summary win a reconciliation decision.
@@ -306,3 +309,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-09-03 | 24.2 | Added atomic retained custom-field history capture plus explicit merge and purge lifecycle handling. |
 | 2026-09-02 | 25 | Retired rank rewrites and made favourite membership feed shared Dashboard Default ordering. |
 | 2026-09-02 | 28 | Added transaction-composed Dashboard bulk category, frequency, favourite, snooze, and archive actions. |
+| 2026-09-02 | 31 | Added Profile presentation fallout to Category changes, retained source-owned relationship actions, and removed the direct Profile AI-draft entry. |
