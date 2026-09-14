@@ -1,7 +1,7 @@
 # Persistence Core
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 29-orrery-camera-scale-exploration
+**Updated by phase:** 30-orrery-systems
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -32,6 +32,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - `bulk_review_resolutions` — durable fixed or ignored dispositions for flagged imported data; it never rewrites immutable source payloads.
 - `memories`, `relationships`, and `current_state_entries` — migration-016 contact-knowledge rows; their complete lifecycle and query contracts belong to Contact Knowledge.
 - `custom_field_value_history` — migration-018 append-only prior raw values for history-retained custom fields; it is portable state, unlike destructive-operation `field_history`.
+- `systems` and `system_rules` — migration-022 custom Orrery definitions and their closed rule values; rule rows cascade with their owning definition.
+- `system_overrides` and `system_prefs` — migration-022 ref-keyed membership exceptions plus cross-kind display order and visibility for built-in, Category and custom Systems.
 
 **Types** (`src/db/types.ts`):
 - `SqlExecutor` — database operations shared by Expo SQLite and the node-side test adapter.
@@ -60,7 +62,10 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/016-contact-knowledge.ts` | Adds typed Memory, relationship, and current-state-history tables without a data move. |
 | Migration | `src/db/migrations/017-knowledge-egress-datamove.ts` | Adds default-off Memory permission and proves fuel-to-Memory copies before retiring source rows. |
 | Migration | `src/db/migrations/018-custom-field-scope-history.ts` | Adds scope-ready definition metadata and retained custom-field value history. |
+| Migration | `src/db/migrations/022-orrery-systems.ts` | Adds custom System definitions, rules, manual overrides, and cross-kind display preferences. |
+| Migration | `src/db/migrations/023-orrery-system-selection-revision.ts` | Adds the monotonic internal revision that prevents Undo from overwriting a newer System selection. |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
+| Systems DAO | `src/db/systems-dao.ts` | Owns transactional System definitions, rules, overrides, preferences, delete/Undo, and selection-aware lifecycle composites. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
 | Transaction utility | `src/db/transaction.ts` | Opens a hand-rolled transaction inside the shared non-reentrant mutex. |
 | Launch-sweep registry | `src/services/launch-sweep.ts` | Runs registered local maintenance hooks after migration. |
@@ -91,6 +96,9 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/019-dashboard-prefs.ts` | Adds checked Dashboard view/sort and validated JSON population/filter preference columns. |
 | `src/db/migrations/020-dashboard-swipe-pref.ts` | Adds the constrained `quick-log` / `log-contact` Dashboard right-swipe action. |
 | `src/db/migrations/021-orrery-preferences.ts` | Adds constrained Orrery density, satellite-toggle, and last-System settings. |
+| `src/db/migrations/022-orrery-systems.ts` | Creates the four UID-bearing System tables and their uniqueness, mode, cascade, and lookup constraints. |
+| `src/db/migrations/023-orrery-system-selection-revision.ts` | Adds a nonnegative `orrery_system_selection_revision` to the settings singleton. |
+| `src/db/systems-dao.ts` | Sole mutation boundary for System metadata and ref-keyed customization. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
 | `src/db/types.ts` | Testable database and migration interfaces. |
@@ -125,6 +133,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 21. Migration 019 adds defaulted Dashboard view, population, filter, and sort preferences. The two multi-value axes remain validated JSON text; a v0-to-v19 upgrade receives safe singleton defaults in the same forward-only sequence.
 22. Migration 020 adds `dashboard_right_swipe_action` with a Quick Log default and a SQLite CHECK over the two supported actions. It is additive, so every earlier singleton row receives the default during its normal forward upgrade.
 23. Migration 021 adds constrained Orrery density, satellite-toggle, and last-System columns. It defaults to Balanced, satellites off, and All Contacts; the DAO validates the complete System-token grammar while stale Category existence is resolved on read.
+24. Migration 022 creates the four System tables without altering the already-shipped last-System setting. Custom names are case-insensitively unique in SQLite; the DAO additionally prevents collisions with generated built-in and live Category names.
+25. Migration 023 adds an internal selection revision. Explicit System selections advance it, and delete/Undo compares both the stored token and revision so an Undo cannot replace a selection made after deletion.
 
 ### Running launch maintenance
 
@@ -137,7 +147,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
-| `TARGET_VERSION` | `21` | `src/db/database.ts` | Schema version after the Orrery preference migration. |
+| `TARGET_VERSION` | `23` | `src/db/database.ts` | Schema version after the Orrery System selection-revision migration. |
 
 ## Decisions
 
@@ -196,6 +206,9 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 20. **A data move must prove each source row before removal.** Count equality is insufficient; re-read the mapped destination and let an integrity failure roll the version step back.
 21. **Dashboard preference defaults are semantic.** Keep `dashboard_sort='default'` rather than persisting a resolved population order, and validate JSON axes before query construction.
 22. **Orrery camera state is never an app setting.** Migration 021 stores only density, satellite visibility, and last-System; camera pose and focus stay in navigation-session memory.
+23. **System customization is ref-keyed.** Built-in and Category bases have no `systems` row, so `system_overrides` and `system_prefs` deliberately use validated `system_ref` text. Every writer must validate that reference against the complete live catalog.
+24. **A System read never prunes stale exclusions.** It ignores and reports exclusions whose contacts no longer match; the next intentional definition save performs the physical deletion inside the Systems transaction.
+25. **Selection revision is internal conflict evidence.** It is not camera state or user-facing content. Any selection writer that bypasses the revision increment can let a delayed Undo overwrite a newer choice.
 
 ## Related Systems
 
@@ -204,7 +217,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **Custom fields** — uses migration 006, the shared transaction, and the launch-sweep registry for normalized-row cleanup.
 - **Notifications** — reads the persisted policy during launch/foreground schedule reconciliation.
 - **Orrery** — reads and writes the app-level sun settings added by migration 003.
-- **Orrery** — validates and stores migration-021 view preferences while resolving live System membership separately from Dashboard state.
+- **Orrery** — validates migration-021 view preferences, stores migration-022 System definitions/customization, and uses migration 023 to order selection versus Undo.
 - **AI suggestions** — persists non-secret settings and acknowledgement state through migration 004 while keeping credentials outside SQLite.
 - **Digest** — reads the migration-005 scheduling preference and registers a post-migration launch-sweep reconcile.
 - **Backup & Restore** — uses migrations 007/008, revisions, snapshots, and launch recovery without a backend.
@@ -235,3 +248,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-09-02 | 25 | Added migration 019 for durable, validated Dashboard query preferences. |
 | 2026-09-02 | 27 | Added migration 020's defaulted, CHECK-constrained global Dashboard right-swipe action. |
 | 2026-09-02 | 29 | Added migration 021's constrained Orrery density, satellite, and last-System preferences. |
+| 2026-09-02 | 30 | Added migrations 022/023 for custom Orrery Systems, ref-keyed customization, and revision-guarded selection lifecycle. |
