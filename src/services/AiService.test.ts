@@ -208,7 +208,7 @@ describe("sanitized HTTP-status errors", () => {
     expect(jsonSpy).not.toHaveBeenCalled();
   });
 
-  it("maps 429 to rate_limited and 5xx to provider_error", async () => {
+  it("maps actionable provider statuses without reading response bodies", async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 429, json: vi.fn() });
     const p = new AnthropicProvider(staticKey("k"));
     await expect(
@@ -218,7 +218,20 @@ describe("sanitized HTTP-status errors", () => {
     fetchMock.mockResolvedValueOnce({ ok: false, status: 503, json: vi.fn() });
     await expect(
       p.generate(inputFor("hi", new AbortController().signal)),
-    ).rejects.toMatchObject({ code: "provider_error" });
+    ).rejects.toMatchObject({ code: "provider_unavailable" });
+
+    for (const [status, code] of [
+      [402, "billing"],
+      [404, "model_unavailable"],
+      [413, "context_too_large"],
+    ] as const) {
+      const jsonSpy = vi.fn();
+      fetchMock.mockResolvedValueOnce({ ok: false, status, json: jsonSpy });
+      await expect(
+        p.generate(inputFor("hi", new AbortController().signal)),
+      ).rejects.toMatchObject({ code });
+      expect(jsonSpy).not.toHaveBeenCalled();
+    }
   });
 
   it("maps malformed JSON to invalid_response", async () => {

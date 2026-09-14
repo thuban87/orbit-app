@@ -63,6 +63,11 @@
  * =============================================================================
  */
 import type { ResolvedPrompt } from "@/ai/prompt-types";
+import type {
+  AiDiagnosticEvent,
+  AiFailureCategory,
+  AiOperation,
+} from "@/logic/ai-diagnostics";
 import type { AiProviderId } from "@/services/ai-types";
 
 /**
@@ -99,7 +104,20 @@ export type AiSuggestionState =
    */
   | { readonly status: "review"; readonly suggestions: readonly string[] }
   /** A sanitized failure (its `code` only — never raw provider detail). */
-  | { readonly status: "error"; readonly code: string };
+  | {
+      readonly status: "error";
+      readonly code: string;
+      readonly category?: AiFailureCategory;
+      readonly message?: string;
+      readonly diagnostic?: AiDiagnosticEvent;
+    };
+
+export interface AiSuggestionFailureDetails {
+  readonly code: string;
+  readonly category: AiFailureCategory;
+  readonly message: string;
+  readonly diagnostic: AiDiagnosticEvent;
+}
 
 /** The injected effects + freshness facts the lifecycle drives. */
 export interface AiSuggestionDeps {
@@ -140,6 +158,16 @@ export interface AiSuggestionDeps {
   readonly isActive: () => boolean;
   /** Map an unknown failure to a stable, sanitized code (never raw detail). */
   readonly sanitizeError: (err: unknown) => string;
+  /** Build the user copy + allowlisted Details event. No raw error is retained. */
+  readonly getFailureDetails?: (
+    err: unknown,
+    operation: AiOperation,
+    elapsedMs: number,
+  ) => AiSuggestionFailureDetails;
+  /** Future observability seam. Receives only the strict allowlisted event. */
+  readonly onDiagnostic?: (event: AiDiagnosticEvent) => void;
+  /** Monotonic-enough clock used only for sanitized request duration. */
+  readonly now?: () => number;
   /** Surface each state transition to the screen. */
   readonly onChange: (state: AiSuggestionState) => void;
 }
@@ -158,6 +186,8 @@ export class AiSuggestionLifecycle {
   private timer: TimerHandle | null = null;
   /** Session-only guidance retained solely so an explicit retry preserves it. */
   private lastAdjustGuidance: string | undefined;
+  private operation: AiOperation = "Draft";
+  private requestStartedAt = 0;
   private state: AiSuggestionState = { status: "idle" };
 
   constructor(private readonly deps: AiSuggestionDeps) {}
@@ -170,6 +200,25 @@ export class AiSuggestionLifecycle {
   private set(next: AiSuggestionState): void {
     this.state = next;
     this.deps.onChange(next);
+  }
+
+  /** Publish a sanitized failure while preserving every caller-owned Compose field. */
+  private fail(err: unknown): void {
+    const elapsedMs = Math.max(
+      0,
+      Math.round((this.deps.now?.() ?? Date.now()) - this.requestStartedAt),
+    );
+    const details = this.deps.getFailureDetails?.(
+      err,
+      this.operation,
+      elapsedMs,
+    );
+    if (details) {
+      this.deps.onDiagnostic?.(details.diagnostic);
+      this.set({ status: "error", ...details });
+      return;
+    }
+    this.set({ status: "error", code: this.deps.sanitizeError(err) });
   }
 
   /** Stop + null the timeout handle if one is armed. */
@@ -212,6 +261,12 @@ export class AiSuggestionLifecycle {
     const sourceDraft = this.deps.isEditorEmpty()
       ? undefined
       : this.deps.getEditorBody();
+    this.operation = this.lastAdjustGuidance
+      ? "Adjust"
+      : sourceDraft === undefined
+        ? "Draft"
+        : "Rewrite";
+    this.requestStartedAt = this.deps.now?.() ?? Date.now();
     this.set({ status: "resolving" });
 
     let prompt: ResolvedPrompt;
@@ -223,7 +278,7 @@ export class AiSuggestionLifecycle {
           : await this.deps.resolvePrompt(sourceDraft, this.lastAdjustGuidance);
     } catch (err) {
       if (token !== this.gen) return; // superseded while resolving
-      this.set({ status: "error", code: this.deps.sanitizeError(err) });
+      this.fail(err);
       return;
     }
     // A cancel/unmount/config-change during resolution supersedes this request.
@@ -257,7 +312,7 @@ export class AiSuggestionLifecycle {
       controller.abort();
       this.stopTimer();
       this.controller = null;
-      this.set({ status: "error", code: this.deps.sanitizeError(err) });
+      this.fail(err);
       return;
     }
 
@@ -297,7 +352,7 @@ export class AiSuggestionLifecycle {
       this.controller = null;
     }
     this.timer = null;
-    this.set({ status: "error", code: "timeout" });
+    this.fail({ code: "timeout" });
   }
 
   /**

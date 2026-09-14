@@ -43,11 +43,13 @@
  */
 import { type NavigationProp, useFocusEffect } from "@react-navigation/native";
 import * as Clipboard from "expo-clipboard";
+import Constants from "expo-constants";
 import * as SMS from "expo-sms";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   BackHandler,
+  Platform,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -58,7 +60,7 @@ import type { ModelCatalog } from "@/ai/model-catalog-filter";
 import { createFileCatalogStorage } from "@/ai/model-catalog-storage";
 import { resolveActiveCatalog, SEED_CATALOG } from "@/ai/model-registry";
 import { resolvePrompt } from "@/ai/prompt-template";
-import type { ResolvedPrompt } from "@/ai/prompt-types";
+import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import { resolveMaxOutputTokens } from "@/ai/token-budget";
 import { Avatar } from "@/components/Avatar";
 import { AppText } from "@/components/ui/AppText";
@@ -98,6 +100,12 @@ import {
   readCredentialPresence,
   selectAiAffordance,
 } from "@/logic/ai-availability";
+import {
+  buildAiDiagnostic,
+  classifyAiFailure,
+  createAiCorrelationId,
+  failureMessage,
+} from "@/logic/ai-diagnostics";
 import {
   generateVariants,
   variantTemperature,
@@ -249,6 +257,7 @@ export function ComposeScreen({
   // the ENTIRE prior AI wiring so everything here is RE-CREATED, not reused). ──
   // The lifecycle's view-state (idle → resolving/loading → review | error).
   const [aiState, setAiState] = useState<AiSuggestionState>({ status: "idle" });
+  const [aiDetailsOpen, setAiDetailsOpen] = useState(false);
   // Ephemeral Adjust state: component/session memory only. It never enters the
   // app-settings DAO, personalization DAO, backup, or any durable store.
   const [adjustOpen, setAdjustOpen] = useState(false);
@@ -272,6 +281,10 @@ export function ComposeScreen({
   // Latest loaded prompt-template setting, via ref so the lifecycle dependency
   // always reads the current value without re-creating the lifecycle.
   const settingsRef = useRef<AppSettings | null>(null);
+  // Safe COUNTS for diagnostics come from the exact closed context projection
+  // used by the current request. No contact value or prompt text enters an event.
+  const promptContextRef = useRef<PromptContext | null>(null);
+  const promptSizeRef = useRef(0);
   // The generation callback reads the exact resolved connection loaded on focus;
   // it never falls back to the legacy singular settings fields.
   const activeConnectionRef = useRef<ResolvedAiConnection | null>(null);
@@ -411,12 +424,20 @@ export function ComposeScreen({
         const contactContext = await readPromptContext(exec, contactId);
         const writingStyle = await getWritingStyle(exec);
         const personalizationSections = await listPersonalizationSections(exec);
-        return resolvePrompt(
+        const completeContext = {
+          ...contactContext,
+          writingStyle,
+          personalizationSections,
+        };
+        const resolved = resolvePrompt(
           "",
-          { ...contactContext, writingStyle, personalizationSections },
+          completeContext,
           sourceDraft,
           ephemeralAdjustGuidance,
         );
+        promptContextRef.current = completeContext;
+        promptSizeRef.current = Array.from(resolved.payload).length;
+        return resolved;
       },
       // The provider fan-out (COMP-12 / HIGH-3). Three independently-cancellable
       // calls under the lifecycle's ONE shared signal via generateVariants. The
@@ -487,6 +508,45 @@ export function ComposeScreen({
       // Sanitized code only — never raw provider detail (T-35-03 / T-14-05).
       sanitizeError: (err): string =>
         err instanceof AiError ? err.code : "unknown",
+      getFailureDetails: (err, operation, elapsedMs) => {
+        const connection = activeConnectionRef.current;
+        // A request cannot legitimately reach egress without a resolved
+        // connection. The fallback is used only for an earlier resolution error
+        // and remains a sanitized lane identifier.
+        const lane = connection?.lane ?? "custom";
+        const classified = classifyAiFailure(err, lane);
+        const context = promptContextRef.current;
+        const itemCount = context
+          ? context.rankedFuel.length +
+            context.sharedFields.length +
+            (context.sharedMemories?.length ?? 0) +
+            (context.gatedRecentInteractionNotes?.length ?? 0)
+          : 0;
+        const diagnostic = buildAiDiagnostic({
+          operation,
+          lane,
+          modelId: connection?.model ?? "unresolved",
+          status: classified.status,
+          category: classified.category,
+          correlationId: createAiCorrelationId(),
+          appBuildVersion: Constants.expoConfig?.version ?? "unknown",
+          osVersion: `${Platform.OS} ${String(Platform.Version)}`,
+          approxTokenCount: Math.ceil(promptSizeRef.current / 4),
+          itemCount,
+          elapsedMs,
+        });
+        return {
+          code:
+            err instanceof AiError
+              ? err.code
+              : classified.status === "unknown"
+                ? "unknown"
+                : String(classified.status),
+          category: classified.category,
+          message: failureMessage(classified.category),
+          diagnostic,
+        };
+      },
       onChange: (next): void => setAiState(next),
     });
   }
@@ -767,6 +827,7 @@ export function ComposeScreen({
   // lifecycle decides via the injected isEditorEmpty and carries the body as the
   // bounded sourceDraft on Rewrite.
   const onAiAction = useCallback(() => {
+    setAiDetailsOpen(false);
     void lifecycleRef.current?.begin();
   }, []);
 
@@ -774,6 +835,7 @@ export function ComposeScreen({
   // the lifecycle's sole controller and returns to idle, leaving the manual draft
   // untouched (COMP-13, failure-safe).
   const onAiCancel = useCallback(() => {
+    setAiDetailsOpen(false);
     lifecycleRef.current?.cancel();
   }, []);
 
@@ -1418,8 +1480,42 @@ export function ComposeScreen({
           ]}
         >
           <AppText testID="compose-ai-error-text" role="body">
-            {aiErrorText(aiState.code)}
+            {aiState.message ?? aiErrorText(aiState.code)}
           </AppText>
+          {aiState.diagnostic ? (
+            <View style={styles.affordance}>
+              <Button
+                testID="compose-ai-error-details-toggle"
+                role="tertiary"
+                label={aiDetailsOpen ? "Hide details" : "Details"}
+                accessibilityLabel={
+                  aiDetailsOpen
+                    ? "Hide AI failure details"
+                    : "Show AI failure details"
+                }
+                onPress={() => setAiDetailsOpen((open) => !open)}
+              />
+            </View>
+          ) : null}
+          {aiDetailsOpen && aiState.diagnostic ? (
+            <View testID="compose-ai-error-details" style={styles.section}>
+              <AppText role="caption">
+                {[
+                  `Operation: ${aiState.diagnostic.operation}`,
+                  `Lane: ${aiState.diagnostic.lane}`,
+                  `Model: ${aiState.diagnostic.modelId}`,
+                  `Status: ${String(aiState.diagnostic.status)}`,
+                  `Category: ${aiState.diagnostic.category}`,
+                  `Correlation: ${aiState.diagnostic.correlationId}`,
+                  `Build: ${aiState.diagnostic.appBuildVersion}`,
+                  `OS: ${aiState.diagnostic.osVersion}`,
+                  `Approx. tokens: ${aiState.diagnostic.approxTokenCount}`,
+                  `Shared items: ${aiState.diagnostic.itemCount}`,
+                  `Elapsed: ${aiState.diagnostic.elapsedMs} ms`,
+                ].join("\n")}
+              </AppText>
+            </View>
+          ) : null}
           <View style={styles.panelActions}>
             <Button
               testID="compose-ai-error-cancel"

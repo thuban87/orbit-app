@@ -107,6 +107,10 @@ export type AiErrorCode =
   | "blocked"
   | "unauthorized"
   | "rate_limited"
+  | "model_unavailable"
+  | "billing"
+  | "context_too_large"
+  | "provider_unavailable"
   | "provider_error"
   | "invalid_response"
   | "network"
@@ -149,7 +153,11 @@ export function parseSuggestionOutput(value: unknown): string {
 /** Map a resolved non-ok HTTP status to a sanitized code (no body read). */
 function classifyHttpStatus(status: number): AiErrorCode {
   if (status === 401 || status === 403) return "unauthorized";
+  if (status === 402) return "billing";
+  if (status === 404) return "model_unavailable";
+  if (status === 413) return "context_too_large";
   if (status === 429) return "rate_limited";
+  if (status >= 500) return "provider_unavailable";
   return "provider_error";
 }
 
