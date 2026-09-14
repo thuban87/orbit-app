@@ -736,7 +736,6 @@ export function CreateContactScreen({
               onDelete={(id: number) =>
                 setFuelDrafts((prev) => prev.filter((_, i) => i !== id))
               }
-              onConfirm={() => {}}
             />
           </AccordionSection>
         </>

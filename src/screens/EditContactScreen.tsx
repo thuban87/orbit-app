@@ -1587,7 +1587,6 @@ export function EditContactScreen({
           onAdd={addOffLimitsRow}
           onEdit={editOffLimitsRow}
           onDelete={deleteOffLimitsRow}
-          onConfirm={() => {}}
         />
       </AccordionSection>
 

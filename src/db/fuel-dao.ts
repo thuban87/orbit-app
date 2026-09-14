@@ -45,9 +45,7 @@ export type FuelKind = "recent" | "topic" | "fact" | "gift" | "off_limits";
 /**
  * The provenance of a fuel row. A `string` alias (the column has no CHECK) whose
  * documented vocabulary is: 'user' (typed on the profile), 'share' (Phase-10
- * multi-attach), 'ai' (an AI suggestion, unconfirmed), 'manual' (an AI suggestion
- * a user confirmed — the confirm-flip target, resolved owner decision 2026-08-15,
- * recorded in Plan 03).
+ * multi-attach), and historical 'ai'/'manual' values retained for compatibility.
  */
 export type FuelSource = string;
 
@@ -94,14 +92,6 @@ export interface EditFuelInput {
   text?: string | null;
   /** Present → UPDATE url. Absent (`undefined`) → left untouched. */
   url?: string | null;
-  /** Local wall-clock now — bumps `modified_at`; `created_at` is left untouched. */
-  now: string;
-}
-
-/** Confirm an AI-suggested row, scoped by BOTH id AND contactId. */
-export interface ConfirmFuelInput {
-  id: number;
-  contactId: number;
   /** Local wall-clock now — bumps `modified_at`; `created_at` is left untouched. */
   now: string;
 }
@@ -197,34 +187,6 @@ export async function editFuelCore(
 }
 
 /**
- * Confirm an AI-suggested row (FUEL-06): a single UPDATE that flips
- * `source = 'manual'` and bumps `modified_at` for the matching (id, contact_id) +
- * assertOneChange. NEVER touches `created_at` (age is stable from creation).
- *
- * LOCKED OWNER DECISION (2026-08-15, resolves RESEARCH Open Q1): confirming is
- * ONLY this source flip — there is deliberately NO migration, NO new column, and
- * NO `ai_confirmed_at` timestamp. The flip intentionally ERASES the "was
- * AI-proposed" provenance: once confirmed, the row is indistinguishable from a
- * user's own manual note, so it ranks in `getRankedFuel` (which excludes
- * source='ai') and becomes eligible for AI prompts (Phase 14). Do NOT "restore
- * provenance" as a later bug fix — the loss of provenance is the decision, not an
- * oversight. The UPDATE is unconditional on the current source (the UI only offers
- * Confirm on 'ai' rows); a wrong (id, contactId) pair changes 0 rows → throws.
- */
-export async function confirmFuelCore(
-  exec: SqlExecutor,
-  input: ConfirmFuelInput,
-): Promise<void> {
-  const result = await exec.runAsync(
-    `UPDATE fuel
-        SET source = 'manual', modified_at = ?
-      WHERE id = ? AND contact_id = ?`,
-    [input.now, input.id, input.contactId],
-  );
-  assertOneChange("confirmFuel", input.id, input.contactId, result.changes);
-}
-
-/**
  * DELETE the matching (id, contact_id) + assertOneChange, writing a tombstone.
  *
  * The tombstone's `insertTombstoneCore` self-bumps `data_revision` by DEFAULT
@@ -285,21 +247,6 @@ export function editFuel(
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
     await editFuelCore(exec, input);
-    await bumpDataRevisionCore(exec);
-  });
-}
-
-/**
- * Confirm an AI-suggested row (standalone). Wraps `confirmFuelCore` in one
- * transaction. See `confirmFuelCore` for the locked owner decision (flip
- * source→'manual', no migration, no new column, provenance intentionally lost).
- */
-export function confirmFuel(
-  exec: SqlExecutor,
-  input: ConfirmFuelInput,
-): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    await confirmFuelCore(exec, input);
     await bumpDataRevisionCore(exec);
   });
 }
