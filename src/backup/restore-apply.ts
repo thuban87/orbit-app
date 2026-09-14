@@ -1,7 +1,7 @@
 /**
  * Restore application owns the write boundary. Reconciliation and durable photo
- * staging happen before its single transaction; committed journal rows are the
- * only authority for post-commit filesystem work.
+ * staging happens before its single transaction. Photo journal rows and
+ * version-bound background evidence own post-commit filesystem recovery.
  */
 import { reconcileEntity, type MergeableEntityType, type ReconciliationAction } from "@/backup/reconciliation";
 import type { BackupManifest, ReconciliationRow, ReconciliationTombstone } from "@/backup/types";
@@ -9,10 +9,6 @@ import { getPortableSettingsSnapshot, updateAppSettingsCore, type AppSettingsPat
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { remapLegacyChannel, remapLegacyQuality } from "@/db/interaction-vocabulary";
 import { recomputeLastContactCore } from "@/db/recency-dao";
-import {
-  deleteBackgroundJournalEntry,
-  insertBackgroundJournalEntryCore,
-} from "@/db/restore-background-journal-dao";
 import { deleteJournalEntryCore, insertJournalEntryCore, type RestorePhotoJournalEntry } from "@/db/restore-photo-journal-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -41,7 +37,7 @@ export interface RestoreApplyDependencies {
   createVerifiedPreRestoreSnapshot?: () => Promise<PreRestoreSnapshotResult>;
   stagePhoto?: (base64: string, relative: string) => Promise<void>;
   persistPhoto?: (sourceUri: string, canonicalRelativePath: string) => Promise<unknown>;
-  stageBackground?: (base64: string, templateUid: string, sessionToken: string) => Promise<unknown>;
+  stageBackground?: (base64: string, templateUid: string, sessionToken: string, expectedModifiedAt: string) => Promise<unknown>;
   persistBackground?: (sourceUri: string, canonicalRelativePath: string) => Promise<unknown>;
   deleteStagedBackground?: (relativePath: string) => void;
   deleteCanonicalPhoto?: (canonicalRelativePath: string) => void;
@@ -308,7 +304,12 @@ async function stageBackgroundCandidates(
   for (const action of writes(plan, "profile_background_templates")) {
     const row = action.row!;
     if (typeof row.imageBase64 !== "string") continue;
-    await stage(row.imageBase64, row.uid, sessionToken);
+    await stage(
+      row.imageBase64,
+      row.uid,
+      sessionToken,
+      String(row.modified_at),
+    );
     candidates.push({
       uid: row.uid,
       modifiedAt: String(row.modified_at),
@@ -413,15 +414,6 @@ export async function applyRestore(exec: SqlExecutor, manifest: BackupManifest, 
     for (const candidate of candidates.finalize) { const canonical = await canonicalFor(exec,candidate.target); if (!canonical) throw new Error("restore photo target disappeared before commit"); await writePhotoReference(exec,candidate.target,canonical); await insertJournalEntryCore(exec,entry("finalize",candidate.relativePath,candidate.target,canonical,manifest.metadata.exportedAt)); }
     for (const candidate of candidates.deletes) if (candidate.clearReference) await writePhotoReference(exec,candidate.target,null);
     for (const candidate of candidates.deletes) await insertJournalEntryCore(exec,entry("delete",`delete:${candidate.canonicalRelativePath}`,candidate.target,candidate.canonicalRelativePath,manifest.metadata.exportedAt));
-    for (const candidate of backgroundCandidates) {
-      await insertBackgroundJournalEntryCore(exec, {
-        relativePath: candidate.pendingRelativePath,
-        templateUid: candidate.uid,
-        templateModifiedAt: candidate.modifiedAt,
-        canonicalRelativePath: candidate.canonicalRelativePath,
-        createdAt: manifest.metadata.exportedAt,
-      });
-    }
     if (applySettings) { const uid = manifest.appSettings.sunContactUid; const sun = typeof uid === "string" && survivors.contacts?.has(uid) ? contacts.get(uid) ?? null : null; const patch = Object.fromEntries(Object.entries(manifest.appSettings).filter(([key]) => key !== "modifiedAt" && key !== "sunContactUid")) as AppSettingsPatch; await updateAppSettingsCore(exec,{ ...patch, sunContactId: sun },manifest.appSettings.modifiedAt as string); }
     await bumpDataRevisionCore(exec);
   });
@@ -431,12 +423,26 @@ export async function applyRestore(exec: SqlExecutor, manifest: BackupManifest, 
   const deleteStagedBackground = deps.deleteStagedBackground ?? deleteBackgroundRestorePending;
   for (const candidate of backgroundCandidates) {
     try {
+      const committed = await exec.getFirstAsync<{
+        imagePath: string;
+        modifiedAt: string;
+      }>(
+        "SELECT image_path AS imagePath,modified_at AS modifiedAt FROM profile_background_templates WHERE uid=?",
+        [candidate.uid],
+      );
+      if (
+        !committed ||
+        committed.modifiedAt !== candidate.modifiedAt ||
+        committed.imagePath !== candidate.canonicalRelativePath
+      ) {
+        deleteStagedBackground(candidate.pendingRelativePath);
+        continue;
+      }
       await persistBackground(
         resolveBackgroundRestorePendingUri(candidate.pendingRelativePath),
         candidate.canonicalRelativePath,
       );
       deleteStagedBackground(candidate.pendingRelativePath);
-      await deleteBackgroundJournalEntry(exec, candidate.pendingRelativePath);
     } catch {
       photosNeedingAttention += 1;
     }

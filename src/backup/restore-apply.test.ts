@@ -10,7 +10,7 @@ const photoMocks = vi.hoisted(() => ({
   deleteLeavesFile: false,
 }));
 const backgroundMocks = vi.hoisted(() => ({
-  staged: [] as Array<[string, string]>,
+  staged: [] as Array<[string, string, string, string]>,
   persisted: [] as Array<[string, string]>,
   deleted: [] as string[],
 }));
@@ -18,8 +18,13 @@ vi.mock("@/services/photos/background-storage", () => ({
   backgroundDerivativeRelPath: (uid: string) => `profile-backgrounds/${uid}.jpg`,
   resolveBackgroundRestorePendingUri: (relative: string) =>
     `file:///doc/${relative}`,
-  stageBackgroundRestorePendingBase64: async (base64: string, uid: string) => {
-    backgroundMocks.staged.push([base64, uid]);
+  stageBackgroundRestorePendingBase64: async (
+    base64: string,
+    uid: string,
+    session: string,
+    expectedModifiedAt: string,
+  ) => {
+    backgroundMocks.staged.push([base64, uid, session, expectedModifiedAt]);
   },
   persistBackgroundDerivative: async (source: string, destination: string) => {
     backgroundMocks.persisted.push([source, destination]);
@@ -94,7 +99,6 @@ import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { migration027 } from "@/db/migrations/027-default-interaction-channel";
 import { migration028 } from "@/db/migrations/028-compose-message-mode";
 import { migration029 } from "@/db/migrations/029-ai-configuration";
-import { migration030 } from "@/db/migrations/030-restore-background-journal";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import { readOrrerySystemSnapshot } from "@/db/orrery-system-read";
@@ -150,9 +154,8 @@ async function db(): Promise<SqlExecutor> {
       migration027,
       migration028,
       migration029,
-      migration030,
     ],
-    30,
+    29,
     { now: NOW, newUid },
   );
   return exec;
@@ -215,7 +218,12 @@ beforeEach(() => {
       expect(restoredAi).toEqual({ enabled: 1, active: "custom" });
       expect(computeAiAvailability({ aiEnabled: restoredAi!.enabled === 1, activeConnection: restoredAi!.active, hasCredential: false, selectedModel: "remembered", modelAvailable: true }))
         .toBe("needs-attention");
-      expect(backgroundMocks.staged).toContainEqual(["AQID", "portable-background"]);
+      expect(backgroundMocks.staged).toContainEqual([
+        "AQID",
+        "portable-background",
+        expect.stringMatching(/^[A-Za-z0-9_-]+$/),
+        NOW,
+      ]);
       expect(backgroundMocks.persisted).toHaveLength(1);
       expect(backgroundMocks.persisted[0]?.[0]).toMatch(
         /^file:\/\/\/doc\/profile-backgrounds\/_restore_pending\/portable-background\/[A-Za-z0-9_-]+\.jpg$/,
@@ -619,6 +627,58 @@ describe("applyRestore", () => {
     await expect(
       destination.getAllAsync("SELECT entity_uid FROM tombstones"),
     ).resolves.toEqual([]);
+  });
+
+  it("leaves same-UID background staging bound to the rolled-back incoming version", async () => {
+    const source = await db();
+    await source.runAsync(
+      "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [
+        "atomic-background",
+        "Incoming",
+        "profile-backgrounds/atomic-background.jpg",
+        NOW,
+        "2026-08-26 12:00:00",
+      ],
+    );
+    const manifest = await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "TkVX",
+    });
+    const destination = await db();
+    await destination.runAsync(
+      "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [
+        "atomic-background",
+        "Local",
+        "profile-backgrounds/atomic-background.jpg",
+        NOW,
+        NOW,
+      ],
+    );
+    await destination.execAsync(`CREATE TRIGGER fail_background_restore_revision BEFORE UPDATE OF data_revision ON app_settings
+      BEGIN SELECT RAISE(ABORT, 'background restore revision failed'); END`);
+
+    await expect(
+      applyRestore(destination, manifest, "merge", { sessionToken: "session" }),
+    ).rejects.toThrow("background restore revision failed");
+    await expect(
+      destination.getFirstAsync<{
+        name: string;
+        modified_at: string;
+      }>(
+        "SELECT name,modified_at FROM profile_background_templates WHERE uid='atomic-background'",
+      ),
+    ).resolves.toEqual({ name: "Local", modified_at: NOW });
+    expect(backgroundMocks.staged).toEqual([
+      [
+        "TkVX",
+        "atomic-background",
+        "session",
+        "2026-08-26 12:00:00",
+      ],
+    ]);
+    expect(backgroundMocks.persisted).toEqual([]);
   });
 
   it("allows a newer merged knowledge row to be permanently deleted after its older tombstone survives", async () => {

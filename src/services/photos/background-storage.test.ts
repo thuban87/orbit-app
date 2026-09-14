@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   operations: [] as string[],
   exists: new Set<string>(),
-  bytes: new Map<string, Uint8Array>(),
+  bytes: new Map<string, Uint8Array | string>(),
 }));
 
 vi.mock("expo-file-system", () => {
@@ -48,10 +48,14 @@ vi.mock("expo-file-system", () => {
       h.exists.delete(this.uri);
       h.bytes.delete(this.uri);
     }
-    write(bytes: Uint8Array) {
+    write(bytes: Uint8Array | string) {
       h.operations.push(`write ${this.uri}`);
       h.exists.add(this.uri);
       h.bytes.set(this.uri, bytes);
+    }
+    async text() {
+      const contents = h.bytes.get(this.uri);
+      return typeof contents === "string" ? contents : "";
     }
   }
   class Directory {
@@ -106,14 +110,39 @@ describe("background storage", () => {
       "AQID",
       "background_1",
       "session_1",
+      "2026-09-14 05:00:00",
     );
     expect(relative).toBe(
       backgroundRestorePendingRelPath("background_1", "session_1"),
     );
-    expect([...h.bytes.get(`file:///doc/${relative}`)!]).toEqual([1, 2, 3]);
-    expect(listBackgroundRestorePendingEntries()).toEqual([{ relative }]);
+    expect([...(h.bytes.get(`file:///doc/${relative}`) as Uint8Array)]).toEqual(
+      [1, 2, 3],
+    );
+    await expect(listBackgroundRestorePendingEntries()).resolves.toEqual([
+      {
+        relative,
+        evidence: {
+          version: 1,
+          templateUid: "background_1",
+          expectedModifiedAt: "2026-09-14 05:00:00",
+          canonicalRelativePath: "profile-backgrounds/background_1.jpg",
+        },
+      },
+    ]);
     deleteBackgroundRestorePending(relative);
     expect(h.exists.has(`file:///doc/${relative}`)).toBe(false);
+    expect(h.exists.has(`file:///doc/${relative}.json`)).toBe(false);
+  });
+
+  it("retains malformed or missing evidence as a prune-only pending entry", async () => {
+    const relative = backgroundRestorePendingRelPath(
+      "background_1",
+      "session_1",
+    );
+    h.exists.add(`file:///doc/${relative}`);
+    await expect(listBackgroundRestorePendingEntries()).resolves.toEqual([
+      { relative, evidence: null },
+    ]);
   });
 
   it("only permits UID-derived profile-background paths and rejects traversal/cache paths", () => {

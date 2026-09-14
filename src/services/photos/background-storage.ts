@@ -10,6 +10,7 @@ const SAFE_BACKGROUND_SIDECAR =
   /^profile-backgrounds\/[A-Za-z0-9_-]+\.jpg\.(?:tmp|bak)$/;
 const SAFE_BACKGROUND_RESTORE_PENDING =
   /^profile-backgrounds\/_restore_pending\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+\.jpg$/;
+const RESTORE_EVIDENCE_VERSION = 1;
 
 const writeTails = new Map<string, Promise<void>>();
 
@@ -17,6 +18,18 @@ export type BackgroundReconcileAction =
   | { kind: "deleteTmp"; relative: string }
   | { kind: "deleteBak"; relative: string }
   | { kind: "restoreBak"; from: string; to: string };
+
+export interface BackgroundRestoreEvidence {
+  version: typeof RESTORE_EVIDENCE_VERSION;
+  templateUid: string;
+  expectedModifiedAt: string;
+  canonicalRelativePath: string;
+}
+
+export interface BackgroundRestorePendingEntry {
+  relative: string;
+  evidence: BackgroundRestoreEvidence | null;
+}
 
 function assertBackgroundRelative(relative: string): void {
   if (
@@ -95,8 +108,13 @@ export async function stageBackgroundRestorePendingBase64(
   base64: string,
   templateUid: string,
   sessionToken: string,
+  expectedModifiedAt: string,
 ): Promise<string> {
   const relative = backgroundRestorePendingRelPath(templateUid, sessionToken);
+  const canonicalRelativePath = backgroundDerivativeRelPath(templateUid);
+  if (!expectedModifiedAt) {
+    throw new Error("Profile background restore evidence needs a row version");
+  }
   new Directory(
     Paths.document,
     BACKGROUND_RESTORE_PENDING_DIR,
@@ -110,18 +128,48 @@ export async function stageBackgroundRestorePendingBase64(
   for (let index = 0; index < binary.length; index += 1)
     bytes[index] = binary.charCodeAt(index);
   new File(Paths.document, relative).write(bytes);
+  new File(Paths.document, `${relative}.json`).write(
+    JSON.stringify({
+      version: RESTORE_EVIDENCE_VERSION,
+      templateUid,
+      expectedModifiedAt,
+      canonicalRelativePath,
+    } satisfies BackgroundRestoreEvidence),
+  );
   return relative;
 }
 
-export function listBackgroundRestorePendingEntries(): Array<{
-  relative: string;
-}> {
+function parseBackgroundRestoreEvidence(
+  raw: string,
+): BackgroundRestoreEvidence | null {
+  try {
+    const value = JSON.parse(raw) as Partial<BackgroundRestoreEvidence>;
+    if (
+      value.version !== RESTORE_EVIDENCE_VERSION ||
+      typeof value.templateUid !== "string" ||
+      typeof value.expectedModifiedAt !== "string" ||
+      value.expectedModifiedAt.length === 0 ||
+      typeof value.canonicalRelativePath !== "string" ||
+      backgroundDerivativeRelPath(value.templateUid) !==
+        value.canonicalRelativePath
+    ) {
+      return null;
+    }
+    return value as BackgroundRestoreEvidence;
+  } catch {
+    return null;
+  }
+}
+
+export async function listBackgroundRestorePendingEntries(): Promise<
+  BackgroundRestorePendingEntry[]
+> {
   const directory = new Directory(
     Paths.document,
     BACKGROUND_RESTORE_PENDING_DIR,
   );
   if (!directory.exists) return [];
-  const pending: Array<{ relative: string }> = [];
+  const pending: BackgroundRestorePendingEntry[] = [];
   for (const templateDirectory of directory.list()) {
     if (
       !(templateDirectory instanceof Directory) ||
@@ -131,8 +179,17 @@ export function listBackgroundRestorePendingEntries(): Array<{
     }
     for (const entry of templateDirectory.list()) {
       if (entry instanceof File && /^[A-Za-z0-9_-]+\.jpg$/.test(entry.name)) {
+        const relative = `${BACKGROUND_RESTORE_PENDING_DIR}/${templateDirectory.name}/${entry.name}`;
+        const evidenceFile = new File(Paths.document, `${relative}.json`);
+        const parsedEvidence = evidenceFile.exists
+          ? parseBackgroundRestoreEvidence(await evidenceFile.text())
+          : null;
         pending.push({
-          relative: `${BACKGROUND_RESTORE_PENDING_DIR}/${templateDirectory.name}/${entry.name}`,
+          relative,
+          evidence:
+            parsedEvidence?.templateUid === templateDirectory.name
+              ? parsedEvidence
+              : null,
         });
       }
     }
@@ -144,7 +201,10 @@ export function listBackgroundRestorePendingEntries(): Array<{
 
 export function deleteBackgroundRestorePending(relative: string): void {
   assertBackgroundRestorePendingRelative(relative);
-  new File(Paths.document, relative).delete();
+  for (const path of [relative, `${relative}.json`]) {
+    const file = new File(Paths.document, path);
+    if (file.exists) file.delete();
+  }
 }
 
 function enqueueWrite<T>(
