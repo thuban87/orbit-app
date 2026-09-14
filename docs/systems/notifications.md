@@ -1,7 +1,7 @@
 # Notifications
 
-**Last updated:** 2026-08-27
-**Updated by phase:** 18.2-bound-unbound-lifecycle
+**Last updated:** 2026-09-02
+**Updated by phase:** 31-profile-experience
 **Owners:** `src/db/notification-read.ts`, `src/db/snooze-dao.ts`, `src/services/notifications/`, `src/navigation/notification-gate.tsx`
 
 ## Purpose
@@ -93,6 +93,12 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 1. `purgeContact()` commits its database fan-out before calling its extension hook.
 2. The notification cleanup reconstructs `decay:<id>` and `birthday:<id>` from the deleted contact ID and best-effort cancels both OS requests.
 
+### Applying Profile relationship actions
+
+1. Profile Frequency and Snooze sheets call the existing public composed writers rather than patching contact columns directly.
+2. A successful Frequency write publishes lifecycle/notification effects after commit; Snooze and Unsnooze retain their unconditional immutable event rows.
+3. Profile reloads committed local state before publishing the changed tile, while UI pending state prevents accidental duplicate presses.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -114,6 +120,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the independent Sunday digest request, private channel, durable toggle, and dashboard-rooted tap reset.
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — requires headless first-open migration to supply a device region without making endpoint data part of notifications.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — gates decay and stale active actions while retaining factual birthdays and touchpoint history.
+- **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — keeps Profile Frequency/Snooze controls on the established notification and immutable-event boundary.
 
 ## Gotchas
 
@@ -129,6 +136,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 10. **Do not migrate national endpoints with a guessed headless region.** The action path uses the shared platform region provider; an unavailable region leaves a national method non-actionable rather than inventing canonical identity.
 11. **Recheck lifecycle at delivered ingress.** A notification can outlive an Unbind; Mark may record real history, but stale decay Compose and Snooze actions must not revive cadence work.
 12. **Do not restore flat root routes in a notification response.** The response gate must use the shared nested Dashboard reset builders after the tab-shell conversion.
+13. **Pending UI is not event deduplication.** Repeated explicit Snooze/Unsnooze invocations remain auditable; only an accidental concurrent press is suppressed in the Profile sheet.
 
 ## Related Systems
 
@@ -150,3 +158,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-08-27 | 18.1 | Supplied device region to the notification headless first-open migration path. |
 | 2026-08-27 | 18.2 | Made decay Bound-only, added Unbound birthday policy, and guarded stale notification actions and body taps. |
 | 2026-09-02 | 22 | Re-expressed body-tap destinations as typed nested Dashboard-tab resets without changing notification policy. |
+| 2026-09-02 | 31 | Routed Profile Frequency and Snooze controls through the existing composed effects and immutable-event contracts. |
