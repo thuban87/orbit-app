@@ -83,6 +83,11 @@ Phase 32 owns the full History UX while preserving `interaction-history`. Phase 
 
 ## Decisions
 
+- **ADR-108:** Durable Independent-Axis Profile Presentation and Inheritance — owns the normalized template/assignment/override model, precedence, collapse persistence, and presentation-only reset.
+- **ADR-109:** Fixed-Hero Semantic Profile Composition and Focused Accessible Editors — fixes Hero geometry and constrains the semantic body and editor workflows.
+- **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — keeps one local snapshot while preserving each knowledge source's ownership and permission semantics.
+- **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — defines truthful Bound/Unbound facts and source-owned Frequency/Snooze writes.
+- **ADR-112:** App-Owned Profile Background Derivatives and Launch Reconciliation — owns local crop, safe derivative storage, reference-aware cleanup, and fallback rendering.
 - **ADR-062:** Bound/Unbound lifecycle — cadence is nullable and all Profile consumers guard it.
 - **ADR-078:** Off Limits remains a local caution surface and is not an AI/search/dashboard permission proxy.
 - **ADR-079:** Compose is the only suggestion invocation; the Profile AI draft entry is retired.
@@ -110,6 +115,7 @@ Phase 32 owns the full History UX while preserving `interaction-history`. Phase 
 
 | Date | Phase | What changed |
 |------|-------|--------------|
+| 2026-09-02 | 31 | Established the durable independent-axis presentation model, fixed-Hero semantic composition, coherent local snapshot, guarded relationship facts, focused editors, and app-owned background lifecycle. |
 | 2026-09-14 | 36 | Added parent-UID-keyed Profile presentation, templates, global preferences, and crash-consistent background bytes to backup format v5. |
 | 2026-09-10 | 31 | Final acceptance reconciliation: all seven bounded owner-smoke journeys are complete after targeted direct-drag, template-discovery/arbitrary-contact assignment, and clear-to-theme repairs. The owner approved the final template lifecycle check; Preview functionality passed while its visual polish remains intentionally deferred. |
 | 2026-09-10 | 31 | Reconciled the six owner-reported Profile UAT gaps against Plans 31-11 through 31-13. Retained physical-Pixel evidence closes the background, sheet, manager, factory-collapse, and compact-bar reports; the owner directly approved the final crop editor's genuine touch/pinch behavior. This does **not** convert the independent unexercised native-checklist rows into passes. |
