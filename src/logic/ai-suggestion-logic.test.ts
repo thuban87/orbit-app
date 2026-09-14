@@ -210,6 +210,44 @@ describe("AiSuggestionLifecycle — Draft vs Rewrite source-draft carry (HIGH-3)
   });
 });
 
+describe("AiSuggestionLifecycle — ephemeral Adjust (AICFG-09)", () => {
+  it("passes session guidance with the selected draft and returns three alternatives", async () => {
+    const h = makeHarness(
+      {},
+      { editorEmpty: false, editorBody: "selected prior suggestion" },
+    );
+
+    await h.lifecycle.adjust("Make it warmer");
+
+    expect(h.deps.resolvePrompt).toHaveBeenCalledWith(
+      "selected prior suggestion",
+      "Make it warmer",
+    );
+    expect(h.lifecycle.getState()).toEqual({
+      status: "review",
+      suggestions: ["ALPHA", "BRAVO", "CHARLIE"],
+    });
+  });
+
+  it("preserves adjustment guidance on an explicit retry only", async () => {
+    const h = makeHarness(
+      {},
+      { editorEmpty: false, editorBody: "selected prior suggestion" },
+    );
+    await h.lifecycle.adjust("Shorter");
+    await h.lifecycle.retry();
+    expect(h.deps.resolvePrompt).toHaveBeenLastCalledWith(
+      "selected prior suggestion",
+      "Shorter",
+    );
+
+    await h.lifecycle.begin();
+    expect(h.deps.resolvePrompt).toHaveBeenLastCalledWith(
+      "selected prior suggestion",
+    );
+  });
+});
+
 describe("AiSuggestionLifecycle — single controller ownership (H4)", () => {
   it("hands the sole controller's signal to generate", async () => {
     const gen = deferred<readonly string[]>();

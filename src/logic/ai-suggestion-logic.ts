@@ -109,7 +109,10 @@ export interface AiSuggestionDeps {
    * `undefined`. The lifecycle only PASSES it through — the delimited rendering
    * of the source-draft into the prompt is plan 35-08's prompt-template work.
    */
-  readonly resolvePrompt: (sourceDraft?: string) => Promise<ResolvedPrompt>;
+  readonly resolvePrompt: (
+    sourceDraft?: string,
+    adjustGuidance?: string,
+  ) => Promise<ResolvedPrompt>;
   /**
    * The provider fan-out — receives the caller-owned signal (H4) and resolves
    * EXACTLY three variant drafts. Wired in plan 35-08 to `generateVariants`
@@ -153,6 +156,8 @@ export class AiSuggestionLifecycle {
   private controller: AbortController | null = null;
   /** The SOLE timeout handle for the active request, or null when none. */
   private timer: TimerHandle | null = null;
+  /** Session-only guidance retained solely so an explicit retry preserves it. */
+  private lastAdjustGuidance: string | undefined;
   private state: AiSuggestionState = { status: "idle" };
 
   constructor(private readonly deps: AiSuggestionDeps) {}
@@ -195,9 +200,14 @@ export class AiSuggestionLifecycle {
    * Empty editor → Draft (no sourceDraft); non-empty editor → Rewrite (the
    * current editor body carried as sourceDraft).
    */
-  async begin(): Promise<void> {
+  async begin(adjustGuidance?: string): Promise<void> {
     this.invalidate();
     const token = this.gen;
+    const normalizedGuidance = adjustGuidance?.trim();
+    this.lastAdjustGuidance =
+      normalizedGuidance && normalizedGuidance.length > 0
+        ? normalizedGuidance
+        : undefined;
     // Snapshot the Draft-vs-Rewrite decision at begin time.
     const sourceDraft = this.deps.isEditorEmpty()
       ? undefined
@@ -207,7 +217,10 @@ export class AiSuggestionLifecycle {
     let prompt: ResolvedPrompt;
     try {
       // Resolve the ONE immutable prompt for this request, exactly once.
-      prompt = await this.deps.resolvePrompt(sourceDraft);
+      prompt =
+        this.lastAdjustGuidance === undefined
+          ? await this.deps.resolvePrompt(sourceDraft)
+          : await this.deps.resolvePrompt(sourceDraft, this.lastAdjustGuidance);
     } catch (err) {
       if (token !== this.gen) return; // superseded while resolving
       this.set({ status: "error", code: this.deps.sanitizeError(err) });
@@ -314,6 +327,11 @@ export class AiSuggestionLifecycle {
 
   /** A deliberate Retry — a brand-new request, NEVER an automatic one. */
   retry(): Promise<void> {
-    return this.begin();
+    return this.begin(this.lastAdjustGuidance);
+  }
+
+  /** Deliberately generate a fresh three-alternative set with ephemeral guidance. */
+  adjust(guidance: string): Promise<void> {
+    return this.begin(guidance);
   }
 }

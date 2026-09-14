@@ -134,12 +134,17 @@ function makeSeam(opts: {
   };
 
   const deps: AiSuggestionDeps = {
-    resolvePrompt: async (sourceDraft?: string) => {
+    resolvePrompt: async (sourceDraft?: string, adjustGuidance?: string) => {
       // The SOLE construction path — one immutable object per request. The
       // Rewrite source-draft (the user's own composition) is passed through; its
       // delimited rendering is plan 35-08's prompt-template work, so here it does
       // not widen the closed PromptContext allowlist.
-      const p = resolvePrompt(sourceDraft ?? "", CONTEXT);
+      const p = resolvePrompt(
+        sourceDraft ?? "",
+        CONTEXT,
+        undefined,
+        adjustGuidance,
+      );
       seam.resolved = p;
       return p;
     },

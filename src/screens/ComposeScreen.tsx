@@ -141,6 +141,9 @@ const AI_TEMPERATURE_BASE = 0.7;
 /** The number of suggestions the review surface always shows (ADR-079). */
 const AI_VARIANT_COUNT = 3;
 
+/** Minimal session-only Adjust shortcuts (dossier §AA). */
+const AI_ADJUST_QUICK_ACTIONS = ["Shorter", "Warmer", "More direct"] as const;
+
 /**
  * Map a SANITIZED AI error code to a short, user-facing recovery line (COMP-13 /
  * T-35-03). RE-CREATED here — plan 35-01 removed the prior `aiErrorText` with the
@@ -242,6 +245,10 @@ export function ComposeScreen({
   // the ENTIRE prior AI wiring so everything here is RE-CREATED, not reused). ──
   // The lifecycle's view-state (idle → resolving/loading → review | error).
   const [aiState, setAiState] = useState<AiSuggestionState>({ status: "idle" });
+  // Ephemeral Adjust state: component/session memory only. It never enters the
+  // app-settings DAO, personalization DAO, backup, or any durable store.
+  const [adjustOpen, setAdjustOpen] = useState(false);
+  const [adjustGuidance, setAdjustGuidance] = useState("");
   // AI availability is SOURCED here (COMP-09 / D-07 / D-12): the durable master
   // switch, resolved active connection, exact selected-model usability, and a
   // credential-PRESENCE boolean (never the key value, never logged) feed the
@@ -392,11 +399,19 @@ export function ComposeScreen({
       // For a Draft `sourceDraft` is undefined and the prompt is byte-identical to
       // today. The closed PromptContext egress projection (readPromptContext) is
       // unchanged; sourceDraft is a resolvePrompt param, not a context field.
-      resolvePrompt: async (sourceDraft?: string): Promise<ResolvedPrompt> => {
+      resolvePrompt: async (
+        sourceDraft?: string,
+        ephemeralAdjustGuidance?: string,
+      ): Promise<ResolvedPrompt> => {
         const exec = getExecutor();
         const context = await readPromptContext(exec, contactId);
         const template = settingsRef.current?.aiPromptTemplate ?? "";
-        return resolvePrompt(template, context, sourceDraft);
+        return resolvePrompt(
+          template,
+          context,
+          sourceDraft,
+          ephemeralAdjustGuidance,
+        );
       },
       // The provider fan-out (COMP-12 / HIGH-3). Three independently-cancellable
       // calls under the lifecycle's ONE shared signal via generateVariants. The
@@ -767,6 +782,16 @@ export function ComposeScreen({
   // ONLY path that mutates the editor from the AI flow (ADR-079 / T-35-18).
   const onAiChoose = useCallback((index: number) => {
     lifecycleRef.current?.chooseSuggestion(index);
+  }, []);
+
+  // Adjust is a deliberate, per-generation action. The lifecycle reuses the
+  // same three-variant fan-out and the current editor body as continuity source.
+  const onAiAdjust = useCallback((guidance: string) => {
+    const normalized = guidance.trim();
+    if (normalized.length === 0) return;
+    setAdjustGuidance(normalized);
+    setAdjustOpen(false);
+    void lifecycleRef.current?.adjust(normalized);
   }, []);
 
   // Needs-Attention repair route — send the user to the EXISTING AI settings
@@ -1149,14 +1174,87 @@ export function ComposeScreen({
           meaningful text. Rendered only when AI is configured and nothing is in
           flight (idle). It NEVER auto-starts; begin() runs only on this tap. */}
       {aiState.status === "idle" && aiPosture.showAiActions ? (
-        <View style={styles.affordance}>
-          <Button
-            testID="compose-ai-action"
-            role="primary"
-            label={aiActionLabel}
-            accessibilityLabel={aiActionLabel}
-            onPress={onAiAction}
+        <>
+          <View style={styles.affordance}>
+            <Button
+              testID="compose-ai-action"
+              role="primary"
+              label={aiActionLabel}
+              accessibilityLabel={aiActionLabel}
+              onPress={onAiAction}
+            />
+          </View>
+          {body.trim().length > 0 ? (
+            <View style={styles.affordance}>
+              <Button
+                testID="compose-ai-adjust-open"
+                role="tertiary"
+                label="Adjust"
+                accessibilityLabel="Adjust this message with AI"
+                onPress={() => setAdjustOpen((open) => !open)}
+              />
+            </View>
+          ) : null}
+        </>
+      ) : null}
+
+      {aiState.status === "idle" && aiPosture.showAiActions && adjustOpen ? (
+        <View
+          testID="compose-ai-adjust"
+          style={[
+            styles.panel,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <AppText role="label">Adjust this message</AppText>
+          <View style={styles.panelActions}>
+            {AI_ADJUST_QUICK_ACTIONS.map((guidance) => (
+              <Button
+                key={guidance}
+                testID={`compose-ai-adjust-${guidance.toLowerCase().replace(/\s+/g, "-")}`}
+                role="secondary"
+                label={guidance}
+                accessibilityLabel={`Adjust: ${guidance}`}
+                onPress={() => onAiAdjust(guidance)}
+              />
+            ))}
+          </View>
+          <TextInput
+            testID="compose-ai-adjust-input"
+            value={adjustGuidance}
+            onChangeText={setAdjustGuidance}
+            placeholder="Tell Orbit what to change…"
+            placeholderTextColor={colors.textSecondary}
+            multiline
+            style={[
+              styles.adjustInput,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                color: colors.textPrimary,
+                fontSize: TYPOGRAPHY.body.size,
+                lineHeight: TYPOGRAPHY.body.lineHeight,
+                fontFamily: "Inter-Regular",
+              },
+            ]}
           />
+          <View style={styles.panelActions}>
+            <Button
+              testID="compose-ai-adjust-cancel"
+              role="secondary"
+              label="Cancel"
+              accessibilityLabel="Cancel adjustment"
+              onPress={() => setAdjustOpen(false)}
+            />
+            <Button
+              testID="compose-ai-adjust-apply"
+              role="primary"
+              label="Generate alternatives"
+              accessibilityLabel="Generate adjusted alternatives"
+              disabled={adjustGuidance.trim().length === 0}
+              onPress={() => onAiAdjust(adjustGuidance)}
+            />
+          </View>
         </View>
       ) : null}
 
@@ -1503,6 +1601,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
+  },
+  adjustInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    minHeight: 88,
+    textAlignVertical: "top",
   },
   // A bounded box so a long suggestion (or the original) scrolls WITHIN the
   // review surface while staying individually selectable (no shrink — body 16/24).
