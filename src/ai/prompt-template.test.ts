@@ -15,7 +15,6 @@ import {
   resolvePrompt,
   STATIC_INSTRUCTION,
   TEMPLATE_LIMIT,
-  TOTAL_LIMIT,
 } from "@/ai/prompt-template";
 import type { PromptContext } from "@/ai/prompt-types";
 
@@ -142,7 +141,7 @@ describe("resolvePrompt — bounded immutable construction", () => {
     expect(resolved.prompt).not.toContain("T".repeat(TEMPLATE_LIMIT + 1));
   });
 
-  it("never exceeds the 6000 code-point total and drops overflow fields in order", () => {
+  it("preserves permitted shared fields beyond the retired fixed total ceiling", () => {
     const sharedFields = Array.from({ length: 60 }, (_, i) => ({
       label: `Field${i}`,
       value: "y".repeat(PER_VALUE_LIMIT),
@@ -151,11 +150,76 @@ describe("resolvePrompt — bounded immutable construction", () => {
       "T".repeat(TEMPLATE_LIMIT),
       baseContext({ sharedFields }),
     );
-    expect(cp(resolved.prompt)).toBeLessThanOrEqual(TOTAL_LIMIT);
-    const notice = resolved.truncations.find(
-      (t) => t.category === "shared details",
+    expect(cp(resolved.prompt)).toBeGreaterThan(6_000);
+    for (let i = 0; i < sharedFields.length; i++) {
+      expect(resolved.prompt).toContain(`Field${i}`);
+    }
+    expect(
+      resolved.truncations.some((notice) =>
+        notice.detail.includes("omitted to fit"),
+      ),
+    ).toBe(false);
+  });
+
+  it("renders structured Writing Style and only enabled personalization sections as fenced DATA", () => {
+    const context = baseContext({
+      writingStyle: {
+        tone: "polished",
+        length: "concise",
+        directness: "custom",
+        freeform: "Use my usual gentle opening.",
+      },
+      personalizationSections: [
+        {
+          uid: "enabled",
+          title: "My voice",
+          body: "Prefer concrete invitations.",
+          enabled: true,
+          displayOrder: 1,
+        },
+        {
+          uid: "disabled",
+          title: "Private draft notes",
+          body: "MUST_STAY_LOCAL",
+          enabled: false,
+          displayOrder: 0,
+        },
+      ],
+    } as Partial<PromptContext>);
+    const resolved = resolvePrompt("LEGACY_STYLE_MUST_NOT_RENDER", context);
+
+    expect(resolved.prompt).toContain("===== DATA: WRITING STYLE =====");
+    expect(resolved.prompt).toContain("Tone: Polished");
+    expect(resolved.prompt).toContain("Length: Concise");
+    expect(resolved.prompt).toContain("Directness: Use custom guidance");
+    expect(resolved.prompt).toContain("Use my usual gentle opening.");
+    expect(resolved.prompt).toContain(
+      "===== DATA: PERSONALIZATION CONTEXT 1 =====",
     );
-    expect(notice).toBeDefined();
+    expect(resolved.prompt).toContain("Prefer concrete invitations.");
+    expect(resolved.prompt).not.toContain("MUST_STAY_LOCAL");
+    expect(resolved.prompt).not.toContain("LEGACY_STYLE_MUST_NOT_RENDER");
+    expect(resolved.prompt).toBe(resolved.inspectorDisplay);
+    expect(resolved.prompt).toBe(resolved.payload);
+  });
+
+  it("a disabled personalization section is byte-identical to its absence", () => {
+    const absent = resolvePrompt("Warm.", baseContext());
+    const disabled = resolvePrompt(
+      "Warm.",
+      baseContext({
+        personalizationSections: [
+          {
+            uid: "disabled",
+            title: "Stored locally",
+            body: "Never sent",
+            enabled: false,
+            displayOrder: 0,
+          },
+        ],
+      } as Partial<PromptContext>),
+    );
+    expect(disabled.prompt).toBe(absent.prompt);
   });
 
   it("returns a deeply frozen object handed by strict reference identity to every consumer", () => {
@@ -250,7 +314,7 @@ describe("resolvePrompt — bounded immutable construction", () => {
       baseContext({ sharedMemories, gatedRecentInteractionNotes }),
     );
 
-    expect(cp(resolved.prompt)).toBeGreaterThan(TOTAL_LIMIT);
+    expect(cp(resolved.prompt)).toBeGreaterThan(6_000);
     for (let index = 0; index < sharedMemories.length; index++) {
       expect(resolved.prompt).toContain(`MEMORY_${index}_`);
     }
@@ -384,10 +448,7 @@ describe("resolvePrompt — bounded Rewrite source-draft (HIGH-3 / §P-411)", ()
     expect(resolved.prompt).toBe(resolved.payload);
   });
 
-  it("keeps every DATA block's fences balanced and the rewrite instruction intact at exactly/over the total budget (construction-order / fence integrity #6)", () => {
-    // Drive the assembled prompt to/over TOTAL_LIMIT via many shared fields (the
-    // natural over-limit path); the rewrite block is reserved in the scaffold so
-    // fields budget against the remainder and the end hard-trim never fires.
+  it("keeps every DATA block's fences balanced while preserving context beyond the retired total budget", () => {
     const sharedFields = Array.from({ length: 80 }, (_, i) => ({
       label: `Field${i}`,
       value: "y".repeat(PER_VALUE_LIMIT),
@@ -397,8 +458,8 @@ describe("resolvePrompt — bounded Rewrite source-draft (HIGH-3 / §P-411)", ()
       baseContext({ sharedFields }),
       "please make this friendlier but keep the ask",
     );
-    // Never over budget.
-    expect(cp(resolved.prompt)).toBeLessThanOrEqual(TOTAL_LIMIT);
+    expect(cp(resolved.prompt)).toBeGreaterThan(6_000);
+    expect(resolved.prompt).toContain("Field79");
     // Every DATA block keeps BOTH fences (balanced open/close, exactly one each).
     for (const [open, close] of [
       [
@@ -414,12 +475,10 @@ describe("resolvePrompt — bounded Rewrite source-draft (HIGH-3 / §P-411)", ()
       expect(occurrences(resolved.prompt, open)).toBe(1);
       expect(occurrences(resolved.prompt, close)).toBe(1);
     }
-    // The rewrite-instruction line survived (not severed by the hard-trim).
     expect(resolved.prompt.toLowerCase()).toContain("rewrite that message");
-    // The blunt end hard-trim never fired (it would have severed a fence).
-    expect(resolved.truncations.some((t) => t.category === "prompt")).toBe(
-      false,
-    );
+    expect(
+      resolved.truncations.some((t) => t.detail.includes("omitted to fit")),
+    ).toBe(false);
   });
 });
 
