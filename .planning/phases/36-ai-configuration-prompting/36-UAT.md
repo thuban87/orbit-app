@@ -1,24 +1,16 @@
 ---
-status: testing
+status: passed
 phase: 36-ai-configuration-prompting
 source: [36-VERIFICATION.md]
 started: 2026-09-14T10:18:00-05:00
-updated: 2026-09-14T11:07:28-05:00
+updated: 2026-09-14T13:40:53-05:00
 ---
-
-## Current Test
-
-number: 1
-name: OpenRouter physical-device redirect
-expected: |
-  Browser authorization returns through orbit://openrouter-auth; the callback is accepted once and produces a usable connection without exposing the code or state.
-awaiting: owner completes OpenRouter sign-in/authorization in Chrome
 
 ## Tests
 
-### 1. OpenRouter physical-device redirect
-expected: Browser authorization returns through orbit://openrouter-auth; the callback is accepted once and produces a usable connection without exposing the code or state.
-result: [blocked] Current native dev client was rebuilt with expo-crypto and installed on the physical Pixel. The OpenRouter CTA now opens the real authorization page in a Chrome custom tab; completing the callback requires the owner's OpenRouter account/sign-in choice.
+### 1. OpenRouter physical-device localhost callback
+expected: Browser authorization returns through the temporary `http://127.0.0.1:<dynamic>/openrouter-auth` listener, then a credential-free `orbit://openrouter-auth` wake foregrounds Orbit; the callback is accepted once and produces a usable connection without exposing the code or state.
+result: [passed] A clean native debug client was installed on the physical Pixel 6 Pro (`1A071FDEE002BU`, raven). OpenRouter presented authorization for the signed-in account using the dynamic localhost callback, authorization returned to Orbit without manual code entry, and the provider model picker opened. The visible completion wake, Orbit UI, Metro delta, and sanitized logcat delta contained no `code` or `state` callback parameters. The JVM report contained 6 tests with zero failures/errors, and the clean debug build completed successfully.
 
 ### 2. Long connection and hub values
 expected: Long endpoint, model, and provider values wrap or truncate without overlap or lost actions.
@@ -26,7 +18,7 @@ result: [passed] A deliberately long HTTPS endpoint and provider/model id remain
 
 ### 3. OpenRouter authorization state and activation ordering
 expected: Connect shows progress; cancellation/failure preserves the prior active lane; successful authorization activates OpenRouter.
-result: [blocked] The physical browser transition and cancellation path passed: returning from Chrome showed the failure notice and preserved the prior active lane. Custom and direct setup both activated only after successful persistence. The OpenRouter-success half requires the owner's OpenRouter sign-in/authorization.
+result: [passed] The prior OpenAI lane remained active before the real browser authorization completed. After the validated localhost callback and key persistence, Orbit opened model selection; choosing `Cohere: North Mini Code (free)` then made OpenRouter the Active lane. No Draft, Rewrite, or other AI generation request was invoked.
 
 ### 4. Long personalization content
 expected: Long section titles, bodies, and custom guidance remain readable and editable without overlapping controls.
@@ -47,12 +39,12 @@ result: [passed] The long saved Custom model wrapped within its connection card 
 ## Summary
 
 total: 7
-passed: 5
+passed: 7
 issues: 0
 pending: 0
 skipped: 0
-blocked: 2
+blocked: 0
 
 ## Gaps
 
-No automated or implementation gaps remain. Five device/visual checks pass. The two remaining checks share one external blocker: completing OpenRouter sign-in/authorization in Chrome on the physical Pixel.
+No automated, implementation, or UAT gaps remain. Checks 1 and 3 were rerun against the freshly built native client and passed through the localhost callback contract. The other five already-passed checks were not rerun.
