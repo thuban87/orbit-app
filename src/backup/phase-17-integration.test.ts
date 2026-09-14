@@ -179,6 +179,14 @@ describe("Phase 17 composed backup regressions", () => {
         "profile_background_templates",
         "Profile presentation backup serialization is deferred",
       ],
+      // Phase 36 personalization is durable local state, but its backup-format
+      // emission and restore reconciliation are owned by Plan 36-08. Until that
+      // format bump lands, deleting a section is intentionally non-mergeable;
+      // do not mint a tombstone entity that the current manifest cannot carry.
+      [
+        "personalization_sections",
+        "Phase 36 Plan 08 personalization backup serialization is deferred",
+      ],
     ]);
     for (const table of writers) {
       expect(
