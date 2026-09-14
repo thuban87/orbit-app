@@ -1,6 +1,11 @@
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { MergeImpactSummary } from "@/components/MergeImpactSummary";
 import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
+import { AIConnectionScreen } from "@/screens/AIConnectionScreen";
+import { AIModelPickerScreen } from "@/screens/AIModelPickerScreen";
+import { AIPermissionsScreen } from "@/screens/AIPermissionsScreen";
+import { AIPersonalizationScreen } from "@/screens/AIPersonalizationScreen";
+import { AIPreviewScreen } from "@/screens/AIPreviewScreen";
 import { BulkImportSetupScreen } from "@/screens/BulkImportSetupScreen";
 import { BulkReviewScreen } from "@/screens/BulkReviewScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
@@ -42,6 +47,45 @@ function CustomFieldsRoute({
   return <CustomFieldsScreen onBack={() => navigation.goBack()} />;
 }
 
+function AIConnectionRoute({
+  navigation,
+}: SettingsScreenProps<"AIConnection">) {
+  return (
+    <AIConnectionScreen
+      onBack={() => navigation.goBack()}
+      onChooseModel={(lane) => navigation.navigate("AIModelPicker", { lane })}
+    />
+  );
+}
+
+function AIModelPickerRoute({
+  navigation,
+  route,
+}: SettingsScreenProps<"AIModelPicker">) {
+  return (
+    <AIModelPickerScreen
+      lane={route.params.lane}
+      onBack={() => navigation.goBack()}
+    />
+  );
+}
+
+function AIPersonalizationRoute({
+  navigation,
+}: SettingsScreenProps<"AIPersonalization">) {
+  return <AIPersonalizationScreen onBack={() => navigation.goBack()} />;
+}
+
+function AIPermissionsRoute({
+  navigation,
+}: SettingsScreenProps<"AIPermissions">) {
+  return <AIPermissionsScreen onBack={() => navigation.goBack()} />;
+}
+
+function AIPreviewRoute({ navigation }: SettingsScreenProps<"AIPreview">) {
+  return <AIPreviewScreen onBack={() => navigation.goBack()} />;
+}
+
 export function SettingsStack() {
   return (
     <Stack.Navigator
@@ -49,6 +93,14 @@ export function SettingsStack() {
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="AIConnection" component={AIConnectionRoute} />
+      <Stack.Screen name="AIModelPicker" component={AIModelPickerRoute} />
+      <Stack.Screen
+        name="AIPersonalization"
+        component={AIPersonalizationRoute}
+      />
+      <Stack.Screen name="AIPermissions" component={AIPermissionsRoute} />
+      <Stack.Screen name="AIPreview" component={AIPreviewRoute} />
       {__DEV__ && ThemePreviewScreen ? (
         <Stack.Screen name="__ThemePreview" component={ThemePreviewScreen} />
       ) : null}

@@ -8,6 +8,7 @@ import type { CurrentStateFieldKey } from "@/db/memory-registry";
 import type { MergeResolutions } from "@/db/merge-dao";
 import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
 import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
+import type { AiCloudProviderId } from "@/services/ai-types";
 
 /** Serializable Profile route state shared by every stack that can open it. */
 export type ProfileRouteParams = {
@@ -227,6 +228,13 @@ export type BackupStackParamList = {
 
 export type SettingsStackParamList = {
   Settings: undefined;
+  AIConnection: undefined;
+  AIModelPicker: { lane: AiCloudProviderId };
+  AIPersonalization:
+    | { focus?: "writing-style" | "personalization" }
+    | undefined;
+  AIPermissions: undefined;
+  AIPreview: undefined;
   /** DEV-only device-UAT harness; its route is compile-time gated from release. */
   __ThemePreview: undefined;
   SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;

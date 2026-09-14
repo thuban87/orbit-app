@@ -1906,6 +1906,24 @@ export function SettingsScreen() {
           AI message suggestions
         </Text>
 
+        <Pressable
+          testID="settings-ai-connection-row"
+          accessibilityRole="button"
+          accessibilityLabel="AI Connection"
+          onPress={() => navigation.navigate("AIConnection")}
+          style={[
+            styles.row,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+            Connection
+          </Text>
+          <Text style={[styles.helper, { color: colors.textSecondary }]}>
+            Choose or manage the connection Orbit uses for AI.
+          </Text>
+        </Pressable>
+
         <View
           style={[
             styles.row,
