@@ -1,79 +1,52 @@
 {
   "version": "1.0",
-  "timestamp": "2026-09-11T08:16:23.085Z",
-  "phase": "31.1",
-  "phase_name": "app-wide-system-backgrounds",
-  "phase_dir": ".planning/phases/31.1-app-wide-system-backgrounds",
-  "plan": 4,
-  "task": 3,
-  "total_tasks": 3,
+  "timestamp": "2026-09-14T01:23:17.287Z",
+  "phase": "36",
+  "phase_name": "ai-configuration-prompting",
+  "phase_dir": ".planning/phases/36-ai-configuration-prompting",
+  "workflow": "gsd-plan-review-convergence",
+  "invocation": "/gsd-plan-review-convergence 36 --codex --claude --max-cycles 3",
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
   "status": "paused",
+  "convergence_state": {
+    "loop": "plan-review-convergence (cross-AI: codex + claude)",
+    "max_cycles": 3,
+    "converged": false,
+    "plan_count": 9,
+    "cycles": [
+      {"cycle": 1, "current_high": 6, "current_actionable": 9, "action": "replan incorporated all; added plan 36-09 (Settings AI hub + nav)"},
+      {"cycle": 2, "current_high": 2, "current_actionable": 6, "action": "replan closed all; owner decided D-13 (OAuth state REQUIRED)"},
+      {"cycle": 3, "current_high": 1, "current_actionable": 0, "action": "sole HIGH-C = v5 backup omits Profile presentation; owner decided D-14 (include fully); 36-08 revised"},
+      {"cycle": 4, "current_high": null, "current_actionable": null, "action": "CONFIRMATION review STARTED then KILLED by owner before producing output — NOT run; nothing committed for cycle 4"}
+    ],
+    "last_completed_review": {"cycle": 3, "commit": "cb7de88", "reviews_file": ".planning/phases/36-ai-configuration-prompting/36-REVIEWS.md", "current_high": 1, "current_actionable": 0},
+    "sole_remaining_high": "HIGH-C (cycle 3): v5 backup (36-08) omitted profile_contact_presentation / profile_category_presentation + background image bytes. ADDRESSED in plan by commit 90c9784 per owner D-14, but NOT yet independently re-reviewed."
+  },
   "completed_tasks": [
-    {
-      "id": 1,
-      "name": "Shell background host, route classification, and Settings picker",
-      "status": "implemented",
-      "commits": ["b71081c", "3a9a513", "8811784", "93b4fdd", "e009420", "99076a8"]
-    },
-    {
-      "id": 2,
-      "name": "Cooperating browse and dense screen roots",
-      "status": "implemented",
-      "commits": ["79719c", "8359b98", "412db0b"]
-    },
-    {
-      "id": 3,
-      "name": "DEBUG/release Pixel UAT and release artifact gate",
-      "status": "executed_but_invalidated_by_owner_release_test",
-      "commits": ["09ba594", "4f47852", "7a9289f", "2bf96f6", "5111597", "f57bbb8"]
-    }
+    {"id": "cycle-1", "name": "Review + replan (6 HIGH/9 actionable)", "status": "done", "commit": "07e74fe"},
+    {"id": "cycle-1-nits", "name": "plan-checker warnings fixed inline (0 blockers/4 warnings)", "status": "done", "commit": "601aebd"},
+    {"id": "cycle-2", "name": "Review (2 HIGH/6 actionable) + owner D-13 + replan", "status": "done", "commit": "3a51dd4"},
+    {"id": "d-13", "name": "Owner decision D-13 (OAuth state REQUIRED) + REQUIREMENTS v4->v5 sync", "status": "done", "commit": "3967b6d"},
+    {"id": "cycle-3", "name": "Review (1 HIGH-C) + plan-checker PASSED", "status": "done", "commit": "cb7de88"},
+    {"id": "d-14", "name": "Owner decision D-14 (Profile presentation + bg bytes in v5)", "status": "done", "commit": "dc88348"},
+    {"id": "36-08-d14", "name": "36-08 revised to implement D-14 (export+restore+bg bytes)", "status": "done", "commit": "90c9784"}
   ],
   "remaining_tasks": [
-    {
-      "id": 1,
-      "name": "Treat the owner-reported release failure as phase-blocking; reproduce and correct the background composition so selection is visibly observable on regular screens.",
-      "status": "not_started"
-    },
-    {
-      "id": 2,
-      "name": "Re-run debug and standalone-release visual validation after the correction, including an explicit asset-to-asset comparison on regular presentation, comfortable, and dense routes.",
-      "status": "not_started"
-    },
-    {
-      "id": 3,
-      "name": "Complete independent phase verification and update phase tracking only after the production failure is resolved.",
-      "status": "not_started"
-    }
+    {"id": "cycle-4-review", "name": "Run the confirmation review (codex + claude) to verify HIGH-C is closed by 90c9784 and nothing regressed", "status": "not_started"},
+    {"id": "converge-or-iterate", "name": "If current_high=0 AND current_actionable=0 -> record STATE planned-phase + declare converged. Else replan (gsd-plan-phase 36 --reviews --skip-research) and re-review; a few more cycles expected.", "status": "not_started"}
   ],
-  "blockers": [
-    {
-      "description": "Owner installed app-release-31.1-04.apk on a personal phone and reports that choosing any of the eight backgrounds or None changes the Settings selection but produces no visible background change on other app pages.",
-      "type": "technical",
-      "workaround": "None. Do not mark Phase 31.1 complete; diagnose and repair before another release gate."
-    },
-    {
-      "description": "Source inspection identifies a likely render-composition cause: BackgroundHost paints its asset first, then a full-screen colors.surface scrim. SURFACE density opacities are Galaxy 0.88/0.93/0.97 and Standard 0.97/0.99/1.0 (presentation/comfortable/dense), which leaves only 12% or less of Galaxy art and 3%, 1%, or 0% of Standard art visible before opaque component surfaces.",
-      "type": "technical",
-      "workaround": "Confirm by reproducing on a release-capable device, then design a readable but observably distinct composition consistent with the dossier/owner visual intent."
-    }
-  ],
+  "blockers": [],
   "async_jobs": [],
   "human_actions_pending": [],
   "decisions": [
-    {
-      "decision": "Pause Phase 31.1 rather than closing it despite the recorded debug/release UAT pass.",
-      "rationale": "The owner’s real-device release report contradicts the acceptance claim and is phase-blocking."
-    },
-    {
-      "decision": "Do not treat the selector/persistence path as the primary suspected fault yet.",
-      "rationale": "Settings updates Zustand immediately and persists the active package column; BackgroundHost consumes the selected store value. The full-screen scrim is the stronger source-backed explanation for imperceptible visuals."
-    }
+    {"decision": "D-13: OpenRouter OAuth anti-CSRF `state` is REQUIRED not conditional (reject missing OR mismatched before code exchange; no PKCE-only fallback)", "rationale": "codex flagged conditional-state as a control downgrade by name; security posture is owner's bucket; owner chose strict", "phase": "36", "context_ref": "36-CONTEXT.md D-13; 36-02-PLAN.md"},
+    {"decision": "D-14: Profile presentation (per-contact/category assignments, freeform_layout_json, collapse_json) AND background image bytes ARE included in the irreversible v5 backup", "rationale": "docs deferred this coordinated format decision to Phase 36; owner chose 'include everything' (no data loss on restore, AICFG-16/17 bar)", "phase": "36", "context_ref": "36-CONTEXT.md D-14; 36-08-PLAN.md"},
+    {"decision": "REQUIREMENTS.md AICFG-17 synced v4->v5", "rationale": "v4 landed early in 24.1; canonical text was stale; plans correctly target v5", "phase": "36", "context_ref": ".planning/REQUIREMENTS.md:277"},
+    {"decision": "36-03 requirements retagged to canonical [AICFG-08, AICFG-09]", "rationale": "36-RESEARCH.md used a divergent requirement numbering for AICFG-11/12/15/16/17; plans now cite canonical REQUIREMENTS.md IDs", "phase": "36", "context_ref": "36-03-PLAN.md"}
   ],
-  "uncommitted_files": [
-    "tsconfig.json",
-    ".planning/phases/30-orrery-systems/30-REVIEW.md",
-    ".planning/phases/30-orrery-systems/30-REVIEW-FIX.md"
-  ],
-  "next_action": "Read the phase handoff and the canonical dossier/UI spec, reproduce the owner report with a selected contrast-maximizing background in a standalone release, then plan a corrective gap that makes backgrounds visibly observable without weakening readability or the Orrery/Profile exceptions.",
-  "context_notes": "All four original plans are committed, but the phase is NOT verified or complete. The standalone artifact was delivered to droid Drive and installed on a Pixel. An attempted independent verifier failed only because the agent hit a usage limit; no 31.1-VERIFICATION.md was created."
+  "uncommitted_files": ["(pre-existing, UNRELATED to this work — do NOT commit): .planning/phases/30-orrery-systems/30-REVIEW-FIX.md, .planning/phases/30-orrery-systems/30-REVIEW.md, tsconfig.json"],
+  "next_action": "Run the confirmation review: Agent -> Skill(gsd-review, '--phase 36 --codex --claude'). Require the CYCLE_SUMMARY contract. Verify HIGH-C is closed against the CODE on disk (open src/db/migrations/profile-presentation.ts + the backup files), not just plan text.",
+  "context_notes": "This is a plan-review-convergence loop, NOT task execution. All 9 plans are committed; convergence NOT yet declared. Cycle 3 left current_high=1 (HIGH-C); owner D-14 + commit 90c9784 addressed it in the plans but it is UN-RE-REVIEWED. Reviewers: codex (real) + claude via a READ-ONLY subagent (the built-in `claude -p` lane hits a Write-permission gap — do not use it). If a review agent omits the CYCLE_SUMMARY line, read counts from 36-REVIEWS.md `cycle_summary:` frontmatter. NEVER push, NEVER git worktree. Drive convergence from Opus (planner/checker/review inherit the orchestrator model). Owner-bucket calls (security posture, irreversible-format inclusion, recorded-decision reversals) get escalated to the owner, batched — don't decide them autonomously."
 }
