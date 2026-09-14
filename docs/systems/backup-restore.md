@@ -93,6 +93,8 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 
 ## Decisions
 
+- **ADR-108:** Durable Independent-Axis Profile Presentation and Inheritance — Phase 31 allowlisted global preference UIDs but deliberately left the complete presentation graph and image bytes out of format 4.
+
 - **ADR-012:** Opt-Out Android Backup for Third-Party PII — makes the explicit backup path load-bearing.
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — defines merge identity and deletion evidence.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — defines the portable snapshot and automatic policy.
