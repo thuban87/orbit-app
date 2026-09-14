@@ -240,6 +240,7 @@ describe("whole-system and contact-specific prompt previews", () => {
           displayOrder: 0,
         },
       ],
+      messageFocus: [{ label: "Priority", value: "Ask about the garden" }],
     };
     const resolved = resolvePrompt("", context);
     const review = buildContactPromptReview(resolved, context);
@@ -251,6 +252,8 @@ describe("whole-system and contact-specific prompt previews", () => {
     expect(review.display).toContain("Madison");
     expect(review.display).toContain("Coast");
     expect(review.display).toContain("Talked about tomatoes");
+    expect(review.display).toContain("===== DATA: MESSAGE FOCUS =====");
+    expect(review.display).toContain("Ask about the garden");
     expect(review.display).not.toContain(STATIC_INSTRUCTION);
     expect(review.display).not.toContain("PRIVATE GLOBAL STYLE");
     expect(review.display).not.toContain("PRIVATE GLOBAL PERSONALIZATION");

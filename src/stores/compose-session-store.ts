@@ -42,13 +42,13 @@
  * =============================================================================
  */
 import { create } from "zustand";
+import { MESSAGE_FOCUS_CAP } from "@/ai/message-focus";
 import type { ResearchItem } from "@/db/compose-research-read";
 
 /** The compose delivery mode. 'email' is an additive branch in a later plan. */
 export type ComposeMode = "text" | "email";
 
-/** The hard ceiling on session Message Focus selections (COMP-11, dossier §O). */
-export const MESSAGE_FOCUS_CAP = 3;
+export { MESSAGE_FOCUS_CAP } from "@/ai/message-focus";
 
 export interface ComposeSessionState {
   /** The contact whose draft the session currently holds, or null before start. */
@@ -135,7 +135,9 @@ export const useComposeSession = create<ComposeSessionState>()((set, get) => ({
     const current = get().messageFocus;
     if (current.some((existing) => existing.id === item.id)) {
       // Tap-again removes (dedupe by identity).
-      set({ messageFocus: current.filter((existing) => existing.id !== item.id) });
+      set({
+        messageFocus: current.filter((existing) => existing.id !== item.id),
+      });
       return;
     }
     if (current.length >= MESSAGE_FOCUS_CAP) {

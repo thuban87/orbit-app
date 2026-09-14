@@ -60,6 +60,7 @@ import {
   assertPromptFitsContext,
   PromptContextOverflowError,
 } from "@/ai/context-estimate";
+import { projectMessageFocus } from "@/ai/message-focus";
 import { loadCachedCatalog } from "@/ai/model-catalog-cache";
 import type { ModelCatalog } from "@/ai/model-catalog-filter";
 import { createFileCatalogStorage } from "@/ai/model-catalog-storage";
@@ -427,12 +428,22 @@ export function ComposeScreen({
       ): Promise<ResolvedPrompt> => {
         const exec = getExecutor();
         const contactContext = await readPromptContext(exec, contactId);
+        // Message Focus never grants permission. Re-read the normalized Research
+        // boundary for this request and intersect by stable identity so a
+        // permission withdrawn after selection takes effect before egress. Only
+        // fresh label/value data survives; stale session content is never sent.
+        const currentResearch = await readComposeResearch(exec, contactId);
+        const focusedContext = projectMessageFocus(
+          useComposeSession.getState().messageFocus,
+          currentResearch,
+        );
         const writingStyle = await getWritingStyle(exec);
         const personalizationSections = await listPersonalizationSections(exec);
         const completeContext = {
           ...contactContext,
           writingStyle,
           personalizationSections,
+          messageFocus: focusedContext,
         };
         const resolved = resolvePrompt(
           "",

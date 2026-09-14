@@ -264,7 +264,7 @@ export function buildContactPromptReview(
   context: PromptContext,
 ): ContactPromptReview {
   const contactBlockPattern =
-    /^===== DATA: (CONTACT CONTEXT|SHARED MEMORY \d+|RECENT INTERACTION \d+) =====\n[\s\S]*?^===== END DATA: \1 =====$/gm;
+    /^===== DATA: (CONTACT CONTEXT|SHARED MEMORY \d+|RECENT INTERACTION \d+|MESSAGE FOCUS) =====\n[\s\S]*?^===== END DATA: \1 =====$/gm;
   const blocks = Object.freeze(
     Array.from(
       resolved.payload.matchAll(contactBlockPattern),

@@ -122,6 +122,16 @@ export interface PromptPersonalizationSection {
 }
 
 /**
+ * One currently permitted, session-selected Message Focus item. Identity and
+ * permission metadata are consumed locally while projecting this shape and are
+ * never serialized; only the fresh label/value may reach the prompt.
+ */
+export interface PromptMessageFocusItem {
+  readonly label: string;
+  readonly value: string;
+}
+
+/**
  * The CLOSED allowlist of contact-derived data that may enter an AI prompt.
  *
  * Direct-contact fields are EXACTLY two: `contactName` and `category` (the
@@ -170,6 +180,12 @@ export interface PromptContext {
   readonly writingStyle?: PromptWritingStyle;
   /** Global context sections; only enabled rows are serialized by resolvePrompt. */
   readonly personalizationSections?: ReadonlyArray<PromptPersonalizationSection>;
+  /**
+   * Session-only emphasis for currently permitted contact knowledge. Compose
+   * revalidates every selected identity immediately before constructing this
+   * projection; presence here never creates or preserves AI permission.
+   */
+  readonly messageFocus?: ReadonlyArray<PromptMessageFocusItem>;
 }
 
 /**

@@ -26,6 +26,7 @@
  *   This module is node-pure (no expo / react-native import).
  * =============================================================================
  */
+import { MESSAGE_FOCUS_CAP } from "@/ai/message-focus";
 import type {
   PromptContext,
   ResolvedPrompt,
@@ -277,6 +278,44 @@ function personalizationBlocks(
 }
 
 /**
+ * Render session-only Message Focus as explicit emphasis, never as permission.
+ * Compose has already intersected the selection with a fresh permission read;
+ * the cap here is defense in depth at the sole serialization boundary.
+ */
+function messageFocusBlock(
+  context: PromptContext,
+  truncations: TruncationNotice[],
+): string | null {
+  const focused = (context.messageFocus ?? []).slice(0, MESSAGE_FOCUS_CAP);
+  if (focused.length === 0) return null;
+
+  const lines = focused.flatMap((item, index) => {
+    const ordinal = index + 1;
+    const label = boundedDataValue(
+      item.label,
+      `message focus ${ordinal} label`,
+      truncations,
+    );
+    const value = boundedDataValue(
+      item.value,
+      `message focus ${ordinal}`,
+      truncations,
+    );
+    return [
+      `Item ${ordinal}:`,
+      `Label: ${label || NONE_AVAILABLE}`,
+      `Value: ${value || NONE_AVAILABLE}`,
+    ];
+  });
+
+  return [
+    "===== DATA: MESSAGE FOCUS =====",
+    ...lines,
+    "===== END DATA: MESSAGE FOCUS =====",
+  ].join("\n");
+}
+
+/**
  * Resolve the ONE immutable prompt for a `PromptContext` + user template.
  *
  * Pure and deterministic: the same inputs always yield the same object shape and
@@ -451,6 +490,7 @@ export function resolvePrompt(
   const interactionBlocks = recentInteractionBlocks(context, truncations);
   const structuredStyle = writingStyleBlock(context, truncations);
   const globalContextBlocks = personalizationBlocks(context, truncations);
+  const focusBlock = messageFocusBlock(context, truncations);
 
   // Assemble the scaffold. Every optional section adds nothing when absent, so
   // the no-memory/no-note Draft scaffold stays byte-identical.
@@ -460,6 +500,17 @@ export function resolvePrompt(
   }
   if (adjustInstruction !== null) {
     scaffoldParts.push("", adjustInstruction);
+  }
+  if (focusBlock !== null) {
+    scaffoldParts.push(
+      "",
+      [
+        "The MESSAGE FOCUS data below is currently permitted information the",
+        "user marked as especially important for this message. Give it stronger",
+        "relevance when useful, while keeping all other permitted context",
+        "available. Do not copy it mechanically into the message.",
+      ].join("\n"),
+    );
   }
   scaffoldParts.push("", contactBlock);
   for (const block of memoryBlocks) {
@@ -473,6 +524,9 @@ export function resolvePrompt(
   }
   for (const block of globalContextBlocks) {
     scaffoldParts.push("", block);
+  }
+  if (focusBlock !== null) {
+    scaffoldParts.push("", focusBlock);
   }
   if (adjustBlock !== null) {
     scaffoldParts.push("", adjustBlock);
