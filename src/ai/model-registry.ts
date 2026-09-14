@@ -19,6 +19,7 @@
  */
 import type { CatalogProvider, ModelCatalog } from "@/ai/model-catalog-filter";
 import { MODEL_CATALOG_SEED } from "@/ai/model-registry.seed.generated";
+import type { OpenRouterModel } from "@/ai/openrouter-catalog";
 import type { AiProviderId } from "@/services/ai-types";
 
 /** The bundled seed catalog — the offline / first-run fallback (D-01). */
@@ -26,6 +27,22 @@ export const SEED_CATALOG: ModelCatalog = MODEL_CATALOG_SEED;
 
 /** The picker scope: the current-gen frontier subset, or the full chat set. */
 export type ModelScope = "frontier" | "all";
+
+export type ModelRecommendationReason =
+  | "Balanced"
+  | "Cost efficient"
+  | "Lightweight";
+
+export interface CuratedModelRef {
+  readonly id: string;
+  readonly reason: ModelRecommendationReason;
+}
+
+const RECOMMENDATION_REASONS: readonly ModelRecommendationReason[] = [
+  "Balanced",
+  "Cost efficient",
+  "Lightweight",
+];
 
 // ─── Tunable frontier TIER keywords (top-of-file — CLAUDE.md tunable-constants) ─
 //
@@ -212,4 +229,76 @@ export function filterToFrontier(
   const cp = asCatalogProvider(provider);
   if (!cp) return EMPTY;
   return frontierWinners(cp, discovered);
+}
+
+/**
+ * Orbit's curated ordering metadata. IDs are resolved from the supplied runtime
+ * catalog rather than frozen in UI logic; app updates can change tier policy,
+ * while live availability remains authoritative.
+ */
+export function curatedModelsFor(
+  catalog: ModelCatalog,
+  provider: AiProviderId,
+): readonly CuratedModelRef[] {
+  return modelsFor(catalog, provider, "frontier").map((id, index) => ({
+    id,
+    reason: RECOMMENDATION_REASONS[index] ?? "Balanced",
+  }));
+}
+
+function numericPrice(value: string | undefined): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed >= 0
+    ? parsed
+    : Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Resolve the OpenRouter curated set from the live/cached catalog itself. The
+ * registry owns the recommendation policy; cards only match the returned IDs
+ * back to that same runtime catalog, so stale or absent models cannot appear.
+ */
+export function curatedOpenRouterModels(
+  models: readonly OpenRouterModel[],
+): readonly CuratedModelRef[] {
+  if (models.length === 0) return [];
+  const stable = [...models].sort((a, b) => a.id.localeCompare(b.id));
+  const picks: CuratedModelRef[] = [];
+  const add = (
+    model: OpenRouterModel | undefined,
+    reason: ModelRecommendationReason,
+  ) => {
+    if (model && !picks.some((pick) => pick.id === model.id)) {
+      picks.push({ id: model.id, reason });
+    }
+  };
+  add(
+    [...stable].sort(
+      (a, b) =>
+        (b.contextLength ?? 0) - (a.contextLength ?? 0) ||
+        a.id.localeCompare(b.id),
+    )[0],
+    "Balanced",
+  );
+  add(
+    [...stable].sort((a, b) => {
+      const aCost =
+        numericPrice(a.pricing.prompt) + numericPrice(a.pricing.completion);
+      const bCost =
+        numericPrice(b.pricing.prompt) + numericPrice(b.pricing.completion);
+      return aCost - bCost || a.id.localeCompare(b.id);
+    })[0],
+    "Cost efficient",
+  );
+  add(
+    [...stable].sort(
+      (a, b) =>
+        numericPrice(a.pricing.prompt) - numericPrice(b.pricing.prompt) ||
+        (a.contextLength ?? Number.POSITIVE_INFINITY) -
+          (b.contextLength ?? Number.POSITIVE_INFINITY) ||
+        a.id.localeCompare(b.id),
+    )[0],
+    "Lightweight",
+  );
+  return picks;
 }
