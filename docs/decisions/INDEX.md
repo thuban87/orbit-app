@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 23 of
-  106 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 24 of
+  107 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -82,7 +82,7 @@ not something you can pattern-match against.
 | 049 | BYO-Key AI Configuration and Credential Boundary | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `src/db`, `src/db/migrations`, `src/services` |
 | 050 | Closed AI Prompt Egress Allowlist and Opt-In Field Sharing | Accepted | 14-ai-message-suggestions | — | ADR-078 (partial — Off Limits and permitted interaction notes) | — | 5 | `src/ai`, `src/components`, `src/db` |
 | 051 | Public-HTTPS Custom AI Egress Guard | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `modules/orbit-secure-fetch/src`, `src/ai`, `src/ai/__fixtures__` +1 |
-| 052 | Compose-Owned AI Draft Lifecycle and Acknowledged Egress | Accepted | 14-ai-message-suggestions | — | ADR-079 (partial — acknowledgement and Profile entry) | — | 5 | `src/db`, `src/logic`, `src/navigation` +1 |
+| 052 | Compose-Owned AI Draft Lifecycle and Acknowledged Egress | Accepted | 14-ai-message-suggestions | — | ADR-079 (partial — acknowledgement and Profile entry) | — | 4/5 live | `src/db`, `src/logic`, `src/screens` |
 | 053 | Local-First LiteLLM AI Model Catalog | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `scripts`, `src/ai`, `src/screens` |
 | 054 | Live Weekly Digest Retrospective and Overlooked Relationship Read | Accepted | 15-weekly-digest | — | — | — | 4 | `src/db`, `src/logic`, `src/screens` |
 | 055 | Dedicated Weekly Digest Scheduling and Persisted Notification Policy | Accepted | 15-weekly-digest | — | — | — | 7 | `src/db`, `src/db/migrations`, `src/screens` +1 |
@@ -108,8 +108,8 @@ not something you can pattern-match against.
 | 075 | Binary Favourite Membership Without a User-Facing Order | Accepted | milestone-2 | ADR-033 (full); ADR-043 (partial — ordering source only) | — | — | 4/6 live | `src/db`, `src/screens`, `src/services/widget` |
 | 076 | Population-Reached Birthdays Without a Dashboard Banner | Accepted | milestone-2 | ADR-034 (partial — banner) | — | — | 3/4 live | `src/db`, `src/logic`, `src/screens` |
 | 077 | Single Canonical Orrery with a Constrained Inspection Camera | Accepted | milestone-2 | ADR-048 (partial — dual view/morph) | — | — | 4 | `src/components`, `src/components/orrery`, `src/screens` |
-| 078 | Negative-Constraint Off Limits and Gated Recent-Interaction AI Context | Accepted | milestone-2 | ADR-050 (partial — Off Limits and permitted interaction notes); ADR-036 (partial — Off Limits visible on the Research side) | — | — | 5 | `src/ai`, `src/db`, `src/screens` |
-| 079 | On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation | Accepted | milestone-2 | ADR-052 (partial — acknowledgement and Profile entry) | — | — | 5 | `src/db`, `src/logic`, `src/navigation` +1 |
+| 078 | Negative-Constraint Off Limits and Gated Recent-Interaction AI Context | Accepted | milestone-2 | ADR-050 (partial — Off Limits and permitted interaction notes); ADR-036 (partial — Off Limits visible on the Research side) | ADR-107 (partial — Off Limits AI egress reversed; the gated recent-interaction-note carry and the Group Notes ban below remain in force) | — | 5 | `src/ai`, `src/db`, `src/screens` |
+| 079 | On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation | Accepted | milestone-2 | ADR-052 (partial — acknowledgement and Profile entry) | — | — | 4/5 live | `src/db`, `src/logic`, `src/screens` |
 | 080 | Four-Tab Bottom Navigation Shell with Per-Tab Stacks | Accepted | milestone-2 | ADR-019 (partial — root shell); ADR-018 (note — Archived list entry points only; gate unchanged) | — | — | 4 | `src/navigation`, `src/screens` |
 | 081 | Retire AI-Proposed Fuel for Explicit Per-Item Permission | Accepted | 24.2-contact-knowledge-egress-search-types | ADR-030 | — | — | 2 | `src/db`, `src/db/migrations` |
 | 082 | Universal Capture FAB, Canonical Picker, and Truthful Quick Log | Accepted | 22-app-shell-navigation | — | — | — | 6 | `src/components`, `src/db` |
@@ -137,3 +137,4 @@ not something you can pattern-match against.
 | 104 | Durable Orrery Preferences and Live System Scope | Accepted | 29-orrery-camera-scale-exploration | — | — | — | 5 | `src/db`, `src/db/migrations`, `src/logic` +1 |
 | 105 | Scoped Relationship Satellites for System-Member Context | Accepted | 29-orrery-camera-scale-exploration | — | — | — | 4 | `src/components/orrery`, `src/db`, `src/logic` |
 | 106 | Derived Orrery Gravity Visual Mass and Accessible Context | Accepted | 29-orrery-camera-scale-exploration | ADR-027 (partial — profile-only presentation and rejected Orrery encoding clauses) | — | — | 5 | `src/components/orrery`, `src/db`, `src/logic` +1 |
+| 107 | Off Limits Excluded from All AI Egress | Accepted | 35-messaging-ai-compose | ADR-078 (partial — Off Limits AI egress only; ADR-078's gated recent-interaction-note carry and absolute Group Notes ban remain in force) | — | — | 5 | `src/ai`, `src/db`, `src/screens` |
