@@ -12,25 +12,49 @@ import {
 } from "@/logic/ai-availability";
 
 describe("computeAiAvailability — three-state derivation (D-12)", () => {
-  it("provider 'none' → 'off' (regardless of credential)", () => {
+  const readyInput = {
+    aiEnabled: true,
+    activeConnection: "openai" as const,
+    hasCredential: true,
+    selectedModel: "gpt-model",
+    modelAvailable: true,
+  };
+
+  it("AI disabled → 'off' for every connection/model condition", () => {
+    expect(computeAiAvailability({ ...readyInput, aiEnabled: false })).toBe(
+      "off",
+    );
     expect(
-      computeAiAvailability({ provider: "none", hasCredential: false }),
-    ).toBe("off");
-    expect(
-      computeAiAvailability({ provider: "none", hasCredential: true }),
+      computeAiAvailability({
+        aiEnabled: false,
+        activeConnection: null,
+        hasCredential: false,
+        selectedModel: "",
+        modelAvailable: false,
+      }),
     ).toBe("off");
   });
 
-  it("provider set + credential present → 'ready'", () => {
-    expect(
-      computeAiAvailability({ provider: "openai", hasCredential: true }),
-    ).toBe("ready");
+  it("AI enabled + connection + credential + available model → 'ready'", () => {
+    expect(computeAiAvailability(readyInput)).toBe("ready");
   });
 
-  it("provider set + credential missing/invalid → 'needs-attention'", () => {
+  it("missing connection or credential → 'needs-attention'", () => {
     expect(
-      computeAiAvailability({ provider: "anthropic", hasCredential: false }),
+      computeAiAvailability({ ...readyInput, activeConnection: null }),
     ).toBe("needs-attention");
+    expect(
+      computeAiAvailability({ ...readyInput, hasCredential: false }),
+    ).toBe("needs-attention");
+  });
+
+  it("missing or unavailable selected model → 'needs-attention' without substitution", () => {
+    expect(computeAiAvailability({ ...readyInput, selectedModel: "" })).toBe(
+      "needs-attention",
+    );
+    expect(computeAiAvailability({ ...readyInput, modelAvailable: false })).toBe(
+      "needs-attention",
+    );
   });
 });
 
@@ -69,19 +93,37 @@ describe("selectAiAffordance — every-state usability (COMP-09 / D-07)", () => 
 describe("computeAiAvailability — missing-key vs credential-present (Task 4)", () => {
   it("provider set + credential missing → 'needs-attention'", () => {
     expect(
-      computeAiAvailability({ provider: "openai", hasCredential: false }),
+      computeAiAvailability({
+        aiEnabled: true,
+        activeConnection: "openai",
+        hasCredential: false,
+        selectedModel: "gpt-model",
+        modelAvailable: true,
+      }),
     ).toBe("needs-attention");
   });
 
   it("provider set + credential present → 'ready'", () => {
     expect(
-      computeAiAvailability({ provider: "openai", hasCredential: true }),
+      computeAiAvailability({
+        aiEnabled: true,
+        activeConnection: "openai",
+        hasCredential: true,
+        selectedModel: "gpt-model",
+        modelAvailable: true,
+      }),
     ).toBe("ready");
   });
 
-  it("provider 'none' + no credential → 'off'", () => {
+  it("master disabled + no connection → 'off'", () => {
     expect(
-      computeAiAvailability({ provider: "none", hasCredential: false }),
+      computeAiAvailability({
+        aiEnabled: false,
+        activeConnection: null,
+        hasCredential: false,
+        selectedModel: "",
+        modelAvailable: false,
+      }),
     ).toBe("off");
   });
 });
