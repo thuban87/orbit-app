@@ -1,18 +1,16 @@
 /**
- * The CLOSED outbound-data allowlist (AI-03 / H1) and the immutable resolved
- * prompt (AI-04) for Phase 14 AI message suggestions.
+ * The CLOSED outbound-data allowlist (AI-03 / H1), global personalization, and
+ * the immutable resolved prompt (AI-04) for AI message suggestions.
  *
  * =============================================================================
  * THIS TYPE IS A PRIVACY / SECURITY CONTROL — READ BEFORE EDITING:
  *
- *   `PromptContext` enumerates EVERY field of a contact's local record that may
- *   ever be SERIALIZED into an AI prompt and cross the device boundary. It is a
- *   CLOSED type: adding a field here is the only way to widen what leaves the
- *   device, so any widening is a deliberate COMPILE-TIME change reviewed as such,
- *   never a silent runtime broadening. `readPromptContext` (ai-context-read.ts)
- *   is the sole projection that produces one, and it selects ONLY the columns
- *   named here — never `SELECT *`, never the free-text interaction/event columns,
- *   never a non-allowlisted `contacts` column.
+ *   `PromptContext` enumerates EVERY field that may be SERIALIZED into an AI
+ *   prompt and cross the device boundary. It is a CLOSED type: adding a field is
+ *   a deliberate COMPILE-TIME widening, never a silent runtime broadening.
+ *   `readPromptContext` (ai-context-read.ts) is the sole contact-data projection;
+ *   the Compose boundary adds only the separately approved global Writing Style
+ *   and personalization rows — never a broad contact/editor record.
  *
  *   Local-first is a product commitment (CLAUDE.md): contact data is DATA, never
  *   instructions. `resolvePrompt` (prompt-template.ts) is the sole construction
@@ -97,6 +95,23 @@ export interface SharedFieldValue {
   readonly value: string;
 }
 
+/** Structured, durable user-authored voice controls for prompt personalization. */
+export interface PromptWritingStyle {
+  readonly tone: "casual" | "balanced" | "polished" | "custom";
+  readonly length: "concise" | "normal" | "detailed" | "custom";
+  readonly directness: "gentle" | "balanced" | "direct" | "custom";
+  readonly freeform: string;
+}
+
+/** A global personalization section. `enabled` is its only egress gate. */
+export interface PromptPersonalizationSection {
+  readonly uid: string;
+  readonly title: string;
+  readonly body: string;
+  readonly enabled: boolean;
+  readonly displayOrder: number;
+}
+
 /**
  * The CLOSED allowlist of contact-derived data that may enter an AI prompt.
  *
@@ -149,6 +164,10 @@ export interface PromptContext {
    * (D-14 / ADR-107). The read boundary always supplies an array.
    */
   readonly gatedRecentInteractionNotes?: ReadonlyArray<string>;
+  /** Durable global Writing Style. When present it supersedes the legacy note. */
+  readonly writingStyle?: PromptWritingStyle;
+  /** Global context sections; only enabled rows are serialized by resolvePrompt. */
+  readonly personalizationSections?: ReadonlyArray<PromptPersonalizationSection>;
 }
 
 /**

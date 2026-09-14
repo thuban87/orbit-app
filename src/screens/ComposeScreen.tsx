@@ -88,6 +88,10 @@ import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { markAssistLogged } from "@/db/interaction-assist-dao";
 import {
+  getWritingStyle,
+  listPersonalizationSections,
+} from "@/db/personalization-dao";
+import {
   type AiAvailability,
   computeAiAvailability,
   isCredentialFailure,
@@ -404,11 +408,12 @@ export function ComposeScreen({
         ephemeralAdjustGuidance?: string,
       ): Promise<ResolvedPrompt> => {
         const exec = getExecutor();
-        const context = await readPromptContext(exec, contactId);
-        const template = settingsRef.current?.aiPromptTemplate ?? "";
+        const contactContext = await readPromptContext(exec, contactId);
+        const writingStyle = await getWritingStyle(exec);
+        const personalizationSections = await listPersonalizationSections(exec);
         return resolvePrompt(
-          template,
-          context,
+          "",
+          { ...contactContext, writingStyle, personalizationSections },
           sourceDraft,
           ephemeralAdjustGuidance,
         );
