@@ -526,3 +526,82 @@ describe("key accessor is invoked at call time, not during refreshProviders (C3-
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("OpenRouter OpenAI-compatible generation adapter", () => {
+  function serviceWithKey(key: string | null) {
+    const getKey = vi.fn(async () => key);
+    const keyStore: AiKeyStoreLike = {
+      getKey,
+      setKey: async () => {},
+      deleteKey: async () => {},
+    };
+    const service = new AiService(keyStore);
+    const connection = { lane: "openrouter" as const, customEndpoint: "" };
+    service.refreshProviders(connection);
+    return { service, connection, getKey };
+  }
+
+  it("resolves the active lane and posts the selected model and payload to OpenRouter", async () => {
+    fetchMock.mockResolvedValueOnce(
+      okJson({ choices: [{ message: { content: "router-text" } }] }),
+    );
+    const { service, connection, getKey } = serviceWithKey("router-key");
+    expect(getKey).not.toHaveBeenCalled();
+    const provider = service.getActiveProvider(connection);
+    expect(provider).not.toBeNull();
+    await expect(
+      provider?.generate(
+        inputFor("exact-router-payload", new AbortController().signal, "vendor/model"),
+      ),
+    ).resolves.toBe("router-text");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://openrouter.ai/api/v1/chat/completions",
+      expect.objectContaining({ method: "POST" }),
+    );
+    const init = fetchMock.mock.calls[0][1];
+    expect(init.headers.Authorization).toBe("Bearer router-key");
+    expect(JSON.parse(init.body)).toMatchObject({
+      model: "vendor/model",
+      messages: [{ role: "user", content: "exact-router-payload" }],
+    });
+    expect(JSON.parse(init.body).max_completion_tokens).toBeUndefined();
+    expect(getKey).toHaveBeenCalledWith("openrouter");
+  });
+
+  it("returns not_configured without a key and performs no request", async () => {
+    const { service, connection } = serviceWithKey(null);
+    await expect(
+      service
+        .getActiveProvider(connection)
+        ?.generate(inputFor("payload", new AbortController().signal)),
+    ).rejects.toMatchObject({ code: "not_configured" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uses the shared HTTP and transport error mapping", async () => {
+    const { service, connection } = serviceWithKey("router-key");
+    const provider = service.getActiveProvider(connection);
+    fetchMock.mockResolvedValueOnce({ ok: false, status: 429, json: vi.fn() });
+    await expect(
+      provider?.generate(inputFor("payload", new AbortController().signal)),
+    ).rejects.toMatchObject({ code: "rate_limited" });
+
+    fetchMock.mockRejectedValueOnce(new Error("offline"));
+    await expect(
+      provider?.generate(inputFor("payload", new AbortController().signal)),
+    ).rejects.toMatchObject({ code: "network" });
+  });
+
+  it("honors an already-aborted caller signal without reading a key", async () => {
+    const { service, connection, getKey } = serviceWithKey("router-key");
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      service
+        .getActiveProvider(connection)
+        ?.generate(inputFor("payload", controller.signal)),
+    ).rejects.toMatchObject({ code: "cancelled" });
+    expect(getKey).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
