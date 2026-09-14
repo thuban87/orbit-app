@@ -34,11 +34,9 @@ import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 import { reconcileDigestSchedule } from "@/services/notifications/digest-schedule";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
+import { finalizeBackgroundRestoreCandidate } from "@/services/photos/background-finalization";
 import {
   backgroundDerivativeRelPath,
-  deleteBackgroundRestorePending,
-  persistBackgroundDerivative,
-  resolveBackgroundRestorePendingUri,
   stageBackgroundRestorePendingBase64,
 } from "@/services/photos/background-storage";
 import {
@@ -115,7 +113,6 @@ type DeleteCandidate = {
 type BackgroundFinalizeCandidate = {
   uid: string;
   pendingRelativePath: string;
-  canonicalRelativePath: string;
 };
 
 const entities: readonly MergeableEntityType[] = [
@@ -1108,7 +1105,6 @@ async function stageBackgroundCandidates(
     candidates.push({
       uid: row.uid,
       pendingRelativePath: `profile-backgrounds/_restore_pending/${row.uid}/${sessionToken}.jpg`,
-      canonicalRelativePath: backgroundDerivativeRelPath(row.uid),
     });
   }
   return candidates;
@@ -1543,42 +1539,19 @@ export async function applyRestore(
       photosNeedingAttention += 1;
     }
   }
-  const persistBackground =
-    deps.persistBackground ?? persistBackgroundDerivative;
-  const deleteStagedBackground =
-    deps.deleteStagedBackground ?? deleteBackgroundRestorePending;
   for (const candidate of backgroundCandidates) {
     try {
-      const committed = await exec.getFirstAsync<{
-        imagePath: string;
-      }>(
-        "SELECT image_path AS imagePath FROM profile_background_templates WHERE uid=?",
-        [candidate.uid],
+      await finalizeBackgroundRestoreCandidate(
+        exec,
+        {
+          uid: candidate.uid,
+          pendingRelativePath: candidate.pendingRelativePath,
+        },
+        {
+          persist: deps.persistBackground,
+          deletePending: deps.deleteStagedBackground,
+        },
       );
-      if (!committed || committed.imagePath !== candidate.pendingRelativePath) {
-        deleteStagedBackground(candidate.pendingRelativePath);
-        continue;
-      }
-      await persistBackground(
-        resolveBackgroundRestorePendingUri(candidate.pendingRelativePath),
-        candidate.canonicalRelativePath,
-      );
-      await inWriteTransaction(exec, async () => {
-        const result = await exec.runAsync(
-          "UPDATE profile_background_templates SET image_path=? WHERE uid=? AND image_path=?",
-          [
-            candidate.canonicalRelativePath,
-            candidate.uid,
-            candidate.pendingRelativePath,
-          ],
-        );
-        if (result.changes !== 1) {
-          throw new Error(
-            "Profile background restore marker changed during finalization",
-          );
-        }
-      });
-      deleteStagedBackground(candidate.pendingRelativePath);
     } catch {
       photosNeedingAttention += 1;
     }

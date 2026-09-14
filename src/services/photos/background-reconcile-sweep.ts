@@ -1,15 +1,12 @@
-import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { registerSweepHook } from "@/services/launch-sweep";
+import { finalizeBackgroundRestoreCandidate } from "@/services/photos/background-finalization";
 import {
   applyBackgroundReconcileAction,
   backgroundDerivativeRelPath,
   deleteBackgroundDerivative,
-  deleteBackgroundRestorePending,
   listBackgroundRestorePendingEntries,
   listBackgroundStorageEntries,
-  persistBackgroundDerivative,
-  resolveBackgroundRestorePendingUri,
 } from "@/services/photos/background-storage";
 import { Logger } from "@/utils/logger";
 import { planBackgroundReconciliation } from "./background-reconcile-model";
@@ -54,38 +51,15 @@ export async function runBackgroundReconciliation(
   // The listing must be fresh and the re-drive must be the final canonical
   // writer, after any .bak recovery above. Canonical existence is deliberately
   // irrelevant: it may contain stale bytes from a same-uid replacement.
-  const rowsByUid = new Map(rows.map((row) => [row.uid, row]));
   const recoveredPaths = new Set<string>();
   for (const pending of await listBackgroundRestorePendingEntries()) {
-    const row = rowsByUid.get(pending.templateUid);
-    if (!row || row.imagePath !== pending.relative) {
-      deleteBackgroundRestorePending(pending.relative);
-      continue;
-    }
-    const canonical = backgroundDerivativeRelPath(row.uid);
-    await persistBackgroundDerivative(
-      resolveBackgroundRestorePendingUri(pending.relative),
-      canonical,
-    );
-    await inWriteTransaction(exec, async () => {
-      const result = await exec.runAsync(
-        "UPDATE profile_background_templates SET image_path=? WHERE uid=? AND image_path=?",
-        [canonical, row.uid, pending.relative],
-      );
-      if (result.changes !== 1) {
-        const current = await exec.getFirstAsync<{ imagePath: string }>(
-          "SELECT image_path AS imagePath FROM profile_background_templates WHERE uid=?",
-          [row.uid],
-        );
-        if (current?.imagePath !== canonical) {
-          throw new Error(
-            "Profile background restore marker changed during finalization",
-          );
-        }
-      }
+    const result = await finalizeBackgroundRestoreCandidate(exec, {
+      uid: pending.templateUid,
+      pendingRelativePath: pending.relative,
     });
-    deleteBackgroundRestorePending(pending.relative);
-    recoveredPaths.add(canonical);
+    if (result === "finalized") {
+      recoveredPaths.add(backgroundDerivativeRelPath(pending.templateUid));
+    }
   }
   for (const relative of plan.missingReferences) {
     if (recoveredPaths.has(relative)) continue;

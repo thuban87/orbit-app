@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
   entries: [] as string[],
@@ -8,6 +8,9 @@ const h = vi.hoisted(() => ({
   }>,
   bytes: new Map<string, string>(),
   operations: [] as string[],
+  pendingRead: null as
+    | null
+    | (() => Promise<Array<{ relative: string; templateUid: string }>>),
 }));
 
 vi.mock("expo-file-system", () => ({
@@ -44,7 +47,8 @@ vi.mock("@/services/photos/background-storage", () => ({
     return actions;
   },
   listBackgroundStorageEntries: () => [...h.entries],
-  listBackgroundRestorePendingEntries: async () => [...h.pending],
+  listBackgroundRestorePendingEntries: async () =>
+    h.pendingRead ? h.pendingRead() : [...h.pending],
   backgroundDerivativeRelPath: (uid: string) =>
     `profile-backgrounds/${uid}.jpg`,
   resolveBackgroundRestorePendingUri: (relative: string) =>
@@ -73,8 +77,13 @@ vi.mock("@/services/photos/background-storage", () => ({
   },
 }));
 
+import { finalizeBackgroundRestoreCandidate } from "./background-finalization";
 import { planBackgroundReconciliation } from "./background-reconcile-model";
 import { runBackgroundReconciliation } from "./background-reconcile-sweep";
+
+beforeEach(() => {
+  h.pendingRead = null;
+});
 
 function execFor(imagePaths: Record<string, string>) {
   const rows = new Map(
@@ -156,6 +165,70 @@ describe("background launch reconciliation plan", () => {
 });
 
 describe("background restore-pending crash recovery", () => {
+  it("re-checks sweep A after restore B finalizes while A is paused after discovery", async () => {
+    h.entries = ["same.jpg"];
+    h.pending = [];
+    h.bytes = new Map([["profile-backgrounds/same.jpg", "OLD"]]);
+    h.operations = [];
+    const markerA = pending("same", "A", "session-a");
+    const markerB = pending("same", "B", "session-b");
+    const rows = new Map([
+      ["same", { uid: "same", imagePath: markerA, modifiedAt: "same" }],
+    ]);
+    const exec = {
+      getAllAsync: async () => [...rows.values()],
+      getFirstAsync: async (_sql: string, params?: unknown[]) => {
+        const row = rows.get(String(params?.[0]));
+        return row ? { imagePath: row.imagePath } : null;
+      },
+      runAsync: async (_sql: string, params?: unknown[]) => {
+        const [canonical, uid, expected] = params as string[];
+        const row = rows.get(uid);
+        if (!row || row.imagePath !== expected) return { changes: 0 };
+        row.imagePath = canonical;
+        return { changes: 1 };
+      },
+      execAsync: async () => undefined,
+    } as never;
+    let announceDiscovery!: () => void;
+    let resumeSweep!: () => void;
+    const discovered = new Promise<void>((resolve) => {
+      announceDiscovery = resolve;
+    });
+    const resume = new Promise<void>((resolve) => {
+      resumeSweep = resolve;
+    });
+    h.pendingRead = async () => {
+      const discoveredA = h.pending.filter(
+        (entry) => entry.relative === markerA,
+      );
+      announceDiscovery();
+      await resume;
+      return discoveredA;
+    };
+
+    const sweepA = runBackgroundReconciliation(exec);
+    await discovered;
+    const row = rows.get("same");
+    if (!row) throw new Error("test row missing");
+    row.imagePath = markerB;
+    await finalizeBackgroundRestoreCandidate(exec, {
+      uid: "same",
+      pendingRelativePath: markerB,
+    });
+    resumeSweep();
+    await sweepA;
+
+    expect(h.bytes.get("profile-backgrounds/same.jpg")).toBe("B");
+    expect(h.operations).toContain(
+      `persist pending:${markerB} -> profile-backgrounds/same.jpg`,
+    );
+    expect(h.operations).not.toContain(
+      `persist pending:${markerA} -> profile-backgrounds/same.jpg`,
+    );
+    expect(rows.get("same")?.imagePath).toBe("profile-backgrounds/same.jpg");
+  });
+
   it.each([
     ["insert after commit", false],
     ["same-uid replacement after commit", true],
