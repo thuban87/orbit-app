@@ -153,7 +153,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 34: Rapid Capture & Update Flows** - Streamlined Add Contact, Quick Log with post-log capture, Tone vocabulary, Update Contact chooser loop (completed 2026-09-13; goal ACHIEVED — verifier 15/15 must-haves, code review 0 blockers/3 warnings-all-fixed/3 info-deferred, on-device UAT passed on the Pixel: migration 027 at user_version=27 + Quick Log channel seeds from the Default Interaction Channel preference (owner decision) both proven against the device DB, Edit Contact 9-section accordion IA confirmed. 3287 tests pass, tsc/colors clean. One non-blocking visual sign-off (motion/scroll feel) left for an owner glance)
 - [x] **Phase 35: Messaging & AI Compose** - Compose-first drafting workspace, Text/Email transmit handoff, Research side, three-suggestion AI review (completed 2026-09-13; goal ACHIEVED — verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel) + 3 warnings, ALL fixed; one Wave-1 cross-plan regression (35-05→006 test) caught and fixed. On-device: migration 028 proven at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk). 3391 tests pass, tsc/colors clean. AiService.ts untouched all phase — AI egress not widened)
 - [ ] **Phase 36: AI Configuration & Prompting** - Three connection lanes, prompt personalization, permission manager, and the final backup format bump (v5 — v4 landed early in 24.1)
-- [ ] **Phase 37: Settings & Personalization** - DEFERRED PLANNING — consolidates the preference/admin seams exported by Phases 22–36
+- [ ] **Phase 37: Settings & Personalization** - Navigation-first Settings directory (hub + per-concept category screens) replacing the 2,168-line monolith; surfaces already-persisted preferences, dual-homes Data & Backup, reserves the Categories IA slot — no schema/format change (planned 2026-09-14: 8 plans, 8 waves)
 - [ ] **Phase 38: Your Week** - DEFERRED PLANNING — relocated birthday presentation, Group Event rollups, heatmap-aggregation reuse
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
@@ -918,14 +918,55 @@ Plans:
 
 ### Phase 37: Settings & Personalization
 
-**Goal**: Consolidate the preference and administration seams exported by Phases 22–36 into one coherent, discoverable Settings experience.
-**Depends on**: Executed Phases 22–35 (it consolidates what they actually shipped)
-**Requirements**: None yet — deferred planning
-**Success Criteria**: Defined at planning time
-**Canonical refs**: docs/dossier/milestone-2/planning-notes/phase-15-17-18-stub-contracts.md
-**Plans**: TBD
+**Goal**: Consolidate the preference and administration seams exported by Phases 22–36 into one coherent, discoverable Settings experience — turn the 2,168-line Settings monolith into a navigation-first directory (hub + per-concept category screens) over the shipped preference/admin seams.
+**Depends on**: Executed Phases 22–36 (it consolidates what they actually shipped)
+**Requirements**: None (deferred-planning phase — no REQ-IDs). Success derived at planning time from the GOAL + CONTEXT decisions D-01..D-09 + dossier §A–§S.
+**Success Criteria** (what must be TRUE):
 
-> **Deferred planning — interrogated later against the implemented product; do not plan or discuss yet.**
+  1. Settings is a navigation-first directory (§A/D-09) mounted at the preserved `Settings` route (§M): a hub of icon+title+subtitle rows (no live values) leading to per-concept category screens in the §A order (Appearance, Contacts & Relationships, Interactions, Notifications, Orrery, Data & Backup, AI, About) plus a widget utility row — with the monolith retired and no behaviour lost.
+  2. Every migrated control keeps its exact write path — theme live-restyle + durable persist, the notification/digest reconcile-on-write (Pitfall 5), and DAO-validated preference writes — and the newly surfaced already-persisted preferences appear: Compose default message mode (D-04a), Dashboard right-swipe (D-04c), default channel, global profile layout/background default (D-05), and a self-name editor on the `profile` table via a new `setProfileName` (D-04b).
+  3. Appearance ships the Galaxy-conditional control as a one-line active-package guard (D-07) and Orbit Center + self-star colour enforcing ADR-047 (D-02); the Categories IA slot is reserved as a route name only with no dead row and no CRUD (D-03 / §K); Data & Backup is dual-homed on one canonical tree with the two dual-home hazards handled and the tab preserved (D-08).
+  4. No schema and no backup-format bump across the phase (D-06): every surfaced preference reuses an existing column or the existing `profile` record; `TARGET_VERSION` stays 29 and `BACKUP_FORMAT_VERSION` stays 5.
+
+**Canonical refs**: docs/dossier/milestone-2/phase-37-settings-personalization-dossier.md (ground truth §A–§S); .planning/phases/37-settings-personalization/37-CONTEXT.md (D-01..D-09 overlay); 37-RESEARCH.md; 37-PATTERNS.md
+**Schema**: none — Phase 37 adds NO migration and NO backup-format bump (D-06; verified head migration 029 / `TARGET_VERSION=29`, `BACKUP_FORMAT_VERSION=5` on disk). A newly required durable/portable preference would owe a format-6 bump, which is an OWNER decision — not planned here.
+**Plans**: 8 plans (8 sequential waves — the Settings nav files, hub model, and monolith are shared by nearly every plan, so waves are strictly sequential)
+
+**Wave 1**
+
+- [ ] 37-01-PLAN.md — TRACER: navigation-first hub at `Settings` + Interactions category (D-04a/D-04c/D-09), monolith preserved via transitional `SettingsMore` route
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 37-02-PLAN.md — Appearance › Theme (package/mode/accent/background) + Galaxy-conditional guard (D-07)
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 37-03-PLAN.md — Appearance › Orbit Center + self-star (D-02), owner photo, global profile default (D-05), self-name editor + `setProfileName` (D-04b)
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 37-04-PLAN.md — Contacts & Relationships category (§E) + Categories IA reservation, route-name only (D-03)
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 37-05-PLAN.md — Notifications category (§G) with the reconcile-on-write path preserved + permission handoff
+
+**Wave 6** *(blocked on Wave 5)*
+
+- [ ] 37-06-PLAN.md — Orrery category (Display shared pref source + Systems, §H) + AI category routing into the Phase 36 hub (§J)
+
+**Wave 7** *(blocked on Wave 6)*
+
+- [ ] 37-07-PLAN.md — Data & Backup dual-home (D-08): register the four Backup routes + handle the two dual-home hazards, tab preserved
+
+**Wave 8** *(blocked on Wave 7)*
+
+- [ ] 37-08-PLAN.md — About Orbit (§K) + widget utility row (§L) + monolith retirement + D-06 no-schema/format-change confirmation
+
+**Roadmap follow-up owed (D-03):** a future **Category Management** phase (category CRUD + deletion cascade to Orrery Systems, custom-System rules, Profile assignments, backup) is an unscheduled dependency surfaced during Phase 37 planning. Raise with the owner to schedule it; Phase 37 only reserves the route name/IA slot.
+
+**UI hint**: yes
 
 ### Phase 38: Your Week
 
@@ -983,7 +1024,7 @@ Plans:
 | 34. Rapid Capture & Update Flows | 8/8 | Complete | 2026-09-13 |
 | 35. Messaging & AI Compose | 9/9 | Complete |  |
 | 36. AI Configuration & Prompting | 11/11 | Complete | 2026-09-14 |
-| 37. Settings & Personalization | 0/TBD | Deferred planning | - |
+| 37. Settings & Personalization | 0/8 | Planned | - |
 | 38. Your Week | 0/TBD | Deferred planning | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |

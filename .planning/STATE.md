@@ -4,11 +4,11 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 37
 current_phase_name: Settings & Personalization
-status: planning
-stopped_at: Phase 37 context gathered
-last_updated: "2026-09-14T21:11:05.566Z"
+status: planned
+stopped_at: Phase 37 planned (8 plans, 8 sequential waves)
+last_updated: "2026-09-14T22:30:00.000Z"
 last_activity: 2026-09-14
-last_activity_desc: Phase 36 complete, transitioned to Phase 37
+last_activity_desc: Phase 37 planned — 8 plans across 8 sequential waves (navigation-first Settings decomposition)
 state_head: 10fe220a8e2a57f2a0962fed38455ca7cd472937
 progress:
   total_phases: 21
@@ -37,8 +37,8 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 37 — Settings & Personalization
-Plan: Not started
-Status: Ready to plan
+Plan: 8 plans created (37-01..37-08); execution not started
+Status: Ready to execute — run /gsd-execute-phase 37 (8 sequential waves; nav files + hub model + monolith are shared so no wave parallelizes). Roadmap follow-up owed to owner (D-03): schedule a future Category Management phase.
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
