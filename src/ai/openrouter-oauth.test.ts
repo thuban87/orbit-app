@@ -7,8 +7,8 @@ import {
   OPENROUTER_AUTH_URL,
   OPENROUTER_KEY_EXCHANGE_URL,
   OPENROUTER_REDIRECT_URI,
-  validateOpenRouterCallback,
   type OpenRouterCrypto,
+  validateOpenRouterCallback,
 } from "@/ai/openrouter-oauth";
 
 const bytes = (length: number, start = 0): Uint8Array =>
@@ -63,7 +63,10 @@ describe("OpenRouter callback validation", () => {
     ["foreign scheme", "https://openrouter-auth?code=x&state=expected"],
     ["foreign host", "orbit://attacker?code=x&state=expected"],
     ["unexpected path", "orbit://openrouter-auth/path?code=x&state=expected"],
-    ["unexpected parameter", "orbit://openrouter-auth?code=x&state=expected&next=bad"],
+    [
+      "unexpected parameter",
+      "orbit://openrouter-auth?code=x&state=expected&next=bad",
+    ],
     ["duplicate code", "orbit://openrouter-auth?code=x&code=y&state=expected"],
     ["malformed", "not a url"],
   ])("rejects %s", (_case, url) => {
@@ -113,18 +116,31 @@ describe("OpenRouter connect", () => {
         url: `${OPENROUTER_REDIRECT_URI}?code=one-time-code&state=${state}`,
       };
     });
-    const fetchImpl = vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({ key: "sk-or-result" }),
-    }));
+    const fetchImpl = vi.fn(
+      async (
+        _url: string,
+        _init: {
+          method: "POST";
+          headers: { "Content-Type": "application/json" };
+          body: string;
+          signal?: AbortSignal;
+        },
+      ) => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ key: "sk-or-result" }),
+      }),
+    );
     const setKey = vi.fn(async () => undefined);
 
     await expect(
       connectOpenRouter({ crypto: cryptoPort, opener, fetchImpl, setKey }),
     ).resolves.toEqual({ connected: true });
 
-    expect(opener).toHaveBeenCalledWith(expect.stringContaining("state="), OPENROUTER_REDIRECT_URI);
+    expect(opener).toHaveBeenCalledWith(
+      expect.stringContaining("state="),
+      OPENROUTER_REDIRECT_URI,
+    );
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(fetchImpl).toHaveBeenCalledWith(
       OPENROUTER_KEY_EXCHANGE_URL,

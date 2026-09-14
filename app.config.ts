@@ -81,6 +81,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // generated release manifest (asserted on droid during the prebuild in
     // Task 3). This ENFORCES a recorded decision — never "fix" it back to true.
     allowBackup: false,
+    // Phase 36 OpenRouter browser authorization. Expo's generated MainActivity
+    // is singleTask; this exact browsable filter routes only the decided OAuth
+    // callback host back into that activity (ADR-051 / D-05).
+    intentFilters: [
+      ...(config.android?.intentFilters ?? []),
+      {
+        action: "VIEW",
+        category: ["BROWSABLE", "DEFAULT"],
+        data: { scheme: "orbit", host: "openrouter-auth" },
+      },
+    ],
   },
   // Pre-register the native deps that ship a config plugin so the first
   // prebuild covers them. Deduped: `expo install` already added expo-sqlite to
@@ -129,6 +140,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         // enters SQLite). No plugin options needed; the Set-dedupe handles it like
         // the other string plugins.
         "expo-secure-store",
+        // Phase-36 OpenRouter OAuth: registers the native browser-auth module.
+        // The callback itself is constrained by android.intentFilters above.
+        "expo-web-browser",
         // Phase-17 backup encryption (Plan 17-01). RNQC's Expo config plugin
         // generates the native Nitro/C++ wiring required for the approved
         // PBKDF2 and AES-256-GCM implementation. No sodium option is enabled:
