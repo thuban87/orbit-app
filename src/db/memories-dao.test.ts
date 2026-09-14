@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { setAiPermissionDefault } from "@/db/ai-permissions-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
   addMemory,
@@ -40,6 +41,35 @@ async function seedContact(name = "Alex"): Promise<number> {
 }
 
 describe("memories DAO", () => {
+  it("applies the durable Memory default only to rows created afterward", async () => {
+    const contactId = await seedContact();
+    const first = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "First",
+      createdAt: NOW,
+      now: NOW,
+    });
+    await setAiPermissionDefault(exec, "memory", 1, "2026-09-04 12:05:00");
+    const second = await addMemory(exec, {
+      contactId,
+      type: "general",
+      value: "Second",
+      createdAt: NOW,
+      now: NOW,
+    });
+
+    await expect(
+      exec.getAllAsync(
+        "SELECT id,allow_ai FROM memories WHERE id IN (?,?) ORDER BY id",
+        [first, second],
+      ),
+    ).resolves.toEqual([
+      { id: first, allow_ai: 0 },
+      { id: second, allow_ai: 1 },
+    ]);
+  });
+
   it("seeds AI permission off and toggles it only for the matching contact", async () => {
     const contactId = await seedContact();
     const otherContactId = await seedContact("Blair");

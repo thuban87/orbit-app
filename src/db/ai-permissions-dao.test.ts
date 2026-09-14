@@ -197,6 +197,16 @@ describe("AI permissions DAO", () => {
     );
   });
 
+  it("enable impact counts only information that will newly become accessible", async () => {
+    const seeded = await seedReviewRows();
+    await expect(
+      getBulkPermissionImpact(exec, [
+        { category: "memory", id: seeded.memoryId },
+        { category: "memory", id: seeded.disabledMemoryId },
+      ]),
+    ).resolves.toEqual({ contacts: 1, items: 1 });
+  });
+
   it("contains no query path for excluded information stores", () => {
     const source = readFileSync(
       new URL("./ai-permissions-dao.ts", import.meta.url),

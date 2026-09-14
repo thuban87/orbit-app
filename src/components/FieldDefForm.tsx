@@ -33,12 +33,12 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { FieldValueInput } from "@/components/FieldValueInput";
 import {
   draftToFieldFields,
   type FieldDefDraft,
   hydrateFieldDefDraft,
 } from "@/components/field-def-form-logic";
-import { FieldValueInput } from "@/components/FieldValueInput";
 import { makeColName } from "@/db/col-name";
 import { localDateTime } from "@/db/database";
 import type { CustomFieldDef, NewFieldDef, SqliteBool } from "@/db/field-types";
@@ -70,6 +70,8 @@ interface CreateProps {
   existingColNames: ReadonlySet<string>;
   /** The append position for the new def's display_order. */
   nextDisplayOrder: number;
+  /** Durable creation default resolved from app_settings by the screen. */
+  initialShareWithAi?: SqliteBool;
   onSubmit: (def: NewFieldDef) => void;
   onCancel: () => void;
 }
@@ -118,10 +120,17 @@ export function FieldDefForm(props: FieldDefFormProps) {
   const { colors } = useTheme();
 
   const initial = props.mode === "edit" ? props.field : null;
+  const initialShareWithAi =
+    props.mode === "create" ? props.initialShareWithAi : undefined;
   // Seed every editor field through the node-tested hydration helper so the
   // create-default (share_with_ai OFF) and edit-hydration (from the stored value)
   // decision is proven off-device (C2-M4 / H7).
-  const seed = useMemo(() => hydrateFieldDefDraft(initial), [initial]);
+  const seed = useMemo(() => {
+    const hydrated = hydrateFieldDefDraft(initial);
+    return initialShareWithAi !== undefined
+      ? { ...hydrated, share_with_ai: initialShareWithAi }
+      : hydrated;
+  }, [initial, initialShareWithAi]);
   const [label, setLabel] = useState(seed.label);
   const [type, setType] = useState<FieldType>(seed.type);
   const [optionRows, setOptionRows] = useState<string[]>(

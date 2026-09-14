@@ -207,7 +207,9 @@ describe("log-interaction-logic — ordinary-log channel options + Allow-AI seam
     expect(values).not.toContain("unspecified");
   });
 
-  it("resolveInitialAllowAi is the OFF (0) Phase-36 type-default seam", () => {
+  it("resolveInitialAllowAi reflects the resolved type default and fails closed", () => {
     expect(resolveInitialAllowAi()).toBe(0);
+    expect(resolveInitialAllowAi(0)).toBe(0);
+    expect(resolveInitialAllowAi(1)).toBe(1);
   });
 });

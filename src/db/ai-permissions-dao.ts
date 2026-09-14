@@ -337,7 +337,9 @@ export async function getBulkPermissionImpact(
   refs: readonly AiPermissionRef[],
 ): Promise<AiPermissionImpact> {
   const selection = explicitSelection(refs);
-  return summarizeAiPermissionItems(await itemsForRefs(exec, selection));
+  return summarizeAiPermissionItems(
+    (await itemsForRefs(exec, selection)).filter((item) => item.enabled === 0),
+  );
 }
 
 async function setSelectedPermissions(
@@ -348,7 +350,9 @@ async function setSelectedPermissions(
 ): Promise<AiPermissionImpact> {
   const selection = explicitSelection(refs);
   const impact = summarizeAiPermissionItems(
-    await itemsForRefs(exec, selection),
+    (await itemsForRefs(exec, selection)).filter(
+      (item) => item.enabled !== value,
+    ),
   );
   return inWriteTransaction(exec, async () => {
     for (const ref of selection) {

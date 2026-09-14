@@ -11,14 +11,16 @@
  * The genuinely-new logic — channel-sensitive Direction/Connected defaulting
  * (CAPT-08), the Default Interaction Channel preference resolution and the
  * remembered-on-success-only gate (CAPT-11, D-09), and the recordTouchpoint input
- * assembly with Tone-null (D-08) + Allow-AI-OFF (D-04) — lives in the node-tested
+ * assembly with Tone-null (D-08) + the durable new-item Allow-AI default (OFF
+ * until deliberately changed) — lives in the node-tested
  * `log-interaction-logic.ts`. This shell owns only React state, navigation, and
  * the DAO calls.
  *
- * PRIVACY-CRITICAL SURFACE: the Allow AI toggle ships default OFF
- * (`resolveInitialAllowAi()` → 0); the note egress reader is NOT widened here
- * (ADR-078). All interaction writes route through `recordTouchpoint` — the SOLE
- * recency writer (ADR-010/024/071); the screen builds no SQL.
+ * PRIVACY-CRITICAL SURFACE: the Allow AI toggle is seeded from the migration-029
+ * default at creation time and remains OFF until deliberately changed; the note
+ * egress reader is NOT widened here. All interaction writes route through
+ * `recordTouchpoint` — the SOLE recency writer (ADR-010/024/071); the screen
+ * builds no SQL.
  *
  * NON-ATOMIC REMEMBERED-CHANNEL WRITE (CAPT-11 recovery, Review MEDIUM 34-04): the
  * interaction is the source of truth. The remembered-channel `updateAppSettings`
@@ -43,6 +45,7 @@ import {
   type TouchpointRefineValue,
 } from "@/components/TouchpointRefineForm";
 import { AppText, Button } from "@/components/ui";
+import { resolveNewItemAiDefault } from "@/db/ai-permissions-dao";
 import {
   getAppSettings,
   REMEMBERED_INTERACTION_CHANNELS,
@@ -111,7 +114,11 @@ export function LogInteractionScreen({
   const seed = useCallback(async () => {
     const now = localDateTime();
     try {
-      const settings = await getAppSettings(getExecutor());
+      const exec = getExecutor();
+      const [settings, allowAiDefault] = await Promise.all([
+        getAppSettings(exec),
+        resolveNewItemAiDefault(exec, "interaction-note"),
+      ]);
       const channel = resolveInitialChannel(
         settings.defaultInteractionChannel,
         settings.rememberedInteractionChannel,
@@ -125,7 +132,7 @@ export function LogInteractionScreen({
         quality: null,
         note: null,
         duration: null,
-        allowAi: resolveInitialAllowAi(),
+        allowAi: resolveInitialAllowAi(allowAiDefault),
       });
     } catch (err) {
       // A settings read failure falls back to the Message default so the form is

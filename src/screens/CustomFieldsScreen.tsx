@@ -33,6 +33,7 @@ import {
   View,
 } from "react-native";
 import { type FieldDefDraft, FieldDefForm } from "@/components/FieldDefForm";
+import { resolveNewItemAiDefault } from "@/db/ai-permissions-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { createField, deleteOrQuarantineField } from "@/db/field-ddl";
 import {
@@ -103,17 +104,22 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
   const [defs, setDefs] = useState<CustomFieldDef[]>([]);
   const [emptyById, setEmptyById] = useState<Record<number, boolean>>({});
   const [editor, setEditor] = useState<Editor>(null);
+  const [newFieldShareDefault, setNewFieldShareDefault] = useState<0 | 1>(0);
 
   /** Load all defs (incl. quarantined) and each field's emptiness. */
   const load = useCallback(async () => {
     try {
       const exec = getExecutor();
-      const all = await listDefs(exec, { includeQuarantined: true });
+      const [all, shareDefault] = await Promise.all([
+        listDefs(exec, { includeQuarantined: true }),
+        resolveNewItemAiDefault(exec, "custom-field"),
+      ]);
       const empties: Record<number, boolean> = {};
       for (const d of all) {
         empties[d.id] = await isFieldEmpty(exec, d.id);
       }
       setDefs(all);
+      setNewFieldShareDefault(shareDefault);
       setEmptyById(empties);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load custom fields", err);
@@ -319,6 +325,7 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
           mode="create"
           existingColNames={existingColNames}
           nextDisplayOrder={nextDisplayOrder}
+          initialShareWithAi={newFieldShareDefault}
           onSubmit={(def) => void handleCreate(def)}
           onCancel={() => setEditor(null)}
         />

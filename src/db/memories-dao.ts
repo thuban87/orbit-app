@@ -1,4 +1,5 @@
 /** Mutexed writer for typed Memory rows. */
+import { resolveNewItemAiDefault } from "@/db/ai-permissions-dao";
 import {
   MEMORY_TYPE_REGISTRY,
   type MemoryTypeKey,
@@ -102,6 +103,9 @@ export async function addMemoryCore(
   if (value === null && customLabel === null) {
     throw new Error("memories-dao: memory value or custom label is required");
   }
+  // The durable category default supersedes the registry's static `aiDefault`
+  // for NEW rows. Both ship OFF until the user deliberately changes the setting.
+  const allowAi = await resolveNewItemAiDefault(exec, "memory");
 
   const result = await exec.runAsync(
     `INSERT INTO memories
@@ -123,7 +127,7 @@ export async function addMemoryCore(
       input.provenance ?? "user",
       input.createdAt,
       input.now,
-      MEMORY_TYPE_REGISTRY[input.type].aiDefault ? 1 : 0,
+      allowAi,
     ],
   );
   return result.lastInsertRowId;

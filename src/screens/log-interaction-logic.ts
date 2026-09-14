@@ -140,12 +140,12 @@ export function shouldUpdateRemembered(ctx: RememberedWriteContext): boolean {
 }
 
 /**
- * The Allow-AI initial value (CAPT-10, D-04). Returns 0 (OFF) today — the single
- * seam Phase 36's new-items-only type default will later feed WITHOUT changing
- * shipped behavior. A forward reference only; this phase ships Allow-AI-OFF.
+ * Apply the already-resolved durable interaction-note default to a new form.
+ * The node-pure logic never reads SQLite itself; callers resolve the value at
+ * screen seed time. An omitted value remains fail-closed OFF.
  */
-export function resolveInitialAllowAi(): number {
-  return 0;
+export function resolveInitialAllowAi(defaultValue: 0 | 1 = 0): number {
+  return defaultValue;
 }
 
 /** The ids + timestamp that scope one ordinary log through the recency spine. */

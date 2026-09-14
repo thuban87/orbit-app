@@ -11,6 +11,10 @@
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import {
+  resolveNewItemAiDefault,
+  setAiPermissionDefault,
+} from "@/db/ai-permissions-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -20,6 +24,7 @@ import { migration006 } from "@/db/migrations/006-normalize-custom-field-values"
 import { migration007 } from "@/db/migrations/007-tombstones";
 import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { migration026 } from "@/db/migrations/026-group-events-schema";
+import { migration029 } from "@/db/migrations/029-ai-configuration";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   createContactWithInteraction,
@@ -59,8 +64,9 @@ beforeEach(async () => {
       // and app_settings (002).
       migration025,
       migration026,
+      migration029,
     ],
-    26,
+    29,
     { now: NOW, newUid: uid },
   );
 });
@@ -814,6 +820,36 @@ describe("recency DAO — one-tap record path (LOG-01 / LOG-06)", () => {
 });
 
 describe("recency DAO — duration / allow_ai round-trip (HIST-14 / D-04)", () => {
+  it("persists the creation-time interaction-note default without rewriting older rows", async () => {
+    const c = await makeContact();
+    const first = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-08-13 12:00:00",
+      now: NOW,
+      note: "First",
+      allowAi: await resolveNewItemAiDefault(exec, "interaction-note"),
+    });
+    await setAiPermissionDefault(exec, "interaction-note", 1, NOW);
+    const second = await recordTouchpoint(exec, {
+      contactId: c,
+      uid: uid(),
+      occurredAt: "2026-08-14 12:00:00",
+      now: NOW,
+      note: "Second",
+      allowAi: await resolveNewItemAiDefault(exec, "interaction-note"),
+    });
+    await expect(
+      exec.getAllAsync(
+        "SELECT id,allow_ai FROM interactions WHERE id IN (?,?) ORDER BY id",
+        [first.interactionId, second.interactionId],
+      ),
+    ).resolves.toEqual([
+      { id: first.interactionId, allow_ai: 0 },
+      { id: second.interactionId, allow_ai: 1 },
+    ]);
+  });
+
   it("defaults duration to NULL and allow_ai to 0 when the record path omits them", async () => {
     const c = await makeContact();
     const { interactionId } = await recordTouchpoint(exec, {

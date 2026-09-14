@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
+  resolveNewItemAiDefault,
+  setAiPermissionDefault,
+} from "@/db/ai-permissions-dao";
+import {
   createField,
   deleteOrQuarantineField,
   dropField,
@@ -69,6 +73,32 @@ async function value(
 }
 
 describe("normalized field lifecycle", () => {
+  it("persists the creation-time custom-field default without re-defaulting older definitions", async () => {
+    await createField(
+      exec,
+      newDef({
+        col_name: "first_field",
+        share_with_ai: await resolveNewItemAiDefault(exec, "custom-field"),
+      }),
+    );
+    await setAiPermissionDefault(exec, "custom-field", 1, NOW);
+    await createField(
+      exec,
+      newDef({
+        col_name: "second_field",
+        share_with_ai: await resolveNewItemAiDefault(exec, "custom-field"),
+      }),
+    );
+    await expect(
+      exec.getAllAsync(
+        "SELECT col_name,share_with_ai FROM custom_field_defs ORDER BY id",
+      ),
+    ).resolves.toEqual([
+      { col_name: "first_field", share_with_ai: 0 },
+      { col_name: "second_field", share_with_ai: 1 },
+    ]);
+  });
+
   it("creates durable blank pairs for every existing contact, including archived contacts", async () => {
     const live = await seedContact("Alex");
     const archived = await seedContact("Bo", true);
