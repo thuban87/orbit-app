@@ -100,4 +100,37 @@ describe("settings AI hub", () => {
       }),
     ).toBe("ready");
   });
+
+  it.each([true, false])(
+    "reports authenticated=%s Custom ready when its model and endpoint are valid",
+    (hasCredential) => {
+      expect(
+        computeAiHubAvailability({
+          aiEnabled: true,
+          activeConnection: {
+            lane: "custom",
+            model: "local-model",
+            customEndpoint: "https://ai.example.com/v1",
+          },
+          hasCredential,
+          openRouterModels: [],
+        }),
+      ).toBe("ready");
+    },
+  );
+
+  it("rejects invalid restored Custom endpoint metadata even when a credential exists", () => {
+    expect(
+      computeAiHubAvailability({
+        aiEnabled: true,
+        activeConnection: {
+          lane: "custom",
+          model: "local-model",
+          customEndpoint: "http://old.example.com/v1",
+        },
+        hasCredential: true,
+        openRouterModels: [],
+      }),
+    ).toBe("needs-attention");
+  });
 });

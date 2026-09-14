@@ -35,13 +35,29 @@ describe("isSelectedConnectionModelAvailable — exact OpenRouter model", () => 
     ).toBe(false);
   });
 
-  it("preserves manual non-blank model ids for direct and custom connections", () => {
+  it("preserves manual non-blank model ids for direct connections and validates Custom endpoints", () => {
     expect(
       isSelectedConnectionModelAvailable(
         { lane: "openai", model: "manual-model", customEndpoint: "" },
         [],
       ),
     ).toBe(true);
+    expect(
+      isSelectedConnectionModelAvailable(
+        {
+          lane: "custom",
+          model: "manual-model",
+          customEndpoint: "http://old.example.com/v1",
+        },
+        [],
+      ),
+    ).toBe(false);
+    expect(
+      isSelectedConnectionModelAvailable(
+        { lane: "custom", model: "manual-model", customEndpoint: "" },
+        [],
+      ),
+    ).toBe(false);
     expect(
       isSelectedConnectionModelAvailable(
         {
@@ -90,6 +106,21 @@ describe("computeAiAvailability — three-state derivation (D-12)", () => {
     expect(computeAiAvailability({ ...readyInput, hasCredential: false })).toBe(
       "needs-attention",
     );
+  });
+
+  it("allows authenticated and unauthenticated Custom while direct providers still require credentials", () => {
+    for (const hasCredential of [true, false]) {
+      expect(
+        computeAiAvailability({
+          ...readyInput,
+          activeConnection: "custom",
+          hasCredential,
+        }),
+      ).toBe("ready");
+    }
+    expect(
+      computeAiAvailability({ ...readyInput, hasCredential: false }),
+    ).toBe("needs-attention");
   });
 
   it("missing or unavailable selected model → 'needs-attention' without substitution", () => {

@@ -20,6 +20,7 @@
  * NODE-PURE: no UI-runtime import.
  */
 import type { OpenRouterModel } from "@/ai/openrouter-catalog";
+import { validateCustomEndpoint } from "@/ai/custom-endpoint";
 import type { ResolvedAiConnection } from "@/db/ai-connections-dao";
 import type { AiErrorCode } from "@/services/AiService";
 import type { AiCloudProviderId, AiProviderId } from "@/services/ai-types";
@@ -36,7 +37,7 @@ export interface AiAvailabilityInput {
   /**
    * Whether a usable credential is present for `provider` — supplied by the
    * caller from the existing key store. The adapter never reads a secret itself.
-   * For a provider that needs no stored credential the caller passes `true`.
+   * Custom credentials are optional; direct/OpenRouter credentials are not.
    */
   readonly hasCredential: boolean;
   /** The active connection's remembered selected model. */
@@ -47,7 +48,8 @@ export interface AiAvailabilityInput {
 
 /**
  * Off is distinct from misconfiguration. Ready requires the exact configured
- * connection, credential, and model; nothing is silently substituted.
+ * connection and model. Credentials are mandatory except for Custom, whose
+ * endpoint may intentionally be unauthenticated; nothing is substituted.
  */
 export function computeAiAvailability(
   input: AiAvailabilityInput,
@@ -55,7 +57,7 @@ export function computeAiAvailability(
   if (!input.aiEnabled) return "off";
   if (
     input.activeConnection === null ||
-    !input.hasCredential ||
+    (input.activeConnection !== "custom" && !input.hasCredential) ||
     input.selectedModel.trim() === "" ||
     !input.modelAvailable
   ) {
@@ -67,14 +69,19 @@ export function computeAiAvailability(
 /**
  * Validate the exact remembered model for the active connection. OpenRouter's
  * catalog is authoritative: a missing id needs attention and is never silently
- * replaced. Direct-provider and Custom model ids retain their documented manual
- * entry escape hatch, so any non-blank id remains usable there.
+ * replaced. Direct-provider model ids retain their documented manual entry
+ * escape hatch. Custom additionally requires the shared endpoint validator to
+ * accept a non-empty endpoint before readiness can be reported.
  */
 export function isSelectedConnectionModelAvailable(
   connection: ResolvedAiConnection | null,
   openRouterModels: readonly OpenRouterModel[],
 ): boolean {
   if (!connection || connection.model.trim() === "") return false;
+  if (connection.lane === "custom") {
+    const endpoint = validateCustomEndpoint(connection.customEndpoint);
+    return endpoint.ok && endpoint.url !== "";
+  }
   if (connection.lane !== "openrouter") return true;
   return openRouterModels.some((model) => model.id === connection.model);
 }
