@@ -446,7 +446,7 @@ function validate(manifest: RawManifest): BackupManifest {
   const categories = uidSet(arrays.categories, "categories");
   const defs = uidSet(arrays.customFieldDefs, "customFieldDefs");
   const systems = uidSet(newArrays.systems, "systems");
-  const groupEvents = uidSet(newArrays.groupEvents, "groupEvents");
+  uidSet(newArrays.groupEvents, "groupEvents");
   for (const key of [
     "systemRules",
     "systemOverrides",
@@ -476,8 +476,8 @@ function validate(manifest: RawManifest): BackupManifest {
     if (typeof row.contactUid !== "string" || !contacts.has(row.contactUid))
       fail("systemOverrides has an unknown contact UID");
   for (const row of arrays.interactions)
-    if (row.groupEventUid != null && (typeof row.groupEventUid !== "string" || !groupEvents.has(row.groupEventUid)))
-      fail("interactions has an unknown Group Event UID");
+    if (row.groupEventUid != null && typeof row.groupEventUid !== "string")
+      fail("interactions has an invalid Group Event UID");
   for (const row of newArrays.profileContactPresentation)
     if (!contacts.has(row.contactUid as string))
       fail("profileContactPresentation has an unknown contact UID");

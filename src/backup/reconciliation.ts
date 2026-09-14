@@ -21,7 +21,18 @@ export type MergeableEntityType =
   | "relationships"
   | "current_state_entries"
   | "categories"
-  | "profile";
+  | "profile"
+  | "systems"
+  | "system_rules"
+  | "system_overrides"
+  | "system_prefs"
+  | "profile_layout_templates"
+  | "profile_background_templates"
+  | "ai_connections"
+  | "personalization_sections"
+  | "group_events"
+  | "profile_contact_presentation"
+  | "profile_category_presentation";
 
 type WriteMode = "lww" | "insert-if-missing";
 
@@ -62,6 +73,8 @@ export const ENTITY_POLICIES: Readonly<Record<MergeableEntityType, EntityPolicy>
   },
   interactions: {
     writeMode: "lww",
+    // A missing Group Event is repaired to NULL by restore-apply; the member
+    // interaction remains ordinary contact history rather than being dropped.
     parentFields: [{ field: "contact_id", entityType: "contacts" }],
   },
   events: {
@@ -101,6 +114,29 @@ export const ENTITY_POLICIES: Readonly<Record<MergeableEntityType, EntityPolicy>
     reservedUids: Object.values(RESERVED_CATEGORY_UIDS),
   },
   profile: { writeMode: "lww", reservedUids: [RESERVED_PROFILE_UID] },
+  systems: { writeMode: "lww" },
+  system_rules: {
+    writeMode: "lww",
+    parentFields: [{ field: "system_id", entityType: "systems" }],
+  },
+  system_overrides: {
+    writeMode: "lww",
+    parentFields: [{ field: "contact_id", entityType: "contacts" }],
+  },
+  system_prefs: { writeMode: "lww" },
+  profile_layout_templates: { writeMode: "lww" },
+  profile_background_templates: { writeMode: "lww" },
+  ai_connections: { writeMode: "lww" },
+  personalization_sections: { writeMode: "lww" },
+  group_events: { writeMode: "lww" },
+  profile_contact_presentation: {
+    writeMode: "lww",
+    parentFields: [{ field: "contact_id", entityType: "contacts" }],
+  },
+  profile_category_presentation: {
+    writeMode: "lww",
+    parentFields: [{ field: "category_id", entityType: "categories" }],
+  },
 };
 
 export interface ReconciliationAction {
@@ -230,6 +266,9 @@ function readParentUid(row: ReconciliationRow, field: string): string | undefine
     field_def_id: "fieldDefUid",
     method_id: "methodUid",
     external_contact_link_id: "externalContactLinkUid",
+    system_id: "systemUid",
+    group_event_id: "groupEventUid",
+    category_id: "categoryUid",
   };
   const value = row[field] ?? row[aliases[field] ?? field];
   return typeof value === "string" ? value : undefined;

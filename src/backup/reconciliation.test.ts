@@ -120,6 +120,7 @@ describe("reconciliation", () => {
 
   it("exposes every mergeable entity policy and fixed singleton seed identities", () => {
     expect(Object.keys(ENTITY_POLICIES).sort()).toEqual([
+      "ai_connections",
       "categories",
       "contact_links",
       "contact_method_provenance",
@@ -132,10 +133,20 @@ describe("reconciliation", () => {
       "events",
       "external_contact_links",
       "fuel",
+      "group_events",
       "interactions",
       "memories",
+      "personalization_sections",
       "profile",
+      "profile_background_templates",
+      "profile_category_presentation",
+      "profile_contact_presentation",
+      "profile_layout_templates",
       "relationships",
+      "system_overrides",
+      "system_prefs",
+      "system_rules",
+      "systems",
     ]);
     expect(ENTITY_POLICIES.profile.reservedUids).toEqual([RESERVED_PROFILE_UID]);
     expect(ENTITY_POLICIES.categories.reservedUids).toEqual(Object.values(RESERVED_CATEGORY_UIDS));
