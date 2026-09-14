@@ -260,6 +260,31 @@ describe("OpenRouter connect", () => {
     expect(loopback.cancelAttempt).toHaveBeenCalledWith("opaque-attempt");
   });
 
+  it("cancels native work immediately when the caller aborts during Chrome", async () => {
+    const loopback = loopbackPort();
+    const controller = new AbortController();
+    let finishBrowser: ((result: { type: string; url: string }) => void) | undefined;
+    const opener: OpenRouterBrowserOpener = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          finishBrowser = resolve;
+        }),
+    );
+    const connection = connectOpenRouter({
+      crypto: cryptoPort,
+      loopback,
+      opener,
+      signal: controller.signal,
+    });
+    await vi.waitFor(() => expect(loopback.startAttempt).toHaveBeenCalled());
+    controller.abort();
+    await vi.waitFor(() =>
+      expect(loopback.cancelAttempt).toHaveBeenCalledWith("opaque-attempt"),
+    );
+    finishBrowser?.({ type: "success", url: OPENROUTER_WAKE_URI });
+    await expect(connection).rejects.toThrow("openrouter_connection_failed");
+  });
+
   it("maps native, exchange, and persistence failures to one sanitized error", async () => {
     const cases: Array<{
       loopback: OpenRouterLoopback;

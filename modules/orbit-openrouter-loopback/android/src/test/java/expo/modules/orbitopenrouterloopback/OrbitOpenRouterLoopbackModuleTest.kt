@@ -73,6 +73,33 @@ class OrbitOpenRouterLoopbackModuleTest {
     fresh.cancel(ERR_CANCELLED)
   }
 
+  @Test fun `owner rejects a concurrent start and duplicate await until cleanup`() {
+    val owner = LoopbackAttemptOwner()
+    val first = owner.start("first", 5_000)
+    try { owner.start("second", 5_000); fail("concurrent start should reject") }
+    catch (failure: LoopbackFailure) { assertEquals(ERR_ACTIVE_ATTEMPT, failure.stableCode) }
+    assertTrue(owner.claim(first.attemptId) === first)
+    try { owner.claim(first.attemptId); fail("duplicate await should reject") }
+    catch (failure: LoopbackFailure) { assertEquals(ERR_ALREADY_AWAITED, failure.stableCode) }
+    owner.cancel(first.attemptId)
+    val fresh = owner.start("fresh", 5_000)
+    owner.cancel(fresh.attemptId)
+  }
+
+  @Test fun `oversized and slow clients cannot consume or wedge the listener`() {
+    val attempt = LoopbackAttempt.start("expected", 5_000)
+    val oversized = "GET /openrouter-auth?code=${"x".repeat(5_000)}&state=expected HTTP/1.1\r\nHost: 127.0.0.1:${attempt.port}\r\n\r\n"
+    assertEquals(400, rawRequest(attempt.port, oversized))
+    assertFalse(attempt.result.isDone)
+    java.net.Socket("127.0.0.1", attempt.port).use { slow ->
+      slow.getOutputStream().write("GET /openrouter-auth".toByteArray())
+      slow.getOutputStream().flush()
+      Thread.sleep(1_200)
+    }
+    assertFalse(attempt.result.isDone)
+    assertEquals(303, responseCode("${attempt.baseUrl}?code=x&state=expected"))
+  }
+
   private fun responseCode(url: String): Int {
     val connection = URL(url).openConnection() as HttpURLConnection
     connection.instanceFollowRedirects = false
