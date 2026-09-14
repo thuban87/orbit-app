@@ -16,6 +16,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ResolvedPrompt } from "@/ai/prompt-types";
 import { generateVariants } from "@/logic/ai-generate-variants";
+import type { AiDiagnosticEvent } from "@/logic/ai-diagnostics";
 import {
   AI_REQUEST_TIMEOUT_MS,
   type AiSuggestionDeps,
@@ -339,6 +340,59 @@ describe("AiSuggestionLifecycle — non-stale failure aborts the controller (HIG
       status: "error",
       code: "network",
     });
+  });
+
+  it("preserves Compose state and surfaces sanitized failure details without changing config", async () => {
+    const editorBody = "keep my unfinished message";
+    const safeDiagnostic = Object.freeze({
+      operation: "Rewrite",
+      lane: "openai",
+      modelId: "gpt-test",
+      status: 429,
+      category: "rate-limit",
+      correlationId: "corr-1",
+      appBuildVersion: "42",
+      osVersion: "Android 16",
+      approxTokenCount: 100,
+      itemCount: 2,
+      elapsedMs: 15,
+    }) as AiDiagnosticEvent;
+    const onDiagnostic = vi.fn();
+    const getFailureDetails = vi.fn(() => ({
+      code: "rate_limited",
+      category: "rate-limit" as const,
+      message: "Rate limited — try again shortly.",
+      diagnostic: safeDiagnostic,
+    }));
+    const h = makeHarness(
+      {
+        getFailureDetails,
+        onDiagnostic,
+      },
+      {
+        editorEmpty: false,
+        editorBody,
+        generate: vi.fn(async () => {
+          throw { code: "rate_limited", raw: "PRIVATE RESPONSE" };
+        }),
+      },
+    );
+
+    await h.lifecycle.begin();
+
+    expect(h.deps.applyDraft).not.toHaveBeenCalled();
+    expect(h.deps.getEditorBody()).toBe(editorBody);
+    expect(onDiagnostic).toHaveBeenCalledWith(safeDiagnostic);
+    expect(h.lifecycle.getState()).toEqual({
+      status: "error",
+      code: "rate_limited",
+      category: "rate-limit",
+      message: "Rate limited — try again shortly.",
+      diagnostic: safeDiagnostic,
+    });
+    // The lifecycle owns no fallback/switch capability.
+    expect(h.deps).not.toHaveProperty("setActiveConnection");
+    expect(h.deps).not.toHaveProperty("setModel");
   });
 });
 
