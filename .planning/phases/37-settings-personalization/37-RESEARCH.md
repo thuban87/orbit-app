@@ -375,18 +375,20 @@ const themePackage = useThemeStore((s) => s.package); // reactive; "galaxy" | "s
 
 *(All other load-bearing claims are `[VERIFIED]` against files read this session. This table is deliberately short because the phase is codebase archaeology, not external research.)*
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Backup-from-Settings return semantics (D-08).**
+All three were framed as planner-time delegations and were resolved during planning (see the cross-AI review replan, commit `d32a0e5`). Retained here with their resolutions for the artifact record.
+
+1. **Backup-from-Settings return semantics (D-08).** — **RESOLVED (Plan 37-07):** origin-aware return via an explicit `host` prop (per-stack wrappers, fail-closed `DEFAULT_BACKUP_HOST="backup-tab"`); every reset site made origin-aware rather than accepting the hard reset.
    - Known: `RestoreResultScreen` hard-resets to "Backup" (RestoreResultScreen.tsx:18); dual-mounting is type-safe.
    - Unclear: whether, from the Settings entry, the post-restore return should land on the Settings hub or on Backup-within-Settings.
    - Recommendation: planner decides at plan time (origin-aware return vs. accept the reset); flag if it becomes an owner-facing UX call.
 
-2. **Shared-backup consume ownership when Backup is dual-mounted.**
+2. **Shared-backup consume ownership when Backup is dual-mounted.** — **RESOLVED (Plan 37-07):** consumption stays host-scoped — `consumeSharedBackup` is gated on the host so the Settings copy never drains it; single-drain-per-host test added.
    - Known: the share-intent gate routes shared backups to `BackupTab › Backup` (linking.ts:67); `BackupScreen` consumes the singleton on focus (BackupScreen.tsx:262).
    - Recommendation: keep shared-backup consumption tab-scoped (or gate on which stack hosts the screen) so the Settings copy never drains it.
 
-3. **Categories reservation form (D-03 / §K).**
+3. **Categories reservation form (D-03 / §K).** — **RESOLVED (Plan 37-04 / D-03):** route name reserved (typed but unregistered `CategoryManagement`, asserted by the `SETTINGS_REGISTERED_ROUTES` source-scan test), no visible row; the manager itself is deferred to Phase 37.1.
    - Known: reserve route name + IA slot, render no row.
    - Recommendation: hold the route string + section-order position for the future Category Management phase; the planner picks the lightest no-visible-placeholder representation.
 
