@@ -10,24 +10,33 @@ const photoMocks = vi.hoisted(() => ({
   deleteLeavesFile: false,
 }));
 const backgroundMocks = vi.hoisted(() => ({
-  staged: [] as Array<[string, string, string, string]>,
+  staged: [] as Array<[string, string, string]>,
   persisted: [] as Array<[string, string]>,
   deleted: [] as string[],
+  bytes: new Map<string, string>(),
 }));
 vi.mock("@/services/photos/background-storage", () => ({
-  backgroundDerivativeRelPath: (uid: string) => `profile-backgrounds/${uid}.jpg`,
+  backgroundDerivativeRelPath: (uid: string) =>
+    `profile-backgrounds/${uid}.jpg`,
   resolveBackgroundRestorePendingUri: (relative: string) =>
     `file:///doc/${relative}`,
   stageBackgroundRestorePendingBase64: async (
     base64: string,
     uid: string,
     session: string,
-    expectedModifiedAt: string,
   ) => {
-    backgroundMocks.staged.push([base64, uid, session, expectedModifiedAt]);
+    backgroundMocks.staged.push([base64, uid, session]);
+    backgroundMocks.bytes.set(
+      `profile-backgrounds/_restore_pending/${uid}/${session}.jpg`,
+      base64,
+    );
   },
   persistBackgroundDerivative: async (source: string, destination: string) => {
     backgroundMocks.persisted.push([source, destination]);
+    backgroundMocks.bytes.set(
+      destination,
+      backgroundMocks.bytes.get(source.replace("file:///doc/", "")) ?? "",
+    );
   },
   deleteBackgroundRestorePending: (relative: string) => {
     backgroundMocks.deleted.push(relative);
@@ -171,157 +180,338 @@ beforeEach(() => {
   backgroundMocks.staged = [];
   backgroundMocks.persisted = [];
   backgroundMocks.deleted = [];
+  backgroundMocks.bytes = new Map();
 });
 
-  it.each(["merge", "replace-all"] as const)(
-    "restores new entities with different destination rowids in %s mode",
-    async (mode) => {
-      const source = await db();
-      await source.runAsync("INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)", ["portable-category", "Portable", 8, NOW, NOW]);
-      const category = await source.getFirstAsync<{ id: number }>("SELECT id FROM categories WHERE uid='portable-category'");
-      await source.runAsync("INSERT INTO contacts(uid,name,category_id,interval_days,created_at,modified_at) VALUES(?,?,?,?,?,?)", ["portable-contact", "Ada", category!.id, 7, NOW, NOW]);
-      const contact = await source.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid='portable-contact'");
-      await source.runAsync("INSERT INTO systems(uid,name,created_at,modified_at) VALUES(?,?,?,?)", ["portable-system", "Inner", NOW, NOW]);
-      const system = await source.getFirstAsync<{ id: number }>("SELECT id FROM systems WHERE uid='portable-system'");
-      await source.runAsync("INSERT INTO system_rules(uid,system_id,family,value,created_at) VALUES(?,?,?,?,?)", ["portable-rule", system!.id, "favorite", "on", NOW]);
-      await source.runAsync("INSERT INTO system_overrides(uid,system_ref,contact_id,mode,created_at) VALUES(?,?,?,?,?)", ["portable-override", "custom:portable-system", contact!.id, "include", NOW]);
-      await source.runAsync("INSERT INTO system_prefs(uid,system_ref,display_order,hidden,created_at,modified_at) VALUES(?,?,?,?,?,?)", ["portable-pref", "custom:portable-system", 3, 0, NOW, NOW]);
-      await source.runAsync("INSERT INTO profile_layout_templates(uid,name,layout_json,created_at,modified_at) VALUES(?,?,?,?,?)", ["portable-layout", "Portable layout", '{"version":1,"sections":[]}', NOW, NOW]);
-      await source.runAsync("INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)", ["portable-background", "Portable background", "profile-backgrounds/portable-background.jpg", NOW, NOW]);
-      await source.runAsync("INSERT INTO profile_contact_presentation(contact_id,layout_template_uid,background_template_uid,collapse_json,created_at,modified_at) VALUES(?,?,?,?,?,?)", [contact!.id, "portable-layout", "portable-background", '{"memories":true}', NOW, NOW]);
-      await source.runAsync("INSERT INTO profile_category_presentation(category_id,layout_template_uid,background_template_uid,created_at,modified_at) VALUES(?,?,?,?,?)", [category!.id, "portable-layout", "portable-background", NOW, NOW]);
-      await source.runAsync("INSERT INTO group_events(uid,title,occurred_at,channel,duration,group_note,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)", ["portable-group", "Dinner", NOW, "In Person", 60, "Shared note", NOW, NOW]);
-      const group = await source.getFirstAsync<{ id: number }>("SELECT id FROM group_events WHERE uid='portable-group'");
-      await source.runAsync("INSERT INTO interactions(uid,contact_id,occurred_at,recorded_at,channel,duration,allow_ai,group_event_id,ge_follow_duration,source,modified_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)", ["portable-interaction", contact!.id, NOW, NOW, "In Person", 60, 1, group!.id, 1, "manual", NOW]);
-      await source.runAsync("INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)", ["portable-connection", "custom", "remembered", "https://example.invalid/v1", "custom-model", NOW, NOW, NOW]);
-      await source.runAsync("UPDATE app_settings SET ai_enabled=1,ai_active_connection='custom',modified_at='2026-08-26 12:00:00' WHERE id=1");
-      await source.runAsync("INSERT INTO personalization_sections(uid,title,body,enabled,display_order,created_at,modified_at) VALUES(?,?,?,?,?,?,?)", ["portable-section", "About me", "Local context", 1, 0, NOW, NOW]);
-      const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "AQID" });
-
-      const destination = await db();
-      await destination.runAsync("INSERT INTO contacts(uid,name,interval_days,created_at,modified_at) VALUES(?,?,?,?,?)", ["rowid-shifter-contact", "Shift", 7, NOW, NOW]);
-      await destination.runAsync("INSERT INTO systems(uid,name,created_at,modified_at) VALUES(?,?,?,?)", ["rowid-shifter-system", "Shift system", NOW, NOW]);
-      await destination.runAsync("INSERT INTO group_events(uid,title,occurred_at,created_at,modified_at) VALUES(?,?,?,?,?)", ["rowid-shifter-group", "Shift group", NOW, NOW, NOW]);
-      await applyRestore(destination, manifest, mode);
-
-      expect(await destination.getFirstAsync(`SELECT s.uid AS systemUid,c.uid AS contactUid,g.uid AS groupUid,i.allow_ai AS allowAi,i.duration FROM system_rules r JOIN systems s ON s.id=r.system_id JOIN system_overrides o ON o.uid='portable-override' JOIN contacts c ON c.id=o.contact_id JOIN interactions i ON i.uid='portable-interaction' JOIN group_events g ON g.id=i.group_event_id WHERE r.uid='portable-rule'`))
-        .toEqual({ systemUid: "portable-system", contactUid: "portable-contact", groupUid: "portable-group", allowAi: 1, duration: 60 });
-      expect(await destination.getFirstAsync("SELECT c.uid AS contactUid,p.layout_template_uid AS layoutTemplateUid,p.background_template_uid AS backgroundTemplateUid,p.collapse_json AS collapseJson FROM profile_contact_presentation p JOIN contacts c ON c.id=p.contact_id WHERE c.uid='portable-contact'"))
-        .toEqual({ contactUid: "portable-contact", layoutTemplateUid: "portable-layout", backgroundTemplateUid: "portable-background", collapseJson: '{"memories":true}' });
-      expect(await destination.getFirstAsync("SELECT c.uid AS categoryUid FROM profile_category_presentation p JOIN categories c ON c.id=p.category_id WHERE c.uid='portable-category'"))
-        .toEqual({ categoryUid: "portable-category" });
-      expect(await destination.getFirstAsync("SELECT remembered_model AS model FROM ai_connections WHERE uid='portable-connection'"))
-        .toEqual({ model: "remembered" });
-      expect(await destination.getFirstAsync("SELECT body FROM personalization_sections WHERE uid='portable-section'"))
-        .toEqual({ body: "Local context" });
-      const restoredAi = await destination.getFirstAsync<{ enabled: number; active: "custom" }>("SELECT ai_enabled AS enabled,ai_active_connection AS active FROM app_settings WHERE id=1");
-      expect(restoredAi).toEqual({ enabled: 1, active: "custom" });
-      expect(computeAiAvailability({ aiEnabled: restoredAi!.enabled === 1, activeConnection: restoredAi!.active, hasCredential: false, selectedModel: "remembered", modelAvailable: true }))
-        .toBe("needs-attention");
-      expect(backgroundMocks.staged).toContainEqual([
-        "AQID",
-        "portable-background",
-        expect.stringMatching(/^[A-Za-z0-9_-]+$/),
-        NOW,
-      ]);
-      expect(backgroundMocks.persisted).toHaveLength(1);
-      expect(backgroundMocks.persisted[0]?.[0]).toMatch(
-        /^file:\/\/\/doc\/profile-backgrounds\/_restore_pending\/portable-background\/[A-Za-z0-9_-]+\.jpg$/,
-      );
-      expect(backgroundMocks.persisted[0]?.[1]).toBe(
-        "profile-backgrounds/portable-background.jpg",
-      );
-      expect(await destination.getFirstAsync("SELECT image_path AS imagePath FROM profile_background_templates WHERE uid='portable-background'"))
-        .toEqual({ imagePath: "profile-backgrounds/portable-background.jpg" });
-    },
-  );
-
-  it.each([
-    [
-      "incoming",
-      "2026-08-24 10:00:00",
-      "2026-08-24 10:00:01",
-      "incoming-model",
-    ],
-    [
-      "local",
-      "2026-08-24 10:00:01",
-      "2026-08-24 10:00:00",
-      "local-model",
-    ],
-  ] as const)(
-    "merges distinct AI connection UIDs for one lane when %s metadata is newer",
-    async (_winner, localModifiedAt, incomingModifiedAt, expectedModel) => {
-      const source = await db();
-      await source.runAsync(
-        "INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)",
-        [
-          "incoming-connection",
-          "openai",
-          "incoming-model",
-          "",
-          "",
-          incomingModifiedAt,
-          incomingModifiedAt,
-          incomingModifiedAt,
-        ],
-      );
-      const manifest = await buildExportManifest(source, {
-        exportedAt: NOW,
-        readPhotoBase64: async () => "",
-      });
-
-      const destination = await db();
-      await destination.runAsync(
-        "INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)",
-        [
-          "local-connection",
-          "openai",
-          "local-model",
-          "",
-          "",
-          localModifiedAt,
-          localModifiedAt,
-          localModifiedAt,
-        ],
-      );
-
-      await expect(
-        applyRestore(destination, manifest, "merge"),
-      ).resolves.toMatchObject({ status: "applied" });
-      await expect(
-        destination.getAllAsync<{
-          uid: string;
-          lane: string;
-          model: string;
-        }>(
-          "SELECT uid,lane,remembered_model AS model FROM ai_connections ORDER BY lane",
-        ),
-      ).resolves.toEqual([
-        {
-          uid: "local-connection",
-          lane: "openai",
-          model: expectedModel,
-        },
-      ]);
-    },
-  );
-
-  it("applies a Group Event tombstone and preserves an orphaned member as contact history", async () => {
+it.each(["merge", "replace-all"] as const)(
+  "restores new entities with different destination rowids in %s mode",
+  async (mode) => {
     const source = await db();
-    const contact = await source.runAsync("INSERT INTO contacts(uid,name,interval_days,created_at,modified_at) VALUES(?,?,?,?,?)", ["orphan-contact", "Ada", 7, NOW, NOW]);
-    const group = await source.runAsync("INSERT INTO group_events(uid,title,occurred_at,created_at,modified_at) VALUES(?,?,?,?,?)", ["deleted-group", "Dinner", NOW, NOW, NOW]);
-    await source.runAsync("INSERT INTO interactions(uid,contact_id,occurred_at,recorded_at,channel,group_event_id,source,modified_at) VALUES(?,?,?,?,?,?,?,?)", ["orphan-member", contact.lastInsertRowId, NOW, NOW, "In Person", group.lastInsertRowId, "manual", NOW]);
-    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "AQID" });
-    manifest.groupEvents = [];
-    manifest.tombstones.push({ entityType: "group_event", entityUid: "deleted-group", deletedAt: "2026-08-26 12:00:00" });
+    await source.runAsync(
+      "INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)",
+      ["portable-category", "Portable", 8, NOW, NOW],
+    );
+    const category = await source.getFirstAsync<{ id: number }>(
+      "SELECT id FROM categories WHERE uid='portable-category'",
+    );
+    await source.runAsync(
+      "INSERT INTO contacts(uid,name,category_id,interval_days,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+      ["portable-contact", "Ada", category!.id, 7, NOW, NOW],
+    );
+    const contact = await source.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contacts WHERE uid='portable-contact'",
+    );
+    await source.runAsync(
+      "INSERT INTO systems(uid,name,created_at,modified_at) VALUES(?,?,?,?)",
+      ["portable-system", "Inner", NOW, NOW],
+    );
+    const system = await source.getFirstAsync<{ id: number }>(
+      "SELECT id FROM systems WHERE uid='portable-system'",
+    );
+    await source.runAsync(
+      "INSERT INTO system_rules(uid,system_id,family,value,created_at) VALUES(?,?,?,?,?)",
+      ["portable-rule", system!.id, "favorite", "on", NOW],
+    );
+    await source.runAsync(
+      "INSERT INTO system_overrides(uid,system_ref,contact_id,mode,created_at) VALUES(?,?,?,?,?)",
+      [
+        "portable-override",
+        "custom:portable-system",
+        contact!.id,
+        "include",
+        NOW,
+      ],
+    );
+    await source.runAsync(
+      "INSERT INTO system_prefs(uid,system_ref,display_order,hidden,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+      ["portable-pref", "custom:portable-system", 3, 0, NOW, NOW],
+    );
+    await source.runAsync(
+      "INSERT INTO profile_layout_templates(uid,name,layout_json,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [
+        "portable-layout",
+        "Portable layout",
+        '{"version":1,"sections":[]}',
+        NOW,
+        NOW,
+      ],
+    );
+    await source.runAsync(
+      "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [
+        "portable-background",
+        "Portable background",
+        "profile-backgrounds/portable-background.jpg",
+        NOW,
+        NOW,
+      ],
+    );
+    await source.runAsync(
+      "INSERT INTO profile_contact_presentation(contact_id,layout_template_uid,background_template_uid,collapse_json,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+      [
+        contact!.id,
+        "portable-layout",
+        "portable-background",
+        '{"memories":true}',
+        NOW,
+        NOW,
+      ],
+    );
+    await source.runAsync(
+      "INSERT INTO profile_category_presentation(category_id,layout_template_uid,background_template_uid,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [category!.id, "portable-layout", "portable-background", NOW, NOW],
+    );
+    await source.runAsync(
+      "INSERT INTO group_events(uid,title,occurred_at,channel,duration,group_note,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)",
+      [
+        "portable-group",
+        "Dinner",
+        NOW,
+        "In Person",
+        60,
+        "Shared note",
+        NOW,
+        NOW,
+      ],
+    );
+    const group = await source.getFirstAsync<{ id: number }>(
+      "SELECT id FROM group_events WHERE uid='portable-group'",
+    );
+    await source.runAsync(
+      "INSERT INTO interactions(uid,contact_id,occurred_at,recorded_at,channel,duration,allow_ai,group_event_id,ge_follow_duration,source,modified_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+      [
+        "portable-interaction",
+        contact!.id,
+        NOW,
+        NOW,
+        "In Person",
+        60,
+        1,
+        group!.id,
+        1,
+        "manual",
+        NOW,
+      ],
+    );
+    await source.runAsync(
+      "INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)",
+      [
+        "portable-connection",
+        "custom",
+        "remembered",
+        "https://example.invalid/v1",
+        "custom-model",
+        NOW,
+        NOW,
+        NOW,
+      ],
+    );
+    await source.runAsync(
+      "UPDATE app_settings SET ai_enabled=1,ai_active_connection='custom',modified_at='2026-08-26 12:00:00' WHERE id=1",
+    );
+    await source.runAsync(
+      "INSERT INTO personalization_sections(uid,title,body,enabled,display_order,created_at,modified_at) VALUES(?,?,?,?,?,?,?)",
+      ["portable-section", "About me", "Local context", 1, 0, NOW, NOW],
+    );
+    const manifest = await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "AQID",
+    });
+
     const destination = await db();
-    await applyRestore(destination, parseBackupManifest(manifest), "replace-all");
-    expect(await destination.getFirstAsync("SELECT group_event_id AS groupEventId FROM interactions WHERE uid='orphan-member'"))
-      .toEqual({ groupEventId: null });
-    expect(await destination.getFirstAsync("SELECT entity_uid AS uid FROM tombstones WHERE entity_type='group_event'"))
-      .toEqual({ uid: "deleted-group" });
+    await destination.runAsync(
+      "INSERT INTO contacts(uid,name,interval_days,created_at,modified_at) VALUES(?,?,?,?,?)",
+      ["rowid-shifter-contact", "Shift", 7, NOW, NOW],
+    );
+    await destination.runAsync(
+      "INSERT INTO systems(uid,name,created_at,modified_at) VALUES(?,?,?,?)",
+      ["rowid-shifter-system", "Shift system", NOW, NOW],
+    );
+    await destination.runAsync(
+      "INSERT INTO group_events(uid,title,occurred_at,created_at,modified_at) VALUES(?,?,?,?,?)",
+      ["rowid-shifter-group", "Shift group", NOW, NOW, NOW],
+    );
+    await applyRestore(destination, manifest, mode);
+
+    expect(
+      await destination.getFirstAsync(
+        `SELECT s.uid AS systemUid,c.uid AS contactUid,g.uid AS groupUid,i.allow_ai AS allowAi,i.duration FROM system_rules r JOIN systems s ON s.id=r.system_id JOIN system_overrides o ON o.uid='portable-override' JOIN contacts c ON c.id=o.contact_id JOIN interactions i ON i.uid='portable-interaction' JOIN group_events g ON g.id=i.group_event_id WHERE r.uid='portable-rule'`,
+      ),
+    ).toEqual({
+      systemUid: "portable-system",
+      contactUid: "portable-contact",
+      groupUid: "portable-group",
+      allowAi: 1,
+      duration: 60,
+    });
+    expect(
+      await destination.getFirstAsync(
+        "SELECT c.uid AS contactUid,p.layout_template_uid AS layoutTemplateUid,p.background_template_uid AS backgroundTemplateUid,p.collapse_json AS collapseJson FROM profile_contact_presentation p JOIN contacts c ON c.id=p.contact_id WHERE c.uid='portable-contact'",
+      ),
+    ).toEqual({
+      contactUid: "portable-contact",
+      layoutTemplateUid: "portable-layout",
+      backgroundTemplateUid: "portable-background",
+      collapseJson: '{"memories":true}',
+    });
+    expect(
+      await destination.getFirstAsync(
+        "SELECT c.uid AS categoryUid FROM profile_category_presentation p JOIN categories c ON c.id=p.category_id WHERE c.uid='portable-category'",
+      ),
+    ).toEqual({ categoryUid: "portable-category" });
+    expect(
+      await destination.getFirstAsync(
+        "SELECT remembered_model AS model FROM ai_connections WHERE uid='portable-connection'",
+      ),
+    ).toEqual({ model: "remembered" });
+    expect(
+      await destination.getFirstAsync(
+        "SELECT body FROM personalization_sections WHERE uid='portable-section'",
+      ),
+    ).toEqual({ body: "Local context" });
+    const restoredAi = await destination.getFirstAsync<{
+      enabled: number;
+      active: "custom";
+    }>(
+      "SELECT ai_enabled AS enabled,ai_active_connection AS active FROM app_settings WHERE id=1",
+    );
+    expect(restoredAi).toEqual({ enabled: 1, active: "custom" });
+    expect(
+      computeAiAvailability({
+        aiEnabled: restoredAi!.enabled === 1,
+        activeConnection: restoredAi!.active,
+        hasCredential: false,
+        selectedModel: "remembered",
+        modelAvailable: true,
+      }),
+    ).toBe("ready");
+    expect(backgroundMocks.staged).toContainEqual([
+      "AQID",
+      "portable-background",
+      expect.stringMatching(/^[A-Za-z0-9_-]+$/),
+    ]);
+    expect(backgroundMocks.persisted).toHaveLength(1);
+    expect(backgroundMocks.persisted[0]?.[0]).toMatch(
+      /^file:\/\/\/doc\/profile-backgrounds\/_restore_pending\/portable-background\/[A-Za-z0-9_-]+\.jpg$/,
+    );
+    expect(backgroundMocks.persisted[0]?.[1]).toBe(
+      "profile-backgrounds/portable-background.jpg",
+    );
+    expect(
+      await destination.getFirstAsync(
+        "SELECT image_path AS imagePath FROM profile_background_templates WHERE uid='portable-background'",
+      ),
+    ).toEqual({ imagePath: "profile-backgrounds/portable-background.jpg" });
+  },
+);
+
+it.each([
+  ["incoming", "2026-08-24 10:00:00", "2026-08-24 10:00:01", "incoming-model"],
+  ["local", "2026-08-24 10:00:01", "2026-08-24 10:00:00", "local-model"],
+] as const)(
+  "merges distinct AI connection UIDs for one lane when %s metadata is newer",
+  async (_winner, localModifiedAt, incomingModifiedAt, expectedModel) => {
+    const source = await db();
+    await source.runAsync(
+      "INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)",
+      [
+        "incoming-connection",
+        "openai",
+        "incoming-model",
+        "",
+        "",
+        incomingModifiedAt,
+        incomingModifiedAt,
+        incomingModifiedAt,
+      ],
+    );
+    const manifest = await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "",
+    });
+
+    const destination = await db();
+    await destination.runAsync(
+      "INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)",
+      [
+        "local-connection",
+        "openai",
+        "local-model",
+        "",
+        "",
+        localModifiedAt,
+        localModifiedAt,
+        localModifiedAt,
+      ],
+    );
+
+    await expect(
+      applyRestore(destination, manifest, "merge"),
+    ).resolves.toMatchObject({ status: "applied" });
+    await expect(
+      destination.getAllAsync<{
+        uid: string;
+        lane: string;
+        model: string;
+      }>(
+        "SELECT uid,lane,remembered_model AS model FROM ai_connections ORDER BY lane",
+      ),
+    ).resolves.toEqual([
+      {
+        uid: "local-connection",
+        lane: "openai",
+        model: expectedModel,
+      },
+    ]);
+  },
+);
+
+it("applies a Group Event tombstone and preserves an orphaned member as contact history", async () => {
+  const source = await db();
+  const contact = await source.runAsync(
+    "INSERT INTO contacts(uid,name,interval_days,created_at,modified_at) VALUES(?,?,?,?,?)",
+    ["orphan-contact", "Ada", 7, NOW, NOW],
+  );
+  const group = await source.runAsync(
+    "INSERT INTO group_events(uid,title,occurred_at,created_at,modified_at) VALUES(?,?,?,?,?)",
+    ["deleted-group", "Dinner", NOW, NOW, NOW],
+  );
+  await source.runAsync(
+    "INSERT INTO interactions(uid,contact_id,occurred_at,recorded_at,channel,group_event_id,source,modified_at) VALUES(?,?,?,?,?,?,?,?)",
+    [
+      "orphan-member",
+      contact.lastInsertRowId,
+      NOW,
+      NOW,
+      "In Person",
+      group.lastInsertRowId,
+      "manual",
+      NOW,
+    ],
+  );
+  const manifest = await buildExportManifest(source, {
+    exportedAt: NOW,
+    readPhotoBase64: async () => "AQID",
   });
+  manifest.groupEvents = [];
+  manifest.tombstones.push({
+    entityType: "group_event",
+    entityUid: "deleted-group",
+    deletedAt: "2026-08-26 12:00:00",
+  });
+  const destination = await db();
+  await applyRestore(destination, parseBackupManifest(manifest), "replace-all");
+  expect(
+    await destination.getFirstAsync(
+      "SELECT group_event_id AS groupEventId FROM interactions WHERE uid='orphan-member'",
+    ),
+  ).toEqual({ groupEventId: null });
+  expect(
+    await destination.getFirstAsync(
+      "SELECT entity_uid AS uid FROM tombstones WHERE entity_type='group_event'",
+    ),
+  ).toEqual({ uid: "deleted-group" });
+});
 
 describe("applyRestore", () => {
   it("recomputes a retained contact after inserting history and removes it from Not Contacted", async () => {
@@ -629,7 +819,7 @@ describe("applyRestore", () => {
     ).resolves.toEqual([]);
   });
 
-  it("leaves same-UID background staging bound to the rolled-back incoming version", async () => {
+  it("keeps equal-metadata same-UID replacement bytes unchanged on replace-all rollback", async () => {
     const source = await db();
     await source.runAsync(
       "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
@@ -638,7 +828,7 @@ describe("applyRestore", () => {
         "Incoming",
         "profile-backgrounds/atomic-background.jpg",
         NOW,
-        "2026-08-26 12:00:00",
+        NOW,
       ],
     );
     const manifest = await buildExportManifest(source, {
@@ -658,27 +848,85 @@ describe("applyRestore", () => {
     );
     await destination.execAsync(`CREATE TRIGGER fail_background_restore_revision BEFORE UPDATE OF data_revision ON app_settings
       BEGIN SELECT RAISE(ABORT, 'background restore revision failed'); END`);
+    backgroundMocks.bytes.set(
+      "profile-backgrounds/atomic-background.jpg",
+      "OLD",
+    );
 
     await expect(
-      applyRestore(destination, manifest, "merge", { sessionToken: "session" }),
+      applyRestore(destination, manifest, "replace-all", {
+        sessionToken: "session",
+      }),
     ).rejects.toThrow("background restore revision failed");
     await expect(
       destination.getFirstAsync<{
         name: string;
+        imagePath: string;
         modified_at: string;
       }>(
-        "SELECT name,modified_at FROM profile_background_templates WHERE uid='atomic-background'",
+        "SELECT name,image_path AS imagePath,modified_at FROM profile_background_templates WHERE uid='atomic-background'",
       ),
-    ).resolves.toEqual({ name: "Local", modified_at: NOW });
+    ).resolves.toEqual({
+      name: "Local",
+      imagePath: "profile-backgrounds/atomic-background.jpg",
+      modified_at: NOW,
+    });
     expect(backgroundMocks.staged).toEqual([
-      [
-        "TkVX",
-        "atomic-background",
-        "session",
-        "2026-08-26 12:00:00",
-      ],
+      ["TkVX", "atomic-background", "session"],
     ]);
     expect(backgroundMocks.persisted).toEqual([]);
+    expect(
+      backgroundMocks.bytes.get("profile-backgrounds/atomic-background.jpg"),
+    ).toBe("OLD");
+    expect(
+      backgroundMocks.bytes.get(
+        "profile-backgrounds/_restore_pending/atomic-background/session.jpg",
+      ),
+    ).toBe("TkVX");
+  });
+
+  it("commits the exact pending path when post-commit background persist fails", async () => {
+    const source = await db();
+    await source.runAsync(
+      "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [
+        "pending-background",
+        "Pending",
+        "profile-backgrounds/pending-background.jpg",
+        NOW,
+        NOW,
+      ],
+    );
+    const manifest = await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "TkVX",
+    });
+    const destination = await db();
+
+    await expect(
+      applyRestore(destination, manifest, "merge", {
+        sessionToken: "crash-session",
+        persistBackground: async () => {
+          throw new Error("process stopped after commit");
+        },
+      }),
+    ).resolves.toMatchObject({
+      status: "applied",
+      photosNeedingAttention: 1,
+    });
+    await expect(
+      destination.getFirstAsync<{ imagePath: string }>(
+        "SELECT image_path AS imagePath FROM profile_background_templates WHERE uid='pending-background'",
+      ),
+    ).resolves.toEqual({
+      imagePath:
+        "profile-backgrounds/_restore_pending/pending-background/crash-session.jpg",
+    });
+    expect(
+      backgroundMocks.bytes.get(
+        "profile-backgrounds/_restore_pending/pending-background/crash-session.jpg",
+      ),
+    ).toBe("TkVX");
   });
 
   it("allows a newer merged knowledge row to be permanently deleted after its older tombstone survives", async () => {

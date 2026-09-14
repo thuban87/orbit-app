@@ -110,7 +110,6 @@ describe("background storage", () => {
       "AQID",
       "background_1",
       "session_1",
-      "2026-09-14 05:00:00",
     );
     expect(relative).toBe(
       backgroundRestorePendingRelPath("background_1", "session_1"),
@@ -121,12 +120,7 @@ describe("background storage", () => {
     await expect(listBackgroundRestorePendingEntries()).resolves.toEqual([
       {
         relative,
-        evidence: {
-          version: 1,
-          templateUid: "background_1",
-          expectedModifiedAt: "2026-09-14 05:00:00",
-          canonicalRelativePath: "profile-backgrounds/background_1.jpg",
-        },
+        templateUid: "background_1",
       },
     ]);
     deleteBackgroundRestorePending(relative);
@@ -134,14 +128,14 @@ describe("background storage", () => {
     expect(h.exists.has(`file:///doc/${relative}.json`)).toBe(false);
   });
 
-  it("retains malformed or missing evidence as a prune-only pending entry", async () => {
+  it("derives the template UID from the safe pending directory", async () => {
     const relative = backgroundRestorePendingRelPath(
       "background_1",
       "session_1",
     );
     h.exists.add(`file:///doc/${relative}`);
     await expect(listBackgroundRestorePendingEntries()).resolves.toEqual([
-      { relative, evidence: null },
+      { relative, templateUid: "background_1" },
     ]);
   });
 

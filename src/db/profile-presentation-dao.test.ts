@@ -175,6 +175,21 @@ describe("Profile presentation read model", () => {
     expect(await listProfileBackgroundTemplates(exec)).toHaveLength(3);
   });
 
+  it("hides transaction-committed restore markers from presentation reads", async () => {
+    await exec.runAsync(
+      "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [
+        "pending-bg",
+        "Pending background",
+        "profile-backgrounds/_restore_pending/pending-bg/session.jpg",
+        NOW,
+        NOW,
+      ],
+    );
+
+    await expect(listProfileBackgroundTemplates(exec)).resolves.toEqual([]);
+  });
+
   it("reports usage by scope and never counts freeform layouts as templates", async () => {
     const categoryId = (
       await exec.runAsync(

@@ -55,7 +55,10 @@ import "@/services/notifications/headless-task";
 import { registerDigestScheduleSweep } from "@/services/notifications/digest-schedule";
 import { FOREGROUND_NOTIFICATION_BEHAVIOR } from "@/services/notifications/notification-ids";
 import { registerNotificationScheduleSweep } from "@/services/notifications/notification-schedule";
-import { registerBackgroundReconcileSweep } from "@/services/photos/background-reconcile-sweep";
+import {
+  registerBackgroundReconcileSweep,
+  runBackgroundReconciliation,
+} from "@/services/photos/background-reconcile-sweep";
 import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-sweep";
 import { registerRestorePhotoFinalizeSweep } from "@/services/photos/restore-photo-finalize-sweep";
 import { registerWidgetSweep } from "@/services/widget/widget-refresh";
@@ -188,6 +191,10 @@ function AppShell() {
               updateAppSettings(getExecutor(), patch, localDateTime()),
           }),
           loadAppFonts(),
+          // A committed restore may temporarily point image_path at its exact
+          // pending artifact. Reconcile before the main tree can read template
+          // paths; later foreground sweeps remain the ongoing recovery path.
+          runBackgroundReconciliation(getExecutor()),
         ]);
         if (!active) return;
         useThemeStore.getState().hydrate(themeSelectionFromSettings(settings));
@@ -225,11 +232,6 @@ function AppShell() {
       registerMemoryTrashSweep(getExecutor);
       memoryTrashSweepRegistered = true;
     }
-    // Backup must register before the trigger's cold-start foreground sweep.
-    if (!backupSweepRegistered) {
-      registerBackupSweep(getExecutor);
-      backupSweepRegistered = true;
-    }
     // Durable assist rows are bounded only during a real foreground launch. The
     // hook gets its executor lazily and is registered before the cold-start
     // trigger, so headless widget/notification taps cannot reach it.
@@ -251,6 +253,13 @@ function AppShell() {
     if (!backgroundReconcileRegistered) {
       registerBackgroundReconcileSweep(getExecutor);
       backgroundReconcileRegistered = true;
+    }
+    // Backup runs only after background reconciliation. A committed restore
+    // marker is an internal crash-recovery state and must never be exported as
+    // a portable image path on cold start or a later foreground launch.
+    if (!backupSweepRegistered) {
+      registerBackupSweep(getExecutor);
+      backupSweepRegistered = true;
     }
     // A committed restore-photo journal is drained only on real foreground
     // launches, after migration readiness and before the cold-start sweep fires.

@@ -1,7 +1,9 @@
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { registerSweepHook } from "@/services/launch-sweep";
 import {
   applyBackgroundReconcileAction,
+  backgroundDerivativeRelPath,
   deleteBackgroundDerivative,
   deleteBackgroundRestorePending,
   listBackgroundRestorePendingEntries,
@@ -26,7 +28,18 @@ export async function runBackgroundReconciliation(
   }>(
     "SELECT uid,image_path AS imagePath,modified_at AS modifiedAt FROM profile_background_templates",
   );
-  const referencedPaths = new Set(rows.map((row) => row.imagePath));
+  // A committed restore marker references the pending artifact, but the old
+  // canonical remains a safety net until that artifact is successfully copied.
+  // Keep the UID-derived canonical out of orphan deletion during this window.
+  const referencedPaths = new Set(
+    rows.map((row) =>
+      row.imagePath.startsWith(
+        `profile-backgrounds/_restore_pending/${row.uid}/`,
+      )
+        ? backgroundDerivativeRelPath(row.uid)
+        : row.imagePath,
+    ),
+  );
   const plan = planBackgroundReconciliation({
     entries: listBackgroundStorageEntries(),
     referencedPaths,
@@ -44,23 +57,35 @@ export async function runBackgroundReconciliation(
   const rowsByUid = new Map(rows.map((row) => [row.uid, row]));
   const recoveredPaths = new Set<string>();
   for (const pending of await listBackgroundRestorePendingEntries()) {
-    const evidence = pending.evidence;
-    const row = evidence ? rowsByUid.get(evidence.templateUid) : null;
-    if (
-      !evidence ||
-      !row ||
-      row.modifiedAt !== evidence.expectedModifiedAt ||
-      row.imagePath !== evidence.canonicalRelativePath
-    ) {
+    const row = rowsByUid.get(pending.templateUid);
+    if (!row || row.imagePath !== pending.relative) {
       deleteBackgroundRestorePending(pending.relative);
       continue;
     }
+    const canonical = backgroundDerivativeRelPath(row.uid);
     await persistBackgroundDerivative(
       resolveBackgroundRestorePendingUri(pending.relative),
-      evidence.canonicalRelativePath,
+      canonical,
     );
+    await inWriteTransaction(exec, async () => {
+      const result = await exec.runAsync(
+        "UPDATE profile_background_templates SET image_path=? WHERE uid=? AND image_path=?",
+        [canonical, row.uid, pending.relative],
+      );
+      if (result.changes !== 1) {
+        const current = await exec.getFirstAsync<{ imagePath: string }>(
+          "SELECT image_path AS imagePath FROM profile_background_templates WHERE uid=?",
+          [row.uid],
+        );
+        if (current?.imagePath !== canonical) {
+          throw new Error(
+            "Profile background restore marker changed during finalization",
+          );
+        }
+      }
+    });
     deleteBackgroundRestorePending(pending.relative);
-    recoveredPaths.add(evidence.canonicalRelativePath);
+    recoveredPaths.add(canonical);
   }
   for (const relative of plan.missingReferences) {
     if (recoveredPaths.has(relative)) continue;

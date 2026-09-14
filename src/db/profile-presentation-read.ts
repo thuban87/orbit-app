@@ -69,6 +69,7 @@ export function listProfileBackgroundTemplates(
     `SELECT id, uid, name, image_path AS imagePath,
             created_at AS createdAt, modified_at AS modifiedAt
        FROM profile_background_templates
+      WHERE image_path NOT GLOB 'profile-backgrounds/_restore_pending/*/*.jpg'
       ORDER BY name COLLATE NOCASE, uid`,
   );
 }
