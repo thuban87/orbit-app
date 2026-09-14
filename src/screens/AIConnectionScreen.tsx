@@ -43,7 +43,7 @@ const LANE_NAMES: Record<AiCloudProviderId, string> = {
 
 export interface AIConnectionScreenProps {
   onBack: () => void;
-  onChooseModel?: (lane: AiCloudProviderId) => void;
+  onChooseModel: (lane: AiCloudProviderId) => void;
 }
 
 export function AIConnectionScreen({
@@ -113,9 +113,14 @@ export function AIConnectionScreen({
         rememberedModel: previous?.rememberedModel ?? "",
         now: localDateTime(),
       });
-      await activateAiConnection(getExecutor(), lane, localDateTime());
       setKeyInput("");
       await load();
+      if (previous?.rememberedModel.trim()) {
+        await activateAiConnection(getExecutor(), lane, localDateTime());
+        await load();
+      } else {
+        onChooseModel(lane);
+      }
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to configure direct connection", caught);
       setError(
@@ -140,8 +145,17 @@ export function AIConnectionScreen({
         rememberedModel: previous?.rememberedModel ?? "",
         now: localDateTime(),
       });
-      await activateAiConnection(getExecutor(), "openrouter", localDateTime());
       await load();
+      if (previous?.rememberedModel.trim()) {
+        await activateAiConnection(
+          getExecutor(),
+          "openrouter",
+          localDateTime(),
+        );
+        await load();
+      } else {
+        onChooseModel("openrouter");
+      }
     } catch (caught) {
       Logger.error(LOG_SCOPE, "OpenRouter setup did not complete", caught);
       setError(
@@ -263,7 +277,7 @@ export function AIConnectionScreen({
                 <Button
                   role="tertiary"
                   label="Choose model"
-                  onPress={() => onChooseModel?.(lane)}
+                  onPress={() => onChooseModel(lane)}
                 />
                 <Button
                   role="destructive"

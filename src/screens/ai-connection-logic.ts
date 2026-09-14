@@ -47,7 +47,7 @@ export function connectionCardState(
   activeLane: AiCloudProviderId | null,
   rememberedModel: string | null | undefined,
 ) {
-  const configured = rememberedModel !== null && rememberedModel !== undefined;
+  const configured = (rememberedModel ?? "").trim() !== "";
   return {
     active: lane === activeLane,
     saved: configured && lane !== activeLane,

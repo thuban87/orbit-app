@@ -38,6 +38,7 @@ describe("AI connection switching", () => {
       saved: true,
       rememberedModel: "gpt-live",
     });
+    expect(connectionCardState("google", "anthropic", "").saved).toBe(false);
   });
 });
 

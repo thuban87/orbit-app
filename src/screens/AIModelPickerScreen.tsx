@@ -27,7 +27,10 @@ import {
   refreshOpenRouterCatalogIfStale,
 } from "@/ai/openrouter-catalog";
 import { AppText, Button, GlassSurface } from "@/components/ui";
-import { setRememberedModel } from "@/db/ai-connections-dao";
+import {
+  activateAiConnection,
+  setRememberedModel,
+} from "@/db/ai-connections-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { AiCloudProviderId } from "@/services/ai-types";
 import { useTheme } from "@/theme";
@@ -139,6 +142,7 @@ export function AIModelPickerScreen({
     if (trimmed === "") return;
     try {
       await setRememberedModel(getExecutor(), lane, trimmed, localDateTime());
+      await activateAiConnection(getExecutor(), lane, localDateTime());
       onSelected?.(trimmed);
       onBack();
     } catch (caught) {
