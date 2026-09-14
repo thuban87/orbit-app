@@ -3,10 +3,13 @@ import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "background-storage";
 const BACKGROUND_DIR = "profile-backgrounds";
+const BACKGROUND_RESTORE_PENDING_DIR = `${BACKGROUND_DIR}/_restore_pending`;
 const SAFE_BACKGROUND_UID = /^[A-Za-z0-9_-]{1,256}$/;
 const SAFE_BACKGROUND_RELATIVE = /^profile-backgrounds\/[A-Za-z0-9_-]+\.jpg$/;
 const SAFE_BACKGROUND_SIDECAR =
   /^profile-backgrounds\/[A-Za-z0-9_-]+\.jpg\.(?:tmp|bak)$/;
+const SAFE_BACKGROUND_RESTORE_PENDING =
+  /^profile-backgrounds\/_restore_pending\/[A-Za-z0-9_-]+\.jpg$/;
 
 const writeTails = new Map<string, Promise<void>>();
 
@@ -61,6 +64,68 @@ export function resolveBackgroundUriFromDocumentUri(
 
 export function resolveBackgroundUri(relative: string): string {
   return resolveBackgroundUriFromDocumentUri(Paths.document.uri, relative);
+}
+
+function assertBackgroundRestorePendingRelative(relative: string): void {
+  if (
+    typeof relative !== "string" ||
+    relative.includes("\0") ||
+    !SAFE_BACKGROUND_RESTORE_PENDING.test(relative)
+  ) {
+    throw new Error("unsafe profile background restore-pending path");
+  }
+}
+
+/** Durable uid-keyed evidence for a post-commit background persist. */
+export function backgroundRestorePendingRelPath(templateUid: string): string {
+  backgroundDerivativeRelPath(templateUid);
+  return `${BACKGROUND_RESTORE_PENDING_DIR}/${templateUid}.jpg`;
+}
+
+export function resolveBackgroundRestorePendingUri(templateUid: string): string {
+  const relative = backgroundRestorePendingRelPath(templateUid);
+  assertBackgroundRestorePendingRelative(relative);
+  return `${Paths.document.uri.endsWith("/") ? Paths.document.uri : `${Paths.document.uri}/`}${relative}`;
+}
+
+export async function stageBackgroundRestorePendingBase64(
+  base64: string,
+  templateUid: string,
+): Promise<string> {
+  const relative = backgroundRestorePendingRelPath(templateUid);
+  new Directory(Paths.document, BACKGROUND_RESTORE_PENDING_DIR).create({
+    intermediates: true,
+    idempotent: true,
+  });
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1)
+    bytes[index] = binary.charCodeAt(index);
+  new File(Paths.document, relative).write(bytes);
+  return relative;
+}
+
+export function listBackgroundRestorePendingEntries(): Array<{
+  uid: string;
+  relative: string;
+}> {
+  const directory = new Directory(Paths.document, BACKGROUND_RESTORE_PENDING_DIR);
+  if (!directory.exists) return [];
+  return directory
+    .list()
+    .map((entry) => entry.name)
+    .filter((name) => /^[A-Za-z0-9_-]+\.jpg$/.test(name))
+    .sort()
+    .map((name) => ({
+      uid: name.slice(0, -".jpg".length),
+      relative: `${BACKGROUND_RESTORE_PENDING_DIR}/${name}`,
+    }));
+}
+
+export function deleteBackgroundRestorePending(templateUid: string): void {
+  const relative = backgroundRestorePendingRelPath(templateUid);
+  assertBackgroundRestorePendingRelative(relative);
+  new File(Paths.document, relative).delete();
 }
 
 function enqueueWrite<T>(

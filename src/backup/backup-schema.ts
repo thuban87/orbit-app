@@ -484,6 +484,9 @@ function validate(manifest: RawManifest): BackupManifest {
   for (const row of newArrays.profileCategoryPresentation)
     if (!categories.has(row.categoryUid as string))
       fail("profileCategoryPresentation has an unknown category UID");
+  for (const row of newArrays.profileBackgroundTemplates)
+    if (!validBase64(row.imageBase64))
+      fail("profileBackgroundTemplates has invalid image bytes");
   // Validate the fields the scope-aware restore now branches on (WR-01): a
   // malformed `scope` in a hand-edited backup must not silently bypass
   // assertCompleteIncomingPairs, and a non-string/non-flag value must fail as a

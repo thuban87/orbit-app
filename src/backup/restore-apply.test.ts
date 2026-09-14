@@ -9,6 +9,25 @@ const photoMocks = vi.hoisted(() => ({
   persistFails: false,
   deleteLeavesFile: false,
 }));
+const backgroundMocks = vi.hoisted(() => ({
+  staged: [] as Array<[string, string]>,
+  persisted: [] as Array<[string, string]>,
+  deleted: [] as string[],
+}));
+vi.mock("@/services/photos/background-storage", () => ({
+  backgroundDerivativeRelPath: (uid: string) => `profile-backgrounds/${uid}.jpg`,
+  resolveBackgroundRestorePendingUri: (uid: string) =>
+    `file:///doc/profile-backgrounds/_restore_pending/${uid}.jpg`,
+  stageBackgroundRestorePendingBase64: async (base64: string, uid: string) => {
+    backgroundMocks.staged.push([base64, uid]);
+  },
+  persistBackgroundDerivative: async (source: string, destination: string) => {
+    backgroundMocks.persisted.push([source, destination]);
+  },
+  deleteBackgroundRestorePending: (uid: string) => {
+    backgroundMocks.deleted.push(uid);
+  },
+}));
 vi.mock("@/services/photos/photo-storage", () => ({
   contactPhotoRelPath: (id: number) => `avatars/contact-${id}.jpg`,
   customFieldPhotoRelPath: (id: number, colName: string) =>
@@ -143,6 +162,9 @@ beforeEach(() => {
   photoMocks.deleted = [];
   photoMocks.persistFails = false;
   photoMocks.deleteLeavesFile = false;
+  backgroundMocks.staged = [];
+  backgroundMocks.persisted = [];
+  backgroundMocks.deleted = [];
 });
 
   it.each(["merge", "replace-all"] as const)(
@@ -185,6 +207,13 @@ beforeEach(() => {
         .toEqual({ model: "remembered" });
       expect(await destination.getFirstAsync("SELECT body FROM personalization_sections WHERE uid='portable-section'"))
         .toEqual({ body: "Local context" });
+      expect(backgroundMocks.staged).toContainEqual(["AQID", "portable-background"]);
+      expect(backgroundMocks.persisted).toContainEqual([
+        "file:///doc/profile-backgrounds/_restore_pending/portable-background.jpg",
+        "profile-backgrounds/portable-background.jpg",
+      ]);
+      expect(await destination.getFirstAsync("SELECT image_path AS imagePath FROM profile_background_templates WHERE uid='portable-background'"))
+        .toEqual({ imagePath: "profile-backgrounds/portable-background.jpg" });
     },
   );
 

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   operations: [] as string[],
   exists: new Set<string>(),
+  bytes: new Map<string, Uint8Array>(),
 }));
 
 vi.mock("expo-file-system", () => {
@@ -31,26 +32,46 @@ vi.mock("expo-file-system", () => {
     async copy(destination: File) {
       h.operations.push(`copy ${this.uri} -> ${destination.uri}`);
       h.exists.add(destination.uri);
+      h.bytes.set(destination.uri, h.bytes.get(this.uri) ?? new Uint8Array());
     }
     async move(destination: File) {
       h.operations.push(`move ${this.uri} -> ${destination.uri}`);
       h.exists.delete(this.uri);
       h.exists.add(destination.uri);
+      const bytes = h.bytes.get(this.uri);
+      if (bytes) h.bytes.set(destination.uri, bytes);
+      h.bytes.delete(this.uri);
       this.uri = destination.uri;
     }
     delete() {
       h.operations.push(`delete ${this.uri}`);
       h.exists.delete(this.uri);
+      h.bytes.delete(this.uri);
+    }
+    write(bytes: Uint8Array) {
+      h.operations.push(`write ${this.uri}`);
+      h.exists.add(this.uri);
+      h.bytes.set(this.uri, bytes);
     }
   }
   class Directory {
-    constructor(..._parts: unknown[]) {}
+    uri: string;
+    constructor(...parts: unknown[]) {
+      this.uri = uri(parts);
+    }
     create() {}
     get exists() {
       return true;
     }
     list() {
-      return [];
+      const prefix = `${this.uri}/`;
+      return [...h.exists]
+        .filter(
+          (entry) =>
+            entry.startsWith(prefix) &&
+            !entry.slice(prefix.length).includes("/"),
+        )
+        .map((entry) => ({ name: entry.slice(prefix.length) }));
     }
   }
   return { Directory, File, Paths: { document: { uri: "file:///doc" } } };
@@ -58,17 +79,33 @@ vi.mock("expo-file-system", () => {
 
 import {
   backgroundDerivativeRelPath,
+  backgroundRestorePendingRelPath,
+  deleteBackgroundRestorePending,
+  listBackgroundRestorePendingEntries,
   persistBackgroundDerivative,
   reconcileBackgroundDir,
   resolveBackgroundUriFromDocumentUri,
+  stageBackgroundRestorePendingBase64,
 } from "./background-storage";
 
 beforeEach(() => {
   h.operations = [];
   h.exists = new Set();
+  h.bytes = new Map();
 });
 
 describe("background storage", () => {
+  it("stages decoded bytes in the uid-keyed restore-pending namespace", async () => {
+    const relative = await stageBackgroundRestorePendingBase64("AQID", "background_1");
+    expect(relative).toBe(backgroundRestorePendingRelPath("background_1"));
+    expect([...h.bytes.get(`file:///doc/${relative}`)!]).toEqual([1, 2, 3]);
+    expect(listBackgroundRestorePendingEntries()).toEqual([
+      { uid: "background_1", relative },
+    ]);
+    deleteBackgroundRestorePending("background_1");
+    expect(h.exists.has(`file:///doc/${relative}`)).toBe(false);
+  });
+
   it("only permits UID-derived profile-background paths and rejects traversal/cache paths", () => {
     expect(backgroundDerivativeRelPath("background_1")).toBe(
       "profile-backgrounds/background_1.jpg",

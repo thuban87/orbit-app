@@ -215,6 +215,19 @@ async function readManifest(
       }
     }),
   );
+  const backgroundsWithBytes = await Promise.all(
+    profileBackgroundTemplates.map(async (row) => {
+      if (typeof row.imagePath !== "string")
+        throw new BackupPhotoUnreadableError();
+      try {
+        const imageBase64 = await deps.readPhotoBase64(row.imagePath);
+        if (!imageBase64) throw new Error("empty background");
+        return { ...row, imageBase64 };
+      } catch {
+        throw new BackupPhotoUnreadableError();
+      }
+    }),
+  );
   const manifest: BackupManifest = {
     backupFormatVersion: BACKUP_FORMAT_VERSION,
     envelopeVersion: BACKUP_ENVELOPE_VERSION,
@@ -250,7 +263,7 @@ async function readManifest(
     systemOverrides,
     systemPrefs,
     profileLayoutTemplates,
-    profileBackgroundTemplates,
+    profileBackgroundTemplates: backgroundsWithBytes,
     aiConnections,
     personalizationSections,
     groupEvents,

@@ -7,6 +7,7 @@ import type {
   LocalExportFiles,
 } from "@/services/backup/backup-service";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
+import { resolveBackgroundUri } from "@/services/photos/background-storage";
 
 const EXPORT_DIRECTORY = "backup-exports";
 
@@ -33,7 +34,10 @@ export function createLocalExportFiles(
 
 /** Read stored bytes through the existing safe relative-path photo boundary. */
 export function readStoredPhotoBase64(relativePath: string): Promise<string> {
-  return new File(resolvePhotoUri(relativePath)).base64();
+  const uri = relativePath.startsWith("profile-backgrounds/")
+    ? resolveBackgroundUri(relativePath)
+    : resolvePhotoUri(relativePath);
+  return new File(uri).base64();
 }
 
 /** The sole expo-sharing integration: its local-file URI becomes a platform sheet. */

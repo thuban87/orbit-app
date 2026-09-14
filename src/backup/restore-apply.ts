@@ -16,6 +16,13 @@ import { newUid } from "@/db/uid";
 import { reconcileDigestSchedule } from "@/services/notifications/digest-schedule";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import {
+  backgroundDerivativeRelPath,
+  deleteBackgroundRestorePending,
+  persistBackgroundDerivative,
+  resolveBackgroundRestorePendingUri,
+  stageBackgroundRestorePendingBase64,
+} from "@/services/photos/background-storage";
+import {
   contactPhotoRelPath, customFieldPhotoRelPath, deletePhoto, deleteRestorePending,
   persistMaster, photoFileExists, profilePhotoRelPath, resolveRestorePendingUri,
   restorePendingRelPath, stageRestorePendingBase64, type RestorePendingTarget,
@@ -30,6 +37,9 @@ export interface RestoreApplyDependencies {
   createVerifiedPreRestoreSnapshot?: () => Promise<PreRestoreSnapshotResult>;
   stagePhoto?: (base64: string, relative: string) => Promise<void>;
   persistPhoto?: (sourceUri: string, canonicalRelativePath: string) => Promise<unknown>;
+  stageBackground?: (base64: string, templateUid: string) => Promise<unknown>;
+  persistBackground?: (sourceUri: string, canonicalRelativePath: string) => Promise<unknown>;
+  deleteStagedBackground?: (templateUid: string) => void;
   deleteCanonicalPhoto?: (canonicalRelativePath: string) => void;
   canonicalPhotoExists?: (canonicalRelativePath: string) => boolean;
   reconcileNotificationSchedule?: () => Promise<void>;
@@ -46,6 +56,7 @@ type Plan = Record<MergeableEntityType, ReconciliationAction[]>;
 type PhotoTarget = RestorePendingTarget & { valueUid?: string; fieldDefUid?: string };
 type FinalizeCandidate = { target: PhotoTarget; relativePath: string };
 type DeleteCandidate = { target: PhotoTarget; canonicalRelativePath: string; clearReference: boolean };
+type BackgroundFinalizeCandidate = { uid: string; canonicalRelativePath: string };
 
 const entities: readonly MergeableEntityType[] = ["categories", "profile", "contacts", "custom_field_defs", "systems", "profile_layout_templates", "profile_background_templates", "ai_connections", "personalization_sections", "group_events", "system_rules", "system_overrides", "system_prefs", "contact_methods", "external_contact_links", "contact_method_provenance", "interactions", "events", "fuel", "contact_links", "custom_field_values", "custom_field_value_history", "memories", "relationships", "current_state_entries", "profile_contact_presentation", "profile_category_presentation"];
 const tableOf: Record<MergeableEntityType, string> = Object.fromEntries(entities.map((entity) => [entity, entity])) as Record<MergeableEntityType, string>;
@@ -195,7 +206,7 @@ async function upsertParents(exec: SqlExecutor, plan: Plan): Promise<void> {
   for (const a of writes(plan, "custom_field_defs")) { const r = a.row!; await exec.runAsync("INSERT INTO custom_field_defs (uid,col_name,label,type,options,show_on_new,always_show,display_order,quarantined_at,share_with_ai,scope,history_retained,field_group,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET col_name=excluded.col_name,label=excluded.label,type=excluded.type,options=excluded.options,show_on_new=excluded.show_on_new,always_show=excluded.always_show,display_order=excluded.display_order,quarantined_at=excluded.quarantined_at,share_with_ai=excluded.share_with_ai,scope=excluded.scope,history_retained=excluded.history_retained,field_group=excluded.field_group,modified_at=excluded.modified_at", [r.uid,r.colName,r.label,r.type,r.options ?? null,r.showOnNew,r.alwaysShow,r.displayOrder,r.quarantinedAt ?? null,r.shareWithAi,r.scope ?? "global",r.historyRetained ?? 0,r.fieldGroup ?? null,r.createdAt,r.modified_at]); }
   for (const a of writes(plan, "systems")) { const r=a.row!; await exec.runAsync("INSERT INTO systems(uid,name,created_at,modified_at) VALUES(?,?,?,?) ON CONFLICT(uid) DO UPDATE SET name=excluded.name,modified_at=excluded.modified_at", [r.uid,r.name,r.createdAt,r.modified_at]); }
   for (const a of writes(plan, "profile_layout_templates")) { const r=a.row!; await exec.runAsync("INSERT INTO profile_layout_templates(uid,name,layout_json,created_at,modified_at) VALUES(?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET name=excluded.name,layout_json=excluded.layout_json,modified_at=excluded.modified_at", [r.uid,r.name,r.layoutJson,r.createdAt,r.modified_at]); }
-  for (const a of writes(plan, "profile_background_templates")) { const r=a.row!; await exec.runAsync("INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET name=excluded.name,image_path=excluded.image_path,modified_at=excluded.modified_at", [r.uid,r.name,r.imagePath,r.createdAt,r.modified_at]); }
+  for (const a of writes(plan, "profile_background_templates")) { const r=a.row!; await exec.runAsync("INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET name=excluded.name,image_path=excluded.image_path,modified_at=excluded.modified_at", [r.uid,r.name,backgroundDerivativeRelPath(r.uid),r.createdAt,r.modified_at]); }
   for (const a of writes(plan, "ai_connections")) { const r=a.row!; await exec.runAsync("INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET lane=excluded.lane,remembered_model=excluded.remembered_model,custom_endpoint=excluded.custom_endpoint,custom_model=excluded.custom_model,configured_at=excluded.configured_at,modified_at=excluded.modified_at", [r.uid,r.lane,r.rememberedModel,r.customEndpoint,r.customModel,r.configuredAt ?? null,r.createdAt,r.modified_at]); }
   for (const a of writes(plan, "personalization_sections")) { const r=a.row!; await exec.runAsync("INSERT INTO personalization_sections(uid,title,body,enabled,display_order,created_at,modified_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET title=excluded.title,body=excluded.body,enabled=excluded.enabled,display_order=excluded.display_order,modified_at=excluded.modified_at", [r.uid,r.title,r.body,r.enabled,r.displayOrder,r.createdAt,r.modified_at]); }
   for (const a of writes(plan, "group_events")) { const r=a.row!; await exec.runAsync("INSERT INTO group_events(uid,title,occurred_at,channel,quality,duration,group_note,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(uid) DO UPDATE SET title=excluded.title,occurred_at=excluded.occurred_at,channel=excluded.channel,quality=excluded.quality,duration=excluded.duration,group_note=excluded.group_note,modified_at=excluded.modified_at", [r.uid,r.title,r.occurredAt,r.channel ?? null,r.quality ?? null,r.duration ?? null,r.groupNote ?? null,r.createdAt,r.modified_at]); }
@@ -279,6 +290,22 @@ async function stageCandidates(exec: SqlExecutor, plan: Plan, session: string, s
   }
   return { finalize, deletes };
 }
+async function stageBackgroundCandidates(
+  plan: Plan,
+  stage: NonNullable<RestoreApplyDependencies["stageBackground"]>,
+): Promise<BackgroundFinalizeCandidate[]> {
+  const candidates: BackgroundFinalizeCandidate[] = [];
+  for (const action of writes(plan, "profile_background_templates")) {
+    const row = action.row!;
+    if (typeof row.imageBase64 !== "string") continue;
+    await stage(row.imageBase64, row.uid);
+    candidates.push({
+      uid: row.uid,
+      canonicalRelativePath: backgroundDerivativeRelPath(row.uid),
+    });
+  }
+  return candidates;
+}
 function entry(action: "finalize" | "delete", relativePath: string, target: PhotoTarget, canonical: string, now: string): RestorePhotoJournalEntry {
   return { relativePath, action, targetKind: target.kind, contactUid: target.kind === "profile" ? null : target.uid, valueUid: target.kind === "customField" ? target.valueUid ?? null : null, fieldDefUid: target.kind === "customField" ? target.fieldDefUid ?? null : null, canonicalRelativePath: canonical, createdAt: now };
 }
@@ -340,6 +367,10 @@ export async function applyRestore(exec: SqlExecutor, manifest: BackupManifest, 
   const applySettings = mode === "replace-all" || (manifest.appSettings.modifiedAt as string) > settings.modifiedAt;
   if (totals.insert + totals.update + totals.delete === 0 && !applySettings) return { status: "applied", mode, inserted: 0, updated: 0, retained: totals.retain, deleted: 0, blocked: totals.blocked, photosNeedingAttention: 0, photoCleanupPending: 0, scheduleResyncPending: false, preRestoreSnapshotCreated };
   const candidates = await stageCandidates(exec, plan, deps.sessionToken ?? newUid(), deps.stagePhoto ?? stageRestorePendingBase64);
+  const backgroundCandidates = await stageBackgroundCandidates(
+    plan,
+    deps.stageBackground ?? stageBackgroundRestorePendingBase64,
+  );
   await inWriteTransaction(exec, async () => {
     // ADR-010/ADR-056: child winners are independent of metadata winners.
     // Include every changed contact (including qualification-flag changes) and
@@ -373,6 +404,19 @@ export async function applyRestore(exec: SqlExecutor, manifest: BackupManifest, 
   });
   const persist = deps.persistPhoto ?? persistMaster; const remove = deps.deleteCanonicalPhoto ?? deletePhoto; const exists = deps.canonicalPhotoExists ?? photoFileExists; let photosNeedingAttention = 0; let photoCleanupPending = 0;
   for (const candidate of candidates.finalize) { const canonical = await canonicalFor(exec,candidate.target); if (!canonical) { deleteRestorePending(candidate.relativePath); await deleteJournalEntryCore(exec,candidate.relativePath); continue; } try { await persist(resolveRestorePendingUri(candidate.relativePath),canonical); deleteRestorePending(candidate.relativePath); await deleteJournalEntryCore(exec,candidate.relativePath); } catch { photosNeedingAttention += 1; } }
+  const persistBackground = deps.persistBackground ?? persistBackgroundDerivative;
+  const deleteStagedBackground = deps.deleteStagedBackground ?? deleteBackgroundRestorePending;
+  for (const candidate of backgroundCandidates) {
+    try {
+      await persistBackground(
+        resolveBackgroundRestorePendingUri(candidate.uid),
+        candidate.canonicalRelativePath,
+      );
+      deleteStagedBackground(candidate.uid);
+    } catch {
+      photosNeedingAttention += 1;
+    }
+  }
   for (const candidate of candidates.deletes) { const key = `delete:${candidate.canonicalRelativePath}`; try { remove(candidate.canonicalRelativePath); if (exists(candidate.canonicalRelativePath)) photoCleanupPending += 1; else await deleteJournalEntryCore(exec,key); } catch { photoCleanupPending += 1; } }
   let scheduleResyncPending = false;
   try { await (deps.reconcileNotificationSchedule ?? (() => reconcileSchedule(exec)))(); } catch { scheduleResyncPending = true; }

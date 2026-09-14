@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { buildExportManifest } from "@/backup/export-manifest";
-import { BACKUP_FORMAT_VERSION } from "@/backup/types";
+import { BACKUP_FORMAT_VERSION, BackupPhotoUnreadableError } from "@/backup/types";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
@@ -441,5 +441,26 @@ describe("buildExportManifest", () => {
         },
       }),
     ).rejects.toThrow(/repair/i);
+  });
+
+  it("raises a content-free repair cue for an unreadable profile background", async () => {
+    const exec = nodeSqliteExecutor(openTestDb());
+    let count = 0;
+    await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+      now: NOW,
+      newUid: () => `uid-${++count}`,
+    });
+    await exec.runAsync(
+      "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
+      ["missing-background", "Missing", "profile-backgrounds/missing-background.jpg", NOW, NOW],
+    );
+    await expect(
+      buildExportManifest(exec, {
+        exportedAt: NOW,
+        readPhotoBase64: async () => {
+          throw new Error("private local path details");
+        },
+      }),
+    ).rejects.toBeInstanceOf(BackupPhotoUnreadableError);
   });
 });
