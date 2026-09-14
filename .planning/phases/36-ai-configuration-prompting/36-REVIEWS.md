@@ -1,8 +1,8 @@
 ---
 phase: 36
-cycle: 5
+cycle: 6
 reviewers: [codex, claude]
-reviewed_at: 2026-09-13T22:20:00Z
+reviewed_at: 2026-09-13T23:45:00Z
 plans_reviewed: [36-01-PLAN.md, 36-02-PLAN.md, 36-03-PLAN.md, 36-04-PLAN.md, 36-05-PLAN.md, 36-06-PLAN.md, 36-07-PLAN.md, 36-08-PLAN.md, 36-09-PLAN.md]
 models:
   codex: "gpt-5.6-terra (codex-cli 0.154.0, reasoning=high)"
@@ -11,23 +11,179 @@ model_sources:
   codex: "banner"
   claude: "subagent-lane"
 review_notes:
-  - "CYCLE 5 (confirmation cycle — verifies the C4 HIGH fix). This file accumulates history: the Cycle 5 review is at the top; Cycles 4/3/2/1 are preserved verbatim below, unchanged. `cycle_summary` reflects the CURRENT (cycle 5) unresolved counts; `cycle4_summary`/`cycle3_summary`/`cycle2_summary`/`cycle1_summary` record prior cycles."
-  - "CYCLE 5 RESULT: NOT converged. `current_high=1 current_actionable=1`. The C4 HIGH (background bytes routed through `restore_photo_journal`, forcing a migration that would reverse D-03/36-01) is FULLY RESOLVED by the c9462dc redesign — all three lanes agree the journal route is gone, migration 008's CHECK is untouched (008-restore-photo-journal.ts:8), and migration 029 remains the phase's only migration. The C4 MEDIUM (avatars-scoped duplicate persist/guard) is FULLY RESOLVED — 36-08 names `persistBackgroundDerivative` + `registerBackgroundReconcileSweep` and removed photo-relative-path.ts/photo-storage.ts from its write set. BUT codex (gpt-5.6-terra, reasoning=high) found a NEW HIGH the redesign left open, verified against code by the orchestrator: a crash-consistency gap on the same irreversible v5 surface (see below). This is the classic 'closed the migration-reversal HIGH, opened a durability HIGH in its place' outcome."
-  - "The Claude read-only-subagent lane and the orchestrator's first pass both returned high=0/actionable=0 — but they verified only NECESSARY conditions (the named exports exist in background-storage.ts/background-reconcile-sweep.ts; the migration is preserved). Codex at reasoning=high traced the SUFFICIENT condition — the crash-safe DB↔filesystem ordering invariant — and found it unbacked. Per CLAUDE.md 'review the code, not the diff' and the data-layer-correctness mandate, the orchestrator re-verified codex's finding against restore-apply.ts:298/324/330-331 and background-reconcile-sweep.ts:20/31-35 and COUNTS it. This is the adversarial value of cross-AI review working as intended (cf. the project's 'eight diff-scoped reviews missed what one subsystem audit found' lesson)."
-  - "NEW HIGH (36-08 Task 4, codex; orchestrator-verified): the redesign asserts the D-14 invariant 'a committed `profile_background_templates` row always has a durable file / never a broken row' (36-08:273,277), but provides no migration-free mechanism that guarantees it across the 'DB transaction COMMITTED, process dies before/mid background persist' window. The avatar flow it mirrors is crash-safe ONLY because it (a) stages bytes into a recovery namespace before the txn (restore-apply.ts:298), (b) writes a durable JOURNAL row inside the txn (:324), and (c) finalizes post-commit with the journal as re-drivable evidence (:330-331). The background redesign deliberately has NO journal (correct — a `background` journal kind needs a table-rebuild migration that WOULD reverse D-03) and the named recovery, `registerBackgroundReconcileSweep`, only reconciles `.tmp`/`.bak` sidecars and LOGS missing-file rows (background-reconcile-sweep.ts:20,31-35) — it neither retains the base64 nor recreates the file. If persist is post-commit (as the mirrored `persistPhoto` dep is), a crash in that window commits a row pointing at a nonexistent file, unrecoverable, in the phase's single IRREVERSIBLE plan (v5 + migration 029)."
-  - "NOT a [RECORDED-DECISION COLLISION]: the fix is migration-free and does NOT reverse D-03/36-01 or weaken D-14 — it STRENGTHENS D-14 enforcement. The plan must specify a migration-free crash-safe ORDERING (persist the durable canonical file BEFORE the row commits, so a post-commit crash cannot orphan the reference and a pre-commit crash rolls the row back for the sweep to prune) OR migration-free durable evidence analogous to the avatar staging+journal (base64 retained in a restore-pending namespace re-driven by a background finalize sweep) — plus tests for the four crash windows codex enumerates (crash before SQL commit; after commit before FS replacement; after old→bak before tmp→canonical; rollback after a staged replacement). This is a planner-fixable completeness gap, NOT an owner escalation. CAVEAT for the planner: do NOT 'fix' it by adding a migration or a `background` journal kind — either reverses 36-01's owner-accepted single-migration-029 shape and becomes an owner decision."
-  - "NEW ACTIONABLE MEDIUM (36-01 Task 2, codex; orchestrator-verified): the checkpoint offers a sanctioned `approve-retire-ack` option (36-01:172-176 — retire `acknowledgeProvider`, omit `ai_ack_openrouter`, per ADR-079's own invitation). Task 2's ACTION is correctly conditional on that choice (36-01:210), but its `<done>` (36-01:214: 'openrouter is a first-class provider id across ... the ack never-switch ...') and `<acceptance_criteria>` (36-01:217: 'The `acknowledgeProvider` `never` default is unreachable ... with an `openrouter` case present') are hardcoded to the `approve-with-ack` path. Selecting the valid `approve-retire-ack` option makes those acceptance criteria impossible to satisfy (there is no `acknowledgeProvider` to make exhaustive). Fix: make 36-01 Task 2's `<done>` and `<acceptance_criteria>` conditional on the checkpoint selection, mirroring the already-conditional `<action>`."
-  - "The Claude lane ran as a read-only Claude subagent (not the built-in `claude -p` CLI lane), per the project's known Write-permission gap in that lane (MEMORY: claude-reviewer-via-subagent). It received the same source-grounding prompt and had full repo read access. Codex ran as a direct `codex exec` invocation (reasoning=low)."
-  - "HIGH-C (v5 omitted Profile-presentation entities + background bytes) is now SPLIT by the confirmation: the PRESENTATION-ENTITY half is FULLY RESOLVED — 36-08 serializes AND restores profile_contact_presentation/profile_category_presentation, and the orchestrator verified every schema claim against src/db/migrations/profile-presentation.ts (neither table has its own uid; PK is contact_id/category_id; layout_template_uid/background_template_uid are already-portable TEXT template-uid FKs; idMap supports contacts+categories at restore-apply.ts:87; readParentUid at reconciliation.ts:227 lacks the category_id alias exactly as 36-08:234 says it will add; a different-rowid roundtrip test is mandated). D-14 is honored, NOT reversed; credentials excluded (ADR-049); no AI-egress boundary widened."
-  - "NEW HIGH found by BOTH lanes independently with identical code evidence: the D-14 background-BYTES restore path in 36-08 Task 4 routes finalization through `restore_photo_journal`, whose SHIPPED CHECK constraint (src/db/migrations/008-restore-photo-journal.ts:8 — target_kind IN 'contact','profile','customField') will raise a constraint violation on an INSERT of a 'background' kind, aborting restore of any backup carrying a custom background. Fixing it as the plan implies (extend the DAO union) is insufficient — SQLite cannot ALTER a CHECK, so it needs a table-rebuild migration that is NOT in 36-08's files_modified, NOT in Task 4's action, and NOT covered by the Task-5 completeness checkpoint. This is a data-availability defect (T-36-33/T-36-34) in the phase's single IRREVERSIBLE plan."
-  - "Orchestrator code investigation (beyond both lanes): a COMPLETE, SHIPPED background subsystem already exists and neither the plan nor the two reviewers connected it — src/services/photos/background-storage.ts provides SAFE_BACKGROUND_RELATIVE (:7, an already-hardened profile-backgrounds/ guard), backgroundDerivativeRelPath (:43, the uid-derived canonical path), persistBackgroundDerivative (:88, the crash-safe tmp/bak swap), and src/services/photos/background-reconcile-sweep.ts registers a ready-gated LAUNCH sweep that reconciles interrupted background writes AND flags template rows whose durable file is missing. Routing v5 background-byte restore through THIS subsystem needs NO new migration and NO restore-photo-journal change — it honors BOTH D-14 (backgrounds included) AND 36-01's recorded single-migration-029 decision (no further PRAGMA migration). This is the recommended remediation; it also removes duplication the plan would otherwise create (a second profile-backgrounds/ guard in photo-relative-path.ts + a second persist in photo-storage.ts, which the photo-relative-path.ts header explicitly bans)."
-  - "NOT a recorded-decision collision (contra codex's [RECORDED-DECISION COLLISION] tag): codex assumed the ONLY fix is a new migration (which WOULD collide with 36-01). Because the migration-free existing-subsystem path preserves BOTH 36-01 and D-14, no decision is reversed and no owner escalation is required — this is a planner-fixable completeness+reuse gap. Enforcing a recorded decision is a planner call. CAVEAT for the planner: IF the redesign cannot avoid a new migration, adding one reverses 36-01's owner-accepted single-migration-029 shape and becomes an owner decision — do not add a migration silently."
-  - "A source-grounding + cross-artifact fact-drift pass was run (advisory; excluded from counts). Confirmed: no toISOString().split('T')[0] reintroduced (36-02:142 mandates formatLocalDate()); custom-field normalized storage (migration 006/ADR-001) untouched; ai_connections serialized without credential columns. LOW/informational (not counted): 36-08:224 read_first attributes profile_*_templates to 'migration 029' — they actually live in profile-presentation.ts (SCHEMA_VERSION 24); harmless since the same read_first also cites profile-presentation.ts directly."
+  - "CYCLE 6 (SCOPED confirmation — owner-narrowed to end the asymptotic loop). Verifies ONLY (a) the two cycle-5 findings against commit f842988 and (b) any regression directly caused by f842988. Both grounded lanes were constrained to those two items; unrelated new concerns in other plans/tasks are NOT counted. This file accumulates history: cycle 6 is on top; cycles 5/4/3/2/1 are preserved verbatim below. `cycle_summary` reflects the CURRENT (cycle 6) counts; `cycle5_summary`..`cycle1_summary` record prior cycles."
+  - "CYCLE 6 RESULT: NOT converged. `current_high=1 current_actionable=0`. Scoped item 2 (36-01 Task 2 ack-checkpoint contradiction) is FULLY RESOLVED — both lanes + orchestrator agree `<done>`/`<acceptance_criteria>` are now conditional on the checkpoint (36-01:214,217-222) mirroring the conditional `<action>`, and NEITHER branch reverses ADR-079 (line 22 rejects ADR-052's exact-prompt ack; line 49 drops the acknowledgement gate; line 53 'removal is a plan-phase choice'). Scoped item 1 (36-08 Task 4 background-byte crash consistency) is PARTIALLY resolved: the migration-free constraint and the sweep-extension-as-deliverable are satisfied, but BOTH lanes independently found the SAME residual HIGH — the staged design is insufficient for a same-uid REPLACEMENT/UPDATE."
+  - "SCOPED ITEM 1 — MIGRATION-FREE (RESOLVED, both lanes + orchestrator): migration 008 CHECK untouched (008-restore-photo-journal.ts:8 — target_kind IN 'contact','profile','customField'); NO `background` journal kind; NO new migration; migration 029 remains the phase's only migration (D-03/36-01 preserved). profile_background_templates has its own uid so the canonical path is uid-derivable (background-storage.ts:43-51) — the premise for dropping the journal is sound FOR INSERTS."
+  - "SCOPED ITEM 1 — SWEEP EXTENSION AS DELIVERABLE (RESOLVED): background-reconcile-sweep.ts + .test.ts are in files_modified (36-08:41-42), the verify block runs the sweep test (36-08:124/178/299), the four crash-window tests are specified (36-08:134-138) and gated at the pre-bump checkpoint (36-08:147), and threat T-36-36 is added (36-08:173). The 'today only logs' baseline is accurate (background-reconcile-sweep.ts:31-36 only Logger.errors missingReferences). The avatar mirror citations all check out (restore-apply.ts:232-246 stage, :298 stage-before-txn, :324 commit-inside-txn, :330-331 persist-after-commit)."
+  - "SCOPED ITEM 1 — RESIDUAL HIGH (CONVERGENT, both lanes independently; orchestrator-verified against code): the fix is crash-consistent for the fresh-install/INSERT path (canonical absent) across all four windows, but INSUFFICIENT for a same-uid REPLACEMENT/UPDATE (canonical pre-holding prior bytes). Root cause: the sweep's re-drive/prune discriminator keys on CANONICAL-FILE EXISTENCE, not on 'is a persist owed to a committed referencing row'. Per 36-08:293, case (b) re-drives ONLY when canonical is missing, and case (d) treats 'canonical exists' as 'persist completed → prune the staged file'. That equivalence holds only for inserts."
+  - "SCOPED ITEM 1 — the two lanes hit the same flaw from two windows, both valid: (codex, window #3) after a mid-swap crash of a same-uid replacement, the EXISTING sidecar reconcile deletes the .tmp (new bytes) and restoreBak's the OLD .bak onto canonical (background-storage.ts:148,161), then case (d) sees canonical-exists and prunes the staged NEW bytes; (claude, window #2) crash after commit before persist on an in-place UPDATE — canonical still holds OLD bytes (correctly never pre-mutated), so case (b) does not fire and case (d) prunes the winning staged NEW bytes. Both end with the committed row rendering the STALE prior background and the incoming restored bytes discarded — silent content loss on the IRREVERSIBLE v5 surface. Reachability is on the plan's own model (window #4 'rollback after a staged replacement' presupposes same-uid replacement) and in code (profile-presentation-dao.ts in-place UPDATE under stable uid + merge restore, restore-apply.ts:24). The plan's window tests assert only 'canonical file exists', never that canonical BYTES equal the incoming payload — so they would pass while the hole remains."
+  - "SCOPED ITEM 1 — NOT a [RECORDED-DECISION COLLISION]: the remedy is migration-free and STRENGTHENS D-14; it does not reverse D-03/36-01/D-14. Planner-fixable, NOT an owner escalation. Convergent minimal remedy from both lanes: gate the re-drive/prune on 'is there a committed profile_background_templates row referencing this uid?' — if yes, persist the staged bytes to canonical idempotently (overwrite via persistBackgroundDerivative) REGARDLESS of whether canonical already exists, then delete staged; prune only when NO committed row references the staged uid (rolled-back insert, window #4). Also pin the sweep ORDERING so the restore-pending re-drive wins over the stale up-front sidecar restoreBak (runBackgroundReconciliation computes its whole action plan from a single up-front listBackgroundStorageEntries snapshot — background-reconcile-sweep.ts:15-23), and strengthen the window tests to assert canonical BYTES == incoming payload for a committed replacement (and == prior payload for a rolled-back replacement). CAVEAT for the planner: do NOT 'fix' via a migration or a `background` journal kind — either reverses 36-01's single-migration-029 shape and becomes an owner decision."
+  - "SCOPED ITEM 2 (RESOLVED, both lanes + orchestrator): 36-01 Task 2 `<done>` (36-01:214) and `<acceptance_criteria>` (36-01:217-222) are now conditional on the checkpoint selection, mirroring the already-conditional `<action>` (36-01:210): approve-with-ack keeps the exhaustive `never`-switch + ai_ack_openrouter; approve-retire-ack removes acknowledgeProvider + callers/tests and omits ai_ack_openrouter (grep returns zero non-historical hits). Verified against ADR-079 on disk (lines 22/49/53). Neither branch reverses ADR-079; generation is never ack-gated. NOT a decision collision."
+  - "REGRESSION CHECK on f842988 (doc-only, two plan files): NONE. The sweep's status flipped consistently from 'reused AS-IS / NOT modified / not in files_modified' to 'EXTENDED' at every reference (36-08:35,93,121,134,144,284,372); background-reconcile-sweep.ts was added to files_modified, the verify block, the artifacts list, and T-36-36. No internal contradiction introduced. The only substantive finding is the sufficiency gap above — a property of the fix's design surfaced by this cycle's mandated sufficiency test, not a doc inconsistency."
+  - "LANE MECHANICS: codex ran as a direct `codex exec` invocation (gpt-5.6-terra, reasoning=high, read-only sandbox) — the lane that traced the SUFFICIENT condition, as in cycle 5. The Claude lane ran as a read-only Claude subagent (NOT the built-in `claude -p` CLI lane, per the project's known Write-permission gap, MEMORY: claude-reviewer-via-subagent), same source-grounding prompt, full repo read access — this cycle it independently reached the same sufficiency HIGH. The orchestrator re-verified the convergent finding against background-storage.ts:141-170, background-reconcile-sweep.ts:15-37, restore-apply.ts and the 36-08 plan text, and COUNTS it (CLAUDE.md 'review the code, not the diff')."
 cycle1_summary: "current_high=6 current_actionable=9"
 cycle2_summary: "current_high=2 current_actionable=6"
 cycle3_summary: "current_high=1 current_actionable=0"
 cycle4_summary: "current_high=1 current_actionable=1"
-cycle_summary: "current_high=1 current_actionable=1"
+cycle5_summary: "current_high=1 current_actionable=1"
+cycle_summary: "current_high=1 current_actionable=0"
+---
+
+# Cross-AI Plan Review — Phase 36 "AI Configuration & Prompting" — CYCLE 6 (SCOPED CONFIRMATION)
+
+Cycle 6 is a DELIBERATELY NARROW confirmation review, owner-scoped to end the asymptotic loop. It
+verifies ONLY (a) the two cycle-5 findings against commit `f842988` and (b) any regression directly
+caused by that commit. It does NOT trawl the other plans/tasks for new unrelated issues; both grounded
+lanes were constrained to the two scoped items, and unrelated observations are excluded from the counts.
+Two grounded lanes ran — **codex** (`codex exec`, gpt-5.6-terra, reasoning=high, read-only sandbox) and a
+**Claude read-only subagent** (the built-in `claude -p` lane is skipped for the known Write-permission
+gap, MEMORY: claude-reviewer-via-subagent) — and the orchestrator independently re-verified every counted
+claim against the code on disk. Cycles 5/4/3/2/1 are preserved verbatim below the dividers.
+
+## Cycle 6 Consensus Summary
+
+**Result: NOT converged. `current_high=1 current_actionable=0`.**
+
+- **Scoped item 2 (36-01 Task 2 ack-checkpoint contradiction): FULLY RESOLVED (both lanes + orchestrator).**
+  `<done>` (36-01:214) and `<acceptance_criteria>` (36-01:217-222) are now conditional on the checkpoint
+  selection, mirroring the already-conditional `<action>` (36-01:210). approve-with-ack keeps the exhaustive
+  `never`-switch + `ai_ack_openrouter`; approve-retire-ack removes `acknowledgeProvider` + callers/tests and
+  omits the column. Neither branch reverses ADR-079 — verified on disk at ADR-079 lines 22 (rejects ADR-052's
+  exact-prompt ack), 49 (drops the acknowledgement gate), 53 ("removal is a plan-phase choice"). Generation is
+  never ack-gated. Not a decision collision.
+
+- **Scoped item 1 (36-08 Task 4 background-byte crash consistency): PARTIALLY RESOLVED — one residual HIGH.**
+  Migration-free constraint (RESOLVED): migration 008 CHECK untouched (008-restore-photo-journal.ts:8), no
+  `background` journal kind, no new migration, migration 029 remains the phase's only migration (D-03/36-01).
+  Sweep extension as an executable deliverable with four-window tests (RESOLVED): background-reconcile-sweep.ts
+  + .test.ts in files_modified (36-08:41-42), tests specified (36-08:134-138) and gated at the pre-bump
+  checkpoint. BUT **both lanes independently** found the SAME residual HIGH: the staged design is sufficient for
+  the fresh-install/INSERT path but **insufficient for a same-uid REPLACEMENT/UPDATE**, because the sweep's
+  re-drive/prune discriminator keys on **canonical-file existence** rather than on "is a persist owed to a
+  committed referencing row." A committed replacement that crashes in the persist window (codex: mid-swap #3;
+  claude: after-commit-before-persist #2 under in-place update) ends with the row rendering the STALE prior
+  background and the incoming staged bytes pruned by case (d) — silent content loss on the irreversible v5
+  surface. The plan's window tests assert only "canonical file exists," never that canonical BYTES equal the
+  incoming payload, so they would pass while the hole remains.
+
+### Agreed Concerns (2/2 lanes, orchestrator-verified)
+The background re-drive/prune discriminator (36-08:293 cases b/d) must gate on "a committed
+`profile_background_templates` row references this uid," not on canonical existence: if a committed row
+references the uid, persist the staged bytes idempotently (overwrite via `persistBackgroundDerivative`)
+regardless of whether canonical already exists, then delete staged; prune only when NO committed row
+references the staged uid (rolled-back insert). Pin the sweep ORDERING so the restore-pending re-drive wins
+over the stale up-front sidecar `restoreBak` (`runBackgroundReconciliation` computes its whole action plan
+from one up-front `listBackgroundStorageEntries` snapshot — background-reconcile-sweep.ts:15-23). Strengthen
+the window tests to assert canonical BYTES == incoming payload for a committed replacement (and == prior
+payload for a rolled-back replacement). **Migration-free; strengthens D-14; planner-fixable, NOT an owner
+escalation.** CAVEAT: do NOT fix via a migration or a `background` journal kind — either reverses 36-01's
+single-migration-029 shape and becomes an owner decision.
+
+### Divergent Views
+None of substance — both lanes reached the same residual HIGH via different (both valid) crash windows and
+proposed the same migration-free remedy. codex additionally emphasized the mid-swap `.tmp`/`.bak` interaction
+(window #3); claude additionally grounded reachability in `profile-presentation-dao.ts` in-place edits + merge
+restore (window #2).
+
+## Codex Review (cycle 6)
+
+```
+## Scoped item 1 — UNRESOLVED
+
+The plan correctly makes staging, post-commit persistence, sweep extension, tests, and migration-free
+constraints explicit (36-08-PLAN.md:283, 291, 293, 297). It also correctly leaves migration 008's
+target-kind CHECK untouched (008-restore-photo-journal.ts:8) and requires no new migration (36-08:285, 305).
+
+However, window 3 is not sufficient for a same-UID replacement. After `old → .bak` and before
+`.tmp → canonical`, the current reconciler deletes `.tmp` and restores `.bak` to canonical
+(background-storage.ts:148, 153, 161). The proposed sweep then says to delete staged bytes when canonical
+exists (36-08:293). That can leave the committed restored row with the old background bytes and discard the
+incoming restored bytes. The required test only asserts that a canonical file exists, not that it contains
+the committed incoming bytes (36-08:297, 308).
+
+The plan needs an explicit sidecar-aware ordering/state rule: retain and re-drive the staged incoming bytes
+after recovering `.bak` for an interrupted replacement, then verify the canonical bytes equal the restored
+payload before deleting the staged artifact.
+
+## Scoped item 2 — RESOLVED
+
+Task 2's `<done>` and acceptance criteria now explicitly accept both checkpoint branches: keep the exhaustive
+switch plus `ai_ack_openrouter`, or remove the acknowledgement function/callers/tests and omit the column
+(36-01:214, 217). Neither branch reverses ADR-079: generation is never acknowledgement-gated (36-01:214);
+ADR-079 drops that gate (ADR-079:49) and expressly leaves acknowledgement-column removal to planning
+(ADR-079:53).
+
+CYCLE_SUMMARY: current_high=1 current_actionable=0
+
+## Current HIGH Concerns
+- Scoped item 1: window-3 recovery can restore old `.bak` bytes and then prune the staged restored bytes,
+  leaving a committed restore semantically incomplete.
+
+## Current Actionable Non-HIGH Concerns
+None.
+```
+
+## Claude Review (cycle 6, read-only subagent lane)
+
+```
+## SCOPED ITEM 1 — 36-08 Task 4 background-byte restore crash consistency
+
+Migration-free (Q2): RESOLVED. migration 008-restore-photo-journal.ts:8 CHECK untouched, no `background`
+kind, no new migration; recovery routes through the uid-keyed restore-pending file, not restore_photo_journal.
+D-03/36-01 preserved. profile-presentation.ts:27-38 confirms profile_background_templates has its own uid and
+image_path CHECK GLOB 'profile-backgrounds/*', so the canonical path is uid-derivable (background-storage.ts:43-51)
+— the premise for dropping the journal is sound FOR INSERTS.
+
+Sweep extension named as deliverable with tests (Q3): RESOLVED. background-reconcile-sweep.ts + .test.ts in
+files_modified (36-08:41-42), verify block runs the sweep test (:299), four crash-window tests specified (:297)
+and gated at the pre-bump checkpoint. Avatar-pattern citations check out: restore-apply.ts:232-246, :298, :324,
+:330-331. "Today only logs" is accurate (background-reconcile-sweep.ts:31-36).
+
+Crash-consistency SUFFICIENCY across all four windows (Q1): UNRESOLVED — one HIGH. Sufficient for
+fresh-install/INSERT across all four windows; INSUFFICIENT for an in-place UPDATE (same uid, canonical already
+holding prior bytes), which is reachable: profile-presentation-dao.ts:208-222 updateProfileBackgroundTemplateCore
+edits in place under a stable uid; background-pipeline.ts:44-59 persists new bytes to the same uid-derived
+canonical path; restore supports merge (restore-apply.ts:24) and Task 4 stages each incoming WINNING row's
+imageBase64 (winners include UPDATE winners; 36-08:372). The sweep's re-drive discriminator is canonical-file
+existence, not "is a persist owed": case (b) re-drives only when canonical is missing; case (d) treats
+"canonical exists" as "persist completed → delete staged." Window #2 under in-place update: committed UPDATE,
+crash after commit before persist → canonical still holds OLD bytes (correctly never pre-mutated) → sweep sees
+canonical exists → case (d) prunes the winning staged NEW bytes → committed row renders the stale old background.
+Silent content loss on the irreversible v5 surface. The window-#2 test exercises only canonical-missing/insert.
+
+NOT a recorded-decision collision: fix stays migration-free. Minimal remedy: make the re-drive/prune
+discriminator "is there a committed profile_background_templates row referencing this uid?" — if yes, persist
+staged bytes to canonical idempotently regardless of whether canonical exists, then delete staged; prune only
+when NO committed row references the staged uid (rolled-back insert, window #4). Collapses cases (b)+(d) and
+closes the update hole while keeping window #4 correct.
+
+## SCOPED ITEM 2 — 36-01 Task 2 checkpoint contradiction: RESOLVED
+<done> (36-01:214) and <acceptance_criteria> (:217-219) are now conditional on the checkpoint, mirroring the
+conditional <action> (:210): approve-with-ack keeps the exhaustive never-switch + ai_ack_openrouter;
+approve-retire-ack removes acknowledgeProvider + callers/tests, no ai_ack_openrouter. Neither reverses ADR-079
+(lines 22/49/53). Generation never ack-gated.
+
+## Regression check on f842988 (doc-only edits): NONE
+Every prior "reused AS-IS / not in files_modified" reference to the sweep updated to "EXTENDED" consistently
+(36-08:35,93,121,134,144,284,372); sweep added to files_modified, verify block, artifacts, T-36-36 (:395). The
+only substantive issue is the sufficiency gap above, not a doc inconsistency.
+
+CYCLE_SUMMARY: current_high=1 current_actionable=0
+
+## Current HIGH Concerns
+- 36-08 Task 4 background-byte crash window is insufficient for an in-place UPDATE (same-uid, canonical
+  pre-existing): re-drive keys on "canonical missing" and case (d) prunes staged bytes when "canonical exists"
+  (36-08:293), so a committed update crashing before persist leaves the stale prior background and discards the
+  winning staged bytes — silent content loss on the irreversible v5 surface. Migration-free remedy: gate
+  re-drive/prune on "a committed row references this uid," not on canonical existence.
+
+## Current Actionable Non-HIGH Concerns
+None.
+```
+
+## Out-of-scope observations (not counted)
+None surfaced by either lane — both stayed within the two scoped items as instructed.
+
 ---
 
 # Cross-AI Plan Review — Phase 36 "AI Configuration & Prompting" — CYCLE 5 (CONFIRMATION)
