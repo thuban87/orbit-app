@@ -105,6 +105,21 @@ const FORWARD_MIGRATIONS: Readonly<Record<number, Migration>> = {
     relationships: [],
     currentStateEntries: [],
   }),
+  4: (manifest) => ({
+    ...manifest,
+    backupFormatVersion: 5,
+    systems: [],
+    systemRules: [],
+    systemOverrides: [],
+    systemPrefs: [],
+    profileLayoutTemplates: [],
+    profileBackgroundTemplates: [],
+    aiConnections: [],
+    personalizationSections: [],
+    groupEvents: [],
+    profileContactPresentation: [],
+    profileCategoryPresentation: [],
+  }),
 };
 
 function fail(message: string): never {
@@ -415,30 +430,30 @@ function validate(manifest: RawManifest): BackupManifest {
     "customFieldValueHistory",
   );
   const newArrays = {
-    systems: array(manifest.systems ?? [], "systems"),
-    systemRules: array(manifest.systemRules ?? [], "systemRules"),
-    systemOverrides: array(manifest.systemOverrides ?? [], "systemOverrides"),
-    systemPrefs: array(manifest.systemPrefs ?? [], "systemPrefs"),
+    systems: array(manifest.systems, "systems"),
+    systemRules: array(manifest.systemRules, "systemRules"),
+    systemOverrides: array(manifest.systemOverrides, "systemOverrides"),
+    systemPrefs: array(manifest.systemPrefs, "systemPrefs"),
     profileLayoutTemplates: array(
-      manifest.profileLayoutTemplates ?? [],
+      manifest.profileLayoutTemplates,
       "profileLayoutTemplates",
     ),
     profileBackgroundTemplates: array(
-      manifest.profileBackgroundTemplates ?? [],
+      manifest.profileBackgroundTemplates,
       "profileBackgroundTemplates",
     ),
-    aiConnections: array(manifest.aiConnections ?? [], "aiConnections"),
+    aiConnections: array(manifest.aiConnections, "aiConnections"),
     personalizationSections: array(
-      manifest.personalizationSections ?? [],
+      manifest.personalizationSections,
       "personalizationSections",
     ),
-    groupEvents: array(manifest.groupEvents ?? [], "groupEvents"),
+    groupEvents: array(manifest.groupEvents, "groupEvents"),
     profileContactPresentation: array(
-      manifest.profileContactPresentation ?? [],
+      manifest.profileContactPresentation,
       "profileContactPresentation",
     ),
     profileCategoryPresentation: array(
-      manifest.profileCategoryPresentation ?? [],
+      manifest.profileCategoryPresentation,
       "profileCategoryPresentation",
     ),
   };

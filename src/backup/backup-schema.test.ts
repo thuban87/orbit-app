@@ -14,6 +14,10 @@ const valid = (): Record<string, any> => ({
   contactMethodProvenance: [], interactions: [], events: [], fuel: [],
   contactLinks: [], customFieldDefs: [], customFieldValues: [], memories: [],
   relationships: [], currentStateEntries: [], tombstones: [],
+  systems: [], systemRules: [], systemOverrides: [], systemPrefs: [],
+  profileLayoutTemplates: [], profileBackgroundTemplates: [],
+  aiConnections: [], personalizationSections: [], groupEvents: [],
+  profileContactPresentation: [], profileCategoryPresentation: [],
 });
 
 describe("dashboard preference portable allowlist", () => {
@@ -131,8 +135,8 @@ describe("Systems restore acceptance (declare-only)", () => {
   });
 });
 
-describe("Profile presentation restore acceptance (declare-only)", () => {
-  it("accepts dangling global template UIDs without requiring partial template entities", () => {
+describe("Profile presentation restore acceptance", () => {
+  it("accepts dangling global template UIDs alongside the complete template inventory", () => {
     const portable = valid();
     portable.appSettings.profileLayoutTemplateUid = "layout-not-in-format-4";
     portable.appSettings.profileBackgroundTemplateUid = "background-not-in-format-4";
@@ -140,8 +144,8 @@ describe("Profile presentation restore acceptance (declare-only)", () => {
       profileLayoutTemplateUid: "layout-not-in-format-4",
       profileBackgroundTemplateUid: "background-not-in-format-4",
     });
-    expect(portable).not.toHaveProperty("profileLayoutTemplates");
-    expect(portable).not.toHaveProperty("profileBackgroundTemplates");
+    expect(portable).toHaveProperty("profileLayoutTemplates", []);
+    expect(portable).toHaveProperty("profileBackgroundTemplates", []);
   });
 
   it("rejects malformed template UIDs", () => {
@@ -330,7 +334,7 @@ describe("parseBackupManifest", () => {
     const parsed = parseBackupManifest(legacy) as typeof legacy & {
       contactMethods: Array<Record<string, unknown>>;
     };
-    expect(parsed.backupFormatVersion).toBe(4);
+    expect(parsed.backupFormatVersion).toBe(5);
     expect(parsed.contacts[0]).not.toHaveProperty("phone");
     expect(parsed.contacts[0]).not.toHaveProperty("email");
     expect(parsed.appSettings).toHaveProperty("phoneRegionOverride", null);
@@ -354,7 +358,7 @@ describe("parseBackupManifest", () => {
 
     const parsed = parseBackupManifest(legacy);
 
-    expect(parsed.backupFormatVersion).toBe(4);
+    expect(parsed.backupFormatVersion).toBe(5);
     expect(parsed.contacts).toEqual([
       expect.objectContaining({ uid: "contact-a", trackingEnabled: 1, intervalDays: 7 }),
     ]);
@@ -362,6 +366,34 @@ describe("parseBackupManifest", () => {
       includeUnboundNeverContacted: 0,
       birthdayUnboundEnabled: 1,
     });
+  });
+
+  it("upgrades v4 to v5 exactly once and requires the complete v5 inventory", () => {
+    const legacy = valid();
+    legacy.backupFormatVersion = 4;
+    legacy.appSettings.includeUnboundNeverContacted = 1;
+    for (const key of [
+      "systems", "systemRules", "systemOverrides", "systemPrefs",
+      "profileLayoutTemplates", "profileBackgroundTemplates", "aiConnections",
+      "personalizationSections", "groupEvents", "profileContactPresentation",
+      "profileCategoryPresentation",
+    ]) delete legacy[key];
+    const upgraded = parseBackupManifest(legacy);
+    expect(upgraded.backupFormatVersion).toBe(5);
+    expect(upgraded.systems).toEqual([]);
+    expect(upgraded.profileContactPresentation).toEqual([]);
+    expect(upgraded.appSettings.includeUnboundNeverContacted).toBe(1);
+    expect(parseBackupManifest(upgraded)).toEqual(upgraded);
+
+    const incompleteV5 = valid();
+    delete incompleteV5.systems;
+    expect(() => parseBackupManifest(incompleteV5)).toThrow(/systems must be an array/);
+
+    const retiredManageFavouritesKey = valid();
+    retiredManageFavouritesKey.appSettings.manageFavouritesOrder = ["contact-a"];
+    expect(() => parseBackupManifest(retiredManageFavouritesKey)).toThrow(
+      /local-only or secret member/,
+    );
   });
 
   it("rejects illegal lifecycle and cadence cells before restore planning", () => {

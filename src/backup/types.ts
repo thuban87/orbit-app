@@ -11,7 +11,7 @@ export interface ReconciliationTombstone {
 }
 
 /** Bump only when the portable JSON wire shape changes, never with SQLite. */
-export const BACKUP_FORMAT_VERSION = 4;
+export const BACKUP_FORMAT_VERSION = 5;
 /** Container/envelope evolution is independent from the plaintext manifest. */
 export const BACKUP_ENVELOPE_VERSION = 1;
 

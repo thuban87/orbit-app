@@ -106,6 +106,7 @@ import {
   purgeRelationshipPermanently,
 } from "@/db/relationships-dao";
 import type { SqlExecutor } from "@/db/types";
+import { computeAiAvailability } from "@/logic/ai-availability";
 
 const NOW = "2026-08-25 12:00:00";
 let uid = 0;
@@ -188,6 +189,7 @@ beforeEach(() => {
       const group = await source.getFirstAsync<{ id: number }>("SELECT id FROM group_events WHERE uid='portable-group'");
       await source.runAsync("INSERT INTO interactions(uid,contact_id,occurred_at,recorded_at,channel,duration,allow_ai,group_event_id,ge_follow_duration,source,modified_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)", ["portable-interaction", contact!.id, NOW, NOW, "In Person", 60, 1, group!.id, 1, "manual", NOW]);
       await source.runAsync("INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)", ["portable-connection", "custom", "remembered", "https://example.invalid/v1", "custom-model", NOW, NOW, NOW]);
+      await source.runAsync("UPDATE app_settings SET ai_enabled=1,ai_active_connection='custom',modified_at='2026-08-26 12:00:00' WHERE id=1");
       await source.runAsync("INSERT INTO personalization_sections(uid,title,body,enabled,display_order,created_at,modified_at) VALUES(?,?,?,?,?,?,?)", ["portable-section", "About me", "Local context", 1, 0, NOW, NOW]);
       const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "AQID" });
 
@@ -207,6 +209,10 @@ beforeEach(() => {
         .toEqual({ model: "remembered" });
       expect(await destination.getFirstAsync("SELECT body FROM personalization_sections WHERE uid='portable-section'"))
         .toEqual({ body: "Local context" });
+      const restoredAi = await destination.getFirstAsync<{ enabled: number; active: "custom" }>("SELECT ai_enabled AS enabled,ai_active_connection AS active FROM app_settings WHERE id=1");
+      expect(restoredAi).toEqual({ enabled: 1, active: "custom" });
+      expect(computeAiAvailability({ aiEnabled: restoredAi!.enabled === 1, activeConnection: restoredAi!.active, hasCredential: false, selectedModel: "remembered", modelAvailable: true }))
+        .toBe("needs-attention");
       expect(backgroundMocks.staged).toContainEqual(["AQID", "portable-background"]);
       expect(backgroundMocks.persisted).toContainEqual([
         "file:///doc/profile-backgrounds/_restore_pending/portable-background.jpg",

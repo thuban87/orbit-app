@@ -57,7 +57,7 @@ describe("buildExportManifest", () => {
         exportedAt: NOW,
         readPhotoBase64: async () => "AQID",
       });
-      expect(manifest.backupFormatVersion).toBe(4);
+      expect(manifest.backupFormatVersion).toBe(5);
       expect(manifest.tombstones).toContainEqual(
         expect.objectContaining({
           entityType: "group_event",
@@ -89,8 +89,8 @@ describe("buildExportManifest", () => {
     });
 
     // D-06 trip-wire: Phase 36 owns the coordinated wire change to v5.
-    expect(BACKUP_FORMAT_VERSION).toBe(4);
-    expect(manifest.backupFormatVersion).toBe(4);
+    expect(BACKUP_FORMAT_VERSION).toBe(5);
+    expect(manifest.backupFormatVersion).toBe(5);
     expect(manifest.appSettings).toMatchObject({
       orreryLastSystem: "builtin:all-contacts",
       themePackage: "galaxy",
@@ -150,7 +150,7 @@ describe("buildExportManifest", () => {
       }),
     ]);
     // Phase 36 owns the format bump; this guard keeps it unchanged this phase.
-    expect(BACKUP_FORMAT_VERSION).toBe(4);
+    expect(BACKUP_FORMAT_VERSION).toBe(5);
   });
 
   it("serializes the v5 entity inventory with portable parent UIDs", async () => {
@@ -408,7 +408,7 @@ describe("buildExportManifest", () => {
       exportedAt: NOW,
       readPhotoBase64: async () => "AQID",
     });
-    expect(manifest.backupFormatVersion).toBe(4);
+    expect(manifest.backupFormatVersion).toBe(5);
     for (const key of [
       "themePackage",
       "galaxyMode",
