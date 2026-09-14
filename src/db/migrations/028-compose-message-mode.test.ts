@@ -18,9 +18,11 @@ beforeEach(() => {
 });
 
 describe("migration 028 — compose default message mode preference", () => {
-  it("bumps the schema head to 28 via the version const", () => {
+  it("records migration 028 without requiring it to remain the schema head", () => {
     expect(COMPOSE_MESSAGE_MODE_SCHEMA_VERSION).toBe(28);
-    expect(TARGET_VERSION).toBe(28);
+    expect(TARGET_VERSION).toBeGreaterThanOrEqual(
+      COMPOSE_MESSAGE_MODE_SCHEMA_VERSION,
+    );
   });
 
   it("adds both app_settings columns with seeded defaults on a long forward jump (v20 → v28)", async () => {

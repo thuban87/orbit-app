@@ -71,6 +71,7 @@ import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { migration027 } from "@/db/migrations/027-default-interaction-channel";
 import { migration028 } from "@/db/migrations/028-compose-message-mode";
+import { migration029 } from "@/db/migrations/029-ai-configuration";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
@@ -146,14 +147,17 @@ async function migrateToV5(): Promise<void> {
       migration026,
       migration027,
       migration028,
+      migration029,
     ],
-    28,
+    29,
     { now: NOW, newUid },
   );
 }
 
 /** The disabled-by-default AI fields, for splicing into full-object expectations. */
 const AI_DEFAULTS = {
+  aiEnabled: 0 as const,
+  aiActiveConnection: "",
   aiProvider: "none" as const,
   aiModel: "",
   aiCustomEndpoint: "",

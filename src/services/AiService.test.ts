@@ -44,7 +44,6 @@ import {
   OpenAiProvider,
   parseSuggestionOutput,
 } from "@/services/AiService";
-import type { AiSettings } from "@/services/ai-types";
 
 let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -491,11 +490,9 @@ describe("output cap removed — adapters omit the cap; Anthropic keeps its requ
 // ─── Per-call key accessor, never cached in refreshProviders (C3-M2) ─
 
 describe("key accessor is invoked at call time, not during refreshProviders (C3-M2)", () => {
-  const settings: AiSettings = {
-    aiProvider: "openai",
-    aiModel: "model-x",
-    aiCustomEndpoint: "",
-    aiCustomModel: "",
+  const connection = {
+    lane: "openai" as const,
+    customEndpoint: "",
   };
 
   it("refreshProviders wires the accessor but reads no key", async () => {
@@ -506,14 +503,14 @@ describe("key accessor is invoked at call time, not during refreshProviders (C3-
       deleteKey: async () => {},
     };
     const service = new AiService(fakeStore);
-    service.refreshProviders(settings);
+    service.refreshProviders(connection);
     // Wiring must NOT have fetched any key.
     expect(getKey).not.toHaveBeenCalled();
 
     fetchMock.mockResolvedValueOnce(
       okJson({ choices: [{ message: { content: "ok" } }] }),
     );
-    const provider = service.getActiveProvider(settings);
+    const provider = service.getActiveProvider(connection);
     expect(provider).not.toBeNull();
     await provider?.generate(inputFor("hi", new AbortController().signal));
     // The key is fetched exactly once, at generate time.

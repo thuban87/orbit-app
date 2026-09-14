@@ -714,10 +714,8 @@ export function SettingsScreen() {
     if (aiProvider === "none") return;
     setAiStatus("Discovering models…");
     aiService.refreshProviders({
-      aiProvider,
-      aiModel,
-      aiCustomEndpoint,
-      aiCustomModel,
+      lane: aiProvider,
+      customEndpoint: aiCustomEndpoint,
     });
     const provider = aiService.getProvider(aiProvider);
     if (!provider) {
@@ -734,14 +732,7 @@ export function SettingsScreen() {
         ? `Found ${state.models.length} model${state.models.length === 1 ? "" : "s"}.`
         : "No model list available — enter a model name manually.",
     );
-  }, [
-    aiProvider,
-    aiModel,
-    aiCustomEndpoint,
-    aiCustomModel,
-    aiService,
-    modelScope,
-  ]);
+  }, [aiProvider, aiCustomEndpoint, aiService, modelScope]);
 
   // User-instigated "Refresh models" — the ONLY place the runtime LiteLLM fetch
   // fires (never on a read path). A PLAIN public GET (no key, no user/contact

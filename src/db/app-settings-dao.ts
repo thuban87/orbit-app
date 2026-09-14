@@ -32,10 +32,7 @@ import {
   RIGHT_SWIPE_ACTIONS,
   type RightSwipeAction,
 } from "@/logic/dashboard-query-logic";
-import {
-  AI_PROVIDER_IDS,
-  type AiProviderId,
-} from "@/services/ai-types";
+import { AI_PROVIDER_IDS, type AiProviderId } from "@/services/ai-types";
 import {
   ACCENT_IDS,
   type AccentId,
@@ -346,6 +343,12 @@ export interface AppSettings {
    */
   rememberedMessageMode: RememberedMessageMode;
 
+  // --- Multi-connection AI state (Phase 36, migration 029) ----------------
+  /** Real master switch. Turning it off preserves every other AI setting. */
+  aiEnabled: 0 | 1;
+  /** Active connection lane, or the empty string when none is selected. */
+  aiActiveConnection: string;
+
   // --- Optional-AI non-secret settings (Phase 14, AI-01) --------------------
   // NO API KEY LIVES HERE — provider credentials are SecureStore-only
   // (ai-key-store.ts). These fields are export-safe by construction.
@@ -484,6 +487,9 @@ export interface PortableSettingsSnapshot {
   // and do NOT bump BACKUP_FORMAT_VERSION.
   defaultMessageMode?: DefaultMessageMode;
   rememberedMessageMode?: RememberedMessageMode;
+  // Phase 36 declare/write now; format-5 emission is owned by Plan 36-08.
+  aiEnabled?: 0 | 1;
+  aiActiveConnection?: string;
   modifiedAt: string;
 }
 
@@ -557,7 +563,9 @@ type WritableSettingsKey =
   | "defaultInteractionChannel"
   | "rememberedInteractionChannel"
   | "defaultMessageMode"
-  | "rememberedMessageMode";
+  | "rememberedMessageMode"
+  | "aiEnabled"
+  | "aiActiveConnection";
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
@@ -598,6 +606,8 @@ interface AppSettingsRow {
   remembered_interaction_channel: string;
   default_message_mode: string;
   remembered_message_mode: string;
+  ai_enabled: number;
+  ai_active_connection: string;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -639,6 +649,7 @@ const TOGGLE_FIELDS: Array<keyof AppSettingsPatch> = [
   "lockscreenPublic",
   "includeUnboundNeverContacted",
   "birthdayUnboundEnabled",
+  "aiEnabled",
 ];
 
 const BACKUP_DAY_FIELDS: Array<keyof AppSettingsPatch> = [
@@ -696,6 +707,8 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   rememberedInteractionChannel: "remembered_interaction_channel",
   defaultMessageMode: "default_message_mode",
   rememberedMessageMode: "remembered_message_mode",
+  aiEnabled: "ai_enabled",
+  aiActiveConnection: "ai_active_connection",
 };
 
 /** The saved setting is authoritative; device region is used only when it is absent. */
@@ -729,6 +742,7 @@ export async function getAppSettings(
             history_lens, history_cycle_count,
             default_interaction_channel, remembered_interaction_channel,
             default_message_mode, remembered_message_mode,
+            ai_enabled, ai_active_connection,
             orrery_density, orrery_satellites_enabled, orrery_last_system,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, ai_ack_openai, ai_ack_anthropic,
@@ -802,6 +816,8 @@ export async function getAppSettings(
     // read-shape convenience — validation is on WRITE via assertMessageMode.
     defaultMessageMode: row.default_message_mode as DefaultMessageMode,
     rememberedMessageMode: row.remembered_message_mode as RememberedMessageMode,
+    aiEnabled: (row.ai_enabled ? 1 : 0) as 0 | 1,
+    aiActiveConnection: row.ai_active_connection,
     // AI non-secret settings. The column default is `'none'`; the cast is a
     // read-shape convenience (validation on WRITE guarantees a known id).
     aiProvider: row.ai_provider as AiProviderId,
@@ -1236,6 +1252,18 @@ function validateAppSettingsPatch(patch: AppSettingsPatch): void {
   }
   if (patch.aiProvider !== undefined) {
     assertAiProvider("aiProvider", patch.aiProvider);
+  }
+  if (patch.aiActiveConnection !== undefined) {
+    const lane = patch.aiActiveConnection;
+    if (
+      typeof lane !== "string" ||
+      (lane !== "" && !(AI_PROVIDER_IDS as readonly string[]).includes(lane)) ||
+      lane === "none"
+    ) {
+      throw new Error(
+        `updateAppSettings: aiActiveConnection must be empty or a known connection lane, got ${String(lane)}`,
+      );
+    }
   }
   // A NON-empty Custom endpoint must pass the shared URL-literal egress guard.
   if (patch.aiCustomEndpoint !== undefined && patch.aiCustomEndpoint !== "") {

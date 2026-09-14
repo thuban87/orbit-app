@@ -64,13 +64,17 @@ import { Avatar } from "@/components/Avatar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
+import {
+  type ResolvedAiConnection,
+  resolveActiveAiConnection,
+} from "@/db/ai-connections-dao";
 import { readPromptContext } from "@/db/ai-context-read";
-import { readComposeResearch } from "@/db/compose-research-read";
 import {
   type AppSettings,
   getAppSettings,
   updateAppSettings,
 } from "@/db/app-settings-dao";
+import { readComposeResearch } from "@/db/compose-research-read";
 import {
   type ContactMethodRow,
   setContactMethodPrimary,
@@ -112,10 +116,10 @@ import {
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import type { RootStackScreenProps, TabParamList } from "@/navigation/types";
-import { aiKeyStore } from "@/services/ai-key-store";
-import type { AiProviderId } from "@/services/ai-types";
 import { AiError, type AiErrorCode, AiService } from "@/services/AiService";
+import { aiKeyStore } from "@/services/ai-key-store";
 import { performReachOut } from "@/services/reach-out/handoff";
+import { useAiConfigStore } from "@/stores/ai-config-store";
 import { useComposeSession } from "@/stores/compose-session-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -194,6 +198,17 @@ function truncateMethodValue(value: string): string {
   return value.length > 32 ? `${value.slice(0, 31)}…` : value;
 }
 
+/** Resolve adapter usability without substituting a different selected model. */
+function isConnectionModelAvailable(
+  connection: ResolvedAiConnection | null,
+): boolean {
+  if (!connection || connection.model.trim() === "") return false;
+  // OpenRouter's adapter is intentionally deferred to Plan 36-05. Direct BYOK
+  // model ids remain free-text capable: the LiteLLM catalog is advisory, not an
+  // allowlist, so a non-catalog model must not be rejected here.
+  return connection.lane !== "openrouter";
+}
+
 export function ComposeScreen({
   navigation,
   route,
@@ -227,18 +242,28 @@ export function ComposeScreen({
   // the ENTIRE prior AI wiring so everything here is RE-CREATED, not reused). ──
   // The lifecycle's view-state (idle → resolving/loading → review | error).
   const [aiState, setAiState] = useState<AiSuggestionState>({ status: "idle" });
-  // AI availability is SOURCED here (COMP-09 / D-07 / D-12): the active provider +
-  // a credential-PRESENCE boolean (never the key value, never logged) feed the
+  // AI availability is SOURCED here (COMP-09 / D-07 / D-12): the durable master
+  // switch, resolved active connection, exact selected-model usability, and a
+  // credential-PRESENCE boolean (never the key value, never logged) feed the
   // pure computeAiAvailability adapter — the screen computes no availability state
   // itself. `credentialFailed` is a session-local lever flipped by an OBSERVED
   // unauthorized generation error (isCredentialFailure) and cleared on a later
   // success, moving availability to needs-attention WITHOUT exposing key material.
-  const [activeProvider, setActiveProvider] = useState<AiProviderId>("none");
+  const aiEnabled = useAiConfigStore((state) => state.aiEnabled);
+  const configuredActiveLane = useAiConfigStore(
+    (state) => state.activeConnection,
+  );
+  const [activeConnection, setActiveConnection] =
+    useState<ResolvedAiConnection | null>(null);
+  const [modelAvailable, setModelAvailable] = useState(false);
   const [credentialPresent, setCredentialPresent] = useState(false);
   const [credentialFailed, setCredentialFailed] = useState(false);
-  // Latest loaded AI settings (provider/model/template), via ref so the lifecycle
-  // deps always read the current values without re-creating the lifecycle.
+  // Latest loaded prompt-template setting, via ref so the lifecycle dependency
+  // always reads the current value without re-creating the lifecycle.
   const settingsRef = useRef<AppSettings | null>(null);
+  // The generation callback reads the exact resolved connection loaded on focus;
+  // it never falls back to the legacy singular settings fields.
+  const activeConnectionRef = useRef<ResolvedAiConnection | null>(null);
   // The one AiService instance (holds the four provider adapters; refreshed per
   // request from the live settings).
   const serviceRef = useRef<AiService | null>(null);
@@ -379,23 +404,31 @@ export function ComposeScreen({
       // GenerationInput, not (prompt, signal)) — it BUILDS the GenerationInput and
       // applies a DISTINCT per-variant temperature (variantTemperature) so the
       // three suggestions are deliberately varied. RE-CREATED here (35-01 deleted
-      // the prior adapter): refresh providers from live settings, select the
-      // active provider + model, and resolve the per-provider max_tokens from the
-      // catalog (dropping it would silently break Anthropic's required max_tokens).
+      // the prior adapter): refresh providers from the resolved active connection
+      // and resolve the per-provider max_tokens from the catalog (dropping it
+      // would silently break Anthropic's required max_tokens).
       generate: (prompt, signal): Promise<readonly string[]> => {
-        const s = settingsRef.current;
+        const connection = activeConnectionRef.current;
+        const config = useAiConfigStore.getState();
         const service = serviceRef.current;
-        if (!s || !service) throw new AiError("not_configured");
-        service.refreshProviders(s);
-        const provider = service.getActiveProvider(s);
+        if (
+          !config.aiEnabled ||
+          !connection ||
+          config.activeConnection !== connection.lane ||
+          !service
+        ) {
+          throw new AiError("not_configured");
+        }
+        service.refreshProviders(connection);
+        const provider = service.getActiveProvider(connection);
         if (!provider) throw new AiError("not_configured");
-        const model = s.aiProvider === "custom" ? s.aiCustomModel : s.aiModel;
+        const model = connection.model;
         // 14-11: only Anthropic sends max_tokens (its API requires one), set to
         // the selected model's OWN catalog maximum; OpenAI/Gemini omit it so the
         // model default applies. Visible length is bounded by AiService's
         // 1,200-code-point post-parse trim, not here.
         const maxOutputTokens = resolveMaxOutputTokens(
-          s.aiProvider,
+          connection.lane,
           model,
           catalogRef.current,
         );
@@ -415,12 +448,7 @@ export function ComposeScreen({
             maxOutputTokens,
             signal: sig,
           });
-        return generateVariants(
-          generateOne,
-          prompt,
-          signal,
-          AI_VARIANT_COUNT,
-        );
+        return generateVariants(generateOne, prompt, signal, AI_VARIANT_COUNT);
       },
       // Apply a chosen suggestion to the editor — the ONLY editor mutation the AI
       // flow performs (chooseSuggestion is the sole write; ADR-079 T-35-18).
@@ -466,34 +494,42 @@ export function ComposeScreen({
       const exec = getExecutor();
       void (async () => {
         try {
-          const [row, methodGroups, settings] = await Promise.all([
+          const [row, methodGroups, settings, connection] = await Promise.all([
             getContactHeader(exec, contactId),
             listContactMethodGroups(exec, contactId),
             getAppSettings(exec),
+            resolveActiveAiConnection(exec),
+            useAiConfigStore.getState().hydrate(exec),
           ]);
           if (cancelled) {
             return;
           }
-          // Publish the AI settings for the lifecycle deps (provider/model/
-          // template read via settingsRef inside resolvePrompt/generate).
+          // Publish the prompt template and exact active-connection resolution.
+          // The pointer is hydrated into the durable store by the same focus read;
+          // a dangling pointer deliberately resolves to null.
           settingsRef.current = settings;
+          activeConnectionRef.current = connection;
+          setActiveConnection(connection);
+          setModelAvailable(isConnectionModelAvailable(connection));
           // Best-effort refresh of the active model catalog (cache-overrides-seed)
           // so Anthropic's required max_tokens uses the freshest per-model max.
           // Non-blocking + failure-tolerant — the seed default already works, and
           // this never sits on the render path.
           void loadCachedCatalog(createFileCatalogStorage())
             .then((cached) => {
-              if (!cancelled) catalogRef.current = resolveActiveCatalog(cached);
+              if (!cancelled) {
+                catalogRef.current = resolveActiveCatalog(cached);
+                setModelAvailable(isConnectionModelAvailable(connection));
+              }
             })
             .catch(() => undefined);
-          // Source AI availability (COMP-09): publish the active provider and
-          // reset the session-local observed-unauthorized lever, then read the
+          // Source AI availability (COMP-09): reset the session-local observed-
+          // unauthorized lever, then read the active lane's
           // credential PRESENCE off the key store (presence only, never the value)
           // concurrently so it never blocks header render. readCredentialPresence
           // narrows 'none' out BEFORE any getKey call (A4). Guarded by `cancelled`.
-          setActiveProvider(settings.aiProvider);
           setCredentialFailed(false);
-          void readCredentialPresence(settings.aiProvider, (p) =>
+          void readCredentialPresence(connection?.lane ?? "none", (p) =>
             aiKeyStore.getKey(p),
           )
             .then((present) => {
@@ -680,7 +716,11 @@ export function ComposeScreen({
     try {
       const exec = getExecutor();
       const settings = await getAppSettings(exec);
-      const next = nextRememberedMode(settings.rememberedMessageMode, mode, true);
+      const next = nextRememberedMode(
+        settings.rememberedMessageMode,
+        mode,
+        true,
+      );
       if (next !== settings.rememberedMessageMode) {
         await updateAppSettings(
           exec,
@@ -901,7 +941,10 @@ export function ComposeScreen({
   // "missing" has already navigated home (render nothing meaningful).
   if (screenState !== "ready" || header === null) {
     return (
-      <ScrollView testID="compose-screen" contentContainerStyle={styles.content}>
+      <ScrollView
+        testID="compose-screen"
+        contentContainerStyle={styles.content}
+      >
         <View style={styles.header}>{backControl}</View>
       </ScrollView>
     );
@@ -935,8 +978,14 @@ export function ComposeScreen({
   // that REPLACES (never hides) the actions. `credentialFailed` folds an observed
   // unauthorized into needs-attention without exposing key material.
   const aiAvailability: AiAvailability = computeAiAvailability({
-    provider: activeProvider,
+    aiEnabled,
+    activeConnection:
+      activeConnection?.lane === configuredActiveLane
+        ? activeConnection.lane
+        : null,
     hasCredential: credentialPresent && !credentialFailed,
+    selectedModel: activeConnection?.model ?? "",
+    modelAvailable,
   });
   const aiPosture = selectAiAffordance(aiAvailability);
 
@@ -1126,8 +1175,8 @@ export function ComposeScreen({
         >
           <AppText role="label">AI needs attention</AppText>
           <AppText role="caption">
-            Your AI provider needs attention before Draft or Rewrite can run. Open
-            AI settings to sort it out.
+            Your AI provider needs attention before Draft or Rewrite can run.
+            Open AI settings to sort it out.
           </AppText>
           <View style={styles.affordance}>
             <Button

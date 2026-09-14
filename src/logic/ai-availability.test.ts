@@ -43,18 +43,18 @@ describe("computeAiAvailability — three-state derivation (D-12)", () => {
     expect(
       computeAiAvailability({ ...readyInput, activeConnection: null }),
     ).toBe("needs-attention");
-    expect(
-      computeAiAvailability({ ...readyInput, hasCredential: false }),
-    ).toBe("needs-attention");
+    expect(computeAiAvailability({ ...readyInput, hasCredential: false })).toBe(
+      "needs-attention",
+    );
   });
 
   it("missing or unavailable selected model → 'needs-attention' without substitution", () => {
     expect(computeAiAvailability({ ...readyInput, selectedModel: "" })).toBe(
       "needs-attention",
     );
-    expect(computeAiAvailability({ ...readyInput, modelAvailable: false })).toBe(
-      "needs-attention",
-    );
+    expect(
+      computeAiAvailability({ ...readyInput, modelAvailable: false }),
+    ).toBe("needs-attention");
   });
 });
 

@@ -33,7 +33,7 @@ import { validateCustomEndpoint } from "@/ai/custom-endpoint";
 import type { ResolvedPrompt } from "@/ai/prompt-types";
 import { SecureFetchError, secureCustomFetch } from "@/ai/secure-fetch";
 import { aiKeyStore } from "./ai-key-store";
-import type { AiCloudProviderId, AiSettings } from "./ai-types";
+import type { AiCloudProviderId } from "./ai-types";
 
 // ─── Neutral contract ───────────────────────────────────────────
 
@@ -90,6 +90,12 @@ export interface AiProvider {
   listModels(signal?: AbortSignal): Promise<ModelDiscovery>;
   /** Produce one validated draft, or throw a sanitized {@link AiError}. */
   generate(input: GenerationInput): Promise<string>;
+}
+
+/** Non-secret active-connection fields needed to select and build an adapter. */
+export interface AiServiceConnection {
+  readonly lane: AiCloudProviderId;
+  readonly customEndpoint: string;
 }
 
 // ─── Sanitized error taxonomy ───────────────────────────────────
@@ -570,7 +576,7 @@ export class AiService {
 
   constructor(private readonly keyStore: AiKeyStoreLike = aiKeyStore) {}
 
-  refreshProviders(settings: AiSettings): void {
+  refreshProviders(connection: AiServiceConnection): void {
     this.providers.clear();
     this.providers.set(
       "openai",
@@ -586,7 +592,7 @@ export class AiService {
     );
     this.providers.set(
       "custom",
-      new CustomProvider(settings.aiCustomEndpoint, () =>
+      new CustomProvider(connection.customEndpoint, () =>
         this.keyStore.getKey("custom"),
       ),
     );
@@ -596,8 +602,7 @@ export class AiService {
     return this.providers.get(id);
   }
 
-  getActiveProvider(settings: AiSettings): AiProvider | null {
-    if (settings.aiProvider === "none") return null;
-    return this.providers.get(settings.aiProvider) ?? null;
+  getActiveProvider(connection: AiServiceConnection): AiProvider | null {
+    return this.providers.get(connection.lane) ?? null;
   }
 }
