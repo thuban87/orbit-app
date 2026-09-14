@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 59
+open_count: 60
 waived_count: 0
-fixed_count: 7
-total_count: 66
-last_updated: 2026-09-14T07:43:33.730Z
+fixed_count: 10
+total_count: 70
+last_updated: 2026-09-14T08:19:39.433Z
 ---
 
 # Broken Windows Ledger
@@ -81,6 +81,10 @@ last_updated: 2026-09-14T07:43:33.730Z
 | 64 | 35 | deviation | src/db/migrations/006-normalize-custom-field-values.test.ts |  | Pre-existing failure (not from 35-02): 'no such column: allow_ai' in the v5-profile lifecycle test | open |  | 2026-09-13T15:54:19.413Z |  |
 | 65 | 35 | deviation | src/components/orrery/orrery-controls-render.test.tsx |  | Pre-existing render-test failure (not from 35-02) | open |  | 2026-09-13T15:54:19.591Z |  |
 | 66 | 36 | deviation | src/screens/AIConnectionScreen.tsx |  | New connection activation deferred until explicit model selection completes | fixed |  | 2026-09-14T07:42:44.403Z | 2026-09-14T07:43:33.730Z |
+| 67 | 36 | deviation | src/screens/ComposeScreen.tsx |  | Wired durable personalization into the production Compose prompt resolver | fixed |  | 2026-09-14T08:19:18.368Z | 2026-09-14T08:19:39.077Z |
+| 68 | 36 | deviation | src/ai/model-catalog-filter.ts |  | Preserved direct-model max_input_tokens for selected-window estimates | fixed |  | 2026-09-14T08:19:18.547Z | 2026-09-14T08:19:39.255Z |
+| 69 | 36 | deviation | src/backup/phase-17-integration.test.ts |  | Classified personalization deletion as non-mergeable until Plan 36-08 backup v5 | fixed |  | 2026-09-14T08:19:18.727Z | 2026-09-14T08:19:39.433Z |
+| 70 | 36 | unrun-verify | src/components/orrery/orrery-controls-render.test.tsx |  | Full suite cannot collect the pre-existing Phase 30 Orrery render test; all other 3465 tests pass | open |  | 2026-09-14T08:19:18.951Z |  |
 
 ````json
 [
@@ -875,6 +879,54 @@ last_updated: 2026-09-14T07:43:33.730Z
     "reason": "",
     "recorded_at": "2026-09-14T07:42:44.403Z",
     "resolved_at": "2026-09-14T07:43:33.730Z"
+  },
+  {
+    "id": 67,
+    "kind": "deviation",
+    "phase": "36",
+    "file": "src/screens/ComposeScreen.tsx",
+    "line": null,
+    "description": "Wired durable personalization into the production Compose prompt resolver",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-09-14T08:19:18.368Z",
+    "resolved_at": "2026-09-14T08:19:39.077Z"
+  },
+  {
+    "id": 68,
+    "kind": "deviation",
+    "phase": "36",
+    "file": "src/ai/model-catalog-filter.ts",
+    "line": null,
+    "description": "Preserved direct-model max_input_tokens for selected-window estimates",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-09-14T08:19:18.547Z",
+    "resolved_at": "2026-09-14T08:19:39.255Z"
+  },
+  {
+    "id": 69,
+    "kind": "deviation",
+    "phase": "36",
+    "file": "src/backup/phase-17-integration.test.ts",
+    "line": null,
+    "description": "Classified personalization deletion as non-mergeable until Plan 36-08 backup v5",
+    "status": "fixed",
+    "reason": "",
+    "recorded_at": "2026-09-14T08:19:18.727Z",
+    "resolved_at": "2026-09-14T08:19:39.433Z"
+  },
+  {
+    "id": 70,
+    "kind": "unrun-verify",
+    "phase": "36",
+    "file": "src/components/orrery/orrery-controls-render.test.tsx",
+    "line": null,
+    "description": "Full suite cannot collect the pre-existing Phase 30 Orrery render test; all other 3465 tests pass",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-14T08:19:18.951Z",
+    "resolved_at": null
   }
 ]
 ````
