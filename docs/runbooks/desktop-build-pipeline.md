@@ -271,3 +271,14 @@ These were latent since the scaffold and only surfaced at the **first real metro
 **Rename the app** = one-line edit in `src/constants/app-name.json` (`APP_NAME`). It is
 **decoupled** from `android.package` (`com.bwales.orbit`), which is install-locked and must
 not track the display name.
+
+## 7. Native generated-code patch verification (Phase 31)
+
+Phase 31's standalone release exposed a missing `react-native-screens` generated manager interface. The repository carries the source-set repair in `patches/react-native-screens+4.26.2.patch`; `npm ci` must apply it before every clean prebuild.
+
+1. Sync source to `droid` and run the exact `npm ci` command from §1c. A rejected patch is a hard stop; do not continue with an unpatched dependency tree.
+2. Run the clean non-interactive Expo prebuild, then `assembleRelease --console=plain --no-daemon` when reproducing release acceptance.
+3. Install the resulting standalone APK without clearing app data, launch it with Metro unavailable, and verify the affected native screen opens rather than merely checking that Gradle succeeded.
+4. When a dependency version changes, regenerate and review the patch against that exact version instead of weakening `patch-package`'s loud failure.
+
+**Expected:** `npm ci` reports the patch applied, the clean release build succeeds, and the installed APK opens the native-backed Profile workflow standalone.
