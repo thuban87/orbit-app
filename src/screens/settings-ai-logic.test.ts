@@ -10,14 +10,36 @@
  */
 import { describe, expect, it } from "vitest";
 import { SEED_CATALOG } from "@/ai/model-registry";
-import type { ResolvedPrompt } from "@/ai/prompt-types";
+import { resolvePrompt, STATIC_INSTRUCTION } from "@/ai/prompt-template";
+import type { PromptContext, ResolvedPrompt } from "@/ai/prompt-types";
 import {
   buildAiSettingsPatch,
+  buildContactPromptReview,
   buildInspectorViewState,
   buildProviderAckViewState,
+  buildWholePromptPreview,
   discoverModelsForField,
   validateEndpointForSave,
 } from "@/screens/settings-ai-logic";
+
+const EMPTY_CONTEXT: PromptContext = {
+  contactName: "Casey",
+  category: "Friend",
+  rankedFuel: [],
+  gravityTier: "steady",
+  intensity: {
+    currentCount: 0,
+    intendedPerPeriod: 1,
+    multiple: 0,
+    trailingAvgGapDays: null,
+  },
+  quality: { good: 0, fine: 0, hard: 0 },
+  cadence: { totalCount: 0, connectedCount: 0 },
+  newestChannel: "unspecified",
+  sharedFields: [],
+  sharedMemories: [],
+  gatedRecentInteractionNotes: [],
+};
 
 function frozenPrompt(text: string): ResolvedPrompt {
   return Object.freeze({
@@ -175,5 +197,88 @@ describe("inspector / ack builders — surface the EXACT prompt, never rebuild (
     expect(view.isCustom).toBe(true);
     expect(view.retentionCaveat).not.toBeNull();
     expect(view.prompt).toBe(rp.prompt);
+  });
+});
+
+describe("whole-system and contact-specific prompt previews", () => {
+  it("keeps the whole preview byte-identical to the resolved provider payload", () => {
+    const resolved = resolvePrompt("Be kind.", EMPTY_CONTEXT);
+    const preview = buildWholePromptPreview(resolved);
+    expect(preview.display).toBe(resolved.payload);
+    expect(preview.raw).toBe(resolved.payload);
+    expect(preview.display).toContain(STATIC_INSTRUCTION);
+  });
+
+  it("derives contact review blocks from that exact resolved prompt and omits global boilerplate", () => {
+    const context: PromptContext = {
+      ...EMPTY_CONTEXT,
+      rankedFuel: [{ text: "Garden plans", kind: "interest", ageDays: 2 }],
+      sharedFields: [{ label: "City", value: "Madison" }],
+      sharedMemories: [{ label: "Trip", value: "Coast" }],
+      gatedRecentInteractionNotes: ["Talked about tomatoes"],
+      writingStyle: {
+        tone: "casual",
+        length: "concise",
+        directness: "gentle",
+        freeform: "PRIVATE GLOBAL STYLE",
+      },
+      personalizationSections: [
+        {
+          uid: "section-1",
+          title: "Global context",
+          body: "PRIVATE GLOBAL PERSONALIZATION",
+          enabled: true,
+          displayOrder: 0,
+        },
+      ],
+    };
+    const resolved = resolvePrompt("", context);
+    const review = buildContactPromptReview(resolved, context);
+    expect(review.heading).toBe("Sharing 4 items with AI about Casey");
+    expect(review.display).toContain("Garden plans");
+    expect(review.display).toContain("Madison");
+    expect(review.display).toContain("Coast");
+    expect(review.display).toContain("Talked about tomatoes");
+    expect(review.display).not.toContain(STATIC_INSTRUCTION);
+    expect(review.display).not.toContain("PRIVATE GLOBAL STYLE");
+    expect(review.display).not.toContain("PRIVATE GLOBAL PERSONALIZATION");
+    for (const block of review.blocks) {
+      expect(resolved.payload).toContain(block);
+    }
+  });
+
+  it("uses correct zero/one grammar and an explicit nothing-shared resolution", () => {
+    const empty = buildContactPromptReview(
+      resolvePrompt("", EMPTY_CONTEXT),
+      EMPTY_CONTEXT,
+    );
+    expect(empty.heading).toBe("Sharing 0 items with AI about Casey");
+    expect(empty.emptyMessage).toBeTruthy();
+
+    const oneContext: PromptContext = {
+      ...EMPTY_CONTEXT,
+      sharedFields: [{ label: "City", value: "Madison" }],
+    };
+    const one = buildContactPromptReview(
+      resolvePrompt("", oneContext),
+      oneContext,
+    );
+    expect(one.heading).toBe("Sharing 1 item with AI about Casey");
+    expect(one.emptyMessage).toBeNull();
+  });
+
+  it("cannot expose credentials supplied as excess runtime properties", () => {
+    const withSecret = {
+      ...EMPTY_CONTEXT,
+      credential: "sk-PRIVATE-CREDENTIAL",
+      apiKey: "PRIVATE-API-KEY",
+    } as PromptContext & { credential: string; apiKey: string };
+    const resolved = resolvePrompt("", withSecret);
+    const views = JSON.stringify({
+      whole: buildWholePromptPreview(resolved),
+      contact: buildContactPromptReview(resolved, withSecret),
+    });
+    expect(views).not.toContain("sk-PRIVATE-CREDENTIAL");
+    expect(views).not.toContain("PRIVATE-API-KEY");
   });
 });
