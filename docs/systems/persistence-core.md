@@ -1,7 +1,7 @@
 # Persistence Core
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 30-orrery-systems
+**Updated by phase:** 31-profile-experience
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -98,6 +98,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/021-orrery-preferences.ts` | Adds constrained Orrery density, satellite-toggle, and last-System settings. |
 | `src/db/migrations/022-orrery-systems.ts` | Creates the four UID-bearing System tables and their uniqueness, mode, cascade, and lookup constraints. |
 | `src/db/migrations/023-orrery-system-selection-revision.ts` | Adds a nonnegative `orrery_system_selection_revision` to the settings singleton. |
+| `src/db/migrations/profile-presentation.ts` | Exports migration 024 and its schema version for Profile templates, assignments, overrides, collapse state, and global preference UIDs. |
 | `src/db/systems-dao.ts` | Sole mutation boundary for System metadata and ref-keyed customization. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
@@ -135,6 +136,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 23. Migration 021 adds constrained Orrery density, satellite-toggle, and last-System columns. It defaults to Balanced, satellites off, and All Contacts; the DAO validates the complete System-token grammar while stale Category existence is resolved on read.
 24. Migration 022 creates the four System tables without altering the already-shipped last-System setting. Custom names are case-insensitively unique in SQLite; the DAO additionally prevents collisions with generated built-in and live Category names.
 25. Migration 023 adds an internal selection revision. Explicit System selections advance it, and delete/Undo compares both the stored token and revision so an Undo cannot replace a selection made after deletion.
+26. Migration 024 adds independent Profile layout/background templates, Category/contact presentation rows, and nullable global template UIDs. The database target imports the migration's exported version instead of repeating a numeric literal.
 
 ### Running launch maintenance
 
@@ -180,6 +182,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-092:** Durable Shared Dashboard Query State — defines migration 019's durable Dashboard preference boundary.
 - **ADR-099:** Durable Global Dashboard Right-Swipe Action — defines migration 020's constrained, defaulted action preference.
 - **ADR-104:** Durable Orrery Preferences and Live System Scope — defines migration 021's constrained, defaulted Orrery preference boundary.
+- **ADR-108:** Durable Independent-Axis Profile Presentation and Inheritance — defines migration 024 and the exported Profile schema-version boundary.
 
 ## Gotchas
 
@@ -209,6 +212,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 23. **System customization is ref-keyed.** Built-in and Category bases have no `systems` row, so `system_overrides` and `system_prefs` deliberately use validated `system_ref` text. Every writer must validate that reference against the complete live catalog.
 24. **A System read never prunes stale exclusions.** It ignores and reports exclusions whose contacts no longer match; the next intentional definition save performs the physical deletion inside the Systems transaction.
 25. **Selection revision is internal conflict evidence.** It is not camera state or user-facing content. Any selection writer that bypasses the revision increment can let a delayed Undo overwrite a newer choice.
+26. **Do not duplicate the Profile migration number.** Import `PROFILE_PRESENTATION_SCHEMA_VERSION` and `profilePresentationMigration`; a literal target can drift from the registered step.
 
 ## Related Systems
 
@@ -249,3 +253,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-09-02 | 27 | Added migration 020's defaulted, CHECK-constrained global Dashboard right-swipe action. |
 | 2026-09-02 | 29 | Added migration 021's constrained Orrery density, satellite, and last-System preferences. |
 | 2026-09-02 | 30 | Added migrations 022/023 for custom Orrery Systems, ref-keyed customization, and revision-guarded selection lifecycle. |
+| 2026-09-02 | 31 | Added migration 024's independent Profile templates, assignments, overrides, collapse state, and exported schema-version contract. |
