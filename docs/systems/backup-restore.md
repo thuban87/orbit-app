@@ -55,6 +55,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | `src/db/tombstones-dao.ts` | Records merge-safe hard deletions. |
 | `src/db/restore-photo-journal-dao.ts` | Persists committed photo recovery work. |
 | `src/screens/BackupScreen.tsx` | Provides the health/action landing and restore entry. |
+| `docs/systems/orrery-systems-backup-contract.md` | Records the Phase-30 stable-UID entity, validation, and orphan-repair contract consumed by the coordinated Systems wire implementation. |
 
 ## How It Works
 
@@ -134,6 +135,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 - **Dashboard** — offers the temporary Backup entry and rare health nudge.
 - **Contact Import** — retains local-only recovery sessions that Replace-all intentionally clears.
 - **Interaction Assist & Reach Out** — its `interactionAssistEnabled` preference rides in the portable manifest; its assist rows do not.
+- **Orrery** — owns live System definitions and membership; its backup contract distinguishes portable authored rules and overrides from derived resolved membership.
 
 ## Changelog
 
@@ -148,5 +150,6 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | 2026-09-03 | 24.2 | Added Memory permission, retained custom-field history, scope metadata, and compatible format-4 restoration. |
 | 2026-09-02 | 25 | Allowlisted durable Dashboard preferences for a future wire without changing the current backup format. |
 | 2026-09-02 | 27 | Allowlisted the durable Dashboard right-swipe action for a future wire without changing the current backup format. |
+| 2026-09-02 | 30 | Declared the stable-UID Systems entity, validation, and orphan-repair boundary while intentionally leaving the format-4 wire unchanged. |
 | 2026-09-09 | 31 | Documented Profile presentation's format-4 boundary: global preference keys are accepted, while Profile entities and background bytes remain device-local pending the coordinated backup format decision. |
 | 2026-09-14 | 36 | Profile presentation + background bytes added to v5 backup — deferral discharged per D-14. |
