@@ -1,7 +1,7 @@
 # Conversational Fuel
 
-**Last updated:** 2026-08-24
-**Updated by phase:** 17-backup-export-restore
+**Last updated:** 2026-09-02
+**Updated by phase:** 31-profile-experience
 **Owners:** `src/db/fuel-dao.ts`, `src/db/fuel-read.ts`, `src/services/fuel-ranking.ts`, `src/services/fuel-age.ts`
 
 ## Purpose
@@ -121,7 +121,11 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — carries fuel in the complete portable manifest.
 - **ADR-081:** Retire AI-Proposed Fuel for Explicit Per-Item Permission — moves retired AI and share rows to verified, default-off Memories.
 
+- **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — adds a narrow owner-facing Off Limits adapter without changing eligible projections.
+
 ## Gotchas
+
+1. **Owner-facing Off Limits is a separate Profile projection.** It may be shown as caution content, but it must never be reused as ranked/search/AI input or assigned an inferred permission/sparkle.
 
 1. **Only the editor reads private fuel.** `listFuelForEditor` intentionally includes `off_limits`; every projection must use the in-query exclusions, never a UI filter.
 2. **Do not nest the write mutex.** Compose `addFuelCore` calls under one outer transaction for multi-item work; the public wrappers already own their transaction.
@@ -154,3 +158,4 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 | 2026-08-16 | 12 | Added larger-widget fuel consumption and post-mutation refresh publishing. |
 | 2026-08-24 | 17 | Added merge-safe fuel deletion evidence and portable reconciliation. |
 | 2026-09-03 | 24.2 | Retired legacy AI-proposal and topic/share fuel through verified carry-over to Memories. |
+| 2026-09-02 | 31 | Added a narrow local Profile projection for Off Limits while preserving every ranked, search, and AI exclusion. |
