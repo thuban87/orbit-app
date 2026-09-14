@@ -1,7 +1,7 @@
 # Backup & Restore
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 27-dashboard-list-view
+**Last updated:** 2026-09-14
+**Updated by phase:** 36-ai-configuration-prompting
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -12,14 +12,15 @@ Backup & Restore gives Orbit a user-controlled, local loss barrier while Android
 
 ### Data Model
 
-The backup manifest is a versioned wire model separate from SQLite's schema version. Format 4 carries non-secret app settings, typed knowledge, relationship rows, method/link/provenance children, tombstones, and embedded photo bytes; it excludes API keys, passphrases, destructive-operation `field_history`, local photo paths, and derived OS schedules.
+The backup manifest is a versioned wire model separate from SQLite's schema version. Format 5 carries the complete non-secret preference inventory, typed knowledge, Systems, Group Events, Profile presentation/templates, AI connection metadata, personalization, tombstones, and embedded photo/background bytes; it excludes API keys, OAuth credentials, passphrases, destructive-operation `field_history`, local source paths, and derived OS schedules.
 
 **Tables:**
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for mergeable rows.
-- `app_settings` — stores portable preferences (including the default-on `interactionAssistEnabled` toggle) plus device-local automatic-backup configuration, revision, health, and encryption-flag state. Theme, Dashboard query, and Dashboard right-swipe-action keys are allowlisted so a later format can accept them, but the current wire intentionally omits all three sets. The transient `interaction_assists` rows themselves are device-local and excluded from the manifest.
+- `app_settings` — stores portable preferences plus device-local automatic-backup configuration, revision, health, and encryption-flag state. Format v5 emits the complete portable allowlist; transient `interaction_assists` rows remain device-local and excluded.
 - `restore_photo_journal` — committed-only finalize/delete work for restored photo files.
 - `contact_methods`, external links, and method provenance — first-class UID-bearing portable children with labels and canonicalization regions where present.
 - `memories`, `relationships`, `current_state_entries`, and `custom_field_value_history` — portable typed knowledge rows, including soft deletion, explicit AI permission, and retained prior field values.
+- `systems`, `system_rules`, `system_overrides`, `system_prefs`, `group_events`, profile template/presentation tables, `ai_connections`, and `personalization_sections` — v5 portable entities whose integer relationships are rebuilt from UIDs on restore. AI connection rows never contain credentials.
 
 **Types** (`src/backup/types.ts`):
 - `BackupManifest` — complete portable snapshot with UID-shaped relationships.
@@ -30,7 +31,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 
 | Layer | File | Responsibility |
 |---|---|---|
-| Wire validation | `src/backup/backup-schema.ts` | Parses and forward-migrates the manifest before preview or apply, including allowlisted future theme and Dashboard keys. |
+| Wire validation | `src/backup/backup-schema.ts` | Parses and forward-migrates older manifests before strict v5 whole-graph validation. |
 | Export | `src/backup/export-manifest.ts` | Builds one full non-secret manifest inside a read snapshot. |
 | Reconciliation | `src/backup/reconciliation.ts` | Resolves UID, tombstone, parent, and natural-key outcomes. |
 | Restore | `src/backup/restore-apply.ts` | Applies a validated Merge or Replace-all under one write transaction. |
@@ -60,7 +61,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 ### Exporting a snapshot
 
 1. `BackupScreen` invokes the manual export service; it does not alter automatic-backup health.
-2. `buildExportManifest()` reads tables and photo bytes under `inReadSnapshot()` so the manifest is coherent with serialized writers. Format 4 includes Memory permission, custom-field scope/history/group metadata, and retained value-history rows.
+2. `buildExportManifest()` reads every portable table and photo/background bytes under `inReadSnapshot()` so the manifest is coherent with serialized writers. Format 5 includes Memory/interaction permission, custom-field scope/history/group metadata, Systems, Group Events, AI configuration metadata, personalization, and Profile presentation.
 3. The service writes the local file, reads it back, parses it again, and only then opens Android's share sheet.
 4. The normalized method graph retains nullable labels and canonical regions; v1 scalar endpoint data forward-migrates to deterministic legacy method UIDs rather than reintroducing a scalar authority.
 4. When automatic backup is configured, `registerBackupSweep()` checks cadence and `data_revision` at a foreground launch, writes and verifies a new SAF file, records success, then prunes eligible owned copies.
@@ -75,8 +76,8 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 
 1. The landing screen reads a picker cache copy immediately, decrypts if necessary, parses, validates the complete graph, and stores the valid candidate in a process-local cache.
 2. `RestorePreviewScreen` shows aggregate metadata only. Merge is the default; Replace-all requires an impact confirmation and, with a configured destination, a fresh verified pre-restore snapshot.
-3. `applyRestore()` reconciles UID rows and tombstones, normalizes method/link natural-key collisions before writing, recomputes contact recency, and registers committed photo-finalization work in one transaction.
-4. Post-commit photo and schedule work is retryable. The launch sweep resumes only journal rows proven to belong to a committed restore.
+3. `applyRestore()` reconciles UID rows and tombstones, remaps portable parent UIDs to destination row IDs, normalizes method/link natural-key collisions before writing, recomputes contact recency, and registers committed photo-finalization work in one transaction.
+4. Post-commit photo, background, and schedule work is retryable. Avatar work uses committed journal rows; background work uses retained UID-keyed restore-pending bytes and a launch re-drive after sidecar recovery.
 5. Import sessions are local-only transient recovery state: exports omit them, and Replace-all clears their rows so a portable snapshot cannot revive a stale system-picker selection.
 6. A format-4 backup that predates retained custom-field value history normalizes its missing array to `[]`; restored older rows default to AI off and global, non-history field definitions.
 
@@ -84,7 +85,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 
 | Constant | Value | File | Purpose |
 |---|---|---|---|
-| `BACKUP_FORMAT_VERSION` | `4` | `src/backup/types.ts` | Portable manifest compatibility version. |
+| `BACKUP_FORMAT_VERSION` | `5` | `src/backup/types.ts` | Portable manifest compatibility version. |
 | `BACKUP_ENVELOPE_VERSION` | `1` | `src/backup/types.ts` | Encrypted-container compatibility version. |
 | PBKDF2 iterations | `600000` | `src/services/backup/encryption.ts` | Approved passphrase derivation cost. |
 | Backup days | `1..3650`, defaults `1` / `7` | `src/db/app-settings-dao.ts` | Automatic cadence and retention bounds. |
@@ -116,11 +117,11 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 8. **Demote before promoting a primary or active link.** SQLite partial unique indexes are statement-immediate, so a promotion-first write can fail mid-restore.
 9. **Plan lifecycle conflicts before the transaction.** A valid newer Unbound row with NULL cadence retains a local assigned cadence as dormant; malformed lifecycle cells fail validation before mutation.
 10. **Do not export import sessions.** Their picker-derived snapshots are local recovery state, not portable relationship authority.
-11. **Allowlisting is not emission.** Theme keys may be accepted when a future format carries them, but adding them to a format-3 projection would silently break cross-version restore compatibility.
-12. **Do not require a new array from an older format-4 file.** There is no 4→4 forward migration, so optional additive arrays normalize during parse before validation and restore.
-13. **Allowlisting is not emission for Dashboard preferences.** Migration 019 makes the keys durable and restorable; the current manifest projection stays unchanged until its coordinated format bump.
-14. **The right-swipe action follows the same deferred-wire rule.** Accepting its key in validation does not authorize format-4 export or restore emission before the coordinated backup change.
-15. **Profile presentation is not a format-4 entity.** The nullable global Profile preference keys are allowlisted, but templates, assignments, freeform layouts, collapse maps, and local background bytes must not be emitted/restored until the coordinated Profile wire-format decision.
+11. **v5 is the coordinated preference boundary.** Theme, Dashboard, Orrery, Profile, History, capture, compose, and non-secret AI preferences are emitted and restored together; credentials remain SecureStore-only.
+12. **Older v4 files upgrade before strict v5 validation.** The 4→5 forward migration injects empty arrays for every new entity, and a native v5 file must carry the complete array inventory.
+13. **Integer relationships travel as UIDs.** Systems, contacts, Group Events, and presentation parents are looked up in the destination database; source row IDs never cross the wire.
+14. **Group Event deletion remains durable.** v5 carries parent tombstones, while an interaction whose Group Event no longer survives is retained as ordinary contact history with a NULL parent.
+15. **Profile presentation and background bytes are v5 entities.** `profile_contact_presentation` and `profile_category_presentation` are keyed by parent UID, preserve template assignments/freeform/collapse state, and restore background bytes through staged, UID-derived `profile-backgrounds/<uid>.jpg` files.
 
 ## Related Systems
 
@@ -148,3 +149,4 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | 2026-09-02 | 25 | Allowlisted durable Dashboard preferences for a future wire without changing the current backup format. |
 | 2026-09-02 | 27 | Allowlisted the durable Dashboard right-swipe action for a future wire without changing the current backup format. |
 | 2026-09-09 | 31 | Documented Profile presentation's format-4 boundary: global preference keys are accepted, while Profile entities and background bytes remain device-local pending the coordinated backup format decision. |
+| 2026-09-14 | 36 | Profile presentation + background bytes added to v5 backup — deferral discharged per D-14. |

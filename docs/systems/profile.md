@@ -77,9 +77,9 @@ Background bytes stay in app-owned `profile-backgrounds/<uid>.jpg` paths. Picker
 
 ## Backup and cross-phase boundaries
 
-`BACKUP_FORMAT_VERSION` remains 4. The two nullable global Profile preference keys are accepted/allowlisted in the portable settings schema, but Profile templates, Category/contact assignments, freeform layouts, collapse maps, background-template rows, and image bytes are **not emitted or restored** by format 4. This is deliberate: Phase 36 owns the coordinated format decision. Do not add partial Profile entities to an existing format projection.
+Backup format v5 emits and restores both nullable global Profile preference keys, reusable layout/background templates, and the `profile_contact_presentation` / `profile_category_presentation` assignment rows. Presentation rows travel under their parent contact or Category UID; freeform layout JSON and collapse JSON remain intact. Each background template also carries its image bytes, which restore stages before the database transaction and rehydrates after commit to the UID-derived `profile-backgrounds/<uid>.jpg` path.
 
-Phase 32 owns the full History UX while preserving `interaction-history`. Phase 36 owns the eventual Profile presentation backup-wire decision. Phase 37 may reuse the Profile template managers from Settings and owns Category CRUD; its Category deletion must preserve this resolver's fallout contract. Phase 40 owns background-image memory/performance hardening.
+Phase 32 owns the full History UX while preserving `interaction-history`. Phase 37 may reuse the Profile template managers from Settings and owns Category CRUD; its Category deletion must preserve this resolver's fallout contract. Phase 40 owns background-image memory/performance hardening.
 
 ## Decisions
 
@@ -96,7 +96,7 @@ Phase 32 owns the full History UX while preserving `interaction-history`. Phase 
 4. **Never materialize inheritance.** Missing references diagnose and fall through; Category changes must not copy effective presentation into contact rows.
 5. **No AI inference.** Hidden-from-Profile and Off Limits do not imply privacy, deletion, AI exclusion, or permission.
 6. **No literal migration number.** Refer to `profilePresentationMigration` and `PROFILE_PRESENTATION_SCHEMA_VERSION`; the ordered registry is authoritative.
-7. **No partial backup widening.** Allowlisting a settings key is not permission to emit entities under the current format.
+7. **Keep presentation backup atomic.** A v5 change must preserve the settings, templates, parent-keyed assignments, and background bytes together; never add an emitter without its restore writer.
 
 ## Related systems
 
@@ -104,12 +104,13 @@ Phase 32 owns the full History UX while preserving `interaction-history`. Phase 
 - **Contact methods / Interaction assist** — supplies actionable methods and user-triggered native handoff.
 - **Status engine / Interaction log** — supplies truthful derived metrics and bounded interim history.
 - **Photos** — owns app-local background derivative lifecycle.
-- **Backup & restore** — owns the deferred portable-wire boundary.
+- **Backup & restore** — owns the v5 presentation graph and background-byte recovery boundary.
 
 ## Changelog
 
 | Date | Phase | What changed |
 |------|-------|--------------|
+| 2026-09-14 | 36 | Added parent-UID-keyed Profile presentation, templates, global preferences, and crash-consistent background bytes to backup format v5. |
 | 2026-09-10 | 31 | Final acceptance reconciliation: all seven bounded owner-smoke journeys are complete after targeted direct-drag, template-discovery/arbitrary-contact assignment, and clear-to-theme repairs. The owner approved the final template lifecycle check; Preview functionality passed while its visual polish remains intentionally deferred. |
 | 2026-09-10 | 31 | Reconciled the six owner-reported Profile UAT gaps against Plans 31-11 through 31-13. Retained physical-Pixel evidence closes the background, sheet, manager, factory-collapse, and compact-bar reports; the owner directly approved the final crop editor's genuine touch/pinch behavior. This does **not** convert the independent unexercised native-checklist rows into passes. |
 | 2026-09-09 | 31 | A droid-built standalone release was installed and inspected on the physical Pixel: Galaxy and Standard local backgrounds rendered full bleed with a compact factory Profile, the release layout chooser/editor remained reachable at 1.15x text after the shared Sheet geometry repair, and the actual empty local Background manager was nonblank. Populated/crop/assistive-technology and owner visual acceptance remain explicitly gated in `31-NATIVE-CHECKLIST.md`. |
