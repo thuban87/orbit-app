@@ -93,6 +93,18 @@ the dossier stands as written.
   Data & Backup, …) require building the hub + category routes and decomposing the monolith. Read
   §P's "small shared UI/navigation infrastructure" to include this decomposition — it is the
   phase's core structural work, larger than the phrase implies.
+
+- **D-10:** The migrated **Interaction Assist toggle MUST preserve ADR-070** ("off means off,
+  clear at once" — Accepted / one-way; leaving pending assists to keep prompting is a
+  *rejected* alternative). It writes through the canonical specialized writer
+  `setInteractionAssistEnabled()` (`src/db/app-settings-dao.ts:1443`), which expires every
+  `pending` `interaction_assists` row in one transaction, followed by
+  `useAssistBanner.getState().refresh()` — **never** the generic `updateAppSettings`/`persist()`
+  path (which would silently drop the atomic queue-clear + banner refresh). Migration surfaced
+  by the Phase 37 cross-AI review (cycle 2, codex lane) after the cycle-1 replan mistakenly
+  routed the toggle through the generic path; this is decision *enforcement* (planner bucket),
+  not a reversal. Plan 37-01 owns coverage and cites ADR-070; a queue-clear-on-opt-out test is
+  required.
 </decisions>
 
 <canonical_refs>
