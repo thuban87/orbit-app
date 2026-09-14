@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 30-orrery-systems
+**Updated by phase:** 31-profile-experience
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -292,7 +292,12 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-098:** Scan-First, Accessible Dashboard List Rows — reuses typed Dashboard Profile/Edit destinations and accessible action primitives.
 - **ADR-099:** Durable Global Dashboard Right-Swipe Action — reuses the shell's commit-truthful Quick Log and typed Log Contact route from the global Dashboard preference.
 
+- **ADR-109:** Fixed-Hero Semantic Profile Composition and Focused Accessible Editors — keeps Profile overlays typed, modal-accessible, and origin-preserving.
+- **ADR-112:** App-Owned Profile Background Derivatives and Launch Reconciliation — registers background recovery only after migration readiness.
+
 ## Gotchas
+
+1. **Profile sheets are topmost transient work.** Expanded layout/background editors make the Profile underlay inert, consume Back before the native stack, and retain dirty drafts until explicit discard or Save.
 
 1. **Do not mount a read screen before migration readiness.** The navigator belongs only in the successful ready branch.
 2. **Keep all root-level Dashboard resets in `reset-intents.ts`.** A bare flat route fails under the tab tree and can strand a deep-link user without the required fallback.
@@ -382,3 +387,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 27 | Shared the Quick Log command and existing Dashboard Profile/Edit routing with accessible List gesture actions. |
 | 2026-09-02 | 28 | Enabled Select Contacts, added selection-first Back behavior, and defined the serializable Group Log participant handoff. |
 | 2026-09-02 | 30 | Added dual-stack Systems Management and System Builder routes with shared focused-workflow and selection-publication contracts. |
+| 2026-09-02 | 31 | Added origin-preserving Profile composition, focused expanded sheets, Compose-only AI entry, and ready-gated background reconciliation. |
