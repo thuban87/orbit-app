@@ -1003,6 +1003,15 @@ describe("app-settings-dao — portable backup projection and local bookkeeping"
       aiCustomEndpoint: "",
       aiCustomModel: "",
       aiPromptTemplate: "",
+      aiEnabled: 0,
+      aiActiveConnection: "",
+      aiWritingTone: "balanced",
+      aiWritingLength: "normal",
+      aiWritingDirectness: "balanced",
+      aiWritingFreeform: "",
+      aiDefaultMemoryAllow: 0,
+      aiDefaultInteractionNoteAllow: 0,
+      aiDefaultCustomFieldShare: 0,
       backupIntervalDays: 1,
       backupRetentionDays: 7,
       modifiedAt: NOW,
@@ -1188,7 +1197,7 @@ describe("app-settings-dao — theme settings (migration 015, Phase 23)", () => 
     expect(() => assertBackgroundId("galaxyBackground", "made-up")).toThrow();
   });
 
-  it("allowlists all seven theme keys in PORTABLE_SETTINGS_KEYS but does NOT emit them (deferral guard)", async () => {
+  it("emits all seven portable theme keys", async () => {
     for (const key of [
       "themePackage",
       "galaxyMode",
@@ -1200,8 +1209,6 @@ describe("app-settings-dao — theme settings (migration 015, Phase 23)", () => 
     ]) {
       expect(PORTABLE_SETTINGS_KEYS.has(key)).toBe(true);
     }
-    // Emission is DEFERRED to Phase 36: the real portable snapshot omits them, so
-    // this build's format-3 wire stays byte-identical (REVIEWS 23-01 HIGH).
     const snapshot = await getPortableSettingsSnapshot(exec);
     for (const key of [
       "themePackage",
@@ -1212,7 +1219,7 @@ describe("app-settings-dao — theme settings (migration 015, Phase 23)", () => 
       "galaxyBackground",
       "standardBackground",
     ]) {
-      expect(snapshot).not.toHaveProperty(key);
+      expect(snapshot).toHaveProperty(key);
     }
   });
 });
@@ -1222,7 +1229,7 @@ describe("app-settings-dao — dashboard preference settings (migration 019, Pha
     await migrateToV5();
   });
 
-  it("round-trips the four durable dashboard preference axes but does not emit them", async () => {
+  it("round-trips and emits the durable dashboard preference axes", async () => {
     await updateAppSettings(
       exec,
       {
@@ -1246,7 +1253,7 @@ describe("app-settings-dao — dashboard preference settings (migration 019, Pha
       "dashboardFilters",
       "dashboardSort",
     ]) {
-      expect(snapshot).not.toHaveProperty(key);
+      expect(snapshot).toHaveProperty(key);
     }
   });
 
@@ -1347,8 +1354,10 @@ describe("app-settings-dao — Profile presentation preferences", () => {
       profileBackgroundTemplateUid: "background-global",
     });
     const snapshot = await getPortableSettingsSnapshot(exec);
-    expect(snapshot).not.toHaveProperty("profileLayoutTemplateUid");
-    expect(snapshot).not.toHaveProperty("profileBackgroundTemplateUid");
+    expect(snapshot).toMatchObject({
+      profileLayoutTemplateUid: "layout-global",
+      profileBackgroundTemplateUid: "background-global",
+    });
     expect(PORTABLE_SETTINGS_KEYS.has("profileLayoutTemplateUid")).toBe(true);
     expect(PORTABLE_SETTINGS_KEYS.has("profileBackgroundTemplateUid")).toBe(
       true,
@@ -1407,15 +1416,14 @@ describe("app-settings-dao — history lens/preset settings (migration 025, D-11
     },
   );
 
-  it("does not emit history keys through the portable snapshot (Phase 36 owns emission)", async () => {
+  it("emits history keys through the portable snapshot", async () => {
     await updateAppSettings(
       exec,
       { historyLens: "7days", historyCycleCount: 15 },
       LATER,
     );
     const snapshot = await getPortableSettingsSnapshot(exec);
-    expect(snapshot).not.toHaveProperty("historyLens");
-    expect(snapshot).not.toHaveProperty("historyCycleCount");
+    expect(snapshot).toMatchObject({ historyLens: "7days", historyCycleCount: 15 });
   });
 });
 
@@ -1513,7 +1521,7 @@ describe("app-settings-dao — default interaction channel (migration 027, CAPT-
     );
   });
 
-  it("does not emit the channel keys through the portable snapshot (Phase 36 owns emission)", async () => {
+  it("emits the channel keys through the portable snapshot", async () => {
     await updateAppSettings(
       exec,
       {
@@ -1523,8 +1531,10 @@ describe("app-settings-dao — default interaction channel (migration 027, CAPT-
       LATER,
     );
     const snapshot = await getPortableSettingsSnapshot(exec);
-    expect(snapshot).not.toHaveProperty("defaultInteractionChannel");
-    expect(snapshot).not.toHaveProperty("rememberedInteractionChannel");
+    expect(snapshot).toMatchObject({
+      defaultInteractionChannel: "Call",
+      rememberedInteractionChannel: "Call",
+    });
   });
 });
 
@@ -1608,15 +1618,17 @@ describe("app-settings-dao — compose message mode (migration 028, COMP-02)", (
     expect((await getAppSettings(exec)).defaultMessageMode).toBe("remember");
   });
 
-  it("does not emit the message-mode keys through the portable snapshot (Phase 36 owns emission)", async () => {
+  it("emits the message-mode keys through the portable snapshot", async () => {
     await updateAppSettings(
       exec,
       { defaultMessageMode: "email", rememberedMessageMode: "email" },
       LATER,
     );
     const snapshot = await getPortableSettingsSnapshot(exec);
-    expect(snapshot).not.toHaveProperty("defaultMessageMode");
-    expect(snapshot).not.toHaveProperty("rememberedMessageMode");
+    expect(snapshot).toMatchObject({
+      defaultMessageMode: "email",
+      rememberedMessageMode: "email",
+    });
   });
 
   it("allowlists both message-mode keys in PORTABLE_SETTINGS_KEYS (accepted for restore)", () => {

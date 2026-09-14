@@ -212,6 +212,15 @@ export const PORTABLE_SETTINGS_KEYS = new Set([
   // format bump are Phase 36.
   "defaultMessageMode",
   "rememberedMessageMode",
+  "aiEnabled",
+  "aiActiveConnection",
+  "aiWritingTone",
+  "aiWritingLength",
+  "aiWritingDirectness",
+  "aiWritingFreeform",
+  "aiDefaultMemoryAllow",
+  "aiDefaultInteractionNoteAllow",
+  "aiDefaultCustomFieldShare",
 ]);
 
 const SECRET_SHAPED_KEY =

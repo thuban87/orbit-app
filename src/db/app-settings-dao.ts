@@ -492,6 +492,13 @@ export interface PortableSettingsSnapshot {
   // Phase 36 declare/write now; format-5 emission is owned by Plan 36-08.
   aiEnabled?: 0 | 1;
   aiActiveConnection?: string;
+  aiWritingTone?: "casual" | "balanced" | "polished" | "custom";
+  aiWritingLength?: "concise" | "normal" | "detailed" | "custom";
+  aiWritingDirectness?: "gentle" | "balanced" | "direct" | "custom";
+  aiWritingFreeform?: string;
+  aiDefaultMemoryAllow?: 0 | 1;
+  aiDefaultInteractionNoteAllow?: 0 | 1;
+  aiDefaultCustomFieldShare?: 0 | 1;
   modifiedAt: string;
 }
 
@@ -567,7 +574,14 @@ type WritableSettingsKey =
   | "defaultMessageMode"
   | "rememberedMessageMode"
   | "aiEnabled"
-  | "aiActiveConnection";
+  | "aiActiveConnection"
+  | "aiWritingTone"
+  | "aiWritingLength"
+  | "aiWritingDirectness"
+  | "aiWritingFreeform"
+  | "aiDefaultMemoryAllow"
+  | "aiDefaultInteractionNoteAllow"
+  | "aiDefaultCustomFieldShare";
 
 /** The persisted (snake_case) column shape of the id=1 row. */
 interface AppSettingsRow {
@@ -611,6 +625,13 @@ interface AppSettingsRow {
   ai_enabled: number;
   ai_active_connection: string;
   ai_first_use_disclosed: number;
+  ai_writing_tone: "casual" | "balanced" | "polished" | "custom";
+  ai_writing_length: "concise" | "normal" | "detailed" | "custom";
+  ai_writing_directness: "gentle" | "balanced" | "direct" | "custom";
+  ai_writing_freeform: string;
+  ai_default_memory_allow: number;
+  ai_default_interaction_note_allow: number;
+  ai_default_custom_field_share: number;
   ai_provider: string;
   ai_model: string;
   ai_custom_endpoint: string;
@@ -653,6 +674,9 @@ const TOGGLE_FIELDS: Array<keyof AppSettingsPatch> = [
   "includeUnboundNeverContacted",
   "birthdayUnboundEnabled",
   "aiEnabled",
+  "aiDefaultMemoryAllow",
+  "aiDefaultInteractionNoteAllow",
+  "aiDefaultCustomFieldShare",
 ];
 
 const BACKUP_DAY_FIELDS: Array<keyof AppSettingsPatch> = [
@@ -712,6 +736,13 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   rememberedMessageMode: "remembered_message_mode",
   aiEnabled: "ai_enabled",
   aiActiveConnection: "ai_active_connection",
+  aiWritingTone: "ai_writing_tone",
+  aiWritingLength: "ai_writing_length",
+  aiWritingDirectness: "ai_writing_directness",
+  aiWritingFreeform: "ai_writing_freeform",
+  aiDefaultMemoryAllow: "ai_default_memory_allow",
+  aiDefaultInteractionNoteAllow: "ai_default_interaction_note_allow",
+  aiDefaultCustomFieldShare: "ai_default_custom_field_share",
 };
 
 /** The saved setting is authoritative; device region is used only when it is absent. */
@@ -874,6 +905,38 @@ export async function getPortableSettingsSnapshot(
       | "phone_region_override"
       | "include_unbound_never_contacted"
       | "birthday_unbound_enabled"
+      | "theme_package"
+      | "galaxy_mode"
+      | "standard_mode"
+      | "galaxy_accent"
+      | "standard_accent"
+      | "galaxy_background"
+      | "standard_background"
+      | "dashboard_view_mode"
+      | "dashboard_populations"
+      | "dashboard_filters"
+      | "dashboard_sort"
+      | "dashboard_right_swipe_action"
+      | "orrery_density"
+      | "orrery_satellites_enabled"
+      | "orrery_last_system"
+      | "profile_layout_template_uid"
+      | "profile_background_template_uid"
+      | "history_lens"
+      | "history_cycle_count"
+      | "default_interaction_channel"
+      | "remembered_interaction_channel"
+      | "default_message_mode"
+      | "remembered_message_mode"
+      | "ai_enabled"
+      | "ai_active_connection"
+      | "ai_writing_tone"
+      | "ai_writing_length"
+      | "ai_writing_directness"
+      | "ai_writing_freeform"
+      | "ai_default_memory_allow"
+      | "ai_default_interaction_note_allow"
+      | "ai_default_custom_field_share"
       | "ai_provider"
       | "ai_model"
       | "ai_custom_endpoint"
@@ -888,6 +951,19 @@ export async function getPortableSettingsSnapshot(
             digest_enabled, interaction_assist_enabled, lockscreen_public, delivery_hour, quiet_start_hour,
             quiet_end_hour, sun_contact_id, self_sun_colour, phone_region_override,
             include_unbound_never_contacted, birthday_unbound_enabled,
+            theme_package, galaxy_mode, standard_mode, galaxy_accent,
+            standard_accent, galaxy_background, standard_background,
+            dashboard_view_mode, dashboard_populations, dashboard_filters,
+            dashboard_sort, dashboard_right_swipe_action,
+            orrery_density, orrery_satellites_enabled, orrery_last_system,
+            profile_layout_template_uid, profile_background_template_uid,
+            history_lens, history_cycle_count,
+            default_interaction_channel, remembered_interaction_channel,
+            default_message_mode, remembered_message_mode,
+            ai_enabled, ai_active_connection, ai_writing_tone,
+            ai_writing_length, ai_writing_directness, ai_writing_freeform,
+            ai_default_memory_allow, ai_default_interaction_note_allow,
+            ai_default_custom_field_share,
             ai_provider, ai_model, ai_custom_endpoint, ai_custom_model,
             ai_prompt_template, backup_interval_days, backup_retention_days,
             modified_at
@@ -916,6 +992,44 @@ export async function getPortableSettingsSnapshot(
       ? 1
       : 0) as 0 | 1,
     birthdayUnboundEnabled: (row.birthday_unbound_enabled ? 1 : 0) as 0 | 1,
+    themePackage: row.theme_package as ThemePackage,
+    galaxyMode: row.galaxy_mode as ThemeMode,
+    standardMode: row.standard_mode as ThemeMode,
+    galaxyAccent: (row.galaxy_accent ?? null) as AccentId | null,
+    standardAccent: (row.standard_accent ?? null) as AccentId | null,
+    galaxyBackground: (row.galaxy_background ?? null) as BackgroundSlotId | null,
+    standardBackground: (row.standard_background ?? null) as BackgroundSlotId | null,
+    dashboardViewMode: row.dashboard_view_mode as DashboardViewMode,
+    dashboardPopulations: row.dashboard_populations,
+    dashboardFilters: row.dashboard_filters,
+    dashboardSort: row.dashboard_sort as DashboardSortMode,
+    dashboardRightSwipeAction:
+      row.dashboard_right_swipe_action as RightSwipeAction,
+    orreryDensity: row.orrery_density,
+    orrerySatellitesEnabled: row.orrery_satellites_enabled,
+    orreryLastSystem: row.orrery_last_system,
+    profileLayoutTemplateUid: row.profile_layout_template_uid ?? null,
+    profileBackgroundTemplateUid: row.profile_background_template_uid ?? null,
+    historyLens: row.history_lens as HistoryLens,
+    historyCycleCount: row.history_cycle_count as HistoryCycleCount,
+    defaultInteractionChannel:
+      row.default_interaction_channel as DefaultInteractionChannel,
+    rememberedInteractionChannel:
+      row.remembered_interaction_channel as RememberedInteractionChannel,
+    defaultMessageMode: row.default_message_mode as DefaultMessageMode,
+    rememberedMessageMode:
+      row.remembered_message_mode as RememberedMessageMode,
+    aiEnabled: (row.ai_enabled ? 1 : 0) as 0 | 1,
+    aiActiveConnection: row.ai_active_connection,
+    aiWritingTone: row.ai_writing_tone,
+    aiWritingLength: row.ai_writing_length,
+    aiWritingDirectness: row.ai_writing_directness,
+    aiWritingFreeform: row.ai_writing_freeform,
+    aiDefaultMemoryAllow: (row.ai_default_memory_allow ? 1 : 0) as 0 | 1,
+    aiDefaultInteractionNoteAllow: (row.ai_default_interaction_note_allow
+      ? 1
+      : 0) as 0 | 1,
+    aiDefaultCustomFieldShare: (row.ai_default_custom_field_share ? 1 : 0) as 0 | 1,
     aiProvider: row.ai_provider as AiProviderId,
     aiModel: row.ai_model,
     aiCustomEndpoint: row.ai_custom_endpoint,
