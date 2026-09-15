@@ -51,4 +51,4 @@ The system uses one shared selectable library containing the eight approved bund
 - `src/screens/SettingsScreen.tsx` — implemented the phase's inline grouped picker before the Settings surface was later split.
 
 **Depends on:** ADR-087 (Bundled Background Presets and Package-Specific Surface Treatment)
-**Required by:** None
+**Required by:** ADR-114 (Route-Aware App-Wide System Background Composition)
