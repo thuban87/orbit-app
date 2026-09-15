@@ -77,7 +77,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 
 1. The landing screen reads a picker cache copy immediately, decrypts if necessary, parses, validates the complete graph, and stores the valid candidate in a process-local cache.
 2. `RestorePreviewScreen` shows aggregate metadata only. Merge is the default; Replace-all requires an impact confirmation and, with a configured destination, a fresh verified pre-restore snapshot.
-3. `applyRestore()` reconciles UID rows and tombstones, remaps portable parent UIDs to destination row IDs, normalizes method/link natural-key collisions before writing, recomputes contact recency, and registers committed photo-finalization work in one transaction.
+3. `applyRestore()` reconciles UID rows and tombstones, remaps portable parent UIDs to destination row IDs, normalizes method/link natural-key collisions before writing, remaps any legacy interaction Tone/channel vocabulary on ingest through the shared map, forces `allow_ai=0` on the interactions merge/update arm, recomputes contact recency, and registers committed photo-finalization work in one transaction.
 4. Post-commit photo, background, and schedule work is retryable. Avatar work uses committed journal rows; background work uses retained UID-keyed restore-pending bytes and a launch re-drive after sidecar recovery.
 5. Import sessions are local-only transient recovery state: exports omit them, and Replace-all clears their rows so a portable snapshot cannot revive a stale system-picker selection.
 6. A format-4 backup that predates retained custom-field value history normalizes its missing array to `[]`; restored older rows default to AI off and global, non-history field definitions.
@@ -105,6 +105,8 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 - **ADR-070:** Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out — adds the `interactionAssistEnabled` setting to the portable manifest while excluding the transient assist rows.
 - **ADR-083:** Durable Multi-Package Theme Configuration and Restore-Before-Paint — allowlists seven future-portable theme keys without changing the current format-3 wire shape.
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — makes retained prior values a mergeable, tombstoned portable entity.
+- **ADR-116:** Value-Remapped Interaction Vocabulary and Optional Descriptive Duration — restore-apply remaps legacy `quality`/`channel` values on ingest through the single shared map, so a pre-Phase-32 backup cannot re-open the vocabulary miscount.
+- **ADR-117:** Per-Interaction Allow-AI Consent Gate — restore is fail-closed for `allow_ai` on both paths (fresh insert via `DEFAULT 0`, merge/update via an explicit `allow_ai=0`), so no restored backup leaves an interaction more AI-permissive.
 - **ADR-092:** Durable Shared Dashboard Query State — allowlists future-portable Dashboard preferences without changing the current wire format.
 - **ADR-099:** Durable Global Dashboard Right-Swipe Action — allowlists the future-portable action key without an in-phase format change.
 
@@ -125,6 +127,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 13. **Integer relationships travel as UIDs.** Systems, contacts, Group Events, and presentation parents are looked up in the destination database; source row IDs never cross the wire.
 14. **Group Event deletion remains durable.** v5 carries parent tombstones, while an interaction whose Group Event no longer survives is retained as ordinary contact history with a NULL parent.
 15. **Profile presentation and background bytes are v5 entities.** `profile_contact_presentation` and `profile_category_presentation` are keyed by parent UID, preserve template assignments/freeform/collapse state, and restore background bytes through staged, UID-derived `profile-backgrounds/<uid>.jpg` files.
+16. **Restore is a separate interaction writer.** `restore-apply` writes `interactions` without going through migration 025, so it must consume the same `interaction-vocabulary.ts` remap and force `allow_ai=0` on its merge arm; otherwise the restore backdoor re-opens the vocabulary miscount or a stale AI-permissive row (SQLite's column `DEFAULT` fires only on fresh INSERT, not `ON CONFLICT` update).
 
 ## Related Systems
 
@@ -154,4 +157,5 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | 2026-09-02 | 27 | Allowlisted the durable Dashboard right-swipe action for a future wire without changing the current backup format. |
 | 2026-09-02 | 30 | Declared the stable-UID Systems entity, validation, and orphan-repair boundary while intentionally leaving the format-4 wire unchanged. |
 | 2026-09-09 | 31 | Documented Profile presentation's format-4 boundary: global preference keys are accepted, while Profile entities and background bytes remain device-local pending the coordinated backup format decision. |
+| 2026-09-02 | 32 | Closed the restore backdoors for the interaction Tone/channel vocabulary (remap-on-ingest through the shared map) and the per-interaction `allow_ai` gate (fail-closed on both the fresh-insert and merge/update paths); declared the `history_lens`/`history_cycle_count` preferences restore-accept only, with emission deferred to Phase 36. |
 | 2026-09-14 | 36 | Profile presentation + background bytes added to v5 backup — deferral discharged per D-14. |
