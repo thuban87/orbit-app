@@ -65,6 +65,14 @@ export type SettingsHubRow = SettingsHubRouteEntry | SettingsHubActionEntry;
 export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
   {
     kind: "route",
+    key: "appearance",
+    title: "Appearance",
+    subtitle: "Theme, mode, accent, and background",
+    icon: "palette",
+    route: "SettingsAppearance",
+  },
+  {
+    kind: "route",
     key: "interactions",
     title: "Interactions",
     subtitle: "Message defaults, dashboard swipe, and Interaction Assist",

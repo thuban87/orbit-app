@@ -9,7 +9,6 @@ import { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   FlatList,
-  Image,
   Modal,
   Pressable,
   ScrollView,
@@ -17,7 +16,6 @@ import {
   Switch,
   Text,
   TextInput,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { requestPinWidget } from "react-native-android-widget";
@@ -53,25 +51,7 @@ import {
   requestNotificationPermission,
 } from "@/services/notifications/permission";
 import { useAiConfigStore } from "@/stores/ai-config-store";
-import { useThemeStore } from "@/stores/theme-store";
 import { useTheme } from "@/theme";
-import { ACCENTS } from "@/theme/accents";
-import {
-  BACKGROUND_ORDER,
-  NONE_SLOT_ID,
-  PACKAGE_DEFAULT_SLOT,
-  resolveRenderableBackground,
-} from "@/theme/backgrounds";
-import {
-  ACCENT_IDS,
-  type AccentId,
-  type BackgroundSlotId,
-} from "@/theme/theme-option-ids";
-import type {
-  ThemeMode,
-  ThemePackage,
-  ThemePalette,
-} from "@/theme/theme-types";
 import { Logger } from "@/utils/logger";
 import { pickContacts } from "../../modules/orbit-contact-picker";
 import { pinResultCopy } from "./settings-add-widget";
@@ -111,84 +91,6 @@ function seedForHour(hour: number): Date {
   return d;
 }
 
-const BACKGROUND_LABELS: Record<BackgroundSlotId, string> = {
-  "galaxy-deep-space": "Deep Space",
-  "galaxy-starfield": "Starfield",
-  "galaxy-nebula": "Nebula",
-  "galaxy-aurora": "Aurora",
-  "standard-dawn": "Dawn",
-  "standard-paper": "Paper",
-  "standard-dusk": "Dusk",
-  "standard-mesh": "Mesh",
-  none: "None (Solid)",
-};
-
-type BackgroundThumbnailProps = {
-  colors: ThemePalette;
-  columnWidth: "23%" | "48%";
-  label: string;
-  onPress: (slot: BackgroundSlotId) => void;
-  selected: boolean;
-  slot: BackgroundSlotId;
-  sourcePackage: ThemePackage;
-};
-
-function BackgroundThumbnail({
-  colors,
-  columnWidth,
-  label,
-  onPress,
-  selected,
-  slot,
-  sourcePackage,
-}: BackgroundThumbnailProps) {
-  const [thumbFailed, setThumbFailed] = useState(false);
-  const resolved = resolveRenderableBackground(
-    sourcePackage,
-    slot,
-    thumbFailed,
-  );
-
-  return (
-    <Pressable
-      testID={`settings-theme-background-${slot}`}
-      accessibilityRole="button"
-      accessibilityLabel={`${label} background`}
-      accessibilityState={{ selected }}
-      onPress={() => onPress(slot)}
-      style={[
-        styles.backgroundThumbnail,
-        {
-          flexBasis: columnWidth,
-          backgroundColor: colors.surface,
-          borderColor: selected ? colors.accent : colors.border,
-        },
-      ]}
-    >
-      <View
-        style={[
-          styles.backgroundPreview,
-          { backgroundColor: colors.background },
-        ]}
-      >
-        {resolved.kind === "asset" ? (
-          <Image
-            source={resolved.source()}
-            style={StyleSheet.absoluteFill}
-            resizeMode="cover"
-            onError={() => setThumbFailed(true)}
-          />
-        ) : null}
-      </View>
-      <Text
-        style={[styles.backgroundThumbnailLabel, { color: colors.textPrimary }]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 /**
  * SettingsScreen — the low-traffic host for the two CRUD-05 "separate homes":
  * Custom Fields (relocated off the Phase-3 `HomeScreen` dependency-free route)
@@ -212,28 +114,10 @@ function BackgroundThumbnail({
  * `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 export function SettingsScreen() {
-  const { colors, mode } = useTheme();
-  const { fontScale } = useWindowDimensions();
-  // Appearance (23-08): live theme selection from the store — the ThemeProvider
-  // re-renders from these, so a change restyles the whole app instantly; the
-  // persist() helper below writes the durable app_settings columns.
-  const themePackage = useThemeStore((s) => s.package);
-  const galaxyMode = useThemeStore((s) => s.galaxyMode);
-  const standardMode = useThemeStore((s) => s.standardMode);
-  const galaxyAccent = useThemeStore((s) => s.galaxyAccent);
-  const standardAccent = useThemeStore((s) => s.standardAccent);
-  const galaxyBackground = useThemeStore((s) => s.galaxyBackground);
-  const standardBackground = useThemeStore((s) => s.standardBackground);
-  const setThemePackage = useThemeStore((s) => s.setPackage);
-  const setModeForActivePackage = useThemeStore(
-    (s) => s.setModeForActivePackage,
-  );
-  const setAccentForActivePackage = useThemeStore(
-    (s) => s.setAccentForActivePackage,
-  );
-  const setBackgroundForActivePackage = useThemeStore(
-    (s) => s.setBackgroundForActivePackage,
-  );
+  const { colors } = useTheme();
+  // Appearance/Theme controls migrated to SettingsAppearanceScreen in Phase 37
+  // (Plan 02): package / mode / accent / background now live there, reading the
+  // theme-store selectors and persisting through persistAppearanceSetting.
   const bottomClearance = useBottomClearance();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -257,12 +141,6 @@ export function SettingsScreen() {
   const [phoneRegionSearch, setPhoneRegionSearch] = useState("");
   const [resumableReconcile, setResumableReconcile] =
     useState<ResumableReconcile | null>(null);
-
-  const activeBackground =
-    themePackage === "galaxy" ? galaxyBackground : standardBackground;
-  const selectedBackgroundSlot =
-    activeBackground ?? PACKAGE_DEFAULT_SLOT[themePackage];
-  const backgroundColumnWidth = fontScale >= 1.3 ? "48%" : "23%";
 
   const onImportContacts = useCallback(async () => {
     try {
@@ -517,18 +395,6 @@ export function SettingsScreen() {
     }
   }, []);
 
-  const onSelectBackground = useCallback(
-    (slot: BackgroundSlotId) => {
-      setBackgroundForActivePackage(slot);
-      void persist(
-        themePackage === "galaxy"
-          ? { galaxyBackground: slot }
-          : { standardBackground: slot },
-      );
-    },
-    [persist, setBackgroundForActivePackage, themePackage],
-  );
-
   const savePhoneRegionOverride = useCallback(
     async (input: string): Promise<boolean> => {
       try {
@@ -661,310 +527,6 @@ export function SettingsScreen() {
       ]}
     >
       <ShellAppBar variant="root" title="Settings" />
-
-      {__DEV__ ? (
-        <Pressable
-          testID="settings-dev-theme-preview-row"
-          accessibilityRole="button"
-          accessibilityLabel="Open background failure test harness"
-          onPress={() => navigation.navigate("__ThemePreview")}
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-            Background failure test harness
-          </Text>
-        </Pressable>
-      ) : null}
-
-      {/* Appearance (23-08) — the in-app entry point for the theme axes that
-          resolve through ThemeProvider app-wide today: package, mode, accent.
-          Each control drives a live store setter (instant restyle) AND persists
-          the durable app_settings column via persist(). Background/glass/status
-          adoption has no production consumer yet, so it is intentionally absent. */}
-      <View testID="settings-appearance-section" style={styles.section}>
-        <Text
-          accessibilityRole="header"
-          style={[styles.sectionHeading, { color: colors.textSecondary }]}
-        >
-          Appearance
-        </Text>
-
-        {/* Theme package */}
-        <View
-          testID="settings-theme-package-row"
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-            Theme
-          </Text>
-          <View style={styles.themeChipRow}>
-            {(
-              [
-                ["galaxy", "Galaxy"],
-                ["standard", "Standard"],
-              ] as [ThemePackage, string][]
-            ).map(([value, label]) => {
-              const selected = themePackage === value;
-              return (
-                <Pressable
-                  key={value}
-                  testID={`settings-theme-package-${value}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Theme ${label}`}
-                  accessibilityState={{ selected }}
-                  onPress={() => {
-                    setThemePackage(value);
-                    void persist({ themePackage: value });
-                  }}
-                  style={[
-                    styles.themeChip,
-                    {
-                      borderColor: selected ? colors.accent : colors.border,
-                      backgroundColor: selected
-                        ? colors.accent
-                        : colors.surface,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.themeChipLabel,
-                      {
-                        color: selected ? colors.onAccent : colors.textPrimary,
-                      },
-                    ]}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Galaxy is glass-forward and deep-space; Standard is flatter and
-            calmer. Each package remembers its own mode and accent.
-          </Text>
-        </View>
-
-        {/* Appearance mode (per active package) */}
-        <View
-          testID="settings-theme-mode-row"
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-            Mode
-          </Text>
-          <View style={styles.themeChipRow}>
-            {(
-              [
-                ["light", "Light"],
-                ["dark", "Dark"],
-                ["system", "Follow System"],
-              ] as [ThemeMode, string][]
-            ).map(([value, label]) => {
-              const activeMode =
-                themePackage === "galaxy" ? galaxyMode : standardMode;
-              const selected = activeMode === value;
-              return (
-                <Pressable
-                  key={value}
-                  testID={`settings-theme-mode-${value}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Mode ${label}`}
-                  accessibilityState={{ selected }}
-                  onPress={() => {
-                    setModeForActivePackage(value);
-                    void persist(
-                      themePackage === "galaxy"
-                        ? { galaxyMode: value }
-                        : { standardMode: value },
-                    );
-                  }}
-                  style={[
-                    styles.themeChip,
-                    {
-                      borderColor: selected ? colors.accent : colors.border,
-                      backgroundColor: selected
-                        ? colors.accent
-                        : colors.surface,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.themeChipLabel,
-                      {
-                        color: selected ? colors.onAccent : colors.textPrimary,
-                      },
-                    ]}
-                  >
-                    {label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-
-        {/* Accent (per active package) */}
-        <View
-          testID="settings-theme-accent-row"
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-            Accent
-          </Text>
-          <View style={styles.swatchRow}>
-            {(() => {
-              const activeAccent =
-                themePackage === "galaxy" ? galaxyAccent : standardAccent;
-              const defaultSelected = activeAccent === null;
-              return (
-                <>
-                  {/* Package default (NULL accent) */}
-                  <Pressable
-                    testID="settings-theme-accent-default"
-                    accessibilityRole="button"
-                    accessibilityLabel="Accent package default"
-                    accessibilityState={{ selected: defaultSelected }}
-                    onPress={() => {
-                      setAccentForActivePackage(null);
-                      void persist(
-                        themePackage === "galaxy"
-                          ? { galaxyAccent: null }
-                          : { standardAccent: null },
-                      );
-                    }}
-                    style={[
-                      styles.themeChip,
-                      {
-                        borderColor: defaultSelected
-                          ? colors.accent
-                          : colors.border,
-                        backgroundColor: colors.surface,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.themeChipLabel,
-                        { color: colors.textPrimary },
-                      ]}
-                    >
-                      Default
-                    </Text>
-                  </Pressable>
-                  {ACCENT_IDS.map((id: AccentId, index) => {
-                    const selected = activeAccent === id;
-                    const fill = ACCENTS[id][mode].fill;
-                    return (
-                      <Pressable
-                        key={id}
-                        testID={`settings-theme-accent-${index}`}
-                        accessibilityRole="button"
-                        accessibilityLabel={`Accent ${id.replace(/-/g, " ")}`}
-                        accessibilityState={{ selected }}
-                        onPress={() => {
-                          setAccentForActivePackage(id);
-                          void persist(
-                            themePackage === "galaxy"
-                              ? { galaxyAccent: id }
-                              : { standardAccent: id },
-                          );
-                        }}
-                        style={[
-                          styles.swatch,
-                          {
-                            backgroundColor: fill,
-                            borderColor: selected
-                              ? colors.accent
-                              : colors.border,
-                          },
-                        ]}
-                      />
-                    );
-                  })}
-                </>
-              );
-            })()}
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            The accent tints buttons, links, and active states across the app.
-          </Text>
-        </View>
-
-        {/* Background (per active package) — all bundled slots remain selectable
-            regardless of the active package; only the destination preference
-            column changes. A failed thumbnail silently becomes themed solid. */}
-        <View
-          testID="settings-theme-background-row"
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-            Background
-          </Text>
-          {(["galaxy", "standard"] as ThemePackage[]).map((sourcePackage) => (
-            <View key={sourcePackage} style={styles.backgroundSubgroup}>
-              <Text
-                style={[
-                  styles.backgroundSubgroupLabel,
-                  { color: colors.textSecondary },
-                ]}
-              >
-                {sourcePackage === "galaxy" ? "Galaxy" : "Standard"}
-              </Text>
-              <View style={styles.backgroundGrid}>
-                {BACKGROUND_ORDER[sourcePackage]
-                  .filter((slot) => slot !== NONE_SLOT_ID)
-                  .map((slot) => (
-                    <BackgroundThumbnail
-                      key={slot}
-                      colors={colors}
-                      columnWidth={backgroundColumnWidth}
-                      label={BACKGROUND_LABELS[slot]}
-                      onPress={onSelectBackground}
-                      selected={selectedBackgroundSlot === slot}
-                      slot={slot}
-                      sourcePackage={sourcePackage}
-                    />
-                  ))}
-              </View>
-            </View>
-          ))}
-          <View style={styles.backgroundSubgroup}>
-            <View style={styles.backgroundGrid}>
-              <BackgroundThumbnail
-                colors={colors}
-                columnWidth={backgroundColumnWidth}
-                label={BACKGROUND_LABELS[NONE_SLOT_ID]}
-                onPress={onSelectBackground}
-                selected={selectedBackgroundSlot === NONE_SLOT_ID}
-                slot={NONE_SLOT_ID}
-                sourcePackage={themePackage}
-              />
-            </View>
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Backgrounds stay fixed behind your screens. Each package remembers
-            its own choice.
-          </Text>
-        </View>
-      </View>
 
       <View testID="settings-phone-region-section" style={styles.section}>
         <Text
@@ -2000,52 +1562,6 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 3,
-  },
-  backgroundSubgroup: {
-    gap: 8,
-  },
-  backgroundSubgroupLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  backgroundGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  backgroundThumbnail: {
-    minHeight: 44,
-    flexGrow: 1,
-    gap: 6,
-    borderWidth: 2,
-    borderRadius: 10,
-    padding: 6,
-  },
-  backgroundPreview: {
-    height: 64,
-    overflow: "hidden",
-    borderRadius: 6,
-  },
-  backgroundThumbnailLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  themeChipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  themeChip: {
-    minHeight: 44,
-    justifyContent: "center",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  themeChipLabel: {
-    fontSize: 15,
-    fontWeight: "600",
   },
   modalRoot: {
     flex: 1,

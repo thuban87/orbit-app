@@ -29,8 +29,11 @@ export const SETTINGS_REGISTERED_ROUTES = [
   // migrated control stays reachable; Plan 08 removes this once every group has
   // migrated into a category screen.
   "SettingsMore",
-  // The first real category route (this plan) — Interactions.
+  // The first real category route (Plan 01) — Interactions.
   "SettingsInteractions",
+  // The Appearance category route (Plan 02) — Theme section (package / mode /
+  // accent / background); its <Stack.Screen> is registered in SettingsStack.tsx.
+  "SettingsAppearance",
 ] as const;
 
 export type SettingsRegisteredRoute =

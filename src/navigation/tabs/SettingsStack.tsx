@@ -26,6 +26,7 @@ import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { ReconcileCompleteScreen } from "@/screens/ReconcileCompleteScreen";
 import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
+import { SettingsAppearanceScreen } from "@/screens/SettingsAppearanceScreen";
 import { SettingsHubScreen } from "@/screens/SettingsHubScreen";
 import { SettingsInteractionsScreen } from "@/screens/SettingsInteractionsScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
@@ -100,6 +101,12 @@ function SettingsInteractionsRoute({
   return <SettingsInteractionsScreen onBack={() => navigation.goBack()} />;
 }
 
+function SettingsAppearanceRoute({
+  navigation,
+}: SettingsScreenProps<"SettingsAppearance">) {
+  return <SettingsAppearanceScreen onBack={() => navigation.goBack()} />;
+}
+
 export function SettingsStack() {
   return (
     <Stack.Navigator
@@ -115,6 +122,10 @@ export function SettingsStack() {
       <Stack.Screen
         name="SettingsInteractions"
         component={SettingsInteractionsRoute}
+      />
+      <Stack.Screen
+        name="SettingsAppearance"
+        component={SettingsAppearanceRoute}
       />
       <Stack.Screen name="AIConnection" component={AIConnectionRoute} />
       <Stack.Screen name="AIModelPicker" component={AIModelPickerRoute} />

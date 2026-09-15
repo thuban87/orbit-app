@@ -7,8 +7,8 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { CurrentStateFieldKey } from "@/db/memory-registry";
 import type { MergeResolutions } from "@/db/merge-dao";
 import type { RestorePreviewRoute } from "@/screens/backup-restore-logic";
-import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
 import type { AiCloudProviderId } from "@/services/ai-types";
+import type { PhotoTargetDescriptor } from "@/services/photos/photo-storage";
 
 /** Serializable Profile route state shared by every stack that can open it. */
 export type ProfileRouteParams = {
@@ -244,6 +244,7 @@ export type SettingsStackParamList = {
    */
   SettingsMore: undefined;
   SettingsInteractions: undefined;
+  SettingsAppearance: undefined;
   /** DEV-only device-UAT harness; its route is compile-time gated from release. */
   __ThemePreview: undefined;
   SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;
