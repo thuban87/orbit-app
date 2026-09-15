@@ -25,11 +25,9 @@
 export const SETTINGS_REGISTERED_ROUTES = [
   // The preserved hub route name (§M — deep-link + back-stack safe).
   "Settings",
-  // Transitional re-registration of the untouched monolith so every not-yet-
-  // migrated control stays reachable; Plan 08 removes this once every group has
-  // migrated into a category screen.
-  "SettingsMore",
-  // The first real category route (Plan 01) — Interactions.
+  // The first real category route (Plan 01) — Interactions. (The transitional
+  // `SettingsMore` monolith route was retired in Plan 08 once every group had
+  // migrated into its category screen.)
   "SettingsInteractions",
   // The Appearance category route (Plan 02) — Theme section (package / mode /
   // accent / background); its <Stack.Screen> is registered in SettingsStack.tsx.

@@ -237,12 +237,10 @@ export type SettingsStackParamList = {
   AIPreview: undefined;
   /**
    * Phase 37 Settings decomposition (D-09). `Settings` (above) now mounts the
-   * navigation-first hub; `SettingsMore` re-registers the untouched monolith at
-   * a transitional internal route so every not-yet-migrated control stays
-   * reachable (removed in Plan 08), and `SettingsInteractions` is the first real
-   * category screen. Later plans add the remaining category route names.
+   * navigation-first hub; each category below is a dedicated sub-route. The
+   * transitional `SettingsMore` monolith route was retired in Plan 08 once every
+   * group had migrated into its category screen.
    */
-  SettingsMore: undefined;
   SettingsInteractions: undefined;
   SettingsAppearance: undefined;
   SettingsContacts: undefined;

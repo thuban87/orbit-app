@@ -58,15 +58,47 @@ describe("Settings hub model", () => {
     expect(orreryPos).toBeLessThan(aiPos);
   });
 
-  it("keeps the transitional SettingsMore row present as the last non-utility row", () => {
-    const routeRows = SETTINGS_HUB_ROWS.filter((row) => row.kind === "route");
-    expect(routeRows.length).toBeGreaterThan(0);
-    const moreRow = routeRows.find(
-      (row) => row.kind === "route" && row.route === "SettingsMore",
+  it("has retired the transitional SettingsMore scaffold (Plan 08)", () => {
+    // No hub row targets the removed monolith route... (cast: `SettingsMore` is
+    // no longer even a member of the registered-route type — its absence there
+    // is itself the retirement guard).
+    const moreRow = SETTINGS_HUB_ROWS.find(
+      (row) => row.kind === "route" && (row.route as string) === "SettingsMore",
     );
-    expect(moreRow, "transitional SettingsMore row must exist").toBeDefined();
-    // It is the LAST non-utility (route) row — the migration scaffold Plan 08
-    // removes once every group has migrated.
-    expect(routeRows[routeRows.length - 1]).toBe(moreRow);
+    expect(moreRow, "SettingsMore hub row must be gone").toBeUndefined();
+    // ...and it is no longer a registered route at all (source-scan test also
+    // asserts no <Stack.Screen> for it).
+    expect(SETTINGS_REGISTERED_ROUTES).not.toContain("SettingsMore");
+  });
+
+  it("renders the COMPLETE §A category order, then the widget action row (§A/§K/§L)", () => {
+    // The route (category) rows, in render order, are EXACTLY the canonical §A
+    // top-level order — every category present, none missing, none out of order.
+    const routeKeys = SETTINGS_HUB_ROWS.filter(
+      (row) => row.kind === "route",
+    ).map((row) => row.key);
+    expect(routeKeys).toEqual([...SETTINGS_CATEGORY_ORDER]);
+
+    // The Home Screen Widget access is a single bottom utility row, modeled as
+    // kind:"action" (§L) — after the whole category/About hierarchy.
+    const lastRow = SETTINGS_HUB_ROWS[SETTINGS_HUB_ROWS.length - 1];
+    expect(lastRow.kind).toBe("action");
+    const actionRows = SETTINGS_HUB_ROWS.filter((row) => row.kind === "action");
+    expect(actionRows).toHaveLength(1);
+
+    // No route row precedes About out of order: About is the final category.
+    expect(routeKeys[routeKeys.length - 1]).toBe("about");
+  });
+
+  it("renders no row targeting the reserved CategoryManagement route (D-03)", () => {
+    const reserved = SETTINGS_HUB_ROWS.find(
+      (row) =>
+        row.kind === "route" &&
+        (row.route as string) === "CategoryManagement",
+    );
+    expect(
+      reserved,
+      "no hub row may target the inert CategoryManagement reservation",
+    ).toBeUndefined();
   });
 });

@@ -38,7 +38,6 @@ import { SettingsHubScreen } from "@/screens/SettingsHubScreen";
 import { SettingsInteractionsScreen } from "@/screens/SettingsInteractionsScreen";
 import { SettingsNotificationsScreen } from "@/screens/SettingsNotificationsScreen";
 import { SettingsOrreryScreen } from "@/screens/SettingsOrreryScreen";
-import { SettingsScreen } from "@/screens/SettingsScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
@@ -179,11 +178,10 @@ export function SettingsStack() {
       screenOptions={{ headerShown: false }}
     >
       {/* Phase 37 (D-09): the hub replaces the monolith at the preserved
-          `Settings` route name (§M — deep-link + back-stack safe). The untouched
-          monolith is re-registered at the transitional `SettingsMore` route so
-          every not-yet-migrated control stays reachable (Plan 08 removes it). */}
+          `Settings` route name (§M — deep-link + back-stack safe). Plan 08 retired
+          the transitional `SettingsMore` monolith once every group had migrated
+          into a category screen (§A order below). */}
       <Stack.Screen name="Settings" component={SettingsHubScreen} />
-      <Stack.Screen name="SettingsMore" component={SettingsScreen} />
       <Stack.Screen
         name="SettingsInteractions"
         component={SettingsInteractionsRoute}

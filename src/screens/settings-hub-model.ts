@@ -19,12 +19,12 @@ type ParamlessSettingsRoute = {
 }[SettingsRegisteredRoute];
 
 /**
- * Canonical §A top-level category order (dossier §A). Later plans fill in the
- * currently-absent categories (Appearance, Contacts & Relationships,
- * Notifications, Orrery, Data & Backup, AI, About) at their correct index. This
- * is the anchor `settings-hub-model.test.ts` reads to assert §A ordering of the
- * present category rows. `SettingsMore` is a transitional migration scaffold,
- * NOT a §A category, and is intentionally absent from this order.
+ * Canonical §A top-level category order (dossier §A). Every category now has a
+ * dedicated hub sub-route (Appearance, Contacts & Relationships, Interactions,
+ * Notifications, Orrery, Data & Backup, AI, About). This is the anchor
+ * `settings-hub-model.test.ts` reads to assert §A ordering. The transitional
+ * `SettingsMore` monolith scaffold was retired in Plan 08 and never was a §A
+ * category, so it does not appear here.
  */
 export const SETTINGS_CATEGORY_ORDER = [
   "appearance",
@@ -73,14 +73,10 @@ export type SettingsHubRow = SettingsHubRouteEntry | SettingsHubActionEntry;
 
 /**
  * The hub directory rows, authored in §A order. Per §A the rows carry NO live
- * setting values — title + subtitle only. Per §K, ONLY rows whose destination
- * screen exists after THIS plan are present: the real Interactions category and
- * the transitional "More settings" row that fronts the untouched monolith.
- * Later plans insert their category rows at the correct §A index and append the
- * bottom utility (`kind:"action"`) row.
- *
- * The transitional `SettingsMore` row is the last non-utility row (a regression
- * anchor — Plan 08 removes it once every group has migrated).
+ * setting values — title + subtitle only. After Plan 08 the full §A category
+ * hierarchy is present (Appearance → About) followed by the bottom utility
+ * (`kind:"action"`) "Add Orbit widget" row (§L). The transitional "More settings"
+ * (`SettingsMore`) row was removed once every group migrated into its category.
  */
 export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
   {
@@ -144,22 +140,13 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
   },
   {
     // About Orbit (§A index 7 / §K). The final §A category — a basic leaf
-    // (product name + semantic version only). Placed after AI and before the
-    // transitional "More settings" row (Plan 08 removes that scaffold in Task 3).
+    // (product name + semantic version only). The last category row, after AI.
     kind: "route",
     key: "about",
     title: "About Orbit",
     subtitle: "App name and version",
     icon: "info",
     route: "SettingsAbout",
-  },
-  {
-    kind: "route",
-    key: "more",
-    title: "More settings",
-    subtitle: "Everything not yet reorganised into a category",
-    icon: "dots",
-    route: "SettingsMore",
   },
   {
     // Home Screen Widget access (§L). A UTILITY row modeled as `kind:"action"`
