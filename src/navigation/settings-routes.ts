@@ -34,6 +34,10 @@ export const SETTINGS_REGISTERED_ROUTES = [
   // The Appearance category route (Plan 02) — Theme section (package / mode /
   // accent / background); its <Stack.Screen> is registered in SettingsStack.tsx.
   "SettingsAppearance",
+  // The Contacts & Relationships category route (Plan 04) — Contact Sources,
+  // Relationship Structure, Contact Management (§E); its <Stack.Screen> is
+  // registered in SettingsStack.tsx.
+  "SettingsContacts",
 ] as const;
 
 export type SettingsRegisteredRoute =

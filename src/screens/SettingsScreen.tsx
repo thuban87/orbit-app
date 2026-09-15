@@ -4,24 +4,18 @@ import DateTimePicker, {
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { File, Paths } from "expo-file-system";
-import { getCountries } from "libphonenumber-js";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import {
-  Alert,
-  FlatList,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { requestPinWidget } from "react-native-android-widget";
 import { loadCachedOpenRouterCatalog } from "@/ai/openrouter-catalog";
 import { AIFirstUseDisclosure } from "@/components/AIFirstUseDisclosure";
-import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { resolveActiveAiConnection } from "@/db/ai-connections-dao";
 import {
@@ -31,14 +25,10 @@ import {
   updateAppSettings,
 } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
-import { getNewestPendingReconcileSessionId } from "@/db/reconcile-session-read";
 import { readCredentialPresence } from "@/logic/ai-availability";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { aiKeyStore } from "@/services/ai-key-store";
-import { getDeviceRegion } from "@/services/device-region";
-import type { ResumableReconcile } from "@/services/import/reconcile-resume-sweep";
-import { startContactImport } from "@/services/import/start-contact-import";
 import { reconcileDigestSchedule } from "@/services/notifications/digest-schedule";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import {
@@ -48,29 +38,16 @@ import {
 import { useAiConfigStore } from "@/stores/ai-config-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
-import { pickContacts } from "../../modules/orbit-contact-picker";
 import { pinResultCopy } from "./settings-add-widget";
 import {
   computeAiHubAvailability,
   deriveAiHubState,
 } from "./settings-ai-hub-logic";
-import { phoneRegionValueLabel } from "./settings-lifecycle-logic";
-import { phoneRegionOverridePatch } from "./settings-region-logic";
-import { contactImportMode } from "./use-contact-import-mode";
 
 const LOG_SCOPE = "settings-screen";
 
 /** Which time control's native picker is open (null = none). */
 type ActivePicker = "delivery" | "quiet-start" | "quiet-end" | null;
-
-const regionNames =
-  typeof Intl.DisplayNames === "function"
-    ? new Intl.DisplayNames(["en"], { type: "region" })
-    : null;
-
-const PHONE_REGIONS = getCountries()
-  .map((code) => ({ code, name: regionNames?.of(code) ?? code }))
-  .sort((a, b) => a.name.localeCompare(b.name));
 
 /** Format a 0-23 hour as a "h:MM AM/PM" wall-clock label (e.g. 9 → "9:00 AM"). */
 function formatHour(hour: number): string {
@@ -87,37 +64,32 @@ function seedForHour(hour: number): Date {
 }
 
 /**
- * SettingsScreen — the low-traffic host for the two CRUD-05 "separate homes":
- * Custom Fields (relocated off the Phase-3 `HomeScreen` dependency-free route)
- * and Archived contacts (the distinct archive home, no count badge — the
- * Archived screen states its count when opened, CONTEXT Area 1).
+ * SettingsScreen — the transitional `SettingsMore` monolith (Phase 37, D-09).
+ * Category groups migrate out into dedicated hub sub-routes plan by plan; Plan 08
+ * removes this screen once every group has a home. Currently hosts the Phase-11
+ * Notifications section, the AI hub, the "Add Orbit widget" utility, and the
+ * Systems row.
  *
- * PLUS the Phase-11 Notifications section (NOTIF-05): the master toggle IS the
- * value-moment `POST_NOTIFICATIONS` affordance, the decay/birthday/lock-screen
- * toggles gate scheduling, and the owner's user-tunable delivery hour + quiet
- * window (the reversal) get their tappable time controls. Every control reads/
- * writes `app_settings` via the DAO and fires `reconcileSchedule` after a change
- * so the OS's scheduled set updates immediately (no wait for next launch).
+ * The Notifications section (NOTIF-05): the master toggle IS the value-moment
+ * `POST_NOTIFICATIONS` affordance, the decay/birthday/lock-screen toggles gate
+ * scheduling, and the owner's user-tunable delivery hour + quiet window get their
+ * tappable time controls. Every control reads/writes `app_settings` via the DAO
+ * and fires `reconcileSchedule` after a change so the OS's scheduled set updates
+ * immediately (no wait for next launch).
  *
- * TWO base rows, not three: UI-SPEC:192's "Custom Fields" and "Reachability
- * route" name the SAME `CustomFieldsScreen` (there is no distinct Reachability
- * screen on disk), so a phantom third row would navigate nowhere. See the Plan
- * 04-01 Settings-rows reconciliation.
+ * Migrated OUT of this monolith:
+ * - Appearance / Theme + owner-profile + Orbit Appearance → SettingsAppearance (Plans 02–03).
+ * - Interaction Assist + interaction defaults → SettingsInteractions (Plan 01).
+ * - Contact methods (phone region, reconcile, review-flagged), Contacts Integration
+ *   (import), Custom Fields, and Archived → SettingsContacts (Plan 04, §E).
  *
- * Mirrors the `CustomFieldsScreen` chrome (ScrollView root `background`, header
- * with a `goBack` Back control, title 24/700). Every colour resolves through
- * `useTheme().colors.*` (CLAUDE.md / check:colors).
+ * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 export function SettingsScreen() {
   const { colors } = useTheme();
-  // Appearance/Theme controls migrated to SettingsAppearanceScreen in Phase 37
-  // (Plan 02): package / mode / accent / background now live there, reading the
-  // theme-store selectors and persisting through persistAppearanceSetting.
   const bottomClearance = useBottomClearance();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  // The owner photo + "Your orbit" (self-star + Orbit Center) controls migrated
-  // to SettingsAppearanceScreen in Phase 37 (Plan 03).
 
   // Notification settings mirror app_settings; permission is READ FRESH on focus
   // (OS-owned, revocable between opens). `degraded` renders the non-nagging note
@@ -126,40 +98,6 @@ export function SettingsScreen() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [degraded, setDegraded] = useState(false);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
-  const [phoneRegionPickerOpen, setPhoneRegionPickerOpen] = useState(false);
-  const [phoneRegionSearch, setPhoneRegionSearch] = useState("");
-  const [resumableReconcile, setResumableReconcile] =
-    useState<ResumableReconcile | null>(null);
-
-  const onImportContacts = useCallback(async () => {
-    try {
-      const currentSettings = await getAppSettings(getExecutor());
-      await startContactImport({
-        mode: contactImportMode(),
-        exec: getExecutor(),
-        effectivePhoneRegion:
-          currentSettings.phoneRegionOverride ?? getDeviceRegion(),
-        now: localDateTime(),
-        pick: () => pickContacts({ multiple: true }),
-        navigate: navigation.navigate,
-      });
-    } catch {
-      Alert.alert("Couldn't import contacts", "Please try again.");
-    }
-  }, [navigation]);
-
-  const onCheckLinkedContacts = useCallback(async () => {
-    try {
-      const pendingId = await getNewestPendingReconcileSessionId(getExecutor());
-      if (pendingId !== null) {
-        setResumableReconcile({ sessionId: pendingId, discardOnly: false });
-        return;
-      }
-      navigation.navigate("ReconcileGrid");
-    } catch {
-      Alert.alert("Couldn't check linked contacts", "Please try again.");
-    }
-  }, [navigation]);
 
   // The "Add Orbit widget" fallback copy — null while there is nothing to show,
   // set to the UI-SPEC fallback string when requestPinWidget can't pin (unsupported
@@ -270,44 +208,6 @@ export function SettingsScreen() {
     }
   }, []);
 
-  const savePhoneRegionOverride = useCallback(
-    async (input: string): Promise<boolean> => {
-      try {
-        await updateAppSettings(
-          getExecutor(),
-          phoneRegionOverridePatch(input),
-          localDateTime(),
-        );
-        await reloadNotifications();
-        return true;
-      } catch (err) {
-        Logger.error(LOG_SCOPE, "failed to persist phone region override", err);
-        return false;
-      }
-    },
-    [reloadNotifications],
-  );
-
-  const onSelectPhoneRegion = useCallback(
-    async (region: string) => {
-      if (await savePhoneRegionOverride(region)) {
-        setPhoneRegionPickerOpen(false);
-        setPhoneRegionSearch("");
-      }
-    },
-    [savePhoneRegionOverride],
-  );
-
-  const filteredPhoneRegions = useMemo(() => {
-    const term = phoneRegionSearch.trim().toLocaleLowerCase();
-    if (term === "") return PHONE_REGIONS;
-    return PHONE_REGIONS.filter(
-      (region) =>
-        region.code.toLocaleLowerCase().includes(term) ||
-        region.name.toLocaleLowerCase().includes(term),
-    );
-  }, [phoneRegionSearch]);
-
   const masterOn = settings?.notificationsEnabled === 1;
 
   // Master toggle = the value-moment permission affordance. Flipping ON requests
@@ -402,189 +302,6 @@ export function SettingsScreen() {
       ]}
     >
       <ShellAppBar variant="root" title="Settings" />
-
-      <View testID="settings-phone-region-section" style={styles.section}>
-        <Text
-          accessibilityRole="header"
-          style={[styles.sectionHeading, { color: colors.textSecondary }]}
-        >
-          Contact methods
-        </Text>
-        <Pressable
-          testID="settings-phone-region-row"
-          accessibilityRole="button"
-          accessibilityLabel={`Phone number region, ${phoneRegionValueLabel(settings?.phoneRegionOverride ?? null, settings?.phoneRegionOverride ? (regionNames?.of(settings.phoneRegionOverride) ?? settings.phoneRegionOverride) : null)}`}
-          accessibilityState={{ disabled: settings === null }}
-          disabled={settings === null}
-          onPress={() => setPhoneRegionPickerOpen(true)}
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Phone number region
-            </Text>
-            <Text style={[styles.rowValue, { color: colors.accent }]}>
-              {phoneRegionValueLabel(
-                settings?.phoneRegionOverride ?? null,
-                settings?.phoneRegionOverride
-                  ? (regionNames?.of(settings.phoneRegionOverride) ??
-                      settings.phoneRegionOverride)
-                  : null,
-              )}
-            </Text>
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Used to format phone numbers entered without a country code.
-          </Text>
-        </Pressable>
-        <Pressable
-          testID="settings-check-linked-contacts-row"
-          accessibilityRole="button"
-          accessibilityLabel="Check linked contacts"
-          onPress={() => void onCheckLinkedContacts()}
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-            Check linked contacts
-          </Text>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Review changes from linked people in your phone.
-          </Text>
-        </Pressable>
-        <Pressable
-          testID="settings-bulk-review-row"
-          accessibilityRole="button"
-          accessibilityLabel="Review flagged items"
-          onPress={() => navigation.navigate("BulkReview")}
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-            Review flagged items
-          </Text>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Fix import details Orbit could not read.
-          </Text>
-        </Pressable>
-      </View>
-
-      <View
-        testID="settings-contacts-integration-section"
-        style={styles.section}
-      >
-        <Text
-          accessibilityRole="header"
-          style={[styles.sectionHeading, { color: colors.textSecondary }]}
-        >
-          Contacts Integration
-        </Text>
-        <Pressable
-          testID="settings-import-contacts-row"
-          accessibilityRole="button"
-          accessibilityLabel="Import contacts"
-          onPress={() => void onImportContacts()}
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-            Import contacts
-          </Text>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Choose people from your phone and review each import first.
-          </Text>
-        </Pressable>
-      </View>
-
-      <ResumeReconcilePrompt
-        resumable={resumableReconcile}
-        onDismiss={() => setResumableReconcile(null)}
-        onDiscarded={() => navigation.navigate("ReconcileGrid")}
-      />
-
-      <Modal
-        visible={phoneRegionPickerOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setPhoneRegionPickerOpen(false)}
-      >
-        <View style={styles.regionModalScrim}>
-          <View
-            testID="settings-phone-region-modal"
-            style={[
-              styles.regionModal,
-              { backgroundColor: colors.surfaceElevated },
-            ]}
-          >
-            <Text
-              accessibilityRole="header"
-              style={[styles.title, { color: colors.textPrimary }]}
-            >
-              Phone number region
-            </Text>
-            <TextInput
-              testID="settings-phone-region-search"
-              accessibilityLabel="Search phone number regions"
-              value={phoneRegionSearch}
-              onChangeText={setPhoneRegionSearch}
-              placeholder="Search regions"
-              placeholderTextColor={colors.textSecondary}
-              autoCorrect={false}
-              style={[
-                styles.aiInput,
-                {
-                  color: colors.textPrimary,
-                  backgroundColor: colors.background,
-                  borderColor: colors.border,
-                },
-              ]}
-            />
-            <Pressable
-              testID="settings-phone-region-device"
-              accessibilityRole="button"
-              accessibilityLabel="Use device region"
-              onPress={() => void onSelectPhoneRegion("")}
-              style={[styles.regionOption, { borderColor: colors.border }]}
-            >
-              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-                Use device region
-              </Text>
-              <Text style={[styles.helper, { color: colors.textSecondary }]}>
-                {getDeviceRegion() ?? "Unavailable"}
-              </Text>
-            </Pressable>
-            <FlatList
-              data={filteredPhoneRegions}
-              keyExtractor={(region) => region.code}
-              renderItem={({ item }) => (
-                <Pressable
-                  testID={`settings-phone-region-${item.code}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${item.name} (${item.code})`}
-                  accessibilityState={{
-                    selected: settings?.phoneRegionOverride === item.code,
-                  }}
-                  onPress={() => void onSelectPhoneRegion(item.code)}
-                  style={[styles.regionOption, { borderColor: colors.border }]}
-                >
-                  <Text
-                    style={[styles.rowLabel, { color: colors.textPrimary }]}
-                  >{`${item.name} (${item.code})`}</Text>
-                </Pressable>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
 
       {/* The "Include unbound in Not yet contacted" toggle is retired with the
           standalone Never Contacted screen (DASHQ-03). Only the UI row is removed
@@ -951,17 +668,6 @@ export function SettingsScreen() {
         ) : null}
       </View>
 
-      {/* The Interaction Assist toggle migrated to the Interactions category
-          screen in Phase 37 (Plan 01, Task 2). It writes through the canonical
-          `setInteractionAssistEnabled` + banner refresh there (D-10 / ADR-070),
-          not this monolith. */}
-
-      {/* The owner photo + "Your orbit" (self-star colour + Orbit Center picker)
-          controls migrated to SettingsAppearanceScreen in Phase 37 (Plan 03):
-          they live in the Appearance category's owner-profile and Orbit
-          Appearance sections, writing profile-dao / self_sun_colour /
-          sun_contact_id there (ADR-047 / D-02 upheld), not this monolith. */}
-
       {/* AI is an optional capability. The master switch mutates only
           app_settings.ai_enabled; every connection, model, personalization
           section, and permission survives the off state. */}
@@ -1163,21 +869,6 @@ export function SettingsScreen() {
       </View>
 
       <Pressable
-        testID="settings-custom-fields-row"
-        accessibilityRole="button"
-        accessibilityLabel="Custom Fields"
-        onPress={() => navigation.navigate("CustomFields")}
-        style={[
-          styles.row,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-          Custom Fields
-        </Text>
-      </Pressable>
-
-      <Pressable
         testID="settings-systems-row"
         accessibilityRole="button"
         accessibilityLabel="Systems"
@@ -1191,21 +882,6 @@ export function SettingsScreen() {
           Systems
         </Text>
       </Pressable>
-
-      <Pressable
-        testID="settings-archived-row"
-        accessibilityRole="button"
-        accessibilityLabel="Archived contacts"
-        onPress={() => navigation.navigate("Archived")}
-        style={[
-          styles.row,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-          Archived contacts
-        </Text>
-      </Pressable>
     </ScrollView>
   );
 }
@@ -1214,21 +890,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 12,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  backBtn: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: "700",
   },
   section: {
     gap: 12,
@@ -1248,9 +909,6 @@ const styles = StyleSheet.create({
   rowLabel: {
     fontSize: 16,
     fontWeight: "600",
-  },
-  rowCopy: {
-    gap: 4,
   },
   addWidgetRow: {
     flexDirection: "row",
@@ -1285,13 +943,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  aiInput: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 15,
-  },
   aiButton: {
     borderWidth: 1,
     borderRadius: 8,
@@ -1305,22 +956,5 @@ const styles = StyleSheet.create({
   },
   aiHubLabel: {
     flex: 1,
-  },
-  regionModalScrim: {
-    flex: 1,
-    justifyContent: "flex-end",
-  },
-  regionModal: {
-    maxHeight: "80%",
-    gap: 12,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    padding: 16,
-  },
-  regionOption: {
-    minHeight: 44,
-    justifyContent: "center",
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    paddingVertical: 10,
   },
 });

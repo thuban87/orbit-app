@@ -245,6 +245,7 @@ export type SettingsStackParamList = {
   SettingsMore: undefined;
   SettingsInteractions: undefined;
   SettingsAppearance: undefined;
+  SettingsContacts: undefined;
   /** DEV-only device-UAT harness; its route is compile-time gated from release. */
   __ThemePreview: undefined;
   SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;
