@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 37
 current_phase_name: Settings & Personalization
 status: executing
-stopped_at: Phase 37 Plan 01 (tracer) complete — Settings hub + Interactions category + route-registration contract
-last_updated: "2026-09-14T20:05:00.000Z"
+stopped_at: Phase 37 Plan 02 complete — Appearance › Theme migrated + Galaxy-conditional background (D-07)
+last_updated: "2026-09-14T20:18:00.000Z"
 last_activity: 2026-09-14
-last_activity_desc: Phase 37 Plan 01 (tracer) executed — 3 tasks, 4 commits, 120 tests green
+last_activity_desc: Phase 37 Plan 02 executed — 2 tasks, 2 commits; Theme controls migrated to SettingsAppearanceScreen, failed-write reconcile added, D-07 guard shipped; tsc/colors clean
 state_head: d293722e2e953b64748ee0af96d70ad6e7369843
 progress:
   total_phases: 22
   completed_phases: 11
   total_plans: 156
-  completed_plans: 146
+  completed_plans: 147
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -37,7 +37,7 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 37 (Settings & Personalization) — EXECUTING
-Plan: 2 of 8 (Plan 01 tracer complete)
+Plan: 3 of 8 (Plans 01–02 complete)
 Status: Executing Phase 37
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
@@ -295,6 +295,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 36 P09 | 17min | 3 tasks | 9 files |
 | Phase 36 P11 | 34min | 3 tasks | 12 files |
 | Phase 37 P01 | 12min | 3 tasks | 11 files |
+| Phase 37 P02 | 8min | 2 tasks | 10 files |
 
 ## Accumulated Context
 

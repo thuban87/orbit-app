@@ -939,7 +939,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 37-02-PLAN.md — Appearance › Theme (package/mode/accent/background) + Galaxy-conditional guard (D-07)
+- [x] 37-02-PLAN.md — Appearance › Theme (package/mode/accent/background) + Galaxy-conditional guard (D-07)
 
 **Wave 3** *(blocked on Wave 2)*
 
