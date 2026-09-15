@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 37
 current_phase_name: Settings & Personalization
 status: executing
-stopped_at: Phase 37 Plan 02 complete — Appearance › Theme migrated + Galaxy-conditional background (D-07)
-last_updated: "2026-09-14T20:18:00.000Z"
+stopped_at: Phase 37 Plan 03 complete — Appearance completed (Orbit Center + self-star D-02, owner photo, global profile defaults D-05, self-name editor D-04b)
+last_updated: "2026-09-15T01:36:51.000Z"
 last_activity: 2026-09-14
-last_activity_desc: Phase 37 Plan 02 executed — 2 tasks, 2 commits; Theme controls migrated to SettingsAppearanceScreen, failed-write reconcile added, D-07 guard shipped; tsc/colors clean
-state_head: d293722e2e953b64748ee0af96d70ad6e7369843
+last_activity_desc: Phase 37 Plan 03 executed — 3 tasks, 5 commits; setProfileName writer (D-04b) + Orbit Appearance/owner-photo migration + global profile defaults (D-05, Default/None clear); ADR-047 enforced; no schema/format change (D-06); tsc/tests/colors clean
+state_head: f22ee6ca77d972acc65c33a71fb5ab2bd46c98d1
 progress:
   total_phases: 22
   completed_phases: 11
   total_plans: 156
-  completed_plans: 147
+  completed_plans: 148
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -37,7 +37,7 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 37 (Settings & Personalization) — EXECUTING
-Plan: 3 of 8 (Plans 01–02 complete)
+Plan: 4 of 8 (Plans 01–03 complete)
 Status: Executing Phase 37
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
@@ -45,9 +45,9 @@ FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-14 — Phase 37 execution started
+Last activity: 2026-09-14 — Phase 37 Plan 03 executed (Appearance category complete: Orbit Center + self-star D-02, owner photo, global profile defaults D-05, self-name editor D-04b via new setProfileName writer)
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
-Next: End-of-phase Pixel UAT for Phase 34 (see 34-08-SUMMARY coverage), then verify/close the phase.
+Next: Phase 37 Plan 04 (per 37 plan sequence). End-of-phase Pixel UAT still owed for the Appearance controls (self-name persist/clear, star colour, Orbit Center, global default fallback) per 37-03-SUMMARY coverage.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -296,6 +296,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 36 P11 | 34min | 3 tasks | 12 files |
 | Phase 37 P01 | 12min | 3 tasks | 11 files |
 | Phase 37 P02 | 8min | 2 tasks | 10 files |
+| Phase 37 P03 | 14min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -660,6 +661,9 @@ Foundational decisions affecting current work:
 - [Phase 36]: Writing Style and Personalization Context share one focus-aware screen while remaining distinct Settings hub entries.
 - [Phase 36]: Phase 36 Plan 11: Implemented the owner-approved on-device localhost callback; OpenRouter never receives the unsupported orbit:// callback.
 - [Phase 36]: Phase 36 Plan 11: Retained orbit://openrouter-auth only as a credential-free foreground wake after native callback acceptance.
+- [Phase 37]: 37-03: New setProfileName(exec, name, now) writer on the single-row profile table (id=1, D-04b) mirrors setProfilePhoto; trims, empty/whitespace/null clears to NULL, bounds at 100 chars + rejects control chars BEFORE the UPDATE (V5); writes profile, never contacts.
+- [Phase 37]: 37-03: ADR-047 / D-02 enforced not reversed — only the self-star colour is user-configurable (stays available regardless of the current centre); a contact at the Orbit Center keeps its status-derived glow, no user-chosen colour.
+- [Phase 37]: 37-03: Global default profile layout/background (D-05) written via updateAppSettings with a Default/None choice that writes null (both keys nullable); per-contact managers stay contact-scoped and are NOT linked from Settings. No schema change, BACKUP_FORMAT_VERSION stays 5 (D-06).
 
 ### Pending Todos
 

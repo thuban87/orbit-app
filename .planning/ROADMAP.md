@@ -943,7 +943,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 37-03-PLAN.md — Appearance › Orbit Center + self-star (D-02), owner photo, global profile default (D-05), self-name editor + `setProfileName` (D-04b)
+- [x] 37-03-PLAN.md — Appearance › Orbit Center + self-star (D-02), owner photo, global profile default (D-05), self-name editor + `setProfileName` (D-04b)
 
 **Wave 4** *(blocked on Wave 3)*
 
