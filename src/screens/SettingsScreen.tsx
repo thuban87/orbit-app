@@ -1,6 +1,3 @@
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from "@react-native-community/datetimepicker";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { File, Paths } from "expo-file-system";
@@ -18,23 +15,11 @@ import { loadCachedOpenRouterCatalog } from "@/ai/openrouter-catalog";
 import { AIFirstUseDisclosure } from "@/components/AIFirstUseDisclosure";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { resolveActiveAiConnection } from "@/db/ai-connections-dao";
-import {
-  type AppSettings,
-  type AppSettingsPatch,
-  getAppSettings,
-  updateAppSettings,
-} from "@/db/app-settings-dao";
-import { getExecutor, localDateTime } from "@/db/database";
+import { getExecutor } from "@/db/database";
 import { readCredentialPresence } from "@/logic/ai-availability";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { aiKeyStore } from "@/services/ai-key-store";
-import { reconcileDigestSchedule } from "@/services/notifications/digest-schedule";
-import { reconcileSchedule } from "@/services/notifications/notification-schedule";
-import {
-  getNotificationPermission,
-  requestNotificationPermission,
-} from "@/services/notifications/permission";
 import { useAiConfigStore } from "@/stores/ai-config-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -46,42 +31,20 @@ import {
 
 const LOG_SCOPE = "settings-screen";
 
-/** Which time control's native picker is open (null = none). */
-type ActivePicker = "delivery" | "quiet-start" | "quiet-end" | null;
-
-/** Format a 0-23 hour as a "h:MM AM/PM" wall-clock label (e.g. 9 → "9:00 AM"). */
-function formatHour(hour: number): string {
-  const period = hour < 12 ? "AM" : "PM";
-  const h12 = hour % 12 === 0 ? 12 : hour % 12;
-  return `${h12}:00 ${period}`;
-}
-
-/** A Date seeded to today at the given 0-23 hour — the time picker's initial value. */
-function seedForHour(hour: number): Date {
-  const d = new Date();
-  d.setHours(hour, 0, 0, 0);
-  return d;
-}
-
 /**
  * SettingsScreen — the transitional `SettingsMore` monolith (Phase 37, D-09).
  * Category groups migrate out into dedicated hub sub-routes plan by plan; Plan 08
- * removes this screen once every group has a home. Currently hosts the Phase-11
- * Notifications section, the AI hub, the "Add Orbit widget" utility, and the
- * Systems row.
- *
- * The Notifications section (NOTIF-05): the master toggle IS the value-moment
- * `POST_NOTIFICATIONS` affordance, the decay/birthday/lock-screen toggles gate
- * scheduling, and the owner's user-tunable delivery hour + quiet window get their
- * tappable time controls. Every control reads/writes `app_settings` via the DAO
- * and fires `reconcileSchedule` after a change so the OS's scheduled set updates
- * immediately (no wait for next launch).
+ * removes this screen once every group has a home. Currently hosts the AI hub,
+ * the "Add Orbit widget" utility, and the Systems row.
  *
  * Migrated OUT of this monolith:
  * - Appearance / Theme + owner-profile + Orbit Appearance → SettingsAppearance (Plans 02–03).
  * - Interaction Assist + interaction defaults → SettingsInteractions (Plan 01).
  * - Contact methods (phone region, reconcile, review-flagged), Contacts Integration
  *   (import), Custom Fields, and Archived → SettingsContacts (Plan 04, §E).
+ * - Notifications (master, degraded note, Decay, Birthday, Birthday-unbound,
+ *   Weekly digest, Lock-screen, Reminder time, Quiet start/end) → SettingsNotifications
+ *   (Plan 05, §G) — carrying the shared reconcile-on-write path.
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
@@ -90,14 +53,6 @@ export function SettingsScreen() {
   const bottomClearance = useBottomClearance();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-
-  // Notification settings mirror app_settings; permission is READ FRESH on focus
-  // (OS-owned, revocable between opens). `degraded` renders the non-nagging note
-  // when the master is on but the OS permission is denied — text only, never a
-  // re-prompt (orchestrator pick 6 / T-11-PERM).
-  const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [degraded, setDegraded] = useState(false);
-  const [activePicker, setActivePicker] = useState<ActivePicker>(null);
 
   // The "Add Orbit widget" fallback copy — null while there is nothing to show,
   // set to the UI-SPEC fallback string when requestPinWidget can't pin (unsupported
@@ -116,24 +71,6 @@ export function SettingsScreen() {
     "off" | "ready" | "needs-attention"
   >("off");
   const aiHubState = deriveAiHubState(aiEnabled, aiAvailability);
-
-  // Load app_settings + the current OS permission status. If the master is on but
-  // the OS later revoked permission (out-of-app), surface the degraded note so the
-  // user understands why nothing fires — still no re-prompt.
-  const reloadNotifications = useCallback(async () => {
-    try {
-      const next = await getAppSettings(getExecutor());
-      setSettings(next);
-      if (next.notificationsEnabled === 1) {
-        const perm = await getNotificationPermission();
-        setDegraded(!perm.granted);
-      } else {
-        setDegraded(false);
-      }
-    } catch (err) {
-      Logger.error(LOG_SCOPE, "failed to load notification settings", err);
-    }
-  }, []);
 
   const reloadAiAvailability = useCallback(async () => {
     const exec = getExecutor();
@@ -176,90 +113,12 @@ export function SettingsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void reloadNotifications();
       void reloadAiAvailability().catch((error) => {
         Logger.error(LOG_SCOPE, "failed to load AI configuration", error);
         setAiHubError("Couldn't load AI settings. Please try again.");
       });
-    }, [reloadAiAvailability, reloadNotifications]),
+    }, [reloadAiAvailability]),
   );
-
-  // Persist a patch to app_settings then fire-and-forget a reconcile so the OS
-  // schedule re-arms immediately (the self-coordinating reconcile coalesces
-  // concurrent calls). Local state is refreshed from the write's return read.
-  const persist = useCallback(async (patch: AppSettingsPatch) => {
-    const exec = getExecutor();
-    try {
-      await updateAppSettings(exec, patch, localDateTime());
-      const next = await getAppSettings(exec);
-      setSettings(next);
-      void reconcileSchedule(exec);
-      // Fold the digest reconcile into the SHARED post-write path (review H1 /
-      // Pitfall 7): master ON/OFF, the delivery-hour picker, AND the digest
-      // toggle all route through `persist`, so every write that can affect the
-      // WEEKLY trigger arms/cancels/re-times it synchronously — not only the
-      // digest Switch, and not only at next launch. reconcileDigestSchedule
-      // re-reads settings fresh, is idempotent, and is defer-one guarded, so
-      // running it on every settings write is harmless (a quiet-window-only
-      // change reconciles to "matching -> leave").
-      void reconcileDigestSchedule(exec);
-    } catch (err) {
-      Logger.error(LOG_SCOPE, "failed to persist notification setting", err);
-    }
-  }, []);
-
-  const masterOn = settings?.notificationsEnabled === 1;
-
-  // Master toggle = the value-moment permission affordance. Flipping ON requests
-  // POST_NOTIFICATIONS at that moment: granted → persist enabled + reconcile;
-  // denied → keep master off and show the degraded note once (no re-prompt).
-  const onToggleMaster = useCallback(
-    async (on: boolean) => {
-      if (on) {
-        const result = await requestNotificationPermission();
-        if (result.granted) {
-          setDegraded(false);
-          await persist({ notificationsEnabled: 1 });
-        } else {
-          // Denial reverts master to off (never persisted on) + degraded note.
-          setDegraded(true);
-        }
-      } else {
-        setDegraded(false);
-        await persist({ notificationsEnabled: 0 });
-      }
-    },
-    [persist],
-  );
-
-  // Time-picker pick handler. Extract the chosen hour (0-23) and persist it to the
-  // field the open row owns — the DAO re-validates the 0-23 bound (T-11-05) — then
-  // reconcile. Android dismiss/cancel (event.type !== "set") keeps the prior value.
-  const onPickTime = useCallback(
-    (event: DateTimePickerEvent, date?: Date) => {
-      const which = activePicker;
-      setActivePicker(null);
-      if (event.type !== "set" || !date || which === null) {
-        return;
-      }
-      const hour = date.getHours();
-      const field: AppSettingsPatch =
-        which === "delivery"
-          ? { deliveryHour: hour }
-          : which === "quiet-start"
-            ? { quietStartHour: hour }
-            : { quietEndHour: hour };
-      void persist(field);
-    },
-    [activePicker, persist],
-  );
-
-  const pickerSeedHour =
-    activePicker === "delivery"
-      ? (settings?.deliveryHour ?? 9)
-      : activePicker === "quiet-start"
-        ? (settings?.quietStartHour ?? 21)
-        : (settings?.quietEndHour ?? 8);
 
   // "Add Orbit widget": open the launcher's native pin prompt. requestPinWidget
   // resolves false on an unsupported launcher / API < 26; a REJECTED promise is
@@ -302,371 +161,6 @@ export function SettingsScreen() {
       ]}
     >
       <ShellAppBar variant="root" title="Settings" />
-
-      {/* The "Include unbound in Not yet contacted" toggle is retired with the
-          standalone Never Contacted screen (DASHQ-03). Only the UI row is removed
-          here: the `include_unbound_never_contacted` app_settings column and its
-          `PORTABLE_SETTINGS_KEYS` entry are intentionally KEPT — their removal is
-          coordinated with the Phase 36 backup format bump (D-05), never dropped
-          unilaterally. */}
-
-      <View testID="settings-notifications-section" style={styles.section}>
-        <Text
-          accessibilityRole="header"
-          style={[styles.sectionHeading, { color: colors.textSecondary }]}
-        >
-          Notifications
-        </Text>
-
-        {/* Master toggle — the value-moment permission affordance. */}
-        <View
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Allow notifications
-            </Text>
-            <Switch
-              testID="settings-notifications-master"
-              accessibilityRole="switch"
-              accessibilityLabel="Allow notifications"
-              accessibilityState={{ checked: masterOn }}
-              value={masterOn}
-              onValueChange={(v) => void onToggleMaster(v)}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
-            />
-          </View>
-          {!masterOn ? (
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              Get a calm morning reminder when someone's overdue, and a heads-up
-              on birthdays.
-            </Text>
-          ) : null}
-        </View>
-
-        {degraded ? (
-          <View
-            style={[
-              styles.row,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text
-              testID="settings-notifications-degraded"
-              style={[styles.degradedHeading, { color: colors.textPrimary }]}
-            >
-              Notifications are off
-            </Text>
-            <Text style={[styles.helper, { color: colors.textSecondary }]}>
-              Orbit's dashboard still shows who's due. To get reminders, turn
-              notifications on in your phone's settings.
-            </Text>
-          </View>
-        ) : null}
-
-        {/* Decay reminders — gated by master. */}
-        <View
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text
-              style={[
-                styles.rowLabel,
-                { color: masterOn ? colors.textPrimary : colors.textSecondary },
-              ]}
-            >
-              Decay reminders
-            </Text>
-            <Switch
-              testID="settings-notifications-decay"
-              accessibilityRole="switch"
-              accessibilityLabel="Decay reminders"
-              accessibilityState={{
-                disabled: !masterOn,
-                checked: settings?.decayEnabled === 1,
-              }}
-              disabled={!masterOn}
-              value={settings?.decayEnabled === 1}
-              onValueChange={(v) => void persist({ decayEnabled: v ? 1 : 0 })}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
-            />
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Reminders to reach out to people you're overdue with.
-          </Text>
-        </View>
-
-        {/* Birthday alerts — gated by master. */}
-        <View
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text
-              style={[
-                styles.rowLabel,
-                { color: masterOn ? colors.textPrimary : colors.textSecondary },
-              ]}
-            >
-              Birthday alerts
-            </Text>
-            <Switch
-              testID="settings-notifications-birthday"
-              accessibilityRole="switch"
-              accessibilityLabel="Birthday alerts"
-              accessibilityState={{
-                disabled: !masterOn,
-                checked: settings?.birthdayEnabled === 1,
-              }}
-              disabled={!masterOn}
-              value={settings?.birthdayEnabled === 1}
-              onValueChange={(v) =>
-                void persist({ birthdayEnabled: v ? 1 : 0 })
-              }
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
-            />
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            A morning nudge on a contact's birthday.
-          </Text>
-        </View>
-
-        <View
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text
-              style={[
-                styles.rowLabel,
-                { color: masterOn ? colors.textPrimary : colors.textSecondary },
-              ]}
-            >
-              Birthday alerts for unbound contacts
-            </Text>
-            <Switch
-              testID="settings-notifications-birthday-unbound"
-              accessibilityRole="switch"
-              accessibilityLabel="Birthday alerts for unbound contacts"
-              accessibilityState={{
-                disabled: !masterOn,
-                checked: settings?.birthdayUnboundEnabled === 1,
-              }}
-              disabled={!masterOn}
-              value={settings?.birthdayUnboundEnabled === 1}
-              onValueChange={(value) =>
-                void persist({ birthdayUnboundEnabled: value ? 1 : 0 })
-              }
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
-            />
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Keep birthday reminders on for contacts outside your active orbit.
-          </Text>
-        </View>
-
-        {/* Weekly digest — gated by master. Persists + reconciles the WEEKLY
-            trigger through the shared persist path (review H1). */}
-        <View
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text
-              style={[
-                styles.rowLabel,
-                { color: masterOn ? colors.textPrimary : colors.textSecondary },
-              ]}
-            >
-              Weekly digest
-            </Text>
-            <Switch
-              testID="settings-notifications-digest"
-              accessibilityRole="switch"
-              accessibilityLabel="Weekly digest"
-              accessibilityState={{
-                disabled: !masterOn,
-                checked: settings?.digestEnabled === 1,
-              }}
-              disabled={!masterOn}
-              value={settings?.digestEnabled === 1}
-              onValueChange={(v) => void persist({ digestEnabled: v ? 1 : 0 })}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
-            />
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            A Sunday-morning look back at your week — who you reached, and who's
-            slipping quietly.
-          </Text>
-        </View>
-
-        {/* Lock-screen visibility — default off (private). */}
-        <View
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text
-              style={[
-                styles.rowLabel,
-                { color: masterOn ? colors.textPrimary : colors.textSecondary },
-              ]}
-            >
-              Show names on lock screen
-            </Text>
-            <Switch
-              testID="settings-notifications-lockscreen"
-              accessibilityRole="switch"
-              accessibilityLabel="Show names on lock screen"
-              accessibilityState={{
-                disabled: !masterOn,
-                checked: settings?.lockscreenPublic === 1,
-              }}
-              disabled={!masterOn}
-              value={settings?.lockscreenPublic === 1}
-              onValueChange={(v) =>
-                void persist({ lockscreenPublic: v ? 1 : 0 })
-              }
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
-            />
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            When off, lock-screen reminders won't show who they're about.
-          </Text>
-        </View>
-
-        {/* Reminder time — the user-tunable delivery hour (the reversal). */}
-        <Pressable
-          testID="settings-notifications-time"
-          accessibilityRole="button"
-          accessibilityLabel={`Reminder time, ${formatHour(settings?.deliveryHour ?? 9)}`}
-          accessibilityState={{ disabled: !masterOn }}
-          disabled={!masterOn}
-          onPress={() => setActivePicker("delivery")}
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text
-              style={[
-                styles.rowLabel,
-                { color: masterOn ? colors.textPrimary : colors.textSecondary },
-              ]}
-            >
-              Reminder time
-            </Text>
-            <Text
-              style={[
-                styles.rowValue,
-                { color: masterOn ? colors.accent : colors.textSecondary },
-              ]}
-            >
-              {formatHour(settings?.deliveryHour ?? 9)}
-            </Text>
-          </View>
-        </Pressable>
-
-        {/* Quiet-hours start — the user-tunable quiet-window start (the reversal). */}
-        <Pressable
-          testID="settings-notifications-quiet-start"
-          accessibilityRole="button"
-          accessibilityLabel={`Quiet hours start, ${formatHour(settings?.quietStartHour ?? 21)}`}
-          accessibilityState={{ disabled: !masterOn }}
-          disabled={!masterOn}
-          onPress={() => setActivePicker("quiet-start")}
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text
-              style={[
-                styles.rowLabel,
-                { color: masterOn ? colors.textPrimary : colors.textSecondary },
-              ]}
-            >
-              Quiet hours start
-            </Text>
-            <Text
-              style={[
-                styles.rowValue,
-                { color: masterOn ? colors.accent : colors.textSecondary },
-              ]}
-            >
-              {formatHour(settings?.quietStartHour ?? 21)}
-            </Text>
-          </View>
-        </Pressable>
-
-        {/* Quiet-hours end — the user-tunable quiet-window end (the reversal). */}
-        <Pressable
-          testID="settings-notifications-quiet-end"
-          accessibilityRole="button"
-          accessibilityLabel={`Quiet hours end, ${formatHour(settings?.quietEndHour ?? 8)}`}
-          accessibilityState={{ disabled: !masterOn }}
-          disabled={!masterOn}
-          onPress={() => setActivePicker("quiet-end")}
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text
-              style={[
-                styles.rowLabel,
-                { color: masterOn ? colors.textPrimary : colors.textSecondary },
-              ]}
-            >
-              Quiet hours end
-            </Text>
-            <Text
-              style={[
-                styles.rowValue,
-                { color: masterOn ? colors.accent : colors.textSecondary },
-              ]}
-            >
-              {formatHour(settings?.quietEndHour ?? 8)}
-            </Text>
-          </View>
-        </Pressable>
-        <Text style={[styles.helper, { color: colors.textSecondary }]}>
-          Reminders that would land inside quiet hours wait until the next
-          morning.
-        </Text>
-
-        {activePicker !== null ? (
-          <DateTimePicker
-            testID="settings-notifications-time-picker"
-            value={seedForHour(pickerSeedHour)}
-            mode="time"
-            onChange={onPickTime}
-          />
-        ) : null}
-      </View>
 
       {/* AI is an optional capability. The master switch mutates only
           app_settings.ai_enabled; every connection, model, personalization
@@ -924,10 +418,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "600",
   },
-  rowValue: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -938,10 +428,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "400",
     lineHeight: 18,
-  },
-  degradedHeading: {
-    fontSize: 16,
-    fontWeight: "600",
   },
   aiButton: {
     borderWidth: 1,

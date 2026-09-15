@@ -38,6 +38,10 @@ export const SETTINGS_REGISTERED_ROUTES = [
   // Relationship Structure, Contact Management (§E); its <Stack.Screen> is
   // registered in SettingsStack.tsx.
   "SettingsContacts",
+  // The Notifications category route (Plan 05, §G) — all 10 notification controls
+  // migrated from the monolith, routed through the shared reconcile-on-write
+  // helper; its <Stack.Screen> is registered in SettingsStack.tsx.
+  "SettingsNotifications",
 ] as const;
 
 export type SettingsRegisteredRoute =

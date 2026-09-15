@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import type { AppSettings, AppSettingsPatch } from "@/db/app-settings-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
-  persistNotificationSettings,
   type PersistNotificationDeps,
+  persistNotificationSettings,
 } from "./settings-notifications-logic";
 
 /**
@@ -28,9 +28,10 @@ const EXEC = {} as SqlExecutor;
 const PATCH: AppSettingsPatch = { decayEnabled: 1 };
 const NOW = "2026-09-14T09:00:00";
 
-function makeDeps(
-  overrides: Partial<PersistNotificationDeps> = {},
-): { deps: PersistNotificationDeps; calls: string[] } {
+function makeDeps(overrides: Partial<PersistNotificationDeps> = {}): {
+  deps: PersistNotificationDeps;
+  calls: string[];
+} {
   const calls: string[] = [];
   const deps: PersistNotificationDeps = {
     updateAppSettings: vi.fn(async () => {

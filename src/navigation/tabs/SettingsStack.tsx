@@ -30,6 +30,7 @@ import { SettingsAppearanceScreen } from "@/screens/SettingsAppearanceScreen";
 import { SettingsContactsScreen } from "@/screens/SettingsContactsScreen";
 import { SettingsHubScreen } from "@/screens/SettingsHubScreen";
 import { SettingsInteractionsScreen } from "@/screens/SettingsInteractionsScreen";
+import { SettingsNotificationsScreen } from "@/screens/SettingsNotificationsScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
@@ -114,6 +115,12 @@ function SettingsContactsRoute({
   return <SettingsContactsScreen onBack={() => navigation.goBack()} />;
 }
 
+function SettingsNotificationsRoute({
+  navigation,
+}: SettingsScreenProps<"SettingsNotifications">) {
+  return <SettingsNotificationsScreen onBack={() => navigation.goBack()} />;
+}
+
 export function SettingsStack() {
   return (
     <Stack.Navigator
@@ -135,6 +142,10 @@ export function SettingsStack() {
         component={SettingsAppearanceRoute}
       />
       <Stack.Screen name="SettingsContacts" component={SettingsContactsRoute} />
+      <Stack.Screen
+        name="SettingsNotifications"
+        component={SettingsNotificationsRoute}
+      />
       <Stack.Screen name="AIConnection" component={AIConnectionRoute} />
       <Stack.Screen name="AIModelPicker" component={AIModelPickerRoute} />
       <Stack.Screen

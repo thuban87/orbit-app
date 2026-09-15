@@ -246,6 +246,7 @@ export type SettingsStackParamList = {
   SettingsInteractions: undefined;
   SettingsAppearance: undefined;
   SettingsContacts: undefined;
+  SettingsNotifications: undefined;
   /**
    * Categories IA reservation (D-03 / §K). A stable internal route NAME held for
    * a FUTURE Category Management phase (CRUD + deletion cascade). Phase 37 ships

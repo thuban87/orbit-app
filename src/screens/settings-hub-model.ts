@@ -89,6 +89,14 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
   },
   {
     kind: "route",
+    key: "notifications",
+    title: "Notifications",
+    subtitle: "Reminders, birthdays, weekly digest, and delivery time",
+    icon: "bell",
+    route: "SettingsNotifications",
+  },
+  {
+    kind: "route",
     key: "more",
     title: "More settings",
     subtitle: "Everything not yet reorganised into a category",
