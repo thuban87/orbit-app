@@ -955,7 +955,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5)*
 
-- [ ] 37-06-PLAN.md — Orrery category (Display shared pref source + Systems, §H) + AI category routing into the Phase 36 hub (§J)
+- [x] 37-06-PLAN.md — Orrery category (Display shared pref source + Systems, §H) + AI category routing into the Phase 36 hub (§J)
 
 **Wave 7** *(blocked on Wave 6)*
 

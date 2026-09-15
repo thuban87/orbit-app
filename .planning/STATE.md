@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 37
 current_phase_name: Settings & Personalization
 status: executing
-stopped_at: Phase 37 Plan 05 complete — Notifications category (§G) migrated (all 10 controls → SettingsNotifications) via a shared, tested persistNotificationSettings reconcile-on-write helper; raw OS-permission surface + Linking.openSettings() handoff
-last_updated: "2026-09-14T21:10:00.000Z"
+stopped_at: Phase 37 Plan 06 complete — Orrery category (§H) Display bound to the CANONICAL useOrreryPreferencesStore (shared source, no forked writer, lastSystem excluded) + Systems routing, and AI category (§J) routing into the Phase 36 hub with the migrated fresh-on-focus availability hydration pipeline, ai_enabled-only, AiService.ts untouched
+last_updated: "2026-09-14T21:30:00.000Z"
 last_activity: 2026-09-14
-last_activity_desc: Phase 37 Plan 05 executed — 2 tasks, 3 task commits (TDD RED→GREEN + permission surface); SettingsNotificationsScreen + persistNotificationSettings (updateAppSettings → getAppSettings re-read RETURNED → both reconcilers void-fired, rejects on write failure); raw permission read fresh on focus independent of the master + system-settings handoff; monolith Notifications group removed; no schema/format change (D-06); tsc/tests/colors clean
-state_head: af27ff8
+last_activity_desc: Phase 37 Plan 06 executed — 3 tasks, 4 task commits (TDD test + 2 feat + hub-model test); SettingsOrreryScreen Display bound to useOrreryPreferencesStore (committed read / save write / hydrate-on-focus / saving-saveError-hydration + retry) + Systems routing + cross-surface store test; SettingsAIScreen routes into the Phase 36 AI hierarchy + escape hatch, master toggle ai_enabled-only (buildAiEnabledPatch), derives from the migrated injectable loadAiHubAvailability pipeline (read-path, no network); monolith Systems row + AI group + pipeline removed; no schema/format change (D-06); AiService.ts untouched; tsc/tests(3587)/colors clean
+state_head: ca5d957
 progress:
   total_phases: 22
   completed_phases: 11
   total_plans: 156
-  completed_plans: 150
+  completed_plans: 151
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -37,7 +37,7 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 37 (Settings & Personalization) — EXECUTING
-Plan: 6 of 8 (Plans 01–05 complete)
+Plan: 7 of 8 (Plans 01–06 complete)
 Status: Executing Phase 37
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
@@ -45,9 +45,9 @@ FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-14 — Phase 37 Plan 05 executed (Notifications category §G: all 10 controls migrated into SettingsNotificationsScreen via the shared persistNotificationSettings reconcile-on-write helper; raw OS-permission surface read fresh on focus independent of the master + Linking.openSettings() handoff; monolith Notifications group removed; no schema/format change D-06)
+Last activity: 2026-09-14 — Phase 37 Plan 06 executed (Orrery category §H: SettingsOrreryScreen Display bound to the canonical useOrreryPreferencesStore — committed read / save write / hydrate-on-focus / saving-saveError-hydration + retry — with a cross-surface store test proving one shared source and lastSystem excluded, plus a Systems routing section; AI category §J: SettingsAIScreen routes into the Phase 36 AI hierarchy + AI-Off escape hatch, master toggle ai_enabled-only via buildAiEnabledPatch, hub state derived from the migrated injectable loadAiHubAvailability fresh-on-focus hydration pipeline (read-path, local cached catalog, no network, AiService.ts untouched); monolith Systems row + AI group + reloadAiAvailability pipeline removed; no schema/format change D-06)
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
-Next: Phase 37 Plan 06 (Orrery category §H + AI category routing §J). End-of-phase Pixel UAT still owed for the Appearance controls (37-03), the Contacts rows (37-04), AND the Notifications controls (37-05: OS-schedule re-arm on toggle, denied-permission row with master off, system-settings handoff). Roadmap follow-up owed (D-03, owner): Category Management is scheduled as inserted Phase 37.1.
+Next: Phase 37 Plan 07 (Data & Backup dual-home §I / D-08 — register the four Backup routes + handle the RestoreResult hard-reset and shared-backup singleton hazards, tab preserved). End-of-phase Pixel UAT still owed for the Appearance controls (37-03), the Contacts rows (37-04), the Notifications controls (37-05), AND now the Orrery single-source agreement + AI hub real-availability rendering (37-06 — do NOT trigger a real AI API call without clearing with the owner). Roadmap follow-up owed (D-03, owner): Category Management is scheduled as inserted Phase 37.1.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
