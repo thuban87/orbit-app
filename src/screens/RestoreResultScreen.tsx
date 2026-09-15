@@ -1,11 +1,16 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { RootStackScreenProps } from "@/navigation/types";
-import type { BackupHost } from "@/screens/backup-dualhome-logic";
+import {
+  type BackupHost,
+  DEFAULT_BACKUP_HOST,
+  restoreReturnRouteName,
+} from "@/screens/backup-dualhome-logic";
 import { useTheme } from "@/theme";
 
 export function RestoreResultScreen({
   navigation,
   route,
+  host = DEFAULT_BACKUP_HOST,
 }: RootStackScreenProps<"RestoreResult"> & { host?: BackupHost }) {
   const { colors } = useTheme();
   const { added, updated, newerLocalKept, deletionsApplied, replaceSafetySnapshot } = route.params;
@@ -16,7 +21,7 @@ export function RestoreResultScreen({
         <Text style={[styles.body, { color: colors.textSecondary }]}>Added: {added} · Updated: {updated} · Newer local kept: {newerLocalKept} · Deletions applied: {deletionsApplied}</Text>
         {replaceSafetySnapshot === "verified" ? <Text style={[styles.body, { color: colors.textSecondary }]}>A verified backup of this device was created first.</Text> : null}
         {replaceSafetySnapshot === "not-configured" ? <Text style={[styles.body, { color: colors.textSecondary }]}>No automatic backup destination was configured.</Text> : null}
-        <Pressable testID="restore-return-to-backup" accessibilityRole="button" accessibilityLabel="Return to Backup and Restore" onPress={() => navigation.reset({ index: 0, routes: [{ name: "Backup" }] })} style={[styles.primaryButton, { backgroundColor: colors.accent }]}><Text style={{ color: colors.textPrimary }}>Return to Backup & Restore</Text></Pressable>
+        <Pressable testID="restore-return-to-backup" accessibilityRole="button" accessibilityLabel="Return to Backup and Restore" onPress={() => navigation.reset({ index: 0, routes: [{ name: restoreReturnRouteName(host) }] })} style={[styles.primaryButton, { backgroundColor: colors.accent }]}><Text style={{ color: colors.textPrimary }}>Return to Backup & Restore</Text></Pressable>
       </View>
     </ScrollView>
   );

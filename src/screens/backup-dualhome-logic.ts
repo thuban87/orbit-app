@@ -20,3 +20,39 @@ export type BackupHost = "backup-tab" | "settings";
  * Flipping this default is an owner risk-posture call, never a silent change.
  */
 export const DEFAULT_BACKUP_HOST: BackupHost = "backup-tab";
+
+/**
+ * Origin-aware post-restore return target. The Backup-TAB flow resets to the
+ * `Backup` root (UNCHANGED shipped behaviour); the Settings-entry flow returns
+ * to the `Settings` hub. Applied at EVERY reset-to-Backup site across the tree
+ * (`RestoreResultScreen`'s "Return to Backup & Restore" and the
+ * `RestorePreviewScreen` success-reset BASE) so a Settings-hosted restore never
+ * strands the user on a `Backup` route inside the Settings stack.
+ */
+export function restoreReturnRouteName(
+  host: BackupHost,
+): "Backup" | "Settings" {
+  return host === "settings" ? "Settings" : "Backup";
+}
+
+/**
+ * Whether this mount drains the native shared-backup singleton
+ * (`consumeSharedBackup`) on focus. Only the BACKUP-TAB copy does: the
+ * share-intent gate routes a shared backup to `BackupTab › Backup`
+ * (linking.ts:67), so a Settings-mounted copy that also consumed on focus would
+ * DOUBLE-DRAIN the single native resource (RESEARCH Pitfall 3 hazard 2, T-37-02).
+ */
+export function shouldConsumeSharedBackup(host: BackupHost): boolean {
+  return host === "backup-tab";
+}
+
+/**
+ * Host-aware Backup app-bar chrome (review cycle-2 MEDIUM / §M). The
+ * Settings-hosted copy renders `variant="child"` (a Back affordance that returns
+ * to the Settings hub via ShellAppBar's `onBack`); the Backup-tab root stays
+ * `variant="root"` (title-only, UNCHANGED). Reusing `root` under Settings would
+ * strand the back affordance.
+ */
+export function backupAppBarVariant(host: BackupHost): "root" | "child" {
+  return host === "settings" ? "child" : "root";
+}

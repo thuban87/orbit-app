@@ -28,7 +28,12 @@ import {
 } from "@/services/backup/share-export";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
-import type { BackupHost } from "./backup-dualhome-logic";
+import {
+  type BackupHost,
+  backupAppBarVariant,
+  DEFAULT_BACKUP_HOST,
+  shouldConsumeSharedBackup,
+} from "./backup-dualhome-logic";
 import {
   type BackupHealth,
   resolveBackupHealth,
@@ -63,6 +68,7 @@ function exportFailureCopy(result: ManualExportResult): string | null {
 
 export function BackupScreen({
   navigation,
+  host = DEFAULT_BACKUP_HOST,
 }: RootStackScreenProps<"Backup"> & { host?: BackupHost }) {
   const { colors } = useTheme();
   const bottomClearance = useBottomClearance();
@@ -261,6 +267,11 @@ export function BackupScreen({
 
   useFocusEffect(
     useCallback(() => {
+      // The native shared-backup singleton is drained by the BACKUP-TAB copy
+      // ONLY (linking.ts routes a shared backup to BackupTab › Backup). The
+      // Settings-hosted copy must not also consume on focus, or the single
+      // native resource would double-drain (T-37-02 / RESEARCH Pitfall 3).
+      if (!shouldConsumeSharedBackup(host)) return;
       let cancelled = false;
       void consumeSharedBackup().then(({ uri }) => {
         if (!cancelled && uri) void loadRestoreDocument(uri);
@@ -272,7 +283,7 @@ export function BackupScreen({
         }
       });
       return () => { cancelled = true; };
-    }, [loadRestoreDocument]),
+    }, [host, loadRestoreDocument]),
   );
 
   const continueEncryptedRestore = useCallback(() => {
@@ -290,7 +301,7 @@ export function BackupScreen({
 
   return (
     <ScrollView testID="backup-screen" contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]}>
-      <ShellAppBar variant="root" title="Backup & Restore" />
+      <ShellAppBar variant={backupAppBarVariant(host)} title="Backup & Restore" />
 
       {health ? (
         <View testID={`backup-health-${health.kind}`} accessibilityLabel={`${health.headline}. ${"body" in health ? health.body : ""}`} style={[styles.hero, { backgroundColor: colors.surface, borderColor: colors.border }]}>

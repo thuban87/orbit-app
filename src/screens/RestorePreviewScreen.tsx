@@ -4,7 +4,11 @@ import { applyRestore, type RestoreMode } from "@/backup/restore-apply";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { RootStackScreenProps } from "@/navigation/types";
-import type { BackupHost } from "@/screens/backup-dualhome-logic";
+import {
+  type BackupHost,
+  DEFAULT_BACKUP_HOST,
+  restoreReturnRouteName,
+} from "@/screens/backup-dualhome-logic";
 import {
   confirmReplaceAllRestore,
   createRestoreApplySingleFlight,
@@ -74,6 +78,7 @@ async function createPreRestoreSnapshot() {
 export function RestorePreviewScreen({
   navigation,
   route,
+  host = DEFAULT_BACKUP_HOST,
 }: RootStackScreenProps<"RestorePreview"> & { host?: BackupHost }) {
   const { colors } = useTheme();
   const [mode, setMode] = useState<RestoreMode>("merge");
@@ -96,6 +101,12 @@ export function RestorePreviewScreen({
     if (applying && !allowNavigationRef.current) event.preventDefault();
   }), [applying, navigation]);
 
+  // Re-pick a file: intentionally stays targeting `Backup`, NOT the origin hub.
+  // `Backup` exists in BOTH hosting stacks, so this reset resolves within
+  // whichever stack currently hosts this screen — the user lands back on the
+  // Backup screen to choose another file, which is the right destination for a
+  // "choose file again" affordance regardless of entry point (review MEDIUM:
+  // this site is deliberately not origin-routed, unlike the success/return sites).
   const returnToSelection = useCallback(() => {
     navigation.reset({ index: 0, routes: [{ name: "Backup" }] });
   }, [navigation]);
@@ -121,10 +132,14 @@ export function RestorePreviewScreen({
       // against user Back actions during the apply.
       allowNavigationRef.current = true;
       restorePreviewCache.discard(route.params.token);
+      // Origin-aware success reset: the BASE route is the entry point's return
+      // target (Backup tab → `Backup`, UNCHANGED; Settings entry → `Settings`
+      // hub) so RestoreResult sits atop the right root. The RestoreResult that
+      // lands is the same-stack copy — its own `host` drives its return button.
       navigation.reset({
         index: 1,
         routes: [
-          { name: "Backup" },
+          { name: restoreReturnRouteName(host) },
           { name: "RestoreResult", params: toRestoreResultParams(result) },
         ],
       });
