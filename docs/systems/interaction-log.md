@@ -1,8 +1,8 @@
 # Interaction Log
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
-**Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`, `src/services/quick-log-command.ts`, `src/db/bulk-actions-dao.ts`
+**Updated by phase:** 32-interaction-history-insights
+**Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`, `src/services/quick-log-command.ts`, `src/db/bulk-actions-dao.ts`, `src/db/interaction-vocabulary.ts`
 
 ## Purpose
 
@@ -19,23 +19,28 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
   - `uid` (`TEXT`) — stable interaction identity.
   - `contact_id` (`INTEGER`) — owning contact.
   - `occurred_at` / `recorded_at` (`TEXT`) — local wall-clock time of the touchpoint and immutable log time.
-  - `channel` (`TEXT`) — `call`, `text`, `in-person`, `email`, `other`, or `unspecified`.
+  - `channel` (`TEXT`) — the migrated user-facing vocabulary `Message`, `Call`, or `In Person`, with `other`/`unspecified` retained as representable legacy values. The SQL column keeps the name `channel` (values migrate, the column name does not — a locked invariant so backup round-trips).
   - `direction` (`TEXT`, nullable) — `outbound`, `inbound`, or `mutual`.
   - `connected` (`INTEGER`) — whether the touchpoint connected; it controls qualifying recency for Rarely-responds contacts.
-  - `quality` (`TEXT`, nullable) — `good`, `fine`, or `hard` when refined.
+  - `quality` (`TEXT`, nullable) — the Tone vocabulary `Positive`, `Neutral`, or `Negative` when refined (`NULL` when unset; omitted ≠ Neutral). The SQL column keeps the name `quality` though its user-facing label is Tone.
+  - `duration` (`INTEGER`, nullable) — optional interaction length in canonical seconds; absent → `NULL`, never `0`. Descriptive only — it never affects Status, Gravity, or Intensity, and Quick Log never sets it.
+  - `allow_ai` (`INTEGER NOT NULL DEFAULT 0 CHECK(allow_ai IN (0,1))`) — the durable per-interaction AI-egress consent gate, defaulting OFF (see `ai-suggestions.md`).
   - `note` (`TEXT`, nullable) — local timeline detail.
   - `source` (`TEXT`) — `manual`, `widget`, `notification`, `ai`, or `assist` creation route (free text, no CHECK constraint).
 - `events` — immutable, read-only lifecycle history.
   - `uid` (`TEXT`) — stable event identity.
   - `contact_id` (`INTEGER`) — owning contact.
-  - `event_type` (`TEXT`) — `archive`, `restore`, `snooze`, or `unsnooze`.
+  - `type` (`TEXT`, CHECK-less) — `archive`, `restore`, `snooze`, `unsnooze`, `bind`, or `unbind`. Because the column has no `CHECK`, adding the `bind`/`unbind` moments is a TypeScript union change with no migration.
   - `occurred_at` / `recorded_at` (`TEXT`) — local wall-clock event and immutable record times.
   - `detail` (`TEXT`, nullable) — event-specific display detail.
 
 **Types** (`src/db/recency-dao.ts`, `src/db/timeline-read.ts`, and `src/db/events-dao.ts`):
-- `RecordTouchpointInput` / `EditTouchpointFullInput` — scoped mutable touchpoint write contracts.
+- `RecordTouchpointInput` / `EditTouchpointFullInput` — scoped mutable touchpoint write contracts, now carrying optional `duration` and `allow_ai`.
 - `TimelineItem` — discriminated union of editable touchpoints and read-only events.
 - `RecordEventInput` — immutable lifecycle event input.
+- `EventType` — `archive | restore | snooze | unsnooze | bind | unbind`.
+
+`src/db/interaction-vocabulary.ts` is the single canonical `remapLegacyQuality`/`remapLegacyChannel` map. Migration 025, restore-apply, and `markAssistLogged` all consume it, so no writer can reintroduce a retired value; the migration's frozen CASE arms are test-pinned equal to it but never import it at upgrade time.
 
 ### Store, Service & DAO Layer
 
@@ -112,8 +117,9 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 
 1. Archive and restore update contact lifecycle state only when their state guard matches.
 2. The same transaction records an immutable event through `recordEventCore()`.
-3. `listTimeline()` returns touchpoints and events newest first, ordering ties by id and kind.
-4. `TimelineRow` permits touchpoint refinement/deletion but keeps events read-only.
+3. `bindContact`/`unbindContact` (Contacts subsystem) likewise compose one insert-only `recordEventCore()` inside their already-open transaction — never a nested transaction, since the write mutex is non-reentrant — emitting a `bind` or `unbind` event at the moment of the cadence change.
+4. `listTimeline()` returns touchpoints and events newest first, ordering ties by id and kind.
+5. `TimelineRow` permits touchpoint refinement/deletion but keeps events read-only. The History & Insights Detail Sheet is now the profile's live lifecycle-event surface and consumes the shared `EVENT_LABELS` (with the new Bound/Unbound labels) exported from `TimelineRow`; see `interaction-history.md`.
 
 ### Restoring interaction history
 
@@ -156,10 +162,13 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 
 - **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — supplies bounded history and impact inputs inside one read snapshot.
 - **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — defines the Bound interval and Unbound local-month Profile views.
+- **ADR-116:** Value-Remapped Interaction Vocabulary and Optional Descriptive Duration — remaps the stored `quality`/`channel` values to the Tone / Message-Call-In Person vocabulary and adds nullable descriptive `duration` (migration 025), keeping the SQL column names. Partially supersedes ADR-023's value vocabulary.
+- **ADR-117:** Per-Interaction Allow-AI Consent Gate — adds the durable `allow_ai` flag (default OFF, fail-closed on restore) to every interaction row.
+- **ADR-118:** Bind/Unbind Immutable Lifecycle Events Without a Migration — extends `EventType` and emits insert-only bind/unbind events inside the existing cadence-change transaction.
 
 ## Gotchas
 
-1. **Keep the Phase 31 History read bounded.** The Profile snapshot renders only the latest few entries behind `interaction-history`; Phase 32 owns the complete timeline and insights renderer.
+1. **The full History & Insights surface has replaced the interim bounded read.** Phase 31's bounded Profile snapshot timeline is superseded — `ProfileModuleHost.renderHistory()` now mounts the complete History section (Heatmap, Intensity, Rolodex, Detail Sheet). The canonical single-contact read is `src/db/history-read.ts`; see `interaction-history.md`. `timeline-read.ts` remains only for other consumers (e.g. fuel).
 2. **Unbound activity is not cadence-relative.** Profile Intensity uses the current local calendar month and labels it `This month` when active cadence is unavailable.
 
 1. **Use local wall-clock strings.** Never convert a user-entered interaction time through `toISOString()`; it can change the recorded day.
@@ -175,6 +184,11 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 11. **List swipe must use the shared command.** A List-specific direct touchpoint write would drift from the FAB's haptic, Undo, Retry, and refresh guarantees.
 12. **A Dashboard batch must compose cores, not SQL shortcuts.** A direct batch interaction insert leaves recency stale, and a direct archive update omits immutable history.
 13. **Bulk Undo is receipt-scoped.** Use the exact interaction receipt from the committed batch; the single-contact Undo controller cannot reverse an N-contact write.
+14. **Never rename the `quality`/`channel` SQL columns.** Their values are the Tone / Message-Call-In Person vocabulary but the column names are a locked invariant so export/restore round-trip without a backup-format bump. Do not "fix" the mismatch by renaming to `tone`.
+15. **Route every `quality`/`channel` literal comparison through `interaction-vocabulary.ts`.** A new reader that compares against the retired `good/fine/hard` or `text/email` values silently miscounts (the D-06 trip-wire). AI-context and digest were lockstepped in the migration commit for exactly this reason.
+16. **`allow_ai` defaults OFF and restore is fail-closed on both paths.** A fresh insert takes the column `DEFAULT 0`; the merge/update arm must explicitly set `allow_ai=0` (SQLite's `DEFAULT` fires only on fresh INSERT). Never ship a serializer that could restore an interaction more AI-permissive than the backup.
+17. **`duration` is descriptive only.** Persist canonical seconds, present minutes/hours, show it only when present, and never feed it into Status, Gravity, or Intensity.
+18. **Bind/unbind events write inside the cadence transaction.** The producer composes `recordEventCore()` within the existing bind/unbind transaction (non-reentrant mutex), never after it, and the events are immutable like every other lifecycle event.
 
 ## Related Systems
 
@@ -199,3 +213,4 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 | 2026-09-02 | 27 | Extracted the shared Quick Log command for Dashboard List gestures while retaining commit-only feedback and the sole recency writer. |
 | 2026-09-02 | 28 | Added atomic Dashboard batch logging, receipt-scoped Undo, and archive event fan-out through composed cores. |
 | 2026-09-02 | 31 | Added snapshot-compatible impact reads, bounded interim Profile history, and the shared no-cadence calendar-month activity contract. |
+| 2026-09-02 | 32 | Migration 025 remapped the stored `quality`/`channel` values to the Tone / Message-Call-In Person vocabulary (column names kept), added nullable descriptive `duration`, and added the default-OFF `allow_ai` consent gate; added `bind`/`unbind` immutable lifecycle events (no migration); single-sourced the vocabulary in `interaction-vocabulary.ts`. The full History & Insights surface replaced the interim bounded Profile timeline. |
