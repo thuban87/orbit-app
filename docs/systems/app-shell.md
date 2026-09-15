@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-09-10
-**Updated by phase:** 31.1-app-wide-system-backgrounds
+**Last updated:** 2026-09-02
+**Updated by phase:** 32-interaction-history-insights
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -72,8 +72,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/screens/ReconcileGridScreen.tsx` | Provides the Settings-launched linked-contact review workspace. |
 | `src/screens/ReconcileDetailScreen.tsx` | Provides per-contact reconciliation and missing-source actions. |
 | `src/screens/SurvivorSelectScreen.tsx` | Provides the explicit duplicate-contact merge entry. |
-| `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, and Orrery star/muted values. |
-| `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar, relationship-status, and Orrery palette values. |
+| `src/theme/theme-types.ts` | Names palette tokens, including avatar swatches, rogue status, gravity tiers, Orrery star/muted values, and the History `heatmapScale`/`heatmapCellEmpty`/`markerInteraction`/`markerLifecycle` tokens. |
+| `src/theme/theme-presets.ts` | Holds the only allowed color literals, including avatar, relationship-status, Orrery, and per-palette History heatmap/marker values. |
 | `src/theme/hydrate-theme-at-boot.ts` | Safely imports legacy theme state and returns the SQLite-backed boot selection. |
 | `src/components/icons/icon-registry.ts` | Maps semantic icon names and variants to the replaceable base icon family. |
 | `src/components/ui/` | Hosts AppText, Button, and standardized overlay primitives for consuming screens. |
@@ -221,8 +221,13 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 ### Opening contact knowledge
 
 1. A contact profile in either the Dashboard or Orrery stack opens `ThingsToRemember` with a serializable contact ID.
-2. Both stacks also register typed `RecentlyDeleted` and `MemoryHistory` destinations, preserving native Back behavior for their origin.
+2. Both stacks also register typed `RecentlyDeleted` and `MemoryHistory` destinations, preserving native Back behavior for their origin. The Settings stack additionally registers `ThingsToRemember` and `MemoryHistory` so a Settings-originated Profile (Archived → Profile) can resolve a History Detail Sheet knowledge-change edit.
 3. Each destination self-fetches its local SQLite projection; route parameters carry no Memory content or callbacks.
+
+### Navigating interaction history
+
+1. The History section's Interaction Detail opens the canonical `EditInteraction { contactId, interactionId }` route, registered in all three Profile-hosting stacks (Dashboard, Orrery, Settings) — React Navigation throws on an unregistered name.
+2. An empty History date routes the typed `LogContact { contactId, prefillDate }` contract (also registered across those stacks); the target is a placeholder screen until Phase 34 supplies the detailed-log form. `prefillDate` is a serializable string, never a callback.
 
 ## Configuration
 
@@ -310,6 +315,9 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 - **ADR-109:** Fixed-Hero Semantic Profile Composition and Focused Accessible Editors — keeps Profile overlays typed, modal-accessible, and origin-preserving.
 - **ADR-112:** App-Owned Profile Background Derivatives and Launch Reconciliation — registers background recovery only after migration readiness.
+- **ADR-120:** Shared-Window Heatmap and Intensity with Globally-Persisted Lenses — adds the per-palette `heatmapScale`/`heatmapCellEmpty`/`markerInteraction`/`markerLifecycle` theme tokens.
+- **ADR-122:** Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet — registers the `EditInteraction` route in all three Profile-hosting stacks.
+- **ADR-123:** Profile History Section Replacing the Vertical Timeline — extends `LogContact` with `prefillDate` and registers it (plus Settings-side `ThingsToRemember`/`MemoryHistory`) across the Profile-hosting stacks.
 
 ## Gotchas
 
@@ -355,6 +363,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 33. **A mounted image is not visual acceptance.** The original Phase 31.1 release UAT was a false positive because a near-opaque host veil made different selections indistinguishable. Compare materially different slots on the same physical-device route.
 34. **Do not reuse card opacity as the host veil.** Card contrast and background visibility are separate token contracts; coupling them recreates the imperceptible-background defect.
 35. **Avoid Android elevation on translucent Galaxy cards.** It renders an opaque inner rectangle; the iOS shadow remains independently supported.
+36. **Register `EditInteraction` and `LogContact` in every Profile-hosting stack.** A Profile is reachable from Dashboard, Orrery, and Settings; a route registered in only one stack throws when a Settings-originated Profile navigates to it. The Settings stack also needs `ThingsToRemember`/`MemoryHistory` for History Detail Sheet knowledge edits.
 
 ## Related Systems
 
@@ -410,3 +419,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 30 | Added dual-stack Systems Management and System Builder routes with shared focused-workflow and selection-publication contracts. |
 | 2026-09-02 | 31 | Added origin-preserving Profile composition, focused expanded sheets, Compose-only AI entry, and ready-gated background reconciliation. |
 | 2026-09-10 | 31.1 | Adopted persistent shared System backgrounds across ordinary routes, preserved Profile and canvas precedence, and corrected veil/card/chrome composition after production-device validation. |
+| 2026-09-02 | 32 | Registered the canonical `EditInteraction` route and the `prefillDate`-extended `LogContact` contract across all Profile-hosting stacks (plus Settings-side `ThingsToRemember`/`MemoryHistory`), and added the per-palette History heatmap/marker theme tokens. |
