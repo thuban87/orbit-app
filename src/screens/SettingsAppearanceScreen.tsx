@@ -23,8 +23,6 @@ import { useThemeStore } from "@/stores/theme-store";
 import { useTheme } from "@/theme";
 import { ACCENTS } from "@/theme/accents";
 import {
-  BACKGROUND_ORDER,
-  NONE_SLOT_ID,
   PACKAGE_DEFAULT_SLOT,
   resolveRenderableBackground,
 } from "@/theme/backgrounds";
@@ -39,6 +37,10 @@ import type {
   ThemePalette,
 } from "@/theme/theme-types";
 import { Logger } from "@/utils/logger";
+import {
+  backgroundChoicesForPackage,
+  backgroundPatchForPackage,
+} from "./settings-appearance-background";
 import { persistAppearanceSetting } from "./settings-appearance-persist";
 
 const LOG_SCOPE = "settings-appearance-screen";
@@ -209,11 +211,7 @@ export function SettingsAppearanceScreen({
   const onSelectBackground = useCallback(
     (slot: BackgroundSlotId) => {
       setBackgroundForActivePackage(slot);
-      void persist(
-        themePackage === "galaxy"
-          ? { galaxyBackground: slot }
-          : { standardBackground: slot },
-      );
+      void persist(backgroundPatchForPackage(themePackage, slot));
     },
     [persist, setBackgroundForActivePackage, themePackage],
   );
@@ -497,9 +495,11 @@ export function SettingsAppearanceScreen({
             </Text>
           </View>
 
-          {/* Background (per active package) — all bundled slots remain
-              selectable regardless of the active package; only the destination
-              preference column changes. A failed thumbnail silently becomes
+          {/* Background — only the ACTIVE package's choices are offered (D-07):
+              the reactive themePackage selects backgroundChoicesForPackage, so
+              the Galaxy-only slots are not shown while Standard is active (and
+              vice-versa). Mode/Accent already read the active package, so only
+              this grid needed the guard. A failed thumbnail silently becomes
               themed solid. */}
           <View
             testID="settings-theme-background-row"
@@ -511,46 +511,19 @@ export function SettingsAppearanceScreen({
             <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
               Background
             </Text>
-            {(["galaxy", "standard"] as ThemePackage[]).map((sourcePackage) => (
-              <View key={sourcePackage} style={styles.backgroundSubgroup}>
-                <Text
-                  style={[
-                    styles.backgroundSubgroupLabel,
-                    { color: colors.textSecondary },
-                  ]}
-                >
-                  {sourcePackage === "galaxy" ? "Galaxy" : "Standard"}
-                </Text>
-                <View style={styles.backgroundGrid}>
-                  {BACKGROUND_ORDER[sourcePackage]
-                    .filter((slot) => slot !== NONE_SLOT_ID)
-                    .map((slot) => (
-                      <BackgroundThumbnail
-                        key={slot}
-                        colors={colors}
-                        columnWidth={backgroundColumnWidth}
-                        label={BACKGROUND_LABELS[slot]}
-                        onPress={onSelectBackground}
-                        selected={selectedBackgroundSlot === slot}
-                        slot={slot}
-                        sourcePackage={sourcePackage}
-                      />
-                    ))}
-                </View>
-              </View>
-            ))}
-            <View style={styles.backgroundSubgroup}>
-              <View style={styles.backgroundGrid}>
+            <View style={styles.backgroundGrid}>
+              {backgroundChoicesForPackage(themePackage).map((slot) => (
                 <BackgroundThumbnail
+                  key={slot}
                   colors={colors}
                   columnWidth={backgroundColumnWidth}
-                  label={BACKGROUND_LABELS[NONE_SLOT_ID]}
+                  label={BACKGROUND_LABELS[slot]}
                   onPress={onSelectBackground}
-                  selected={selectedBackgroundSlot === NONE_SLOT_ID}
-                  slot={NONE_SLOT_ID}
+                  selected={selectedBackgroundSlot === slot}
+                  slot={slot}
                   sourcePackage={themePackage}
                 />
-              </View>
+              ))}
             </View>
             <Text style={[styles.helper, { color: colors.textSecondary }]}>
               Backgrounds stay fixed behind your screens. Each package remembers
@@ -612,13 +585,6 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 3,
-  },
-  backgroundSubgroup: {
-    gap: 8,
-  },
-  backgroundSubgroupLabel: {
-    fontSize: 14,
-    fontWeight: "600",
   },
   backgroundGrid: {
     flexDirection: "row",
