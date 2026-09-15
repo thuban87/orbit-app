@@ -21,7 +21,6 @@ import {
 import { requestPinWidget } from "react-native-android-widget";
 import { loadCachedOpenRouterCatalog } from "@/ai/openrouter-catalog";
 import { AIFirstUseDisclosure } from "@/components/AIFirstUseDisclosure";
-import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { resolveActiveAiConnection } from "@/db/ai-connections-dao";
@@ -31,13 +30,9 @@ import {
   getAppSettings,
   updateAppSettings,
 } from "@/db/app-settings-dao";
-import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
-import { getProfile } from "@/db/profile-dao";
 import { getNewestPendingReconcileSessionId } from "@/db/reconcile-session-read";
-import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
 import { readCredentialPresence } from "@/logic/ai-availability";
-import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { aiKeyStore } from "@/services/ai-key-store";
@@ -121,14 +116,8 @@ export function SettingsScreen() {
   const bottomClearance = useBottomClearance();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  // Self-record photo seed. `name` is nullable (the id=1 seed row carries no name
-  // until a self-name editor ships), so a stable "You" fallback below keeps the
-  // initials avatar deterministic ("Y") rather than a permanently blank swatch.
-  const [selfPhoto, setSelfPhoto] = useState<string | null>(null);
-  const [selfName, setSelfName] = useState<string | null>(null);
-  const [selfModifiedAt, setSelfModifiedAt] = useState<string | undefined>(
-    undefined,
-  );
+  // The owner photo + "Your orbit" (self-star + Orbit Center) controls migrated
+  // to SettingsAppearanceScreen in Phase 37 (Plan 03).
 
   // Notification settings mirror app_settings; permission is READ FRESH on focus
   // (OS-owned, revocable between opens). `degraded` renders the non-nagging note
@@ -190,35 +179,6 @@ export function SettingsScreen() {
   >("off");
   const aiHubState = deriveAiHubState(aiEnabled, aiAvailability);
 
-  // "Your orbit" section (ORR-05 / relocated ORR-06). `selfSunColour` is the raw
-  // stored self-star hex or NULL; NULL resolves to `starPalette[0]` (gold) at
-  // RENDER — no stored hex default (the DAO cannot import theme). Loaded on focus.
-  const [selfSunColour, setSelfSunColour] = useState<string | null>(null);
-
-  // The centre occupant (relocated ORR-06): the raw stored id (NULL = self), the
-  // RESOLVED display name (with the M4 archived/missing→"Me" fallback), the
-  // favourites-first candidate list, and whether the picker modal is open.
-  const [sunContactId, setSunContactId] = useState<number | null>(null);
-  const [sunOccupantName, setSunOccupantName] = useState("Me");
-  const [sunCandidates, setSunCandidates] = useState<SunCandidate[]>([]);
-  const [sunPickerOpen, setSunPickerOpen] = useState(false);
-
-  // Reload the self record so a set/remove made on the crop screen refreshes when
-  // it goBack()s here (mirrors ContactProfileScreen's reload-on-focus). The
-  // sub-second same-path replace is closed elsewhere: the crop screen's profile
-  // branch calls bumpPhotoCacheBust(profilePhotoRelPath()), which Avatar folds
-  // into its cache key — so this only needs the coarse `modified_at` cache-bust.
-  const reloadProfile = useCallback(async () => {
-    try {
-      const profile = await getProfile(getExecutor());
-      setSelfPhoto(profile?.photo ?? null);
-      setSelfName(profile?.name ?? null);
-      setSelfModifiedAt(profile?.modified_at);
-    } catch (err) {
-      Logger.error(LOG_SCOPE, "failed to load self profile", err);
-    }
-  }, []);
-
   // Load app_settings + the current OS permission status. If the master is on but
   // the OS later revoked permission (out-of-app), surface the degraded note so the
   // user understands why nothing fires — still no re-prompt.
@@ -234,39 +194,6 @@ export function SettingsScreen() {
       }
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load notification settings", err);
-    }
-  }, []);
-
-  // Load the "Your orbit" settings (self-star colour, and — added in the sun
-  // picker below — the centre occupant). Read on focus so a change made
-  // elsewhere refreshes when this screen regains focus, mirroring reloadProfile.
-  const reloadOrbit = useCallback(async () => {
-    const exec = getExecutor();
-    try {
-      const next = await getAppSettings(exec);
-      setSelfSunColour(next.selfSunColour);
-      setSunContactId(next.sunContactId);
-      setSunCandidates(await listSunCandidates(exec));
-      // M4: resolve the occupant name through the SAME self-fallback predicate the
-      // canvas uses (sunOccupantIsSelf, 13-05) so Settings and the orrery can never
-      // disagree about a hidden occupant. NULL → "Me"; a stored id whose contact is
-      // missing OR archived also shows "Me"; else the live contact's name.
-      const header =
-        next.sunContactId === null
-          ? null
-          : await getContactHeader(exec, next.sunContactId);
-      const isSelf = sunOccupantIsSelf({
-        sunContactId: next.sunContactId,
-        occupant: header
-          ? {
-              archived: header.archived_at !== null,
-              trackingEnabled: header.trackingEnabled,
-            }
-          : null,
-      });
-      setSunOccupantName(isSelf ? "Me" : (header?.name ?? "Me"));
-    } catch (err) {
-      Logger.error(LOG_SCOPE, "failed to load orbit settings", err);
     }
   }, []);
 
@@ -311,65 +238,13 @@ export function SettingsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void reloadProfile();
       void reloadNotifications();
-      void reloadOrbit();
       void reloadAiAvailability().catch((error) => {
         Logger.error(LOG_SCOPE, "failed to load AI configuration", error);
         setAiHubError("Couldn't load AI settings. Please try again.");
       });
-    }, [reloadAiAvailability, reloadProfile, reloadNotifications, reloadOrbit]),
+    }, [reloadAiAvailability, reloadNotifications]),
   );
-
-  // M6: persist the tapped star token through the same try/catch + Logger.error
-  // posture as `persist` — if a future design pass seeds a non-`#RRGGBB`
-  // starPalette token the DAO validator throws, which is caught and logged here
-  // rather than escaping as an unhandled rejection. Reloads from the write.
-  const onPickStarColour = useCallback(
-    async (token: string) => {
-      try {
-        await updateAppSettings(
-          getExecutor(),
-          { selfSunColour: token },
-          localDateTime(),
-        );
-        await reloadOrbit();
-      } catch (err) {
-        Logger.error(LOG_SCOPE, "failed to persist star colour", err);
-      }
-    },
-    [reloadOrbit],
-  );
-
-  // M6: persist the chosen centre occupant (a candidate id, or NULL for "Me")
-  // through the same try/catch + Logger.error posture. Closes the picker and
-  // reloads the displayed occupant from the write.
-  const onPickSunOccupant = useCallback(
-    async (id: number | null) => {
-      try {
-        await updateAppSettings(
-          getExecutor(),
-          { sunContactId: id },
-          localDateTime(),
-        );
-        setSunPickerOpen(false);
-        await reloadOrbit();
-      } catch (err) {
-        Logger.error(LOG_SCOPE, "failed to persist sun occupant", err);
-      }
-    },
-    [reloadOrbit],
-  );
-
-  // The picker list: a synthetic "Me" (NULL id) first, then the favourites-first
-  // candidates (already archived-excluded by listSunCandidates). This IS ORR-06's
-  // "assign the sun" — RELOCATED to Settings by owner decision, NOT an orrery
-  // gesture (the orrery long-press was rejected). Do not read the absence of an
-  // orrery sun-assignment gesture as an ORR-06 gap (L10 doc-sync pointer).
-  const sunOptions: Array<{ id: number | null; name: string }> = [
-    { id: null, name: "Me" },
-    ...sunCandidates.map((c) => ({ id: c.id as number | null, name: c.name })),
-  ];
 
   // Persist a patch to app_settings then fire-and-forget a reconcile so the OS
   // schedule re-arms immediately (the self-coordinating reconcile coalesces
@@ -1081,168 +956,11 @@ export function SettingsScreen() {
           `setInteractionAssistEnabled` + banner refresh there (D-10 / ADR-070),
           not this monolith. */}
 
-      <View
-        testID="settings-your-photo-row"
-        style={[
-          styles.row,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-          Your photo
-        </Text>
-        <PhotoSourcePicker
-          target={{ kind: "profile" }}
-          photo={selfPhoto}
-          name={selfName ?? "You"}
-          cacheBust={selfModifiedAt}
-          onChanged={() => void reloadProfile()}
-        />
-      </View>
-
-      <View testID="settings-your-orbit-section" style={styles.section}>
-        <Text
-          accessibilityRole="header"
-          style={[styles.sectionHeading, { color: colors.textSecondary }]}
-        >
-          Your orbit
-        </Text>
-
-        {/* "Your star" — the self-sun colour, picked from the themed starPalette.
-            The selected swatch = selfSunColour, or starPalette[0] (gold) when
-            unset (NULL resolves to gold at RENDER — no stored hex default). Swatch
-            fills ARE starPalette TOKENS (legitimate token use, not hardcoded hex);
-            the accent ring marks the selection. Writes self_sun_colour (ORR-05). */}
-        <View
-          testID="settings-your-star-row"
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-            Your star
-          </Text>
-          <View style={styles.swatchRow}>
-            {colors.starPalette.map((token, index) => {
-              const isSelected =
-                token === (selfSunColour ?? colors.starPalette[0]);
-              return (
-                <Pressable
-                  key={token}
-                  testID={`settings-star-swatch-${index}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Star colour ${index + 1}`}
-                  accessibilityState={{ selected: isSelected }}
-                  onPress={() => void onPickStarColour(token)}
-                  style={[
-                    styles.swatch,
-                    {
-                      backgroundColor: token,
-                      borderColor: isSelected ? colors.accent : colors.border,
-                    },
-                  ]}
-                />
-              );
-            })}
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Pick the colour of your star at the centre of your orbit.
-          </Text>
-        </View>
-
-        {/* "Sun / centre" — the occupant picker (Me / favourites / all contacts),
-            writing sun_contact_id (NULL = Me). ORR-06 relocated to Settings by
-            owner decision — NOT an orrery gesture. The row shows the resolved
-            occupant name (M4: "Me" when the stored occupant is archived/missing). */}
-        <Pressable
-          testID="settings-sun-centre-row"
-          accessibilityRole="button"
-          accessibilityLabel={`Sun / centre, ${sunOccupantName}`}
-          onPress={() => setSunPickerOpen(true)}
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Sun / centre
-            </Text>
-            <Text style={[styles.rowValue, { color: colors.accent }]}>
-              {sunOccupantName}
-            </Text>
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Choose who sits at the centre — you, or someone you orbit around.
-          </Text>
-        </Pressable>
-
-        <Modal
-          visible={sunPickerOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setSunPickerOpen(false)}
-        >
-          <View style={styles.modalRoot}>
-            <Pressable
-              accessibilityLabel="Dismiss sun options"
-              style={StyleSheet.absoluteFill}
-              onPress={() => setSunPickerOpen(false)}
-            >
-              <View
-                style={[
-                  StyleSheet.absoluteFill,
-                  styles.scrim,
-                  { backgroundColor: colors.background },
-                ]}
-              />
-            </Pressable>
-
-            <View
-              testID="settings-sun-picker"
-              style={[
-                styles.sheet,
-                {
-                  backgroundColor: colors.surfaceElevated,
-                  borderColor: colors.border,
-                },
-              ]}
-            >
-              <FlatList
-                data={sunOptions}
-                keyExtractor={(item) =>
-                  item.id === null ? "me" : String(item.id)
-                }
-                renderItem={({ item }) => {
-                  const isSelected = item.id === sunContactId;
-                  return (
-                    <Pressable
-                      testID={`settings-sun-option-${item.id === null ? "me" : item.id}`}
-                      accessibilityRole="button"
-                      accessibilityLabel={item.name}
-                      accessibilityState={{ selected: isSelected }}
-                      onPress={() => void onPickSunOccupant(item.id)}
-                      style={[styles.option, { borderColor: colors.border }]}
-                    >
-                      <Text
-                        numberOfLines={1}
-                        style={{
-                          color: isSelected
-                            ? colors.accent
-                            : colors.textPrimary,
-                        }}
-                      >
-                        {item.name}
-                      </Text>
-                    </Pressable>
-                  );
-                }}
-              />
-            </View>
-          </View>
-        </Modal>
-      </View>
+      {/* The owner photo + "Your orbit" (self-star colour + Orbit Center picker)
+          controls migrated to SettingsAppearanceScreen in Phase 37 (Plan 03):
+          they live in the Appearance category's owner-profile and Orbit
+          Appearance sections, writing profile-dao / self_sun_colour /
+          sun_contact_id there (ADR-047 / D-02 upheld), not this monolith. */}
 
       {/* AI is an optional capability. The master switch mutates only
           app_settings.ai_enabled; every connection, model, personalization
@@ -1551,36 +1269,6 @@ const styles = StyleSheet.create({
   rowValue: {
     fontSize: 16,
     fontWeight: "600",
-  },
-  swatchRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-  },
-  swatch: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 3,
-  },
-  modalRoot: {
-    flex: 1,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  scrim: {
-    opacity: 0.85,
-  },
-  sheet: {
-    borderWidth: 1,
-    borderRadius: 12,
-    maxHeight: "60%",
-    overflow: "hidden",
-  },
-  option: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   toggleRow: {
     flexDirection: "row",

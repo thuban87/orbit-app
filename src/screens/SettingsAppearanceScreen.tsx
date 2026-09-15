@@ -1,22 +1,30 @@
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
+  FlatList,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   useWindowDimensions,
   View,
 } from "react-native";
+import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
   type AppSettingsPatch,
   getAppSettings,
   updateAppSettings,
 } from "@/db/app-settings-dao";
+import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
+import { getProfile } from "@/db/profile-dao";
+import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
+import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useThemeStore } from "@/stores/theme-store";
@@ -175,6 +183,137 @@ export function SettingsAppearanceScreen({
   );
 
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // Owner profile (migrated from the Settings monolith's "Your photo" row). The
+  // self record's `name` is nullable — the "You" display fallback keeps the
+  // initials avatar deterministic ("Y") until a self-name editor sets it.
+  const [selfPhoto, setSelfPhoto] = useState<string | null>(null);
+  const [selfName, setSelfName] = useState<string | null>(null);
+  const [selfModifiedAt, setSelfModifiedAt] = useState<string | undefined>(
+    undefined,
+  );
+
+  // "Orbit Appearance" / Orbit Center (migrated from the monolith's "Your
+  // orbit" group). `selfSunColour` is the raw stored self-star hex or NULL; NULL
+  // resolves to `starPalette[0]` (gold) at RENDER — no stored hex default. The
+  // centre occupant is the raw stored id (NULL = You), the RESOLVED display name
+  // (archived/missing → "You"), the favourites-first candidate list, the picker
+  // modal's open state, and its search term.
+  const [selfSunColour, setSelfSunColour] = useState<string | null>(null);
+  const [sunContactId, setSunContactId] = useState<number | null>(null);
+  const [sunOccupantName, setSunOccupantName] = useState("You");
+  const [sunCandidates, setSunCandidates] = useState<SunCandidate[]>([]);
+  const [sunPickerOpen, setSunPickerOpen] = useState(false);
+  const [sunSearch, setSunSearch] = useState("");
+
+  // Reload the self record so a photo set/removed on the crop screen refreshes
+  // when it goBack()s here (mirrors ContactProfileScreen's reload-on-focus).
+  const reloadProfile = useCallback(async () => {
+    try {
+      const profile = await getProfile(getExecutor());
+      setSelfPhoto(profile?.photo ?? null);
+      setSelfName(profile?.name ?? null);
+      setSelfModifiedAt(profile?.modified_at);
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to load self profile", err);
+    }
+  }, []);
+
+  // Load the Orbit Center settings (self-star colour + centre occupant). Read on
+  // focus so a change made elsewhere refreshes when this screen regains focus.
+  const reloadOrbit = useCallback(async () => {
+    const exec = getExecutor();
+    try {
+      const next = await getAppSettings(exec);
+      setSelfSunColour(next.selfSunColour);
+      setSunContactId(next.sunContactId);
+      setSunCandidates(await listSunCandidates(exec));
+      // Resolve the occupant name through the SAME self-fallback predicate the
+      // canvas uses (sunOccupantIsSelf) so Settings and the orrery can never
+      // disagree about a hidden occupant. NULL → "You"; a stored id whose
+      // contact is missing OR archived also shows "You"; else the live name.
+      const header =
+        next.sunContactId === null
+          ? null
+          : await getContactHeader(exec, next.sunContactId);
+      const isSelf = sunOccupantIsSelf({
+        sunContactId: next.sunContactId,
+        occupant: header
+          ? {
+              archived: header.archived_at !== null,
+              trackingEnabled: header.trackingEnabled,
+            }
+          : null,
+      });
+      setSunOccupantName(isSelf ? "You" : (header?.name ?? "You"));
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to load orbit settings", err);
+    }
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void reloadProfile();
+      void reloadOrbit();
+    }, [reloadProfile, reloadOrbit]),
+  );
+
+  // Persist the tapped self-star token (a themed starPalette entry). ADR-047 /
+  // D-02: only the self-star colour is user-configurable — a contact at centre
+  // keeps its status-derived glow, so this control is NOT conditioned on the
+  // current centre and never assigns a colour to a contact centre.
+  const onPickStarColour = useCallback(
+    async (token: string) => {
+      try {
+        await updateAppSettings(
+          getExecutor(),
+          { selfSunColour: token },
+          localDateTime(),
+        );
+        await reloadOrbit();
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to persist star colour", err);
+      }
+    },
+    [reloadOrbit],
+  );
+
+  // Persist the chosen centre occupant (a candidate id, or NULL for "You").
+  // Closes the picker and reloads the displayed occupant from the write.
+  const onPickSunOccupant = useCallback(
+    async (id: number | null) => {
+      try {
+        await updateAppSettings(
+          getExecutor(),
+          { sunContactId: id },
+          localDateTime(),
+        );
+        setSunPickerOpen(false);
+        setSunSearch("");
+        await reloadOrbit();
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to persist sun occupant", err);
+      }
+    },
+    [reloadOrbit],
+  );
+
+  // The picker list: a synthetic "You" (NULL id) first, then the favourites-first
+  // candidates (already archived-excluded by listSunCandidates), filtered by the
+  // search term. Choosing the centre lives in Settings by owner decision — NOT an
+  // orrery gesture (the orrery long-press was rejected, ADR-047).
+  const sunOptions = useMemo<Array<{ id: number | null; name: string }>>(() => {
+    const all: Array<{ id: number | null; name: string }> = [
+      { id: null, name: "You" },
+      ...sunCandidates.map((c) => ({
+        id: c.id as number | null,
+        name: c.name,
+      })),
+    ];
+    const term = sunSearch.trim().toLocaleLowerCase();
+    if (term === "") return all;
+    return all.filter((o) => o.name.toLocaleLowerCase().includes(term));
+  }, [sunCandidates, sunSearch]);
 
   const activeBackground =
     themePackage === "galaxy" ? galaxyBackground : standardBackground;
@@ -531,6 +670,202 @@ export function SettingsAppearanceScreen({
             </Text>
           </View>
         </View>
+
+        {/* Owner profile — the self record's photo (migrated from the monolith's
+            "Your photo" row). The self-name editor is added alongside it. */}
+        <View testID="settings-owner-profile-section" style={styles.section}>
+          <Text
+            accessibilityRole="header"
+            style={[styles.sectionHeading, { color: colors.textSecondary }]}
+          >
+            Your profile
+          </Text>
+
+          <View
+            testID="settings-your-photo-row"
+            style={[
+              styles.row,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+              Your photo
+            </Text>
+            <PhotoSourcePicker
+              target={{ kind: "profile" }}
+              photo={selfPhoto}
+              name={selfName ?? "You"}
+              cacheBust={selfModifiedAt}
+              onChanged={() => void reloadProfile()}
+            />
+          </View>
+        </View>
+
+        {/* Orbit Appearance / Orbit Center (§D, migrated from the monolith's
+            "Your orbit" group). Per ADR-047 / D-02 the self-star colour is the
+            ONLY user-configurable colour: it stays available regardless of the
+            current centre, and a contact at centre keeps its status-derived glow
+            (no user-chosen colour for a contact centre). */}
+        <View testID="settings-orbit-appearance-section" style={styles.section}>
+          <Text
+            accessibilityRole="header"
+            style={[styles.sectionHeading, { color: colors.textSecondary }]}
+          >
+            Orbit Appearance
+          </Text>
+
+          {/* "Your star" — the self-sun colour, picked from the themed
+              starPalette. The selected swatch = selfSunColour, or starPalette[0]
+              (gold) when unset (NULL resolves to gold at RENDER — no stored hex
+              default). Swatch fills ARE starPalette TOKENS (legitimate token
+              use, not hardcoded hex); the accent ring marks the selection. */}
+          <View
+            testID="settings-your-star-row"
+            style={[
+              styles.row,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+              Your star
+            </Text>
+            <View style={styles.swatchRow}>
+              {colors.starPalette.map((token, index) => {
+                const isSelected =
+                  token === (selfSunColour ?? colors.starPalette[0]);
+                return (
+                  <Pressable
+                    key={token}
+                    testID={`settings-star-swatch-${index}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Star colour ${index + 1}`}
+                    accessibilityState={{ selected: isSelected }}
+                    onPress={() => void onPickStarColour(token)}
+                    style={[
+                      styles.swatch,
+                      {
+                        backgroundColor: token,
+                        borderColor: isSelected ? colors.accent : colors.border,
+                      },
+                    ]}
+                  />
+                );
+              })}
+            </View>
+            <Text style={[styles.helper, { color: colors.textSecondary }]}>
+              Pick the colour of your star at the centre of your orbit.
+            </Text>
+          </View>
+
+          {/* "Orbit Center" — the occupant picker (You / favourites / all
+              contacts), writing sun_contact_id (NULL = You). Relocated to
+              Settings by owner decision (ADR-047). Shows the resolved occupant
+              name ("You" when the stored occupant is archived/missing). */}
+          <Pressable
+            testID="settings-sun-centre-row"
+            accessibilityRole="button"
+            accessibilityLabel={`Orbit Center, ${sunOccupantName}`}
+            onPress={() => setSunPickerOpen(true)}
+            style={[
+              styles.row,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <View style={styles.toggleRow}>
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                Orbit Center
+              </Text>
+              <Text style={[styles.rowValue, { color: colors.accent }]}>
+                {sunOccupantName}
+              </Text>
+            </View>
+            <Text style={[styles.helper, { color: colors.textSecondary }]}>
+              Choose who sits at the centre — you, or someone you orbit around.
+            </Text>
+          </Pressable>
+
+          <Modal
+            visible={sunPickerOpen}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setSunPickerOpen(false)}
+          >
+            <View style={styles.modalRoot}>
+              <Pressable
+                accessibilityLabel="Dismiss Orbit Center options"
+                style={StyleSheet.absoluteFill}
+                onPress={() => setSunPickerOpen(false)}
+              >
+                <View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    styles.scrim,
+                    { backgroundColor: colors.background },
+                  ]}
+                />
+              </Pressable>
+
+              <View
+                testID="settings-sun-picker"
+                style={[
+                  styles.sheet,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <TextInput
+                  testID="settings-sun-picker-search"
+                  accessibilityLabel="Search Orbit Center contacts"
+                  value={sunSearch}
+                  onChangeText={setSunSearch}
+                  placeholder="Search contacts"
+                  placeholderTextColor={colors.textSecondary}
+                  autoCorrect={false}
+                  style={[
+                    styles.searchInput,
+                    {
+                      color: colors.textPrimary,
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                />
+                <FlatList
+                  data={sunOptions}
+                  keyExtractor={(item) =>
+                    item.id === null ? "me" : String(item.id)
+                  }
+                  renderItem={({ item }) => {
+                    const isSelected = item.id === sunContactId;
+                    return (
+                      <Pressable
+                        testID={`settings-sun-option-${item.id === null ? "me" : item.id}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={item.name}
+                        accessibilityState={{ selected: isSelected }}
+                        onPress={() => void onPickSunOccupant(item.id)}
+                        style={[styles.option, { borderColor: colors.border }]}
+                      >
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            color: isSelected
+                              ? colors.accent
+                              : colors.textPrimary,
+                          }}
+                        >
+                          {item.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  }}
+                />
+              </View>
+            </View>
+          </Modal>
+        </View>
       </ScrollView>
     </View>
   );
@@ -585,6 +920,41 @@ const styles = StyleSheet.create({
     height: 44,
     borderRadius: 22,
     borderWidth: 3,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  rowValue: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalRoot: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  scrim: {
+    opacity: 0.85,
+  },
+  sheet: {
+    borderWidth: 1,
+    borderRadius: 12,
+    maxHeight: "60%",
+    overflow: "hidden",
+  },
+  searchInput: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+  },
+  option: {
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   backgroundGrid: {
     flexDirection: "row",
