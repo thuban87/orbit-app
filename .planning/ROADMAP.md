@@ -974,13 +974,24 @@ Plans:
 **Goal:** Build category CRUD (create / rename / delete) over the `categories` table — read-only since migration 001 (4 seeded rows, zero runtime CRUD writers) — and handle the deletion-cascade fallout across every consumer: Orrery Systems, custom-System rules, Profile category assignments, and backup. Consumes the `CategoryManagement` route name / IA slot Phase 37 reserves under Contacts & Relationships → Relationship Structure.
 **Depends on:** Phase 37 (consumes the reserved Categories route + IA slot)
 **Requirements**: TBD — deferred to planning
-**Scope source:** D-03 in `.planning/phases/37-settings-personalization/37-CONTEXT.md` (owner-confirmed 2026-09-14). Deletion cascade must be designed against a destructive, forward-only, irreversible-in-production SQLite migration (no remote DB access; `field_history`-style snapshot discipline where a destructive op removes dependent rows).
+**Scope source:** D-03 in `.planning/phases/37-settings-personalization/37-CONTEXT.md` (owner-confirmed 2026-09-14), the Phase 37.1 dossier, and the approved Phase 37.1 UI-SPEC. Category deletion is a permanent runtime application transaction with durable category tombstone evidence; it adds no migration, `field_history` category history, Undo, quarantine, or reseeding, and zero categories is valid.
 **Canonical refs**: `.planning/phases/37-settings-personalization/37-CONTEXT.md` (D-03), the `categories` table (migration 001), Orrery Systems + custom-System rules + Profile category assignment + backup writers.
-**Plans:** 0 plans
+**Plans:** 12 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 37.1 to break down)
+- [ ] 37.1-01-PLAN.md — Tracer: activate the reserved Settings route and add categories through the canonical DAO
+- [ ] 37.1-02-PLAN.md — Specify and implement the atomic deletion aggregate with per-stage rollback proof
+- [ ] 37.1-03-PLAN.md — Share cross-kind name uniqueness and canonical System Needs Attention semantics
+- [ ] 37.1-04-PLAN.md — Extend backup v5 schema/export/reconciliation for category tombstones
+- [ ] 37.1-05-PLAN.md — Apply category-aware merge deletes and exact replace-all taxonomy
+- [ ] 37.1-06-PLAN.md — Complete manager rename/reorder/delete UI and reusable anchored menu
+- [ ] 37.1-07-PLAN.md — Build the shared complete/searchable category selector model and choice Sheet
+- [ ] 37.1-08-PLAN.md — Integrate Create/Edit Contact and Bulk Import category consumers
+- [ ] 37.1-09-PLAN.md — Integrate Dashboard filters and bulk Set Category
+- [ ] 37.1-10-PLAN.md — Integrate Profile presentation managers and live identity behavior
+- [ ] 37.1-11-PLAN.md — Integrate System Builder and the exact three-group Orrery selector
+- [ ] 37.1-12-PLAN.md — Audit every writer/consumer, update living contracts, and complete physical-device UAT
 
 ### Phase 38: Your Week
 
