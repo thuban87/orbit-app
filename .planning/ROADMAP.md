@@ -951,7 +951,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4)*
 
-- [ ] 37-05-PLAN.md — Notifications category (§G) with the reconcile-on-write path preserved + permission handoff
+- [x] 37-05-PLAN.md — Notifications category (§G) with the reconcile-on-write path preserved + permission handoff
 
 **Wave 6** *(blocked on Wave 5)*
 
