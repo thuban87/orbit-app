@@ -32,8 +32,8 @@
 // NOTE: ADR-0020 [ACCEPTED] Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download
 // NOTE: ADR-0021 [ACCEPTED] Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup
 // NOTE: ADR-0022 [ACCEPTED] Tokenized Deterministic Initials Avatars
-// NOTE: ADR-0023 [ACCEPTED] Structured Touchpoints and One-Tap Defaults
-// NOTE: ADR-0024 [ACCEPTED] Editable Touchpoint History and Recomputed Recency
+// IMPORTANT: ADR-0023 [SUPERSEDED BY ADR-116 (partial — the stored channel/quality value vocabulary; the structured-touchpoint architecture, one-tap defaults, and `unspecified` channel remain in forc
+// IMPORTANT: ADR-0024 [SUPERSEDED BY ADR-123 (partial — the newest-first profile timeline as the interaction-refinement surface is replaced by the History section, Interaction Detail, and Edit Intera
 // NOTE: ADR-0025 [ACCEPTED] Immutable Lifecycle Events in a Unified Timeline
 // NOTE: ADR-0026 [ACCEPTED] Rogue Status for Unresponsive or Far-Overdue Contacts
 // IMPORTANT: ADR-0027 [SUPERSEDED BY ADR-106 (partial — Orrery Gravity display scope and companion context)] Derived Profile-Only Gravity and Intensity
@@ -125,5 +125,13 @@
 // NOTE: ADR-0113 [ACCEPTED] Persistent Shared System Background Selection
 // NOTE: ADR-0114 [ACCEPTED] Route-Aware App-Wide System Background Composition
 // NOTE: ADR-0115 [ACCEPTED] Visible Mode-Aware Background Surface Composition
+// NOTE: ADR-0116 [ACCEPTED] Value-Remapped Interaction Vocabulary and Optional Descriptive Duration
+// NOTE: ADR-0117 [ACCEPTED] Per-Interaction Allow-AI Consent Gate, Default-Off and Fail-Closed on Restore
+// NOTE: ADR-0118 [ACCEPTED] Bind/Unbind Immutable Lifecycle Events Without a Migration
+// NOTE: ADR-0119 [ACCEPTED] Reusable Count-Only History Aggregation and Canonical Single-Contact History Read
+// NOTE: ADR-0120 [ACCEPTED] Shared-Window Heatmap and Intensity with Globally-Persisted Lenses
+// NOTE: ADR-0121 [ACCEPTED] Rolodex Month/Day/Year History Browser (Reanimated, No Skia)
+// NOTE: ADR-0122 [ACCEPTED] Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Recency Writer
+// NOTE: ADR-0123 [ACCEPTED] Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing
 
-export const ADR_COUNT = 115;
+export const ADR_COUNT = 123;

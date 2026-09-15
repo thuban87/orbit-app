@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 25 of
-  115 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 27 of
+  123 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -53,8 +53,8 @@ not something you can pattern-match against.
 | 020 | Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download | Accepted | 05-photos | — | — | — | 5 | `src/components`, `src/screens`, `src/services/photos` |
 | 021 | Durable Relative-Path Photo Masters with Crash-Safe Lifecycle Cleanup | Accepted | 05-photos | — | — | — | 7 | `src/components/field-widgets`, `src/db`, `src/services/photos` |
 | 022 | Tokenized Deterministic Initials Avatars | Accepted | 05-photos | — | — | — | 5 | `src/components`, `src/stores`, `src/theme` |
-| 023 | Structured Touchpoints and One-Tap Defaults | Accepted | 06-interaction-log-status-impact | — | — | — | 4 | `src/components`, `src/db`, `src/screens` |
-| 024 | Editable Touchpoint History and Recomputed Recency | Accepted | 06-interaction-log-status-impact | — | — | — | 5 | `src/components`, `src/db`, `src/screens` |
+| 023 | Structured Touchpoints and One-Tap Defaults | Accepted | 06-interaction-log-status-impact | — | ADR-116 (partial — the stored channel/quality value vocabulary; the structured-touchpoint architecture, one-tap defaults, and `unspecified` channel remain in force) | — | 4 | `src/components`, `src/db`, `src/screens` |
+| 024 | Editable Touchpoint History and Recomputed Recency | Accepted | 06-interaction-log-status-impact | — | ADR-123 (partial — the newest-first profile timeline as the interaction-refinement surface is replaced by the History section, Interaction Detail, and Edit Interaction route; recency-recompute, same-day-row, past/future, and permanent-deletion behavior remain in force) | — | 5 | `src/components`, `src/db`, `src/screens` |
 | 025 | Immutable Lifecycle Events in a Unified Timeline | Accepted | 06-interaction-log-status-impact | — | — | — | 5 | `src/components`, `src/db` |
 | 026 | Rogue Status for Unresponsive or Far-Overdue Contacts | Accepted | 06-interaction-log-status-impact | — | — | — | 5 | `src/db`, `src/screens`, `src/theme` |
 | 027 | Derived Profile-Only Gravity and Intensity | Accepted | 06-interaction-log-status-impact | — | ADR-106 (partial — Orrery Gravity display scope and companion context) | — | 6 | `src/components`, `src/db`, `src/services` |
@@ -146,3 +146,11 @@ not something you can pattern-match against.
 | 113 | Persistent Shared System Background Selection | Accepted | 31.1-app-wide-system-backgrounds | — | — | — | 5/6 live | `assets/backgrounds`, `src/db`, `src/stores` +1 |
 | 114 | Route-Aware App-Wide System Background Composition | Accepted | 31.1-app-wide-system-backgrounds | — | — | — | 9 | `src/components/ui`, `src/navigation`, `src/screens` +2 |
 | 115 | Visible Mode-Aware Background Surface Composition | Accepted | 31.1-app-wide-system-backgrounds | ADR-087 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation) | — | — | 7 | `src/components`, `src/components/ui`, `src/screens` +1 |
+| 116 | Value-Remapped Interaction Vocabulary and Optional Descriptive Duration | Accepted | 32-interaction-history-insights | ADR-023 (partial — the stored channel/quality value vocabulary) | — | — | 10 | `src/ai`, `src/components`, `src/db` +1 |
+| 117 | Per-Interaction Allow-AI Consent Gate, Default-Off and Fail-Closed on Restore | Accepted | 32-interaction-history-insights | — | — | — | 9 | `src/backup`, `src/components`, `src/components/history` +3 |
+| 118 | Bind/Unbind Immutable Lifecycle Events Without a Migration | Accepted | 32-interaction-history-insights | — | — | — | 3 | `src/backup`, `src/db` |
+| 119 | Reusable Count-Only History Aggregation and Canonical Single-Contact History Read | Accepted | 32-interaction-history-insights | — | — | — | 6 | `src/db`, `src/services/history` |
+| 120 | Shared-Window Heatmap and Intensity with Globally-Persisted Lenses | Accepted | 32-interaction-history-insights | — | — | — | 8 | `src/components`, `src/components/history`, `src/db` +1 |
+| 121 | Rolodex Month/Day/Year History Browser (Reanimated, No Skia) | Accepted | 32-interaction-history-insights | — | — | — | 3 | `src/components/history` |
+| 122 | Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Recency Writer | Accepted | 32-interaction-history-insights | — | — | — | 9 | `src/components`, `src/components/history`, `src/db` +1 |
+| 123 | Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing | Accepted | 32-interaction-history-insights | ADR-024 (partial — the profile-timeline refinement surface) | — | — | 7 | `src/components/history`, `src/components/profile`, `src/navigation` +2 |
