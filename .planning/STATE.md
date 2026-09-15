@@ -32,7 +32,7 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 37 — Settings & Personalization
+**Current focus:** Phase 37.1 — Category Management
 
 ## Current Position
 
