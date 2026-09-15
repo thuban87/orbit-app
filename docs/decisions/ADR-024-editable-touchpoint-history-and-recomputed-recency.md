@@ -7,7 +7,7 @@
 **Reversibility:** one-way
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** None
+**Superseded by:** ADR-123 (partial — the newest-first profile timeline as the interaction-refinement surface is replaced by the History section, Interaction Detail, and Edit Interaction route; recency-recompute, same-day-row, past/future, and permanent-deletion behavior remain in force)
 
 ## Context
 
@@ -50,4 +50,4 @@ The system logs immediately and refines from a full, editable, newest-first prof
 - `src/screens/ContactProfileScreen.tsx` — wires refinement, confirmed deletion, and in-place refresh.
 
 **Depends on:** ADR-010 (Single-Writer Interaction Recency Spine)
-**Required by:** ADR-054 (Live Weekly Digest Retrospective and Overlooked Relationship Read); ADR-071 (User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer); ADR-103 (Atomic Composed Dashboard Bulk Mutations)
+**Required by:** ADR-054 (Live Weekly Digest Retrospective and Overlooked Relationship Read); ADR-071 (User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer); ADR-103 (Atomic Composed Dashboard Bulk Mutations); ADR-122 (Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet)

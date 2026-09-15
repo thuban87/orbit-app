@@ -51,4 +51,4 @@ We build a reusable, node-tested aggregation seam plus one canonical read. Pure 
 - `src/db/current-state-history-read.ts` — widened to a read-only `Pick<SqlExecutor,"getAllAsync">` surface so the read composes without a writable executor.
 
 **Depends on:** ADR-027 (Derived Profile-Only Gravity and Intensity); ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment); ADR-010 (Single-Writer Interaction Recency Spine)
-**Required by:** None
+**Required by:** ADR-120 (Shared-Window Heatmap and Intensity with Globally-Persisted Lenses); ADR-121 (Rolodex Month/Day/Year History Browser); ADR-122 (Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet); ADR-123 (Profile History Section Replacing the Vertical Timeline)

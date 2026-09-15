@@ -46,4 +46,4 @@ The system subscribes to `AccessibilityInfo` and exposes the result both as a Re
 - `src/components/orrery/SunBody.tsx` — gates the shared-clock sun glow pulse inside its derived-value loop.
 
 **Depends on:** ADR-077 (Single Canonical Orrery with a Constrained Inspection Camera)
-**Required by:** _None._
+**Required by:** ADR-121 (Rolodex Month/Day/Year History Browser)

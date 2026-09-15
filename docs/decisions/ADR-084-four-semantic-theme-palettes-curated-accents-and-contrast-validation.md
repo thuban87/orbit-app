@@ -50,4 +50,4 @@ The system resolves four complete semantic palettes: Galaxy and Standard, each i
 - `src/screens/SettingsScreen.tsx` — offers live package, appearance-mode, and accent controls for existing consumers.
 
 **Depends on:** ADR-083 (Durable Multi-Package Theme Configuration and Restore-Before-Paint)
-**Required by:** _None._
+**Required by:** ADR-120 (Shared-Window Heatmap and Intensity with Globally-Persisted Lenses)

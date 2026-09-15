@@ -48,4 +48,4 @@ The conventional vertical timeline is replaced by a specialized date browser for
 - `src/components/history/RolodexBrowser.tsx` — three synchronized wheels (Day primary) plus the lifecycle-inclusive drawer; owns the pause-on-blur lifecycle and conditional mount.
 
 **Depends on:** ADR-119 (Reusable Count-Only History Aggregation and Canonical History Read); ADR-085 (Live Reduced-Motion Signal for Skia Ambient Animation); ADR-086 (Semantic Icons and Accessible Interaction Primitives)
-**Required by:** None
+**Required by:** ADR-123 (Profile History Section Replacing the Vertical Timeline)

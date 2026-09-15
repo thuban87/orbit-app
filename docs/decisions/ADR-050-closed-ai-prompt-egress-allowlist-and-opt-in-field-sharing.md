@@ -47,4 +47,4 @@ The system constructs every AI request from one closed `PromptContext` allowlist
 - `src/components/FieldDefForm.tsx` — exposes the default-off sharing control.
 
 **Depends on:** ADR-013 (Runtime Two-Table Custom Fields with Whitelist-Constructed DDL)
-**Required by:** None
+**Required by:** ADR-117 (Per-Interaction Allow-AI Consent Gate)
