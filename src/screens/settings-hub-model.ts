@@ -142,6 +142,17 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     route: "SettingsAI",
   },
   {
+    // About Orbit (§A index 7 / §K). The final §A category — a basic leaf
+    // (product name + semantic version only). Placed after AI and before the
+    // transitional "More settings" row (Plan 08 removes that scaffold in Task 3).
+    kind: "route",
+    key: "about",
+    title: "About Orbit",
+    subtitle: "App name and version",
+    icon: "info",
+    route: "SettingsAbout",
+  },
+  {
     kind: "route",
     key: "more",
     title: "More settings",

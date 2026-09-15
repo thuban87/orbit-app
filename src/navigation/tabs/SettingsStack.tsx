@@ -30,6 +30,7 @@ import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
 import { RestorePreviewScreen } from "@/screens/RestorePreviewScreen";
 import { RestoreResultScreen } from "@/screens/RestoreResultScreen";
+import { SettingsAboutScreen } from "@/screens/SettingsAboutScreen";
 import { SettingsAIScreen } from "@/screens/SettingsAIScreen";
 import { SettingsAppearanceScreen } from "@/screens/SettingsAppearanceScreen";
 import { SettingsContactsScreen } from "@/screens/SettingsContactsScreen";
@@ -141,6 +142,12 @@ function SettingsAIRoute({ navigation }: SettingsScreenProps<"SettingsAI">) {
   return <SettingsAIScreen onBack={() => navigation.goBack()} />;
 }
 
+function SettingsAboutRoute({
+  navigation,
+}: SettingsScreenProps<"SettingsAbout">) {
+  return <SettingsAboutScreen onBack={() => navigation.goBack()} />;
+}
+
 // Data & Backup dual-home (D-08 / Plan 37-07): the SAME four Backup screens the
 // Backup tab hosts, re-registered in the Settings stack — one canonical tree,
 // two entry points (§I), NOT a second copy. The per-stack wrappers thread an
@@ -192,6 +199,7 @@ export function SettingsStack() {
       />
       <Stack.Screen name="SettingsOrrery" component={SettingsOrreryRoute} />
       <Stack.Screen name="SettingsAI" component={SettingsAIRoute} />
+      <Stack.Screen name="SettingsAbout" component={SettingsAboutRoute} />
       {/* Data & Backup dual-home (D-08 / §I): the four Backup screens the tab
           hosts, re-registered here via `host="settings"` wrappers — one canonical
           tree, two entry points. The Backup bottom tab stays (removal deferred,

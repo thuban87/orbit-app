@@ -250,6 +250,11 @@ export type SettingsStackParamList = {
   SettingsOrrery: undefined;
   SettingsAI: undefined;
   /**
+   * About Orbit category (§K / Plan 08) — a basic leaf: product name + semantic
+   * version only, unavailable rows omitted. The final §A category (index 7).
+   */
+  SettingsAbout: undefined;
+  /**
    * Data & Backup dual-home (D-08 / §I). The four Backup screens are ONE
    * canonical tree reachable from both the Backup bottom tab (`BackupStack`) and
    * Settings → Data & Backup. Each hosting stack must list the routes it reaches

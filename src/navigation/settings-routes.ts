@@ -64,6 +64,9 @@ export const SETTINGS_REGISTERED_ROUTES = [
   "BackupSettings",
   "RestorePreview",
   "RestoreResult",
+  // The About Orbit category route (Plan 08, §K) — a basic leaf (product name +
+  // semantic version only); its <Stack.Screen> is registered in SettingsStack.tsx.
+  "SettingsAbout",
 ] as const;
 
 export type SettingsRegisteredRoute =
