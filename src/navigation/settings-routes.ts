@@ -47,6 +47,12 @@ export const SETTINGS_REGISTERED_ROUTES = [
   // source, NOT a forked writer) + Systems Management routing; its <Stack.Screen>
   // is registered in SettingsStack.tsx.
   "SettingsOrrery",
+  // The AI category route (Plan 06, §J) — routes into the canonical Phase 36 AI
+  // hierarchy (AIConnection/AIModelPicker/AIPersonalization/AIPermissions/
+  // AIPreview) + the AI-Off escape hatch, derives hub state from the migrated
+  // fresh-on-focus availability hydration pipeline, and flips ai_enabled only
+  // (no egress widening); its <Stack.Screen> is registered in SettingsStack.tsx.
+  "SettingsAI",
 ] as const;
 
 export type SettingsRegisteredRoute =

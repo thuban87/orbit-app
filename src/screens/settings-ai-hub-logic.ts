@@ -1,11 +1,16 @@
-import type { OpenRouterModel } from "@/ai/openrouter-catalog";
+import type {
+  OpenRouterCatalog,
+  OpenRouterModel,
+} from "@/ai/openrouter-catalog";
 import type { ResolvedAiConnection } from "@/db/ai-connections-dao";
 import type { AppSettingsPatch } from "@/db/app-settings-dao";
+import type { SqlExecutor } from "@/db/types";
 import {
   type AiAvailability,
   computeAiAvailability,
   isSelectedConnectionModelAvailable,
 } from "@/logic/ai-availability";
+import type { AiCloudProviderId, AiProviderId } from "@/services/ai-types";
 
 export type AiHubSection =
   | { readonly label: "Connection"; readonly route: "AIConnection" }
@@ -93,5 +98,67 @@ export function computeAiHubAvailability(input: {
       input.activeConnection,
       input.openRouterModels,
     ),
+  });
+}
+
+/**
+ * Injectable collaborators for {@link loadAiHubAvailability}. The screen binds
+ * these to the real DAO/store/SecureStore/catalog readers; a test injects mocks
+ * so the PRODUCER of availability is provable without a real AI provider network
+ * call. `loadCachedOpenRouterCatalog` is a storage-bound thunk (the screen owns
+ * the on-disk cache-file storage) — this module stays free of expo-file-system.
+ */
+export interface AiHubAvailabilityDeps {
+  readonly hydrateAiConfig: (exec: SqlExecutor) => Promise<void>;
+  readonly getAiConfig: () => { readonly aiEnabled: boolean };
+  readonly resolveActiveAiConnection: (
+    exec: SqlExecutor,
+  ) => Promise<ResolvedAiConnection | null>;
+  readonly readCredentialPresence: (
+    provider: AiProviderId,
+    getKey: (p: AiCloudProviderId) => Promise<string | null>,
+  ) => Promise<boolean>;
+  readonly loadCachedOpenRouterCatalog: () => Promise<OpenRouterCatalog | null>;
+  readonly getKey: (
+    provider: AiCloudProviderId,
+    customEndpoint?: string,
+  ) => Promise<string | null>;
+}
+
+/**
+ * PRODUCES the AI hub availability that {@link deriveAiHubState} consumes,
+ * porting the monolith's fresh-on-focus `reloadAiAvailability` pipeline: hydrate
+ * config → resolve the active connection → read credential presence → load the
+ * cached OpenRouter catalog ONLY when the active lane is `openrouter` → compute.
+ *
+ * This is READ-PATH hydration of already-stored config: the catalog step reads
+ * the local on-disk cache (via the injected thunk), never a real AI provider
+ * network call (local-first; no new egress; `AiService.ts` untouched). A failing
+ * collaborator REJECTS so the caller can surface its focus-load error path.
+ */
+export async function loadAiHubAvailability(
+  exec: SqlExecutor,
+  deps: AiHubAvailabilityDeps,
+): Promise<AiAvailability> {
+  await deps.hydrateAiConfig(exec);
+  const config = deps.getAiConfig();
+  const connection = await deps.resolveActiveAiConnection(exec);
+  const hasCredential = await deps.readCredentialPresence(
+    connection?.lane ?? "none",
+    (lane) =>
+      deps.getKey(
+        lane,
+        lane === "custom" ? connection?.customEndpoint : undefined,
+      ),
+  );
+  const catalog =
+    connection?.lane === "openrouter"
+      ? await deps.loadCachedOpenRouterCatalog()
+      : null;
+  return computeAiHubAvailability({
+    aiEnabled: config.aiEnabled,
+    activeConnection: connection,
+    hasCredential,
+    openRouterModels: catalog?.models ?? [],
   });
 }
