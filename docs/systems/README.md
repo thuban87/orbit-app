@@ -23,6 +23,7 @@ Read the relevant system doc *before* making changes to that subsystem.
 | Contact methods | `contact-methods.md` | `db/contact-methods-dao.ts`, `db/contact-methods-read.ts`, `db/contact-links-dao.ts`; compose/SMS handoff (`screens/ComposeScreen.tsx`) | 18, 18.1, 18.2, 09 |
 | Custom fields | `custom-fields.md` | `db/field-defs-dao.ts`, `db/field-values-dao.ts`, `db/field-ddl.ts`, `db/field-parsers.ts`, `db/field-sort.ts`, `db/field-type-change.ts`, `db/col-name.ts` | 03, 16 |
 | Interaction log | `interaction-log.md` | `db/events-dao.ts`, `services/impact.ts`, `db/impact-read.ts`, `db/timeline-read.ts`, `db/log-guards.ts` | 06 |
+| Interaction history & insights | `interaction-history.md` | `db/history-read.ts`, `db/interaction-edit-read.ts`, `services/history/`, `components/history/`, `screens/EditInteractionScreen.tsx` | 32 |
 | Conversational fuel | `conversational-fuel.md` | `db/fuel-dao.ts`, `db/fuel-read.ts`, `services/fuel-age.ts`, `services/fuel-ranking.ts` | 07 |
 | Photos | `photos.md` | `db/photo-dao.ts`, `db/photo-relative-path.ts`, `services/photos/` | 05 |
 | Dashboard | `dashboard.md` | `db/dashboard-read.ts`, `screens/dashboard-search-row-logic.ts` | 08 |

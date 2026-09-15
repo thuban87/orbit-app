@@ -4,7 +4,7 @@
 
 Orbit evolves its on-device SQLite schema with ordered TypeScript migrations rather than SQL files or a remote database. Use this process when changing durable SQLite structure: it keeps one version step atomic, testable with node-side SQLite, and safe to retry after a failure.
 
-## Architecture (Phases 02, 11, 16, 17, 18.1, 24.2, 31)
+## Architecture (Phases 02, 11, 16, 17, 18.1, 24.2, 31, 32)
 
 The bootstrap opens `orbit.db`, sets connection PRAGMAs before opening a transaction, then calls the migration runner. The runner reads `PRAGMA user_version`, sorts pending steps, and commits each step's DDL and version bump together.
 
@@ -124,6 +124,8 @@ try {
 7. **Treating equal row counts as a data-move proof.** Duplicate sources can mask a dropped row. Retain a source-to-destination mapping and re-read every destination before deleting any source.
 
 8. **Repeating a literal head version across the feature.** Derive head+1 from the live registry immediately before implementation and single-source the accepted version from the migration module.
+
+9. **Shipping a value-remap migration without lockstepping every literal consumer.** When a migration re-maps stored *values* in place (e.g. migration 025's `good/fine/hard → Positive/Neutral/Negative` and channel remap), a reader still comparing the retired literal silently miscounts. Single-source the map in one module (e.g. `src/db/interaction-vocabulary.ts`), let the migration's CASE arms be frozen literals **test-pinned** equal to that map but never importing it at upgrade time, and ship the migration **plus every live literal comparer** (AI-context, digest, timeline renderer, and the backup serializer) in the **same commit**. Remember the separate writers a schema migration never touches — `restore-apply` writes the table without running the migration, so it must consume the same map on ingest.
 
 ## Smoke Test
 
