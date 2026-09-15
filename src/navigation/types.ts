@@ -246,6 +246,16 @@ export type SettingsStackParamList = {
   SettingsInteractions: undefined;
   SettingsAppearance: undefined;
   SettingsContacts: undefined;
+  /**
+   * Categories IA reservation (D-03 / §K). A stable internal route NAME held for
+   * a FUTURE Category Management phase (CRUD + deletion cascade). Phase 37 ships
+   * NO `<Stack.Screen>` for it, NO tappable row, and NO category create/rename/
+   * delete writer — the `categories` table stays read-only (seeded at migration
+   * 001; only ever read at runtime). Deliberately EXCLUDED from
+   * `SETTINGS_REGISTERED_ROUTES`; the source-scan test asserts it is not
+   * registered (the D-03 typed-but-unregistered case, no dead placeholder).
+   */
+  CategoryManagement: undefined;
   /** DEV-only device-UAT harness; its route is compile-time gated from release. */
   __ThemePreview: undefined;
   SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;
