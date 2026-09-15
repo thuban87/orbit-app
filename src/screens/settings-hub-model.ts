@@ -1,4 +1,21 @@
 import type { SettingsRegisteredRoute } from "@/navigation/settings-routes";
+import type { RootStackParamList } from "@/navigation/types";
+
+/**
+ * The subset of registered Settings routes reachable with a BARE
+ * `navigation.navigate(name)` — i.e. whose params are optional/`undefined`. A
+ * hub directory row is a top-level jump with no context to pass, so it can only
+ * target a params-free route. This deliberately EXCLUDES the params-required
+ * Backup sub-routes (`RestorePreview` needs a preview token, `RestoreResult`
+ * needs restore counts) that Plan 37-07 added to the registration contract for
+ * dual-home: those are reached only from WITHIN the restore flow, never as a hub
+ * destination. `Backup` (undefined params) remains a valid Data & Backup target.
+ */
+type ParamlessSettingsRoute = {
+  [K in SettingsRegisteredRoute]: undefined extends RootStackParamList[K]
+    ? K
+    : never;
+}[SettingsRegisteredRoute];
 
 /**
  * Canonical §A top-level category order (dossier §A). Later plans fill in the
@@ -35,8 +52,10 @@ export type SettingsHubRouteEntry = {
   readonly subtitle: string;
   readonly icon: string;
   /** Typed against the runtime registration contract — an unregistered or
-   *  reserved (D-03) name fails to type-check. */
-  readonly route: SettingsRegisteredRoute;
+   *  reserved (D-03) name fails to type-check. Narrowed to the params-free
+   *  subset: a hub row is a bare `navigate(name)` with no context to pass, so
+   *  params-required routes (the Backup restore sub-routes) can't be targeted. */
+  readonly route: ParamlessSettingsRoute;
 };
 
 export type SettingsHubActionEntry = {
@@ -102,6 +121,17 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     subtitle: "Display density, relationship satellites, and Systems",
     icon: "orbit",
     route: "SettingsOrrery",
+  },
+  {
+    // Data & Backup (§A index 5 / D-08). A second canonical entry point into the
+    // one Backup screen tree; the generic `Backup` route resolves within the
+    // Settings stack (§I — no forked alias). The Backup bottom tab stays (§R).
+    kind: "route",
+    key: "data-backup",
+    title: "Data & Backup",
+    subtitle: "Export, restore, encryption, and automatic backups",
+    icon: "database",
+    route: "Backup",
   },
   {
     kind: "route",

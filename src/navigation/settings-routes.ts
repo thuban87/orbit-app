@@ -53,6 +53,17 @@ export const SETTINGS_REGISTERED_ROUTES = [
   // fresh-on-focus availability hydration pipeline, and flips ai_enabled only
   // (no egress widening); its <Stack.Screen> is registered in SettingsStack.tsx.
   "SettingsAI",
+  // Data & Backup dual-home (Plan 37-07, §I / D-08). The four EXISTING Backup
+  // screens re-registered in the Settings stack — one canonical tree, two entry
+  // points (Backup tab + Settings → Data & Backup). Each <Stack.Screen> is
+  // registered in SettingsStack.tsx via a per-stack `host="settings"` wrapper;
+  // the Backup bottom tab stays (removal deferred, §R). The hub `Data & Backup`
+  // row targets the generic `Backup` route name (§I — a Settings-specific alias
+  // would fork the tree).
+  "Backup",
+  "BackupSettings",
+  "RestorePreview",
+  "RestoreResult",
 ] as const;
 
 export type SettingsRegisteredRoute =

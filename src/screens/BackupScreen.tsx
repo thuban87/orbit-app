@@ -28,6 +28,7 @@ import {
 } from "@/services/backup/share-export";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import type { BackupHost } from "./backup-dualhome-logic";
 import {
   type BackupHealth,
   resolveBackupHealth,
@@ -60,7 +61,9 @@ function exportFailureCopy(result: ManualExportResult): string | null {
     : "Nothing was shared. Please try again.";
 }
 
-export function BackupScreen({ navigation }: RootStackScreenProps<"Backup">) {
+export function BackupScreen({
+  navigation,
+}: RootStackScreenProps<"Backup"> & { host?: BackupHost }) {
   const { colors } = useTheme();
   const bottomClearance = useBottomClearance();
   const [health, setHealth] = useState<BackupHealth | null>(null);

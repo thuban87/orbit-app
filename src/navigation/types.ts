@@ -250,6 +250,25 @@ export type SettingsStackParamList = {
   SettingsOrrery: undefined;
   SettingsAI: undefined;
   /**
+   * Data & Backup dual-home (D-08 / §I). The four Backup screens are ONE
+   * canonical tree reachable from both the Backup bottom tab (`BackupStack`) and
+   * Settings → Data & Backup. Each hosting stack must list the routes it reaches
+   * (RootStackParamList is a TYPE intersection); these shapes are IDENTICAL to
+   * `BackupStackParamList` above — the same screens, re-registered, NOT a second
+   * tree. The Backup tab stays (removal deferred, §R). Per-stack wrappers pass an
+   * explicit `host` so the shared screens stay origin-aware (Plan 37-07).
+   */
+  Backup: undefined;
+  BackupSettings: { section?: "automatic" | "encryption" } | undefined;
+  RestorePreview: RestorePreviewRoute;
+  RestoreResult: {
+    added: number;
+    updated: number;
+    newerLocalKept: number;
+    deletionsApplied: number;
+    replaceSafetySnapshot: "verified" | "not-configured" | null;
+  };
+  /**
    * Categories IA reservation (D-03 / §K). A stable internal route NAME held for
    * a FUTURE Category Management phase (CRUD + deletion cascade). Phase 37 ships
    * NO `<Stack.Screen>` for it, NO tappable row, and NO category create/rename/

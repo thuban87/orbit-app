@@ -4,6 +4,7 @@ import { applyRestore, type RestoreMode } from "@/backup/restore-apply";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { RootStackScreenProps } from "@/navigation/types";
+import type { BackupHost } from "@/screens/backup-dualhome-logic";
 import {
   confirmReplaceAllRestore,
   createRestoreApplySingleFlight,
@@ -73,7 +74,7 @@ async function createPreRestoreSnapshot() {
 export function RestorePreviewScreen({
   navigation,
   route,
-}: RootStackScreenProps<"RestorePreview">) {
+}: RootStackScreenProps<"RestorePreview"> & { host?: BackupHost }) {
   const { colors } = useTheme();
   const [mode, setMode] = useState<RestoreMode>("merge");
   const [expired, setExpired] = useState(

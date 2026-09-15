@@ -1,11 +1,12 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { RootStackScreenProps } from "@/navigation/types";
+import type { BackupHost } from "@/screens/backup-dualhome-logic";
 import { useTheme } from "@/theme";
 
 export function RestoreResultScreen({
   navigation,
   route,
-}: RootStackScreenProps<"RestoreResult">) {
+}: RootStackScreenProps<"RestoreResult"> & { host?: BackupHost }) {
   const { colors } = useTheme();
   const { added, updated, newerLocalKept, deletionsApplied, replaceSafetySnapshot } = route.params;
   return (

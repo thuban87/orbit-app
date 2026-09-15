@@ -6,6 +6,8 @@ import { AIPermissionsScreen } from "@/screens/AIPermissionsScreen";
 import { AIPersonalizationScreen } from "@/screens/AIPersonalizationScreen";
 import { AIPreviewScreen } from "@/screens/AIPreviewScreen";
 import { ArchivedContactsScreen } from "@/screens/ArchivedContactsScreen";
+import { BackupScreen } from "@/screens/BackupScreen";
+import { BackupSettingsScreen } from "@/screens/BackupSettingsScreen";
 import { BulkImportSetupScreen } from "@/screens/BulkImportSetupScreen";
 import { BulkReviewScreen } from "@/screens/BulkReviewScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
@@ -26,6 +28,8 @@ import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { ReconcileCompleteScreen } from "@/screens/ReconcileCompleteScreen";
 import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
+import { RestorePreviewScreen } from "@/screens/RestorePreviewScreen";
+import { RestoreResultScreen } from "@/screens/RestoreResultScreen";
 import { SettingsAIScreen } from "@/screens/SettingsAIScreen";
 import { SettingsAppearanceScreen } from "@/screens/SettingsAppearanceScreen";
 import { SettingsContactsScreen } from "@/screens/SettingsContactsScreen";
@@ -38,7 +42,11 @@ import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
 import { SystemsManagementScreen } from "@/screens/SystemsManagementScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
-import type { SettingsScreenProps, SettingsStackParamList } from "../types";
+import type {
+  RootStackScreenProps,
+  SettingsScreenProps,
+  SettingsStackParamList,
+} from "../types";
 
 // Kept behind a compile-time guard so Metro removes the device-UAT-only harness
 // and its failure toggles from release bundles.
@@ -133,6 +141,30 @@ function SettingsAIRoute({ navigation }: SettingsScreenProps<"SettingsAI">) {
   return <SettingsAIScreen onBack={() => navigation.goBack()} />;
 }
 
+// Data & Backup dual-home (D-08 / Plan 37-07): the SAME four Backup screens the
+// Backup tab hosts, re-registered in the Settings stack — one canonical tree,
+// two entry points (§I), NOT a second copy. The per-stack wrappers thread an
+// explicit `host="settings"` (review cycle-1 HIGH — no nav-state inference) so
+// the shared screens return to the Settings hub after a restore, do NOT drain
+// the shared-backup singleton (the tab is the sole consumer, linking.ts:67), and
+// render a Back affordance. `BackupSettings` needs no host — it neither resets to
+// Backup nor consumes.
+function BackupSettingsHostRoute(props: RootStackScreenProps<"Backup">) {
+  return <BackupScreen {...props} host="settings" />;
+}
+
+function RestorePreviewSettingsRoute(
+  props: RootStackScreenProps<"RestorePreview">,
+) {
+  return <RestorePreviewScreen {...props} host="settings" />;
+}
+
+function RestoreResultSettingsRoute(
+  props: RootStackScreenProps<"RestoreResult">,
+) {
+  return <RestoreResultScreen {...props} host="settings" />;
+}
+
 export function SettingsStack() {
   return (
     <Stack.Navigator
@@ -160,6 +192,20 @@ export function SettingsStack() {
       />
       <Stack.Screen name="SettingsOrrery" component={SettingsOrreryRoute} />
       <Stack.Screen name="SettingsAI" component={SettingsAIRoute} />
+      {/* Data & Backup dual-home (D-08 / §I): the four Backup screens the tab
+          hosts, re-registered here via `host="settings"` wrappers — one canonical
+          tree, two entry points. The Backup bottom tab stays (removal deferred,
+          §R). `BackupSettings` reuses the screen directly (no host needed). */}
+      <Stack.Screen name="Backup" component={BackupSettingsHostRoute} />
+      <Stack.Screen name="BackupSettings" component={BackupSettingsScreen} />
+      <Stack.Screen
+        name="RestorePreview"
+        component={RestorePreviewSettingsRoute}
+      />
+      <Stack.Screen
+        name="RestoreResult"
+        component={RestoreResultSettingsRoute}
+      />
       <Stack.Screen name="AIConnection" component={AIConnectionRoute} />
       <Stack.Screen name="AIModelPicker" component={AIModelPickerRoute} />
       <Stack.Screen
