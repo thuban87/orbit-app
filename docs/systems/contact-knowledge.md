@@ -1,7 +1,7 @@
 # Contact Knowledge
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
+**Updated by phase:** 32-interaction-history-insights
 **Owners:** `src/db/memory-registry.ts`, `src/db/memories-dao.ts`, `src/db/memories-read.ts`, `src/db/relationships-dao.ts`, `src/db/relationships-read.ts`, `src/db/current-state-history-dao.ts`, `src/db/current-state-history-read.ts`, `src/db/first-class-knowledge-read.ts`, `src/db/knowledge-search-read.ts`, `src/db/dashboard-knowledge-read.ts`, `src/services/knowledge-search.ts`, `src/services/memory-trash-sweep.ts`
 
 ## Purpose
@@ -51,7 +51,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | Relationship writer | `src/db/relationships-dao.ts` | Writes structured relationships, rejects self-links, and owns their Undo lifecycle. |
 | Relationship reader | `src/db/relationships-read.ts` | Reads live rows and optional linked-contact display names. |
 | State-history writer | `src/db/current-state-history-dao.ts` | Atomically sets, promotes, and edits retained current-state values. |
-| State-history reader | `src/db/current-state-history-read.ts` | Reads the current value, full backlist, and batched recognized fields. |
+| State-history reader | `src/db/current-state-history-read.ts` | Reads the current value, full backlist, and batched recognized fields. `getCurrentStateHistory` accepts a read-only `Pick<SqlExecutor,"getAllAsync">` surface so the History read (`history-read.ts`) can compose it without a writable executor. |
 | First-class reader | `src/db/first-class-knowledge-read.ts` | Projects core contact fields plus local gravity/intensity display values. |
 | Dashboard candidate reader | `src/db/dashboard-knowledge-read.ts` | Batches bounded, visibility-safe candidates for loaded List and Card result sets. |
 | Maintenance service | `src/services/memory-trash-sweep.ts` | Expires stale Memory and relationship trash at foreground launch. |
@@ -112,6 +112,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 2. `setCurrentStateValue` demotes any existing current row and inserts the new current row in one transaction.
 3. The drill-in renders the current value separately from earlier entries; editing an earlier entry is scoped by contact, field, and row identity.
 4. Promoting an earlier value atomically demotes the displaced current value instead of deleting it.
+5. The History & Insights Detail Sheet surfaces current-state changes as its third "knowledge-change" record family: `history-read` unions `getCurrentStateHistory` over **every** registered current-state field (calling it once would drop the others), and each row carries its `fieldKey` so a Detail Sheet tap routes back to `MemoryHistoryScreen` for editing. See `interaction-history.md`.
 
 ### Relationships and removal
 
@@ -146,6 +147,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **ADR-101:** Avatar-First Accessible Dashboard Card Renderer — reuses the same bounded candidates and semantic search descriptors for compact Card context.
 
 - **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — lets Profile shape compact knowledge while each source retains its writer and permission semantics.
+- **ADR-119:** Reusable Count-Only History Aggregation and Canonical History Read — the canonical History read composes the read-only `getCurrentStateHistory` surface to expose current-state changes as the Detail Sheet's knowledge-change record family.
 
 ## Gotchas
 
@@ -184,3 +186,4 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | 2026-09-02 | 27 | Added bounded visibility-safe candidates for deterministic List context and tightened List search presentation boundaries. |
 | 2026-09-02 | 28 | Reused bounded candidates and shared descriptors for compact Card View context and search presentation. |
 | 2026-09-02 | 31 | Added typed source-owned knowledge projections to one coherent Profile snapshot, including explicit local-only Off Limits presentation. |
+| 2026-09-02 | 32 | Widened `getCurrentStateHistory` to a read-only executor surface so the canonical History read composes it; current-state changes now surface as the History Detail Sheet's knowledge-change record family, routing edits back to `MemoryHistoryScreen` by `fieldKey`. |
