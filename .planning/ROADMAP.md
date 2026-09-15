@@ -976,30 +976,19 @@ Plans:
 **Requirements**: TBD — deferred to planning
 **Scope source:** D-03 in `.planning/phases/37-settings-personalization/37-CONTEXT.md` (owner-confirmed 2026-09-14), the Phase 37.1 dossier, and the approved Phase 37.1 UI-SPEC. Category deletion is a permanent runtime application transaction with durable category tombstone evidence; it adds no migration, `field_history` category history, Undo, quarantine, or reseeding, and zero categories is valid.
 **Canonical refs**: `.planning/phases/37-settings-personalization/37-CONTEXT.md` (D-03), the `categories` table (migration 001), Orrery Systems + custom-System rules + Profile category assignment + backup writers.
-**Plans:** 20 plans across 9 waves
+**Plans:** 9 plans across 6 waves
 
 Plans:
 
-- [ ] 37.1-01-PLAN.md (Wave 1) — Tracer: activate the reserved Settings route and add categories through the canonical DAO
-- [ ] 37.1-02-PLAN.md (Wave 2) — Implement atomic deletion with all-status import-session reassignment and rollback proof
-- [ ] 37.1-03-PLAN.md (Wave 2) — Share cross-kind name uniqueness and canonical System Needs Attention semantics
-- [ ] 37.1-07-PLAN.md (Wave 2) — Build the shared complete/searchable category selector model and choice Sheet
-- [ ] 37.1-13-PLAN.md (Wave 2) — Extend the shared Snackbar and publish committed Add success
-- [ ] 37.1-04-PLAN.md (Wave 3) — Reconcile category tombstones and validate the final category/System survivor union
-- [ ] 37.1-08-PLAN.md (Wave 3) — Integrate Create/Edit Contact and all-status Bulk Import category behavior
-- [ ] 37.1-09-PLAN.md (Wave 3) — Integrate Dashboard bulk Set Category
-- [ ] 37.1-10-PLAN.md (Wave 3) — Integrate Profile presentation managers and live identity behavior
-- [ ] 37.1-11-PLAN.md (Wave 3) — Integrate complete searchable System Builder category rules
-- [ ] 37.1-14-PLAN.md (Wave 3) — Implement canonical lock-safe renameCategory and reorderCategories APIs
-- [ ] 37.1-15-PLAN.md (Wave 3) — Integrate the exact reduced-motion-aware three-group Orrery selector
-- [ ] 37.1-05-PLAN.md (Wave 4) — Apply category-aware merge deletes and exact replace-all taxonomy
-- [ ] 37.1-06-PLAN.md (Wave 4) — Complete reduced-motion-aware manager rename/reorder/delete UI and anchored menu
-- [ ] 37.1-16-PLAN.md (Wave 4) — Add closed Dashboard Uncategorized query/store/backup semantics
-- [ ] 37.1-17-PLAN.md (Wave 5) — Integrate complete searchable Dashboard category filters and live refresh
-- [ ] 37.1-18-PLAN.md (Wave 6) — Audit every writer/consumer and publish the canonical living contract
-- [ ] 37.1-20-PLAN.md (Wave 7) — Build the fail-closed app-wide disposable database and one-shot fault infrastructure
-- [ ] 37.1-19-PLAN.md (Wave 8) — Expose explicit production-unreachable device-UAT controls through ordinary app routes
-- [ ] 37.1-12-PLAN.md (Wave 9) — Complete safe physical-device UAT and final validation evidence
+- [ ] 37.1-01-PLAN.md (Wave 1) — Production Add tracer plus canonical non-destructive Category CRUD/order contract
+- [ ] 37.1-02-PLAN.md (Wave 2) — Atomic deletion, all-status import reassignment, canonical System validity, and exhaustive rollback proof
+- [ ] 37.1-05-PLAN.md (Wave 2) — Shared complete/searchable category-choice model plus Contact and Import consumers
+- [ ] 37.1-03-PLAN.md (Wave 3) — Backup-v5 category tombstones, reconciliation, merge deletion, and exact replace-all taxonomy
+- [ ] 37.1-04-PLAN.md (Wave 3) — Complete manager interactions, anchored menu, deletion UI, and commit-truthful Snackbar feedback
+- [ ] 37.1-07-PLAN.md (Wave 3) — System Builder category rules and exact three-group Orrery selector
+- [ ] 37.1-06-PLAN.md (Wave 4) — Dashboard Uncategorized/filter/bulk behavior and Profile presentation consumers
+- [ ] 37.1-08-PLAN.md (Wave 5) — Final writer/consumer audit, living documentation, and full automated phase gate
+- [ ] 37.1-09-PLAN.md (Wave 6) — Owner-gated physical-device setup and ordinary successful UAT
 
 ### Phase 38: Your Week
 
