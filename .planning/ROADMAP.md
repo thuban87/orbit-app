@@ -931,7 +931,7 @@ Plans:
 
 **Canonical refs**: docs/dossier/milestone-2/phase-37-settings-personalization-dossier.md (ground truth §A–§S); .planning/phases/37-settings-personalization/37-CONTEXT.md (D-01..D-09 overlay); 37-RESEARCH.md; 37-PATTERNS.md
 **Schema**: none — Phase 37 adds NO migration and NO backup-format bump (D-06; verified head migration 029 / `TARGET_VERSION=29`, `BACKUP_FORMAT_VERSION=5` on disk). A newly required durable/portable preference would owe a format-6 bump, which is an OWNER decision — not planned here.
-**Plans**: 8 plans (8 sequential waves — the Settings nav files, hub model, and monolith are shared by nearly every plan, so waves are strictly sequential)
+**Plans**: 5/8 plans executed (8 sequential waves — the Settings nav files, hub model, and monolith are shared by nearly every plan, so waves are strictly sequential)
 
 **Wave 1**
 
@@ -947,7 +947,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3)*
 
-- [ ] 37-04-PLAN.md — Contacts & Relationships category (§E) + Categories IA reservation, route-name only (D-03)
+- [x] 37-04-PLAN.md — Contacts & Relationships category (§E) + Categories IA reservation, route-name only (D-03)
 
 **Wave 5** *(blocked on Wave 4)*
 
@@ -979,6 +979,7 @@ Plans:
 **Plans:** 0 plans
 
 Plans:
+
 - [ ] TBD (run /gsd-plan-phase 37.1 to break down)
 
 ### Phase 38: Your Week
@@ -1037,7 +1038,7 @@ Plans:
 | 34. Rapid Capture & Update Flows | 8/8 | Complete | 2026-09-13 |
 | 35. Messaging & AI Compose | 9/9 | Complete |  |
 | 36. AI Configuration & Prompting | 11/11 | Complete | 2026-09-14 |
-| 37. Settings & Personalization | 4/8 | In Progress |  |
+| 37. Settings & Personalization | 5/8 | In Progress|  |
 | 38. Your Week | 0/TBD | Deferred planning | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
