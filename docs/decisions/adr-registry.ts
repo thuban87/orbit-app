@@ -96,7 +96,7 @@
 // NOTE: ADR-0084 [ACCEPTED] Four Semantic Theme Palettes, Curated Accents, and Contrast Validation
 // NOTE: ADR-0085 [ACCEPTED] Live Reduced-Motion Signal for Skia Ambient Animation
 // NOTE: ADR-0086 [ACCEPTED] Semantic Icons and Accessible Interaction Primitives
-// NOTE: ADR-0087 [ACCEPTED] Bundled Background Presets and Package-Specific Surface Treatment
+// IMPORTANT: ADR-0087 [SUPERSEDED BY ADR-115 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation)] Bundled Background Presets and Package-Speci
 // NOTE: ADR-0088 [ACCEPTED] Additive Contact-Knowledge Schema and Application-Owned Memory Registry
 // NOTE: ADR-0089 [ACCEPTED] Recoverable Memory Lifecycle and Contact-Operation Integrity
 // NOTE: ADR-0090 [ACCEPTED] Additive Custom-Field Value History and Deferred Contact Scope
@@ -122,5 +122,8 @@
 // NOTE: ADR-0110 [ACCEPTED] Coherent Local Profile Snapshot and Source-Owned Knowledge Projection
 // NOTE: ADR-0111 [ACCEPTED] Cadence-Guarded Profile Metrics and Composed Relationship Actions
 // NOTE: ADR-0112 [ACCEPTED] App-Owned Profile Background Derivatives and Launch Reconciliation
+// NOTE: ADR-0113 [ACCEPTED] Persistent Shared System Background Selection
+// NOTE: ADR-0114 [ACCEPTED] Route-Aware App-Wide System Background Composition
+// NOTE: ADR-0115 [ACCEPTED] Visible Mode-Aware Background Surface Composition
 
-export const ADR_COUNT = 112;
+export const ADR_COUNT = 115;
