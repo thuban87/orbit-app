@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { AppSettings } from "@/db/app-settings-dao";
-import { MESSAGE_MODES } from "@/db/app-settings-dao";
-import type { SqlExecutor } from "@/db/types";
 import {
   DEFAULT_INTERACTION_CHANNELS,
-  RIGHT_SWIPE_ACTIONS,
+  MESSAGE_MODES,
 } from "@/db/app-settings-dao";
+import type { SqlExecutor } from "@/db/types";
+import { RIGHT_SWIPE_ACTIONS } from "@/logic/dashboard-query-logic";
 import {
   DEFAULT_CHANNEL_OPTIONS,
   MESSAGE_MODE_OPTIONS,

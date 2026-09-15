@@ -31,7 +31,6 @@ import {
   type AppSettings,
   type AppSettingsPatch,
   getAppSettings,
-  setInteractionAssistEnabled,
   updateAppSettings,
 } from "@/db/app-settings-dao";
 import { getContactHeader } from "@/db/contact-read";
@@ -54,7 +53,6 @@ import {
   requestNotificationPermission,
 } from "@/services/notifications/permission";
 import { useAiConfigStore } from "@/stores/ai-config-store";
-import { useAssistBanner } from "@/stores/assist-store";
 import { useThemeStore } from "@/stores/theme-store";
 import { useTheme } from "@/theme";
 import { ACCENTS } from "@/theme/accents";
@@ -592,18 +590,6 @@ export function SettingsScreen() {
     },
     [persist],
   );
-
-  const onToggleInteractionAssist = useCallback(async (on: boolean) => {
-    const exec = getExecutor();
-    try {
-      await setInteractionAssistEnabled(exec, on ? 1 : 0, localDateTime());
-      setSettings(await getAppSettings(exec));
-      await useAssistBanner.getState().refresh();
-    } catch (error) {
-      Logger.error(LOG_SCOPE, "failed to update Interaction Assist", error);
-      Alert.alert("Couldn't update Interaction Assist", "Please try again.");
-    }
-  }, []);
 
   // Time-picker pick handler. Extract the chosen hour (0-23) and persist it to the
   // field the open row owns — the DAO re-validates the 0-23 bound (T-11-05) — then
@@ -1528,41 +1514,10 @@ export function SettingsScreen() {
         ) : null}
       </View>
 
-      <View testID="settings-interaction-assist-section" style={styles.section}>
-        <Text
-          accessibilityRole="header"
-          style={[styles.sectionHeading, { color: colors.textSecondary }]}
-        >
-          Interaction Assist
-        </Text>
-        <View
-          style={[
-            styles.row,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <View style={styles.toggleRow}>
-            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-              Interaction Assist
-            </Text>
-            <Switch
-              testID="settings-interaction-assist"
-              accessibilityRole="switch"
-              accessibilityLabel="Interaction Assist"
-              accessibilityState={{
-                checked: settings?.interactionAssistEnabled === 1,
-              }}
-              value={settings?.interactionAssistEnabled === 1}
-              onValueChange={(value) => void onToggleInteractionAssist(value)}
-              trackColor={{ false: colors.border, true: colors.accent }}
-              thumbColor={colors.surfaceElevated}
-            />
-          </View>
-          <Text style={[styles.helper, { color: colors.textSecondary }]}>
-            Ask me to log calls, texts and emails started from Orbit.
-          </Text>
-        </View>
-      </View>
+      {/* The Interaction Assist toggle migrated to the Interactions category
+          screen in Phase 37 (Plan 01, Task 2). It writes through the canonical
+          `setInteractionAssistEnabled` + banner refresh there (D-10 / ADR-070),
+          not this monolith. */}
 
       <View
         testID="settings-your-photo-row"

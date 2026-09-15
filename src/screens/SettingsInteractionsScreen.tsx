@@ -1,21 +1,36 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  View,
+} from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui";
 import {
   type AppSettings,
   type AppSettingsPatch,
   getAppSettings,
+  setInteractionAssistEnabled,
   updateAppSettings,
 } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { reconcileDigestSchedule } from "@/services/notifications/digest-schedule";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
+import { useAssistBanner } from "@/stores/assist-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
-import { MESSAGE_MODE_OPTIONS } from "./settings-interactions-logic";
+import {
+  DEFAULT_CHANNEL_OPTIONS,
+  type InteractionOption,
+  MESSAGE_MODE_OPTIONS,
+  persistInteractionAssistEnabled,
+  RIGHT_SWIPE_OPTIONS,
+} from "./settings-interactions-logic";
 
 const LOG_SCOPE = "settings-interactions-screen";
 
@@ -24,11 +39,13 @@ interface SettingsInteractionsScreenProps {
 }
 
 /**
- * Interactions category screen — the far end of the Phase 37 tracer's vertical
- * slice (D-09). Ships the Compose default message mode selector (D-04a) writing
- * a real `app_settings` value that round-trips through the DAO. Task 2 expands
- * this with the dashboard right-swipe action (D-04c), the default interaction
- * channel (§F), and the migrated Interaction Assist toggle (D-10 / ADR-070).
+ * Interactions category screen (D-09). Surfaces the Compose default message mode
+ * (D-04a), the dashboard right-swipe action (D-04c), and the default interaction
+ * channel (§F) — each writing its existing `app_settings` column through the
+ * generic `updateAppSettings` / `persist()` path (they have no specialized
+ * writer) — plus the migrated Interaction Assist toggle, which writes through
+ * its CANONICAL specialized writer `setInteractionAssistEnabled` + banner refresh
+ * (D-10 / ADR-070), NEVER the generic path.
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
@@ -53,11 +70,11 @@ export function SettingsInteractionsScreen({
     }, [reload]),
   );
 
-  // Persist a patch to app_settings then fire-and-forget a reconcile so the OS
-  // schedule re-arms immediately. Copied verbatim from SettingsScreen.tsx's
-  // persist() (the notification/digest reconcilers are idempotent + defer-one
-  // guarded, so running them on every settings write is harmless). Never inline
-  // SQL — every write routes through the DAO.
+  // Generic settings write: persist a patch then fire-and-forget a reconcile so
+  // the OS schedule re-arms immediately. Copied verbatim from SettingsScreen's
+  // persist() (both reconcilers are idempotent + defer-one guarded). Used for
+  // message mode / right-swipe / default channel — NOT the assist toggle. Never
+  // inline SQL — every write routes through the DAO.
   const persist = useCallback(async (patch: AppSettingsPatch) => {
     const exec = getExecutor();
     try {
@@ -70,6 +87,78 @@ export function SettingsInteractionsScreen({
       Logger.error(LOG_SCOPE, "failed to persist interaction setting", err);
     }
   }, []);
+
+  // Interaction Assist (D-10 / ADR-070): route through the CANONICAL specialized
+  // writer (atomic pending-queue expiry on opt-out) + banner refresh, NEVER the
+  // generic persist above. Mirrors SettingsScreen.tsx:596-606.
+  const onToggleInteractionAssist = useCallback(async (on: boolean) => {
+    const exec = getExecutor();
+    try {
+      const next = await persistInteractionAssistEnabled(exec, on ? 1 : 0, {
+        setInteractionAssistEnabled,
+        getAppSettings,
+        refreshBanner: () => useAssistBanner.getState().refresh(),
+        now: localDateTime,
+      });
+      setSettings(next);
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to update Interaction Assist", error);
+      Alert.alert("Couldn't update Interaction Assist", "Please try again.");
+    }
+  }, []);
+
+  const renderChipSection = <T,>(
+    testID: string,
+    title: string,
+    caption: string,
+    options: ReadonlyArray<InteractionOption<T>>,
+    selectedValue: T | undefined,
+  ) => (
+    <View testID={testID} style={styles.section}>
+      <AppText
+        accessibilityRole="header"
+        role="heading"
+        style={{ color: colors.textPrimary }}
+      >
+        {title}
+      </AppText>
+      <AppText role="caption" style={{ color: colors.textSecondary }}>
+        {caption}
+      </AppText>
+      <View style={styles.chipRow}>
+        {options.map((option) => {
+          const selected = selectedValue === option.value;
+          return (
+            <Pressable
+              key={String(option.value)}
+              testID={`${testID}-${String(option.value)}`}
+              accessibilityRole="button"
+              accessibilityLabel={`${title} ${option.label}`}
+              accessibilityState={{ selected, disabled: settings === null }}
+              disabled={settings === null}
+              onPress={() => void persist(option.patch)}
+              style={[
+                styles.chip,
+                {
+                  borderColor: selected ? colors.accent : colors.border,
+                  backgroundColor: selected ? colors.accent : colors.surface,
+                },
+              ]}
+            >
+              <AppText
+                role="body"
+                style={{
+                  color: selected ? colors.onAccent : colors.textPrimary,
+                }}
+              >
+                {option.label}
+              </AppText>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
 
   return (
     <View style={styles.root}>
@@ -85,61 +174,67 @@ export function SettingsInteractionsScreen({
           accessibilityRole="button"
           accessibilityLabel="Back"
           onPress={onBack}
-          style={[styles.backLink]}
+          style={styles.backLink}
         >
           <AppText role="caption" style={{ color: colors.accent }}>
             Back
           </AppText>
         </Pressable>
 
-        <View testID="settings-message-mode-section" style={styles.section}>
-          <AppText
-            accessibilityRole="header"
-            role="heading"
-            style={{ color: colors.textPrimary }}
-          >
-            Default message mode
-          </AppText>
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            Which channel Compose opens with when you start a message.
-          </AppText>
-          <View style={styles.chipRow}>
-            {MESSAGE_MODE_OPTIONS.map((option) => {
-              const selected = settings?.defaultMessageMode === option.value;
-              return (
-                <Pressable
-                  key={option.value}
-                  testID={`settings-message-mode-${option.value}`}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Default message mode ${option.label}`}
-                  accessibilityState={{
-                    selected,
-                    disabled: settings === null,
-                  }}
-                  disabled={settings === null}
-                  onPress={() => void persist(option.patch)}
-                  style={[
-                    styles.chip,
-                    {
-                      borderColor: selected ? colors.accent : colors.border,
-                      backgroundColor: selected
-                        ? colors.accent
-                        : colors.surface,
-                    },
-                  ]}
-                >
-                  <AppText
-                    role="body"
-                    style={{
-                      color: selected ? colors.onAccent : colors.textPrimary,
-                    }}
-                  >
-                    {option.label}
-                  </AppText>
-                </Pressable>
-              );
-            })}
+        {renderChipSection(
+          "settings-message-mode-section",
+          "Default message mode",
+          "Which channel Compose opens with when you start a message.",
+          MESSAGE_MODE_OPTIONS,
+          settings?.defaultMessageMode,
+        )}
+
+        {renderChipSection(
+          "settings-right-swipe-section",
+          "Dashboard right swipe",
+          "What a right swipe on a dashboard card does.",
+          RIGHT_SWIPE_OPTIONS,
+          settings?.dashboardRightSwipeAction,
+        )}
+
+        {renderChipSection(
+          "settings-default-channel-section",
+          "Default interaction channel",
+          "The channel a new interaction defaults to.",
+          DEFAULT_CHANNEL_OPTIONS,
+          settings?.defaultInteractionChannel,
+        )}
+
+        <View
+          testID="settings-interaction-assist-section"
+          style={styles.section}
+        >
+          <View style={styles.toggleRow}>
+            <AppText
+              accessibilityRole="header"
+              role="heading"
+              style={{ color: colors.textPrimary }}
+            >
+              Interaction Assist
+            </AppText>
+            <Switch
+              testID="settings-interaction-assist"
+              accessibilityRole="switch"
+              accessibilityLabel="Interaction Assist"
+              accessibilityState={{
+                checked: settings?.interactionAssistEnabled === 1,
+                disabled: settings === null,
+              }}
+              disabled={settings === null}
+              value={settings?.interactionAssistEnabled === 1}
+              onValueChange={(value) => void onToggleInteractionAssist(value)}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surfaceElevated}
+            />
           </View>
+          <AppText role="caption" style={{ color: colors.textSecondary }}>
+            Ask me to log calls, texts and emails started from Orbit.
+          </AppText>
         </View>
       </ScrollView>
     </View>
@@ -158,6 +253,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   section: {
+    gap: 12,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     gap: 12,
   },
   chipRow: {
