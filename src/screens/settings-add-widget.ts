@@ -14,6 +14,13 @@
  * UI-SPEC fallback string on false.
  */
 
+/**
+ * Stable action identifier for the hub "Add Orbit widget" `kind:"action"` row
+ * (§L, Plan 08). The hub model tags the utility row with this; `SettingsHubScreen`
+ * switches on it to invoke the pin path — no navigation route exists.
+ */
+export const ADD_WIDGET_ACTION = "add-widget";
+
 /** The exact UI-SPEC "Add-widget fallback" copy (12-UI-SPEC.md:173). */
 export const ADD_WIDGET_FALLBACK_COPY =
   "Your launcher can't add it automatically — add Orbit from your home screen's widget menu.";

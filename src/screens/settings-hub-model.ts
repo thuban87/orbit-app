@@ -1,5 +1,6 @@
 import type { SettingsRegisteredRoute } from "@/navigation/settings-routes";
 import type { RootStackParamList } from "@/navigation/types";
+import { ADD_WIDGET_ACTION } from "./settings-add-widget";
 
 /**
  * The subset of registered Settings routes reachable with a BARE
@@ -159,5 +160,17 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     subtitle: "Everything not yet reorganised into a category",
     icon: "dots",
     route: "SettingsMore",
+  },
+  {
+    // Home Screen Widget access (§L). A UTILITY row modeled as `kind:"action"`
+    // (the discriminated-union arm from Plan 01), NOT a navigation route — it
+    // invokes the existing `requestPinWidget` pin path in place. It sits AFTER
+    // the primary category/About hierarchy and does NOT get a dedicated category.
+    kind: "action",
+    key: "add-widget",
+    title: "Add Orbit widget",
+    subtitle: "Pin the Orbit widget to your home screen",
+    icon: "widget",
+    action: ADD_WIDGET_ACTION,
   },
 ]);
