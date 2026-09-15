@@ -1037,7 +1037,7 @@ Plans:
 | 34. Rapid Capture & Update Flows | 8/8 | Complete | 2026-09-13 |
 | 35. Messaging & AI Compose | 9/9 | Complete |  |
 | 36. AI Configuration & Prompting | 11/11 | Complete | 2026-09-14 |
-| 37. Settings & Personalization | 0/8 | Planned | - |
+| 37. Settings & Personalization | 4/8 | In Progress |  |
 | 38. Your Week | 0/TBD | Deferred planning | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
