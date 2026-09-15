@@ -1,7 +1,7 @@
 # AI Suggestions
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
+**Updated by phase:** 32-interaction-history-insights
 **Owners:** `src/services/AiService.ts`, `src/services/ai-key-store.ts`, `src/ai/`, `src/db/ai-context-read.ts`, `src/db/app-settings-dao.ts`, `src/logic/ai-suggestion-logic.ts`, `src/screens/SettingsScreen.tsx`, `src/screens/ComposeScreen.tsx`
 
 ## Purpose
@@ -94,6 +94,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — permits explicit Unbound assistance without proactive cadence evaluation.
 - **ADR-081:** Retire AI-Proposed Fuel for Explicit Per-Item Permission — replaces provenance-based proposal eligibility with default-off Memory permission.
 - **ADR-079:** On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation — removes the direct Profile AI entry and keeps invocation inside Compose.
+- **ADR-117:** Per-Interaction Allow-AI Consent Gate — adds the durable, default-off `interactions.allow_ai` flag (migration 025) as the prerequisite consent control for any future interaction-note transmission; `ai-context-read` still selects no `note` this phase.
 - **ADR-109:** Fixed-Hero Semantic Profile Composition and Focused Accessible Editors — applies the Compose-only boundary to the rebuilt Profile Hero and overflow.
 
 ## Gotchas
@@ -106,6 +107,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 6. **The owner accepted one device egress smoke test instead of the original full on-device escape matrix.** Shared JVM/vector tests cover the remaining address cases; keep that limitation visible if the guard changes.
 7. **Never invent cadence for an Unbound contact.** The neutral intensity aggregate is the only permitted representation of unavailable cadence in explicit AI context.
 8. **Memory permission fails closed in SQL.** Do not infer it from a Memory type, source, or visibility flag, and do not claim an eligible projection has reached a provider payload before its prompt serializer consumes it.
+9. **The per-interaction `allow_ai` gate exists but does not yet transmit anything.** Migration 025 added the default-off `interactions.allow_ai` flag as the note-transmission consent control; wiring an interaction `note` into the egress projection is a later phase and is still an owner decision. Building the gate did not widen what leaves the device — `ai-context-read` still selects only `channel, quality, connected`. A Group Note is never transmitted regardless of any participant flag.
 
 ## Related Systems
 
@@ -124,3 +126,4 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | 2026-08-27 | 18.2 | Kept explicit Unbound AI available with neutral intensity and no normalized-method egress. |
 | 2026-09-03 | 24.2 | Added a default-off, SQL-gated Memory eligibility projection while deferring prompt serialization to Phase 36. |
 | 2026-09-02 | 31 | Removed the direct Profile AI-draft entry; Message is the sole Profile route into Compose-owned invocation. |
+| 2026-09-02 | 32 | Added the default-off per-interaction `allow_ai` consent gate (migration 025) as the prerequisite control for future interaction-note transmission; the egress projection is unchanged (still no `note`). |
