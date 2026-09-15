@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
+**Last updated:** 2026-09-10
+**Updated by phase:** 31.1-app-wide-system-backgrounds
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -12,7 +12,7 @@ The app shell holds Orbit’s ready-gated four-tab navigation tree and reusable 
 
 ### Data Model
 
-The shell owns runtime navigation and consumes the durable theme contract; `app_settings` owns the non-secret theme values themselves.
+The shell owns runtime navigation and consumes the durable theme contract; `app_settings` owns the non-secret theme values themselves. Its `galaxy_background` and `standard_background` columns remember independent stable slot IDs, while the runtime theme and focused-route stores supply the active selection and presentation density without another persistence source.
 
 ### Store, Service & DAO Layer
 
@@ -20,6 +20,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 |-------|------|----------------|
 | Bootstrap | `App.tsx`, `src/theme/hydrate-theme-at-boot.ts` | Opens and migrates SQLite, imports legacy theme state once, hydrates the theme store, then mounts the navigator; renders accurate classified or generic startup failure copy when opening fails. |
 | Navigator | `src/navigation/RootNavigator.tsx` | Mounts the fixed Dashboard, Orrery, Backup, and Settings tabs with a native stack for each. |
+| Background shell | `src/components/ui/BackgroundHost.tsx`, `src/navigation/focused-route-classification.ts`, `src/stores/focused-route-store.ts` | Renders one fixed local System background, selects a density from the deepest focused route, and suppresses the image only on the Orrery visualization. |
 | Route types | `src/navigation/types.ts` | Defines serializable tab and per-stack route parameters. |
 | Reset intents | `src/navigation/reset-intents.ts` | Sole owner of typed nested Dashboard-root reset states for external and completion paths. |
 | Transient/back state | `src/stores/shell-transient-store.ts`, `src/navigation/back-intent.ts` | Registers executable overlay dismissal callbacks and resolves transient-first Back behavior. |
@@ -29,7 +30,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | Backup-share gate | `src/navigation/backup-share-intent.ts` | Holds a narrow inbound backup-file intent until the backup restore surface is ready. |
 | Notification gate | `src/navigation/notification-gate.tsx` | Converts warm and cold local-notification responses into ready-gated actions or navigation. |
 | Widget gate | `src/navigation/widget-linking.ts` | Converts narrowly accepted widget `orbit://` links into ready-gated Dashboard-rooted resets. |
-| Settings surface | `src/screens/SettingsScreen.tsx` | Hosts low-traffic lifecycle routes, live Appearance controls, self-photo, sun controls, and non-secret AI configuration. |
+| Settings surface | `src/screens/SettingsHubScreen.tsx`, `src/screens/SettingsAppearanceScreen.tsx` | Hosts the settings index and live package, mode, accent, and System-background controls. |
 | Systems workflow | `src/screens/SystemsManagementScreen.tsx`, `src/screens/SystemBuilderScreen.tsx` | Provides one management destination and one focused authoring workflow from both the Orrery and Settings stacks. |
 | Theme contract | `src/theme/` | Defines four semantic palettes, curated accents, typography and motion tokens, local background/surface primitives, and their sole palette values. |
 | Interaction primitives | `src/components/icons/`, `src/components/ui/` | Provides semantic icons, non-colour status glyphs, scalable text, and shared action/overlay contracts. |
@@ -40,6 +41,11 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 |---|---|
 | `App.tsx` | Readiness gate, theme hydration before first main paint, startup-failure presentation, navigation mount point, gesture root, and photo/notification lifecycle registration. |
 | `src/navigation/RootNavigator.tsx` | Four-tab root, semantic registry tab icons, fade transition, focused-route and keyboard visibility, transient-first retap, and system-Back boundary. |
+| `src/navigation/focused-route-classification.ts` | Maps the deepest route to background density and the Orrery-only solid override. |
+| `src/theme/navigation-theme.ts` | Makes navigator scene layers reveal the shell host through the theme boundary. |
+| `src/components/ui/BackgroundHost.tsx` | Renders the fixed local background, density veil, Profile override, and solid failure fallback. |
+| `src/components/ui/GlassSurface.tsx` | Applies mode-aware glass or opaque card treatment. |
+| `src/components/ui/ChromeScrim.tsx` | Protects text and controls drawn directly over visible artwork. |
 | `src/navigation/tabs/` | Owns the native-stack registrations for each persistent tab. |
 | `src/navigation/types.ts` | Typed tab and stack contracts, including semantic placeholder routes. |
 | `src/screens/ThingsToRememberScreen.tsx` | Contact-knowledge surface reached from either contact-profile stack. |
@@ -56,7 +62,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/screens/CaptureScreen.tsx` | Provides the in-app target for a pending Android text share. |
 | `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
 | `src/screens/DigestScreen.tsx` | Provides the live weekly retrospective destination with its own themed Back chrome. |
-| `src/screens/SettingsScreen.tsx` | Provides the distinct settings home, including live Theme/Mode/Accent controls, AI configuration, self-photo, self-star, and sun-centre entries. |
+| `src/screens/SettingsHubScreen.tsx` | Provides the distinct settings home and routes to focused settings pages. |
+| `src/screens/SettingsAppearanceScreen.tsx` | Provides immediate package, mode, accent, and grouped System-background selection. |
 | `src/screens/SystemsManagementScreen.tsx` | Provides the shared flat System catalog and guarded management actions from either owning stack. |
 | `src/screens/SystemBuilderScreen.tsx` | Provides the focused custom-definition and immutable-base override workflow with discard protection. |
 | `src/screens/LegacyContactPickerScreen.tsx` | Provides the typed API-36-and-below custom contact-picker route and permission-recovery views. |
@@ -178,8 +185,11 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 ### Applying the visual system
 
 1. `ThemeProvider` resolves the active package and system/light/dark appearance to one of four palettes, then overlays its curated accent tone triple.
-2. Screens use semantic registry names and shared UI primitives rather than base-family icon names or ad-hoc action/overlay implementations.
-3. `AppText` preserves OS text scaling. Destructive controls combine the danger treatment, warning glyph, and an explicit confirmation rather than relying on colour alone.
+2. `SettingsAppearanceScreen` shows all eight bundled System backgrounds plus None/Solid. A tap updates only the active package in the theme store and persists its stable slot ID through the existing settings DAO.
+3. `App.tsx` applies the transparent navigation theme and synchronizes the deepest focused route. `RootNavigator` mounts one `BackgroundHost` behind the tab scenes, so ordinary transparent page roots scroll over one fixed image.
+4. `densityForRoute()` selects presentation, comfortable, or dense treatment. `systemBackgroundSlotOverride()` forces solid only for the actual `Orrery` route; browse routes reached through the Orrery stack continue to show the System background, while System Builder keeps its own opaque authoring canvas.
+5. The host veil controls artwork contribution independently from cards. `GlassSurface` is glassy when the package artwork tone matches the resolved mode and opaque when it does not; `ChromeScrim` protects bare-on-background chrome.
+6. Screens use semantic registry names and shared UI primitives rather than base-family icon names or ad-hoc action/overlay implementations. `AppText` preserves OS text scaling, and destructive controls do not rely on colour alone.
 
 ### Applying relationship-state emphasis
 
@@ -227,6 +237,9 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `gravityTiers` | 4 ordered tokens | `src/theme/theme-presets.ts` | Named gravity-bar ramp from thin through deep. |
 | `starPalette` | 6 ordered tokens | `src/theme/theme-presets.ts` | Self-sun choices; index 0 is the render-time default. |
 | Theme packages | Galaxy / Standard | `src/theme/theme-types.ts` | Independent of light/dark/follow-system appearance mode. |
+| `PACKAGE_DEFAULT_SLOT` | Galaxy and Standard package defaults | `src/theme/backgrounds.ts` | Resolves a NULL or absent package selection without duplicating defaults in a screen. |
+| `BACKGROUND_VEIL_OPACITY` | Per package and density | `src/theme/tokens/surface.ts` | Keeps bundled artwork visibly present behind ordinary content. |
+| `CARD_GLASS_OPACITY` | Galaxy `0.05`; Standard `0.5` | `src/theme/tokens/surface.ts` | Controls matched-mode card translucency while mismatched modes stay opaque. |
 | `AA_NORMAL` / `AA_LARGE` | `4.5` / `3.0` | `src/theme/contrast.ts` | Contrast thresholds for text and large/status elements. |
 
 ## Decisions
@@ -242,6 +255,9 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-084:** Four Semantic Theme Palettes, Curated Accents, and Contrast Validation — supplies the four-palette and live-accent contract.
 - **ADR-086:** Semantic Icons and Accessible Interaction Primitives — supplies registry, typography, status, action, and overlay seams.
 - **ADR-087:** Bundled Background Presets and Package-Specific Surface Treatment — supplies tokenized local background and surface primitives for later screen adoption.
+- **ADR-113:** Persistent Shared System Background Selection — exposes every approved local slot and persists an independent active-package choice.
+- **ADR-114:** Route-Aware App-Wide System Background Composition — mounts one fixed shell host with route density and explicit Profile/Orrery/SystemBuilder precedence.
+- **ADR-115:** Visible Mode-Aware Background Surface Composition — separates veil, chrome, and card treatment so selected art remains visible and readable.
 - **ADR-101:** Avatar-First Accessible Dashboard Card Renderer — consumes the semantic icon and accessible interaction primitives in Card View.
 - **ADR-102:** Frozen-Universe Dashboard Multi-Select — adds the Select Contacts entry and serializable Group Log participant handoff.
 - **ADR-020:** Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download — adds the modal crop route and self-photo entry.
@@ -334,6 +350,11 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 28. **A disabled overflow entry must not close its menu.** Select Contacts is a visible future capability, not a no-op route or a hidden item.
 29. **Keep Archived registered in both owning stacks.** It is one screen with two deliberate entry paths; replacing either route with a duplicate breaks origin-aware Back behavior.
 30. **Keep Quick Log command-owned.** The Dashboard List may invoke it, but must not duplicate FAB feedback, Undo, Retry, haptic, or refresh behavior in a second shell path.
+31. **Do not classify the Orrery exception by tab.** Only the deepest `Orrery` visualization route forces None/Solid; ordinary browse children must look the same from every owning stack.
+32. **Remove only full-page washes.** Inputs, cards, sheets, dialogs, loading/error overlays, crop canvases, and the System Builder authoring canvas remain opaque semantic surfaces.
+33. **A mounted image is not visual acceptance.** The original Phase 31.1 release UAT was a false positive because a near-opaque host veil made different selections indistinguishable. Compare materially different slots on the same physical-device route.
+34. **Do not reuse card opacity as the host veil.** Card contrast and background visibility are separate token contracts; coupling them recreates the imperceptible-background defect.
+35. **Avoid Android elevation on translucent Galaxy cards.** It renders an opaque inner rectangle; the iOS shadow remains independently supported.
 
 ## Related Systems
 
@@ -388,3 +409,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 28 | Enabled Select Contacts, added selection-first Back behavior, and defined the serializable Group Log participant handoff. |
 | 2026-09-02 | 30 | Added dual-stack Systems Management and System Builder routes with shared focused-workflow and selection-publication contracts. |
 | 2026-09-02 | 31 | Added origin-preserving Profile composition, focused expanded sheets, Compose-only AI entry, and ready-gated background reconciliation. |
+| 2026-09-10 | 31.1 | Adopted persistent shared System backgrounds across ordinary routes, preserved Profile and canvas precedence, and corrected veil/card/chrome composition after production-device validation. |
