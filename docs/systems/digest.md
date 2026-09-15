@@ -1,7 +1,7 @@
 # Digest
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 25-dashboard-data-state-foundation
+**Updated by phase:** 32-interaction-history-insights
 **Owners:** `src/db/digest-read.ts`, `src/logic/digest-logic.ts`, `src/screens/DigestScreen.tsx`, `src/services/notifications/digest-schedule.ts`
 
 ## Purpose
@@ -15,14 +15,14 @@ The digest gives a person a calm, local weekly retrospective without turning rel
 The digest has no table and stores no per-contact state. It reads existing SQLite interactions and contacts at screen-open time; its only durable policy is the notification toggle in the singleton `app_settings` row.
 
 **Tables:**
-- `interactions` — supplies all recent touchpoints and optional `good` / `fine` / `hard` quality marks.
+- `interactions` — supplies all recent touchpoints and optional Tone marks `Positive` / `Neutral` / `Negative` (the stored `quality` column, migrated from the retired `good`/`fine`/`hard` in phase 32).
 - `contacts` — supplies names, photos, lifecycle state, recency, rare-response state, and the never-contacted backlog.
 - `app_settings` — supplies the master notification setting, `digest_enabled`, and the shared delivery hour.
 
 **Types** (`src/db/digest-read.ts`):
 - `RetrospectiveRow` — one non-archived person and their latest touchpoint in the inclusive trailing window.
 - `OverlookedRow` — one non-archived rogue person, including the shared status-engine reason.
-- `GentleLine` — the neutral hard-quality tally and its distinct named people.
+- `GentleLine` — the neutral difficult-conversation tally (the `Negative` Tone value) and its distinct named people.
 
 ### Store, Service & DAO Layer
 
@@ -75,12 +75,13 @@ The digest has no table and stores no per-contact state. It reads existing SQLit
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — supplies the weekly prompt and durable scheduling gate.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — gates only active overlooked work while preserving relationship history.
 - **ADR-093:** Scoped Composable Dashboard Population and Filter Model — retains the backlog count while retiring its standalone Dashboard route.
+- **ADR-116:** Value-Remapped Interaction Vocabulary and Optional Descriptive Duration — the gentle line's difficult-conversation count reads the migrated `Negative` Tone value; `digest-read` was lockstepped with migration 025 so it never silently counts zero over the retired `hard` literal.
 
 ## Gotchas
 
 1. **The overlooked population is the inverse of decay eligibility.** Do not reuse the decay-suppression predicate: muted rogue and rarely-responding people belong here, while never-contacted people appear only through the backlog nudge.
 2. **Stored timestamps are local wall-clock values.** Use bare `date(stored_column)` and convert only SQLite's current time; UTC conversion can move an edge touchpoint.
-3. **Keep the quality line rare.** The threshold requires both a count and fraction so a single difficult conversation never becomes a relationship verdict.
+3. **Keep the quality line rare.** The threshold requires both a count and fraction so a single difficult conversation never becomes a relationship verdict. As of phase 32 it counts the migrated `Negative` Tone value; a reader still comparing against the retired `hard` literal would silently tally zero.
 4. **A weekly trigger still needs device proof.** The physical-device test confirms its Sunday fire and Expo’s headless re-arm for the next occurrence.
 5. **Do not describe the whole digest as Bound-only.** The retrospective and gentle line intentionally retain Unbound relationship history.
 6. **The backlog count is not a route contract.** `countNeverContacted()` stays available to Digest even though the standalone Never Contacted screen is retired.
@@ -101,3 +102,4 @@ The digest has no table and stores no per-contact state. It reads existing SQLit
 | 2026-08-23 | 15 | Created the live weekly retrospective, overlooked relationship read, Sunday scheduling, and dashboard entry. |
 | 2026-08-27 | 18.2 | Made the active overlooked projection Bound-only while retaining inclusive retrospective history. |
 | 2026-09-02 | 25 | Repointed the backlog action to live Home while retaining the never-contacted count. |
+| 2026-09-02 | 32 | Lockstepped the gentle-line count onto the migrated `Negative` Tone value (from the retired `hard`) with migration 025's vocabulary remap. |
