@@ -235,6 +235,15 @@ export type SettingsStackParamList = {
     | undefined;
   AIPermissions: undefined;
   AIPreview: undefined;
+  /**
+   * Phase 37 Settings decomposition (D-09). `Settings` (above) now mounts the
+   * navigation-first hub; `SettingsMore` re-registers the untouched monolith at
+   * a transitional internal route so every not-yet-migrated control stays
+   * reachable (removed in Plan 08), and `SettingsInteractions` is the first real
+   * category screen. Later plans add the remaining category route names.
+   */
+  SettingsMore: undefined;
+  SettingsInteractions: undefined;
   /** DEV-only device-UAT harness; its route is compile-time gated from release. */
   __ThemePreview: undefined;
   SystemBuilder: { systemUid?: string; systemRef?: string } | undefined;

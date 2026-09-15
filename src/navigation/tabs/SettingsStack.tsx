@@ -26,6 +26,8 @@ import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { ReconcileCompleteScreen } from "@/screens/ReconcileCompleteScreen";
 import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
+import { SettingsHubScreen } from "@/screens/SettingsHubScreen";
+import { SettingsInteractionsScreen } from "@/screens/SettingsInteractionsScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
@@ -92,13 +94,28 @@ function AIPreviewRoute({ navigation }: SettingsScreenProps<"AIPreview">) {
   return <AIPreviewScreen onBack={() => navigation.goBack()} />;
 }
 
+function SettingsInteractionsRoute({
+  navigation,
+}: SettingsScreenProps<"SettingsInteractions">) {
+  return <SettingsInteractionsScreen onBack={() => navigation.goBack()} />;
+}
+
 export function SettingsStack() {
   return (
     <Stack.Navigator
       initialRouteName="Settings"
       screenOptions={{ headerShown: false }}
     >
-      <Stack.Screen name="Settings" component={SettingsScreen} />
+      {/* Phase 37 (D-09): the hub replaces the monolith at the preserved
+          `Settings` route name (§M — deep-link + back-stack safe). The untouched
+          monolith is re-registered at the transitional `SettingsMore` route so
+          every not-yet-migrated control stays reachable (Plan 08 removes it). */}
+      <Stack.Screen name="Settings" component={SettingsHubScreen} />
+      <Stack.Screen name="SettingsMore" component={SettingsScreen} />
+      <Stack.Screen
+        name="SettingsInteractions"
+        component={SettingsInteractionsRoute}
+      />
       <Stack.Screen name="AIConnection" component={AIConnectionRoute} />
       <Stack.Screen name="AIModelPicker" component={AIModelPickerRoute} />
       <Stack.Screen
