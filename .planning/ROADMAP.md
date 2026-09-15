@@ -935,7 +935,7 @@ Plans:
 
 **Wave 1**
 
-- [ ] 37-01-PLAN.md — TRACER: navigation-first hub at `Settings` + Interactions category (D-04a/D-04c/D-09), monolith preserved via transitional `SettingsMore` route
+- [x] 37-01-PLAN.md — TRACER: navigation-first hub at `Settings` + Interactions category (D-04a/D-04c/D-09), monolith preserved via transitional `SettingsMore` route
 
 **Wave 2** *(blocked on Wave 1)*
 

@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 37
-current_phase_name: settings-personalization
-status: planned
-stopped_at: Phase 37 planned (8 plans, 8 sequential waves)
-last_updated: "2026-09-15T00:18:45.318Z"
+current_phase_name: Settings & Personalization
+status: executing
+stopped_at: Phase 37 Plan 01 (tracer) complete — Settings hub + Interactions category + route-registration contract
+last_updated: "2026-09-14T20:05:00.000Z"
 last_activity: 2026-09-14
-last_activity_desc: Phase 37 planned — 8 plans across 8 sequential waves (navigation-first Settings decomposition)
-state_head: e247a7c230e159aef528e2111823aa3c4900cafb
+last_activity_desc: Phase 37 Plan 01 (tracer) executed — 3 tasks, 4 commits, 120 tests green
+state_head: d293722e2e953b64748ee0af96d70ad6e7369843
 progress:
   total_phases: 22
   completed_phases: 11
@@ -32,20 +32,20 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 36 — AI Configuration & Prompting
+**Current focus:** Phase 37 — Settings & Personalization
 
 ## Current Position
 
-Phase: 37 (settings-personalization) — READY TO EXECUTE
-Plan: 8 plans created (37-01..37-08); execution not started
-Status: Ready to execute — run /gsd-execute-phase 37 (8 sequential waves; nav files + hub model + monolith are shared so no wave parallelizes). D-03 follow-up RESOLVED: Category Management inserted as Phase 37.1 (INSERTED, owner-approved 2026-09-14) to run right after Phase 37, before Phase 38.
+Phase: 37 (Settings & Personalization) — EXECUTING
+Plan: 2 of 8 (Plan 01 tracer complete)
+Status: Executing Phase 37
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-14 — Phase 36 complete, transitioned to Phase 37
+Last activity: 2026-09-14 — Phase 37 execution started
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: End-of-phase Pixel UAT for Phase 34 (see 34-08-SUMMARY coverage), then verify/close the phase.
 
@@ -294,6 +294,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 36-ai-configuration-prompting P08 | 34min | 7 tasks | 22 files |
 | Phase 36 P09 | 17min | 3 tasks | 9 files |
 | Phase 36 P11 | 34min | 3 tasks | 12 files |
+| Phase 37 P01 | 12min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
