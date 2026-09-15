@@ -31,6 +31,7 @@ RESEARCH | Writer inventory | categories, contacts, imports, rules/refs/prefs, s
 RESEARCH | Backup safety | Parse-before-mutate, tombstones, dependency order, exact replace-all | 04, 05, 16 | COVERED | Final post-reconciliation local+incoming union validates both cross-kind directions and winner/tombstone variants
 RESEARCH | Validation architecture | Fault rollback, 0/1/12/13/many, backups, source contracts, physical device | 02, 04–20, 12 | COVERED | Automated hook remains test-only; device seam is compile-time dev-only, app-wide, and isolated
 OWNER RULING | 2026-09-15 | Every referencing import session—pending, complete, discarded—reassigns to the transaction target | 02, 06, 08, 18, 20, 19, 12 | COVERED | Preview, lock fingerprint, update, rollback, docs, audit, and UAT all name every status
+OWNER RULING | 2026-09-15 | Development-only category UAT uses exactly `orbit-category-uat.db`; compile-time/memory-only activation throws in production; active UAT never reads/writes/closes/deletes `orbit.db`; exact cleanup; all accessor/cached-reference shapes tested; synthetic evidence only | 20, 19, 12 | COVERED | Normal DB may open during bootstrap; plans make only the narrower approved non-interference claim
 
 ## Reachability and prohibition audit
 
@@ -38,7 +39,7 @@ OWNER RULING | 2026-09-15 | Every referencing import session—pending, complete
 - Rename/reorder UI cannot run before Plan 14's concrete public DAO APIs; Plan 06 depends on it.
 - Dashboard Uncategorized flows from Plan 16's one closed token through safe SQL/store/backup validation to Plan 17's filter UI.
 - Backup final-union validation runs after category/System reconciliation and before candidate staging or transaction work; Plan 05 consumes Plan 04's pure validator.
-- Device failure UAT uses Plan 20's fail-closed app-wide executor and exact-target synthetic SQLite lifecycle plus Plan 19's compile-time `__DEV__` controls. Plan 12 navigates from an explicitly active synthetic banner into ordinary app routes, forbids destructive work before activation, and records deactivation, close/delete absence, normal-executor restoration, and inactive-on-restart proof.
+- Device failure UAT uses Plan 20's fail-closed app-wide database route across `getExecutor()`, `getDb()`, registered callbacks, and cached references, with exact `orbit-category-uat.db` lifecycle, plus Plan 19's compile-time `__DEV__` controls. Plan 12 navigates from an explicitly active synthetic banner into ordinary app routes, forbids destructive work before activation, and records deactivation, exact-file close/delete absence, normal-routing restoration, inactive-on-restart proof, and exact reduced-motion baseline/restoration.
 - No migration 030, TARGET_VERSION change, backup-format bump, field_history/category history, Undo, quarantine, reseed, network/telemetry, inline component SQL, hardcoded color, worktree, branch, or push is planned.
 
 All source items are covered; there are no deferred or missing implementation items hidden by this audit.
