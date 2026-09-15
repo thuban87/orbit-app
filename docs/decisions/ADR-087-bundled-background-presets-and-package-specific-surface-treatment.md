@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** None
+**Superseded by:** ADR-115 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation)
 
 ## Context
 
