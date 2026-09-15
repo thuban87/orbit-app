@@ -959,7 +959,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6)*
 
-- [ ] 37-07-PLAN.md — Data & Backup dual-home (D-08): register the four Backup routes + handle the two dual-home hazards, tab preserved
+- [x] 37-07-PLAN.md — Data & Backup dual-home (D-08): four Backup screens registered in the Settings stack via explicit per-stack `host` wrappers (one canonical tree), origin-aware post-restore return + tab-scoped shared-backup consume + host-aware app-bar chrome, Backup tab preserved (§R), no schema/format change (D-06)
 
 **Wave 8** *(blocked on Wave 7)*
 
@@ -1038,7 +1038,7 @@ Plans:
 | 34. Rapid Capture & Update Flows | 8/8 | Complete | 2026-09-13 |
 | 35. Messaging & AI Compose | 9/9 | Complete |  |
 | 36. AI Configuration & Prompting | 11/11 | Complete | 2026-09-14 |
-| 37. Settings & Personalization | 5/8 | In Progress|  |
+| 37. Settings & Personalization | 6/8 | In Progress|  |
 | 38. Your Week | 0/TBD | Deferred planning | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
