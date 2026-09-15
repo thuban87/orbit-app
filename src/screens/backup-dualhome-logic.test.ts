@@ -3,6 +3,7 @@ import {
   type BackupHost,
   backupAppBarVariant,
   DEFAULT_BACKUP_HOST,
+  restoreReturnLabel,
   restoreReturnRouteName,
   shouldConsumeSharedBackup,
 } from "./backup-dualhome-logic";
@@ -29,6 +30,29 @@ describe("backup dual-home host helpers (D-08 / §I)", () => {
 
     it("defaults (via DEFAULT_BACKUP_HOST) to resetting to Backup", () => {
       expect(restoreReturnRouteName(DEFAULT_BACKUP_HOST)).toBe("Backup");
+    });
+  });
+
+  describe("restoreReturnLabel", () => {
+    it("labels the tab host return as Backup & Restore (UNCHANGED)", () => {
+      expect(restoreReturnLabel("backup-tab")).toBe(
+        "Return to Backup & Restore",
+      );
+    });
+
+    it("labels the settings host return as Settings (matches destination, WR-02)", () => {
+      expect(restoreReturnLabel("settings")).toBe("Return to Settings");
+    });
+
+    it("describes the same destination restoreReturnRouteName resets to", () => {
+      // The label must not misdescribe where the button actually navigates.
+      for (const host of ALL_HOSTS) {
+        const route = restoreReturnRouteName(host);
+        const label = restoreReturnLabel(host);
+        expect(
+          label.includes(route === "Settings" ? "Settings" : "Backup"),
+        ).toBe(true);
+      }
     });
   });
 

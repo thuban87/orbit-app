@@ -36,6 +36,19 @@ export function restoreReturnRouteName(
 }
 
 /**
+ * Host-aware label for the post-restore return button. Must describe the actual
+ * destination `restoreReturnRouteName` resets to: the Backup-tab flow returns to
+ * "Backup & Restore" (UNCHANGED), the Settings-entry flow returns to the Settings
+ * hub. A single hardcoded "Return to Backup & Restore" misdescribed the Settings
+ * destination (review WR-02). Mirrors restoreReturnRouteName's host split.
+ */
+export function restoreReturnLabel(host: BackupHost): string {
+  return host === "settings"
+    ? "Return to Settings"
+    : "Return to Backup & Restore";
+}
+
+/**
  * Whether this mount drains the native shared-backup singleton
  * (`consumeSharedBackup`) on focus. Only the BACKUP-TAB copy does: the
  * share-intent gate routes a shared backup to `BackupTab › Backup`
