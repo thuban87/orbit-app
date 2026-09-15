@@ -1,7 +1,7 @@
 # Profile presentation
 
 **Last updated:** 2026-09-10
-**Updated by phase:** 31-profile-experience
+**Updated by phase:** 31.1-app-wide-system-backgrounds
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
 ## Purpose
@@ -75,6 +75,8 @@ The sole overflow order is Edit Contact, Snooze/Unsnooze, Archive, separator, Pr
 
 Background bytes stay in app-owned `profile-backgrounds/<uid>.jpg` paths. Picker/cache paths never enter SQLite. A launch-time reconciliation sweep, registered after migration readiness, cleans interrupted local derivative writes; no timer or network work is used.
 
+Background rendering follows the already-resolved presentation axis rather than checking only a contact override. A resolved contact, Category, or global app-owned background URI wins. When resolution falls through to `source: "theme"`, Profile passes no app-owned URI to its own `BackgroundHost`, which then renders the active package's selected System background. Bundled System slots never enter `profile_background_templates`, and the Profile manager does not navigate to the System-background selector.
+
 ## Backup and cross-phase boundaries
 
 Backup format v5 emits and restores both nullable global Profile preference keys, reusable layout/background templates, and the `profile_contact_presentation` / `profile_category_presentation` assignment rows. Presentation rows travel under their parent contact or Category UID; freeform layout JSON and collapse JSON remain intact. Each background template also carries its image bytes, which restore stages before the database transaction and rehydrates after commit to the UID-derived `profile-backgrounds/<uid>.jpg` path.
@@ -88,6 +90,7 @@ Phase 32 owns the full History UX while preserving `interaction-history`. Phase 
 - **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — keeps one local snapshot while preserving each knowledge source's ownership and permission semantics.
 - **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — defines truthful Bound/Unbound facts and source-owned Frequency/Snooze writes.
 - **ADR-112:** App-Owned Profile Background Derivatives and Launch Reconciliation — owns local crop, safe derivative storage, reference-aware cleanup, and fallback rendering.
+- **ADR-114:** Route-Aware App-Wide System Background Composition — preserves resolved Profile-photo precedence and uses the selected System background only as the theme fallback.
 - **ADR-062:** Bound/Unbound lifecycle — cadence is nullable and all Profile consumers guard it.
 - **ADR-078:** Off Limits remains a local caution surface and is not an AI/search/dashboard permission proxy.
 - **ADR-079:** Compose is the only suggestion invocation; the Profile AI draft entry is retired.
@@ -102,6 +105,8 @@ Phase 32 owns the full History UX while preserving `interaction-history`. Phase 
 5. **No AI inference.** Hidden-from-Profile and Off Limits do not imply privacy, deletion, AI exclusion, or permission.
 6. **No literal migration number.** Refer to `profilePresentationMigration` and `PROFILE_PRESENTATION_SCHEMA_VERSION`; the ordered registry is authoritative.
 7. **Keep presentation backup atomic.** A v5 change must preserve the settings, templates, parent-keyed assignments, and background bytes together; never add an emitter without its restore writer.
+8. **Resolve before choosing the background host input.** Contact-only checks skip Category and global assignments; pass the fully resolved app-owned URI or `null` for the System fallback.
+9. **Keep bundled slots out of Profile templates.** System backgrounds are settings-owned packaged assets, while Profile templates are app-owned photo derivatives with independent assignment and cleanup.
 
 ## Related systems
 
@@ -122,3 +127,4 @@ Phase 32 owns the full History UX while preserving `interaction-history`. Phase 
 | 2026-09-09 | 31 | A droid-built standalone release was installed and inspected on the physical Pixel: Galaxy and Standard local backgrounds rendered full bleed with a compact factory Profile, the release layout chooser/editor remained reachable at 1.15x text after the shared Sheet geometry repair, and the actual empty local Background manager was nonblank. Populated/crop/assistive-technology and owner visual acceptance remain explicitly gated in `31-NATIVE-CHECKLIST.md`. |
 | 2026-09-09 | 31 | Physical Pixel objective pass confirmed the fixed Hero, origin Back, inert Profile actions sheet, and reachable overflow/layout chooser controls; broader theme, assistive-technology, varied-data, crop, and local-only acceptance remains owner-gated in `31-NATIVE-CHECKLIST.md`. |
 | 2026-09-09 | 31 | Added the Profile presentation controller, local snapshot/resolution architecture, customization boundaries, and Phase 32/36/37/40 handoffs. |
+| 2026-09-10 | 31.1 | Established resolved Profile-photo precedence over the app-wide System background while keeping bundled slots and Profile templates independent. |
