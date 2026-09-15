@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 37
 current_phase_name: Settings & Personalization
 status: executing
-stopped_at: Phase 37 Plan 07 complete — Data & Backup dual-home (§I / D-08): the four EXISTING Backup screens registered in the Settings stack via explicit per-stack `host` wrappers (one canonical tree, two entry points — Backup tab + Settings → Data & Backup), with origin-aware post-restore return + tab-scoped shared-backup consume + host-aware app-bar chrome; Backup bottom tab preserved (§R); no schema/format change (D-06)
-last_updated: "2026-09-14T21:44:00.000Z"
+stopped_at: Phase 37 Plan 08 complete (CLOSING plan — all 8 plans executed) — About Orbit (§K: basic leaf, real product-name constant "Orbit" + expo-constants semantic version with module-constant fallback, unavailable rows omitted) + Home Screen Widget hub kind:"action" utility row (§L, reused requestPinWidget) + SettingsMore monolith RETIRED (§S / D-01: SettingsScreen.tsx deleted, route/row/registration removed, hub in full §A order); D-06 confirmed (no Phase-37 migration, TARGET_VERSION=29 / BACKUP_FORMAT_VERSION=5)
+last_updated: "2026-09-14T21:59:00.000Z"
 last_activity: 2026-09-14
-last_activity_desc: Phase 37 Plan 07 executed — 2 tasks, 3 task commits (feat + TDD test + feat); reused the four Backup screens unchanged (BackupScreen/BackupSettingsScreen/RestorePreviewScreen/RestoreResultScreen) and registered them in SettingsStackParamList + SETTINGS_REGISTERED_ROUTES + SettingsStack.tsx via host="settings" wrappers, converted BackupStack to explicit host="backup-tab" wrappers, inserted Data & Backup hub row (route Backup, §A index 5); new backup-dualhome-logic.ts (BackupHost + fail-closed DEFAULT_BACKUP_HOST + restoreReturnRouteName/shouldConsumeSharedBackup/backupAppBarVariant, 9 unit tests); origin-aware resets at RestoreResultScreen + RestorePreviewScreen success base, tab-scoped consumeSharedBackup gate, host-aware ShellAppBar variant (child/Back under Settings, root under tab); nav-state inference removed (review HIGH). Rule-3 auto-fix: narrowed hub row route type to the params-free registered subset so params-required RestorePreview/RestoreResult didn't break the hub's bare navigate. Backup tab intact; no migration, BACKUP_FORMAT_VERSION stays 5 (D-06); tsc/colors clean, dual-home+hub+routes tests green. Commits local on main, NOT pushed.
-state_head: c4ffef7
+last_activity_desc: Phase 37 Plan 08 executed (CLOSING) — 3 tasks, 3 feat task commits. Task 1 (52d7363): new SettingsAboutScreen + settings-about-model.ts (ABOUT_APP_NAME constant, resolveAboutVersion via expo-constants + "1.0.0" fallback), declared expo-constants as a direct dep (npx expo install → ~57.0.18), registered SettingsAbout in types/stack/SETTINGS_REGISTERED_ROUTES + hub row at §A index 7; build number + licenses + support/legal OMITTED per §K (F-1/F-2 owner flags). Task 2 (4da7516): moved Home Screen Widget to a hub kind:"action" row (ADD_WIDGET_ACTION) reusing requestPinWidget + addWidgetCopy fallback verbatim, emptied the monolith. Task 3 (38c6109): deleted SettingsScreen.tsx, removed SettingsMore from types/SettingsStack/SETTINGS_REGISTERED_ROUTES/hub row; hub-model test inverted to assert SettingsMore ABSENT + full §A order (Appearance→About) + single widget action row + no CategoryManagement target; Migration-Matrix walk confirmed every 37-01 group migrated (nothing dropped). D-06 confirmed (TARGET_VERSION=29, BACKUP_FORMAT_VERSION=5 unchanged). tsc/colors clean; full suite 3598 tests pass (1 pre-existing unrelated fail: orrery-controls-render.test.tsx Phase-29 transform error). Commits local on main, NOT pushed. End-of-phase Pixel UAT still owed before owner phase-close.
+state_head: 38c6109
 progress:
   total_phases: 22
   completed_phases: 11
   total_plans: 156
-  completed_plans: 151
+  completed_plans: 152
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -36,9 +36,9 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 37 (Settings & Personalization) — EXECUTING
-Plan: 8 of 8 (Plans 01–07 complete)
-Status: Executing Phase 37
+Phase: 37 (Settings & Personalization) — ALL PLANS EXECUTED (8/8); end-of-phase Pixel UAT owed before owner phase-close
+Plan: 8 of 8 complete (Plans 01–08 all executed)
+Status: Phase 37 plans complete — awaiting device UAT + owner phase-close
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
@@ -47,7 +47,7 @@ Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backu
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
 Last activity: 2026-09-14 — Phase 37 Plan 06 executed (Orrery category §H: SettingsOrreryScreen Display bound to the canonical useOrreryPreferencesStore — committed read / save write / hydrate-on-focus / saving-saveError-hydration + retry — with a cross-surface store test proving one shared source and lastSystem excluded, plus a Systems routing section; AI category §J: SettingsAIScreen routes into the Phase 36 AI hierarchy + AI-Off escape hatch, master toggle ai_enabled-only via buildAiEnabledPatch, hub state derived from the migrated injectable loadAiHubAvailability fresh-on-focus hydration pipeline (read-path, local cached catalog, no network, AiService.ts untouched); monolith Systems row + AI group + reloadAiAvailability pipeline removed; no schema/format change D-06)
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
-Next: Phase 37 Plan 08 (About Orbit §K + widget utility row §L + monolith retirement + D-06 no-schema/format-change confirmation). End-of-phase Pixel UAT still owed for the Appearance controls (37-03), the Contacts rows (37-04), the Notifications controls (37-05), the Orrery single-source agreement + AI hub real-availability rendering (37-06 — do NOT trigger a real AI API call without clearing with the owner), AND now the Data & Backup dual-home (37-07: Back affordance returns to the Settings hub, origin-aware post-restore return, shared backup opens once with no double-drain — exercise the SAF-grant reconnect path). Roadmap follow-up owed (D-03, owner): Category Management is scheduled as inserted Phase 37.1.
+Next: Phase 37 is fully executed (8/8 plans) — verify + owner phase-close, then Phase 37.1 (Category Management, INSERTED). End-of-phase Pixel UAT still owed across the phase: Appearance controls (37-03), Contacts rows (37-04), Notifications controls (37-05), Orrery single-source agreement + AI hub real-availability rendering (37-06 — do NOT trigger a real AI API call without clearing with the owner), Data & Backup dual-home (37-07: Back returns to the Settings hub, origin-aware post-restore return, shared backup opens once with no double-drain — exercise the SAF-grant reconnect path), AND now About Orbit (37-08: name + version render with no dead rows) + the hub widget row still pins from the hub. Roadmap follow-up owed (D-03, owner): Category Management is scheduled as inserted Phase 37.1.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -300,6 +300,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 37 P04 | 20min | 3 tasks | 8 files |
 | Phase 37 P05 | 8min | 2 tasks | 8 files |
 | Phase 37 P07 | 10min | 2 tasks | 10 files |
+| Phase 37 P08 | 12min | 3 tasks | 11 files |
 
 ## Accumulated Context
 

@@ -931,7 +931,7 @@ Plans:
 
 **Canonical refs**: docs/dossier/milestone-2/phase-37-settings-personalization-dossier.md (ground truth §A–§S); .planning/phases/37-settings-personalization/37-CONTEXT.md (D-01..D-09 overlay); 37-RESEARCH.md; 37-PATTERNS.md
 **Schema**: none — Phase 37 adds NO migration and NO backup-format bump (D-06; verified head migration 029 / `TARGET_VERSION=29`, `BACKUP_FORMAT_VERSION=5` on disk). A newly required durable/portable preference would owe a format-6 bump, which is an OWNER decision — not planned here.
-**Plans**: 5/8 plans executed (8 sequential waves — the Settings nav files, hub model, and monolith are shared by nearly every plan, so waves are strictly sequential)
+**Plans**: 8/8 plans executed (8 sequential waves — the Settings nav files, hub model, and monolith are shared by nearly every plan, so waves are strictly sequential). All plans executed; end-of-phase Pixel UAT still owed (Appearance/Contacts/Notifications/Orrery/AI hub/Data & Backup dual-home) before owner phase-close.
 
 **Wave 1**
 
@@ -963,7 +963,7 @@ Plans:
 
 **Wave 8** *(blocked on Wave 7)*
 
-- [ ] 37-08-PLAN.md — About Orbit (§K) + widget utility row (§L) + monolith retirement + D-06 no-schema/format-change confirmation
+- [x] 37-08-PLAN.md — About Orbit (§K, real name + semantic version only, unavailable rows omitted) + Home Screen Widget hub `kind:"action"` utility row (§L) + SettingsMore monolith retirement (§S / D-01: SettingsScreen.tsx deleted, route/row/registration removed, full §A order asserted) + D-06 confirmed (no Phase-37 migration, `TARGET_VERSION=29` / `BACKUP_FORMAT_VERSION=5`)
 
 **Roadmap follow-up (D-03) — SCHEDULED as Phase 37.1 (INSERTED, owner-approved 2026-09-14):** the **Category Management** phase (category CRUD + deletion cascade to Orrery Systems, custom-System rules, Profile assignments, backup) surfaced during Phase 37 planning is now scheduled to run immediately after Phase 37, before Phase 38. Phase 37 reserves only the route name/IA slot; 37.1 builds the manager and the cascade.
 
