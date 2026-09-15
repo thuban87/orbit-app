@@ -2,19 +2,19 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 37
-current_phase_name: Settings & Personalization
-status: executing
-stopped_at: Phase 37 Plan 08 complete (CLOSING plan — all 8 plans executed) — About Orbit (§K: basic leaf, real product-name constant "Orbit" + expo-constants semantic version with module-constant fallback, unavailable rows omitted) + Home Screen Widget hub kind:"action" utility row (§L, reused requestPinWidget) + SettingsMore monolith RETIRED (§S / D-01: SettingsScreen.tsx deleted, route/row/registration removed, hub in full §A order); D-06 confirmed (no Phase-37 migration, TARGET_VERSION=29 / BACKUP_FORMAT_VERSION=5)
-last_updated: "2026-09-14T21:59:00.000Z"
+current_phase: 37.1
+current_phase_name: Category Management
+status: planning
+stopped_at: Phase 37 complete, ready to plan Phase 37.1
+last_updated: "2026-09-15T04:49:35.171Z"
 last_activity: 2026-09-14
-last_activity_desc: Phase 37 Plan 08 executed (CLOSING) — 3 tasks, 3 feat task commits. Task 1 (52d7363): new SettingsAboutScreen + settings-about-model.ts (ABOUT_APP_NAME constant, resolveAboutVersion via expo-constants + "1.0.0" fallback), declared expo-constants as a direct dep (npx expo install → ~57.0.18), registered SettingsAbout in types/stack/SETTINGS_REGISTERED_ROUTES + hub row at §A index 7; build number + licenses + support/legal OMITTED per §K (F-1/F-2 owner flags). Task 2 (4da7516): moved Home Screen Widget to a hub kind:"action" row (ADD_WIDGET_ACTION) reusing requestPinWidget + addWidgetCopy fallback verbatim, emptied the monolith. Task 3 (38c6109): deleted SettingsScreen.tsx, removed SettingsMore from types/SettingsStack/SETTINGS_REGISTERED_ROUTES/hub row; hub-model test inverted to assert SettingsMore ABSENT + full §A order (Appearance→About) + single widget action row + no CategoryManagement target; Migration-Matrix walk confirmed every 37-01 group migrated (nothing dropped). D-06 confirmed (TARGET_VERSION=29, BACKUP_FORMAT_VERSION=5 unchanged). tsc/colors clean; full suite 3598 tests pass (1 pre-existing unrelated fail: orrery-controls-render.test.tsx Phase-29 transform error). Commits local on main, NOT pushed. End-of-phase Pixel UAT still owed before owner phase-close.
-state_head: 38c6109
+last_activity_desc: Phase 37 complete, transitioned to Phase 37.1
+state_head: b34ef6280b8fb8fc46c0a1d7482f88e70c412d03
 progress:
   total_phases: 22
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 156
-  completed_plans: 152
+  completed_plans: 154
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -36,16 +36,16 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 37 (Settings & Personalization) — ALL PLANS EXECUTED (8/8); end-of-phase Pixel UAT owed before owner phase-close
-Plan: 8 of 8 complete (Plans 01–08 all executed)
-Status: Phase 37 plans complete — awaiting device UAT + owner phase-close
+Phase: 37.1 — Category Management
+Plan: Not started
+Status: Ready to plan
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-14 — Phase 37 Plan 06 executed (Orrery category §H: SettingsOrreryScreen Display bound to the canonical useOrreryPreferencesStore — committed read / save write / hydrate-on-focus / saving-saveError-hydration + retry — with a cross-surface store test proving one shared source and lastSystem excluded, plus a Systems routing section; AI category §J: SettingsAIScreen routes into the Phase 36 AI hierarchy + AI-Off escape hatch, master toggle ai_enabled-only via buildAiEnabledPatch, hub state derived from the migrated injectable loadAiHubAvailability fresh-on-focus hydration pipeline (read-path, local cached catalog, no network, AiService.ts untouched); monolith Systems row + AI group + reloadAiAvailability pipeline removed; no schema/format change D-06)
+Last activity: 2026-09-14 — Phase 37 complete, transitioned to Phase 37.1
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: Phase 37 is fully executed (8/8 plans) — verify + owner phase-close, then Phase 37.1 (Category Management, INSERTED). End-of-phase Pixel UAT still owed across the phase: Appearance controls (37-03), Contacts rows (37-04), Notifications controls (37-05), Orrery single-source agreement + AI hub real-availability rendering (37-06 — do NOT trigger a real AI API call without clearing with the owner), Data & Backup dual-home (37-07: Back returns to the Settings hub, origin-aware post-restore return, shared backup opens once with no double-drain — exercise the SAF-grant reconnect path), AND now About Orbit (37-08: name + version render with no dead rows) + the hub widget row still pins from the hub. Roadmap follow-up owed (D-03, owner): Category Management is scheduled as inserted Phase 37.1.
 
@@ -63,7 +63,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 
 **Velocity:**
 
-- Total plans completed: 110
+- Total plans completed: 118
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -84,6 +84,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | 34 | 8 | - | - |
 | 35 | 9 | - | - |
 | 36 | 11 | - | - |
+| 37 | 8 | - | - |
 
 **Recent Trend:**
 
@@ -735,7 +736,7 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 ## Session
 
 **Last session:** 2026-09-14T21:11:00.548Z
-**Stopped at:** Phase 37 context gathered
+**Stopped at:** Phase 37 complete, ready to plan Phase 37.1
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** .planning/phases/37-settings-personalization/37-CONTEXT.md
