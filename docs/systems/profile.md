@@ -65,7 +65,7 @@ The module registry owns persisted semantic IDs, not component names. Relationsh
 
 Things to Remember is a one-column, source-owned presentation. Its cards emit owner targets for Memory, relationships, current state, normalized custom fields/history, and fuel; Profile does not reinterpret or directly mutate them. Ordinary Off Limits stays local caution content with no sparkle and no inferred permission. There is no Profile AI-draft entry: Compose remains the sole AI-suggestion invocation surface under ADR-079.
 
-Interaction History is deliberately bounded and rendered behind the stable `interaction-history` semantic key. Phase 32 may replace that renderer without migrating layouts or collapse state.
+Interaction History renders the full History & Insights section (Heatmap, Intensity, Rolodex, Detail Sheet) behind the stable `interaction-history` semantic key via `ProfileModuleHost.renderHistory()`; the replacement of the earlier bounded stub migrated no layouts or collapse state. Knowledge-change rows in its Detail Sheet route back through the screen's existing knowledge navigation via a threaded `onOpenKnowledgeChange`. See `interaction-history.md`.
 
 ### Customization and reset
 
@@ -81,7 +81,7 @@ Background rendering follows the already-resolved presentation axis rather than 
 
 Backup format v5 emits and restores both nullable global Profile preference keys, reusable layout/background templates, and the `profile_contact_presentation` / `profile_category_presentation` assignment rows. Presentation rows travel under their parent contact or Category UID; freeform layout JSON and collapse JSON remain intact. Each background template also carries its image bytes, which restore stages before the database transaction and rehydrates after commit to the UID-derived `profile-backgrounds/<uid>.jpg` path.
 
-Phase 32 owns the full History UX while preserving `interaction-history`. Phase 37 may reuse the Profile template managers from Settings and owns Category CRUD; its Category deletion must preserve this resolver's fallout contract. Phase 40 owns background-image memory/performance hardening.
+The full History UX is owned by the History & Insights subsystem and mounts behind the preserved `interaction-history` key. Phase 37 may reuse the Profile template managers from Settings and owns Category CRUD; its Category deletion must preserve this resolver's fallout contract. Phase 40 owns background-image memory/performance hardening.
 
 ## Decisions
 
@@ -95,6 +95,7 @@ Phase 32 owns the full History UX while preserving `interaction-history`. Phase 
 - **ADR-078:** Off Limits remains a local caution surface and is not an AI/search/dashboard permission proxy.
 - **ADR-079:** Compose is the only suggestion invocation; the Profile AI draft entry is retired.
 - **ADR-081:** Per-item explicit AI permission replaces proposed fuel permission; no implicit permission is inferred here.
+- **ADR-123:** Profile History Section Replacing the Vertical Timeline — mounts the full History & Insights section behind the `interaction-history` renderer seam without migrating layout/collapse state; the knowledge-change edit reuses the screen's existing navigation.
 
 ## Gotchas
 
@@ -128,3 +129,4 @@ Phase 32 owns the full History UX while preserving `interaction-history`. Phase 
 | 2026-09-09 | 31 | Physical Pixel objective pass confirmed the fixed Hero, origin Back, inert Profile actions sheet, and reachable overflow/layout chooser controls; broader theme, assistive-technology, varied-data, crop, and local-only acceptance remains owner-gated in `31-NATIVE-CHECKLIST.md`. |
 | 2026-09-09 | 31 | Added the Profile presentation controller, local snapshot/resolution architecture, customization boundaries, and Phase 32/36/37/40 handoffs. |
 | 2026-09-10 | 31.1 | Established resolved Profile-photo precedence over the app-wide System background while keeping bundled slots and Profile templates independent. |
+| 2026-09-02 | 32 | `ProfileModuleHost.renderHistory()` now mounts the full History & Insights section behind the preserved `interaction-history` key (replacing the bounded stub, no layout/collapse migration); threaded `onOpenKnowledgeChange` for Detail Sheet knowledge rows. |
