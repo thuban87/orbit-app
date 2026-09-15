@@ -31,6 +31,7 @@ import { SettingsContactsScreen } from "@/screens/SettingsContactsScreen";
 import { SettingsHubScreen } from "@/screens/SettingsHubScreen";
 import { SettingsInteractionsScreen } from "@/screens/SettingsInteractionsScreen";
 import { SettingsNotificationsScreen } from "@/screens/SettingsNotificationsScreen";
+import { SettingsOrreryScreen } from "@/screens/SettingsOrreryScreen";
 import { SettingsScreen } from "@/screens/SettingsScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { SystemBuilderScreen } from "@/screens/SystemBuilderScreen";
@@ -121,6 +122,12 @@ function SettingsNotificationsRoute({
   return <SettingsNotificationsScreen onBack={() => navigation.goBack()} />;
 }
 
+function SettingsOrreryRoute({
+  navigation,
+}: SettingsScreenProps<"SettingsOrrery">) {
+  return <SettingsOrreryScreen onBack={() => navigation.goBack()} />;
+}
+
 export function SettingsStack() {
   return (
     <Stack.Navigator
@@ -146,6 +153,7 @@ export function SettingsStack() {
         name="SettingsNotifications"
         component={SettingsNotificationsRoute}
       />
+      <Stack.Screen name="SettingsOrrery" component={SettingsOrreryRoute} />
       <Stack.Screen name="AIConnection" component={AIConnectionRoute} />
       <Stack.Screen name="AIModelPicker" component={AIModelPickerRoute} />
       <Stack.Screen

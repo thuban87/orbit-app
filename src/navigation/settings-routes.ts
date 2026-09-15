@@ -42,6 +42,11 @@ export const SETTINGS_REGISTERED_ROUTES = [
   // migrated from the monolith, routed through the shared reconcile-on-write
   // helper; its <Stack.Screen> is registered in SettingsStack.tsx.
   "SettingsNotifications",
+  // The Orrery category route (Plan 06, §H) — Display prefs (density/satellites)
+  // bound to the canonical useOrreryPreferencesStore (the shared preference
+  // source, NOT a forked writer) + Systems Management routing; its <Stack.Screen>
+  // is registered in SettingsStack.tsx.
+  "SettingsOrrery",
 ] as const;
 
 export type SettingsRegisteredRoute =

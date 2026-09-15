@@ -34,8 +34,8 @@ const LOG_SCOPE = "settings-screen";
 /**
  * SettingsScreen — the transitional `SettingsMore` monolith (Phase 37, D-09).
  * Category groups migrate out into dedicated hub sub-routes plan by plan; Plan 08
- * removes this screen once every group has a home. Currently hosts the AI hub,
- * the "Add Orbit widget" utility, and the Systems row.
+ * removes this screen once every group has a home. Currently hosts the AI hub
+ * and the "Add Orbit widget" utility.
  *
  * Migrated OUT of this monolith:
  * - Appearance / Theme + owner-profile + Orbit Appearance → SettingsAppearance (Plans 02–03).
@@ -45,6 +45,8 @@ const LOG_SCOPE = "settings-screen";
  * - Notifications (master, degraded note, Decay, Birthday, Birthday-unbound,
  *   Weekly digest, Lock-screen, Reminder time, Quiet start/end) → SettingsNotifications
  *   (Plan 05, §G) — carrying the shared reconcile-on-write path.
+ * - Orrery Display (density, satellites) bound to the shared preference store +
+ *   the Systems row → SettingsOrrery (Plan 06, §H).
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
@@ -361,21 +363,6 @@ export function SettingsScreen() {
           </Text>
         ) : null}
       </View>
-
-      <Pressable
-        testID="settings-systems-row"
-        accessibilityRole="button"
-        accessibilityLabel="Systems"
-        onPress={() => navigation.navigate("SystemsManagement")}
-        style={[
-          styles.row,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-      >
-        <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
-          Systems
-        </Text>
-      </Pressable>
     </ScrollView>
   );
 }

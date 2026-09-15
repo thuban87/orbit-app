@@ -97,6 +97,14 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
   },
   {
     kind: "route",
+    key: "orrery",
+    title: "Orrery",
+    subtitle: "Display density, relationship satellites, and Systems",
+    icon: "orbit",
+    route: "SettingsOrrery",
+  },
+  {
+    kind: "route",
     key: "more",
     title: "More settings",
     subtitle: "Everything not yet reorganised into a category",
