@@ -1363,6 +1363,52 @@ describe("app-settings-dao — Profile presentation preferences", () => {
       true,
     );
   });
+
+  it("clears each global template UID back to null (the Default/None choice, review MEDIUM #3)", async () => {
+    // Seed real templates so the assign step references valid rows.
+    await exec.runAsync(
+      "INSERT INTO profile_layout_templates(uid,name,layout_json,created_at,modified_at) VALUES(?,?,?,?,?)",
+      ["layout-clear", "Clearable", JSON.stringify({ version: 1 }), NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [
+        "background-clear",
+        "Clearable",
+        "profile-backgrounds/clear.webp",
+        NOW,
+        NOW,
+      ],
+    );
+
+    // Assign a UID to each global key…
+    await updateAppSettings(
+      exec,
+      {
+        profileLayoutTemplateUid: "layout-clear",
+        profileBackgroundTemplateUid: "background-clear",
+      },
+      LATER,
+    );
+    expect(await getAppSettings(exec)).toMatchObject({
+      profileLayoutTemplateUid: "layout-clear",
+      profileBackgroundTemplateUid: "background-clear",
+    });
+
+    // …then write null for each ("Default / None") and prove it restores the
+    // no-global-override state (falls back to factory/inherited in the reader).
+    await updateAppSettings(
+      exec,
+      {
+        profileLayoutTemplateUid: null,
+        profileBackgroundTemplateUid: null,
+      },
+      LATER,
+    );
+    const cleared = await getAppSettings(exec);
+    expect(cleared.profileLayoutTemplateUid).toBeNull();
+    expect(cleared.profileBackgroundTemplateUid).toBeNull();
+  });
 });
 
 describe("app-settings-dao — history lens/preset settings (migration 025, D-11)", () => {

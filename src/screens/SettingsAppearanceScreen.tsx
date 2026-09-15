@@ -22,7 +22,13 @@ import {
 } from "@/db/app-settings-dao";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
-import { getProfile } from "@/db/profile-dao";
+import { getProfile, setProfileName } from "@/db/profile-dao";
+import {
+  listProfileBackgroundTemplates,
+  listProfileLayoutTemplates,
+  type ProfileBackgroundTemplateRow,
+  type ProfileLayoutTemplateRow,
+} from "@/db/profile-presentation-read";
 import { listSunCandidates, type SunCandidate } from "@/db/sun-picker-read";
 import { sunOccupantIsSelf } from "@/logic/sun-occupant-logic";
 import type { RootStackParamList } from "@/navigation/types";
@@ -206,18 +212,116 @@ export function SettingsAppearanceScreen({
   const [sunPickerOpen, setSunPickerOpen] = useState(false);
   const [sunSearch, setSunSearch] = useState("");
 
+  // Self-name editor (D-04b). The draft mirrors the persisted `profile.name`
+  // (seeded on focus); committing routes through `setProfileName` (trim /
+  // empty-clears-to-NULL / bounded, Task 1's contract). A failed write surfaces
+  // an inline notice and never leaves the draft silently unsaved.
+  const [selfNameDraft, setSelfNameDraft] = useState("");
+  const [nameError, setNameError] = useState<string | null>(null);
+
+  // Global default profile layout/background (D-05): the app_settings PREFs
+  // (`profile_layout_template_uid` / `profile_background_template_uid`),
+  // DISTINCT from the per-contact managers (which stay reachable only from a
+  // contact's profile — not linked here). NULL = "Default / None" (no global
+  // override → factory/inherited). Choices come from the template lists, which
+  // resolve async, so loading + error states are explicit.
+  const [globalLayoutUid, setGlobalLayoutUid] = useState<string | null>(null);
+  const [globalBackgroundUid, setGlobalBackgroundUid] = useState<string | null>(
+    null,
+  );
+  const [layoutTemplates, setLayoutTemplates] = useState<
+    ProfileLayoutTemplateRow[]
+  >([]);
+  const [backgroundTemplates, setBackgroundTemplates] = useState<
+    ProfileBackgroundTemplateRow[]
+  >([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const [openTemplatePicker, setOpenTemplatePicker] = useState<
+    "layout" | "background" | null
+  >(null);
+
   // Reload the self record so a photo set/removed on the crop screen refreshes
-  // when it goBack()s here (mirrors ContactProfileScreen's reload-on-focus).
+  // when it goBack()s here (mirrors ContactProfileScreen's reload-on-focus). The
+  // name draft is reseeded from the persisted value on each focus.
   const reloadProfile = useCallback(async () => {
     try {
       const profile = await getProfile(getExecutor());
       setSelfPhoto(profile?.photo ?? null);
       setSelfName(profile?.name ?? null);
+      setSelfNameDraft(profile?.name ?? "");
       setSelfModifiedAt(profile?.modified_at);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load self profile", err);
     }
   }, []);
+
+  // Load the global-default template PREFs + the choice lists. The lists resolve
+  // async (they hit SQLite), so this owns the loading flag and an error state the
+  // controls render inline rather than assuming synchronous availability.
+  const reloadProfileDefaults = useCallback(async () => {
+    const exec = getExecutor();
+    setTemplatesLoading(true);
+    try {
+      const [settings, layouts, backgrounds] = await Promise.all([
+        getAppSettings(exec),
+        listProfileLayoutTemplates(exec),
+        listProfileBackgroundTemplates(exec),
+      ]);
+      setGlobalLayoutUid(settings.profileLayoutTemplateUid);
+      setGlobalBackgroundUid(settings.profileBackgroundTemplateUid);
+      setLayoutTemplates(layouts);
+      setBackgroundTemplates(backgrounds);
+      setTemplatesError(null);
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to load profile default templates", err);
+      setTemplatesError("Couldn't load profile templates. Please try again.");
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, []);
+
+  // Commit the self name through setProfileName (Task 1's clear/trim/length
+  // contract — empty clears to NULL). Writes the `profile` table, NEVER contacts.
+  const onCommitSelfName = useCallback(async () => {
+    try {
+      await setProfileName(getExecutor(), selfNameDraft, localDateTime());
+      setNameError(null);
+      await reloadProfile();
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to persist self name", err);
+      setNameError(
+        "Couldn't save that name. Try a shorter name without special characters.",
+      );
+    }
+  }, [selfNameDraft, reloadProfile]);
+
+  // Write the GLOBAL default for an axis via updateAppSettings (D-05). A null uid
+  // is the "Default / None" clear — both keys are nullable, so this returns the
+  // no-global-override state (falls back to factory/inherited).
+  const onSelectGlobalTemplate = useCallback(
+    async (axis: "layout" | "background", uid: string | null) => {
+      try {
+        await updateAppSettings(
+          getExecutor(),
+          axis === "layout"
+            ? { profileLayoutTemplateUid: uid }
+            : { profileBackgroundTemplateUid: uid },
+          localDateTime(),
+        );
+        setOpenTemplatePicker(null);
+        await reloadProfileDefaults();
+      } catch (err) {
+        Logger.error(
+          LOG_SCOPE,
+          "failed to persist global profile default",
+          err,
+        );
+        setTemplatesError("Couldn't save that change. Please try again.");
+      }
+    },
+    [reloadProfileDefaults],
+  );
 
   // Load the Orbit Center settings (self-star colour + centre occupant). Read on
   // focus so a change made elsewhere refreshes when this screen regains focus.
@@ -255,7 +359,8 @@ export function SettingsAppearanceScreen({
     useCallback(() => {
       void reloadProfile();
       void reloadOrbit();
-    }, [reloadProfile, reloadOrbit]),
+      void reloadProfileDefaults();
+    }, [reloadProfile, reloadOrbit, reloadProfileDefaults]),
   );
 
   // Persist the tapped self-star token (a themed starPalette entry). ADR-047 /
@@ -681,6 +786,58 @@ export function SettingsAppearanceScreen({
             Your profile
           </Text>
 
+          {/* Self-name editor (D-04b). A bounded input seeded from the persisted
+              `profile.name`; committing on blur/submit routes through
+              setProfileName (empty clears to NULL → the "You" display fallback).
+              Writes the `profile` table, never `contacts`. */}
+          <View
+            testID="settings-self-name-row"
+            style={[
+              styles.row,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+              Your name
+            </Text>
+            <TextInput
+              testID="settings-self-name-input"
+              accessibilityLabel="Your name"
+              value={selfNameDraft}
+              onChangeText={setSelfNameDraft}
+              onEndEditing={() => void onCommitSelfName()}
+              onSubmitEditing={() => void onCommitSelfName()}
+              placeholder="You"
+              placeholderTextColor={colors.textSecondary}
+              maxLength={100}
+              returnKeyType="done"
+              style={[
+                styles.searchInput,
+                {
+                  color: colors.textPrimary,
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  borderWidth: 1,
+                  borderRadius: 8,
+                },
+              ]}
+            />
+            {nameError !== null ? (
+              <Text
+                testID="settings-self-name-error"
+                accessibilityLiveRegion="polite"
+                accessibilityRole="alert"
+                style={[styles.helper, { color: colors.danger }]}
+              >
+                {nameError}
+              </Text>
+            ) : (
+              <Text style={[styles.helper, { color: colors.textSecondary }]}>
+                Shown at the centre of your orbit. Leave blank to use "You".
+              </Text>
+            )}
+          </View>
+
           <View
             testID="settings-your-photo-row"
             style={[
@@ -846,6 +1003,200 @@ export function SettingsAppearanceScreen({
                         accessibilityLabel={item.name}
                         accessibilityState={{ selected: isSelected }}
                         onPress={() => void onPickSunOccupant(item.id)}
+                        style={[styles.option, { borderColor: colors.border }]}
+                      >
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            color: isSelected
+                              ? colors.accent
+                              : colors.textPrimary,
+                          }}
+                        >
+                          {item.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  }}
+                />
+              </View>
+            </View>
+          </Modal>
+        </View>
+
+        {/* Profile Defaults (D-05) — the GLOBAL default profile layout/background
+            (app_settings PREFs), distinct from the per-contact managers (which
+            stay reachable only from a contact's profile and are NOT linked here).
+            A NULL value is "Default / None": no global override, so a contact
+            without a stronger override falls back to factory/inherited. */}
+        <View testID="settings-profile-defaults-section" style={styles.section}>
+          <Text
+            accessibilityRole="header"
+            style={[styles.sectionHeading, { color: colors.textSecondary }]}
+          >
+            Profile Defaults
+          </Text>
+
+          {templatesError !== null ? (
+            <View
+              testID="settings-profile-defaults-error"
+              accessibilityLiveRegion="polite"
+              accessibilityRole="alert"
+              style={[
+                styles.row,
+                { backgroundColor: colors.surface, borderColor: colors.danger },
+              ]}
+            >
+              <Text style={[styles.helper, { color: colors.danger }]}>
+                {templatesError}
+              </Text>
+            </View>
+          ) : null}
+
+          {templatesLoading ? (
+            <Text
+              testID="settings-profile-defaults-loading"
+              accessibilityLiveRegion="polite"
+              style={[styles.helper, { color: colors.textSecondary }]}
+            >
+              Loading profile templates…
+            </Text>
+          ) : (
+            <>
+              <Pressable
+                testID="settings-profile-default-layout-row"
+                accessibilityRole="button"
+                accessibilityLabel={`Default profile layout, ${
+                  layoutTemplates.find((t) => t.uid === globalLayoutUid)
+                    ?.name ?? "Default / None"
+                }`}
+                onPress={() => setOpenTemplatePicker("layout")}
+                style={[
+                  styles.row,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View style={styles.toggleRow}>
+                  <Text
+                    style={[styles.rowLabel, { color: colors.textPrimary }]}
+                  >
+                    Default profile layout
+                  </Text>
+                  <Text style={[styles.rowValue, { color: colors.accent }]}>
+                    {layoutTemplates.find((t) => t.uid === globalLayoutUid)
+                      ?.name ?? "Default / None"}
+                  </Text>
+                </View>
+                <Text style={[styles.helper, { color: colors.textSecondary }]}>
+                  Used for any contact that doesn't have its own layout.
+                </Text>
+              </Pressable>
+
+              <Pressable
+                testID="settings-profile-default-background-row"
+                accessibilityRole="button"
+                accessibilityLabel={`Default profile background, ${
+                  backgroundTemplates.find((t) => t.uid === globalBackgroundUid)
+                    ?.name ?? "Default / None"
+                }`}
+                onPress={() => setOpenTemplatePicker("background")}
+                style={[
+                  styles.row,
+                  {
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <View style={styles.toggleRow}>
+                  <Text
+                    style={[styles.rowLabel, { color: colors.textPrimary }]}
+                  >
+                    Default profile background
+                  </Text>
+                  <Text style={[styles.rowValue, { color: colors.accent }]}>
+                    {backgroundTemplates.find(
+                      (t) => t.uid === globalBackgroundUid,
+                    )?.name ?? "Default / None"}
+                  </Text>
+                </View>
+                <Text style={[styles.helper, { color: colors.textSecondary }]}>
+                  Used for any contact that doesn't have its own background.
+                </Text>
+              </Pressable>
+            </>
+          )}
+
+          {/* Shared picker: "Default / None" (writes null) first, then every
+              template for the open axis. */}
+          <Modal
+            visible={openTemplatePicker !== null}
+            transparent
+            animationType="fade"
+            onRequestClose={() => setOpenTemplatePicker(null)}
+          >
+            <View style={styles.modalRoot}>
+              <Pressable
+                accessibilityLabel="Dismiss profile default options"
+                style={StyleSheet.absoluteFill}
+                onPress={() => setOpenTemplatePicker(null)}
+              >
+                <View
+                  style={[
+                    StyleSheet.absoluteFill,
+                    styles.scrim,
+                    { backgroundColor: colors.background },
+                  ]}
+                />
+              </Pressable>
+
+              <View
+                testID="settings-profile-default-picker"
+                style={[
+                  styles.sheet,
+                  {
+                    backgroundColor: colors.surfaceElevated,
+                    borderColor: colors.border,
+                  },
+                ]}
+              >
+                <FlatList
+                  data={
+                    [
+                      { uid: null, name: "Default / None" },
+                      ...(openTemplatePicker === "layout"
+                        ? layoutTemplates
+                        : backgroundTemplates
+                      ).map((t) => ({
+                        uid: t.uid as string | null,
+                        name: t.name,
+                      })),
+                    ] as Array<{ uid: string | null; name: string }>
+                  }
+                  keyExtractor={(item) => item.uid ?? "default-none"}
+                  renderItem={({ item }) => {
+                    const currentUid =
+                      openTemplatePicker === "layout"
+                        ? globalLayoutUid
+                        : globalBackgroundUid;
+                    const isSelected = item.uid === currentUid;
+                    return (
+                      <Pressable
+                        testID={`settings-profile-default-option-${item.uid ?? "default-none"}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={item.name}
+                        accessibilityState={{ selected: isSelected }}
+                        onPress={() => {
+                          if (openTemplatePicker !== null) {
+                            void onSelectGlobalTemplate(
+                              openTemplatePicker,
+                              item.uid,
+                            );
+                          }
+                        }}
                         style={[styles.option, { borderColor: colors.border }]}
                       >
                         <Text
