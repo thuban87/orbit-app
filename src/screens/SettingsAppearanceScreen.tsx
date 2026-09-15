@@ -1,6 +1,6 @@
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Image,
@@ -217,6 +217,10 @@ export function SettingsAppearanceScreen({
   // empty-clears-to-NULL / bounded, Task 1's contract). A failed write surfaces
   // an inline notice and never leaves the draft silently unsaved.
   const [selfNameDraft, setSelfNameDraft] = useState("");
+  // Last committed/persisted self name (normalized), tracked synchronously so the
+  // paired onEndEditing + onSubmitEditing handlers don't double-write on a single
+  // confirmed edit (review WR-03). null = persisted as cleared.
+  const lastCommittedNameRef = useRef<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
 
   // Global default profile layout/background (D-05): the app_settings PREFs
@@ -250,6 +254,7 @@ export function SettingsAppearanceScreen({
       setSelfPhoto(profile?.photo ?? null);
       setSelfName(profile?.name ?? null);
       setSelfNameDraft(profile?.name ?? "");
+      lastCommittedNameRef.current = profile?.name ?? null;
       setSelfModifiedAt(profile?.modified_at);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load self profile", err);
@@ -284,11 +289,22 @@ export function SettingsAppearanceScreen({
   // Commit the self name through setProfileName (Task 1's clear/trim/length
   // contract — empty clears to NULL). Writes the `profile` table, NEVER contacts.
   const onCommitSelfName = useCallback(async () => {
+    const trimmed = selfNameDraft.trim();
+    const nextName = trimmed === "" ? null : trimmed;
+    // Skip when unchanged from the last committed value — dedupes the paired
+    // onEndEditing/onSubmitEditing fire on a single confirmed edit and avoids a
+    // spurious write (+ data-revision bump) on a no-op blur (review WR-03).
+    if (nextName === lastCommittedNameRef.current) {
+      return;
+    }
+    const previous = lastCommittedNameRef.current;
+    lastCommittedNameRef.current = nextName;
     try {
       await setProfileName(getExecutor(), selfNameDraft, localDateTime());
       setNameError(null);
       await reloadProfile();
     } catch (err) {
+      lastCommittedNameRef.current = previous;
       Logger.error(LOG_SCOPE, "failed to persist self name", err);
       setNameError(
         "Couldn't save that name. Try a shorter name without special characters.",
@@ -431,24 +447,39 @@ export function SettingsAppearanceScreen({
   // fired (instant restyle); this only makes a failed durable write observable
   // AND reconciled. Never inline SQL — every write routes through the DAO.
   const persist = useCallback(async (patch: AppSettingsPatch) => {
-    const result = await persistAppearanceSetting(getExecutor(), patch, {
-      updateAppSettings,
-      getAppSettings,
-      hydrateThemeStore: (selection) =>
-        useThemeStore.getState().hydrate(selection),
-      now: localDateTime,
-    });
-    if (!result.ok) {
+    try {
+      const result = await persistAppearanceSetting(getExecutor(), patch, {
+        updateAppSettings,
+        getAppSettings,
+        hydrateThemeStore: (selection) =>
+          useThemeStore.getState().hydrate(selection),
+        now: localDateTime,
+      });
+      if (!result.ok) {
+        Logger.error(
+          LOG_SCOPE,
+          "failed to persist appearance setting",
+          result.error,
+        );
+        setSaveError(
+          "Couldn't save that change. Your last saved appearance was restored.",
+        );
+      } else {
+        setSaveError(null);
+      }
+    } catch (err) {
+      // Correlated double failure: the durable write failed AND the reconcile
+      // re-read threw, so persistAppearanceSetting rejected. Every caller invokes
+      // this as `void persist(...)`, so without this guard the rejection is
+      // unhandled and the live store is left on its optimistic value. We cannot
+      // read the durable state to reconcile, so surface an honest error rather
+      // than claim a restore that did not happen (review WR-01/WR-04).
       Logger.error(
         LOG_SCOPE,
-        "failed to persist appearance setting",
-        result.error,
+        "failed to persist appearance setting (unrecoverable)",
+        err,
       );
-      setSaveError(
-        "Couldn't save that change. Your last saved appearance was restored.",
-      );
-    } else {
-      setSaveError(null);
+      setSaveError("Couldn't save that change. Please try again.");
     }
   }, []);
 
