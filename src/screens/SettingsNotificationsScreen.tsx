@@ -4,6 +4,8 @@ import DateTimePicker, {
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useState } from "react";
 import {
+  Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,6 +26,7 @@ import { reconcileDigestSchedule } from "@/services/notifications/digest-schedul
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import {
   getNotificationPermission,
+  type NotificationPermissionResult,
   requestNotificationPermission,
 } from "@/services/notifications/permission";
 import { useTheme } from "@/theme";
@@ -105,20 +108,25 @@ export function SettingsNotificationsScreen({
   const [degraded, setDegraded] = useState(false);
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // The RAW OS notification-permission status, read fresh on focus INDEPENDENT of
+  // the master toggle (Task 2 / §G). This is tracked separately from `degraded`
+  // (master-on-but-blocked): the monolith only read permission when the master was
+  // on (SettingsScreen.tsx:349), which cannot power a general permission row that
+  // must reflect true OS status even with the master off.
+  const [permission, setPermission] =
+    useState<NotificationPermissionResult | null>(null);
 
-  // Load app_settings + the current OS permission status. If the master is on but
-  // the OS later revoked permission (out-of-app), surface the degraded note so the
-  // user understands why nothing fires — still no re-prompt.
+  // Load app_settings + the current OS permission status. Permission is OS-owned
+  // and revocable between opens, so it is READ FRESH on every focus regardless of
+  // the master. `degraded` stays the master-on-but-blocked note (a separate
+  // concern from the raw permission row) — still text only, never a re-prompt.
   const reloadNotifications = useCallback(async () => {
     try {
       const next = await getAppSettings(getExecutor());
       setSettings(next);
-      if (next.notificationsEnabled === 1) {
-        const perm = await getNotificationPermission();
-        setDegraded(!perm.granted);
-      } else {
-        setDegraded(false);
-      }
+      const perm = await getNotificationPermission();
+      setPermission(perm);
+      setDegraded(next.notificationsEnabled === 1 && !perm.granted);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load notification settings", err);
     }
@@ -147,6 +155,20 @@ export function SettingsNotificationsScreen({
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to persist notification setting", err);
       setSaveError("Couldn't save that change. Please try again.");
+    }
+  }, []);
+
+  // Denied permission is OS-owned — Orbit cannot flip it itself, so it hands off
+  // to system settings (mirrors `openContactsSettings`, incl. the calm OEM
+  // fallback). Never a silent in-app re-prompt (§G).
+  const onOpenSystemSettings = useCallback(async () => {
+    try {
+      await Linking.openSettings();
+    } catch {
+      Alert.alert(
+        "Open Settings manually",
+        "Open Orbit's app settings and allow notifications.",
+      );
     }
   }, []);
 
@@ -262,6 +284,50 @@ export function SettingsNotificationsScreen({
               </Text>
             ) : null}
           </View>
+
+          {/* RAW OS notification-permission row (§G) — reflects true OS status
+              regardless of the master toggle (separate from the master-on-but-
+              blocked `degraded` note). When blocked, hands off to system settings;
+              the controls below stay visible with this explanation. */}
+          {permission ? (
+            <View
+              testID="settings-notifications-permission"
+              style={[
+                styles.row,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
+                Notification permission
+              </Text>
+              <Text
+                testID="settings-notifications-permission-status"
+                style={[styles.helper, { color: colors.textSecondary }]}
+              >
+                {permission.granted
+                  ? "Your phone allows Orbit's notifications. Reminders can be delivered."
+                  : "Your phone is blocking Orbit's notifications. Reminders won't appear until you allow them in system settings — the controls below stay available."}
+              </Text>
+              {!permission.granted ? (
+                <Pressable
+                  testID="settings-notifications-permission-open-settings"
+                  accessibilityRole="button"
+                  accessibilityLabel="Open system settings for notifications"
+                  onPress={() => void onOpenSystemSettings()}
+                  style={[styles.inlineButton, { borderColor: colors.border }]}
+                >
+                  <Text
+                    style={[styles.rowLabel, { color: colors.textPrimary }]}
+                  >
+                    Open system settings
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
 
           {degraded ? (
             <View
@@ -724,5 +790,12 @@ const styles = StyleSheet.create({
   degradedHeading: {
     fontSize: 16,
     fontWeight: "600",
+  },
+  inlineButton: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignSelf: "flex-start",
   },
 });
