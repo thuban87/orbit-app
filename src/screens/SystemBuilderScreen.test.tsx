@@ -16,6 +16,7 @@ vi.mock("react", () => ({
 vi.mock("react-native", () => ({
   Alert: { alert: vi.fn() },
   AppState: { addEventListener: () => ({ remove: () => {} }) },
+  Pressable: "Pressable",
   ScrollView: "ScrollView",
   StyleSheet: { create: (styles: unknown) => styles, absoluteFill: {} },
   TextInput: "TextInput",
@@ -108,6 +109,9 @@ const { previewSaveAction } = await import("./SystemBuilderScreen");
 const { focusPreviewBody } = await import(
   "@/components/orrery/SystemPreviewCanvas"
 );
+const { buildCategoryRuleView } = await vi.importActual<
+  typeof import("@/components/orrery/SystemRuleAccordion")
+>("@/components/orrery/SystemRuleAccordion");
 
 beforeEach(() => {
   hydrated = false;
@@ -201,5 +205,48 @@ describe("SystemBuilder save selection channel", () => {
     });
     expect(saveSystemDefinition).not.toHaveBeenCalled();
     expect(prefsSave).not.toHaveBeenCalled();
+  });
+});
+
+describe("SystemBuilder category rule catalog", () => {
+  const categories = Array.from({ length: 13 }, (_, index) => ({
+    value: `category-${index}`,
+    label: index === 12 ? "Renamed Family" : `Category ${index}`,
+  }));
+
+  it("adds search at 13 categories without clearing hidden selections", () => {
+    const view = buildCategoryRuleView(
+      categories,
+      ["category-0", "category-12"],
+      "renamed",
+    );
+
+    expect(view.searchable).toBe(true);
+    expect(view.selectedCount).toBe(2);
+    expect(view.visibleOptions).toEqual([categories[12]]);
+    expect(view.selectedValues).toEqual(["category-0", "category-12"]);
+  });
+
+  it("keeps UID identity through rename and drops only deleted UIDs", () => {
+    expect(
+      buildCategoryRuleView(
+        [{ value: "family", label: "Family renamed" }],
+        ["family", "deleted"],
+        "",
+      ),
+    ).toMatchObject({
+      selectedValues: ["family"],
+      selectedCount: 1,
+      visibleOptions: [{ value: "family", label: "Family renamed" }],
+    });
+  });
+
+  it("exposes the exact neutral empty state", () => {
+    expect(buildCategoryRuleView([], [], "")).toMatchObject({
+      searchable: false,
+      selectedCount: 0,
+      visibleOptions: [],
+      emptyCopy: "No categories available",
+    });
   });
 });
