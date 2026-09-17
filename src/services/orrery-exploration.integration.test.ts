@@ -605,7 +605,7 @@ describe("Orrery production exploration integration", () => {
     });
     for (const key of ["camera", "pose", "focus", "sunContactId"])
       expect(manifest.appSettings).not.toHaveProperty(key);
-    expect(manifest.backupFormatVersion).toBe(5);
+    expect(manifest.backupFormatVersion).toBe(6);
     await deleteRelationship(exec, { id, contactId: parent.id, now: LATER });
     const restored = await applyRestore(exec, manifest, "replace-all", {
       reconcileNotificationSchedule: async () => {},
