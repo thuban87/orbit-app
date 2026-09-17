@@ -14,8 +14,8 @@ export interface VisibleNameCollision {
 
 /** Pure final-survivor gate shared by parse-time and destination-aware restore planning. */
 export function findVisibleNameCollisions(
-  categories: readonly (Pick<ReconciliationRow, "uid"> & { name?: unknown })[],
-  systems: readonly (Pick<ReconciliationRow, "uid"> & { name?: unknown })[],
+  categories: readonly { uid?: unknown; name?: unknown }[],
+  systems: readonly { uid?: unknown; name?: unknown }[],
 ): VisibleNameCollision[] {
   const seen = new Map<string, string>();
   const collisions: VisibleNameCollision[] = [];
@@ -28,8 +28,10 @@ export function findVisibleNameCollisions(
   };
   for (const [id, label] of Object.entries(BUILTIN_SYSTEM_LABELS))
     visit(`builtin:${id}`, label);
-  for (const row of categories) visit(row.uid, row.name);
-  for (const row of systems) visit(row.uid, row.name);
+  for (const row of categories)
+    if (typeof row.uid === "string") visit(row.uid, row.name);
+  for (const row of systems)
+    if (typeof row.uid === "string") visit(row.uid, row.name);
   return collisions;
 }
 
@@ -189,6 +191,59 @@ export interface ReconciliationResult {
   incompatibilities: ReconciliationIncompatibility[];
   totals: Record<ReconciliationAction["kind"], number>;
   survivors: ReadonlySet<string>;
+}
+
+export interface CategoryDependentPlan {
+  contacts: ReconciliationAction[];
+  system_rules: ReconciliationAction[];
+  system_overrides: ReconciliationAction[];
+  system_prefs: ReconciliationAction[];
+  profile_category_presentation: ReconciliationAction[];
+}
+
+/**
+ * Normalize fallout only for categories proven deleted by reconciliation.
+ * Historical dangling rules remain intact so the existing diagnostic contract
+ * can continue surfacing them for user repair.
+ */
+export function suppressCategoryTombstoneDependents(
+  plan: CategoryDependentPlan,
+  deletedCategoryUids: ReadonlySet<string>,
+): void {
+  for (const action of plan.contacts) {
+    if (
+      action.row &&
+      typeof action.row.categoryUid === "string" &&
+      deletedCategoryUids.has(action.row.categoryUid)
+    ) {
+      action.row.categoryUid = null;
+      if (action.kind === "retain") action.kind = "update";
+    }
+  }
+  for (const action of plan.system_rules) {
+    if (
+      action.row?.family === "category" &&
+      typeof action.row.value === "string" &&
+      deletedCategoryUids.has(action.row.value)
+    )
+      action.kind = "delete";
+  }
+  for (const entity of ["system_overrides", "system_prefs"] as const)
+    for (const action of plan[entity]) {
+      const ref = action.row?.systemRef;
+      if (
+        typeof ref === "string" &&
+        ref.startsWith("category:") &&
+        deletedCategoryUids.has(ref.slice("category:".length))
+      )
+        action.kind = "delete";
+    }
+  for (const action of plan.profile_category_presentation)
+    if (
+      typeof action.row?.categoryUid === "string" &&
+      deletedCategoryUids.has(action.row.categoryUid)
+    )
+      action.kind = "delete";
 }
 
 export interface ReconcileEntityInput {
