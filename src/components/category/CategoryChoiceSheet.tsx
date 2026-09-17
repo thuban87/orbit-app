@@ -33,10 +33,12 @@ export function categoryChoiceSheetModel({
       category.id !== excludeCategoryId && category.uid !== excludeCategoryUid,
   );
   const choices = buildCategoryChoices(eligible, allowUncategorized);
+  const effectiveQuery = choices.searchable ? query : "";
   return {
     selectedId,
-    rows: filterCategoryChoices(choices.rows, query),
-    emptyCopy: `No categories match \u201c${query.trim()}\u201d.`,
+    searchable: choices.searchable,
+    rows: filterCategoryChoices(choices.rows, effectiveQuery),
+    emptyCopy: `No categories match \u201c${effectiveQuery.trim()}\u201d.`,
   };
 }
 
