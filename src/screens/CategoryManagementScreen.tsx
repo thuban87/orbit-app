@@ -49,7 +49,15 @@ import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
 
 const LOAD_ERROR = "Couldn't load categories. Try again.";
-const SAVE_ERROR = "Couldn't save this category. Please try again.";
+export const CATEGORY_MANAGER_COPY = {
+  saveError: "Couldn't save this category. Your changes weren’t applied.",
+  emptyHeading: "No categories yet",
+  emptyBody:
+    "Add a category to organize your contacts. Uncategorized is always available.",
+  uncategorizedBody:
+    "Contacts without a category stay here. Uncategorized is always available and can’t be renamed or deleted.",
+} as const;
+const SAVE_ERROR = CATEGORY_MANAGER_COPY.saveError;
 const REORDER_ERROR =
   "Couldn't save the new category order. The previous order was restored.";
 type Editor =
@@ -665,9 +673,14 @@ export function CategoryManagementScreen() {
               />
             )}
             ListEmptyComponent={
-              <AppText style={{ color: colors.textSecondary }}>
-                No categories yet. Add one when you’re ready.
-              </AppText>
+              <View>
+                <AppText role="heading">
+                  {CATEGORY_MANAGER_COPY.emptyHeading}
+                </AppText>
+                <AppText style={{ color: colors.textSecondary }}>
+                  {CATEGORY_MANAGER_COPY.emptyBody}
+                </AppText>
+              </View>
             }
             ListFooterComponent={
               <View
@@ -678,7 +691,7 @@ export function CategoryManagementScreen() {
                   {categoryCountLabel(uncategorizedCount)}
                 </AppText>
                 <AppText role="caption" style={{ color: colors.textSecondary }}>
-                  Contacts without a category stay here.
+                  {CATEGORY_MANAGER_COPY.uncategorizedBody}
                 </AppText>
               </View>
             }

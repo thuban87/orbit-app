@@ -47,6 +47,7 @@ vi.mock("@/theme/use-reduced-motion", () => ({
 }));
 
 const {
+  CATEGORY_MANAGER_COPY,
   categoryCountLabel,
   createCategoryManagementLoadGuard,
   deletionImpactRows,
@@ -59,6 +60,17 @@ const {
 } = await import("./CategoryManagementScreen");
 
 describe("CategoryManagementScreen tracer contracts", () => {
+  it("uses the exact owner-approved manager copy", () => {
+    expect(CATEGORY_MANAGER_COPY).toEqual({
+      saveError: "Couldn't save this category. Your changes weren’t applied.",
+      emptyHeading: "No categories yet",
+      emptyBody:
+        "Add a category to organize your contacts. Uncategorized is always available.",
+      uncategorizedBody:
+        "Contacts without a category stay here. Uncategorized is always available and can’t be renamed or deleted.",
+    });
+  });
+
   it("prevents stale loads from publishing", () => {
     const next = createCategoryManagementLoadGuard();
     const first = next();
