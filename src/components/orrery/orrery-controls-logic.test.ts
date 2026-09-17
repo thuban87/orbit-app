@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  buildSystemChoices,
   buildSystemChoiceGroups,
+  buildSystemChoices,
   initialExpandedSystemGroups,
   registerSystemSelectorTransient,
   systemEmptyCopy,
@@ -174,6 +174,9 @@ describe("Orrery System controls", () => {
       category: true,
       custom: false,
     });
+    expect(
+      initialExpandedSystemGroups(groups, "custom:not-loaded-yet"),
+    ).toEqual({ builtin: false, category: false, custom: true });
   });
 
   it("keeps empty category/custom groups visible and treats canonical validity as needs attention", () => {
