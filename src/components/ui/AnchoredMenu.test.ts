@@ -1,5 +1,36 @@
-import { describe, expect, it } from "vitest";
-import { placeAnchoredMenu } from "./AnchoredMenu";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("react", () => ({
+  useCallback: <T>(value: T) => value,
+  useEffect: vi.fn(),
+  useRef: <T>(value: T) => ({ current: value }),
+  useState: <T>(value: T) => [value, vi.fn()],
+}));
+vi.mock("react-native", () => ({
+  AccessibilityInfo: {},
+  findNodeHandle: vi.fn(),
+  Modal: "Modal",
+  Pressable: "Pressable",
+  ScrollView: "ScrollView",
+  StyleSheet: {
+    absoluteFill: {},
+    create: (value: unknown) => value,
+    hairlineWidth: 1,
+  },
+  useWindowDimensions: () => ({ width: 360, height: 800 }),
+  View: "View",
+}));
+vi.mock("react-native-safe-area-context", () => ({
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
+vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
+vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
+vi.mock("@/components/ui/GlassSurface", () => ({
+  GlassSurface: "GlassSurface",
+}));
+vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
+
+const { placeAnchoredMenu } = await import("./AnchoredMenu");
 
 describe("placeAnchoredMenu", () => {
   it("prefers below/end and clamps to the safe-area inset", () => {
