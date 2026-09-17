@@ -124,8 +124,24 @@ const MAX_CUSTOM_SYSTEM_COUNTS_PER_OPEN = 12;
 
 type SystemCountCache = {
   counts: Map<string, number>;
-  broken: Map<string, boolean>;
+  needsAttention: Map<string, boolean>;
 };
+
+export function systemAttentionFeedback(
+  validity: "valid" | "needs-attention" | undefined,
+  brokenCount: number,
+): { heading: string; detail: string | null } | null {
+  if (validity !== "needs-attention" && brokenCount === 0) return null;
+  return {
+    heading: "This System needs attention",
+    detail:
+      brokenCount === 0
+        ? null
+        : brokenCount === 1
+          ? "One membership rule could not be applied."
+          : `${brokenCount} membership rules could not be applied.`,
+  };
+}
 
 export function OrreryScreen() {
   const { colors } = useTheme();
@@ -273,9 +289,9 @@ export function OrreryScreen() {
   const [systemCounts, setSystemCounts] = useState<Map<string, number>>(
     new Map(),
   );
-  const [systemBroken, setSystemBroken] = useState<Map<string, boolean>>(
-    new Map(),
-  );
+  const [systemNeedsAttention, setSystemNeedsAttention] = useState<
+    Map<string, boolean>
+  >(new Map());
   const [systemSelectorRequest, setSystemSelectorRequest] = useState<
     number | null
   >(null);
@@ -497,7 +513,9 @@ export function OrreryScreen() {
         ? undefined
         : systemCountCache.current.get(catalogRevision);
     setSystemCounts(cached ? new Map(cached.counts) : new Map());
-    setSystemBroken(cached ? new Map(cached.broken) : new Map());
+    setSystemNeedsAttention(
+      cached ? new Map(cached.needsAttention) : new Map(),
+    );
   }, [catalogRevision]);
   useEffect(() => {
     if (
@@ -509,7 +527,7 @@ export function OrreryScreen() {
     const cached = systemCountCache.current.get(catalogRevision);
     if (cached) {
       setSystemCounts(new Map(cached.counts));
-      setSystemBroken(new Map(cached.broken));
+      setSystemNeedsAttention(new Map(cached.needsAttention));
       return;
     }
     let cancelled = false;
@@ -519,11 +537,11 @@ export function OrreryScreen() {
       .filter((ref) => ref.kind !== "custom");
     const custom = visible.filter((entry) => entry.ref.kind === "custom");
     const counts = new Map<string, number>();
-    const broken = new Map<string, boolean>();
+    const needsAttention = new Map<string, boolean>();
     const publish = () => {
       if (!cancelled) {
         setSystemCounts(new Map(counts));
-        setSystemBroken(new Map(broken));
+        setSystemNeedsAttention(new Map(needsAttention));
       }
     };
     void (async () => {
@@ -538,13 +556,17 @@ export function OrreryScreen() {
         const result = await countSystemMembers(getExecutor(), entry.ref);
         if (cancelled) return;
         counts.set(entry.id, result.count);
-        broken.set(entry.id, result.brokenRules.length > 0);
+        needsAttention.set(
+          entry.id,
+          result.validity === "needs-attention" ||
+            result.brokenRules.length > 0,
+        );
         publish();
       }
       if (!cancelled)
         systemCountCache.current.set(catalogRevision, {
           counts: new Map(counts),
-          broken: new Map(broken),
+          needsAttention: new Map(needsAttention),
         });
     })().catch(() => {
       // A stale count must not displace a usable selector or System scene.
@@ -1003,6 +1025,10 @@ export function OrreryScreen() {
     qualifyingSun,
   );
   const brokenRules = scene?.systemSnapshot.brokenRules ?? [];
+  const attentionFeedback = systemAttentionFeedback(
+    scene?.systemSnapshot.validity,
+    brokenRules.length,
+  );
   const showAll = () => state.select(ALL_CONTACTS_SYSTEM, undefined, true);
 
   return (
@@ -1044,7 +1070,7 @@ export function OrreryScreen() {
           enabled={hydrated}
           catalog={systemCatalog}
           counts={systemCounts}
-          broken={systemBroken}
+          needsAttention={systemNeedsAttention}
           onOpenChange={onSystemSelectorOpenChange}
         />
         <OrreryViewOptions availableHeight={viewport.height} />
@@ -1225,18 +1251,16 @@ export function OrreryScreen() {
             />
           </OrreryFeedback>
         ) : null}
-        {brokenRules.length > 0 ? (
+        {attentionFeedback ? (
           <OrreryFeedback
             obstacleId="orrery-broken-system-feedback"
             style={[styles.saveFeedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
-            <AppText role="label">This System needs attention</AppText>
-            <AppText role="caption">
-              {brokenRules.length === 1
-                ? "One membership rule could not be applied."
-                : `${brokenRules.length} membership rules could not be applied.`}
-            </AppText>
+            <AppText role="label">{attentionFeedback.heading}</AppText>
+            {attentionFeedback.detail ? (
+              <AppText role="caption">{attentionFeedback.detail}</AppText>
+            ) : null}
           </OrreryFeedback>
         ) : null}
         {hydration === "error" && !hydrated ? (

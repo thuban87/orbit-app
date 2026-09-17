@@ -134,12 +134,9 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
       } catch (error) {
         if (!active || generation !== get().generation) return;
         if (error instanceof MissingOrreryCategoryError) {
-          set({
-            status: "missing-category",
-            snapshot: null,
-            categories: error.snapshot.categories,
-            catalogLoaded: true,
-          });
+          // Category deletion owns durable cleanup; this closes any already-open
+          // stale session through the same safe token and persistence channel.
+          await select(ALL_CONTACTS_SYSTEM);
         } else if (error instanceof MissingOrreryCustomSystemError) {
           // This re-enters select with a fresh generation; the generation guard
           // abandons the stale custom request, so it cannot recurse into a loop.

@@ -14,6 +14,16 @@ export type SystemChoice = SystemDescriptor & {
   overrides: boolean;
 };
 
+export type SystemChoiceGroupId = "builtin" | "category" | "custom";
+export type SystemChoiceGroup = {
+  id: SystemChoiceGroupId;
+  label: "Built-in" | "Categories" | "Custom Systems";
+  rows: SystemChoice[];
+  emptyCopy: string | null;
+};
+
+export type ExpandedSystemGroups = Record<SystemChoiceGroupId, boolean>;
+
 export function buildSystemChoices(
   catalog: readonly SystemCatalogEntry[],
   counts: ReadonlyMap<string, number>,
@@ -111,6 +121,51 @@ export function buildSystemChoices(
       }),
     ),
   ];
+}
+
+/** The approved selector IA is closed: exactly three visible groups. */
+export function buildSystemChoiceGroups(
+  rows: readonly SystemChoice[],
+): SystemChoiceGroup[] {
+  return [
+    {
+      id: "builtin",
+      label: "Built-in",
+      rows: rows.filter((row) => row.ref.kind === "builtin"),
+      emptyCopy: null,
+    },
+    {
+      id: "category",
+      label: "Categories",
+      rows: rows.filter((row) => row.ref.kind === "category"),
+      emptyCopy: "No category Systems",
+    },
+    {
+      id: "custom",
+      label: "Custom Systems",
+      rows: rows.filter((row) => row.ref.kind === "custom"),
+      emptyCopy: "No custom Systems",
+    },
+  ];
+}
+
+export function initialExpandedSystemGroups(
+  groups: readonly SystemChoiceGroup[],
+  selectedId: string,
+): ExpandedSystemGroups {
+  const selected =
+    groups.find((group) => group.rows.some((row) => row.id === selectedId))
+      ?.id ??
+    (selectedId.startsWith("category:")
+      ? "category"
+      : selectedId.startsWith("custom:")
+        ? "custom"
+        : "builtin");
+  return {
+    builtin: selected === "builtin",
+    category: selected === "category",
+    custom: selected === "custom",
+  };
 }
 export function systemSelectorLabel(name: string): string {
   return `Choose System. Current System: ${name}`;

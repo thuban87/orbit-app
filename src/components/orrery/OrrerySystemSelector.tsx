@@ -1,7 +1,7 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText uses semantic typography roles.
 import { useIsFocused, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   AppState,
@@ -23,7 +23,10 @@ import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { OrreryObstacle } from "./OrreryObstacle";
 import {
+  buildSystemChoiceGroups,
   buildSystemChoices,
+  type ExpandedSystemGroups,
+  initialExpandedSystemGroups,
   registerSystemSelectorTransient,
   systemSelectorLabel,
 } from "./orrery-controls-logic";
@@ -34,7 +37,7 @@ export function OrrerySystemSelector({
   enabled,
   catalog,
   counts,
-  broken,
+  needsAttention,
   onOpenChange,
 }: {
   state: OrrerySystemState;
@@ -42,7 +45,7 @@ export function OrrerySystemSelector({
   enabled: boolean;
   catalog: readonly SystemCatalogEntry[];
   counts: ReadonlyMap<string, number>;
-  broken: ReadonlyMap<string, boolean>;
+  needsAttention: ReadonlyMap<string, boolean>;
   onOpenChange: (open: boolean, requestId: number) => void;
 }) {
   const { colors } = useTheme();
@@ -50,19 +53,31 @@ export function OrrerySystemSelector({
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const focused = useIsFocused();
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState<ExpandedSystemGroups>({
+    builtin: true,
+    category: false,
+    custom: false,
+  });
   const [height, setHeight] = useState(44);
   const trigger = useRef<View>(null);
   const heading = useRef<View>(null);
   const requestId = useRef(0);
   const openRef = useRef(false);
+  const rows = useMemo(
+    () => buildSystemChoices(catalog, counts, needsAttention),
+    [catalog, counts, needsAttention],
+  );
+  const groups = useMemo(() => buildSystemChoiceGroups(rows), [rows]);
   const setSelectorOpen = useCallback(
     (next: boolean) => {
       if (openRef.current === next) return;
       openRef.current = next;
+      if (next)
+        setExpanded(initialExpandedSystemGroups(groups, state.requested.id));
       setOpen(next);
       onOpenChange(next, ++requestId.current);
     },
-    [onOpenChange],
+    [groups, onOpenChange, state.requested.id],
   );
   const dismiss = useCallback(() => setSelectorOpen(false), [setSelectorOpen]);
   const latest = useRef(dismiss);
@@ -71,7 +86,6 @@ export function OrrerySystemSelector({
   const blocked = shellTransientStore((store) =>
     store.entries.some((entry) => entry.id !== "orrery-system-selector"),
   );
-  const rows = buildSystemChoices(catalog, counts, broken);
   useEffect(() => {
     if (!open) return;
     // Only one Orrery popup owns the screen; shell Back still dismisses its top entry.
@@ -169,89 +183,133 @@ export function OrrerySystemSelector({
               >
                 <AppText role="heading">Choose System</AppText>
               </View>
-              {rows.map((row) => {
-                const selected = row.id === state.requested.id;
-                const stateLabel =
-                  row.severity === "empty"
-                    ? ", empty"
-                    : row.severity === "broken"
-                      ? ", needs attention"
-                      : "";
-                const indicator =
-                  row.severity === "empty"
-                    ? {
-                        name: "system-empty" as const,
-                        tone: "statusWobble" as const,
-                      }
-                    : row.severity === "broken"
-                      ? {
-                          name: "system-broken" as const,
-                          tone: "danger" as const,
-                        }
-                      : row.overrides
-                        ? {
-                            name: "system-overrides" as const,
-                            tone: "textSecondary" as const,
-                          }
-                        : null;
-                return (
+              {groups.map((group) => (
+                <View key={group.id}>
                   <Pressable
-                    key={row.id}
-                    accessibilityRole="radio"
-                    accessibilityLabel={`${row.name}${stateLabel}`}
-                    accessibilityState={{
-                      checked: selected,
-                      busy: selected && busy,
-                    }}
-                    style={[
-                      styles.row,
-                      {
-                        borderWidth: 1,
-                        borderColor: selected ? colors.accent : colors.border,
-                      },
-                    ]}
-                    onPress={() => {
-                      void state.select(row.ref, row.name, true);
-                      dismiss();
-                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${group.label}, ${group.rows.length} ${group.rows.length === 1 ? "System" : "Systems"}`}
+                    accessibilityState={{ expanded: expanded[group.id] }}
+                    onPress={() =>
+                      setExpanded((current) => ({
+                        ...current,
+                        [group.id]: !current[group.id],
+                      }))
+                    }
+                    style={styles.groupHeader}
                   >
-                    <View style={styles.rowContent}>
-                      <View style={styles.rowText}>
+                    <View style={styles.groupHeadingCopy}>
+                      <AppText role="label">{group.label}</AppText>
+                      <AppText
+                        role="caption"
+                        style={{ color: colors.textSecondary }}
+                      >
+                        {group.rows.length}
+                      </AppText>
+                    </View>
+                    <Icon
+                      name={expanded[group.id] ? "chevron-down" : "forward"}
+                      size="sm"
+                    />
+                  </Pressable>
+                  {expanded[group.id] ? (
+                    <View style={styles.groupBody}>
+                      {group.rows.length === 0 && group.emptyCopy ? (
                         <AppText
-                          role="label"
-                          numberOfLines={1}
-                          ellipsizeMode="tail"
-                          style={styles.rowName}
+                          role="caption"
+                          style={{ color: colors.textSecondary }}
                         >
-                          {`${row.name} — ${row.count ?? "…"}${selected ? " — Selected" : ""}`}
+                          {group.emptyCopy}
                         </AppText>
-                        {row.severity !== "none" ? (
-                          <AppText
-                            role="caption"
-                            style={{
-                              color:
-                                row.severity === "broken"
-                                  ? colors.danger
-                                  : colors.statusWobble,
+                      ) : null}
+                      {group.rows.map((row) => {
+                        const selected = row.id === state.requested.id;
+                        const stateLabel =
+                          row.severity === "empty"
+                            ? ", empty"
+                            : row.severity === "broken"
+                              ? ", needs attention"
+                              : "";
+                        const indicator =
+                          row.severity === "empty"
+                            ? {
+                                name: "system-empty" as const,
+                                tone: "statusWobble" as const,
+                              }
+                            : row.severity === "broken"
+                              ? {
+                                  name: "system-broken" as const,
+                                  tone: "danger" as const,
+                                }
+                              : row.overrides
+                                ? {
+                                    name: "system-overrides" as const,
+                                    tone: "textSecondary" as const,
+                                  }
+                                : null;
+                        return (
+                          <Pressable
+                            key={row.id}
+                            accessibilityRole="radio"
+                            accessibilityLabel={`${row.name}${stateLabel}`}
+                            accessibilityState={{
+                              checked: selected,
+                              busy: selected && busy,
+                            }}
+                            style={[
+                              styles.row,
+                              {
+                                borderWidth: 1,
+                                borderColor: selected
+                                  ? colors.accent
+                                  : colors.border,
+                              },
+                            ]}
+                            onPress={() => {
+                              void state.select(row.ref, row.name, true);
+                              dismiss();
                             }}
                           >
-                            {row.severity === "broken"
-                              ? "Needs attention"
-                              : "Empty"}
-                          </AppText>
-                        ) : null}
-                      </View>
-                      {indicator ? (
-                        <Icon
-                          name={indicator.name}
-                          size="sm"
-                          tone={indicator.tone}
-                        />
-                      ) : null}
+                            <View style={styles.rowContent}>
+                              <View style={styles.rowText}>
+                                <AppText
+                                  role="label"
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                  style={styles.rowName}
+                                >
+                                  {`${row.name} — ${row.count ?? "…"}${selected ? " — Selected" : ""}`}
+                                </AppText>
+                                {row.severity !== "none" ? (
+                                  <AppText
+                                    role="caption"
+                                    style={{
+                                      color:
+                                        row.severity === "broken"
+                                          ? colors.danger
+                                          : colors.statusWobble,
+                                    }}
+                                  >
+                                    {row.severity === "broken"
+                                      ? "Needs attention"
+                                      : "Empty"}
+                                  </AppText>
+                                ) : null}
+                              </View>
+                              {indicator ? (
+                                <Icon
+                                  name={indicator.name}
+                                  size="sm"
+                                  tone={indicator.tone}
+                                />
+                              ) : null}
+                            </View>
+                          </Pressable>
+                        );
+                      })}
                     </View>
-                  </Pressable>
-                );
-              })}
+                  ) : null}
+                </View>
+              ))}
               {busy ? (
                 <AppText accessibilityLiveRegion="polite">
                   Loading contacts…
@@ -319,6 +377,19 @@ const styles = StyleSheet.create({
     maxWidth: "90%",
   },
   row: { minHeight: 44, minWidth: 44, padding: SPACING.md },
+  groupHeader: {
+    minHeight: 44,
+    paddingHorizontal: SPACING.md,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  groupHeadingCopy: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  groupBody: { gap: SPACING.sm },
   rowContent: { flexDirection: "row", alignItems: "center", gap: SPACING.sm },
   rowText: { flex: 1, flexShrink: 1 },
   rowName: { flexShrink: 1 },
