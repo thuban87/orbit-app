@@ -43,7 +43,11 @@ describe("category consumer integration contract", () => {
     }
   });
 
-  it.each(["CreateContactScreen.tsx", "EditContactScreen.tsx"])(
+  it.each([
+    "CreateContactScreen.tsx",
+    "EditContactScreen.tsx",
+    "ImportReviewScreen.tsx",
+  ])(
     "%s routes initial and focus publication through the shared authority",
     (name) => {
       const source = read(name);

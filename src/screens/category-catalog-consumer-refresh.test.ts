@@ -53,7 +53,13 @@ async function runWiredConsumerRace() {
 }
 
 describe("category catalog consumer refresh wiring", () => {
-  it.each(["CreateContactScreen", "EditContactScreen"])(
+  const consumers = [
+    "CreateContactScreen",
+    "EditContactScreen",
+    "ImportReviewScreen",
+  ];
+
+  it.each(consumers)(
     "%s keeps unrelated hydration independent and rejects stale initial publication",
     async () => {
       const { state, read } = await runWiredConsumerRace();
@@ -63,6 +69,36 @@ describe("category catalog consumer refresh wiring", () => {
         selectedId: 1,
         hydrated: "complete",
       });
+    },
+  );
+
+  it.each(consumers)("%s retains state on rejection", async () => {
+    const commit = vi.fn();
+    const coordinator = createCategoryCatalogRefreshCoordinator({
+      read: () => Promise.reject(new Error("failed")),
+      commit,
+    });
+    await coordinator.request("initial");
+    await coordinator.request("focus");
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it.each(consumers)(
+    "%s rejects stale completion after blur and unmount",
+    async () => {
+      for (const lifecycle of ["blur", "unmount"] as const) {
+        const pending = deferred<Category[]>();
+        const commit = vi.fn();
+        const coordinator = createCategoryCatalogRefreshCoordinator({
+          read: () => pending.promise,
+          commit,
+        });
+        const request = coordinator.request("focus");
+        coordinator.invalidate(lifecycle);
+        pending.resolve([{ id: 2, name: "Stale" }]);
+        await request;
+        expect(commit).not.toHaveBeenCalled();
+      }
     },
   );
 });
