@@ -514,6 +514,38 @@ it("applies a Group Event tombstone and preserves an orphaned member as contact 
 });
 
 describe("applyRestore", () => {
+  it("rejects a final taxonomy collision before staging or mutation", async () => {
+    const source = await db();
+    const manifest = await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "",
+    });
+    manifest.systems.push({
+      uid: "incoming-system",
+      name: "Family",
+      createdAt: NOW,
+      modifiedAt: "2026-08-25 12:01:00",
+    });
+    const destination = await db();
+    const before = await destination.getAllAsync(
+      "SELECT uid,name,modified_at FROM categories ORDER BY uid",
+    );
+    const stagePhoto = vi.fn(async () => {});
+
+    await expect(
+      applyRestore(destination, manifest, "merge", { stagePhoto }),
+    ).resolves.toEqual({
+      status: "incompatible-destination",
+      incompatibilities: 1,
+    });
+    expect(stagePhoto).not.toHaveBeenCalled();
+    await expect(
+      destination.getAllAsync(
+        "SELECT uid,name,modified_at FROM categories ORDER BY uid",
+      ),
+    ).resolves.toEqual(before);
+  });
+
   it("replace-all reproduces an empty taxonomy and tombstones every removed category", async () => {
     const source = await db();
     const manifest = await buildExportManifest(source, {
@@ -544,6 +576,47 @@ describe("applyRestore", () => {
         "SELECT entity_uid FROM tombstones WHERE entity_type='category' ORDER BY entity_uid",
       ),
     ).resolves.toEqual(local.map(({ uid: entity_uid }) => ({ entity_uid })));
+  });
+
+  it("merge category deletion clears every import-session status through runtime fallout", async () => {
+    const destination = await db();
+    await destination.runAsync(
+      "INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)",
+      ["merge-away", "Merge Away", 10, NOW, NOW],
+    );
+    const category = await destination.getFirstAsync<{ id: number }>(
+      "SELECT id FROM categories WHERE uid='merge-away'",
+    );
+    for (const status of ["pending", "complete", "discarded"])
+      await destination.runAsync(
+        "INSERT INTO import_sessions(uid,mode,status,batch_category_id,total_rows,created_at,modified_at) VALUES(?,?,?,?,?,?,?)",
+        [`session-${status}`, "bulk", status, category!.id, 0, NOW, NOW],
+      );
+    const manifest = await buildExportManifest(destination, {
+      exportedAt: "2026-08-25 12:01:00",
+      readPhotoBase64: async () => "",
+    });
+    manifest.categories = manifest.categories.filter(
+      (row) => row.uid !== "merge-away",
+    );
+    manifest.tombstones.push({
+      entityType: "category",
+      entityUid: "merge-away",
+      deletedAt: "2026-08-25 12:01:00",
+    });
+
+    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({
+      status: "applied",
+    });
+    await expect(
+      destination.getAllAsync<{ status: string; batch_category_id: number | null }>(
+        "SELECT status,batch_category_id FROM import_sessions ORDER BY status",
+      ),
+    ).resolves.toEqual([
+      { status: "complete", batch_category_id: null },
+      { status: "discarded", batch_category_id: null },
+      { status: "pending", batch_category_id: null },
+    ]);
   });
 
   it("recomputes a retained contact after inserting history and removes it from Not Contacted", async () => {

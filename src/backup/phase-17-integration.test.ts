@@ -47,8 +47,8 @@ async function migrated(version = TARGET_VERSION): Promise<SqlExecutor> {
 
 async function populateV6(exec: SqlExecutor): Promise<void> {
   const categories = [
-    ["family-category", "Family", 20],
-    ["work-category", "Work", 21],
+    ["family-category", "Portable Family", 20],
+    ["work-category", "Portable Work", 21],
   ] as const;
   for (const [uid, name, displayOrder] of categories) {
     await exec.runAsync(

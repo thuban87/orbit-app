@@ -176,7 +176,7 @@ describe("buildExportManifest", () => {
     expect(BACKUP_FORMAT_VERSION).toBe(6);
   });
 
-  it("serializes the v5 entity inventory with portable parent UIDs", async () => {
+  it("serializes the v6 entity inventory with portable parent UIDs", async () => {
     const exec = nodeSqliteExecutor(openTestDb());
     let count = 0;
     await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {

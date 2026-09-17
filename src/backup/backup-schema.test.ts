@@ -409,7 +409,7 @@ describe("parseBackupManifest", () => {
     });
   });
 
-  it("upgrades v4 to v5 exactly once and requires the complete v5 inventory", () => {
+  it("upgrades v4 through v5 to v6 and requires the complete inventory", () => {
     const legacy = valid();
     legacy.backupFormatVersion = 4;
     legacy.appSettings.includeUnboundNeverContacted = 1;

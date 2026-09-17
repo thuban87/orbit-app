@@ -6,7 +6,9 @@
 import {
   type MergeableEntityType,
   type ReconciliationAction,
+  findVisibleNameCollisions,
   reconcileEntity,
+  suppressCategoryTombstoneDependents,
 } from "@/backup/reconciliation";
 import type {
   BackupManifest,
@@ -19,6 +21,10 @@ import {
   updateAppSettingsCore,
 } from "@/db/app-settings-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import {
+  applyCategoryDeletionFalloutCore,
+  readCategoryDeletionPreviewCore,
+} from "@/db/categories-dao";
 import {
   remapLegacyChannel,
   remapLegacyQuality,
@@ -160,7 +166,7 @@ const tombstoneEntity: Record<MergeableEntityType, string | null> = {
   custom_field_defs: "custom_field_def",
   custom_field_values: "custom_field_value",
   custom_field_value_history: "custom_field_value_history",
-  categories: null,
+  categories: "category",
   profile: null,
   memories: "memory",
   relationships: "relationship",
@@ -1170,7 +1176,7 @@ async function replaceAllReset(
     MergeableEntityType,
     readonly [string, string] | null
   > = {
-    categories: null,
+    categories: ["category", "categories"],
     profile: null,
     contacts: ["contact", "contacts"],
     contact_methods: ["contact_method", "contact_methods"],
@@ -1265,6 +1271,7 @@ async function replaceAllReset(
     "system_prefs",
     ...ownedResidualTables.contacts,
     "contacts",
+    "categories",
     "custom_field_defs",
     "systems",
     "ai_connections",
@@ -1273,6 +1280,17 @@ async function replaceAllReset(
     "profile_background_templates",
   ])
     await exec.runAsync(`DELETE FROM ${table}`);
+}
+
+async function clearLiveCategoryTombstones(
+  exec: SqlExecutor,
+  categoryUids: ReadonlySet<string>,
+): Promise<void> {
+  for (const uid of categoryUids)
+    await exec.runAsync(
+      "DELETE FROM tombstones WHERE entity_type='category' AND entity_uid=?",
+      [uid],
+    );
 }
 async function importTombstones(
   exec: SqlExecutor,
@@ -1376,10 +1394,39 @@ export async function applyRestore(
     return { status: "incompatible-destination", incompatibilities };
   normalizePlan(plan);
   if (mode === "merge") {
+    const deletedCategoryUids = new Set(
+      plan.categories
+        .filter((action) => action.kind === "delete")
+        .map((action) => action.uid),
+    );
+    suppressCategoryTombstoneDependents(plan, deletedCategoryUids);
+  }
+  if (mode === "merge") {
     const [, contacts] = local.find(([entity]) => entity === "contacts")!;
     retainAssignedCadence(plan, new Map(contacts.map((row) => [row.uid, row])));
   }
   for (const entity of entities) survivors[entity] = survivorSet(plan[entity]);
+  const finalCategories = plan.categories
+    .filter(
+      (action) =>
+        action.row && ["insert", "update", "retain"].includes(action.kind),
+    )
+    .map((action) => action.row!);
+  const finalSystems = plan.systems
+    .filter(
+      (action) =>
+        action.row && ["insert", "update", "retain"].includes(action.kind),
+    )
+    .map((action) => action.row!);
+  const visibleNameCollisions = findVisibleNameCollisions(
+    finalCategories,
+    finalSystems,
+  );
+  if (visibleNameCollisions.length)
+    return {
+      status: "incompatible-destination",
+      incompatibilities: visibleNameCollisions.length,
+    };
   const totals = entities.reduce(
     (out, entity) => {
       for (const action of plan[entity]) out[action.kind] += 1;
@@ -1447,11 +1494,46 @@ export async function applyRestore(
       )
         recencyUids.add(action.row.contactUid);
     }
-    if (mode === "replace-all")
+    if (mode === "replace-all") {
       await replaceAllReset(exec, manifest, candidates.deletes);
-    else
-      for (const entity of [...entities].reverse())
+      await clearLiveCategoryTombstones(
+        exec,
+        survivors.categories ?? new Set(),
+      );
+    } else {
+      for (const action of plan.categories)
+        if (action.kind === "delete") {
+          const row = await exec.getFirstAsync<{ id: number }>(
+            "SELECT id FROM categories WHERE uid=?",
+            [action.uid],
+          );
+          if (!row) continue;
+          const preview = await readCategoryDeletionPreviewCore(exec, row.id);
+          if (!preview) continue;
+          const timestamps = [
+            ...manifest.tombstones
+              .filter(
+                (item) =>
+                  item.entityType === "category" &&
+                  item.entityUid === action.uid,
+              )
+              .map((item) => item.deletedAt),
+            ...((local.find(([entity]) => entity === "categories")?.[2] ?? [])
+              .filter((item) => item.entity_uid === action.uid)
+              .map((item) => item.deleted_at)),
+          ].sort();
+          await applyCategoryDeletionFalloutCore(exec, {
+            preview,
+            targetCategoryId: null,
+            now: timestamps.at(-1) ?? manifest.metadata.exportedAt,
+            mode: "merge-null-only",
+          });
+        }
+      for (const entity of [...entities].reverse()) {
+        if (entity === "categories") continue;
         await deleteActions(exec, entity, plan[entity]);
+      }
+    }
     await importTombstones(exec, manifest);
     await upsertParents(exec, plan, backgroundPendingByUid);
     await upsertContacts(exec, plan);
