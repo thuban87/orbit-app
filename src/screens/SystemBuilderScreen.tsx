@@ -315,6 +315,13 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
         mode,
       }));
     }
+    const categoryUids = new Set(
+      loadedCategories.map((category) => category.uid),
+    );
+    rules = {
+      ...rules,
+      category: rules.category.filter((uid) => categoryUids.has(uid)),
+    };
     const nextDraft = { name, rules, overrideIntent: [] };
     initialDraft.current = { ...nextDraft, overrideIntent: [] };
     setCategories(loadedCategories);

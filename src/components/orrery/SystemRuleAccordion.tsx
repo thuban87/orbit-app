@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText/Button semantic roles are domain props.
 import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import {
   RULE_FAMILY_OPTIONS,
   type RuleDraft,
@@ -9,6 +9,7 @@ import {
   summarizeFamily,
 } from "@/components/orrery/system-builder-logic";
 import { AppText } from "@/components/ui/AppText";
+import { CATEGORY_SEARCH_THRESHOLD } from "@/logic/category-logic";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -37,6 +38,32 @@ function selectedValues(rules: RuleDraft, family: SystemRuleFamily): string[] {
   return Array.isArray(value) ? value : value ? ["on"] : [];
 }
 
+export function buildCategoryRuleView(
+  categories: readonly RuleOption[],
+  selected: readonly string[],
+  query: string,
+) {
+  const available = new Set(categories.map((category) => category.value));
+  const selectedValues = selected.filter((value) => available.has(value));
+  const key = query.trim().normalize("NFC").toLowerCase();
+  const visibleOptions = key
+    ? categories.filter((category) =>
+        category.label.normalize("NFC").toLowerCase().includes(key),
+      )
+    : [...categories];
+  return {
+    searchable: categories.length > CATEGORY_SEARCH_THRESHOLD,
+    selectedValues,
+    selectedCount: selectedValues.length,
+    visibleOptions,
+    emptyCopy: categories.length === 0 ? "No categories available" : null,
+    noMatchesCopy:
+      categories.length > 0 && visibleOptions.length === 0
+        ? `No categories match “${query.trim()}”.`
+        : null,
+  };
+}
+
 /** Eight closed predicate families; Birthday deliberately is not a System rule. */
 export function SystemRuleAccordion({
   rules,
@@ -46,13 +73,20 @@ export function SystemRuleAccordion({
 }: SystemRuleAccordionProps) {
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState<SystemRuleFamily | null>(null);
+  const [categoryQuery, setCategoryQuery] = useState("");
   return (
     <View style={styles.root}>
       {SYSTEM_RULE_FAMILIES.map((family) => {
         const open = expanded === family;
-        const selected = selectedValues(rules, family);
+        const rawSelected = selectedValues(rules, family);
         const options =
           family === "category" ? categories : RULE_FAMILY_OPTIONS[family];
+        const categoryView =
+          family === "category"
+            ? buildCategoryRuleView(categories, rawSelected, categoryQuery)
+            : null;
+        const selected = categoryView?.selectedValues ?? rawSelected;
+        const visibleOptions = categoryView?.visibleOptions ?? options;
         const labels = Object.fromEntries(
           options.map((option) => [option.value, option.label]),
         );
@@ -94,7 +128,41 @@ export function SystemRuleAccordion({
             </Pressable>
             {open && !disabled ? (
               <View style={styles.options}>
-                {options.map((option) => {
+                {categoryView?.searchable ? (
+                  <TextInput
+                    accessibilityLabel="Search categories"
+                    placeholder="Search categories"
+                    placeholderTextColor={colors.textSecondary}
+                    value={categoryQuery}
+                    onChangeText={setCategoryQuery}
+                    style={[
+                      styles.search,
+                      {
+                        color: colors.textPrimary,
+                        borderColor: colors.border,
+                        backgroundColor: colors.surface,
+                      },
+                    ]}
+                  />
+                ) : null}
+                {categoryView?.emptyCopy ? (
+                  <AppText
+                    role="caption"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {categoryView.emptyCopy}
+                  </AppText>
+                ) : null}
+                {categoryView?.noMatchesCopy ? (
+                  <AppText
+                    role="caption"
+                    accessibilityLiveRegion="polite"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {categoryView.noMatchesCopy}
+                  </AppText>
+                ) : null}
+                {visibleOptions.map((option) => {
                   const selectedOption = selected.includes(option.value);
                   return (
                     <Pressable
@@ -154,5 +222,12 @@ const styles = StyleSheet.create({
     minHeight: 44,
     justifyContent: "center",
     paddingHorizontal: SPACING.sm,
+  },
+  search: {
+    minHeight: 44,
+    borderWidth: 1,
+    borderRadius: RADII.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
   },
 });
