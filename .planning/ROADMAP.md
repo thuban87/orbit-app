@@ -976,7 +976,7 @@ Plans:
 **Requirements**: TBD — deferred to planning
 **Scope source:** D-03 in `.planning/phases/37-settings-personalization/37-CONTEXT.md` (owner-confirmed 2026-09-14), the Phase 37.1 dossier, and the approved Phase 37.1 UI-SPEC. Category deletion is a permanent runtime application transaction with durable category tombstone evidence; it adds no migration, `field_history` category history, Undo, quarantine, or reseeding, and zero categories is valid.
 **Canonical refs**: `.planning/phases/37-settings-personalization/37-CONTEXT.md` (D-03), the `categories` table (migration 001), Orrery Systems + custom-System rules + Profile category assignment + backup writers.
-**Plans:** 4/9 plans executed across 6 waves
+**Plans:** 5/9 plans executed across 6 waves
 
 Plans:
 
@@ -984,7 +984,7 @@ Plans:
 - [x] 37.1-02-PLAN.md (Wave 2) — Atomic deletion, all-status import reassignment, canonical System validity, and exhaustive rollback proof
 - [x] 37.1-05-PLAN.md (Wave 2) — Shared complete/searchable category-choice model plus Contact and Import consumers
 - [x] 37.1-03-PLAN.md (Wave 3) — Backup-v6 category tombstones, reconciliation, merge deletion, and exact replace-all taxonomy
-- [ ] 37.1-04-PLAN.md (Wave 3) — Complete manager interactions, anchored menu, deletion UI, and commit-truthful Snackbar feedback
+- [x] 37.1-04-PLAN.md (Wave 3) — Complete manager interactions, anchored menu, deletion UI, and commit-truthful Snackbar feedback
 - [ ] 37.1-07-PLAN.md (Wave 3) — System Builder category rules and exact three-group Orrery selector
 - [ ] 37.1-06-PLAN.md (Wave 4) — Dashboard Uncategorized/filter/bulk behavior and Profile presentation consumers
 - [ ] 37.1-08-PLAN.md (Wave 5) — Final writer/consumer audit, living documentation, and full automated phase gate
