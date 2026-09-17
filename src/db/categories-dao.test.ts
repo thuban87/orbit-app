@@ -191,6 +191,96 @@ describe("atomic category deletion", () => {
     ).toEqual({ id: source.id });
   });
 
+  it("rolls back every deletion target when filters corrupt after preview", async () => {
+    const [source, target] = await listCategoriesForManagement(exec);
+    const contact = await exec.runAsync(
+      "INSERT INTO contacts(uid,name,category_id,interval_days,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+      ["corrupt-filter", "Corrupt filter", source.id, 30, NOW, NOW],
+    );
+    for (const status of ["pending", "complete", "discarded"]) {
+      await exec.runAsync(
+        "INSERT INTO import_sessions(uid,mode,batch_category_id,batch_tracking_enabled,status,total_rows,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)",
+        [`corrupt-${status}`, "bulk", source.id, 1, status, 0, NOW, NOW],
+      );
+    }
+    const system = await exec.runAsync(
+      "INSERT INTO systems(uid,name,created_at,modified_at) VALUES(?,?,?,?)",
+      ["system-corrupt", "Corrupt filter", NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO system_rules(uid,system_id,family,value,created_at) VALUES(?,?,?,?,?)",
+      ["rule-corrupt", system.lastInsertRowId, "category", source.uid, NOW],
+    );
+    const ref = `category:${source.uid}`;
+    await exec.runAsync(
+      "INSERT INTO system_overrides(uid,system_ref,contact_id,mode,created_at) VALUES(?,?,?,?,?)",
+      ["override-corrupt", ref, contact.lastInsertRowId, "include", NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO system_prefs(uid,system_ref,display_order,hidden,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+      ["pref-corrupt", ref, 7, 1, NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO profile_category_presentation(category_id,created_at,modified_at) VALUES(?,?,?)",
+      [source.id, NOW, NOW],
+    );
+    await exec.runAsync(
+      "UPDATE app_settings SET orrery_last_system=?,dashboard_filters=? WHERE id=1",
+      [
+        ref,
+        JSON.stringify({
+          category: [String(source.id), "uncategorized"],
+          gravity: ["Outer"],
+        }),
+      ],
+    );
+    const preview = await readCategoryDeletionPreview(exec, source.id);
+    if (!preview) throw new Error("expected source category preview");
+    const corruptFilters = "null";
+    await exec.runAsync(
+      "UPDATE app_settings SET dashboard_filters=? WHERE id=1",
+      [corruptFilters],
+    );
+    const snapshot = async () => ({
+      categories: await exec.getAllAsync("SELECT * FROM categories ORDER BY id"),
+      contacts: await exec.getAllAsync("SELECT * FROM contacts ORDER BY id"),
+      imports: await exec.getAllAsync(
+        "SELECT * FROM import_sessions ORDER BY id",
+      ),
+      rules: await exec.getAllAsync("SELECT * FROM system_rules ORDER BY id"),
+      overrides: await exec.getAllAsync(
+        "SELECT * FROM system_overrides ORDER BY id",
+      ),
+      prefs: await exec.getAllAsync("SELECT * FROM system_prefs ORDER BY id"),
+      profile: await exec.getAllAsync(
+        "SELECT * FROM profile_category_presentation ORDER BY category_id",
+      ),
+      settings: await exec.getAllAsync("SELECT * FROM app_settings ORDER BY id"),
+      tombstones: await exec.getAllAsync(
+        "SELECT * FROM tombstones ORDER BY id",
+      ),
+    });
+    const before = await snapshot();
+    const beforeRevision = await readDataRevision(exec);
+
+    await expect(
+      deleteCategory(exec, {
+        categoryId: source.id,
+        targetCategoryId: target.id,
+        expectedFingerprint: preview.fingerprint,
+        now: "2026-09-17 04:00:00",
+      }),
+    ).rejects.toThrow("Category deletion requires valid dashboard_filters");
+
+    expect(await snapshot()).toEqual(before);
+    expect(before.settings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ dashboard_filters: corruptFilters }),
+      ]),
+    );
+    expect(await readDataRevision(exec)).toBe(beforeRevision);
+  });
+
   it.each([
     "contacts",
     "imports",
