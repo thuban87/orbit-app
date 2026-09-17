@@ -15,6 +15,7 @@ import {
   NOT_CONTACTED_RULE_VALUE,
   resolveCandidateIds,
   resolveCustomSystemMembers,
+  resolveMembershipFromDefinition,
   SCOPE_POPULATION_FAMILY,
   SCOPE_POPULATION_VALUE,
   SNOOZED_RULE_VALUE,
@@ -46,6 +47,42 @@ async function addContact(input: {
 }
 
 describe("manual-only custom System resolver", () => {
+  it("classifies empty and exclude-only definitions as needs attention, but include-only as valid", async () => {
+    const contactId = await addContact({
+      uid: "valid-include",
+      lastContact: "2026-09-01",
+    });
+    const empty = await resolveMembershipFromDefinition(
+      exec,
+      { rules: [], overrides: [], now: NOW },
+      async () => null,
+    );
+    const excludeOnly = await resolveMembershipFromDefinition(
+      exec,
+      {
+        rules: [],
+        overrides: [
+          { id: 1, uid: "exclude", systemRef: "custom:test", contactId, mode: "exclude", createdAt: NOW },
+        ],
+        now: NOW,
+      },
+      async () => null,
+    );
+    const includeOnly = await resolveMembershipFromDefinition(
+      exec,
+      {
+        rules: [],
+        overrides: [
+          { id: 2, uid: "include", systemRef: "custom:test", contactId, mode: "include", createdAt: NOW },
+        ],
+        now: NOW,
+      },
+      async () => null,
+    );
+    expect(empty.validity).toBe("needs-attention");
+    expect(excludeOnly.validity).toBe("needs-attention");
+    expect(includeOnly.validity).toBe("valid");
+  });
   it("returns eligible inclusions minus exclusions through the read pipeline", async () => {
     const system = await createCustomSystem(exec, { name: "Manual", now: NOW });
     const included = await addContact({
