@@ -5,7 +5,9 @@ vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   createCategory,
+  deleteCategory,
   listCategoriesForManagement,
+  readCategoryDeletionPreview,
   renameCategory,
   reorderCategories,
 } from "@/db/categories-dao";
@@ -24,6 +26,85 @@ beforeEach(async () => {
   await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
     now: NOW,
     newUid: () => `seed-${++counter}`,
+  });
+});
+
+describe("atomic category deletion", () => {
+  it("previews all-status fallout and commits one identity-safe aggregate", async () => {
+    const [source, target] = await listCategoriesForManagement(exec);
+    await exec.runAsync(
+      "INSERT INTO contacts(uid,name,category_id,interval_days,tracking_enabled,archived_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)",
+      ["archived", "Archived", source.id, 30, 0, NOW, NOW, NOW],
+    );
+    for (const status of ["pending", "complete", "discarded"]) {
+      await exec.runAsync(
+        "INSERT INTO import_sessions(uid,mode,batch_category_id,batch_tracking_enabled,status,total_rows,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)",
+        [`session-${status}`, "bulk", source.id, 1, status, 0, NOW, NOW],
+      );
+    }
+    const system = await exec.runAsync(
+      "INSERT INTO systems(uid,name,created_at,modified_at) VALUES(?,?,?,?)",
+      ["system-delete", "Delete test", NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO system_rules(uid,system_id,family,value,created_at) VALUES(?,?,?,?,?)",
+      ["category-rule", system.lastInsertRowId, "category", source.uid, NOW],
+    );
+    await exec.runAsync(
+      "UPDATE app_settings SET orrery_last_system=?, dashboard_filters=? WHERE id=1",
+      [`category:${source.uid}`, JSON.stringify({ category: [String(source.id)], gravity: ["Inner"] })],
+    );
+
+    const preview = await readCategoryDeletionPreview(exec, source.id);
+    expect(preview.counts).toMatchObject({
+      contacts: 1,
+      importPending: 1,
+      importComplete: 1,
+      importDiscarded: 1,
+      rules: 1,
+      systems: 1,
+      dashboardFilters: 1,
+    });
+    const beforeRevision = await readDataRevision(exec);
+    const result = await deleteCategory(exec, {
+      categoryId: source.id,
+      targetCategoryId: target.id,
+      expectedFingerprint: preview.fingerprint,
+      now: "2026-09-17 03:00:00",
+    });
+    expect(result.status).toBe("deleted");
+    expect(await exec.getFirstAsync("SELECT id FROM categories WHERE id=?", [source.id])).toBeNull();
+    expect(await exec.getFirstAsync("SELECT category_id FROM contacts WHERE uid='archived'")).toEqual({ category_id: target.id });
+    expect(await exec.getAllAsync("SELECT status,batch_category_id FROM import_sessions ORDER BY status")).toEqual([
+      { status: "complete", batch_category_id: target.id },
+      { status: "discarded", batch_category_id: target.id },
+      { status: "pending", batch_category_id: target.id },
+    ]);
+    expect(await exec.getFirstAsync("SELECT COUNT(*) AS count FROM system_rules WHERE uid='category-rule'")).toEqual({ count: 0 });
+    expect(await exec.getFirstAsync("SELECT orrery_last_system,dashboard_filters FROM app_settings WHERE id=1")).toEqual({
+      orrery_last_system: "builtin:all-contacts",
+      dashboard_filters: JSON.stringify({ gravity: ["Inner"] }),
+    });
+    expect(await exec.getFirstAsync("SELECT entity_type,entity_uid FROM tombstones WHERE entity_type='category' AND entity_uid=?", [source.uid])).toEqual({ entity_type: "category", entity_uid: source.uid });
+    expect(await readDataRevision(exec)).toBe(beforeRevision + 1);
+  });
+
+  it("returns a refreshed stale preview without writes", async () => {
+    const [source] = await listCategoriesForManagement(exec);
+    const preview = await readCategoryDeletionPreview(exec, source.id);
+    await exec.runAsync(
+      "INSERT INTO contacts(uid,name,category_id,interval_days,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+      ["late", "Late", source.id, 30, NOW, NOW],
+    );
+    const result = await deleteCategory(exec, {
+      categoryId: source.id,
+      targetCategoryId: null,
+      expectedFingerprint: preview.fingerprint,
+      now: NOW,
+    });
+    expect(result.status).toBe("stale");
+    expect(result.preview?.counts.contacts).toBe(1);
+    expect(await exec.getFirstAsync("SELECT id FROM categories WHERE id=?", [source.id])).toEqual({ id: source.id });
   });
 });
 
