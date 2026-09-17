@@ -97,6 +97,16 @@ export function listCategoriesForManagement(
   );
 }
 
+/** Uncategorized is the permanent NULL fallback and includes every contact status. */
+export async function countUncategorizedContacts(
+  exec: ReadOnlyExecutor,
+): Promise<number> {
+  const row = await exec.getFirstAsync<{ count: number }>(
+    "SELECT COUNT(*) AS count FROM contacts WHERE category_id IS NULL",
+  );
+  return row?.count ?? 0;
+}
+
 export async function createCategoryCore(
   exec: SqlExecutor,
   input: { name: string; now: string },

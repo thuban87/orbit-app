@@ -11,7 +11,7 @@ export interface SnackbarAction {
 export interface SnackbarMessage {
   kind: SnackbarKind;
   label: string;
-  action: SnackbarAction;
+  action?: SnackbarAction;
   /**
    * Optional second action rendered AFTER the primary (e.g. Quick Log's "Add
    * Note" beside "Undo", CAPT-05). Single-action callers omit it and render

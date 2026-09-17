@@ -1,6 +1,10 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+// biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography variant.
+import { Pressable, StyleSheet, View } from "react-native";
+import { AppText } from "@/components/ui/AppText";
 import { snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
+import { SPACING } from "@/theme/tokens/spacing";
 
 /** A single host for commit-truthful feedback above every shell browse surface. */
 export function Snackbar() {
@@ -19,22 +23,25 @@ export function Snackbar() {
           { backgroundColor: colors.surface, borderColor: colors.border },
         ]}
       >
-        <Text style={[styles.label, { color: colors.textPrimary }]}>
+        <AppText role="caption" style={styles.label}>
           {snackbar.label}
-        </Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={snackbar.action.accessibilityLabel}
-          onPress={() => {
-            dismiss();
-            snackbar.action.onPress();
-          }}
-          style={styles.action}
-        >
-          <Text style={[styles.actionLabel, { color: colors.accent }]}>
-            {snackbar.action.label}
-          </Text>
-        </Pressable>
+        </AppText>
+        {snackbar.action ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={snackbar.action.accessibilityLabel}
+            onPress={() => {
+              const action = snackbar.action;
+              dismiss();
+              action?.onPress();
+            }}
+            style={styles.action}
+          >
+            <AppText role="label" style={{ color: colors.accent }}>
+              {snackbar.action.label}
+            </AppText>
+          </Pressable>
+        ) : null}
         {snackbar.secondaryAction ? (
           <Pressable
             accessibilityRole="button"
@@ -45,9 +52,9 @@ export function Snackbar() {
             }}
             style={styles.action}
           >
-            <Text style={[styles.actionLabel, { color: colors.accent }]}>
+            <AppText role="label" style={{ color: colors.accent }}>
               {snackbar.secondaryAction.label}
-            </Text>
+            </AppText>
           </Pressable>
         ) : null}
       </View>
@@ -61,30 +68,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-end",
     paddingBottom: 112,
-    paddingHorizontal: 16,
+    paddingHorizontal: SPACING.base,
   },
   surface: {
     alignItems: "center",
-    borderRadius: 999,
+    borderRadius: RADII.pill,
     borderWidth: 1,
     flexDirection: "row",
     maxWidth: "100%",
     minHeight: 48,
-    paddingLeft: 16,
+    paddingLeft: SPACING.base,
   },
   label: {
     flexShrink: 1,
-    fontSize: 15,
   },
   action: {
     alignItems: "center",
     justifyContent: "center",
     minHeight: 44,
     minWidth: 56,
-    paddingHorizontal: 12,
-  },
-  actionLabel: {
-    fontSize: 15,
-    fontWeight: "700",
+    paddingHorizontal: SPACING.md,
   },
 });

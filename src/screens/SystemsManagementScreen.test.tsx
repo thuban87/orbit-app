@@ -188,8 +188,9 @@ describe("SystemsManagementScreen contracts", () => {
     );
 
     const undo = vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action
-      .onPress;
-    undo();
+      ?.onPress;
+    expect(undo).toBeDefined();
+    undo?.();
     await vi.waitFor(() =>
       expect(dao.restoreDeletedSystemAndActiveSelection).toHaveBeenCalledWith(
         "exec",
@@ -279,7 +280,7 @@ describe("SystemsManagementScreen contracts", () => {
     });
     await vi.waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
 
-    vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action.onPress();
+    vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action?.onPress();
     await vi.waitFor(() =>
       expect(dao.restoreDeletedSystemAndActiveSelection).toHaveBeenCalledOnce(),
     );
@@ -325,7 +326,7 @@ describe("SystemsManagementScreen contracts", () => {
     });
     await vi.waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
 
-    vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action.onPress();
+    vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action?.onPress();
     await vi.waitFor(() =>
       expect(dao.restoreDeletedSystemAndActiveSelection).toHaveBeenCalledOnce(),
     );
@@ -375,7 +376,7 @@ describe("SystemsManagementScreen contracts", () => {
       onChanged,
     });
     await vi.waitFor(() => expect(onChanged).toHaveBeenCalledOnce());
-    vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action.onPress();
+    vi.mocked(snackbar.showSnackbar).mock.calls[0][0].action?.onPress();
     await vi.waitFor(() =>
       expect(dao.restoreDeletedSystemAndActiveSelection).toHaveBeenCalledOnce(),
     );

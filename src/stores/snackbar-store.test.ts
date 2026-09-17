@@ -1,10 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  type SnackbarMessage,
-  snackbarStore,
-} from "./snackbar-store";
+import { type SnackbarMessage, snackbarStore } from "./snackbar-store";
 
-function baseMessage(overrides: Partial<SnackbarMessage> = {}): SnackbarMessage {
+function baseMessage(
+  overrides: Partial<SnackbarMessage> = {},
+): SnackbarMessage {
   return {
     kind: "success",
     label: "Logged",
@@ -31,12 +30,14 @@ describe("snackbarStore", () => {
 
     const snackbar = snackbarStore.getState().snackbar;
     expect(snackbar?.label).toBe("Logged");
-    expect(snackbar?.action.label).toBe("Undo");
+    expect(snackbar?.action?.label).toBe("Undo");
     expect(snackbar?.secondaryAction).toBeUndefined();
   });
 
   it("supports actionless committed-success feedback", () => {
-    snackbarStore.getState().show({ kind: "success", label: "Category added." });
+    snackbarStore
+      .getState()
+      .show({ kind: "success", label: "Category added." });
     expect(snackbarStore.getState().snackbar).toEqual({
       kind: "success",
       label: "Category added.",
@@ -56,7 +57,7 @@ describe("snackbarStore", () => {
     );
 
     const snackbar = snackbarStore.getState().snackbar;
-    expect(snackbar?.action.label).toBe("Undo");
+    expect(snackbar?.action?.label).toBe("Undo");
     expect(snackbar?.secondaryAction?.label).toBe("Add Note");
     snackbar?.secondaryAction?.onPress();
     expect(onAddNote).toHaveBeenCalledOnce();
