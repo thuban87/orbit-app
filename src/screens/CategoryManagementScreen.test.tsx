@@ -23,7 +23,11 @@ vi.mock("@/db/database", () => ({
 }));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 
-const { createCategoryManagementLoadGuard } = await import(
+const {
+  categoryCountLabel,
+  createCategoryManagementLoadGuard,
+  moveCategoryRows,
+} = await import(
   "./CategoryManagementScreen"
 );
 
@@ -34,5 +38,21 @@ describe("CategoryManagementScreen tracer contracts", () => {
     const second = next();
     expect(first()).toBe(false);
     expect(second()).toBe(true);
+  });
+
+  it("formats exact singular and plural all-contact counts", () => {
+    expect(categoryCountLabel(0)).toBe("0 contacts");
+    expect(categoryCountLabel(1)).toBe("1 contact");
+    expect(categoryCountLabel(12)).toBe("12 contacts");
+  });
+
+  it("moves canonical rows without mutating committed state", () => {
+    const rows = [
+      { id: 1, name: "Family" },
+      { id: 2, name: "Friends" },
+      { id: 3, name: "Work" },
+    ];
+    expect(moveCategoryRows(rows, 2, 0).map((row) => row.id)).toEqual([3, 1, 2]);
+    expect(rows.map((row) => row.id)).toEqual([1, 2, 3]);
   });
 });

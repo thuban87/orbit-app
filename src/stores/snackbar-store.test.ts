@@ -35,6 +35,14 @@ describe("snackbarStore", () => {
     expect(snackbar?.secondaryAction).toBeUndefined();
   });
 
+  it("supports actionless committed-success feedback", () => {
+    snackbarStore.getState().show({ kind: "success", label: "Category added." });
+    expect(snackbarStore.getState().snackbar).toEqual({
+      kind: "success",
+      label: "Category added.",
+    });
+  });
+
   it("carries an optional secondaryAction when provided", () => {
     const onAddNote = vi.fn();
     snackbarStore.getState().show(
