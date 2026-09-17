@@ -9,6 +9,10 @@ import { inWriteTransaction, type ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 import { validateCategoryName } from "@/logic/category-logic";
+import {
+  type DashboardFilters,
+  parseDashboardFilters as parseCanonicalDashboardFilters,
+} from "@/logic/dashboard-query-logic";
 import { BUILTIN_SYSTEM_LABELS } from "@/logic/orrery-system-logic";
 
 export interface CategoryManagementRow {
@@ -237,15 +241,17 @@ function countValue(row: { count: number } | null): number {
   return row?.count ?? 0;
 }
 
-function parseDashboardFilters(value: string): Record<string, unknown> {
+function parseStoredDashboardFilters(value: string): DashboardFilters {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(value);
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-      ? parsed
-      : {};
+    parsed = JSON.parse(value);
   } catch {
-    return {};
+    throw new Error("Category deletion requires valid dashboard_filters");
   }
+  const filters = parseCanonicalDashboardFilters(parsed);
+  if (!filters)
+    throw new Error("Category deletion requires valid dashboard_filters");
+  return filters;
 }
 
 export async function readCategoryDeletionPreviewCore(
@@ -296,7 +302,7 @@ export async function readCategoryDeletionPreviewCore(
   if (!settings)
     throw new Error("Category deletion requires app_settings id=1");
   const importCounts = new Map(imports.map((row) => [row.status, row.count]));
-  const filters = parseDashboardFilters(settings.dashboard_filters);
+  const filters = parseStoredDashboardFilters(settings.dashboard_filters);
   const selected = Array.isArray(filters.category)
     ? filters.category.filter((value) => value === String(categoryId)).length
     : 0;
@@ -404,7 +410,7 @@ export async function applyCategoryDeletionFalloutCore(
   );
   if (!settings)
     throw new Error("Category deletion requires app_settings id=1");
-  const filters = parseDashboardFilters(settings.dashboard_filters);
+  const filters = parseStoredDashboardFilters(settings.dashboard_filters);
   if (Array.isArray(filters.category)) {
     const remaining = filters.category.filter(
       (value) => value !== String(category.id),

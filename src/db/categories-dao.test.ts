@@ -46,9 +46,9 @@ describe("atomic category deletion", () => {
       [stored],
     );
 
-    await expect(
-      readCategoryDeletionPreview(exec, source.id),
-    ).rejects.toThrow("Category deletion requires valid dashboard_filters");
+    await expect(readCategoryDeletionPreview(exec, source.id)).rejects.toThrow(
+      "Category deletion requires valid dashboard_filters",
+    );
     expect(
       await exec.getFirstAsync<{ dashboard_filters: string }>(
         "SELECT dashboard_filters FROM app_settings WHERE id=1",
