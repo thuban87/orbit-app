@@ -20,7 +20,6 @@
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { Picker } from "@react-native-picker/picker";
-import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -28,7 +27,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from "react-native";
@@ -73,6 +71,7 @@ import type { FuelItem } from "@/db/fuel-read";
 import type { MemoryRow } from "@/db/memories-read";
 import type { RelationshipRow } from "@/db/relationships-read";
 import { newUid } from "@/db/uid";
+import { useCategoryCatalogRefresh } from "@/hooks/use-category-catalog-refresh";
 import {
   CATEGORY_SEARCH_THRESHOLD,
   resolveCategorySelection,
@@ -280,15 +279,22 @@ export function CreateContactScreen({
   const [currentLocation, setCurrentLocation] = useState("");
   const [fuelDrafts, setFuelDrafts] = useState<FuelDraft[]>([]);
 
+  const commitCategories = useCallback(
+    (current: Array<{ id: number; name: string }>) => {
+      setCategories(current);
+      setCategoryId((selected) => resolveCategorySelection(current, selected));
+    },
+    [],
+  );
+  const requestInitialCategories = useCategoryCatalogRefresh(commitCategories);
+
   const load = useCallback(async () => {
     try {
       const exec = getExecutor();
-      const [cats, defs, settings] = await Promise.all([
-        listCategories(exec),
+      const [defs, settings] = await Promise.all([
         listDefs(exec, { includeQuarantined: false }),
         getAppSettings(exec),
       ]);
-      setCategories(cats);
       setCreateDefs(defsForCreateForm(defs));
       setEffectivePhoneRegion(
         resolveEffectivePhoneRegion(
@@ -304,18 +310,8 @@ export function CreateContactScreen({
 
   useEffect(() => {
     void load();
-  }, [load]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void listCategories(getExecutor()).then((current) => {
-        setCategories(current);
-        setCategoryId((selected) =>
-          resolveCategorySelection(current, selected),
-        );
-      });
-    }, []),
-  );
+    void requestInitialCategories();
+  }, [load, requestInitialCategories]);
 
   const formState: CreateFormState = useMemo(
     () => ({

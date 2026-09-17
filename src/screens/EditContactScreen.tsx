@@ -118,6 +118,7 @@ import {
   type RelationshipRow,
 } from "@/db/relationships-read";
 import { newUid } from "@/db/uid";
+import { useCategoryCatalogRefresh } from "@/hooks/use-category-catalog-refresh";
 import {
   CATEGORY_SEARCH_THRESHOLD,
   resolveCategorySelection,
@@ -532,12 +533,30 @@ export function EditContactScreen({
     };
   }, [contactId]);
 
+  const commitCategories = useCallback(
+    (current: Array<{ id: number; name: string }>) => {
+      setCategories(current);
+      setForm((existing) =>
+        existing
+          ? {
+              ...existing,
+              categoryId: resolveCategorySelection(
+                current,
+                existing.categoryId,
+              ),
+            }
+          : existing,
+      );
+    },
+    [],
+  );
+  const requestInitialCategories = useCategoryCatalogRefresh(commitCategories);
+
   const load = useCallback(async () => {
     try {
       const exec = getExecutor();
       const defs = await listDefs(exec, { includeQuarantined: false });
-      const [cats, result, settings, knowledge] = await Promise.all([
-        listCategories(exec),
+      const [result, settings, knowledge] = await Promise.all([
         getContactForEdit(exec, contactId, defs),
         getAppSettings(exec),
         readKnowledgeSeeds(),
@@ -546,7 +565,6 @@ export function EditContactScreen({
         Alert.alert("Couldn't load this contact", "Please go back and retry.");
         return;
       }
-      setCategories(cats);
       const nextEditDefs = defsForEditForm(defs);
       const nextNeverContacted = isNeverContacted(result);
       const nextPhoneRegion = resolveEffectivePhoneRegion(
@@ -597,7 +615,8 @@ export function EditContactScreen({
 
   useEffect(() => {
     void load();
-  }, [load]);
+    void requestInitialCategories();
+  }, [load, requestInitialCategories]);
 
   // LIGHT photo-only re-read: refresh ONLY the photo + its cache-bust token, never
   // the form. Wired to `useFocusEffect` so returning from CropPhotoScreen (which
@@ -618,20 +637,6 @@ export function EditContactScreen({
   useFocusEffect(
     useCallback(() => {
       void refreshPhoto();
-      void listCategories(getExecutor()).then((current) => {
-        setCategories(current);
-        setForm((existing) =>
-          existing
-            ? {
-                ...existing,
-                categoryId: resolveCategorySelection(
-                  current,
-                  existing.categoryId,
-                ),
-              }
-            : existing,
-        );
-      });
     }, [refreshPhoto]),
   );
 

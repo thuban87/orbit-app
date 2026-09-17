@@ -21,7 +21,7 @@ describe("category consumer integration contract", () => {
       expect(source).toContain("CategoryChoiceSheet");
       expect(source).toContain("Uncategorized");
       expect(source).not.toContain('label="No category"');
-      expect(source).toContain("useFocusEffect");
+      expect(source).toMatch(/useFocusEffect|useCategoryCatalogRefresh/);
     },
   );
 
@@ -43,13 +43,13 @@ describe("category consumer integration contract", () => {
     }
   });
 
-  it.each([
-    "CreateContactScreen.tsx",
-    "EditContactScreen.tsx",
-  ])("%s routes initial and focus publication through the shared authority", (name) => {
-    const source = read(name);
-    expect(source).toContain("useCategoryCatalogRefresh");
-    expect(source).toContain("requestInitialCategories");
-    expect(source).not.toMatch(/useFocusEffect[\s\S]{0,500}listCategories/);
-  });
+  it.each(["CreateContactScreen.tsx", "EditContactScreen.tsx"])(
+    "%s routes initial and focus publication through the shared authority",
+    (name) => {
+      const source = read(name);
+      expect(source).toContain("useCategoryCatalogRefresh");
+      expect(source).toContain("requestInitialCategories");
+      expect(source).not.toMatch(/useFocusEffect[\s\S]{0,500}listCategories/);
+    },
+  );
 });
