@@ -65,11 +65,9 @@ export type SettingsContactsActionRow = {
 };
 
 /**
- * A reserved IA slot (D-03 / §K): holds a stable internal route NAME and its
- * section-order position for a FUTURE Category Management phase, but the screen
- * renders NO row for it. Inert by construction — `isActiveContactsRow` returns
- * false — so it never becomes a tappable dead placeholder. Task 2 inserts the
- * `CategoryManagement` reservation into Relationship Structure.
+ * A reserved IA slot for destinations that are intentionally not live yet.
+ * Inert by construction — `isActiveContactsRow` returns false — so it can never
+ * become a tappable dead placeholder.
  */
 export type SettingsContactsReservedRow = {
   readonly kind: "reserved";
@@ -91,8 +89,8 @@ export type SettingsContactsSection = {
 
 /**
  * A row the screen actually renders. Everything except the inert `reserved`
- * slot is "active"; the D-03 reservation is deliberately excluded so no dead
- * Categories placeholder ever ships (§K no-dead-placeholders).
+ * slot is "active"; reservations remain deliberately excluded so no dead
+ * placeholder can ship (§K no-dead-placeholders).
  */
 export function isActiveContactsRow(
   row: SettingsContactsRow,

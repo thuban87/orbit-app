@@ -12,15 +12,9 @@
  * `SettingsRegisteredRoute`, so a row targeting an unregistered/reserved name
  * fails to type-check.
  *
- * LATER PLANS APPEND their category / Backup / About route names here as they
- * register the corresponding `<Stack.Screen>` in `SettingsStack.tsx` (Plans
- * 02–08). Keep this array and the stack registrations in lockstep.
- *
- * `CategoryManagement` (D-03) is DELIBERATELY EXCLUDED: Phase 37 reserves that
- * route name/IA slot for the future Category Management phase (37.1) but ships
- * NO `<Stack.Screen>` and NO tappable row (§K no-dead-placeholders). The
- * source-scan test asserts `CategoryManagement` is NOT registered, closing the
- * D-03 typed-but-unregistered false-positive.
+ * Keep this array and the stack registrations in lockstep. Phase 37.1 activates
+ * the previously reserved `CategoryManagement` destination as a real child
+ * route immediately after Custom Fields.
  */
 export const SETTINGS_REGISTERED_ROUTES = [
   // The preserved hub route name (§M — deep-link + back-stack safe).

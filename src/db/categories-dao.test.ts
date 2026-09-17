@@ -47,21 +47,27 @@ describe("category rename and reorder", () => {
       displayOrder: category.displayOrder,
     });
     expect(
-      await exec.getFirstAsync("SELECT category_id FROM contacts WHERE id = ?", [
-        contact.lastInsertRowId,
-      ]),
+      await exec.getFirstAsync(
+        "SELECT category_id FROM contacts WHERE id = ?",
+        [contact.lastInsertRowId],
+      ),
     ).toEqual({ category_id: category.id });
     expect(await readDataRevision(exec)).toBe(beforeRevision + 1);
   });
 
   it("normalizes reordered positions and bumps revision exactly once", async () => {
     const rows = await listCategoriesForManagement(exec);
-    await exec.runAsync("UPDATE categories SET display_order = display_order * 3");
+    await exec.runAsync(
+      "UPDATE categories SET display_order = display_order * 3",
+    );
     const orderedIds = rows.map((row) => row.id).reverse();
     const beforeRevision = await readDataRevision(exec);
     await reorderCategories(exec, { orderedIds, now: NOW });
     expect(
-      (await listCategoriesForManagement(exec)).map((row) => [row.id, row.displayOrder]),
+      (await listCategoriesForManagement(exec)).map((row) => [
+        row.id,
+        row.displayOrder,
+      ]),
     ).toEqual(orderedIds.map((id, index) => [id, index]));
     expect(await readDataRevision(exec)).toBe(beforeRevision + 1);
   });

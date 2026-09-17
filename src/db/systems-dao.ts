@@ -8,6 +8,7 @@ import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { inWriteTransaction, type ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
+import { categoryNameKey, normalizeCategoryName } from "@/logic/category-logic";
 import {
   CONTACT_FREQUENCY_BANDS,
   NEEDS_ATTENTION_VALUE,
@@ -231,18 +232,21 @@ export async function assertUniqueSystemName(
   exec: ReadOnlyExecutor,
   input: { name: string; excludeId?: number },
 ): Promise<void> {
-  const duplicate = await exec.getFirstAsync<{ id: number }>(
-    `SELECT id FROM systems
-      WHERE name = ? COLLATE NOCASE AND id != ?
-      LIMIT 1`,
-    [input.name, input.excludeId ?? -1],
+  const key = categoryNameKey(input.name);
+  const customNames = await exec.getAllAsync<{ id: number; name: string }>(
+    "SELECT id, name FROM systems",
+  );
+  const duplicate = customNames.some(
+    (row) => row.id !== input.excludeId && categoryNameKey(row.name) === key,
   );
   const builtin = Object.values(BUILTIN_SYSTEM_LABELS).some(
-    (label) => label.toLocaleLowerCase() === input.name.toLocaleLowerCase(),
+    (label) => categoryNameKey(label) === key,
   );
-  const category = await exec.getFirstAsync<{ id: number }>(
-    "SELECT id FROM categories WHERE name = ? COLLATE NOCASE LIMIT 1",
-    [input.name],
+  const categoryNames = await exec.getAllAsync<{ name: string }>(
+    "SELECT name FROM categories",
+  );
+  const category = categoryNames.some(
+    (row) => categoryNameKey(row.name) === key,
   );
   if (duplicate || builtin || category) {
     throw new Error(`A System named ${input.name} already exists`);
@@ -250,7 +254,7 @@ export async function assertUniqueSystemName(
 }
 
 function normalizeSystemName(name: string): string {
-  const normalized = name.trim();
+  const normalized = normalizeCategoryName(name);
   if (!normalized) throw new Error("Give this System a name.");
   return normalized;
 }

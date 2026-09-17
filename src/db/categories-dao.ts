@@ -89,3 +89,92 @@ export function createCategory(
     return row;
   });
 }
+
+async function categoryById(
+  exec: ReadOnlyExecutor,
+  id: number,
+): Promise<CategoryManagementRow | null> {
+  return exec.getFirstAsync<CategoryManagementRow>(
+    `SELECT c.id, c.uid, c.name, c.display_order AS displayOrder,
+            COUNT(contact.id) AS contactCount,
+            c.created_at AS createdAt, c.modified_at AS modifiedAt
+       FROM categories c
+       LEFT JOIN contacts contact ON contact.category_id = c.id
+      WHERE c.id = ?
+      GROUP BY c.id`,
+    [id],
+  );
+}
+
+export async function renameCategoryCore(
+  exec: SqlExecutor,
+  input: { id: number; name: string; now: string },
+): Promise<CategoryManagementRow> {
+  const existing = await categoryById(exec, input.id);
+  if (!existing)
+    throw new Error(`renameCategory: unknown category id=${input.id}`);
+  const name = await validatedName(exec, input.name, input.id);
+  const updated = await exec.runAsync(
+    "UPDATE categories SET name = ?, modified_at = ? WHERE id = ?",
+    [name, input.now, input.id],
+  );
+  if (updated.changes !== 1) {
+    throw new Error(
+      `renameCategory: expected one changed row, got ${updated.changes}`,
+    );
+  }
+  return { ...existing, name, modifiedAt: input.now };
+}
+
+export function renameCategory(
+  exec: SqlExecutor,
+  input: { id: number; name: string; now: string },
+): Promise<CategoryManagementRow> {
+  return inWriteTransaction(exec, async () => {
+    const row = await renameCategoryCore(exec, input);
+    await bumpDataRevisionCore(exec);
+    return row;
+  });
+}
+
+export async function reorderCategoriesCore(
+  exec: SqlExecutor,
+  input: { orderedIds: readonly number[]; now: string },
+): Promise<void> {
+  const stored = await exec.getAllAsync<{ id: number }>(
+    "SELECT id FROM categories ORDER BY id",
+  );
+  const expected = stored.map((row) => row.id);
+  const submitted = [...input.orderedIds];
+  const submittedSet = new Set(submitted);
+  if (
+    submitted.length !== expected.length ||
+    submittedSet.size !== submitted.length ||
+    expected.some((id) => !submittedSet.has(id))
+  ) {
+    throw new Error(
+      "reorderCategories: orderedIds must be the complete current category set",
+    );
+  }
+  for (let index = 0; index < submitted.length; index += 1) {
+    const updated = await exec.runAsync(
+      "UPDATE categories SET display_order = ?, modified_at = ? WHERE id = ?",
+      [index, input.now, submitted[index]],
+    );
+    if (updated.changes !== 1) {
+      throw new Error(
+        `reorderCategories: category set changed at id=${submitted[index]}`,
+      );
+    }
+  }
+}
+
+export function reorderCategories(
+  exec: SqlExecutor,
+  input: { orderedIds: readonly number[]; now: string },
+): Promise<void> {
+  return inWriteTransaction(exec, async () => {
+    await reorderCategoriesCore(exec, input);
+    await bumpDataRevisionCore(exec);
+  });
+}
