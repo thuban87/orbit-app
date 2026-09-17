@@ -52,7 +52,10 @@ describe("atomic category deletion", () => {
     );
     await exec.runAsync(
       "UPDATE app_settings SET orrery_last_system=?, dashboard_filters=? WHERE id=1",
-      [`category:${source.uid}`, JSON.stringify({ category: [String(source.id)], gravity: ["Inner"] })],
+      [
+        `category:${source.uid}`,
+        JSON.stringify({ category: [String(source.id)], gravity: ["Inner"] }),
+      ],
     );
 
     const preview = await readCategoryDeletionPreview(exec, source.id);
@@ -73,19 +76,44 @@ describe("atomic category deletion", () => {
       now: "2026-09-17 03:00:00",
     });
     expect(result.status).toBe("deleted");
-    expect(await exec.getFirstAsync("SELECT id FROM categories WHERE id=?", [source.id])).toBeNull();
-    expect(await exec.getFirstAsync("SELECT category_id FROM contacts WHERE uid='archived'")).toEqual({ category_id: target.id });
-    expect(await exec.getAllAsync("SELECT status,batch_category_id FROM import_sessions ORDER BY status")).toEqual([
+    expect(
+      await exec.getFirstAsync("SELECT id FROM categories WHERE id=?", [
+        source.id,
+      ]),
+    ).toBeNull();
+    expect(
+      await exec.getFirstAsync(
+        "SELECT category_id FROM contacts WHERE uid='archived'",
+      ),
+    ).toEqual({ category_id: target.id });
+    expect(
+      await exec.getAllAsync(
+        "SELECT status,batch_category_id FROM import_sessions ORDER BY status",
+      ),
+    ).toEqual([
       { status: "complete", batch_category_id: target.id },
       { status: "discarded", batch_category_id: target.id },
       { status: "pending", batch_category_id: target.id },
     ]);
-    expect(await exec.getFirstAsync("SELECT COUNT(*) AS count FROM system_rules WHERE uid='category-rule'")).toEqual({ count: 0 });
-    expect(await exec.getFirstAsync("SELECT orrery_last_system,dashboard_filters FROM app_settings WHERE id=1")).toEqual({
+    expect(
+      await exec.getFirstAsync(
+        "SELECT COUNT(*) AS count FROM system_rules WHERE uid='category-rule'",
+      ),
+    ).toEqual({ count: 0 });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT orrery_last_system,dashboard_filters FROM app_settings WHERE id=1",
+      ),
+    ).toEqual({
       orrery_last_system: "builtin:all-contacts",
       dashboard_filters: JSON.stringify({ gravity: ["Inner"] }),
     });
-    expect(await exec.getFirstAsync("SELECT entity_type,entity_uid FROM tombstones WHERE entity_type='category' AND entity_uid=?", [source.uid])).toEqual({ entity_type: "category", entity_uid: source.uid });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT entity_type,entity_uid FROM tombstones WHERE entity_type='category' AND entity_uid=?",
+        [source.uid],
+      ),
+    ).toEqual({ entity_type: "category", entity_uid: source.uid });
     expect(await readDataRevision(exec)).toBe(beforeRevision + 1);
   });
 
@@ -104,8 +132,71 @@ describe("atomic category deletion", () => {
     });
     expect(result.status).toBe("stale");
     expect(result.preview?.counts.contacts).toBe(1);
-    expect(await exec.getFirstAsync("SELECT id FROM categories WHERE id=?", [source.id])).toEqual({ id: source.id });
+    expect(
+      await exec.getFirstAsync("SELECT id FROM categories WHERE id=?", [
+        source.id,
+      ]),
+    ).toEqual({ id: source.id });
   });
+
+  it.each([
+    "contacts",
+    "imports",
+    "rules",
+    "overrides",
+    "prefs",
+    "active-selection",
+    "dashboard-filter",
+    "profile",
+    "order",
+    "tombstone",
+    "category",
+  ] as const)(
+    "rolls back the complete aggregate after %s",
+    async (faultStage) => {
+      const [source, target] = await listCategoriesForManagement(exec);
+      await exec.runAsync(
+        "INSERT INTO contacts(uid,name,category_id,interval_days,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+        [`rollback-${faultStage}`, "Rollback", source.id, 30, NOW, NOW],
+      );
+      const preview = await readCategoryDeletionPreview(exec, source.id);
+      const before = {
+        categories: await exec.getAllAsync(
+          "SELECT * FROM categories ORDER BY id",
+        ),
+        contacts: await exec.getAllAsync("SELECT * FROM contacts ORDER BY id"),
+        settings: await exec.getAllAsync(
+          "SELECT * FROM app_settings ORDER BY id",
+        ),
+        tombstones: await exec.getAllAsync(
+          "SELECT * FROM tombstones ORDER BY id",
+        ),
+      };
+      await expect(
+        deleteCategory(exec, {
+          categoryId: source.id,
+          targetCategoryId: target.id,
+          expectedFingerprint: preview?.fingerprint ?? "",
+          now: NOW,
+          afterStage(stage) {
+            if (stage === faultStage) throw new Error(`fault:${stage}`);
+          },
+        }),
+      ).rejects.toThrow(`fault:${faultStage}`);
+      expect({
+        categories: await exec.getAllAsync(
+          "SELECT * FROM categories ORDER BY id",
+        ),
+        contacts: await exec.getAllAsync("SELECT * FROM contacts ORDER BY id"),
+        settings: await exec.getAllAsync(
+          "SELECT * FROM app_settings ORDER BY id",
+        ),
+        tombstones: await exec.getAllAsync(
+          "SELECT * FROM tombstones ORDER BY id",
+        ),
+      }).toEqual(before);
+    },
+  );
 });
 
 describe("category rename and reorder", () => {
