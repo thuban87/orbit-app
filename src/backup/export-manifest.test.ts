@@ -16,6 +16,29 @@ import { runMigrations } from "@/db/migrations/runner";
 const NOW = "2026-08-25 12:00:00";
 
 describe("buildExportManifest", () => {
+  it("exports category tombstones in format v6", async () => {
+    let count = 0;
+    const exec = nodeSqliteExecutor(openTestDb());
+    await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+      now: NOW,
+      newUid: () => `uid-${++count}`,
+    });
+    await exec.runAsync(
+      "INSERT INTO tombstones(entity_type,entity_uid,deleted_at) VALUES('category','gone-category',?)",
+      [NOW],
+    );
+    const manifest = await buildExportManifest(exec, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "AQID",
+    });
+    expect(manifest.backupFormatVersion).toBe(6);
+    expect(manifest.tombstones).toContainEqual({
+      entityType: "category",
+      entityUid: "gone-category",
+      deletedAt: NOW,
+    });
+  });
+
   it.each(["dissolve", "delete"] as const)(
     "carries a local Group Event tombstone after %s",
     async (action) => {

@@ -40,6 +40,47 @@ describe("dashboard preference portable allowlist", () => {
   });
 });
 
+describe("format v6 category deletion evidence", () => {
+  it("accepts category tombstones and rejects a category child whose parent is deleted", () => {
+    const manifest = valid();
+    manifest.categories = [
+      { uid: "friends", name: "Friends", modifiedAt: "2026-08-25 11:00:00" },
+    ];
+    manifest.tombstones = [
+      {
+        entityType: "category",
+        entityUid: "friends",
+        deletedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    expect(parseBackupManifest(manifest).tombstones).toEqual(
+      manifest.tombstones,
+    );
+
+    manifest.contacts = [
+      {
+        uid: "contact",
+        trackingEnabled: 1,
+        intervalDays: 7,
+        categoryUid: "friends",
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    expect(() => parseBackupManifest(manifest)).toThrow(/surviving category/i);
+  });
+
+  it("rejects normalized visible-name collisions across categories and Systems", () => {
+    const manifest = valid();
+    manifest.categories = [
+      { uid: "friends", name: "  Cafe\u0301  ", modifiedAt: "2026-08-25 12:00:00" },
+    ];
+    manifest.systems = [
+      { uid: "system", name: "CAFÉ", modifiedAt: "2026-08-25 12:00:00" },
+    ];
+    expect(() => parseBackupManifest(manifest)).toThrow(/visible name/i);
+  });
+});
+
 describe("default interaction channel portable allowlist (declare-only, CAPT-11)", () => {
   it("allowlists both camelCase MANIFEST keys, NOT the snake_case columns", () => {
     // camelCase MANIFEST keys match COLUMN_OF's key side + the restore cast; the
