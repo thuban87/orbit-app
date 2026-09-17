@@ -1,9 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 
+const reactMocks = vi.hoisted(() => ({
+  effects: [] as Array<() => void>,
+  query: "",
+  setQuery: vi.fn(),
+}));
+
 vi.mock("react", () => ({
-  useEffect: vi.fn(),
+  useEffect: (effect: () => void) => reactMocks.effects.push(effect),
   useMemo: <T,>(factory: () => T) => factory(),
-  useState: <T,>(value: T) => [value, vi.fn()],
+  useState: <T,>(_value: T) => [reactMocks.query, reactMocks.setQuery],
 }));
 vi.mock("react-native", () => ({
   FlatList: "FlatList",
@@ -15,7 +21,20 @@ vi.mock("react-native", () => ({
 vi.mock("@/components/ui", () => ({ AppText: "AppText", Sheet: "Sheet" }));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 
-const { categoryChoiceSheetModel } = await import("./CategoryChoiceSheet");
+const { CategoryChoiceSheet, categoryChoiceSheetModel } = await import(
+  "./CategoryChoiceSheet"
+);
+
+function findElements(node: unknown, type: unknown): unknown[] {
+  if (!node || typeof node !== "object") return [];
+  const element = node as { type?: unknown; props?: { children?: unknown } };
+  const matches = element.type === type ? [node] : [];
+  const children = element.props?.children;
+  const nested = Array.isArray(children)
+    ? children.flatMap((child) => findElements(child, type))
+    : findElements(children, type);
+  return [...matches, ...nested];
+}
 
 describe("CategoryChoiceSheet", () => {
   const categories = Array.from({ length: 20 }, (_, index) => ({
@@ -113,5 +132,47 @@ describe("CategoryChoiceSheet", () => {
     expect(byUid.rows.map((row) => row.id)).toEqual(
       thirteen.filter((row) => row.uid !== "uid-2").map((row) => row.id),
     );
+  });
+
+  it("renders search only for a searchable eligible catalog", () => {
+    const render = (length: number) =>
+      CategoryChoiceSheet({
+        visible: true,
+        categories: categories.slice(0, length),
+        selectedId: null,
+        onSelect: vi.fn(),
+        onRequestClose: vi.fn(),
+      });
+
+    expect(findElements(render(12), "TextInput")).toHaveLength(0);
+    expect(findElements(render(13), "TextInput")).toHaveLength(1);
+  });
+
+  it("clears query state when the sheet closes or becomes non-searchable", () => {
+    reactMocks.query = "friends";
+    reactMocks.effects.length = 0;
+    reactMocks.setQuery.mockClear();
+
+    CategoryChoiceSheet({
+      visible: false,
+      categories: categories.slice(0, 13),
+      selectedId: null,
+      onSelect: vi.fn(),
+      onRequestClose: vi.fn(),
+    });
+    for (const effect of reactMocks.effects) effect();
+    expect(reactMocks.setQuery).toHaveBeenCalledWith("");
+
+    reactMocks.effects.length = 0;
+    reactMocks.setQuery.mockClear();
+    CategoryChoiceSheet({
+      visible: true,
+      categories: categories.slice(0, 12),
+      selectedId: null,
+      onSelect: vi.fn(),
+      onRequestClose: vi.fn(),
+    });
+    for (const effect of reactMocks.effects) effect();
+    expect(reactMocks.setQuery).toHaveBeenCalledWith("");
   });
 });
