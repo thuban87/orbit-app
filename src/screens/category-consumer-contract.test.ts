@@ -42,4 +42,14 @@ describe("category consumer integration contract", () => {
       );
     }
   });
+
+  it.each([
+    "CreateContactScreen.tsx",
+    "EditContactScreen.tsx",
+  ])("%s routes initial and focus publication through the shared authority", (name) => {
+    const source = read(name);
+    expect(source).toContain("useCategoryCatalogRefresh");
+    expect(source).toContain("requestInitialCategories");
+    expect(source).not.toMatch(/useFocusEffect[\s\S]{0,500}listCategories/);
+  });
 });
