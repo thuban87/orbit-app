@@ -77,6 +77,10 @@ type Page = "list" | "crop" | "name" | "assign";
 type CropSource = { uri: string; width: number; height: number };
 type Category = { id: number; uid?: string; name: string };
 
+function clearCategoryAccessibilityLabel(category: { name: string }): string {
+  return `Clear ${category.name} background`;
+}
+
 export interface ProfileBackgroundManagerProps {
   visible: boolean;
   contactId: number;
@@ -1141,6 +1145,11 @@ export function ProfileBackgroundManager({
         categories={categories}
         selectedId={null}
         allowUncategorized={false}
+        getAccessibilityLabel={
+          categoryPickerMode === "clear"
+            ? clearCategoryAccessibilityLabel
+            : (category) => `Assign background to ${category.name}`
+        }
         title={
           categoryPickerMode === "clear"
             ? "Clear category background"

@@ -4,6 +4,7 @@ import { AppText, Sheet } from "@/components/ui";
 import {
   buildCategoryChoices,
   type CategoryChoice,
+  type CategoryChoiceRow,
   filterCategoryChoices,
 } from "@/logic/category-logic";
 import { useTheme } from "@/theme";
@@ -47,6 +48,7 @@ export interface CategoryChoiceSheetProps {
   excludeCategoryId?: number;
   excludeCategoryUid?: string;
   title?: string;
+  getAccessibilityLabel?: (category: CategoryChoiceRow) => string;
   onSelect: (categoryId: number | null) => void;
   onRequestClose: () => void;
 }
@@ -59,6 +61,7 @@ export function CategoryChoiceSheet({
   excludeCategoryId,
   excludeCategoryUid,
   title = "Choose category",
+  getAccessibilityLabel,
   onSelect,
   onRequestClose,
 }: CategoryChoiceSheetProps) {
@@ -124,6 +127,7 @@ export function CategoryChoiceSheet({
             return (
               <Pressable
                 accessibilityRole="radio"
+                accessibilityLabel={getAccessibilityLabel?.(item) ?? item.name}
                 accessibilityState={{ selected }}
                 onPress={() => {
                   onSelect(item.id);
