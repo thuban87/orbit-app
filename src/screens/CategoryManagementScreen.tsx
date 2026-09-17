@@ -48,7 +48,7 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
 
-const LOAD_ERROR = "Couldn't load categories. Please try again.";
+const LOAD_ERROR = "Couldn't load categories. Try again.";
 const SAVE_ERROR = "Couldn't save this category. Please try again.";
 const REORDER_ERROR =
   "Couldn't save the new category order. The previous order was restored.";
@@ -61,6 +61,57 @@ export type CategoryManagementLoadOutcome =
   | { status: "success" }
   | { status: "stale" }
   | { status: "failure" };
+
+export type PendingCategoryMutation = {
+  operation: "create" | "rename" | "delete";
+  successLabel: string;
+  finalize: "editor" | "delete";
+};
+
+type CategoryMutationCoordinatorInput = {
+  readback: () => Promise<CategoryManagementLoadOutcome>;
+  pending: PendingCategoryMutation;
+  setPending: (pending: PendingCategoryMutation | null) => void;
+  finalizeUi: (finalize: PendingCategoryMutation["finalize"]) => void;
+  publishSuccess: (label: string) => void;
+};
+
+export async function reconcilePendingCategoryMutation(
+  input: CategoryMutationCoordinatorInput,
+): Promise<CategoryManagementLoadOutcome> {
+  const outcome = await input.readback();
+  if (outcome.status === "success") {
+    input.finalizeUi(input.pending.finalize);
+    input.publishSuccess(input.pending.successLabel);
+    input.setPending(null);
+  }
+  return outcome;
+}
+
+export async function runCategoryMutation(
+  input: CategoryMutationCoordinatorInput & { mutation: () => Promise<void> },
+): Promise<CategoryManagementLoadOutcome> {
+  await input.mutation();
+  input.setPending(input.pending);
+  return reconcilePendingCategoryMutation(input);
+}
+
+export async function runCategoryReorder<T>(input: {
+  next: T[];
+  prior: T[];
+  mutate: () => Promise<void>;
+  publishRows: (rows: T[]) => void;
+  commitRows: (rows: T[]) => void;
+}): Promise<void> {
+  input.publishRows(input.next);
+  try {
+    await input.mutate();
+    input.commitRows(input.next);
+  } catch (cause) {
+    input.publishRows(input.prior);
+    throw cause;
+  }
+}
 
 export async function resolveCategoryManagementLoad(input: {
   isCurrent: () => boolean;
@@ -285,6 +336,8 @@ export function CategoryManagementScreen() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [targetCategoryId, setTargetCategoryId] = useState<number | null>(null);
   const [targetChoiceOpen, setTargetChoiceOpen] = useState(false);
+  const [readbackPending, setReadbackPending] =
+    useState<PendingCategoryMutation | null>(null);
   const nextLoad = useRef(createCategoryManagementLoadGuard());
 
   const load = useCallback(async (): Promise<CategoryManagementLoadOutcome> => {
@@ -319,8 +372,37 @@ export function CategoryManagementScreen() {
     showSnackbar({ kind: "success", label });
   };
 
+  const finalizeMutationUi = (
+    finalize: PendingCategoryMutation["finalize"],
+  ) => {
+    if (finalize === "editor") setEditor(null);
+    else {
+      setDeleteConfirmOpen(false);
+      setDeleteDetailOpen(false);
+      setDeletePreview(null);
+      setTargetChoiceOpen(false);
+    }
+  };
+
+  const retryReadback = async () => {
+    if (!readbackPending || saving) return;
+    setSaving(true);
+    try {
+      const outcome = await reconcilePendingCategoryMutation({
+        readback: load,
+        pending: readbackPending,
+        setPending: setReadbackPending,
+        finalizeUi: finalizeMutationUi,
+        publishSuccess,
+      });
+      if (outcome.status !== "success") setLoadError(true);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const submitEditor = async () => {
-    if (!editor || saving) return;
+    if (!editor || saving || readbackPending) return;
     const validation = validateCategoryName(editor.name, {
       categoryNames: rows,
       systemNames: [],
@@ -333,23 +415,33 @@ export function CategoryManagementScreen() {
     setSaving(true);
     setNameError(null);
     try {
-      if (editor.kind === "add")
-        await createCategory(getExecutor(), {
-          name: editor.name,
-          now: localDateTime(),
-        });
-      else
-        await renameCategory(getExecutor(), {
-          id: editor.row.id,
-          name: editor.name,
-          now: localDateTime(),
-        });
-      const readback = await load();
-      if (readback.status !== "success") return;
-      publishSuccess(
-        editor.kind === "add" ? "Category added." : "Category renamed.",
-      );
-      setEditor(null);
+      const pending: PendingCategoryMutation = {
+        operation: editor.kind === "add" ? "create" : "rename",
+        successLabel:
+          editor.kind === "add" ? "Category added." : "Category renamed.",
+        finalize: "editor",
+      };
+      const outcome = await runCategoryMutation({
+        mutation: async () => {
+          if (editor.kind === "add")
+            await createCategory(getExecutor(), {
+              name: editor.name,
+              now: localDateTime(),
+            });
+          else
+            await renameCategory(getExecutor(), {
+              id: editor.row.id,
+              name: editor.name,
+              now: localDateTime(),
+            });
+        },
+        readback: load,
+        pending,
+        setPending: setReadbackPending,
+        finalizeUi: finalizeMutationUi,
+        publishSuccess,
+      });
+      if (outcome.status !== "success") setLoadError(true);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : SAVE_ERROR;
       setNameError(/category name|System/.test(message) ? message : SAVE_ERROR);
@@ -362,16 +454,23 @@ export function CategoryManagementScreen() {
     next: CategoryManagementRow[],
     movedIndex: number,
   ) => {
-    if (reordering) return;
+    if (reordering || readbackPending) return;
     setReordering(true);
-    setRows(next);
     setSaveError(null);
     try {
-      await reorderCategories(getExecutor(), {
-        orderedIds: next.map((row) => row.id),
-        now: localDateTime(),
+      await runCategoryReorder({
+        next,
+        prior: committedRows.current,
+        mutate: () =>
+          reorderCategories(getExecutor(), {
+            orderedIds: next.map((row) => row.id),
+            now: localDateTime(),
+          }),
+        publishRows: setRows,
+        commitRows: (committed) => {
+          committedRows.current = committed;
+        },
       });
-      committedRows.current = next;
       bumpShellRefresh();
       const moved = next[movedIndex];
       if (moved)
@@ -379,7 +478,6 @@ export function CategoryManagementScreen() {
           `${moved.name}, position ${movedIndex + 1} of ${next.length}`,
         );
     } catch {
-      setRows(committedRows.current);
       setSaveError(REORDER_ERROR);
       AccessibilityInfo.announceForAccessibility(REORDER_ERROR);
     } finally {
@@ -388,7 +486,7 @@ export function CategoryManagementScreen() {
   };
 
   const beginDelete = async (row: CategoryManagementRow) => {
-    if (saving) return;
+    if (saving || readbackPending) return;
     setSaving(true);
     setSaveError(null);
     try {
@@ -417,18 +515,40 @@ export function CategoryManagementScreen() {
   };
 
   const commitDelete = async () => {
-    if (!deletePreview || saving) return;
+    if (!deletePreview || saving || readbackPending) return;
     setSaving(true);
     setSaveError(null);
+    let result: Awaited<ReturnType<typeof deleteCategory>> | undefined;
     try {
-      const result = await deleteCategory(getExecutor(), {
-        categoryId: deletePreview.category.id,
-        targetCategoryId,
-        expectedFingerprint: deletePreview.fingerprint,
-        now: localDateTime(),
+      const pending: PendingCategoryMutation = {
+        operation: "delete",
+        successLabel: "Category deleted.",
+        finalize: "delete",
+      };
+      const outcome = await runCategoryMutation({
+        mutation: async () => {
+          result = await deleteCategory(getExecutor(), {
+            categoryId: deletePreview.category.id,
+            targetCategoryId,
+            expectedFingerprint: deletePreview.fingerprint,
+            now: localDateTime(),
+          });
+          if (result.status === "stale") throw new Error("stale deletion");
+        },
+        readback: load,
+        pending,
+        setPending: setReadbackPending,
+        finalizeUi: finalizeMutationUi,
+        publishSuccess,
       });
-      if (result.status === "stale") {
-        const fresh = result.preview;
+      if (outcome.status !== "success") {
+        setLoadError(true);
+        setDeleteConfirmOpen(false);
+        setDeleteDetailOpen(true);
+      }
+    } catch (cause) {
+      if (cause instanceof Error && cause.message === "stale deletion") {
+        const fresh = result?.status === "stale" ? result.preview : null;
         setDeletePreview(fresh);
         const stillValid =
           targetCategoryId === null ||
@@ -441,13 +561,6 @@ export function CategoryManagementScreen() {
         AccessibilityInfo.announceForAccessibility(SAVE_ERROR);
         return;
       }
-      const readback = await load();
-      if (readback.status !== "success") return;
-      setDeleteConfirmOpen(false);
-      setDeleteDetailOpen(false);
-      setDeletePreview(null);
-      publishSuccess("Category deleted.");
-    } catch {
       setSaveError(SAVE_ERROR);
       AccessibilityInfo.announceForAccessibility(SAVE_ERROR);
     } finally {
@@ -460,6 +573,7 @@ export function CategoryManagementScreen() {
     index: number,
     action: RowAction,
   ) => {
+    if (readbackPending) return;
     if (action === "rename") {
       setNameError(null);
       setEditor({ kind: "rename", row, name: row.name });
@@ -505,8 +619,11 @@ export function CategoryManagementScreen() {
             role="secondary"
             label="Try again"
             onPress={() => {
-              setInitialLoading(true);
-              void load();
+              if (readbackPending) void retryReadback();
+              else {
+                setInitialLoading(true);
+                void load();
+              }
             }}
           />
         </View>
@@ -523,7 +640,7 @@ export function CategoryManagementScreen() {
           <Button
             role="primary"
             label="+ Add Category"
-            disabled={saving || reordering}
+            disabled={saving || reordering || readbackPending !== null}
             onPress={() => {
               setNameError(null);
               setEditor({ kind: "add", name: "" });
@@ -543,7 +660,7 @@ export function CategoryManagementScreen() {
                 row={item}
                 index={index}
                 total={rows.length}
-                disabled={saving || reordering}
+                disabled={saving || reordering || readbackPending !== null}
                 onAction={(action) => handleAction(item, index, action)}
               />
             )}
@@ -574,7 +691,7 @@ export function CategoryManagementScreen() {
       <Sheet
         visible={editor !== null}
         onRequestClose={() => {
-          if (!saving) setEditor(null);
+          if (!saving && !readbackPending) setEditor(null);
         }}
       >
         {editor ? (
@@ -590,7 +707,7 @@ export function CategoryManagementScreen() {
                 setEditor({ ...editor, name });
                 setNameError(null);
               }}
-              editable={!saving}
+              editable={!saving && !readbackPending}
               maxLength={101}
               style={[
                 styles.input,
@@ -606,6 +723,22 @@ export function CategoryManagementScreen() {
                 {nameError}
               </AppText>
             ) : null}
+            {readbackPending?.finalize === "editor" ? (
+              <View style={styles.recovery}>
+                <AppText
+                  accessibilityLiveRegion="polite"
+                  style={{ color: colors.danger }}
+                >
+                  {LOAD_ERROR}
+                </AppText>
+                <Button
+                  role="secondary"
+                  label="Try again"
+                  disabled={saving}
+                  onPress={() => void retryReadback()}
+                />
+              </View>
+            ) : null}
             <Button
               role="secondary"
               label={
@@ -613,13 +746,13 @@ export function CategoryManagementScreen() {
                   ? "Discard new category"
                   : "Keep current name"
               }
-              disabled={saving}
+              disabled={saving || readbackPending !== null}
               onPress={() => setEditor(null)}
             />
             <Button
               role="primary"
               label={editor.kind === "add" ? "Add category" : "Save name"}
-              disabled={saving}
+              disabled={saving || readbackPending !== null}
               onPress={() => void submitEditor()}
             />
           </View>
@@ -629,7 +762,7 @@ export function CategoryManagementScreen() {
         visible={deleteDetailOpen}
         variant="expanded"
         onRequestClose={() => {
-          if (!saving) {
+          if (!saving && !readbackPending) {
             setDeleteDetailOpen(false);
             setDeletePreview(null);
           }
@@ -670,10 +803,26 @@ export function CategoryManagementScreen() {
                 settings are removed, not transferred.
               </AppText>
             </ScrollView>
+            {readbackPending?.finalize === "delete" ? (
+              <View style={styles.recovery}>
+                <AppText
+                  accessibilityLiveRegion="polite"
+                  style={{ color: colors.danger }}
+                >
+                  {LOAD_ERROR}
+                </AppText>
+                <Button
+                  role="secondary"
+                  label="Try again"
+                  disabled={saving}
+                  onPress={() => void retryReadback()}
+                />
+              </View>
+            ) : null}
             <Button
               role="secondary"
               label="Keep category"
-              disabled={saving}
+              disabled={saving || readbackPending !== null}
               onPress={() => {
                 setDeleteDetailOpen(false);
                 setDeletePreview(null);
@@ -682,7 +831,7 @@ export function CategoryManagementScreen() {
             <Button
               role="primary"
               label="Review deletion"
-              disabled={saving}
+              disabled={saving || readbackPending !== null}
               onPress={() => {
                 setDeleteDetailOpen(false);
                 setDeleteConfirmOpen(true);
@@ -692,7 +841,7 @@ export function CategoryManagementScreen() {
         ) : null}
       </Sheet>
       <CategoryChoiceSheet
-        visible={targetChoiceOpen}
+        visible={targetChoiceOpen && !readbackPending}
         categories={deletePreview?.targets ?? []}
         selectedId={targetCategoryId}
         excludeCategoryId={deletePreview?.category.id}
@@ -718,8 +867,10 @@ export function CategoryManagementScreen() {
         }
         confirmLabel="Delete category"
         cancelLabel="Keep category"
-        confirmDisabled={saving}
-        onCancel={keepCategory}
+        confirmDisabled={saving || readbackPending !== null}
+        onCancel={() => {
+          if (!readbackPending) keepCategory();
+        }}
         onConfirm={() => void commitDelete()}
       />
     </View>
@@ -760,6 +911,7 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   sheetBody: { gap: SPACING.base },
+  recovery: { gap: SPACING.sm },
   deleteSheet: { flex: 1, gap: SPACING.base },
   deleteContent: { gap: SPACING.base, paddingBottom: SPACING.base },
   choice: {

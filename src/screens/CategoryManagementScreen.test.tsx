@@ -211,13 +211,28 @@ describe("CategoryManagementScreen committed mutation coordinator", () => {
     "retries %s through readback only and finalizes success exactly once",
     async (operation, successLabel, finalize) => {
       const mutation = vi.fn().mockResolvedValue(undefined);
-      const readback = vi
+      const readRows = vi
         .fn()
-        .mockResolvedValueOnce({ status: "failure" })
-        .mockResolvedValueOnce({ status: "failure" })
-        .mockResolvedValueOnce({ status: "success" });
+        .mockRejectedValueOnce(new Error("first read failed"))
+        .mockRejectedValueOnce(new Error("second read failed"))
+        .mockResolvedValueOnce([]);
+      const readUncategorizedCount = vi.fn().mockResolvedValue(0);
+      const publishSnapshot = vi.fn();
+      const readback = vi.fn(() =>
+        resolveCategoryManagementLoad({
+          isCurrent: () => true,
+          readRows,
+          readUncategorizedCount,
+          publish: publishSnapshot,
+        }),
+      );
       const setPending = vi.fn();
-      const publishSuccess = vi.fn();
+      const showSnackbar = vi.fn();
+      const bumpShellRefresh = vi.fn();
+      const publishSuccess = vi.fn((label: string) => {
+        bumpShellRefresh();
+        showSnackbar({ kind: "success", label });
+      });
       const finalizeUi = vi.fn();
       const pending = { operation, successLabel, finalize };
 
@@ -246,10 +261,19 @@ describe("CategoryManagementScreen committed mutation coordinator", () => {
 
       expect(mutation).toHaveBeenCalledTimes(1);
       expect(readback).toHaveBeenCalledTimes(3);
+      expect(readRows).toHaveBeenCalledTimes(3);
+      expect(readUncategorizedCount).toHaveBeenCalledTimes(3);
+      expect(publishSnapshot).toHaveBeenCalledTimes(1);
       expect(finalizeUi).toHaveBeenCalledTimes(1);
       expect(finalizeUi).toHaveBeenCalledWith(finalize);
       expect(publishSuccess).toHaveBeenCalledTimes(1);
       expect(publishSuccess).toHaveBeenCalledWith(successLabel);
+      expect(bumpShellRefresh).toHaveBeenCalledTimes(1);
+      expect(showSnackbar).toHaveBeenCalledTimes(1);
+      expect(showSnackbar).toHaveBeenCalledWith({
+        kind: "success",
+        label: successLabel,
+      });
       expect(setPending).toHaveBeenLastCalledWith(null);
     },
   );
