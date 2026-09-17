@@ -976,18 +976,38 @@ Plans:
 **Requirements**: TBD — deferred to planning
 **Scope source:** D-03 in `.planning/phases/37-settings-personalization/37-CONTEXT.md` (owner-confirmed 2026-09-14), the Phase 37.1 dossier, and the approved Phase 37.1 UI-SPEC. Category deletion is a permanent runtime application transaction with durable category tombstone evidence; it adds no migration, `field_history` category history, Undo, quarantine, or reseeding, and zero categories is valid.
 **Canonical refs**: `.planning/phases/37-settings-personalization/37-CONTEXT.md` (D-03), the `categories` table (migration 001), Orrery Systems + custom-System rules + Profile category assignment + backup writers.
-**Plans:** 9/9 plans executed across 6 waves
+**Plans:** 9/13 plans executed across 6 implementation waves plus 1 gap-closure wave
 
 Plans:
+**Wave 1**
 
 - [x] 37.1-01-PLAN.md (Wave 1) — Production Add tracer plus canonical non-destructive Category CRUD/order contract
+- [ ] 37.1-10-PLAN.md (Gap Wave 1) — Fail-closed malformed Dashboard-filter deletion and full rollback proof
+- [ ] 37.1-11-PLAN.md (Gap Wave 1) — Exact 12/13 shared CategoryChoiceSheet search boundary
+- [ ] 37.1-12-PLAN.md (Gap Wave 1) — One async catalog-publication authority across Create, Edit, and Import Review
+- [ ] 37.1-13-PLAN.md (Gap Wave 1) — Explicit manager post-write readback outcomes and truthful UI transitions
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [x] 37.1-02-PLAN.md (Wave 2) — Atomic deletion, all-status import reassignment, canonical System validity, and exhaustive rollback proof
 - [x] 37.1-05-PLAN.md (Wave 2) — Shared complete/searchable category-choice model plus Contact and Import consumers
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [x] 37.1-03-PLAN.md (Wave 3) — Backup-v6 category tombstones, reconciliation, merge deletion, and exact replace-all taxonomy
 - [x] 37.1-04-PLAN.md (Wave 3) — Complete manager interactions, anchored menu, deletion UI, and commit-truthful Snackbar feedback
 - [x] 37.1-07-PLAN.md (Wave 3) — System Builder category rules and exact three-group Orrery selector
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [x] 37.1-06-PLAN.md (Wave 4) — Dashboard Uncategorized/filter/bulk behavior and Profile presentation consumers
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [x] 37.1-08-PLAN.md (Wave 5) — Final writer/consumer audit, living documentation, and full automated phase gate
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [x] 37.1-09-PLAN.md (Wave 6) — Owner-gated physical-device setup and ordinary successful UAT
 
 ### Phase 38: Your Week

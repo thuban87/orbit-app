@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 37.1
-current_phase_name: Category Management (INSERTED)
-status: verifying
+current_phase_name: Category Management
+status: executing
 stopped_at: Completed 37.1-09-PLAN.md
-last_updated: "2026-09-17T11:02:44.414Z"
+last_updated: "2026-09-17T18:16:19.500Z"
 last_activity: 2026-09-17
 last_activity_desc: Phase 37.1 execution started
-state_head: 80227494f43772f1a4497d5193d6670c15643ae0
+state_head: a4005eb7fc1d68506bba07ce49b97473d045ca35
 progress:
   total_phases: 22
   completed_phases: 12
-  total_plans: 165
+  total_plans: 169
   completed_plans: 163
 carried_forward:
 
@@ -36,9 +36,9 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 37.1 (Category Management (INSERTED)) — VERIFYING
+Phase: 37.1 (Category Management) — READY TO EXECUTE
 Plan: 9 of 9
-Status: Phase complete — ready for verification
+Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
