@@ -10,6 +10,7 @@ import { BackupScreen } from "@/screens/BackupScreen";
 import { BackupSettingsScreen } from "@/screens/BackupSettingsScreen";
 import { BulkImportSetupScreen } from "@/screens/BulkImportSetupScreen";
 import { BulkReviewScreen } from "@/screens/BulkReviewScreen";
+import { CategoryManagementScreen } from "@/screens/CategoryManagementScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
@@ -229,6 +230,10 @@ export function SettingsStack() {
         component={SystemsManagementScreen}
       />
       <Stack.Screen name="CustomFields" component={CustomFieldsRoute} />
+      <Stack.Screen
+        name="CategoryManagement"
+        component={CategoryManagementScreen}
+      />
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
       <Stack.Screen name="Profile" component={ContactProfileScreen} />
       {/* Detailed-log route (HIST-15): a Settings-originated (Archived -> Profile)

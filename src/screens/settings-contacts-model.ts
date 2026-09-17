@@ -166,18 +166,12 @@ export const SETTINGS_CONTACTS_SECTIONS: ReadonlyArray<SettingsContactsSection> 
           subtitle: "Define the fields your contacts can carry.",
           route: "CustomFields",
         },
-        // Categories IA reservation (D-03 / §K): the section-order slot and a
-        // stable internal route NAME are held here for a FUTURE Category
-        // Management phase, but `isActiveContactsRow` returns false for this
-        // `reserved` row so the screen renders NOTHING — no dead placeholder, no
-        // Category CRUD. `CategoryManagement` is intentionally NOT registered as
-        // a <Stack.Screen> and NOT in SETTINGS_REGISTERED_ROUTES.
         {
-          kind: "reserved",
+          kind: "route",
           key: "category-management",
+          title: "Categories",
+          subtitle: "Organize contacts into your own relationship groups.",
           route: "CategoryManagement",
-          reason:
-            "Reserved for the future Category Management phase (D-03); no CRUD, no rendered row (§K).",
         },
       ],
     },

@@ -13,11 +13,15 @@ describe("category name contract", () => {
 
   it("uses locale-independent Unicode case folding", () => {
     expect(categoryNameKey("İSTANBUL")).toBe("i̇stanbul");
-    expect(categoryNameKey("İSTANBUL")).toBe(normalizeCategoryName("İstanbul").toLowerCase());
+    expect(categoryNameKey("İSTANBUL")).toBe(
+      normalizeCategoryName("İstanbul").toLowerCase(),
+    );
   });
 
   it("returns the locked validation errors for blank, long, duplicate, and System names", () => {
-    expect(validateCategoryName("   ", { categoryNames: [], systemNames: [] })).toEqual({
+    expect(
+      validateCategoryName("   ", { categoryNames: [], systemNames: [] }),
+    ).toEqual({
       ok: false,
       message: "Enter a category name.",
     });
@@ -26,19 +30,37 @@ describe("category name contract", () => {
         categoryNames: [],
         systemNames: [],
       }),
-    ).toEqual({ ok: false, message: "Category names can be up to 100 characters." });
-    expect(validateCategoryName(" friends ", { categoryNames: ["Friends"], systemNames: [] })).toEqual({
+    ).toEqual({
+      ok: false,
+      message: "Category names can be up to 100 characters.",
+    });
+    expect(
+      validateCategoryName(" friends ", {
+        categoryNames: ["Friends"],
+        systemNames: [],
+      }),
+    ).toEqual({
       ok: false,
       message: "A category with this name already exists.",
     });
-    expect(validateCategoryName(" favorites ", { categoryNames: [], systemNames: ["Favorites"] })).toEqual({
+    expect(
+      validateCategoryName(" favorites ", {
+        categoryNames: [],
+        systemNames: ["Favorites"],
+      }),
+    ).toEqual({
       ok: false,
       message: "That name is already used by a System.",
     });
   });
 
   it("permits exactly 100 characters and capitalization-only rename", () => {
-    expect(validateCategoryName("x".repeat(100), { categoryNames: [], systemNames: [] }).ok).toBe(true);
+    expect(
+      validateCategoryName("x".repeat(100), {
+        categoryNames: [],
+        systemNames: [],
+      }).ok,
+    ).toBe(true);
     expect(
       validateCategoryName("FRIENDS", {
         categoryNames: [{ id: 1, name: "Friends" }],

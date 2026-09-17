@@ -25,6 +25,7 @@
 export const SETTINGS_REGISTERED_ROUTES = [
   // The preserved hub route name (§M — deep-link + back-stack safe).
   "Settings",
+  "CategoryManagement",
   // The first real category route (Plan 01) — Interactions. (The transitional
   // `SettingsMore` monolith route was retired in Plan 08 once every group had
   // migrated into its category screen.)

@@ -53,8 +53,13 @@ describe("Settings contacts model", () => {
         .map((row) => row.route),
     );
     expect(activeTargets).toContain("CategoryManagement");
-    const relationship = SETTINGS_CONTACTS_SECTIONS.find((section) => section.key === "relationship-structure");
-    expect(relationship?.rows.map((row) => row.key)).toEqual(["custom-fields", "category-management"]);
+    const relationship = SETTINGS_CONTACTS_SECTIONS.find(
+      (section) => section.key === "relationship-structure",
+    );
+    expect(relationship?.rows.map((row) => row.key)).toEqual([
+      "custom-fields",
+      "category-management",
+    ]);
     expect(isRegisteredScreen("CategoryManagement")).toBe(true);
   });
 
