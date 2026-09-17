@@ -45,33 +45,17 @@ describe("Settings contacts model", () => {
     }
   });
 
-  it("renders NO active row targeting CategoryManagement (D-03 / §K reservation stays inert)", () => {
+  it("renders CategoryManagement immediately after Custom Fields", () => {
     const activeTargets = SETTINGS_CONTACTS_SECTIONS.flatMap((section) =>
       section.rows
         .filter(isActiveContactsRow)
         .filter((row) => row.kind === "route")
         .map((row) => row.route),
     );
-    expect(activeTargets).not.toContain("CategoryManagement");
-  });
-
-  it("holds the CategoryManagement slot as an inert reserved row (no rendered placeholder)", () => {
-    const reservedRows = SETTINGS_CONTACTS_SECTIONS.flatMap((section) =>
-      section.rows.filter((row) => row.kind === "reserved"),
-    );
-    const categorySlot = reservedRows.find(
-      (row) => row.route === "CategoryManagement",
-    );
-    expect(
-      categorySlot,
-      "CategoryManagement reservation slot must exist",
-    ).toBeDefined();
-    // A reserved row is never active — the screen renders nothing for it.
-    for (const row of reservedRows) {
-      expect(isActiveContactsRow(row)).toBe(false);
-    }
-    // And it is NOT registered as a <Stack.Screen> (typed-but-unregistered, D-03).
-    expect(isRegisteredScreen("CategoryManagement")).toBe(false);
+    expect(activeTargets).toContain("CategoryManagement");
+    const relationship = SETTINGS_CONTACTS_SECTIONS.find((section) => section.key === "relationship-structure");
+    expect(relationship?.rows.map((row) => row.key)).toEqual(["custom-fields", "category-management"]);
+    expect(isRegisteredScreen("CategoryManagement")).toBe(true);
   });
 
   it("orders the phone-region control lower within Contact Sources (§E)", () => {

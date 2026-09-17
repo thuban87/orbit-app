@@ -34,8 +34,8 @@ describe("Settings route-registration contract", () => {
     }
   });
 
-  it("does NOT register CategoryManagement (D-03 typed-but-unregistered reservation)", () => {
-    expect(isRegistered("CategoryManagement")).toBe(false);
-    expect(SETTINGS_REGISTERED_ROUTES).not.toContain("CategoryManagement");
+  it("activates the reserved CategoryManagement destination", () => {
+    expect(isRegistered("CategoryManagement")).toBe(true);
+    expect(SETTINGS_REGISTERED_ROUTES).toContain("CategoryManagement");
   });
 });
