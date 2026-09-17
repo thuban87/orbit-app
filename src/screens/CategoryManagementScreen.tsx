@@ -57,6 +57,30 @@ type Editor =
   | { kind: "rename"; row: CategoryManagementRow; name: string };
 type RowAction = "rename" | "earlier" | "later" | "delete";
 
+export type CategoryManagementLoadOutcome =
+  | { status: "success" }
+  | { status: "stale" }
+  | { status: "failure" };
+
+export async function resolveCategoryManagementLoad(input: {
+  isCurrent: () => boolean;
+  readRows: () => Promise<CategoryManagementRow[]>;
+  readUncategorizedCount: () => Promise<number>;
+  publish: (rows: CategoryManagementRow[], uncategorizedCount: number) => void;
+}): Promise<CategoryManagementLoadOutcome> {
+  try {
+    const [rows, uncategorizedCount] = await Promise.all([
+      input.readRows(),
+      input.readUncategorizedCount(),
+    ]);
+    if (!input.isCurrent()) return { status: "stale" };
+    input.publish(rows, uncategorizedCount);
+    return { status: "success" };
+  } catch {
+    return input.isCurrent() ? { status: "failure" } : { status: "stale" };
+  }
+}
+
 export function categoryCountLabel(count: number): string {
   return `${count} ${count === 1 ? "contact" : "contacts"}`;
 }
@@ -263,24 +287,26 @@ export function CategoryManagementScreen() {
   const [targetChoiceOpen, setTargetChoiceOpen] = useState(false);
   const nextLoad = useRef(createCategoryManagementLoadGuard());
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (): Promise<CategoryManagementLoadOutcome> => {
     const current = nextLoad.current();
-    try {
-      const exec = getExecutor();
-      const [loaded, fallbackCount] = await Promise.all([
-        listCategoriesForManagement(exec),
-        countUncategorizedContacts(exec),
-      ]);
-      if (!current()) return;
-      committedRows.current = loaded;
-      setRows(loaded);
-      setUncategorizedCount(fallbackCount);
+    const exec = getExecutor();
+    const outcome = await resolveCategoryManagementLoad({
+      isCurrent: current,
+      readRows: () => listCategoriesForManagement(exec),
+      readUncategorizedCount: () => countUncategorizedContacts(exec),
+      publish: (loaded, fallbackCount) => {
+        committedRows.current = loaded;
+        setRows(loaded);
+        setUncategorizedCount(fallbackCount);
+      },
+    });
+    if (outcome.status === "success") {
       setLoadError(false);
-    } catch {
-      if (current()) setLoadError(true);
-    } finally {
-      if (current()) setInitialLoading(false);
+    } else if (outcome.status === "failure") {
+      setLoadError(true);
     }
+    if (outcome.status !== "stale") setInitialLoading(false);
+    return outcome;
   }, []);
   useFocusEffect(
     useCallback(() => {
@@ -318,7 +344,8 @@ export function CategoryManagementScreen() {
           name: editor.name,
           now: localDateTime(),
         });
-      await load();
+      const readback = await load();
+      if (readback.status !== "success") return;
       publishSuccess(
         editor.kind === "add" ? "Category added." : "Category renamed.",
       );
@@ -414,7 +441,8 @@ export function CategoryManagementScreen() {
         AccessibilityInfo.announceForAccessibility(SAVE_ERROR);
         return;
       }
-      await load();
+      const readback = await load();
+      if (readback.status !== "success") return;
       setDeleteConfirmOpen(false);
       setDeleteDetailOpen(false);
       setDeletePreview(null);
