@@ -976,14 +976,14 @@ Plans:
 **Requirements**: TBD — deferred to planning
 **Scope source:** D-03 in `.planning/phases/37-settings-personalization/37-CONTEXT.md` (owner-confirmed 2026-09-14), the Phase 37.1 dossier, and the approved Phase 37.1 UI-SPEC. Category deletion is a permanent runtime application transaction with durable category tombstone evidence; it adds no migration, `field_history` category history, Undo, quarantine, or reseeding, and zero categories is valid.
 **Canonical refs**: `.planning/phases/37-settings-personalization/37-CONTEXT.md` (D-03), the `categories` table (migration 001), Orrery Systems + custom-System rules + Profile category assignment + backup writers.
-**Plans:** 9/13 plans executed across 6 implementation waves plus 1 gap-closure wave
+**Plans:** 11/13 plans executed across 6 implementation waves plus 1 gap-closure wave
 
 Plans:
 **Wave 1**
 
 - [x] 37.1-01-PLAN.md (Wave 1) — Production Add tracer plus canonical non-destructive Category CRUD/order contract
-- [ ] 37.1-10-PLAN.md (Gap Wave 1) — Fail-closed malformed Dashboard-filter deletion and full rollback proof
-- [ ] 37.1-11-PLAN.md (Gap Wave 1) — Exact 12/13 shared CategoryChoiceSheet search boundary
+- [x] 37.1-10-PLAN.md (Gap Wave 1) — Fail-closed malformed Dashboard-filter deletion and full rollback proof
+- [x] 37.1-11-PLAN.md (Gap Wave 1) — Exact 12/13 shared CategoryChoiceSheet search boundary
 - [ ] 37.1-12-PLAN.md (Gap Wave 1) — One async catalog-publication authority across Create, Edit, and Import Review
 - [ ] 37.1-13-PLAN.md (Gap Wave 1) — Explicit manager post-write readback outcomes and truthful UI transitions
 
