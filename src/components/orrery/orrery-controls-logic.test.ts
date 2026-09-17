@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   buildSystemChoices,
+  buildSystemChoiceGroups,
+  initialExpandedSystemGroups,
   registerSystemSelectorTransient,
   systemEmptyCopy,
   systemSelectorLabel,
@@ -122,6 +124,79 @@ describe("Orrery System controls", () => {
         overrides: false,
       },
     );
+  });
+  it("projects exactly Built-in, Categories, and Custom Systems while preserving row order", () => {
+    const rows = buildSystemChoices(
+      [
+        {
+          id: "custom:later",
+          ref: { kind: "custom", uid: "later" },
+          name: "Later",
+          displayOrder: null,
+          hidden: false,
+          hasOverrides: false,
+          createdAt: "2026-09-02",
+        },
+        {
+          id: "category:second",
+          ref: { kind: "category", uid: "second" },
+          name: "Second",
+          displayOrder: null,
+          hidden: false,
+          hasOverrides: false,
+          categoryOrder: 2,
+        },
+        {
+          id: "builtin:all-contacts",
+          ref: { kind: "builtin", id: "all-contacts" },
+          name: "All Contacts",
+          displayOrder: null,
+          hidden: false,
+          hasOverrides: false,
+        },
+      ],
+      new Map(),
+      new Map(),
+    );
+    const groups = buildSystemChoiceGroups(rows);
+    expect(groups.map((group) => group.label)).toEqual([
+      "Built-in",
+      "Categories",
+      "Custom Systems",
+    ]);
+    expect(groups.map((group) => group.rows.map((row) => row.id))).toEqual([
+      ["builtin:all-contacts"],
+      ["category:second"],
+      ["custom:later"],
+    ]);
+    expect(initialExpandedSystemGroups(groups, "category:second")).toEqual({
+      builtin: false,
+      category: true,
+      custom: false,
+    });
+  });
+
+  it("keeps empty category/custom groups visible and treats canonical validity as needs attention", () => {
+    const rows = buildSystemChoices(
+      [
+        {
+          id: "builtin:all-contacts",
+          ref: { kind: "builtin", id: "all-contacts" },
+          name: "All Contacts",
+          displayOrder: null,
+          hidden: false,
+          hasOverrides: false,
+        },
+      ],
+      new Map([["builtin:all-contacts", 0]]),
+      new Map([["builtin:all-contacts", true]]),
+    );
+    expect(buildSystemChoiceGroups(rows)).toMatchObject([
+      { id: "builtin", emptyCopy: null },
+      { id: "category", rows: [], emptyCopy: "No category Systems" },
+      { id: "custom", rows: [], emptyCopy: "No custom Systems" },
+    ]);
+    expect(rows[0].severity).toBe("broken");
   });
   it("preserves full long name in accessibility while the trigger can visually ellipsize", () => {
     const name = "A long name ".repeat(30);

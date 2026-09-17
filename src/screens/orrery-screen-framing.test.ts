@@ -282,6 +282,10 @@ function harness() {
   cameraModule = load("src/components/orrery/use-orrery-camera.ts");
   const screen = load("src/screens/OrreryScreen.tsx") as {
     OrreryScreen: () => Element;
+    systemAttentionFeedback: (
+      validity: "valid" | "needs-attention" | undefined,
+      brokenCount: number,
+    ) => { heading: string; detail: string | null } | null;
   };
   let tree: Element;
   function render() {
@@ -308,6 +312,7 @@ function harness() {
   );
   return {
     scene,
+    attention: screen.systemAttentionFeedback,
     pending,
     render,
     find,
@@ -385,3 +390,16 @@ it.each([180, 200])(
     expect(h.find("World")!.props.focusedIds).toEqual([]);
   },
 );
+
+it("shows canonical Needs Attention feedback without inventing malformed-rule detail", () => {
+  const h = harness();
+  expect(h.attention("needs-attention", 0)).toEqual({
+    heading: "This System needs attention",
+    detail: null,
+  });
+  expect(h.attention("needs-attention", 2)).toEqual({
+    heading: "This System needs attention",
+    detail: "2 membership rules could not be applied.",
+  });
+  expect(h.attention("valid", 0)).toBeNull();
+});

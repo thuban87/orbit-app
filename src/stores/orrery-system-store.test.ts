@@ -137,25 +137,27 @@ describe("System publication ownership", () => {
     expect(store.getState().current()).toBeNull();
     expect(persist).not.toHaveBeenCalled();
   });
-  it("retains a named removed category and fresh catalog instead of silently switching", async () => {
+  it("falls back an already-open removed category to All Contacts", async () => {
     const category = parseSystemRef("category:gone")!;
+    const persist = vi.fn().mockResolvedValue(true);
     const store = createOrrerySystemStore({
-      load: async () => {
-        throw new MissingOrreryCategoryError({
-          status: "missing-category",
-          system: category,
-          categories: [],
-        } as unknown as OrrerySystemSnapshot);
+      load: async (system) => {
+        if (system.kind === "category")
+          throw new MissingOrreryCategoryError({
+            status: "missing-category",
+            system: category,
+            categories: [],
+          } as unknown as OrrerySystemSnapshot);
+        return scene(system);
       },
-      persist: vi.fn(),
+      persist,
     });
     await store.getState().select(category, "Family");
     expect(store.getState()).toMatchObject({
-      status: "missing-category",
-      requested: { name: "Family", id: "category:gone" },
-      snapshot: null,
-      catalogLoaded: true,
+      status: "ready",
+      requested: { name: "All Contacts", id: "builtin:all-contacts" },
     });
+    expect(persist).toHaveBeenCalledWith(all);
   });
   it("a failed persistence keeps successful membership usable and retry saves that active System", async () => {
     const persist = vi
