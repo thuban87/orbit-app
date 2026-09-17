@@ -47,6 +47,7 @@ export interface ConfirmDialogProps extends OverlayLifecycle {
    * the dialog requires an explicit choice — no scrim/Back dismissal.
    */
   destructive?: boolean;
+  confirmDisabled?: boolean;
 }
 
 export function ConfirmDialog({
@@ -59,6 +60,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   destructive = false,
+  confirmDisabled = false,
 }: ConfirmDialogProps) {
   const { colors } = useTheme();
   const cancel = onCancel ?? onRequestClose;
@@ -99,6 +101,7 @@ export function ConfirmDialog({
           <Button
             role={destructive ? "destructive" : "primary"}
             label={confirmLabel}
+            disabled={confirmDisabled}
             onPress={onConfirm}
           />
         </View>

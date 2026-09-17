@@ -23,6 +23,12 @@ vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
 vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
 vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
 vi.mock("@/components/ui/Sheet", () => ({ Sheet: "Sheet" }));
+vi.mock("@/components/ui/ConfirmDialog", () => ({
+  ConfirmDialog: "ConfirmDialog",
+}));
+vi.mock("@/components/category/CategoryChoiceSheet", () => ({
+  CategoryChoiceSheet: "CategoryChoiceSheet",
+}));
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/components/ui/AnchoredMenu", () => ({
   AnchoredMenu: "AnchoredMenu",
@@ -91,7 +97,9 @@ describe("CategoryManagementScreen tracer contracts", () => {
     };
     expect(isUnusedCategoryPreview(zero)).toBe(true);
     expect(isUnusedCategoryPreview({ ...zero, importComplete: 1 })).toBe(false);
-    expect(isUnusedCategoryPreview({ ...zero, activeSelection: 1 })).toBe(false);
+    expect(isUnusedCategoryPreview({ ...zero, activeSelection: 1 })).toBe(
+      false,
+    );
   });
 
   it("renders count-only conditional fallout rows with separate import statuses", () => {

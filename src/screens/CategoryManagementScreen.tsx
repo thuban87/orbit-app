@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   findNodeHandle,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -15,6 +16,7 @@ import ReorderableList, {
   type ReorderableListReorderEvent,
   useReorderableDrag,
 } from "react-native-reorderable-list";
+import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { Icon } from "@/components/icons/Icon";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import {
@@ -23,12 +25,17 @@ import {
 } from "@/components/ui/AnchoredMenu";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Sheet } from "@/components/ui/Sheet";
 import {
+  type CategoryDeletionCounts,
+  type CategoryDeletionPreview,
   type CategoryManagementRow,
   countUncategorizedContacts,
   createCategory,
+  deleteCategory,
   listCategoriesForManagement,
+  readCategoryDeletionPreview,
   renameCategory,
   reorderCategories,
 } from "@/db/categories-dao";
@@ -63,6 +70,54 @@ export function moveCategoryRows<T>(
   const [moved] = next.splice(from, 1);
   if (moved !== undefined) next.splice(to, 0, moved);
   return next;
+}
+
+export function isUnusedCategoryPreview(
+  counts: CategoryDeletionCounts,
+): boolean {
+  return Object.values(counts).every((count) => count === 0);
+}
+
+function plural(count: number, one: string, many = `${one}s`): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+export function deletionImpactRows(counts: CategoryDeletionCounts): string[] {
+  const rows: string[] = [];
+  if (counts.contacts) rows.push(plural(counts.contacts, "contact"));
+  if (counts.importPending)
+    rows.push(plural(counts.importPending, "pending import session"));
+  if (counts.importComplete)
+    rows.push(plural(counts.importComplete, "completed import session"));
+  if (counts.importDiscarded)
+    rows.push(plural(counts.importDiscarded, "discarded import session"));
+  if (counts.rules)
+    rows.push(
+      `${plural(counts.rules, "rule")} across ${plural(counts.systems, "System")}`,
+    );
+  const categorySettings = counts.categoryOverrides + counts.categoryPrefs;
+  if (categorySettings)
+    rows.push(
+      plural(
+        categorySettings,
+        "category-System setting or override",
+        "category-System settings or overrides",
+      ),
+    );
+  if (counts.profilePresentations)
+    rows.push(
+      plural(counts.profilePresentations, "Profile presentation assignment"),
+    );
+  const savedViews = counts.dashboardFilters + counts.activeSelection;
+  if (savedViews)
+    rows.push(
+      plural(
+        savedViews,
+        "saved view or active selection",
+        "saved views or active selections",
+      ),
+    );
+  return rows;
 }
 
 export function createCategoryManagementLoadGuard() {
@@ -200,6 +255,12 @@ export function CategoryManagementScreen() {
   const [nameError, setNameError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [reordering, setReordering] = useState(false);
+  const [deletePreview, setDeletePreview] =
+    useState<CategoryDeletionPreview | null>(null);
+  const [deleteDetailOpen, setDeleteDetailOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [targetCategoryId, setTargetCategoryId] = useState<number | null>(null);
+  const [targetChoiceOpen, setTargetChoiceOpen] = useState(false);
   const nextLoad = useRef(createCategoryManagementLoadGuard());
 
   const load = useCallback(async () => {
@@ -299,6 +360,73 @@ export function CategoryManagementScreen() {
     }
   };
 
+  const beginDelete = async (row: CategoryManagementRow) => {
+    if (saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const preview = await readCategoryDeletionPreview(getExecutor(), row.id);
+      if (!preview) {
+        await load();
+        setSaveError(SAVE_ERROR);
+        return;
+      }
+      setDeletePreview(preview);
+      setTargetCategoryId(null);
+      if (isUnusedCategoryPreview(preview.counts)) setDeleteConfirmOpen(true);
+      else setDeleteDetailOpen(true);
+    } catch {
+      setSaveError(SAVE_ERROR);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const keepCategory = () => {
+    setDeleteConfirmOpen(false);
+    if (deletePreview && !isUnusedCategoryPreview(deletePreview.counts))
+      setDeleteDetailOpen(true);
+    else setDeletePreview(null);
+  };
+
+  const commitDelete = async () => {
+    if (!deletePreview || saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const result = await deleteCategory(getExecutor(), {
+        categoryId: deletePreview.category.id,
+        targetCategoryId,
+        expectedFingerprint: deletePreview.fingerprint,
+        now: localDateTime(),
+      });
+      if (result.status === "stale") {
+        const fresh = result.preview;
+        setDeletePreview(fresh);
+        const stillValid =
+          targetCategoryId === null ||
+          !!fresh?.targets.some((target) => target.id === targetCategoryId);
+        if (!stillValid) setTargetCategoryId(null);
+        setDeleteConfirmOpen(false);
+        setDeleteDetailOpen(!!fresh && !isUnusedCategoryPreview(fresh.counts));
+        await load();
+        setSaveError(SAVE_ERROR);
+        AccessibilityInfo.announceForAccessibility(SAVE_ERROR);
+        return;
+      }
+      await load();
+      setDeleteConfirmOpen(false);
+      setDeleteDetailOpen(false);
+      setDeletePreview(null);
+      publishSuccess("Category deleted.");
+    } catch {
+      setSaveError(SAVE_ERROR);
+      AccessibilityInfo.announceForAccessibility(SAVE_ERROR);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleAction = (
     row: CategoryManagementRow,
     index: number,
@@ -309,7 +437,10 @@ export function CategoryManagementScreen() {
       setEditor({ kind: "rename", row, name: row.name });
       return;
     }
-    if (action === "delete") return;
+    if (action === "delete") {
+      void beginDelete(row);
+      return;
+    }
     const to = action === "earlier" ? index - 1 : index + 1;
     void persistOrder(moveCategoryRows(rows, index, to), to);
   };
@@ -466,6 +597,103 @@ export function CategoryManagementScreen() {
           </View>
         ) : null}
       </Sheet>
+      <Sheet
+        visible={deleteDetailOpen}
+        variant="expanded"
+        onRequestClose={() => {
+          if (!saving) {
+            setDeleteDetailOpen(false);
+            setDeletePreview(null);
+          }
+        }}
+      >
+        {deletePreview ? (
+          <View style={styles.deleteSheet}>
+            <AppText role="heading">
+              Delete {deletePreview.category.name}?
+            </AppText>
+            <ScrollView contentContainerStyle={styles.deleteContent}>
+              <AppText role="body">This permanent deletion affects:</AppText>
+              {deletionImpactRows(deletePreview.counts).map((label) => (
+                <AppText key={label} role="caption">
+                  {label}
+                </AppText>
+              ))}
+              <AppText role="label">Move contacts to</AppText>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Choose reassignment category"
+                onPress={() => setTargetChoiceOpen(true)}
+                style={[styles.choice, { borderColor: colors.border }]}
+              >
+                <AppText>
+                  {targetCategoryId === null
+                    ? "Uncategorized"
+                    : (deletePreview.targets.find(
+                        (target) => target.id === targetCategoryId,
+                      )?.name ?? "Uncategorized")}
+                </AppText>
+              </Pressable>
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                Pending, completed, and discarded imports move to the same
+                target. Only this category’s rule or reference is removed from
+                each custom System; unrelated rules stay. An emptied invalid
+                System becomes Needs Attention. Profile and saved presentation
+                settings are removed, not transferred.
+              </AppText>
+            </ScrollView>
+            <Button
+              role="secondary"
+              label="Keep category"
+              disabled={saving}
+              onPress={() => {
+                setDeleteDetailOpen(false);
+                setDeletePreview(null);
+              }}
+            />
+            <Button
+              role="primary"
+              label="Review deletion"
+              disabled={saving}
+              onPress={() => {
+                setDeleteDetailOpen(false);
+                setDeleteConfirmOpen(true);
+              }}
+            />
+          </View>
+        ) : null}
+      </Sheet>
+      <CategoryChoiceSheet
+        visible={targetChoiceOpen}
+        categories={deletePreview?.targets ?? []}
+        selectedId={targetCategoryId}
+        excludeCategoryId={deletePreview?.category.id}
+        title="Move contacts to"
+        onSelect={setTargetCategoryId}
+        onRequestClose={() => setTargetChoiceOpen(false)}
+      />
+      <ConfirmDialog
+        visible={deleteConfirmOpen}
+        onRequestClose={() => {}}
+        destructive
+        title={`Delete ${deletePreview?.category.name ?? "category"}?`}
+        message={
+          deletePreview && isUnusedCategoryPreview(deletePreview.counts)
+            ? `Delete ${deletePreview.category.name}? This can’t be undone.`
+            : `Move affected contacts and imports to ${
+                targetCategoryId === null
+                  ? "Uncategorized"
+                  : (deletePreview?.targets.find(
+                      (target) => target.id === targetCategoryId,
+                    )?.name ?? "Uncategorized")
+              }, remove the summarized dependent references, and permanently delete this category. This can’t be undone.`
+        }
+        confirmLabel="Delete category"
+        cancelLabel="Keep category"
+        confirmDisabled={saving}
+        onCancel={keepCategory}
+        onConfirm={() => void commitDelete()}
+      />
     </View>
   );
 }
@@ -504,6 +732,15 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   sheetBody: { gap: SPACING.base },
+  deleteSheet: { flex: 1, gap: SPACING.base },
+  deleteContent: { gap: SPACING.base, paddingBottom: SPACING.base },
+  choice: {
+    minHeight: 44,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: RADII.md,
+    justifyContent: "center",
+    paddingHorizontal: SPACING.base,
+  },
   input: {
     minHeight: 44,
     borderWidth: 1,
