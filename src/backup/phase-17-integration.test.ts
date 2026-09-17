@@ -151,6 +151,12 @@ describe("Phase 17 composed backup regressions", () => {
       ["contact_method_provenance", "contact_method_provenance"],
       ["memories", "memory"], ["relationships", "relationship"], ["current_state_entries", "current_state_entry"],
       ["group_events", "group_event"],
+      ["categories", "category"],
+      // Category presentation is keyed by its category parent UID. Runtime
+      // category deletion removes the dependent row in the same transaction as
+      // the category tombstone; merge reconciliation suppresses it through the
+      // categories parent-survivor policy rather than a second child tombstone.
+      ["profile_category_presentation", "category"],
     ]);
     const nonMergeable = new Map([
       ["field_history", "local audit history"],
