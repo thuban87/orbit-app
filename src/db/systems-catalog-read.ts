@@ -23,6 +23,7 @@ import {
   type BrokenRule,
   resolveCustomSystemMembers,
   type SystemGravityInputsLoader,
+  type SystemDefinitionValidity,
 } from "@/logic/system-rule-resolver";
 
 type FixedSystemRef = Exclude<OrrerySystemRef, { kind: "custom" }>;
@@ -41,6 +42,7 @@ export type SystemCatalogEntry = SystemDescriptor & {
 export interface SystemMemberCount {
   count: number;
   brokenRules: BrokenRule[];
+  validity: SystemDefinitionValidity;
 }
 
 function systemPrefByRef(
@@ -232,6 +234,7 @@ export async function countSystemMembers(
           systemRefId(ref),
         ) ?? 0,
       brokenRules: [],
+      validity: "valid",
     };
   }
   const resolved = await resolveCustomSystemMembers(
@@ -243,6 +246,7 @@ export async function countSystemMembers(
   return {
     count: resolved.memberIds.length,
     brokenRules: resolved.brokenRules,
+    validity: resolved.validity,
   };
 }
 

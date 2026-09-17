@@ -43,6 +43,7 @@ export interface SystemRule {
 }
 
 export interface ResolvedCustomSystemMembers {
+  validity: SystemDefinitionValidity;
   memberIds: number[];
   /** Rule-derived ids before overrides; intentionally empty for manual-only Systems. */
   candidateIds: number[];
@@ -50,6 +51,8 @@ export interface ResolvedCustomSystemMembers {
   /** Dynamic-bucket exclusion cleanup begins in plan 02. */
   prunableExclusionContactIds: number[];
 }
+
+export type SystemDefinitionValidity = "valid" | "needs-attention";
 
 /** Closed system-axis values; rule rows never choose SQL syntax. */
 export const FAVORITE_RULE_VALUE = "on";
@@ -261,7 +264,18 @@ export async function resolveMembershipFromDefinition(
     excludeIds,
     eligibleIncludeIds: await eligibleIncludedIds(exec, includeIds),
   });
-  return { candidateIds, brokenRules: mapped.broken, ...applied };
+  const hasMeaningfulRule = definition.rules.some(
+    (rule) => !mapped.broken.some((broken) => broken.ruleUid === rule.uid),
+  );
+  const hasExplicitInclude = definition.overrides.some(
+    (row) => row.mode === "include",
+  );
+  return {
+    validity: hasMeaningfulRule || hasExplicitInclude ? "valid" : "needs-attention",
+    candidateIds,
+    brokenRules: mapped.broken,
+    ...applied,
+  };
 }
 
 export async function resolveCustomSystemMembers(

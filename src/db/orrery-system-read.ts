@@ -31,6 +31,7 @@ import {
   resolveCustomSystemMembers,
   resolveMembershipFromDefinition,
   type SystemGravityInputsLoader,
+  type SystemDefinitionValidity,
   type SystemRule,
 } from "@/logic/system-rule-resolver";
 
@@ -70,6 +71,8 @@ export interface OrreryMembersResult {
   members: OrrerySystemMember[];
   /** Custom resolver diagnostics; omitted for existing built-in/category paths. */
   brokenRules?: BrokenRule[];
+  /** Canonical custom-definition health, independent of malformed rule diagnostics. */
+  validity?: SystemDefinitionValidity;
 }
 
 const MEMBER_SELECT = `SELECT c.id,c.uid,c.name,c.photo,c.ring_seq,c.rarely_responds,c.favourite_rank,c.last_contact,c.created_at,
@@ -186,6 +189,7 @@ export async function readOrrerySystemMembersCore(
         system,
         members: [],
         brokenRules: resolved.brokenRules,
+        validity: resolved.validity,
       };
     const members = await selectMembersByIds(exec, resolved.memberIds);
     return {
@@ -193,6 +197,7 @@ export async function readOrrerySystemMembersCore(
       system,
       members,
       brokenRules: resolved.brokenRules,
+      validity: resolved.validity,
     };
   }
   const where = buildOrrerySystemWhere(system);

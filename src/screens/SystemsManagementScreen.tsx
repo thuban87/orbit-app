@@ -355,7 +355,8 @@ export function SystemsManagementScreen() {
             hasOverrides: overrides.length > 0,
             broken:
               members.status !== "ready" ||
-              (members.brokenRules?.length ?? 0) > 0,
+              (members.brokenRules?.length ?? 0) > 0 ||
+              members.validity === "needs-attention",
             sourceIndex,
             displayOrder: pref?.displayOrder,
           };

@@ -1145,6 +1145,18 @@ export function listSystemRules(
   );
 }
 
+/** Remove only rules that reference one category under the caller's transaction. */
+export async function removeCategoryRulesCore(
+  exec: SqlExecutor,
+  categoryUid: string,
+): Promise<number> {
+  const result = await exec.runAsync(
+    "DELETE FROM system_rules WHERE family = 'category' AND value = ?",
+    [categoryUid],
+  );
+  return result.changes;
+}
+
 export function listSystemOverrides(
   exec: ReadOnlyExecutor,
   systemRef: OrrerySystemId,

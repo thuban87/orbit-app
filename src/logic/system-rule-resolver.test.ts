@@ -117,6 +117,7 @@ describe("manual-only custom System resolver", () => {
       async () => null,
     );
     expect(resolved).toEqual({
+      validity: "valid",
       memberIds: [included, ineligible],
       candidateIds: [],
       brokenRules: [],

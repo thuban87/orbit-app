@@ -401,6 +401,21 @@ export function setSessionBatchCategory(
   });
 }
 
+/** Reassign every session regardless of lifecycle status inside a caller-owned transaction. */
+export async function reassignImportSessionsCategoryCore(
+  exec: SqlExecutor,
+  sourceCategoryId: number,
+  targetCategoryId: number | null,
+  now: string,
+): Promise<number> {
+  const result = await exec.runAsync(
+    `UPDATE import_sessions SET batch_category_id = ?, modified_at = ?
+      WHERE batch_category_id = ?`,
+    [targetCategoryId, now, sourceCategoryId],
+  );
+  return result.changes;
+}
+
 export function finalizeSessionIfTerminal(
   exec: SqlExecutor,
   sessionId: number,
