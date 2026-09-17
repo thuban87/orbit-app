@@ -3,18 +3,18 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 37.1
-current_phase_name: Category Management
-status: planning
-stopped_at: Phase 37.1 plans converged (cross-AI, 3 cycles) — ready to execute
-last_updated: "2026-09-17T06:47:07.000Z"
+current_phase_name: Category Management (INSERTED)
+status: executing
+stopped_at: Completed 37.1-01-PLAN.md
+last_updated: "2026-09-17T07:15:05.827Z"
 last_activity: 2026-09-17
-last_activity_desc: Phase 37.1 plan-review convergence complete (9 plans, 3 cycles); ready for execution
-state_head: e2defa8f6026a499de9cf139f963b6db7ea62504
+last_activity_desc: Phase 37.1 execution started
+state_head: 1cc34a043b488081b1730dd8cb52dc1b5a752575
 progress:
   total_phases: 22
   completed_phases: 12
-  total_plans: 156
-  completed_plans: 154
+  total_plans: 165
+  completed_plans: 155
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -32,20 +32,20 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 37.1 — Category Management
+**Current focus:** Phase 37.1 — Category Management (INSERTED)
 
 ## Current Position
 
-Phase: 37.1 — Category Management
-Plan: Not started
-Status: Ready to plan
+Phase: 37.1 (Category Management (INSERTED)) — EXECUTING
+Plan: 2 of 9
+Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-14 — Phase 37 complete, transitioned to Phase 37.1
+Last activity: 2026-09-17 — Phase 37.1 execution started
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: Phase 37 is fully executed (8/8 plans) — verify + owner phase-close, then Phase 37.1 (Category Management, INSERTED). End-of-phase Pixel UAT still owed across the phase: Appearance controls (37-03), Contacts rows (37-04), Notifications controls (37-05), Orrery single-source agreement + AI hub real-availability rendering (37-06 — do NOT trigger a real AI API call without clearing with the owner), Data & Backup dual-home (37-07: Back returns to the Settings hub, origin-aware post-restore return, shared backup opens once with no double-drain — exercise the SAF-grant reconnect path), AND now About Orbit (37-08: name + version render with no dead rows) + the hub widget row still pins from the hub. Roadmap follow-up owed (D-03, owner): Category Management is scheduled as inserted Phase 37.1.
 
@@ -302,6 +302,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 37 P05 | 8min | 2 tasks | 8 files |
 | Phase 37 P07 | 10min | 2 tasks | 10 files |
 | Phase 37 P08 | 12min | 3 tasks | 11 files |
+| Phase 37.1 P01 | 9min | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -669,6 +670,8 @@ Foundational decisions affecting current work:
 - [Phase 37]: 37-03: New setProfileName(exec, name, now) writer on the single-row profile table (id=1, D-04b) mirrors setProfilePhoto; trims, empty/whitespace/null clears to NULL, bounds at 100 chars + rejects control chars BEFORE the UPDATE (V5); writes profile, never contacts.
 - [Phase 37]: 37-03: ADR-047 / D-02 enforced not reversed — only the self-star colour is user-configurable (stays available regardless of the current centre); a contact at the Orbit Center keeps its status-derived glow, no user-chosen colour.
 - [Phase 37]: 37-03: Global default profile layout/background (D-05) written via updateAppSettings with a Default/None choice that writes null (both keys nullable); per-contact managers stay contact-scoped and are NOT linked from Settings. No schema change, BACKUP_FORMAT_VERSION stays 5 (D-06).
+- [Phase 37.1]: 37.1-01: Visible Category/System name identity uses trim, NFC, and locale-independent toLowerCase under the shared writer lock.
+- [Phase 37.1]: 37.1-01: Reorder validates the complete current category ID set before issuing any position update.
 
 ### Pending Todos
 
@@ -735,11 +738,11 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-17T06:47:07.000Z
-**Stopped at:** Phase 37.1 plan-review convergence complete — 9 plans, 3 cross-AI cycles (Claude headless + codex adversarial reviewers; Opus replanner/checker). Recovered from the codex 20-plan re-fracture back to the committed 9-plan batch, resolved the cycle-1 punch-list + the v6 backup bump (owner-ruled 2026-09-16: minimal version-relabel step only, NO v5-restore piping), then closed 2 codex blockers (v6 gate/test breakage, replace-all stale-tombstone) + a HIGH name-validator scope gap. Converged; working tree clean; NOT pushed. Next: gsd-execute-phase on 37.1 (9 plans, waves 1–6) in a fresh session.
+**Last session:** 2026-09-17T07:14:59.898Z
+**Stopped at:** Completed 37.1-01-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** .planning/phases/37.1-category-management/
+**Resume file:** None
 are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
