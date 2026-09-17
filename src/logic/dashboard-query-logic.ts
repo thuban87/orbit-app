@@ -20,6 +20,37 @@ export const DASHBOARD_FILTER_FAMILIES = [
 ] as const;
 export type DashboardFilterFamily = (typeof DASHBOARD_FILTER_FAMILIES)[number];
 export type DashboardFilters = Partial<Record<DashboardFilterFamily, string[]>>;
+export const DASHBOARD_UNCATEGORIZED_TOKEN = "uncategorized";
+
+export function isDashboardCategoryToken(value: unknown): value is string {
+  if (value === DASHBOARD_UNCATEGORIZED_TOKEN) return true;
+  return (
+    typeof value === "string" &&
+    /^[1-9]\d*$/.test(value) &&
+    Number.isSafeInteger(Number(value))
+  );
+}
+
+export function canonicalizeDashboardFilters(
+  value: DashboardFilters,
+): DashboardFilters {
+  const next: DashboardFilters = {};
+  for (const family of DASHBOARD_FILTER_FAMILIES) {
+    const selections = value[family];
+    if (!selections?.length) continue;
+    const unique = [...new Set(selections)];
+    next[family] =
+      family === "category"
+        ? unique.filter(isDashboardCategoryToken).sort((a, b) => {
+            if (a === DASHBOARD_UNCATEGORIZED_TOKEN) return 1;
+            if (b === DASHBOARD_UNCATEGORIZED_TOKEN) return -1;
+            return Number(a) - Number(b);
+          })
+        : unique;
+    if (next[family]?.length === 0) delete next[family];
+  }
+  return next;
+}
 
 /**
  * Inclusive upper bounds for the product cadence buckets. Keep the tuning
@@ -38,8 +69,10 @@ type ContactFrequencyBucket = keyof typeof CONTACT_FREQUENCY_BANDS;
 export const SOCIAL_BATTERY_VALUES = ["Charger", "Neutral", "Drain"] as const;
 export const NEEDS_ATTENTION_VALUE = "on";
 
-function isContactFrequencyBucket(value: string): value is ContactFrequencyBucket {
-  return Object.prototype.hasOwnProperty.call(CONTACT_FREQUENCY_BANDS, value);
+function isContactFrequencyBucket(
+  value: string,
+): value is ContactFrequencyBucket {
+  return Object.hasOwn(CONTACT_FREQUENCY_BANDS, value);
 }
 
 function frequencyPredicate(bucket: ContactFrequencyBucket): {
@@ -72,36 +105,68 @@ function frequencyPredicate(bucket: ContactFrequencyBucket): {
  * closed constants and every runtime value stays ?-bound. Gravity deliberately
  * contributes no SQL because it is a reversible post-query TypeScript pass.
  */
-export function buildFilterWhere(filters: DashboardFilters | Record<string, unknown>): PopulationWhere {
+export function buildFilterWhere(
+  filters: DashboardFilters | Record<string, unknown>,
+): PopulationWhere {
   const groups: string[] = [];
   const params: unknown[] = [];
   const selections = (family: DashboardFilterFamily): string[] => {
     const value = filters[family];
-    return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === "string")
+      : [];
   };
 
-  const categoryIds = [...new Set(selections("category")
-    .filter((value) => /^\d+$/.test(value))
-    .map(Number)
-    .filter((value) => Number.isSafeInteger(value) && value > 0))];
-  if (categoryIds.length > 0) {
-    groups.push(`c.category_id IN (${categoryIds.map(() => "?").join(", ")})`);
+  const categorySelections = selections("category").filter(
+    isDashboardCategoryToken,
+  );
+  const categoryIds = [
+    ...new Set(
+      categorySelections
+        .filter((value) => value !== DASHBOARD_UNCATEGORIZED_TOKEN)
+        .map(Number)
+        .filter((value) => Number.isSafeInteger(value) && value > 0),
+    ),
+  ];
+  if (
+    categoryIds.length > 0 ||
+    categorySelections.includes(DASHBOARD_UNCATEGORIZED_TOKEN)
+  ) {
+    const predicates: string[] = [];
+    if (categoryIds.length > 0)
+      predicates.push(
+        `c.category_id IN (${categoryIds.map(() => "?").join(", ")})`,
+      );
+    if (categorySelections.includes(DASHBOARD_UNCATEGORIZED_TOKEN))
+      predicates.push("c.category_id IS NULL");
+    groups.push(
+      predicates.length === 1 ? predicates[0] : `(${predicates.join(" OR ")})`,
+    );
     params.push(...categoryIds);
   }
 
-  const batteries = [...new Set(selections("social-battery").filter(
-    (value): value is (typeof SOCIAL_BATTERY_VALUES)[number] =>
-      (SOCIAL_BATTERY_VALUES as readonly string[]).includes(value),
-  ))];
+  const batteries = [
+    ...new Set(
+      selections("social-battery").filter(
+        (value): value is (typeof SOCIAL_BATTERY_VALUES)[number] =>
+          (SOCIAL_BATTERY_VALUES as readonly string[]).includes(value),
+      ),
+    ),
+  ];
   if (batteries.length > 0) {
     groups.push(`c.social_battery IN (${batteries.map(() => "?").join(", ")})`);
     params.push(...batteries);
   }
 
-  const frequencyGroups = [...new Set(selections("contact-frequency").filter(isContactFrequencyBucket))]
-    .map(frequencyPredicate);
+  const frequencyGroups = [
+    ...new Set(
+      selections("contact-frequency").filter(isContactFrequencyBucket),
+    ),
+  ].map(frequencyPredicate);
   if (frequencyGroups.length > 0) {
-    groups.push(`(${frequencyGroups.map((group) => `(${group.sql})`).join(" OR ")})`);
+    groups.push(
+      `(${frequencyGroups.map((group) => `(${group.sql})`).join(" OR ")})`,
+    );
     params.push(...frequencyGroups.flatMap((group) => group.params));
   }
 
@@ -206,6 +271,8 @@ export function buildPopulationWhere(
         return SNOOZED_WHERE;
       case "all-contacts":
         return `(${ACTIVE_SEGREGATION_WHERE}) OR (${NOT_CONTACTED_WHERE})`;
+      default:
+        return "0";
     }
   });
 
@@ -275,9 +342,13 @@ export function parseDashboardFilters(value: unknown): DashboardFilters | null {
     if (
       !(DASHBOARD_FILTER_FAMILIES as readonly string[]).includes(family) ||
       !Array.isArray(selections) ||
-      !selections.every((item) => typeof item === "string")
+      !selections.every((item) =>
+        family === "category"
+          ? isDashboardCategoryToken(item)
+          : typeof item === "string",
+      )
     )
       return null;
   }
-  return value as DashboardFilters;
+  return canonicalizeDashboardFilters(value as DashboardFilters);
 }

@@ -8,23 +8,44 @@ const categories = [
 
 describe("selectedFilterLabels", () => {
   it("returns selected labels from one family", () => {
-    expect(selectedFilterLabels({ "social-battery": ["Charger"] }, categories)).toEqual(["Charger"]);
+    expect(
+      selectedFilterLabels({ "social-battery": ["Charger"] }, categories),
+    ).toEqual(["Charger"]);
   });
 
   it("orders mixed families and resolves category ids", () => {
-    expect(selectedFilterLabels({
-      category: ["2", "1"],
-      "social-battery": ["Drain", "Charger"],
-      "needs-attention": ["on"],
-      gravity: ["deep", "thin"],
-      "contact-frequency": ["yearly", "weekly"],
-    }, categories)).toEqual([
-      "Friends", "Family", "Charger", "Drain", "Needs attention", "Thin", "Deep", "Weekly", "Yearly",
+    expect(
+      selectedFilterLabels(
+        {
+          category: ["2", "1"],
+          "social-battery": ["Drain", "Charger"],
+          "needs-attention": ["on"],
+          gravity: ["deep", "thin"],
+          "contact-frequency": ["yearly", "weekly"],
+        },
+        categories,
+      ),
+    ).toEqual([
+      "Friends",
+      "Family",
+      "Charger",
+      "Drain",
+      "Needs attention",
+      "Thin",
+      "Deep",
+      "Weekly",
+      "Yearly",
     ]);
   });
 
   it("skips an unknown category id", () => {
     expect(selectedFilterLabels({ category: ["999"] }, categories)).toEqual([]);
+  });
+
+  it("names Uncategorized after real category selections", () => {
+    expect(
+      selectedFilterLabels({ category: ["1", "uncategorized"] }, categories),
+    ).toEqual(["Family", "Uncategorized"]);
   });
 
   it("returns no labels for empty filters", () => {

@@ -52,34 +52,37 @@ import {
   TextInput,
   View,
 } from "react-native";
+import ReanimatedSwipeable, {
+  type SwipeableMethods,
+} from "react-native-gesture-handler/ReanimatedSwipeable";
 import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
-import ReanimatedSwipeable, {
-  type SwipeableMethods,
-} from "react-native-gesture-handler/ReanimatedSwipeable";
 import { useShallow } from "zustand/react/shallow";
 import { BulkActionSurface } from "@/components/BulkActionSurface";
 import { CardContextMenu } from "@/components/CardContextMenu";
 import { CardGrid } from "@/components/CardGrid";
-import { ListRow, type ListRowProps } from "@/components/ListRow";
-import {
-  PostLogNoteEditor,
-  type PostLogNoteTarget,
-} from "@/components/PostLogNoteEditor";
+import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
 import { Icon } from "@/components/icons/Icon";
 import { ICON_REGISTRY, type IconName } from "@/components/icons/icon-registry";
+import { ListRow, type ListRowProps } from "@/components/ListRow";
+import {
+  PostLogNoteEditor,
+  type PostLogNoteTarget,
+} from "@/components/PostLogNoteEditor";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { Sheet } from "@/components/ui/Sheet";
+import { createQuickLogUndoController } from "@/components/universal-fab-logic";
+import { getAppSettings } from "@/db/app-settings-dao";
 import {
   bulkAddFavourites,
   bulkArchive,
@@ -92,6 +95,7 @@ import {
   undoBulkQuickLog,
 } from "@/db/bulk-actions-dao";
 import { listCategories } from "@/db/contact-read";
+import { readLine3Candidates } from "@/db/dashboard-knowledge-read";
 import {
   countAllContacts,
   countArchived,
@@ -105,52 +109,52 @@ import {
   listDashboardSearch,
 } from "@/db/dashboard-read";
 import { composeDashboardSearch } from "@/db/dashboard-search-read";
-import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
-import { readLine3Candidates } from "@/db/dashboard-knowledge-read";
 import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { deleteTouchpoint, recordTouchpoint } from "@/db/recency-dao";
-import { clearSnooze, snoozeContact, type SnoozePreset } from "@/db/snooze-dao";
+import { clearSnooze, type SnoozePreset, snoozeContact } from "@/db/snooze-dao";
 import { newUid } from "@/db/uid";
 import { countUnbound } from "@/db/unbound-read";
+import { selectCardLine3 } from "@/logic/card-line3-selection";
+import {
+  type BulkActionClaim,
+  createBulkActionGate,
+  getCurrentSelectionIds,
+} from "@/logic/dashboard-bulk-action-session";
 import {
   type DashboardPopulationCounts,
   selectDashboardEmptyState,
 } from "@/logic/dashboard-empty-logic";
 import type { DashboardViewMode } from "@/logic/dashboard-query-logic";
-import {
-  createBulkActionGate,
-  getCurrentSelectionIds,
-  type BulkActionClaim,
-} from "@/logic/dashboard-bulk-action-session";
+import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
 import {
   applyCommittedMembership,
   createFavouriteOptimisticStore,
 } from "@/logic/favourite-optimistic";
 import { selectLine3 } from "@/logic/list-row-selection";
-import { selectCardLine3 } from "@/logic/card-line3-selection";
-import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
-import type { DashboardScreenProps } from "@/navigation/types";
 import { navigationRef } from "@/navigation/linking";
+import type { DashboardScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { buildDashboardOverflowActions } from "@/screens/dashboard-overflow-actions";
+import { reconcileSchedule } from "@/services/notifications/notification-schedule";
+import { runQuickLog } from "@/services/quick-log-command";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
 import { useDashboardSelectionStore } from "@/stores/dashboard-selection-store";
 import { useDashboardSessionStore } from "@/stores/dashboard-session-store";
-import { bumpShellRefresh, useShellRefresh } from "@/stores/shell-refresh-store";
+import {
+  bumpShellRefresh,
+  useShellRefresh,
+} from "@/stores/shell-refresh-store";
 import { showSnackbar, snackbarStore } from "@/stores/snackbar-store";
-import { runQuickLog } from "@/services/quick-log-command";
-import { reconcileSchedule } from "@/services/notifications/notification-schedule";
-import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
-import { createQuickLogUndoController } from "@/components/universal-fab-logic";
 import { useTheme } from "@/theme";
 import { EASING, MOTION } from "@/theme/tokens/motion";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
-import { Logger } from "@/utils/logger";
 import { isSnoozed, parseLocalMs } from "@/utils/dates";
+import { Logger } from "@/utils/logger";
 
 /** The debounce interval (ms) that collapses a keystroke burst to one read. */
 const SEARCH_DEBOUNCE_MS = 220;
@@ -236,12 +240,30 @@ function ListLoadingSkeleton() {
           ]}
         >
           <View
-            style={[styles.skeletonAvatar, { backgroundColor: colors.surfaceElevated }]}
+            style={[
+              styles.skeletonAvatar,
+              { backgroundColor: colors.surfaceElevated },
+            ]}
           />
           <View style={styles.skeletonTextBlock}>
-            <View style={[styles.skeletonName, { backgroundColor: colors.surfaceElevated }]} />
-            <View style={[styles.skeletonLine, { backgroundColor: colors.surfaceElevated }]} />
-            <View style={[styles.skeletonLineShort, { backgroundColor: colors.surfaceElevated }]} />
+            <View
+              style={[
+                styles.skeletonName,
+                { backgroundColor: colors.surfaceElevated },
+              ]}
+            />
+            <View
+              style={[
+                styles.skeletonLine,
+                { backgroundColor: colors.surfaceElevated },
+              ]}
+            />
+            <View
+              style={[
+                styles.skeletonLineShort,
+                { backgroundColor: colors.surfaceElevated },
+              ]}
+            />
           </View>
         </View>
       ))}
@@ -387,7 +409,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   );
   const toggleSelection = useDashboardSelectionStore((state) => state.toggle);
   const selectAll = useDashboardSelectionStore((state) => state.selectAll);
-  const exitSelection = useDashboardSelectionStore((state) => state.exitSelection);
+  const exitSelection = useDashboardSelectionStore(
+    (state) => state.exitSelection,
+  );
   const removeFromUniverse = useDashboardSelectionStore(
     (state) => state.removeFromUniverse,
   );
@@ -438,25 +462,24 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const [refreshing, setRefreshing] = useState(false);
   const [initialLoad, setInitialLoad] = useState(true);
 
-  const frozenIds = useMemo(
-    () => new Set(frozenUniverse),
-    [frozenUniverse],
-  );
+  const frozenIds = useMemo(() => new Set(frozenUniverse), [frozenUniverse]);
   const cardRows = selectionMode
     ? rows.filter((row) => frozenIds.has(row.id))
     : rows;
   const selectionCount = selectedIds.size;
   const [bulkActionPending, setBulkActionPending] = useState(false);
-  const bulkActionGateRef = useRef<ReturnType<typeof createBulkActionGate> | null>(
-    null,
-  );
+  const bulkActionGateRef = useRef<ReturnType<
+    typeof createBulkActionGate
+  > | null>(null);
   if (!bulkActionGateRef.current) {
     bulkActionGateRef.current = createBulkActionGate(setBulkActionPending);
   }
   // Holds a claim while it is awaiting a dialog or picker choice. Once a
   // choice consumes it, the writer owns that claim until its settled path.
   const bulkActionInputClaimRef = useRef<BulkActionClaim | null>(null);
-  const [bulkConfirm, setBulkConfirm] = useState<BulkConfirmAction | null>(null);
+  const [bulkConfirm, setBulkConfirm] = useState<BulkConfirmAction | null>(
+    null,
+  );
   const [snoozePicker, setSnoozePicker] = useState<{
     claim: BulkActionClaim;
     ids: number[];
@@ -479,9 +502,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   }, [selectionCount, selectionMode]);
   const [resultGeneration, setResultGeneration] = useState(0);
   const [panelOpen, setPanelOpen] = useState(false);
-  const [contextMenuContactId, setContextMenuContactId] = useState<number | null>(
-    null,
-  );
+  const [contextMenuContactId, setContextMenuContactId] = useState<
+    number | null
+  >(null);
   const openRowRef = useRef<SwipeableMethods | null>(null);
   const [postLogTarget, setPostLogTarget] = useState<PostLogNoteTarget | null>(
     null,
@@ -534,7 +557,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const onLogInteraction = useCallback(
     async (contactId: number) => {
       try {
-        const { dashboardRightSwipeAction } = await getAppSettings(getExecutor());
+        const { dashboardRightSwipeAction } = await getAppSettings(
+          getExecutor(),
+        );
         if (dashboardRightSwipeAction === "log-contact") {
           navigateDashboardContactAction(contactId, "LogContact");
           return;
@@ -709,7 +734,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                 : listDashboardPopulation(exec, query, now)
               ).then((rows) => ({
                 rows,
-                resultsByContactId: new Map<number, DashboardSearchResult | null>(),
+                resultsByContactId: new Map<
+                  number,
+                  DashboardSearchResult | null
+                >(),
               })),
           countLiveContacts(exec),
           countNeverContacted(exec),
@@ -732,7 +760,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           );
           const candidatesByContactId = new Map<number, typeof candidates>();
           for (const candidate of candidates) {
-            const forContact = candidatesByContactId.get(candidate.contactId) ?? [];
+            const forContact =
+              candidatesByContactId.get(candidate.contactId) ?? [];
             forContact.push(candidate);
             candidatesByContactId.set(candidate.contactId, forContact);
           }
@@ -768,8 +797,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           snoozed,
         });
         setError(false);
-        resultProgress.value =
-          isFocused && appActive && !reducedMotion ? 0 : 1;
+        resultProgress.value = isFocused && appActive && !reducedMotion ? 0 : 1;
         setResultGeneration((generation) => generation + 1);
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to load dashboard", err);
@@ -931,7 +959,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               onPress: () => {
                 void undoBulkQuickLog(getExecutor(), receipt, localDateTime())
                   .then(() => {
-                    commitBulkOutcome(`Undid ${ids.length} logged interactions`);
+                    commitBulkOutcome(
+                      `Undid ${ids.length} logged interactions`,
+                    );
                   })
                   .catch((undoError: unknown) =>
                     reportBulkFailure("undo bulk quick log", undoError),
@@ -1058,10 +1088,16 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     }
     if (!consumeBulkAction(claim)) return;
     void bulkAddFavourites(getExecutor(), ids, localDateTime())
-      .then(() => commitBulkOutcome(`Added ${ids.length} contacts to Favorites`))
+      .then(() =>
+        commitBulkOutcome(`Added ${ids.length} contacts to Favorites`),
+      )
       .catch((writeError: unknown) => {
         releaseBulkAction(claim);
-        reportBulkFailure("add contacts to Favorites", writeError, onBulkAddFavourites);
+        reportBulkFailure(
+          "add contacts to Favorites",
+          writeError,
+          onBulkAddFavourites,
+        );
       })
       .finally(() => releaseBulkAction(claim));
   }, [
@@ -1128,7 +1164,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       .then(async () => {
         commitBulkOutcome(`Unsnoozed ${ids.length} contacts`);
         await reconcileSchedule(getExecutor()).catch((scheduleError) =>
-          Logger.error(LOG_SCOPE, "failed to reconcile after bulk unsnooze", scheduleError),
+          Logger.error(
+            LOG_SCOPE,
+            "failed to reconcile after bulk unsnooze",
+            scheduleError,
+          ),
         );
       })
       .catch((writeError: unknown) => {
@@ -1168,7 +1208,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       })
       .catch((readError: unknown) => {
         releaseBulkAction(claim);
-        reportBulkFailure("load categories", readError, onBulkOpenCategoryPicker);
+        reportBulkFailure(
+          "load categories",
+          readError,
+          onBulkOpenCategoryPicker,
+        );
       });
   }, [releaseBulkAction, reportBulkFailure, tryAcquireBulkAction]);
 
@@ -1258,7 +1302,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         .catch((writeError: unknown) => {
           Logger.error(LOG_SCOPE, "failed to update favourite", writeError);
           if (
-            favouriteStore.resolve(contactId, generation, "failure") === "applied"
+            favouriteStore.resolve(contactId, generation, "failure") ===
+            "applied"
           ) {
             showSnackbar({
               kind: "error",
@@ -1346,7 +1391,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             );
           })
           .catch((snoozeError: unknown) => {
-            Logger.error(LOG_SCOPE, "failed to unsnooze card contact", snoozeError);
+            Logger.error(
+              LOG_SCOPE,
+              "failed to unsnooze card contact",
+              snoozeError,
+            );
             showSnackbar({
               kind: "error",
               label: "Couldn't unsnooze contact. Try again.",
@@ -1360,28 +1409,25 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         return;
       }
 
-      Alert.alert(
-        "Snooze contact",
-        "Choose how long to pause reminders.",
-        [
-          ...CARD_SNOOZE_PRESETS.map(({ label, preset }) => ({
-            text: label,
-            onPress: () => {
-              void snoozeContactWithPreset(contactId, preset);
-            },
-          })),
-          { text: "Cancel", style: "cancel" as const },
-        ],
-      );
+      Alert.alert("Snooze contact", "Choose how long to pause reminders.", [
+        ...CARD_SNOOZE_PRESETS.map(({ label, preset }) => ({
+          text: label,
+          onPress: () => {
+            void snoozeContactWithPreset(contactId, preset);
+          },
+        })),
+        { text: "Cancel", style: "cancel" as const },
+      ]);
     },
     [snoozeContactWithPreset, refreshAfterSnooze],
   );
 
   const enterCardSelection = useCallback(
     (contactId: number) => {
-      useDashboardSelectionStore
-        .getState()
-        .enterSelection(rows.map((row) => row.id), contactId);
+      useDashboardSelectionStore.getState().enterSelection(
+        rows.map((row) => row.id),
+        contactId,
+      );
     },
     [rows],
   );
@@ -1394,9 +1440,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       if (viewMode !== "card") {
         await setViewMode(getExecutor(), "card");
       }
-      useDashboardSelectionStore
-        .getState()
-        .enterSelection(currentEligibleIds);
+      useDashboardSelectionStore.getState().enterSelection(currentEligibleIds);
     } catch (selectContactsError) {
       Logger.error(
         LOG_SCOPE,
@@ -1454,7 +1498,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const contextMenuIsFavourite =
     contextMenuContact !== null &&
     (favouriteOverlay.get(contextMenuContact.id) ??
-      (contextMenuContact.favourite_rank !== null));
+      contextMenuContact.favourite_rank !== null);
   const contextMenuIsSnoozed =
     contextMenuContact !== null &&
     isSnoozed(contextMenuContact.snooze_until, listNow);
@@ -1591,10 +1635,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   ) : null;
 
   return (
-    <View
-      testID="dashboard-root"
-      style={styles.root}
-    >
+    <View testID="dashboard-root" style={styles.root}>
       <View
         accessible={!panelOpen}
         importantForAccessibility={panelOpen ? "no-hide-descendants" : "auto"}
@@ -1740,124 +1781,127 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
       >
         {!selectionMode ? (
           <View testID="dashboard-search-row" style={styles.searchRow}>
-          <Pressable
-            testID="dashboard-search-toggle"
-            accessibilityRole="button"
-            accessibilityLabel={searchExpanded ? "Close search" : "Search"}
-            accessibilityState={{ expanded: searchExpanded }}
-            onPress={onToggleSearch}
-            hitSlop={8}
-            style={styles.searchToggle}
-          >
-            <Icon
-              name="search"
-              state={searchExpanded ? "active" : "default"}
-              size="md"
-              tone="textSecondary"
-            />
-          </Pressable>
-          {searchExpanded ? (
-            <Animated.View style={[styles.searchInputWrap, searchInputStyle]}>
-              <TextInput
-                testID="dashboard-search-input"
-                value={searchText}
-                onChangeText={setSearchText}
-                placeholder="Search people and notes"
-                placeholderTextColor={colors.textSecondary}
-                style={[
-                  styles.searchInput,
-                  {
-                    color: colors.textPrimary,
-                    borderColor: colors.border,
-                    backgroundColor: colors.surface,
-                  },
-                ]}
+            <Pressable
+              testID="dashboard-search-toggle"
+              accessibilityRole="button"
+              accessibilityLabel={searchExpanded ? "Close search" : "Search"}
+              accessibilityState={{ expanded: searchExpanded }}
+              onPress={onToggleSearch}
+              hitSlop={8}
+              style={styles.searchToggle}
+            >
+              <Icon
+                name="search"
+                state={searchExpanded ? "active" : "default"}
+                size="md"
+                tone="textSecondary"
               />
-              {searchText !== "" ? (
-                <Pressable
-                  testID="dashboard-search-clear"
-                  accessibilityRole="button"
-                  accessibilityLabel="Clear"
-                  onPress={onClearSearch}
-                  style={[styles.searchClear, { borderColor: colors.border }]}
-                >
-                  <Text
-                    style={[
-                      styles.searchClearText,
-                      { color: colors.textSecondary },
-                    ]}
+            </Pressable>
+            {searchExpanded ? (
+              <Animated.View style={[styles.searchInputWrap, searchInputStyle]}>
+                <TextInput
+                  testID="dashboard-search-input"
+                  value={searchText}
+                  onChangeText={setSearchText}
+                  placeholder="Search people and notes"
+                  placeholderTextColor={colors.textSecondary}
+                  style={[
+                    styles.searchInput,
+                    {
+                      color: colors.textPrimary,
+                      borderColor: colors.border,
+                      backgroundColor: colors.surface,
+                    },
+                  ]}
+                />
+                {searchText !== "" ? (
+                  <Pressable
+                    testID="dashboard-search-clear"
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear"
+                    onPress={onClearSearch}
+                    style={[styles.searchClear, { borderColor: colors.border }]}
                   >
-                    Clear
-                  </Text>
-                </Pressable>
-              ) : null}
-            </Animated.View>
-          ) : (
-            <View style={styles.searchSpacer} />
-          )}
-          <View style={styles.viewToggleWrap}>
-            <SegmentedControl<DashboardViewMode>
-              testID="dashboard-view-toggle"
-              options={VIEW_TOGGLE_OPTIONS}
-              value={query.viewMode}
-              onChange={onChangeView}
-            />
-          </View>
+                    <Text
+                      style={[
+                        styles.searchClearText,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
+                      Clear
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </Animated.View>
+            ) : (
+              <View style={styles.searchSpacer} />
+            )}
+            <View style={styles.viewToggleWrap}>
+              <SegmentedControl<DashboardViewMode>
+                testID="dashboard-view-toggle"
+                options={VIEW_TOGGLE_OPTIONS}
+                value={query.viewMode}
+                onChange={onChangeView}
+              />
+            </View>
           </View>
         ) : null}
         <View style={styles.listRegion}>
           {query.viewMode === "list" ? (
             <Animated.View style={[styles.listRegion, resultTransitionStyle]}>
               <FlatList
-              data={error || showInitialSkeleton ? [] : rows}
-              keyExtractor={(item) => String(item.id)}
-              renderItem={({ item }) => (
-                <SwipeableListRow
-                  contactId={item.id}
-                  name={item.name}
-                  photo={item.photo}
-                  modifiedAt={item.modified_at}
-                  categoryLabel={item.categoryLabel}
-                  lastContact={item.last_contact}
-                  snoozeUntil={item.snooze_until}
-                  status={item.status}
-                  now={listNow}
-                  onPress={() => goToProfile(item.id)}
-                  isFavourite={
-                    favouriteOverlay.get(item.id) ?? (item.favourite_rank !== null)
-                  }
-                  onToggleFavourite={() => {
-                    const renderedMembership =
+                data={error || showInitialSkeleton ? [] : rows}
+                keyExtractor={(item) => String(item.id)}
+                renderItem={({ item }) => (
+                  <SwipeableListRow
+                    contactId={item.id}
+                    name={item.name}
+                    photo={item.photo}
+                    modifiedAt={item.modified_at}
+                    categoryLabel={item.categoryLabel}
+                    lastContact={item.last_contact}
+                    snoozeUntil={item.snooze_until}
+                    status={item.status}
+                    now={listNow}
+                    onPress={() => goToProfile(item.id)}
+                    isFavourite={
                       favouriteOverlay.get(item.id) ??
-                      (item.favourite_rank !== null);
-                    toggleFavourite(item.id, !renderedMembership);
-                  }}
-                  line3={line3ByContactId.get(item.id) ?? null}
-                  searchResult={
-                    isSearchMode
-                      ? (searchResultsByContactId.get(item.id) ?? null)
-                      : undefined
-                  }
-                  searchSnippet={isSearchMode ? item.snippet : null}
-                  onLogInteraction={onLogInteraction}
-                  onEditContact={onEditContact}
-                  openRowRef={openRowRef}
-                />
-              )}
-              ListHeaderComponent={listHeader}
-              ListEmptyComponent={showInitialSkeleton ? <ListLoadingSkeleton /> : listEmpty}
-              contentContainerStyle={[
-                styles.content,
-                { paddingBottom: bottomClearance },
-              ]}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  tintColor={colors.accent}
-                  colors={[colors.accent]}
-                />
-              }
+                      item.favourite_rank !== null
+                    }
+                    onToggleFavourite={() => {
+                      const renderedMembership =
+                        favouriteOverlay.get(item.id) ??
+                        item.favourite_rank !== null;
+                      toggleFavourite(item.id, !renderedMembership);
+                    }}
+                    line3={line3ByContactId.get(item.id) ?? null}
+                    searchResult={
+                      isSearchMode
+                        ? (searchResultsByContactId.get(item.id) ?? null)
+                        : undefined
+                    }
+                    searchSnippet={isSearchMode ? item.snippet : null}
+                    onLogInteraction={onLogInteraction}
+                    onEditContact={onEditContact}
+                    openRowRef={openRowRef}
+                  />
+                )}
+                ListHeaderComponent={listHeader}
+                ListEmptyComponent={
+                  showInitialSkeleton ? <ListLoadingSkeleton /> : listEmpty
+                }
+                contentContainerStyle={[
+                  styles.content,
+                  { paddingBottom: bottomClearance },
+                ]}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={colors.accent}
+                    colors={[colors.accent]}
+                  />
+                }
               />
             </Animated.View>
           ) : (
@@ -1866,32 +1910,32 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               style={[styles.listRegion, resultTransitionStyle]}
             >
               <CardGrid
-              rows={cardRows}
-              now={listNow}
-              onPressContact={goToProfile}
-              onLongPressContact={openCardContextMenu}
-              onViewProfile={goToProfile}
-              onQuickLog={logQuickly}
-              onLogInteraction={logCardInteraction}
-              onMessage={messageContact}
-              onEditContact={onEditContact}
-              onSelect={enterCardSelection}
-              selectionMode={selectionMode}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelection}
-              favouriteOverlay={favouriteOverlay}
-              onToggleFavourite={toggleFavourite}
-              line3ByContactId={line3ByContactId}
-              searchResultsByContactId={searchResultsByContactId}
-              isSearchMode={isSearchMode}
-              error={error}
-              showInitialSkeleton={showInitialSkeleton}
-              loadingSkeleton={<ListLoadingSkeleton />}
-              listHeader={listHeader}
-              listEmpty={listEmpty}
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              bottomClearance={bottomClearance}
+                rows={cardRows}
+                now={listNow}
+                onPressContact={goToProfile}
+                onLongPressContact={openCardContextMenu}
+                onViewProfile={goToProfile}
+                onQuickLog={logQuickly}
+                onLogInteraction={logCardInteraction}
+                onMessage={messageContact}
+                onEditContact={onEditContact}
+                onSelect={enterCardSelection}
+                selectionMode={selectionMode}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelection}
+                favouriteOverlay={favouriteOverlay}
+                onToggleFavourite={toggleFavourite}
+                line3ByContactId={line3ByContactId}
+                searchResultsByContactId={searchResultsByContactId}
+                isSearchMode={isSearchMode}
+                error={error}
+                showInitialSkeleton={showInitialSkeleton}
+                loadingSkeleton={<ListLoadingSkeleton />}
+                listHeader={listHeader}
+                listEmpty={listEmpty}
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                bottomClearance={bottomClearance}
               />
             </Animated.View>
           )}
@@ -1959,88 +2003,91 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               void bulkSnooze(getExecutor(), ids, preset, localDateTime())
                 .then(async () => {
                   commitBulkOutcome(`Snoozed ${ids.length} contacts`);
-                  await reconcileSchedule(getExecutor()).catch((scheduleError) =>
-                    Logger.error(
-                      LOG_SCOPE,
-                      "failed to reconcile after bulk snooze",
-                      scheduleError,
-                    ),
+                  await reconcileSchedule(getExecutor()).catch(
+                    (scheduleError) =>
+                      Logger.error(
+                        LOG_SCOPE,
+                        "failed to reconcile after bulk snooze",
+                        scheduleError,
+                      ),
                   );
                 })
                 .catch((writeError: unknown) => {
                   releaseBulkAction(picker.claim);
-                  reportBulkFailure("snooze contacts", writeError, onBulkOpenSnoozePicker);
+                  reportBulkFailure(
+                    "snooze contacts",
+                    writeError,
+                    onBulkOpenSnoozePicker,
+                  );
                 })
                 .finally(() => releaseBulkAction(picker.claim));
             }}
             style={[styles.bulkPickerRow, { borderColor: colors.border }]}
           >
             <Icon name="snooze" size="md" tone="textPrimary" />
-            <Text style={[styles.bulkPickerLabel, { color: colors.textPrimary }]}>
+            <Text
+              style={[styles.bulkPickerLabel, { color: colors.textPrimary }]}
+            >
               {label}
             </Text>
           </Pressable>
         ))}
       </Sheet>
-      <Sheet
+      <CategoryChoiceSheet
         visible={categoryPicker !== null}
+        categories={categoryPicker?.categories ?? []}
+        selectedId={null}
+        allowUncategorized
+        title="Set category"
         onRequestClose={() => {
           setCategoryPicker(null);
           releaseBulkInputClaim();
         }}
-        variant="detail"
-      >
-        <Text style={[styles.bulkPickerTitle, { color: colors.textSecondary }]}>
-          Set category
-        </Text>
-        {categoryPicker?.categories.map((category) => (
-          <Pressable
-            key={category.id}
-            testID={`bulk-category-${category.id}`}
-            accessibilityRole="button"
-            accessibilityLabel={`Set category to ${category.name} for ${selectionCount} contacts`}
-            onPress={() => {
-              const picker = categoryPicker;
-              if (!picker || !consumeBulkAction(picker.claim)) return;
-              setCategoryPicker(null);
-              const ids = getCurrentSelectionIds(
-                useDashboardSelectionStore.getState(),
-                picker.sessionId,
-              );
-              if (!ids?.length) {
-                releaseBulkAction(picker.claim);
-                return;
-              }
-              void bulkSetCategory(
+        onSelect={(categoryId) => {
+          const picker = categoryPicker;
+          if (!picker || !consumeBulkAction(picker.claim)) return;
+          setCategoryPicker(null);
+          const ids = getCurrentSelectionIds(
+            useDashboardSelectionStore.getState(),
+            picker.sessionId,
+          );
+          if (!ids?.length) {
+            releaseBulkAction(picker.claim);
+            return;
+          }
+          void listCategories(getExecutor())
+            .then((currentCategories) => {
+              const target =
+                categoryId === null
+                  ? null
+                  : currentCategories.find(
+                      (category) => category.id === categoryId,
+                    );
+              if (categoryId !== null && !target)
+                throw new Error("Category no longer exists");
+              return bulkSetCategory(
                 getExecutor(),
                 ids,
-                category.id,
+                categoryId,
                 localDateTime(),
-              )
-                .then(() =>
-                  commitBulkOutcome(
-                    `Set category to ${category.name} for ${ids.length} contacts`,
-                  ),
-                )
-                .catch((writeError: unknown) => {
-                  releaseBulkAction(picker.claim);
-                  reportBulkFailure(
-                    "set contact category",
-                    writeError,
-                    onBulkOpenCategoryPicker,
-                  );
-                })
-                .finally(() => releaseBulkAction(picker.claim));
-            }}
-            style={[styles.bulkPickerRow, { borderColor: colors.border }]}
-          >
-            <Icon name="category" size="md" tone="textPrimary" />
-            <Text style={[styles.bulkPickerLabel, { color: colors.textPrimary }]}>
-              {category.name}
-            </Text>
-          </Pressable>
-        ))}
-      </Sheet>
+              );
+            })
+            .then(() =>
+              commitBulkOutcome(
+                `Set category to ${categoryId === null ? "Uncategorized" : (picker.categories.find((category) => category.id === categoryId)?.name ?? "category")} for ${ids.length} contacts`,
+              ),
+            )
+            .catch((writeError: unknown) => {
+              releaseBulkAction(picker.claim);
+              reportBulkFailure(
+                "set contact category",
+                writeError,
+                onBulkOpenCategoryPicker,
+              );
+            })
+            .finally(() => releaseBulkAction(picker.claim));
+        }}
+      />
       <Sheet
         visible={frequencyPicker !== null}
         onRequestClose={() => {
@@ -2076,7 +2123,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           onPress={() => {
             const intervalDays = Number(frequencyDraft);
             const picker = frequencyPicker;
-            if (!picker || !Number.isInteger(intervalDays) || intervalDays <= 0) {
+            if (
+              !picker ||
+              !Number.isInteger(intervalDays) ||
+              intervalDays <= 0
+            ) {
               AccessibilityInfo.announceForAccessibility(
                 "Frequency must be a positive whole number",
               );

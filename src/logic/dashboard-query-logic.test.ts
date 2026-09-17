@@ -4,6 +4,7 @@ import {
   buildFilterWhere,
   buildPopulationWhere,
   CONTACT_FREQUENCY_BANDS,
+  parseDashboardFilters,
   resetDashboardView,
   resolveDefaultSort,
 } from "@/logic/dashboard-query-logic";
@@ -38,8 +39,29 @@ describe("dashboard query logic", () => {
     ).toEqual({ sql: "", params: [] });
   });
 
+  it("supports closed Uncategorized category filtering and canonical persistence", () => {
+    expect(buildFilterWhere({ category: ["uncategorized"] })).toEqual({
+      sql: "(c.category_id IS NULL)",
+      params: [],
+    });
+    const mixed = buildFilterWhere({ category: ["2", "uncategorized", "1"] });
+    expect(mixed.sql).toContain(
+      "c.category_id IN (?, ?) OR c.category_id IS NULL",
+    );
+    expect(mixed.params).toEqual([2, 1]);
+    expect(
+      parseDashboardFilters({ category: ["2", "uncategorized", "1", "2"] }),
+    ).toEqual({
+      category: ["1", "2", "uncategorized"],
+    });
+    expect(parseDashboardFilters({ category: ["0"] })).toBeNull();
+    expect(parseDashboardFilters({ category: ["1 OR 1=1"] })).toBeNull();
+  });
+
   it("uses the single frequency-band boundary source with bound values", () => {
-    const where = buildFilterWhere({ "contact-frequency": ["weekly", "monthly"] });
+    const where = buildFilterWhere({
+      "contact-frequency": ["weekly", "monthly"],
+    });
 
     expect(CONTACT_FREQUENCY_BANDS).toEqual({
       weekly: 7,
@@ -108,9 +130,9 @@ describe("dashboard query logic", () => {
     expect(
       buildPopulationWhere(["birthdays"], { birthdayIds: [41, 99] }).sql,
     ).toContain("c.id IN (?, ?)");
-    expect(buildPopulationWhere(["birthdays"], { birthdayIds: [] }).sql).toContain(
-      "0",
-    );
+    expect(
+      buildPopulationWhere(["birthdays"], { birthdayIds: [] }).sql,
+    ).toContain("0");
   });
 
   it("resolves population-aware Defaults while preserving explicit sorts", () => {

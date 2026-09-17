@@ -1,8 +1,9 @@
 import {
   CONTACT_FREQUENCY_BANDS,
+  DASHBOARD_UNCATEGORIZED_TOKEN,
+  type DashboardFilters,
   NEEDS_ATTENTION_VALUE,
   SOCIAL_BATTERY_VALUES,
-  type DashboardFilters,
 } from "@/logic/dashboard-query-logic";
 import { GRAVITY_TIERS } from "@/services/impact";
 import { filterOptionLabel } from "./control-labels";
@@ -14,11 +15,17 @@ export function selectedFilterLabels(
   filters: DashboardFilters,
   categories: Category[],
 ): string[] {
-  const categoryNames = new Map(categories.map((category) => [String(category.id), category.name]));
+  const categoryNames = new Map(
+    categories.map((category) => [String(category.id), category.name]),
+  );
   const selected = (family: keyof DashboardFilters) => filters[family] ?? [];
   const labels: string[] = [];
 
   for (const id of selected("category")) {
+    if (id === DASHBOARD_UNCATEGORIZED_TOKEN) {
+      labels.push("Uncategorized");
+      continue;
+    }
     const name = categoryNames.get(id);
     if (name) labels.push(name);
   }
@@ -30,7 +37,10 @@ export function selectedFilterLabels(
   }
 
   if (selected("needs-attention").includes(NEEDS_ATTENTION_VALUE)) {
-    labels.push(filterOptionLabel("needs-attention", NEEDS_ATTENTION_VALUE) ?? NEEDS_ATTENTION_VALUE);
+    labels.push(
+      filterOptionLabel("needs-attention", NEEDS_ATTENTION_VALUE) ??
+        NEEDS_ATTENTION_VALUE,
+    );
   }
 
   for (const { name } of GRAVITY_TIERS) {

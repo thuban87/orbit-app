@@ -16,6 +16,7 @@ import {
   assertRememberedMessageMode,
 } from "@/db/app-settings-dao";
 import { isCurrentStateFieldKey, isMemoryTypeKey } from "@/db/memory-registry";
+import { parseDashboardFilters } from "@/logic/dashboard-query-logic";
 
 /** Displayed before any preview or restore work for a file from a newer app. */
 export const UPDATE_FIRST_MESSAGE =
@@ -285,6 +286,18 @@ function assertPortableSettings(
   } catch {
     fail("appSettings has an invalid Orrery preference");
   }
+  if (settings.dashboardFilters !== undefined) {
+    try {
+      if (
+        typeof settings.dashboardFilters !== "string" ||
+        parseDashboardFilters(JSON.parse(settings.dashboardFilters)) === null
+      ) {
+        fail("appSettings has invalid Dashboard filters");
+      }
+    } catch {
+      fail("appSettings has invalid Dashboard filters");
+    }
+  }
   // CAPT-11 / T-34-03: reject a malformed/adversarial restored channel value at
   // the backup boundary, reusing the SAME DAO validators that guard ordinary
   // writes, so it can never reach the DB. The remembered value is always a
@@ -479,14 +492,22 @@ function validate(manifest: RawManifest): BackupManifest {
     uidSet(newArrays[key], key);
   const contactPresentation = new Set<string>();
   for (const row of newArrays.profileContactPresentation) {
-    if (typeof row.contactUid !== "string" || contactPresentation.has(row.contactUid))
+    if (
+      typeof row.contactUid !== "string" ||
+      contactPresentation.has(row.contactUid)
+    )
       fail("profileContactPresentation has an invalid or duplicate contactUid");
     contactPresentation.add(row.contactUid);
   }
   const categoryPresentation = new Set<string>();
   for (const row of newArrays.profileCategoryPresentation) {
-    if (typeof row.categoryUid !== "string" || categoryPresentation.has(row.categoryUid))
-      fail("profileCategoryPresentation has an invalid or duplicate categoryUid");
+    if (
+      typeof row.categoryUid !== "string" ||
+      categoryPresentation.has(row.categoryUid)
+    )
+      fail(
+        "profileCategoryPresentation has an invalid or duplicate categoryUid",
+      );
     categoryPresentation.add(row.categoryUid);
   }
   for (const row of newArrays.systemRules)

@@ -3,6 +3,7 @@ import { getAppSettings, updateAppSettings } from "@/db/app-settings-dao";
 import { localDateTime } from "@/db/database";
 import type { SqlExecutor } from "@/db/types";
 import {
+  canonicalizeDashboardFilters,
   type DashboardFilters,
   type DashboardPopulation,
   type DashboardQueryState,
@@ -97,12 +98,16 @@ export const useDashboardQueryStore = create<DashboardQueryStore>()(
       set((state) => ({ populations, generation: state.generation + 1 }));
     },
     setFilters: async (exec, filters) => {
+      const canonical = canonicalizeDashboardFilters(filters);
       await updateAppSettings(
         exec,
-        { dashboardFilters: JSON.stringify(filters) },
+        { dashboardFilters: JSON.stringify(canonical) },
         localDateTime(),
       );
-      set((state) => ({ filters, generation: state.generation + 1 }));
+      set((state) => ({
+        filters: canonical,
+        generation: state.generation + 1,
+      }));
     },
     setSort: async (exec, sort) => {
       await updateAppSettings(exec, { dashboardSort: sort }, localDateTime());
