@@ -514,6 +514,38 @@ it("applies a Group Event tombstone and preserves an orphaned member as contact 
 });
 
 describe("applyRestore", () => {
+  it("replace-all reproduces an empty taxonomy and tombstones every removed category", async () => {
+    const source = await db();
+    const manifest = await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "",
+    });
+    manifest.categories = [];
+    manifest.contacts = manifest.contacts.map((contact) => ({
+      ...contact,
+      categoryUid: null,
+    }));
+    manifest.profileCategoryPresentation = [];
+
+    const destination = await db();
+    const local = await destination.getAllAsync<{ uid: string }>(
+      "SELECT uid FROM categories ORDER BY uid",
+    );
+    await expect(
+      applyRestore(destination, manifest, "replace-all"),
+    ).resolves.toMatchObject({ status: "applied" });
+    await expect(
+      destination.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) AS count FROM categories",
+      ),
+    ).resolves.toEqual({ count: 0 });
+    await expect(
+      destination.getAllAsync<{ entity_uid: string }>(
+        "SELECT entity_uid FROM tombstones WHERE entity_type='category' ORDER BY entity_uid",
+      ),
+    ).resolves.toEqual(local.map(({ uid: entity_uid }) => ({ entity_uid })));
+  });
+
   it("recomputes a retained contact after inserting history and removes it from Not Contacted", async () => {
     const source = await db();
     const destination = await db();
