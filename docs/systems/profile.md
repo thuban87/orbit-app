@@ -1,7 +1,7 @@
 # Profile presentation
 
-**Last updated:** 2026-09-10
-**Updated by phase:** 31.1-app-wide-system-backgrounds
+**Last updated:** 2026-09-17
+**Updated by phase:** 37.1-category-management
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
 ## Purpose
@@ -77,6 +77,8 @@ Background bytes stay in app-owned `profile-backgrounds/<uid>.jpg` paths. Picker
 
 Background rendering follows the already-resolved presentation axis rather than checking only a contact override. A resolved contact, Category, or global app-owned background URI wins. When resolution falls through to `source: "theme"`, Profile passes no app-owned URI to its own `BackgroundHost`, which then renders the active package's selected System background. Bundled System slots never enter `profile_background_templates`, and the Profile manager does not navigate to the System-background selector.
 
+Both template managers obtain categories in canonical order and use a bounded complete searchable Sheet with no Uncategorized row. Category rename preserves the local-ID assignment. Category deletion removes only the deleted row's presentation inside the same fallout transaction, so affected contacts fall through to global/factory inheritance while contact-specific choices remain unchanged.
+
 ## Backup and cross-phase boundaries
 
 Backup format v5 emits and restores both nullable global Profile preference keys, reusable layout/background templates, and the `profile_contact_presentation` / `profile_category_presentation` assignment rows. Presentation rows travel under their parent contact or Category UID; freeform layout JSON and collapse JSON remain intact. Each background template also carries its image bytes, which restore stages before the database transaction and rehydrates after commit to the UID-derived `profile-backgrounds/<uid>.jpg` path.
@@ -130,3 +132,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-09-09 | 31 | Added the Profile presentation controller, local snapshot/resolution architecture, customization boundaries, and Phase 32/36/37/40 handoffs. |
 | 2026-09-10 | 31.1 | Established resolved Profile-photo precedence over the app-wide System background while keeping bundled slots and Profile templates independent. |
 | 2026-09-02 | 32 | `ProfileModuleHost.renderHistory()` now mounts the full History & Insights section behind the preserved `interaction-history` key (replacing the bounded stub, no layout/collapse migration); threaded `onOpenKnowledgeChange` for Detail Sheet knowledge rows. |
+| 2026-09-17 | 37.1 | Added complete bounded real-category assignment, rename-stable inheritance, and atomic deletion cleanup with fallback to the next presentation axis. |

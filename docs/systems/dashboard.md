@@ -92,6 +92,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 2. It validates and writes each durable axis through `updateAppSettings`; `default` remains a semantic sentinel until the read resolves it for the selected populations.
 3. `useDashboardSessionStore` keeps search text and scroll offset in memory, so a fresh launch starts at top with search cleared.
 4. `resetDashboardView()` restores Active Contacts, no filters, and Default sort while preserving List/Card preference; later control-surface work composes that reset with session clearing.
+5. Category filters use a closed grammar: positive decimal local IDs for real categories and the literal `uncategorized` for `category_id IS NULL`. A shell refresh reconciles deleted IDs from durable filters instead of retaining a dead reference.
 
 ### Changing the visible Dashboard state
 
@@ -128,6 +129,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 2. Card taps toggle selection, stars remain visible but non-interactive, and Back exits selection before route navigation. Ordinary committed operations retain the session; Archive removes only its committed IDs from both selection and frozen universe.
 3. The replacement control area exposes Quick Log, count-aware detailed logging, explicit favourite and snooze actions, category, Archive, and Frequency as the sole Sensitive Operation. Two or more detailed-log targets navigate with serializable `GroupLog.participantIds`; Group Event behavior remains outside Dashboard.
 4. Every writer is claimed synchronously before asynchronous work. Committed batches refresh Dashboard state and notify widget and shell consumers once; failures report without claiming a completed outcome.
+5. Category assignment uses the complete shared chooser, pins Uncategorized after real rows, and re-reads the catalog before calling `bulkSetCategory`; a stale real target fails without partially writing the batch.
 
 ### Retired legacy Dashboard surfaces
 
@@ -215,3 +217,4 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | 2026-09-02 | 26 | Added the live Population/Filters/Sort floating control surface, session search and view toggle, fixed Dashboard discovery entries, and dedicated Unbound name retrieval. |
 | 2026-09-02 | 27 | Added the scan-first List renderer, deterministic knowledge context, binary Favourite reconciliation, constrained swipe actions, and relevance-first List search. |
 | 2026-09-02 | 28 | Added the responsive Card renderer, frozen-universe multi-select, explicit bulk controls, and count-aware detailed-log handoff. |
+| 2026-09-17 | 37.1 | Closed category filters to positive IDs plus `uncategorized`, added searchable stale-safe bulk assignment, and reconciled deleted filters after committed shell refresh. |

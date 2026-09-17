@@ -61,6 +61,8 @@ payload with the same closed, parameter-bound grammar used by live writers:
 
 ## Orphan repair and attention states
 
+Runtime category deletion and historical corruption are intentionally distinct. The category deletion transaction removes only rules whose `family='category'` value equals the deleted category UID, plus that Category System's ref-keyed overrides/preferences. It does not sweep unrelated missing UIDs. A custom System remains valid when another meaningful rule or explicit include survives; an empty or exclude-only definition is Needs Attention. During backup merge, only category UIDs proven deleted by winning format-6 tombstones have their dependent rules/references suppressed.
+
 Restore resolves contacts, Categories, and custom Systems by their portable
 UIDs after their parent entities are available. It must perform the following
 repairs explicitly and report them through the normal restore diagnostics;
@@ -95,3 +97,4 @@ it must never leave an FK-invalid local row behind.
 | Date | Phase | What Changed |
 | --- | --- | --- |
 | 2026-09-08 | 30 | Declared the Phase 36 Systems serialization, validation, and orphan-repair contract without changing the format-4 wire. |
+| 2026-09-17 | 37.1 | Clarified that proven runtime category deletion removes only the affected UID rule, while unrelated historical missing-rule diagnostics remain; format 6 tombstones suppress older category dependents. |

@@ -149,7 +149,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
-| `TARGET_VERSION` | `23` | `src/db/database.ts` | Schema version after the Orrery System selection-revision migration. |
+| `TARGET_VERSION` | `29` | `src/db/database.ts` | Current registered schema head; Phase 37.1 category management adds no migration. |
 
 ## Decisions
 
@@ -254,3 +254,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-09-02 | 29 | Added migration 021's constrained Orrery density, satellite, and last-System preferences. |
 | 2026-09-02 | 30 | Added migrations 022/023 for custom Orrery Systems, ref-keyed customization, and revision-guarded selection lifecycle. |
 | 2026-09-02 | 31 | Added migration 024's independent Profile templates, assignments, overrides, collapse state, and exported schema-version contract. |
+| 2026-09-17 | 37.1 | Confirmed mutable categories require no schema change: target stays 29, runtime deletion uses existing transactions/tombstones, and runtime/restore paths never reseed migration-001 defaults. |

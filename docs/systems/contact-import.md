@@ -67,6 +67,8 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 
 ## How It Works
 
+Category choices use the canonical ordered catalog and switch to the complete searchable Sheet at 13 rows. Both bulk setup and single-contact review re-read catalog truth immediately before writing, so a deleted selection becomes Uncategorized. If a category itself is deleted, the category DAO reassigns every referencing import session—`pending`, `complete`, and `discarded`—to the same chosen survivor or `NULL`; session status and unrelated recovery data are preserved.
+
 ### Acquiring and accepting a selection
 
 1. `AddSpeedDialFab` and Settings call `startContactImport()`, which routes API 37+ to the permissionless system picker and API 36 and below to `LegacyContactPicker`.
@@ -154,3 +156,4 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 | 2026-08-29 | 19.1 | Added SDK-routed legacy acquisition, scoped permission recovery, and explicit shared-pipeline terminal outcomes. |
 | 2026-08-26 | 20 | Added reconcile-only API-37+ permission handling and durable unreadable-birthday Fix/Ignore review. |
 | 2026-09-03 | 24.2 | Added Note MIME acquisition and durable AI-off imported-Memory writes for new-contact imports. |
+| 2026-09-17 | 37.1 | Made category selection complete and stale-safe; category deletion reassigns pending, complete, and discarded sessions to the same target. |

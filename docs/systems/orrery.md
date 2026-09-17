@@ -1,6 +1,6 @@
 # Orrery
 
-**Last updated:** 2026-09-02
+**Last updated:** 2026-09-17
 
 **Updated by phase:** 30-orrery-systems
 
@@ -99,6 +99,8 @@ Initial loading, empty membership, read failure, retained refresh failure, missi
 
 ## System switching
 
+The selector presents exactly three disclosure groups—Built-in, Categories, and Custom Systems—and recreates expansion state on every open from the selected System. Category rows and category rules use stable UIDs, so rename changes labels without changing identity. System Builder searches the complete category catalog without discarding hidden draft selections. A proven runtime category deletion removes only that UID's rule and ref-keyed customization; unrelated historical missing-category rules remain visible diagnostics. If the deleted Category System is already open, the store follows the normal durable selection channel back to All Contacts.
+
 The ordered switcher pins All Contacts, omits hidden Systems, and shows progressively resolved live counts. Empty and broken Systems remain selectable and use different icon shapes, visible text and accessibility labels; customized generated Systems also expose a non-severity overrides indicator.
 
 A genuine System change sends the destination to canonical Home framing while retaining a focused contact that survives in both memberships. The screen-owned runtime classifies retained, leaving and entering bodies by stable key, then samples accelerate, shed, capture and settle stages on the Reanimated/Skia path. Membership turnover controls whole-turn impulse and radial displacement. One sampled world remains authoritative for rings, bodies, labels, visibility and hit targets, and re-targeting starts from the exact displayed sample rather than stale source geometry.
@@ -140,3 +142,4 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 | 2026-09-02 | 23 | Added live Reduced Motion for ambient consumers. |
 | 2026-09-02 | 29 | Replaced dual-view rendering with canonical world/camera/Systems; added preferences, sessions, guarded filtered ordering, relationship moons, and ADR-104–106 decision records. |
 | 2026-09-02 | 30 | Added migration-backed custom Systems, rule and override resolution, authoring/management/preview surfaces, revision-guarded selection, and owner-approved staged switching. |
+| 2026-09-17 | 37.1 | Added complete UID-backed Category rule authoring, exact grouped selection, canonical Needs Attention, and deleted-category fallback through durable All Contacts selection. |

@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
+**Last updated:** 2026-09-17
+**Updated by phase:** 37.1-category-management
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`, `src/db/snooze-dao.ts`, `src/db/bulk-actions-dao.ts`
 
 ## Purpose
@@ -140,7 +140,7 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 ### Applying Dashboard bulk contact changes
 
 1. A Dashboard selection passes selected IDs to `bulk-actions-dao`; each non-empty operation opens one outer transaction, invokes the relevant non-mutexed contact core per ID, and bumps data revision once.
-2. Category and frequency writes update only their named contact column and `modified_at`; frequency rejects non-positive or fractional values before the transaction. Favourite operations remain explicit add or remove membership, never rank ordering.
+2. Category and frequency writes update only their named contact column and `modified_at`; category targets are revalidated against the current canonical catalog before the batch writer runs, and Uncategorized is stored as `NULL`. Frequency rejects non-positive or fractional values before the transaction. Favourite operations remain explicit add or remove membership, never rank ordering.
 3. Archive composes the same guarded archive core and immutable event as the single-contact lifecycle path. It is recoverable; permanent deletion remains archive-gated in the Archived Contacts surface.
 4. Snooze resolves one SQLite-local target date for a whole batch. All selected IDs are passed to each action, including Unbound or never-contacted contacts, matching the single-contact command boundary.
 
@@ -310,3 +310,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-09-02 | 25 | Retired rank rewrites and made favourite membership feed shared Dashboard Default ordering. |
 | 2026-09-02 | 28 | Added transaction-composed Dashboard bulk category, frequency, favourite, snooze, and archive actions. |
 | 2026-09-02 | 31 | Added Profile presentation fallout to Category changes, retained source-owned relationship actions, and removed the direct Profile AI-draft entry. |
+| 2026-09-17 | 37.1 | Added mutable single-category assignment with stale-target validation and atomic delete reassignment to a survivor or Uncategorized. |
