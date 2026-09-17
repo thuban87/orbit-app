@@ -51,6 +51,7 @@ const {
   createCategoryManagementLoadGuard,
   deletionImpactRows,
   isUnusedCategoryPreview,
+  resolveCategoryManagementLoad,
   moveCategoryRows,
 } = await import("./CategoryManagementScreen");
 
@@ -61,6 +62,42 @@ describe("CategoryManagementScreen tracer contracts", () => {
     const second = next();
     expect(first()).toBe(false);
     expect(second()).toBe(true);
+  });
+
+  it("returns explicit current-success, stale, and failure load outcomes", async () => {
+    const publish = vi.fn();
+    const rows = [{ id: 1 }] as never;
+
+    await expect(
+      resolveCategoryManagementLoad({
+        isCurrent: () => true,
+        readRows: async () => rows,
+        readUncategorizedCount: async () => 2,
+        publish,
+      }),
+    ).resolves.toEqual({ status: "success" });
+    expect(publish).toHaveBeenCalledWith(rows, 2);
+
+    publish.mockClear();
+    await expect(
+      resolveCategoryManagementLoad({
+        isCurrent: () => false,
+        readRows: async () => rows,
+        readUncategorizedCount: async () => 2,
+        publish,
+      }),
+    ).resolves.toEqual({ status: "stale" });
+    expect(publish).not.toHaveBeenCalled();
+
+    await expect(
+      resolveCategoryManagementLoad({
+        isCurrent: () => true,
+        readRows: async () => Promise.reject(new Error("read failed")),
+        readUncategorizedCount: async () => 2,
+        publish,
+      }),
+    ).resolves.toEqual({ status: "failure" });
+    expect(publish).not.toHaveBeenCalled();
   });
 
   it("formats exact singular and plural all-contact counts", () => {
