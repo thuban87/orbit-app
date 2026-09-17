@@ -105,6 +105,12 @@ describe("systems DAO", () => {
     await expect(
       createCustomSystem(exec, { name: "family", now: NOW }),
     ).rejects.toThrow("A System named family already exists");
+    await exec.runAsync("UPDATE categories SET name = ? WHERE id = 1", [
+      "Cafe\u0301",
+    ]);
+    await expect(
+      createCustomSystem(exec, { name: " CAFÉ ", now: NOW }),
+    ).rejects.toThrow("A System named CAFÉ already exists");
   });
 
   it("renames only custom Systems with a nonempty cross-catalog-unique name", async () => {

@@ -6,6 +6,8 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   createCategory,
   listCategoriesForManagement,
+  renameCategory,
+  reorderCategories,
 } from "@/db/categories-dao";
 import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
@@ -22,6 +24,63 @@ beforeEach(async () => {
   await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
     now: NOW,
     newUid: () => `seed-${++counter}`,
+  });
+});
+
+describe("category rename and reorder", () => {
+  it("renames only display text while preserving durable identity and assignments", async () => {
+    const [category] = await listCategoriesForManagement(exec);
+    const contact = await exec.runAsync(
+      "INSERT INTO contacts(uid,name,category_id,interval_days,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+      ["contact", "Alex", category.id, 30, NOW, NOW],
+    );
+    const beforeRevision = await readDataRevision(exec);
+    const renamed = await renameCategory(exec, {
+      id: category.id,
+      name: category.name.toUpperCase(),
+      now: "2026-09-17 02:00:00",
+    });
+    expect(renamed).toMatchObject({
+      id: category.id,
+      uid: category.uid,
+      name: category.name.toUpperCase(),
+      displayOrder: category.displayOrder,
+    });
+    expect(
+      await exec.getFirstAsync("SELECT category_id FROM contacts WHERE id = ?", [
+        contact.lastInsertRowId,
+      ]),
+    ).toEqual({ category_id: category.id });
+    expect(await readDataRevision(exec)).toBe(beforeRevision + 1);
+  });
+
+  it("normalizes reordered positions and bumps revision exactly once", async () => {
+    const rows = await listCategoriesForManagement(exec);
+    await exec.runAsync("UPDATE categories SET display_order = display_order * 3");
+    const orderedIds = rows.map((row) => row.id).reverse();
+    const beforeRevision = await readDataRevision(exec);
+    await reorderCategories(exec, { orderedIds, now: NOW });
+    expect(
+      (await listCategoriesForManagement(exec)).map((row) => [row.id, row.displayOrder]),
+    ).toEqual(orderedIds.map((id, index) => [id, index]));
+    expect(await readDataRevision(exec)).toBe(beforeRevision + 1);
+  });
+
+  it.each([
+    ["duplicate", (ids: number[]) => [ids[0], ids[0], ...ids.slice(2)]],
+    ["missing", (ids: number[]) => ids.slice(0, -1)],
+    ["stale", (ids: number[]) => [...ids.slice(0, -1), 99999]],
+  ])("rejects a %s reorder before any writes", async (_label, mutate) => {
+    const before = await listCategoriesForManagement(exec);
+    const beforeRevision = await readDataRevision(exec);
+    await expect(
+      reorderCategories(exec, {
+        orderedIds: mutate(before.map((row) => row.id)),
+        now: NOW,
+      }),
+    ).rejects.toThrow("complete current category set");
+    expect(await listCategoriesForManagement(exec)).toEqual(before);
+    expect(await readDataRevision(exec)).toBe(beforeRevision);
   });
 });
 
