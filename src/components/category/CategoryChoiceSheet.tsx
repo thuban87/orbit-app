@@ -69,9 +69,6 @@ export function CategoryChoiceSheet({
 }: CategoryChoiceSheetProps) {
   const { colors } = useTheme();
   const [query, setQuery] = useState("");
-  useEffect(() => {
-    if (!visible) setQuery("");
-  }, [visible]);
   const model = useMemo(
     () =>
       categoryChoiceSheetModel({
@@ -91,6 +88,9 @@ export function CategoryChoiceSheet({
       excludeCategoryUid,
     ],
   );
+  useEffect(() => {
+    if ((!visible || !model.searchable) && query) setQuery("");
+  }, [model.searchable, query, visible]);
 
   return (
     <Sheet visible={visible} onRequestClose={onRequestClose} variant="expanded">
@@ -98,21 +98,23 @@ export function CategoryChoiceSheet({
         <AppText role="heading" accessibilityRole="header">
           {title}
         </AppText>
-        <TextInput
-          accessibilityLabel="Search categories"
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search categories"
-          placeholderTextColor={colors.textSecondary}
-          style={[
-            styles.search,
-            {
-              color: colors.textPrimary,
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          ]}
-        />
+        {model.searchable ? (
+          <TextInput
+            accessibilityLabel="Search categories"
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search categories"
+            placeholderTextColor={colors.textSecondary}
+            style={[
+              styles.search,
+              {
+                color: colors.textPrimary,
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+              },
+            ]}
+          />
+        ) : null}
         <FlatList
           data={model.rows}
           keyExtractor={(row) =>
