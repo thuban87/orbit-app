@@ -1235,7 +1235,7 @@ describe("app-settings-dao — dashboard preference settings (migration 019, Pha
       {
         dashboardViewMode: "card",
         dashboardPopulations: '["favourites"]',
-        dashboardFilters: '{"category":["family"]}',
+        dashboardFilters: '{"category":["1","uncategorized"]}',
         dashboardSort: "name-asc",
       },
       LATER,
@@ -1243,7 +1243,7 @@ describe("app-settings-dao — dashboard preference settings (migration 019, Pha
     expect(await getAppSettings(exec)).toMatchObject({
       dashboardViewMode: "card",
       dashboardPopulations: '["favourites"]',
-      dashboardFilters: '{"category":["family"]}',
+      dashboardFilters: '{"category":["1","uncategorized"]}',
       dashboardSort: "name-asc",
     });
     const snapshot = await getPortableSettingsSnapshot(exec);
