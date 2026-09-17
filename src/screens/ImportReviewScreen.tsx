@@ -1,5 +1,4 @@
 import { Picker } from "@react-native-picker/picker";
-import { useFocusEffect } from "@react-navigation/native";
 import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -35,6 +34,7 @@ import {
 import { getSessionById, listSessionRows } from "@/db/import-session-read";
 import { linkExistingContactToRow } from "@/db/imported-contact-dao";
 import { newUid } from "@/db/uid";
+import { useCategoryCatalogRefresh } from "@/hooks/use-category-catalog-refresh";
 import { normalizeEditedBirthday } from "@/logic/birthday-logic";
 import {
   CATEGORY_SEARCH_THRESHOLD,
@@ -113,14 +113,22 @@ export function ImportReviewScreen({
 
   useImportLeaveGuard(navigation, route.params.sessionId, edited);
 
+  const commitCategories = useCallback(
+    (current: Array<{ id: number; name: string }>) => {
+      setCategories(current);
+      setCategoryId((selected) => resolveCategorySelection(current, selected));
+    },
+    [],
+  );
+  const requestInitialCategories = useCategoryCatalogRefresh(commitCategories);
+
   const load = useCallback(async () => {
     try {
       const exec = getExecutor();
-      const [rows, settings, session, nextCategories] = await Promise.all([
+      const [rows, settings, session] = await Promise.all([
         listSessionRows(exec, route.params.sessionId),
         getAppSettings(exec),
         getSessionById(exec, route.params.sessionId),
-        listCategories(exec),
       ]);
       if (!session) throw new Error("import session is unavailable");
       const row = rows.find((candidate) => candidate.contactId === null);
@@ -163,7 +171,6 @@ export function ImportReviewScreen({
           .filter((method) => method.type === "email")
           .map((method) => ({ ...method, extension: "", label: "Main" })),
       });
-      setCategories(nextCategories);
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to load import review", error);
       Alert.alert("Couldn't load this import", "Please try again.");
@@ -174,18 +181,8 @@ export function ImportReviewScreen({
 
   useEffect(() => {
     void load();
-  }, [load]);
-
-  useFocusEffect(
-    useCallback(() => {
-      void listCategories(getExecutor()).then((current) => {
-        setCategories(current);
-        setCategoryId((selected) =>
-          resolveCategorySelection(current, selected),
-        );
-      });
-    }, []),
-  );
+    void requestInitialCategories();
+  }, [load, requestInitialCategories]);
 
   const normalizedBirthday = useMemo(
     () => normalizeEditedBirthday(birthdayInput),
