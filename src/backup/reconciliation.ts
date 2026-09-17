@@ -3,6 +3,35 @@ import {
   RESERVED_PROFILE_UID,
 } from "@/db/migrations/007-tombstones";
 import type { ReconciliationRow, ReconciliationTombstone } from "@/backup/types";
+import { categoryNameKey } from "@/logic/category-logic";
+import { BUILTIN_SYSTEM_LABELS } from "@/logic/orrery-system-logic";
+
+export interface VisibleNameCollision {
+  key: string;
+  firstUid: string;
+  secondUid: string;
+}
+
+/** Pure final-survivor gate shared by parse-time and destination-aware restore planning. */
+export function findVisibleNameCollisions(
+  categories: readonly (Pick<ReconciliationRow, "uid"> & { name?: unknown })[],
+  systems: readonly (Pick<ReconciliationRow, "uid"> & { name?: unknown })[],
+): VisibleNameCollision[] {
+  const seen = new Map<string, string>();
+  const collisions: VisibleNameCollision[] = [];
+  const visit = (uid: string, name: unknown) => {
+    if (typeof name !== "string") return;
+    const key = categoryNameKey(name);
+    const firstUid = seen.get(key);
+    if (firstUid) collisions.push({ key, firstUid, secondUid: uid });
+    else seen.set(key, uid);
+  };
+  for (const [id, label] of Object.entries(BUILTIN_SYSTEM_LABELS))
+    visit(`builtin:${id}`, label);
+  for (const row of categories) visit(row.uid, row.name);
+  for (const row of systems) visit(row.uid, row.name);
+  return collisions;
+}
 
 /** Every UID-bearing table that a Merge caller may reconcile. */
 export type MergeableEntityType =

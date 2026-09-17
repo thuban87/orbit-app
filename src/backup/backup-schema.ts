@@ -1,4 +1,7 @@
-import { sameFileSurvivorUids } from "@/backup/reconciliation";
+import {
+  findVisibleNameCollisions,
+  sameFileSurvivorUids,
+} from "@/backup/reconciliation";
 import {
   BACKUP_FORMAT_VERSION,
   type BackupManifest,
@@ -120,6 +123,7 @@ const FORWARD_MIGRATIONS: Readonly<Record<number, Migration>> = {
     profileContactPresentation: [],
     profileCategoryPresentation: [],
   }),
+  5: (manifest) => ({ ...manifest, backupFormatVersion: 6 }),
 };
 
 function fail(message: string): never {
@@ -256,6 +260,7 @@ const TOMBSTONE_ENTITY_TYPES = new Set([
   "relationship",
   "current_state_entry",
   "group_event",
+  "category",
 ]);
 
 function assertPortableSettings(
@@ -820,6 +825,31 @@ function validate(manifest: RawManifest): BackupManifest {
     tombstones,
     "external_contact_link",
   );
+  const survivingCategories = survivorsFor(
+    arrays.categories,
+    tombstones,
+    "category",
+  );
+  const liveCategories = arrays.categories.filter((row) =>
+    survivingCategories.has(row.uid as string),
+  );
+  if (findVisibleNameCollisions(liveCategories, newArrays.systems).length)
+    fail("backup has a normalized visible name collision");
+  for (const contact of arrays.contacts)
+    if (
+      typeof contact.categoryUid === "string" &&
+      !survivingCategories.has(contact.categoryUid)
+    )
+      fail("contacts has no surviving category parent");
+  for (const presentation of newArrays.profileCategoryPresentation)
+    if (!survivingCategories.has(presentation.categoryUid as string))
+      fail("profileCategoryPresentation has no surviving category parent");
+  for (const rule of newArrays.systemRules)
+    if (
+      rule.family === "category" &&
+      (typeof rule.value !== "string" || !survivingCategories.has(rule.value))
+    )
+      fail("systemRules has no surviving category parent");
   for (const method of arrays.contactMethods)
     if (!survivingContacts.has(method.contactUid as string))
       fail("contactMethods has no surviving contact parent");

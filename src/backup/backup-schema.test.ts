@@ -375,7 +375,7 @@ describe("parseBackupManifest", () => {
     const parsed = parseBackupManifest(legacy) as typeof legacy & {
       contactMethods: Array<Record<string, unknown>>;
     };
-    expect(parsed.backupFormatVersion).toBe(5);
+    expect(parsed.backupFormatVersion).toBe(6);
     expect(parsed.contacts[0]).not.toHaveProperty("phone");
     expect(parsed.contacts[0]).not.toHaveProperty("email");
     expect(parsed.appSettings).toHaveProperty("phoneRegionOverride", null);
@@ -399,7 +399,7 @@ describe("parseBackupManifest", () => {
 
     const parsed = parseBackupManifest(legacy);
 
-    expect(parsed.backupFormatVersion).toBe(5);
+    expect(parsed.backupFormatVersion).toBe(6);
     expect(parsed.contacts).toEqual([
       expect.objectContaining({ uid: "contact-a", trackingEnabled: 1, intervalDays: 7 }),
     ]);
@@ -420,7 +420,7 @@ describe("parseBackupManifest", () => {
       "profileCategoryPresentation",
     ]) delete legacy[key];
     const upgraded = parseBackupManifest(legacy);
-    expect(upgraded.backupFormatVersion).toBe(5);
+    expect(upgraded.backupFormatVersion).toBe(6);
     expect(upgraded.systems).toEqual([]);
     expect(upgraded.profileContactPresentation).toEqual([]);
     expect(upgraded.appSettings.includeUnboundNeverContacted).toBe(1);

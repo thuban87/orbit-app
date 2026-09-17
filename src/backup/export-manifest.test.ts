@@ -80,7 +80,7 @@ describe("buildExportManifest", () => {
         exportedAt: NOW,
         readPhotoBase64: async () => "AQID",
       });
-      expect(manifest.backupFormatVersion).toBe(5);
+      expect(manifest.backupFormatVersion).toBe(6);
       expect(manifest.tombstones).toContainEqual(
         expect.objectContaining({
           entityType: "group_event",
@@ -112,8 +112,8 @@ describe("buildExportManifest", () => {
     });
 
     // D-06 trip-wire: Phase 36 owns the coordinated wire change to v5.
-    expect(BACKUP_FORMAT_VERSION).toBe(5);
-    expect(manifest.backupFormatVersion).toBe(5);
+    expect(BACKUP_FORMAT_VERSION).toBe(6);
+    expect(manifest.backupFormatVersion).toBe(6);
     expect(manifest.appSettings).toMatchObject({
       orreryLastSystem: "builtin:all-contacts",
       themePackage: "galaxy",
@@ -173,7 +173,7 @@ describe("buildExportManifest", () => {
       }),
     ]);
     // Phase 36 owns the format bump; this guard keeps it unchanged this phase.
-    expect(BACKUP_FORMAT_VERSION).toBe(5);
+    expect(BACKUP_FORMAT_VERSION).toBe(6);
   });
 
   it("serializes the v5 entity inventory with portable parent UIDs", async () => {
@@ -183,7 +183,7 @@ describe("buildExportManifest", () => {
       now: NOW,
       newUid: () => `uid-${++count}`,
     });
-    await exec.runAsync("INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)", ["cat-a", "Friends", 1, NOW, NOW]);
+    await exec.runAsync("INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)", ["cat-a", "Portable Circle", 1, NOW, NOW]);
     const category = await exec.getFirstAsync<{ id: number }>("SELECT id FROM categories WHERE uid='cat-a'");
     await exec.runAsync("INSERT INTO contacts(uid,name,category_id,interval_days,created_at,modified_at) VALUES(?,?,?,?,?,?)", ["contact-a", "Ada", category!.id, 7, NOW, NOW]);
     const contact = await exec.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid='contact-a'");
@@ -431,7 +431,7 @@ describe("buildExportManifest", () => {
       exportedAt: NOW,
       readPhotoBase64: async () => "AQID",
     });
-    expect(manifest.backupFormatVersion).toBe(5);
+    expect(manifest.backupFormatVersion).toBe(6);
     for (const key of [
       "themePackage",
       "galaxyMode",
