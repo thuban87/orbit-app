@@ -30,6 +30,56 @@ beforeEach(async () => {
 });
 
 describe("atomic category deletion", () => {
+  it.each([
+    ["malformed JSON", "{"],
+    ["null", "null"],
+    ["an array", "[]"],
+    ["a primitive", '"category"'],
+    ["an unknown family", JSON.stringify({ unknown: ["value"] })],
+    ["a non-array family", JSON.stringify({ gravity: "Inner" })],
+    ["a non-string selection", JSON.stringify({ gravity: [1] })],
+    ["an invalid category token", JSON.stringify({ category: ["01"] })],
+  ])("rejects %s in durable Dashboard filters", async (_label, stored) => {
+    const [source] = await listCategoriesForManagement(exec);
+    await exec.runAsync(
+      "UPDATE app_settings SET dashboard_filters=? WHERE id=1",
+      [stored],
+    );
+
+    await expect(
+      readCategoryDeletionPreview(exec, source.id),
+    ).rejects.toThrow("Category deletion requires valid dashboard_filters");
+    expect(
+      await exec.getFirstAsync<{ dashboard_filters: string }>(
+        "SELECT dashboard_filters FROM app_settings WHERE id=1",
+      ),
+    ).toEqual({ dashboard_filters: stored });
+  });
+
+  it("accepts canonical filters without narrowing non-category vocabularies", async () => {
+    const [source] = await listCategoriesForManagement(exec);
+    const stored = JSON.stringify({
+      category: [String(source.id), "uncategorized"],
+      "social-battery": ["future-battery"],
+      "needs-attention": ["future-attention"],
+      gravity: ["future-gravity"],
+      "contact-frequency": ["future-frequency"],
+    });
+    await exec.runAsync(
+      "UPDATE app_settings SET dashboard_filters=? WHERE id=1",
+      [stored],
+    );
+
+    const preview = await readCategoryDeletionPreview(exec, source.id);
+
+    expect(preview?.counts.dashboardFilters).toBe(1);
+    expect(
+      await exec.getFirstAsync<{ dashboard_filters: string }>(
+        "SELECT dashboard_filters FROM app_settings WHERE id=1",
+      ),
+    ).toEqual({ dashboard_filters: stored });
+  });
+
   it("previews all-status fallout and commits one identity-safe aggregate", async () => {
     const [source, target] = await listCategoriesForManagement(exec);
     await exec.runAsync(
