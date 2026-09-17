@@ -19,7 +19,7 @@ UI-SPEC | 7–8 | Shared ordinary selectors and System Builder | 05–07 | COVER
 UI-SPEC | 9 | Exact bounded three-group Orrery selector | 07 | COVERED
 UI-SPEC | 10–11 | Commit-first sync/privacy and every integration-matrix consumer | 02–08 | COVERED
 RESEARCH | Writer inventory | categories, contacts, all-status imports, Systems, settings, Profile, tombstones, restore | 01–03, 08 | COVERED
-RESEARCH | Backup safety | v5 tombstones, survivor union, dependency order, exact zero replace-all | 03 | COVERED
+RESEARCH | Backup safety | v6 tombstones, survivor union, dependency order, exact zero replace-all | 03 | COVERED
 RESEARCH | Validation | rollback matrix, manager rejection state, boundaries, physical device | 02, 04, 08, 09 | COVERED
 OWNER | 2026-09-15 | Pending/complete/discarded imports use one interactive target; backup merge nulls all statuses | 02–04, 08 | COVERED
 OWNER | 2026-09-15 supersession | No database substitution/fault route; automated rollback/UI rejection plus ordinary physical UAT | 02, 04, 09 | COVERED
@@ -30,7 +30,7 @@ OWNER | 2026-09-15 supersession | No database substitution/fault route; automate
 |---|---:|---|
 | 01 | 2 | Production Add tracer plus the same DAO's non-destructive CRUD/order contract |
 | 02 | 2 | One atomic deletion invariant and the transaction-composable System/fallout semantics it requires |
-| 03 | 3 | One backup-v5 pipeline: schema/export → reconciliation → apply/replace-all |
+| 03 | 3 | One backup-v6 pipeline: schema/export → reconciliation → apply/replace-all |
 | 04 | 3 | One centralized manager interaction state machine and its admitted shared UI primitives |
 | 05 | 2 | One shared category-choice contract plus tightly related Contact/Import consumers |
 | 06 | 2 | Dashboard and Profile consumers whose live durable state must follow category mutation |
@@ -40,4 +40,4 @@ OWNER | 2026-09-15 supersession | No database substitution/fault route; automate
 
 ## Explicit prohibitions
 
-No migration 030 or TARGET_VERSION change; no backup-format bump; no category history/field_history, Undo, quarantine, recovery UI, seed reconciliation, network/telemetry, inline component SQL, hardcoded colors, alternate database file, executor override, file cleanup route, dev-only category UAT screen, worktree, branch, or push is planned.
+No migration 030 or TARGET_VERSION change; a v6 backup-format bump (no v5→v6 legacy migration); no category history/field_history, Undo, quarantine, recovery UI, seed reconciliation, network/telemetry, inline component SQL, hardcoded colors, alternate database file, executor override, file cleanup route, dev-only category UAT screen, worktree, branch, or push is planned.

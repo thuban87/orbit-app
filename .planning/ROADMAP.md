@@ -983,7 +983,7 @@ Plans:
 - [ ] 37.1-01-PLAN.md (Wave 1) — Production Add tracer plus canonical non-destructive Category CRUD/order contract
 - [ ] 37.1-02-PLAN.md (Wave 2) — Atomic deletion, all-status import reassignment, canonical System validity, and exhaustive rollback proof
 - [ ] 37.1-05-PLAN.md (Wave 2) — Shared complete/searchable category-choice model plus Contact and Import consumers
-- [ ] 37.1-03-PLAN.md (Wave 3) — Backup-v5 category tombstones, reconciliation, merge deletion, and exact replace-all taxonomy
+- [ ] 37.1-03-PLAN.md (Wave 3) — Backup-v6 category tombstones, reconciliation, merge deletion, and exact replace-all taxonomy
 - [ ] 37.1-04-PLAN.md (Wave 3) — Complete manager interactions, anchored menu, deletion UI, and commit-truthful Snackbar feedback
 - [ ] 37.1-07-PLAN.md (Wave 3) — System Builder category rules and exact three-group Orrery selector
 - [ ] 37.1-06-PLAN.md (Wave 4) — Dashboard Uncategorized/filter/bulk behavior and Profile presentation consumers
