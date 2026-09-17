@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   ENTITY_POLICIES,
+  findVisibleNameCollisions,
   reconcileEntity,
   referenceOrFallback,
   sameFileSurvivorUids,
+  suppressCategoryTombstoneDependents,
 } from "@/backup/reconciliation";
 import {
   RESERVED_CATEGORY_UIDS,
@@ -194,5 +196,69 @@ describe("reconciliation", () => {
     expect(referenceOrFallback("contact", new Set(["other"]), null)).toBeNull();
     expect(referenceOrFallback("category", new Set(["other"]), null)).toBeNull();
     expect(referenceOrFallback(null, new Set(["contact"]), "fallback")).toBeNull();
+  });
+
+  it("suppresses only dependents of categories that lost to tombstones", () => {
+    const retainedContact = {
+      kind: "retain" as const,
+      uid: "contact",
+      row: row("contact", old, { categoryUid: "deleted-category" }),
+    };
+    const lostRule = {
+      kind: "retain" as const,
+      uid: "lost-rule",
+      row: row("lost-rule", old, {
+        family: "category",
+        value: "deleted-category",
+      }),
+    };
+    const historicalRule = {
+      kind: "retain" as const,
+      uid: "historical-rule",
+      row: row("historical-rule", old, {
+        family: "category",
+        value: "historically-missing",
+      }),
+    };
+    suppressCategoryTombstoneDependents(
+      {
+        contacts: [retainedContact],
+        system_rules: [lostRule, historicalRule],
+        system_overrides: [],
+        system_prefs: [],
+        profile_category_presentation: [],
+      },
+      new Set(["deleted-category"]),
+    );
+    expect(retainedContact).toMatchObject({
+      kind: "update",
+      row: { categoryUid: null },
+    });
+    expect(lostRule.kind).toBe("delete");
+    expect(historicalRule.kind).toBe("retain");
+  });
+
+  it("finds same-kind, cross-kind, and built-in visible-name collisions", () => {
+    expect(
+      findVisibleNameCollisions(
+        [
+          row("category-a", old, { name: " Cafe\u0301 " }),
+          row("category-b", old, { name: "CAFÉ" }),
+        ],
+        [],
+      ),
+    ).toHaveLength(1);
+    expect(
+      findVisibleNameCollisions(
+        [row("category", old, { name: "Shared" })],
+        [row("system", old, { name: " shared " })],
+      ),
+    ).toHaveLength(1);
+    expect(
+      findVisibleNameCollisions(
+        [row("category", old, { name: "All Contacts" })],
+        [],
+      ),
+    ).toHaveLength(1);
   });
 });
