@@ -94,6 +94,8 @@ export const PURGE_CHILDREN: Record<TombstoneEntityType, PurgeChildSpec | null> 
   current_state_entry: { countSql: "SELECT COUNT(*) AS n FROM current_state_entries WHERE contact_id = ?", tombstoneSql: "SELECT uid FROM current_state_entries WHERE contact_id = ?", deleteSql: "DELETE FROM current_state_entries WHERE contact_id = ?" },
   // Group Events are not contact-scoped purge children.
   group_event: null,
+  // Categories have their own aggregate deletion path and are never contact purge children.
+  category: null,
 };
 
 const KNOWLEDGE_CHILD_TABLES = {

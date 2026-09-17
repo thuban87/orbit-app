@@ -59,6 +59,7 @@ describe("atomic category deletion", () => {
     );
 
     const preview = await readCategoryDeletionPreview(exec, source.id);
+    if (!preview) throw new Error("expected source category preview");
     expect(preview.counts).toMatchObject({
       contacts: 1,
       importPending: 1,
@@ -120,6 +121,7 @@ describe("atomic category deletion", () => {
   it("returns a refreshed stale preview without writes", async () => {
     const [source] = await listCategoriesForManagement(exec);
     const preview = await readCategoryDeletionPreview(exec, source.id);
+    if (!preview) throw new Error("expected source category preview");
     await exec.runAsync(
       "INSERT INTO contacts(uid,name,category_id,interval_days,created_at,modified_at) VALUES(?,?,?,?,?,?)",
       ["late", "Late", source.id, 30, NOW, NOW],
