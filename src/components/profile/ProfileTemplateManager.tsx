@@ -1,8 +1,9 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText/Button semantic roles are domain props.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, TextInput, View } from "react-native";
-import { AppText } from "@/components/ui/AppText";
 import { ContactPicker } from "@/components/ContactPicker";
+import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
+import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { GlassSurface } from "@/components/ui/GlassSurface";
@@ -30,11 +31,11 @@ import {
   activeTemplateManagerPage,
   beginTemplateManagerListLoad,
   beginTemplateOperation,
-  createTemplateManagerListLoadState,
   clearTemplateDraft,
-  finishTemplateManagerListLoad,
+  createTemplateManagerListLoadState,
   createTemplateManagerState,
   describeTemplateAssignment,
+  finishTemplateManagerListLoad,
   managerBackIntent,
   openTemplateManagerPage,
   popTemplateManagerPage,
@@ -50,6 +51,7 @@ import type {
   ProfilePresentationInputs,
   ProfilePresentationSource,
 } from "@/profile/types";
+import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -79,7 +81,7 @@ export interface ProfileTemplateManagerProps {
   onPendingTemplateResolved?: () => void;
 }
 
-type Category = { id: number; name: string };
+type Category = { id: number; uid?: string; name: string };
 
 function usageText(usage: ProfileTemplateUsage | undefined): string {
   if (!usage) return "Checking usage…";
@@ -118,9 +120,7 @@ export function ProfileTemplateManager({
   );
   const [templates, setTemplates] = useState<ProfileLayoutTemplateRow[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [listLoad, setListLoad] = useState(
-    createTemplateManagerListLoadState,
-  );
+  const [listLoad, setListLoad] = useState(createTemplateManagerListLoadState);
   const [editingLayout, setEditingLayout] = useState<{
     uid: string | null;
     name: string;
@@ -129,6 +129,7 @@ export function ProfileTemplateManager({
   const [deleteUid, setDeleteUid] = useState<string | null>(null);
   const [assignCreatedTemplate, setAssignCreatedTemplate] = useState(false);
   const [contactPickerVisible, setContactPickerVisible] = useState(false);
+  const [categoryPickerVisible, setCategoryPickerVisible] = useState(false);
   const pendingTemplateUids = useRef(new Set<string>());
 
   const activePage = activeTemplateManagerPage(state);
@@ -168,6 +169,9 @@ export function ProfileTemplateManager({
       ),
     );
   }, []);
+  useShellRefresh(() => {
+    if (visible) void refresh();
+  });
 
   const loadList = useCallback(async () => {
     setListLoad(beginTemplateManagerListLoad());
@@ -430,7 +434,9 @@ export function ProfileTemplateManager({
                   />
                 </>
               ) : null}
-              {!listLoad.loading && !listLoad.error && templates.length === 0 ? (
+              {!listLoad.loading &&
+              !listLoad.error &&
+              templates.length === 0 ? (
                 <AppText role="body">
                   No reusable templates yet. The default layout is still
                   available.
@@ -602,14 +608,15 @@ export function ProfileTemplateManager({
                 onPress={() => assign("global")}
               />
               <AppText role="label">Category override</AppText>
-              {categories.map((category) => (
+              {categories.length === 0 ? (
+                <AppText role="body">No categories available</AppText>
+              ) : (
                 <Button
-                  key={category.id}
                   role="tertiary"
-                  label={`Assign to ${category.name}`}
-                  onPress={() => assign("category", undefined, category.id)}
+                  label="Choose category"
+                  onPress={() => setCategoryPickerVisible(true)}
                 />
-              ))}
+              )}
               <AppText role="label">This Profile</AppText>
               <Button
                 role="primary"
@@ -629,9 +636,9 @@ export function ProfileTemplateManager({
               />
               <AppText role="caption">
                 Choose any active local contact to give it this template as a
-                direct layout override. Applying or removing a contact
-                selection clears only that contact's collapsed-section
-                overrides after the write commits.
+                direct layout override. Applying or removing a contact selection
+                clears only that contact's collapsed-section overrides after the
+                write commits.
               </AppText>
             </View>
           ) : null}
@@ -644,6 +651,17 @@ export function ProfileTemplateManager({
         onSelect={(selectedContactId) => {
           setContactPickerVisible(false);
           assign("contact", selectedContactId);
+        }}
+      />
+      <CategoryChoiceSheet
+        visible={categoryPickerVisible}
+        categories={categories}
+        selectedId={null}
+        allowUncategorized={false}
+        title="Assign layout to category"
+        onRequestClose={() => setCategoryPickerVisible(false)}
+        onSelect={(categoryId) => {
+          if (categoryId !== null) assign("category", undefined, categoryId);
         }}
       />
       <ConfirmDialog

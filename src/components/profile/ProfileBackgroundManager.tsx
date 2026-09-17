@@ -18,6 +18,7 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
+import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
@@ -48,7 +49,6 @@ import {
   resolveBackgroundListState,
   shouldResetBackgroundManagerViewOnOpen,
 } from "@/profile/background-manager-model";
-import { prepareProfileBackground } from "@/services/photos/background-pipeline";
 import {
   clampBackgroundCropSelection,
   createInitialBackgroundCropSelection,
@@ -56,15 +56,15 @@ import {
   pinchResizeBackgroundCropSelection,
   translateBackgroundCropSelection,
 } from "@/services/photos/background-crop-geometry";
+import { prepareProfileBackground } from "@/services/photos/background-pipeline";
 import {
   backgroundDerivativeRelPath,
   deleteBackgroundDerivative,
   persistBackgroundDerivative,
   resolveBackgroundUri,
 } from "@/services/photos/background-storage";
-import {
-  profileBackgroundTarget,
-} from "@/services/photos/profile-background-target";
+import { profileBackgroundTarget } from "@/services/photos/profile-background-target";
+import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -75,7 +75,7 @@ const MAX_ZOOM = 8;
 
 type Page = "list" | "crop" | "name" | "assign";
 type CropSource = { uri: string; width: number; height: number };
-type Category = { id: number; name: string };
+type Category = { id: number; uid?: string; name: string };
 
 export interface ProfileBackgroundManagerProps {
   visible: boolean;
@@ -125,6 +125,9 @@ export function ProfileBackgroundManager({
   const [listError, setListError] = useState<string | null>(null);
   const [cropStatus, setCropStatus] = useState("");
   const [fineTuneOpen, setFineTuneOpen] = useState(false);
+  const [categoryPickerMode, setCategoryPickerMode] = useState<
+    "assign" | "clear" | null
+  >(null);
   const tokenCounter = useRef(0);
   const activeTokenRef = useRef<string | null>(null);
   const wasVisibleRef = useRef(false);
@@ -164,6 +167,9 @@ export function ProfileBackgroundManager({
       setListLoading(false);
     }
   }, []);
+  useShellRefresh(() => {
+    if (visible) void refresh();
+  });
 
   useEffect(() => {
     if (!visible) {
@@ -189,7 +195,13 @@ export function ProfileBackgroundManager({
   const profileAspect = cropTarget.preview.width / cropTarget.preview.height;
   const publishStatus = useCallback(
     (x: number, y: number, width: number, height: number) => {
-      if (source) setCropStatus(describeBackgroundCropSelection({ originX: x, originY: y, width, height }, source));
+      if (source)
+        setCropStatus(
+          describeBackgroundCropSelection(
+            { originX: x, originY: y, width, height },
+            source,
+          ),
+        );
     },
     [source],
   );
@@ -203,8 +215,23 @@ export function ProfileBackgroundManager({
     selectionWidth.value = initial.width;
     selectionHeight.value = initial.height;
     setFineTuneOpen(false);
-    publishStatus(initial.originX, initial.originY, initial.width, initial.height);
-  }, [profileAspect, publishStatus, selectionHeight, selectionWidth, selectionX, selectionY, source, sourceHeight, sourceWidth]);
+    publishStatus(
+      initial.originX,
+      initial.originY,
+      initial.width,
+      initial.height,
+    );
+  }, [
+    profileAspect,
+    publishStatus,
+    selectionHeight,
+    selectionWidth,
+    selectionX,
+    selectionY,
+    source,
+    sourceHeight,
+    sourceWidth,
+  ]);
   useEffect(() => {
     if (!source || !cropSpace) return;
     const scale = Math.min(
@@ -217,48 +244,112 @@ export function ProfileBackgroundManager({
   }, [cropSpace, displayOffsetX, displayOffsetY, displayScale, source]);
   const clampSelection = () => {
     "worklet";
-    const maxWidth = Math.min(sourceWidth.value, sourceHeight.value * profileAspect);
-    const width = Math.max(maxWidth / MAX_ZOOM, Math.min(selectionWidth.value, maxWidth));
+    const maxWidth = Math.min(
+      sourceWidth.value,
+      sourceHeight.value * profileAspect,
+    );
+    const width = Math.max(
+      maxWidth / MAX_ZOOM,
+      Math.min(selectionWidth.value, maxWidth),
+    );
     selectionWidth.value = width;
     selectionHeight.value = width / profileAspect;
-    selectionX.value = Math.max(0, Math.min(selectionX.value, sourceWidth.value - width));
-    selectionY.value = Math.max(0, Math.min(selectionY.value, sourceHeight.value - selectionHeight.value));
+    selectionX.value = Math.max(
+      0,
+      Math.min(selectionX.value, sourceWidth.value - width),
+    );
+    selectionY.value = Math.max(
+      0,
+      Math.min(selectionY.value, sourceHeight.value - selectionHeight.value),
+    );
   };
-  const pan = Gesture.Pan().onStart(() => {
-    startX.value = selectionX.value;
-    startY.value = selectionY.value;
-  }).onUpdate((event) => {
-    selectionX.value = startX.value + event.translationX / displayScale.value;
-    selectionY.value = startY.value + event.translationY / displayScale.value;
-    const maxX = Math.max(0, sourceWidth.value - selectionWidth.value);
-    selectionX.value = Math.max(0, Math.min(selectionX.value, maxX));
-    selectionY.value = Math.max(0, Math.min(selectionY.value, sourceHeight.value - selectionHeight.value));
-  }).onFinalize(() => runOnJS(publishStatus)(selectionX.value, selectionY.value, selectionWidth.value, selectionHeight.value));
-  const pinch = Gesture.Pinch().onStart((event) => {
-    startWidth.value = selectionWidth.value;
-    startHeight.value = selectionHeight.value;
-    startX.value = selectionX.value;
-    startY.value = selectionY.value;
-    pinchFocalX.value = (event.focalX - displayOffsetX.value) / displayScale.value;
-    pinchFocalY.value = (event.focalY - displayOffsetY.value) / displayScale.value;
-    pinchRatioX.value = (pinchFocalX.value - startX.value) / startWidth.value;
-    pinchRatioY.value = (pinchFocalY.value - startY.value) / startHeight.value;
-  }).onUpdate((event) => {
-    const width = startWidth.value / event.scale;
-    const focalX = pinchFocalX.value;
-    const focalY = pinchFocalY.value;
-    selectionWidth.value = width;
-    selectionHeight.value = width / profileAspect;
-    selectionX.value = focalX - width * pinchRatioX.value;
-    selectionY.value = focalY - selectionHeight.value * pinchRatioY.value;
-    clampSelection();
-  }).onFinalize(() => runOnJS(publishStatus)(selectionX.value, selectionY.value, selectionWidth.value, selectionHeight.value));
-  const sourceImageStyle = useAnimatedStyle(() => ({ height: sourceHeight.value * displayScale.value, left: displayOffsetX.value, top: displayOffsetY.value, width: sourceWidth.value * displayScale.value }));
-  const selectionStyle = useAnimatedStyle(() => ({ height: selectionHeight.value * displayScale.value, left: displayOffsetX.value + selectionX.value * displayScale.value, top: displayOffsetY.value + selectionY.value * displayScale.value, width: selectionWidth.value * displayScale.value }));
-  const maskTopStyle = useAnimatedStyle(() => ({ height: displayOffsetY.value + selectionY.value * displayScale.value }));
-  const maskBottomStyle = useAnimatedStyle(() => ({ top: displayOffsetY.value + (selectionY.value + selectionHeight.value) * displayScale.value }));
-  const maskLeftStyle = useAnimatedStyle(() => ({ height: selectionHeight.value * displayScale.value, top: displayOffsetY.value + selectionY.value * displayScale.value, width: displayOffsetX.value + selectionX.value * displayScale.value }));
-  const maskRightStyle = useAnimatedStyle(() => ({ height: selectionHeight.value * displayScale.value, left: displayOffsetX.value + (selectionX.value + selectionWidth.value) * displayScale.value, top: displayOffsetY.value + selectionY.value * displayScale.value }));
+  const pan = Gesture.Pan()
+    .onStart(() => {
+      startX.value = selectionX.value;
+      startY.value = selectionY.value;
+    })
+    .onUpdate((event) => {
+      selectionX.value = startX.value + event.translationX / displayScale.value;
+      selectionY.value = startY.value + event.translationY / displayScale.value;
+      const maxX = Math.max(0, sourceWidth.value - selectionWidth.value);
+      selectionX.value = Math.max(0, Math.min(selectionX.value, maxX));
+      selectionY.value = Math.max(
+        0,
+        Math.min(selectionY.value, sourceHeight.value - selectionHeight.value),
+      );
+    })
+    .onFinalize(() =>
+      runOnJS(publishStatus)(
+        selectionX.value,
+        selectionY.value,
+        selectionWidth.value,
+        selectionHeight.value,
+      ),
+    );
+  const pinch = Gesture.Pinch()
+    .onStart((event) => {
+      startWidth.value = selectionWidth.value;
+      startHeight.value = selectionHeight.value;
+      startX.value = selectionX.value;
+      startY.value = selectionY.value;
+      pinchFocalX.value =
+        (event.focalX - displayOffsetX.value) / displayScale.value;
+      pinchFocalY.value =
+        (event.focalY - displayOffsetY.value) / displayScale.value;
+      pinchRatioX.value = (pinchFocalX.value - startX.value) / startWidth.value;
+      pinchRatioY.value =
+        (pinchFocalY.value - startY.value) / startHeight.value;
+    })
+    .onUpdate((event) => {
+      const width = startWidth.value / event.scale;
+      const focalX = pinchFocalX.value;
+      const focalY = pinchFocalY.value;
+      selectionWidth.value = width;
+      selectionHeight.value = width / profileAspect;
+      selectionX.value = focalX - width * pinchRatioX.value;
+      selectionY.value = focalY - selectionHeight.value * pinchRatioY.value;
+      clampSelection();
+    })
+    .onFinalize(() =>
+      runOnJS(publishStatus)(
+        selectionX.value,
+        selectionY.value,
+        selectionWidth.value,
+        selectionHeight.value,
+      ),
+    );
+  const sourceImageStyle = useAnimatedStyle(() => ({
+    height: sourceHeight.value * displayScale.value,
+    left: displayOffsetX.value,
+    top: displayOffsetY.value,
+    width: sourceWidth.value * displayScale.value,
+  }));
+  const selectionStyle = useAnimatedStyle(() => ({
+    height: selectionHeight.value * displayScale.value,
+    left: displayOffsetX.value + selectionX.value * displayScale.value,
+    top: displayOffsetY.value + selectionY.value * displayScale.value,
+    width: selectionWidth.value * displayScale.value,
+  }));
+  const maskTopStyle = useAnimatedStyle(() => ({
+    height: displayOffsetY.value + selectionY.value * displayScale.value,
+  }));
+  const maskBottomStyle = useAnimatedStyle(() => ({
+    top:
+      displayOffsetY.value +
+      (selectionY.value + selectionHeight.value) * displayScale.value,
+  }));
+  const maskLeftStyle = useAnimatedStyle(() => ({
+    height: selectionHeight.value * displayScale.value,
+    top: displayOffsetY.value + selectionY.value * displayScale.value,
+    width: displayOffsetX.value + selectionX.value * displayScale.value,
+  }));
+  const maskRightStyle = useAnimatedStyle(() => ({
+    height: selectionHeight.value * displayScale.value,
+    left:
+      displayOffsetX.value +
+      (selectionX.value + selectionWidth.value) * displayScale.value,
+    top: displayOffsetY.value + selectionY.value * displayScale.value,
+  }));
 
   const chooseImage = useCallback(async () => {
     try {
@@ -294,7 +385,12 @@ export function ProfileBackgroundManager({
       const prepared = await prepareProfileBackground({
         rawUri: source.uri,
         selection: clampBackgroundCropSelection(
-          { originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value },
+          {
+            originX: selectionX.value,
+            originY: selectionY.value,
+            width: selectionWidth.value,
+            height: selectionHeight.value,
+          },
           source,
           profileAspect,
         ),
@@ -453,13 +549,7 @@ export function ProfileBackgroundManager({
         setSaving(false);
       }
     },
-    [
-      contactId,
-      onCommitted,
-      refresh,
-      saving,
-      selectedUid,
-    ],
+    [contactId, onCommitted, refresh, saving, selectedUid],
   );
 
   const closeOrGuard = () => {
@@ -498,329 +588,576 @@ export function ProfileBackgroundManager({
   });
 
   return (
-    <Sheet visible={visible} onRequestClose={closeOrGuard} variant="expanded">
-      <View style={styles.root} accessibilityViewIsModal>
-        {page !== "crop" ? (
-          <View style={styles.heading}>
-            <AppText role="heading">Profile backgrounds</AppText>
-            <Button role="secondary" label="Back" onPress={closeOrGuard} />
-          </View>
-        ) : null}
-        {page !== "crop" && managerState.error ? (
-          <AppText style={{ color: colors.danger }}>
-            {managerState.error}
-          </AppText>
-        ) : null}
-        {page === "list" ? (
-          <ScrollView
-            style={styles.workspace}
-            contentContainerStyle={styles.content}
-          >
-            <AppText role="body">
-              Background templates are separate from layout templates.
-            </AppText>
-            <Button
-              role="primary"
-              label="Choose photo"
-              onPress={() => void chooseImage()}
-            />
-            <AppText role="label">Background assignment</AppText>
-            <AppText role="body">
-              Clear an assignment to use the next available Category, global, or
-              active theme background. Layout choices stay unchanged.
-            </AppText>
-            <Button
-              role="secondary"
-              label="Clear global background"
-              onPress={() => void assign("clear-global")}
-            />
-            {categories.map((category) => (
-              <Button
-                key={`clear-${category.id}`}
-                role="secondary"
-                label={`Clear ${category.name} background`}
-                onPress={() => void assign("clear-category", category.id)}
-              />
-            ))}
-            <Button
-              role="secondary"
-              label={`Inherit Category, global, or theme background for ${contactName}`}
-              onPress={() => void assign("inherit")}
-            />
-            {listState.kind === "loading" ? (
-              <AppText role="body">Loading backgrounds…</AppText>
-            ) : null}
-            {listState.kind === "empty" ? (
-              <AppText role="body">
-                No saved backgrounds yet. Choose a photo to create one.
-              </AppText>
-            ) : null}
-            {listState.kind === "error" ? (
-              <>
-                <AppText style={{ color: colors.danger }}>
-                  {listState.message}
-                </AppText>
-                <Button
-                  role="secondary"
-                  label="Retry"
-                  onPress={() => void refresh()}
-                />
-              </>
-            ) : null}
-            {listState.kind === "populated"
-              ? templates.map((template) => (
-                  <GlassSurface
-                    key={template.uid}
-                    density="dense"
-                    style={styles.row}
-                  >
-                    <Image
-                      source={{ uri: resolveBackgroundUri(template.imagePath) }}
-                      style={styles.thumbnail}
-                    />
-                    <View style={styles.rowText}>
-                      <AppText role="label">{template.name}</AppText>
-                      <Button
-                        role="tertiary"
-                        label="Assign"
-                        onPress={() => {
-                          setSelectedUid(template.uid);
-                          setPage("assign");
-                        }}
-                      />
-                      <Button
-                        role="tertiary"
-                        label="Delete"
-                        onPress={() =>
-                          Alert.alert(
-                            "Delete background template?",
-                            "Profiles using it will fall back to their Category or default background. Contact information will not change.",
-                            [
-                              { text: "Cancel", style: "cancel" },
-                              {
-                                text: "Delete template",
-                                style: "destructive",
-                                onPress: () =>
-                                  void (async () => {
-                                    try {
-                                      await deleteBackgroundTemplateAndRefresh({
-                                        removeTemplate: () =>
-                                          deleteProfileBackgroundTemplate(
-                                            getExecutor(),
-                                            template.uid,
-                                            localDateTime(),
-                                          ),
-                                        removeDerivative:
-                                          deleteBackgroundDerivative,
-                                        refresh,
-                                        onCommitted,
-                                      });
-                                    } catch (error) {
-                                      Logger.error(
-                                        LOG_SCOPE,
-                                        "failed to delete background template",
-                                        error,
-                                      );
-                                      setListError(
-                                        "Couldn't delete that background. Try again.",
-                                      );
-                                    }
-                                  })(),
-                              },
-                            ],
-                          )
-                        }
-                      />
-                    </View>
-                  </GlassSurface>
-                ))
-              : null}
-          </ScrollView>
-        ) : null}
-        {page === "crop" && source ? (
-          <View style={styles.cropEditor}>
-            <GlassSurface density="dense" style={styles.cropTopOverlay}>
-              <View style={styles.heading}>
-                <AppText role="heading">Crop background</AppText>
-                <Button role="secondary" label="Back" onPress={closeOrGuard} />
-              </View>
-              <AppText role="body">
-                Drag to reposition. Pinch or use the controls to zoom.
-              </AppText>
-            </GlassSurface>
-            <View
-              style={styles.cropPreviewSpace}
-              onLayout={({ nativeEvent }) => {
-                const { width, height } = nativeEvent.layout;
-                setCropSpace((current) =>
-                  current?.width === width && current.height === height
-                    ? current
-                    : { width, height },
-                );
-              }}
-            >
-              {cropSpace ? (
-                <View style={[styles.cropViewport, { height: cropSpace.height, width: "100%" }]}>
-                  <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
-                    <Animated.View style={styles.cropTouchSurface}>
-                      <Animated.Image source={{ uri: source.uri }} style={[styles.containedSource, sourceImageStyle]} resizeMode="stretch" />
-                      <Animated.View pointerEvents="none" style={[styles.cropMask, styles.cropMaskTop, { backgroundColor: colors.background }, maskTopStyle]} />
-                      <Animated.View pointerEvents="none" style={[styles.cropMask, styles.cropMaskBottom, { backgroundColor: colors.background }, maskBottomStyle]} />
-                      <Animated.View pointerEvents="none" style={[styles.cropMask, styles.cropMaskLeft, { backgroundColor: colors.background }, maskLeftStyle]} />
-                      <Animated.View pointerEvents="none" style={[styles.cropMask, styles.cropMaskRight, { backgroundColor: colors.background }, maskRightStyle]} />
-                      <Animated.View pointerEvents="none" style={[styles.cropSelection, { borderColor: colors.accent }, selectionStyle]} />
-                    </Animated.View>
-                  </GestureDetector>
-                </View>
-              ) : null}
+    <>
+      <Sheet visible={visible} onRequestClose={closeOrGuard} variant="expanded">
+        <View style={styles.root} accessibilityViewIsModal>
+          {page !== "crop" ? (
+            <View style={styles.heading}>
+              <AppText role="heading">Profile backgrounds</AppText>
+              <Button role="secondary" label="Back" onPress={closeOrGuard} />
             </View>
-            <GlassSurface density="dense" style={styles.cropBottomOverlay}>
-              {managerState.error ? (
-                <AppText style={{ color: colors.danger }}>
-                  {managerState.error}
-                </AppText>
-              ) : null}
-              <AppText accessibilityLiveRegion="polite" role="body">{cropStatus}</AppText>
-              {fineTuneOpen ? <View style={styles.fineTuneControls}>
-                <Button
-                  role="tertiary"
-                  label="Reset"
-                  accessibilityLabel="Reset crop"
-                  onPress={() => {
-                    if (!source) return;
-                    const next = createInitialBackgroundCropSelection(source, profileAspect);
-                    selectionX.value = next.originX;
-                    selectionY.value = next.originY;
-                    selectionWidth.value = next.width;
-                    selectionHeight.value = next.height;
-                    publishStatus(next.originX, next.originY, next.width, next.height);
-                  }}
-                />
-                <Button
-                  role="tertiary"
-                  label="Zoom in"
-                  accessibilityLabel="Zoom in"
-                  onPress={() => source && (() => { const next = pinchResizeBackgroundCropSelection({ originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value }, source, profileAspect, { x: selectionX.value + selectionWidth.value / 2, y: selectionY.value + selectionHeight.value / 2 }, 1.15); selectionX.value = next.originX; selectionY.value = next.originY; selectionWidth.value = next.width; selectionHeight.value = next.height; publishStatus(next.originX, next.originY, next.width, next.height); })()}
-                />
-                <Button
-                  role="tertiary"
-                  label="Zoom out"
-                  accessibilityLabel="Zoom out"
-                  onPress={() => source && (() => { const next = pinchResizeBackgroundCropSelection({ originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value }, source, profileAspect, { x: selectionX.value + selectionWidth.value / 2, y: selectionY.value + selectionHeight.value / 2 }, 1 / 1.15); selectionX.value = next.originX; selectionY.value = next.originY; selectionWidth.value = next.width; selectionHeight.value = next.height; publishStatus(next.originX, next.originY, next.width, next.height); })()}
-                />
-                <Button
-                  role="tertiary"
-                  label="Move left"
-                  accessibilityLabel="Move left"
-                  onPress={() => source && (() => { const next = translateBackgroundCropSelection({ originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value }, source, -24, 0); selectionX.value = next.originX; selectionY.value = next.originY; publishStatus(next.originX, next.originY, next.width, next.height); })()}
-                />
-                <Button
-                  role="tertiary"
-                  label="Move right"
-                  accessibilityLabel="Move right"
-                  onPress={() => source && (() => { const next = translateBackgroundCropSelection({ originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value }, source, 24, 0); selectionX.value = next.originX; selectionY.value = next.originY; publishStatus(next.originX, next.originY, next.width, next.height); })()}
-                />
-                <Button
-                  role="tertiary"
-                  label="Move up"
-                  accessibilityLabel="Move up"
-                  onPress={() => source && (() => { const next = translateBackgroundCropSelection({ originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value }, source, 0, -24); selectionX.value = next.originX; selectionY.value = next.originY; publishStatus(next.originX, next.originY, next.width, next.height); })()}
-                />
-                <Button
-                  role="tertiary"
-                  label="Move down"
-                  accessibilityLabel="Move down"
-                  onPress={() => source && (() => { const next = translateBackgroundCropSelection({ originX: selectionX.value, originY: selectionY.value, width: selectionWidth.value, height: selectionHeight.value }, source, 0, 24); selectionX.value = next.originX; selectionY.value = next.originY; publishStatus(next.originX, next.originY, next.width, next.height); })()}
-                />
-              </View> : null}
-              <View style={styles.cropActions}>
+          ) : null}
+          {page !== "crop" && managerState.error ? (
+            <AppText style={{ color: colors.danger }}>
+              {managerState.error}
+            </AppText>
+          ) : null}
+          {page === "list" ? (
+            <ScrollView
+              style={styles.workspace}
+              contentContainerStyle={styles.content}
+            >
+              <AppText role="body">
+                Background templates are separate from layout templates.
+              </AppText>
+              <Button
+                role="primary"
+                label="Choose photo"
+                onPress={() => void chooseImage()}
+              />
+              <AppText role="label">Background assignment</AppText>
+              <AppText role="body">
+                Clear an assignment to use the next available Category, global,
+                or active theme background. Layout choices stay unchanged.
+              </AppText>
+              <Button
+                role="secondary"
+                label="Clear global background"
+                onPress={() => void assign("clear-global")}
+              />
+              {categories.length === 0 ? (
+                <AppText role="body">No categories available</AppText>
+              ) : (
                 <Button
                   role="secondary"
-                  label="Cancel"
-                  onPress={closeOrGuard}
+                  label="Clear category background"
+                  onPress={() => setCategoryPickerMode("clear")}
                 />
-                <Button role="tertiary" label="Fine tune" onPress={() => setFineTuneOpen((open) => !open)} />
-                {managerState.error ? (
+              )}
+              <Button
+                role="secondary"
+                label={`Inherit Category, global, or theme background for ${contactName}`}
+                onPress={() => void assign("inherit")}
+              />
+              {listState.kind === "loading" ? (
+                <AppText role="body">Loading backgrounds…</AppText>
+              ) : null}
+              {listState.kind === "empty" ? (
+                <AppText role="body">
+                  No saved backgrounds yet. Choose a photo to create one.
+                </AppText>
+              ) : null}
+              {listState.kind === "error" ? (
+                <>
+                  <AppText style={{ color: colors.danger }}>
+                    {listState.message}
+                  </AppText>
                   <Button
                     role="secondary"
                     label="Retry"
-                    disabled={saving}
-                    onPress={retryCrop}
+                    onPress={() => void refresh()}
                   />
+                </>
+              ) : null}
+              {listState.kind === "populated"
+                ? templates.map((template) => (
+                    <GlassSurface
+                      key={template.uid}
+                      density="dense"
+                      style={styles.row}
+                    >
+                      <Image
+                        source={{
+                          uri: resolveBackgroundUri(template.imagePath),
+                        }}
+                        style={styles.thumbnail}
+                      />
+                      <View style={styles.rowText}>
+                        <AppText role="label">{template.name}</AppText>
+                        <Button
+                          role="tertiary"
+                          label="Assign"
+                          onPress={() => {
+                            setSelectedUid(template.uid);
+                            setPage("assign");
+                          }}
+                        />
+                        <Button
+                          role="tertiary"
+                          label="Delete"
+                          onPress={() =>
+                            Alert.alert(
+                              "Delete background template?",
+                              "Profiles using it will fall back to their Category or default background. Contact information will not change.",
+                              [
+                                { text: "Cancel", style: "cancel" },
+                                {
+                                  text: "Delete template",
+                                  style: "destructive",
+                                  onPress: () =>
+                                    void (async () => {
+                                      try {
+                                        await deleteBackgroundTemplateAndRefresh(
+                                          {
+                                            removeTemplate: () =>
+                                              deleteProfileBackgroundTemplate(
+                                                getExecutor(),
+                                                template.uid,
+                                                localDateTime(),
+                                              ),
+                                            removeDerivative:
+                                              deleteBackgroundDerivative,
+                                            refresh,
+                                            onCommitted,
+                                          },
+                                        );
+                                      } catch (error) {
+                                        Logger.error(
+                                          LOG_SCOPE,
+                                          "failed to delete background template",
+                                          error,
+                                        );
+                                        setListError(
+                                          "Couldn't delete that background. Try again.",
+                                        );
+                                      }
+                                    })(),
+                                },
+                              ],
+                            )
+                          }
+                        />
+                      </View>
+                    </GlassSurface>
+                  ))
+                : null}
+            </ScrollView>
+          ) : null}
+          {page === "crop" && source ? (
+            <View style={styles.cropEditor}>
+              <GlassSurface density="dense" style={styles.cropTopOverlay}>
+                <View style={styles.heading}>
+                  <AppText role="heading">Crop background</AppText>
+                  <Button
+                    role="secondary"
+                    label="Back"
+                    onPress={closeOrGuard}
+                  />
+                </View>
+                <AppText role="body">
+                  Drag to reposition. Pinch or use the controls to zoom.
+                </AppText>
+              </GlassSurface>
+              <View
+                style={styles.cropPreviewSpace}
+                onLayout={({ nativeEvent }) => {
+                  const { width, height } = nativeEvent.layout;
+                  setCropSpace((current) =>
+                    current?.width === width && current.height === height
+                      ? current
+                      : { width, height },
+                  );
+                }}
+              >
+                {cropSpace ? (
+                  <View
+                    style={[
+                      styles.cropViewport,
+                      { height: cropSpace.height, width: "100%" },
+                    ]}
+                  >
+                    <GestureDetector gesture={Gesture.Simultaneous(pan, pinch)}>
+                      <Animated.View style={styles.cropTouchSurface}>
+                        <Animated.Image
+                          source={{ uri: source.uri }}
+                          style={[styles.containedSource, sourceImageStyle]}
+                          resizeMode="stretch"
+                        />
+                        <Animated.View
+                          pointerEvents="none"
+                          style={[
+                            styles.cropMask,
+                            styles.cropMaskTop,
+                            { backgroundColor: colors.background },
+                            maskTopStyle,
+                          ]}
+                        />
+                        <Animated.View
+                          pointerEvents="none"
+                          style={[
+                            styles.cropMask,
+                            styles.cropMaskBottom,
+                            { backgroundColor: colors.background },
+                            maskBottomStyle,
+                          ]}
+                        />
+                        <Animated.View
+                          pointerEvents="none"
+                          style={[
+                            styles.cropMask,
+                            styles.cropMaskLeft,
+                            { backgroundColor: colors.background },
+                            maskLeftStyle,
+                          ]}
+                        />
+                        <Animated.View
+                          pointerEvents="none"
+                          style={[
+                            styles.cropMask,
+                            styles.cropMaskRight,
+                            { backgroundColor: colors.background },
+                            maskRightStyle,
+                          ]}
+                        />
+                        <Animated.View
+                          pointerEvents="none"
+                          style={[
+                            styles.cropSelection,
+                            { borderColor: colors.accent },
+                            selectionStyle,
+                          ]}
+                        />
+                      </Animated.View>
+                    </GestureDetector>
+                  </View>
                 ) : null}
-                <Button
-                  role="primary"
-                  label={saving ? "Preparing…" : "Use background"}
-                  disabled={saving}
-                  onPress={() => void prepareCrop()}
-                />
               </View>
-            </GlassSurface>
-          </View>
-        ) : null}
-        {page === "name" ? (
-          <ScrollView
-            style={styles.workspace}
-            contentContainerStyle={styles.content}
-          >
-            <AppText role="body">
-              Name this reusable background template.
-            </AppText>
-            <TextInput
-              accessibilityLabel="Background template name"
-              value={templateName}
-              onChangeText={setTemplateName}
-              style={[
-                styles.input,
-                {
-                  color: colors.textPrimary,
-                  borderColor: colors.border,
-                  backgroundColor: colors.background,
-                },
-              ]}
-            />
-            <Button
-              role="primary"
-              label={saving ? "Saving…" : "Save background template"}
-              disabled={saving || !templateName.trim()}
-              onPress={() => void saveTemplate()}
-            />
-          </ScrollView>
-        ) : null}
-        {page === "assign" && selected ? (
-          <ScrollView
-            style={styles.workspace}
-            contentContainerStyle={styles.content}
-          >
-            <AppText role="heading">Assign {selected.name}</AppText>
-            <Button
-              role="secondary"
-              label="Set as global default"
-              onPress={() => void assign("global")}
-            />
-            <AppText role="label">Category override</AppText>
-            {categories.map((category) => (
-              <Button
-                key={category.id}
-                role="tertiary"
-                label={`Assign to ${category.name}`}
-                onPress={() => void assign("category", category.id)}
+              <GlassSurface density="dense" style={styles.cropBottomOverlay}>
+                {managerState.error ? (
+                  <AppText style={{ color: colors.danger }}>
+                    {managerState.error}
+                  </AppText>
+                ) : null}
+                <AppText accessibilityLiveRegion="polite" role="body">
+                  {cropStatus}
+                </AppText>
+                {fineTuneOpen ? (
+                  <View style={styles.fineTuneControls}>
+                    <Button
+                      role="tertiary"
+                      label="Reset"
+                      accessibilityLabel="Reset crop"
+                      onPress={() => {
+                        if (!source) return;
+                        const next = createInitialBackgroundCropSelection(
+                          source,
+                          profileAspect,
+                        );
+                        selectionX.value = next.originX;
+                        selectionY.value = next.originY;
+                        selectionWidth.value = next.width;
+                        selectionHeight.value = next.height;
+                        publishStatus(
+                          next.originX,
+                          next.originY,
+                          next.width,
+                          next.height,
+                        );
+                      }}
+                    />
+                    <Button
+                      role="tertiary"
+                      label="Zoom in"
+                      accessibilityLabel="Zoom in"
+                      onPress={() =>
+                        source &&
+                        (() => {
+                          const next = pinchResizeBackgroundCropSelection(
+                            {
+                              originX: selectionX.value,
+                              originY: selectionY.value,
+                              width: selectionWidth.value,
+                              height: selectionHeight.value,
+                            },
+                            source,
+                            profileAspect,
+                            {
+                              x: selectionX.value + selectionWidth.value / 2,
+                              y: selectionY.value + selectionHeight.value / 2,
+                            },
+                            1.15,
+                          );
+                          selectionX.value = next.originX;
+                          selectionY.value = next.originY;
+                          selectionWidth.value = next.width;
+                          selectionHeight.value = next.height;
+                          publishStatus(
+                            next.originX,
+                            next.originY,
+                            next.width,
+                            next.height,
+                          );
+                        })()
+                      }
+                    />
+                    <Button
+                      role="tertiary"
+                      label="Zoom out"
+                      accessibilityLabel="Zoom out"
+                      onPress={() =>
+                        source &&
+                        (() => {
+                          const next = pinchResizeBackgroundCropSelection(
+                            {
+                              originX: selectionX.value,
+                              originY: selectionY.value,
+                              width: selectionWidth.value,
+                              height: selectionHeight.value,
+                            },
+                            source,
+                            profileAspect,
+                            {
+                              x: selectionX.value + selectionWidth.value / 2,
+                              y: selectionY.value + selectionHeight.value / 2,
+                            },
+                            1 / 1.15,
+                          );
+                          selectionX.value = next.originX;
+                          selectionY.value = next.originY;
+                          selectionWidth.value = next.width;
+                          selectionHeight.value = next.height;
+                          publishStatus(
+                            next.originX,
+                            next.originY,
+                            next.width,
+                            next.height,
+                          );
+                        })()
+                      }
+                    />
+                    <Button
+                      role="tertiary"
+                      label="Move left"
+                      accessibilityLabel="Move left"
+                      onPress={() =>
+                        source &&
+                        (() => {
+                          const next = translateBackgroundCropSelection(
+                            {
+                              originX: selectionX.value,
+                              originY: selectionY.value,
+                              width: selectionWidth.value,
+                              height: selectionHeight.value,
+                            },
+                            source,
+                            -24,
+                            0,
+                          );
+                          selectionX.value = next.originX;
+                          selectionY.value = next.originY;
+                          publishStatus(
+                            next.originX,
+                            next.originY,
+                            next.width,
+                            next.height,
+                          );
+                        })()
+                      }
+                    />
+                    <Button
+                      role="tertiary"
+                      label="Move right"
+                      accessibilityLabel="Move right"
+                      onPress={() =>
+                        source &&
+                        (() => {
+                          const next = translateBackgroundCropSelection(
+                            {
+                              originX: selectionX.value,
+                              originY: selectionY.value,
+                              width: selectionWidth.value,
+                              height: selectionHeight.value,
+                            },
+                            source,
+                            24,
+                            0,
+                          );
+                          selectionX.value = next.originX;
+                          selectionY.value = next.originY;
+                          publishStatus(
+                            next.originX,
+                            next.originY,
+                            next.width,
+                            next.height,
+                          );
+                        })()
+                      }
+                    />
+                    <Button
+                      role="tertiary"
+                      label="Move up"
+                      accessibilityLabel="Move up"
+                      onPress={() =>
+                        source &&
+                        (() => {
+                          const next = translateBackgroundCropSelection(
+                            {
+                              originX: selectionX.value,
+                              originY: selectionY.value,
+                              width: selectionWidth.value,
+                              height: selectionHeight.value,
+                            },
+                            source,
+                            0,
+                            -24,
+                          );
+                          selectionX.value = next.originX;
+                          selectionY.value = next.originY;
+                          publishStatus(
+                            next.originX,
+                            next.originY,
+                            next.width,
+                            next.height,
+                          );
+                        })()
+                      }
+                    />
+                    <Button
+                      role="tertiary"
+                      label="Move down"
+                      accessibilityLabel="Move down"
+                      onPress={() =>
+                        source &&
+                        (() => {
+                          const next = translateBackgroundCropSelection(
+                            {
+                              originX: selectionX.value,
+                              originY: selectionY.value,
+                              width: selectionWidth.value,
+                              height: selectionHeight.value,
+                            },
+                            source,
+                            0,
+                            24,
+                          );
+                          selectionX.value = next.originX;
+                          selectionY.value = next.originY;
+                          publishStatus(
+                            next.originX,
+                            next.originY,
+                            next.width,
+                            next.height,
+                          );
+                        })()
+                      }
+                    />
+                  </View>
+                ) : null}
+                <View style={styles.cropActions}>
+                  <Button
+                    role="secondary"
+                    label="Cancel"
+                    onPress={closeOrGuard}
+                  />
+                  <Button
+                    role="tertiary"
+                    label="Fine tune"
+                    onPress={() => setFineTuneOpen((open) => !open)}
+                  />
+                  {managerState.error ? (
+                    <Button
+                      role="secondary"
+                      label="Retry"
+                      disabled={saving}
+                      onPress={retryCrop}
+                    />
+                  ) : null}
+                  <Button
+                    role="primary"
+                    label={saving ? "Preparing…" : "Use background"}
+                    disabled={saving}
+                    onPress={() => void prepareCrop()}
+                  />
+                </View>
+              </GlassSurface>
+            </View>
+          ) : null}
+          {page === "name" ? (
+            <ScrollView
+              style={styles.workspace}
+              contentContainerStyle={styles.content}
+            >
+              <AppText role="body">
+                Name this reusable background template.
+              </AppText>
+              <TextInput
+                accessibilityLabel="Background template name"
+                value={templateName}
+                onChangeText={setTemplateName}
+                style={[
+                  styles.input,
+                  {
+                    color: colors.textPrimary,
+                    borderColor: colors.border,
+                    backgroundColor: colors.background,
+                  },
+                ]}
               />
-            ))}
-            <Button
-              role="primary"
-              label={`Use for ${contactName}`}
-              onPress={() => void assign("contact")}
-            />
-            <Button
-              role="secondary"
-              label={`Use inherited background for ${contactName}`}
-              onPress={() => void assign("inherit")}
-            />
-          </ScrollView>
-        ) : null}
-      </View>
-    </Sheet>
+              <Button
+                role="primary"
+                label={saving ? "Saving…" : "Save background template"}
+                disabled={saving || !templateName.trim()}
+                onPress={() => void saveTemplate()}
+              />
+            </ScrollView>
+          ) : null}
+          {page === "assign" && selected ? (
+            <ScrollView
+              style={styles.workspace}
+              contentContainerStyle={styles.content}
+            >
+              <AppText role="heading">Assign {selected.name}</AppText>
+              <Button
+                role="secondary"
+                label="Set as global default"
+                onPress={() => void assign("global")}
+              />
+              <AppText role="label">Category override</AppText>
+              {categories.length === 0 ? (
+                <AppText role="body">No categories available</AppText>
+              ) : (
+                <Button
+                  role="tertiary"
+                  label="Choose category"
+                  onPress={() => setCategoryPickerMode("assign")}
+                />
+              )}
+              <Button
+                role="primary"
+                label={`Use for ${contactName}`}
+                onPress={() => void assign("contact")}
+              />
+              <Button
+                role="secondary"
+                label={`Use inherited background for ${contactName}`}
+                onPress={() => void assign("inherit")}
+              />
+            </ScrollView>
+          ) : null}
+        </View>
+      </Sheet>
+      <CategoryChoiceSheet
+        visible={categoryPickerMode !== null}
+        categories={categories}
+        selectedId={null}
+        allowUncategorized={false}
+        title={
+          categoryPickerMode === "clear"
+            ? "Clear category background"
+            : "Assign background to category"
+        }
+        onRequestClose={() => setCategoryPickerMode(null)}
+        onSelect={(categoryId) => {
+          const mode = categoryPickerMode;
+          setCategoryPickerMode(null);
+          if (categoryId !== null && mode)
+            void assign(
+              mode === "clear" ? "clear-category" : "category",
+              categoryId,
+            );
+        }}
+      />
+    </>
   );
 }
 
