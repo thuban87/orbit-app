@@ -1,4 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
+import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -9,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { ConsolidationPrompt } from "@/components/ConsolidationPrompt";
+import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { listCategories } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { setSessionBatchCategory } from "@/db/import-session-dao";
@@ -18,6 +20,10 @@ import {
   listSessionRows,
   sessionRowCounts,
 } from "@/db/import-session-read";
+import {
+  CATEGORY_SEARCH_THRESHOLD,
+  resolveCategorySelection,
+} from "@/logic/category-logic";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { importedPhotoFs } from "@/services/import/import-photo";
 import {
@@ -45,6 +51,7 @@ export function BulkImportSetupScreen({
     Array<{ id: number; name: string }>
   >([]);
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const [edited, setEdited] = useState(false);
   const [saving, setSaving] = useState(false);
   const [consolidationRows, setConsolidationRows] = useState<
@@ -77,6 +84,7 @@ export function BulkImportSetupScreen({
   useEffect(() => {
     void load();
   }, [load]);
+  useFocusEffect(useCallback(() => void load(), [load]));
 
   function clusterKey(rows: ImportSessionRow[]): string {
     return rows
@@ -89,15 +97,23 @@ export function BulkImportSetupScreen({
     if (saving || count === 0) return;
     setSaving(true);
     try {
-      await setSessionBatchCategory(
-        getExecutor(),
-        route.params.sessionId,
+      const exec = getExecutor();
+      const currentCategories = await listCategories(exec);
+      const currentCategoryId = resolveCategorySelection(
+        currentCategories,
         categoryId,
+      );
+      setCategories(currentCategories);
+      if (currentCategoryId !== categoryId) setCategoryId(currentCategoryId);
+      await setSessionBatchCategory(
+        exec,
+        route.params.sessionId,
+        currentCategoryId,
         localDateTime(),
       );
       navigation.navigate("ImportProgress", {
         sessionId: route.params.sessionId,
-        batchCategoryId: categoryId,
+        batchCategoryId: currentCategoryId,
       });
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to start bulk import", error);
@@ -136,11 +152,20 @@ export function BulkImportSetupScreen({
     setSaving(true);
     try {
       const exec = getExecutor();
-      const session = await getSessionById(exec, route.params.sessionId);
+      const [session, currentCategories] = await Promise.all([
+        getSessionById(exec, route.params.sessionId),
+        listCategories(exec),
+      ]);
       if (!session) throw new Error("import session is unavailable");
+      const currentCategoryId = resolveCategorySelection(
+        currentCategories,
+        categoryId,
+      );
+      setCategories(currentCategories);
+      if (currentCategoryId !== categoryId) setCategoryId(currentCategoryId);
       const result = await combineCluster(exec, importedPhotoFs, {
         rows: consolidationRows,
-        batchCategoryId: categoryId,
+        batchCategoryId: currentCategoryId,
         phoneRegion: session.phoneRegion,
         now: localDateTime(),
       });
@@ -180,9 +205,7 @@ export function BulkImportSetupScreen({
   const importLabel = `Import ${contactLabel(count)}`;
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-    >
+    <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
@@ -232,32 +255,60 @@ export function BulkImportSetupScreen({
         <Text style={[styles.label, { color: colors.textSecondary }]}>
           Category override
         </Text>
-        <View
-          style={[
-            styles.picker,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Picker
+        {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
+          <Pressable
+            accessibilityRole="button"
             accessibilityLabel="Batch category override"
-            selectedValue={categoryId ?? -1}
-            onValueChange={(value) => {
-              setEdited(true);
-              setCategoryId(value === -1 ? null : Number(value));
-            }}
-            dropdownIconColor={colors.textSecondary}
-            style={{ color: colors.textPrimary }}
+            onPress={() => setCategorySheetOpen(true)}
+            style={[
+              styles.picker,
+              styles.categoryChoice,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
           >
-            <Picker.Item label="Uncategorized" value={-1} />
-            {categories.map((category) => (
-              <Picker.Item
-                key={category.id}
-                label={category.name}
-                value={category.id}
-              />
-            ))}
-          </Picker>
-        </View>
+            <Text style={{ color: colors.textPrimary }}>
+              {categories.find((row) => row.id === categoryId)?.name ??
+                "Uncategorized"}
+            </Text>
+          </Pressable>
+        ) : (
+          <View
+            style={[
+              styles.picker,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Picker
+              accessibilityLabel="Batch category override"
+              selectedValue={categoryId ?? -1}
+              onValueChange={(value) => {
+                setEdited(true);
+                setCategoryId(value === -1 ? null : Number(value));
+              }}
+              dropdownIconColor={colors.textSecondary}
+              style={{ color: colors.textPrimary }}
+            >
+              <Picker.Item label="Uncategorized" value={-1} />
+              {categories.map((category) => (
+                <Picker.Item
+                  key={category.id}
+                  label={category.name}
+                  value={category.id}
+                />
+              ))}
+            </Picker>
+          </View>
+        )}
+        <CategoryChoiceSheet
+          visible={categorySheetOpen}
+          categories={categories}
+          selectedId={categoryId}
+          onSelect={(value) => {
+            setEdited(true);
+            setCategoryId(value);
+          }}
+          onRequestClose={() => setCategorySheetOpen(false)}
+        />
       </View>
 
       <Pressable
@@ -316,6 +367,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   picker: { borderWidth: 1, borderRadius: 10, overflow: "hidden" },
+  categoryChoice: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
   import: {
     minHeight: 48,
     justifyContent: "center",

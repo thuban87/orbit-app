@@ -13,25 +13,33 @@ describe("category consumer integration contract", () => {
     "ImportReviewScreen.tsx",
   ];
 
-  it.each(consumers)("%s uses shared threshold, sheet, canonical copy, and focus refresh", (name) => {
-    const source = read(name);
-    expect(source).toContain("CATEGORY_SEARCH_THRESHOLD");
-    expect(source).toContain("CategoryChoiceSheet");
-    expect(source).toContain("Uncategorized");
-    expect(source).not.toContain('label="No category"');
-    expect(source).toContain("useFocusEffect");
-  });
+  it.each(consumers)(
+    "%s uses shared threshold, sheet, canonical copy, and focus refresh",
+    (name) => {
+      const source = read(name);
+      expect(source).toContain("CATEGORY_SEARCH_THRESHOLD");
+      expect(source).toContain("CategoryChoiceSheet");
+      expect(source).toContain("Uncategorized");
+      expect(source).not.toContain('label="No category"');
+      expect(source).toContain("useFocusEffect");
+    },
+  );
 
-  it.each(consumers)("%s revalidates the selected ID from current DAO truth before writing", (name) => {
-    const source = read(name);
-    expect(source).toContain("resolveCategorySelection");
-    expect(source).toMatch(/await listCategories\(exec\)/);
-  });
+  it.each(consumers)(
+    "%s revalidates the selected ID from current DAO truth before writing",
+    (name) => {
+      const source = read(name);
+      expect(source).toContain("resolveCategorySelection");
+      expect(source).toMatch(/await listCategories\(exec\)/);
+    },
+  );
 
   it("does not expose category management affordances from ordinary consumers", () => {
     for (const name of consumers) {
       const source = read(name);
-      expect(source).not.toMatch(/Add Category|Rename category|Delete category/);
+      expect(source).not.toMatch(
+        /Add Category|Rename category|Delete category/,
+      );
     }
   });
 });

@@ -20,6 +20,7 @@
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import { Picker } from "@react-native-picker/picker";
+import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -32,6 +33,7 @@ import {
   View,
 } from "react-native";
 import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
+import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import {
   addMethodDraft,
   choosePrimary,
@@ -44,25 +46,22 @@ import {
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import {
-  FuelEditor,
   type FuelDraft,
+  FuelEditor,
   type FuelEditPatch,
 } from "@/components/FuelEditor";
 import {
-  MemoryEditor,
   type MemoryDraft,
+  MemoryEditor,
   type MemoryEditPatch,
 } from "@/components/MemoryEditor";
 import {
-  RelationshipEditor,
   type RelationshipDraft,
+  RelationshipEditor,
 } from "@/components/RelationshipEditor";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
-import { AccordionSection, AppText, Button } from "@/components/ui";
-import type { FuelItem } from "@/db/fuel-read";
-import type { MemoryRow } from "@/db/memories-read";
-import type { RelationshipRow } from "@/db/relationships-read";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
+import { AccordionSection, AppText, Button } from "@/components/ui";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { isDuplicateName, listCategories } from "@/db/contact-read";
 import { createContactFull } from "@/db/contacts-dao";
@@ -70,7 +69,14 @@ import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { defsForCreateForm } from "@/db/field-values-dao";
+import type { FuelItem } from "@/db/fuel-read";
+import type { MemoryRow } from "@/db/memories-read";
+import type { RelationshipRow } from "@/db/relationships-read";
 import { newUid } from "@/db/uid";
+import {
+  CATEGORY_SEARCH_THRESHOLD,
+  resolveCategorySelection,
+} from "@/logic/category-logic";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
@@ -78,12 +84,12 @@ import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import {
   buildCreateInput,
-  collectBlockingErrors,
-  coordinateBoundToggle,
-  coordinateCadenceSelection,
   CREATE_SECTION_FIELD_MAP,
   type CreateFormState,
   canSave,
+  collectBlockingErrors,
+  coordinateBoundToggle,
+  coordinateCadenceSelection,
   resolveErrorSection,
 } from "./create-contact-logic";
 
@@ -187,6 +193,7 @@ export function CreateContactScreen({
   // Fixed-block state.
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   // A contact created without touching cadence is Unbound (trackingEnabled=false)
   // with no cadence (intervalDays=null) — NOT the prior Monthly + Bound default
   // (CAPT-03, dossier §F). Unbound never gates Save on cadence, so intervalValid
@@ -251,7 +258,8 @@ export function CreateContactScreen({
         if (node && scroll && scrollHandle != null) {
           node.measureLayout(
             scrollHandle,
-            (_x, y) => scroll.scrollTo({ y: Math.max(0, y - 16), animated: true }),
+            (_x, y) =>
+              scroll.scrollTo({ y: Math.max(0, y - 16), animated: true }),
             () => {},
           );
         }
@@ -297,6 +305,17 @@ export function CreateContactScreen({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void listCategories(getExecutor()).then((current) => {
+        setCategories(current);
+        setCategoryId((selected) =>
+          resolveCategorySelection(current, selected),
+        );
+      });
+    }, []),
+  );
 
   const formState: CreateFormState = useMemo(
     () => ({
@@ -352,19 +371,29 @@ export function CreateContactScreen({
     setSaving(true);
     try {
       const exec = getExecutor();
+      const currentCategories = await listCategories(exec);
+      const currentCategoryId = resolveCategorySelection(
+        currentCategories,
+        categoryId,
+      );
+      setCategories(currentCategories);
+      if (currentCategoryId !== categoryId) setCategoryId(currentCategoryId);
       // Duplicate-name warning fires on save (non-blocking, "save anyway").
       if (await isDuplicateName(exec, trimmed)) {
         if (!(await confirmDuplicate(trimmed))) {
           return; // Cancel — nothing is written.
         }
       }
-      const input = buildCreateInput(formState, {
-        now: localDateTime(),
-        contactUid: newUid(),
-        interactionUid: newUid(),
-        createDefs,
-        effectivePhoneRegion,
-      });
+      const input = buildCreateInput(
+        { ...formState, categoryId: currentCategoryId },
+        {
+          now: localDateTime(),
+          contactUid: newUid(),
+          interactionUid: newUid(),
+          createDefs,
+          effectivePhoneRegion,
+        },
+      );
       const { contactId } = await createContactFull(exec, input);
       navigation.replace("Profile", { contactId });
     } catch (err) {
@@ -432,26 +461,53 @@ export function CreateContactScreen({
           <AppText role="label" style={{ color: colors.textSecondary }}>
             Category
           </AppText>
-          <View
-            style={[
-              styles.pickerShell,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Picker
-              testID="create-contact-category"
+          {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
+            <Pressable
+              accessibilityRole="button"
               accessibilityLabel="Category"
-              selectedValue={categoryId ?? -1}
-              onValueChange={(v) => setCategoryId(v === -1 ? null : Number(v))}
-              dropdownIconColor={colors.textSecondary}
-              style={{ color: colors.textPrimary }}
+              onPress={() => setCategorySheetOpen(true)}
+              style={[
+                styles.pickerShell,
+                styles.categoryChoice,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
             >
-              <Picker.Item label="No category" value={-1} />
-              {categories.map((c) => (
-                <Picker.Item key={c.id} label={c.name} value={c.id} />
-              ))}
-            </Picker>
-          </View>
+              <AppText>
+                {categories.find((row) => row.id === categoryId)?.name ??
+                  "Uncategorized"}
+              </AppText>
+            </Pressable>
+          ) : (
+            <View
+              style={[
+                styles.pickerShell,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Picker
+                testID="create-contact-category"
+                accessibilityLabel="Category"
+                selectedValue={categoryId ?? -1}
+                onValueChange={(v) =>
+                  setCategoryId(v === -1 ? null : Number(v))
+                }
+                dropdownIconColor={colors.textSecondary}
+                style={{ color: colors.textPrimary }}
+              >
+                <Picker.Item label="Uncategorized" value={-1} />
+                {categories.map((c) => (
+                  <Picker.Item key={c.id} label={c.name} value={c.id} />
+                ))}
+              </Picker>
+            </View>
+          )}
+          <CategoryChoiceSheet
+            visible={categorySheetOpen}
+            categories={categories}
+            selectedId={categoryId}
+            onSelect={setCategoryId}
+            onRequestClose={() => setCategorySheetOpen(false)}
+          />
         </View>
       </AccordionSection>
 
@@ -623,9 +679,7 @@ export function CreateContactScreen({
                 return true;
               }}
               onDelete={(id: number) =>
-                setRelationshipDrafts((prev) =>
-                  prev.filter((_, i) => i !== id),
-                )
+                setRelationshipDrafts((prev) => prev.filter((_, i) => i !== id))
               }
               onRestore={() => {}}
             />
@@ -692,10 +746,16 @@ export function CreateContactScreen({
               expanded={expandedSections.custom}
               onExpandedChange={(next) => setSectionExpanded("custom", next)}
             >
-              <View testID="create-contact-custom-block" style={styles.customBlock}>
+              <View
+                testID="create-contact-custom-block"
+                style={styles.customBlock}
+              >
                 {createDefs.map((def) => (
                   <View key={def.id} style={styles.field}>
-                    <AppText role="label" style={{ color: colors.textSecondary }}>
+                    <AppText
+                      role="label"
+                      style={{ color: colors.textSecondary }}
+                    >
                       {def.label}
                     </AppText>
                     <FieldValueInput
@@ -720,9 +780,7 @@ export function CreateContactScreen({
           >
             <FuelEditor
               testID="create-contact-off-limits"
-              items={fuelDrafts.map((d, i) =>
-                fuelDraftToItem(d, i, draftNow),
-              )}
+              items={fuelDrafts.map((d, i) => fuelDraftToItem(d, i, draftNow))}
               now={draftNow}
               onAdd={async (draft: FuelDraft) => {
                 setFuelDrafts((prev) => [...prev, draft]);
@@ -827,6 +885,11 @@ const styles = StyleSheet.create({
   pickerShell: {
     borderWidth: 1,
     borderRadius: 8,
+  },
+  categoryChoice: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 12,
   },
   customBlock: {
     gap: 16,

@@ -1,4 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
+import { useFocusEffect } from "@react-navigation/native";
 import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -13,6 +14,7 @@ import {
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
+import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import {
   addMethodDraft,
   choosePrimary,
@@ -34,10 +36,14 @@ import { getSessionById, listSessionRows } from "@/db/import-session-read";
 import { linkExistingContactToRow } from "@/db/imported-contact-dao";
 import { newUid } from "@/db/uid";
 import { normalizeEditedBirthday } from "@/logic/birthday-logic";
+import {
+  CATEGORY_SEARCH_THRESHOLD,
+  resolveCategorySelection,
+} from "@/logic/category-logic";
 import { mapPickedContact } from "@/logic/picked-contact-map";
-import type { RootStackScreenProps } from "@/navigation/types";
 import { navigationRef } from "@/navigation/linking";
 import { resetToDashboardWith } from "@/navigation/reset-intents";
+import type { RootStackScreenProps } from "@/navigation/types";
 import { getDeviceRegion } from "@/services/device-region";
 import {
   type DuplicateEvidenceCandidate,
@@ -88,6 +94,7 @@ export function ImportReviewScreen({
     Array<{ id: number; name: string }>
   >([]);
   const [categoryId, setCategoryId] = useState<number | null>(null);
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [intervalDays, setIntervalDays] = useState<number | null>(null);
   const [phoneRegion, setPhoneRegion] = useState<string | null>(null);
@@ -169,6 +176,17 @@ export function ImportReviewScreen({
     void load();
   }, [load]);
 
+  useFocusEffect(
+    useCallback(() => {
+      void listCategories(getExecutor()).then((current) => {
+        setCategories(current);
+        setCategoryId((selected) =>
+          resolveCategorySelection(current, selected),
+        );
+      });
+    }, []),
+  );
+
   const normalizedBirthday = useMemo(
     () => normalizeEditedBirthday(birthdayInput),
     [birthdayInput],
@@ -187,7 +205,7 @@ export function ImportReviewScreen({
     [photoRelPath],
   );
 
-  function makeImportInput(now: string) {
+  function makeImportInput(now: string, currentCategoryId: number | null) {
     return {
       uid: newUid(),
       name: name.trim(),
@@ -196,7 +214,7 @@ export function ImportReviewScreen({
         : null,
       trackingEnabled,
       now,
-      categoryId,
+      categoryId: currentCategoryId,
       methodDrafts: toMethodDrafts(methods),
       methodNormalization: { effectivePhoneRegion: phoneRegion },
     };
@@ -204,11 +222,19 @@ export function ImportReviewScreen({
 
   async function importAsNew() {
     if (rowId === null || externalContactId === null) return;
+    const exec = getExecutor();
+    const currentCategories = await listCategories(exec);
+    const currentCategoryId = resolveCategorySelection(
+      currentCategories,
+      categoryId,
+    );
+    setCategories(currentCategories);
+    if (currentCategoryId !== categoryId) setCategoryId(currentCategoryId);
     const now = localDateTime();
-    const contactId = await commitSingleImport(getExecutor(), {
+    const contactId = await commitSingleImport(exec, {
       sessionId: route.params.sessionId,
       rowId,
-      input: makeImportInput(now),
+      input: makeImportInput(now, currentCategoryId),
       externalLinks: [{ provider: "android", externalContactId }],
       birthday: normalizedBirthday.stored,
       now,
@@ -340,9 +366,7 @@ export function ImportReviewScreen({
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.content}
-    >
+    <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.header}>
         <Pressable
           onPress={() => navigation.goBack()}
@@ -431,31 +455,59 @@ export function ImportReviewScreen({
         <Text style={[styles.label, { color: colors.textSecondary }]}>
           Category
         </Text>
-        <View
-          style={[
-            styles.picker,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Picker
-            selectedValue={categoryId ?? -1}
-            onValueChange={(value) => {
-              setEdited(true);
-              setCategoryId(value === -1 ? null : Number(value));
-            }}
-            dropdownIconColor={colors.textSecondary}
-            style={{ color: colors.textPrimary }}
+        {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Category"
+            onPress={() => setCategorySheetOpen(true)}
+            style={[
+              styles.picker,
+              styles.categoryChoice,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
           >
-            <Picker.Item label="No category" value={-1} />
-            {categories.map((category) => (
-              <Picker.Item
-                key={category.id}
-                label={category.name}
-                value={category.id}
-              />
-            ))}
-          </Picker>
-        </View>
+            <Text style={{ color: colors.textPrimary }}>
+              {categories.find((row) => row.id === categoryId)?.name ??
+                "Uncategorized"}
+            </Text>
+          </Pressable>
+        ) : (
+          <View
+            style={[
+              styles.picker,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Picker
+              selectedValue={categoryId ?? -1}
+              onValueChange={(value) => {
+                setEdited(true);
+                setCategoryId(value === -1 ? null : Number(value));
+              }}
+              dropdownIconColor={colors.textSecondary}
+              style={{ color: colors.textPrimary }}
+            >
+              <Picker.Item label="Uncategorized" value={-1} />
+              {categories.map((category) => (
+                <Picker.Item
+                  key={category.id}
+                  label={category.name}
+                  value={category.id}
+                />
+              ))}
+            </Picker>
+          </View>
+        )}
+        <CategoryChoiceSheet
+          visible={categorySheetOpen}
+          categories={categories}
+          selectedId={categoryId}
+          onSelect={(value) => {
+            setEdited(true);
+            setCategoryId(value);
+          }}
+          onRequestClose={() => setCategorySheetOpen(false)}
+        />
       </View>
       {trackingEnabled ? (
         <View style={styles.field}>
@@ -662,6 +714,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   picker: { borderWidth: 1, borderRadius: 10, overflow: "hidden" },
+  categoryChoice: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
   import: {
     minHeight: 48,
     justifyContent: "center",

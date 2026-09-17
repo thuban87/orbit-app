@@ -58,6 +58,7 @@ import {
   View,
 } from "react-native";
 import { ContactMethodsEditor } from "@/components/ContactMethodsEditor";
+import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import {
   addMethodDraft,
   canonicalDuplicateCopy,
@@ -70,21 +71,21 @@ import {
 import { FieldValueInput } from "@/components/FieldValueInput";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import {
-  FuelEditor,
   type FuelDraft,
+  FuelEditor,
   type FuelEditPatch,
 } from "@/components/FuelEditor";
 import { type LinkDraft, LinksEditor } from "@/components/LinksEditor";
 import {
   initialDraft as initialMemoryDraft,
-  MemoryEditor,
   type MemoryDraft,
+  MemoryEditor,
   type MemoryEditPatch,
 } from "@/components/MemoryEditor";
 import { PhotoSourcePicker } from "@/components/PhotoSourcePicker";
 import {
-  RelationshipEditor,
   type RelationshipDraft,
+  RelationshipEditor,
 } from "@/components/RelationshipEditor";
 import { TriStateLastSpoke } from "@/components/TriStateLastSpoke";
 import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
@@ -117,9 +118,13 @@ import {
   type RelationshipRow,
 } from "@/db/relationships-read";
 import { newUid } from "@/db/uid";
+import {
+  CATEGORY_SEARCH_THRESHOLD,
+  resolveCategorySelection,
+} from "@/logic/category-logic";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
-import type { RootStackScreenProps } from "@/navigation/types";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
+import type { RootStackScreenProps } from "@/navigation/types";
 import { applyLifecycleTransitionEffects } from "@/services/contact-lifecycle-effects";
 import { getDeviceRegion } from "@/services/device-region";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
@@ -132,9 +137,9 @@ import { formatLocalDate } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 import {
   buildEditInput,
+  type CurrentStateSeed,
   canSave,
   collectEditBlockingErrors,
-  type CurrentStateSeed,
   EDIT_SECTION_FIELD_MAP,
   type EditFormState,
   type FuelDraftRow,
@@ -373,6 +378,7 @@ export function EditContactScreen({
   const [categories, setCategories] = useState<{ id: number; name: string }[]>(
     [],
   );
+  const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const [editDefs, setEditDefs] = useState<CustomFieldDef[]>([]);
   const [form, setForm] = useState<EditFormState | null>(null);
   // Links: the seeded snapshot (the diff baseline) + the editable draft. Add/edit/
@@ -387,9 +393,8 @@ export function EditContactScreen({
     RelationshipDraftRow[]
   >([]);
   const [seededOffLimits, setSeededOffLimits] = useState<FuelDraftRow[]>([]);
-  const [seededCurrentState, setSeededCurrentState] = useState<CurrentStateSeed>(
-    {},
-  );
+  const [seededCurrentState, setSeededCurrentState] =
+    useState<CurrentStateSeed>({});
   // The edit-only Allow-AI availability (real app setting, NOT a hardcoded false —
   // Review cycle-4 LOW #4 / D-04). A stubbed false would silently disable the
   // per-Memory Allow-AI control that 34-07's privacy design relies on.
@@ -613,6 +618,20 @@ export function EditContactScreen({
   useFocusEffect(
     useCallback(() => {
       void refreshPhoto();
+      void listCategories(getExecutor()).then((current) => {
+        setCategories(current);
+        setForm((existing) =>
+          existing
+            ? {
+                ...existing,
+                categoryId: resolveCategorySelection(
+                  current,
+                  existing.categoryId,
+                ),
+              }
+            : existing,
+        );
+      });
     }, [refreshPhoto]),
   );
 
@@ -899,6 +918,15 @@ export function EditContactScreen({
     setSaving(true);
     try {
       const exec = getExecutor();
+      const currentCategories = await listCategories(exec);
+      const currentCategoryId = resolveCategorySelection(
+        currentCategories,
+        form.categoryId,
+      );
+      setCategories(currentCategories);
+      if (currentCategoryId !== form.categoryId) {
+        setField("categoryId", currentCategoryId);
+      }
       // Duplicate-name warning fires on save (non-blocking), excluding self.
       if (await isDuplicateName(exec, trimmed, contactId)) {
         if (!(await confirmDuplicate(trimmed))) {
@@ -912,18 +940,21 @@ export function EditContactScreen({
           : form.trackingEnabled
             ? "bind"
             : "unbind";
-      const input = buildEditInput(form, {
-        now,
-        contactId,
-        interactionUid: newUid(),
-        editDefs,
-        neverContacted,
-        effectivePhoneRegion,
-        seededMemories,
-        seededRelationships,
-        seededOffLimits,
-        seededCurrentState,
-      });
+      const input = buildEditInput(
+        { ...form, categoryId: currentCategoryId },
+        {
+          now,
+          contactId,
+          interactionUid: newUid(),
+          editDefs,
+          neverContacted,
+          effectivePhoneRegion,
+          seededMemories,
+          seededRelationships,
+          seededOffLimits,
+          seededCurrentState,
+        },
+      );
 
       // TWO-TRANSACTION BOUNDARY (by design): metadata + ALL knowledge subdomains
       // (updateContactFull, one txn) and links (applyLinkDiff, second txn) are
@@ -1168,28 +1199,53 @@ export function EditContactScreen({
           <AppText role="label" style={{ color: colors.textSecondary }}>
             Category
           </AppText>
-          <View
-            style={[
-              styles.pickerShell,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Picker
-              testID="edit-contact-category"
+          {categories.length > CATEGORY_SEARCH_THRESHOLD ? (
+            <Pressable
+              accessibilityRole="button"
               accessibilityLabel="Category"
-              selectedValue={form.categoryId ?? -1}
-              onValueChange={(v) =>
-                setField("categoryId", v === -1 ? null : Number(v))
-              }
-              dropdownIconColor={colors.textSecondary}
-              style={{ color: colors.textPrimary }}
+              onPress={() => setCategorySheetOpen(true)}
+              style={[
+                styles.pickerShell,
+                styles.categoryChoice,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
             >
-              <Picker.Item label="No category" value={-1} />
-              {categories.map((c) => (
-                <Picker.Item key={c.id} label={c.name} value={c.id} />
-              ))}
-            </Picker>
-          </View>
+              <AppText>
+                {categories.find((row) => row.id === form.categoryId)?.name ??
+                  "Uncategorized"}
+              </AppText>
+            </Pressable>
+          ) : (
+            <View
+              style={[
+                styles.pickerShell,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
+              <Picker
+                testID="edit-contact-category"
+                accessibilityLabel="Category"
+                selectedValue={form.categoryId ?? -1}
+                onValueChange={(v) =>
+                  setField("categoryId", v === -1 ? null : Number(v))
+                }
+                dropdownIconColor={colors.textSecondary}
+                style={{ color: colors.textPrimary }}
+              >
+                <Picker.Item label="Uncategorized" value={-1} />
+                {categories.map((c) => (
+                  <Picker.Item key={c.id} label={c.name} value={c.id} />
+                ))}
+              </Picker>
+            </View>
+          )}
+          <CategoryChoiceSheet
+            visible={categorySheetOpen}
+            categories={categories}
+            selectedId={form.categoryId}
+            onSelect={(value) => setField("categoryId", value)}
+            onRequestClose={() => setCategorySheetOpen(false)}
+          />
         </View>
 
         {/* Birthday: native date picker + a "Year unknown" toggle (the native
@@ -1354,7 +1410,9 @@ export function EditContactScreen({
                     styles.lifecycleChoice,
                     {
                       borderColor: selected ? colors.accent : colors.border,
-                      backgroundColor: selected ? colors.accent : colors.surface,
+                      backgroundColor: selected
+                        ? colors.accent
+                        : colors.surface,
                     },
                   ]}
                 >
@@ -1660,6 +1718,11 @@ const styles = StyleSheet.create({
   pickerShell: {
     borderWidth: 1,
     borderRadius: 8,
+  },
+  categoryChoice: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: 12,
   },
   toggleRow: {
     flexDirection: "row",
