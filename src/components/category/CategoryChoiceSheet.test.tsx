@@ -63,4 +63,55 @@ describe("CategoryChoiceSheet", () => {
     expect(model.selectedId).toBe(999);
     expect(model.emptyCopy).toBe("No categories match \u201cxyz\u201d.");
   });
+
+  it("enables search at thirteen eligible real categories, not twelve", () => {
+    const twelve = categoryChoiceSheetModel({
+      categories: categories.slice(0, 12),
+      selectedId: null,
+      query: "20",
+      allowUncategorized: true,
+    });
+    const thirteen = categoryChoiceSheetModel({
+      categories: categories.slice(0, 13),
+      selectedId: null,
+      query: "13",
+      allowUncategorized: true,
+    });
+
+    expect(twelve.searchable).toBe(false);
+    expect(twelve.rows.map((row) => row.id)).toEqual([
+      ...categories.slice(0, 12).map((row) => row.id),
+      null,
+    ]);
+    expect(thirteen.searchable).toBe(true);
+    expect(thirteen.rows.map((row) => row.id)).toEqual([13]);
+  });
+
+  it("computes the threshold after ID or UID exclusion", () => {
+    const thirteen = categories.slice(0, 13);
+    const byId = categoryChoiceSheetModel({
+      categories: thirteen,
+      selectedId: null,
+      query: "missing",
+      allowUncategorized: true,
+      excludeCategoryId: 1,
+    });
+    const byUid = categoryChoiceSheetModel({
+      categories: thirteen,
+      selectedId: null,
+      query: "missing",
+      allowUncategorized: false,
+      excludeCategoryUid: "uid-2",
+    });
+
+    expect(byId.searchable).toBe(false);
+    expect(byId.rows.map((row) => row.id)).toEqual([
+      ...thirteen.slice(1).map((row) => row.id),
+      null,
+    ]);
+    expect(byUid.searchable).toBe(false);
+    expect(byUid.rows.map((row) => row.id)).toEqual(
+      thirteen.filter((row) => row.uid !== "uid-2").map((row) => row.id),
+    );
+  });
 });
