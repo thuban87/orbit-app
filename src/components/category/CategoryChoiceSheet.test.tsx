@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("react", () => ({
+  useEffect: vi.fn(),
   useMemo: <T,>(factory: () => T) => factory(),
   useState: <T,>(value: T) => [value, vi.fn()],
 }));

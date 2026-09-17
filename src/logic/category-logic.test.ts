@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCategoryChoices,
   CATEGORY_NAME_MAX_LENGTH,
   CATEGORY_SEARCH_THRESHOLD,
-  buildCategoryChoices,
   categoryNameKey,
   filterCategoryChoices,
   normalizeCategoryName,

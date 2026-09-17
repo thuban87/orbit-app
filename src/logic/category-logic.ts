@@ -3,6 +3,52 @@
 export const CATEGORY_NAME_MAX_LENGTH = 100;
 export const CATEGORY_SEARCH_THRESHOLD = 12;
 
+export interface CategoryChoice {
+  id: number;
+  uid?: string;
+  name: string;
+}
+
+export interface CategoryChoiceRow {
+  id: number | null;
+  uid?: string;
+  name: string;
+}
+
+export function buildCategoryChoices(
+  categories: readonly CategoryChoice[],
+  allowUncategorized: boolean,
+): { rows: CategoryChoiceRow[]; searchable: boolean } {
+  const rows: CategoryChoiceRow[] = [...categories];
+  if (allowUncategorized) rows.push({ id: null, name: "Uncategorized" });
+  return {
+    rows,
+    searchable: categories.length > CATEGORY_SEARCH_THRESHOLD,
+  };
+}
+
+export function filterCategoryChoices(
+  rows: readonly CategoryChoiceRow[],
+  query: string,
+): CategoryChoiceRow[] {
+  const key = query.trim().normalize("NFC").toLowerCase();
+  if (!key) return [...rows];
+  return rows.filter((row) =>
+    row.name.normalize("NFC").toLowerCase().includes(key),
+  );
+}
+
+/** A persisted ID is selectable only while it exists in current DAO truth. */
+export function resolveCategorySelection(
+  categories: readonly CategoryChoice[],
+  selectedId: number | null,
+): number | null {
+  if (selectedId === null) return null;
+  return categories.some((category) => category.id === selectedId)
+    ? selectedId
+    : null;
+}
+
 export type CategoryNameCandidate = string | { id: number; name: string };
 
 export function normalizeCategoryName(name: string): string {
