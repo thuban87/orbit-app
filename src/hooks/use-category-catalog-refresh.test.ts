@@ -1,4 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@react-navigation/native", () => ({ useFocusEffect: vi.fn() }));
+vi.mock("@/db/contact-read", () => ({ listCategories: vi.fn() }));
+vi.mock("@/db/database", () => ({ getExecutor: vi.fn() }));
+
 import { createCategoryCatalogRefreshCoordinator } from "./use-category-catalog-refresh";
 
 type Category = { id: number; name: string };
@@ -17,24 +22,30 @@ describe("category catalog refresh coordinator", () => {
   it.each([
     ["initial then focus", "initial", "focus"],
     ["focus then initial", "focus", "initial"],
-  ] as const)("publishes only the latest request: %s", async (_label, first, second) => {
-    const pending = [deferred<Category[]>(), deferred<Category[]>()];
-    const commit = vi.fn();
-    const coordinator = createCategoryCatalogRefreshCoordinator({
-      read: vi.fn().mockReturnValueOnce(pending[0].promise).mockReturnValueOnce(pending[1].promise),
-      commit,
-    });
+  ] as const)(
+    "publishes only the latest request: %s",
+    async (_label, first, second) => {
+      const pending = [deferred<Category[]>(), deferred<Category[]>()];
+      const commit = vi.fn();
+      const coordinator = createCategoryCatalogRefreshCoordinator({
+        read: vi
+          .fn()
+          .mockReturnValueOnce(pending[0].promise)
+          .mockReturnValueOnce(pending[1].promise),
+        commit,
+      });
 
-    const older = coordinator.request(first);
-    const newer = coordinator.request(second);
-    pending[1].resolve([{ id: 2, name: "Newest" }]);
-    await newer;
-    pending[0].resolve([{ id: 1, name: "Stale" }]);
-    await older;
+      const older = coordinator.request(first);
+      const newer = coordinator.request(second);
+      pending[1].resolve([{ id: 2, name: "Newest" }]);
+      await newer;
+      pending[0].resolve([{ id: 1, name: "Stale" }]);
+      await older;
 
-    expect(commit).toHaveBeenCalledOnce();
-    expect(commit).toHaveBeenCalledWith([{ id: 2, name: "Newest" }]);
-  });
+      expect(commit).toHaveBeenCalledOnce();
+      expect(commit).toHaveBeenCalledWith([{ id: 2, name: "Newest" }]);
+    },
+  );
 
   it.each(["initial", "focus"] as const)(
     "catches a rejected %s request without publishing",
