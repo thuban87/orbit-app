@@ -83,6 +83,12 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 4. It reparents knowledge rows before deletion, clears links that would become a self-link, and demotes a colliding current-state value so retained history survives.
 5. The UI lands on the survivor only after the transaction succeeds; an error leaves both contacts intact.
 
+### Resolving same-Group-Event merge collisions
+
+Before reparenting interaction rows, `mergeContacts` checks whether survivor and absorbed contact share a non-null Group Event membership inside its existing write transaction. A collision throws `GroupMergeCollisionError`; the complete merge rolls back with both contacts, children, and deletion evidence intact. `MergeImpactSummary` displays the typed guidance to remove one membership from the shared event before retrying.
+
+A no-collision merge preserves existing child reparenting, Group Event reference, and survivor recency recomputation. The writer never picks a destructive child survivor or reconciles competing participant notes automatically.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -97,6 +103,8 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — defines explicit atomic consolidation and absorbed-contact retirement.
 - **ADR-073:** Merge-Reparented, Purge-Cascaded Interaction Assists — extends the merge reparent loop to the pending-assist child table so redirect needs no lazy lookup.
 - **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — extends merge reparenting to typed contact-knowledge rows and their collision rules.
+- **[ADR-090: Additive Custom-Field Value History and Deferred Contact Scope](../decisions/ADR-090-additive-custom-field-value-history-and-deferred-contact-scope.md)** — governs `src/db/merge-dao.ts`.
+- **[ADR-128: Same-Group Contact Merge Refusal with Remediation](../decisions/ADR-128-same-group-contact-merge-refusal-with-remediation.md)** — governs `src/db/merge-dao.ts`.
 
 ## Gotchas
 
@@ -108,6 +116,8 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 6. **Reconciled method additions have no v1 provenance row.** Imported methods retain stronger source attribution than reconciliation-added methods.
 7. **Every contact-owned child must join the reparent loop.** The merge reparents children explicitly (not by cascade); a new child table — like `interaction_assists` in phase 21 — that is not added to `mergeContacts()` would be stranded on the absorbed identity. Do not rely on `ON DELETE CASCADE` for merge.
 8. **Clear prospective relationship self-links before reparenting.** The migration-level CHECK is a backstop, not permission to let a merge fail after other choices were resolved.
+
+- **Remediation must reach the screen.** The original generic catch discarded typed guidance and encouraged an ineffective retry. The corrected merge summary displays the collision-specific message and keeps generic fallback for unrelated failures.
 
 ## Related Systems
 
@@ -126,3 +136,4 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 | 2026-08-26 | 20 | Created user-triggered durable reconciliation, safe relinking, and atomic tombstone-backed merge documentation. |
 | 2026-08-31 | 21 | Extended the merge reparent loop to pending `interaction_assists` so a merged target's later confirmation logs against the survivor. |
 | 2026-09-03 | 24.1 | Extended merge reparenting with typed contact-knowledge rows, self-link safety, and current-state collision preservation. |
+| 2026-09-02 | 33 | Added owner-locked same-event merge refusal before reparenting and user-visible membership remediation. |
