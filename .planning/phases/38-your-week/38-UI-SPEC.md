@@ -1,10 +1,11 @@
 ---
 phase: 38
 slug: digest-navigation-restructure
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-09-18
+reviewed_at: 2026-09-18
 ---
 
 # Phase 38 — UI Design Contract
@@ -175,11 +176,11 @@ No third-party UI registry is used or introduced. All UI is built from Orbit's i
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved (gsd-ui-checker, 2026-09-18) — 6/6 dimensions PASS, no recommendations. UI-consideration probe confirmed coverage (39 applicable state axes across 6 surfaces; all covered, `long-text` held to physical-device UAT §S.15).
