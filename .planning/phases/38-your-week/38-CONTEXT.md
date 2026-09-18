@@ -1,54 +1,90 @@
-# Phase 38: Your Week - Context
+# Phase 38: Digest & Navigation Restructure - Context
 
-**Gathered:** 2026-09-02
-**Status:** DEFERRED PLANNING (provisional slot) — do not plan, discuss, or interrogate yet
+**Gathered:** 2026-09-02 (placeholder) · **Rewritten:** 2026-09-18 against the interrogated dossier
+**Status:** READY TO PLAN — dossier interrogated through 2026-09-18; dependency phases (32, 33, 36, 37, 37.1) landed
+
+> **Scope note:** This phase was originally slotted as a single "Your Week" page. It was
+> re-specced into a full home/navigation restructure. "Your Week" is now one of three
+> modules *inside* Digest, not the phase. The directory name (`38-your-week`) is retained
+> for tooling stability; the phase's real name and contract are in the dossier below.
 
 <domain>
 ## Phase Boundary
 
-Designs the Your Week page: the relocated upcoming-birthday presentation (ADR-076 superseded
-ADR-034), Group Event rollups, and reuse of Phase 32's heatmap/history aggregation. This slot
-exists because four dossier decisions delegate content to Your Week; without it the 7-day
-"reason to reconnect" surface would vanish when the Dashboard banner is removed.
+Replaces Orbit's contact-browser-as-dashboard shell with a Digest-centered home. Permanent
+navigation becomes **Contacts · Events · Digest · Orrery · Settings**, Digest centered and the
+default launch destination. Dashboard is relabelled Contacts; Group Events is relabelled Events;
+the redundant Backup bottom tab is removed (Backup & Restore already lives in Settings from
+Phase 37). Digest itself is a fixed three-part surface — **Up Next**, **Horizon**, **Your Week** —
+composed from existing reads/aggregation, not new domain logic.
 
-**Trigger to plan:** Phases 32 (History aggregation), 33 (Group Events), and 36 (backup v4 bump)
-have landed. Interrogate with the owner first; this shim then gets replaced by a real CONTEXT.md.
+The phase absorbs the previously deferred birthday, Group Event rollup, and history/aggregation
+obligations without expanding into a Contacts redesign, Events redesign, calendar system,
+configurable dashboard, or new relationship-domain model.
+
+**Trigger to plan:** Fired. Dependency phases have landed and the dossier is interrogated
+(2026-09-18). Plan against the dossier as the authoritative contract.
 </domain>
 
 <decisions>
 ## Implementation Decisions
 
-- **D-01:** No dossier exists. The placeholder file in canonical_refs records the inputs that must
-  reach this phase (birthday inheritance per the ADR-034→076 supersession; Group Event rollups
-  read from Phase 33's schema; Phase 32's aggregation layer reused, never reimplemented).
-- **D-02:** As scoped this is a read/aggregation surface implying NO schema of its own. It is
-  planned after Phase 36's backup v4 bump, so any durable state it wants would force another
-  format bump — a strong reason to keep it read-only. A migration need discovered here signals an
-  upstream phase missed something.
-- **D-03:** Cadence-relative aggregation is undefined for Unbound contacts (ADR-062 guard);
-  whatever fallback Phases 31/32 settled applies here too — do not invent a third answer.
-- **D-04:** Any interaction this phase creates or edits routes through the single recency writer
-  cores composed in one transaction (ADR-010/024/071).
+These D-NN are the cross-cutting **enforced guards** that must reach plan-phase. They do not
+replace the dossier — read it in full first.
+
+- **D-01:** The authoritative product contract is
+  `docs/dossier/milestone-2/phase-38-digest-navigation-restructure-dossier.md`. Plan against it,
+  not against this shim or the retired "Your Week page" framing.
+- **D-02:** Digest is a read/derive-only surface with **NO schema of its own** and **no persisted
+  Digest snapshot/cache** (dossier §O). Any durable state it wants would force another
+  backup-format bump on top of the recent one — a strong signal an upstream phase missed
+  something. Discovering a migration need here is a stop-and-confirm, not a licence to add one.
+- **D-03:** Do **not** decompose into one-plan-per-tab or one-plan-per-Digest-module (dossier §R).
+  The coherent unit is the shell/home-model transition plus the minimum Digest composition needed
+  to make it useful. Keep the phase narrow; do not opportunistically redesign Contacts, Events, or
+  Settings while restructuring navigation (§K, §R).
+- **D-04:** Up Next ordering uses **canonical relationship/orbit status/progress semantics** — do
+  not invent Digest-specific urgency classifications (§D). Up Next takes first claim on its (max
+  three) contacts; Horizon must dedup against them and not re-surface the same condition (§E).
+- **D-05:** Reuse Phase 32 / Profile heatmap + history aggregation and canonical interaction /
+  Group-Event reads; do **not** reimplement them or create parallel metric definitions (§H, §J,
+  §O). Unbound-contact cadence aggregation follows whatever Phases 31/32 settled (ADR-062 guard) —
+  do not invent a third answer.
+- **D-06:** The inherited birthday obligation now lives at **Horizon → Birthdays** (forward
+  7-day window), **not** in Your Week — this corrects the earlier placeholder mapping (§F;
+  ADR-076 superseding ADR-034).
+- **D-07:** The dossier specifies no inline write actions in Up Next / Horizon (§D). If any
+  interaction create/edit does appear, it must route through the single recency-writer core in one
+  transaction (ADR-010/024/071); a write surfacing here otherwise signals scope drift.
 </decisions>
 
 <canonical_refs>
 ## Canonical References
 
-**Read these before planning this phase (when its trigger fires).**
+**Read the dossier before planning; the rest are supporting.**
 
-- `docs/dossier/milestone-2/planning-notes/phase-19-your-week-placeholder.md` — the slot's
-  inherited inputs and constraints
-- `docs/decisions/ADR-076-population-reached-birthdays-without-a-dashboard-banner.md` — what was
-  ratified about birthday presentation
-- `docs/dossier/milestone-2/orbit-ui-ux-working-roadmap-v1.0.md` §4/§11 — the provisional slot
+- `docs/dossier/milestone-2/phase-38-digest-navigation-restructure-dossier.md` — **authoritative
+  contract** (Scope, §A–§S, planning-time verification checklist).
+- `docs/decisions/ADR-076-population-reached-birthdays-without-a-dashboard-banner.md` — ratified
+  birthday-presentation decision now homed in Horizon → Birthdays.
+- Phase 32 history/heatmap aggregation and Profile activity-heatmap components — the reuse target
+  for Your Week's heatmap and inline day detail (§J).
+- Phase 37 Settings (Backup & Restore page; preferences persistence path) — enables Backup-tab
+  removal (§K) and hosts the Your Week period preference (§I).
+- `docs/dossier/milestone-2/planning-notes/phase-19-your-week-placeholder.md` — historical; the
+  original inherited-inputs note now superseded by the dossier.
 </canonical_refs>
 
 <deferred>
 ## Deferred Ideas
 
-This entire phase is deferred planning until its dependency phases land.
+Carried in the dossier §Q (Explicit Deferrals): Digest customization beyond the Your Week period
+preference; configurable Up Next count / birthday horizon; Digest-specific FAB or inline outreach
+controls; calendar rotary / long-range history in Digest; Contacts or Events redesign;
+planned-event/calendar integration; broad Settings restructuring; repository-wide historical
+terminology cleanup.
 </deferred>
 
 ---
-*Phase: 38-your-week*
-*Context gathered: 2026-09-02 (deferred-planning placeholder)*
+*Phase: 38-your-week (dir) — Digest & Navigation Restructure (name)*
+*Context rewritten: 2026-09-18 against the interrogated dossier*

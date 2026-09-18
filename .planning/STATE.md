@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38
-current_phase_name: Your Week
+current_phase_name: Digest & Navigation Restructure
 status: planning
 stopped_at: Phase 37.1 complete, ready to plan Phase 38
 last_updated: "2026-09-17T19:27:43.952Z"
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 38 — Your Week
+Phase: 38 — Digest & Navigation Restructure (re-specced from the original single "Your Week" page)
 Plan: Not started
 Status: Ready to plan
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
@@ -54,7 +54,7 @@ Next: Run Phase 37.1 verification against the complete nine-plan implementation 
 25 Dashboard Data/State · 26 Dashboard Controls · 27 List View · 28 Card View · 29 Orrery Camera ·
 30 Orrery Systems · 31 Profile · 32 History & Insights · 33 Group Logging · 34 Rapid Capture ·
 35 Compose · 36 AI Config (ends the milestone schema chain with the backup v4 bump) ·
-37–40 deferred planning (Settings, Your Week, Onboarding, Release Hardening).
+37–40 deferred planning (Settings, Digest & Navigation Restructure, Onboarding, Release Hardening).
 Migration order is milestone-wide (schema → consumers → backup v4 last); **never** write a literal
 migration number — each phase verifies head+1 against `src/db/migrations/` + `TARGET_VERSION` on disk
 at plan time. All new durable preferences are `app_settings` columns, never AsyncStorage.

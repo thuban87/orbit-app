@@ -86,7 +86,7 @@ bump**. They are sequenced milestone-wide, not per phase:
   - **Orrery** — 29 Orrery Camera, Scale & Exploration · 30 Orrery Systems
   - **Profile & history** — 31 Profile Experience · 32 Interaction History & Insights
   - **Capture & messaging** — 33 Group Interaction Logging · 34 Rapid Capture & Update Flows · 35 Messaging & AI Compose · 36 AI Configuration & Prompting
-  - **Deferred planning** — 37 Settings & Personalization · 38 Your Week · 39 Onboarding · 40 Responsive & Release Hardening
+  - **Deferred planning** — 37 Settings & Personalization · 38 Digest & Navigation Restructure · 39 Onboarding · 40 Responsive & Release Hardening
 - ⏭️ **v3.0 Sync** — scope already drafted in `.planning/sync-milestone/` (relabeled from the earlier
   v2.0 placeholder). Not started; sits over a working local DB, never replaces it.
 
@@ -155,7 +155,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [ ] **Phase 36: AI Configuration & Prompting** - Three connection lanes, prompt personalization, permission manager, and the final backup format bump (v5 — v4 landed early in 24.1)
 - [x] **Phase 37: Settings & Personalization** - Navigation-first Settings directory (hub + per-concept category screens) replacing the 2,168-line monolith; surfaces already-persisted preferences, dual-homes Data & Backup, reserves the Categories IA slot — no schema/format change (completed 2026-09-14; goal ACHIEVED — verifier 10/10 must-haves, code review 0 blockers/4 warnings-all-fixed/1 info-fixed, on-device UAT 7/7 passed on the Pixel 6 Pro (nav parity, instant restyle + durable relaunch, contacts permission handoff, notifications OS-schedule re-arm 0→18 alarms, orrery single-source, backup dual-home chrome, About render), release APK built + delivered. 3601 tests pass, tsc/colors clean. Monolith retired (SettingsScreen.tsx deleted); no schema/format change (D-06, TARGET_VERSION=29/BACKUP_FORMAT_VERSION=5))
 - [ ] **Phase 37.1: Category Management** (INSERTED) - Category CRUD (create/rename/delete) over the read-only `categories` table + the deletion-cascade fallout to Orrery Systems, custom-System rules, Profile category assignments, and backup; consumes the route name/IA slot Phase 37 reserves (D-03, owner-approved 2026-09-14 to schedule now, before Phase 38)
-- [ ] **Phase 38: Your Week** - DEFERRED PLANNING — relocated birthday presentation, Group Event rollups, heatmap-aggregation reuse
+- [ ] **Phase 38: Digest & Navigation Restructure** - READY TO PLAN (re-specced from the original single "Your Week" page; dossier interrogated 2026-09-18) — five-tab shell (Contacts · Events · Digest · Orrery · Settings) with Digest as centered default home; relabels Dashboard→Contacts and Group Events→Events; removes the redundant Backup tab; composes the Digest surface (Up Next · Horizon · Your Week) from existing reads/aggregation with no new schema
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
 
@@ -1010,16 +1010,17 @@ Plans:
 
 - [x] 37.1-09-PLAN.md (Wave 6) — Owner-gated physical-device setup and ordinary successful UAT
 
-### Phase 38: Your Week
+### Phase 38: Digest & Navigation Restructure
 
-**Goal**: A weekly surface that owns the relocated birthday presentation (ADR-076), Group Event rollups, and reuse of the heatmap aggregation built in Phase 32.
-**Depends on**: Phases 32, 33, 36
-**Requirements**: None yet — deferred planning
-**Success Criteria**: Defined at planning time
-**Canonical refs**: docs/dossier/milestone-2/planning-notes/phase-19-your-week-placeholder.md
+**Goal**: Replace the contact-browser-as-dashboard shell with a Digest-centered home. Permanent navigation becomes **Contacts · Events · Digest · Orrery · Settings** (Digest centered and the default launch destination); Dashboard is relabelled Contacts, Group Events becomes Events, and the redundant Backup bottom tab is removed. Digest is a fixed three-part surface — **Up Next · Horizon · Your Week** — composed from existing reads, canonical relationship/orbit status, birthdays, and Phase 32 history/heatmap aggregation, with no new relationship-domain schema.
+**Scope note**: Re-specced from the original single "Your Week" page. "Your Week" is now one module inside Digest, not the phase.
+**Depends on**: Phases 32 (history/heatmap aggregation), 33 (Group Events), 36 (backup format), 37 + 37.1 (Settings — Backup & Restore page, period preference)
+**Requirements**: Defined at planning time from the dossier
+**Success Criteria**: Defined at planning time (dossier §S planning-time verification checklist)
+**Canonical refs**: docs/dossier/milestone-2/phase-38-digest-navigation-restructure-dossier.md (authoritative); ADR-076
 **Plans**: TBD
 
-> **Deferred planning — interrogated later against the implemented product; do not plan or discuss yet.**
+> **Ready to plan — dossier interrogated 2026-09-18; plan against the dossier as the authoritative contract.**
 
 ### Phase 39: Onboarding
 
@@ -1067,7 +1068,7 @@ Plans:
 | 35. Messaging & AI Compose | 9/9 | Complete |  |
 | 36. AI Configuration & Prompting | 11/11 | Complete | 2026-09-14 |
 | 37. Settings & Personalization | 8/8 | Complete | 2026-09-14 |
-| 38. Your Week | 0/TBD | Deferred planning | - |
+| 38. Digest & Navigation Restructure | 0/TBD | Ready to plan | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
