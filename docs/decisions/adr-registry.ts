@@ -131,7 +131,13 @@
 // NOTE: ADR-0119 [ACCEPTED] Reusable Count-Only History Aggregation and Canonical Single-Contact History Read
 // NOTE: ADR-0120 [ACCEPTED] Shared-Window Heatmap and Intensity with Globally-Persisted Lenses
 // NOTE: ADR-0121 [ACCEPTED] Rolodex Month/Day/Year History Browser (Reanimated, No Skia)
-// NOTE: ADR-0122 [ACCEPTED] Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Recency Writer
+// IMPORTANT: ADR-0122 [SUPERSEDED BY ADR-127 (partial — dormant group-context and edit-scope routing only)] Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Rec
 // NOTE: ADR-0123 [ACCEPTED] Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing
+// NOTE: ADR-0124 [ACCEPTED] Group Event Parents with Canonical Per-Contact Children
+// NOTE: ADR-0125 [ACCEPTED] Three-Field Live Inheritance with Separate Local-Only Group Notes
+// NOTE: ADR-0126 [ACCEPTED] Explicit Group Lifecycle and Identity-Preserving Conversion
+// NOTE: ADR-0127 [ACCEPTED] Canonical Event-First Group Logging and Explicit Child Edit Scope
+// NOTE: ADR-0128 [ACCEPTED] Same-Group Contact Merge Refusal with Remediation
+// NOTE: ADR-0129 [ACCEPTED] Portable Group Identity and History-Preserving Orphan Disposition
 
-export const ADR_COUNT = 123;
+export const ADR_COUNT = 129;

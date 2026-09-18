@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 27 of
-  123 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 28 of
+  129 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -152,5 +152,11 @@ not something you can pattern-match against.
 | 119 | Reusable Count-Only History Aggregation and Canonical Single-Contact History Read | Accepted | 32-interaction-history-insights | — | — | — | 6 | `src/db`, `src/services/history` |
 | 120 | Shared-Window Heatmap and Intensity with Globally-Persisted Lenses | Accepted | 32-interaction-history-insights | — | — | — | 8 | `src/components`, `src/components/history`, `src/db` +1 |
 | 121 | Rolodex Month/Day/Year History Browser (Reanimated, No Skia) | Accepted | 32-interaction-history-insights | — | — | — | 3 | `src/components/history` |
-| 122 | Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Recency Writer | Accepted | 32-interaction-history-insights | — | — | — | 9 | `src/components`, `src/components/history`, `src/db` +1 |
+| 122 | Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Recency Writer | Accepted | 32-interaction-history-insights | — | ADR-127 (partial — dormant group-context and edit-scope routing only) | — | 9 | `src/components`, `src/components/history`, `src/db` +1 |
 | 123 | Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing | Accepted | 32-interaction-history-insights | ADR-024 (partial — the profile-timeline refinement surface) | — | — | 7 | `src/components/history`, `src/components/profile`, `src/navigation` +2 |
+| 124 | Group Event Parents with Canonical Per-Contact Children | Accepted | 33-group-interaction-logging | — | — | — | 6 | `src/db`, `src/db/migrations` |
+| 125 | Three-Field Live Inheritance with Separate Local-Only Group Notes | Accepted | 33-group-interaction-logging | — | — | — | 6 | `src/components/group`, `src/db`, `src/db/migrations` +1 |
+| 126 | Explicit Group Lifecycle and Identity-Preserving Conversion | Accepted | 33-group-interaction-logging | — | — | — | 5 | `src/components/group`, `src/components/history`, `src/db` |
+| 127 | Canonical Event-First Group Logging and Explicit Child Edit Scope | Accepted | 33-group-interaction-logging | ADR-122 (partial — dormant group-context and edit-scope routing only) | — | — | 17 | `src/components`, `src/components/history`, `src/db` +3 |
+| 128 | Same-Group Contact Merge Refusal with Remediation | Accepted | 33-group-interaction-logging | — | — | — | 3 | `src/components`, `src/db`, `src/db/migrations` |
+| 129 | Portable Group Identity and History-Preserving Orphan Disposition | Accepted | 33-group-interaction-logging | — | — | — | 4 | `.planning/phases/33-group-interaction-logging`, `src/backup`, `src/db` |
