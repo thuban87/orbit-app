@@ -23,6 +23,7 @@ Read the relevant system doc *before* making changes to that subsystem.
 | Status engine | `status-engine.md` | `db/status.ts`, `services/gravity-logic.ts`, `services/intensity-logic.ts`, `db/contact-status-read.ts` | 02 |
 | Contact methods | `contact-methods.md` | `db/contact-methods-dao.ts`, `db/contact-methods-read.ts`, `db/contact-links-dao.ts`; compose/SMS handoff (`screens/ComposeScreen.tsx`) | 18, 18.1, 18.2, 09 |
 | Custom fields | `custom-fields.md` | `db/field-defs-dao.ts`, `db/field-values-dao.ts`, `db/field-ddl.ts`, `db/field-parsers.ts`, `db/field-sort.ts`, `db/field-type-change.ts`, `db/col-name.ts` | 03, 16 |
+| Group Events | `group-events.md` | `db/group-events-dao.ts`, `db/group-events-read.ts`, `logic/group-inheritance.ts` | 33 |
 | Interaction log | `interaction-log.md` | `db/events-dao.ts`, `services/impact.ts`, `db/impact-read.ts`, `db/timeline-read.ts`, `db/log-guards.ts` | 06 |
 | Interaction history & insights | `interaction-history.md` | `db/history-read.ts`, `db/interaction-edit-read.ts`, `services/history/`, `components/history/`, `screens/EditInteractionScreen.tsx` | 32 |
 | Conversational fuel | `conversational-fuel.md` | `db/fuel-dao.ts`, `db/fuel-read.ts`, `services/fuel-age.ts`, `services/fuel-ranking.ts` | 07 |
