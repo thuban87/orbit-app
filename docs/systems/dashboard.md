@@ -1,7 +1,7 @@
 # Dashboard
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 28-dashboard-card-view
+**Updated by phase:** 33-group-interaction-logging
 **Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/stores/dashboard-selection-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
@@ -138,6 +138,12 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 3. The standalone Never Contacted screen and Settings toggle are retired. The Not Contacted data path remains for the next control-surface phase, and `countNeverContacted()` remains a Digest input.
 4. Unbound contacts remain outside the Dashboard universe. Their child browse route now filters its loaded local rows by name and distinguishes a true empty state from no matching rows.
 
+### Handing selected contacts to canonical Group Log
+
+The Group Events header and redundant overflow entries navigate to the local reverse-chronological browse page, with title and participant-name search. Card multi-select keeps Quick Log separate from detailed Log Interaction: one selected contact uses the individual route, and two or more pass `participantIds` to `GroupLog`.
+
+`GroupLogScreen` consumes those IDs as the initial draft and owns event fields, participant selection, and the atomic Group Event save. Dashboard owns no parent persistence or duplicate group-authoring form; global Group Log also supports an initially empty participant set.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -170,6 +176,19 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 - **ADR-101:** Avatar-First Accessible Dashboard Card Renderer — establishes the shared-model Card renderer and compact presentation rules.
 - **ADR-102:** Frozen-Universe Dashboard Multi-Select — makes selection the Dashboard bulk-management surface and records its routing boundary.
 - **ADR-103:** Atomic Composed Dashboard Bulk Mutations — requires host orchestration to call the invariant-preserving batch composers.
+- **[ADR-041: Notification Settings, Privacy Channels, and Birthday Alerts](../decisions/ADR-041-notification-settings-privacy-channels-and-birthday-alerts.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-047: App-Level Assignable Sun and Themed Self Identity](../decisions/ADR-047-app-level-assignable-sun-and-themed-self-identity.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-049: BYO-Key AI Configuration and Credential Boundary](../decisions/ADR-049-byo-key-ai-configuration-and-credential-boundary.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-052: Compose-Owned AI Draft Lifecycle and Acknowledged Egress](../decisions/ADR-052-compose-owned-ai-draft-lifecycle-and-acknowledged-egress.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-055: Dedicated Weekly Digest Scheduling and Persisted Notification Policy](../decisions/ADR-055-dedicated-weekly-digest-scheduling-and-persisted-notification-policy.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-059: Normalized Contact Methods, Canonical Actionability, and Local Provenance](../decisions/ADR-059-normalized-contact-methods-canonical-actionability-and-local-provenance.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-070: Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out](../decisions/ADR-070-durable-pending-interaction-assist-lifecycle-and-portable-opt-out.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-079: On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation](../decisions/ADR-079-on-demand-ai-transparency-and-compose-only-three-suggestion-invocation.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-083: Durable Multi-Package Theme Configuration and Restore-Before-Paint](../decisions/ADR-083-durable-multi-package-theme-configuration-and-restore-before-paint.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-104: Durable Orrery Preferences and Live System Scope](../decisions/ADR-104-durable-orrery-preferences-and-live-system-scope.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-108: Durable Independent-Axis Profile Presentation and Inheritance](../decisions/ADR-108-durable-independent-axis-profile-presentation-and-inheritance.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-113: Persistent Shared System Background Selection](../decisions/ADR-113-persistent-shared-system-background-selection.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-120: Shared-Window Heatmap and Intensity with Globally-Persisted Lenses](../decisions/ADR-120-shared-window-heatmap-and-intensity-with-persisted-lenses.md)** — governs `src/db/app-settings-dao.ts`.
 
 ## Gotchas
 
@@ -218,3 +237,4 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | 2026-09-02 | 27 | Added the scan-first List renderer, deterministic knowledge context, binary Favourite reconciliation, constrained swipe actions, and relevance-first List search. |
 | 2026-09-02 | 28 | Added the responsive Card renderer, frozen-universe multi-select, explicit bulk controls, and count-aware detailed-log handoff. |
 | 2026-09-17 | 37.1 | Closed category filters to positive IDs plus `uncategorized`, added searchable stale-safe bulk assignment, and reconciled deleted filters after committed shell refresh. |
+| 2026-09-02 | 33 | Connected existing Group Events discovery and count-aware participant handoff to canonical event-first Group Log and local browse surfaces. |
