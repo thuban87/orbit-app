@@ -188,6 +188,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 4. The same transaction reparents compatible Memory, relationship, and current-state rows before deleting the absorbed contact; it clears would-be relationship self-links and demotes a conflicting current-state row rather than dropping history.
 5. It also reparents retained custom-field value-history rows to the survivor. An archive-gated purge instead tombstones and explicitly deletes those rows before contact deletion.
 
+### Participating in Group Events
+
+The shared multi-select picker admits archived contacts through explicit search and keeps snoozed contacts selectable. Adding an archived participant records an ordinary child at the event’s historical local timestamp and recomputes `last_contact` without restoring the contact or changing `archived_at`.
+
+Permanent contact purge removes and tombstones that contact’s child Interactions but does not remove a Group Event parent: `PURGE_CHILDREN.group_event` is explicitly `null`. Other participants and a now-empty event remain valid. Duplicate-contact merge checks same-event membership before reparenting; a collision refuses the whole merge with typed remediation and preserves both records.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -235,6 +241,25 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 - **ADR-071:** User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer — assist confirmation recomputes `last_contact` through the same sole recomputer without a bespoke write.
 - **ADR-073:** Merge-Reparented, Purge-Cascaded Interaction Assists — purge removes pending assists via FK cascade; merge reparents them to the survivor.
 - **ADR-103:** Atomic Composed Dashboard Bulk Mutations — requires Dashboard batches to compose contact cores in one transaction without rank or lifecycle shortcuts.
+- **[ADR-028: Per-Item Conversational Fuel with Fixed Kinds](../decisions/ADR-028-per-item-conversational-fuel-with-fixed-kinds.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-029: In-Query Fuel Eligibility and a Shared Ranked Projection](../decisions/ADR-029-in-query-fuel-eligibility-and-a-shared-ranked-projection.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-030: Explicit Confirmation of AI-Proposed Fuel](../decisions/ADR-030-explicit-confirmation-of-ai-proposed-fuel.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-060: Versioned Portable Method Graph and Collision-Normalized Restoration](../decisions/ADR-060-versioned-portable-method-graph-and-collision-normalized-restoration.md)** — governs `src/db/purge-dao.ts`.
+- **[ADR-061: DAO-Selected Actionable Primary SMS Handoff](../decisions/ADR-061-dao-selected-actionable-primary-sms-handoff.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-072: Shared Actionable Reach Out Router with Native Channel Handoff](../decisions/ADR-072-shared-actionable-reach-out-router-with-native-channel-handoff.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-074: Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe](../decisions/ADR-074-widget-contact-supersession-and-strict-reach-deep-link-fail-safe.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-079: On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation](../decisions/ADR-079-on-demand-ai-transparency-and-compose-only-three-suggestion-invocation.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-091: Imported Contact Notes as AI-Off Typed Memories](../decisions/ADR-091-imported-contact-notes-as-ai-off-typed-memories.md)** — governs `src/db/imported-contact-dao.ts`.
+- **[ADR-096: Dashboard Header and Overflow Discovery Paths](../decisions/ADR-096-dashboard-header-and-overflow-discovery-paths.md)** — governs `src/screens/ArchivedContactsScreen.tsx`.
+- **[ADR-109: Fixed-Hero Semantic Profile Composition and Focused Accessible Editors](../decisions/ADR-109-fixed-hero-semantic-profile-composition-and-focused-accessible-editors.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-114: Route-Aware App-Wide System Background Composition](../decisions/ADR-114-route-aware-app-wide-system-background-composition.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-116: Value-Remapped Interaction Vocabulary and Optional Descriptive Duration](../decisions/ADR-116-value-remapped-interaction-vocabulary-and-descriptive-duration.md)** — governs `src/db/recency-dao.ts`.
+- **[ADR-117: Per-Interaction Allow-AI Consent Gate, Default-Off and Fail-Closed on Restore](../decisions/ADR-117-per-interaction-allow-ai-consent-gate.md)** — governs `src/db/recency-dao.ts`.
+- **[ADR-118: Bind/Unbind Immutable Lifecycle Events Without a Migration](../decisions/ADR-118-bind-unbind-immutable-lifecycle-events-without-a-migration.md)** — governs `src/db/contact-lifecycle-dao.ts`, `src/db/events-dao.ts`.
+- **[ADR-122: Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Recency Writer](../decisions/ADR-122-canonical-interaction-detail-edit-and-shared-detail-sheet.md)** — governs `src/db/recency-dao.ts`.
+- **[ADR-123: Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing](../decisions/ADR-123-profile-history-section-replacing-the-vertical-timeline.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-124: Group Event Parents with Canonical Per-Contact Children](../decisions/ADR-124-group-event-parents-with-canonical-per-contact-children.md)** — governs `src/db/purge-dao.ts`, `src/db/recency-dao.ts`.
+- **[ADR-128: Same-Group Contact Merge Refusal with Remediation](../decisions/ADR-128-same-group-contact-merge-refusal-with-remediation.md)** — governs `src/db/merge-dao.ts`.
 
 ## Gotchas
 
@@ -265,6 +290,8 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 24. **Retained custom-field history is a child with evidence.** Edit appends its prior raw value in the contact transaction; merge reparents it and purge tombstones it before deletion.
 25. **A bulk action is not a set-based update.** Calling a public writer inside the batch deadlocks the non-reentrant transaction mutex; compose its core inside `bulk-actions-dao` instead.
 26. **Archive batch state must include its event.** Updating `archived_at` without the immutable archive event breaks the lifecycle timeline.
+
+- **Archived participation is allowed.** An archive guard or automatic restore prompt on Group Event insertion would reverse the owner-accepted recency behavior.
 
 ## Related Systems
 
@@ -311,3 +338,4 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 | 2026-09-02 | 28 | Added transaction-composed Dashboard bulk category, frequency, favourite, snooze, and archive actions. |
 | 2026-09-02 | 31 | Added Profile presentation fallout to Category changes, retained source-owned relationship actions, and removed the direct Profile AI-draft entry. |
 | 2026-09-17 | 37.1 | Added mutable single-category assignment with stale-target validation and atomic delete reassignment to a survivor or Uncategorized. |
+| 2026-09-02 | 33 | Documented owner-accepted archived participation, Group Event parent survival on purge, and lossless same-event merge refusal. |
