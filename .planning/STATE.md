@@ -4,16 +4,16 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38
 current_phase_name: Digest & Navigation Restructure
-status: planning
-stopped_at: Phase 37.1 complete, ready to plan Phase 38
-last_updated: "2026-09-17T19:27:43.952Z"
+status: executing
+stopped_at: Phase 38 UI-SPEC approved
+last_updated: "2026-09-18T21:31:52.541Z"
 last_activity: 2026-09-17
 last_activity_desc: Phase 37.1 complete, transitioned to Phase 38
-state_head: 31c23258140aaa6f5644e1bdf2872aff95ca416e
+state_head: 2a9dbfce77d08c380a32e498d86d396946ea56d2
 progress:
   total_phases: 22
   completed_phases: 13
-  total_plans: 169
+  total_plans: 176
   completed_plans: 167
 carried_forward:
 
@@ -36,9 +36,9 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 38 — Digest & Navigation Restructure (re-specced from the original single "Your Week" page)
+Phase: 38 (Digest & Navigation Restructure) — READY TO EXECUTE
 Plan: Not started
-Status: Ready to plan
+Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
@@ -772,11 +772,11 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-17T18:42:59.317Z
-**Stopped at:** Phase 37.1 complete, ready to plan Phase 38
+**Last session:** 2026-09-18T20:29:07.558Z
+**Stopped at:** Phase 38 UI-SPEC approved
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** None
+**Resume file:** .planning/phases/38-your-week/38-UI-SPEC.md
 are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE

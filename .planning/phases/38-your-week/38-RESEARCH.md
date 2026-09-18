@@ -341,7 +341,9 @@ SELECT date(i.occurred_at) AS d, COUNT(*) AS n
 | A4 | Period preference stored as a TEXT enum (`'rolling7'` \| `'calendar_week'`) default `'rolling7'` | Period pref | LOW — shape is planner's; matches existing enum-column idiom |
 | A5 | Digest tab should be a fresh `DigestStack` (not Digest left in DashboardStack) so origin-aware Back → Digest works | Shell | LOW — dossier §L requires Digest→Profile→Back→Digest; a shared stack would break origin |
 
-## Open Questions
+## Open Questions (RESOLVED at planning time)
+
+> All four resolved in the Phase 38 plans: Q1 → Plan 05 (reuse helpers in a thin period-scoped wrapper, not the `ActivityHeatmap` component); Q2 → Plan 02 (documented metric definition — group-linked child interactions counted); Q3 → Plan 05 (inline app-wide day list with contact identity, not `DateDetailSheet`); Q4 → Plan 05 (in-context Your Week toggle persisted via `app_settings`, no separate Settings row). Executable resolution lives in the PLAN.md files.
 
 1. **Your Week heatmap: reuse component vs. reuse helpers?**
    - What we know: `ActivityHeatmap` renders count cells from a `HistoryWindow` + `Map<date,count>` and reuses `heatmapScale`, but ships a lens switcher + prev/next nav (`ActivityHeatmap.tsx:271-323`).

@@ -1021,12 +1021,23 @@ Plans:
 **Plans**: 7 plans (4 waves)
 
 Plans:
+**Wave 1**
+
 - [ ] 38-01-PLAN.md — Five-tab shell + semantic routing (tracer) [wave 1]
 - [ ] 38-02-PLAN.md — Your Week data layer + migration 030 + period preference [wave 1, has reversibility checkpoint]
 - [ ] 38-03-PLAN.md — Up Next + Horizon composition logic (up-next-read + digest-composition) [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 38-04-PLAN.md — Digest notification deep-link + global FAB audit + Contacts header cleanup [wave 2]
 - [ ] 38-05-PLAN.md — Your Week presentation (section + heatmap + inline day detail) [wave 2]
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 38-06-PLAN.md — Digest surface assembly (DigestScreen rewrite + Up Next + Horizon) [wave 3]
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 38-07-PLAN.md — Navigation regression + accessibility + themes + physical-device UAT [wave 4]
 
 > **Ready to plan — dossier interrogated 2026-09-18; plan against the dossier as the authoritative contract.**
