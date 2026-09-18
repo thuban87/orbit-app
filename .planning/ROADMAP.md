@@ -1015,10 +1015,19 @@ Plans:
 **Goal**: Replace the contact-browser-as-dashboard shell with a Digest-centered home. Permanent navigation becomes **Contacts · Events · Digest · Orrery · Settings** (Digest centered and the default launch destination); Dashboard is relabelled Contacts, Group Events becomes Events, and the redundant Backup bottom tab is removed. Digest is a fixed three-part surface — **Up Next · Horizon · Your Week** — composed from existing reads, canonical relationship/orbit status, birthdays, and Phase 32 history/heatmap aggregation, with no new relationship-domain schema.
 **Scope note**: Re-specced from the original single "Your Week" page. "Your Week" is now one module inside Digest, not the phase.
 **Depends on**: Phases 32 (history/heatmap aggregation), 33 (Group Events), 36 (backup format), 37 + 37.1 (Settings — Backup & Restore page, period preference)
-**Requirements**: Defined at planning time from the dossier
-**Success Criteria**: Defined at planning time (dossier §S planning-time verification checklist)
+**Requirements**: S-01…S-15 — the dossier §S planning-time verification checklist (S-01 root-tab/route inventory · S-02 origin-aware Profile · S-03 FAB audit · S-04 Settings Backup before tab removal · S-05 Dashboard/Group-Events label inventory · S-06 canonical status for Up Next · S-07 overlooked/never-contacted + dedup · S-08 7-day birthdays · S-09 Phase-32 heatmap/day-detail reuse · S-10 Rolling-7 + Calendar Week · S-11 Group-Event no double-count · S-12 period pref persistence · S-13 Digest notification routing · S-14 reselect/fresh-launch/resume · S-15 physical-device UAT)
+**Success Criteria**: All S-01…S-15 verified (dossier §S), incl. on-device UAT across all five tabs + both theme packages
 **Canonical refs**: docs/dossier/milestone-2/phase-38-digest-navigation-restructure-dossier.md (authoritative); ADR-076
-**Plans**: TBD
+**Plans**: 7 plans (4 waves)
+
+Plans:
+- [ ] 38-01-PLAN.md — Five-tab shell + semantic routing (tracer) [wave 1]
+- [ ] 38-02-PLAN.md — Your Week data layer + migration 030 + period preference [wave 1, has reversibility checkpoint]
+- [ ] 38-03-PLAN.md — Up Next + Horizon composition logic (up-next-read + digest-composition) [wave 1]
+- [ ] 38-04-PLAN.md — Digest notification deep-link + global FAB audit + Contacts header cleanup [wave 2]
+- [ ] 38-05-PLAN.md — Your Week presentation (section + heatmap + inline day detail) [wave 2]
+- [ ] 38-06-PLAN.md — Digest surface assembly (DigestScreen rewrite + Up Next + Horizon) [wave 3]
+- [ ] 38-07-PLAN.md — Navigation regression + accessibility + themes + physical-device UAT [wave 4]
 
 > **Ready to plan — dossier interrogated 2026-09-18; plan against the dossier as the authoritative contract.**
 
