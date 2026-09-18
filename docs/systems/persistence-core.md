@@ -1,7 +1,7 @@
 # Persistence Core
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
+**Updated by phase:** 33-group-interaction-logging
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -144,6 +144,12 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 2. The trigger runs each hook once for the foreground launch, after database access is available.
 3. A hook that writes obtains its own `inWriteTransaction()`; it must not nest that non-reentrant boundary inside another hook transaction.
 
+### Group Event schema and composed writes
+
+`group_events` stores encounter identity and shared context. `interactions.group_event_id` is a nullable foreign key with `ON DELETE SET NULL`; nullable `ge_follow_channel`, `ge_follow_quality`, and `ge_follow_duration` retain authoring state. The partial `idx_group_member_unique` index allows each contact at most one child in an event while leaving standalone rows unrestricted.
+
+`group-events-dao` owns one outer `inWriteTransaction` per fan-out, invokes non-mutexed recency cores, and advances `data_revision` once after complete success. `saveParticipantEdits` writes ordinary values and membership-scoped follow flags together. The public mutex-owning DAO methods cannot be nested inside that boundary. Event date changes recompute each child contact’s recency; Group Note changes update only the parent.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -183,6 +189,13 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-099:** Durable Global Dashboard Right-Swipe Action — defines migration 020's constrained, defaulted action preference.
 - **ADR-104:** Durable Orrery Preferences and Live System Scope — defines migration 021's constrained, defaulted Orrery preference boundary.
 - **ADR-108:** Durable Independent-Axis Profile Presentation and Inheritance — defines migration 024 and the exported Profile schema-version boundary.
+- **[ADR-063: Versioned Lifecycle Backup and Dormant-Cadence Restore](../decisions/ADR-063-versioned-lifecycle-backup-and-dormant-cadence-restore.md)** — governs `src/db/migrations/011-contact-lifecycle-schema.ts`, `tracking_enabled`.
+- **[ADR-070: Durable Pending Interaction-Assist Lifecycle and Portable Opt-Out](../decisions/ADR-070-durable-pending-interaction-assist-lifecycle-and-portable-opt-out.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-079: On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation](../decisions/ADR-079-on-demand-ai-transparency-and-compose-only-three-suggestion-invocation.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-113: Persistent Shared System Background Selection](../decisions/ADR-113-persistent-shared-system-background-selection.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-116: Value-Remapped Interaction Vocabulary and Optional Descriptive Duration](../decisions/ADR-116-value-remapped-interaction-vocabulary-and-descriptive-duration.md)** — governs `src/db/database.ts`.
+- **[ADR-120: Shared-Window Heatmap and Intensity with Globally-Persisted Lenses](../decisions/ADR-120-shared-window-heatmap-and-intensity-with-persisted-lenses.md)** — governs `src/db/app-settings-dao.ts`.
+- **[ADR-124: Group Event Parents with Canonical Per-Contact Children](../decisions/ADR-124-group-event-parents-with-canonical-per-contact-children.md)** — governs `src/db/database.ts`.
 
 ## Gotchas
 
@@ -213,6 +226,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 24. **A System read never prunes stale exclusions.** It ignores and reports exclusions whose contacts no longer match; the next intentional definition save performs the physical deletion inside the Systems transaction.
 25. **Selection revision is internal conflict evidence.** It is not camera state or user-facing content. Any selection writer that bypasses the revision increment can let a delayed Undo overwrite a newer choice.
 26. **Do not duplicate the Profile migration number.** Import `PROFILE_PRESENTATION_SCHEMA_VERSION` and `profilePresentationMigration`; a literal target can drift from the registered step.
+
+- **FK detachment needs explicit cleanup.** `ON DELETE SET NULL` clears only the link. Lifecycle writers and the locked orphan contract clear all three follow flags together with the reference.
 
 ## Related Systems
 
@@ -255,3 +270,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-09-02 | 30 | Added migrations 022/023 for custom Orrery Systems, ref-keyed customization, and revision-guarded selection lifecycle. |
 | 2026-09-02 | 31 | Added migration 024's independent Profile templates, assignments, overrides, collapse state, and exported schema-version contract. |
 | 2026-09-17 | 37.1 | Confirmed mutable categories require no schema change: target stays 29, runtime deletion uses existing transactions/tombstones, and runtime/restore paths never reseed migration-001 defaults. |
+| 2026-09-02 | 33 | Added migration-026 Group Event parent/linkage, membership uniqueness, and single-transaction recency-core fan-outs. |
