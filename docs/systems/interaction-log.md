@@ -1,7 +1,7 @@
 # Interaction Log
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 32-interaction-history-insights
+**Updated by phase:** 33-group-interaction-logging
 **Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`, `src/services/quick-log-command.ts`, `src/db/bulk-actions-dao.ts`, `src/db/interaction-vocabulary.ts`
 
 ## Purpose
@@ -134,6 +134,12 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 3. `computeContactIntensity()` uses the same connection scope, counts outbound/mutual rows over the contact interval, and sorts qualifying history ascending for trailing cadence.
 4. The profile presents both values together; neither produces a database write or appears on the dashboard card.
 
+### Group-linked canonical interactions
+
+An Interaction may reference `group_events` through nullable `group_event_id`, with exactly three follow flags for Channel, Tone/quality, and Duration. It remains the participant’s one canonical touchpoint, containing resolved ordinary values and its own note. A Group Event parent contributes no extra History or metric count; an empty event has no recency effect.
+
+`createGroupEvent` and `addParticipants` compose `insertInteractionCore` and `recomputeLastContactCore` for each contact. `updateGroupEvent` and `saveParticipantEdits` compose `editTouchpointFullCore`; child deletion uses `deleteInteractionCore`. All run under the Group Event operation’s single transaction, with one trailing revision bump. Linked timestamps follow the authoritative event date/time through the future-date guard. Group Note remains separately owned parent context, never merged into `interactions.note` or authorized for AI by a child toggle.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -165,6 +171,25 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 - **ADR-116:** Value-Remapped Interaction Vocabulary and Optional Descriptive Duration — remaps the stored `quality`/`channel` values to the Tone / Message-Call-In Person vocabulary and adds nullable descriptive `duration` (migration 025), keeping the SQL column names. Partially supersedes ADR-023's value vocabulary.
 - **ADR-117:** Per-Interaction Allow-AI Consent Gate — adds the durable `allow_ai` flag (default OFF, fail-closed on restore) to every interaction row.
 - **ADR-118:** Bind/Unbind Immutable Lifecycle Events Without a Migration — extends `EventType` and emits insert-only bind/unbind events inside the existing cadence-change transaction.
+- **[ADR-011: Query-Time Status and Never-Contacted Segregation](../decisions/ADR-011-query-time-status-and-never-contacted-segregation.md)** — governs `src/db/recency-dao.ts`.
+- **[ADR-016: Fixed-First Contact Forms and Atomic Contact Creation](../decisions/ADR-016-fixed-first-contact-forms-and-atomic-contact-creation.md)** — governs `src/db/recency-dao.ts`.
+- **[ADR-028: Per-Item Conversational Fuel with Fixed Kinds](../decisions/ADR-028-per-item-conversational-fuel-with-fixed-kinds.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-029: In-Query Fuel Eligibility and a Shared Ranked Projection](../decisions/ADR-029-in-query-fuel-eligibility-and-a-shared-ranked-projection.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-030: Explicit Confirmation of AI-Proposed Fuel](../decisions/ADR-030-explicit-confirmation-of-ai-proposed-fuel.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-033: Profile Marking and Shared Drag-Reordered Favourites](../decisions/ADR-033-profile-marking-and-shared-drag-reordered-favourites.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-036: Entry-Agnostic Compose Navigation and Transmittable-Fuel Guardrails](../decisions/ADR-036-entry-agnostic-compose-navigation-and-transmittable-fuel-guardrails.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-052: Compose-Owned AI Draft Lifecycle and Acknowledged Egress](../decisions/ADR-052-compose-owned-ai-draft-lifecycle-and-acknowledged-egress.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-061: DAO-Selected Actionable Primary SMS Handoff](../decisions/ADR-061-dao-selected-actionable-primary-sms-handoff.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-072: Shared Actionable Reach Out Router with Native Channel Handoff](../decisions/ADR-072-shared-actionable-reach-out-router-with-native-channel-handoff.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-074: Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe](../decisions/ADR-074-widget-contact-supersession-and-strict-reach-deep-link-fail-safe.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-079: On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation](../decisions/ADR-079-on-demand-ai-transparency-and-compose-only-three-suggestion-invocation.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-108: Durable Independent-Axis Profile Presentation and Inheritance](../decisions/ADR-108-durable-independent-axis-profile-presentation-and-inheritance.md)** — governs `src/db/bulk-actions-dao.ts`.
+- **[ADR-109: Fixed-Hero Semantic Profile Composition and Focused Accessible Editors](../decisions/ADR-109-fixed-hero-semantic-profile-composition-and-focused-accessible-editors.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-114: Route-Aware App-Wide System Background Composition](../decisions/ADR-114-route-aware-app-wide-system-background-composition.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-120: Shared-Window Heatmap and Intensity with Globally-Persisted Lenses](../decisions/ADR-120-shared-window-heatmap-and-intensity-with-persisted-lenses.md)** — governs `src/components/IntensityLine.tsx`.
+- **[ADR-122: Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Recency Writer](../decisions/ADR-122-canonical-interaction-detail-edit-and-shared-detail-sheet.md)** — governs `src/components/TimelineRow.tsx`, `src/db/recency-dao.ts`.
+- **[ADR-123: Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing](../decisions/ADR-123-profile-history-section-replacing-the-vertical-timeline.md)** — governs `src/screens/ContactProfileScreen.tsx`.
+- **[ADR-124: Group Event Parents with Canonical Per-Contact Children](../decisions/ADR-124-group-event-parents-with-canonical-per-contact-children.md)** — governs `src/db/recency-dao.ts`.
 
 ## Gotchas
 
@@ -190,6 +215,8 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 17. **`duration` is descriptive only.** Persist canonical seconds, present minutes/hours, show it only when present, and never feed it into Status, Gravity, or Intensity.
 18. **Bind/unbind events write inside the cadence transaction.** The producer composes `recordEventCore()` within the existing bind/unbind transaction (non-reentrant mutex), never after it, and the events are immutable like every other lifecycle event.
 
+- **Parent removal and child removal differ.** Direct child deletion removes only that participant. Dissolve detaches all children; full event deletion removes all linked children. The parent can remain valid with no participants.
+
 ## Related Systems
 
 - **Contacts** — owns contact policy, lifecycle transitions, and the materialized `last_contact` value.
@@ -214,3 +241,4 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 | 2026-09-02 | 28 | Added atomic Dashboard batch logging, receipt-scoped Undo, and archive event fan-out through composed cores. |
 | 2026-09-02 | 31 | Added snapshot-compatible impact reads, bounded interim Profile history, and the shared no-cadence calendar-month activity contract. |
 | 2026-09-02 | 32 | Migration 025 remapped the stored `quality`/`channel` values to the Tone / Message-Call-In Person vocabulary (column names kept), added nullable descriptive `duration`, and added the default-OFF `allow_ai` consent gate; added `bind`/`unbind` immutable lifecycle events (no migration); single-sourced the vocabulary in `interaction-vocabulary.ts`. The full History & Insights surface replaced the interim bounded Profile timeline. |
+| 2026-09-02 | 33 | Documented canonical Group Event children, three-field inheritance, parent-only note ownership, and recency-safe lifecycle composition. |
