@@ -1,7 +1,7 @@
 # Interaction History & Insights
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 32-interaction-history-insights
+**Updated by phase:** 33-group-interaction-logging
 **Owners:** `src/db/history-read.ts`, `src/db/interaction-edit-read.ts`, `src/services/history/` (`window.ts`, `buckets.ts`, `cycles.ts`, `intensity-window.ts`), `src/components/history/`, `src/screens/EditInteractionScreen.tsx`, `src/screens/edit-interaction-logic.ts`
 
 ## Purpose
@@ -51,8 +51,8 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 | `src/components/history/rolodex-logic.ts` | Pure `rollDate`/`clampDate`/`clampToToday`, `markerFor`, `formatDrawerSummary`. |
 | `src/components/history/DateDetailSheet.tsx` | Shared period/date sheet interleaving the three record families. |
 | `src/components/history/InteractionDetail.tsx` | Present-only inspection + AI sparkle + hard-delete + edit-scope gating. |
-| `src/components/history/interaction-detail-logic.ts` | Pure `buildDetailRows` (no blanks), `showSparkle`, dormant `buildGroupContext`. |
-| `src/components/history/GroupScopePrompt.tsx` | Dormant individual-vs-group scope prompt (Phase 33 seam). |
+| `src/components/history/interaction-detail-logic.ts` | Pure `buildDetailRows` (no blanks), `showSparkle`, active `buildGroupContext`. |
+| `src/components/history/GroupScopePrompt.tsx` | Explicit individual-vs-group edit scope prompt. |
 | `src/screens/EditInteractionScreen.tsx` | The one canonical Edit Interaction route, saving via `editTouchpointFull`. |
 
 ## How It Works
@@ -81,7 +81,15 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 1. A `DateDetailSheet` row → `InteractionDetail`, which renders only present fields, a restrained AI sparkle strictly when `allow_ai === 1`, and Edit/Delete.
 2. Edit → `EditInteractionScreen`, seeded by `readInteractionForEdit`, saving every editable field through `editTouchpointFull` — the sole recency writer — with future dates rejected via the DAO's shared guard; a failed save preserves the form.
 3. Delete opens a destructive `ConfirmDialog` and calls `deleteTouchpoint` (tombstone + recompute in one transaction); a failure leaves the row and derived metrics intact with the control re-enabled.
-4. Group-linked routing (context badge, `GroupScopePrompt`, scope-gated Edit) is a dormant seam gated on the hard-false `isGroupLinked` predicate — it never fires in Phase 32 (Phase 33 owns group persistence).
+Group-linked context and edit-scope routing are active through the Group Event routes; standalone interactions continue using the canonical Edit Interaction route.
+
+### Inspecting and editing group-linked history
+
+`readContactHistory` projects Group Event identity, title, and Group Note as local context on the existing child Interaction row. The parent never becomes a second history record or an aggregation input. `InteractionDetail` shows the shared prose explicitly as Group Note alongside the unchanged participant note and offers View Group Event.
+
+Linked Edit opens `GroupScopePrompt`: individual scope routes to `EditParticipant`, and group scope routes to `EditGroupEvent`. Those routes and `GroupEventDetail` exist in Dashboard, Orrery, and Settings profile-hosting stacks. Participant editing cannot change event title/date or Group Note. Conversion from an ordinary Interaction uses the nonblank `GroupTitlePromptSheet` and `convertInteractionToGroupEvent`, preserving the child ID/UID. Failed conversion retains the title prompt with visible retry feedback.
+
+Group Event Detail’s participant card opens the same child Detail shape through `buildGroupEventDetailInteraction`, carrying the actual stored `allowAi`; `groupEventDurationLabel` delegates whole-second duration rendering to `formatDurationLabel`. Neither projection adds an AI permission control for Group Note.
 
 ## Configuration
 
@@ -100,6 +108,8 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 - **ADR-122:** Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet — one inspection/correction surface through the sole recency writer with hard-delete.
 - **ADR-123:** Profile History Section Replacing the Vertical Timeline — the assembled section behind the ProfileModuleHost seam and the typed `LogContact` backfill contract. Partially supersedes ADR-024's profile-timeline refinement surface.
 - **ADR-116 / ADR-117:** the interaction vocabulary/duration and Allow-AI gate this surface renders (see `interaction-log.md`, `ai-suggestions.md`).
+- **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/components/history/HistorySection.tsx`.
+- **[ADR-127: Canonical Event-First Group Logging and Explicit Child Edit Scope](../decisions/ADR-127-canonical-event-first-group-logging-and-explicit-child-edit-scope.md)** — governs `src/components/history/GroupScopePrompt.tsx`, `src/components/history/HistorySection.tsx`, `src/components/history/InteractionDetail.tsx`.
 
 ## Gotchas
 
@@ -108,11 +118,13 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 3. **The Cycles lens has no date grid.** Intensity for Cycles is computed over a synthetic span window `[oldest.start, newest.end]`; day lenses use the real shared window.
 4. **A structural blank is not a zero-count day.** `heatmapScale[0]` is a real logged-nothing plate; `heatmapCellEmpty` is a transparent Month/Year padding cell. Keep them distinct (node-tested) so a placeholder never reads as activity.
 5. **The current cycle is marked structurally, never by a second hue.** Use the outline + `Current cycle` a11y label; the colour ramp means count only.
-6. **The group-link seam is inert in Phase 32.** `isGroupLinked` is hard-false and references no `group_event_id` column. Do not make it "exercisable" by adding the column early — that reverses D-07/ADR-116's migration scope (Phase 33 owns group persistence). The Group Note stays a distinct field, never concatenated into the participant note and never AI-transmitted.
+Group-linked context and edit-scope routing are active through the Group Event routes; standalone interactions continue using the canonical Edit Interaction route.
 7. **The drawer/context card never auto-open the sheet.** Scrolling or selecting a date updates only the committed selection; the sheet opens exclusively from an explicit `See details` / `Log interaction` action.
 8. **Backfill routes detailed logging, never Quick Log.** `buildLogRoute` returns the typed `LogContact { contactId, prefillDate }` — Quick Log means "now" and must not be reused for a historical date.
 9. **Worklet-forward-ref safety.** The Rolodex depth worklet is defined above its caller; a worklet calling a helper defined later crashes undefined-on-device on Hermes and vitest cannot catch it.
 10. **IntensityChart caption reads the contact cadence, not the window span.** A regression once made the caption describe the window; it now reflects the contact's true intended cadence (fixed live during UAT, commit `84e4013`).
+
+- **Truthful Detail projection.** The initial Group Event Detail supplied a static Allow-AI value and displayed seconds as minutes. Gap closure reads the stored child flag and reuses the shared duration formatter.
 
 ## Related Systems
 
@@ -129,3 +141,4 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-09-02 | 32 | Created the History & Insights subsystem: reusable count-only aggregation seam + canonical `history-read`, shared-window Heatmap/Intensity with globally-persisted lenses, the Rolodex Month/Day/Year Browser, the shared Date Detail Sheet + Interaction Detail + canonical Edit route with hard-delete, and the Profile History section replacing the vertical timeline. Group-linked routing is a dormant Phase-33 seam. |
+| 2026-09-02 | 33 | Activated local group context, explicit child/event edit scope, identity-preserving conversion, and truthful participant Detail projection. |
