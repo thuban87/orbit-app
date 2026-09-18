@@ -56,6 +56,20 @@ replace the dossier — read it in full first.
 - **D-07:** The dossier specifies no inline write actions in Up Next / Horizon (§D). If any
   interaction create/edit does appear, it must route through the single recency-writer core in one
   transaction (ADR-010/024/071); a write surfacing here otherwise signals scope drift.
+- **D-08 [owner ruling, cycle-1 review]:** The `yourWeekPeriod` preference **is portable** and
+  **`BACKUP_FORMAT_VERSION` bumps 6→7**. Emit it in `getPortableSettingsSnapshot`
+  (`src/db/app-settings-dao.ts`) and its return mapping, following the **landed Phase 36 backup
+  policy** — NOT the stale "declare-optional, emission-deferred" comment pattern at
+  `app-settings-dao.ts:460-473`, which is now spent (Phase 36 already emits the formerly-deferred
+  keys). This is a persisted **app-settings preference**, distinct from the D-02 prohibition on a
+  durable *Digest snapshot/cache*; D-02 is not in tension. `BACKUP_FORMAT_VERSION` lives at
+  `src/backup/types.ts` (currently 6). Owner decided this on 2026-09-18.
+- **D-09 [owner ruling, cycle-1 review]:** The Your Week period preference is surfaced in **BOTH**
+  places: a **Settings row** in Phase 37 Settings (its canonical home per dossier §I) **AND** the
+  in-context Digest toggle. The two stay in sync (single source of truth in app-settings; the
+  in-context toggle reads/writes the same preference). This **honors §I** and **supersedes** Plan
+  05's earlier read of D-03 as licence to place it in-context only. D-03 governs plan
+  *decomposition*, not preference *placement*. Owner decided this on 2026-09-18.
 </decisions>
 
 <canonical_refs>
