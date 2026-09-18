@@ -53,4 +53,4 @@ Migration 025 adds `interactions.allow_ai` as `INTEGER NOT NULL DEFAULT 0 CHECK(
 - `src/components/TouchpointRefineForm.tsx` — the OFF-by-default Allow-AI toggle at log time.
 
 **Depends on:** ADR-078 (Negative-Constraint Off-Limits and Gated Recent-Interaction AI Context); ADR-050 (Closed AI Prompt Egress Allowlist and Opt-In Field Sharing); ADR-010 (Single-Writer Interaction Recency Spine)
-**Required by:** None
+**Required by:** ADR-125

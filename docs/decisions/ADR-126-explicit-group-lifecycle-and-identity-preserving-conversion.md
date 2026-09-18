@@ -48,4 +48,4 @@ The system asks Delete interaction / Keep as individual interaction / Cancel for
 - `src/components/history/HistorySection.tsx` — conversion and removal navigation.
 
 **Depends on:** ADR-124 (Group Event Parents with Canonical Per-Contact Children); ADR-125 (Three-Field Live Inheritance with Separate Local-Only Group Notes); ADR-056 (Tombstone-Backed UID Reconciliation for Portable Restores)
-**Required by:** None
+**Required by:** ADR-129

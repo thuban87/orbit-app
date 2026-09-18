@@ -51,4 +51,4 @@ Dashboard Card View uses in-memory multi-select with an entry-time frozen eligib
 - `src/navigation/types.ts` — defines the additive serializable `GroupLog.participantIds` route contract.
 
 **Depends on:** ADR-075 (Binary Favourite Membership Without a User-Facing Order); ADR-092 (Durable Shared Dashboard Query State); ADR-093 (Scoped Composable Dashboard Population and Filter Model); ADR-096 (Dashboard Header and Overflow Discovery Paths)
-**Required by:** None
+**Required by:** ADR-127

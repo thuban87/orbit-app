@@ -49,4 +49,4 @@ The system uses a UID-bearing Group Event parent and one ordinary canonical chil
 - `src/db/purge-dao.ts` — leaves Group Event parents outside contact purge.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations); ADR-010 (Single-Writer Interaction Recency Spine); ADR-024 (Editable Touchpoint History and Recomputed Recency)
-**Required by:** None
+**Required by:** ADR-125; ADR-126; ADR-127; ADR-128

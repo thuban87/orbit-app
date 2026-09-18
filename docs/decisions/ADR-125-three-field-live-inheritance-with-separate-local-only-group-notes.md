@@ -50,4 +50,4 @@ The system uses live Follow event state for exactly Channel, Tone (quality), and
 - `src/db/ai-context-read.ts` — closed AI context projection without Group Event access.
 
 **Depends on:** ADR-124 (Group Event Parents with Canonical Per-Contact Children); ADR-078 (Negative-Constraint Off Limits and Gated Recent-Interaction AI Context); ADR-117 (Per-Interaction Allow-AI Consent Gate)
-**Required by:** None
+**Required by:** ADR-126
