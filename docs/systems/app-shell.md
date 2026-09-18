@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 32-interaction-history-insights
+**Updated by phase:** 33-group-interaction-logging
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -119,7 +119,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 ### Handing off detailed Dashboard logging
 
 1. Card View routes one selected contact to the existing `LogContact` route. Two or more targets navigate to `GroupLog` with an optional serializable `participantIds` array.
-2. `navigation/types.ts` defines the handoff only. The Group Interaction Logging phase consumes those IDs when it replaces the placeholder workflow; no contact data or callback crosses the route boundary.
+2. `navigation/types.ts` defines the handoff only. `GroupLogScreen` consumes those IDs as its initial participant draft; no contact data or callback crosses the route boundary.
 
 ### Opening Backup & Restore
 
@@ -229,6 +229,12 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 1. The History section's Interaction Detail opens the canonical `EditInteraction { contactId, interactionId }` route, registered in all three Profile-hosting stacks (Dashboard, Orrery, Settings) — React Navigation throws on an unregistered name.
 2. An empty History date routes the typed `LogContact { contactId, prefillDate }` contract (also registered across those stacks); the target is a placeholder screen until Phase 34 supplies the detailed-log form. `prefillDate` is a serializable string, never a callback.
 
+### Group Event routes and shared picker confirmation
+
+`GroupLog` opens the canonical event-first form directly and consumes optional serializable `participantIds`. `GroupEvents` browses local parent records; `GroupEventDetail`, `EditGroupEvent`, and `EditParticipant` are registered in each of Dashboard, Orrery, and Settings’s profile-hosting stacks. Focused-route classification suppresses browse capture chrome on the editors while Detail remains a presentation surface.
+
+`ContactPicker` uses a discriminated single/multi-select contract over the same picker foundation. Multi-select maintains insertion-ordered IDs, count, Clear, and Done, excluding current members before normal filtering. Its owner may return a promise: Done waits for persistence and reload, blocks duplicate submission, and clears/dismisses only after success. Failure keeps the Modal, selected IDs, and a visible local error for retry; synchronous multi-select owners retain their successful behavior.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -318,6 +324,9 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-120:** Shared-Window Heatmap and Intensity with Globally-Persisted Lenses — adds the per-palette `heatmapScale`/`heatmapCellEmpty`/`markerInteraction`/`markerLifecycle` theme tokens.
 - **ADR-122:** Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet — registers the `EditInteraction` route in all three Profile-hosting stacks.
 - **ADR-123:** Profile History Section Replacing the Vertical Timeline — extends `LogContact` with `prefillDate` and registers it (plus Settings-side `ThingsToRemember`/`MemoryHistory`) across the Profile-hosting stacks.
+- **[ADR-097: Scoped Dashboard Search and Dedicated Unbound Retrieval](../decisions/ADR-097-scoped-dashboard-search-and-dedicated-unbound-retrieval.md)** — governs `src/screens/HomeScreen.tsx`.
+- **[ADR-100: Relevance-First, Visibility-Safe Dashboard List Search](../decisions/ADR-100-relevance-first-visibility-safe-dashboard-list-search.md)** — governs `src/screens/HomeScreen.tsx`.
+- **[ADR-127: Canonical Event-First Group Logging and Explicit Child Edit Scope](../decisions/ADR-127-canonical-event-first-group-logging-and-explicit-child-edit-scope.md)** — governs `src/navigation/focused-route-classification.ts`, `src/navigation/types.ts`.
 
 ## Gotchas
 
@@ -364,6 +373,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 34. **Do not reuse card opacity as the host veil.** Card contrast and background visibility are separate token contracts; coupling them recreates the imperceptible-background defect.
 35. **Avoid Android elevation on translucent Galaxy cards.** It renders an opaque inner rectangle; the iOS shadow remains independently supported.
 36. **Register `EditInteraction` and `LogContact` in every Profile-hosting stack.** A Profile is reachable from Dashboard, Orrery, and Settings; a route registered in only one stack throws when a Settings-originated Profile navigates to it. The Settings stack also needs `ThingsToRemember`/`MemoryHistory` for History Detail Sheet knowledge edits.
+
+- **Types do not register native routes.** A shared type intersection cannot prove that a route is mounted in each hosting stack; Group Event routes require all three runtime registrations.
 
 ## Related Systems
 
@@ -420,3 +431,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 31 | Added origin-preserving Profile composition, focused expanded sheets, Compose-only AI entry, and ready-gated background reconciliation. |
 | 2026-09-10 | 31.1 | Adopted persistent shared System backgrounds across ordinary routes, preserved Profile and canvas precedence, and corrected veil/card/chrome composition after production-device validation. |
 | 2026-09-02 | 32 | Registered the canonical `EditInteraction` route and the `prefillDate`-extended `LogContact` contract across all Profile-hosting stacks (plus Settings-side `ThingsToRemember`/`MemoryHistory`), and added the per-palette History heatmap/marker theme tokens. |
+| 2026-09-02 | 33 | Replaced Group Log/browse placeholders with cross-stack Group Event routes and awaited, failure-preserving multi-select confirmation. |
