@@ -56,6 +56,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | `src/db/restore-photo-journal-dao.ts` | Persists committed photo recovery work. |
 | `src/screens/BackupScreen.tsx` | Provides the health/action landing and restore entry. |
 | `docs/systems/orrery-systems-backup-contract.md` | Records the Phase-30 stable-UID entity, validation, and orphan-repair contract consumed by the coordinated Systems wire implementation. |
+| `src/db/group-events-dao.ts` | Owns local Group Event deletion evidence and detach semantics. |
 
 ## How It Works
 
@@ -118,6 +119,8 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 - **[ADR-118: Bind/Unbind Immutable Lifecycle Events Without a Migration](../decisions/ADR-118-bind-unbind-immutable-lifecycle-events-without-a-migration.md)** — governs `src/backup/restore-apply.ts`.
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/db/tombstones-dao.ts`.
 - **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/backup/export-manifest.ts`, `src/db/tombstones-dao.ts`.
+- **[ADR-124: Group Event Parents with Canonical Per-Contact Children](../decisions/ADR-124-group-event-parents-with-canonical-per-contact-children.md)** — governs `src/db/group-events-dao.ts`.
+- **[ADR-125: Three-Field Live Inheritance with Separate Local-Only Group Notes](../decisions/ADR-125-three-field-live-inheritance-with-separate-local-only-group-notes.md)** — governs `src/db/group-events-dao.ts`.
 
 ## Gotchas
 

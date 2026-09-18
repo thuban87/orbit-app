@@ -54,6 +54,7 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 | `src/components/history/interaction-detail-logic.ts` | Pure `buildDetailRows` (no blanks), `showSparkle`, active `buildGroupContext`. |
 | `src/components/history/GroupScopePrompt.tsx` | Explicit individual-vs-group edit scope prompt. |
 | `src/screens/EditInteractionScreen.tsx` | The one canonical Edit Interaction route, saving via `editTouchpointFull`. |
+| `src/db/history-read.ts` | Projects canonical child rows plus local parent context without double counting. |
 
 ## How It Works
 
@@ -81,7 +82,7 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 1. A `DateDetailSheet` row → `InteractionDetail`, which renders only present fields, a restrained AI sparkle strictly when `allow_ai === 1`, and Edit/Delete.
 2. Edit → `EditInteractionScreen`, seeded by `readInteractionForEdit`, saving every editable field through `editTouchpointFull` — the sole recency writer — with future dates rejected via the DAO's shared guard; a failed save preserves the form.
 3. Delete opens a destructive `ConfirmDialog` and calls `deleteTouchpoint` (tombstone + recompute in one transaction); a failure leaves the row and derived metrics intact with the control re-enabled.
-Group-linked context and edit-scope routing are active through the Group Event routes; standalone interactions continue using the canonical Edit Interaction route.
+4. Group-linked context and edit-scope routing are active through the Group Event routes; standalone interactions continue using the canonical Edit Interaction route.
 
 ### Inspecting and editing group-linked history
 
@@ -110,6 +111,8 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 - **ADR-116 / ADR-117:** the interaction vocabulary/duration and Allow-AI gate this surface renders (see `interaction-log.md`, `ai-suggestions.md`).
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/components/history/HistorySection.tsx`.
 - **[ADR-127: Canonical Event-First Group Logging and Explicit Child Edit Scope](../decisions/ADR-127-canonical-event-first-group-logging-and-explicit-child-edit-scope.md)** — governs `src/components/history/GroupScopePrompt.tsx`, `src/components/history/HistorySection.tsx`, `src/components/history/InteractionDetail.tsx`.
+- **[ADR-124: Group Event Parents with Canonical Per-Contact Children](../decisions/ADR-124-group-event-parents-with-canonical-per-contact-children.md)** — governs `src/db/history-read.ts`.
+- **[ADR-125: Three-Field Live Inheritance with Separate Local-Only Group Notes](../decisions/ADR-125-three-field-live-inheritance-with-separate-local-only-group-notes.md)** — governs `src/db/history-read.ts`.
 
 ## Gotchas
 
@@ -118,7 +121,7 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 3. **The Cycles lens has no date grid.** Intensity for Cycles is computed over a synthetic span window `[oldest.start, newest.end]`; day lenses use the real shared window.
 4. **A structural blank is not a zero-count day.** `heatmapScale[0]` is a real logged-nothing plate; `heatmapCellEmpty` is a transparent Month/Year padding cell. Keep them distinct (node-tested) so a placeholder never reads as activity.
 5. **The current cycle is marked structurally, never by a second hue.** Use the outline + `Current cycle` a11y label; the colour ramp means count only.
-Group-linked context and edit-scope routing are active through the Group Event routes; standalone interactions continue using the canonical Edit Interaction route.
+6. **Group context is local presentation only.** Keep Group Note distinct from the participant note; child Allow-AI never authorizes shared text.
 7. **The drawer/context card never auto-open the sheet.** Scrolling or selecting a date updates only the committed selection; the sheet opens exclusively from an explicit `See details` / `Log interaction` action.
 8. **Backfill routes detailed logging, never Quick Log.** `buildLogRoute` returns the typed `LogContact { contactId, prefillDate }` — Quick Log means "now" and must not be reused for a historical date.
 9. **Worklet-forward-ref safety.** The Rolodex depth worklet is defined above its caller; a worklet calling a helper defined later crashes undefined-on-device on Hermes and vitest cannot catch it.

@@ -58,6 +58,7 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 | `src/db/merge-dao.ts` | Owns transactional merge order, child reparenting, and tombstoning. |
 | `src/screens/ReconcileDetailScreen.tsx` | Renders per-contact review, missing-source actions, and permission-gated source reads. |
 | `src/screens/ReconcileGridScreen.tsx` | Runs a Settings-launched scan and hosts durable bulk review. |
+| `src/components/MergeImpactSummary.tsx` | Displays the typed same-event collision remediation. |
 
 ## How It Works
 

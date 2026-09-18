@@ -12,6 +12,8 @@ The interaction log records contact touchpoints and lifecycle events on-device, 
 
 ### Data Model
 
+Group-linked `interactions` add nullable `group_event_id` and `ge_follow_channel` / `ge_follow_quality` / `ge_follow_duration` columns. The ordinary Channel/Tone/Duration values stay resolved on each child, and its `note` remains participant-owned. Shared Group Note belongs only to `group_events`; the partial UNIQUE index enforces one child per event/contact pair. See [Group Events](group-events.md) for the full parent schema.
+
 All log data lives in local SQLite. A touchpoint is distinct from a lifecycle event: only qualifying interaction rows can advance a contact's maintained `last_contact`.
 
 **Tables:**
@@ -72,6 +74,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 | `src/components/GravityBar.tsx` | Displays a named gravity tier without a raw score. |
 | `src/components/IntensityLine.tsx` | Displays neutral intensity and trailing cadence. |
 | `src/screens/ContactProfileScreen.tsx` | Hosts one-tap logging, history correction, and profile-only impact views. |
+| `src/db/group-events-dao.ts` | Composes ordinary child mutations within atomic Group Event operations. |
 
 ## How It Works
 
@@ -190,6 +193,9 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 - **[ADR-122: Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet Through the Sole Recency Writer](../decisions/ADR-122-canonical-interaction-detail-edit-and-shared-detail-sheet.md)** — governs `src/components/TimelineRow.tsx`, `src/db/recency-dao.ts`.
 - **[ADR-123: Profile History Section Replacing the Vertical Timeline, with Detailed-Log Backfill Routing](../decisions/ADR-123-profile-history-section-replacing-the-vertical-timeline.md)** — governs `src/screens/ContactProfileScreen.tsx`.
 - **[ADR-124: Group Event Parents with Canonical Per-Contact Children](../decisions/ADR-124-group-event-parents-with-canonical-per-contact-children.md)** — governs `src/db/recency-dao.ts`.
+- **[ADR-125: Three-Field Live Inheritance with Separate Local-Only Group Notes](../decisions/ADR-125-three-field-live-inheritance-with-separate-local-only-group-notes.md)** — governs `src/db/group-events-dao.ts`.
+- **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/db/group-events-dao.ts`.
+- **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/db/group-events-dao.ts`.
 
 ## Gotchas
 

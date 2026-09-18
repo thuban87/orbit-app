@@ -77,6 +77,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/theme/hydrate-theme-at-boot.ts` | Safely imports legacy theme state and returns the SQLite-backed boot selection. |
 | `src/components/icons/icon-registry.ts` | Maps semantic icon names and variants to the replaceable base icon family. |
 | `src/components/ui/` | Hosts AppText, Button, and standardized overlay primitives for consuming screens. |
+| `src/components/ContactPicker.tsx` | Canonical single/multi-select picker and awaited confirmation outcomes. |
 
 ## How It Works
 

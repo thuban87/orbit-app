@@ -18,7 +18,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - `categories` — seeded, user-editable single-select contact groups.
 - `profile` — the single self/profile record.
 - `contacts` — the primary person record and maintained recency summary.
-- `interactions` — dated contact touchpoints.
+- `interactions` — dated contact touchpoints, optionally linked to a Group Event through a nullable parent reference and three follow flags.
+- `group_events` — UID-bearing encounter parents with shared Channel, Tone, Duration, and distinct Group Note; the parent itself never counts as a contact interaction.
 - `contact_links`, `events`, `custom_field_defs`, `field_history`, `fuel` — durable supporting data introduced in the first schema.
 - `custom_field_values` — migration-006 normalized uid-bearing custom-field current state, unique per contact-and-definition pair.
 - `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. Migration 015 adds theme selection; migrations 019 and 020 add validated Dashboard query and right-swipe-action preferences; migration 021 adds validated Orrery density, satellite, and last-System preferences. It never contains an API key, passphrase, or palette hex.
@@ -64,6 +65,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/018-custom-field-scope-history.ts` | Adds scope-ready definition metadata and retained custom-field value history. |
 | Migration | `src/db/migrations/022-orrery-systems.ts` | Adds custom System definitions, rules, manual overrides, and cross-kind display preferences. |
 | Migration | `src/db/migrations/023-orrery-system-selection-revision.ts` | Adds the monotonic internal revision that prevents Undo from overwriting a newer System selection. |
+| Migration | `src/db/migrations/026-group-events-schema.ts` | Adds Group Event parents, nullable child linkage, three follow flags, and partial membership uniqueness. |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Systems DAO | `src/db/systems-dao.ts` | Owns transactional System definitions, rules, overrides, preferences, delete/Undo, and selection-aware lifecycle composites. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
@@ -74,6 +76,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 
 | File | Role |
 |---|---|
+| `src/db/migrations/026-group-events-schema.ts` | Group Event schema and partial membership-unique index. |
+| `src/db/group-events-dao.ts` | One-transaction canonical child fan-outs. |
 | `src/db/database.ts` | Bootstrap, PRAGMAs, migrated database access, and local timestamp helper. |
 | `src/db/migrations/runner.ts` | Per-step atomic `user_version` migration control flow. |
 | `src/db/migrations/001-initial.ts` | Initial DDL and category/profile seeds. |
@@ -196,6 +200,10 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **[ADR-116: Value-Remapped Interaction Vocabulary and Optional Descriptive Duration](../decisions/ADR-116-value-remapped-interaction-vocabulary-and-descriptive-duration.md)** — governs `src/db/database.ts`.
 - **[ADR-120: Shared-Window Heatmap and Intensity with Globally-Persisted Lenses](../decisions/ADR-120-shared-window-heatmap-and-intensity-with-persisted-lenses.md)** — governs `src/db/app-settings-dao.ts`.
 - **[ADR-124: Group Event Parents with Canonical Per-Contact Children](../decisions/ADR-124-group-event-parents-with-canonical-per-contact-children.md)** — governs `src/db/database.ts`.
+- **[ADR-125: Three-Field Live Inheritance with Separate Local-Only Group Notes](../decisions/ADR-125-three-field-live-inheritance-with-separate-local-only-group-notes.md)** — governs `src/db/group-events-dao.ts`, `src/db/migrations/026-group-events-schema.ts`.
+- **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/db/group-events-dao.ts`.
+- **[ADR-128: Same-Group Contact Merge Refusal with Remediation](../decisions/ADR-128-same-group-contact-merge-refusal-with-remediation.md)** — governs `src/db/migrations/026-group-events-schema.ts`.
+- **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/db/group-events-dao.ts`.
 
 ## Gotchas
 
