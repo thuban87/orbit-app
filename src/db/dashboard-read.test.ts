@@ -971,6 +971,42 @@ describe("counts", () => {
     );
     expect(await countNeverContacted(exec)).toBe(2);
   });
+
+  it("keeps the D-10 never-contacted count and exact population universe aligned", async () => {
+    const bound = await seedContact({ name: "Bound Never", lastContact: null });
+    const unbound = await seedContact({
+      name: "Unbound Never",
+      lastContact: null,
+      trackingEnabled: 0,
+      favouriteRank: 1,
+    });
+    const query: DashboardQueryState = {
+      viewMode: "list",
+      populations: ["not-contacted"],
+      filters: {},
+      sort: "default",
+    };
+
+    expect(ids(await listDashboardPopulation(exec, query, NOW))).toEqual([bound]);
+    await exec.runAsync(
+      "UPDATE app_settings SET include_unbound_never_contacted = 1 WHERE id = 1",
+    );
+    const neverRows = await listDashboardPopulation(exec, query, NOW);
+    expect(ids(neverRows)).toEqual([bound, unbound]);
+    expect(neverRows).toHaveLength(await countNeverContacted(exec));
+
+    for (const population of ["all-contacts", "favourites"] as const) {
+      expect(
+        ids(
+          await listDashboardPopulation(
+            exec,
+            { ...query, populations: [population] },
+            NOW,
+          ),
+        ),
+      ).not.toContain(unbound);
+    }
+  });
 });
 
 describe("Bound SQL predicate parity", () => {

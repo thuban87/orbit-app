@@ -92,14 +92,15 @@ interface ContactOpts {
   remindersOff?: number;
   archivedAt?: string | null;
   trackingEnabled?: number;
+  snoozeUntil?: string | null;
 }
 
 async function seedContact(o: ContactOpts = {}): Promise<number> {
   const result = await exec.runAsync(
     `INSERT INTO contacts
        (uid, name, interval_days, last_contact, photo, rarely_responds,
-        reminders_off, tracking_enabled, archived_at, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        reminders_off, tracking_enabled, archived_at, snooze_until, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       uid(),
       o.name ?? "Alex",
@@ -110,6 +111,7 @@ async function seedContact(o: ContactOpts = {}): Promise<number> {
       o.remindersOff ?? 0,
       o.trackingEnabled ?? 1,
       o.archivedAt ?? null,
+      o.snoozeUntil ?? null,
       NOW,
       NOW,
     ],
@@ -317,6 +319,24 @@ describe("readOverlooked", () => {
     }); // progress 8.0
     const rows = await readOverlooked(exec);
     expect(rows.map((r) => r.name)).toEqual(["Badly", "Lightly"]);
+  });
+
+  it("excludes an actively snoozed rogue but keeps an unsnoozed rogue", async () => {
+    await seedContact({
+      name: "Snoozed rogue",
+      intervalDays: 10,
+      lastContact: localDateOffset(-40),
+      snoozeUntil: localDateOffset(3),
+    });
+    await seedContact({
+      name: "Visible rogue",
+      intervalDays: 10,
+      lastContact: localDateOffset(-40),
+    });
+
+    expect((await readOverlooked(exec)).map((row) => row.name)).toEqual([
+      "Visible rogue",
+    ]);
   });
 });
 

@@ -109,6 +109,19 @@ describe("dashboard query logic", () => {
     expect(where.params).toEqual([]);
   });
 
+  it("relaxes scope only for an exact not-contacted selection (D-10)", () => {
+    const exact = buildPopulationWhere(["not-contacted"]);
+    expect(exact.sql).toContain("include_unbound_never_contacted");
+    expect(exact.sql).toContain("c.tracking_enabled = 0");
+
+    const mixed = buildPopulationWhere(["not-contacted", "favourites"]);
+    expect(mixed.sql).toContain("c.tracking_enabled = 1");
+    expect(mixed.sql).not.toContain("include_unbound_never_contacted");
+    expect(buildPopulationWhere(["all-contacts"]).sql).not.toContain(
+      "include_unbound_never_contacted",
+    );
+  });
+
   it("uses Active when the final population is deselected", () => {
     const where = buildPopulationWhere([]);
 
