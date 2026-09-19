@@ -14,10 +14,9 @@
  *     T-11-BACKSTACK). `index: 1` selects Compose as the focused route.
  *   - birthday body tap → a RESET onto [Home, Profile{contactId}], preserving
  *     the Dashboard fallback used by every external entry.
- *   - digest body tap → a RESET onto [Home, Digest] (index 1), mirroring the
- *     decay reset so Back ALWAYS lands on the dashboard on warm AND cold stacks
- *     (review H3 / T-11-BACKSTACK). A digest payload carries NO contactId — there
- *     is nothing to forge into a profile navigation (V5 boundary).
+ *   - digest body tap → select the promoted Digest tab at its root. A digest
+ *     payload carries NO contactId — there is nothing to forge into a profile
+ *     navigation (V5 boundary).
  *
  * A malformed / unknown payload returns null so the gate performs no navigation.
  */
@@ -29,6 +28,7 @@ import type { NotificationData } from "./notification-ids";
  * shapes keep this resolver node-loadable and the gate a thin adapter.
  */
 export type NavIntent =
+  | { type: "select-digest" }
   | {
       type: "reset";
       index: 1;
@@ -36,11 +36,6 @@ export type NavIntent =
         { name: "Home" },
         { name: "Compose"; params: { contactId: number } },
       ];
-    }
-  | {
-      type: "reset";
-      index: 1;
-      routes: [{ name: "Home" }, { name: "Digest" }];
     }
   | {
       type: "reset";
@@ -76,20 +71,14 @@ function isNotificationData(d: unknown): d is NotificationData {
 export function resolveNotificationNav(data: unknown): NavIntent | null {
   // Digest pre-check, BEFORE the isNotificationData narrowing: a digest payload
   // carries NO contactId (nothing to forge — V5 boundary), so the numeric-
-  // contactId narrowing below would wrongly reject it. Return a RESET onto
-  // [Home, Digest] (index 1) — mirroring the decay reset — so Back ALWAYS lands
-  // on the dashboard regardless of the warm stack the OS handed us under
-  // singleTask/onNewIntent, NOT a bare navigate (review H3 / T-11-BACKSTACK).
+  // contactId narrowing below would wrongly reject it. The gate selects the
+  // promoted Digest tab at its root, so it carries no stale Dashboard route.
   if (
     typeof data === "object" &&
     data !== null &&
     (data as Record<string, unknown>).kind === "digest"
   ) {
-    return {
-      type: "reset",
-      index: 1,
-      routes: [{ name: "Home" }, { name: "Digest" }],
-    };
+    return { type: "select-digest" };
   }
 
   if (!isNotificationData(data)) {

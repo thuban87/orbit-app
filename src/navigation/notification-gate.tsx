@@ -56,7 +56,7 @@ import {
 import { resolveNotificationNav } from "@/services/notifications/notification-nav";
 import { Logger } from "@/utils/logger";
 import { navigationRef } from "./linking";
-import { resetToDashboardWith } from "./reset-intents";
+import { resetToDashboardWith, resetToDigestTab } from "./reset-intents";
 
 const LOG_SOURCE = "notif-gate";
 
@@ -97,7 +97,7 @@ export async function guardNotificationBodyIntent(
   if (!intent) {
     return null;
   }
-  if (intent.type !== "reset" || intent.routes[1]?.name !== "Compose") {
+  if (intent.type === "select-digest" || intent.routes[1]?.name !== "Compose") {
     return intent;
   }
 
@@ -127,7 +127,7 @@ export async function guardNotificationBodyIntent(
  * selected by a newer notification body tap.
  */
 export async function applyBodyNav(
-  data: NotificationData,
+  data: unknown,
   isCurrent: () => boolean = () => true,
   lookup: NotificationContactLookup = async (contactId) => {
     const [{ getExecutor }, { getContactHeader }] = await Promise.all([
@@ -148,7 +148,11 @@ export async function applyBodyNav(
   if (!nav) {
     return;
   }
-  nav.reset(resetToDashboardWith(intent.routes[1]));
+  nav.reset(
+    intent.type === "select-digest"
+      ? resetToDigestTab()
+      : resetToDashboardWith(intent.routes[1]),
+  );
 }
 
 /** Read the app-minted payload off a tapped notification. */

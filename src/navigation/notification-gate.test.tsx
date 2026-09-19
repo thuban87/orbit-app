@@ -24,8 +24,17 @@ const birthday = {
   contactId: 7,
   occurrenceKey: "2026-08-29",
 };
+const digest = { kind: "digest" as const };
 
 describe("guardNotificationBodyIntent", () => {
+  it("keeps Digest as a lookup-free promoted-tab intent", async () => {
+    const lookup = vi.fn();
+
+    await expect(
+      guardNotificationBodyIntent(digest, lookup),
+    ).resolves.toEqual({ type: "select-digest" });
+    expect(lookup).not.toHaveBeenCalled();
+  });
   it("keeps a Bound decay tap on Compose", async () => {
     await expect(
       guardNotificationBodyIntent(decay, async () => ({
@@ -74,6 +83,24 @@ describe("guardNotificationBodyIntent", () => {
 });
 
 describe("applyBodyNav", () => {
+  it("resets a Digest body tap to the Digest tab root without a lookup", async () => {
+    const reset = vi.fn();
+    const lookup = vi.fn();
+    navigationRef.current = { reset } as never;
+
+    await applyBodyNav(digest, () => true, lookup);
+
+    expect(lookup).not.toHaveBeenCalled();
+    expect(reset).toHaveBeenCalledWith({
+      index: 0,
+      routes: [
+        {
+          name: "DigestTab",
+          state: { index: 0, routes: [{ name: "Digest" }] },
+        },
+      ],
+    });
+  });
   it("does not let an older lookup overwrite a newer notification destination", async () => {
     let resolveFirst:
       | ((value: { archived_at: null; trackingEnabled: 1 }) => void)

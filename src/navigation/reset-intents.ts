@@ -25,6 +25,19 @@ export function resetToDashboardRoot(): TabResetState {
   } as TabResetState;
 }
 
+/** Select the promoted Digest tab at its stack root. */
+export function resetToDigestTab(): TabResetState {
+  return {
+    index: 0,
+    routes: [
+      {
+        name: "DigestTab",
+        state: { index: 0, routes: [{ name: "Digest" }] },
+      },
+    ],
+  } as TabResetState;
+}
+
 /** Keep Home below an external-entry target so Back returns to Dashboard. */
 export function resetToDashboardWith(
   target: DashboardResetTarget,
