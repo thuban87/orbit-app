@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38
-current_phase_name: Digest & Navigation Restructure
+current_phase_name: your-week
 status: executing
 stopped_at: Phase 38 UI-SPEC approved
-last_updated: "2026-09-18T21:31:52.541Z"
+last_updated: "2026-09-19T00:24:42.921Z"
 last_activity: 2026-09-17
 last_activity_desc: Phase 37.1 complete, transitioned to Phase 38
-state_head: 2a9dbfce77d08c380a32e498d86d396946ea56d2
+state_head: 6fd031cf08acfbe1d34eaf06911078d4b9f5d4e7
 progress:
   total_phases: 22
   completed_phases: 13
@@ -36,7 +36,7 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 38 (Digest & Navigation Restructure) — READY TO EXECUTE
+Phase: 38 (your-week) — READY TO EXECUTE
 Plan: Not started
 Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
