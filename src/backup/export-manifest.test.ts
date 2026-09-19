@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { buildExportManifest } from "@/backup/export-manifest";
-import { BACKUP_FORMAT_VERSION, BackupPhotoUnreadableError } from "@/backup/types";
+import {
+  BACKUP_FORMAT_VERSION,
+  BackupPhotoUnreadableError,
+} from "@/backup/types";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
@@ -16,7 +19,7 @@ import { runMigrations } from "@/db/migrations/runner";
 const NOW = "2026-08-25 12:00:00";
 
 describe("buildExportManifest", () => {
-  it("exports category tombstones in format v6", async () => {
+  it("exports category tombstones in format v7", async () => {
     let count = 0;
     const exec = nodeSqliteExecutor(openTestDb());
     await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
@@ -31,7 +34,7 @@ describe("buildExportManifest", () => {
       exportedAt: NOW,
       readPhotoBase64: async () => "AQID",
     });
-    expect(manifest.backupFormatVersion).toBe(6);
+    expect(manifest.backupFormatVersion).toBe(7);
     expect(manifest.tombstones).toContainEqual({
       entityType: "category",
       entityUid: "gone-category",
@@ -80,7 +83,7 @@ describe("buildExportManifest", () => {
         exportedAt: NOW,
         readPhotoBase64: async () => "AQID",
       });
-      expect(manifest.backupFormatVersion).toBe(6);
+      expect(manifest.backupFormatVersion).toBe(7);
       expect(manifest.tombstones).toContainEqual(
         expect.objectContaining({
           entityType: "group_event",
@@ -112,14 +115,15 @@ describe("buildExportManifest", () => {
     });
 
     // D-06 trip-wire: Phase 36 owns the coordinated wire change to v5.
-    expect(BACKUP_FORMAT_VERSION).toBe(6);
-    expect(manifest.backupFormatVersion).toBe(6);
+    expect(BACKUP_FORMAT_VERSION).toBe(7);
+    expect(manifest.backupFormatVersion).toBe(7);
     expect(manifest.appSettings).toMatchObject({
       orreryLastSystem: "builtin:all-contacts",
       themePackage: "galaxy",
       dashboardViewMode: "list",
       profileLayoutTemplateUid: null,
       historyLens: "cycles",
+      yourWeekPeriod: "rolling7",
       defaultInteractionChannel: "remember",
       defaultMessageMode: "remember",
       aiEnabled: 0,
@@ -173,7 +177,7 @@ describe("buildExportManifest", () => {
       }),
     ]);
     // Phase 36 owns the format bump; this guard keeps it unchanged this phase.
-    expect(BACKUP_FORMAT_VERSION).toBe(6);
+    expect(BACKUP_FORMAT_VERSION).toBe(7);
   });
 
   it("serializes the v6 entity inventory with portable parent UIDs", async () => {
@@ -183,32 +187,140 @@ describe("buildExportManifest", () => {
       now: NOW,
       newUid: () => `uid-${++count}`,
     });
-    await exec.runAsync("INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)", ["cat-a", "Portable Circle", 1, NOW, NOW]);
-    const category = await exec.getFirstAsync<{ id: number }>("SELECT id FROM categories WHERE uid='cat-a'");
-    await exec.runAsync("INSERT INTO contacts(uid,name,category_id,interval_days,created_at,modified_at) VALUES(?,?,?,?,?,?)", ["contact-a", "Ada", category!.id, 7, NOW, NOW]);
-    const contact = await exec.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid='contact-a'");
-    await exec.runAsync("INSERT INTO systems(uid,name,created_at,modified_at) VALUES(?,?,?,?)", ["system-a", "Inner", NOW, NOW]);
-    const system = await exec.getFirstAsync<{ id: number }>("SELECT id FROM systems WHERE uid='system-a'");
-    await exec.runAsync("INSERT INTO system_rules(uid,system_id,family,value,created_at) VALUES(?,?,?,?,?)", ["rule-a", system!.id, "favorite", "on", NOW]);
-    await exec.runAsync("INSERT INTO system_overrides(uid,system_ref,contact_id,mode,created_at) VALUES(?,?,?,?,?)", ["override-a", "custom:system-a", contact!.id, "include", NOW]);
-    await exec.runAsync("INSERT INTO system_prefs(uid,system_ref,display_order,hidden,created_at,modified_at) VALUES(?,?,?,?,?,?)", ["pref-a", "custom:system-a", 2, 0, NOW, NOW]);
-    await exec.runAsync("INSERT INTO profile_layout_templates(uid,name,layout_json,created_at,modified_at) VALUES(?,?,?,?,?)", ["layout-a", "Layout", '{"version":1,"sections":[]}', NOW, NOW]);
-    await exec.runAsync("INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)", ["background-a", "Background", "profile-backgrounds/background-a.jpg", NOW, NOW]);
-    await exec.runAsync("INSERT INTO profile_contact_presentation(contact_id,layout_template_uid,background_template_uid,collapse_json,created_at,modified_at) VALUES(?,?,?,?,?,?)", [contact!.id, "layout-a", "background-a", '{"notes":true}', NOW, NOW]);
-    await exec.runAsync("INSERT INTO profile_category_presentation(category_id,layout_template_uid,background_template_uid,created_at,modified_at) VALUES(?,?,?,?,?)", [category!.id, "layout-a", "background-a", NOW, NOW]);
-    await exec.runAsync("INSERT INTO group_events(uid,title,occurred_at,channel,quality,duration,group_note,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?,?)", ["group-a", "Dinner", NOW, "In Person", "warm", 90, "Private context", NOW, NOW]);
-    const group = await exec.getFirstAsync<{ id: number }>("SELECT id FROM group_events WHERE uid='group-a'");
-    await exec.runAsync("INSERT INTO interactions(uid,contact_id,occurred_at,recorded_at,channel,duration,allow_ai,group_event_id,ge_follow_channel,source,modified_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)", ["interaction-a", contact!.id, NOW, NOW, "In Person", 90, 1, group!.id, 1, "manual", NOW]);
-    await exec.runAsync("INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)", ["connection-a", "custom", "local", "https://example.invalid/v1", "model", NOW, NOW, NOW]);
-    await exec.runAsync("INSERT INTO personalization_sections(uid,title,body,enabled,display_order,created_at,modified_at) VALUES(?,?,?,?,?,?,?)", ["section-a", "Me", "Context", 1, 0, NOW, NOW]);
+    await exec.runAsync(
+      "INSERT INTO categories(uid,name,display_order,created_at,modified_at) VALUES(?,?,?,?,?)",
+      ["cat-a", "Portable Circle", 1, NOW, NOW],
+    );
+    const category = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM categories WHERE uid='cat-a'",
+    );
+    await exec.runAsync(
+      "INSERT INTO contacts(uid,name,category_id,interval_days,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+      ["contact-a", "Ada", category!.id, 7, NOW, NOW],
+    );
+    const contact = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contacts WHERE uid='contact-a'",
+    );
+    await exec.runAsync(
+      "INSERT INTO systems(uid,name,created_at,modified_at) VALUES(?,?,?,?)",
+      ["system-a", "Inner", NOW, NOW],
+    );
+    const system = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM systems WHERE uid='system-a'",
+    );
+    await exec.runAsync(
+      "INSERT INTO system_rules(uid,system_id,family,value,created_at) VALUES(?,?,?,?,?)",
+      ["rule-a", system!.id, "favorite", "on", NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO system_overrides(uid,system_ref,contact_id,mode,created_at) VALUES(?,?,?,?,?)",
+      ["override-a", "custom:system-a", contact!.id, "include", NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO system_prefs(uid,system_ref,display_order,hidden,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+      ["pref-a", "custom:system-a", 2, 0, NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO profile_layout_templates(uid,name,layout_json,created_at,modified_at) VALUES(?,?,?,?,?)",
+      ["layout-a", "Layout", '{"version":1,"sections":[]}', NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [
+        "background-a",
+        "Background",
+        "profile-backgrounds/background-a.jpg",
+        NOW,
+        NOW,
+      ],
+    );
+    await exec.runAsync(
+      "INSERT INTO profile_contact_presentation(contact_id,layout_template_uid,background_template_uid,collapse_json,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+      [contact!.id, "layout-a", "background-a", '{"notes":true}', NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO profile_category_presentation(category_id,layout_template_uid,background_template_uid,created_at,modified_at) VALUES(?,?,?,?,?)",
+      [category!.id, "layout-a", "background-a", NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO group_events(uid,title,occurred_at,channel,quality,duration,group_note,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?,?)",
+      [
+        "group-a",
+        "Dinner",
+        NOW,
+        "In Person",
+        "warm",
+        90,
+        "Private context",
+        NOW,
+        NOW,
+      ],
+    );
+    const group = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM group_events WHERE uid='group-a'",
+    );
+    await exec.runAsync(
+      "INSERT INTO interactions(uid,contact_id,occurred_at,recorded_at,channel,duration,allow_ai,group_event_id,ge_follow_channel,source,modified_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+      [
+        "interaction-a",
+        contact!.id,
+        NOW,
+        NOW,
+        "In Person",
+        90,
+        1,
+        group!.id,
+        1,
+        "manual",
+        NOW,
+      ],
+    );
+    await exec.runAsync(
+      "INSERT INTO ai_connections(uid,lane,remembered_model,custom_endpoint,custom_model,configured_at,created_at,modified_at) VALUES(?,?,?,?,?,?,?,?)",
+      [
+        "connection-a",
+        "custom",
+        "local",
+        "https://example.invalid/v1",
+        "model",
+        NOW,
+        NOW,
+        NOW,
+      ],
+    );
+    await exec.runAsync(
+      "INSERT INTO personalization_sections(uid,title,body,enabled,display_order,created_at,modified_at) VALUES(?,?,?,?,?,?,?)",
+      ["section-a", "Me", "Context", 1, 0, NOW, NOW],
+    );
 
-    const manifest = await buildExportManifest(exec, { exportedAt: NOW, readPhotoBase64: async () => "AQID" });
+    const manifest = await buildExportManifest(exec, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "AQID",
+    });
     expect(manifest.systemRules[0]).toMatchObject({ systemUid: "system-a" });
-    expect(manifest.systemOverrides[0]).toMatchObject({ contactUid: "contact-a" });
-    expect(manifest.groupEvents[0]).toMatchObject({ uid: "group-a", groupNote: "Private context" });
-    expect(manifest.interactions[0]).toMatchObject({ groupEventUid: "group-a", duration: 90, allowAi: 1, geFollowChannel: 1 });
-    expect(manifest.profileContactPresentation[0]).toMatchObject({ contactUid: "contact-a", layoutTemplateUid: "layout-a", backgroundTemplateUid: "background-a", collapseJson: '{"notes":true}' });
-    expect(manifest.profileCategoryPresentation[0]).toMatchObject({ categoryUid: "cat-a", layoutTemplateUid: "layout-a" });
+    expect(manifest.systemOverrides[0]).toMatchObject({
+      contactUid: "contact-a",
+    });
+    expect(manifest.groupEvents[0]).toMatchObject({
+      uid: "group-a",
+      groupNote: "Private context",
+    });
+    expect(manifest.interactions[0]).toMatchObject({
+      groupEventUid: "group-a",
+      duration: 90,
+      allowAi: 1,
+      geFollowChannel: 1,
+    });
+    expect(manifest.profileContactPresentation[0]).toMatchObject({
+      contactUid: "contact-a",
+      layoutTemplateUid: "layout-a",
+      backgroundTemplateUid: "background-a",
+      collapseJson: '{"notes":true}',
+    });
+    expect(manifest.profileCategoryPresentation[0]).toMatchObject({
+      categoryUid: "cat-a",
+      layoutTemplateUid: "layout-a",
+    });
     expect(manifest.aiConnections[0]).not.toHaveProperty("credential");
     expect(manifest.personalizationSections).toHaveLength(1);
   });
@@ -475,7 +587,13 @@ describe("buildExportManifest", () => {
     });
     await exec.runAsync(
       "INSERT INTO profile_background_templates(uid,name,image_path,created_at,modified_at) VALUES(?,?,?,?,?)",
-      ["missing-background", "Missing", "profile-backgrounds/missing-background.jpg", NOW, NOW],
+      [
+        "missing-background",
+        "Missing",
+        "profile-backgrounds/missing-background.jpg",
+        NOW,
+        NOW,
+      ],
     );
     await expect(
       buildExportManifest(exec, {

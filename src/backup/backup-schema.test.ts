@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  parseBackupManifest,
   PORTABLE_SETTINGS_KEYS,
+  parseBackupManifest,
 } from "@/backup/backup-schema";
 import { BACKUP_FORMAT_VERSION, BackupSchemaError } from "@/backup/types";
 
@@ -10,19 +10,43 @@ const valid = (): Record<string, any> => ({
   envelopeVersion: 1,
   metadata: { exportedAt: "2026-08-25 12:00:00", sqliteUserVersion: 999 },
   appSettings: { sunContactUid: null, modifiedAt: "2026-08-25 12:00:00" },
-  categories: [], profile: null, contacts: [], contactMethods: [], externalContactLinks: [],
-  contactMethodProvenance: [], interactions: [], events: [], fuel: [],
-  contactLinks: [], customFieldDefs: [], customFieldValues: [], memories: [],
-  relationships: [], currentStateEntries: [], tombstones: [],
-  systems: [], systemRules: [], systemOverrides: [], systemPrefs: [],
-  profileLayoutTemplates: [], profileBackgroundTemplates: [],
-  aiConnections: [], personalizationSections: [], groupEvents: [],
-  profileContactPresentation: [], profileCategoryPresentation: [],
+  categories: [],
+  profile: null,
+  contacts: [],
+  contactMethods: [],
+  externalContactLinks: [],
+  contactMethodProvenance: [],
+  interactions: [],
+  events: [],
+  fuel: [],
+  contactLinks: [],
+  customFieldDefs: [],
+  customFieldValues: [],
+  memories: [],
+  relationships: [],
+  currentStateEntries: [],
+  tombstones: [],
+  systems: [],
+  systemRules: [],
+  systemOverrides: [],
+  systemPrefs: [],
+  profileLayoutTemplates: [],
+  profileBackgroundTemplates: [],
+  aiConnections: [],
+  personalizationSections: [],
+  groupEvents: [],
+  profileContactPresentation: [],
+  profileCategoryPresentation: [],
 });
 
 describe("dashboard preference portable allowlist", () => {
   it("allowlists the future format-5 dashboard keys", () => {
-    for (const key of ["dashboardViewMode", "dashboardPopulations", "dashboardFilters", "dashboardSort"]) {
+    for (const key of [
+      "dashboardViewMode",
+      "dashboardPopulations",
+      "dashboardFilters",
+      "dashboardSort",
+    ]) {
       expect(PORTABLE_SETTINGS_KEYS.has(key)).toBe(true);
     }
   });
@@ -72,7 +96,11 @@ describe("format v6 category deletion evidence", () => {
   it("rejects normalized visible-name collisions across categories and Systems", () => {
     const manifest = valid();
     manifest.categories = [
-      { uid: "friends", name: "  Cafe\u0301  ", modifiedAt: "2026-08-25 12:00:00" },
+      {
+        uid: "friends",
+        name: "  Cafe\u0301  ",
+        modifiedAt: "2026-08-25 12:00:00",
+      },
     ];
     manifest.systems = [
       { uid: "system", name: "CAFÉ", modifiedAt: "2026-08-25 12:00:00" },
@@ -85,10 +113,16 @@ describe("default interaction channel portable allowlist (declare-only, CAPT-11)
   it("allowlists both camelCase MANIFEST keys, NOT the snake_case columns", () => {
     // camelCase MANIFEST keys match COLUMN_OF's key side + the restore cast; the
     // snake_case column names would pass .has() nowhere and drop at restore (HIGH #2).
-    for (const key of ["defaultInteractionChannel", "rememberedInteractionChannel"]) {
+    for (const key of [
+      "defaultInteractionChannel",
+      "rememberedInteractionChannel",
+    ]) {
       expect(PORTABLE_SETTINGS_KEYS.has(key)).toBe(true);
     }
-    for (const key of ["default_interaction_channel", "remembered_interaction_channel"]) {
+    for (const key of [
+      "default_interaction_channel",
+      "remembered_interaction_channel",
+    ]) {
       expect(PORTABLE_SETTINGS_KEYS.has(key)).toBe(false);
     }
   });
@@ -97,23 +131,34 @@ describe("default interaction channel portable allowlist (declare-only, CAPT-11)
     const portable = valid();
     portable.appSettings.defaultInteractionChannel = "Call";
     portable.appSettings.rememberedInteractionChannel = "In Person";
-    expect(parseBackupManifest(portable).appSettings).toMatchObject({ defaultInteractionChannel: "Call", rememberedInteractionChannel: "In Person" });
+    expect(parseBackupManifest(portable).appSettings).toMatchObject({
+      defaultInteractionChannel: "Call",
+      rememberedInteractionChannel: "In Person",
+    });
     portable.appSettings.unrecognizedSibling = "nope";
     expect(() => parseBackupManifest(portable)).toThrow(BackupSchemaError);
   });
 
   it("rejects an out-of-vocabulary channel value at the parse boundary", () => {
-    const badDefault = valid(); badDefault.appSettings.defaultInteractionChannel = "bogus";
-    expect(() => parseBackupManifest(badDefault)).toThrow(/invalid interaction channel/i);
+    const badDefault = valid();
+    badDefault.appSettings.defaultInteractionChannel = "bogus";
+    expect(() => parseBackupManifest(badDefault)).toThrow(
+      /invalid interaction channel/i,
+    );
     // 'remember' is a valid DEFAULT sentinel but NOT a valid remembered value.
-    const badRemembered = valid(); badRemembered.appSettings.rememberedInteractionChannel = "remember";
-    expect(() => parseBackupManifest(badRemembered)).toThrow(/invalid interaction channel/i);
+    const badRemembered = valid();
+    badRemembered.appSettings.rememberedInteractionChannel = "remember";
+    expect(() => parseBackupManifest(badRemembered)).toThrow(
+      /invalid interaction channel/i,
+    );
   });
 
   it("does not inject the channel keys when a manifest omits them (parser adds nothing)", () => {
     const parsed = parseBackupManifest(valid());
     expect(parsed.appSettings).not.toHaveProperty("defaultInteractionChannel");
-    expect(parsed.appSettings).not.toHaveProperty("rememberedInteractionChannel");
+    expect(parsed.appSettings).not.toHaveProperty(
+      "rememberedInteractionChannel",
+    );
   });
 });
 
@@ -142,7 +187,9 @@ describe("compose message mode portable allowlist (declare-only, COMP-02)", () =
   it("rejects an out-of-vocabulary message mode value at the parse boundary", () => {
     const badDefault = valid();
     badDefault.appSettings.defaultMessageMode = "sms";
-    expect(() => parseBackupManifest(badDefault)).toThrow(/invalid message mode/i);
+    expect(() => parseBackupManifest(badDefault)).toThrow(
+      /invalid message mode/i,
+    );
     // CR-01: 'remember' is a valid DEFAULT sentinel but NOT a valid remembered
     // value — the CHECK-free remembered_message_mode column must reject it here.
     const badRemembered = valid();
@@ -180,7 +227,8 @@ describe("Profile presentation restore acceptance", () => {
   it("accepts dangling global template UIDs alongside the complete template inventory", () => {
     const portable = valid();
     portable.appSettings.profileLayoutTemplateUid = "layout-not-in-format-4";
-    portable.appSettings.profileBackgroundTemplateUid = "background-not-in-format-4";
+    portable.appSettings.profileBackgroundTemplateUid =
+      "background-not-in-format-4";
     expect(parseBackupManifest(portable).appSettings).toMatchObject({
       profileLayoutTemplateUid: "layout-not-in-format-4",
       profileBackgroundTemplateUid: "background-not-in-format-4",
@@ -197,22 +245,50 @@ describe("Profile presentation restore acceptance", () => {
 });
 
 describe("parseBackupManifest", () => {
+  it("migrates format 6 to 7 with the rolling Your Week default", () => {
+    const legacy = valid();
+    legacy.backupFormatVersion = 6;
+    delete legacy.appSettings.yourWeekPeriod;
+    expect(parseBackupManifest(legacy)).toMatchObject({
+      backupFormatVersion: 7,
+      appSettings: { yourWeekPeriod: "rolling7" },
+    });
+  });
+
+  it.each([6, 7])(
+    "rejects a malformed Your Week period at the format %s parse boundary",
+    (backupFormatVersion) => {
+      const malformed = valid();
+      malformed.backupFormatVersion = backupFormatVersion;
+      malformed.appSettings.yourWeekPeriod = "weekly";
+      expect(() => parseBackupManifest(malformed)).toThrow(/Your Week period/);
+    },
+  );
+
   it("accepts a different SQLite schema version because backupFormatVersion alone gates compatibility", () => {
     expect(parseBackupManifest(valid()).metadata.sqliteUserVersion).toBe(999);
   });
 
   it("rejects only a future portable format with the update-first message", () => {
-    const future = valid(); future.backupFormatVersion = BACKUP_FORMAT_VERSION + 1;
+    const future = valid();
+    future.backupFormatVersion = BACKUP_FORMAT_VERSION + 1;
     expect(() => parseBackupManifest(future)).toThrow(/update.*app/i);
   });
 
   it("rejects duplicate UIDs, dangling settings references, and duplicate custom-value pairs", () => {
-    const duplicate = valid(); duplicate.contacts = [{ uid: "c" }, { uid: "c" }];
+    const duplicate = valid();
+    duplicate.contacts = [{ uid: "c" }, { uid: "c" }];
     expect(() => parseBackupManifest(duplicate)).toThrow(BackupSchemaError);
-    const dangling = valid(); dangling.appSettings.sunContactUid = "missing";
+    const dangling = valid();
+    dangling.appSettings.sunContactUid = "missing";
     expect(() => parseBackupManifest(dangling)).toThrow(/sun/i);
-    const pairs = valid(); pairs.contacts = [{ uid: "c", trackingEnabled: 1, intervalDays: 1 }]; pairs.customFieldDefs = [{ uid: "d" }];
-    pairs.customFieldValues = [{ uid: "v1", contactUid: "c", fieldDefUid: "d", value: null }, { uid: "v2", contactUid: "c", fieldDefUid: "d", value: null }];
+    const pairs = valid();
+    pairs.contacts = [{ uid: "c", trackingEnabled: 1, intervalDays: 1 }];
+    pairs.customFieldDefs = [{ uid: "d" }];
+    pairs.customFieldValues = [
+      { uid: "v1", contactUid: "c", fieldDefUid: "d", value: null },
+      { uid: "v2", contactUid: "c", fieldDefUid: "d", value: null },
+    ];
     expect(() => parseBackupManifest(pairs)).toThrow(/duplicate custom/i);
   });
 
@@ -228,21 +304,54 @@ describe("parseBackupManifest", () => {
 
   it("rejects a child whose same-file parent lost to a tombstone", () => {
     const broken = valid();
-    broken.contacts = [{ uid: "contact", trackingEnabled: 1, intervalDays: 1, modifiedAt: "2026-08-25 12:00:00" }];
-    broken.interactions = [{ uid: "interaction", contactUid: "contact", modifiedAt: "2026-08-25 12:00:00" }];
-    broken.tombstones = [{ entityType: "contact", entityUid: "contact", deletedAt: "2026-08-25 12:00:00" }];
+    broken.contacts = [
+      {
+        uid: "contact",
+        trackingEnabled: 1,
+        intervalDays: 1,
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    broken.interactions = [
+      {
+        uid: "interaction",
+        contactUid: "contact",
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    broken.tombstones = [
+      {
+        entityType: "contact",
+        entityUid: "contact",
+        deletedAt: "2026-08-25 12:00:00",
+      },
+    ];
     expect(() => parseBackupManifest(broken)).toThrow(/surviving contact/i);
   });
 
   it("accepts Memory and relationship tombstones", () => {
     const manifest = valid();
     manifest.tombstones = [
-      { entityType: "memory", entityUid: "memory-a", deletedAt: "2026-08-25 12:00:00" },
-      { entityType: "relationship", entityUid: "relationship-a", deletedAt: "2026-08-25 12:00:00" },
-      { entityType: "current_state_entry", entityUid: "current-state-a", deletedAt: "2026-08-25 12:00:00" },
+      {
+        entityType: "memory",
+        entityUid: "memory-a",
+        deletedAt: "2026-08-25 12:00:00",
+      },
+      {
+        entityType: "relationship",
+        entityUid: "relationship-a",
+        deletedAt: "2026-08-25 12:00:00",
+      },
+      {
+        entityType: "current_state_entry",
+        entityUid: "current-state-a",
+        deletedAt: "2026-08-25 12:00:00",
+      },
     ];
 
-    expect(parseBackupManifest(manifest).tombstones).toEqual(manifest.tombstones);
+    expect(parseBackupManifest(manifest).tombstones).toEqual(
+      manifest.tombstones,
+    );
   });
 
   it("rejects knowledge rows outside the application-owned registry contracts", () => {
@@ -355,23 +464,45 @@ describe("parseBackupManifest", () => {
 
   it("rejects a category reference that cannot be resolved within the backup itself", () => {
     const broken = valid();
-    broken.contacts = [{ uid: "contact", trackingEnabled: 1, intervalDays: 1, modifiedAt: "2026-08-25 12:00:00", categoryUid: "missing" }];
+    broken.contacts = [
+      {
+        uid: "contact",
+        trackingEnabled: 1,
+        intervalDays: 1,
+        modifiedAt: "2026-08-25 12:00:00",
+        categoryUid: "missing",
+      },
+    ];
     expect(() => parseBackupManifest(broken)).toThrow(/category/i);
   });
 
   it("rejects malformed photo bytes before an apply can begin", () => {
     const broken = valid();
-    broken.contacts = [{ uid: "contact", trackingEnabled: 1, intervalDays: 1, modifiedAt: "2026-08-25 12:00:00", photoBase64: "%%%" }];
+    broken.contacts = [
+      {
+        uid: "contact",
+        trackingEnabled: 1,
+        intervalDays: 1,
+        modifiedAt: "2026-08-25 12:00:00",
+        photoBase64: "%%%",
+      },
+    ];
     expect(() => parseBackupManifest(broken)).toThrow(/photo/i);
   });
 
   it("forward-migrates scalar v1 contact endpoints into deterministic v2 method rows", () => {
     const legacy = valid();
     legacy.backupFormatVersion = 1;
-    legacy.contacts = [{
-      uid: "contact-a", name: "Ada", intervalDays: 14,
-      phone: "+1 555 0100", email: "ada@example.test", modifiedAt: "2026-08-25 12:00:00",
-    }];
+    legacy.contacts = [
+      {
+        uid: "contact-a",
+        name: "Ada",
+        intervalDays: 14,
+        phone: "+1 555 0100",
+        email: "ada@example.test",
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
     const parsed = parseBackupManifest(legacy) as typeof legacy & {
       contactMethods: Array<Record<string, unknown>>;
     };
@@ -384,24 +515,46 @@ describe("parseBackupManifest", () => {
       birthdayUnboundEnabled: 1,
     });
     expect(parsed.contacts).toEqual([
-      expect.objectContaining({ uid: "contact-a", trackingEnabled: 1, intervalDays: 14 }),
+      expect.objectContaining({
+        uid: "contact-a",
+        trackingEnabled: 1,
+        intervalDays: 14,
+      }),
     ]);
     expect(parsed.contactMethods).toEqual([
-      expect.objectContaining({ uid: "legacy-method:contact-a:phone", contactUid: "contact-a", methodType: "phone", canonicalRegion: null, label: null }),
-      expect.objectContaining({ uid: "legacy-method:contact-a:email", contactUid: "contact-a", methodType: "email", canonicalRegion: null, label: null }),
+      expect.objectContaining({
+        uid: "legacy-method:contact-a:phone",
+        contactUid: "contact-a",
+        methodType: "phone",
+        canonicalRegion: null,
+        label: null,
+      }),
+      expect.objectContaining({
+        uid: "legacy-method:contact-a:email",
+        contactUid: "contact-a",
+        methodType: "email",
+        canonicalRegion: null,
+        label: null,
+      }),
     ]);
   });
 
   it("forward-migrates v2 contacts and lifecycle settings to the v3 wire format", () => {
     const legacy = valid();
     legacy.backupFormatVersion = 2;
-    legacy.contacts = [{ uid: "contact-a", intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
+    legacy.contacts = [
+      { uid: "contact-a", intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" },
+    ];
 
     const parsed = parseBackupManifest(legacy);
 
     expect(parsed.backupFormatVersion).toBe(6);
     expect(parsed.contacts).toEqual([
-      expect.objectContaining({ uid: "contact-a", trackingEnabled: 1, intervalDays: 7 }),
+      expect.objectContaining({
+        uid: "contact-a",
+        trackingEnabled: 1,
+        intervalDays: 7,
+      }),
     ]);
     expect(parsed.appSettings).toMatchObject({
       includeUnboundNeverContacted: 0,
@@ -414,11 +567,19 @@ describe("parseBackupManifest", () => {
     legacy.backupFormatVersion = 4;
     legacy.appSettings.includeUnboundNeverContacted = 1;
     for (const key of [
-      "systems", "systemRules", "systemOverrides", "systemPrefs",
-      "profileLayoutTemplates", "profileBackgroundTemplates", "aiConnections",
-      "personalizationSections", "groupEvents", "profileContactPresentation",
+      "systems",
+      "systemRules",
+      "systemOverrides",
+      "systemPrefs",
+      "profileLayoutTemplates",
+      "profileBackgroundTemplates",
+      "aiConnections",
+      "personalizationSections",
+      "groupEvents",
+      "profileContactPresentation",
       "profileCategoryPresentation",
-    ]) delete legacy[key];
+    ])
+      delete legacy[key];
     const upgraded = parseBackupManifest(legacy);
     expect(upgraded.backupFormatVersion).toBe(6);
     expect(upgraded.systems).toEqual([]);
@@ -428,10 +589,14 @@ describe("parseBackupManifest", () => {
 
     const incompleteV5 = valid();
     delete incompleteV5.systems;
-    expect(() => parseBackupManifest(incompleteV5)).toThrow(/systems must be an array/);
+    expect(() => parseBackupManifest(incompleteV5)).toThrow(
+      /systems must be an array/,
+    );
 
     const retiredManageFavouritesKey = valid();
-    retiredManageFavouritesKey.appSettings.manageFavouritesOrder = ["contact-a"];
+    retiredManageFavouritesKey.appSettings.manageFavouritesOrder = [
+      "contact-a",
+    ];
     expect(() => parseBackupManifest(retiredManageFavouritesKey)).toThrow(
       /local-only or secret member/,
     );
@@ -449,23 +614,63 @@ describe("parseBackupManifest", () => {
     for (const contact of invalidContacts) {
       const manifest = valid();
       manifest.backupFormatVersion = 3;
-      manifest.contacts = [{ uid: "contact-a", modifiedAt: "2026-08-25 12:00:00", ...contact }];
+      manifest.contacts = [
+        { uid: "contact-a", modifiedAt: "2026-08-25 12:00:00", ...contact },
+      ];
       expect(() => parseBackupManifest(manifest)).toThrow(BackupSchemaError);
     }
   });
 
   it("rejects malformed cadence and duplicate surviving method primaries before restore", () => {
     const cadence = valid();
-    cadence.contacts = [{ uid: "contact-a", trackingEnabled: 1, intervalDays: 0, modifiedAt: "2026-08-25 12:00:00" }];
+    cadence.contacts = [
+      {
+        uid: "contact-a",
+        trackingEnabled: 1,
+        intervalDays: 0,
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
     expect(() => parseBackupManifest(cadence)).toThrow(BackupSchemaError);
 
     const primary = valid();
-    primary.contacts = [{ uid: "contact-a", trackingEnabled: 1, intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
-    primary.contactMethods = [
-      { uid: "method-a", contactUid: "contact-a", methodType: "phone", rawValue: "a", displayValue: "a", isActionable: 1, isPrimary: 1, displayOrder: 0, createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" },
-      { uid: "method-b", contactUid: "contact-a", methodType: "phone", rawValue: "b", displayValue: "b", isActionable: 1, isPrimary: 1, displayOrder: 1, createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" },
+    primary.contacts = [
+      {
+        uid: "contact-a",
+        trackingEnabled: 1,
+        intervalDays: 7,
+        modifiedAt: "2026-08-25 12:00:00",
+      },
     ];
-    expect(() => parseBackupManifest(primary)).toThrow(/duplicate surviving primary/i);
+    primary.contactMethods = [
+      {
+        uid: "method-a",
+        contactUid: "contact-a",
+        methodType: "phone",
+        rawValue: "a",
+        displayValue: "a",
+        isActionable: 1,
+        isPrimary: 1,
+        displayOrder: 0,
+        createdAt: "2026-08-25 12:00:00",
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+      {
+        uid: "method-b",
+        contactUid: "contact-a",
+        methodType: "phone",
+        rawValue: "b",
+        displayValue: "b",
+        isActionable: 1,
+        isPrimary: 1,
+        displayOrder: 1,
+        createdAt: "2026-08-25 12:00:00",
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    expect(() => parseBackupManifest(primary)).toThrow(
+      /duplicate surviving primary/i,
+    );
   });
 
   it("normalizes a missing customFieldValueHistory array to [] for pre-existing format-4 backups (P07-MED)", () => {
@@ -481,64 +686,193 @@ describe("parseBackupManifest", () => {
   it("validates the scope-branching custom_field_defs fields at the parse boundary (WR-01)", () => {
     const withDef = (def: Record<string, unknown>): Record<string, any> => {
       const m = valid();
-      m.customFieldDefs = [{ uid: "def-a", modifiedAt: "2026-08-25 12:00:00", ...def }];
+      m.customFieldDefs = [
+        { uid: "def-a", modifiedAt: "2026-08-25 12:00:00", ...def },
+      ];
       return m;
     };
     // A malformed scope must fail before it can silently bypass the completeness guard.
-    expect(() => parseBackupManifest(withDef({ scope: "Global" }))).toThrow(/scope/i);
+    expect(() => parseBackupManifest(withDef({ scope: "Global" }))).toThrow(
+      /scope/i,
+    );
     expect(() => parseBackupManifest(withDef({ scope: 1 }))).toThrow(/scope/i);
     // Wrong-typed history_retained / field_group fail as a clean parse error, not a bind rollback.
-    expect(() => parseBackupManifest(withDef({ historyRetained: 2 }))).toThrow(/history_retained/i);
-    expect(() => parseBackupManifest(withDef({ fieldGroup: 5 }))).toThrow(/field_group/i);
+    expect(() => parseBackupManifest(withDef({ historyRetained: 2 }))).toThrow(
+      /history_retained/i,
+    );
+    expect(() => parseBackupManifest(withDef({ fieldGroup: 5 }))).toThrow(
+      /field_group/i,
+    );
     // The legitimate contact scope, and absent/null values from older backups, still pass.
-    expect(() => parseBackupManifest(withDef({ scope: "contact", historyRetained: 1, fieldGroup: "Work" }))).not.toThrow();
+    expect(() =>
+      parseBackupManifest(
+        withDef({ scope: "contact", historyRetained: 1, fieldGroup: "Work" }),
+      ),
+    ).not.toThrow();
     expect(() => parseBackupManifest(withDef({}))).not.toThrow();
   });
 
   it("round-trips and validates custom_field_value_history rows and their tombstone", () => {
     const manifest = valid();
-    manifest.contacts = [{ uid: "contact-a", trackingEnabled: 1, intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
-    manifest.customFieldDefs = [{ uid: "def-a", modifiedAt: "2026-08-25 12:00:00" }];
-    manifest.customFieldValues = [{ uid: "value-a", contactUid: "contact-a", fieldDefUid: "def-a", value: null }];
-    manifest.customFieldValueHistory = [
-      { uid: "history-a", contactUid: "contact-a", fieldDefUid: "def-a", value: "Old", createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" },
+    manifest.contacts = [
+      {
+        uid: "contact-a",
+        trackingEnabled: 1,
+        intervalDays: 7,
+        modifiedAt: "2026-08-25 12:00:00",
+      },
     ];
-    manifest.tombstones = [{ entityType: "custom_field_value_history", entityUid: "history-b", deletedAt: "2026-08-25 12:00:00" }];
+    manifest.customFieldDefs = [
+      { uid: "def-a", modifiedAt: "2026-08-25 12:00:00" },
+    ];
+    manifest.customFieldValues = [
+      {
+        uid: "value-a",
+        contactUid: "contact-a",
+        fieldDefUid: "def-a",
+        value: null,
+      },
+    ];
+    manifest.customFieldValueHistory = [
+      {
+        uid: "history-a",
+        contactUid: "contact-a",
+        fieldDefUid: "def-a",
+        value: "Old",
+        createdAt: "2026-08-25 12:00:00",
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    manifest.tombstones = [
+      {
+        entityType: "custom_field_value_history",
+        entityUid: "history-b",
+        deletedAt: "2026-08-25 12:00:00",
+      },
+    ];
     const parsed = parseBackupManifest(manifest);
     expect(parsed.customFieldValueHistory).toEqual([
-      expect.objectContaining({ uid: "history-a", contactUid: "contact-a", fieldDefUid: "def-a", value: "Old" }),
+      expect.objectContaining({
+        uid: "history-a",
+        contactUid: "contact-a",
+        fieldDefUid: "def-a",
+        value: "Old",
+      }),
     ]);
     expect(parsed.tombstones).toEqual([
-      { entityType: "custom_field_value_history", entityUid: "history-b", deletedAt: "2026-08-25 12:00:00" },
+      {
+        entityType: "custom_field_value_history",
+        entityUid: "history-b",
+        deletedAt: "2026-08-25 12:00:00",
+      },
     ]);
   });
 
   it("rejects a value-history row whose fieldDefUid or contactUid is unknown to the manifest", () => {
     const base = () => {
       const manifest = valid();
-      manifest.contacts = [{ uid: "contact-a", trackingEnabled: 1, intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
+      manifest.contacts = [
+        {
+          uid: "contact-a",
+          trackingEnabled: 1,
+          intervalDays: 7,
+          modifiedAt: "2026-08-25 12:00:00",
+        },
+      ];
       manifest.customFieldDefs = [{ uid: "def-a" }];
-      manifest.customFieldValues = [{ uid: "value-a", contactUid: "contact-a", fieldDefUid: "def-a", value: null }];
+      manifest.customFieldValues = [
+        {
+          uid: "value-a",
+          contactUid: "contact-a",
+          fieldDefUid: "def-a",
+          value: null,
+        },
+      ];
       return manifest;
     };
     const badDef = base();
-    badDef.customFieldValueHistory = [{ uid: "history-a", contactUid: "contact-a", fieldDefUid: "ghost-def", value: "Old", createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" }];
-    expect(() => parseBackupManifest(badDef)).toThrow(/customFieldValueHistory has an unknown field definition UID/);
+    badDef.customFieldValueHistory = [
+      {
+        uid: "history-a",
+        contactUid: "contact-a",
+        fieldDefUid: "ghost-def",
+        value: "Old",
+        createdAt: "2026-08-25 12:00:00",
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    expect(() => parseBackupManifest(badDef)).toThrow(
+      /customFieldValueHistory has an unknown field definition UID/,
+    );
 
     const badContact = base();
-    badContact.customFieldValueHistory = [{ uid: "history-a", contactUid: "ghost-contact", fieldDefUid: "def-a", value: "Old", createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" }];
-    expect(() => parseBackupManifest(badContact)).toThrow(/customFieldValueHistory has an unknown contact UID/);
+    badContact.customFieldValueHistory = [
+      {
+        uid: "history-a",
+        contactUid: "ghost-contact",
+        fieldDefUid: "def-a",
+        value: "Old",
+        createdAt: "2026-08-25 12:00:00",
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    expect(() => parseBackupManifest(badContact)).toThrow(
+      /customFieldValueHistory has an unknown contact UID/,
+    );
   });
 
   it("rejects malformed normalized tombstone parent combinations before apply", () => {
     const broken = valid();
-    broken.contacts = [{ uid: "contact-a", trackingEnabled: 1, intervalDays: 7, modifiedAt: "2026-08-25 12:00:00" }];
-    broken.contactMethods = [{ uid: "method-a", contactUid: "contact-a", methodType: "phone", rawValue: "a", displayValue: "a", isActionable: 1, isPrimary: 1, displayOrder: 0, createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" }];
-    broken.contactMethodProvenance = [{ uid: "provenance-a", methodUid: "method-a", externalContactLinkUid: null, sourceMethodId: null, createdAt: "2026-08-25 12:00:00", modifiedAt: "2026-08-25 12:00:00" }];
-    broken.tombstones = [{ entityType: "contact_method", entityUid: "method-a", deletedAt: "2026-08-25 12:00:00" }];
-    expect(() => parseBackupManifest(broken)).toThrow(/surviving method parent/i);
+    broken.contacts = [
+      {
+        uid: "contact-a",
+        trackingEnabled: 1,
+        intervalDays: 7,
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    broken.contactMethods = [
+      {
+        uid: "method-a",
+        contactUid: "contact-a",
+        methodType: "phone",
+        rawValue: "a",
+        displayValue: "a",
+        isActionable: 1,
+        isPrimary: 1,
+        displayOrder: 0,
+        createdAt: "2026-08-25 12:00:00",
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    broken.contactMethodProvenance = [
+      {
+        uid: "provenance-a",
+        methodUid: "method-a",
+        externalContactLinkUid: null,
+        sourceMethodId: null,
+        createdAt: "2026-08-25 12:00:00",
+        modifiedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    broken.tombstones = [
+      {
+        entityType: "contact_method",
+        entityUid: "method-a",
+        deletedAt: "2026-08-25 12:00:00",
+      },
+    ];
+    expect(() => parseBackupManifest(broken)).toThrow(
+      /surviving method parent/i,
+    );
 
-    broken.tombstones = [{ entityType: "unsupported", entityUid: "method-a", deletedAt: "2026-08-25 12:00:00" }];
+    broken.tombstones = [
+      {
+        entityType: "unsupported",
+        entityUid: "method-a",
+        deletedAt: "2026-08-25 12:00:00",
+      },
+    ];
     expect(() => parseBackupManifest(broken)).toThrow(BackupSchemaError);
   });
 });

@@ -57,10 +57,12 @@ import { createOrrerySystemStore } from "@/stores/orrery-system-store";
 
 vi.mock("expo-sqlite", () => ({}));
 vi.mock("@/services/photos/background-storage", () => ({
-  backgroundDerivativeRelPath: (uid: string) => `profile-backgrounds/${uid}.jpg`,
+  backgroundDerivativeRelPath: (uid: string) =>
+    `profile-backgrounds/${uid}.jpg`,
   deleteBackgroundRestorePending: () => {},
   persistBackgroundDerivative: async () => {},
-  resolveBackgroundRestorePendingUri: (uid: string) => `file:///pending/${uid}.jpg`,
+  resolveBackgroundRestorePendingUri: (uid: string) =>
+    `file:///pending/${uid}.jpg`,
   stageBackgroundRestorePendingBase64: async () => {},
 }));
 vi.mock("@/services/notifications/notification-schedule", () => ({
@@ -605,7 +607,7 @@ describe("Orrery production exploration integration", () => {
     });
     for (const key of ["camera", "pose", "focus", "sunContactId"])
       expect(manifest.appSettings).not.toHaveProperty(key);
-    expect(manifest.backupFormatVersion).toBe(6);
+    expect(manifest.backupFormatVersion).toBe(7);
     await deleteRelationship(exec, { id, contactId: parent.id, now: LATER });
     const restored = await applyRestore(exec, manifest, "replace-all", {
       reconcileNotificationSchedule: async () => {},

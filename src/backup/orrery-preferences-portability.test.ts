@@ -20,10 +20,12 @@ vi.mock("@/services/photos/photo-storage", () => ({
   stageRestorePendingBase64: vi.fn(),
 }));
 vi.mock("@/services/photos/background-storage", () => ({
-  backgroundDerivativeRelPath: (uid: string) => `profile-backgrounds/${uid}.jpg`,
+  backgroundDerivativeRelPath: (uid: string) =>
+    `profile-backgrounds/${uid}.jpg`,
   deleteBackgroundRestorePending: vi.fn(),
   persistBackgroundDerivative: vi.fn(),
-  resolveBackgroundRestorePendingUri: (uid: string) => `file:///pending/${uid}.jpg`,
+  resolveBackgroundRestorePendingUri: (uid: string) =>
+    `file:///pending/${uid}.jpg`,
   stageBackgroundRestorePendingBase64: vi.fn(),
 }));
 
@@ -148,8 +150,8 @@ describe("Orrery preferences portability boundary", () => {
       exportedAt: NOW,
       readPhotoBase64: async () => "AQID",
     });
-    expect(BACKUP_FORMAT_VERSION).toBe(6);
-    expect(exported.backupFormatVersion).toBe(6);
+    expect(BACKUP_FORMAT_VERSION).toBe(7);
+    expect(exported.backupFormatVersion).toBe(7);
     expect(portable).toMatchObject({
       orreryDensity: "compact",
       orrerySatellitesEnabled: 1,
@@ -164,5 +166,19 @@ describe("Orrery preferences portability boundary", () => {
       expect(portable).not.toHaveProperty(key);
       expect(exported.appSettings).not.toHaveProperty(key);
     }
+  });
+
+  it("round-trips a non-default Your Week period through export, parse, and restore", async () => {
+    await updateAppSettings(exec, { yourWeekPeriod: "calendar_week" }, NOW);
+    const exported = await buildExportManifest(exec, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "AQID",
+    });
+    await updateAppSettings(exec, { yourWeekPeriod: "rolling7" }, LATER);
+
+    await expect(
+      applyRestore(exec, parseBackupManifest(exported), "merge"),
+    ).resolves.toMatchObject({ status: "applied" });
+    expect((await getAppSettings(exec)).yourWeekPeriod).toBe("calendar_week");
   });
 });

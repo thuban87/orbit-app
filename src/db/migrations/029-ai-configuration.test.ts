@@ -19,13 +19,13 @@ beforeEach(() => {
 describe("migration 029 — AI configuration", () => {
   it("registers and applies the complete schema at user_version 29", async () => {
     expect(AI_CONFIGURATION_SCHEMA_VERSION).toBe(29);
-    expect(TARGET_VERSION).toBe(29);
+    expect(TARGET_VERSION).toBe(30);
 
     await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid });
 
     await expect(
       exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
-    ).resolves.toEqual({ user_version: 29 });
+    ).resolves.toEqual({ user_version: 30 });
     const tables = new Set(
       (
         await exec.getAllAsync<{ name: string }>(

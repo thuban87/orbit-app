@@ -22,11 +22,11 @@ vi.mock("@/backup/export-manifest", () => ({
 }));
 
 import {
+  createAutomaticBackupReencryptionService,
   createAutomaticBackupService,
   createBackupEncryptionLifecycle,
-  createAutomaticBackupReencryptionService,
-  createVerifiedPreRestoreSnapshot,
   createManualExportService,
+  createVerifiedPreRestoreSnapshot,
   loadBackupForPreview,
   resolveWriteEncryptionMode,
   withBackupServiceLock,
@@ -171,7 +171,7 @@ describe("restore preview", () => {
       status: "ready",
       preview: {
         exportedAt: manifest.metadata.exportedAt,
-        backupFormatVersion: 6,
+        backupFormatVersion: 7,
         encrypted: false,
         rowCount: 0,
         photoCount: 0,
@@ -200,7 +200,7 @@ describe("restore preview", () => {
       status: "ready",
       preview: {
         exportedAt: manifest.metadata.exportedAt,
-        backupFormatVersion: 6,
+        backupFormatVersion: 7,
         encrypted: true,
         rowCount: 0,
         photoCount: 0,

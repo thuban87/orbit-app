@@ -212,16 +212,16 @@ describe("category identity repository audit", () => {
     }
   });
 
-  it("pins the no-schema-change phase boundary and portable format 6", () => {
+  it("pins the confirmed Your Week schema boundary and portable format 7", () => {
     const database = source("src/db/database.ts");
     const migrationTests = source("src/db/migrations/full-chain.test.ts");
     const backupTypes = source("src/backup/types.ts");
     expect(database).toContain(
-      "TARGET_VERSION = AI_CONFIGURATION_SCHEMA_VERSION",
+      "TARGET_VERSION = YOUR_WEEK_PERIOD_SCHEMA_VERSION",
     );
-    expect(database).not.toMatch(/migration030|030-category/i);
-    expect(migrationTests).toContain("expect(TARGET_VERSION).toBe(29)");
-    expect(backupTypes).toMatch(/BACKUP_FORMAT_VERSION\s*=\s*6/);
+    expect(database).toContain("migration030");
+    expect(migrationTests).toContain("expect(TARGET_VERSION).toBe(30)");
+    expect(backupTypes).toMatch(/BACKUP_FORMAT_VERSION\s*=\s*7/);
   });
 
   it("keeps category seeding migration-only and leaves zero-category restore exact", () => {
