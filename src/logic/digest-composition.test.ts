@@ -9,17 +9,15 @@ import {
 
 describe("digest composition", () => {
   it("caps Up Next at three and gives those ids first claim over Overlooked", () => {
-    const candidates = [
-      { id: 1 },
-      { id: 2 },
-      { id: 3 },
-      { id: 4 },
-    ];
+    const candidates = [{ id: 1 }, { id: 2 }, { id: 3 }, { id: 4 }];
     const upNext = pickUpNext(candidates);
     expect(upNext.map((row) => row.id)).toEqual([1, 2, 3]);
     expect(
       dedupOverlooked(
-        [{ id: 1, reason: "overdue" }, { id: 4, reason: "overdue" }],
+        [
+          { id: 1, reason: "overdue" },
+          { id: 4, reason: "overdue" },
+        ],
         upNext.map((row) => row.id),
       ),
     ).toEqual([{ id: 4, reason: "overdue" }]);

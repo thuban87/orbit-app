@@ -70,7 +70,9 @@ async function seedContact(input: {
       `uid-${++uidCounter}`,
       input.name,
       input.intervalDays === undefined ? 10 : input.intervalDays,
-      input.lastContact === undefined ? localDateOffset(-10) : input.lastContact,
+      input.lastContact === undefined
+        ? localDateOffset(-10)
+        : input.lastContact,
       input.trackingEnabled ?? 1,
       input.archivedAt ?? null,
       input.snoozeUntil ?? null,
@@ -82,7 +84,10 @@ async function seedContact(input: {
 
 describe("readUpNextCandidates", () => {
   it("returns attention contacts most-overdue first without pre-capping", async () => {
-    await seedContact({ name: "Approaching", lastContact: localDateOffset(-8) });
+    await seedContact({
+      name: "Approaching",
+      lastContact: localDateOffset(-8),
+    });
     await seedContact({ name: "Due", lastContact: localDateOffset(-10) });
     await seedContact({ name: "Rogue", lastContact: localDateOffset(-40) });
     await seedContact({ name: "Decay", lastContact: localDateOffset(-15) });
