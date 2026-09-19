@@ -22,7 +22,8 @@
  * rarely_responds, muted, and never-contacted — exactly the populations this
  * section surfaces (RESEARCH Pitfall 3). It queries `STATUS_SQL = 'rogue'`
  * directly, OMITS the `reminders_off` mute filter (a muted rogue still appears —
- * mute governs decay PUSHES only), and pre-filters `last_contact IS NOT NULL`
+ * mute governs decay PUSHES only), excludes active snoozes to match the
+ * needs-attention drill target, and pre-filters `last_contact IS NOT NULL`
  * (STATUS_SQL has no NULL branch — status.ts:52-57 — so a NULL would falsely
  * read 'stable'). Drifting vs Gone quiet is split by REASON in digest-logic.ts,
  * never by the raw progress value.
@@ -101,10 +102,10 @@ export function readRetrospective(
 
 /**
  * "The overlooked" — non-archived, contacted contacts that have gone rogue, with
- * the mute filter DELIBERATELY omitted. `last_contact IS NOT NULL` is
- * load-bearing (it is what makes STATUS_SQL safe over a possible NULL). Ordered
- * most-slipped first; the Drifting / Gone-quiet split is by `reason` in
- * digest-logic.ts.
+ * the reminder-mute filter deliberately omitted. Active snoozes are excluded so
+ * the preview matches its needs-attention drill target. `last_contact IS NOT
+ * NULL` is load-bearing (it makes STATUS_SQL safe over a possible NULL). Ordered
+ * most-slipped first; the Drifting / Gone-quiet split is by `reason`.
  */
 export function readOverlooked(exec: SqlExecutor): Promise<OverlookedRow[]> {
   const sql = `SELECT c.id AS id,
@@ -118,6 +119,7 @@ export function readOverlooked(exec: SqlExecutor): Promise<OverlookedRow[]> {
   WHERE c.archived_at IS NULL
     AND c.tracking_enabled = 1
     AND c.last_contact IS NOT NULL
+    AND (c.snooze_until IS NULL OR date(c.snooze_until) <= date('now','localtime'))
     AND (${STATUS_SQL}) = 'rogue'
   ORDER BY progress DESC, c.name COLLATE NOCASE, c.id`;
   return exec.getAllAsync<OverlookedRow>(sql);

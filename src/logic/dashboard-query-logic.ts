@@ -220,6 +220,17 @@ export const DASHBOARD_POPULATION_SCOPE_WHERE = `c.archived_at IS NULL
      AND c.tracking_enabled = 1`;
 
 export const NOT_CONTACTED_WHERE = "c.last_contact IS NULL";
+/**
+ * D-10 / ADR-062 extension: the exact Never Contacted population honors the
+ * existing opt-in for Unbound contacts. Other populations remain Bound-only.
+ */
+export const NOT_CONTACTED_INCLUSIVE_WHERE = `c.archived_at IS NULL
+     AND c.last_contact IS NULL
+     AND (c.tracking_enabled = 1 OR (
+       c.tracking_enabled = 0 AND (
+         SELECT include_unbound_never_contacted FROM app_settings WHERE id = 1
+       ) = 1
+     ))`;
 export const FAVOURITES_WHERE = "c.favourite_rank IS NOT NULL";
 export const SNOOZED_WHERE = `c.snooze_until IS NOT NULL
      AND date(c.snooze_until) > date('now','localtime')`;
@@ -252,6 +263,12 @@ export function buildPopulationWhere(
   const selected = [...new Set(populations.filter(isDashboardPopulation))];
   if (selected.length === 0) {
     return { sql: ACTIVE_SEGREGATION_WHERE, params: [] };
+  }
+
+  // Owner ruling D-10: count, preview, and drill share this exact universe.
+  // Mixed selections retain the canonical Bound-only population scope.
+  if (selected.length === 1 && selected[0] === "not-contacted") {
+    return { sql: NOT_CONTACTED_INCLUSIVE_WHERE, params: [] };
   }
 
   const params: unknown[] = [];
