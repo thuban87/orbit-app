@@ -111,7 +111,11 @@ describe("readUpNextCandidates", () => {
     await seedContact({ name: "Included", lastContact: localDateOffset(-8) });
     await seedContact({ name: "Archived", archivedAt: NOW });
     await seedContact({ name: "Unbound", trackingEnabled: 0 });
-    await seedContact({ name: "No cadence", intervalDays: null });
+    await seedContact({
+      name: "No cadence",
+      intervalDays: null,
+      trackingEnabled: 0,
+    });
     await seedContact({ name: "Never", lastContact: null });
     await seedContact({
       name: "Snoozed",
