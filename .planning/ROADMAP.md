@@ -1018,7 +1018,7 @@ Plans:
 **Requirements**: S-01…S-15 — the dossier §S planning-time verification checklist (S-01 root-tab/route inventory · S-02 origin-aware Profile · S-03 FAB audit · S-04 Settings Backup before tab removal · S-05 Dashboard/Group-Events label inventory · S-06 canonical status for Up Next · S-07 overlooked/never-contacted + dedup · S-08 7-day birthdays · S-09 Phase-32 heatmap/day-detail reuse · S-10 Rolling-7 + Calendar Week · S-11 Group-Event no double-count · S-12 period pref persistence · S-13 Digest notification routing · S-14 reselect/fresh-launch/resume · S-15 physical-device UAT)
 **Success Criteria**: All S-01…S-15 verified (dossier §S), incl. on-device UAT across all five tabs + both theme packages
 **Canonical refs**: docs/dossier/milestone-2/phase-38-digest-navigation-restructure-dossier.md (authoritative); ADR-076
-**Plans**: 6/7 plans executed (4 waves)
+**Plans**: 6/8 plans executed (5 waves; Plan 08 is the single bounded UAT gap closure)
 
 Plans:
 **Wave 1**
@@ -1039,6 +1039,10 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [ ] 38-07-PLAN.md — Navigation regression + accessibility + themes + physical-device UAT [wave 4]
+
+**Wave 5** *(single bounded gap closure from Plan-07 device evidence)*
+
+- [ ] 38-08-PLAN.md — Events participant-detail → Profile repair + DEV-only Never Contacted/notification probes + focused Pixel UAT closure [wave 5, gap closure]
 
 > **Ready to plan — dossier interrogated 2026-09-18; plan against the dossier as the authoritative contract.**
 
