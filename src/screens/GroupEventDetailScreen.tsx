@@ -27,6 +27,7 @@ import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import {
   buildGroupEventDetailInteraction,
+  closeThenOpenParticipantProfile,
   groupEventDurationLabel,
 } from "./group-event-detail-logic";
 
@@ -250,6 +251,13 @@ export function GroupEventDetailScreen({
             navigation.navigate("EditParticipant", {
               groupEventId,
               interactionId: detail.interactionId,
+              contactId: detail.contactId,
+            })
+          }
+          onViewProfile={() =>
+            closeThenOpenParticipantProfile({
+              close: () => setDetail(null),
+              navigate: navigation.navigate,
               contactId: detail.contactId,
             })
           }

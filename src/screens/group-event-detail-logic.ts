@@ -4,6 +4,22 @@ import type {
   GroupEventParticipant,
 } from "@/db/group-events-read";
 
+interface ParticipantProfileCommand {
+  close: () => void;
+  navigate: (route: "Profile", params: { contactId: number }) => void;
+  contactId: number;
+}
+
+/** Close the modal surface before pushing Profile onto the current Events stack. */
+export function closeThenOpenParticipantProfile({
+  close,
+  navigate,
+  contactId,
+}: ParticipantProfileCommand): void {
+  close();
+  navigate("Profile", { contactId });
+}
+
 /** The existing duration vocabulary, applied to stored whole seconds. */
 export function groupEventDurationLabel(
   duration: number | null,

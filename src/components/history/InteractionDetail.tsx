@@ -74,6 +74,8 @@ export interface InteractionDetailProps {
     contactId: number,
   ) => void;
   onConvertToGroup?: () => void;
+  /** Optional host-owned route to the interaction owner's Profile. */
+  onViewProfile?: () => void;
   /** Called after a confirmed successful delete (parent closes + refreshes). */
   onDeleted: () => void;
 }
@@ -88,6 +90,7 @@ export function InteractionDetail({
   onEditGroupEvent,
   onEditParticipant,
   onConvertToGroup,
+  onViewProfile,
   onDeleted,
 }: InteractionDetailProps) {
   const { colors } = useTheme();
@@ -207,6 +210,13 @@ export function InteractionDetail({
       ) : null}
 
       <View style={styles.actions}>
+        {onViewProfile ? (
+          <Button
+            role="tertiary"
+            label="View profile"
+            onPress={onViewProfile}
+          />
+        ) : null}
         <Button role="secondary" label="Edit" onPress={onEditPress} />
         <Button
           role="destructive"
