@@ -13,6 +13,7 @@ import { Icon } from "@/components/icons/Icon";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button } from "@/components/ui";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
+import { EVENTS } from "@/constants/product-labels";
 import { getExecutor } from "@/db/database";
 import {
   type GroupEventListItem,
@@ -61,7 +62,7 @@ export function GroupEventsScreen({
     }, [load, term]),
   );
   const emptyCopy = useMemo(
-    () => (term.trim() ? `No group events match "${term.trim()}".` : null),
+    () => (term.trim() ? `No events match "${term.trim()}".` : null),
     [term],
   );
 
@@ -69,12 +70,12 @@ export function GroupEventsScreen({
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <ShellAppBar
         variant="child"
-        title="Group Events"
+        title={EVENTS}
         trailing={
           <Button
             role="iconOnly"
             icon="search"
-            accessibilityLabel="Search group events"
+            accessibilityLabel="Search events"
             onPress={() => setSearchOpen((open) => !open)}
           />
         }
@@ -82,7 +83,7 @@ export function GroupEventsScreen({
       {searchOpen ? (
         <View style={styles.searchWrap}>
           <TextInput
-            accessibilityLabel="Search group events"
+            accessibilityLabel="Search events"
             autoFocus
             placeholder="Search title or participant"
             placeholderTextColor={colors.textSecondary}
@@ -113,7 +114,7 @@ export function GroupEventsScreen({
           renderItem={({ item }) => (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`View group event ${item.title}`}
+              accessibilityLabel={`View event ${item.title}`}
               onPress={() =>
                 navigation.navigate("GroupEventDetail", {
                   groupEventId: item.id,
@@ -142,8 +143,8 @@ export function GroupEventsScreen({
             <ChromeScrim style={styles.emptyPanel} radius={RADII.lg}>
               <AppText role="heading">
                 {failed
-                  ? "Couldn't load group events"
-                  : (emptyCopy ?? "No group events yet")}
+                  ? "Couldn't load events"
+                  : (emptyCopy ?? "No events yet")}
               </AppText>
               <AppText role="body" style={{ color: colors.textSecondary }}>
                 {failed

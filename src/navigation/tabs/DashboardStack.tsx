@@ -7,13 +7,11 @@ import { ComposeScreen } from "@/screens/ComposeScreen";
 import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CreateContactScreen } from "@/screens/CreateContactScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
-import { DigestScreen } from "@/screens/DigestScreen";
 import { EditContactScreen } from "@/screens/EditContactScreen";
 import { EditGroupEventScreen } from "@/screens/EditGroupEventScreen";
 import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
 import { EditParticipantScreen } from "@/screens/EditParticipantScreen";
 import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
-import { GroupEventsScreen } from "@/screens/GroupEventsScreen";
 import { GroupLogScreen } from "@/screens/GroupLogScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
@@ -36,7 +34,6 @@ export function DashboardStack() {
       screenOptions={{ headerShown: false }}
     >
       <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen name="GroupEvents" component={GroupEventsScreen} />
       <Stack.Screen
         name="GroupEventDetail"
         component={GroupEventDetailScreen}
@@ -58,15 +55,11 @@ export function DashboardStack() {
       <Stack.Screen name="EditParticipant" component={EditParticipantScreen} />
       <Stack.Screen name="Create" component={CreateContactScreen} />
       <Stack.Screen name="Compose" component={ComposeScreen} />
-      <Stack.Screen
-        name="ComposeResearch"
-        component={ComposeResearchRoute}
-      />
+      <Stack.Screen name="ComposeResearch" component={ComposeResearchRoute} />
       <Stack.Screen name="Capture" component={CaptureScreen} />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
       <Stack.Screen name="UnboundContacts" component={UnboundContactsScreen} />
-      <Stack.Screen name="Digest" component={DigestScreen} />
       <Stack.Screen name="SurvivorSelect" component={SurvivorSelectScreen} />
       <Stack.Screen name="MergeConflicts" component={MergeConflictsScreen} />
       <Stack.Screen name="MergeImpactSummary" component={MergeImpactSummary} />

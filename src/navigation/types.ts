@@ -229,12 +229,65 @@ export type BackupStackParamList = {
 export type DigestStackParamList = {
   Digest: undefined;
   Profile: ProfileRouteParams;
+  RecentlyDeleted: { contactId: number };
+  GroupEventDetail: { groupEventId: number };
+  EditGroupEvent: { groupEventId: number };
+  EditParticipant: {
+    groupEventId: number;
+    interactionId: number;
+    contactId: number;
+  };
+  Compose: { contactId: number; origin?: ComposeOrigin };
+  ComposeResearch: { contactId: number };
+  LogContact: { contactId?: number; prefillDate?: string } | undefined;
+  Edit: { contactId: number };
+  EditInteraction: { contactId: number; interactionId: number };
+  ThingsToRemember: { contactId: number };
+  MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  CropPhoto: {
+    rawUri: string;
+    target: PhotoTargetDescriptor;
+    requestId?: string;
+  };
+  SurvivorSelect: { firstContactId: number; secondContactId?: number };
+  MergeConflicts: { survivorId: number; absorbedId: number };
+  MergeImpactSummary: {
+    survivorId: number;
+    absorbedId: number;
+    resolutions: MergeResolutions;
+  };
 };
 
 export type EventsStackParamList = {
   GroupEvents: undefined;
   GroupEventDetail: { groupEventId: number };
   Profile: ProfileRouteParams;
+  RecentlyDeleted: { contactId: number };
+  EditGroupEvent: { groupEventId: number };
+  EditParticipant: {
+    groupEventId: number;
+    interactionId: number;
+    contactId: number;
+  };
+  Compose: { contactId: number; origin?: ComposeOrigin };
+  ComposeResearch: { contactId: number };
+  LogContact: { contactId?: number; prefillDate?: string } | undefined;
+  Edit: { contactId: number };
+  EditInteraction: { contactId: number; interactionId: number };
+  ThingsToRemember: { contactId: number };
+  MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  CropPhoto: {
+    rawUri: string;
+    target: PhotoTargetDescriptor;
+    requestId?: string;
+  };
+  SurvivorSelect: { firstContactId: number; secondContactId?: number };
+  MergeConflicts: { survivorId: number; absorbedId: number };
+  MergeImpactSummary: {
+    survivorId: number;
+    absorbedId: number;
+    resolutions: MergeResolutions;
+  };
 };
 
 export type SettingsStackParamList = {
