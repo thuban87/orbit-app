@@ -2,7 +2,8 @@ import type { OverflowAction } from "@/components/OverflowMenu";
 
 /** The navigation surface used by Dashboard's fixed overflow destinations. */
 export interface DashboardOverflowNavigation {
-  navigate: (route: "GroupEvents" | "UnboundContacts" | "Archived") => void;
+  navigate: (route: "UnboundContacts" | "Archived") => void;
+  openEvents: () => void;
 }
 
 interface BuildDashboardOverflowActionsInput {
@@ -25,7 +26,7 @@ export function buildDashboardOverflowActions({
   return [
     {
       label: "Group Events",
-      onPress: () => navigation.navigate("GroupEvents"),
+      onPress: navigation.openEvents,
       testID: "dashboard-group-events-overflow-entry",
     },
     {

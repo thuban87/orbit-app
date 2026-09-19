@@ -29,6 +29,7 @@
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
+import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import {
@@ -133,7 +134,7 @@ import {
 } from "@/logic/favourite-optimistic";
 import { selectLine3 } from "@/logic/list-row-selection";
 import { navigationRef } from "@/navigation/linking";
-import type { DashboardScreenProps } from "@/navigation/types";
+import type { DashboardScreenProps, TabParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { buildDashboardOverflowActions } from "@/screens/dashboard-overflow-actions";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
@@ -1462,7 +1463,21 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   }, [rows]);
 
   const overflowActions = buildDashboardOverflowActions({
-    navigation,
+    navigation: {
+      navigate: (route) => navigation.navigate(route),
+      openEvents: () => {
+        const parent = navigation.getParent<
+          BottomTabNavigationProp<TabParamList>
+        >();
+        if (!parent) {
+          if (__DEV__) {
+            Logger.warn(LOG_SCOPE, "Events tab navigator is not mounted");
+          }
+          return;
+        }
+        parent.navigate("EventsTab", { screen: "GroupEvents" });
+      },
+    },
     onReset,
     onSelectContacts: () => {
       void onSelectContacts();
