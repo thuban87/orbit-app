@@ -1645,77 +1645,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           variant="root"
           title="Orbit"
           overflow={overflowActions}
-          trailingLabelProbe={["Your Week", "Group Events"]}
-          trailing={({ compact }) => (
-            <View style={styles.headerDestinations}>
-              <Pressable
-                testID="dashboard-your-week-entry"
-                accessibilityRole="button"
-                accessibilityLabel="Your Week"
-                hitSlop={4}
-                onPress={() => navigation.navigate("Digest")}
-                style={styles.headerDestination}
-              >
-                {({ pressed }) => (
-                  <>
-                    <Icon
-                      name="your-week"
-                      size="md"
-                      tone={pressed ? "accent" : "textSecondary"}
-                    />
-                    {!compact ? (
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.headerDestinationLabel,
-                          {
-                            color: pressed
-                              ? colors.accent
-                              : colors.textSecondary,
-                          },
-                        ]}
-                      >
-                        Your Week
-                      </Text>
-                    ) : null}
-                  </>
-                )}
-              </Pressable>
-              <Pressable
-                testID="dashboard-group-events-entry"
-                accessibilityRole="button"
-                accessibilityLabel="Group Events"
-                hitSlop={4}
-                onPress={() => navigation.navigate("GroupEvents")}
-                style={styles.headerDestination}
-              >
-                {({ pressed }) => (
-                  <>
-                    <Icon
-                      name="group-events"
-                      size="md"
-                      tone={pressed ? "accent" : "textSecondary"}
-                    />
-                    {!compact ? (
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.headerDestinationLabel,
-                          {
-                            color: pressed
-                              ? colors.accent
-                              : colors.textSecondary,
-                          },
-                        ]}
-                      >
-                        Group Events
-                      </Text>
-                    ) : null}
-                  </>
-                )}
-              </Pressable>
-            </View>
-          )}
         />
       </View>
       {selectionMode ? (
@@ -2202,23 +2131,6 @@ const styles = StyleSheet.create({
   },
   listRegion: {
     flex: 1,
-  },
-  headerDestinations: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  headerDestination: {
-    minHeight: 44,
-    minWidth: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 4,
-  },
-  headerDestinationLabel: {
-    fontSize: 14,
-    fontWeight: "600",
   },
   content: {
     padding: 16,
