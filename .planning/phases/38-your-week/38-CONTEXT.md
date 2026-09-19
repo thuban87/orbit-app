@@ -70,6 +70,17 @@ replace the dossier — read it in full first.
   in-context toggle reads/writes the same preference). This **honors §I** and **supersedes** Plan
   05's earlier read of D-03 as licence to place it in-context only. D-03 governs plan
   *decomposition*, not preference *placement*. Owner decided this on 2026-09-18.
+- **D-10 [owner ruling, cycle-3 review]:** The Digest **Never Contacted** surface (Horizon
+  preview + its Contacts drill-through) **INCLUDES opted-in unbound never-contacted contacts**
+  when `include_unbound_never_contacted = 1`, matching `countNeverContacted`
+  (`dashboard-read.ts`) and the existing Dashboard behavior — so count, preview, and drill are
+  consistent (fixes the cycle-3 HIGH). This requires a not-contacted read path beyond the hard
+  `tracking_enabled = 1` scope of `DASHBOARD_POPULATION_SCOPE_WHERE` /
+  `listDashboardPopulation` (`src/logic/dashboard-query-logic.ts:219-220`). This is an
+  **owner-approved extension of §G/ADR-062 population semantics scoped to the not-contacted
+  population only** — it does NOT broaden any other population, and it aligns the Digest with an
+  already-shipped user setting rather than inventing new cadence semantics. Owner decided this on
+  2026-09-18 with the ADR-062/§G trade-off explicitly surfaced.
 </decisions>
 
 <canonical_refs>
