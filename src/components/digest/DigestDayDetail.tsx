@@ -31,6 +31,7 @@ export function DigestDayDetail({
       accessibilityLabel={`Activity for ${date}`}
       style={[styles.container, { backgroundColor: colors.surfaceElevated }]}
     >
+      {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
       <AppText role="label">{date}</AppText>
       {rows.length === 0 ? (
         <AppText role="caption" style={{ color: colors.textSecondary }}>
@@ -48,10 +49,14 @@ export function DigestDayDetail({
               >
                 <Icon name="group-events" tone="textPrimary" size="sm" />
                 <View style={styles.body}>
+                  {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
                   <AppText role="body" numberOfLines={1}>
                     {row.title ?? "Group Event"}
                   </AppText>
-                  <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  <AppText
+                    role="caption"
+                    style={{ color: colors.textSecondary }}
+                  >
                     {timeOf(row.occurredAt)}
                   </AppText>
                 </View>
@@ -70,10 +75,14 @@ export function DigestDayDetail({
                   size={AVATAR_SIZE}
                 />
                 <View style={styles.body}>
+                  {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
                   <AppText role="body" numberOfLines={1}>
                     {row.contactName ?? "Unknown contact"}
                   </AppText>
-                  <AppText role="caption" style={{ color: colors.textSecondary }}>
+                  <AppText
+                    role="caption"
+                    style={{ color: colors.textSecondary }}
+                  >
                     {timeOf(row.occurredAt)}
                   </AppText>
                 </View>

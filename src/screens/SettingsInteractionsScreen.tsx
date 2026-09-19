@@ -147,6 +147,7 @@ export function SettingsInteractionsScreen({
                 },
               ]}
             >
+              {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
               <AppText
                 role="body"
                 style={{

@@ -28,7 +28,10 @@ import {
   type YourWeekDayRow,
   type YourWeekMetrics,
 } from "@/db/your-week-read";
-import { buildYourWeekWindow, resolveFirstWeekday } from "@/services/history/week-window";
+import {
+  buildYourWeekWindow,
+  resolveFirstWeekday,
+} from "@/services/history/week-window";
 import type { HistoryWindow } from "@/services/history/window";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -69,7 +72,11 @@ export function YourWeekSection() {
   }, []);
 
   const loadPeriod = useCallback(
-    async (period: YourWeekPeriod, generation: number, cancelled?: () => boolean) => {
+    async (
+      period: YourWeekPeriod,
+      generation: number,
+      cancelled?: () => boolean,
+    ) => {
       const today = formatLocalDate(new Date());
       const window = buildYourWeekWindow(period, today, resolveFirstWeekday());
       const exec = getExecutor();
@@ -79,13 +86,17 @@ export function YourWeekSection() {
           readYourWeekDateCounts(exec, window.start, window.end),
         ]);
         if (cancelled?.()) return;
-        const reconciled = reconcileYourWeekRead(controllerRef.current, generation);
+        const reconciled = reconcileYourWeekRead(
+          controllerRef.current,
+          generation,
+        );
         if (!reconciled.accepted) return;
         commitController(reconciled.state);
         setLoaded({ window, metrics, counts: directDateCounts(window, rows) });
         setError(false);
       } catch (cause) {
-        if (cancelled?.() || generation !== controllerRef.current.generation) return;
+        if (cancelled?.() || generation !== controllerRef.current.generation)
+          return;
         Logger.error(LOG_SCOPE, "failed to load Your Week", cause);
         setError(true);
       }
@@ -110,7 +121,11 @@ export function YourWeekSection() {
           await loadPeriod(next.period, next.generation, () => cancelled);
         } catch (cause) {
           if (!cancelled) {
-            Logger.error(LOG_SCOPE, "failed to load Your Week preference", cause);
+            Logger.error(
+              LOG_SCOPE,
+              "failed to load Your Week preference",
+              cause,
+            );
             setError(true);
           }
         }
@@ -169,13 +184,13 @@ export function YourWeekSection() {
 
   const metrics = loaded?.metrics ?? EMPTY_METRICS;
   const empty =
-    loaded !== null &&
-    metrics.interactions === 0 &&
-    metrics.events === 0;
+    loaded !== null && metrics.interactions === 0 && metrics.events === 0;
 
   return (
     <View testID="your-week-section" style={styles.container}>
-      <AppText accessibilityRole="header" role="heading">Your Week</AppText>
+      <AppText accessibilityRole="header" role="heading">
+        Your Week
+      </AppText>
       <SegmentedControl
         testID="your-week-period"
         options={PERIOD_OPTIONS}
@@ -189,6 +204,7 @@ export function YourWeekSection() {
       </View>
       {error ? (
         <View style={styles.message}>
+          {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
           <AppText role="label">Couldn't load your Digest</AppText>
           <AppText role="caption" style={{ color: colors.textSecondary }}>
             Try opening it again in a moment.
@@ -196,6 +212,7 @@ export function YourWeekSection() {
         </View>
       ) : empty ? (
         <View style={styles.message}>
+          {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
           <AppText role="label">A quiet week</AppText>
           <AppText role="caption" style={{ color: colors.textSecondary }}>
             No logged activity in this period yet.
@@ -225,7 +242,9 @@ function Metric({ label, value }: { label: string; value: number }) {
       accessibilityLabel={`${label}, ${value}`}
       style={[styles.metric, { backgroundColor: colors.surface }]}
     >
+      {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
       <AppText role="body">{value}</AppText>
+      {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
       <AppText role="label" style={{ color: colors.textSecondary }}>
         {label}
       </AppText>
@@ -236,6 +255,11 @@ function Metric({ label, value }: { label: string; value: number }) {
 const styles = StyleSheet.create({
   container: { gap: SPACING.md },
   metrics: { flexDirection: "row", gap: SPACING.sm },
-  metric: { flex: 1, gap: SPACING.xs, padding: SPACING.md, borderRadius: SPACING.sm },
+  metric: {
+    flex: 1,
+    gap: SPACING.xs,
+    padding: SPACING.md,
+    borderRadius: SPACING.sm,
+  },
   message: { gap: SPACING.xs },
 });

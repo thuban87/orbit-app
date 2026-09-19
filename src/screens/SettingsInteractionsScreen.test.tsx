@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 
 const mocks = vi.hoisted(() => ({
-  focusEffect: null as null | (() => void | (() => void)),
+  focusEffect: null as null | (() => undefined | (() => undefined)),
   getAppSettings: vi.fn(),
   updateAppSettings: vi.fn(),
   setSettings: vi.fn(),
@@ -23,7 +23,7 @@ vi.mock("react", () => ({
   ],
 }));
 vi.mock("@react-navigation/native", () => ({
-  useFocusEffect: (effect: () => void | (() => void)) => {
+  useFocusEffect: (effect: () => undefined | (() => undefined)) => {
     mocks.focusEffect = effect;
   },
 }));
@@ -87,15 +87,19 @@ describe("SettingsInteractionsScreen Your Week preference", () => {
   it("renders the current period and persists the shared key", async () => {
     const tree = nodes(SettingsInteractionsScreen({ onBack: vi.fn() }));
     const rolling = tree.find(
-      (node) => node.props.testID === "settings-your-week-period-section-rolling7",
+      (node) =>
+        node.props.testID === "settings-your-week-period-section-rolling7",
     );
     const calendar = tree.find(
       (node) =>
         node.props.testID === "settings-your-week-period-section-calendar_week",
     );
     expect(rolling?.props.accessibilityState).toMatchObject({ selected: true });
-    expect(calendar?.props.accessibilityState).toMatchObject({ selected: false });
-    await (calendar?.props.onPress as () => Promise<void>)();
+    expect(calendar?.props.accessibilityState).toMatchObject({
+      selected: false,
+    });
+    if (!calendar) throw new Error("Missing Calendar Week setting");
+    await (calendar.props.onPress as () => Promise<void>)();
     expect(mocks.updateAppSettings).toHaveBeenCalledWith(
       { id: "exec" },
       { yourWeekPeriod: "calendar_week" },

@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { classifyHeatmapCell } from "@/components/history/heatmap-cell";
 import type { HistoryWindow, WindowCell } from "@/services/history/window";
-import { SPACING } from "@/theme/tokens/spacing";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
 
 const CELL_EDGE = 44;
 const COLUMNS = 7;
@@ -46,10 +46,7 @@ export function YourWeekHeatmap({
           key={key}
           accessibilityElementsHidden
           importantForAccessibility="no-hide-descendants"
-          style={[
-            styles.cell,
-            { backgroundColor: colors.heatmapCellEmpty },
-          ]}
+          style={[styles.cell, { backgroundColor: colors.heatmapCellEmpty }]}
         />
       );
     }
@@ -87,7 +84,10 @@ export function YourWeekHeatmap({
   return (
     <View testID={testID} style={styles.grid}>
       {rows.map((row, rowIndex) => (
-        <View key={`week-${rowIndex}`} style={styles.row}>
+        <View
+          key={row.map((cell) => cell.date ?? "blank").join("|")}
+          style={styles.row}
+        >
           {row.map((cell, cellIndex) =>
             renderCell(cell, cell.date ?? `blank-${rowIndex}-${cellIndex}`),
           )}

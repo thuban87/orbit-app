@@ -54,11 +54,10 @@ describe("DigestDayDetail", () => {
       ),
     ).toHaveLength(1);
     expect(
-      tree.find((node) => node.props.testID === "digest-day-detail-interaction-8")
-        ?.props.accessibilityLabel,
+      tree.find(
+        (node) => node.props.testID === "digest-day-detail-interaction-8",
+      )?.props.accessibilityLabel,
     ).toContain("Lin");
-    expect(
-      tree.find((node) => node.type === "Avatar")?.props.name,
-    ).toBe("Lin");
+    expect(tree.find((node) => node.type === "Avatar")?.props.name).toBe("Lin");
   });
 });

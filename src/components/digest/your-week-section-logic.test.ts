@@ -13,12 +13,19 @@ describe("Your Week controller", () => {
   it("drops stale reads after a rapid period change", () => {
     const first = selectYourWeekPeriod(initialYourWeekState(), "calendar_week");
     const second = selectYourWeekPeriod(first, "rolling7");
-    expect(reconcileYourWeekRead(second, first.generation).accepted).toBe(false);
-    expect(reconcileYourWeekRead(second, second.generation).accepted).toBe(true);
+    expect(reconcileYourWeekRead(second, first.generation).accepted).toBe(
+      false,
+    );
+    expect(reconcileYourWeekRead(second, second.generation).accepted).toBe(
+      true,
+    );
   });
 
   it("rolls a rejected preference write back to the persisted period", () => {
-    const pending = selectYourWeekPeriod(initialYourWeekState(), "calendar_week");
+    const pending = selectYourWeekPeriod(
+      initialYourWeekState(),
+      "calendar_week",
+    );
     const rolledBack = persistYourWeekPeriodRejected(
       pending,
       pending.generation,
@@ -29,7 +36,9 @@ describe("Your Week controller", () => {
 
   it("invalidates selected day detail when the period changes", () => {
     const selected = selectYourWeekDay(initialYourWeekState(), "2026-09-18");
-    expect(selectYourWeekPeriod(selected, "calendar_week").selectedDay).toBeNull();
+    expect(
+      selectYourWeekPeriod(selected, "calendar_week").selectedDay,
+    ).toBeNull();
   });
 
   it("copies pre-aggregated activity-unit counts directly", () => {

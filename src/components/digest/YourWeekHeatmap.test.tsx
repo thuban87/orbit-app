@@ -1,7 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { THEME_PRESETS } from "@/theme/theme-presets";
 import type { HistoryWindow } from "@/services/history/window";
+import { THEME_PRESETS } from "@/theme/theme-presets";
 
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
@@ -54,9 +54,7 @@ describe("YourWeekHeatmap", () => {
     );
     expect(selected?.props.accessibilityState).toEqual({ selected: true });
     expect(selected?.props.style).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ borderWidth: 2 }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ borderWidth: 2 })]),
     );
   });
 

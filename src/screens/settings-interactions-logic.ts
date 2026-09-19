@@ -1,12 +1,12 @@
 import {
   type AppSettings,
   type AppSettingsPatch,
-  type DefaultInteractionChannel,
   DEFAULT_INTERACTION_CHANNELS,
+  type DefaultInteractionChannel,
   type DefaultMessageMode,
   MESSAGE_MODES,
-  type YourWeekPeriod,
   YOUR_WEEK_PERIODS,
+  type YourWeekPeriod,
 } from "@/db/app-settings-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
