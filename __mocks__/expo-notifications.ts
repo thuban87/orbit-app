@@ -112,6 +112,8 @@ export const cancelScheduledNotificationAsync = vi.fn(
     return undefined;
   },
 );
+export const dismissNotificationAsync = vi.fn(async () => undefined);
+export const getPresentedNotificationsAsync = vi.fn(async () => []);
 export const getAllScheduledNotificationsAsync = vi.fn(
   async (): Promise<ScheduledRequestDouble[]> => scheduled,
 );
@@ -157,6 +159,8 @@ export function __reset(): void {
   for (const stub of [
     scheduleNotificationAsync,
     cancelScheduledNotificationAsync,
+    dismissNotificationAsync,
+    getPresentedNotificationsAsync,
     getAllScheduledNotificationsAsync,
     setNotificationChannelAsync,
     setNotificationCategoryAsync,

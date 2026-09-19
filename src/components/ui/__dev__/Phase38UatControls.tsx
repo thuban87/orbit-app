@@ -7,6 +7,7 @@ import { getAppSettings, updateAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   cancelPhase38DigestUat,
+  findPhase38DigestUatIdentifier,
   schedulePhase38DigestUat,
 } from "@/services/notifications/__dev__/phase38-uat";
 import { useTheme } from "@/theme";
@@ -23,11 +24,15 @@ export function Phase38UatControls() {
 
   useEffect(() => {
     let mounted = true;
-    getAppSettings(getExecutor())
-      .then((settings) => {
+    Promise.all([
+      getAppSettings(getExecutor()),
+      findPhase38DigestUatIdentifier(),
+    ])
+      .then(([settings, retainedIdentifier]) => {
         if (!mounted) return;
         setOriginal(settings.includeUnboundNeverContacted);
         setCurrent(settings.includeUnboundNeverContacted);
+        setNotificationId(retainedIdentifier);
         setStatus("Ready");
       })
       .catch(() => {

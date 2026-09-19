@@ -1,5 +1,8 @@
 import {
   cancelScheduledNotificationAsync,
+  dismissNotificationAsync,
+  getAllScheduledNotificationsAsync,
+  getPresentedNotificationsAsync,
   scheduleNotificationAsync,
 } from "expo-notifications";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -12,6 +15,7 @@ import {
 } from "../notification-ids";
 import {
   cancelPhase38DigestUat,
+  findPhase38DigestUatIdentifier,
   schedulePhase38DigestUat,
 } from "./phase38-uat";
 
@@ -47,10 +51,28 @@ describe("Phase 38 Digest notification UAT probe", () => {
     expect(cancelScheduledNotificationAsync).toHaveBeenCalledWith(
       "digest:uat:123",
     );
+    expect(dismissNotificationAsync).toHaveBeenCalledWith("digest:uat:123");
 
     await expect(cancelPhase38DigestUat(DIGEST_IDENTIFIER)).rejects.toThrow(
       "UAT-only",
     );
     expect(cancelScheduledNotificationAsync).toHaveBeenCalledTimes(1);
+    expect(dismissNotificationAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it("recovers a delivered UAT identifier without selecting the weekly singleton", async () => {
+    vi.mocked(getAllScheduledNotificationsAsync).mockResolvedValueOnce([]);
+    vi.mocked(getPresentedNotificationsAsync).mockResolvedValueOnce([
+      {
+        request: { identifier: DIGEST_IDENTIFIER },
+      },
+      {
+        request: { identifier: "digest:uat:delivered" },
+      },
+    ] as never);
+
+    await expect(findPhase38DigestUatIdentifier()).resolves.toBe(
+      "digest:uat:delivered",
+    );
   });
 });

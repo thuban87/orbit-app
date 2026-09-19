@@ -1,5 +1,8 @@
 import {
   cancelScheduledNotificationAsync,
+  dismissNotificationAsync,
+  getAllScheduledNotificationsAsync,
+  getPresentedNotificationsAsync,
   SchedulableTriggerInputTypes,
   scheduleNotificationAsync,
 } from "expo-notifications";
@@ -36,6 +39,23 @@ export async function schedulePhase38DigestUat(
   return identifier;
 }
 
+/** Recover an interrupted probe from either the future schedule or the live shade. */
+export async function findPhase38DigestUatIdentifier(): Promise<string | null> {
+  const [scheduled, presented] = await Promise.all([
+    getAllScheduledNotificationsAsync(),
+    getPresentedNotificationsAsync(),
+  ]);
+  const identifiers = [
+    ...scheduled.map((request) => request.identifier),
+    ...presented.map((notification) => notification.request.identifier),
+  ];
+  return (
+    identifiers.find((identifier) =>
+      identifier.startsWith(UAT_IDENTIFIER_PREFIX),
+    ) ?? null
+  );
+}
+
 /** Cancel only an identifier minted by this debug probe. */
 export async function cancelPhase38DigestUat(
   identifier: string,
@@ -47,4 +67,5 @@ export async function cancelPhase38DigestUat(
     throw new Error("Phase 38 cleanup accepts a UAT-only Digest identifier.");
   }
   await cancelScheduledNotificationAsync(identifier);
+  await dismissNotificationAsync(identifier);
 }
