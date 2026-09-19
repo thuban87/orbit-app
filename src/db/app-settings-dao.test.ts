@@ -73,6 +73,7 @@ import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { migration027 } from "@/db/migrations/027-default-interaction-channel";
 import { migration028 } from "@/db/migrations/028-compose-message-mode";
 import { migration029 } from "@/db/migrations/029-ai-configuration";
+import { migration030 } from "@/db/migrations/030-your-week-period";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
@@ -149,8 +150,9 @@ async function migrateToV5(): Promise<void> {
       migration027,
       migration028,
       migration029,
+      migration030,
     ],
-    29,
+    30,
     { now: NOW, newUid },
   );
 }
@@ -228,6 +230,7 @@ const PROFILE_PRESENTATION_DEFAULTS = {
 const HISTORY_DEFAULTS = {
   historyLens: "cycles" as const,
   historyCycleCount: 10 as const,
+  yourWeekPeriod: "rolling7" as const,
 };
 
 /**
@@ -1469,7 +1472,33 @@ describe("app-settings-dao — history lens/preset settings (migration 025, D-11
       LATER,
     );
     const snapshot = await getPortableSettingsSnapshot(exec);
-    expect(snapshot).toMatchObject({ historyLens: "7days", historyCycleCount: 15 });
+    expect(snapshot).toMatchObject({
+      historyLens: "7days",
+      historyCycleCount: 15,
+    });
+  });
+});
+
+describe("app-settings-dao — Your Week period (migration 030, D-08)", () => {
+  beforeEach(async () => {
+    await migrateToV5();
+  });
+
+  it("persists and reloads the calendar-week preference through the generic writer", async () => {
+    expect((await getAppSettings(exec)).yourWeekPeriod).toBe("rolling7");
+    await updateAppSettings(exec, { yourWeekPeriod: "calendar_week" }, LATER);
+    expect((await getAppSettings(exec)).yourWeekPeriod).toBe("calendar_week");
+  });
+
+  it("rejects malformed restored values at the DAO boundary", async () => {
+    await expect(
+      updateAppSettings(
+        exec,
+        { yourWeekPeriod: "weekly" } as Parameters<typeof updateAppSettings>[1],
+        LATER,
+      ),
+    ).rejects.toThrow(/yourWeekPeriod/);
+    expect((await getAppSettings(exec)).yourWeekPeriod).toBe("rolling7");
   });
 });
 

@@ -82,9 +82,9 @@ describe("registered migration chain", () => {
       MIGRATIONS.filter((migration) => migration.version === 28),
     ).toHaveLength(1);
     expect(
-      MIGRATIONS.filter((migration) => migration.version === 29),
+      MIGRATIONS.filter((migration) => migration.version === 30),
     ).toHaveLength(1);
-    expect(TARGET_VERSION).toBe(29);
+    expect(TARGET_VERSION).toBe(30);
     expect(
       await exec.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
     ).toEqual({
@@ -119,6 +119,7 @@ describe("registered migration chain", () => {
       "remembered_interaction_channel",
       "default_message_mode",
       "remembered_message_mode",
+      "your_week_period",
     ]) {
       expect(appSettingsCols.has(col)).toBe(true);
     }
@@ -135,6 +136,11 @@ describe("registered migration chain", () => {
       default_message_mode: "remember",
       remembered_message_mode: "text",
     });
+    expect(
+      await exec.getFirstAsync<{ your_week_period: string }>(
+        "SELECT your_week_period FROM app_settings WHERE id = 1",
+      ),
+    ).toEqual({ your_week_period: "rolling7" });
     // Migration 025's two new interaction columns are present after the full chain.
     const interactionCols = new Set(
       (
