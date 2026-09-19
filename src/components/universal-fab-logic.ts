@@ -133,7 +133,7 @@ function focusedRoute(state: unknown) {
 }
 
 /**
- * Returns profile context only from a focused Dashboard/Orrery profile route.
+ * Returns profile context from any focused relationship-browsing tab stack.
  * Navigation state may be incomplete before the container is ready, so malformed
  * trees deliberately resolve to no context rather than throwing.
  */
@@ -143,7 +143,12 @@ export function getFocusedContactContext(
   const tabRoute = focusedRoute(navigationState);
   if (
     !tabRoute ||
-    (tabRoute.name !== "DashboardTab" && tabRoute.name !== "OrreryTab")
+    ![
+      "DashboardTab",
+      "EventsTab",
+      "DigestTab",
+      "OrreryTab",
+    ].includes(tabRoute.name)
   ) {
     return { originContactId: null };
   }

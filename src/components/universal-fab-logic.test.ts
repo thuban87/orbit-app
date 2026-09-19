@@ -152,8 +152,9 @@ describe("getFocusedContactContext", () => {
   it("returns no contact from root-tab browse surfaces", () => {
     for (const name of [
       "DashboardTab",
+      "EventsTab",
+      "DigestTab",
       "OrreryTab",
-      "BackupTab",
       "SettingsTab",
     ]) {
       expect(
@@ -161,6 +162,29 @@ describe("getFocusedContactContext", () => {
       ).toEqual({ originContactId: null });
     }
   });
+
+  it.each(["DigestTab", "EventsTab"])(
+    "finds a Profile contact opened inside %s",
+    (name) => {
+      expect(
+        getFocusedContactContext({
+          index: 0,
+          routes: [
+            {
+              name,
+              state: {
+                index: 1,
+                routes: [
+                  { name: name === "DigestTab" ? "Digest" : "GroupEvents" },
+                  { name: "Profile", params: { contactId: 12 } },
+                ],
+              },
+            },
+          ],
+        }),
+      ).toEqual({ originContactId: 12 });
+    },
+  );
 
   it("is defensive around stale or malformed state", () => {
     expect(getFocusedContactContext(undefined)).toEqual({
