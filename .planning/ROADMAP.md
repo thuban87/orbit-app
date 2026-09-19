@@ -1018,11 +1018,11 @@ Plans:
 **Requirements**: S-01…S-15 — the dossier §S planning-time verification checklist (S-01 root-tab/route inventory · S-02 origin-aware Profile · S-03 FAB audit · S-04 Settings Backup before tab removal · S-05 Dashboard/Group-Events label inventory · S-06 canonical status for Up Next · S-07 overlooked/never-contacted + dedup · S-08 7-day birthdays · S-09 Phase-32 heatmap/day-detail reuse · S-10 Rolling-7 + Calendar Week · S-11 Group-Event no double-count · S-12 period pref persistence · S-13 Digest notification routing · S-14 reselect/fresh-launch/resume · S-15 physical-device UAT)
 **Success Criteria**: All S-01…S-15 verified (dossier §S), incl. on-device UAT across all five tabs + both theme packages
 **Canonical refs**: docs/dossier/milestone-2/phase-38-digest-navigation-restructure-dossier.md (authoritative); ADR-076
-**Plans**: 7/9 plans executed (5 waves; Plan 08 is the single bounded UAT gap closure)
+**Plans**: 8/8 plans executed (7 original plans plus the single bounded Plan 08 UAT gap closure; 5 waves)
 
 Plans:
 
-- [ ] 38-PLAN-CHECK.md
+Planning review artifact: `38-PLAN-CHECK.md` (not an executable plan)
 
 **Wave 1**
 
@@ -1041,7 +1041,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 38-07-PLAN.md — Navigation regression + accessibility + themes + physical-device UAT [wave 4]
+- [x] 38-07-PLAN.md — Navigation regression + accessibility + themes + physical-device UAT [wave 4]
 
 **Wave 5** *(single bounded gap closure from Plan-07 device evidence)*
 
@@ -1095,7 +1095,7 @@ Plans:
 | 35. Messaging & AI Compose | 9/9 | Complete |  |
 | 36. AI Configuration & Prompting | 11/11 | Complete | 2026-09-14 |
 | 37. Settings & Personalization | 8/8 | Complete | 2026-09-14 |
-| 38. Digest & Navigation Restructure | 7/9 | In Progress|  |
+| 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
