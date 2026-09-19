@@ -95,6 +95,21 @@ export type HistoryLens = (typeof HISTORY_LENSES)[number];
 export const HISTORY_CYCLE_COUNTS = [5, 10, 15, 20] as const;
 export type HistoryCycleCount = (typeof HISTORY_CYCLE_COUNTS)[number];
 
+export const YOUR_WEEK_PERIODS = ["rolling7", "calendar_week"] as const;
+export type YourWeekPeriod = (typeof YOUR_WEEK_PERIODS)[number];
+
+/** Throw unless `v` is a supported Your Week period (migration 030, D-08). */
+export function assertYourWeekPeriod(field: string, v: unknown): void {
+  if (
+    typeof v !== "string" ||
+    !(YOUR_WEEK_PERIODS as readonly string[]).includes(v)
+  ) {
+    throw new Error(
+      `updateAppSettings: ${field} must be rolling7 or calendar_week, got ${String(v)}`,
+    );
+  }
+}
+
 /** Throw unless `v` is a known history lens (`history_lens`, HIST-03/D-11). */
 export function assertHistoryLens(field: string, v: unknown): void {
   if (
@@ -315,6 +330,8 @@ export interface AppSettings {
   historyLens: HistoryLens;
   /** Global Cycles-lens count preset. NOT NULL, defaults 10. */
   historyCycleCount: HistoryCycleCount;
+  /** Digest Your Week boundary mode. NOT NULL, defaults to rolling7. */
+  yourWeekPeriod: YourWeekPeriod;
 
   // --- Rapid capture channel default (Phase 34, migration 027, CAPT-11) -----
   /**
@@ -471,6 +488,7 @@ export interface PortableSettingsSnapshot {
   // BACKUP_FORMAT_VERSION — emitting now would silently change the live wire shape.
   historyLens?: HistoryLens;
   historyCycleCount?: HistoryCycleCount;
+  yourWeekPeriod?: YourWeekPeriod;
   // --- Channel-default keys (Phase 34, CAPT-11) — writable NOW, EMISSION -----
   // DEFERRED. Same declare-only shape as the history keys above: declared
   // OPTIONAL so they enter `AppSettingsPatch` (writable via updateAppSettings)
@@ -569,6 +587,7 @@ type WritableSettingsKey =
   | "profileBackgroundTemplateUid"
   | "historyLens"
   | "historyCycleCount"
+  | "yourWeekPeriod"
   | "defaultInteractionChannel"
   | "rememberedInteractionChannel"
   | "defaultMessageMode"
@@ -618,6 +637,7 @@ interface AppSettingsRow {
   profile_background_template_uid: string | null;
   history_lens: string;
   history_cycle_count: number;
+  your_week_period: string;
   default_interaction_channel: string;
   remembered_interaction_channel: string;
   default_message_mode: string;
@@ -730,6 +750,7 @@ const COLUMN_OF: Record<WritableSettingsKey, string> = {
   profileBackgroundTemplateUid: "profile_background_template_uid",
   historyLens: "history_lens",
   historyCycleCount: "history_cycle_count",
+  yourWeekPeriod: "your_week_period",
   defaultInteractionChannel: "default_interaction_channel",
   rememberedInteractionChannel: "remembered_interaction_channel",
   defaultMessageMode: "default_message_mode",
@@ -773,7 +794,7 @@ export async function getAppSettings(
             dashboard_view_mode, dashboard_populations, dashboard_filters, dashboard_sort,
             dashboard_right_swipe_action,
             profile_layout_template_uid, profile_background_template_uid,
-            history_lens, history_cycle_count,
+            history_lens, history_cycle_count, your_week_period,
             default_interaction_channel, remembered_interaction_channel,
             default_message_mode, remembered_message_mode,
             ai_enabled, ai_active_connection, ai_first_use_disclosed,
@@ -840,6 +861,7 @@ export async function getAppSettings(
     // a known lens/preset value.
     historyLens: row.history_lens as HistoryLens,
     historyCycleCount: row.history_cycle_count as HistoryCycleCount,
+    yourWeekPeriod: row.your_week_period as YourWeekPeriod,
     // Channel default (migration 027). NOT NULL columns; the cast is a read-shape
     // convenience — the CHECK + write validators guarantee a known channel.
     defaultInteractionChannel:
@@ -997,8 +1019,10 @@ export async function getPortableSettingsSnapshot(
     standardMode: row.standard_mode as ThemeMode,
     galaxyAccent: (row.galaxy_accent ?? null) as AccentId | null,
     standardAccent: (row.standard_accent ?? null) as AccentId | null,
-    galaxyBackground: (row.galaxy_background ?? null) as BackgroundSlotId | null,
-    standardBackground: (row.standard_background ?? null) as BackgroundSlotId | null,
+    galaxyBackground: (row.galaxy_background ??
+      null) as BackgroundSlotId | null,
+    standardBackground: (row.standard_background ??
+      null) as BackgroundSlotId | null,
     dashboardViewMode: row.dashboard_view_mode as DashboardViewMode,
     dashboardPopulations: row.dashboard_populations,
     dashboardFilters: row.dashboard_filters,
@@ -1017,8 +1041,7 @@ export async function getPortableSettingsSnapshot(
     rememberedInteractionChannel:
       row.remembered_interaction_channel as RememberedInteractionChannel,
     defaultMessageMode: row.default_message_mode as DefaultMessageMode,
-    rememberedMessageMode:
-      row.remembered_message_mode as RememberedMessageMode,
+    rememberedMessageMode: row.remembered_message_mode as RememberedMessageMode,
     aiEnabled: (row.ai_enabled ? 1 : 0) as 0 | 1,
     aiActiveConnection: row.ai_active_connection,
     aiWritingTone: row.ai_writing_tone,
@@ -1029,7 +1052,9 @@ export async function getPortableSettingsSnapshot(
     aiDefaultInteractionNoteAllow: (row.ai_default_interaction_note_allow
       ? 1
       : 0) as 0 | 1,
-    aiDefaultCustomFieldShare: (row.ai_default_custom_field_share ? 1 : 0) as 0 | 1,
+    aiDefaultCustomFieldShare: (row.ai_default_custom_field_share ? 1 : 0) as
+      | 0
+      | 1,
     aiProvider: row.ai_provider as AiProviderId,
     aiModel: row.ai_model,
     aiCustomEndpoint: row.ai_custom_endpoint,
@@ -1343,6 +1368,9 @@ function validateAppSettingsPatch(patch: AppSettingsPatch): void {
   }
   if (patch.historyCycleCount !== undefined) {
     assertHistoryCycleCount("historyCycleCount", patch.historyCycleCount);
+  }
+  if (patch.yourWeekPeriod !== undefined) {
+    assertYourWeekPeriod("yourWeekPeriod", patch.yourWeekPeriod);
   }
   if (patch.defaultInteractionChannel !== undefined) {
     assertDefaultInteractionChannel(

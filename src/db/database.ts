@@ -49,10 +49,11 @@ import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { migration027 } from "@/db/migrations/027-default-interaction-channel";
 import { migration028 } from "@/db/migrations/028-compose-message-mode";
+import { migration029 } from "@/db/migrations/029-ai-configuration";
 import {
-  AI_CONFIGURATION_SCHEMA_VERSION,
-  migration029,
-} from "@/db/migrations/029-ai-configuration";
+  migration030,
+  YOUR_WEEK_PERIOD_SCHEMA_VERSION,
+} from "@/db/migrations/030-your-week-period";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import type { Migration, SqlExecutor } from "@/db/types";
@@ -64,7 +65,7 @@ import { formatLocalDate } from "@/utils/dates";
 /** Milliseconds a busy connection waits before erroring (concurrent headless access). */
 export const BUSY_TIMEOUT_MS = 5000;
 /** The schema version this build expects; the runner migrates up to this. */
-export const TARGET_VERSION = AI_CONFIGURATION_SCHEMA_VERSION;
+export const TARGET_VERSION = YOUR_WEEK_PERIOD_SCHEMA_VERSION;
 
 /** The one authoritative migration registration list, shared by bootstrap and tests. */
 export const MIGRATIONS: Migration[] = [
@@ -97,6 +98,7 @@ export const MIGRATIONS: Migration[] = [
   migration027,
   migration028,
   migration029,
+  migration030,
 ];
 
 const DATABASE_NAME = "orbit.db";

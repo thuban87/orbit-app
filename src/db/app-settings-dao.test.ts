@@ -1492,11 +1492,14 @@ describe("app-settings-dao — Your Week period (migration 030, D-08)", () => {
 
   it("rejects malformed restored values at the DAO boundary", async () => {
     await expect(
-      updateAppSettings(
-        exec,
-        { yourWeekPeriod: "weekly" } as Parameters<typeof updateAppSettings>[1],
-        LATER,
-      ),
+      (async () =>
+        updateAppSettings(
+          exec,
+          { yourWeekPeriod: "weekly" } as unknown as Parameters<
+            typeof updateAppSettings
+          >[1],
+          LATER,
+        ))(),
     ).rejects.toThrow(/yourWeekPeriod/);
     expect((await getAppSettings(exec)).yourWeekPeriod).toBe("rolling7");
   });
