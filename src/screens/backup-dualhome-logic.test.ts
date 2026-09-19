@@ -57,19 +57,19 @@ describe("backup dual-home host helpers (D-08 / §I)", () => {
   });
 
   describe("shouldConsumeSharedBackup", () => {
-    it("drains the native shared-backup singleton only for the tab host", () => {
-      expect(shouldConsumeSharedBackup("backup-tab")).toBe(true);
+    it("does not drain from the removed legacy tab host", () => {
+      expect(shouldConsumeSharedBackup("backup-tab")).toBe(false);
     });
 
-    it("never drains it for the settings host (no double-drain)", () => {
-      expect(shouldConsumeSharedBackup("settings")).toBe(false);
+    it("drains from the surviving Settings-hosted restore path", () => {
+      expect(shouldConsumeSharedBackup("settings")).toBe(true);
     });
 
     it("consumes the singleton exactly once across the two mounts (single-drain-per-host)", () => {
       const consumers = ALL_HOSTS.filter((host) =>
         shouldConsumeSharedBackup(host),
       );
-      expect(consumers).toEqual(["backup-tab"]);
+      expect(consumers).toEqual(["settings"]);
       expect(consumers).toHaveLength(1);
     });
   });

@@ -64,7 +64,7 @@ export function ShareIntentGate({ isReady }: { isReady: boolean }) {
         (isBackupShareIntent(shareIntent) || !hasShareIntent)
       ) {
         resetShareIntent();
-        navigationRef.current?.navigate("BackupTab", { screen: "Backup" });
+        navigationRef.current?.navigate("SettingsTab", { screen: "Backup" });
         return;
       }
       if (hasShareIntent) {

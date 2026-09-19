@@ -267,10 +267,9 @@ export function BackupScreen({
 
   useFocusEffect(
     useCallback(() => {
-      // The native shared-backup singleton is drained by the BACKUP-TAB copy
-      // ONLY (linking.ts routes a shared backup to BackupTab › Backup). The
-      // Settings-hosted copy must not also consume on focus, or the single
-      // native resource would double-drain (T-37-02 / RESEARCH Pitfall 3).
+      // Backup is Settings-only after Phase 38. This surviving host drains the
+      // shared-backup singleton; ordinary visits are safe because native
+      // consumption returns `{ uri: null }` when no share is staged.
       if (!shouldConsumeSharedBackup(host)) return;
       let cancelled = false;
       void consumeSharedBackup().then(({ uri }) => {

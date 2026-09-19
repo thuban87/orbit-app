@@ -24,7 +24,7 @@ import type { ThemePalette } from "@/theme/theme-types";
  * is the semantic identity, not the glyph, so this is not a collision.
  *
  * Reserved by contract:
- *  - the four TAB identities: dashboard/orrery/backup/settings (TAB_ICON below
+ *  - the five TAB identities: dashboard/group-events/your-week/orrery/settings (TAB_ICON below
  *    maps the real `*Tab` route keys onto them);
  *  - the six StatusGlyph display names (status-*), one distinct silhouette per
  *    display state (Task 2 / THEME-08);
@@ -62,7 +62,7 @@ export const ICON_REGISTRY = {
   frequency: { outline: "repeat-outline", filled: "repeat" },
   overflow: { outline: "ellipsis-horizontal", filled: "ellipsis-horizontal" },
 
-  // ---- Tab identities (the four persistent destinations) ----------------
+  // ---- Tab identities ----------------------------------------------------
   // `settings` above doubles as the Settings tab identity (TAB_ICON maps it).
   dashboard: { outline: "home-outline", filled: "home" },
   orrery: { outline: "planet-outline", filled: "planet" },
@@ -98,16 +98,17 @@ export type IconName = keyof typeof ICON_REGISTRY;
 
 /**
  * The explicit semantic-name -> real route-key mapping (REVIEWS 23-05 LOW). The
- * `TabParamList` keys are the `*Tab`-suffixed forms (DashboardTab/OrreryTab/
- * BackupTab/SettingsTab), NOT the bare semantic words. Typing it
+ * `TabParamList` keys are the `*Tab`-suffixed route names, not the bare
+ * semantic words. Typing it
  * `Record<keyof TabParamList, IconName>` forces completeness — a new tab route
  * cannot compile without an icon, so retiring the ad-hoc TAB_GLYPHS map can
  * never leave a tab without a glyph.
  */
 export const TAB_ICON: Record<keyof TabParamList, IconName> = {
   DashboardTab: "dashboard",
+  EventsTab: "group-events",
+  DigestTab: "your-week",
   OrreryTab: "orrery",
-  BackupTab: "backup",
   SettingsTab: "settings",
 };
 

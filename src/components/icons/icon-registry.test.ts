@@ -96,18 +96,25 @@ describe("ICON_REGISTRY", () => {
 describe("TAB_ICON (route-key -> semantic name mapping, REVIEWS 23-05 LOW)", () => {
   it("maps the explicit semantic names to the real TabParamList keys", () => {
     expect(TAB_ICON.DashboardTab).toBe("dashboard");
+    expect(TAB_ICON.EventsTab).toBe("group-events");
+    expect(TAB_ICON.DigestTab).toBe("your-week");
     expect(TAB_ICON.OrreryTab).toBe("orrery");
-    expect(TAB_ICON.BackupTab).toBe("backup");
     expect(TAB_ICON.SettingsTab).toBe("settings");
   });
 
   it("resolves every TabParamList key to a registered outline+filled entry", () => {
     // TAB_ICON is typed `Record<keyof TabParamList, IconName>`, so its own keys
-    // ARE the four tab identities — iterating them proves no tab route can be
+    // ARE the five tab identities — iterating them proves no tab route can be
     // left without an icon once TAB_GLYPHS is retired.
     const keys = Object.keys(TAB_ICON);
     expect(keys.sort()).toEqual(
-      ["BackupTab", "DashboardTab", "OrreryTab", "SettingsTab"].sort(),
+      [
+        "DashboardTab",
+        "EventsTab",
+        "DigestTab",
+        "OrreryTab",
+        "SettingsTab",
+      ].sort(),
     );
     for (const key of keys as (keyof typeof TAB_ICON)[]) {
       const name = TAB_ICON[key];

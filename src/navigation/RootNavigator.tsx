@@ -17,8 +17,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Icon } from "@/components/icons/Icon";
 import { TAB_ICON } from "@/components/icons/icon-registry";
 import { BackgroundHost } from "@/components/ui/BackgroundHost";
-import { BackupStack } from "@/navigation/tabs/BackupStack";
+import { CONTACTS, DIGEST, EVENTS } from "@/constants/product-labels";
 import { DashboardStack } from "@/navigation/tabs/DashboardStack";
+import { DigestStack } from "@/navigation/tabs/DigestStack";
+import { EventsStack } from "@/navigation/tabs/EventsStack";
 import { OrreryStack } from "@/navigation/tabs/OrreryStack";
 import { SettingsStack } from "@/navigation/tabs/SettingsStack";
 import { useFocusedRouteStore } from "@/stores/focused-route-store";
@@ -32,10 +34,11 @@ import {
   systemBackgroundSlotOverride,
 } from "./focused-route-classification";
 import type { TabParamList } from "./types";
+import { INITIAL_TAB } from "./shell-contract";
 import { useWindowObstacle } from "./use-window-measurement";
 
 /**
- * The app's permanent four-tab shell. Each tab owns a native stack, preserving
+ * The app's permanent five-tab shell. Each tab owns a native stack, preserving
  * in-tab history when the user switches sections.
  *
  * `headerShown: false` (screenOptions): every screen renders its OWN back
@@ -188,7 +191,7 @@ export function RootNavigator() {
     >
       <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
         <Tab.Navigator
-          initialRouteName="DashboardTab"
+          initialRouteName={INITIAL_TAB}
           tabBar={(props) => <MeasuredTabBar {...props} />}
           screenOptions={({ route }) => ({
             headerShown: false,
@@ -215,7 +218,25 @@ export function RootNavigator() {
           <Tab.Screen
             name="DashboardTab"
             component={DashboardStack}
-            options={({ route }) => tabOptions("Dashboard", route, "Home")}
+            options={({ route }) => tabOptions(CONTACTS, route, "Home")}
+            listeners={({ navigation, route }) => ({
+              tabPress: (event) =>
+                handleActiveTabPress(event, navigation, route),
+            })}
+          />
+          <Tab.Screen
+            name="EventsTab"
+            component={EventsStack}
+            options={({ route }) => tabOptions(EVENTS, route, "GroupEvents")}
+            listeners={({ navigation, route }) => ({
+              tabPress: (event) =>
+                handleActiveTabPress(event, navigation, route),
+            })}
+          />
+          <Tab.Screen
+            name="DigestTab"
+            component={DigestStack}
+            options={({ route }) => tabOptions(DIGEST, route, "Digest")}
             listeners={({ navigation, route }) => ({
               tabPress: (event) =>
                 handleActiveTabPress(event, navigation, route),
@@ -225,15 +246,6 @@ export function RootNavigator() {
             name="OrreryTab"
             component={OrreryStack}
             options={({ route }) => tabOptions("Orrery", route, "Orrery")}
-            listeners={({ navigation, route }) => ({
-              tabPress: (event) =>
-                handleActiveTabPress(event, navigation, route),
-            })}
-          />
-          <Tab.Screen
-            name="BackupTab"
-            component={BackupStack}
-            options={({ route }) => tabOptions("Backup", route, "Backup")}
             listeners={({ navigation, route }) => ({
               tabPress: (event) =>
                 handleActiveTabPress(event, navigation, route),

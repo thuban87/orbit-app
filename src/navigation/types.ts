@@ -226,6 +226,17 @@ export type BackupStackParamList = {
   };
 };
 
+export type DigestStackParamList = {
+  Digest: undefined;
+  Profile: ProfileRouteParams;
+};
+
+export type EventsStackParamList = {
+  GroupEvents: undefined;
+  GroupEventDetail: { groupEventId: number };
+  Profile: ProfileRouteParams;
+};
+
 export type SettingsStackParamList = {
   Settings: undefined;
   AIConnection: undefined;
@@ -253,13 +264,9 @@ export type SettingsStackParamList = {
    */
   SettingsAbout: undefined;
   /**
-   * Data & Backup dual-home (D-08 / §I). The four Backup screens are ONE
-   * canonical tree reachable from both the Backup bottom tab (`BackupStack`) and
-   * Settings → Data & Backup. Each hosting stack must list the routes it reaches
-   * (RootStackParamList is a TYPE intersection); these shapes are IDENTICAL to
-   * `BackupStackParamList` above — the same screens, re-registered, NOT a second
-   * tree. The Backup tab stays (removal deferred, §R). Per-stack wrappers pass an
-   * explicit `host` so the shared screens stay origin-aware (Plan 37-07).
+   * Data & Backup is Settings-only after the redundant bottom tab was removed
+   * in Phase 38. These routes host the canonical Backup screens in this stack;
+   * wrappers pass an explicit `host` so restore returns remain origin-aware.
    */
   Backup: undefined;
   BackupSettings: { section?: "automatic" | "encryption" } | undefined;
@@ -345,11 +352,12 @@ export type SettingsStackParamList = {
   ReconcileComplete: { sessionId: number };
 };
 
-/** The root container exposes only the four persistent tab destinations. */
+/** The root container exposes the five permanent tab destinations. */
 export type TabParamList = {
   DashboardTab: NavigatorScreenParams<DashboardStackParamList>;
+  EventsTab: NavigatorScreenParams<EventsStackParamList>;
+  DigestTab: NavigatorScreenParams<DigestStackParamList>;
   OrreryTab: NavigatorScreenParams<OrreryStackParamList>;
-  BackupTab: NavigatorScreenParams<BackupStackParamList>;
   SettingsTab: NavigatorScreenParams<SettingsStackParamList>;
 };
 
@@ -358,6 +366,8 @@ export type TabParamList = {
  * container navigation is deliberately typed against TabParamList instead.
  */
 export type RootStackParamList = DashboardStackParamList &
+  DigestStackParamList &
+  EventsStackParamList &
   OrreryStackParamList &
   BackupStackParamList &
   SettingsStackParamList;

@@ -1,9 +1,8 @@
 /**
  * Host identity for the dual-homed Backup screen tree (D-08 / §I). The four
  * Backup screens (`BackupScreen`/`BackupSettingsScreen`/`RestorePreviewScreen`/
- * `RestoreResultScreen`) are ONE canonical tree reachable from two entry points —
- * the Backup bottom tab (`BackupStack`) and Settings → Data & Backup
- * (`SettingsStack`). The hosting stack threads an EXPLICIT `host` prop through
+ * `RestoreResultScreen`) are one canonical tree now hosted by Settings. The
+ * hosting stack threads an explicit `host` prop through
  * per-stack wrapper components rather than inferring the parent tab from nested
  * navigation state (review cycle-1 HIGH: `getParent`/`getState` inference had no
  * parent id, no fail-closed default, and no test). Every host-dependent
@@ -13,11 +12,9 @@
 export type BackupHost = "backup-tab" | "settings";
 
 /**
- * Fail-closed default: an un-anticipated `host`-less mount preserves the shipped
- * single-consumer / reset-to-Backup behaviour (review cycle-1 CONTESTED — the
- * opposite default, `"settings"`/non-consuming, risks a shared backup NEVER
- * being consumed by ANY mount, a worse failure than a rare double-home).
- * Flipping this default is an owner risk-posture call, never a silent change.
+ * Legacy fail-closed default retained for compatibility with the canonical
+ * Backup screen's optional host prop. The live Settings route always supplies
+ * `host="settings"` explicitly.
  */
 export const DEFAULT_BACKUP_HOST: BackupHost = "backup-tab";
 
@@ -49,14 +46,13 @@ export function restoreReturnLabel(host: BackupHost): string {
 }
 
 /**
- * Whether this mount drains the native shared-backup singleton
- * (`consumeSharedBackup`) on focus. Only the BACKUP-TAB copy does: the
- * share-intent gate routes a shared backup to `BackupTab › Backup`
- * (linking.ts:67), so a Settings-mounted copy that also consumed on focus would
- * DOUBLE-DRAIN the single native resource (RESEARCH Pitfall 3 hazard 2, T-37-02).
+ * Whether this mount drains the native shared-backup singleton on focus. After
+ * Phase 38 removed the Backup tab, the Settings-hosted screen is the sole live
+ * consumer. Native consumption safely returns `{ uri: null }` when nothing is
+ * staged, so ordinary Settings navigation remains a no-op.
  */
 export function shouldConsumeSharedBackup(host: BackupHost): boolean {
-  return host === "backup-tab";
+  return host === "settings";
 }
 
 /**

@@ -148,12 +148,11 @@ function SettingsAboutRoute({
   return <SettingsAboutScreen onBack={() => navigation.goBack()} />;
 }
 
-// Data & Backup dual-home (D-08 / Plan 37-07): the SAME four Backup screens the
-// Backup tab hosts, re-registered in the Settings stack — one canonical tree,
-// two entry points (§I), NOT a second copy. The per-stack wrappers thread an
+// Backup is Settings-only after Phase 38. These wrappers host the same canonical
+// four-screen tree and thread an
 // explicit `host="settings"` (review cycle-1 HIGH — no nav-state inference) so
-// the shared screens return to the Settings hub after a restore, do NOT drain
-// the shared-backup singleton (the tab is the sole consumer, linking.ts:67), and
+// the shared screens return to the Settings hub after a restore, drain the
+// shared-backup singleton as its sole consumer (linking.ts), and
 // render a Back affordance. `BackupSettings` needs no host — it neither resets to
 // Backup nor consumes.
 function BackupSettingsHostRoute(props: RootStackScreenProps<"Backup">) {
@@ -199,10 +198,9 @@ export function SettingsStack() {
       <Stack.Screen name="SettingsOrrery" component={SettingsOrreryRoute} />
       <Stack.Screen name="SettingsAI" component={SettingsAIRoute} />
       <Stack.Screen name="SettingsAbout" component={SettingsAboutRoute} />
-      {/* Data & Backup dual-home (D-08 / §I): the four Backup screens the tab
-          hosts, re-registered here via `host="settings"` wrappers — one canonical
-          tree, two entry points. The Backup bottom tab stays (removal deferred,
-          §R). `BackupSettings` reuses the screen directly (no host needed). */}
+      {/* Backup is Settings-only after Phase 38. The canonical four-screen tree
+          is hosted here via `host="settings"` wrappers; `BackupSettings` reuses
+          the screen directly because it has no host-dependent behavior. */}
       <Stack.Screen name="Backup" component={BackupSettingsHostRoute} />
       <Stack.Screen name="BackupSettings" component={BackupSettingsScreen} />
       <Stack.Screen
