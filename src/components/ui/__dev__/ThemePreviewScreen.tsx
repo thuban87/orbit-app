@@ -26,6 +26,7 @@
 // a11y lint false-fires on the prop name. Dev-only harness.
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Phase38UatControls } from "@/components/ui/__dev__/Phase38UatControls";
 import { AppText } from "@/components/ui/AppText";
 import { BackgroundHost } from "@/components/ui/BackgroundHost";
 import { GlassSurface } from "@/components/ui/GlassSurface";
@@ -124,6 +125,7 @@ export default function ThemePreviewScreen() {
           onPress={() => setMissingAppOwnedUri((enabled) => !enabled)}
         />
       </View>
+      <Phase38UatControls />
       <ScrollView contentContainerStyle={styles.scroll}>
         {Array.from({ length: 8 }).map((_, i) => (
           <GlassSurface

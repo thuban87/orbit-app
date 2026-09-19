@@ -1,19 +1,19 @@
 import {
-  __reset,
   cancelScheduledNotificationAsync,
   scheduleNotificationAsync,
 } from "expo-notifications";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  cancelPhase38DigestUat,
-  schedulePhase38DigestUat,
-} from "./phase38-uat";
+import { __reset } from "../../../../__mocks__/expo-notifications";
 import {
   DIGEST_BODY,
   DIGEST_CHANNEL,
   DIGEST_IDENTIFIER,
   DIGEST_TITLE,
 } from "../notification-ids";
+import {
+  cancelPhase38DigestUat,
+  schedulePhase38DigestUat,
+} from "./phase38-uat";
 
 vi.mock("expo-notifications");
 
