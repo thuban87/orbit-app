@@ -33,8 +33,8 @@ import {
   isFocusedWorkflow,
   systemBackgroundSlotOverride,
 } from "./focused-route-classification";
-import type { TabParamList } from "./types";
 import { INITIAL_TAB } from "./shell-contract";
+import type { TabParamList } from "./types";
 import { useWindowObstacle } from "./use-window-measurement";
 
 /**
