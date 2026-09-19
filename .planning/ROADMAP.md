@@ -1018,7 +1018,7 @@ Plans:
 **Requirements**: S-01…S-15 — the dossier §S planning-time verification checklist (S-01 root-tab/route inventory · S-02 origin-aware Profile · S-03 FAB audit · S-04 Settings Backup before tab removal · S-05 Dashboard/Group-Events label inventory · S-06 canonical status for Up Next · S-07 overlooked/never-contacted + dedup · S-08 7-day birthdays · S-09 Phase-32 heatmap/day-detail reuse · S-10 Rolling-7 + Calendar Week · S-11 Group-Event no double-count · S-12 period pref persistence · S-13 Digest notification routing · S-14 reselect/fresh-launch/resume · S-15 physical-device UAT)
 **Success Criteria**: All S-01…S-15 verified (dossier §S), incl. on-device UAT across all five tabs + both theme packages
 **Canonical refs**: docs/dossier/milestone-2/phase-38-digest-navigation-restructure-dossier.md (authoritative); ADR-076
-**Plans**: 5/7 plans executed (4 waves)
+**Plans**: 6/7 plans executed (4 waves)
 
 Plans:
 **Wave 1**
@@ -1034,7 +1034,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 38-06-PLAN.md — Digest surface assembly (DigestScreen rewrite + Up Next + Horizon) [wave 3]
+- [x] 38-06-PLAN.md — Digest surface assembly (DigestScreen rewrite + Up Next + Horizon) [wave 3]
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -1088,7 +1088,7 @@ Plans:
 | 35. Messaging & AI Compose | 9/9 | Complete |  |
 | 36. AI Configuration & Prompting | 11/11 | Complete | 2026-09-14 |
 | 37. Settings & Personalization | 8/8 | Complete | 2026-09-14 |
-| 38. Digest & Navigation Restructure | 5/7 | In Progress|  |
+| 38. Digest & Navigation Restructure | 6/7 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
