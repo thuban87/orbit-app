@@ -1,408 +1,713 @@
 ---
 phase: 38
 reviewers: [codex, claude]
-reviewed_at: 2026-09-18T23:13:39Z
+reviewed_at: 2026-09-19T00:36:17Z
 plans_reviewed: [38-01-PLAN.md, 38-02-PLAN.md, 38-03-PLAN.md, 38-04-PLAN.md, 38-05-PLAN.md, 38-06-PLAN.md, 38-07-PLAN.md]
 models:
   codex: "gpt-5.6-sol (reasoning=low)"
   claude: "unknown (read-only Claude subagent — Write-gap fallback)"
-models_sources:
+model_sources:
   codex: "banner"
   claude: "subagent-fallback"
 review_method_notes: >
-  The built-in `claude` reviewer lane was NOT used: this run executes inside Claude Code
-  (CLAUDE_CODE_ENTRYPOINT=cli), so the machinery skips its own lane for independence, and
-  that lane is also the known Write-permission-gap hazard. Per the project's documented
-  workaround, the Claude review was run as a READ-ONLY general-purpose subagent and its
-  findings are aggregated here alongside the codex lane. The codex lane's first attempt was
-  a transient "Selected model is at capacity" drop (empty stub); it was re-run and the
-  second attempt returned a genuine source-grounded review.
+  Convergence CYCLE 2. The built-in `claude` reviewer lane was NOT used: this run executes
+  inside Claude Code (CLAUDE_CODE_ENTRYPOINT=cli), so the machinery skips its own lane for
+  independence, and that lane is also the known Write-permission-gap hazard (project MEMORY).
+  Per the documented workaround the Claude review was run as a READ-ONLY general-purpose
+  subagent and aggregated alongside the codex lane. The codex lane returned a genuine
+  source-grounded review on the first attempt (gpt-5.6-sol, reasoning=low). The aggregator
+  independently re-verified every disputed HIGH against the code on disk before recording it
+  (CLAUDE.md "Review the code, not the diff").
 cycle_summary:
-  cycle: 1
-  current_high: 10
-  current_actionable: 16
-  verdict: "Codex HIGH (blocking); Claude MEDIUM (low-leaning). Aggregator verified the three
-    highest-stakes disputed HIGHs against disk and confirmed codex is correct on all three."
+  cycle: 2
+  current_high: 3
+  current_actionable: 11
+  verdict: >
+    Cycle-2 revisions resolved all 10 cycle-1 HIGH gaps on paper and both reviewers confirm the
+    hard data-layer contracts (group-event heatmap unit, buckets() feed, backup portability
+    policy, Up Next attention floor, migration 030) are now correct. THREE HIGHs remain, all
+    verified on disk by the aggregator: (1) Plan 02 wires yourWeekPeriod into a NONEXISTENT
+    KEY_TO_COLUMN instead of the live COLUMN_OF/WritableSettingsKey/AppSettingsRow/validate path
+    — this breaks the DECIDED D-08 restore and D-09 toggle persistence (implementation defect in
+    a decided item, not a decision re-raise); (2) Plan 06 drill-through mutates only one query
+    axis, leaving the orthogonal axis stale so the drilled Contacts list can be empty/narrowed
+    and desynced from the Digest preview/count (partially-resolved cycle-1 HIGH); (3) Plan 07 is
+    marked autonomous:true while its owner-confirmation precondition must HALT. No owner-escalation
+    trigger: D-08/D-09 are implemented per the owner's ruling (only their implementation is
+    flagged), and no plan deletes/weakens/inverts an ADR/HANDOFF/dossier decision.
 ---
 
-# Cross-AI Plan Review — Phase 38: Digest & Navigation Restructure
+# Cross-AI Plan Review — Phase 38: Digest & Navigation Restructure (Convergence Cycle 2)
 
 ## Consensus Summary
 
-Two independent reviewers assessed the 7-plan / 4-wave set. **Codex** rated the phase **HIGH
-risk (blocking)** and raised ~10 HIGH concerns plus two owner-escalation flags. The **Claude
-read-only subagent** rated it **MEDIUM (low-leaning)**, found **no** owner-escalation, and
-surfaced three concrete MEDIUM items codex missed. The divergence is real, so the aggregator
-opened the code on disk and verified the three highest-stakes disputed HIGHs. **All three
-resolved in codex's favor** — the Claude subagent's more lenient read came from checking
-comment blocks / reuse-intent rather than tracing the full data wiring and the live portable
-projection (the diff-scoped miss CLAUDE.md warns about). The two reviews are complementary:
-codex is stronger on data-layer contracts, the Claude subagent is stronger on the navigation
-type-graph and the Backup-reachability deep link.
+Two independent reviewers assessed the 7-plan / 4-wave set after the cycle-1 revision (commits
+6fd031c + 929f687). Both agree cycle 2 is a strong, disciplined response: **codex** rated it
+**HIGH until three blockers are fixed, MEDIUM after**; the **read-only Claude subagent** rated it
+**LOW–MEDIUM**. Both verified, against the code on disk, that the hardest cycle-1 data-layer
+contracts are now genuinely resolved — the group-event heatmap-saturation unit (Plan 02 Task 4),
+the `buckets()` feed mismatch (Plan 05 builds the `{d,n}` Map directly, avoiding `buckets()`), the
+Up Next attention floor (Plan 03 reuses the canonical `dashboard-query-logic.ts:173` predicate
+verbatim), migration 030 numbering + `TARGET_VERSION` repoint, and the backup-portability *policy*
+for `yourWeekPeriod` (emit + allowlist + `FORWARD_MIGRATIONS[6]` + format bump 6→7, per owner
+ruling D-08). The navigation gaps (`RecentlyDeleted` registration, `linking.ts:67` share-intent
+deep link, stale `DashboardStackParamList` entries with correct wave ordering, Events relabel) are
+each owned. **D-08 and D-09 are implemented per the owner's ruling and are NOT re-raised** — only
+their concrete implementation is examined.
 
-**Aggregator verification of the disputed HIGHs (evidence on disk):**
+The divergence between the two reviews is real and the aggregator adjudicated it against disk. The
+Claude subagent verified the *backup emission policy* and rated the whole phase LOW–MEDIUM, but it
+did **not** trace the generic settings-**writer** path or the Plan 07 autonomy flag — exactly the
+two places codex went deeper. On both, disk confirms codex.
 
-1. **Backup portability / "emission deferred" is stale (codex HIGH — CONFIRMED).** Codex says
-   Plan 02's instruction to imitate the "declare optional, emission deferred" precedent is
-   outdated; the Claude subagent said Plan 02 "correctly follows historyLens's still-deferred
-   pattern." Disk settles it: `getPortableSettingsSnapshot` at `src/db/app-settings-dao.ts:888+`
-   now includes `history_lens, history_cycle_count` in **both** its SELECT (~960) and its return
-   map (~1013). Phase 36 already emitted the formerly-deferred keys; the "DEFERRED to Phase 36"
-   comments at `:438-479` describe a state that no longer exists. Whether `yourWeekPeriod` is
-   portable (and whether that needs a `BACKUP_FORMAT_VERSION` bump from the current 6 at
-   `src/backup/types.ts:14`) is therefore a live wire-shape/risk decision the plan cannot settle
-   by citing stale comments. **This is an OWNER decision (backup/risk posture).**
+**Aggregator verification of the disputed / load-bearing findings (evidence on disk):**
 
-2. **Group-event heatmap saturation (codex HIGH — CONFIRMED).** Plan 02's group-event dedup
-   ("ONE record") is explicitly scoped to the **Events metric** and **day detail** only
-   (38-02-PLAN.md:26, :183, :187). The heatmap feed `readYourWeekDateCounts` (38-02-PLAN.md:182)
-   counts qualifying `interactions` rows **including group-linked children** (:58, :181), so an
-   N-participant Group Event saturates the heatmap cell N-fold while its day detail shows one
-   record — an unresolved unit mismatch. The Claude subagent asserted this path was handled; it
-   is not.
+1. **Plan 02 writer wiring is broken (codex HIGH — CONFIRMED).** Plan 02 Task 2 instructs adding
+   `your_week_period` to a `KEY_TO_COLUMN` map (38-02-PLAN.md:153,173). **There is no
+   `KEY_TO_COLUMN` in the live DAO.** The generic writer iterates `Object.keys(COLUMN_OF)`
+   (`src/db/app-settings-dao.ts:1486`), so a writable key must appear in `WritableSettingsKey`
+   (`:531`), `AppSettingsRow` (`:587`), and `COLUMN_OF` (`:692`), and restore-originated values are
+   validated in `validateAppSettingsPatch` (`:1270`) — restore casts external JSON to
+   `AppSettingsPatch` at `src/backup/restore-apply.ts:1592`. As written, the executor would follow
+   a citation to a symbol that does not exist and never wire the column — so `updateAppSettings`
+   would silently never persist `your_week_period`, breaking BOTH the decided D-09 toggle/Settings
+   row and the decided D-08 restore. This is an implementation defect in a decided item, which the
+   review charter says to flag; it is **not** a decision re-raise.
 
-3. **`buckets()` feed-contract incompatibility (codex HIGH — CONFIRMED).** `buckets(window,
-   interactions)` at `src/services/history/buckets.ts:52-70` takes an array of `{occurredAt}`
-   records and increments each cell **once per row**. Plan 02 returns `{d, n}` aggregate rows and
-   Plan 05 says the heatmap is "fed by `buckets()` over the date→count rows" (38-05-PLAN.md:143;
-   38-02-PLAN.md:182). Feeding `{d, n}` through `buckets()` cannot preserve `n` — it either fails
-   tsc (no `occurredAt`) or collapses every active date to a count of 1. Real data-wiring bug.
+2. **Plan 06 drill-through leaves a stale query axis (codex HIGH / Claude MEDIUM — CONFIRMED).**
+   `setPopulations` writes only `dashboardPopulations` and `setFilters` writes only
+   `dashboardFilters` (`src/stores/dashboard-query-store.ts:92-111`); neither clears the other, and
+   the Contacts WHERE is `population AND filter` (`src/logic/dashboard-query-logic.ts:103-104,280`).
+   Plan 06 sets Never Contacted → `setPopulations(['not-contacted'])` only and Overlooked →
+   `setFilters({'needs-attention':['on']})` only (38-06-PLAN.md:135). With a pre-existing persisted
+   filter, the Never Contacted drill yields `not-contacted AND needs-attention` = empty
+   (`not-contacted` is `last_contact IS NULL`, `needs-attention` requires `last_contact IS NOT
+   NULL`), while the Digest preview (fetched with `filters:{}`) and `countNeverContacted` still show
+   N — a visible desync. The cycle-1 "define the state boundary" HIGH is only **partially**
+   resolved: the plan now writes state but only half of it.
 
-CodeRabbit-style diff-only caveats do not apply — both reviewers received the source-grounding
-prompt and cited `file:line` evidence.
+3. **Plan 07 autonomy contradicts its own precondition (codex HIGH — CONFIRMED).** Frontmatter is
+   `autonomous: true` (38-07-PLAN.md:10), while `user_setup` (:12-17) and the Task 2
+   `<precondition>` (:107) require the owner to confirm package name, Metro tmux session, and a
+   single authorized target, and to **HALT if unconfirmed**. An autonomous executor cannot satisfy
+   that owner interaction. The cycle-1 "lacks first-use confirmation" HIGH was addressed in the task
+   text but re-opened by the unchanged autonomy flag.
+
+4. **D-08 backup *policy* is implemented correctly (both reviewers — CONFIRMED, NOT a concern).**
+   `getPortableSettingsSnapshot` now emits the formerly-deferred keys (`history_lens`,
+   `history_cycle_count`) in its SELECT (`src/db/app-settings-dao.ts:960`) and return map (`:1013`),
+   so the "emission-deferred" precedent is genuinely spent; `parseBackupManifest` hard-fails on a
+   missing `FORWARD_MIGRATIONS[from]` (`src/backup/backup-schema.ts:989-996`), so Plan 02's
+   `FORWARD_MIGRATIONS[6]` step is mandatory and correct. `BACKUP_FORMAT_VERSION = 6`
+   (`src/backup/types.ts:14`) → 7 is coherent. The remaining Plan 02 defect is the *writer* wiring
+   (finding 1), not the emission/format policy.
+
+Both reviewers received the source-grounding prompt and cited `file:line` evidence, so no
+diff-only caveat applies.
 
 ### Agreed Strengths
-- **Internal `DashboardTab` id is preserved as the linchpin** — both note the FAB and
-  notification reset hardcode it (`src/components/universal-fab-logic.ts`, `RootNavigator.tsx:91`),
-  so keeping the id avoids a cascade of breakage.
-- **Migration 030 is correctly grounded and gated** — additive `ADD COLUMN … DEFAULT … CHECK`,
-  forward-only, head verified `029→030` at `src/db/database.ts:67`, `checkpoint:decision`
-  one-way-door gate, no shipped-migration edit.
-- **Reuse discipline is real, not asserted** — Up Next reuses the canonical status engine
-  (`src/db/status.ts`), the heatmap reuses the helpers rather than the forbidden `ActivityHeatmap`
-  chrome, and Backup & Restore genuinely survives Backup-tab removal via the Settings stack.
-- **Local-first / theme / date discipline held throughout** — async on-device reads, no network
-  on any read path, `check:colors` gated, `formatLocalDate` over `toISOString`, static Your Week
-  surface (no animation-from-state).
+- **Migration 030 is correctly grounded and gated.** Additive `ALTER TABLE app_settings ADD COLUMN
+  your_week_period TEXT NOT NULL DEFAULT 'rolling7' CHECK(...)`, forward-only, head verified
+  `029→030` with `TARGET_VERSION` repointed to the new head constant (`src/db/database.ts:67`),
+  proven through the full migration runner from a v1 fixture, gated by a one-way-door checkpoint.
+- **Group-event activity-unit contract resolves the cycle-1 heatmap saturation.** One
+  `group_events` parent + one child interaction per participant (`group-events-dao.ts:340`); Plan 02
+  splits headline Interactions (include children) from the deduped activity unit (standalone +
+  distinct group event), with an N-participant→1-unit regression test.
+- **`buckets()` feed mismatch eliminated** — Plan 05 builds the date→count Map directly from
+  `{d,n}` rows instead of routing aggregates through `buckets()` (which increments once per row,
+  `src/services/history/buckets.ts:52-69`).
+- **Up Next attention floor makes the empty state reachable** — reuses the canonical
+  `PROGRESS_SQL >= STABLE_MAX AND (snooze cleared)` predicate (`dashboard-query-logic.ts:173`) plus
+  `STATUS_CADENCE_PRECONDITION`; all-stable→empty and snoozed-excluded tests specified.
+- **Backup-portability policy + `FORWARD_MIGRATIONS[6]`** correctly follow the landed Phase 36
+  emit-and-bump mechanism (D-08).
+- **Navigation surgery is sound** — `DashboardTab` id preserved (FAB hardcodes it,
+  `universal-fab-logic.ts:82-104`), `RecentlyDeleted` registered, `linking.ts:67` repointed to
+  Settings→Backup, stale `Digest`/`GroupEvents` param entries retained in wave 1 and removed in
+  Plan 04 wave 2 after all referencers repoint, no orphaned type consumer breaks.
+- **firstWeekday off-by-one closed** — mandatory documented `firstWeekday - 1` conversion (Expo
+  1-based vs `getDay()` 0-based) with a Monday-first test.
+- **Local-first / theme / date discipline held** — async on-device reads, no read-path network,
+  `check:colors` + `tsc` gated, `formatLocalDate` over `toISOString`, static Your Week surface.
 
 ### Agreed Concerns (highest priority)
-- **Group-event aggregation semantics are under-specified across metrics, day detail, and the
-  heatmap** — both reviewers flag it; codex is more precise that the heatmap date-count is a third,
-  un-deduped path.
-- **The period preference is placed in-context, not in a Settings row** — both note dossier §I
-  ("put the preference in Settings"); the plan reads §I as the persistence path and places the
-  toggle in-context, **and already surfaces this to the owner as a held decision** (38-05-PLAN.md:52).
-  See owner-escalation note below.
-- **User-facing "Group Events" terminology remains after the "Events" relabel** — `GroupEventsScreen`
-  still renders `title="Group Events"`; no plan owns the string change.
+- **Plan 06 Horizon drill-through is only half-wired** (both reviewers). Sets one query axis and
+  leaves the other stale; can empty/narrow the drilled Contacts list and desync it from the Digest
+  preview/count. Codex HIGH, Claude MEDIUM-but-"blocking-for-close." Aggregator: treat as blocking.
+- **Group-event aggregation still under-specifies the archived-participant rule** (codex). Does an
+  event with all participants archived count as an activity unit? Undefined across metric / date
+  count / day detail.
+- **Plan 07 execution protocol** — the failed-gate repair loop is procedurally ambiguous in a
+  sequential executor (both the autonomy contradiction above and the "hand back to the owning plan"
+  wording).
 
 ### Divergent Views (aggregator-adjudicated)
-- **Overall severity:** codex HIGH / blocking vs Claude MEDIUM. Given the three confirmed
-  data-layer HIGHs, the aggregator sides with codex that the data-layer contracts are blocking,
-  while agreeing with the Claude subagent that the navigation surgery itself is architecturally
-  sound.
-- **Backup portability:** codex (escalate) vs Claude (fine, format stays 6). Disk confirms codex.
-- **Heatmap / `buckets()` wiring:** codex (broken) vs Claude (correct). Disk confirms codex.
-- **Navigation completeness:** the Claude subagent uniquely caught the `linking.ts:67`
-  `navigate("BackupTab", …)` share-intent deep link (a data-recovery path) and the stale
-  `DashboardStackParamList` `Digest`/`GroupEvents` entries with their wave-ordering constraint;
-  codex uniquely caught the omitted `RecentlyDeleted` route in the new stacks. These are three
-  distinct, all-real navigation gaps — treat them as a union, not alternatives.
+- **Overall severity:** codex HIGH-until-fixed vs Claude LOW–MEDIUM. Given three disk-confirmed
+  HIGHs, the aggregator sides with codex that the phase is blocking until they are fixed, while
+  agreeing with the Claude subagent that the architecture and data-layer *reasoning* are sound.
+- **Plan 02 writer wiring:** codex HIGH vs Claude silent ("implemented correctly"). Disk confirms
+  codex — the Claude subagent verified the emission/format policy but not the writer path
+  (`COLUMN_OF`/`WritableSettingsKey`/`validateAppSettingsPatch`). The diff-scoped miss CLAUDE.md
+  warns about.
+- **Plan 07 autonomy:** codex HIGH vs Claude silent. Disk confirms codex (`autonomous: true` vs a
+  must-halt precondition).
+- **Drill-through severity:** codex HIGH vs Claude MEDIUM. Both agree it must be fixed before close;
+  counted as an unresolved HIGH (partially-resolved cycle-1 HIGH, fix not verified complete).
 
-### OWNER-ESCALATION triggers (do NOT silently close)
-Per CLAUDE.md, these are the owner's call (risk/backup posture, or a recorded-decision tension),
-not planner discretion:
-
-- **[ESCALATE] Backup portability of `yourWeekPeriod` (Plan 02).** The "emission deferred"
-  precedent is spent (verified above). The owner must decide: (a) portable + format bump to 7;
-  (b) portable as an optional field under an explicitly compatible format policy; or (c)
-  deliberately device-local and omitted. This is a backup/wire-shape/risk decision.
-- **[ESCALATE — already surfaced by the plan] Period preference omitted from a Settings row
-  (Plan 05, dossier §I).** CONTEXT.md:72-73 states Phase 37 Settings "hosts the Your Week period
-  preference (§I)," yet Plan 05 places it only as the in-context toggle citing D-03 (no broad
-  Settings restructuring) and **explicitly flags it as a held owner decision** (38-05-PLAN.md:52).
-  This is the owner's product call, not a silent reversal — but it must be answered before close,
-  and the aggregator is naming it by name here rather than closing it.
+### OWNER-ESCALATION triggers
+**None.** D-08 and D-09 are implemented per the owner's rulings (only their implementation is
+flagged, per the review charter). No new finding deletes, weakens, or inverts an ADR / HANDOFF /
+dossier decision — D-02's "no persisted Digest snapshot/cache" is respected (`yourWeekPeriod` is an
+`app_settings` preference, not a Digest cache). One MEDIUM notes the reverse pathology: Plan 02's
+checkpoint **re-asks** the already-settled D-08 decision (drip-feeding a decided item back to the
+owner) and should be downgraded to a non-decision verification gate.
 
 ---
 
 ## Codex Review
 
-*Model: gpt-5.6-sol (reasoning=low). Source-grounded, repo access confirmed (extensive `file:line`
-citations verified accurate on the disputed points).*
+*Model: gpt-5.6-sol (reasoning=low). Source-grounded, repo access confirmed; `file:line` citations
+spot-checked accurate by the aggregator on all three HIGHs.*
 
-# Cross-AI Plan Review — Phase 38
+# Summary
 
-## Overall assessment
+Cycle 2 is substantially improved: most cycle-1 defects are now explicitly owned, tested, and sequenced. The navigation promotion, portable preference decision, group-event heatmap semantics, Settings placement, notification routing, and device-UAT evidence model are much clearer.
 
-The plans are unusually thorough and broadly align with the dossier, especially around local-first reads, canonical status reuse, migration discipline, notification routing, and physical-device verification. However, several cross-plan contract mismatches would prevent the phase from fully satisfying the settled product decisions. The most important are:
+The plans are not yet convergence-ready. I found three blocking issues:
 
-- Your Week heatmap counting conflicts with the Group Event "one event record" contract.
-- The period preference is deliberately omitted from Settings despite the dossier explicitly placing it there.
-- The proposed backup "emission deferred" pattern is stale now that Phase 36 has landed.
-- Up Next currently selects stable contacts, making its neutral empty state effectively unreachable.
-- Never Contacted lacks a row source for the promised preview.
-- Digest/Events stacks omit at least one Profile-reachable route.
-- User-facing "Group Events" terminology remains after the purported Events relabel.
+1. Plan 02 does not fully wire `yourWeekPeriod` into the actual generic settings writer.
+2. Plan 06’s drill-through preserves stale query axes, so it can open the wrong Contacts result set.
+3. Plan 07 remains marked autonomous despite an explicit owner-confirmation prerequisite.
 
-Overall risk: **HIGH until the blocking contract issues are corrected.**
+There are also two medium plan-quality issues: Plan 02 reopens a settled D-08 decision via a blocking checkpoint, and Plan 05 does not prohibit interaction with future Calendar Week cells.
+
+Overall risk: **HIGH until the three blockers are corrected; MEDIUM afterward.**
 
 ---
 
-### Plan 38-01 — Five-tab shell + semantic routing
+# Plan 01 — Five-tab shell and semantic routing
 
-**Summary:** The shell restructuring is sound in outline: it preserves the internal `DashboardTab` identifier, promotes Digest and Events to independent stacks, removes the redundant Backup tab, and reuses the existing reselect-to-root implementation. The route-registration inventory is incomplete, however, and the plan does not finish the user-facing Group Events → Events terminology change.
+## Summary
 
-**Strengths:**
-- Preserving `DashboardTab` is correct. FAB targets are hardcoded to it in `universal-fab-logic.ts:28` and `UniversalFab.tsx:253`.
-- Reusing `handleActiveTabPress` is appropriate: it generically identifies the focused child stack and dispatches `popToTop` at `RootNavigator.tsx:91`.
-- Keeping Backup routes registered in Settings is supported by the existing dual-home contract at `types.ts:255`.
-- Follows the existing per-stack route-duplication convention documented for Orrery at `types.ts:165`.
+Plan 01 is well grounded and correctly sequences the shell transition. It addresses the important cycle-1 navigation omissions without prematurely removing the old notification route types.
 
-**Concerns:**
-- **HIGH — DigestStack and EventsStack omit a Profile-reachable route.** Task 2 mirrors the Orrery sibling routes but omits `RecentlyDeleted`. Orrery registers it because Profile can reach it at `OrreryStack.tsx:64`, param contract at `types.ts:178`. A Profile opened from Digest or Events could navigate to an unregistered route at runtime.
-- **MEDIUM — The Events relabel is incomplete.** The Events root still renders `title="Group Events"` and "group events" a11y/search copy at `GroupEventsScreen.tsx:68`. Neither this plan nor Plan 04 owns those strings, despite dossier §B.
-- **LOW — The focused-route task is mostly a no-op.** Unknown routes already default to browse treatment at `focused-route-classification.ts:1`, and `Digest`/`GroupEvents` are already tested as browse routes at `focused-route-classification.test.ts:35`.
+## Strengths
 
-**Suggestions:** Build the new stack route sets by mechanically comparing to every target reachable from `ContactProfileScreen`; add `RecentlyDeleted`; own the `GroupEventsScreen` title relabel; add navigation tests that mount each navigator and traverse Profile → Recently Deleted.
+- Preserving the internal `DashboardTab` identifier is correct. FAB destinations currently hardcode it for Create, Group Log, Log Contact, Update Contact, and Memory in `src/components/universal-fab-logic.ts:82-104`.
+- Keeping the old `Digest` and `GroupEvents` param entries temporarily is a sound wave-order decision. The current digest notification still produces `[Home, Digest]` at `src/services/notifications/notification-nav.ts:76-92`, and the gate converts that through `resetToDashboardWith` at `src/navigation/notification-gate.tsx:129-152`.
+- Repointing the shared-backup link to Settings is correct because the Settings stack actually registers the canonical Backup screen at `src/navigation/tabs/SettingsStack.tsx:202-207`.
+- The plan now accounts for Profile-reachable routes instead of merely adding `Profile`. Existing stacks demonstrate why this is necessary: the Orrery stack contract includes `RecentlyDeleted`, history routes, Group Event routes, Compose, photo cropping, and merge routes at `src/navigation/types.ts:165-213`.
+- The user-facing Events relabel is appropriately scoped. It does not propose renaming internal `GroupEvent` route or table identities.
 
-**Risk:** MEDIUM-HIGH. Architecture right; incomplete route registration creates real runtime nav failures; terminology not fully owned.
+## Concerns
 
----
+No blocking source-grounded concern found.
 
-### Plan 38-02 — Your Week data layer + migration 030
+### LOW — `focused-route-classification.ts` remains a likely verification-only task
 
-**Summary:** Period-window builder and additive settings migration are technically reasonable. The aggregation contract and backup treatment are not yet safe: the plan relies on a pre-Phase-36 "emission deferred" convention the live code has superseded, while the Group Event activity-unit definition is internally inconsistent.
+The plan already acknowledges this. Keep it explicitly no-op if the current classifier does not hide these roots; do not manufacture churn merely to satisfy the file list.
 
-**Strengths:**
-- Reuses `buildWindow("7days", …)` at `window.ts:149`.
-- `expo-localization` really does expose nullable 1–7 `firstWeekday`, so the resolver + Sunday fallback are appropriate.
-- Migration 030 follows the forward-only registry; head/`TARGET_VERSION` centralized at `database.ts:67`.
-- Bound date params + bare `date(stored_column)` match the local-wall-clock convention at `status.ts:11`.
-- Human checkpoint before the irreversible migration.
+## Suggestions
 
-**Concerns:**
-- **HIGH — The backup rationale is stale and could silently make the new preference non-portable.** The plan imitates the old "declare optional, emission deferred" pattern (comments at `app-settings-dao.ts:464`), but Phase 36 already added the formerly-deferred fields to the portable projection at `app-settings-dao.ts:950` and return mapping at `:1013`. Whether `yourWeekPeriod` is portable / needs a format bump is a wire-shape/risk decision; `BACKUP_FORMAT_VERSION` is tied to portable JSON shape at `backup/types.ts:13`. **OWNER-ESCALATION** if the plan intends to omit or add the setting without following the landed Phase 36 backup policy.
-- **HIGH — The heatmap aggregation does not honor "Group Event = one event record."** Group Event creation writes one parent and one child interaction per participant at `group-events-dao.ts:340`. A simple `COUNT(*) FROM interactions` contributes N heatmap units for an N-person event. The canonical Profile heatmap counts child interactions once each (`history-read.ts:19`), while the dossier changes the Digest contract to one Group Event activity record. The plan resolves day detail and the Events metric but leaves date-count saturation based on child rows.
-- **MEDIUM — Conflates three distinct aggregation units** (Interactions vs Events vs the heatmap/day-detail activity unit); should not reuse one raw interaction query for all three.
-- **MEDIUM — The "v1→v30 jump" test needs a precise fixture** — migration 030 requires migrations 2–29 to run first; use the full migration runner from a v1 fixture, not a standalone 030 invocation.
+- In the navigation mount test, exercise one route reachable through Profile, such as `RecentlyDeleted`, in each new stack. Type completeness alone does not prove matching `Stack.Screen` registration.
+- Update stale comments in `src/navigation/types.ts:147-153` and `src/navigation/types.ts:256-262` when their old Dashboard/Backup-tab descriptions cease to be true. This is documentation synchronization, not repository-wide terminology cleanup.
 
-**Suggestions:** Add an explicit owner decision/checkpoint for backup portability (portable+bump / portable-optional / device-local-omitted); define a canonical Your Week activity unit (standalone interaction → one unit, distinct `group_event_id` → one unit, group children excluded from the heatmap unit query but counted in headline Interactions/People reached); test a 2–3 participant event against all outputs; name the migration test's starting schema version.
+## Risk Assessment
 
-**Risk:** HIGH. Migration is low-complexity, but backup semantics and Group Event aggregation are durable cross-phase contracts and currently unresolved.
+**LOW.** The route promotion is invasive, but the plan now protects the important route identities and defers stale type removal until the notification transition is complete.
 
 ---
 
-### Plan 38-03 — Up Next + Horizon composition logic
+# Plan 02 — Your Week data, migration, settings, and backup v7
 
-**Summary:** Pure-composition split is good; birthday/dedup well bounded. The Up Next SQL currently selects every tracked, previously-contacted person (including stable contacts), making the intended "nobody needs a nudge" empty state effectively unreachable.
+## Summary
 
-**Strengths:**
-- Reuses `PROGRESS_SQL`/`STATUS_SQL`/`REASON_SQL`/`STATUS_CADENCE_PRECONDITION` from `status.ts:53`.
-- Leaving SQL uncapped and applying the cap after composition is sensible for dedup.
-- The 0–6 birthday window correctly differs from the 0–30 Dashboard population at `dashboard-read.ts:292`.
-- `daysUntilBirthday` handles malformed values, local-midnight, rollover, Feb 29 at `birthday-logic.ts:153`.
+The aggregation and backup design is much stronger than cycle 1, especially the explicit distinction between headline interaction counts and deduplicated activity units. However, the settings-writer instructions omit required pieces of the live DAO contract, which can make both toggles and restore fail at runtime.
 
-**Concerns:**
-- **HIGH — Up Next will almost never be empty.** `STATUS_CADENCE_PRECONDITION` only requires tracking, cadence, and non-null `last_contact` at `status.ts:61` — not "needs attention." Sorting all such contacts by progress and taking three still shows stable contacts. The proposed empty copy will only appear when there are no eligible tracked contacts at all.
-- **MEDIUM — "Approaching" is not defined by the proposed query.** The canonical Dashboard attention filter begins at `STABLE_MAX` and excludes active snoozes at `dashboard-query-logic.ts:173`. Reconcile whether Up Next means that canonical attention population, and snoozed treatment; don't silently choose "all tracked."
-- **LOW — Birthday tie ordering under-specified** (equal-day should be deterministic, name then id).
+## Strengths
 
-**Suggestions:** Reuse/extract the canonical attention predicate; decide+test snoozed treatment; add tests (all-stable → empty; wobble/decay/rogue order; equal-progress deterministic; snoozed rule).
+- Migration 030 is the correct next schema version. The registered chain currently ends at migration 029 and `TARGET_VERSION` points to its constant at `src/db/database.ts:48-55` and `src/db/database.ts:67-100`.
+- The portable-setting decision now follows the landed backup mechanism:
+  - `BACKUP_FORMAT_VERSION` is currently 6 at `src/backup/types.ts:14`.
+  - The parser requires an entry for every intermediate version at `src/backup/backup-schema.ts:987-1000`.
+  - The current registry ends with `5 → 6` at `src/backup/backup-schema.ts:105-128`.
+  - Therefore the proposed `FORWARD_MIGRATIONS[6]` is necessary and correct.
+- D-08 is implemented conceptually correctly: emit the field, allowlist it, bump the format, and add a forward migration. The live snapshot already emits formerly deferred fields such as history preferences at `src/db/app-settings-dao.ts:925-969` and `src/db/app-settings-dao.ts:1013-1021`.
+- The group-event activity-unit distinction is justified by the schema. A group event has one parent and one linked interaction per participant through `group_event_id` and the unique participant index at `src/db/migrations/026-group-events-schema.ts:18-39`.
+- Building the heatmap map directly from `{d,n}` correctly avoids `buckets()`, which increments once per input row at `src/services/history/buckets.ts:52-69`.
+- Testing a full migration jump is appropriate. The authoritative registered-chain test uses `MIGRATIONS`, `TARGET_VERSION`, and the real runner at `src/db/migrations/full-chain.test.ts:15-22`.
 
-**Risk:** HIGH. DAO is simple, but its eligibility predicate changes Up Next's product meaning and breaks the designed empty state.
+## Concerns
 
----
+### HIGH — Task 2 does not completely add `yourWeekPeriod` to the generic writer
 
-### Plan 38-04 — Notification routing + FAB audit + Contacts cleanup
+The plan says to add the field to `AppSettings`, `PortableSettingsSnapshot`, and a `KEY_TO_COLUMN` mapping. There is no `KEY_TO_COLUMN` in the live DAO; the actual writer contract has four separate pieces:
 
-**Summary:** Notification-routing design is structurally strong, preserving the FAB target is correct. Small test-reference errors, and terminology cleanup is incomplete when considered with Plan 01.
+- `WritableSettingsKey` at `src/db/app-settings-dao.ts:531-584`
+- `AppSettingsRow` at `src/db/app-settings-dao.ts:586-656`
+- `COLUMN_OF` at `src/db/app-settings-dao.ts:687-746`
+- `validateAppSettingsPatch` at `src/db/app-settings-dao.ts:1270-1395`
 
-**Strengths:**
-- Distinct `select-digest` intent is cleaner than overloading the Dashboard-stack reset shape.
-- Pure resolver stays node-loadable (`notification-nav.ts:1`).
-- The current gate always wraps the second route in `DashboardTab` at `notification-gate.tsx:129`, so a separate Digest reset adapter is necessary.
-- FAB is globally mounted outside `RootNavigator` at `App.tsx:378`, visibility route-classification based at `UniversalFab.tsx:125`.
+The plan explicitly names only a nonexistent `KEY_TO_COLUMN` and never requires:
 
-**Concerns:**
-- **MEDIUM — Wrong gate test filename.** The repo has `notification-gate.test.tsx`, not `.test.ts`; the automated command as written fails.
-- **MEDIUM — The existing concurrency guard must remain covered after branching.** `applyBodyNav` prevents an older async contact lookup from overwriting a newer destination (`notification-gate.test.tsx:76`); refactoring must preserve it for contact intents while letting Digest bypass the lookup.
-- **MEDIUM — S-05 still incomplete.** Removing Home shortcuts doesn't change the Events root title/search labels (`GroupEventsScreen.tsx:68`).
-- **LOW — FAB context narrower than the new stacks.** `getFocusedContactContext` recognizes only `DashboardTab`/`OrreryTab` (`universal-fab-logic.ts:135`); on a Digest/Events-origin Profile, Quick Log loses current-contact context and opens the picker.
+- `yourWeekPeriod` in `WritableSettingsKey`,
+- `your_week_period` in `AppSettingsRow`,
+- `yourWeekPeriod: "your_week_period"` in `COLUMN_OF`,
+- a runtime enum validator for restore-originated data.
 
-**Suggestions:** Correct the test path to `.test.tsx`; add Digest gate tests (warm/cold/stale-request); own the Events-root relabel here or in Plan 01; extend the FAB audit to DigestTab/EventsTab Profile contexts.
+This is not just typing hygiene. Restore casts manifest entries to `AppSettingsPatch` at `src/backup/restore-apply.ts:1588-1596`, so external JSON bypasses compile-time union safety. Without the actual mapping, the generic writer can construct an invalid column assignment; without DAO validation, malformed format-7 input is deferred to SQLite’s constraint instead of being rejected at the intended boundary.
 
-**Risk:** MEDIUM. Core routing correct; remaining risks are integration and incomplete audit coverage.
+### MEDIUM — The checkpoint reopens settled owner decision D-08
 
----
+The blocking checkpoint offers “proceed or hold” after D-08 has already decided portability and format 7. That conflicts with the repository instruction not to drip-feed settled decisions back to the owner.
 
-### Plan 38-05 — Your Week presentation
+A migration safety checkpoint could confirm the exact SQL and wire diff, but it should not ask whether to implement the already-ratified decision.
 
-**Summary:** Component decomposition and accessibility intent are good, but the planned data wiring cannot work as written. The DAO returns aggregated `{d, n}` rows while `buckets()` expects one `{occurredAt}` per activity; passing aggregate rows through it either fails type checking or collapses each active date to a count of one.
+### MEDIUM — “Archived contacts are excluded everywhere” is under-specified for group-event parents
 
-**Strengths:**
-- Reuses heatmap classification + existing theme ramp; shared bucketer establishes zero-valued cells + local-date extraction at `buckets.ts:46`.
-- Avoiding the full `ActivityHeatmap` is correct (it owns lens/navigation chrome beyond Digest's period).
-- Structural selected state + accessible selection satisfy the non-color-only requirement.
-- App-wide inline day-detail component is justified (Profile history row is contact-scoped).
-- Persisting period changes through `updateAppSettings` follows the settings DAO write path.
+`group_events` has no archived state or direct contact identity at `src/db/migrations/026-group-events-schema.ts:18-29`. The plan says archived contacts are excluded everywhere, while also defining an event as one parent-level activity unit. It must say whether a group event:
 
-**Concerns:**
-- **HIGH — The heatmap feed contract is incompatible.** `buckets()` requires individual records with `occurredAt` and increments once per row (`buckets.ts:17`, `:62`). Plan 02 returns one `{d, n}` aggregate per date. "Feed by `buckets()` over the date→count rows" cannot preserve `n`.
-- **HIGH — The UI inherits Plan 02's group-event saturation error.** Unless the DAO defines a union of standalone interactions and distinct Group Events, an N-participant event produces N heatmap units though its day detail is one row.
-- **HIGH — The preference is not actually placed in Settings.** Dossier §I explicitly says "Put the preference in Settings wherever it naturally fits." This plan chooses only an in-context Digest control and declines a Settings row. That reverses a recorded product decision → **OWNER-ESCALATION**, not planner discretion.
-- **MEDIUM — Focus lifecycle may cause redundant reads** (DigestScreen + YourWeekSection each do focus reads); define cancellation/stale-period protection on rapid toggle.
-- **MEDIUM — Write-failure handling unspecified** (revert / error / diverged UI on `updateAppSettings` failure?).
+- always counts, regardless of current participant archival state, or
+- counts only if at least one linked participant is currently non-archived.
 
-**Suggestions:** Choose one heatmap input contract (individual canonical activity units + `buckets()`, OR aggregated counts built into the date map directly without `buckets()`); add an explicit Settings row or obtain owner approval to reverse §I; specify optimistic-toggle rollback + generation guards; test count>1 on the same day; test a multi-participant Group Event produces exactly one saturation unit.
+Without that definition, metrics, date counts, and day detail may implement different inclusion rules.
 
-**Risk:** HIGH. Visual design good, but the central data-to-heatmap link is invalid and a settled Settings decision is being reversed.
+## Suggestions
 
----
+Revise Task 2 to require all of:
 
-### Plan 38-06 — Digest surface assembly
+```text
+- Add YourWeekPeriod validator.
+- Add yourWeekPeriod to WritableSettingsKey.
+- Add your_week_period to AppSettingsRow.
+- Add yourWeekPeriod: "your_week_period" to COLUMN_OF.
+- Invoke the validator from validateAppSettingsPatch.
+- Test malformed restore input as well as direct invalid writes.
+```
 
-**Summary:** Final screen composition follows Up Next → Horizon → Your Week and retains the focus/error pattern. It cannot yet implement the promised Never Contacted preview, and its cross-tab drill-through contract is underspecified relative to the Zustand-backed Contacts query state.
+Replace the decision checkpoint with a non-decision verification gate: confirm migration number 030, exact additive SQL, format 7, `FORWARD_MIGRATIONS[6]`, and no unrelated schema/wire expansion.
 
-**Strengths:**
-- Retains cancellation guard + null-vs-loaded sentinel (`DigestScreen.tsx:69`).
-- Removing the legacy Back button is correct for a tab root (`DigestScreen.tsx:129`).
-- Shared `ContactCard` avoids a second status-color system.
-- Passing Up Next IDs into Horizon makes first-claim dedup explicit; keeps Up Next/Horizon read-only.
+Define one explicit archived-participant rule and test it across metrics, date counts, and day detail.
 
-**Concerns:**
-- **HIGH — Never Contacted has no row source for the promised preview.** `countNeverContacted` returns only a number (`dashboard-read.ts:539`); neither Plan 03 nor 06 introduces a query returning Never Contacted contacts. A "compact preview + count" cannot be rendered as planned.
-- **HIGH — Cross-tab drill-through is not defined at the actual state boundary.** Contacts populations/filters live in a persisted Zustand store writing through `app_settings` (`dashboard-query-store.ts:92`). Navigating to bare `DashboardTab` does not establish a population/filter. The plan must specify whether it mutates the canonical store before navigation, adds typed route params consumed by Home, or introduces another intent.
-- **MEDIUM — Overlooked has no exact canonical Contacts population** (available: favourites, birthdays, not-contacted, snoozed, all-contacts at `dashboard-query-logic.ts:5`; "needs attention" begins at `STABLE_MAX` at `:173`).
-- **MEDIUM — Up Next empty behavior depends on Plan 03's unresolved eligibility bug.**
-- **LOW — `grep -c 'DashboardTab'` is not behavioral verification.**
+## Risk Assessment
 
-**Suggestions:** Add a canonical `listNeverContactedPreview` read (or reuse a proven list query with a limit); define an `openContactsQuery({populations, filters})` navigation/store intent with hydration + stale-state tests; decide Overlooked's target population (escalate if broader); add integration tests proving each overflow action changes the actual Contacts result set; resolve Plan 03's predicate first.
-
-**Risk:** HIGH. Module composition is clear, but two required drill-through/preview behaviors lack implementable data and state contracts.
+**HIGH.** A missing writer mapping would break both D-09 UI surfaces and D-08 restore portability. The schema and backup architecture are otherwise sound.
 
 ---
 
-### Plan 38-07 — Regression, accessibility, themes, physical-device UAT
+# Plan 03 — Up Next and Horizon composition
 
-**Summary:** A consolidated full-suite + physical-device gate is appropriate. The proposed shell test is too source-structure-oriented, and the device task lacks the required environment precondition / blocked-state handling.
+## Summary
 
-**Strengths:**
-- Requiring Vitest, `tsc`, and the color gate separately is correct.
-- Physical-device coverage well targeted (fresh launch, resume, origin-aware Back, FAB, notification routing, both themes, large text).
-- Captures screenshots + accessibility-tree evidence.
-- Correctly avoids emulator performance claims.
+Plan 03 now resolves the main cycle-1 issue: Up Next is a true attention population rather than all tracked contacts. The canonical predicate and deterministic pure composition are well chosen.
 
-**Concerns:**
-- **HIGH — The autonomous UAT task lacks the required first-use confirmation/precondition.** Repo instructions require confirming Orbit's package name and Metro tmux session with the owner before first use; previous plans encode that (e.g. `31-05-PLAN.md:119`). Plan 07 hardcodes the Metro remap and is marked autonomous.
-- **HIGH — The plan does not define BLOCKED outcomes for unavailable hardware or test data.** Several checks require particular states (nonzero Never Contacted, multi-participant Group Event, a Digest notification, both themes, meaningful week activity). Rendering alone cannot prove them; provision a disposable fixture or record BLOCKED, never infer pass.
-- **MEDIUM — The shell-contract test is likely to become a source scanner** (`TabParamList` erased at runtime; JSX order/listener count can't be proven by importing a type).
-- **MEDIUM — "Fix nothing but the test" creates an execution dead end** if the gate finds a feature defect; the follow-up flow before UAT continues is undefined.
-- **MEDIUM — Build instructions should cite the runbook.** Authoritative pipeline is `docs/runbooks/desktop-build-pipeline.md`; ADR-007 specifies tar-over-SSH/scp because rsync is absent on `droid` (`ADR-007:18`). The plan's "rsync/scp" wording isn't aligned.
+## Strengths
 
-**Suggestions:** Add an owner-confirmation precondition (package/session, exactly one authorized target); add a fixture strategy for all nonempty states; permit PASS/FAIL/BLOCKED and prohibit converting missing hardware/data into a pass; extract a runtime shell descriptor both `RootNavigator` and the test consume; define a repair loop (failed gate → owning-plan follow-up → full gate rerun → device UAT); record build SHA, package, device serial, API level, theme, fixture identity.
+- The attention threshold is correctly shared from `STABLE_MAX = 0.8` at `src/db/status.ts:35-42`.
+- The plan preserves the required status precondition documented at `src/db/status.ts:53-64`.
+- `STATUS_SQL` and `REASON_SQL` are kept canonical rather than reimplemented; their bucket and reason behavior is defined at `src/db/status.ts:72-78` and `src/db/status.ts:100-104`.
+- Snooze exclusion matches the intended attention-filter semantics rather than inventing Digest-local logic.
+- Up Next remains uncapped at the DAO seam, allowing composition to select three and deduplicate Horizon correctly.
+- The 7-day birthday filter correctly avoids the existing 30-day dashboard population. The live dashboard resolver explicitly uses `days <= 30` at `src/db/dashboard-read.ts:292-307`.
+- Equal-day birthday ordering now has deterministic name/id tie-breaks.
 
-**Risk:** MEDIUM-HIGH. Acceptance matrix strong, but the execution protocol is not yet reliable enough for trustworthy phase closure.
+## Concerns
+
+### LOW — The “why-present” value is nullable for wobble/decay candidates
+
+`REASON_SQL` only names rogue branches; non-rogue wobble and decay rows return `NULL` at `src/db/status.ts:96-104`. Up Next includes everything at or above `STABLE_MAX`, so the presentation plan must derive explanatory copy from canonical `status` when `reason` is null.
+
+Plan 06 mentions canonical reason/status, which mostly closes this, but a direct test should pin wobble and decay copy.
+
+## Suggestions
+
+- Add a composition or presentation test for all canonical statuses:
+  - wobble → approaching/due-soon copy,
+  - decay → overdue copy based on status,
+  - rogue + overdue reason,
+  - rogue + unresponsive reason.
+- Keep copy derivation separate from selection logic so changing prose cannot alter population membership.
+
+## Risk Assessment
+
+**LOW.** The primary population and dedup semantics are now correct and testable.
 
 ---
 
-### Codex — Consolidated required changes (block approval on these)
+# Plan 04 — Notification routing, Contacts cleanup, and FAB audit
 
-1. Correct Your Week's canonical activity-unit query so one Group Event contributes one heatmap/day-detail record while headline metrics retain separately-defined semantics.
-2. Resolve backup portability for `yourWeekPeriod`; the "emission deferred" precedent is no longer current.
-3. Honor dossier §I by adding the period preference to Settings, or obtain an explicit owner-approved reversal.
-4. Filter Up Next to the canonical attention population so stable contacts don't make the empty state unreachable.
-5. Add a Never Contacted preview row source.
-6. Define real Contacts drill-through intents/store transitions for Never Contacted and Overlooked.
-7. Register every Profile-reachable route in DigestStack and EventsStack, including `RecentlyDeleted`.
-8. Complete the user-facing Events terminology update.
-9. Correct the notification gate test filename and preserve stale-request coverage.
-10. Strengthen Plan 07 with environment confirmation, fixtures, BLOCKED handling, and behavior-level shell tests.
+## Summary
+
+Plan 04 correctly handles the semantic fallout of promoting Digest and Events. It now covers the notification route, stale Dashboard routes, the live overflow action, and FAB context.
+
+## Strengths
+
+- A distinct digest intent is appropriate because the current intent union hardcodes a Dashboard-stack reset at `src/services/notifications/notification-nav.ts:31-52`.
+- The gate’s stale-request guard is real and worth preserving:
+  - request IDs are assigned at `src/navigation/notification-gate.tsx:174-176` and `src/navigation/notification-gate.tsx:199-216`;
+  - application rechecks `isCurrent()` before navigating at `src/navigation/notification-gate.tsx:129-151`.
+- Repointing the overflow action is necessary. It currently calls `navigation.navigate("GroupEvents")` at `src/screens/dashboard-overflow-actions.ts:20-29`; once DashboardStack stops registering the screen, that becomes a live runtime failure.
+- Removing stale Dashboard param entries after repointing callers closes a genuine “typechecks but crashes” hazard.
+- Extending FAB context to Digest and Events is justified. The current recognizer accepts only `DashboardTab` and `OrreryTab` at `src/components/universal-fab-logic.ts:135-160`.
+- The plan correctly preserves `DashboardTab` as the FAB destination at `src/components/universal-fab-logic.ts:82-104`.
+
+## Concerns
+
+No blocking source-grounded concern found.
+
+### LOW — Cross-tab overflow typing needs the parent navigator shape, not merely a widened string union
+
+The live overflow interface accepts a single stack-route argument at `src/screens/dashboard-overflow-actions.ts:3-6`. `navigate("EventsTab", {screen: "GroupEvents"})` requires either a correctly typed parent/tab navigation callback or a dedicated action callback. Simply widening the existing route union will not model the second parameter.
+
+## Suggestions
+
+Prefer a callback-oriented interface:
+
+```ts
+interface DashboardOverflowNavigation {
+  openEvents(): void;
+  navigateLocal(route: "UnboundContacts" | "Archived"): void;
+}
+```
+
+That keeps cross-tab behavior out of the pure action builder and avoids weakening route typing.
+
+## Risk Assessment
+
+**LOW.** The important concurrency and dead-route hazards are now explicitly covered.
+
+---
+
+# Plan 05 — Your Week presentation and Settings row
+
+## Summary
+
+Plan 05 correctly implements D-09 and fixes the cycle-1 heatmap feed mismatch. The remaining gap is future-day behavior in Calendar Week.
+
+## Strengths
+
+- D-09 is now implemented with a true single source of truth: both surfaces use the same `app_settings` field and DAO writer.
+- `SettingsInteractionsScreen` is a reasonable existing home. It already reads settings on focus at `src/screens/SettingsInteractionsScreen.tsx:57-71` and persists generic settings through `updateAppSettings` at `src/screens/SettingsInteractionsScreen.tsx:73-89`.
+- The direct `{d,n}` map construction is correct because `buckets()` expects raw `{occurredAt}` rows and increments per row at `src/services/history/buckets.ts:17-21` and `src/services/history/buckets.ts:52-69`.
+- Reusing `classifyHeatmapCell` and `heatmapLevel` preserves the established saturation semantics at `src/components/history/heatmap-cell.ts:39-47`.
+- The plan correctly avoids reusing the full `ActivityHeatmap` chrome.
+- Structural selection plus `accessibilityState.selected` addresses the color-independent selection requirement.
+- Stale-read generation guarding and write-failure rollback materially improve the period toggle.
+
+## Concerns
+
+### MEDIUM — Future Calendar Week cells are not required to be non-interactive
+
+The planned Calendar Week window contains all seven days and marks dates after today with `isFuture: true`. The existing heatmap treats future cells as inaccessible, non-interactive blanks at `src/components/history/ActivityHeatmap.tsx:196-211`.
+
+Plan 05 instead says “each real cell” is a touch target and does not instruct `YourWeekHeatmap` to exclude `isFuture`. That could allow selecting future dates and opening meaningless empty day detail.
+
+### LOW — The must-have/key-link language still says it reuses `buckets()`
+
+The implementation correctly forbids calling `buckets()` on aggregate rows, but the artifact and key-link descriptions still claim `buckets()` reuse. That contradiction could mislead an executor.
+
+## Suggestions
+
+- Require `cell.isFuture` to render as a non-interactive structural blank, matching `ActivityHeatmap`.
+- Add a test proving future Calendar Week cells have no button role and cannot call `onSelectDay`.
+- Remove `buckets()` from Plan 05’s key-link and artifact descriptions; say it reuses `heatmapLevel`, `classifyHeatmapCell`, and `heatmapScale`.
+
+## Risk Assessment
+
+**MEDIUM.** The core presentation model is correct, but future-day behavior should be pinned before implementation.
+
+---
+
+# Plan 06 — Digest assembly
+
+## Summary
+
+Plan 06 has good module composition, loading/error semantics, and real preview-row sourcing. Its drill-through contract is still incorrect because it updates only one query axis and leaves stale filters or populations active.
+
+## Strengths
+
+- The Never Contacted preview now has an actual row source. `countNeverContacted` is only a count, while `listDashboardPopulation` returns full `DashboardRow[]` at `src/db/dashboard-read.ts:380-410`.
+- The plan correctly mutates the persisted Zustand/SQLite query state before navigation. Store setters persist through `updateAppSettings` at `src/stores/dashboard-query-store.ts:92-110`.
+- Using the canonical `not-contacted` population and `needs-attention` filter is grounded in the live closed vocabularies at `src/logic/dashboard-query-logic.ts:5-22` and `src/logic/dashboard-query-logic.ts:69-70`.
+- Removing the old Digest Back affordance is correct for a tab root.
+- Separating read loading/error state from presentation avoids empty-state flashes.
+- The screen’s responsibility for passing selected Up Next IDs into Horizon makes dedup explicit and testable.
+
+## Concerns
+
+### HIGH — Drill-through preserves stale query axes and may open the wrong list
+
+The plan specifies:
+
+- Never Contacted: call `setPopulations(['not-contacted'])`
+- Overlooked: call `setFilters({'needs-attention':['on']})`
+
+But the store setters only replace their own axis:
+
+- `setPopulations` leaves `filters` unchanged at `src/stores/dashboard-query-store.ts:92-99`.
+- `setFilters` leaves `populations` unchanged at `src/stores/dashboard-query-store.ts:100-110`.
+
+Dashboard population and filters are then AND-composed at `src/db/dashboard-read.ts:380-406`.
+
+Consequences:
+
+- Never Contacted drill-through can retain an old category, gravity, or attention filter.
+- Overlooked drill-through can retain an old birthdays, favourites, or not-contacted population.
+- The resulting Contacts list may be empty or materially different from the requested canonical target.
+
+This means the cycle-1 “mutate the real state boundary” finding is only partially resolved.
+
+### MEDIUM — The plan describes a capped DAO read, but `listDashboardPopulation` has no cap argument
+
+The live signature is `(exec, query, now)` and returns the entire filtered result at `src/db/dashboard-read.ts:380-410`. The plan can still create a compact preview by slicing after the read, but it should not claim the database read itself is capped unless it adds a dedicated bounded query.
+
+## Suggestions
+
+Define atomic query-state helpers for these destinations, for example:
+
+```ts
+openNeverContacted:
+  populations = ["not-contacted"]
+  filters = {}
+  sort = "default"
+
+openNeedsAttention:
+  populations = []
+  filters = { "needs-attention": ["on"] }
+  sort = "default"
+```
+
+Prefer one store method that persists all relevant axes in one `updateAppSettings` transaction, rather than sequential setters that can briefly expose mixed state.
+
+Behavioral tests should start from deliberately conflicting prior state and verify the final complete query state, not only the changed axis.
+
+Clarify whether preview rows are fetched fully and sliced, or add a legitimate bounded read if dataset size warrants it.
+
+## Risk Assessment
+
+**HIGH.** The current drill-through can visibly fail a core Phase 38 acceptance criterion.
+
+---
+
+# Plan 07 — Regression gate and physical-device UAT
+
+## Summary
+
+The verification content is markedly better than cycle 1: it requires behavioral rendering, reproducible metadata, fixtures, and PASS/FAIL/BLOCKED outcomes. The execution metadata still contradicts the required owner precondition.
+
+## Strengths
+
+- Rendering `RootNavigator` is materially stronger than source scanning or importing erased `TabParamList` types.
+- Runtime `TAB_ICON` key assertions are appropriate because the current map is intentionally typed to the tab param keys.
+- The plan correctly distinguishes Vitest, TypeScript, and color gates.
+- PASS/FAIL/BLOCKED avoids falsely inferring success from a rendered screen.
+- The disposable fixture requirements cover the otherwise untestable non-empty states: Never Contacted, multi-participant Group Event, notification routing, week activity, and both themes.
+- Recording SHA, package, serial, API level, theme, and fixture identity makes the UAT reproducible.
+- The repair loop now routes failures back to the owning plan rather than blind-patching cross-cutting code.
+
+## Concerns
+
+### HIGH — The plan is marked autonomous despite a blocking owner-confirmation precondition
+
+Frontmatter says `autonomous: true`, while `user_setup` and Task 2 require the owner to confirm:
+
+- package name,
+- Metro tmux session,
+- exactly one authorized target.
+
+Task 2 says execution must halt if this is unconfirmed. An autonomous executor cannot satisfy that owner interaction safely. This is especially important because the repository device instructions explicitly prohibit guessing these values.
+
+### MEDIUM — Plan 07’s feature-code repair loop is procedurally ambiguous
+
+It says Plan 07 modifies only the test and validation file, while defects are handed back to “the owning plan.” In a sequential execution system, already-completed plans may not literally resume themselves. The intended behavior should be stated as:
+
+- stop Plan 07,
+- record the owning plan and defect,
+- execute a scoped fix under that plan’s verification contract,
+- rerun the full phase gate,
+- then resume UAT.
+
+## Suggestions
+
+- Set `autonomous: false`.
+- Add an explicit blocking human checkpoint before any ADB/build command.
+- Make Task 1 autonomous and Task 2 checkpoint-gated.
+- Correct the objective’s output filename from `shell-contract.test.ts` to the actual planned `shell-contract.test.tsx`.
+- Require offline mode during at least one Digest read-path check, consistent with the local-first acceptance condition.
+
+## Risk Assessment
+
+**HIGH operationally.** The verification design is good, but its current autonomy declaration can cause unsafe or impossible execution.
+
+---
+
+# Cycle-1 Finding Resolution Matrix
+
+| Cycle-1 finding class | Cycle-2 status |
+|---|---|
+| New Digest/Events stacks omit `RecentlyDeleted` and other Profile-reachable routes | **Resolved** in Plan 01 with full route registration and traversal testing |
+| Events root still displays “Group Events” | **Resolved** in Plan 01 through scoped user-facing relabeling |
+| Shared-backup deep link targets removed `BackupTab` | **Resolved** in Plan 01 by repointing to Settings → Backup |
+| Stale Dashboard `Digest`/`GroupEvents` entries and unsafe removal ordering | **Resolved** through Plan 01 retention followed by Plan 04 removal |
+| D-08 portability/format-bump owner escalation | **Owner-resolved**, and Plan 02 conceptually implements format 7 correctly; **implementation remains incomplete** because the actual generic writer contract is not fully specified |
+| Group Event saturates heatmap N times | **Resolved** by the parent-as-one-activity-unit definition and regression test |
+| `{d,n}` aggregate rows incompatible with `buckets()` | **Resolved** by direct map construction; stale prose references to `buckets()` should be removed |
+| Aggregation units conflated | **Resolved** by separating headline metrics from heatmap/day-detail activity units |
+| Migration test does not prove long upgrade path | **Resolved in intent** with a real-runner fixture requirement |
+| Locale `firstWeekday` off-by-one | **Resolved** with explicit 1-based → 0-based conversion and Monday test |
+| Up Next includes stable contacts / empty state unreachable | **Resolved** through the canonical attention floor |
+| Snoozed treatment undefined | **Resolved** through canonical active-snooze exclusion |
+| Birthday tie ordering under-specified | **Resolved** with name/id tie-break |
+| Notification stale-request guard may be lost | **Resolved** in Plan 04 with explicit preservation and tests |
+| Wrong notification-gate test extension | **Resolved** by targeting the `.tsx` test |
+| FAB context excludes Digest/Events Profile | **Resolved** in Plan 04 |
+| Never Contacted has no row source | **Resolved** with `listDashboardPopulation` |
+| Drill-through only navigates without setting Contacts state | **Partially resolved**: it now writes state, but fails to clear conflicting axes |
+| Overlooked lacks an exact canonical population | **Resolved** through the canonical `needs-attention` filter |
+| Settings placement of period preference | **Owner-resolved and correctly incorporated** in Plan 05 as two surfaces over one key |
+| Rapid toggle stale reads | **Resolved** with generation/cancellation guard |
+| Period write failure leaves UI divergent | **Resolved** with rollback requirement |
+| Device UAT lacks owner-confirmed target | **Partially resolved** in task text, but contradicted by `autonomous: true` |
+| Device UAT lacks fixtures/BLOCKED outcomes | **Resolved** |
+| Shell contract test risks source scanning | **Resolved** through rendered navigator/runtime assertions |
+| Verification plan has no repair path | **Resolved in intent**, with minor procedural clarification still needed |
+| Validation template remains unfilled | **Resolved by explicit Plan 07 ownership** |
+
+# Final Recommendation
+
+Revise before execution:
+
+1. Complete Plan 02’s live `app-settings-dao` writer contract and remove the redundant D-08 decision checkpoint.
+2. Make Plan 06 drill-through atomically replace the full relevant Contacts query state.
+3. Make Plan 07 non-autonomous with a real blocking owner checkpoint.
+4. Pin future Calendar Week cells as non-interactive.
+5. Clarify group-event inclusion when all participants are archived.
+
+After those changes, the plan set should be suitable for another convergence check with an expected overall risk of **MEDIUM**.
 
 ---
 
 ## Claude Review
 
-*Read-only general-purpose Claude subagent (Write-gap fallback per project runbook). Source-grounded;
-repo access confirmed. Overall: MEDIUM (low-leaning).*
+*Read-only general-purpose Claude subagent (Write-gap fallback per project MEMORY). Source-grounded;
+repo access confirmed (27 tool calls, verified against disk). Overall: LOW–MEDIUM.*
 
-**Summary:** A strong, well-grounded plan set. The plans' `file:line` claims hold up: the current
-4-tab shell, migration head (029→030), the group-event seam, the canonical status engine, the
-heatmap helpers, and the `app_settings` declare-optional pattern are all as described. The phase
-achieves its goal — a five-tab, Digest-centered home composed derive-only from existing reads.
-This subagent found **no** owner-escalation trigger. Concerns are a small number of concrete,
-unassigned edge/cleanup items — most notably a Backup-reachability deep link (`linking.ts:67`) that
-no plan touches, a cross-plan tsc-ordering ambiguity around stale `DashboardStackParamList` entries,
-and a `firstWeekday` index-conversion hazard.
+> **Aggregator note:** This subagent verified the backup *emission/format policy* and the data-layer
+> contracts thoroughly, but did **not** trace the generic settings-**writer** path
+> (`COLUMN_OF`/`WritableSettingsKey`/`validateAppSettingsPatch`) or the Plan 07 `autonomous` flag.
+> Codex did, and disk confirms codex on both. Treat codex's Plan 02 writer-wiring HIGH and Plan 07
+> autonomy HIGH as authoritative; this subagent's "no new HIGH except drill-through" is otherwise
+> corroborated.
 
-> **Aggregator note:** This subagent's "no escalation / Plan 02 backup pattern is correct" conclusion
-> was checked against disk and is **superseded** — `getPortableSettingsSnapshot` at
-> `src/db/app-settings-dao.ts:888+` now emits `history_lens/history_cycle_count`, so the "emission
-> deferred" precedent this subagent relied on is stale. Treat codex's backup HIGH as authoritative.
+### Summary
 
-**Strengths (evidence):**
-- Migration correctly grounded and gated; head `029-ai-configuration.ts`, `TARGET_VERSION` at
-  `database.ts:67`; additive `ADD COLUMN … DEFAULT 'rolling7' CHECK(...)`, `checkpoint:decision` gate,
-  `BACKUP_FORMAT_VERSION = 6` unchanged (`backup/types.ts:14`).
-- Backup menu path survives removal — `SettingsStack.tsx:206-207` registers `Backup`/`BackupSettings`
-  as real screens; dossier §K claim is true.
-- Internal `DashboardTab` id preserved as the linchpin (FAB hardcodes it at
-  `universal-fab-logic.ts:30,88,101,146`).
-- FAB-on-Digest is automatic (denylist at `UniversalFab.tsx:148`; `Digest`/`GroupEvents` not in
-  `FOCUSED_WORKFLOW_ROUTES` at `focused-route-classification.ts:7-11`), so Plan 04's "audit-only"
-  framing is correct.
-- Up Next reuses the canonical engine (D-04), matching `readOverlooked`'s `ORDER BY progress DESC`
-  (`digest-read.ts:109`).
-- Heatmap reuses helpers, not the forbidden chrome; structural day selection satisfies §P/HIST-18.
-- Group-event double-count seam correctly identified (`interactions.group_event_id` at
-  `026-group-events-schema.ts:32`, unique index :38).
-- Local-first / theme / date discipline enforced throughout; no read-path network introduced.
+The 7 revised plans are a strong, disciplined response to cycle-1. Every disputed cycle-1 HIGH was
+verified against the actual source and **all are genuinely resolved**: the group-event
+heatmap-saturation contract is now a group-deduped activity-unit count (Plan 02 Task 4), the
+`buckets()` feed mismatch is eliminated by building the date→count Map directly from `{d,n}` rows
+(Plan 05 Task 3), the backup-portability decision is correctly implemented per owner ruling D-08
+(Plan 02 Task 3, and the "emission-deferred" precedent is in fact spent), the Up Next attention
+floor makes the empty state reachable (Plan 03 Task 1, predicate matches the canonical dashboard
+filter verbatim), Never Contacted gets a real row source, the Settings row lands per D-09 with a
+single source of truth, and the navigation gaps are each owned with correct wave ordering. D-08 and
+D-09 are implemented correctly — no re-raise. The one **new** issue worth blocking on is the Horizon
+drill-through: it now mutates the persisted Contacts query store (fixing the cycle-1 HIGH) but only
+sets one query axis each, leaving the orthogonal axis stale in a way that can empty or narrow the
+drilled list and desync it from the Digest preview/count. Everything else is LOW.
 
-**Concerns:**
-- **MEDIUM — The Backup share-intent deep link (`linking.ts:67`) is unassigned.** `src/navigation/linking.ts:67`
-  runs `navigationRef.current?.navigate("BackupTab", { screen: "Backup" })` — the path routing a shared
-  `.orbitbackup` file into restore. Plan 01 removes `BackupTab` from `TabParamList` (`types.ts:352`), so
-  this becomes a tsc error; the correct fix is repoint to `navigate("SettingsTab", { screen: "Backup" })`,
-  but no plan lists `linking.ts` in `files_modified`. Dossier §S.4 is only partly discharged (the menu
-  entry was verified, not this deep link). A data-recovery path.
-- **MEDIUM — Stale `DashboardStackParamList` `Digest`/`GroupEvents` entries + cross-plan tsc ordering.**
-  `types.ts:47` (`GroupEvents: undefined`) and `:155` (`Digest: undefined`) remain in the Contacts stack.
-  Plan 01 removes only the `Stack.Screen` components — and must NOT remove these type entries in wave 1,
-  because `notification-gate.tsx:151` and the digest `NavIntent` `{name:"Digest"}` literal require `Digest`
-  to stay a valid `DashboardResetTarget` until Plan 04 (wave 2) repoints the intent. Risk: (a) an executor
-  "cleaning up" the entries in Plan 01 breaks the wave-1 tsc gate; (b) if left permanently, `navigate("Digest")`
-  inside the Contacts stack typechecks but fails at runtime. Assign the param-list removal to Plan 04.
-- **MEDIUM — Calendar-week `firstWeekday` index conversion off-by-one.** Expo's `firstWeekday` is 1-based
-  (1=Sunday…7=Saturday); `window.ts`'s `weekdayOf` uses `getDay()` which is 0-based (`window.ts:74`).
-  Comparing the two spaces directly is off by one. Document the `firstWeekday − 1` mapping in Plan 02 Task 1
-  and pin it with a test using the real Expo convention (firstWeekday=2 must start on Monday).
-- **LOW — `38-VALIDATION.md` is an unfilled template** (`{pytest / jest / vitest}` placeholders,
-  `status: draft`, `nyquist_compliant: false`). Per-plan verify blocks are solid; the phase-level contract
-  was never populated.
-- **LOW — Residual cross-stack `navigate("Home")` in the Digest surface.** `DigestScreen.tsx:171` has
-  `onPressBacklog={() => navigation.navigate("Home")}`; `Home` is a `DashboardStack` route not in
-  `DigestStackParamList`. Ensure no `navigate("Home")` survives Plan 06's rewrite.
-- **LOW — Metric-granularity mismatch is user-visible** (one 4-person group coffee → 4 "Interactions" but
-  1 "Event" and 1 day-detail record). Dossier-consistent and already surfaced as a reversible held decision;
-  worth an explicit owner confirmation.
+### Strengths (verified on disk)
 
-**Owner-escalation check (subagent's own):** none triggered. *(Aggregator: superseded on the backup item;
-see note above.)*
+- **D-08 premise confirmed correct.** `getPortableSettingsSnapshot` now emits the formerly-deferred
+  keys — `history_lens, history_cycle_count` in the SELECT at `src/db/app-settings-dao.ts:960` and
+  the return map at `:1013-1014`. So the cycle-1 "emission-deferred is stale" HIGH was right, and
+  Plan 02's decision to follow the landed emit-and-bump policy rather than the comment pattern at
+  `:435-489` is well-grounded.
+- **The `FORWARD_MIGRATIONS[6]` requirement is real.** `parseBackupManifest` loops `from = version;
+  from < MAX; from++` and hard-fails on a missing `FORWARD_MIGRATIONS[from]`
+  (`src/backup/backup-schema.ts:989-996`); bumping `MAX_SUPPORTED` to 7 makes a `[6]` entry
+  mandatory — Plan 02 Task 3 correctly provides it. Head verified: `BACKUP_FORMAT_VERSION = 6`
+  (`src/backup/types.ts:14`), last forward migration `5→6` (`:127`).
+- **Migration numbering is correct.** Head `029-ai-configuration.ts`,
+  `TARGET_VERSION = AI_CONFIGURATION_SCHEMA_VERSION` (`src/db/database.ts:67`), no `030` on disk;
+  additive `ALTER TABLE … ADD COLUMN … DEFAULT … CHECK` matches migration 029's posture exactly.
+- **Up Next attention floor is the canonical predicate, verbatim** (`dashboard-query-logic.ts:173-175`
+  `PROGRESS_SQL >= STABLE_MAX AND (snooze cleared)`), with `STATUS_CADENCE_PRECONDITION`
+  (`status.ts:62-64`) guarding the NULL-progress hazard.
+- **Group-event double-count seam is real and correctly handled** — `createGroupEvent` writes one
+  parent + one child per participant (`src/db/group-events-dao.ts:340-373`); Plan 02's two-unit-family
+  split resolves saturation with an N→1 regression test.
+- **firstWeekday off-by-one correctly closed** — `getDay()` 0-based (`window.ts:74-76`) vs Expo
+  1-based; Plan 02 mandates and documents `firstWeekday - 1` with a `firstWeekday=2 → Monday` test.
+- **Navigation gaps all owned with sound wave ordering** — `linking.ts:67` repointed in wave 1; stale
+  `DashboardStackParamList` `Digest`/`GroupEvents` entries retained in wave 1, removed in Plan 04
+  wave 2 after all three referencers (`notification-nav.ts:43/91`, `HomeScreen.tsx:1656/1689`,
+  `dashboard-overflow-actions.ts:28`) repoint; no orphaned type consumer breaks
+  (`DigestScreen.tsx:79`/`GroupEventsScreen.tsx:34` typed via the intersection still resolve).
+- **Referenced infrastructure all exists** — `SegmentedControl`, `ContactCard`, `heatmap-cell.ts`,
+  `ActivityHeatmap`, `DateDetailSheet`, `listDashboardPopulation` (`dashboard-read.ts:380`),
+  `countNeverContacted` (`:540`), `settings-interactions-logic.ts` + `SettingsInteractionsScreen`;
+  Plan 06's `listDashboardPopulation` query shape matches `DashboardQueryState`.
 
-**Suggestions (tied to plan/task):**
-- Plan 01 Task 1: add `linking.ts` to `files_modified`, repoint `:67` to `navigate("SettingsTab", { screen: "Backup" })`, add acceptance `! grep -q '"BackupTab"' src/navigation/linking.ts`.
-- Plan 01 Task 2 + Plan 04: state in Plan 01 that `Digest`/`GroupEvents` stay in `DashboardStackParamList`
-  until routing is repointed; assign the removal to Plan 04.
-- Plan 02 Task 1: document the `firstWeekday`(1=Sun) → `getDay()`(0=Sun) conversion + Monday-first test.
-- Plan 06 Task 3: acceptance line that no `navigate("Home")` remains in the rewritten `DigestScreen`.
-- Plan 07 / validate-phase: populate `38-VALIDATION.md` (vitest, commands, per-task map) or delete it.
-- Owner batch: confirm (a) period-toggle placement in-context vs a Settings row (§I) and (b) the
-  Interactions-vs-Events group-event granularity — both already flagged by the plans.
+### Concerns
 
-**Risk Assessment:** Overall MEDIUM (low-leaning). Architecture is sound, decision-aligned, reuse-based.
-What keeps it from LOW is a cluster of concrete unassigned items (the `linking.ts` Backup deep link, the
-stale `DashboardStackParamList` entries with their wave-ordering constraint, and the `firstWeekday`
-conversion). With those assigned, it drops to LOW.
+**Cycle-1 status:** all 10 codex consolidated required-changes and all Claude MEDIUM/LOW items are
+**RESOLVED** except drill-through, which is **partially resolved and introduces a new gap**.
+
+- **MEDIUM (new this cycle) — Horizon drill-through mutates only one query axis; the stale orthogonal
+  axis can empty/narrow the drilled list and desync it from the Digest preview/count.**
+  `setPopulations` replaces populations only (`dashboard-query-store.ts:92-98`); `setFilters`
+  replaces filters only (`:100-111`); final Contacts WHERE is `populationWhere AND filterWhere`
+  (`dashboard-query-logic.ts:103-104,280`). Plan 06 sets Never Contacted → `setPopulations(['not-contacted'])`
+  (leaves filters) and Overlooked → `setFilters({'needs-attention':['on']})` (leaves populations).
+  If persisted `dashboardFilters` contains `needs-attention`, the Never Contacted drill yields
+  `not-contacted AND needs-attention` = empty (`not-contacted` = `last_contact IS NULL`,
+  `needs-attention` requires `last_contact IS NOT NULL`), while the preview (`filters:{}`) + count
+  show N. Fix: set **both** axes explicitly, or call the existing `resetDashboardView`
+  (`dashboard-query-logic.ts:285`) first, and make the preview/count use the same `filters:{}`
+  semantics the drill lands on. *(Aggregator: codex rates this HIGH; counted as an unresolved HIGH.)*
+- **LOW (new/carryover) — stale "emission deferred / Phase 36 scope" comments remain false** at
+  `src/backup/backup-schema.ts:180-215` and `src/db/app-settings-dao.ts:435-489`, contradicting disk
+  (`:960/:1013`). Plan 02 declines to *follow* them but does not *correct* them — the exact
+  confident-but-false-comment landmine CLAUDE.md warns about. Suggest Plan 02 Task 3 delete/repoint
+  them adjacent to the `yourWeekPeriod` emission.
+- **LOW — Up Next "why-present" line has no reason for wobble/decay contacts.** `REASON_SQL` is
+  non-null only for `rogue` (`status.ts:100-104`); a `progress ≥ STABLE_MAX` but `< ROGUE_K` row
+  yields `reason = NULL`. The executor must fall back to `status` when `reason` is NULL or those
+  rows render a blank context line. (Plan mentions status — a clarity nit.)
+- **LOW — "capped read" wording for `listDashboardPopulation` is imprecise** — signature
+  `(exec, query, now)` has no limit param (`dashboard-read.ts:380-383`); the cap is applied in JS via
+  `previewWithOverflow(rows, cap)` after fetching the full set. Functionally fine; just note it reads
+  all rows then slices.
+- **LOW — minor line-cite drift in Plan 01** — cites the Events-root title at `:68/:72`; `title="Group
+  Events"` is only at `:72`. The grep acceptance still works; cosmetic.
+
+### Suggestions (each tied to a PLAN.md change)
+
+- **Plan 06 Task 2 `<action>`/`<acceptance_criteria>` + drill-through truth:** set both axes — Never
+  Contacted → `setPopulations(['not-contacted'])` **and** `setFilters({})`; Overlooked →
+  `setPopulations(['all-contacts'])` **and** `setFilters({'needs-attention':['on']})` (or
+  `resetDashboardView` then apply). Add a behavioral test that with a **pre-existing** persisted
+  filter/population the drill still lands on the full intended set.
+- **Plan 06 Task 3 `<action>`:** state the Never Contacted preview read and the drill use identical
+  `filters:{}` semantics so count and drilled list agree.
+- **Plan 02 Task 3 `<action>`:** correct (not just ignore) the now-false "emission deferred / Phase 36
+  scope" comments at `backup-schema.ts:180-215` and `app-settings-dao.ts:435-489`.
+- **Plan 06 Task 1 `<action>`:** make explicit that the why-present line falls back to `status`
+  (wobble/decay) when `REASON_SQL` is NULL.
+
+### Risk Assessment
+
+**Overall: LOW–MEDIUM.** The data-layer contracts that made cycle-1 HIGH risk are correctly resolved
+and verified against disk; the migration/backup one-way doors are gated, forward-only, and coherent;
+the architecture is sound. The single item keeping it above LOW is the one-axis drill-through gap — a
+real functional bug in a primary Horizon affordance, conditional on the user's persisted Contacts
+state, with a small well-scoped fix. *(Aggregator addendum: plus the Plan 02 writer-wiring HIGH and
+Plan 07 autonomy HIGH this subagent did not trace — see codex + the aggregator verification above.)*
+
+**Owner-escalation check (subagent's own):** none triggered. D-08 and D-09 are implemented correctly
+and not re-raised; no plan deletes/weakens/inverts an ADR/HANDOFF/dossier decision (D-02's "no
+persisted Digest snapshot" is respected).
 
 ---
 
@@ -412,8 +717,9 @@ conversion). With those assigned, it drops to LOW.
 /gsd-plan-phase 38 --reviews
 ```
 
-Before or during replanning, get owner decisions on the two escalation items (backup portability
-of `yourWeekPeriod`; period preference in Settings vs in-context). The three confirmed data-layer
-HIGHs (backup precedent, heatmap group-event unit, `buckets()` feed contract) and the union of the
-navigation gaps (`RecentlyDeleted` registration + `linking.ts:67` deep link + stale
-`DashboardStackParamList` entries) should be treated as blocking.
+Treat the three verified HIGHs as blocking for cycle 3: (1) Plan 02 — wire `yourWeekPeriod` through
+the real `COLUMN_OF`/`WritableSettingsKey`/`AppSettingsRow`/`validateAppSettingsPatch` contract, not
+the nonexistent `KEY_TO_COLUMN`; (2) Plan 06 — make the drill-through set both query axes atomically
+(and align the preview/count semantics); (3) Plan 07 — set `autonomous: false` (or gate Task 2 behind
+a blocking human checkpoint). Fold the 11 actionable MEDIUM/LOW items into the owning plans. No owner
+decision is pending — D-08 and D-09 are already ruled.
