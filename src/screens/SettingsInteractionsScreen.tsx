@@ -23,6 +23,7 @@ import { reconcileDigestSchedule } from "@/services/notifications/digest-schedul
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { useAssistBanner } from "@/stores/assist-store";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
   DEFAULT_CHANNEL_OPTIONS,
@@ -30,6 +31,7 @@ import {
   MESSAGE_MODE_OPTIONS,
   persistInteractionAssistEnabled,
   RIGHT_SWIPE_OPTIONS,
+  YOUR_WEEK_PERIOD_OPTIONS,
 } from "./settings-interactions-logic";
 
 const LOG_SCOPE = "settings-interactions-screen";
@@ -205,6 +207,14 @@ export function SettingsInteractionsScreen({
           settings?.defaultInteractionChannel,
         )}
 
+        {renderChipSection(
+          "settings-your-week-period-section",
+          "Your Week period",
+          "The period used by the Digest retrospective.",
+          YOUR_WEEK_PERIOD_OPTIONS,
+          settings?.yourWeekPeriod,
+        )}
+
         <View
           testID="settings-interaction-assist-section"
           style={styles.section}
@@ -244,8 +254,8 @@ export function SettingsInteractionsScreen({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   content: {
-    padding: 16,
-    gap: 12,
+    padding: SPACING.base,
+    gap: SPACING.md,
   },
   backLink: {
     alignSelf: "flex-start",
@@ -253,25 +263,25 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   section: {
-    gap: 12,
+    gap: SPACING.md,
   },
   toggleRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    gap: 12,
+    gap: SPACING.md,
   },
   chipRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: SPACING.sm,
   },
   chip: {
     minHeight: 44,
     justifyContent: "center",
     borderWidth: 1,
     borderRadius: 10,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: SPACING.base,
+    paddingVertical: SPACING.sm,
   },
 });

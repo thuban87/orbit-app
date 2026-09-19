@@ -5,6 +5,8 @@ import {
   DEFAULT_INTERACTION_CHANNELS,
   type DefaultMessageMode,
   MESSAGE_MODES,
+  type YourWeekPeriod,
+  YOUR_WEEK_PERIODS,
 } from "@/db/app-settings-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
@@ -86,6 +88,22 @@ export const DEFAULT_CHANNEL_OPTIONS: ReadonlyArray<
     value: channel,
     label: DEFAULT_CHANNEL_LABELS[channel],
     patch: { defaultInteractionChannel: channel } satisfies AppSettingsPatch,
+  })),
+);
+
+const YOUR_WEEK_PERIOD_LABELS: Record<YourWeekPeriod, string> = {
+  rolling7: "Rolling 7 Days",
+  calendar_week: "Calendar Week",
+};
+
+/** Both Digest and Settings persist this exact app_settings preference key. */
+export const YOUR_WEEK_PERIOD_OPTIONS: ReadonlyArray<
+  InteractionOption<YourWeekPeriod>
+> = Object.freeze(
+  YOUR_WEEK_PERIODS.map((period) => ({
+    value: period,
+    label: YOUR_WEEK_PERIOD_LABELS[period],
+    patch: { yourWeekPeriod: period } satisfies AppSettingsPatch,
   })),
 );
 
