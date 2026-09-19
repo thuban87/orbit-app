@@ -81,6 +81,14 @@ replace the dossier — read it in full first.
   population only** — it does NOT broaden any other population, and it aligns the Digest with an
   already-shipped user setting rather than inventing new cadence semantics. Owner decided this on
   2026-09-18 with the ADR-062/§G trade-off explicitly surfaced.
+  **Blast-radius note (implementation consequence, within scope):** the fix lands at the shared
+  `listDashboardPopulation(['not-contacted'])` read (`buildPopulationWhere`), which the Digest
+  preview, the Digest drill-through, AND a direct "Never contacted" selection on the Contacts tab
+  all issue. So D-10 also makes the **Contacts-tab** not-contacted population unbound-inclusive
+  when the flag is on — this is structurally unavoidable (the drilled list IS that population's
+  query) and desirable (the list then matches the count badge, which already honors the setting).
+  It remains scoped to the not-contacted population only and is a no-op when the flag is off
+  (default). Surfaced to the owner 2026-09-18.
 </decisions>
 
 <canonical_refs>
