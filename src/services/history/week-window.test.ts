@@ -1,4 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("expo-localization", () => ({ getCalendars: () => [] }));
+
 import { buildYourWeekWindow } from "@/services/history/week-window";
 import { buildWindow } from "@/services/history/window";
 
@@ -56,9 +59,9 @@ describe("buildYourWeekWindow", () => {
   it.each([undefined, 0, 8])(
     "falls back to Sunday-first when firstWeekday is %s",
     (firstWeekday) => {
-      expect(buildYourWeekWindow("calendar_week", "2026-09-16", firstWeekday).start).toBe(
-        "2026-09-13",
-      );
+      expect(
+        buildYourWeekWindow("calendar_week", "2026-09-16", firstWeekday).start,
+      ).toBe("2026-09-13");
     },
   );
 });
