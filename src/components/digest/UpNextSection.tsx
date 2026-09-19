@@ -1,3 +1,4 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 import { Pressable, StyleSheet, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { ringVisual } from "@/components/ContactCard";

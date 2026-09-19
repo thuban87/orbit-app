@@ -30,22 +30,29 @@ function resolve(node: ReactNode): Node[] {
   if (Array.isArray(node)) return node.flatMap(resolve);
   const element = node as ReactElement<{ children?: ReactNode }>;
   if (typeof element.type === "function") {
-    return resolve((element.type as (props: unknown) => ReactNode)(element.props));
+    return resolve(
+      (element.type as (props: unknown) => ReactNode)(element.props),
+    );
   }
   const children = resolve(element.props.children);
-  return [{
-    type: element.type,
-    props: element.props as Record<string, unknown>,
-    text: children.map((child) => child.text).join(""),
-    children,
-  } as Node];
+  return [
+    {
+      type: element.type,
+      props: element.props as Record<string, unknown>,
+      text: children.map((child) => child.text).join(""),
+      children,
+    } as Node,
+  ];
 }
 
 function all(nodes: Node[]): Node[] {
   return nodes.flatMap((node) => [node, ...all(node.children)]);
 }
 
-const candidate = (id: number, status: "wobble" | "decay" | "rogue" = "wobble") => ({
+const candidate = (
+  id: number,
+  status: "wobble" | "decay" | "rogue" = "wobble",
+) => ({
   id,
   name: `Person ${id}`,
   photo: null,
@@ -56,17 +63,31 @@ const candidate = (id: number, status: "wobble" | "decay" | "rogue" = "wobble") 
 
 describe("UpNextSection", () => {
   it("caps the compact profile rows at three and exposes a themed status ring", () => {
-    const nodes = all(resolve(UpNextSection({
-      candidates: [1, 2, 3, 4].map((id) => candidate(id)),
-      onOpenProfile: vi.fn(),
-    })));
-    expect(nodes.filter((node) => String(node.props.testID).startsWith("digest-up-next-row-"))).toHaveLength(3);
-    expect(nodes.filter((node) => String(node.props.testID).startsWith("digest-up-next-status-"))).toHaveLength(3);
+    const nodes = all(
+      resolve(
+        UpNextSection({
+          candidates: [1, 2, 3, 4].map((id) => candidate(id)),
+          onOpenProfile: vi.fn(),
+        }),
+      ),
+    );
+    expect(
+      nodes.filter((node) =>
+        String(node.props.testID).startsWith("digest-up-next-row-"),
+      ),
+    ).toHaveLength(3);
+    expect(
+      nodes.filter((node) =>
+        String(node.props.testID).startsWith("digest-up-next-status-"),
+      ),
+    ).toHaveLength(3);
     expect(nodes.filter((node) => node.type === "Avatar")).toHaveLength(3);
   });
 
   it("keeps the module visible with its neutral empty state", () => {
-    const text = all(resolve(UpNextSection({ candidates: [], onOpenProfile: vi.fn() })))
+    const text = all(
+      resolve(UpNextSection({ candidates: [], onOpenProfile: vi.fn() })),
+    )
       .map((node) => node.text)
       .join(" ");
     expect(text).toContain("You're all caught up");
@@ -76,13 +97,25 @@ describe("UpNextSection", () => {
   it("always supplies context, including status fallback and rogue reason copy", () => {
     expect(upNextReason(candidate(1, "wobble"))).toContain("Approaching");
     expect(upNextReason(candidate(2, "decay"))).toContain("Overdue");
-    expect(upNextReason({ ...candidate(3, "rogue"), reason: "unresponsive" })).toContain("reply");
+    expect(
+      upNextReason({ ...candidate(3, "rogue"), reason: "unresponsive" }),
+    ).toContain("reply");
 
-    const nodes = all(resolve(UpNextSection({
-      candidates: [candidate(1, "wobble"), candidate(2, "decay"), { ...candidate(3, "rogue"), reason: "overdue" }],
-      onOpenProfile: vi.fn(),
-    })));
-    const reasons = nodes.filter((node) => String(node.props.testID).startsWith("digest-up-next-reason-"));
+    const nodes = all(
+      resolve(
+        UpNextSection({
+          candidates: [
+            candidate(1, "wobble"),
+            candidate(2, "decay"),
+            { ...candidate(3, "rogue"), reason: "overdue" },
+          ],
+          onOpenProfile: vi.fn(),
+        }),
+      ),
+    );
+    const reasons = nodes.filter((node) =>
+      String(node.props.testID).startsWith("digest-up-next-reason-"),
+    );
     expect(reasons).toHaveLength(3);
     expect(reasons.every((node) => node.text.trim().length > 0)).toBe(true);
   });
