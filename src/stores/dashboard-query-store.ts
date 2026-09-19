@@ -27,6 +27,11 @@ interface DashboardQueryStore extends DashboardQueryState {
     populations: DashboardPopulation[],
   ) => Promise<void>;
   setFilters: (exec: SqlExecutor, filters: DashboardFilters) => Promise<void>;
+  setPopulationsAndFilters: (
+    exec: SqlExecutor,
+    populations: DashboardPopulation[],
+    filters: DashboardFilters,
+  ) => Promise<void>;
   setSort: (exec: SqlExecutor, sort: DashboardSortMode) => Promise<void>;
   resetDashboardView: (exec: SqlExecutor) => Promise<void>;
   /** Internal write/hydration ordering guard; not a presentation setting. */
@@ -105,6 +110,22 @@ export const useDashboardQueryStore = create<DashboardQueryStore>()(
         localDateTime(),
       );
       set((state) => ({
+        filters: canonical,
+        generation: state.generation + 1,
+      }));
+    },
+    setPopulationsAndFilters: async (exec, populations, filters) => {
+      const canonical = canonicalizeDashboardFilters(filters);
+      await updateAppSettings(
+        exec,
+        {
+          dashboardPopulations: JSON.stringify(populations),
+          dashboardFilters: JSON.stringify(canonical),
+        },
+        localDateTime(),
+      );
+      set((state) => ({
+        populations,
         filters: canonical,
         generation: state.generation + 1,
       }));

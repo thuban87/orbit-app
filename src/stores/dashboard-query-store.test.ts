@@ -3,8 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
-import { listDashboardPopulation } from "@/db/dashboard-read";
+import {
+  countNeverContacted,
+  listDashboardPopulation,
+} from "@/db/dashboard-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { readOverlooked } from "@/db/digest-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -162,5 +166,102 @@ describe("dashboard query store", () => {
       populations: ["favourites"],
       hydrated: true,
     });
+  });
+
+  it("atomically replaces both drill-through axes and bumps generation once", async () => {
+    useDashboardQueryStore.setState({
+      populations: ["favourites"],
+      filters: { "needs-attention": ["on"] },
+      generation: 4,
+    });
+    const appSettingsWrites: string[] = [];
+    const spyExec: SqlExecutor = {
+      ...exec,
+      runAsync: async (sql: string, params?: unknown[]) => {
+        if (
+          sql.includes("UPDATE app_settings") &&
+          sql.includes("dashboard_populations")
+        )
+          appSettingsWrites.push(sql);
+        return exec.runAsync(sql, params);
+      },
+    };
+
+    await useDashboardQueryStore
+      .getState()
+      .setPopulationsAndFilters(spyExec, ["not-contacted"], {});
+    expect(useDashboardQueryStore.getState()).toMatchObject({
+      populations: ["not-contacted"],
+      filters: {},
+      generation: 5,
+    });
+    expect(appSettingsWrites).toHaveLength(1);
+    expect(appSettingsWrites[0]).toContain("dashboard_populations");
+    expect(appSettingsWrites[0]).toContain("dashboard_filters");
+
+    await useDashboardQueryStore
+      .getState()
+      .setPopulationsAndFilters(exec, [], { "needs-attention": ["on"] });
+    expect(useDashboardQueryStore.getState()).toMatchObject({
+      populations: [],
+      filters: { "needs-attention": ["on"] },
+      generation: 6,
+    });
+  });
+
+  it("keeps D-10 Never Contacted count, preview, and drilled rows equal including Unbound", async () => {
+    await exec.runAsync(
+      "UPDATE app_settings SET include_unbound_never_contacted = 1 WHERE id = 1",
+    );
+    for (const [uid, name, tracking] of [
+      ["bound-never", "Bound Never", 1],
+      ["unbound-never", "Unbound Never", 0],
+    ] as const) {
+      await exec.runAsync(
+        `INSERT INTO contacts (uid, name, tracking_enabled, interval_days, last_contact, rarely_responds, reminders_off, created_at, modified_at)
+         VALUES (?, ?, ?, ?, NULL, 0, 0, ?, ?)`,
+        [uid, name, tracking, tracking ? 30 : null, NOW, NOW],
+      );
+    }
+    const query = {
+      viewMode: "list" as const,
+      populations: ["not-contacted" as const],
+      filters: {},
+      sort: "default" as const,
+    };
+    const count = await countNeverContacted(exec);
+    const preview = await listDashboardPopulation(exec, query, NOW);
+    await useDashboardQueryStore
+      .getState()
+      .setPopulationsAndFilters(exec, ["not-contacted"], {});
+    const drill = await listDashboardPopulation(
+      exec,
+      useDashboardQueryStore.getState(),
+      NOW,
+    );
+    expect(count).toBe(2);
+    expect(preview).toHaveLength(count);
+    expect(drill).toHaveLength(count);
+    expect(drill.map((row) => row.name)).toContain("Unbound Never");
+  });
+
+  it("excludes a snoozed rogue from both Overlooked preview and needs-attention drill", async () => {
+    const inserted = await exec.runAsync(
+      `INSERT INTO contacts (uid, name, tracking_enabled, interval_days, last_contact, snooze_until, rarely_responds, reminders_off, created_at, modified_at)
+       VALUES (?, ?, 1, 1, ?, ?, 0, 0, ?, ?)`,
+      ["snoozed-rogue", "Snoozed Rogue", "2026-01-01", "2099-01-01", NOW, NOW],
+    );
+    const id = Number(inserted.lastInsertRowId);
+    const preview = await readOverlooked(exec);
+    await useDashboardQueryStore
+      .getState()
+      .setPopulationsAndFilters(exec, [], { "needs-attention": ["on"] });
+    const drill = await listDashboardPopulation(
+      exec,
+      useDashboardQueryStore.getState(),
+      NOW,
+    );
+    expect(preview.some((row) => row.id === id)).toBe(false);
+    expect(drill.some((row) => row.id === id)).toBe(false);
   });
 });
