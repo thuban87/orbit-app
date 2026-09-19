@@ -506,7 +506,7 @@ describe("parseBackupManifest", () => {
     const parsed = parseBackupManifest(legacy) as typeof legacy & {
       contactMethods: Array<Record<string, unknown>>;
     };
-    expect(parsed.backupFormatVersion).toBe(6);
+    expect(parsed.backupFormatVersion).toBe(7);
     expect(parsed.contacts[0]).not.toHaveProperty("phone");
     expect(parsed.contacts[0]).not.toHaveProperty("email");
     expect(parsed.appSettings).toHaveProperty("phoneRegionOverride", null);
@@ -548,7 +548,7 @@ describe("parseBackupManifest", () => {
 
     const parsed = parseBackupManifest(legacy);
 
-    expect(parsed.backupFormatVersion).toBe(6);
+    expect(parsed.backupFormatVersion).toBe(7);
     expect(parsed.contacts).toEqual([
       expect.objectContaining({
         uid: "contact-a",
@@ -562,7 +562,7 @@ describe("parseBackupManifest", () => {
     });
   });
 
-  it("upgrades v4 through v5 to v6 and requires the complete inventory", () => {
+  it("upgrades v4 through v7 and requires the complete inventory", () => {
     const legacy = valid();
     legacy.backupFormatVersion = 4;
     legacy.appSettings.includeUnboundNeverContacted = 1;
@@ -581,7 +581,7 @@ describe("parseBackupManifest", () => {
     ])
       delete legacy[key];
     const upgraded = parseBackupManifest(legacy);
-    expect(upgraded.backupFormatVersion).toBe(6);
+    expect(upgraded.backupFormatVersion).toBe(7);
     expect(upgraded.systems).toEqual([]);
     expect(upgraded.profileContactPresentation).toEqual([]);
     expect(upgraded.appSettings.includeUnboundNeverContacted).toBe(1);

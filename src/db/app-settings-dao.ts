@@ -449,16 +449,9 @@ export interface PortableSettingsSnapshot {
   phoneRegionOverride: string | null;
   includeUnboundNeverContacted: 0 | 1;
   birthdayUnboundEnabled: 0 | 1;
-  // --- Theme keys (Phase 23) — allowlisted + writable NOW, EMISSION DEFERRED --
-  // Declared OPTIONAL (`?:`) so they enter `AppSettingsPatch` (writable via
-  // updateAppSettings, restorable via restore-apply) AND so a
-  // getPortableSettingsSnapshot return that OMITS them still typechecks. Their
-  // emission in the snapshot SELECT/return is DEFERRED to Phase 36's format-4
-  // plan (D-03, REVIEWS 23-01 HIGH) — copying the OPTIONAL-then-emit shape
-  // phoneRegionOverride had at deferred-emission commit 69bb048, NOT its current
-  // required-and-emitted form. Emitting them now would silently change the
-  // format-3 wire shape and hard-reject this build's backups on a pre-Phase-23
-  // build. Do NOT add these to the getPortableSettingsSnapshot SELECT this phase.
+  // Theme, Dashboard, Profile, History, channel, and Compose preferences remain
+  // optional on the wire for older-backup compatibility. Phase 36 landed their
+  // coordinated emission; getPortableSettingsSnapshot now includes them.
   themePackage?: ThemePackage;
   galaxyMode?: ThemeMode;
   standardMode?: ThemeMode;
@@ -466,45 +459,24 @@ export interface PortableSettingsSnapshot {
   standardAccent?: AccentId | null;
   galaxyBackground?: BackgroundSlotId | null;
   standardBackground?: BackgroundSlotId | null;
-  // --- Dashboard keys (Phase 25) — allowlisted + writable NOW, emission ----
-  // deferred to Phase 36's format-5 backup plan. They remain optional so the
-  // current snapshot projection intentionally omits them without changing wire.
+  // --- Dashboard keys (Phase 25) -------------------------------------------
   dashboardViewMode?: DashboardViewMode;
   dashboardPopulations?: string;
   dashboardFilters?: string;
   dashboardSort?: DashboardSortMode;
   dashboardRightSwipeAction?: RightSwipeAction;
-  /** Phase 31 declare/restore only; format-4 emission remains unchanged. */
+  /** Portable global Profile presentation preference. */
   profileLayoutTemplateUid?: string | null;
-  /** Phase 31 declare/restore only; format-4 emission remains unchanged. */
+  /** Portable global Profile background preference. */
   profileBackgroundTemplateUid?: string | null;
-  // --- History keys (Phase 32, D-11) — allowlisted + writable NOW, EMISSION ---
-  // DEFERRED. Declared OPTIONAL (`?:`), exactly the Phase-23/25/31 shape, so they
-  // enter `AppSettingsPatch` (writable via updateAppSettings — the runtime lens
-  // switch persists through it) AND so a getPortableSettingsSnapshot return that
-  // OMITS them still typechecks. Their emission in the snapshot SELECT/return is
-  // DEFERRED to Phase 36's backup-format plan (D-11 portability, D-03). Do NOT add
-  // these to the getPortableSettingsSnapshot SELECT this phase and do NOT bump
-  // BACKUP_FORMAT_VERSION — emitting now would silently change the live wire shape.
+  // --- History and Your Week keys (Phase 32/38, D-11/D-08) -----------------
   historyLens?: HistoryLens;
   historyCycleCount?: HistoryCycleCount;
   yourWeekPeriod?: YourWeekPeriod;
-  // --- Channel-default keys (Phase 34, CAPT-11) — writable NOW, EMISSION -----
-  // DEFERRED. Same declare-only shape as the history keys above: declared
-  // OPTIONAL so they enter `AppSettingsPatch` (writable via updateAppSettings)
-  // AND so a getPortableSettingsSnapshot return that OMITS them still typechecks.
-  // Emission in the snapshot SELECT/return is DEFERRED to Phase 36 (D-03). Do NOT
-  // add these to getPortableSettingsSnapshot this phase and do NOT bump
-  // BACKUP_FORMAT_VERSION.
+  // --- Channel-default keys (Phase 34, CAPT-11) ----------------------------
   defaultInteractionChannel?: DefaultInteractionChannel;
   rememberedInteractionChannel?: RememberedInteractionChannel;
-  // --- Compose message-mode keys (Phase 35, COMP-02 / D-03) — writable NOW, ---
-  // EMISSION DEFERRED. Same declare-only shape as the channel-default keys above:
-  // declared OPTIONAL so they enter `AppSettingsPatch` (writable via
-  // updateAppSettings) AND so a getPortableSettingsSnapshot return that OMITS
-  // them still typechecks. Emission in the snapshot SELECT/return is DEFERRED to
-  // Phase 36 (D-03). Do NOT add these to getPortableSettingsSnapshot this phase
-  // and do NOT bump BACKUP_FORMAT_VERSION.
+  // --- Compose message-mode keys (Phase 35, COMP-02 / D-03) ----------------
   defaultMessageMode?: DefaultMessageMode;
   rememberedMessageMode?: RememberedMessageMode;
   // Phase 36 declare/write now; format-5 emission is owned by Plan 36-08.
@@ -946,6 +918,7 @@ export async function getPortableSettingsSnapshot(
       | "profile_background_template_uid"
       | "history_lens"
       | "history_cycle_count"
+      | "your_week_period"
       | "default_interaction_channel"
       | "remembered_interaction_channel"
       | "default_message_mode"
@@ -979,7 +952,7 @@ export async function getPortableSettingsSnapshot(
             dashboard_sort, dashboard_right_swipe_action,
             orrery_density, orrery_satellites_enabled, orrery_last_system,
             profile_layout_template_uid, profile_background_template_uid,
-            history_lens, history_cycle_count,
+            history_lens, history_cycle_count, your_week_period,
             default_interaction_channel, remembered_interaction_channel,
             default_message_mode, remembered_message_mode,
             ai_enabled, ai_active_connection, ai_writing_tone,
@@ -1036,6 +1009,7 @@ export async function getPortableSettingsSnapshot(
     profileBackgroundTemplateUid: row.profile_background_template_uid ?? null,
     historyLens: row.history_lens as HistoryLens,
     historyCycleCount: row.history_cycle_count as HistoryCycleCount,
+    yourWeekPeriod: row.your_week_period as YourWeekPeriod,
     defaultInteractionChannel:
       row.default_interaction_channel as DefaultInteractionChannel,
     rememberedInteractionChannel:

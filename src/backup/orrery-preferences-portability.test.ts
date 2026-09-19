@@ -177,7 +177,7 @@ describe("Orrery preferences portability boundary", () => {
     await updateAppSettings(exec, { yourWeekPeriod: "rolling7" }, LATER);
 
     await expect(
-      applyRestore(exec, parseBackupManifest(exported), "merge"),
+      applyRestore(exec, parseBackupManifest(exported), "replace-all"),
     ).resolves.toMatchObject({ status: "applied" });
     expect((await getAppSettings(exec)).yourWeekPeriod).toBe("calendar_week");
   });

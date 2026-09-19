@@ -108,6 +108,7 @@ import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { migration027 } from "@/db/migrations/027-default-interaction-channel";
 import { migration028 } from "@/db/migrations/028-compose-message-mode";
 import { migration029 } from "@/db/migrations/029-ai-configuration";
+import { migration030 } from "@/db/migrations/030-your-week-period";
 import { profilePresentationMigration } from "@/db/migrations/profile-presentation";
 import { runMigrations } from "@/db/migrations/runner";
 import { readOrrerySystemSnapshot } from "@/db/orrery-system-read";
@@ -163,8 +164,9 @@ async function db(): Promise<SqlExecutor> {
       migration027,
       migration028,
       migration029,
+      migration030,
     ],
-    29,
+    30,
     { now: NOW, newUid },
   );
   return exec;

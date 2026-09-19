@@ -11,7 +11,7 @@ export interface ReconciliationTombstone {
 }
 
 /** Bump only when the portable JSON wire shape changes, never with SQLite. */
-export const BACKUP_FORMAT_VERSION = 6;
+export const BACKUP_FORMAT_VERSION = 7;
 /** Container/envelope evolution is independent from the plaintext manifest. */
 export const BACKUP_ENVELOPE_VERSION = 1;
 
@@ -77,7 +77,11 @@ export interface BackupManifest {
   groupEvents: Record<string, unknown>[];
   profileContactPresentation: Record<string, unknown>[];
   profileCategoryPresentation: Record<string, unknown>[];
-  tombstones: Array<{ entityType: string; entityUid: string; deletedAt: string }>;
+  tombstones: Array<{
+    entityType: string;
+    entityUid: string;
+    deletedAt: string;
+  }>;
 }
 
 export class BackupSchemaError extends Error {

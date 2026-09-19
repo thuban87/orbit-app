@@ -543,7 +543,7 @@ describe("buildExportManifest", () => {
       exportedAt: NOW,
       readPhotoBase64: async () => "AQID",
     });
-    expect(manifest.backupFormatVersion).toBe(6);
+    expect(manifest.backupFormatVersion).toBe(7);
     for (const key of [
       "themePackage",
       "galaxyMode",

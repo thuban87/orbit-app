@@ -14,6 +14,7 @@ import {
   assertOrreryLastSystem,
   assertRememberedInteractionChannel,
   assertRememberedMessageMode,
+  assertYourWeekPeriod,
 } from "@/db/app-settings-dao";
 import { isCurrentStateFieldKey, isMemoryTypeKey } from "@/db/memory-registry";
 import { parseDashboardFilters } from "@/logic/dashboard-query-logic";
@@ -125,6 +126,17 @@ const FORWARD_MIGRATIONS: Readonly<Record<number, Migration>> = {
     profileCategoryPresentation: [],
   }),
   5: (manifest) => ({ ...manifest, backupFormatVersion: 6 }),
+  6: (manifest) => {
+    const settings = record(manifest.appSettings, "appSettings");
+    return {
+      ...manifest,
+      backupFormatVersion: 7,
+      appSettings: {
+        ...settings,
+        yourWeekPeriod: settings.yourWeekPeriod ?? "rolling7",
+      },
+    };
+  },
 };
 
 function fail(message: string): never {
@@ -177,10 +189,8 @@ export const PORTABLE_SETTINGS_KEYS = new Set([
   "phoneRegionOverride",
   "includeUnboundNeverContacted",
   "birthdayUnboundEnabled",
-  // Phase 23 theme keys (D-09): allowlisted NOW so a future format-4 backup that
-  // CARRIES them is accepted by assertPortableSettings. NOT emitted by
-  // getPortableSettingsSnapshot this phase (emission + BACKUP_FORMAT_VERSION bump
-  // + FORWARD_MIGRATIONS entry are Phase 36 / owner scope — REVIEWS 23-01 HIGH).
+  // Phase 36 landed coordinated emission for the optional theme, Dashboard,
+  // Orrery, Profile, History, channel, and Compose preference families below.
   "themePackage",
   "galaxyMode",
   "standardMode",
@@ -188,48 +198,34 @@ export const PORTABLE_SETTINGS_KEYS = new Set([
   "standardAccent",
   "galaxyBackground",
   "standardBackground",
-  // Phase 25 dashboard keys: allowlisted NOW so a future format-5 backup can
-  // carry them, but getPortableSettingsSnapshot does not emit them yet. Emission,
-  // a format bump, and a forward migration remain Phase 36 scope.
+  // Phase 25 Dashboard keys.
   "dashboardViewMode",
   "dashboardPopulations",
   "dashboardFilters",
   "dashboardSort",
   "dashboardRightSwipeAction",
-  // Phase 29: optional restore acceptance only. Phase 36 owns wire emission.
+  // Phase 29 Orrery keys.
   "orreryDensity",
   "orrerySatellitesEnabled",
-  // Phase 30 (declare-only): the widened validator accepts a restored
-  // custom:<uid> last-active System. Systems tables remain Phase 36 wire
-  // entities; do not add them to getPortableSettingsSnapshot before its
-  // coordinated format bump and forward migration.
+  // Phase 30 stable last-active System reference.
   "orreryLastSystem",
-  // Phase 31: accepted for restore only. Template entities and emission remain
-  // coordinated Phase 36 work; dangling UIDs are preserved for read-time fallout.
+  // Phase 31 Profile presentation keys; dangling UIDs use read-time fallout.
   "profileLayoutTemplateUid",
   "profileBackgroundTemplateUid",
-  // Phase 32 (declare-only, D-11 / A4): the two durable history preferences are
-  // accepted for restore only so a future backup that CARRIES them validates.
-  // getPortableSettingsSnapshot does NOT emit them and BACKUP_FORMAT_VERSION is
-  // unchanged this phase — emission + the format bump are Phase 36.
+  // Phase 32 history preferences and Phase 38 Your Week period.
   "historyLens",
   "historyCycleCount",
-  // Phase 34 (declare-only, CAPT-11 / D-03): the durable Default Interaction
-  // Channel preference and its remembered value are accepted for restore only.
+  "yourWeekPeriod",
+  // Phase 34 durable Default Interaction Channel and remembered value.
   // These are the camelCase MANIFEST keys (matching COLUMN_OF's key side and the
   // restore cast to AppSettingsPatch) — NOT the snake_case SQLite column names,
   // which would pass .has() nowhere and silently drop at restore (Review HIGH #2).
-  // getPortableSettingsSnapshot does NOT emit them and the backup format version
-  // is unchanged this phase — emission + the format bump are Phase 36.
   "defaultInteractionChannel",
   "rememberedInteractionChannel",
-  // Phase 35 (declare-only, COMP-02 / D-03): the durable Compose default message
-  // mode preference and its remembered value are accepted for restore only so a
-  // future backup that CARRIES them validates. These are the camelCase MANIFEST
+  // Phase 35 durable Compose default message mode and remembered value. These
+  // are the camelCase MANIFEST
   // keys (matching COLUMN_OF's key side and the restore cast to AppSettingsPatch)
-  // — NOT the snake_case SQLite column names. getPortableSettingsSnapshot does NOT
-  // emit them and BACKUP_FORMAT_VERSION is unchanged this phase — emission + the
-  // format bump are Phase 36.
+  // — NOT the snake_case SQLite column names.
   "defaultMessageMode",
   "rememberedMessageMode",
   "aiEnabled",
@@ -331,6 +327,12 @@ function assertPortableSettings(
       );
   } catch {
     fail("appSettings has an invalid message mode");
+  }
+  try {
+    if (settings.yourWeekPeriod !== undefined)
+      assertYourWeekPeriod("yourWeekPeriod", settings.yourWeekPeriod);
+  } catch {
+    fail("appSettings has an invalid Your Week period");
   }
   if (
     settings.orrerySatellitesEnabled !== undefined &&
