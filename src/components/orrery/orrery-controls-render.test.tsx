@@ -49,6 +49,9 @@ vi.mock("@/components/Avatar", () => ({ Avatar: "Avatar" }));
 vi.mock("react-native-safe-area-context", () => ({
   SafeAreaView: "SafeAreaView",
 }));
+vi.mock("react-native-gesture-handler", () => ({
+  GestureHandlerRootView: "GestureHandlerRootView",
+}));
 vi.mock("@/theme", () => ({
   useTheme: () => ({
     colors: THEME_PRESETS.galaxy.dark,
