@@ -65,7 +65,7 @@ updated: 2026-09-18
 | 38-06-01 | 06 | 3 | S-06 | T-38-EGRESS | Up Next ≤3, status ring via ContactCard, empty state | unit (render) | `npx vitest run src/components/digest/UpNextSection.test.tsx` + `npm run check:colors` | ❌ W0 | ⬜ pending |
 | 38-06-02 | 06 | 3 | S-07,S-08 | T-38-DEDUP | Horizon subgroups; Never-Contacted preview via listDashboardPopulation; store-mutating drill-through | unit (render) | `npx vitest run src/components/digest/HorizonSection.test.tsx` | ❌ W0 | ⬜ pending |
 | 38-06-03 | 06 | 3 | S-02 | T-38-NOSCHEMA | DigestScreen composes 3 modules; no Back; no navigate("Home"); derive-only | unit (render) | `npx vitest run src/screens/DigestScreen.test.tsx` + `npm run check:colors` | ❌ W0 | ⬜ pending |
-| 38-07-01 | 07 | 4 | S-02,S-14 | — | Behavioral shell-contract (rendered navigator); full gate | unit (render) + gate | `npx vitest run` + `npx tsc --noEmit` + `npm run check:colors` | ❌ W0 | ⬜ pending |
+| 38-07-01 | 07 | 4 | S-02,S-14 | — | Render-free shell-contract descriptor regression (TAB_ORDER/INITIAL_TAB + TAB_ICON parity + pure notification resolver; NO navigator mount — the repo has no react-test-renderer and vitest is render-free); full gate | unit (render-free) + gate | `npx vitest run` + `npx tsc --noEmit` + `npm run check:colors` | ❌ W0 | ⬜ pending |
 | 38-07-02 | 07 | 4 | S-15 | T-38-EGRESS | Physical Pixel UAT (both themes); PASS/FAIL/BLOCKED + fixtures | device (human-check) | manual — Pixel debug build + `uiautomator`/screencap | N/A device | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
@@ -84,7 +84,7 @@ New test files to create in the owning task (all Vitest; existing infra covers s
 - [ ] `src/logic/digest-composition.test.ts` — cap-3, dedup, 7-day birthdays w/ tie (Plan 03)
 - [ ] `src/components/digest/YourWeekHeatmap.test.tsx`, `DigestDayDetail.test.tsx`, `YourWeekSection.test.tsx` (Plan 05)
 - [ ] `src/components/digest/UpNextSection.test.tsx`, `HorizonSection.test.tsx`, `src/screens/DigestScreen.test.tsx` (Plan 06)
-- [ ] `src/navigation/shell-contract.test.tsx` — behavioral rendered-navigator regression (Plan 07)
+- [ ] `src/navigation/shell-contract.test.ts` — render-free shell-contract regression, extending Plan 01's descriptor test (Plan 07; NO navigator mount)
 
 Extended existing suites (not Wave 0): `app-settings-dao.test.ts`, `backup-schema.test.ts`, `export-manifest.test.ts`, `notification-nav.test.ts`, `notification-gate.test.tsx`, `universal-fab-logic.test.ts`, `SettingsInteractionsScreen.test.tsx`, `full-chain.test.ts`.
 
