@@ -3,7 +3,7 @@ phase: 38
 slug: digest-navigation-restructure
 # status lifecycle: draft (seeded by plan-phase) → validated (set by validate-phase §6)
 # audit-milestone §5.5 distinguishes NOT-VALIDATED (draft) from PARTIAL (validated + nyquist_compliant: false) (#2117)
-status: draft
+status: validated
 nyquist_compliant: true
 wave_0_complete: true
 created: 2026-09-18
@@ -14,8 +14,8 @@ updated: 2026-09-19
 
 > Per-phase validation contract for feedback sampling during execution.
 > Populated during the `--reviews` replan (was a template). Wave-0 test files are
-> created by their owning task; all Wave-0 files now exist and the automated
-> phase gate is green. Device UAT remains pending behind its owner-confirmation gate.
+> created by their owning task; all Wave-0 files now exist, the automated
+> phase gate is green, and the physical-Pixel UAT is complete.
 
 ---
 
@@ -109,6 +109,6 @@ Extended existing suites (not Wave 0): `app-settings-dao.test.ts`, `backup-schem
 - [x] Wave 0 covers all MISSING test references
 - [x] No watch-mode flags (all `vitest run`)
 - [x] Feedback latency: seconds (quick) / minutes (full)
-- [ ] `nyquist_compliant: true` re-affirmed by validate-phase after execution
+- [x] `nyquist_compliant: true` re-affirmed by validate-phase after execution
 
-**Approval:** pending (validate-phase sets `status: validated` at phase close)
+**Approval:** validated — post-execution Nyquist audit found no uncovered Phase 38 requirement behavior. The focused behavioral audit passed 23 files / 270 tests; the complete repository gate passed 406 files / 3,807 tests, `npx tsc --noEmit`, and `npm run check:colors`. Existing physical-Pixel evidence remains the authority for the manual-only S-15 paths.
