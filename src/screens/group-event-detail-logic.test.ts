@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildGroupEventDetailInteraction,
+  closeThenOpenParticipantProfile,
   groupEventDurationLabel,
 } from "./group-event-detail-logic";
 
@@ -45,5 +46,20 @@ describe("Group Event Detail view model", () => {
       groupEventId: 7,
       groupLinked: true,
     });
+  });
+
+  it("closes the interaction detail before opening the participant profile", () => {
+    const calls: string[] = [];
+    const navigate = (route: "Profile", params: { contactId: number }) => {
+      calls.push(`navigate:${route}:${params.contactId}`);
+    };
+
+    closeThenOpenParticipantProfile({
+      close: () => calls.push("close"),
+      navigate,
+      contactId: 9,
+    });
+
+    expect(calls).toEqual(["close", "navigate:Profile:9"]);
   });
 });
