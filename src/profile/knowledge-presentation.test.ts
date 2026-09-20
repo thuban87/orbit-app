@@ -17,6 +17,7 @@ const input: KnowledgePresentationInput = {
         value: "The garden",
         created_at: "2026-09-01 12:00:00",
         modified_at: "2026-09-01 12:00:00",
+        previous: [],
       },
     },
     featured: {
@@ -123,6 +124,71 @@ const input: KnowledgePresentationInput = {
 };
 
 describe("knowledge presentation", () => {
+  it("presents temporal knowledge as deduped Most Recent and up-to-five Previous rows", () => {
+    const temporalInput: KnowledgePresentationInput = {
+      ...input,
+      knowledge: {
+        ...input.knowledge,
+        currentState: {
+          last_talked_about: {
+            ...input.knowledge.currentState.last_talked_about!,
+            previous: [
+              1, 2, 3, 4, 5, 6,
+            ].map((id) => ({
+              id: id + 1,
+              uid: `previous-${id}`,
+              contact_id: 7,
+              field_key: "last_talked_about" as const,
+              value: `Previous ${id}`,
+              created_at: `2026-08-${String(id).padStart(2, "0")} 12:00:00`,
+              modified_at: "2026-08-01 12:00:00",
+              previous: [],
+            })),
+          },
+        },
+      },
+    };
+
+    const child = buildKnowledgePresentation(temporalInput).children.find(
+      (candidate) => candidate.id === "last-talked-about",
+    );
+    expect(child?.bodySummary).toBe("");
+    expect(child?.items).toHaveLength(6);
+    expect(child?.items[0]).toMatchObject({
+      title: "Most Recent",
+      preview: "The garden",
+      temporalPosition: "most-recent",
+    });
+    expect(child?.items.slice(1).map((item) => item.preview)).toEqual([
+      "Previous 1",
+      "Previous 2",
+      "Previous 3",
+      "Previous 4",
+      "Previous 5",
+    ]);
+    expect(child?.items.slice(1).every((item) => item.temporalPosition === "previous")).toBe(true);
+  });
+
+  it("uses neutral empty and single-record temporal states without empty subsection shells", () => {
+    const zeroInput: KnowledgePresentationInput = {
+      ...input,
+      knowledge: { ...input.knowledge, currentState: {} },
+    };
+    const empty = buildKnowledgePresentation(zeroInput).children.find(
+      (candidate) => candidate.id === "last-talked-about",
+    );
+    expect(empty).toMatchObject({ bodySummary: "Nothing added yet", items: [] });
+
+    const single = buildKnowledgePresentation(input).children.find(
+      (candidate) => candidate.id === "last-talked-about",
+    );
+    expect(single?.items).toHaveLength(1);
+    expect(single?.items[0]).toMatchObject({
+      title: "Most Recent",
+      temporalPosition: "most-recent",
+    });
+  });
+
   it("keeps child identity/order, semantic caps, hidden recovery, and detail ownership", () => {
     const result = buildKnowledgePresentation(input);
 

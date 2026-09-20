@@ -39,6 +39,11 @@ export interface ProfileCurrentStateEntry {
   value: string;
   created_at: string;
   modified_at: string;
+  /**
+   * Bounded retained entries for the same field, newest first. The current row
+   * is structurally absent: this query accepts only `is_current = 0` rows.
+   */
+  previous: ProfileCurrentStateEntry[];
 }
 
 export type ProfileFeaturedReference =
@@ -122,9 +127,35 @@ async function readCurrentState(
       isCurrentStateFieldKey(row.field_key) &&
       result[row.field_key] === undefined
     ) {
-      result[row.field_key] = { ...row, field_key: row.field_key };
+      result[row.field_key] = {
+        ...row,
+        field_key: row.field_key,
+        previous: [],
+      };
     }
   }
+  await Promise.all(
+    Object.values(result).map(async (current) => {
+      if (!current) return;
+      const previousRows = await exec.getAllAsync<CurrentStateDbRow>(
+        `SELECT id, uid, contact_id, field_key, value, created_at, modified_at
+           FROM current_state_entries
+          WHERE contact_id = ? AND field_key = ? AND is_current = 0
+          ORDER BY created_at DESC, id DESC
+          LIMIT 5`,
+        [contactId, current.field_key],
+      );
+      current.previous = previousRows
+        .filter((row) => isCurrentStateFieldKey(row.field_key))
+        .map(
+          (row): ProfileCurrentStateEntry => ({
+            ...row,
+            field_key: row.field_key as CurrentStateFieldKey,
+            previous: [],
+          }),
+        );
+    }),
+  );
   return result;
 }
 

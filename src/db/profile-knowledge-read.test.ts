@@ -95,6 +95,7 @@ describe("Profile knowledge projection", () => {
 
     const result = await readProfileKnowledge(readOnly(), owner);
     expect(result.currentState.last_talked_about?.value).toBe("The garden");
+    expect(result.currentState.last_talked_about?.previous).toEqual([]);
     expect(
       result.featured.items.map((item) => `${item.owner}:${item.id}`),
     ).toEqual([
@@ -110,6 +111,44 @@ describe("Profile knowledge projection", () => {
     expect(result.importedNotes.items).toEqual([
       expect.objectContaining({ type: "imported", value: "Imported note" }),
     ]);
+  });
+
+  it("reads at most five prior temporal rows, structurally excluding the current row", async () => {
+    const owner = await contact("Owner");
+    await exec.runAsync(
+      `INSERT INTO current_state_entries
+         (uid, contact_id, field_key, value, is_current, created_at, modified_at)
+       VALUES (?, ?, 'last_talked_about', 'Most recent', 1, ?, ?)`,
+      [uid(), owner, "2026-09-09 12:00:00", NOW],
+    );
+    for (let index = 0; index < 6; index += 1) {
+      const day = String(index + 1).padStart(2, "0");
+      await exec.runAsync(
+        `INSERT INTO current_state_entries
+           (uid, contact_id, field_key, value, is_current, created_at, modified_at)
+         VALUES (?, ?, 'last_talked_about', ?, 0, ?, ?)`,
+        [
+          uid(),
+          owner,
+          `Previous ${index + 1}`,
+          `2026-09-${day} 12:00:00`,
+          NOW,
+        ],
+      );
+    }
+
+    const result = await readProfileKnowledge(readOnly(), owner);
+    const current = result.currentState.last_talked_about;
+    expect(current?.value).toBe("Most recent");
+    expect(current?.previous).toHaveLength(5);
+    expect(current?.previous.map((entry) => entry.value)).toEqual([
+      "Previous 6",
+      "Previous 5",
+      "Previous 4",
+      "Previous 3",
+      "Previous 2",
+    ]);
+    expect(current?.previous.map((entry) => entry.id)).not.toContain(current?.id);
   });
 
   it("caps repeatable visible collections after filtering and reports truthful totals", async () => {

@@ -6,6 +6,7 @@ import type {
 } from "@/db/profile-knowledge-read";
 import type { RelationshipRow } from "@/db/relationships-read";
 import type { FieldType } from "@/schemas/types";
+import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 import type { ProfileModuleId } from "./persisted-contract";
 
 export type KnowledgeChildId = Extract<
@@ -54,6 +55,8 @@ export interface KnowledgePresentationItem {
   invalid?: boolean;
   rawValue?: string | null;
   history?: { contactId: number; fieldDefId: number };
+  /** Only temporal current-state rows participate in the Profile hierarchy. */
+  temporalPosition?: "most-recent" | "previous";
 }
 
 export interface KnowledgePresentationGroup {
@@ -210,23 +213,33 @@ function formatCurrentState(
       : input.knowledge.currentState.current_location;
   const title =
     id === "last-talked-about" ? "Last Talked About" : "Current Location";
+  const currentItem = entry
+    ? {
+        id: `current-state:${entry.id}`,
+        title: "Most Recent",
+        preview: entry.value,
+        metadata: [formatDateTimeMinuteOrFallback(entry.created_at)],
+        detail: { owner: "current-state" as const, id: entry.id },
+        management: management(["edit"]),
+        sparkle: false,
+        temporalPosition: "most-recent" as const,
+      }
+    : null;
+  const previousItems = (entry?.previous ?? []).slice(0, 5).map((previous) => ({
+    id: `current-state:${previous.id}`,
+    title: "Previous",
+    preview: previous.value,
+    metadata: [formatDateTimeMinuteOrFallback(previous.created_at)],
+    detail: { owner: "current-state" as const, id: previous.id },
+    management: management(["edit"]),
+    sparkle: false,
+    temporalPosition: "previous" as const,
+  }));
   return {
     id,
     title,
-    bodySummary: entry?.value ?? "Nothing added yet",
-    items: entry
-      ? [
-          {
-            id: `current-state:${entry.id}`,
-            title,
-            preview: entry.value,
-            metadata: [],
-            detail: { owner: "current-state", id: entry.id },
-            management: management(["edit"]),
-            sparkle: false,
-          },
-        ]
-      : [],
+    bodySummary: entry ? "" : "Nothing added yet",
+    items: currentItem ? [currentItem, ...previousItems] : [],
     groups: [],
     viewAllLabel: null,
     showHiddenAvailable: false,
