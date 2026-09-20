@@ -240,13 +240,15 @@ describe("integrated Profile controller contracts", () => {
     expect(
       profileOverflowEntries({
         snoozed: false,
+        bound: true,
         hasFreeformLayout: true,
         hasContactPresentationOverride: true,
       }),
     ).toEqual([
-      "edit",
-      "snooze",
-      "archive",
+        "edit",
+        "snooze",
+        "unbind",
+        "archive",
       "separator",
       "layout",
       "background",
@@ -256,6 +258,7 @@ describe("integrated Profile controller contracts", () => {
     expect(
       profileOverflowEntries({
         snoozed: true,
+        bound: false,
         hasFreeformLayout: false,
         hasContactPresentationOverride: false,
       }),
@@ -266,7 +269,7 @@ describe("integrated Profile controller contracts", () => {
       "separator",
       "layout",
       "background",
-    ]);
+      ]);
   });
 
   it("closes only the topmost overlay before ordinary native-stack Back", () => {
