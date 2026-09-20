@@ -239,9 +239,9 @@ describe("integrated Profile controller contracts", () => {
     });
   });
 
-  it("routes Custom Fields to the definition manager, not Edit Contact's value accordion", () => {
+  it("routes Custom Fields to the contact's value editor", () => {
     expect(profileKnowledgeDestination("custom-fields")).toEqual({
-      screen: "CustomFields",
+      screen: "Edit",
     });
   });
 

@@ -9,9 +9,7 @@ export type ProfileMethodType = "phone" | "email";
 /** Source-owned destinations for Profile knowledge collection affordances. */
 export type ProfileKnowledgeDestination =
   | { screen: "MemoryHistory"; fieldKey: CurrentStateFieldKey }
-  | {
-      screen: "OffLimitsEditor" | "Edit" | "ThingsToRemember" | "CustomFields";
-    };
+  | { screen: "OffLimitsEditor" | "Edit" | "ThingsToRemember" };
 
 /** Keeps the host's semantic child IDs from leaking into navigation. */
 export function profileKnowledgeDestination(
@@ -25,9 +23,8 @@ export function profileKnowledgeDestination(
     case "off-limits":
       return { screen: "OffLimitsEditor" };
     case "key-people":
-      return { screen: "Edit" };
     case "custom-fields":
-      return { screen: "CustomFields" };
+      return { screen: "Edit" };
     case "pinned-featured":
     case "memories":
     case "imported-contact-notes":

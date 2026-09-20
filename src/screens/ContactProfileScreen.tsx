@@ -1,6 +1,5 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 
-import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
@@ -32,7 +31,7 @@ import {
   snoozeProfileContact,
   unsnoozeProfileContact,
 } from "@/db/profile-relationship-actions";
-import type { RootStackScreenProps, TabParamList } from "@/navigation/types";
+import type { RootStackScreenProps } from "@/navigation/types";
 import { resolveProfilePresentation } from "@/profile/resolve-presentation";
 import type { ProfileLayoutDocument } from "@/profile/types";
 import {
@@ -188,14 +187,6 @@ export function ContactProfileScreen({
           return;
         case "ThingsToRemember":
           navigation.navigate("ThingsToRemember", { contactId });
-          return;
-        case "CustomFields":
-          // Field definitions are global schema, so Profile deliberately opens
-          // Settings' full Custom Fields manager rather than the contact-value
-          // accordion in Edit Contact. Every Profile host sits below this tab.
-          navigation
-            .getParent<BottomTabNavigationProp<TabParamList>>()
-            ?.navigate("SettingsTab", { screen: "CustomFields" });
       }
     },
     [contactId, navigation],
