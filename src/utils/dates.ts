@@ -71,6 +71,62 @@ export function parseLocalMs(stored: string): number {
   return local.getTime();
 }
 
+const TIME_FORMAT: "12h" | "24h" = "12h";
+
+const MONTH_ABBREVIATIONS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+/** Formats a minute-precision clock independently of device locale. */
+export function formatMinuteClock(
+  parts: Readonly<{ hour: number; minute: number }>,
+  mode: "12h" | "24h",
+): string {
+  const minute = String(parts.minute).padStart(2, "0");
+  if (mode === "24h") {
+    return `${String(parts.hour).padStart(2, "0")}:${minute}`;
+  }
+
+  const period = parts.hour < 12 ? "AM" : "PM";
+  const hour = parts.hour % 12 || 12;
+  return `${hour}:${minute} ${period}`;
+}
+
+/**
+ * Formats a stored local wall-clock timestamp for user-facing display.
+ *
+ * This is deliberately display-only: stored timestamp precision remains
+ * unchanged, while visible timestamps omit seconds.
+ */
+export function formatDateTimeMinute(stored: string): string {
+  const date = new Date(parseLocalMs(stored));
+  const month = MONTH_ABBREVIATIONS[date.getMonth()];
+  return `${month} ${date.getDate()}, ${date.getFullYear()}, ${formatMinuteClock(
+    { hour: date.getHours(), minute: date.getMinutes() },
+    TIME_FORMAT,
+  )}`;
+}
+
+/** Returns a neutral display label when a stored timestamp cannot be parsed. */
+export function formatDateTimeMinuteOrFallback(stored: string): string {
+  try {
+    return formatDateTimeMinute(stored);
+  } catch {
+    return "Unknown time";
+  }
+}
+
 const MS_PER_DAY = 86_400_000;
 
 /**

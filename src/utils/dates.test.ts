@@ -70,7 +70,7 @@ describe("minute-precision display timestamps", () => {
   it("exercises the 24-hour clock branch without mutable formatter state", () => {
     expect(
       formatMinuteClock(
-        { year: 2026, month: 9, day: 19, hour: 19, minute: 14 },
+        { hour: 19, minute: 14 },
         "24h",
       ),
     ).toBe("19:14");
