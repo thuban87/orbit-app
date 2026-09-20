@@ -156,6 +156,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 37: Settings & Personalization** - Navigation-first Settings directory (hub + per-concept category screens) replacing the 2,168-line monolith; surfaces already-persisted preferences, dual-homes Data & Backup, reserves the Categories IA slot — no schema/format change (completed 2026-09-14; goal ACHIEVED — verifier 10/10 must-haves, code review 0 blockers/4 warnings-all-fixed/1 info-fixed, on-device UAT 7/7 passed on the Pixel 6 Pro (nav parity, instant restyle + durable relaunch, contacts permission handoff, notifications OS-schedule re-arm 0→18 alarms, orrery single-source, backup dual-home chrome, About render), release APK built + delivered. 3601 tests pass, tsc/colors clean. Monolith retired (SettingsScreen.tsx deleted); no schema/format change (D-06, TARGET_VERSION=29/BACKUP_FORMAT_VERSION=5))
 - [ ] **Phase 37.1: Category Management** (INSERTED) - Category CRUD (create/rename/delete) over the read-only `categories` table + the deletion-cascade fallout to Orrery Systems, custom-System rules, Profile category assignments, and backup; consumes the route name/IA slot Phase 37 reserves (D-03, owner-approved 2026-09-14 to schedule now, before Phase 38)
 - [x] **Phase 38: Digest & Navigation Restructure** - Completed 2026-09-19 — verifier passed all S-01…S-15; physical Pixel UAT passed all nine mandatory checks; 406 files / 3,807 tests, TypeScript, colors, validation, and security gates passed. Three advisory code/UI warnings remain documented in the phase review artifacts.
+- [ ] **Phase 38.1: Profile & Presentation Polish** (INSERTED) - Bounded post-Phase-38 polish before Onboarding: Orrery overlay translucency decoupled from content-card opacity + three uniform icon-only nav controls; Profile heading ownership + false empty-state fix; Most Recent/Previous temporal knowledge (5-item preview); heading-level edit affordances reaching functional editors; Unbind moved to overflow; Relationship Overview orphan-stretch + centered content; vertical Year heatmap; app-wide minute-precision timestamps; Contacts Grid excerpt removal; bounded cross-app audit + device UAT. No new relationship-domain concepts, no schema/format change (owner-approved 2026-09-19 to schedule now, before Phase 39)
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
 
@@ -1048,6 +1049,19 @@ Planning review artifact: `38-PLAN-CHECK.md` (not an executable plan)
 - [x] 38-08-PLAN.md — Events participant-detail → Profile repair + DEV-only Never Contacted/notification probes + focused Pixel UAT closure [wave 5, gap closure]
 
 > **Ready to plan — dossier interrogated 2026-09-18; plan against the dossier as the authoritative contract.**
+
+### Phase 38.1: Profile & Presentation Polish (INSERTED)
+
+**Goal**: A bounded, post-Phase-38 polish pass that establishes durable presentation contracts across Orrery, Contact Profile, Interaction History, and Contacts before Phase 39 Onboarding is designed around those surfaces. Not a redesign and not open-ended cleanup — it fixes named presentation regressions and interaction friction, makes existing Profile knowledge genuinely editable using the current data model, and closes with a bounded audit for the same defect classes. Adds no new relationship-domain concepts and no schema/backup-format change.
+**Depends on**: Phase 38 (cleans up the surfaces Onboarding will teach against)
+**Requirements**: TBD — deferred to planning (see dossier §R planning-time verification checklist, 15 items)
+**Success Criteria**: Defined at planning time; dossier §N UAT matrix executed on physical Android hardware
+**Scope source**: docs/dossier/milestone-2/phase-38.1-profile-presentation-polish-dossier.md (authoritative), owner-approved 2026-09-19 to schedule now, before Phase 39
+**Canonical refs**: ADR-115 + ADR-087 (surface composition — the Orrery overlay treatment must route through the `src/theme/tokens/surface.ts` token API, NOT fork `GlassSurface` and NOT alter ordinary content-card opacity); ADR-108/109/123 (Profile composition + focused editors); ADR-062/118 (bind/unbind lifecycle); ADR-120/121 (heatmap + Rolodex history browser)
+**UI hint**: yes
+**Plans**: TBD
+
+> **Ready to discuss — dossier authored 2026-09-19 (owner + codex), grounded against the post-Phase-38 repo 2026-09-19; premises confirmed. Run gsd-discuss-phase next, then plan against the dossier as the authoritative contract. Two items flagged during grounding to resolve in discuss: (1) the translucent Orrery-overlay treatment must be a NEW named token treatment in `src/theme/tokens/surface.ts`, AA-proven per `surface.test.ts`, not a `GlassSurface` fork or a change to ordinary content-card opacity — as-is it brushes ADR-087 "no parallel component families" / ADR-115's rejected "always-translucent cards"; (2) a manual compact/wide width toggle ALREADY exists in `ProfileLayoutEditor.tsx:149-164` for `orbit-status` + `last-interaction`, so dossier §I "do not add manual width controls" must reconcile keep-vs-remove and define how orphan-stretch interacts with an explicit compact choice.**
 
 ### Phase 39: Onboarding
 
