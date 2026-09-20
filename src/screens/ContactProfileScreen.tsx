@@ -38,6 +38,7 @@ import {
   consumeProfileReachOutIntent,
   PROFILE_APP_BAR,
   type ProfileOverlay,
+  profileKnowledgeDestination,
   profileLifecycleView,
   profileOverflowEntries,
   unbindConfirmation,
@@ -169,29 +170,21 @@ export function ContactProfileScreen({
 
   const routeKnowledgeChild = useCallback(
     (id: KnowledgeChildId) => {
-      switch (id) {
-        case "last-talked-about":
+      const destination = profileKnowledgeDestination(id);
+      switch (destination.screen) {
+        case "MemoryHistory":
           navigation.navigate("MemoryHistory", {
             contactId,
-            fieldKey: "last_talked_about",
+            fieldKey: destination.fieldKey,
           });
           return;
-        case "current-location":
-          navigation.navigate("MemoryHistory", {
-            contactId,
-            fieldKey: "current_location",
-          });
-          return;
-        case "off-limits":
+        case "OffLimitsEditor":
           navigation.navigate("OffLimitsEditor", { contactId });
           return;
-        case "key-people":
-        case "custom-fields":
+        case "Edit":
           navigation.navigate("Edit", { contactId });
           return;
-        case "pinned-featured":
-        case "memories":
-        case "imported-contact-notes":
+        case "ThingsToRemember":
           navigation.navigate("ThingsToRemember", { contactId });
       }
     },

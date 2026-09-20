@@ -302,12 +302,12 @@ export function ProfileModuleHost({
     }
   };
 
-  const knowledgeHeaderAction = (id: KnowledgeChildId) => {
-    const label = PROFILE_MODULE_REGISTRY[id].label;
+  const knowledgeHeaderAction = (id: KnowledgeChildId, label?: string) => {
+    const actionLabel = label ?? PROFILE_MODULE_REGISTRY[id].label;
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Edit ${label}`}
+        accessibilityLabel={`Edit ${actionLabel}`}
         hitSlop={8}
         onPress={() =>
           onKnowledgeAction({
@@ -434,7 +434,10 @@ export function ProfileModuleHost({
               }
               onToggle={toggle}
               headerAction={knowledgeHeaderAction(
-                placement.id as KnowledgeChildId,
+                // The top-level module ID is not a knowledge child ID. Route the
+                // collection action through its memory owner instead.
+                "memories",
+                PROFILE_MODULE_REGISTRY[placement.id].label,
               )}
             >
               {renderThingsToRemember()}

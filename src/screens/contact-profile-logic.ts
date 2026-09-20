@@ -1,8 +1,40 @@
 import type { ContactMethodRow } from "@/db/contact-methods-dao";
 import type { ContactMethodGroups } from "@/db/contact-methods-read";
+import type { CurrentStateFieldKey } from "@/db/memory-registry";
+import type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 import type { ProfileCollapseMap } from "@/profile/persisted-contract";
 
 export type ProfileMethodType = "phone" | "email";
+
+/** Source-owned destinations for Profile knowledge collection affordances. */
+export type ProfileKnowledgeDestination =
+  | { screen: "MemoryHistory"; fieldKey: CurrentStateFieldKey }
+  | { screen: "OffLimitsEditor" | "Edit" | "ThingsToRemember" };
+
+/**
+ * Keeps the host's semantic child IDs from leaking into navigation. In
+ * particular, the top-level Things to Remember action is represented by the
+ * `memories` child, whose complete editor owns the collection.
+ */
+export function profileKnowledgeDestination(
+  id: KnowledgeChildId,
+): ProfileKnowledgeDestination {
+  switch (id) {
+    case "last-talked-about":
+      return { screen: "MemoryHistory", fieldKey: "last_talked_about" };
+    case "current-location":
+      return { screen: "MemoryHistory", fieldKey: "current_location" };
+    case "off-limits":
+      return { screen: "OffLimitsEditor" };
+    case "key-people":
+    case "custom-fields":
+      return { screen: "Edit" };
+    case "pinned-featured":
+    case "memories":
+    case "imported-contact-notes":
+      return { screen: "ThingsToRemember" };
+  }
+}
 
 export interface ProfileMethodRow {
   id: number;

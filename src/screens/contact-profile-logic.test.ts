@@ -6,6 +6,7 @@ import {
   commitProfileOverviewToggle,
   consumeProfileReachOutIntent,
   PROFILE_APP_BAR,
+  profileKnowledgeDestination,
   profileLifecycleView,
   profileMethodGroups,
   profileOverflowEntries,
@@ -232,6 +233,12 @@ describe("Relationship Overview collapse tracer", () => {
 });
 
 describe("integrated Profile controller contracts", () => {
+  it("routes the Things to Remember collection action through its memories owner", () => {
+    expect(profileKnowledgeDestination("memories")).toEqual({
+      screen: "ThingsToRemember",
+    });
+  });
+
   it("uses one standard compact app bar with reachable icon targets", () => {
     expect(PROFILE_APP_BAR).toEqual({ height: 56, touchTarget: 44 });
   });
@@ -245,10 +252,10 @@ describe("integrated Profile controller contracts", () => {
         hasContactPresentationOverride: true,
       }),
     ).toEqual([
-        "edit",
-        "snooze",
-        "unbind",
-        "archive",
+      "edit",
+      "snooze",
+      "unbind",
+      "archive",
       "separator",
       "layout",
       "background",
@@ -269,7 +276,7 @@ describe("integrated Profile controller contracts", () => {
       "separator",
       "layout",
       "background",
-      ]);
+    ]);
   });
 
   it("closes only the topmost overlay before ordinary native-stack Back", () => {

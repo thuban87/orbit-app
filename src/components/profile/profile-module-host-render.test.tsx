@@ -58,7 +58,9 @@ function resolve(node: ReactNode): Node[] {
   if (Array.isArray(node)) return node.flatMap(resolve);
   const element = node as ReactElement<{ children?: ReactNode }>;
   if (typeof element.type === "function") {
-    return resolve((element.type as (props: unknown) => ReactNode)(element.props));
+    return resolve(
+      (element.type as (props: unknown) => ReactNode)(element.props),
+    );
   }
   if (typeof element.type !== "string") return resolve(element.props.children);
   return [
@@ -79,9 +81,7 @@ const presentation = {
   collapse: {},
   layout: {
     document: {
-      topLevel: [
-        { id: "things-to-remember", visible: true, expanded: true },
-      ],
+      topLevel: [{ id: "things-to-remember", visible: true, expanded: true }],
       thingsToRemember: [],
     },
   },
@@ -94,7 +94,9 @@ function snapshot(knowledge: ProfileSnapshot["knowledge"]): ProfileSnapshot {
   } as ProfileSnapshot;
 }
 
-function sectionHeaderCaptions(knowledge: ProfileSnapshot["knowledge"]): Node[] {
+function sectionHeaderCaptions(
+  knowledge: ProfileSnapshot["knowledge"],
+): Node[] {
   const nodes = all(
     resolve(
       ProfileModuleHost({
@@ -114,7 +116,8 @@ function sectionHeaderCaptions(knowledge: ProfileSnapshot["knowledge"]): Node[] 
     ),
   );
   const header = nodes.find(
-    (node) => node.type === "Pressable" && node.props.accessibilityRole === "button",
+    (node) =>
+      node.type === "Pressable" && node.props.accessibilityRole === "button",
   );
   return header
     ? all([header]).filter(
@@ -123,14 +126,58 @@ function sectionHeaderCaptions(knowledge: ProfileSnapshot["knowledge"]): Node[] 
     : [];
 }
 
+function profileHostNodes(onKnowledgeAction = vi.fn()): Node[] {
+  return all(
+    resolve(
+      ProfileModuleHost({
+        snapshot: snapshot({ status: "ready", data: {} as never }),
+        presentation,
+        todayLocal: "2026-09-19",
+        onOpenHistory: vi.fn(),
+        onSetFrequency: vi.fn(async () => {}),
+        onSnooze: vi.fn(async () => {}),
+        onUnsnooze: vi.fn(async () => {}),
+        onKnowledgeAction,
+        onKnowledgeViewAll: vi.fn(),
+        onOpenValueHistory: vi.fn(),
+        onOpenKnowledgeChange: vi.fn(),
+        onContactMethodAction: vi.fn(),
+      }),
+    ),
+  );
+}
+
 describe("ProfileModuleHost section-header captions", () => {
   it("omits captions in normal state but retains the existing optional-section error", () => {
-    expect(sectionHeaderCaptions({ status: "ready", data: {} as never })).toEqual([]);
+    expect(
+      sectionHeaderCaptions({ status: "ready", data: {} as never }),
+    ).toEqual([]);
     expect(
       sectionHeaderCaptions({
         status: "error",
         message: "Knowledge is unavailable.",
-      }).map((node) => all(node.children).map((child) => child.text).join("")),
+      }).map((node) =>
+        all(node.children)
+          .map((child) => child.text)
+          .join(""),
+      ),
     ).toEqual(["Knowledge is unavailable."]);
+  });
+
+  it("sends the top-level Things to Remember edit press to the memories owner", () => {
+    const onKnowledgeAction = vi.fn();
+    const action = profileHostNodes(onKnowledgeAction).find(
+      (node) => node.props.accessibilityLabel === "Edit Things to Remember",
+    );
+
+    expect(action).toBeDefined();
+    if (!action) throw new Error("Things to Remember edit action is missing");
+    (action.props.onPress as () => void)();
+
+    expect(onKnowledgeAction).toHaveBeenCalledWith({
+      action: "edit",
+      childId: "memories",
+      target: { owner: "memory", id: 0 },
+    });
   });
 });
