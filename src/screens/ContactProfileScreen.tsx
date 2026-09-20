@@ -375,26 +375,7 @@ export function ContactProfileScreen({
                     onPress={() => void transitionLifecycle("bind")}
                   />
                 </View>
-              ) : (
-                <Button
-                  role="tertiary"
-                  label="Unbind contact"
-                  disabled={transitioning}
-                  onPress={() => {
-                    const confirmation = unbindConfirmation(
-                      snapshot.identity.name,
-                    );
-                    Alert.alert(confirmation.title, confirmation.message, [
-                      { text: "Keep contact bound", style: "cancel" },
-                      {
-                        text: "Unbind contact",
-                        style: "destructive",
-                        onPress: () => void transitionLifecycle("unbind"),
-                      },
-                    ]);
-                  }}
-                />
-              )}
+              ) : null}
               <ProfileModuleHost
                 snapshot={snapshot}
                 presentation={presentation}
@@ -444,6 +425,7 @@ export function ContactProfileScreen({
                 <AppText role="heading">Profile actions</AppText>
                 {profileOverflowEntries({
                   snoozed,
+                  bound: lifecycle.kind === "bound",
                   hasFreeformLayout: freeformLayout !== null,
                   hasContactPresentationOverride,
                 }).map((entry) => {
@@ -462,6 +444,7 @@ export function ContactProfileScreen({
                     edit: "Edit Contact",
                     snooze: "Snooze",
                     unsnooze: "Unsnooze",
+                    unbind: "Unbind contact",
                     archive: "Archive",
                     layout: "Profile Layout",
                     background: "Background",
@@ -480,6 +463,20 @@ export function ContactProfileScreen({
                       case "unsnooze":
                         void unsnooze().then(closeOverlay);
                         return;
+                      case "unbind": {
+                        const confirmation = unbindConfirmation(
+                          snapshot.identity.name,
+                        );
+                        Alert.alert(confirmation.title, confirmation.message, [
+                          { text: "Keep contact bound", style: "cancel" },
+                          {
+                            text: "Unbind contact",
+                            style: "destructive",
+                            onPress: () => void transitionLifecycle("unbind"),
+                          },
+                        ]);
+                        return;
+                      }
                       case "archive":
                         void archive();
                         return;
@@ -517,7 +514,7 @@ export function ContactProfileScreen({
                   return (
                     <Button
                       key={entry}
-                      role="secondary"
+                      role={entry === "unbind" ? "destructive" : "secondary"}
                       label={labels[entry]}
                       onPress={onPress}
                     />

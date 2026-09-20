@@ -44,6 +44,7 @@ export type ProfileOverflowEntry =
   | "edit"
   | "snooze"
   | "unsnooze"
+  | "unbind"
   | "archive"
   | "separator"
   | "layout"
@@ -62,12 +63,14 @@ export function closeTopmostProfileOverlay(_overlay: ProfileOverlay): null {
 /** Keep the product-mandated overflow order independent from view rendering. */
 export function profileOverflowEntries(input: {
   snoozed: boolean;
+  bound: boolean;
   hasFreeformLayout: boolean;
   hasContactPresentationOverride: boolean;
 }): ProfileOverflowEntry[] {
   return [
     "edit",
     input.snoozed ? "unsnooze" : "snooze",
+    ...(input.bound ? (["unbind"] as const) : []),
     "archive",
     "separator",
     "layout",
