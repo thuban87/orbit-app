@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type {
+  GroupLinkedDetailInput,
+  InteractionDetailInput,
+} from "./interaction-detail-logic";
 import {
   buildDetailRows,
   buildGroupContext,
   showSparkle,
-} from "./interaction-detail-logic";
-import type {
-  GroupLinkedDetailInput,
-  InteractionDetailInput,
 } from "./interaction-detail-logic";
 
 const base: InteractionDetailInput = {
@@ -62,7 +62,15 @@ describe("buildDetailRows — no blank fields (HIST-11)", () => {
       expect(row.value.trim().length).toBeGreaterThan(0);
       expect(row.label.trim().length).toBeGreaterThan(0);
     }
+    expect(rows.find((r) => r.key === "datetime")?.value).toBe(
+      "Sep 11, 2026, 2:30 PM",
+    );
     expect(rows.find((r) => r.key === "duration")?.value).toBe("25m");
+  });
+
+  it("uses a neutral label rather than the raw timestamp when parsing fails", () => {
+    const rows = buildDetailRows({ ...base, occurredAt: "not a timestamp" });
+    expect(rows.find((r) => r.key === "datetime")?.value).toBe("Unknown time");
   });
 
   it("shows the connected state textually for a no-reply interaction", () => {

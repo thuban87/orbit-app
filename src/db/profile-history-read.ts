@@ -1,4 +1,5 @@
 import type { ReadOnlyExecutor } from "@/db/transaction";
+import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 
 export const PROFILE_HISTORY_MODULE_ID = "interaction-history" as const;
 
@@ -78,7 +79,7 @@ export async function readProfileHistory(
         : {
             kind: "latest",
             lastContact: latest,
-            text: `Last interaction ${latest}`,
+            text: `Last interaction ${formatDateTimeMinuteOrFallback(latest)}`,
           },
     entries,
     viewAll: { moduleId: PROFILE_HISTORY_MODULE_ID, contactId },

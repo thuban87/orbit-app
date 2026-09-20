@@ -78,7 +78,7 @@ describe("bounded interim Profile history", () => {
     expect(result.summary).toEqual({
       kind: "latest",
       lastContact: "2026-09-01 09:00:00",
-      text: "Last interaction 2026-09-01 09:00:00",
+      text: "Last interaction Sep 1, 2026, 9:00 AM",
     });
     expect(result.entries).toEqual([
       {
@@ -91,6 +91,21 @@ describe("bounded interim Profile history", () => {
       },
     ]);
     expect(JSON.stringify(result)).not.toContain("private long-form note");
+  });
+
+  it("uses a neutral label rather than exposing a malformed stored timestamp", async () => {
+    const contactId = await contact();
+    await exec.runAsync("UPDATE contacts SET last_contact = ? WHERE id = ?", [
+      "not a timestamp",
+      contactId,
+    ]);
+
+    const result = await readProfileHistory(readOnly(), contactId);
+    expect(result.summary).toEqual({
+      kind: "latest",
+      lastContact: "not a timestamp",
+      text: "Last interaction Unknown time",
+    });
   });
 
   it("hard-caps at three and breaks timestamp ties by id descending", async () => {

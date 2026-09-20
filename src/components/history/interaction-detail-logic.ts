@@ -26,6 +26,7 @@
  */
 import { formatDurationLabel } from "@/components/touchpoint-refine-logic";
 import { isGroupLinked } from "@/db/history-read";
+import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 
 /** The interaction fields this surface projects (mirrors history-read's record). */
 export interface InteractionDetailInput {
@@ -85,15 +86,22 @@ const hasText = (value: string | null | undefined): value is string =>
  * (unspecified channel, null direction, null Tone, null/zero duration, blank note)
  * produce NO row — there are never blank fields (HIST-11).
  */
-export function buildDetailRows(interaction: InteractionDetailInput): DetailRow[] {
+export function buildDetailRows(
+  interaction: InteractionDetailInput,
+): DetailRow[] {
   const rows: DetailRow[] = [];
 
   if (hasText(interaction.channel) && interaction.channel !== "unspecified") {
     rows.push({ key: "channel", label: "Channel", value: interaction.channel });
   }
 
-  // occurredAt is required — always present. Local wall-clock string as-is.
-  rows.push({ key: "datetime", label: "When", value: interaction.occurredAt });
+  // occurredAt is required — always present. Keep stored data intact while using
+  // a neutral display label if a legacy value cannot be parsed.
+  rows.push({
+    key: "datetime",
+    label: "When",
+    value: formatDateTimeMinuteOrFallback(interaction.occurredAt),
+  });
 
   if (hasText(interaction.direction)) {
     rows.push({

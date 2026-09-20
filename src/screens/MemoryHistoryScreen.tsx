@@ -1,6 +1,13 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button/AppText `role` is a domain prop, not ARIA.
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
 import { AppText, Button } from "@/components/ui";
 import {
   editHistoryEntry,
@@ -8,18 +15,16 @@ import {
   setCurrentStateValue,
 } from "@/db/current-state-history-dao";
 import {
+  type CurrentStateEntryRow,
   getCurrentStateHistory,
   getCurrentStateValue,
-  type CurrentStateEntryRow,
 } from "@/db/current-state-history-read";
 import { getExecutor, localDateTime } from "@/db/database";
-import {
-  CURRENT_STATE_FIELD_REGISTRY,
-  type CurrentStateFieldKey,
-} from "@/db/memory-registry";
+import { CURRENT_STATE_FIELD_REGISTRY } from "@/db/memory-registry";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "memory-history";
@@ -89,7 +94,9 @@ export function MemoryHistoryScreen({
         setNewDraft(null);
         reload();
       })
-      .catch((error) => Logger.error(LOG_SCOPE, "failed to set current value", error));
+      .catch((error) =>
+        Logger.error(LOG_SCOPE, "failed to set current value", error),
+      );
   };
   const saveEdit = () => {
     const value = editDraft.trim();
@@ -106,7 +113,9 @@ export function MemoryHistoryScreen({
         setEditDraft("");
         reload();
       })
-      .catch((error) => Logger.error(LOG_SCOPE, "failed to edit history entry", error));
+      .catch((error) =>
+        Logger.error(LOG_SCOPE, "failed to edit history entry", error),
+      );
   };
   const makeCurrent = (entryId: number) =>
     void promoteToCurrentValue(getExecutor(), {
@@ -116,7 +125,9 @@ export function MemoryHistoryScreen({
       now: localDateTime(),
     })
       .then(reload)
-      .catch((error) => Logger.error(LOG_SCOPE, "failed to promote history entry", error));
+      .catch((error) =>
+        Logger.error(LOG_SCOPE, "failed to promote history entry", error),
+      );
 
   return (
     <View style={styles.root}>
@@ -129,12 +140,21 @@ export function MemoryHistoryScreen({
         >
           <AppText role="caption">Back</AppText>
         </Pressable>
-        <AppText accessibilityRole="header" role="display">{title}</AppText>
+        <AppText accessibilityRole="header" role="display">
+          {title}
+        </AppText>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         {current ? (
-          <View style={[styles.current, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <AppText role="caption" style={{ color: colors.textSecondary }}>most recent</AppText>
+          <View
+            style={[
+              styles.current,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              most recent
+            </AppText>
             <AppText role="body">{current.value}</AppText>
           </View>
         ) : (
@@ -143,20 +163,45 @@ export function MemoryHistoryScreen({
           </View>
         )}
         {newDraft === null ? (
-          <Button role="primary" label="Set new value" onPress={() => setNewDraft("")} />
+          <Button
+            role="primary"
+            label="Set new value"
+            onPress={() => setNewDraft("")}
+          />
         ) : (
-          <View style={[styles.form, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View
+            style={[
+              styles.form,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
             <TextInput
               accessibilityLabel={`New ${title} value`}
               value={newDraft}
               onChangeText={setNewDraft}
               placeholder="Set a new value"
               placeholderTextColor={colors.textSecondary}
-              style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.textPrimary }]}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                  color: colors.textPrimary,
+                },
+              ]}
             />
             <View style={styles.formActions}>
-              <Button role="secondary" label="Cancel" onPress={() => setNewDraft(null)} />
-              <Button role="primary" label="Save" onPress={setNewValue} disabled={!newDraft.trim()} />
+              <Button
+                role="secondary"
+                label="Cancel"
+                onPress={() => setNewDraft(null)}
+              />
+              <Button
+                role="primary"
+                label="Save"
+                onPress={setNewValue}
+                disabled={!newDraft.trim()}
+              />
             </View>
           </View>
         )}
@@ -164,12 +209,28 @@ export function MemoryHistoryScreen({
           <View style={styles.history}>
             <AppText role="heading">Earlier entries</AppText>
             {priorEntries.length === 0 ? (
-              <AppText role="body" style={{ color: colors.textSecondary }}>No earlier entries</AppText>
+              <AppText role="body" style={{ color: colors.textSecondary }}>
+                No earlier entries
+              </AppText>
             ) : (
               priorEntries.map((entry) => (
-                <View key={entry.id} style={[styles.entry, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View
+                  key={entry.id}
+                  style={[
+                    styles.entry,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
                   <AppText role="body">{entry.value}</AppText>
-                  <AppText role="caption" style={{ color: colors.textSecondary }}>{entry.created_at}</AppText>
+                  <AppText
+                    role="caption"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {formatDateTimeMinuteOrFallback(entry.created_at)}
+                  </AppText>
                   {editing?.id === entry.id ? (
                     <View style={styles.editForm}>
                       <TextInput
@@ -178,17 +239,44 @@ export function MemoryHistoryScreen({
                         onChangeText={setEditDraft}
                         placeholder="Edit value"
                         placeholderTextColor={colors.textSecondary}
-                        style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.textPrimary }]}
+                        style={[
+                          styles.input,
+                          {
+                            backgroundColor: colors.background,
+                            borderColor: colors.border,
+                            color: colors.textPrimary,
+                          },
+                        ]}
                       />
                       <View style={styles.formActions}>
-                        <Button role="secondary" label="Cancel" onPress={() => setEditing(null)} />
-                        <Button role="primary" label="Save" onPress={saveEdit} disabled={!editDraft.trim()} />
+                        <Button
+                          role="secondary"
+                          label="Cancel"
+                          onPress={() => setEditing(null)}
+                        />
+                        <Button
+                          role="primary"
+                          label="Save"
+                          onPress={saveEdit}
+                          disabled={!editDraft.trim()}
+                        />
                       </View>
                     </View>
                   ) : (
                     <View style={styles.formActions}>
-                      <Button role="secondary" label="Edit" onPress={() => { setEditing(entry); setEditDraft(entry.value); }} />
-                      <Button role="tertiary" label="Make current" onPress={() => makeCurrent(entry.id)} />
+                      <Button
+                        role="secondary"
+                        label="Edit"
+                        onPress={() => {
+                          setEditing(entry);
+                          setEditDraft(entry.value);
+                        }}
+                      />
+                      <Button
+                        role="tertiary"
+                        label="Make current"
+                        onPress={() => makeCurrent(entry.id)}
+                      />
                     </View>
                   )}
                 </View>
@@ -202,16 +290,47 @@ export function MemoryHistoryScreen({
 }
 
 const styles = StyleSheet.create({
-  back: { borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
+  back: {
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
   content: { gap: SPACING.md, padding: SPACING.base },
-  current: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: SPACING.xs, padding: SPACING.base },
+  current: {
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: SPACING.xs,
+    padding: SPACING.base,
+  },
   editForm: { gap: SPACING.sm },
   empty: { paddingTop: SPACING.xl },
-  entry: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: SPACING.sm, padding: SPACING.base },
-  form: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: SPACING.sm, padding: SPACING.base },
+  entry: {
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: SPACING.sm,
+    padding: SPACING.base,
+  },
+  form: {
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: SPACING.sm,
+    padding: SPACING.base,
+  },
   formActions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
-  header: { alignItems: "center", flexDirection: "row", gap: SPACING.md, padding: SPACING.base },
+  header: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.md,
+    padding: SPACING.base,
+  },
   history: { gap: SPACING.sm },
-  input: { borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, minHeight: 44, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
+  input: {
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    minHeight: 44,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
   root: { flex: 1 },
 });
