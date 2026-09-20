@@ -21,7 +21,7 @@ describe("packOverviewModules", () => {
     ).toEqual({
       columns: 2,
       placements: [
-        { id: "gravity", size: "1x1", row: 0, column: 0, columnSpan: 1 },
+        { id: "gravity", size: "1x1", row: 0, column: 0, columnSpan: 2 },
       ],
     });
   });
@@ -50,7 +50,7 @@ describe("packOverviewModules", () => {
         column: 2,
         columnSpan: 1,
       },
-      { id: "snooze", size: "1x1", row: 3, column: 0, columnSpan: 1 },
+      { id: "snooze", size: "1x1", row: 3, column: 0, columnSpan: 3 },
     ]);
   });
 
@@ -129,9 +129,9 @@ describe("packOverviewModules", () => {
       width: 496,
       fontScale: 1,
     });
-    expect(threeColumns.placements.map((placement) => placement.columnSpan)).toEqual([
-      1, 2,
-    ]);
+    expect(
+      threeColumns.placements.map((placement) => placement.columnSpan),
+    ).toEqual([1, 2]);
 
     const singleColumn = packOverviewModules([modules[1]], {
       width: 150,

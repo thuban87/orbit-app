@@ -80,5 +80,26 @@ export function packOverviewModules(
     return placement;
   });
 
-  return { columns, placements };
+  const placementsByRow = new Map<number, OverviewPlacement[]>();
+  for (const placement of placements) {
+    const rowPlacements = placementsByRow.get(placement.row) ?? [];
+    rowPlacements.push(placement);
+    placementsByRow.set(placement.row, rowPlacements);
+  }
+
+  // Stretch only compact modules stranded on their own row. This post-pass
+  // preserves the forward-pack order and the semantic size saved by the user.
+  const stretchedPlacements = placements.map((placement) => {
+    const rowPlacements = placementsByRow.get(placement.row) ?? [];
+    const isOrphanedCompact =
+      columns >= 2 &&
+      placement.size === "1x1" &&
+      placement.column === 0 &&
+      rowPlacements.length === 1;
+    return isOrphanedCompact
+      ? { ...placement, columnSpan: columns }
+      : placement;
+  });
+
+  return { columns, placements: stretchedPlacements };
 }
