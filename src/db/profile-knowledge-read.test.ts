@@ -127,13 +127,7 @@ describe("Profile knowledge projection", () => {
         `INSERT INTO current_state_entries
            (uid, contact_id, field_key, value, is_current, created_at, modified_at)
          VALUES (?, ?, 'last_talked_about', ?, 0, ?, ?)`,
-        [
-          uid(),
-          owner,
-          `Previous ${index + 1}`,
-          `2026-09-${day} 12:00:00`,
-          NOW,
-        ],
+        [uid(), owner, `Previous ${index + 1}`, `2026-09-${day} 12:00:00`, NOW],
       );
     }
 
@@ -148,7 +142,9 @@ describe("Profile knowledge projection", () => {
       "Previous 3",
       "Previous 2",
     ]);
-    expect(current?.previous.map((entry) => entry.id)).not.toContain(current?.id);
+    expect(current?.previous.map((entry) => entry.id)).not.toContain(
+      current?.id,
+    );
   });
 
   it("caps repeatable visible collections after filtering and reports truthful totals", async () => {
@@ -316,7 +312,9 @@ describe("Profile knowledge projection", () => {
     });
     // The always_show-but-empty placeholder and the quarantined field are excluded.
     expect(
-      items.some((item) => item.fieldDefId === alwaysShowEmptyDef.lastInsertRowId),
+      items.some(
+        (item) => item.fieldDefId === alwaysShowEmptyDef.lastInsertRowId,
+      ),
     ).toBe(false);
     expect(
       items.some((item) => item.fieldDefId === quarantinedDef.lastInsertRowId),

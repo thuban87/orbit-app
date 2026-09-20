@@ -132,9 +132,7 @@ describe("knowledge presentation", () => {
         currentState: {
           last_talked_about: {
             ...input.knowledge.currentState.last_talked_about!,
-            previous: [
-              1, 2, 3, 4, 5, 6,
-            ].map((id) => ({
+            previous: [1, 2, 3, 4, 5, 6].map((id) => ({
               id: id + 1,
               uid: `previous-${id}`,
               contact_id: 7,
@@ -166,7 +164,11 @@ describe("knowledge presentation", () => {
       "Previous 4",
       "Previous 5",
     ]);
-    expect(child?.items.slice(1).every((item) => item.temporalPosition === "previous")).toBe(true);
+    expect(
+      child?.items
+        .slice(1)
+        .every((item) => item.temporalPosition === "previous"),
+    ).toBe(true);
   });
 
   it("uses neutral empty and single-record temporal states without empty subsection shells", () => {
@@ -177,7 +179,10 @@ describe("knowledge presentation", () => {
     const empty = buildKnowledgePresentation(zeroInput).children.find(
       (candidate) => candidate.id === "last-talked-about",
     );
-    expect(empty).toMatchObject({ bodySummary: "Nothing added yet", items: [] });
+    expect(empty).toMatchObject({
+      bodySummary: "Nothing added yet",
+      items: [],
+    });
 
     const single = buildKnowledgePresentation(input).children.find(
       (candidate) => candidate.id === "last-talked-about",

@@ -1,11 +1,11 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import { HistorySection } from "@/components/history/HistorySection";
 import { Icon } from "@/components/icons/Icon";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
-import { HistorySection } from "@/components/history/HistorySection";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { CurrentStateFieldKey } from "@/db/memory-registry";
 import {
@@ -13,9 +13,7 @@ import {
   setProfileCollapseOverride,
 } from "@/db/profile-presentation-dao";
 import type { ProfileSnapshot } from "@/db/profile-read";
-import {
-  resolveProfileModuleHostState,
-} from "@/profile/module-host-model";
+import { resolveProfileModuleHostState } from "@/profile/module-host-model";
 import {
   PROFILE_MODULE_REGISTRY,
   PROFILE_MODULE_RENDERERS,
@@ -23,7 +21,6 @@ import {
 import type {
   ProfileCollapseMap,
   ProfileCollapsibleModuleId,
-  ProfileModuleId,
   ProfileTopLevelModuleId,
 } from "@/profile/persisted-contract";
 import type { ProfilePresentation } from "@/profile/types";
@@ -436,7 +433,9 @@ export function ProfileModuleHost({
                   : undefined
               }
               onToggle={toggle}
-              headerAction={knowledgeHeaderAction(placement.id as KnowledgeChildId)}
+              headerAction={knowledgeHeaderAction(
+                placement.id as KnowledgeChildId,
+              )}
             >
               {renderThingsToRemember()}
             </ProfileSection>

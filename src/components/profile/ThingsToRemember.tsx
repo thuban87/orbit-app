@@ -230,18 +230,18 @@ function KnowledgeChild({
       ) : null}
       {!isTemporal
         ? child.groups.map((group, index) => (
-        <View key={group.name ?? `direct-${index}`} style={styles.group}>
-          {group.heading ? (
-            <AppText role="label">{group.heading}</AppText>
-          ) : null}
-          {group.items.map((item) => (
-            <KnowledgeCard
-              key={item.id}
-              item={item}
-              onOpen={() => onOpen(item)}
-            />
-          ))}
-        </View>
+            <View key={group.name ?? `direct-${index}`} style={styles.group}>
+              {group.heading ? (
+                <AppText role="label">{group.heading}</AppText>
+              ) : null}
+              {group.items.map((item) => (
+                <KnowledgeCard
+                  key={item.id}
+                  item={item}
+                  onOpen={() => onOpen(item)}
+                />
+              ))}
+            </View>
           ))
         : null}
       {!isTemporal && child.groups.length === 0
