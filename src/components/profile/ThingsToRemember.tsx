@@ -19,6 +19,8 @@ export type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 export interface KnowledgeActionIntent {
   action: KnowledgeAction;
   target: KnowledgeDetailTarget;
+  /** Present for a heading action that manages the entire child collection. */
+  childId?: KnowledgeChildId;
 }
 
 export interface KnowledgeViewAllIntent {
@@ -117,11 +119,11 @@ function DetailSheet({
 function KnowledgeCard({
   item,
   onOpen,
-  onManage,
+  hideTitle = false,
 }: {
   item: KnowledgePresentationItem;
   onOpen: () => void;
-  onManage: () => void;
+  hideTitle?: boolean;
 }) {
   return (
     <Pressable
@@ -131,17 +133,19 @@ function KnowledgeCard({
         name: action,
         label: action === "hide" ? "Hide from Profile" : action,
       }))}
-      onAccessibilityAction={() => onManage()}
-      onLongPress={onManage}
+      onAccessibilityAction={() => onOpen()}
+      onLongPress={onOpen}
       onPress={onOpen}
       style={styles.card}
     >
-      <View style={styles.cardHeading}>
-        <AppText role="label">{item.title}</AppText>
-        {item.sparkle ? (
-          <Icon name="sparkle" tone="accentText" size="sm" />
-        ) : null}
-      </View>
+      {!hideTitle ? (
+        <View style={styles.cardHeading}>
+          <AppText role="label">{item.title}</AppText>
+          {item.sparkle ? (
+            <Icon name="sparkle" tone="accentText" size="sm" />
+          ) : null}
+        </View>
+      ) : null}
       {item.preview ? (
         <AppText numberOfLines={2} role="body">
           {item.preview}
@@ -153,12 +157,6 @@ function KnowledgeCard({
         </AppText>
       ))}
       {item.invalid ? <AppText role="caption">Needs attention</AppText> : null}
-      <Button
-        role="tertiary"
-        label="Manage"
-        accessibilityLabel={`Manage ${item.title}`}
-        onPress={onManage}
-      />
     </Pressable>
   );
 }
@@ -179,6 +177,13 @@ function KnowledgeChild({
   ) => void;
 }) {
   const [showingHidden, setShowingHidden] = useState(false);
+  const mostRecent = child.items.filter(
+    (item) => item.temporalPosition === "most-recent",
+  );
+  const previous = child.items.filter(
+    (item) => item.temporalPosition === "previous",
+  );
+  const isTemporal = mostRecent.length > 0 || previous.length > 0;
   return (
     <View style={styles.child}>
       {suppressHeading ? null : (
@@ -189,9 +194,42 @@ function KnowledgeChild({
           </View>
         </View>
       )}
-      <AppText role="body">{child.bodySummary}</AppText>
+      {child.bodySummary ? (
+        <AppText role="body">{child.bodySummary}</AppText>
+      ) : null}
       {child.helper ? <AppText role="caption">{child.helper}</AppText> : null}
-      {child.groups.map((group, index) => (
+      {isTemporal ? (
+        <View style={styles.temporal}>
+          {mostRecent.length > 0 ? (
+            <View style={styles.temporalGroup}>
+              <AppText role="label">MOST RECENT</AppText>
+              {mostRecent.map((item) => (
+                <KnowledgeCard
+                  key={item.id}
+                  item={item}
+                  hideTitle
+                  onOpen={() => onOpen(item)}
+                />
+              ))}
+            </View>
+          ) : null}
+          {previous.length > 0 ? (
+            <View style={styles.temporalGroup}>
+              <AppText role="label">PREVIOUS</AppText>
+              {previous.map((item) => (
+                <KnowledgeCard
+                  key={item.id}
+                  item={item}
+                  hideTitle
+                  onOpen={() => onOpen(item)}
+                />
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+      {!isTemporal
+        ? child.groups.map((group, index) => (
         <View key={group.name ?? `direct-${index}`} style={styles.group}>
           {group.heading ? (
             <AppText role="label">{group.heading}</AppText>
@@ -201,18 +239,17 @@ function KnowledgeChild({
               key={item.id}
               item={item}
               onOpen={() => onOpen(item)}
-              onManage={() => onOpen(item)}
             />
           ))}
         </View>
-      ))}
-      {child.groups.length === 0
+          ))
+        : null}
+      {!isTemporal && child.groups.length === 0
         ? child.items.map((item) => (
             <KnowledgeCard
               key={item.id}
               item={item}
               onOpen={() => onOpen(item)}
-              onManage={() => onOpen(item)}
             />
           ))
         : null}
@@ -297,4 +334,6 @@ const styles = StyleSheet.create({
   container: { gap: SPACING.lg },
   group: { gap: SPACING.xs },
   sheetContent: { gap: SPACING.sm },
+  temporal: { gap: SPACING.lg },
+  temporalGroup: { gap: SPACING.xs },
 });

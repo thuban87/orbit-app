@@ -66,6 +66,7 @@ function ProfileSection({
   failed,
   errorMessage,
   onToggle,
+  headerAction,
   children,
 }: {
   id: ProfileCollapsibleModuleId;
@@ -75,6 +76,7 @@ function ProfileSection({
   failed: boolean;
   errorMessage?: string;
   onToggle: (placement: CollapsePlacement) => void;
+  headerAction?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const state = resolveProfileModuleHostState({
@@ -85,28 +87,31 @@ function ProfileSection({
   const label = PROFILE_MODULE_REGISTRY[id].label;
   return (
     <GlassSurface style={styles.section}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={state.accessibilityLabel}
-        accessibilityState={{ expanded: state.expanded, disabled: pending }}
-        disabled={pending}
-        onPress={() => onToggle({ id, expanded: defaultExpanded })}
-        style={styles.sectionHeader}
-      >
-        <View style={styles.sectionCopy}>
-          <AppText role="heading" accessibilityRole="header">
-            {label}
-          </AppText>
-          {pending ? <AppText role="caption">Saving…</AppText> : null}
-          {!pending && errorMessage ? (
-            <AppText role="caption">{errorMessage}</AppText>
-          ) : null}
-        </View>
-        <Icon
-          name="chevron-down"
-          state={state.expanded ? "active" : "default"}
-        />
-      </Pressable>
+      <View style={styles.sectionHeader}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={state.accessibilityLabel}
+          accessibilityState={{ expanded: state.expanded, disabled: pending }}
+          disabled={pending}
+          onPress={() => onToggle({ id, expanded: defaultExpanded })}
+          style={styles.sectionToggle}
+        >
+          <View style={styles.sectionCopy}>
+            <AppText role="heading" accessibilityRole="header">
+              {label}
+            </AppText>
+            {pending ? <AppText role="caption">Saving…</AppText> : null}
+            {!pending && errorMessage ? (
+              <AppText role="caption">{errorMessage}</AppText>
+            ) : null}
+          </View>
+          <Icon
+            name="chevron-down"
+            state={state.expanded ? "active" : "default"}
+          />
+        </Pressable>
+        {headerAction}
+      </View>
       {state.expanded ? (
         <View style={styles.sectionBody}>{children}</View>
       ) : null}
@@ -280,6 +285,47 @@ export function ProfileModuleHost({
     </View>
   );
 
+  const knowledgeTarget = (
+    id: KnowledgeChildId,
+  ): KnowledgeActionIntent["target"] => {
+    switch (id) {
+      case "last-talked-about":
+      case "current-location":
+        return { owner: "current-state", id: 0 };
+      case "key-people":
+        return { owner: "relationship", id: 0 };
+      case "custom-fields":
+        return { owner: "custom-field", id: 0 };
+      case "off-limits":
+        return { owner: "fuel", id: 0 };
+      case "pinned-featured":
+      case "memories":
+      case "imported-contact-notes":
+        return { owner: "memory", id: 0 };
+    }
+  };
+
+  const knowledgeHeaderAction = (id: KnowledgeChildId) => {
+    const label = PROFILE_MODULE_REGISTRY[id].label;
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Edit ${label}`}
+        hitSlop={8}
+        onPress={() =>
+          onKnowledgeAction({
+            action: "edit",
+            childId: id,
+            target: knowledgeTarget(id),
+          })
+        }
+        style={styles.sectionEdit}
+      >
+        <Icon name="edit" tone="accentText" />
+      </Pressable>
+    );
+  };
+
   const renderContactMethods = () => {
     const methods = [...snapshot.methods.phone, ...snapshot.methods.email];
     if (methods.length === 0) {
@@ -390,6 +436,7 @@ export function ProfileModuleHost({
                   : undefined
               }
               onToggle={toggle}
+              headerAction={knowledgeHeaderAction(placement.id as KnowledgeChildId)}
             >
               {renderThingsToRemember()}
             </ProfileSection>
@@ -454,8 +501,20 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: SPACING.sm,
+  },
+  sectionToggle: {
+    alignItems: "center",
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 44,
+  },
+  sectionEdit: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44,
+    minWidth: 44,
   },
   sectionCopy: { flex: 1, gap: SPACING.xs },
   sectionBody: { gap: SPACING.sm, padding: SPACING.base },
