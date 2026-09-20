@@ -4,7 +4,10 @@
 import { describe, expect, it } from "vitest";
 import {
   calendarDaysBetween,
+  formatDateTimeMinute,
+  formatDateTimeMinuteOrFallback,
   formatLocalDate,
+  formatMinuteClock,
   isSnoozed,
   parseLocalMs,
 } from "@/utils/dates";
@@ -47,6 +50,39 @@ describe("formatLocalDate", () => {
   it("handles leap year Feb 29", () => {
     const date = new Date(2028, 1, 29); // Feb 29, 2028 (leap year)
     expect(formatLocalDate(date)).toBe("2028-02-29");
+  });
+});
+
+describe("minute-precision display timestamps", () => {
+  it("formats stored local timestamps with a month name, 12-hour clock, and no seconds", () => {
+    expect(formatDateTimeMinute("2026-09-19 19:14:37")).toBe(
+      "Sep 19, 2026, 7:14 PM",
+    );
+  });
+
+  it.each([
+    ["2026-09-19 00:05:59", "Sep 19, 2026, 12:05 AM"],
+    ["2026-09-19 12:00:01", "Sep 19, 2026, 12:00 PM"],
+  ])("renders 12-hour boundaries for %s", (stored, expected) => {
+    expect(formatDateTimeMinute(stored)).toBe(expected);
+  });
+
+  it("exercises the 24-hour clock branch without mutable formatter state", () => {
+    expect(
+      formatMinuteClock(
+        { year: 2026, month: 9, day: 19, hour: 19, minute: 14 },
+        "24h",
+      ),
+    ).toBe("19:14");
+  });
+
+  it("defaults the shared display formatter to the 12-hour clock", () => {
+    expect(formatDateTimeMinute("2026-09-19 19:14:37")).toContain("7:14 PM");
+  });
+
+  it("returns a neutral display label rather than the raw timestamp when parsing fails", () => {
+    expect(formatDateTimeMinuteOrFallback("not a timestamp")).toBe("Unknown time");
+    expect(formatDateTimeMinuteOrFallback("")).toBe("Unknown time");
   });
 });
 
