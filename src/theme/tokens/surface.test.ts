@@ -12,6 +12,8 @@ import {
   cardTintOpacity,
   chromeScrimOpacity,
   MIN_BACKGROUND_CONTRIBUTION,
+  ORRERY_OVERLAY_BACKDROP_VISIBILITY_CEILING,
+  orreryOverlayTintOpacity,
   resolveSurfaceStyle,
   SURFACE,
   SURFACE_COLOR_TOKEN_KEYS,
@@ -203,6 +205,50 @@ describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1
       });
     }
   }
+});
+
+describe("orrery-overlay treatment — AA over the raw brightest Orrery pixel (38.1-01)", () => {
+  // Conservative lower-bound model: the tint is composited over the RAW brightest
+  // Orrery pixel with no BlurView contribution. Where GlassSurface renders a real
+  // BlurView, it averages/dims the backdrop; on the no-blur path this raw model is
+  // exact. The on-device composite is therefore never brighter and is at least as
+  // legible as this proof.
+  for (const pkg of PACKAGES) {
+    for (const mode of MODES) {
+      it(`${pkg}/${mode}: foregrounds over the Orrery overlay meet AA and retain backdrop visibility`, () => {
+        const palette = resolvePalette(pkg, mode);
+        const brightestOrreryPixel = [
+          palette.textPrimary,
+          ...palette.starPalette,
+        ].reduce((brightest, candidate) =>
+          contrastRatio("#000000", candidate) >
+          contrastRatio("#000000", brightest)
+            ? candidate
+            : brightest,
+        );
+        const opacity = orreryOverlayTintOpacity(pkg, mode);
+        const composite = alphaComposite(
+          palette[SURFACE[pkg].tintTokenKey],
+          brightestOrreryPixel,
+          opacity,
+        );
+
+        assertForegroundsAA(composite, palette, `${pkg}/${mode} Orrery overlay`);
+        expect(opacity, `${pkg}/${mode}: overlay remains translucent`).toBeLessThan(
+          surfaceOpacityForDensity(pkg, "dense"),
+        );
+        expect(
+          opacity,
+          `${pkg}/${mode}: overlay preserves a visible Orrery backdrop`,
+        ).toBeLessThanOrEqual(ORRERY_OVERLAY_BACKDROP_VISIBILITY_CEILING);
+      });
+    }
+  }
+
+  it("does not retune the shared ordinary-card glass constants", () => {
+    expect(CARD_GLASS_OPACITY.galaxy).toBe(0.05);
+    expect(CARD_GLASS_OPACITY.standard).toBe(0.5);
+  });
 });
 
 describe("mode-aware card glass model (31.1-06)", () => {

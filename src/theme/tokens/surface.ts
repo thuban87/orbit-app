@@ -156,6 +156,38 @@ export const CARD_GLASS_OPACITY: Record<ThemePackage, number> = {
 };
 
 /**
+ * ORRERY OVERLAY (38.1-01 / dossier §B) — a dedicated tint treatment for
+ * floating Orrery controls and panels. Unlike ordinary cards, this surface is
+ * intentionally translucent in every package×mode combination: the Orrery is a
+ * controlled dark canvas rather than a mode-mismatched wallpaper. These values
+ * are the lowest package-wide AA-safe opacities over the raw brightest star,
+ * with the final perceptual tuning held for Plan 03's physical-device UAT.
+ */
+export const ORRERY_OVERLAY_TINT_OPACITY: Record<ThemePackage, number> = {
+  galaxy: 0.91,
+  standard: 0.87,
+};
+
+/**
+ * The maximum overlay tint opacity that preserves a visible slice of the Orrery
+ * behind its floating panels. The AA-safe package values above must not exceed
+ * this ceiling, so numeric translucency also remains perceptually observable.
+ */
+export const ORRERY_OVERLAY_BACKDROP_VISIBILITY_CEILING = 0.92;
+
+/**
+ * Return the dedicated Orrery-overlay tint opacity. `mode` is deliberately part
+ * of the semantic API because callers resolve surfaces on both theme axes, but
+ * this controlled canvas uses one translucent package value across both modes.
+ */
+export function orreryOverlayTintOpacity(
+  themePackage: ThemePackage,
+  _mode: ResolvedMode,
+): number {
+  return ORRERY_OVERLAY_TINT_OPACITY[themePackage];
+}
+
+/**
  * True when the resolved mode matches the package's background art tone, so a
  * glassy (translucent) card stays text-readable. galaxy↔dark, standard↔light.
  */
