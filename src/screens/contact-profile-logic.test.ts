@@ -239,6 +239,12 @@ describe("integrated Profile controller contracts", () => {
     });
   });
 
+  it("routes Custom Fields to the definition manager, not Edit Contact's value accordion", () => {
+    expect(profileKnowledgeDestination("custom-fields")).toEqual({
+      screen: "CustomFields",
+    });
+  });
+
   it("uses one standard compact app bar with reachable icon targets", () => {
     expect(PROFILE_APP_BAR).toEqual({ height: 56, touchTarget: 44 });
   });

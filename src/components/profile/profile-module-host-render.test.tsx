@@ -180,21 +180,12 @@ describe("ProfileModuleHost section-header captions", () => {
     ).toEqual(["Knowledge is unavailable."]);
   });
 
-  it("sends the top-level Things to Remember edit press to the memories owner", () => {
-    const onKnowledgeAction = vi.fn();
-    const action = profileHostNodes(onKnowledgeAction).find(
+  it("does not render an edit action for the top-level Things to Remember collection", () => {
+    const action = profileHostNodes().find(
       (node) => node.props.accessibilityLabel === "Edit Things to Remember",
     );
 
-    expect(action).toBeDefined();
-    if (!action) throw new Error("Things to Remember edit action is missing");
-    (action.props.onPress as () => void)();
-
-    expect(onKnowledgeAction).toHaveBeenCalledWith({
-      action: "edit",
-      childId: "memories",
-      target: { owner: "memory", id: 0 },
-    });
+    expect(action).toBeUndefined();
   });
 
   it("renders a distinct Off Limits heading action without duplicate heading or caption copy", () => {

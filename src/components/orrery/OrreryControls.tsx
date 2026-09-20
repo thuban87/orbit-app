@@ -152,7 +152,9 @@ export function OrreryControls({
 const styles = StyleSheet.create({
   root: { position: "absolute", zIndex: 12, elevation: 12 },
   unmeasured: { right: SPACING.base, bottom: SPACING.base, maxWidth: "90%" },
-  stack: { gap: SPACING.xs },
+  // The region is a deliberately wide free column so it can avoid measured
+  // obstacles. Pin the 44px controls to its right edge, directly above the FAB.
+  stack: { gap: SPACING.xs, alignItems: "flex-end" },
   controlSurface: { width: 44, height: 44 },
   control: {
     minWidth: 44,

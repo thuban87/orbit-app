@@ -131,7 +131,7 @@ export function AnchoredPanel({
         collapsable={false}
         style={[{ width: panelWidth }, panelStyle]}
       >
-        <GlassSurface density="dense">
+        <GlassSurface density="dense" treatment="orrery-overlay">
           <ScrollView
             style={{ maxHeight: maxContentHeight }}
             contentContainerStyle={styles.scrollContent}

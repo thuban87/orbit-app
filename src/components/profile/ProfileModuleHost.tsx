@@ -434,12 +434,6 @@ export function ProfileModuleHost({
                   : undefined
               }
               onToggle={toggle}
-              headerAction={knowledgeHeaderAction(
-                // The top-level module ID is not a knowledge child ID. Route the
-                // collection action through its memory owner instead.
-                "memories",
-                PROFILE_MODULE_REGISTRY[placement.id].label,
-              )}
             >
               {renderThingsToRemember()}
             </ProfileSection>

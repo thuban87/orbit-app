@@ -52,7 +52,7 @@ function all(nodes: Node[]): Node[] {
 }
 
 describe("ActivityHeatmap Year render", () => {
-  it("uses a vertical week-row stack instead of a horizontal ScrollView", () => {
+  it("uses two whole weeks per vertical row instead of a horizontal ScrollView", () => {
     const tree = ActivityHeatmap({
       lens: "year",
       cycleCount: 10,
@@ -69,6 +69,13 @@ describe("ActivityHeatmap Year render", () => {
           { date: "2026-01-01", isPlaceholder: false, isFuture: false },
           { date: "2026-01-02", isPlaceholder: false, isFuture: false },
           { date: "2026-01-03", isPlaceholder: false, isFuture: false },
+          { date: "2026-01-04", isPlaceholder: false, isFuture: false },
+          { date: "2026-01-05", isPlaceholder: false, isFuture: false },
+          { date: "2026-01-06", isPlaceholder: false, isFuture: false },
+          { date: "2026-01-07", isPlaceholder: false, isFuture: false },
+          { date: "2026-01-08", isPlaceholder: false, isFuture: false },
+          { date: "2026-01-09", isPlaceholder: false, isFuture: false },
+          { date: "2026-01-10", isPlaceholder: false, isFuture: false },
         ],
       },
       counts: new Map([["2026-01-01", 2]]),
@@ -91,5 +98,10 @@ describe("ActivityHeatmap Year render", () => {
         (node) => node.type === "ScrollView" && node.props.horizontal === true,
       ),
     ).toBe(false);
+    expect(
+      nodes.filter((node) =>
+        String(node.props.testID).startsWith("activity-heatmap-year-week-0-"),
+      ),
+    ).toHaveLength(2);
   });
 });

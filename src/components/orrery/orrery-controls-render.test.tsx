@@ -105,9 +105,7 @@ function controls(measured = true, blocked = false) {
     onRecenter,
     onResetNorth,
   });
-  const nodes = all(
-    resolve(tree),
-  );
+  const nodes = all(resolve(tree));
   return {
     tree,
     nodes,
@@ -137,7 +135,10 @@ describe("actual Orrery controls and detail sheet", () => {
       children?: ReactNode;
       contentContainerStyle?: unknown;
     }>;
-    expect(group.props.contentContainerStyle).toMatchObject({ gap: 4 });
+    expect(group.props.contentContainerStyle).toMatchObject({
+      gap: 4,
+      alignItems: "flex-end",
+    });
     const surfaces = Array.isArray(group.props.children)
       ? group.props.children
       : [group.props.children];

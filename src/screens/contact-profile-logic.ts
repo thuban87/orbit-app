@@ -9,13 +9,11 @@ export type ProfileMethodType = "phone" | "email";
 /** Source-owned destinations for Profile knowledge collection affordances. */
 export type ProfileKnowledgeDestination =
   | { screen: "MemoryHistory"; fieldKey: CurrentStateFieldKey }
-  | { screen: "OffLimitsEditor" | "Edit" | "ThingsToRemember" };
+  | {
+      screen: "OffLimitsEditor" | "Edit" | "ThingsToRemember" | "CustomFields";
+    };
 
-/**
- * Keeps the host's semantic child IDs from leaking into navigation. In
- * particular, the top-level Things to Remember action is represented by the
- * `memories` child, whose complete editor owns the collection.
- */
+/** Keeps the host's semantic child IDs from leaking into navigation. */
 export function profileKnowledgeDestination(
   id: KnowledgeChildId,
 ): ProfileKnowledgeDestination {
@@ -27,8 +25,9 @@ export function profileKnowledgeDestination(
     case "off-limits":
       return { screen: "OffLimitsEditor" };
     case "key-people":
-    case "custom-fields":
       return { screen: "Edit" };
+    case "custom-fields":
+      return { screen: "CustomFields" };
     case "pinned-featured":
     case "memories":
     case "imported-contact-notes":

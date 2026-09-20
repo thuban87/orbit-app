@@ -44,7 +44,8 @@ import { SPACING } from "@/theme/tokens/spacing";
 
 // --- Tunable geometry (top-of-file single-edit, CLAUDE.md) -------------------
 // Cell edges per lens. Day/cycle cells clear a comfortable tap; the Year dense
-// grid is deliberately small (a11y-compensated, Phase 40 owns final density).
+// grid is deliberately small (a11y-compensated), with two whole weeks per row
+// so it stays compact without horizontal scrolling.
 const HEATMAP_GEOMETRY = {
   dayCellEdge: 38,
   yearCellEdge: 13,
@@ -141,6 +142,15 @@ function chunkWeeks<T>(cells: readonly T[]): T[][] {
   return weeks;
 }
 
+/** Pair adjacent complete weeks so Year uses 26 compact rows. */
+function pairWeeks<T>(weeks: readonly T[][]): T[][][] {
+  const pairs: T[][][] = [];
+  for (let i = 0; i < weeks.length; i += 2) {
+    pairs.push(weeks.slice(i, i + 2));
+  }
+  return pairs;
+}
+
 /** The header window title per lens ("Mar 4 – Mar 10" / "March 2026" / "2026"). */
 function windowTitle(lens: HistoryLens, window: HistoryWindow | null): string {
   if (lens === "cycles") return "Cycles";
@@ -174,6 +184,7 @@ export function ActivityHeatmap({
     () => (window ? chunkWeeks(window.cells) : []),
     [window],
   );
+  const yearWeekPairs = useMemo(() => pairWeeks(dayWeeks), [dayWeeks]);
 
   const cellStyle = (edge: number): ViewStyle => ({
     width: edge,
@@ -334,20 +345,30 @@ export function ActivityHeatmap({
           </AppText>
         )
       ) : lens === "year" ? (
-        // Year: weeks as ROWS, weekdays as COLUMNS (vertical mobile flow).
+        // Year: two adjacent whole weeks per row (14 cells) keeps the vertical
+        // mobile view compact while preserving weekday alignment and no x-scroll.
         <View testID={`${testID}-year-grid`}>
-          {dayWeeks.map((week, w) => (
+          {yearWeekPairs.map((weeks, row) => (
             <View
-              key={`row-${week.find((c) => c.date)?.date ?? w}`}
-              style={styles.dayRow}
+              key={`row-${weeks[0]?.find((c) => c.date)?.date ?? row}`}
+              testID={`${testID}-year-row-${row}`}
+              style={styles.yearRow}
             >
-              {week.map((cell, d) =>
-                renderDayCell(
-                  cell,
-                  `y-${w}-${cell.date ?? `p${d}`}`,
-                  HEATMAP_GEOMETRY.yearCellEdge,
-                ),
-              )}
+              {weeks.map((week, weekIndex) => (
+                <View
+                  key={`week-${week.find((c) => c.date)?.date ?? weekIndex}`}
+                  testID={`${testID}-year-week-${row}-${weekIndex}`}
+                  style={styles.yearWeek}
+                >
+                  {week.map((cell, day) =>
+                    renderDayCell(
+                      cell,
+                      `y-${row}-${weekIndex}-${cell.date ?? `p${day}`}`,
+                      HEATMAP_GEOMETRY.yearCellEdge,
+                    ),
+                  )}
+                </View>
+              ))}
             </View>
           ))}
         </View>
@@ -394,6 +415,12 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
     marginBottom: SPACING.xs,
   },
+  yearRow: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+    marginBottom: SPACING.xs,
+  },
+  yearWeek: { flexDirection: "row", gap: SPACING.xs },
   cycleGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
