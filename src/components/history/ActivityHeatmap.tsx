@@ -27,29 +27,20 @@
  * dossier §AC / Phase 40) but stay a11y-labelled and carry a touch `hitSlop`.
  */
 import { useMemo } from "react";
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-  type ViewStyle,
-} from "react-native";
+import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
 import {
   classifyCycleBlock,
   classifyHeatmapCell,
 } from "@/components/history/heatmap-cell";
-import { AppText } from "@/components/ui/AppText";
 import { Icon } from "@/components/icons/Icon";
 import { SegmentedControl } from "@/components/SegmentedControl";
-import type {
-  HistoryCycleCount,
-  HistoryLens,
-} from "@/db/app-settings-dao";
+import { AppText } from "@/components/ui/AppText";
+import type { HistoryCycleCount, HistoryLens } from "@/db/app-settings-dao";
 import { HISTORY_CYCLE_COUNTS } from "@/db/app-settings-dao";
 import type { CycleBlock, CyclesResult } from "@/services/history/cycles";
 import type { HistoryWindow, WindowCell } from "@/services/history/window";
-import { SPACING } from "@/theme/tokens/spacing";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
 
 // --- Tunable geometry (top-of-file single-edit, CLAUDE.md) -------------------
 // Cell edges per lens. Day/cycle cells clear a comfortable tap; the Year dense
@@ -343,25 +334,23 @@ export function ActivityHeatmap({
           </AppText>
         )
       ) : lens === "year" ? (
-        // Year: weeks as COLUMNS, weekdays as ROWS (GitHub-style dense grid).
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={styles.yearColumns}>
-            {dayWeeks.map((week, w) => (
-              <View
-                key={`col-${week.find((c) => c.date)?.date ?? w}`}
-                style={styles.yearColumn}
-              >
-                {week.map((cell, d) =>
-                  renderDayCell(
-                    cell,
-                    `y-${w}-${cell.date ?? `p${d}`}`,
-                    HEATMAP_GEOMETRY.yearCellEdge,
-                  ),
-                )}
-              </View>
-            ))}
-          </View>
-        </ScrollView>
+        // Year: weeks as ROWS, weekdays as COLUMNS (vertical mobile flow).
+        <View testID={`${testID}-year-grid`}>
+          {dayWeeks.map((week, w) => (
+            <View
+              key={`row-${week.find((c) => c.date)?.date ?? w}`}
+              style={styles.dayRow}
+            >
+              {week.map((cell, d) =>
+                renderDayCell(
+                  cell,
+                  `y-${w}-${cell.date ?? `p${d}`}`,
+                  HEATMAP_GEOMETRY.yearCellEdge,
+                ),
+              )}
+            </View>
+          ))}
+        </View>
       ) : (
         // 7 Days / Month: weeks as ROWS (traditional weekday-aligned grid).
         <View testID={`${testID}-day-grid`}>
@@ -408,14 +397,6 @@ const styles = StyleSheet.create({
   cycleGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: SPACING.xs,
-  },
-  yearColumns: {
-    flexDirection: "row",
-    gap: SPACING.xs,
-  },
-  yearColumn: {
-    flexDirection: "column",
     gap: SPACING.xs,
   },
 });
