@@ -14,6 +14,7 @@ import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
+import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
 import { ThingsToRememberScreen } from "@/screens/ThingsToRememberScreen";
@@ -37,6 +38,7 @@ const DIGEST_ROUTE_COMPONENTS = {
   EditInteraction: EditInteractionScreen,
   ThingsToRemember: ThingsToRememberScreen,
   MemoryHistory: MemoryHistoryScreen,
+  OffLimitsEditor: OffLimitsEditorScreen,
   CropPhoto: CropPhotoScreen,
   SurvivorSelect: SurvivorSelectScreen,
   MergeConflicts: MergeConflictsScreen,

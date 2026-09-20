@@ -73,6 +73,7 @@ export type DashboardStackParamList = {
   ThingsToRemember: { contactId: number };
   RecentlyDeleted: { contactId: number };
   MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  OffLimitsEditor: { contactId: number };
   Edit: { contactId: number };
   /** The canonical Edit Interaction route (HIST-12); scoped by contact + interaction. */
   EditInteraction: { contactId: number; interactionId: number };
@@ -165,6 +166,7 @@ export type OrreryStackParamList = {
   ThingsToRemember: { contactId: number };
   RecentlyDeleted: { contactId: number };
   MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  OffLimitsEditor: { contactId: number };
   Edit: { contactId: number };
   /** The canonical Edit Interaction route (HIST-12); scoped by contact + interaction. */
   EditInteraction: { contactId: number; interactionId: number };
@@ -232,6 +234,7 @@ export type DigestStackParamList = {
   EditInteraction: { contactId: number; interactionId: number };
   ThingsToRemember: { contactId: number };
   MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  OffLimitsEditor: { contactId: number };
   CropPhoto: {
     rawUri: string;
     target: PhotoTargetDescriptor;
@@ -264,6 +267,7 @@ export type EventsStackParamList = {
   EditInteraction: { contactId: number; interactionId: number };
   ThingsToRemember: { contactId: number };
   MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  OffLimitsEditor: { contactId: number };
   CropPhoto: {
     rawUri: string;
     target: PhotoTargetDescriptor;
@@ -351,6 +355,8 @@ export type SettingsStackParamList = {
    */
   ThingsToRemember: { contactId: number };
   MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  OffLimitsEditor: { contactId: number };
+  Edit: { contactId: number };
   /**
    * The canonical Edit Interaction route (HIST-12). Registered here too because
    * Profile is hosted in Settings (Archived → Profile), and RootStackParamList is

@@ -14,6 +14,7 @@ import { GroupEventDetailScreen } from "@/screens/GroupEventDetailScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
+import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { OrreryScreen } from "@/screens/OrreryScreen";
 import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { SurvivorSelectScreen } from "@/screens/SurvivorSelectScreen";
@@ -63,6 +64,7 @@ export function OrreryStack() {
       />
       <Stack.Screen name="RecentlyDeleted" component={RecentlyDeletedScreen} />
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
+      <Stack.Screen name="OffLimitsEditor" component={OffLimitsEditorScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="EditInteraction" component={EditInteractionScreen} />
       <Stack.Screen
@@ -72,10 +74,7 @@ export function OrreryStack() {
       <Stack.Screen name="EditGroupEvent" component={EditGroupEventScreen} />
       <Stack.Screen name="EditParticipant" component={EditParticipantScreen} />
       <Stack.Screen name="Compose" component={ComposeScreen} />
-      <Stack.Screen
-        name="ComposeResearch"
-        component={ComposeResearchRoute}
-      />
+      <Stack.Screen name="ComposeResearch" component={ComposeResearchRoute} />
       <Stack.Screen name="CropPhoto" component={CropPhotoScreen} />
       <Stack.Screen name="SurvivorSelect" component={SurvivorSelectScreen} />
       <Stack.Screen name="MergeConflicts" component={MergeConflictsScreen} />

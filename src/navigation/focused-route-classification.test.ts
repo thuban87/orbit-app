@@ -8,6 +8,7 @@ import {
 const focusedRoutes = [
   "Create",
   "Edit",
+  "OffLimitsEditor",
   "Compose",
   "Capture",
   "CropPhoto",
@@ -69,6 +70,7 @@ describe("isFocusedWorkflow", () => {
 const routeDensities = [
   ["Create", "dense"],
   ["Edit", "dense"],
+  ["OffLimitsEditor", "dense"],
   ["CustomFields", "dense"],
   ["Compose", "dense"],
   ["Capture", "dense"],

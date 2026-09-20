@@ -8,6 +8,10 @@ import { ProfileHero } from "@/components/profile/ProfileHero";
 import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
 import { ProfileModuleHost } from "@/components/profile/ProfileModuleHost";
 import { ProfileTemplateManager } from "@/components/profile/ProfileTemplateManager";
+import type {
+  KnowledgeActionIntent,
+  KnowledgeChildId,
+} from "@/components/profile/ThingsToRemember";
 import { ReachOutRouter } from "@/components/ReachOutRouter";
 import { AppText } from "@/components/ui/AppText";
 import { BackgroundHost } from "@/components/ui/BackgroundHost";
@@ -18,6 +22,7 @@ import { archiveContact } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { deriveReachRoutes } from "@/db/interaction-assist-read";
+import type { CurrentStateFieldKey } from "@/db/memory-registry";
 import { resetProfilePresentation } from "@/db/profile-presentation-dao";
 import { type ProfileSnapshot, readProfileSnapshot } from "@/db/profile-read";
 import {
@@ -160,6 +165,73 @@ export function ContactProfileScreen({
       await load();
     },
     [load],
+  );
+
+  const routeKnowledgeChild = useCallback(
+    (id: KnowledgeChildId) => {
+      switch (id) {
+        case "last-talked-about":
+          navigation.navigate("MemoryHistory", {
+            contactId,
+            fieldKey: "last_talked_about",
+          });
+          return;
+        case "current-location":
+          navigation.navigate("MemoryHistory", {
+            contactId,
+            fieldKey: "current_location",
+          });
+          return;
+        case "off-limits":
+          navigation.navigate("OffLimitsEditor", { contactId });
+          return;
+        case "key-people":
+        case "custom-fields":
+          navigation.navigate("Edit", { contactId });
+          return;
+        case "pinned-featured":
+        case "memories":
+        case "imported-contact-notes":
+          navigation.navigate("ThingsToRemember", { contactId });
+      }
+    },
+    [contactId, navigation],
+  );
+
+  const routeKnowledgeAction = useCallback(
+    (intent: KnowledgeActionIntent) => {
+      if (intent.childId) {
+        routeKnowledgeChild(intent.childId);
+        return;
+      }
+      switch (intent.target.owner) {
+        case "fuel":
+          navigation.navigate("OffLimitsEditor", { contactId });
+          return;
+        case "relationship":
+        case "custom-field":
+          navigation.navigate("Edit", { contactId });
+          return;
+        case "memory":
+          navigation.navigate("ThingsToRemember", { contactId });
+          return;
+        case "current-state": {
+          const currentState =
+            snapshot?.knowledge.status === "ready"
+              ? snapshot.knowledge.data.currentState
+              : {};
+          const fieldKey = (Object.entries(currentState).find(
+            ([, entry]) =>
+              entry?.id === intent.target.id ||
+              entry?.previous.some(
+                (previous) => previous.id === intent.target.id,
+              ),
+          )?.[0] ?? "last_talked_about") as CurrentStateFieldKey;
+          navigation.navigate("MemoryHistory", { contactId, fieldKey });
+        }
+      }
+    },
+    [contactId, navigation, routeKnowledgeChild, snapshot],
   );
 
   const toggleFavourite = useCallback(async () => {
@@ -386,22 +458,17 @@ export function ContactProfileScreen({
                 onSetFrequency={setFrequency}
                 onSnooze={snooze}
                 onUnsnooze={unsnooze}
-                onKnowledgeAction={() =>
-                  navigation.navigate("ThingsToRemember", { contactId })
+                onKnowledgeAction={routeKnowledgeAction}
+                onKnowledgeViewAll={(intent) => routeKnowledgeChild(intent.id)}
+                // Temporal history owns its full add/edit/promote screen; the
+                // stable field key remains serializable across every host stack.
+                onOpenKnowledgeChange={(fieldKey) =>
+                  navigation.navigate("MemoryHistory", { contactId, fieldKey })
                 }
-                onKnowledgeViewAll={() =>
-                  navigation.navigate("ThingsToRemember", { contactId })
-                }
-                // History detail-sheet knowledge-change edit reuses the SAME
-                // existing knowledge nav (decision-preserving — no new target).
-                onOpenKnowledgeChange={() =>
-                  navigation.navigate("ThingsToRemember", { contactId })
-                }
-                // Value-history remains owned by the Knowledge flow. Profile
-                // deliberately carries only a stable detail intent and never
-                // coerces a custom-field id into the current-state route key.
+                // Custom-field history is managed through the existing complete
+                // contact editor, never coerced into a current-state field key.
                 onOpenValueHistory={() =>
-                  navigation.navigate("ThingsToRemember", { contactId })
+                  navigation.navigate("Edit", { contactId })
                 }
                 onContactMethodAction={(method, action) =>
                   void launchMethod(method, action)

@@ -15,6 +15,7 @@ import { ContactProfileScreen } from "@/screens/ContactProfileScreen";
 import { CropPhotoScreen } from "@/screens/CropPhotoScreen";
 import { CustomFieldsScreen } from "@/screens/CustomFieldsScreen";
 import { DuplicateReviewScreen } from "@/screens/DuplicateReviewScreen";
+import { EditContactScreen } from "@/screens/EditContactScreen";
 import { EditGroupEventScreen } from "@/screens/EditGroupEventScreen";
 import { EditInteractionScreen } from "@/screens/EditInteractionScreen";
 import { EditParticipantScreen } from "@/screens/EditParticipantScreen";
@@ -26,6 +27,7 @@ import { LegacyContactPickerScreen } from "@/screens/LegacyContactPickerScreen";
 import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
+import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
 import { ReconcileCompleteScreen } from "@/screens/ReconcileCompleteScreen";
 import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
@@ -246,6 +248,8 @@ export function SettingsStack() {
         component={ThingsToRememberScreen}
       />
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
+      <Stack.Screen name="OffLimitsEditor" component={OffLimitsEditorScreen} />
+      <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="EditInteraction" component={EditInteractionScreen} />
       <Stack.Screen
         name="GroupEventDetail"

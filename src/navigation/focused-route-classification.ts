@@ -7,6 +7,7 @@ import type { SurfaceDensity } from "@/theme/tokens/surface";
 const FOCUSED_WORKFLOW_ROUTES = new Set<string>([
   "Create",
   "Edit",
+  "OffLimitsEditor",
   "Compose",
   "Capture",
   "CropPhoto",
@@ -38,6 +39,7 @@ export function isFocusedWorkflow(routeName: string): boolean {
 const ROUTE_DENSITY: Readonly<Record<string, SurfaceDensity>> = {
   Create: "dense",
   Edit: "dense",
+  OffLimitsEditor: "dense",
   CustomFields: "dense",
   Compose: "dense",
   Capture: "dense",

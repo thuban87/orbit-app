@@ -21,6 +21,7 @@ const PROFILE_REACHABLE_ROUTES = [
   "EditInteraction",
   "ThingsToRemember",
   "MemoryHistory",
+  "OffLimitsEditor",
   "CropPhoto",
   "SurvivorSelect",
   "MergeConflicts",

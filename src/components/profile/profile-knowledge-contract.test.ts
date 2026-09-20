@@ -18,14 +18,16 @@ describe("Profile knowledge component contracts", () => {
     expect(source).toContain("Show hidden");
   });
 
-  it("keeps card management accessible outside long press and exposes detail/history sheets", () => {
+  it("keeps card detail access separate from heading-level collection editing", () => {
     const source = thingsSource();
     expect(source).toContain("onLongPress");
     expect(source).toContain("accessibilityActions");
-    expect(source).toContain("Manage");
+    expect(source).not.toContain('label="Manage"');
     expect(source).toContain("Sheet");
     expect(source).toContain("View history");
     expect(source).not.toContain('role="destructive"');
+    expect(hostSource()).toContain("knowledgeHeaderAction");
+    expect(hostSource()).toContain("accessibilityLabel={`Edit");
   });
 
   it("registers Things to Remember and full contact-method rows in the module host", () => {
