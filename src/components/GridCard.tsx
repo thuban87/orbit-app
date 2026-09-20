@@ -125,7 +125,6 @@ export function GridCard({
   onToggleSelect,
   isFavourite = false,
   onToggleFavourite,
-  line3 = null,
   searchResult,
   searchSnippet = null,
 }: GridCardProps) {
@@ -338,25 +337,7 @@ export function GridCard({
                 color={colors.textPrimary}
               />
             </Text>
-          ) : (
-            <View style={styles.line3}>
-              {line3?.iconName ? (
-                <Icon name={line3.iconName} size="sm" tone="textSecondary" />
-              ) : null}
-              <Text
-                testID={`dashboard-grid-card-line3-${contactId}`}
-                numberOfLines={1}
-                ellipsizeMode="tail"
-                style={[
-                  styles.recency,
-                  styles.line3Text,
-                  { color: colors.textSecondary },
-                ]}
-              >
-                {line3?.text ?? ""}
-              </Text>
-            </View>
-          )}
+          ) : null}
         </View>
       </GlassSurface>
     </Pressable>
@@ -435,12 +416,6 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.caption.weight,
     lineHeight: TYPOGRAPHY.caption.lineHeight,
     textAlign: "center",
-  },
-  line3: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: SPACING.xs,
-    minWidth: 0,
   },
   line3Text: {
     flex: 1,

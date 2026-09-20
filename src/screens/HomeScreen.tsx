@@ -116,7 +116,6 @@ import { deleteTouchpoint, recordTouchpoint } from "@/db/recency-dao";
 import { clearSnooze, type SnoozePreset, snoozeContact } from "@/db/snooze-dao";
 import { newUid } from "@/db/uid";
 import { countUnbound } from "@/db/unbound-read";
-import { selectCardLine3 } from "@/logic/card-line3-selection";
 import {
   type BulkActionClaim,
   createBulkActionGate,
@@ -751,10 +750,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         ]);
         const list = searchRead.rows;
         const nextLine3ByContactId = new Map<number, ListRowLine3>();
-        if (
-          (query.viewMode === "list" || query.viewMode === "card") &&
-          !isSearch
-        ) {
+        if (query.viewMode === "list" && !isSearch) {
           const candidates = await readLine3Candidates(
             exec,
             list.map((row) => row.id),
@@ -768,9 +764,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           }
           const selectionNow = new Date(parseLocalMs(now));
           for (const row of list) {
-            const selection = (
-              query.viewMode === "card" ? selectCardLine3 : selectLine3
-            )(
+            const selection = selectLine3(
               candidatesByContactId.get(row.id) ?? [],
               row.id,
               row.name,
