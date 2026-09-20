@@ -123,48 +123,56 @@ export function RelationshipOverview({
             style={{ width: tileWidth }}
           >
             <GlassSurface density="presentation" style={styles.tile}>
-              <AppText role="caption">{item.label}</AppText>
-              <AppText role="heading">{item.value}</AppText>
-              {item.detail ? (
-                <AppText role="caption">{item.detail}</AppText>
-              ) : null}
-              {placement.id === "gravity" &&
-              snapshot.metrics.gravity.available ? (
-                <View
-                  accessibilityElementsHidden
-                  importantForAccessibility="no-hide-descendants"
-                  style={[
-                    styles.gravity,
-                    {
-                      width:
-                        16 + snapshot.metrics.gravity.factors.tierIndex * 12,
-                      height:
-                        16 + snapshot.metrics.gravity.factors.tierIndex * 12,
-                      backgroundColor:
-                        colors.gravityTiers[
-                          snapshot.metrics.gravity.factors.tierIndex
-                        ] ?? colors.borderStrong,
-                    },
-                  ]}
-                />
-              ) : null}
-              {placement.id === "intensity" ? (
-                <View
-                  accessibilityElementsHidden
-                  importantForAccessibility="no-hide-descendants"
-                  style={styles.histogram}
-                >
-                  {[8, 16, 12, 24].map((height) => (
-                    <View
-                      key={height}
-                      style={[
-                        styles.bar,
-                        { height, backgroundColor: colors.borderStrong },
-                      ]}
-                    />
-                  ))}
-                </View>
-              ) : null}
+              <View style={styles.tileContent}>
+                <AppText role="caption" style={styles.centeredText}>
+                  {item.label}
+                </AppText>
+                <AppText role="heading" style={styles.centeredText}>
+                  {item.value}
+                </AppText>
+                {item.detail ? (
+                  <AppText role="caption" style={styles.centeredText}>
+                    {item.detail}
+                  </AppText>
+                ) : null}
+                {placement.id === "gravity" &&
+                snapshot.metrics.gravity.available ? (
+                  <View
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                    style={[
+                      styles.gravity,
+                      {
+                        width:
+                          16 + snapshot.metrics.gravity.factors.tierIndex * 12,
+                        height:
+                          16 + snapshot.metrics.gravity.factors.tierIndex * 12,
+                        backgroundColor:
+                          colors.gravityTiers[
+                            snapshot.metrics.gravity.factors.tierIndex
+                          ] ?? colors.borderStrong,
+                      },
+                    ]}
+                  />
+                ) : null}
+                {placement.id === "intensity" ? (
+                  <View
+                    accessibilityElementsHidden
+                    importantForAccessibility="no-hide-descendants"
+                    style={styles.histogram}
+                  >
+                    {[8, 16, 12, 24].map((height) => (
+                      <View
+                        key={height}
+                        style={[
+                          styles.bar,
+                          { height, backgroundColor: colors.borderStrong },
+                        ]}
+                      />
+                    ))}
+                  </View>
+                ) : null}
+              </View>
             </GlassSurface>
           </Pressable>
         );
@@ -176,6 +184,8 @@ export function RelationshipOverview({
 const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
   tile: { minHeight: 112, padding: SPACING.base },
+  tileContent: { alignItems: "center" },
+  centeredText: { textAlign: "center" },
   gravity: { borderRadius: RADII.full, marginTop: SPACING.sm },
   histogram: {
     minHeight: 24,
