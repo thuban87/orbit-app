@@ -36,12 +36,8 @@ describe("Profile module renderer registry", () => {
     );
   });
 
-  it("keeps empty summaries and collapse accessibility semantics on semantic IDs", () => {
-    expect(PROFILE_MODULE_EMPTY_SUMMARIES).toMatchObject({
-      "contact-methods": "Contact Methods · None",
-      "interaction-history": "Interaction History · No interactions yet",
-      "things-to-remember": "Things to Remember · Nothing added yet",
-    });
+  it("keeps identifier-only headers and collapse accessibility semantics on semantic IDs", () => {
+    expect(PROFILE_MODULE_EMPTY_SUMMARIES).toEqual({});
     expect(
       resolveProfileModuleHostState({
         id: "interaction-history",
