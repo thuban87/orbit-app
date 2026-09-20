@@ -165,10 +165,13 @@ function KnowledgeCard({
 
 function KnowledgeChild({
   child,
+  suppressHeading,
   onOpen,
   onViewAll,
 }: {
   child: KnowledgePresentationChild;
+  /** A one-child ProfileSection already supplies this semantic heading. */
+  suppressHeading: boolean;
   onOpen: (item: KnowledgePresentationItem) => void;
   onViewAll: (
     child: KnowledgePresentationChild,
@@ -178,12 +181,14 @@ function KnowledgeChild({
   const [showingHidden, setShowingHidden] = useState(false);
   return (
     <View style={styles.child}>
-      <View style={styles.childHeading}>
-        <Icon name={childIcon(child.id)} tone="textSecondary" size="sm" />
-        <View style={styles.childCopy}>
-          <AppText role="heading">{child.title}</AppText>
+      {suppressHeading ? null : (
+        <View style={styles.childHeading}>
+          <Icon name={childIcon(child.id)} tone="textSecondary" size="sm" />
+          <View style={styles.childCopy}>
+            <AppText role="heading">{child.title}</AppText>
+          </View>
         </View>
-      </View>
+      )}
       <AppText role="body">{child.bodySummary}</AppText>
       {child.helper ? <AppText role="caption">{child.helper}</AppText> : null}
       {child.groups.map((group, index) => (
@@ -262,6 +267,7 @@ export function ThingsToRemember({
         <KnowledgeChild
           key={child.id}
           child={child}
+          suppressHeading={childIds?.length === 1}
           onOpen={setSelected}
           onViewAll={(target, includeHidden) =>
             onViewAll({ id: target.id, includeHidden })

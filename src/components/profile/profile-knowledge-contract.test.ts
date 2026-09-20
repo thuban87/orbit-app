@@ -36,4 +36,10 @@ describe("Profile knowledge component contracts", () => {
     expect(source).toContain("Email");
     expect(source).toContain("disabled={method.is_actionable !== 1}");
   });
+
+  it("leaves the parent-owned one-child section with one heading", () => {
+    const source = thingsSource();
+    expect(source).toContain("suppressHeading={childIds?.length === 1}");
+    expect(source).toContain("{suppressHeading ? null : (");
+  });
 });
