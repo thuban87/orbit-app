@@ -264,6 +264,7 @@ export function ProfileModuleHost({
               : undefined
           }
           onToggle={toggle}
+          headerAction={knowledgeHeaderAction(placement.id as KnowledgeChildId)}
         >
           {snapshot.knowledge.status === "error" ? (
             <AppText role="body">{snapshot.knowledge.message}</AppText>

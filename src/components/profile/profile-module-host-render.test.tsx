@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { ProfileSnapshot } from "@/db/profile-read";
+import type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 import type { ProfilePresentation } from "@/profile/types";
 import { ProfileModuleHost } from "./ProfileModuleHost";
 
@@ -126,12 +127,15 @@ function sectionHeaderCaptions(
     : [];
 }
 
-function profileHostNodes(onKnowledgeAction = vi.fn()): Node[] {
+function profileHostNodes(
+  onKnowledgeAction = vi.fn(),
+  hostPresentation: ProfilePresentation = presentation,
+): Node[] {
   return all(
     resolve(
       ProfileModuleHost({
         snapshot: snapshot({ status: "ready", data: {} as never }),
-        presentation,
+        presentation: hostPresentation,
         todayLocal: "2026-09-19",
         onOpenHistory: vi.fn(),
         onSetFrequency: vi.fn(async () => {}),
@@ -145,6 +149,18 @@ function profileHostNodes(onKnowledgeAction = vi.fn()): Node[] {
       }),
     ),
   );
+}
+
+function childPresentation(id: KnowledgeChildId): ProfilePresentation {
+  return {
+    ...presentation,
+    layout: {
+      document: {
+        ...presentation.layout.document,
+        thingsToRemember: [{ id, visible: true, expanded: true }],
+      },
+    },
+  } as unknown as ProfilePresentation;
 }
 
 describe("ProfileModuleHost section-header captions", () => {
@@ -179,5 +195,71 @@ describe("ProfileModuleHost section-header captions", () => {
       childId: "memories",
       target: { owner: "memory", id: 0 },
     });
+  });
+
+  it("renders a distinct Off Limits heading action without duplicate heading or caption copy", () => {
+    const onKnowledgeAction = vi.fn();
+    const nodes = profileHostNodes(
+      onKnowledgeAction,
+      childPresentation("off-limits"),
+    );
+    const action = nodes.find(
+      (node) => node.props.accessibilityLabel === "Edit Off Limits",
+    );
+
+    expect(action).toBeDefined();
+    expect(
+      nodes.filter(
+        (node) =>
+          node.type === "AppText" &&
+          node.props.role === "heading" &&
+          node.children.some(
+            (child) => child.type === "literal" && child.text === "Off Limits",
+          ),
+      ),
+    ).toHaveLength(1);
+    expect(
+      nodes.filter(
+        (node) => node.type === "AppText" && node.props.role === "caption",
+      ),
+    ).toHaveLength(0);
+    if (!action) throw new Error("Off Limits edit action is missing");
+    (action.props.onPress as () => void)();
+
+    expect(onKnowledgeAction).toHaveBeenCalledWith({
+      action: "edit",
+      childId: "off-limits",
+      target: { owner: "fuel", id: 0 },
+    });
+  });
+
+  it("gives every editable child owner its own correctly routed heading action", () => {
+    const cases = [
+      ["pinned-featured", "Pinned / Featured", "memory"],
+      ["last-talked-about", "Last Talked About", "current-state"],
+      ["key-people", "Key People", "relationship"],
+      ["current-location", "Current Location", "current-state"],
+      ["memories", "Memories", "memory"],
+      ["custom-fields", "Custom Fields", "custom-field"],
+      ["off-limits", "Off Limits", "fuel"],
+      ["imported-contact-notes", "Imported from Contacts App", "memory"],
+    ] as const;
+
+    for (const [childId, label, owner] of cases) {
+      const onKnowledgeAction = vi.fn();
+      const action = profileHostNodes(
+        onKnowledgeAction,
+        childPresentation(childId),
+      ).find((node) => node.props.accessibilityLabel === `Edit ${label}`);
+
+      expect(action).toBeDefined();
+      if (!action) throw new Error(`${label} edit action is missing`);
+      (action.props.onPress as () => void)();
+      expect(onKnowledgeAction).toHaveBeenCalledWith({
+        action: "edit",
+        childId,
+        target: { owner, id: 0 },
+      });
+    }
   });
 });
