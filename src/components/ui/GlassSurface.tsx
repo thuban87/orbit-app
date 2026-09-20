@@ -14,10 +14,9 @@
  * pure `resolveSurfaceStyle(package, blurAvailable)` selector (token KEYS + declared
  * opacities) resolved to a real colour ONLY via `useTheme().colors[key]`. This
  * component carries NO colour or opacity literal, so the check:colors `/theme/`
- * LOCATION exemption cannot become an escape hatch. The live tint opacity it applies
- * is `resolveSurfaceStyle().liveGlassTintOpacity`, which is `>= fallbackTintOpacity`
- * (the AA-checked bound), so the rendered glass composite is never more translucent
- * than the surface the AA gate validated (REVIEWS 23-06 MEDIUM live-glass invariant).
+ * LOCATION exemption cannot become an escape hatch. The default card treatment uses
+ * its mode-aware token helper; Orrery callers opt into the separately AA-proven
+ * controlled-canvas treatment without creating a parallel component family.
  */
 import { BlurView } from "expo-blur";
 import type { ReactNode } from "react";
@@ -26,9 +25,12 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import {
   cardTintOpacity,
+  orreryOverlayTintOpacity,
   resolveSurfaceStyle,
   type SurfaceDensity,
 } from "@/theme/tokens/surface";
+
+export type GlassSurfaceTreatment = "card" | "orrery-overlay";
 
 export interface GlassSurfaceProps {
   children?: ReactNode;
@@ -44,6 +46,8 @@ export interface GlassSurfaceProps {
    * Defaults to `comfortable`.
    */
   density?: SurfaceDensity;
+  /** Semantic treatment; defaults to the ordinary mode-aware content card. */
+  treatment?: GlassSurfaceTreatment;
   /** Extra layout style (padding/margins/size) — never colour. */
   style?: StyleProp<ViewStyle>;
 }
@@ -55,15 +59,18 @@ export function GlassSurface({
   children,
   blurAvailable = true,
   density = "comfortable",
+  treatment = "card",
   style,
 }: GlassSurfaceProps) {
   const { colors, mode, package: themePackage } = useTheme();
   const s = resolveSurfaceStyle(themePackage, blurAvailable);
 
-  // Mode-aware card tint (31.1-06): glassy when the background art tone matches
-  // the mode (galaxy↔dark, standard↔light) so the background shows THROUGH the
-  // card; opaque otherwise so text stays readable over a mismatched art.
-  const tintOpacity = cardTintOpacity(themePackage, mode, density);
+  // The default preserves the mode-aware card path (31.1-06). Orrery overlays
+  // opt into their dedicated always-translucent, AA-proven controlled-canvas tint.
+  const tintOpacity =
+    treatment === "orrery-overlay"
+      ? orreryOverlayTintOpacity(themePackage, mode)
+      : cardTintOpacity(themePackage, mode, density);
 
   const tintColor = colors[s.tintTokenKey];
   const borderColor = colors[s.borderTokenKey];
