@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 39
-current_phase_name: Onboarding
+current_phase: 38.1
+current_phase_name: Profile & Presentation Polish
 status: planning
-stopped_at: Phase 38 complete, ready to plan Phase 39
-last_updated: "2026-09-19T16:22:14.528Z"
+stopped_at: Phase 38.1 context gathered — dossier + CONTEXT shim (D-01..D-08) ready; ready to /gsd-plan-phase 38.1
+last_updated: "2026-09-20T02:06:14.000Z"
 last_activity: 2026-09-19
-last_activity_desc: Phase 38 complete, transitioned to Phase 39
+last_activity_desc: Discussed Phase 38.1; wrote 38.1-CONTEXT.md (D-01..D-08) + DISCUSSION-LOG
 state_head: 6f68c50e509adaa61bfbb37fba6c2cc9eb651065
 progress:
-  total_phases: 22
+  total_phases: 23
   completed_phases: 14
   total_plans: 177
   completed_plans: 175
@@ -32,11 +32,11 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 37.1 — Category Management (INSERTED)
+**Current focus:** Phase 38.1 — Profile & Presentation Polish (INSERTED)
 
 ## Current Position
 
-Phase: 39 — Onboarding
+Phase: 38.1 — Profile & Presentation Polish (INSERTED)
 Plan: Not started
 Status: Ready to plan
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
