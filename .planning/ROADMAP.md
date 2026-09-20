@@ -1059,7 +1059,7 @@ Planning review artifact: `38-PLAN-CHECK.md` (not an executable plan)
 **Scope source**: docs/dossier/milestone-2/phase-38.1-profile-presentation-polish-dossier.md (authoritative), owner-approved 2026-09-19 to schedule now, before Phase 39
 **Canonical refs**: ADR-115 + ADR-087 (surface composition — the Orrery overlay treatment must route through the `src/theme/tokens/surface.ts` token API, NOT fork `GlassSurface` and NOT alter ordinary content-card opacity); ADR-108/109/123 (Profile composition + focused editors); ADR-062/118 (bind/unbind lifecycle); ADR-120/121 (heatmap + Rolodex history browser)
 **UI hint**: yes
-**Plans:** 3/9 plans executed
+**Plans:** 4/9 plans executed
 
 Plans:
 **Wave 1**
@@ -1067,7 +1067,7 @@ Plans:
 - [x] 38.1-01-PLAN.md — Orrery overlay surface token + AA proof (D-04 foundation) [wave 1]
 - [x] 38.1-02-PLAN.md — Shared minute-precision timestamp formatter (D-08 foundation) [wave 1]
 - [x] 38.1-05-PLAN.md — Profile heading ownership + false empty-state fix + Unbind→overflow (§D/§E/§H, D-07) [wave 1]
-- [ ] 38.1-07-PLAN.md — Relationship Overview orphan-stretch + centered content (§I, D-05) [wave 1]
+- [x] 38.1-07-PLAN.md — Relationship Overview orphan-stretch + centered content (§I, D-05) [wave 1]
 - [ ] 38.1-08-PLAN.md — Contacts Grid excerpt removal (§L) [wave 1]
 
 **Wave 2** *(blocked on Wave 1 completion)*
