@@ -137,7 +137,7 @@ describe("knowledge presentation", () => {
       "imported-contact-notes",
     ]);
     expect(result.children[0]).toMatchObject({
-      summary: "1 shown · 3 more",
+      bodySummary: "1 shown · 3 more",
       viewAllLabel: "View all 4 featured items",
       showHiddenAvailable: true,
       items: [
@@ -150,6 +150,7 @@ describe("knowledge presentation", () => {
         }),
       ],
     });
+    expect(result.children[0]).not.toHaveProperty("summary");
   });
 
   it("preserves ungrouped rows without inventing a heading and exposes raw-value history", () => {
