@@ -14,7 +14,6 @@ import {
 } from "@/db/profile-presentation-dao";
 import type { ProfileSnapshot } from "@/db/profile-read";
 import {
-  PROFILE_MODULE_EMPTY_SUMMARIES,
   resolveProfileModuleHostState,
 } from "@/profile/module-host-model";
 import {
@@ -59,81 +58,13 @@ const TOP_LEVEL_MODULE_IDS = new Set<ProfileTopLevelModuleId>([
   "interaction-history",
 ]);
 
-function knowledgeChildSummary(
-  snapshot: ProfileSnapshot,
-  id: ProfileModuleId,
-): string {
-  if (snapshot.knowledge.status === "error") return snapshot.knowledge.message;
-  const knowledge = snapshot.knowledge.data;
-  switch (id) {
-    case "pinned-featured":
-      return knowledge.featured.total === 0
-        ? "Nothing added yet"
-        : `${knowledge.featured.total} saved`;
-    case "last-talked-about":
-      return (
-        knowledge.currentState.last_talked_about?.value ?? "Nothing added yet"
-      );
-    case "key-people":
-      return knowledge.relationships.total === 0
-        ? "Nothing added yet"
-        : `${knowledge.relationships.total} saved`;
-    case "current-location":
-      return (
-        knowledge.currentState.current_location?.value ?? "Nothing added yet"
-      );
-    case "memories":
-      return knowledge.memories.total === 0
-        ? "Nothing saved yet"
-        : `${knowledge.memories.total} saved`;
-    case "custom-fields":
-      return knowledge.customFields.length === 0
-        ? "Nothing added yet"
-        : `${knowledge.customFields.reduce((count, group) => count + group.items.length, 0)} fields`;
-    case "off-limits":
-      return knowledge.offLimits.length === 0
-        ? "Nothing added yet"
-        : `${knowledge.offLimits.length} saved`;
-    case "imported-contact-notes":
-      return knowledge.importedNotes.total === 0
-        ? "Nothing added yet"
-        : `${knowledge.importedNotes.total} saved`;
-    default:
-      return "Nothing added yet";
-  }
-}
-
-function topLevelSummary(
-  snapshot: ProfileSnapshot,
-  id: ProfileModuleId,
-): string {
-  switch (id) {
-    case "relationship-overview":
-      return "Relationship facts";
-    case "things-to-remember":
-      return snapshot.knowledge.status === "error"
-        ? snapshot.knowledge.message
-        : (PROFILE_MODULE_EMPTY_SUMMARIES[id] ?? "Things to Remember");
-    case "contact-methods":
-      return snapshot.methods.phone.length + snapshot.methods.email.length === 0
-        ? (PROFILE_MODULE_EMPTY_SUMMARIES[id] ?? "Contact Methods · None")
-        : `${snapshot.methods.phone.length + snapshot.methods.email.length} methods`;
-    case "interaction-history":
-      return snapshot.history.status === "error"
-        ? snapshot.history.message
-        : snapshot.history.data.summary.text;
-    default:
-      return "";
-  }
-}
-
 function ProfileSection({
   id,
   defaultExpanded,
   collapse,
   pending,
   failed,
-  summary,
+  errorMessage,
   onToggle,
   children,
 }: {
@@ -142,7 +73,7 @@ function ProfileSection({
   collapse: ProfileCollapseMap;
   pending: boolean;
   failed: boolean;
-  summary: string;
+  errorMessage?: string;
   onToggle: (placement: CollapsePlacement) => void;
   children: React.ReactNode;
 }) {
@@ -166,7 +97,10 @@ function ProfileSection({
           <AppText role="heading" accessibilityRole="header">
             {label}
           </AppText>
-          <AppText role="caption">{pending ? "Saving…" : summary}</AppText>
+          {pending ? <AppText role="caption">Saving…</AppText> : null}
+          {!pending && errorMessage ? (
+            <AppText role="caption">{errorMessage}</AppText>
+          ) : null}
         </View>
         <Icon
           name="chevron-down"
@@ -322,7 +256,11 @@ export function ProfileModuleHost({
           collapse={collapse}
           pending={pending.has(placement.id as ProfileCollapsibleModuleId)}
           failed={failed === placement.id}
-          summary={knowledgeChildSummary(snapshot, placement.id)}
+          errorMessage={
+            snapshot.knowledge.status === "error"
+              ? snapshot.knowledge.message
+              : undefined
+          }
           onToggle={toggle}
         >
           {snapshot.knowledge.status === "error" ? (
@@ -425,7 +363,7 @@ export function ProfileModuleHost({
               collapse={collapse}
               pending={pending.has(id)}
               failed={failed === id}
-              summary={topLevelSummary(snapshot, id)}
+              errorMessage={undefined}
               onToggle={toggle}
             >
               <RelationshipOverview
@@ -446,7 +384,11 @@ export function ProfileModuleHost({
               collapse={collapse}
               pending={pending.has(id)}
               failed={failed === id}
-              summary={topLevelSummary(snapshot, id)}
+              errorMessage={
+                snapshot.knowledge.status === "error"
+                  ? snapshot.knowledge.message
+                  : undefined
+              }
               onToggle={toggle}
             >
               {renderThingsToRemember()}
@@ -462,7 +404,7 @@ export function ProfileModuleHost({
               collapse={collapse}
               pending={pending.has(id)}
               failed={failed === id}
-              summary={topLevelSummary(snapshot, id)}
+              errorMessage={undefined}
               onToggle={toggle}
             >
               {renderContactMethods()}
@@ -477,7 +419,11 @@ export function ProfileModuleHost({
             collapse={collapse}
             pending={pending.has(id)}
             failed={failed === id}
-            summary={topLevelSummary(snapshot, id)}
+            errorMessage={
+              snapshot.history.status === "error"
+                ? snapshot.history.message
+                : undefined
+            }
             onToggle={toggle}
           >
             {renderHistory()}

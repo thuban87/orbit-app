@@ -5,14 +5,13 @@ import type {
   ProfileModuleId,
 } from "./persisted-contract";
 
-/** Useful collapsed summaries remain visible even while their owning renderer is empty. */
+/**
+ * Section headers are identifiers only. Content state belongs in the rendered
+ * section body, so no module may supply header-adjacent empty-state metadata.
+ */
 export const PROFILE_MODULE_EMPTY_SUMMARIES: Readonly<
   Partial<Record<ProfileModuleId, string>>
-> = Object.freeze({
-  "things-to-remember": "Things to Remember · Nothing added yet",
-  "contact-methods": "Contact Methods · None",
-  "interaction-history": "Interaction History · No interactions yet",
-});
+> = Object.freeze({});
 
 /** Render-free contract shared by the section header and its accessibility state. */
 export function resolveProfileModuleHostState(input: {

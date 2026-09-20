@@ -182,12 +182,10 @@ function KnowledgeChild({
         <Icon name={childIcon(child.id)} tone="textSecondary" size="sm" />
         <View style={styles.childCopy}>
           <AppText role="heading">{child.title}</AppText>
-          <AppText role="caption">{child.summary}</AppText>
-          {child.helper ? (
-            <AppText role="caption">{child.helper}</AppText>
-          ) : null}
         </View>
       </View>
+      <AppText role="body">{child.bodySummary}</AppText>
+      {child.helper ? <AppText role="caption">{child.helper}</AppText> : null}
       {child.groups.map((group, index) => (
         <View key={group.name ?? `direct-${index}`} style={styles.group}>
           {group.heading ? (

@@ -66,7 +66,8 @@ export interface KnowledgePresentationGroup {
 export interface KnowledgePresentationChild {
   id: KnowledgeChildId;
   title: string;
-  summary: string;
+  /** Content state belongs in the rendered section body, never its heading. */
+  bodySummary: string;
   helper?: string;
   items: KnowledgePresentationItem[];
   groups: KnowledgePresentationGroup[];
@@ -188,7 +189,10 @@ function repeatableChild<T extends { id: number }>(input: {
   return {
     id: input.id,
     title: input.title,
-    summary: summary(input.collection.total, input.collection.remainingCount),
+    bodySummary: summary(
+      input.collection.total,
+      input.collection.remainingCount,
+    ),
     items: values.map(input.item),
     groups: [],
     viewAllLabel: viewAllLabel(input.collection.total, input.noun),
@@ -209,7 +213,7 @@ function formatCurrentState(
   return {
     id,
     title,
-    summary: entry?.value ?? "Nothing added yet",
+    bodySummary: entry?.value ?? "Nothing added yet",
     items: entry
       ? [
           {
@@ -299,7 +303,7 @@ function customFieldsChild(
   return {
     id: "custom-fields",
     title: "Custom Fields",
-    summary:
+    bodySummary:
       items.length === 0 ? "Nothing added yet" : `${items.length} fields`,
     items,
     groups,
@@ -325,7 +329,8 @@ function offLimitsChild(
   return {
     id: "off-limits",
     title: "Off Limits",
-    summary: items.length === 0 ? "Nothing added yet" : `${items.length} saved`,
+    bodySummary:
+      items.length === 0 ? "Nothing added yet" : `${items.length} saved`,
     helper: "Avoid bringing these up",
     items,
     groups: [],
