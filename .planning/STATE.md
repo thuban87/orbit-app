@@ -5,11 +5,11 @@ milestone_name: Release Readiness
 current_phase: 38.1
 current_phase_name: Profile & Presentation Polish
 status: planning
-stopped_at: Phase 38.1 context gathered — dossier + CONTEXT shim (D-01..D-08) ready; ready to /gsd-plan-phase 38.1
-last_updated: "2026-09-20T02:06:14.000Z"
+stopped_at: Phase 38.1 UI-SPEC approved
+last_updated: "2026-09-20T02:17:30.039Z"
 last_activity: 2026-09-19
 last_activity_desc: Discussed Phase 38.1; wrote 38.1-CONTEXT.md (D-01..D-08) + DISCUSSION-LOG
-state_head: 6f68c50e509adaa61bfbb37fba6c2cc9eb651065
+state_head: 74cca212b7b73d0a21e580e60a1ddaa2a67014b4
 progress:
   total_phases: 23
   completed_phases: 14
@@ -795,11 +795,11 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-19T16:05:16.817Z
-**Stopped at:** Phase 38 complete, ready to plan Phase 39
+**Last session:** 2026-09-20T02:17:23.282Z
+**Stopped at:** Phase 38.1 UI-SPEC approved
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** None
+**Resume file:** .planning/phases/38.1-profile-presentation-polish/38.1-UI-SPEC.md
 are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
