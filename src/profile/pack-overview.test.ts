@@ -81,4 +81,66 @@ describe("packOverviewModules", () => {
       }),
     ).toThrow("illegal size for Profile module gravity");
   });
+
+  it("stretches every row-local compact orphan without changing order or semantic size", () => {
+    const trailing = packOverviewModules([modules[1]], {
+      width: 328,
+      fontScale: 1,
+    });
+    expect(trailing.placements).toEqual([
+      { id: "gravity", size: "1x1", row: 0, column: 0, columnSpan: 2 },
+    ]);
+
+    const midSequence = packOverviewModules(
+      [modules[1], modules[0], modules[5]],
+      { width: 328, fontScale: 1 },
+    );
+    expect(midSequence.placements).toEqual([
+      { id: "gravity", size: "1x1", row: 0, column: 0, columnSpan: 2 },
+      {
+        id: "orbit-status",
+        size: "2x1",
+        row: 1,
+        column: 0,
+        columnSpan: 2,
+      },
+      { id: "snooze", size: "1x1", row: 2, column: 0, columnSpan: 2 },
+    ]);
+    expect(midSequence.placements.map((placement) => placement.id)).toEqual([
+      "gravity",
+      "orbit-status",
+      "snooze",
+    ]);
+    expect(midSequence.placements.map((placement) => placement.size)).toEqual([
+      "1x1",
+      "2x1",
+      "1x1",
+    ]);
+
+    const paired = packOverviewModules([modules[1], modules[5]], {
+      width: 328,
+      fontScale: 1,
+    });
+    expect(paired.placements.map((placement) => placement.columnSpan)).toEqual([
+      1, 1,
+    ]);
+
+    const threeColumns = packOverviewModules([modules[1], modules[0]], {
+      width: 496,
+      fontScale: 1,
+    });
+    expect(threeColumns.placements.map((placement) => placement.columnSpan)).toEqual([
+      1, 2,
+    ]);
+
+    const singleColumn = packOverviewModules([modules[1]], {
+      width: 150,
+      fontScale: 1,
+    });
+    expect(singleColumn.columns).toBe(1);
+    expect(singleColumn.placements[0]).toMatchObject({
+      size: "1x1",
+      columnSpan: 1,
+    });
+  });
 });
