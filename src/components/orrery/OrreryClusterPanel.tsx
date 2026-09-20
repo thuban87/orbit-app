@@ -46,7 +46,7 @@ export function OrreryClusterPanel({
         maxHeight: region.height,
       }}
     >
-      <GlassSurface density="dense">
+      <GlassSurface density="dense" treatment="orrery-overlay">
         <ScrollView
           style={{ maxHeight: region.height }}
           contentContainerStyle={styles.content}

@@ -139,7 +139,7 @@ export function OrrerySystemSelector({
         style={styles.trigger}
         onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
       >
-        <GlassSurface density="dense">
+        <GlassSurface density="dense" treatment="orrery-overlay">
           <Pressable
             ref={trigger}
             style={styles.triggerRow}
@@ -167,7 +167,7 @@ export function OrrerySystemSelector({
           style={[styles.panel, { top }]}
           accessibilityViewIsModal
         >
-          <GlassSurface density="dense">
+          <GlassSurface density="dense" treatment="orrery-overlay">
             <ScrollView
               style={{
                 maxHeight: Math.max(44, availableHeight - top - SPACING.base),

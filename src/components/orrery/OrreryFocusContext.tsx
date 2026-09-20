@@ -84,7 +84,7 @@ export function OrreryFocusContext({
       importantForAccessibility={blocked ? "no-hide-descendants" : "auto"}
       onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
     >
-      <GlassSurface density="dense">
+      <GlassSurface density="dense" treatment="orrery-overlay">
         <Animated.ScrollView
           style={scrollBounds}
           contentContainerStyle={styles.content}
