@@ -13,7 +13,6 @@ import Animated, {
   useAnimatedProps,
 } from "react-native-reanimated";
 import { Icon } from "@/components/icons/Icon";
-import { AppText } from "@/components/ui/AppText";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import type { CameraPose, CameraViewport } from "@/logic/orrery-camera-logic";
 import { useWindowObstacle } from "@/navigation/use-window-measurement";
@@ -86,10 +85,14 @@ export function OrreryControls({
           : styles.unmeasured,
       ]}
     >
-      <GlassSurface density="dense">
-        <ScrollView
-          style={region ? { maxHeight: region.height - 2 } : undefined}
-          contentContainerStyle={styles.stack}
+      <ScrollView
+        style={region ? { maxHeight: region.height - 2 } : undefined}
+        contentContainerStyle={styles.stack}
+      >
+        <GlassSurface
+          density="dense"
+          treatment="orrery-overlay"
+          style={styles.controlSurface}
         >
           <Pressable
             ref={trigger}
@@ -103,10 +106,13 @@ export function OrreryControls({
             onPress={() => onContacts(restore)}
           >
             <Icon name="list" size="md" />
-            <AppText role="label" style={styles.label}>
-              Contacts in this System
-            </AppText>
           </Pressable>
+        </GlassSurface>
+        <GlassSurface
+          density="dense"
+          treatment="orrery-overlay"
+          style={styles.controlSurface}
+        >
           <Pressable
             style={styles.control}
             accessibilityRole="button"
@@ -118,10 +124,13 @@ export function OrreryControls({
             onPress={onRecenter}
           >
             <Icon name="recenter" size="md" />
-            <AppText role="label" style={styles.label}>
-              Recenter
-            </AppText>
           </Pressable>
+        </GlassSurface>
+        <GlassSurface
+          density="dense"
+          treatment="orrery-overlay"
+          style={styles.controlSurface}
+        >
           <AnimatedPressable
             style={styles.control}
             accessibilityRole="button"
@@ -134,26 +143,22 @@ export function OrreryControls({
             onPress={onResetNorth}
           >
             <Icon name="north" size="md" />
-            <AppText role="label" style={styles.label}>
-              Reset north
-            </AppText>
           </AnimatedPressable>
-        </ScrollView>
-      </GlassSurface>
+        </GlassSurface>
+      </ScrollView>
     </View>
   );
 }
 const styles = StyleSheet.create({
   root: { position: "absolute", zIndex: 12, elevation: 12 },
   unmeasured: { right: SPACING.base, bottom: SPACING.base, maxWidth: "90%" },
-  stack: { gap: SPACING.sm },
+  stack: { gap: SPACING.xs },
+  controlSurface: { width: 44, height: 44 },
   control: {
     minWidth: 44,
     minHeight: 44,
-    flexDirection: "row",
     alignItems: "center",
-    gap: SPACING.sm,
-    padding: SPACING.md,
+    justifyContent: "center",
+    padding: SPACING.sm,
   },
-  label: { flexShrink: 1 },
 });

@@ -96,20 +96,20 @@ function controls(measured = true, blocked = false) {
     onRecenter = vi.fn(),
     onResetNorth = vi.fn();
   const pose = { value: { ...HOME_CAMERA, yaw: Math.PI / 2 } };
+  const tree = OrreryControls({
+    viewport: { width: 400, height: 700 },
+    measured,
+    blocked,
+    pose: pose as never,
+    onContacts,
+    onRecenter,
+    onResetNorth,
+  });
   const nodes = all(
-    resolve(
-      OrreryControls({
-        viewport: { width: 400, height: 700 },
-        measured,
-        blocked,
-        pose: pose as never,
-        onContacts,
-        onRecenter,
-        onResetNorth,
-      }),
-    ),
+    resolve(tree),
   );
   return {
+    tree,
     nodes,
     onContacts,
     onRecenter,
@@ -119,7 +119,7 @@ function controls(measured = true, blocked = false) {
   };
 }
 describe("actual Orrery controls and detail sheet", () => {
-  it("keeps full labels, minimum targets and 8 gap with Contacts above Recenter, no save spinner", () => {
+  it("uses three square overlay controls with icon-only 44px targets and a 4px gap", () => {
     const ui = controls(false);
     expect(ui.buttons.map((node) => node.props.accessibilityLabel)).toEqual([
       "Contacts in this System",
@@ -133,10 +133,20 @@ describe("actual Orrery controls and detail sheet", () => {
     ]);
     for (const node of ui.buttons)
       expect(node.props.style).toMatchObject({ minWidth: 44, minHeight: 44 });
-    expect(
-      ui.nodes.find((node) => node.type === "ScrollView")?.props
-        .contentContainerStyle,
-    ).toMatchObject({ gap: 8 });
+    const group = ui.tree.props.children as ReactElement<{
+      children?: ReactNode;
+      contentContainerStyle?: unknown;
+    }>;
+    expect(group.props.contentContainerStyle).toMatchObject({ gap: 4 });
+    const surfaces = Array.isArray(group.props.children)
+      ? group.props.children
+      : [group.props.children];
+    expect(surfaces).toHaveLength(3);
+    for (const surface of surfaces)
+      expect((surface as ReactElement).props).toMatchObject({
+        treatment: "orrery-overlay",
+        style: { width: 44, height: 44 },
+      });
     for (const node of ui.nodes.filter((node) => node.type === "Text")) {
       expect(node.props.numberOfLines).toBeUndefined();
       expect(node.props.allowFontScaling).toBeUndefined();
