@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.1
 current_phase_name: profile-presentation-polish
 status: planned
-stopped_at: Completed 38.1-03-PLAN.md
-last_updated: "2026-09-20T05:18:39.237Z"
+stopped_at: Completed 38.1-04-PLAN.md
+last_updated: "2026-09-20T05:27:02.812Z"
 last_activity: 2026-09-19
 last_activity_desc: "Phase 38.1 plan convergence (codex+claude, 3 cycles): HIGH 5→0, actionable 18→0; cycle-1/2/3 fixes applied inline (no full replan). 9 plans READY TO EXECUTE."
-state_head: ea3eb992859dda9b8cbfc6d156c5b9a104aef2c2
+state_head: a62d3b494dfbfea1ef1f671b488e41356006d1c2
 progress:
   total_phases: 23
   completed_phases: 14
   total_plans: 186
-  completed_plans: 181
+  completed_plans: 182
 carried_forward:
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
@@ -330,6 +330,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.1-profile-presentation-polish P07 | 5 min | 2 tasks | 3 files |
 | Phase 38.1 P08 | 12m | 2 tasks | 3 files |
 | Phase 38.1 P03 | 5min | 2 tasks | 6 files |
+| Phase 38.1 P04 | 5min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -746,6 +747,8 @@ Foundational decisions affecting current work:
 - [Phase 38.1]: 38.1-08: HomeScreen computes routine line three only for List; Grid search context remains independent.
 - [Phase 38.1]: Orrery floating overlays use the existing AA-proven GlassSurface treatment; the contacts modal remains a Sheet.
 - [Phase 38.1]: Orrery navigation remains bounded by its measured ScrollView while rendering three 44px square icon controls.
+- [Phase 38.1]: Keep ProfileHistorySummary.lastContact raw; format only the Last Interaction display text through the safe minute formatter.
+- [Phase 38.1]: Year heatmap uses the existing vertical week-row renderer so day-cell classification, selection, and accessibility remain unchanged.
 
 ### Pending Todos
 
@@ -812,8 +815,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-20T05:18:32.382Z
-**Stopped at:** Completed 38.1-03-PLAN.md
+**Last session:** 2026-09-20T05:26:55.871Z
+**Stopped at:** Completed 38.1-04-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
