@@ -1059,7 +1059,7 @@ Planning review artifact: `38-PLAN-CHECK.md` (not an executable plan)
 **Scope source**: docs/dossier/milestone-2/phase-38.1-profile-presentation-polish-dossier.md (authoritative), owner-approved 2026-09-19 to schedule now, before Phase 39
 **Canonical refs**: ADR-115 + ADR-087 (surface composition — the Orrery overlay treatment must route through the `src/theme/tokens/surface.ts` token API, NOT fork `GlassSurface` and NOT alter ordinary content-card opacity); ADR-108/109/123 (Profile composition + focused editors); ADR-062/118 (bind/unbind lifecycle); ADR-120/121 (heatmap + Rolodex history browser)
 **UI hint**: yes
-**Plans:** 5/9 plans executed
+**Plans:** 6/9 plans executed
 
 Plans:
 **Wave 1**
@@ -1072,7 +1072,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 38.1-03-PLAN.md — Orrery nav split + apply overlay treatment (§B/§C, D-04) [wave 2, dep 01]
+- [x] 38.1-03-PLAN.md — Orrery nav split + apply overlay treatment (§B/§C, D-04) [wave 2, dep 01]
 - [ ] 38.1-04-PLAN.md — Vertical Year heatmap + timestamp offender reformats (§J/§K, D-08) [wave 2, dep 02]
 - [ ] 38.1-06-PLAN.md — Most Recent/Previous temporal knowledge + heading-level edit affordances (§F/§G, D-06) [wave 2, dep 05]
 
