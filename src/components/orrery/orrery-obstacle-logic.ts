@@ -30,7 +30,7 @@ export function canvasViewport(
 const CONTROL_EDGE = 16;
 const CONTROL_GAP = 8;
 const CONTROL_WIDTH = 200;
-const CONTROL_MIN_TARGET = 44;
+const CONTROL_MIN_TARGET = 55;
 
 /** Bottom-right free column. Native content may grow/scroll, never shrink its targets. */
 export function controlsRegion(viewport: CameraViewport): CameraRect | null {

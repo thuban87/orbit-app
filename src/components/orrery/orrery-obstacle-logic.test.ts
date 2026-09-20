@@ -134,6 +134,7 @@ describe("reachable camera controls", () => {
     expect(region!.x + region!.width).toBe(384);
   });
   it("makes large-text controls scroll within the actual free column and rejects unavailable bounds", () => {
+    expect(controlsRegion({ width: 54, height: 700 })).toBeNull();
     expect(
       controlsRegion({
         width: 160,

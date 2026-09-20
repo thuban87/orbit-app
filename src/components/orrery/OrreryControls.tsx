@@ -24,6 +24,7 @@ import {
 } from "./orrery-obstacle-logic";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const CONTROL_SIZE = 55;
 
 export const ORRERY_CONTROLS_OBSTACLE = "orrery-camera-controls";
 export interface OrreryControlsProps {
@@ -153,12 +154,12 @@ const styles = StyleSheet.create({
   root: { position: "absolute", zIndex: 12, elevation: 12 },
   unmeasured: { right: SPACING.base, bottom: SPACING.base, maxWidth: "90%" },
   // The region is a deliberately wide free column so it can avoid measured
-  // obstacles. Pin the 44px controls to its right edge, directly above the FAB.
+  // obstacles. Pin the 55px controls to its right edge, directly above the FAB.
   stack: { gap: SPACING.xs, alignItems: "flex-end" },
-  controlSurface: { width: 44, height: 44 },
+  controlSurface: { width: CONTROL_SIZE, height: CONTROL_SIZE },
   control: {
-    minWidth: 44,
-    minHeight: 44,
+    minWidth: CONTROL_SIZE,
+    minHeight: CONTROL_SIZE,
     alignItems: "center",
     justifyContent: "center",
     padding: SPACING.sm,

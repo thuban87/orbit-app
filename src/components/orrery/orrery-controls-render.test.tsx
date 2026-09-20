@@ -117,7 +117,7 @@ function controls(measured = true, blocked = false) {
   };
 }
 describe("actual Orrery controls and detail sheet", () => {
-  it("uses three square overlay controls with icon-only 44px targets and a 4px gap", () => {
+  it("uses three square overlay controls with icon-only 55px targets and a 4px gap", () => {
     const ui = controls(false);
     expect(ui.buttons.map((node) => node.props.accessibilityLabel)).toEqual([
       "Contacts in this System",
@@ -130,7 +130,7 @@ describe("actual Orrery controls and detail sheet", () => {
       true,
     ]);
     for (const node of ui.buttons)
-      expect(node.props.style).toMatchObject({ minWidth: 44, minHeight: 44 });
+      expect(node.props.style).toMatchObject({ minWidth: 55, minHeight: 55 });
     const group = ui.tree.props.children as ReactElement<{
       children?: ReactNode;
       contentContainerStyle?: unknown;
@@ -146,7 +146,7 @@ describe("actual Orrery controls and detail sheet", () => {
     for (const surface of surfaces)
       expect((surface as ReactElement).props).toMatchObject({
         treatment: "orrery-overlay",
-        style: { width: 44, height: 44 },
+        style: { width: 55, height: 55 },
       });
     for (const node of ui.nodes.filter((node) => node.type === "Text")) {
       expect(node.props.numberOfLines).toBeUndefined();
