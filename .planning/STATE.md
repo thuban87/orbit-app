@@ -3,17 +3,17 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.1
-current_phase_name: Profile & Presentation Polish
-status: planning
+current_phase_name: profile-presentation-polish
+status: executing
 stopped_at: Phase 38.1 UI-SPEC approved
-last_updated: "2026-09-20T02:17:30.039Z"
+last_updated: "2026-09-20T03:07:10.899Z"
 last_activity: 2026-09-19
 last_activity_desc: Discussed Phase 38.1; wrote 38.1-CONTEXT.md (D-01..D-08) + DISCUSSION-LOG
-state_head: 74cca212b7b73d0a21e580e60a1ddaa2a67014b4
+state_head: 74e11a6ba2327f0f4261f72b851f3b6c6325d6d6
 progress:
   total_phases: 23
   completed_phases: 14
-  total_plans: 177
+  total_plans: 186
   completed_plans: 175
 carried_forward:
 
@@ -36,9 +36,9 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 38.1 — Profile & Presentation Polish (INSERTED)
+Phase: 38.1 (profile-presentation-polish) — READY TO EXECUTE
 Plan: Not started
-Status: Ready to plan
+Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.

@@ -1062,14 +1062,22 @@ Planning review artifact: `38-PLAN-CHECK.md` (not an executable plan)
 **Plans:** 9 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 38.1-01-PLAN.md — Orrery overlay surface token + AA proof (D-04 foundation) [wave 1]
 - [ ] 38.1-02-PLAN.md — Shared minute-precision timestamp formatter (D-08 foundation) [wave 1]
 - [ ] 38.1-05-PLAN.md — Profile heading ownership + false empty-state fix + Unbind→overflow (§D/§E/§H, D-07) [wave 1]
 - [ ] 38.1-07-PLAN.md — Relationship Overview orphan-stretch + centered content (§I, D-05) [wave 1]
 - [ ] 38.1-08-PLAN.md — Contacts Grid excerpt removal (§L) [wave 1]
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 38.1-03-PLAN.md — Orrery nav split + apply overlay treatment (§B/§C, D-04) [wave 2, dep 01]
 - [ ] 38.1-04-PLAN.md — Vertical Year heatmap + timestamp offender reformats (§J/§K, D-08) [wave 2, dep 02]
 - [ ] 38.1-06-PLAN.md — Most Recent/Previous temporal knowledge + heading-level edit affordances (§F/§G, D-06) [wave 2, dep 05]
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 38.1-09-PLAN.md — Bounded cross-app audit + physical-device UAT (§N/§O) [wave 3, dep all]
 
 > **Ready to plan — dossier authored 2026-09-19 (owner + codex), grounded against the post-Phase-38 repo 2026-09-19; discuss session complete 2026-09-19 (see `38.1-CONTEXT.md`, D-01..D-08). Plan against the dossier as the authoritative contract; CONTEXT D-NN are the enforced guards. The two grounding flags are resolved: (1) Orrery overlays stay translucent in all theme/mode combos via a NEW token treatment in `src/theme/tokens/surface.ts`, AA-proven, not a `GlassSurface` fork or a change to content-card opacity (D-04); (2) the existing compact/wide toggle in `ProfileLayoutEditor.tsx:149-164` is KEPT — orphan-stretch is visual-only and never overrides an explicit compact choice (D-05). Deferred: the user-choosable 12/24h time-format setting → own phase (candidate 38.2) / Settings pass (D-08); 38.1 stays no-schema.**
