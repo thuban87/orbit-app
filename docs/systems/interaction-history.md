@@ -69,7 +69,7 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 
 1. Changing the lens or preset writes it through `updateAppSettings({historyLens, historyCycleCount})` (global, not per contact) and re-renders both surfaces over the new window.
 2. Tapping a cell opens `HeatmapContextCard` first (count + `See details`, or `0 interactions` + `Log interaction`) — never the large sheet directly.
-3. `See details` opens the shared `DateDetailSheet`; `Log interaction` routes the typed `LogContact { contactId, prefillDate }` contract (Phase 34 owns the form).
+3. `See details` opens the shared `DateDetailSheet`; `Log interaction` routes the typed `LogContact { contactId, prefillDate }` contract to the canonical detailed form. The prefilled day remains editable.
 
 ### Rolodex browsing
 
@@ -108,6 +108,7 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 - **ADR-121:** Rolodex Month/Day/Year History Browser — Reanimated/Gesture-only wheels (no Skia), Day-primary with leap-aware clamp and today-as-max, silhouette markers, and a no-auto-open drawer.
 - **ADR-122:** Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet — one inspection/correction surface through the sole recency writer with hard-delete.
 - **ADR-123:** Profile History Section Replacing the Vertical Timeline — the assembled section behind the ProfileModuleHost seam and the typed `LogContact` backfill contract. Partially supersedes ADR-024's profile-timeline refinement surface.
+- **ADR-132:** Focused Rapid Capture Workflows — fulfills the typed detailed-log target while retaining the History-owned backfill route contract.
 - **ADR-116 / ADR-117:** the interaction vocabulary/duration and Allow-AI gate this surface renders (see `interaction-log.md`, `ai-suggestions.md`).
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/components/history/HistorySection.tsx`.
 - **[ADR-127: Canonical Event-First Group Logging and Explicit Child Edit Scope](../decisions/ADR-127-canonical-event-first-group-logging-and-explicit-child-edit-scope.md)** — governs `src/components/history/GroupScopePrompt.tsx`, `src/components/history/HistorySection.tsx`, `src/components/history/InteractionDetail.tsx`.
@@ -124,6 +125,7 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 6. **Group context is local presentation only.** Keep Group Note distinct from the participant note; child Allow-AI never authorizes shared text.
 7. **The drawer/context card never auto-open the sheet.** Scrolling or selecting a date updates only the committed selection; the sheet opens exclusively from an explicit `See details` / `Log interaction` action.
 8. **Backfill routes detailed logging, never Quick Log.** `buildLogRoute` returns the typed `LogContact { contactId, prefillDate }` — Quick Log means "now" and must not be reused for a historical date.
+9. **The History date is only an initial value.** The detailed Log Interaction form may edit it; a multi-day History range must never invent an exact day.
 9. **Worklet-forward-ref safety.** The Rolodex depth worklet is defined above its caller; a worklet calling a helper defined later crashes undefined-on-device on Hermes and vitest cannot catch it.
 10. **IntensityChart caption reads the contact cadence, not the window span.** A regression once made the caption describe the window; it now reflects the contact's true intended cadence (fixed live during UAT, commit `84e4013`).
 
@@ -145,3 +147,4 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 |---|---|---|
 | 2026-09-02 | 32 | Created the History & Insights subsystem: reusable count-only aggregation seam + canonical `history-read`, shared-window Heatmap/Intensity with globally-persisted lenses, the Rolodex Month/Day/Year Browser, the shared Date Detail Sheet + Interaction Detail + canonical Edit route with hard-delete, and the Profile History section replacing the vertical timeline. Group-linked routing is a dormant Phase-33 seam. |
 | 2026-09-02 | 33 | Activated local group context, explicit child/event edit scope, identity-preserving conversion, and truthful participant Detail projection. |
+| 2026-09-02 | 34 | Replaced the detailed-log placeholder with the canonical Log Interaction form while preserving typed date prefill. |
