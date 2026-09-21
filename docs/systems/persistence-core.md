@@ -144,6 +144,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 24. Migration 022 creates the four System tables without altering the already-shipped last-System setting. Custom names are case-insensitively unique in SQLite; the DAO additionally prevents collisions with generated built-in and live Category names.
 25. Migration 023 adds an internal selection revision. Explicit System selections advance it, and delete/Undo compares both the stored token and revision so an Undo cannot replace a selection made after deletion.
 26. Migration 024 adds independent Profile layout/background templates, Category/contact presentation rows, and nullable global template UIDs. The database target imports the migration's exported version instead of repeating a numeric literal.
+27. Migration 029 adds non-secret multi-lane AI settings, the `ai_connections` table, and ordered `personalization_sections`. The active lane is durable text rather than a local row ID; credentials remain outside SQLite in SecureStore.
 
 ### Running launch maintenance
 
@@ -171,6 +172,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-010:** Single-Writer Interaction Recency Spine — the shared mutex serializes its write transactions.
 - **ADR-130:** Durable Scoped Default Interaction Channel — migration 027 adds the ordinary channel preference without changing Group Log defaults.
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — migration 028 adds the portable Compose mode preference boundary.
+- **ADR-135:** Multi-Connection AI Configuration and Fail-Closed Readiness — migration 029 adds non-secret lane configuration while preserving the credential boundary.
 - **ADR-012:** Opt-Out Android Backup for Third-Party PII — persistent contact data is excluded from Android Auto Backup.
 - **ADR-001:** Normalized Custom-Field Values — migration 006 atomically establishes normalized custom-field pairs.
 - **ADR-013:** Runtime Two-Table Custom Fields with Whitelist-Constructed DDL — superseded by ADR-001.
@@ -240,6 +242,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 25. **Selection revision is internal conflict evidence.** It is not camera state or user-facing content. Any selection writer that bypasses the revision increment can let a delayed Undo overwrite a newer choice.
 26. **Do not duplicate the Profile migration number.** Import `PROFILE_PRESENTATION_SCHEMA_VERSION` and `profilePresentationMigration`; a literal target can drift from the registered step.
 27. **Keep the remembered Compose value concrete.** `default_message_mode` may be the `remember` sentinel, but `remembered_message_mode` is read as `text` or `email`; do not use it as a second free-form preference.
+28. **AI metadata is not credential material.** Migration 029 may store lane, model, endpoint, preferences, and permission defaults, but no key-shaped value belongs in `app_settings`, `ai_connections`, or backup.
 
 - **FK detachment needs explicit cleanup.** `ON DELETE SET NULL` clears only the link. Lifecycle writers and the locked orphan contract clear all three follow flags together with the reference.
 
@@ -252,6 +255,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **Orrery** — reads and writes the app-level sun settings added by migration 003.
 - **Orrery** — validates migration-021 view preferences, stores migration-022 System definitions/customization, and uses migration 023 to order selection versus Undo.
 - **AI suggestions** — persists non-secret settings and acknowledgement state through migration 004 while keeping credentials outside SQLite.
+- **AI suggestions** — persists non-secret multi-connection, personalization, and permission-default metadata through migration 029 while keeping credentials outside SQLite.
 - **Digest** — reads the migration-005 scheduling preference and registers a post-migration launch-sweep reconcile.
 - **Backup & Restore** — uses migrations 007/008, revisions, snapshots, and launch recovery without a backend.
 - **Contact Import** — uses migration 012, serial write cores, and foreground recovery hooks for accepted selected-contact work.
@@ -287,3 +291,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-09-02 | 33 | Added migration-026 Group Event parent/linkage, membership uniqueness, and single-transaction recency-core fan-outs. |
 | 2026-09-02 | 34 | Added migration 027's validated ordinary default/remembered interaction-channel settings. |
 | 2026-09-02 | 35 | Added migration 028's durable default/remembered Compose message-mode settings. |
+| 2026-09-02 | 36 | Added migration 029's non-secret AI connection, personalization, and permission-default schema. |
