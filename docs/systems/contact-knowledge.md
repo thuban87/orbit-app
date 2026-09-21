@@ -166,6 +166,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **ADR-132:** Focused Rapid Capture Workflows — supplies focused update and Memory-editor paths without flattening knowledge semantics.
 - **ADR-134:** Read-Only Compose Research and Permission-Bounded Message Focus — adds the normalized Research projection and source-owned focus eligibility.
 - **ADR-107:** Off Limits Excluded from All AI Egress — keeps human-visible Avoid context out of Message Focus and every AI-bound shape.
+- **ADR-136:** Permission-Bounded Prompt Assembly and AI Transparency — applies durable new-item defaults and consumes only explicit egress permission.
 
 ## Gotchas
 
@@ -183,6 +184,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 10. **Card compactness is presentation, not a new relevance tier.** Card View may choose a concise candidate only within the same imminent, pinned, and other priority tier ordering.
 11. **Current-state is not a touchpoint.** Last Talked About and Current Location writes preserve knowledge history but must never write an interaction or `last_contact`.
 12. **Local visibility is not Message Focus eligibility.** Compose Research may display an item that lacks AI permission; only its normalized `aiEligible` value can enable Add to AI.
+13. **Permission defaults are new-item-only.** Changing a type default must not rewrite existing Memory permissions; the manager's explicit review and bulk actions own those rows.
 
 ## Related Systems
 
@@ -210,3 +212,4 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | 2026-09-02 | 32 | Widened `getCurrentStateHistory` to a read-only executor surface so the canonical History read composes it; current-state changes now surface as the History Detail Sheet's knowledge-change record family, routing edits back to `MemoryHistoryScreen` by `fieldKey`. |
 | 2026-09-02 | 34 | Added focused Update Contact knowledge editors, registry-keyed rapid Memory creation, and complete-edit transaction composition. |
 | 2026-09-02 | 35 | Added populated-only, read-only Compose Research with source-owned eligibility and structural Off Limits Avoid context. |
+| 2026-09-02 | 36 | Added creation-time AI permission defaults, central review, and bounded resolved-prompt Memory context. |
