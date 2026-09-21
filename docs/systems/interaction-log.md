@@ -181,6 +181,7 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 - **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — defines the Bound interval and Unbound local-month Profile views.
 - **ADR-116:** Value-Remapped Interaction Vocabulary and Optional Descriptive Duration — remaps the stored `quality`/`channel` values to the Tone / Message-Call-In Person vocabulary and adds nullable descriptive `duration` (migration 025), keeping the SQL column names. Partially supersedes ADR-023's value vocabulary.
 - **ADR-117:** Per-Interaction Allow-AI Consent Gate — adds the durable `allow_ai` flag (default OFF, fail-closed on restore) to every interaction row.
+- **ADR-136:** Permission-Bounded Prompt Assembly and AI Transparency — resolves the interaction-note default at creation and serializes only opted-in recent notes.
 - **ADR-118:** Bind/Unbind Immutable Lifecycle Events Without a Migration — extends `EventType` and emits insert-only bind/unbind events inside the existing cadence-change transaction.
 - **[ADR-011: Query-Time Status and Never-Contacted Segregation](../decisions/ADR-011-query-time-status-and-never-contacted-segregation.md)** — governs `src/db/recency-dao.ts`.
 - **[ADR-016: Fixed-First Contact Forms and Atomic Contact Creation](../decisions/ADR-016-fixed-first-contact-forms-and-atomic-contact-creation.md)** — governs `src/db/recency-dao.ts`.
@@ -230,6 +231,7 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 18. **Bind/unbind events write inside the cadence transaction.** The producer composes `recordEventCore()` within the existing bind/unbind transaction (non-reentrant mutex), never after it, and the events are immutable like every other lifecycle event.
 19. **Quick Log remains immediate.** A post-log note or Memory must never turn it into a pre-submit form; post-log content is either the interaction note or a Memory, never both.
 20. **Allow AI remains default off.** Group Note never routes through the interaction toggle, and an omitted Tone stays `NULL`, not Neutral.
+21. **Changing the type default is not a bulk grant.** It affects a new interaction note only; existing rows change only through their explicit editor or permission review.
 
 - **Parent removal and child removal differ.** Direct child deletion removes only that participant. Dissolve detaches all children; full event deletion removes all linked children. The parent can remain valid with no participants.
 
@@ -259,3 +261,4 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 | 2026-09-02 | 32 | Migration 025 remapped the stored `quality`/`channel` values to the Tone / Message-Call-In Person vocabulary (column names kept), added nullable descriptive `duration`, and added the default-OFF `allow_ai` consent gate; added `bind`/`unbind` immutable lifecycle events (no migration); single-sourced the vocabulary in `interaction-vocabulary.ts`. The full History & Insights surface replaced the interim bounded Profile timeline. |
 | 2026-09-02 | 33 | Documented canonical Group Event children, three-field inheritance, parent-only note ownership, and recency-safe lifecycle composition. |
 | 2026-09-02 | 34 | Added detailed Log Interaction, scoped Channel defaults, post-log Note-or-Memory capture, and the ordinary Channel preference consumer. |
+| 2026-09-02 | 36 | Added the new-item interaction-note permission default and bounded opted-in recent-note prompt serialization. |
