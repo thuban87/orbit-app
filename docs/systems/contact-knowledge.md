@@ -114,6 +114,12 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 4. Promoting an earlier value atomically demotes the displaced current value instead of deleting it.
 5. The History & Insights Detail Sheet surfaces current-state changes as its third "knowledge-change" record family: `history-read` unions `getCurrentStateHistory` over **every** registered current-state field (calling it once would drop the others), and each row carries its `fieldKey` so a Detail Sheet tap routes back to `MemoryHistoryScreen` for editing. See `interaction-history.md`.
 
+### Rapid Update Contact editing
+
+1. Update Contact provides focused local editors for Memories, Key People, Last Talked About, Current Location, Off Limits, Contact Method, Contact Frequency, and existing custom fields; it returns to the targeted chooser after each independent save until Done.
+2. Last Talked About and Current Location use the current-state writer, so they retain prior values as history and never create an interaction or change `last_contact`.
+3. Quick Log's post-save editor stores either an Interaction Note or a basic Memory, never both. Full Memory creation and in-place editing stay in the Update Contact Memory editor.
+
 ### Relationships and removal
 
 1. `RelationshipEditor` collects a required person name, optional relation details, and optional link to another Orbit contact.
@@ -132,8 +138,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | Constant | Value | File | Purpose |
 |----------|-------|------|---------|
 | `MEMORY_TRASH_WINDOW_DAYS` | `30` | `src/services/memory-trash-sweep.ts` | Shared retention window for Memory and relationship trash. |
-| `PROVISIONAL_MEMORY_LABEL` | `Memory` | `src/db/memory-registry.ts` | Single-source provisional terminology pending owner reconciliation. |
-| `PROVISIONAL_DEFAULT_MEMORY_TYPE_NAME` | `General` | `src/db/memory-registry.ts` | Provisional display name for the default type. |
+| `DEFAULT_MEMORY_TYPE_KEY` | `general` | `src/db/memory-registry.ts` | Stable registry key requested by rapid capture; its display name is Memory. |
 
 ## Decisions
 
@@ -148,6 +153,8 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 
 - **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — lets Profile shape compact knowledge while each source retains its writer and permission semantics.
 - **ADR-119:** Reusable Count-Only History Aggregation and Canonical History Read — the canonical History read composes the read-only `getCurrentStateHistory` surface to expose current-state changes as the Detail Sheet's knowledge-change record family.
+- **ADR-131:** Progressive Contact Creation and Complete-Record Editing — composes complete-edit knowledge changes under the contact aggregate transaction.
+- **ADR-132:** Focused Rapid Capture Workflows — supplies focused update and Memory-editor paths without flattening knowledge semantics.
 
 ## Gotchas
 
@@ -163,6 +170,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 8. **Search scope is supplied by Dashboard.** The corpus must never broaden that eligible-ID set or add an unscoped global reader.
 9. **Dashboard List context is also visibility-scoped.** Do not select hidden, deleted, outdated, or quarantined data merely because it would fill a sparse row.
 10. **Card compactness is presentation, not a new relevance tier.** Card View may choose a concise candidate only within the same imminent, pinned, and other priority tier ordering.
+11. **Current-state is not a touchpoint.** Last Talked About and Current Location writes preserve knowledge history but must never write an interaction or `last_contact`.
 
 ## Related Systems
 
@@ -187,3 +195,4 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | 2026-09-02 | 28 | Reused bounded candidates and shared descriptors for compact Card View context and search presentation. |
 | 2026-09-02 | 31 | Added typed source-owned knowledge projections to one coherent Profile snapshot, including explicit local-only Off Limits presentation. |
 | 2026-09-02 | 32 | Widened `getCurrentStateHistory` to a read-only executor surface so the canonical History read composes it; current-state changes now surface as the History Detail Sheet's knowledge-change record family, routing edits back to `MemoryHistoryScreen` by `fieldKey`. |
+| 2026-09-02 | 34 | Added focused Update Contact knowledge editors, registry-keyed rapid Memory creation, and complete-edit transaction composition. |
