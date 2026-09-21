@@ -75,7 +75,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 ### Retired AI-proposal rows
 
 1. Migration 017 copies each legacy `source='ai'` row to a default-off Memory and proves the copy before removing the fuel source row.
-2. The old confirmation controls remain inert because no shipped producer creates an AI-proposal fuel row; Phase 36 owns their removal.
+2. Phase 36 removed the obsolete confirmation controls because no shipped producer creates an AI-proposal fuel row.
 3. Explicit per-item AI consent now lives on Memories rather than a fuel provenance transition.
 
 ### Finding saved fuel
@@ -137,6 +137,7 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 8. **Do not create a widget-specific fuel reader.** The larger tile must retain the existing in-query eligibility exclusions and ranked projection.
 9. **Delete with durable evidence.** A missing or failed fuel target must not leave a false tombstone; capture, tombstone, and delete share one transaction.
 10. **Do not revive `source='ai'` as an egress control.** That model is superseded; per-item Memory permission is explicit and defaults off.
+11. **Off Limits remains human-only context.** It may appear as a local Avoid surface but never enters an AI prompt, including as a negative constraint.
 
 ## Related Systems
 
@@ -159,3 +160,4 @@ Fuel uses the on-device SQLite table established empty in migration 1 and activa
 | 2026-08-24 | 17 | Added merge-safe fuel deletion evidence and portable reconciliation. |
 | 2026-09-03 | 24.2 | Retired legacy AI-proposal and topic/share fuel through verified carry-over to Memories. |
 | 2026-09-02 | 31 | Added a narrow local Profile projection for Off Limits while preserving every ranked, search, and AI exclusion. |
+| 2026-09-02 | 36 | Removed the inert legacy AI-proposal confirmation UI; explicit Memory permission remains the sole AI consent model. |
