@@ -88,9 +88,15 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 
 ### Quick Logging from the shell
 
-1. The universal FAB and Dashboard List right-swipe action both select the current Profile contact or canonical picker as needed, then run `runQuickLog()` with the established outbound, connected, manual, unspecified-channel defaults.
-2. The shared command shows success and Undo only after `recordTouchpoint()` resolves. Undo calls `deleteTouchpoint()` with both the interaction and contact IDs; a failed write or undo shows retryable feedback rather than a false success.
+1. The universal FAB and Dashboard List right-swipe action both select the current Profile contact or canonical picker as needed, then run `runQuickLog()` with established outbound, connected, manual defaults and the resolved ordinary Channel preference.
+2. The shared command shows success, Undo, and Add Note only after `recordTouchpoint()` resolves. Undo calls `deleteTouchpoint()` with both the interaction and contact IDs; Add Note opens a post-log editor bound to the committed row; a failed write or undo shows retryable feedback rather than a false success.
 3. The command publishes browse and widget refreshes only after a committed write or delete. Its single-flight guards prevent a rapid tap or swipe from creating or deleting more than one row.
+
+### Detailed ordinary logging
+
+1. Log Interaction accepts a preselected contact and optional History date, otherwise it uses the canonical picker. It initializes the ordinary Channel from the durable preference.
+2. Its scoped chooser offers Message, Call, and In Person. Message and Call default Direction to Outbound with Connected on; In Person defaults Direction to Mutual and hides Connected.
+3. Tone is optional and remains `NULL` when unset. Allow AI sits with Note, starts off, and Duration is available only under More Options; the save routes through the sole recency writer.
 
 ### Quick Logging and archiving a Dashboard selection
 
@@ -157,6 +163,8 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 - **ADR-010:** Single-Writer Interaction Recency Spine — supplies the one maintained recency write path used by touchpoint mutations.
 - **ADR-023:** Structured Touchpoints and One-Tap Defaults — preserves independent interaction axes and explicit fast-path defaults.
 - **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — exposes the established fast path from the shell with commit-only feedback and canonical Undo.
+- **ADR-130:** Durable Scoped Default Interaction Channel — persists ordinary channel seeding and success-only remembered-channel updates.
+- **ADR-132:** Focused Rapid Capture Workflows — establishes the detailed Log Interaction and post-Quick-Log Note-or-Memory paths.
 - **ADR-099:** Durable Global Dashboard Right-Swipe Action — lets the List choose shared Quick Log or detailed logging from one constrained global preference.
 - **ADR-024:** Editable Touchpoint History and Recomputed Recency — makes the timeline the correction path and retains one writer.
 - **ADR-025:** Immutable Lifecycle Events in a Unified Timeline — separates event storage while unifying the profile read.
@@ -220,6 +228,8 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 16. **`allow_ai` defaults OFF and restore is fail-closed on both paths.** A fresh insert takes the column `DEFAULT 0`; the merge/update arm must explicitly set `allow_ai=0` (SQLite's `DEFAULT` fires only on fresh INSERT). Never ship a serializer that could restore an interaction more AI-permissive than the backup.
 17. **`duration` is descriptive only.** Persist canonical seconds, present minutes/hours, show it only when present, and never feed it into Status, Gravity, or Intensity.
 18. **Bind/unbind events write inside the cadence transaction.** The producer composes `recordEventCore()` within the existing bind/unbind transaction (non-reentrant mutex), never after it, and the events are immutable like every other lifecycle event.
+19. **Quick Log remains immediate.** A post-log note or Memory must never turn it into a pre-submit form; post-log content is either the interaction note or a Memory, never both.
+20. **Allow AI remains default off.** Group Note never routes through the interaction toggle, and an omitted Tone stays `NULL`, not Neutral.
 
 - **Parent removal and child removal differ.** Direct child deletion removes only that participant. Dissolve detaches all children; full event deletion removes all linked children. The parent can remain valid with no participants.
 
@@ -248,3 +258,4 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 | 2026-09-02 | 31 | Added snapshot-compatible impact reads, bounded interim Profile history, and the shared no-cadence calendar-month activity contract. |
 | 2026-09-02 | 32 | Migration 025 remapped the stored `quality`/`channel` values to the Tone / Message-Call-In Person vocabulary (column names kept), added nullable descriptive `duration`, and added the default-OFF `allow_ai` consent gate; added `bind`/`unbind` immutable lifecycle events (no migration); single-sourced the vocabulary in `interaction-vocabulary.ts`. The full History & Insights surface replaced the interim bounded Profile timeline. |
 | 2026-09-02 | 33 | Documented canonical Group Event children, three-field inheritance, parent-only note ownership, and recency-safe lifecycle composition. |
+| 2026-09-02 | 34 | Added detailed Log Interaction, scoped Channel defaults, post-log Note-or-Memory capture, and the ordinary Channel preference consumer. |
