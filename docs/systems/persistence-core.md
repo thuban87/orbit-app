@@ -66,6 +66,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/022-orrery-systems.ts` | Adds custom System definitions, rules, manual overrides, and cross-kind display preferences. |
 | Migration | `src/db/migrations/023-orrery-system-selection-revision.ts` | Adds the monotonic internal revision that prevents Undo from overwriting a newer System selection. |
 | Migration | `src/db/migrations/026-group-events-schema.ts` | Adds Group Event parents, nullable child linkage, three follow flags, and partial membership uniqueness. |
+| Migration | `src/db/migrations/027-default-interaction-channel.ts` | Adds validated ordinary interaction-channel preference and remembered-channel columns. |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Systems DAO | `src/db/systems-dao.ts` | Owns transactional System definitions, rules, overrides, preferences, delete/Undo, and selection-aware lifecycle composites. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
@@ -103,6 +104,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/022-orrery-systems.ts` | Creates the four UID-bearing System tables and their uniqueness, mode, cascade, and lookup constraints. |
 | `src/db/migrations/023-orrery-system-selection-revision.ts` | Adds a nonnegative `orrery_system_selection_revision` to the settings singleton. |
 | `src/db/migrations/profile-presentation.ts` | Exports migration 024 and its schema version for Profile templates, assignments, overrides, collapse state, and global preference UIDs. |
+| `src/db/migrations/027-default-interaction-channel.ts` | Adds `default_interaction_channel` and `remembered_interaction_channel` as validated, non-null singleton settings. |
 | `src/db/systems-dao.ts` | Sole mutation boundary for System metadata and ref-keyed customization. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
@@ -166,6 +168,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-008:** Initial Contact Schema as a Cross-Phase Data Contract — migration 001 establishes the durable first schema.
 - **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — every version step commits atomically.
 - **ADR-010:** Single-Writer Interaction Recency Spine — the shared mutex serializes its write transactions.
+- **ADR-130:** Durable Scoped Default Interaction Channel — migration 027 adds the ordinary channel preference without changing Group Log defaults.
 - **ADR-012:** Opt-Out Android Backup for Third-Party PII — persistent contact data is excluded from Android Auto Backup.
 - **ADR-001:** Normalized Custom-Field Values — migration 006 atomically establishes normalized custom-field pairs.
 - **ADR-013:** Runtime Two-Table Custom Fields with Whitelist-Constructed DDL — superseded by ADR-001.
@@ -279,3 +282,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-09-02 | 31 | Added migration 024's independent Profile templates, assignments, overrides, collapse state, and exported schema-version contract. |
 | 2026-09-17 | 37.1 | Confirmed mutable categories require no schema change: target stays 29, runtime deletion uses existing transactions/tombstones, and runtime/restore paths never reseed migration-001 defaults. |
 | 2026-09-02 | 33 | Added migration-026 Group Event parent/linkage, membership uniqueness, and single-transaction recency-core fan-outs. |
+| 2026-09-02 | 34 | Added migration 027's validated ordinary default/remembered interaction-channel settings. |
