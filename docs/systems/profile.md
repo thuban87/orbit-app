@@ -99,6 +99,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 - **ADR-081:** Per-item explicit AI permission replaces proposed fuel permission; no implicit permission is inferred here.
 - **ADR-123:** Profile History Section Replacing the Vertical Timeline — mounts the full History & Insights section behind the `interaction-history` renderer seam without migrating layout/collapse state; the knowledge-change edit reuses the screen's existing navigation.
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — Profile supplies the origin-aware Message entry into session-only Compose.
+- **ADR-138:** Complete Portable Backup Format v5 — carries the complete Profile presentation graph and staged background bytes by durable parent UID.
 
 ## Gotchas
 
@@ -112,6 +113,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 8. **Resolve before choosing the background host input.** Contact-only checks skip Category and global assignments; pass the fully resolved app-owned URI or `null` for the System fallback.
 9. **Keep bundled slots out of Profile templates.** System backgrounds are settings-owned packaged assets, while Profile templates are app-owned photo derivatives with independent assignment and cleanup.
 10. **Compose completion must pop to the originating Profile.** Do not reset a Profile-originated, confirmed Compose flow to Dashboard or leave the finished draft in Back history.
+11. **Presentation backup is not a path backup.** Restore must use embedded background bytes and UID-keyed staging; source-device image paths never cross the portable boundary.
 
 ## Related systems
 
@@ -126,7 +128,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | Date | Phase | What changed |
 |------|-------|--------------|
 | 2026-09-02 | 31 | Established the durable independent-axis presentation model, fixed-Hero semantic composition, coherent local snapshot, guarded relationship facts, focused editors, and app-owned background lifecycle. |
-| 2026-09-14 | 36 | Added parent-UID-keyed Profile presentation, templates, global preferences, and crash-consistent background bytes to backup format v5. |
+| 2026-09-02 | 36 | Added parent-UID-keyed Profile presentation, templates, global preferences, and crash-consistent background bytes to backup format v5. |
 | 2026-09-10 | 31 | Final acceptance reconciliation: all seven bounded owner-smoke journeys are complete after targeted direct-drag, template-discovery/arbitrary-contact assignment, and clear-to-theme repairs. The owner approved the final template lifecycle check; Preview functionality passed while its visual polish remains intentionally deferred. |
 | 2026-09-10 | 31 | Reconciled the six owner-reported Profile UAT gaps against Plans 31-11 through 31-13. Retained physical-Pixel evidence closes the background, sheet, manager, factory-collapse, and compact-bar reports; the owner directly approved the final crop editor's genuine touch/pinch behavior. This does **not** convert the independent unexercised native-checklist rows into passes. |
 | 2026-09-09 | 31 | A droid-built standalone release was installed and inspected on the physical Pixel: Galaxy and Standard local backgrounds rendered full bleed with a compact factory Profile, the release layout chooser/editor remained reachable at 1.15x text after the shared Sheet geometry repair, and the actual empty local Background manager was nonblank. Populated/crop/assistive-technology and owner visual acceptance remain explicitly gated in `31-NATIVE-CHECKLIST.md`. |
