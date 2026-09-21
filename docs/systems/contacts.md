@@ -98,12 +98,12 @@ All data is on-device SQLite. Migration 001 uses a surrogate `contacts.id` and a
 
 ### Creating and editing a contact
 
-1. The create form renders name, category, frequency, last-spoke, and phone before eligible custom fields; duplicate names warn at submit but never block save.
-2. `createContactFull()` opens one shared transaction, inserts the contact, seeds one blank uid-bearing pair for every custom-field definition including quarantined definitions, and for Today or Pick date uses recency cores to insert a manual, directionless interaction and recompute `last_contact`.
-3. “Not yet” writes no interaction and leaves `last_contact` `NULL`; submitted custom values use pair-keyed non-mutexed cores in the same transaction.
-4. The edit form shows every non-quarantined custom field after fixed fields. Changing `rarely_responds` recomputes recency because it changes the qualifying interaction set.
-5. Contact aggregate saves compose method drafts through the method DAO in the same transaction; same-contact canonical duplicates collapse with typed feedback while shared methods on different contacts remain legal.
-6. Bound is the default create/edit choice and requires a positive cadence. A never-assigned Unbound contact may save with NULL cadence; a Bound-to-Unbound edit retains any assigned cadence as dormant rather than clearing it.
+1. Add Contact starts with Identity, Relationship Basics, and Contact Methods; advanced relationship knowledge is behind Show More, duplicate names warn at submit but never block save, and Name is the only required field.
+2. `createContactFull()` opens one shared transaction, inserts the contact, seeds one blank uid-bearing pair for every custom-field definition including quarantined definitions, and composes submitted methods and advanced knowledge through transaction-owned cores.
+3. Today or Pick date uses recency cores to insert a manual, directionless interaction and recompute `last_contact`; “Not yet” writes no interaction and leaves `last_contact` `NULL`.
+4. Edit Contact exposes fixed, custom-field, and direct-access knowledge sections under one form-level Save. Changing `rarely_responds` recomputes recency because it changes the qualifying interaction set.
+5. Contact aggregate saves compose method drafts and knowledge diffs in the same transaction, with one `data_revision` bump; same-contact canonical duplicates collapse with typed feedback while shared methods on different contacts remain legal.
+6. No cadence starts a contact Unbound. Selecting a cadence coordinates Bound state, while a Bound-to-Unbound edit retains any assigned cadence as dormant rather than clearing it.
 
 ### Managing links and lifecycle
 
@@ -219,6 +219,7 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 - **ADR-075:** Binary Favourite Membership Without a User-Facing Order — makes favourite rank ineligible as a contact-picker sort key.
 - **ADR-093:** Scoped Composable Dashboard Population and Filter Model — keeps favourite storage as membership while Dashboard/Widget use shared Default ordering.
 - **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — adds the shared local target picker.
+- **ADR-131:** Progressive Contact Creation and Complete-Record Editing — keeps creation quiet while composing complete edit knowledge atomically.
 - **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — extends merge and purge with explicit contact-knowledge integrity work.
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — requires retained field history to follow explicit contact lifecycle handling.
 - **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — partially superseded; native handoff and Copy remain the interaction boundary.
@@ -290,6 +291,7 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 24. **Retained custom-field history is a child with evidence.** Edit appends its prior raw value in the contact transaction; merge reparents it and purge tombstones it before deletion.
 25. **A bulk action is not a set-based update.** Calling a public writer inside the batch deadlocks the non-reentrant transaction mutex; compose its core inside `bulk-actions-dao` instead.
 26. **Archive batch state must include its event.** Updating `archived_at` without the immutable archive event breaks the lifecycle timeline.
+27. **Off Limits is a fuel kind, not the whole table.** A complete-edit diff must seed and mutate only `off_limits` rows; other fuel kinds must survive the save.
 
 - **Archived participation is allowed.** An archive guard or automatic restore prompt on Group Event insertion would reverse the owner-accepted recency behavior.
 
@@ -339,3 +341,4 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 | 2026-09-02 | 31 | Added Profile presentation fallout to Category changes, retained source-owned relationship actions, and removed the direct Profile AI-draft entry. |
 | 2026-09-17 | 37.1 | Added mutable single-category assignment with stale-target validation and atomic delete reassignment to a survivor or Uncategorized. |
 | 2026-09-02 | 33 | Documented owner-accepted archived participation, Group Event parent survival on purge, and lossless same-event merge refusal. |
+| 2026-09-02 | 34 | Made Add Contact progressively disclosed, made no-cadence creation Unbound, and composed complete-edit knowledge diffs in the atomic contact writer. |
