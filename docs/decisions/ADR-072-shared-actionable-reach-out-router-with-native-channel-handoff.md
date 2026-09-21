@@ -50,4 +50,4 @@ The system exposes one `performReachOut` handoff service and a `ReachOutRouter` 
 - `src/screens/ComposeScreen.tsx` — routes Send through `performReachOut` with the draft, writing no interaction.
 
 **Depends on:** ADR-059 (Normalized Contact Methods, Canonical Actionability, and Local Provenance); ADR-061 (DAO-Selected Actionable Primary SMS Handoff); ADR-035 (Native SMS Handoff with Guaranteed Clipboard Copy); ADR-036 (Entry-Agnostic Compose Navigation and Transmittable Fuel Guardrails)
-**Required by:** None
+**Required by:** ADR-133 (Session-Scoped Compose Modes and Truthful External Handoff)

@@ -96,6 +96,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — permits explicit Unbound assistance without proactive cadence evaluation.
 - **ADR-081:** Retire AI-Proposed Fuel for Explicit Per-Item Permission — replaces provenance-based proposal eligibility with default-off Memory permission.
 - **ADR-079:** On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation — removes the direct Profile AI entry and keeps invocation inside Compose.
+- **ADR-078:** Negative Constraint Off Limits and Gated Recent Interaction AI Context — permits an explicitly consented recent-note carry in the draft context; its avoidance-constraint egress half is partially superseded by ADR-107.
 - **ADR-117:** Per-Interaction Allow-AI Consent Gate — adds the durable, default-off `interactions.allow_ai` flag (migration 025) as the prerequisite consent control for any future interaction-note transmission; `ai-context-read` still selects no `note` this phase.
 - **ADR-109:** Fixed-Hero Semantic Profile Composition and Focused Accessible Editors — applies the Compose-only boundary to the rebuilt Profile Hero and overflow.
 - **ADR-107:** Off Limits Excluded from All AI Egress — reverses avoidance-constraint transmission while retaining the human-facing Avoid group.

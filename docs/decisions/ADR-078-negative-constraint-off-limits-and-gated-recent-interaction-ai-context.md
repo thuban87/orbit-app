@@ -55,4 +55,4 @@ AI-enabled Off Limits items are transmitted as negative "avoid this topic" const
 - `src/screens/ComposeScreen.tsx` — shows Off Limits as the Research-side `Avoid` group and withholds `Add to AI` from those rows.
 
 **Depends on:** ADR-049 (BYO-Key AI Configuration and Credential Boundary); ADR-029 (In-Query Fuel Eligibility and a Shared Ranked Projection)
-**Required by:** ADR-117 (Per-Interaction Allow-AI Consent Gate); ADR-125
+**Required by:** ADR-117 (Per-Interaction Allow-AI Consent Gate); ADR-125; ADR-134 (Read-Only Compose Research and Permission-Bounded Message Focus)

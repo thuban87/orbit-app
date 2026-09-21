@@ -55,4 +55,4 @@ The system writes a durable `interaction_assists` row **immediately before** lau
 - `App.tsx` — mounts the banner app-wide, registers the sweep hook, and refreshes the queue on foreground.
 
 **Depends on:** None
-**Required by:** None
+**Required by:** ADR-133 (Session-Scoped Compose Modes and Truthful External Handoff)
