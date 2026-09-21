@@ -1,7 +1,7 @@
 # Backup & Restore
 
-**Last updated:** 2026-09-14
-**Updated by phase:** 36-ai-configuration-prompting
+**Last updated:** 2026-09-02
+**Updated by phase:** 35-messaging-ai-compose
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -83,6 +83,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 5. Import sessions are local-only transient recovery state: exports omit them, and Replace-all clears their rows so a portable snapshot cannot revive a stale system-picker selection.
 6. A format-4 backup that predates retained custom-field value history normalizes its missing array to `[]`; restored older rows default to AI off and global, non-history field definitions.
 7. The ordinary default and remembered interaction-channel settings use camelCase manifest keys. They are accepted and validated at the restore boundary; Phase 34 declares them without emitting them or changing the backup format.
+8. The Compose default and remembered message-mode settings are likewise allowlisted and validated as a declaration only. Phase 35 does not emit them or bump the backup format; the coordinated wire change belongs to Phase 36.
 
 ### Group Event handoff boundary established by Phase 33
 
@@ -118,6 +119,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 - **ADR-092:** Durable Shared Dashboard Query State — allowlists future-portable Dashboard preferences without changing the current wire format.
 - **ADR-099:** Durable Global Dashboard Right-Swipe Action — allowlists the future-portable action key without an in-phase format change.
 - **ADR-130:** Durable Scoped Default Interaction Channel — declares validated camelCase restore keys without an in-phase wire-format bump.
+- **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — declares Compose message-mode keys without prematurely changing the backup wire format.
 - **[ADR-118: Bind/Unbind Immutable Lifecycle Events Without a Migration](../decisions/ADR-118-bind-unbind-immutable-lifecycle-events-without-a-migration.md)** — governs `src/backup/restore-apply.ts`.
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/db/tombstones-dao.ts`.
 - **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/backup/export-manifest.ts`, `src/db/tombstones-dao.ts`.
@@ -143,6 +145,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 14. **Group Event deletion remains durable.** v5 carries parent tombstones, while an interaction whose Group Event no longer survives is retained as ordinary contact history with a NULL parent.
 15. **Profile presentation and background bytes are v5 entities.** `profile_contact_presentation` and `profile_category_presentation` are keyed by parent UID, preserve template assignments/freeform/collapse state, and restore background bytes through staged, UID-derived `profile-backgrounds/<uid>.jpg` files.
 16. **Restore is a separate interaction writer.** `restore-apply` writes `interactions` without going through migration 025, so it must consume the same `interaction-vocabulary.ts` remap and force `allow_ai=0` on its merge arm; otherwise the restore backdoor re-opens the vocabulary miscount or a stale AI-permissive row (SQLite's column `DEFAULT` fires only on fresh INSERT, not `ON CONFLICT` update).
+17. **Allowlisting is not emission.** A key in `PORTABLE_SETTINGS_KEYS` can be accepted and validated before its format-specific export/restore projection exists; do not mistake the Phase-35 Compose declaration for a format bump.
 
 - **Phase-33 compatibility was deliberately temporary.** Dissolve/delete initially made format-4 export fail validation. Gap closure filtered only unsupported parent tombstones at the export boundary; it preserved durable local evidence and did not complete the portable Group Event graph.
 
@@ -177,6 +180,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 | 2026-09-02 | 32 | Closed the restore backdoors for the interaction Tone/channel vocabulary (remap-on-ingest through the shared map) and the per-interaction `allow_ai` gate (fail-closed on both the fresh-insert and merge/update paths); declared the `history_lens`/`history_cycle_count` preferences restore-accept only, with emission deferred to Phase 36. |
 | 2026-09-14 | 36 | Profile presentation + background bytes added to v5 backup — deferral discharged per D-14. |
 | 2026-09-02 | 34 | Declared and validated restore-only Default Interaction Channel keys without emitting them or changing the format. |
+| 2026-09-02 | 35 | Declared Compose default/remembered message-mode keys without emitting them or changing the backup format. |
 | 2026-09-17 | 37.1 | Bumped to format 6 for category tombstones; merge nulls only proven deleted-category dependents, while Replace-all restores the exact taxonomy including zero and never reseeds defaults. |
 | 2026-09-02 | 33 | Recorded deferred UID-based Group Event wire/restore contract, owner-locked orphan detachment, and temporary format-4 export guard without weakening local tombstones. |
 Category relationships are portable by UID, never local integer ID. Format 6 adds category tombstones with a minimal v5→v6 version relabel. Merge maps a winning deleted category only to Uncategorized and suppresses only dependents proven to reference that UID. Replace-all removes destination-only categories through the canonical fallout transaction, restores the exact incoming order—including an empty taxonomy—clears tombstones for live restored categories, and never replays migration-001 seeds.
