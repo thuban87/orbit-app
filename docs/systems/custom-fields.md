@@ -162,6 +162,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — treats normalized clears as portable data and rejects incompatible identities.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — exports definitions and current normalized values, not history.
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — retains prior values separately while preserving current-pair integrity.
+- **ADR-136:** Permission-Bounded Prompt Assembly and AI Transparency — applies the custom-field sharing default only when a new definition is created and reviews its contact/value impact centrally.
 
 - **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — preserves typed values, grouping, invalid states, and retained history in Profile.
 - **ADR-132:** Focused Rapid Capture Workflows — exposes applicable named fields and the generic Custom Fields path from Update Contact without duplicating definitions.
@@ -185,6 +186,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 13. **Do not reuse `field_history` as value history.** It is a 30-day destructive-operation trace; `custom_field_value_history` is portable prior-value state.
 14. **Contact scope is not ready for UI creation.** Directly-present contact definitions are guarded on write, but Phase 31 owns durable ownership and owner-purge semantics.
 15. **Rapid capture edits values, never definitions.** Update Contact may surface a field by label, but Settings remains the sole definition-editor and slugifier producer.
+16. **Definition sharing expands across its values.** The permission manager presents contact/value review rows but a custom-field enable changes the owning definition's `share_with_ai` state; its impact confirmation must show that fan-out.
 
 ## Related Systems
 
@@ -209,3 +211,4 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | 2026-09-03 | 24.2 | Added ten typed inputs, additive scope/history/group metadata, and portable retained-value history. |
 | 2026-09-02 | 31 | Added typed grouped custom-field and retained-history consumption to the coherent Profile snapshot. |
 | 2026-09-02 | 34 | Added Update Contact discovery of applicable named fields plus the generic Custom Fields value-edit path. |
+| 2026-09-02 | 36 | Added new-definition AI sharing defaults and contact/value-scoped permission review for field definitions. |
