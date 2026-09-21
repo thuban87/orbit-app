@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 33-group-interaction-logging
+**Updated by phase:** 35-messaging-ai-compose
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -130,9 +130,9 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 ### Composing from a contact
 
-1. A profile opens `Compose` with the serializable `{ contactId }` route parameter, or `{ contactId, requestAiSuggestion: true }` for an AI draft; the screen fetches its own current data rather than receiving callbacks or preloaded state.
-2. Compose uses the typed nested Dashboard reset for its external-entry fallback, so the destination is stable without treating Home as a root-stack sibling.
-3. The AI intent is a primitive consumed once by Compose and then cleared with `setParams`; it cannot retain a prompt, contact snapshot, key, or callback across navigation.
+1. A profile opens `Compose` with the serializable `{ contactId, origin: 'profile' }` route parameter. Other callers use the default external-entry origin; Compose fetches current data rather than receiving callbacks or preloaded state.
+2. Both Dashboard and Orrery stacks register Compose and its sibling `ComposeResearch` route. Research carries only a contact ID and reads the retained Compose session in memory.
+3. Back preserves that session and returns to its recorded origin. A confirmed logged handoff clears the session and removes the Compose route; a navigation parameter never starts an AI request automatically.
 
 ### Opening the weekly digest
 
@@ -295,6 +295,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-048:** Status-Default Static Orrery with a Single-Canvas Morph — adds the typed Orrery route and token-driven canvas lifecycle.
 - **ADR-049:** BYO-Key AI Configuration and Credential Boundary — hosts non-secret AI settings while retaining credentials outside navigation and SQLite settings patches.
 - **ADR-052:** Compose-Owned AI Draft Lifecycle and Acknowledged Egress — adds the serializable, consume-once Compose AI request intent.
+- **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — adds origin-aware Compose exits and session-only focused drafting.
+- **ADR-134:** Read-Only Compose Research and Permission-Bounded Message Focus — adds the sibling Compose Research route in both contact stacks.
 - **ADR-053:** Local-First LiteLLM AI Model Catalog — adds Settings model-scope and explicit-refresh controls.
 - **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — adds the self-fetching Digest route and dashboard entry.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the dashboard-rooted Digest notification reset and ready-gated schedule hook.
@@ -344,12 +346,12 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 5. **Crop navigation parameters must stay serializable.** The crop result uses a request id where a custom field needs a return signal; do not pass callbacks through navigation.
 6. **Keep gravity tokens and tiers in lockstep.** The ordered palette ramp has one entry per gravity tier; changing one without the other can miscolor or crash profile presentation.
 7. **Keep search ownership in the dashboard.** The reusable reader and result-row pattern survive the retired FuelSearch route, but Settings must not add a duplicate search surface.
-8. **Compose Back is intentionally not a stack pop.** Both Back paths reset to Home so callers need not provide a profile or other origin route.
+8. **Compose Back follows the recorded origin.** Preserve the in-memory session on a normal exit, return Profile-originated flows to Profile, and use the typed external fallback only when no origin was supplied.
 9. **Keep native share navigation single-owner.** A linking redirect beside `ShareIntentGate` can race the pending native intent, especially on a cold start.
 10. **Initialize immutable notification channels before scheduling.** Scheduling first can post a request on a wrong/default channel and weaken the intended privacy posture.
 11. **Keep widget links separate from React Navigation linking configuration.** A second initial-intent consumer can race `ShareIntentGate`; the explicit widget gate handles only `orbit://`.
 12. **Do not put Orrery sun assignment on the canvas.** Settings owns the Sun / centre picker; canvas long-press conflicts with the radial reorder gesture.
-13. **Keep the AI Compose intent serializable and minimal.** It carries only `contactId` and a boolean request marker; prompts, credentials, and callbacks must not enter route parameters.
+13. **Keep Compose route parameters serializable and minimal.** They identify the contact and origin only; drafts, focus, prompt context, credentials, and callbacks stay out of navigation state.
 14. **Reset digest notification taps instead of navigating onto a warm stack.** The Home/Digest reset is what makes the Digest screen's Back destination stable.
 15. **Do not mount navigation after a bootstrap failure.** A classified migration failure has rolled back unchanged; generic failure copy must not promise unavailable support or recovery.
 16. **Restore route parameters must be content-free.** Pass only an opaque in-memory cache token and aggregate preview; never put a file URI, manifest, callback, or passphrase in navigation state.
@@ -389,7 +391,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **Notifications** — initializes at readiness and uses the response gate for body/action delivery.
 - **Widget** — adds its URI gate, launch refresh registration, and Settings CTA to the ready shell.
 - **Orrery** — registers its dashboard-reached route and receives its self-star and sun-centre controls from Settings.
-- **AI suggestions** — uses Settings for non-secret configuration and the typed Compose intent for profile-originated drafting.
+- **AI suggestions** — uses Settings for non-secret configuration and the session-owned Compose lifecycle for profile-originated drafting.
 - **Digest** — registers a self-fetching route, dashboard entry, ready-gated scheduler, and notification reset destination.
 - **Backup & Restore** — registers typed landing, settings, preview, and result routes plus ready-gated recovery work.
 - **Contact Import** — registers the import route family, Settings entry, and foreground recovery prompt.
@@ -436,3 +438,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 32 | Registered the canonical `EditInteraction` route and the `prefillDate`-extended `LogContact` contract across all Profile-hosting stacks (plus Settings-side `ThingsToRemember`/`MemoryHistory`), and added the per-palette History heatmap/marker theme tokens. |
 | 2026-09-02 | 33 | Replaced Group Log/browse placeholders with cross-stack Group Event routes and awaited, failure-preserving multi-select confirmation. |
 | 2026-09-02 | 34 | Replaced ordinary capture placeholders with Log Interaction, Update Contact, and Memory routes; finalized the visible Log Interaction label and post-log Add Note path. |
+| 2026-09-02 | 35 | Added origin-aware session-scoped Compose navigation, dual-stack Compose Research registration, and durable-mode-free route parameters. |
