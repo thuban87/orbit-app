@@ -102,7 +102,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 
 ## Decisions
 
-- **ADR-108:** Durable Independent-Axis Profile Presentation and Inheritance — Phase 31 allowlisted global preference UIDs but deliberately left the complete presentation graph and image bytes out of format 4.
+- **ADR-108:** Durable Independent-Axis Profile Presentation and Inheritance — defines the Profile presentation graph now carried by format v5.
 
 - **ADR-012:** Opt-Out Android Backup for Third-Party PII — makes the explicit backup path load-bearing.
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — defines merge identity and deletion evidence.
@@ -120,6 +120,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 - **ADR-099:** Durable Global Dashboard Right-Swipe Action — allowlists the future-portable action key without an in-phase format change.
 - **ADR-130:** Durable Scoped Default Interaction Channel — declares validated camelCase restore keys without an in-phase wire-format bump.
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — declares Compose message-mode keys without prematurely changing the backup wire format.
+- **ADR-138:** Complete Portable Backup Format v5 — emits/restores the complete non-secret milestone settings and entity graph, including Profile presentation and background bytes.
 - **[ADR-118: Bind/Unbind Immutable Lifecycle Events Without a Migration](../decisions/ADR-118-bind-unbind-immutable-lifecycle-events-without-a-migration.md)** — governs `src/backup/restore-apply.ts`.
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/db/tombstones-dao.ts`.
 - **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/backup/export-manifest.ts`, `src/db/tombstones-dao.ts`.
@@ -146,6 +147,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 15. **Profile presentation and background bytes are v5 entities.** `profile_contact_presentation` and `profile_category_presentation` are keyed by parent UID, preserve template assignments/freeform/collapse state, and restore background bytes through staged, UID-derived `profile-backgrounds/<uid>.jpg` files.
 16. **Restore is a separate interaction writer.** `restore-apply` writes `interactions` without going through migration 025, so it must consume the same `interaction-vocabulary.ts` remap and force `allow_ai=0` on its merge arm; otherwise the restore backdoor re-opens the vocabulary miscount or a stale AI-permissive row (SQLite's column `DEFAULT` fires only on fresh INSERT, not `ON CONFLICT` update).
 17. **Allowlisting is not emission.** A key in `PORTABLE_SETTINGS_KEYS` can be accepted and validated before its format-specific export/restore projection exists; do not mistake the Phase-35 Compose declaration for a format bump.
+18. **AI connection metadata is portable but credentials are not.** A restored lane can remain selected yet must resolve Needs Attention until its device-local SecureStore credential is supplied.
 
 - **Phase-33 compatibility was deliberately temporary.** Dissolve/delete initially made format-4 export fail validation. Gap closure filtered only unsupported parent tombstones at the export boundary; it preserved durable local evidence and did not complete the portable Group Event graph.
 
@@ -178,7 +180,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 | 2026-09-02 | 30 | Declared the stable-UID Systems entity, validation, and orphan-repair boundary while intentionally leaving the format-4 wire unchanged. |
 | 2026-09-09 | 31 | Documented Profile presentation's format-4 boundary: global preference keys are accepted, while Profile entities and background bytes remain device-local pending the coordinated backup format decision. |
 | 2026-09-02 | 32 | Closed the restore backdoors for the interaction Tone/channel vocabulary (remap-on-ingest through the shared map) and the per-interaction `allow_ai` gate (fail-closed on both the fresh-insert and merge/update paths); declared the `history_lens`/`history_cycle_count` preferences restore-accept only, with emission deferred to Phase 36. |
-| 2026-09-14 | 36 | Profile presentation + background bytes added to v5 backup — deferral discharged per D-14. |
+| 2026-09-02 | 36 | Bumped to v5: emitted/restored complete milestone preferences and entities, including AI metadata, personalization, Group Events, Profile presentation, and crash-consistent background bytes. |
 | 2026-09-02 | 34 | Declared and validated restore-only Default Interaction Channel keys without emitting them or changing the format. |
 | 2026-09-02 | 35 | Declared Compose default/remembered message-mode keys without emitting them or changing the backup format. |
 | 2026-09-17 | 37.1 | Bumped to format 6 for category tombstones; merge nulls only proven deleted-category dependents, while Replace-all restores the exact taxonomy including zero and never reseeds defaults. |
