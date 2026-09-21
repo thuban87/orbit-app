@@ -142,8 +142,9 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 ### Configuring AI settings
 
-1. Settings hosts the token-only AI configuration controls, including provider/model selection, Custom endpoint validation, masked key entry, model-catalog scope, and explicit refresh.
-2. The screen persists ordinary settings through the typed SQLite DAO and routes credentials directly to SecureStore; no navigation state or settings patch carries a key.
+1. Settings exposes the AI Enabled control, simplified off state, connection manager, model picker, Writing Style, Personalization Context, permissions, and prompt preview as typed Settings-stack routes.
+2. The connection manager keeps one active lane while retaining configured inactive lanes. A Needs Attention notice routes to the relevant repair surface rather than silently changing a connection or model.
+3. The screen persists ordinary settings through the typed SQLite DAO and routes credentials directly to SecureStore; no navigation state or settings patch carries a key.
 
 ### Receiving an Android share
 
@@ -298,6 +299,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — adds origin-aware Compose exits and session-only focused drafting.
 - **ADR-134:** Read-Only Compose Research and Permission-Bounded Message Focus — adds the sibling Compose Research route in both contact stacks.
 - **ADR-053:** Local-First LiteLLM AI Model Catalog — adds Settings model-scope and explicit-refresh controls.
+- **ADR-135:** Multi-Connection AI Configuration and Fail-Closed Readiness — adds the routed AI hub, connection/model routes, and repair navigation.
+- **ADR-136:** Permission-Bounded Prompt Assembly and AI Transparency — adds Settings permissions and prompt-preview routes.
 - **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — adds the self-fetching Digest route and dashboard entry.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the dashboard-rooted Digest notification reset and ready-gated schedule hook.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — adds the Backup destination and ready-gated foreground automatic work.
@@ -378,6 +381,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 35. **Avoid Android elevation on translucent Galaxy cards.** It renders an opaque inner rectangle; the iOS shadow remains independently supported.
 36. **Register `EditInteraction` and `LogContact` in every Profile-hosting stack.** A Profile is reachable from Dashboard, Orrery, and Settings; a route registered in only one stack throws when a Settings-originated Profile navigates to it. The Settings stack also needs `ThingsToRemember`/`MemoryHistory` for History Detail Sheet knowledge edits.
 37. **Visible capture labels are product copy.** Keep the internal `LogContact` route identifier for typed compatibility, but show Log Interaction consistently in the dial, accessibility label, and focused form title.
+38. **Keep AI routes typed and content-free.** Route parameters identify a screen or focus only; keys, prompt text, personalization bodies, and callback material remain in their owning local state.
 
 - **Types do not register native routes.** A shared type intersection cannot prove that a route is mounted in each hosting stack; Group Event routes require all three runtime registrations.
 
@@ -416,6 +420,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-08-16 | 12 | Added shared status tokens, widget URI routing, foreground refresh registration, and the Settings pin CTA. |
 | 2026-08-17 | 13 | Added the Orrery route, Settings-owned sun controls, and themed star/muted visual tokens. |
 | 2026-08-18 | 14 | Added non-secret AI settings and a serializable, consume-once Compose AI intent. |
+| 2026-09-02 | 36 | Replaced the inline provider editor with the routed AI hub, multi-connection configuration, permissions, personalization, and prompt-preview surfaces. |
 | 2026-08-23 | 15 | Added the typed Digest route, dashboard entry, dashboard-rooted notification reset, and ready-gated schedule registration. |
 | 2026-08-24 | 16 | Added accurate classified migration and generic bootstrap failure presentation while retaining the readiness gate. |
 | 2026-08-24 | 17 | Added Backup routes, content-free restore navigation, and ready-gated backup/photo recovery hooks. |
