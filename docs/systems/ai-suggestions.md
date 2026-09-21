@@ -1,7 +1,7 @@
 # AI Suggestions
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 32-interaction-history-insights
+**Updated by phase:** 35-messaging-ai-compose
 **Owners:** `src/services/AiService.ts`, `src/services/ai-key-store.ts`, `src/ai/`, `src/db/ai-context-read.ts`, `src/db/app-settings-dao.ts`, `src/logic/ai-suggestion-logic.ts`, `src/screens/SettingsScreen.tsx`, `src/screens/ComposeScreen.tsx`
 
 ## Purpose
@@ -12,13 +12,13 @@ AI suggestions create a short, user-editable message for a contact through a use
 
 ### Data Model
 
-AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_settings` row with non-secret provider configuration and four first-send acknowledgement flags; explicit Memory permission remains on the Memory row and provider keys stay in Expo SecureStore.
+AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_settings` row with non-secret provider configuration and forward-only legacy acknowledgement flags; explicit Memory and interaction permission remain on their source rows and provider keys stay in Expo SecureStore.
 
 **Tables:**
 - `app_settings` — singleton non-secret AI configuration.
   - `ai_provider` (`TEXT`) — `none` by default; enables one of OpenAI, Anthropic, Google, or Custom.
   - `ai_model` / `ai_custom_endpoint` / `ai_custom_model` / `ai_prompt_template` (`TEXT`) — ordinary exportable selection and prompt preferences.
-  - `ai_ack_openai` / `ai_ack_anthropic` / `ai_ack_google` / `ai_ack_custom` (`INTEGER`) — durable acknowledgement state, writable only by `acknowledgeProvider()`.
+  - `ai_ack_openai` / `ai_ack_anthropic` / `ai_ack_google` / `ai_ack_custom` (`INTEGER`) — retained forward-only legacy acknowledgement values; Phase 35 no longer reads them to gate Compose generation.
 
 **Types:**
 - `PromptContext` (`src/ai/prompt-types.ts`) — closed allowlist of contact-derived data permitted to leave the device.
@@ -29,14 +29,15 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 
 | Layer | File | Responsibility |
 |-------|------|----------------|
-| Settings DAO | `src/db/app-settings-dao.ts` | Reads/writes non-secret configuration and owns the acknowledgement writer. |
+| Settings DAO | `src/db/app-settings-dao.ts` | Reads/writes non-secret configuration; retained acknowledgement storage is not a Compose generation gate. |
 | Key repository | `src/services/ai-key-store.ts` | Stores one provider-scoped credential in Expo SecureStore. |
 | Context read | `src/db/ai-context-read.ts` | Builds the narrow outbound context projection. |
 | Prompt resolver | `src/ai/prompt-template.ts` | Creates one bounded, immutable prompt and inspection payload. |
 | Provider adapters | `src/services/AiService.ts` | Makes typed unary provider calls and sanitizes failures. |
 | Custom transport | `src/ai/secure-fetch.ts` | Routes Custom requests through the native egress guard. |
-| Lifecycle | `src/logic/ai-suggestion-logic.ts` | Owns one request, cancellation, timeout, acknowledgement, and stale-result guards. |
-| UI | `src/screens/SettingsScreen.tsx`, `src/screens/ComposeScreen.tsx` | Configures providers and presents the editable-draft flow. |
+| Lifecycle | `src/logic/ai-suggestion-logic.ts` | Owns one three-variant request, cancellation, timeout, and stale-result guards. |
+| Availability | `src/logic/ai-availability.ts` | Resolves Off, Ready, and Needs Attention without exposing credential contents. |
+| UI | `src/screens/SettingsScreen.tsx`, `src/screens/ComposeScreen.tsx` | Configures providers and presents intentional drafting/review. |
 
 ### Key Files
 
@@ -46,6 +47,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | `src/db/ai-context-read.ts` | Sole SQL/data projection for AI context. |
 | `src/db/memories-read.ts` | Supplies the explicit, live-only Memory eligibility projection. |
 | `src/ai/prompt-template.ts` | Sole `ResolvedPrompt` construction path. |
+| `src/logic/ai-generate-variants.ts` | Fans one request into three shared-signal provider calls with bounded variation. |
 | `src/services/AiService.ts` | Provider-specific request/response adapters. |
 | `src/ai/custom-endpoint.ts` | Validates Custom endpoint URLs and public literals. |
 | `modules/orbit-secure-fetch/src/OrbitSecureFetchModule.ts` | Enforces native Custom address, redirect, and proxy posture. |
@@ -63,12 +65,12 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 ### Resolving and sending a suggestion
 
 1. Compose owns every AI invocation. Profile reaches it through Message with contact identity only; the user then explicitly chooses Draft with AI or Rewrite with AI.
-2. `resolvePrompt()` bounds and freezes one `ResolvedPrompt`; its inspection, acknowledgement, and provider payload strings are identical.
-3. On a provider's first request, Compose displays the exact contact-specific prompt and persists acknowledgement before egress. A declined or failed acknowledgement starts no network request.
-4. `AiSuggestionLifecycle` owns the sole controller and 20-second timeout. It invalidates stale work on cancellation, unmount, configuration change, or a superseding request.
-5. A successful suggestion fills an empty draft or asks before replacing a non-empty one. Send and Copy preserve their existing handoff-only behavior and write no touchpoint, fuel, or recency value.
+2. `resolvePrompt()` bounds and freezes one `ResolvedPrompt`; Compose invokes it only after an explicit Draft with AI or Rewrite with AI tap.
+3. `computeAiAvailability()` distinguishes AI Off (no affordance), Ready (normal action), and Needs Attention (a restrained repair route). The provisional adapter reads credential presence, never a key value.
+4. `AiSuggestionLifecycle` owns the sole controller, 20-second timeout, and stale guard. `generateVariants()` makes three shared-signal provider calls; a failure aborts in-flight siblings.
+5. A successful request presents three unlabeled alternatives on a non-destructive review surface. Only Choose this changes the editor; Try Again replaces the set and Cancel preserves the manual draft.
 6. An explicit request for an Unbound contact remains available. Its relationship context retains the closed projection, but unavailable cadence intensity becomes the fixed neutral aggregate rather than NULL arithmetic or a fabricated cadence.
-7. The context reader exposes a Memory only when its stored `allow_ai` flag is on and it is not deleted. This permission is independent of type, provenance, and Profile visibility; prompt-string serialization of this new projection remains the Phase-36 seam.
+7. The context reader exposes a Memory only when its stored `allow_ai` flag is on and it is not deleted. It carries allow-AI-gated recent interaction notes but does not serialize them until Phase 36; Group Notes and Off Limits remain outside every AI-bound shape.
 
 ### Custom egress and model catalog
 
@@ -96,18 +98,21 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 - **ADR-079:** On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation — removes the direct Profile AI entry and keeps invocation inside Compose.
 - **ADR-117:** Per-Interaction Allow-AI Consent Gate — adds the durable, default-off `interactions.allow_ai` flag (migration 025) as the prerequisite consent control for any future interaction-note transmission; `ai-context-read` still selects no `note` this phase.
 - **ADR-109:** Fixed-Hero Semantic Profile Composition and Focused Accessible Editors — applies the Compose-only boundary to the rebuilt Profile Hero and overflow.
+- **ADR-107:** Off Limits Excluded from All AI Egress — reverses avoidance-constraint transmission while retaining the human-facing Avoid group.
+- **ADR-134:** Read-Only Compose Research and Permission-Bounded Message Focus — makes focus a session-only intersection over already-authorized current data.
 
 ## Gotchas
 
-1. **Never add a broad read to the prompt path.** `PromptContext` and `readPromptContext()` are the egress allowlist; interaction `note` and event `detail` must never enter it.
+1. **Never add a broad read to the prompt path.** `PromptContext` and `readPromptContext()` are the egress allowlist; only the bounded, per-interaction `allow_ai` note carry is admitted, and Group Notes never enter it.
 2. **Do not persist or log keys, prompts, endpoint URLs, request bodies, or raw provider failures.** UI and adapter errors use sanitized state only.
 3. **Do not use raw fetch for Custom generation.** The native transport is the connection-time private-address, redirect, and proxy control.
-4. **A Custom endpoint change requires a fresh acknowledgement.** The settings DAO resets the Custom acknowledgement when its endpoint changes.
-5. **Do not reconstruct a prompt after preview.** The frozen `ResolvedPrompt` object is the identity contract across preview, acknowledgement, and egress.
+4. **Do not restore the legacy acknowledgement gate.** The retained `ai_ack_*` columns have no Compose writer/reader path; generation must never wait on a value nothing sets.
+5. **Do not reconstruct a prompt during a request.** The frozen `ResolvedPrompt` object is the identity contract across review and egress.
 6. **The owner accepted one device egress smoke test instead of the original full on-device escape matrix.** Shared JVM/vector tests cover the remaining address cases; keep that limitation visible if the guard changes.
 7. **Never invent cadence for an Unbound contact.** The neutral intensity aggregate is the only permitted representation of unavailable cadence in explicit AI context.
 8. **Memory permission fails closed in SQL.** Do not infer it from a Memory type, source, or visibility flag, and do not claim an eligible projection has reached a provider payload before its prompt serializer consumes it.
-9. **The per-interaction `allow_ai` gate exists but does not yet transmit anything.** Migration 025 added the default-off `interactions.allow_ai` flag as the note-transmission consent control; wiring an interaction `note` into the egress projection is a later phase and is still an owner decision. Building the gate did not widen what leaves the device — `ai-context-read` still selects only `channel, quality, connected`. A Group Note is never transmitted regardless of any participant flag.
+9. **Off Limits never leaves the device through AI.** It is neither positive context nor an avoidance constraint and can never become Message Focus; changing that is an owner decision under ADR-107.
+10. **Carrying is not transmitting.** `gatedRecentInteractionNotes` remains absent from the prompt template/provider payload until Phase 36 deliberately changes that contract.
 
 ## Related Systems
 
@@ -116,7 +121,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 - **Contact methods** — owns Compose, Copy, and best-effort SMS handoff for a returned draft.
 - **Contacts** — supplies the profile entry and source identity without accepting an AI write.
 - **Persistence core** — applies migration 004 and the SQLite singleton contract.
-- **App shell** — carries the serializable profile-to-Compose request intent and hosts settings.
+- **App shell** — registers the Compose and Compose Research routes and hosts settings.
 
 ## Changelog
 
@@ -127,3 +132,4 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | 2026-09-03 | 24.2 | Added a default-off, SQL-gated Memory eligibility projection while deferring prompt serialization to Phase 36. |
 | 2026-09-02 | 31 | Removed the direct Profile AI-draft entry; Message is the sole Profile route into Compose-owned invocation. |
 | 2026-09-02 | 32 | Added the default-off per-interaction `allow_ai` consent gate (migration 025) as the prerequisite control for future interaction-note transmission; the egress projection is unchanged (still no `note`). |
+| 2026-09-02 | 35 | Added three-state Compose availability, three non-destructive suggestions, carry-only gated interaction notes, and ADR-107's total Off Limits exclusion. |
