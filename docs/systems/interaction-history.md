@@ -17,7 +17,7 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 **Read/persisted state:**
 - `app_settings.history_lens` (`TEXT`, default `'cycles'`) — the globally-persisted last-used Heatmap lens.
 - `app_settings.history_cycle_count` (`INTEGER`, default `10`) — the globally-persisted Cycles preset (5/10/15/20).
-- Both are added by migration 025, threaded through `app-settings-dao.ts` with bounded-value validators, and are **declare-only** for backup this phase (emission + format bump are Phase 36's).
+- Both are added by migration 025, threaded through `app-settings-dao.ts` with bounded-value validators, and are emitted/restored as portable format-v5 preferences.
 
 **Types:**
 - `HistoryDateMarker` (`src/db/history-read.ts`) — per-date marker kind (`interaction` / `lifecycle-only` / `multiple`) plus counts.
@@ -136,9 +136,9 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 - **Interaction log** — owns the `interactions`/`events` tables, the recency spine (`editTouchpointFull`/`deleteTouchpoint`), and the vocabulary map this surface reads and writes through.
 - **Profile presentation** — hosts the History section via `ProfileModuleHost.renderHistory()` and owns show/hide/collapse/layout state.
 - **Contact knowledge** — supplies the knowledge-change record family via `getCurrentStateHistory` and receives knowledge-row edit navigation.
-- **AI suggestions** — owns the `allow_ai` egress posture the sparkle reflects; note transmission itself is a later phase.
+- **AI suggestions** — owns the `allow_ai` egress posture the sparkle reflects and serializes only the bounded opted-in recent-note projection.
 - **Status engine** — Status/Gravity/Intensity semantics are unchanged; interaction `duration` never weights them.
-- **Backup & restore** — the durable lens/preset preferences are declare-only until Phase 36 emits them.
+- **Backup & restore** — format v5 emits and restores the durable lens/preset preferences with the complete milestone settings set.
 - **App shell** — registers the Edit Interaction and LogContact routes and owns the heatmap/marker theme tokens.
 
 ## Changelog
@@ -148,3 +148,4 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | 2026-09-02 | 32 | Created the History & Insights subsystem: reusable count-only aggregation seam + canonical `history-read`, shared-window Heatmap/Intensity with globally-persisted lenses, the Rolodex Month/Day/Year Browser, the shared Date Detail Sheet + Interaction Detail + canonical Edit route with hard-delete, and the Profile History section replacing the vertical timeline. Group-linked routing is a dormant Phase-33 seam. |
 | 2026-09-02 | 33 | Activated local group context, explicit child/event edit scope, identity-preserving conversion, and truthful participant Detail projection. |
 | 2026-09-02 | 34 | Replaced the detailed-log placeholder with the canonical Log Interaction form while preserving typed date prefill. |
+| 2026-09-02 | 36 | Emitted and restored the persisted History lens and cycle-preset preferences in backup format v5. |
