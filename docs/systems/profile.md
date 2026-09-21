@@ -1,7 +1,7 @@
 # Profile presentation
 
-**Last updated:** 2026-09-17
-**Updated by phase:** 37.1-category-management
+**Last updated:** 2026-09-02
+**Updated by phase:** 35-messaging-ai-compose
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
 ## Purpose
@@ -55,7 +55,7 @@ The stable migration object is `profilePresentationMigration`; `src/db/database.
 
 ### Fixed identity and origins
 
-The Hero is fixed structure, not a draggable/sticky layout module. It always supplies identity, Favorite, Message, Call, and one overflow entry point. Missing/unusable methods remain readable with explicit disabled reasons. Dashboard, Orrery, Settings, widget, and notification entries retain the native stack's origin-aware Back behavior; widget and notification resets are built at their external routing boundaries.
+The Hero is fixed structure, not a draggable/sticky layout module. It always supplies identity, Favorite, Message, Call, and one overflow entry point. Missing/unusable methods remain readable with explicit disabled reasons. Its Message action opens Compose with `origin: 'profile'`, so Back or a confirmed logged handoff returns by stack pop to the Profile that launched it; widget and notification resets remain built at their external routing boundaries.
 
 The controller never creates a second Profile data writer. Favorite, archive, lifecycle, frequency, and Snooze route through their existing public DAOs/services; after a successful write it reloads the coherent local snapshot. User-triggered call/message/email handoffs use the established interaction-assist service. No read depends on network access.
 
@@ -98,6 +98,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 - **ADR-079:** Compose is the only suggestion invocation; the Profile AI draft entry is retired.
 - **ADR-081:** Per-item explicit AI permission replaces proposed fuel permission; no implicit permission is inferred here.
 - **ADR-123:** Profile History Section Replacing the Vertical Timeline — mounts the full History & Insights section behind the `interaction-history` renderer seam without migrating layout/collapse state; the knowledge-change edit reuses the screen's existing navigation.
+- **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — Profile supplies the origin-aware Message entry into session-only Compose.
 
 ## Gotchas
 
@@ -110,6 +111,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 7. **Keep presentation backup atomic.** A v5 change must preserve the settings, templates, parent-keyed assignments, and background bytes together; never add an emitter without its restore writer.
 8. **Resolve before choosing the background host input.** Contact-only checks skip Category and global assignments; pass the fully resolved app-owned URI or `null` for the System fallback.
 9. **Keep bundled slots out of Profile templates.** System backgrounds are settings-owned packaged assets, while Profile templates are app-owned photo derivatives with independent assignment and cleanup.
+10. **Compose completion must pop to the originating Profile.** Do not reset a Profile-originated, confirmed Compose flow to Dashboard or leave the finished draft in Back history.
 
 ## Related systems
 
@@ -133,3 +135,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-09-10 | 31.1 | Established resolved Profile-photo precedence over the app-wide System background while keeping bundled slots and Profile templates independent. |
 | 2026-09-02 | 32 | `ProfileModuleHost.renderHistory()` now mounts the full History & Insights section behind the preserved `interaction-history` key (replacing the bounded stub, no layout/collapse migration); threaded `onOpenKnowledgeChange` for Detail Sheet knowledge rows. |
 | 2026-09-17 | 37.1 | Added complete bounded real-category assignment, rename-stable inheritance, and atomic deletion cleanup with fallback to the next presentation axis. |
+| 2026-09-02 | 35 | Profile Message now passes a Compose origin so Back and confirmed handoff completion return to the launching Profile. |
