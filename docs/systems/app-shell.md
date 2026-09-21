@@ -301,6 +301,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-053:** Local-First LiteLLM AI Model Catalog — adds Settings model-scope and explicit-refresh controls.
 - **ADR-135:** Multi-Connection AI Configuration and Fail-Closed Readiness — adds the routed AI hub, connection/model routes, and repair navigation.
 - **ADR-136:** Permission-Bounded Prompt Assembly and AI Transparency — adds Settings permissions and prompt-preview routes.
+- **ADR-139:** Loopback-Only OpenRouter Authorization Callback — keeps the `orbit://openrouter-auth` intent as a credential-free foreground wake only.
 - **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — adds the self-fetching Digest route and dashboard entry.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the dashboard-rooted Digest notification reset and ready-gated schedule hook.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — adds the Backup destination and ready-gated foreground automatic work.
