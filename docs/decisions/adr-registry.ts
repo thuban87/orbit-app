@@ -91,7 +91,7 @@
 // NOTE: ADR-0079 [ACCEPTED] On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation
 // NOTE: ADR-0080 [ACCEPTED] Four-Tab Bottom Navigation Shell with Per-Tab Stacks
 // NOTE: ADR-0081 [ACCEPTED] Retire AI-Proposed Fuel for Explicit Per-Item Permission
-// NOTE: ADR-0082 [ACCEPTED] Universal Capture FAB, Canonical Picker, and Truthful Quick Log
+// IMPORTANT: ADR-0082 [SUPERSEDED BY ADR-132 (partial — the visible “Log Contact” action name and its placeholder workflow)] Universal Capture FAB, Canonical Picker, and Truthful Quick Log
 // NOTE: ADR-0083 [ACCEPTED] Durable Multi-Package Theme Configuration and Restore-Before-Paint
 // NOTE: ADR-0084 [ACCEPTED] Four Semantic Theme Palettes, Curated Accents, and Contrast Validation
 // NOTE: ADR-0085 [ACCEPTED] Live Reduced-Motion Signal for Skia Ambient Animation
@@ -139,5 +139,8 @@
 // NOTE: ADR-0127 [ACCEPTED] Canonical Event-First Group Logging and Explicit Child Edit Scope
 // NOTE: ADR-0128 [ACCEPTED] Same-Group Contact Merge Refusal with Remediation
 // NOTE: ADR-0129 [ACCEPTED] Portable Group Identity and History-Preserving Orphan Disposition
+// NOTE: ADR-0130 [ACCEPTED] Durable Scoped Default Interaction Channel
+// NOTE: ADR-0131 [ACCEPTED] Progressive Contact Creation and Complete-Record Editing
+// NOTE: ADR-0132 [ACCEPTED] Focused Rapid Capture Workflows
 
-export const ADR_COUNT = 129;
+export const ADR_COUNT = 132;

@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 28 of
-  129 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 29 of
+  132 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -112,7 +112,7 @@ not something you can pattern-match against.
 | 079 | On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation | Accepted | milestone-2 | ADR-052 (partial — acknowledgement and Profile entry) | — | — | 4/5 live | `src/db`, `src/logic`, `src/screens` |
 | 080 | Four-Tab Bottom Navigation Shell with Per-Tab Stacks | Accepted | milestone-2 | ADR-019 (partial — root shell); ADR-018 (note — Archived list entry points only; gate unchanged) | — | — | 3/4 live | `src/navigation`, `src/screens` |
 | 081 | Retire AI-Proposed Fuel for Explicit Per-Item Permission | Accepted | 24.2-contact-knowledge-egress-search-types | ADR-030 | — | — | 2 | `src/db`, `src/db/migrations` |
-| 082 | Universal Capture FAB, Canonical Picker, and Truthful Quick Log | Accepted | 22-app-shell-navigation | — | — | — | 6 | `src/components`, `src/db` |
+| 082 | Universal Capture FAB, Canonical Picker, and Truthful Quick Log | Accepted | 22-app-shell-navigation | — | ADR-132 (partial — the visible “Log Contact” action name and its placeholder workflow) | — | 6 | `src/components`, `src/db` |
 | 083 | Durable Multi-Package Theme Configuration and Restore-Before-Paint | Accepted | 23-theme-visual-system | ADR-006 (partial) | — | — | 7 | `src/backup`, `src/db`, `src/db/migrations` +2 |
 | 084 | Four Semantic Theme Palettes, Curated Accents, and Contrast Validation | Accepted | 23-theme-visual-system | — | — | — | 5/6 live | `src/theme` |
 | 085 | Live Reduced-Motion Signal for Skia Ambient Animation | Accepted | 23-theme-visual-system | — | — | — | 4 | `src/components/orrery`, `src/theme`, `src/theme/tokens` |
@@ -160,3 +160,6 @@ not something you can pattern-match against.
 | 127 | Canonical Event-First Group Logging and Explicit Child Edit Scope | Accepted | 33-group-interaction-logging | ADR-122 (partial — dormant group-context and edit-scope routing only) | — | — | 17 | `src/components`, `src/components/history`, `src/db` +3 |
 | 128 | Same-Group Contact Merge Refusal with Remediation | Accepted | 33-group-interaction-logging | — | — | — | 3 | `src/components`, `src/db`, `src/db/migrations` |
 | 129 | Portable Group Identity and History-Preserving Orphan Disposition | Accepted | 33-group-interaction-logging | — | — | — | 4 | `.planning/phases/33-group-interaction-logging`, `src/backup`, `src/db` |
+| 130 | Durable Scoped Default Interaction Channel | Accepted | 34-rapid-capture-update-flows | — | — | — | 4 | `src/backup`, `src/db`, `src/db/migrations` +1 |
+| 131 | Progressive Contact Creation and Complete-Record Editing | Accepted | 34-rapid-capture-update-flows | — | — | — | 6 | `src/components/ui`, `src/db`, `src/screens` |
+| 132 | Focused Rapid Capture Workflows | Accepted | 34-rapid-capture-update-flows | ADR-082 (partial — the visible “Log Contact” action name and its placeholder workflow) | — | — | 8 | `src/components`, `src/screens`, `src/services` |
