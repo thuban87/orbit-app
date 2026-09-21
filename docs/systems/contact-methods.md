@@ -1,12 +1,12 @@
 # Contact Methods
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
+**Updated by phase:** 35-messaging-ai-compose
 **Owners:** `src/db/contact-methods-dao.ts`, `src/db/contact-methods-read.ts`, `src/logic/contact-method-normalization.ts`, `src/screens/ComposeScreen.tsx`, `src/logic/compose-logic.ts`
 
 ## Purpose
 
-The contact-methods system stores ordered phone and email endpoints as local-first, mergeable contact data. It separates presentation from canonical actionability, retains incomplete values for editing, and supplies the selected actionable primary phone to the existing Compose/SMS handoff without sending or recording an interaction.
+The contact-methods system stores ordered phone and email endpoints as local-first, mergeable contact data. It separates presentation from canonical actionability, retains incomplete values for editing, and supplies actionable primary destinations to Compose and Reach Out without sending or recording an interaction.
 
 ## Architecture
 
@@ -22,18 +22,18 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 
 **Types** (`src/logic/compose-logic.ts` and `src/navigation/types.ts`):
 - `ComposeControls` — resolved Send, Copy, add-number, and SMS-unavailable presentation state.
-- `RootStackParamList["Compose"]` — serializable `{ contactId, requestAiSuggestion? }` route contract.
+- `RootStackParamList["Compose"]` — serializable contact id plus an optional origin used only for Compose return routing.
 
 ### Store, Service & DAO Layer
 
 | Layer | File | Responsibility |
 |---|---|---|
-| Screen | `src/screens/ComposeScreen.tsx` | Self-fetches the contact and eligible fuel, holds the in-memory draft, and invokes native handoffs. |
+| Screen | `src/screens/ComposeScreen.tsx` | Resolves Text/Email destinations, establishes a selected primary, and invokes native handoffs from session-only drafting state. |
 | Normalizer | `src/logic/contact-method-normalization.ts` | Produces conservative phone/email canonical and actionability outcomes. |
 | Method DAO | `src/db/contact-methods-dao.ts` | Applies transactional ordered drafts, primary promotion, collision handling, and tombstones. |
 | Method read | `src/db/contact-methods-read.ts` | Returns ordered groups and the selected actionable effective primary. |
 | Logic | `src/logic/compose-logic.ts` | Resolves the actionable-primary/SMS capability matrix. |
-| AI lifecycle | `src/logic/ai-suggestion-logic.ts` | Owns one cancellable, acknowledgement-gated suggestion request. |
+| AI lifecycle | `src/logic/ai-suggestion-logic.ts` | Owns cancellable three-suggestion requests without a first-send acknowledgement gate. |
 | Contact read | `src/db/contact-read.ts` | Supplies the scalar-free lightweight header and archive state. |
 | Fuel read | `src/db/fuel-read.ts` | Supplies the ranked projection whose SQL excludes off-limits, unconfirmed-AI, and blank rows. |
 | Link DAO | `src/db/contact-links-dao.ts` | Owns ordered link create, edit, and merge-safe removal. |
@@ -42,12 +42,12 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 
 | File | Role |
 |---|---|
-| `src/screens/ComposeScreen.tsx` | Read-only fuel reference, blank draft, handoff actions, and dashboard-directed Back behavior. |
-| `src/logic/compose-logic.ts` | Node-tested Send/Copy emphasis and availability resolver. |
+| `src/screens/ComposeScreen.tsx` | Session-only Text/Email drafting, destination fallback, handoff, and origin-aware return. |
+| `src/logic/compose-logic.ts` | Node-tested mode fallback, Send/Copy capability, copy targets, and exit resolver. |
 | `src/logic/contact-method-normalization.ts` | Shared canonicalization, extension, and actionability boundary. |
 | `src/db/contact-methods-dao.ts` | Transactional normalized method write boundary. |
 | `src/db/contact-methods-read.ts` | Ordered method-group and actionable-primary read boundary. |
-| `src/logic/ai-suggestion-logic.ts` | Timeout, cancellation, stale-result, acknowledgement, and replacement-confirmation lifecycle. |
+| `src/logic/ai-suggestion-logic.ts` | Timeout, cancellation, stale-result, and non-destructive three-suggestion lifecycle. |
 | `src/db/contact-read.ts` | Lightweight scalar-free contact header and archive gate. |
 | `src/db/fuel-read.ts` | Structural eligible-fuel boundary consumed unchanged by Compose. |
 | `src/navigation/types.ts` | Serializable Compose-route parameter contract. |
@@ -59,11 +59,11 @@ Migration 009 retires scalar contact phone/email storage. Migration 010 adds nul
 
 ### Composing and handing off a message
 
-1. `ContactProfileScreen` navigates to `Compose` with only the contact id.
-2. `ComposeScreen` reloads the header, the DAO-selected actionable primary phone, and all rows from `getRankedFuel()` on focus, while separately probing SMS availability.
-3. Missing or archived contacts reset to Home; the ranked read keeps off-limits, unconfirmed-AI, and blank fuel out of the reference cards in SQL.
-4. The user types a blank-starting local draft. With an actionable primary phone and SMS capability, Send routes through the shared `performReachOut` (`src/services/reach-out/handoff.ts`), which — when Interaction Assist is enabled — writes a pending assist before opening the OS composer with `expo-sms`; Copy uses `expo-clipboard` in every state.
-5. Software and Android hardware Back both reset the stack to dashboard Home. Send and Copy never create a touchpoint or change `last_contact`; the interaction, if any, is written later when the user confirms the assist banner (see `interaction-assist.md`).
+1. `ContactProfileScreen` navigates to `Compose` with a contact id and Profile origin.
+2. `ComposeScreen` reads actionable primary phone and email methods, mode preferences, and method groups on focus; SMS availability gates Text only.
+3. `resolveUsableMode()` keeps the preferred Text/Email mode when it has a destination, falls back to the other supported mode, and leaves drafting/Copy usable when neither exists.
+4. When multiple actionable methods lack an explicit primary, Compose presents a deliberate selection and `setContactMethodPrimary()` validates, clears, and promotes that method in one transaction. A single actionable or explicit primary needs no picker.
+5. Transmit routes the resolved mode and endpoint through `performReachOut`; Email carries subject and body in an encoded `mailto:` handoff, while Copy remains local. Confirmation, if any, is owned by Interaction Assist rather than the method system.
 
 The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/contact-methods-read.ts`) is exported as a pure function so the Reach Out router reuses it directly from already-loaded method groups, with no second query.
 
@@ -124,6 +124,7 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 - **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — compares methods canonically without making a source authoritative.
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — deduplicates compatible methods and requires a choice for competing primaries.
 - **ADR-072:** Shared Actionable Reach Out Router with Native Channel Handoff — reuses the actionable-primary selection and routes Compose Send through the shared handoff without a send-time interaction write.
+- **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — adds mode-aware primary resolution and the transactional Compose primary-selection writer.
 
 - **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — composes normalized method reads into one local Profile snapshot.
 
@@ -143,6 +144,7 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 10. **Do not treat a shared canonical value as identity proof.** Same-contact duplicates collapse, but different contacts may retain the same phone or email.
 11. **Import evidence is not a primary-method selection.** Canonical matching informs an explicit import resolution but does not rewrite an existing contact's ordered methods.
 12. **Resolve primaries before reparenting a merge.** The partial primary-per-type index rejects a naïve child update when both contacts own a primary.
+13. **Validate before promoting a Compose selection.** `setContactMethodPrimary()` must prove contact and method type before clearing a prior primary; promoting first violates SQLite's statement-immediate partial unique index.
 
 ## Related Systems
 
@@ -168,3 +170,4 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 | 2026-08-26 | 20 | Added canonical reconciliation comparison and explicit primary-method merge resolution. |
 | 2026-08-31 | 21 | Compose Send routes through the shared `performReachOut` (pending assist, no send-time interaction); the actionable-primary selection is reused by the Reach Out router. |
 | 2026-09-02 | 31 | Added snapshot-compatible Profile method reads, separate Message/Call capability, and Compose-only AI invocation. |
+| 2026-09-02 | 35 | Added mode-aware Text/Email Compose resolution, explicit primary selection, and encoded email handoff. |
