@@ -142,5 +142,7 @@
 // NOTE: ADR-0130 [ACCEPTED] Durable Scoped Default Interaction Channel
 // NOTE: ADR-0131 [ACCEPTED] Progressive Contact Creation and Complete-Record Editing
 // NOTE: ADR-0132 [ACCEPTED] Focused Rapid Capture Workflows
+// NOTE: ADR-0133 [ACCEPTED] Session-Scoped Compose Modes and Truthful External Handoff
+// NOTE: ADR-0134 [ACCEPTED] Read-Only Compose Research and Permission-Bounded Message Focus
 
-export const ADR_COUNT = 132;
+export const ADR_COUNT = 134;
