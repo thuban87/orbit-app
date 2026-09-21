@@ -1,7 +1,7 @@
 # Contact Knowledge
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 32-interaction-history-insights
+**Updated by phase:** 35-messaging-ai-compose
 **Owners:** `src/db/memory-registry.ts`, `src/db/memories-dao.ts`, `src/db/memories-read.ts`, `src/db/relationships-dao.ts`, `src/db/relationships-read.ts`, `src/db/current-state-history-dao.ts`, `src/db/current-state-history-read.ts`, `src/db/first-class-knowledge-read.ts`, `src/db/knowledge-search-read.ts`, `src/db/dashboard-knowledge-read.ts`, `src/services/knowledge-search.ts`, `src/services/memory-trash-sweep.ts`
 
 ## Purpose
@@ -77,6 +77,8 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | `src/screens/ThingsToRememberScreen.tsx` | Unified grouped contact-knowledge screen. |
 | `src/screens/RecentlyDeletedScreen.tsx` | Restore and confirmed permanent deletion surface. |
 | `src/screens/MemoryHistoryScreen.tsx` | Current-state backlist edit and promote surface. |
+| `src/db/compose-research-read.ts` | Builds the compact, populated-only Compose Research projection with source-owned display and AI eligibility. |
+| `src/screens/ComposeResearchScreen.tsx` | Renders the read-only Compose sibling surface; it owns no knowledge writer. |
 
 ## How It Works
 
@@ -86,6 +88,13 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 2. `ThingsToRememberScreen` loads Memory, relationship, current-state, first-class, and existing custom-field reads through DAOs; no component issues inline SQL or a network request.
 3. The screen presents featured/current information first, then grouped Key People and Memory content. Visibility is a presentation rule: a Memory override wins over the registry default but does not change storage or privacy.
 4. The screen owns writer calls and reloads the same local projection after a successful add, edit, hide/show, delete, or Undo action.
+
+### Reading Compose Research
+
+1. Compose enters a sibling Research screen that calls `readComposeResearch()` locally on focus; it is not another Profile or Things to Remember editor.
+2. The read composes populated, visible Memories, relationships, current-state entries, first-class fields, custom fields, and Off Limits into normalized `ResearchItem` records.
+3. Each item carries the source-owned `aiEligible` result. Memory `allow_ai` and custom-field `share_with_ai` can admit an item; relationships, first-class values, current state, and Off Limits do not infer consent.
+4. Off Limits renders as an Avoid group for the human. The read marks it structurally non-eligible, so neither the screen nor session state can add it to Message Focus.
 
 ### Creating and maintaining a Memory
 
@@ -155,6 +164,8 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **ADR-119:** Reusable Count-Only History Aggregation and Canonical History Read — the canonical History read composes the read-only `getCurrentStateHistory` surface to expose current-state changes as the Detail Sheet's knowledge-change record family.
 - **ADR-131:** Progressive Contact Creation and Complete-Record Editing — composes complete-edit knowledge changes under the contact aggregate transaction.
 - **ADR-132:** Focused Rapid Capture Workflows — supplies focused update and Memory-editor paths without flattening knowledge semantics.
+- **ADR-134:** Read-Only Compose Research and Permission-Bounded Message Focus — adds the normalized Research projection and source-owned focus eligibility.
+- **ADR-107:** Off Limits Excluded from All AI Egress — keeps human-visible Avoid context out of Message Focus and every AI-bound shape.
 
 ## Gotchas
 
@@ -171,6 +182,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 9. **Dashboard List context is also visibility-scoped.** Do not select hidden, deleted, outdated, or quarantined data merely because it would fill a sparse row.
 10. **Card compactness is presentation, not a new relevance tier.** Card View may choose a concise candidate only within the same imminent, pinned, and other priority tier ordering.
 11. **Current-state is not a touchpoint.** Last Talked About and Current Location writes preserve knowledge history but must never write an interaction or `last_contact`.
+12. **Local visibility is not Message Focus eligibility.** Compose Research may display an item that lacks AI permission; only its normalized `aiEligible` value can enable Add to AI.
 
 ## Related Systems
 
@@ -181,6 +193,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **Custom fields** — remain structured and render as a read-only grouped portion of Things to Remember.
 - **Conversational fuel** — legacy share and AI-proposal rows migrate into Memories through the verified phase-24.2 data move.
 - **AI suggestions** — consumes only the explicit, SQL-gated Memory projection.
+- **AI suggestions** — consumes the closed prompt projection; Compose Research remains useful even when no item is AI-eligible.
 - **Contact import** — supplies imported Notes as AI-off typed Memories.
 - **Dashboard** — consumes bounded visible candidates for List and Card context and the visible corpus for semantic search.
 
@@ -196,3 +209,4 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | 2026-09-02 | 31 | Added typed source-owned knowledge projections to one coherent Profile snapshot, including explicit local-only Off Limits presentation. |
 | 2026-09-02 | 32 | Widened `getCurrentStateHistory` to a read-only executor surface so the canonical History read composes it; current-state changes now surface as the History Detail Sheet's knowledge-change record family, routing edits back to `MemoryHistoryScreen` by `fieldKey`. |
 | 2026-09-02 | 34 | Added focused Update Contact knowledge editors, registry-keyed rapid Memory creation, and complete-edit transaction composition. |
+| 2026-09-02 | 35 | Added populated-only, read-only Compose Research with source-owned eligibility and structural Off Limits Avoid context. |
