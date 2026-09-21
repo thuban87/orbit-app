@@ -139,6 +139,11 @@ Migration 006 stores current values as normalized rows. Field type determines in
 2. Reconciliation applies surviving definitions before values; a child whose contact or definition did not survive is blocked rather than inserted.
 3. Permanent definition deletion tombstones the definition and its value rows in the existing transaction. Quarantine and `field_history` stay transient and are neither tombstoned nor exported.
 
+### Updating a field from rapid capture
+
+1. Update Contact surfaces applicable existing definitions by their user-facing labels and also retains a generic Custom Fields entry for less-prominent definitions.
+2. Both paths edit the same normalized value row through the established field-value input and DAO boundary; they do not create a second schema or definition authoring path.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -159,6 +164,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — retains prior values separately while preserving current-pair integrity.
 
 - **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — preserves typed values, grouping, invalid states, and retained history in Profile.
+- **ADR-132:** Focused Rapid Capture Workflows — exposes applicable named fields and the generic Custom Fields path from Update Contact without duplicating definitions.
 
 ## Gotchas
 
@@ -178,6 +184,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 12. **Quarantine is not deletion.** Only permanent removal creates tombstones; `field_history` remains excluded from portable restore.
 13. **Do not reuse `field_history` as value history.** It is a 30-day destructive-operation trace; `custom_field_value_history` is portable prior-value state.
 14. **Contact scope is not ready for UI creation.** Directly-present contact definitions are guarded on write, but Phase 31 owns durable ownership and owner-purge semantics.
+15. **Rapid capture edits values, never definitions.** Update Contact may surface a field by label, but Settings remains the sole definition-editor and slugifier producer.
 
 ## Related Systems
 
@@ -201,3 +208,4 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | 2026-08-24 | 17 | Added permanent-delete tombstones and whole-file restore validation for normalized field data. |
 | 2026-09-03 | 24.2 | Added ten typed inputs, additive scope/history/group metadata, and portable retained-value history. |
 | 2026-09-02 | 31 | Added typed grouped custom-field and retained-history consumption to the coherent Profile snapshot. |
+| 2026-09-02 | 34 | Added Update Contact discovery of applicable named fields plus the generic Custom Fields value-edit path. |
