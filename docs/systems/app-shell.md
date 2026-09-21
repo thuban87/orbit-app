@@ -106,8 +106,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 ### Capturing from any browse surface
 
 1. `App.tsx` mounts one `UniversalFab` and snackbar host outside the tab tree. The FAB is visible only on browse/read routes and uses measured tab-bar geometry for its bottom offset.
-2. The fixed labeled speed dial is Add Contact, Quick Log, Log Contact, Group Log, Update Contact, and Memory. Profile context preselects a contact; global contact-specific actions open the reusable local picker, while Group Log routes directly. Dashboard List can reuse the same Quick Log command after its configured gesture commits.
-3. Quick Log waits for the canonical SQLite write to resolve before it shows success and an Undo action. Its picker, dial, List host, and snackbar register real dismissal callbacks with the transient store.
+2. The fixed labeled speed dial is Add Contact, Quick Log, Log Interaction, Group Log, Update Contact, and Memory. Profile context preselects a contact; global contact-specific actions open the reusable local picker, while Group Log routes directly. Dashboard List can reuse the same Quick Log command after its configured gesture commits.
+3. Quick Log waits for the canonical SQLite write to resolve before it shows success, Undo, and Add Note. Its picker, dial, List host, and snackbar register real dismissal callbacks with the transient store.
 
 ### Navigating dashboard and settings
 
@@ -228,7 +228,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 ### Navigating interaction history
 
 1. The History section's Interaction Detail opens the canonical `EditInteraction { contactId, interactionId }` route, registered in all three Profile-hosting stacks (Dashboard, Orrery, Settings) — React Navigation throws on an unregistered name.
-2. An empty History date routes the typed `LogContact { contactId, prefillDate }` contract (also registered across those stacks); the target is a placeholder screen until Phase 34 supplies the detailed-log form. `prefillDate` is a serializable string, never a callback.
+2. An empty History date routes the typed `LogContact { contactId, prefillDate }` contract to the detailed Log Interaction screen, registered across those stacks. `prefillDate` is a serializable string, never a callback.
 
 ### Group Event routes and shared picker confirmation
 
@@ -263,6 +263,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-019:** Native Stack Contact Lifecycle Navigation — replaces temporary Home-local routing with native-stack navigation.
 - **ADR-080:** Four-Tab Bottom Navigation Shell with Per-Tab Stacks — supersedes the flat root shell while retaining the migration gate and Dashboard fallback.
 - **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — fixes shell capture actions, local target selection, and commit-only feedback.
+- **ADR-132:** Focused Rapid Capture Workflows — supplies the real Log Interaction, Update Contact, and Memory targets while preserving the shell action contract.
 - **ADR-083:** Durable Multi-Package Theme Configuration and Restore-Before-Paint — moves theme selection to SQLite and gates first main paint on its hydration.
 - **ADR-084:** Four Semantic Theme Palettes, Curated Accents, and Contrast Validation — supplies the four-palette and live-accent contract.
 - **ADR-086:** Semantic Icons and Accessible Interaction Primitives — supplies registry, typography, status, action, and overlay seams.
@@ -374,6 +375,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 34. **Do not reuse card opacity as the host veil.** Card contrast and background visibility are separate token contracts; coupling them recreates the imperceptible-background defect.
 35. **Avoid Android elevation on translucent Galaxy cards.** It renders an opaque inner rectangle; the iOS shadow remains independently supported.
 36. **Register `EditInteraction` and `LogContact` in every Profile-hosting stack.** A Profile is reachable from Dashboard, Orrery, and Settings; a route registered in only one stack throws when a Settings-originated Profile navigates to it. The Settings stack also needs `ThingsToRemember`/`MemoryHistory` for History Detail Sheet knowledge edits.
+37. **Visible capture labels are product copy.** Keep the internal `LogContact` route identifier for typed compatibility, but show Log Interaction consistently in the dial, accessibility label, and focused form title.
 
 - **Types do not register native routes.** A shared type intersection cannot prove that a route is mounted in each hosting stack; Group Event routes require all three runtime registrations.
 
@@ -433,3 +435,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-10 | 31.1 | Adopted persistent shared System backgrounds across ordinary routes, preserved Profile and canvas precedence, and corrected veil/card/chrome composition after production-device validation. |
 | 2026-09-02 | 32 | Registered the canonical `EditInteraction` route and the `prefillDate`-extended `LogContact` contract across all Profile-hosting stacks (plus Settings-side `ThingsToRemember`/`MemoryHistory`), and added the per-palette History heatmap/marker theme tokens. |
 | 2026-09-02 | 33 | Replaced Group Log/browse placeholders with cross-stack Group Event routes and awaited, failure-preserving multi-select confirmation. |
+| 2026-09-02 | 34 | Replaced ordinary capture placeholders with Log Interaction, Update Contact, and Memory routes; finalized the visible Log Interaction label and post-log Add Note path. |
