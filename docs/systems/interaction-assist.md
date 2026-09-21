@@ -1,7 +1,7 @@
 # Interaction Assist & Reach Out
 
-**Last updated:** 2026-08-31
-**Updated by phase:** 21-interaction-assist-reach-out
+**Last updated:** 2026-09-02
+**Updated by phase:** 35-messaging-ai-compose
 **Owners:** `src/db/interaction-assist-dao.ts`, `src/db/interaction-assist-read.ts`, `src/logic/assist-eligibility.ts`, `src/services/reach-out/handoff.ts`, `src/services/interaction-assist-sweep.ts`, `src/stores/assist-store.ts`, `src/components/ReachOutRouter.tsx`, `src/components/EndpointSelector.tsx`, `src/components/AssistBanner.tsx`, `src/components/AssistConfirmation.tsx`, `src/components/PendingConfirmationsSheet.tsx`
 
 ## Purpose
@@ -35,7 +35,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | DAO (write) | `src/db/interaction-assist-dao.ts` | Cap-5 `createPendingAssist`, and the status-guarded `markAssistLogged` / `markAssistDismissed` / `markAssistFailed` transitions — each inside the shared write mutex. |
 | DAO (read) | `src/db/interaction-assist-read.ts` | The eligible pending queue (15s–24h window) and pending count, joined to `contacts`. |
 | Logic | `src/logic/assist-eligibility.ts` | Pure 15s/24h local-wall-clock eligibility + newest-eligible banner selection. |
-| Service | `src/services/reach-out/handoff.ts` | `performReachOut`: the one shared write-before-launch native handoff for all callers. |
+| Service | `src/services/reach-out/handoff.ts` | `performReachOut`: shared write-before-launch handoff that returns launch status and the created assist UID when one exists. |
 | Service | `src/services/interaction-assist-sweep.ts` | Foreground launch-sweep: 24h expiry of pending rows + 30-day prune of terminal rows. |
 | Store | `src/stores/assist-store.ts` | SQLite-backed eligible-queue state; refreshes only on a real background→active return. |
 
@@ -49,6 +49,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | `src/components/AssistBanner.tsx` | App-global non-modal overlay; owns the confirm/dismiss DB writes and widget invalidation. |
 | `src/components/AssistConfirmation.tsx` | Presentational attestation controls (Yes / No answer / Don't log) + optional Notes expander. |
 | `src/components/PendingConfirmationsSheet.tsx` | Transient multi-item pending-queue review surface. |
+| `src/screens/ComposeScreen.tsx` | Compose-attached Yes / Not yet panel that supplements, never replaces, the durable queue surfaces. |
 
 ## How It Works
 
@@ -59,6 +60,12 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 3. Choosing a channel with exactly one endpoint launches directly (2 taps); with ≥2 endpoints it opens `EndpointSelector` (3rd tap), where the `is_primary` row is accent-filled and tagged "Primary".
 4. `launch()` calls `performReachOut` with the canonical method value. When Interaction Assist is enabled, `performReachOut` writes a pending assist **before** `SMS.sendSMSAsync` / `Linking.openURL('tel:'|'mailto:')`. A thrown launch marks the assist `failed` and shows a per-channel Alert; a resolved OS call is treated only as a successful handoff request, never as delivery.
 5. The larger widget's `Contact` action deep-links `orbit://reach/<id>` into this same router (see `widget.md` / `app-shell.md`); the widget never writes assist rows.
+
+### Compose-attached confirmation
+
+1. `ComposeScreen` presents `Did you send it?` only when `performReachOut()` reports both a started handoff and an assist UID.
+2. `Yes, log interaction` calls `markAssistLogged()` with that UID and `connected: 1`; the DAO re-reads the pending row and writes at its original `handoff_at` through the sole recency writer.
+3. `Not yet` closes only the local panel and preserves the Compose session. It does not dismiss the assist, leaving the app-global banner and pending-confirmations sheet available after navigation, process death, or the 24-hour window.
 
 ### Returning and confirming
 
@@ -90,6 +97,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 - **ADR-072:** Shared Actionable Reach Out Router with Native Channel Handoff — phone/email-granular routing, ≤3 taps, primary emphasis, hidden-when-method-less, `tel:`/`sms:`/`mailto:` handoff, Compose Send seam.
 - **ADR-073:** Merge-Reparented, Purge-Cascaded Interaction Assists — redirect-to-survivor without a lazy lookup.
 - **ADR-074:** Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe — the widget entry into this router.
+- **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — adds a Compose-attached confirmation without weakening the durable assist lifecycle.
 
 ## Gotchas
 
@@ -99,6 +107,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 4. **Confirm/dismiss handlers have no try/catch** (review IN-03, backlog): a rejected `markAssistLogged`/`markAssistDismissed` (e.g. the LOG-06 future-`handoff_at` guard on a backward clock) is currently an unhandled rejection. Mirror `doLogContact`'s Alert if you touch these.
 5. **`endpoint_value` is not history.** It exists only to perform the handoff; the interaction row records the coarse `channel` only. Do not add endpoint/provider columns to `interactions` — that is explicitly out of scope.
 6. **Failed = the native launch threw**, not "the user didn't send." `expo-sms` returns `unknown` on Android and `tel:`/`mailto:` only report that some app can handle them, so "sent" is never observable — confirmation is user attestation.
+7. **Not yet is not Don't log.** The Compose panel must not call `markAssistDismissed`; durable dismissal remains available from the pending-confirmations sheet.
 
 ## Related Systems
 
@@ -114,3 +123,4 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | Date | Phase | What Changed |
 |------|-------|--------------|
 | 2026-08-31 | 21-interaction-assist-reach-out | New subsystem: migration 014 `interaction_assists` + `interaction_assist_enabled`; shared Reach Out router + native handoff; app-global assist banner; durable lifecycle (cap-5 / 15s–24h / 30-day sweep); attestation logging through the sole recency writer; merge/purge wiring; widget `Contact` deep-link. |
+| 2026-09-02 | 35 | Added the Compose-attached confirmation panel while preserving the banner, sheet, dismissal path, and handoff-time interaction write. |
