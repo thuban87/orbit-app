@@ -2,9 +2,9 @@
 
 ## Overview
 
-Use this process when Orbit's bundled AI model choices need a new LiteLLM snapshot or its provider/tier policy changes. It regenerates the offline seed from a public catalog while retaining the app's local-first picker: a device uses its cache when present and the committed seed otherwise.
+Use this process when Orbit's bundled direct-provider model choices need a new LiteLLM snapshot or its filter policy changes. It regenerates the offline seed while retaining the local-first picker. OpenRouter is a separate runtime catalog: its cache and current pricing refresh on device, while this repository maintains only its curated recommendation policy.
 
-## Architecture (Phase 14)
+## Architecture (Phase 36)
 
 ### Catalog generation
 
@@ -23,6 +23,10 @@ writeFileSync(SEED_PATH, renderSeedModule(catalog), "utf8")
 2. **Bundled seed** — `src/ai/model-registry.seed.generated.ts` is used on first run, offline, or after an invalid cache.
 3. **Free-text model id** — remains available when a model is absent from the catalog or discovery fails.
 
+### OpenRouter catalog and curation
+
+`src/ai/openrouter-catalog.ts` owns the cached public OpenRouter catalog, its daily/manual refresh policy, and runtime pricing/capacity metadata. `src/ai/model-registry.ts` maps curated recommendation categories to runtime catalog IDs; it is policy, not a frozen catalog. An absent curated ID produces no card, and product logic must never hardcode an OpenRouter price.
+
 ## File Locations
 
 ### Code
@@ -34,6 +38,8 @@ writeFileSync(SEED_PATH, renderSeedModule(catalog), "utf8")
 | `src/ai/model-registry.seed.generated.ts` | Generated offline/first-run model snapshot. |
 | `src/ai/model-registry.ts` | Resolves All or latest-per-tier Frontier choices. |
 | `src/ai/model-catalog-cache.ts` | Performs user-instigated refresh without replacing a good prior catalog on failure. |
+| `src/ai/openrouter-catalog.ts` | Caches public OpenRouter models, pricing, capacity, and local-day refresh state. |
+| `src/ai/model-registry.ts` | Holds curated recommendation policy resolved against the runtime OpenRouter catalog. |
 
 ## How to Refresh the Bundled Catalog
 
@@ -64,6 +70,7 @@ writeFileSync(SEED_PATH, renderSeedModule(catalog), "utf8")
 - Do not change the SecureStore key repository; catalog refresh sends no key.
 - Do not change the Custom egress guard; catalog refresh is a separate public GET with no user/contact data.
 - Do not add a SQLite migration; the runtime catalog cache is a fully re-derivable document-file cache.
+- Do not regenerate or hand-edit OpenRouter prices in this workflow; cards take them from runtime cached/live metadata.
 
 ## Pitfalls
 
@@ -71,6 +78,7 @@ writeFileSync(SEED_PATH, renderSeedModule(catalog), "utf8")
 2. **Do not refresh automatically on a read path.** `refreshModelCatalog()` belongs only to an explicit user action; missing or corrupt cache falls back locally.
 3. **Do not make model discovery the only entry path.** Provider discovery is advisory, may need a key, and free-text entry remains the escape hatch.
 4. **Do not restore a flat output cap.** OpenAI and Gemini omit artificial caps; Anthropic alone receives the catalog maximum because its API requires `max_tokens`.
+5. **Do not turn curated OpenRouter policy into a frozen list.** Resolve registry IDs against the runtime catalog; missing models remain unavailable and require explicit reselection.
 
 ## Smoke Test
 
