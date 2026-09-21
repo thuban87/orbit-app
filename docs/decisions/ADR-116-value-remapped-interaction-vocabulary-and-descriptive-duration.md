@@ -56,4 +56,4 @@ Migration 025 (forward-only, irreversible, owner-authorized) re-maps the stored 
 - `src/components/touchpoint-refine-logic.ts` — pure duration-preset shaping logic.
 
 **Depends on:** ADR-023 (Structured Touchpoints and One-Tap Defaults); ADR-010 (Single-Writer Interaction Recency Spine); ADR-009 (Crash-Safe Forward-Only SQLite Migrations)
-**Required by:** None
+**Required by:** ADR-130 (Durable Scoped Default Interaction Channel); ADR-132 (Focused Rapid Capture Workflows)

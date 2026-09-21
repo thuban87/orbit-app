@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-02
 **Phase:** 34-rapid-capture-update-flows
-**Source decisions:** dossier `phase-13-rapid-capture-update-flows` §§P–Q; 34-CONTEXT D-03, D-09
+**Source decisions:** dossier `phase-13-rapid-capture-update-flows` §§P–Q; 34-CONTEXT D-03, D-09; owner-approved Quick Log adoption in 34-UAT
 **Reversibility:** one-way
 **Migration:** 027
 **Supersedes:** None
@@ -15,7 +15,7 @@ Ordinary detailed logging needs a useful initial Channel without allowing an aba
 
 ## Decision
 
-The system uses two validated `app_settings` columns: `default_interaction_channel` chooses Remember Last Choice or a fixed Message, Call, or In Person value; `remembered_interaction_channel` always holds a concrete channel and seeds Remember Last Choice with Message. An ordinary successful detailed-log save alone updates the remembered value. Group Log ignores the preference and defaults In Person; the keys are accepted and validated on restore but are not emitted or accompanied by a backup-format bump in this phase.
+The system uses two validated `app_settings` columns: `default_interaction_channel` chooses Remember Last Choice or a fixed Message, Call, or In Person value; `remembered_interaction_channel` always holds a concrete channel and seeds Remember Last Choice with Message. A successful ordinary single-contact save, including Quick Log, updates the remembered value; a cancelled or failed form does not. Group Log ignores the preference and defaults In Person; the keys are accepted and validated on restore but are not emitted or accompanied by a backup-format bump in this phase.
 
 ## Alternatives Considered
 

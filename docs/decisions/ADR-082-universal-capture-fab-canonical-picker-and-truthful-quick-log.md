@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** None
+**Superseded by:** ADR-132 (partial — the visible “Log Contact” action name and its placeholder workflow)
 
 ## Context
 
@@ -52,4 +52,4 @@ The shell uses one fixed-order, six-action universal FAB: Add Contact, Quick Log
 - `src/db/recency-dao.ts` — owns the reused touchpoint insert and delete transactions.
 
 **Depends on:** ADR-023 (Structured Touchpoints and One-Tap Defaults); ADR-075 (Binary Favourite Membership Without a User-Facing Order); ADR-080 (Four-Tab Bottom Navigation Shell with Per-Tab Stacks)
-**Required by:** _None._
+**Required by:** ADR-132 (Focused Rapid Capture Workflows).

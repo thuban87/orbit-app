@@ -52,4 +52,4 @@ The profile previously refined interactions from a weak newest-first vertical ti
 - `src/navigation/tabs/SettingsStack.tsx` — registers `LogContact`, `ThingsToRemember`, and `MemoryHistory` so Settings-originated Profiles resolve them.
 
 **Depends on:** ADR-108 (Durable Independent-Axis Profile Presentation and Inheritance); ADR-119 (Reusable Count-Only History Aggregation and Canonical History Read); ADR-120 (Shared-Window Heatmap and Intensity with Persisted Lenses); ADR-121 (Rolodex Month/Day/Year History Browser); ADR-122 (Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet)
-**Required by:** None
+**Required by:** ADR-132 (Focused Rapid Capture Workflows)
