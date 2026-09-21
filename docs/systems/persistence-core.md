@@ -1,7 +1,7 @@
 # Persistence Core
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 33-group-interaction-logging
+**Updated by phase:** 35-messaging-ai-compose
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -22,7 +22,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - `group_events` — UID-bearing encounter parents with shared Channel, Tone, Duration, and distinct Group Note; the parent itself never counts as a contact interaction.
 - `contact_links`, `events`, `custom_field_defs`, `field_history`, `fuel` — durable supporting data introduced in the first schema.
 - `custom_field_values` — migration-006 normalized uid-bearing custom-field current state, unique per contact-and-definition pair.
-- `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. Migration 015 adds theme selection; migrations 019 and 020 add validated Dashboard query and right-swipe-action preferences; migration 021 adds validated Orrery density, satellite, and last-System preferences. It never contains an API key, passphrase, or palette hex.
+- `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. Migration 028 adds `default_message_mode` (the `remember`/`text`/`email` preference) and concrete `remembered_message_mode` for Compose; their backup declaration intentionally precedes a later format emission. It never contains an API key, passphrase, or palette hex.
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for portable reconciliation.
 - `restore_photo_journal` — committed restore-photo finalization and cleanup work.
 - `contact_methods` — ordered UID-bearing phone/email rows with canonical/actionability data, optional label, and durable display order.
@@ -67,6 +67,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/023-orrery-system-selection-revision.ts` | Adds the monotonic internal revision that prevents Undo from overwriting a newer System selection. |
 | Migration | `src/db/migrations/026-group-events-schema.ts` | Adds Group Event parents, nullable child linkage, three follow flags, and partial membership uniqueness. |
 | Migration | `src/db/migrations/027-default-interaction-channel.ts` | Adds validated ordinary interaction-channel preference and remembered-channel columns. |
+| Migration | `src/db/migrations/028-compose-message-mode.ts` | Adds validated Compose default/remembered message-mode settings without a new entity table. |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Systems DAO | `src/db/systems-dao.ts` | Owns transactional System definitions, rules, overrides, preferences, delete/Undo, and selection-aware lifecycle composites. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
@@ -169,6 +170,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — every version step commits atomically.
 - **ADR-010:** Single-Writer Interaction Recency Spine — the shared mutex serializes its write transactions.
 - **ADR-130:** Durable Scoped Default Interaction Channel — migration 027 adds the ordinary channel preference without changing Group Log defaults.
+- **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — migration 028 adds the portable Compose mode preference boundary.
 - **ADR-012:** Opt-Out Android Backup for Third-Party PII — persistent contact data is excluded from Android Auto Backup.
 - **ADR-001:** Normalized Custom-Field Values — migration 006 atomically establishes normalized custom-field pairs.
 - **ADR-013:** Runtime Two-Table Custom Fields with Whitelist-Constructed DDL — superseded by ADR-001.
@@ -237,6 +239,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 24. **A System read never prunes stale exclusions.** It ignores and reports exclusions whose contacts no longer match; the next intentional definition save performs the physical deletion inside the Systems transaction.
 25. **Selection revision is internal conflict evidence.** It is not camera state or user-facing content. Any selection writer that bypasses the revision increment can let a delayed Undo overwrite a newer choice.
 26. **Do not duplicate the Profile migration number.** Import `PROFILE_PRESENTATION_SCHEMA_VERSION` and `profilePresentationMigration`; a literal target can drift from the registered step.
+27. **Keep the remembered Compose value concrete.** `default_message_mode` may be the `remember` sentinel, but `remembered_message_mode` is read as `text` or `email`; do not use it as a second free-form preference.
 
 - **FK detachment needs explicit cleanup.** `ON DELETE SET NULL` clears only the link. Lifecycle writers and the locked orphan contract clear all three follow flags together with the reference.
 
@@ -283,3 +286,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-09-17 | 37.1 | Confirmed mutable categories require no schema change: target stays 29, runtime deletion uses existing transactions/tombstones, and runtime/restore paths never reseed migration-001 defaults. |
 | 2026-09-02 | 33 | Added migration-026 Group Event parent/linkage, membership uniqueness, and single-transaction recency-core fan-outs. |
 | 2026-09-02 | 34 | Added migration 027's validated ordinary default/remembered interaction-channel settings. |
+| 2026-09-02 | 35 | Added migration 028's durable default/remembered Compose message-mode settings. |
