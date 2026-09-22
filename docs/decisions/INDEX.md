@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 29 of
-  141 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 30 of
+  145 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -93,7 +93,7 @@ not something you can pattern-match against.
 | 060 | Versioned Portable Method Graph and Collision-Normalized Restoration | Accepted | 18.1-contact-method-normalization | ADR-056 (partial) | ADR-063 (partial) | — | 7 | `src/backup`, `src/db` |
 | 061 | DAO-Selected Actionable Primary SMS Handoff | Accepted | 18.1-contact-method-normalization | ADR-035 (partial) | — | — | 5 | `src/db`, `src/logic`, `src/screens` |
 | 062 | Bound/Unbound Lifecycle and One-Way Cadence Assignment | Accepted | 18.2-bound-unbound-lifecycle | — | — | — | 7 | `src/db`, `src/db/migrations`, `src/services` +1 |
-| 063 | Versioned Lifecycle Backup and Dormant-Cadence Restore | Accepted | 18.2-bound-unbound-lifecycle | ADR-060 (partial) | — | — | 5 | `src/backup`, `src/db/migrations` |
+| 063 | Versioned Lifecycle Backup and Dormant-Cadence Restore | Accepted | 18.2-bound-unbound-lifecycle | ADR-060 (partial) | ADR-145 (partial) | — | 5 | `src/backup`, `src/db/migrations` |
 | 064 | Permissionless Android 17 System-Contact Snapshot Acquisition | Accepted | 19-system-contact-import | — | — | — | 4 | `modules/orbit-contact-picker`, `modules/orbit-contact-picker/android/src/main`, `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker` +1 |
 | 065 | Durable Resumable Contact-Import Sessions with Failure-Isolated Photos | Accepted | 19-system-contact-import | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` +1 |
 | 066 | Deliberate Reviewed Import with Unbound Bulk Defaults | Accepted | 19-system-contact-import | — | — | — | 7 | `src/db`, `src/screens`, `src/services/import` |
@@ -172,3 +172,7 @@ not something you can pattern-match against.
 | 139 | Loopback-Only OpenRouter Authorization Callback | Accepted | 36-ai-configuration-prompting | — | — | — | 4 | `modules/orbit-openrouter-loopback/android/src/main/java/expo/modules/orbitopenrouterloopback`, `modules/orbit-openrouter-loopback/src`, `src/ai` +1 |
 | 140 | Navigation-First Settings Directory and Canonical Sub-Routes | Accepted | 37-settings-personalization | — | — | — | 5 | `src/navigation`, `src/navigation/tabs`, `src/screens` |
 | 141 | Explicit-Host Dual-Home Backup Navigation | Accepted | 37-settings-personalization | — | — | — | 6 | `src/navigation/tabs`, `src/screens` |
+| 142 | User-Owned Categories with Stable Identity and Canonical Ordering | Accepted | 37.1-category-management | — | — | — | 5 | `src/db`, `src/logic`, `src/navigation` +1 |
+| 143 | Lock-Time-Revalidated Atomic Category Deletion and System Fallout | Accepted | 37.1-category-management | — | — | — | 6 | `src/db`, `src/logic` |
+| 144 | Complete Category Selection and Grouped Orrery System Discovery | Accepted | 37.1-category-management | — | — | — | 8 | `src/components/category`, `src/components/orrery`, `src/logic` +2 |
+| 145 | Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore | Accepted | 37.1-category-management | ADR-063 (partial) | — | — | 6 | `src/backup`, `src/db` |

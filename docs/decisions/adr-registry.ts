@@ -72,7 +72,7 @@
 // IMPORTANT: ADR-0060 [SUPERSEDED BY ADR-063 (partial)] Versioned Portable Method Graph and Collision-Normalized Restoration
 // NOTE: ADR-0061 [ACCEPTED] DAO-Selected Actionable Primary SMS Handoff
 // NOTE: ADR-0062 [ACCEPTED] Bound/Unbound Lifecycle and One-Way Cadence Assignment
-// NOTE: ADR-0063 [ACCEPTED] Versioned Lifecycle Backup and Dormant-Cadence Restore
+// IMPORTANT: ADR-0063 [SUPERSEDED BY ADR-145 (partial)] Versioned Lifecycle Backup and Dormant-Cadence Restore
 // NOTE: ADR-0064 [ACCEPTED] Permissionless Android 17 System-Contact Snapshot Acquisition
 // NOTE: ADR-0065 [ACCEPTED] Durable Resumable Contact-Import Sessions with Failure-Isolated Photos
 // NOTE: ADR-0066 [ACCEPTED] Deliberate Reviewed Import with Unbound Bulk Defaults
@@ -151,5 +151,9 @@
 // NOTE: ADR-0139 [ACCEPTED] Loopback-Only OpenRouter Authorization Callback
 // NOTE: ADR-0140 [ACCEPTED] Navigation-First Settings Directory and Canonical Sub-Routes
 // NOTE: ADR-0141 [ACCEPTED] Explicit-Host Dual-Home Backup Navigation
+// NOTE: ADR-0142 [ACCEPTED] User-Owned Categories with Stable Identity and Canonical Ordering
+// NOTE: ADR-0143 [ACCEPTED] Lock-Time-Revalidated Atomic Category Deletion and System Fallout
+// NOTE: ADR-0144 [ACCEPTED] Complete Category Selection and Grouped Orrery System Discovery
+// NOTE: ADR-0145 [ACCEPTED] Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore
 
-export const ADR_COUNT = 141;
+export const ADR_COUNT = 145;
