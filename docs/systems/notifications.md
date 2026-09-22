@@ -1,7 +1,7 @@
 # Notifications
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
+**Updated by phase:** 37-settings-personalization
 **Owners:** `src/db/notification-read.ts`, `src/db/snooze-dao.ts`, `src/services/notifications/`, `src/navigation/notification-gate.tsx`
 
 ## Purpose
@@ -55,6 +55,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | `src/services/notifications/channels.ts` | Creates low-importance private/public decay and private birthday channels. |
 | `src/services/notifications/purge-notification-cleanup.ts` | Cancels a purged contact's decay and birthday identifiers after commit. |
 | `src/navigation/notification-gate.tsx` | Receives warm and cold body/action responses and queues body navigation until ready. |
+| `src/screens/SettingsNotificationsScreen.tsx` | Presents the existing policy and OS-permission controls through the Notifications category. |
 
 ## How It Works
 
@@ -65,6 +66,11 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 3. It derives a local due date, applies a future snooze as the minimum base, then calculates a quiet-windowed, staggered fire instant. A birthday stays on its birthday date or is skipped.
 4. The scheduler keeps requests inside a 35-day, 48-request bound, reserves within-horizon birthdays first, and uses a full-request diff to cancel or replace stale `decay:<id>` and `birthday:<id>` requests.
 5. Concurrent callers coalesce through a DEFER-ONE coordinator; the final pass re-reads state so a committed mute or snooze cannot be undone by an older snapshot.
+
+### Changing notification preferences
+
+1. The Settings Notifications category keeps all policy controls and OS permission status together while preserving the existing settings DAO and reconcile-on-write behavior.
+2. A denied OS permission remains visible with an actionable system-settings handoff; it is not hidden or represented as an app-managed toggle.
 
 ### Reconciling the weekly digest
 
@@ -137,6 +143,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 11. **Recheck lifecycle at delivered ingress.** A notification can outlive an Unbind; Mark may record real history, but stale decay Compose and Snooze actions must not revive cadence work.
 12. **Do not restore flat root routes in a notification response.** The response gate must use the shared nested Dashboard reset builders after the tab-shell conversion.
 13. **Pending UI is not event deduplication.** Repeated explicit Snooze/Unsnooze invocations remain auditable; only an accidental concurrent press is suppressed in the Profile sheet.
+14. **Keep the permission row independent.** OS delivery permission is distinct from Orbit's durable master toggle and must be read fresh when the category receives focus.
 
 ## Related Systems
 
@@ -159,3 +166,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-08-27 | 18.2 | Made decay Bound-only, added Unbound birthday policy, and guarded stale notification actions and body taps. |
 | 2026-09-02 | 22 | Re-expressed body-tap destinations as typed nested Dashboard-tab resets without changing notification policy. |
 | 2026-09-02 | 31 | Routed Profile Frequency and Snooze controls through the existing composed effects and immutable-event contracts. |
+| 2026-09-02 | 37 | Moved notification policy and permission visibility into the dedicated Settings category without changing scheduler ownership. |
