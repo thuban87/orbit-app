@@ -1,7 +1,7 @@
 # Photos
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
+**Updated by phase:** 36-ai-configuration-prompting
 **Owners:** `src/services/photos/`, `src/db/contacts-dao.ts`, `src/db/profile-dao.ts`, `src/components/Avatar.tsx`, `src/components/PhotoSourcePicker.tsx`
 
 ## Purpose
@@ -110,6 +110,12 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 3. Presentation assignment commits before obsolete-byte cleanup. Shared files are deleted only after a fresh reference check proves no template still owns them.
 4. The ready-gated launch sweep repairs interrupted swaps and removes proven orphans; uncertain state prefers a bounded leak over deleting a referenced image.
 
+### Restoring a Profile background
+
+1. Format-v5 restore stages embedded background bytes in the guarded restore-pending namespace before the database transaction; it never accepts a serialized source path.
+2. After the parent-UID presentation graph commits, the background finalizer promotes only the candidate owned by the committed template to `profile-backgrounds/<uid>.jpg`.
+3. The shared finalization lock and launch reconciliation re-drive an interrupted committed candidate or prune an uncommitted one without overwriting a newer replacement.
+
 ## Configuration
 
 | Constant | Value | File | Purpose |
@@ -130,6 +136,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 - **ADR-065:** Durable Resumable Contact-Import Sessions with Failure-Isolated Photos — keeps selected-contact photo staging retryable without making photo failure invalidate the contact.
 - **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — stages and promotes a selected current source photo around the reconciliation transaction.
 - **ADR-112:** App-Owned Profile Background Derivatives and Launch Reconciliation — adds bounded local derivatives, shared-reference cleanup, and DB-aware recovery.
+- **ADR-138:** Complete Portable Backup Format v5 — stages and restores Profile background bytes with the parent-UID presentation graph.
 
 ## Gotchas
 
@@ -144,6 +151,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 9. **Do not pass import staging to `Avatar`.** It is preview-only and outside Avatar's canonical master namespace; resolve it directly in import UI.
 10. **Guard WebCrypto in Hermes.** Reconciliation photo hashing must fall back to RNQC when `globalThis.crypto` is unavailable; the original unguarded digest blocked photo-bearing scans before its Phase-20 fix.
 11. **A Profile background is shared template data.** Never apply the avatar pipeline's single-owner deletion assumption; re-read every live template reference first.
+12. **Background restore is not contact-photo journaling.** Its UID-derived pending/finalization path must retain the incoming bytes until the committed template owns the candidate.
 
 ## Related Systems
 
@@ -165,3 +173,4 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | 2026-08-26 | 19 | Added selected-contact staging and post-commit failure-isolated import mastering. |
 | 2026-08-26 | 20 | Added hashed reconciliation staging and post-commit chosen-source photo promotion. |
 | 2026-09-02 | 31 | Added Profile-aspect background derivatives, safe app-owned storage, reference-aware cleanup, and launch reconciliation. |
+| 2026-09-02 | 36 | Added staged format-v5 Profile-background byte restore and committed-candidate reconciliation. |
