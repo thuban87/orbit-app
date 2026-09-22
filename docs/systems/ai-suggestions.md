@@ -1,8 +1,8 @@
 # AI Suggestions
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 35-messaging-ai-compose
-**Owners:** `src/services/AiService.ts`, `src/services/ai-key-store.ts`, `src/ai/`, `src/db/ai-context-read.ts`, `src/db/app-settings-dao.ts`, `src/logic/ai-suggestion-logic.ts`, `src/screens/SettingsScreen.tsx`, `src/screens/ComposeScreen.tsx`
+**Updated by phase:** 37-settings-personalization
+**Owners:** `src/services/AiService.ts`, `src/services/ai-key-store.ts`, `src/ai/`, `src/db/ai-context-read.ts`, `src/db/app-settings-dao.ts`, `src/logic/ai-suggestion-logic.ts`, `src/screens/SettingsAIScreen.tsx`, `src/screens/ComposeScreen.tsx`
 
 ## Purpose
 
@@ -37,7 +37,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | Custom transport | `src/ai/secure-fetch.ts` | Routes Custom requests through the native egress guard. |
 | Lifecycle | `src/logic/ai-suggestion-logic.ts` | Owns one three-variant request, cancellation, timeout, and stale-result guards. |
 | Availability | `src/logic/ai-availability.ts` | Resolves Off, Ready, and Needs Attention without exposing credential contents. |
-| UI | `src/screens/SettingsScreen.tsx`, `src/screens/ComposeScreen.tsx` | Configures providers and presents intentional drafting/review. |
+| UI | `src/screens/SettingsAIScreen.tsx`, `src/screens/ComposeScreen.tsx` | Routes configuration into the canonical AI hierarchy and presents intentional drafting/review. |
 
 ### Key Files
 
@@ -58,7 +58,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 
 ### Configuring a connection
 
-1. Settings reads `ai_enabled`, the active lane, non-secret connection metadata, and credential presence; it never reads, displays, serializes, or backs up a key.
+1. The Settings AI category reads `ai_enabled`, the active lane, non-secret connection metadata, and credential presence; it never reads, displays, serializes, or backs up a key.
 2. The user configures the recommended OpenRouter lane or an Advanced direct/Custom lane. A new lane does not replace the active connection until it has a selected model and activates successfully; inactive saved lanes retain their remembered models.
 3. SecureStore writes or removes provider-specific credentials directly. OpenRouter authorizes through its one-shot loopback callback; Custom endpoint validation rejects malformed, credentialed, local, cleartext, and non-public literal URLs.
 4. OpenRouter cards use cached/live catalog metadata and real input/output pricing. Direct lanes use the LiteLLM seed/cache and manual model entry; a missing or unavailable model is Needs Attention rather than a fallback.
@@ -142,3 +142,4 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | 2026-09-02 | 32 | Added the default-off per-interaction `allow_ai` consent gate (migration 025) as the prerequisite control for future interaction-note transmission; the egress projection is unchanged (still no `note`). |
 | 2026-09-02 | 35 | Added three-state Compose availability, three non-destructive suggestions, carry-only gated interaction notes, and ADR-107's total Off Limits exclusion. |
 | 2026-09-02 | 36 | Added multi-lane connection configuration, OpenRouter authorization/catalog, permission-bounded prompt assembly, personalization, transparency, diagnostics, and model-aware capacity handling. |
+| 2026-09-02 | 37 | Replaced the monolithic Settings entry with the AI category, preserving the existing configuration hierarchy and local availability read. |
