@@ -4,7 +4,7 @@
 
 Use this process when adding a curated accent, bundled background slot, semantic theme token, or a complete theme package. It preserves Orbit's local-only appearance system, durable option-ID settings, token-only colour rule, and contrast/accessibility checks.
 
-## Architecture (Phases 23, 31, 31.1)
+## Architecture (Phases 23, 31, 31.1, 38.1)
 
 `app_settings` stores a package plus per-package mode, accent ID, and background ID. `ThemeProvider` resolves the active package and OS appearance, then applies a curated accent tone at render time. Palette hex values live only under `src/theme/`; screens receive resolved semantic tokens through `useTheme()`.
 
@@ -15,7 +15,7 @@ Use this process when adding a curated accent, bundled background slot, semantic
 3. **Palette and accent** — `src/theme/theme-presets.ts` selects one complete palette; `src/theme/accents.ts` overlays `{ fill, onAccent, text }`.
 4. **Background and shell** — `src/theme/backgrounds.ts` resolves a local asset or solid fallback; one `BackgroundHost` in `RootNavigator` renders it fixed behind transparent ordinary routes.
 5. **Route treatment** — `src/navigation/focused-route-classification.ts` selects presentation, comfortable, or dense treatment and suppresses the image only on the Orrery visualization.
-6. **Readable composition** — `src/theme/tokens/surface.ts` independently selects the host veil, mode-aware card tint, and protected chrome opacity.
+6. **Readable composition** — `src/theme/tokens/surface.ts` independently selects the host veil, mode-aware card tint, protected chrome opacity, and the controlled-canvas Orrery overlay treatment.
 
 ## File Locations
 
@@ -60,7 +60,7 @@ Use this process when adding a curated accent, bundled background slot, semantic
 
 6. **Preserve production adoption.** A bundled slot automatically appears through the shared `BACKGROUND_ORDER`, but verify the Settings label and grouping remain meaningful. Ordinary page roots omit only their full-page background wash; do not mount another `BackgroundHost`. New routes must receive the right density in `src/navigation/focused-route-classification.ts`, and only the actual `Orrery` route may force `none`.
 
-7. **Keep veil, cards, and chrome independent.** Tune background visibility through `BACKGROUND_VEIL_OPACITY`; tune matched-mode card glass through `CARD_GLASS_OPACITY`; protect text outside a card with `ChromeScrim`. Do not reuse card density opacity as the host veil, and keep mismatched package/mode cards opaque unless a new contrast proof supports a change.
+7. **Keep veil, cards, chrome, and controlled-canvas overlays independent.** Tune background visibility through `BACKGROUND_VEIL_OPACITY`; tune matched-mode card glass through `CARD_GLASS_OPACITY`; protect text outside a card with `ChromeScrim`. The Orrery alone may use `ORRERY_OVERLAY_TINT_OPACITY` through `GlassSurface treatment="orrery-overlay"`: it stays translucent in every package/mode, remains at or below the visibility ceiling, and needs AA proof against the brightest actual canvas backdrop. Do not change ordinary card constants to tune it.
 
 8. **Validate durable-settings scope.** Do not edit migration 015. A new persisted setting requires a new forward migration, typed DAO validation, the `PORTABLE_SETTINGS_KEYS` allowlist, and an explicit decision about the backup-format projection. Storing a hex value in SQLite is prohibited; store an ID or NULL.
 
@@ -92,6 +92,8 @@ Use this process when adding a curated accent, bundled background slot, semantic
 8. **Do not suppress by top-level tab.** Orrery-stack browse children are ordinary pages and must reveal the same background regardless of navigation origin.
 
 9. **Android elevation and translucent cards conflict.** Elevation can render an opaque inner rectangle over a glassy Galaxy card; retain the iOS shadow without restoring Android elevation.
+
+10. **A controlled canvas is not wallpaper.** Do not apply the Orrery overlay treatment to ordinary cards or modal Sheets; it is a named semantic exception for floating Orrery `GlassSurface` consumers.
 
 ## Smoke Test
 
