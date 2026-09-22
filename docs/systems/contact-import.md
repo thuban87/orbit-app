@@ -122,6 +122,8 @@ Category choices use the canonical ordered catalog and switch to the complete se
 - **ADR-003:** `READ_CONTACTS` on API 37+ for Reconcile — enables a permission-gated linked-contact re-read without changing the API-37+ import picker.
 - **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — shares the local source records and durable import flag-review boundary.
 - **ADR-091:** Imported Contact Notes as AI-Off Typed Memories — preserves accepted provider Notes through all new-contact import paths.
+- **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — reassigns every referenced pending, complete, and discarded import session in the deletion transaction.
+- **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — keeps import selectors complete, ordered, searchable, and stale-safe.
 
 ## Gotchas
 
