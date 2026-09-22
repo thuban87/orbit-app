@@ -1,7 +1,7 @@
 # Interaction History & Insights
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 38-your-week
+**Last updated:** 2026-09-19
+**Updated by phase:** 38.1-profile-presentation-polish
 **Owners:** `src/db/history-read.ts`, `src/db/interaction-edit-read.ts`, `src/services/history/` (`window.ts`, `buckets.ts`, `cycles.ts`, `intensity-window.ts`), `src/components/history/`, `src/screens/EditInteractionScreen.tsx`, `src/screens/edit-interaction-logic.ts`
 
 ## Purpose
@@ -71,6 +71,11 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 1. Changing the lens or preset writes it through `updateAppSettings({historyLens, historyCycleCount})` (global, not per contact) and re-renders both surfaces over the new window.
 2. Tapping a cell opens `HeatmapContextCard` first (count + `See details`, or `0 interactions` + `Log interaction`) — never the large sheet directly.
 3. `See details` opens the shared `DateDetailSheet`; `Log interaction` routes the typed `LogContact { contactId, prefillDate }` contract to the canonical detailed form. The prefilled day remains editable.
+4. The Year lens uses vertically flowing, weekday-aligned week rows rather than a horizontal scroll container. It reuses the same day-cell renderer, selection, classification, and accessible labels as the other lenses.
+
+### Explicit timestamp presentation
+
+Visible local timestamps use `formatDateTimeMinuteOrFallback()` from `src/utils/dates.ts`. It preserves stored local-wall-clock values and structured raw fields, renders a 12-hour minute-precision default, and displays `Unknown time` rather than exposing malformed raw storage. Relative language remains separate.
 
 ### Sharing history language with Digest
 
@@ -117,6 +122,7 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 - **ADR-122:** Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet — one inspection/correction surface through the sole recency writer with hard-delete.
 - **ADR-123:** Profile History Section Replacing the Vertical Timeline — the assembled section behind the ProfileModuleHost seam and the typed `LogContact` backfill contract. Partially supersedes ADR-024's profile-timeline refinement surface.
 - **ADR-148:** Portable Your Week Period and Group-Deduplicated Activity Aggregation — reuses this system’s heatmap language and owns the shared week-window definition without changing Profile History scope.
+- **ADR-152:** Vertical History Heatmap and Minute-Precision Timestamps — preserves Year cell semantics while changing its mobile flow and centralizes explicit timestamp display formatting.
 - **ADR-132:** Focused Rapid Capture Workflows — fulfills the typed detailed-log target while retaining the History-owned backfill route contract.
 - **ADR-116 / ADR-117:** the interaction vocabulary/duration and Allow-AI gate this surface renders (see `interaction-log.md`, `ai-suggestions.md`).
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/components/history/HistorySection.tsx`.
@@ -138,6 +144,7 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 9. **Worklet-forward-ref safety.** The Rolodex depth worklet is defined above its caller; a worklet calling a helper defined later crashes undefined-on-device on Hermes and vitest cannot catch it.
 10. **IntensityChart caption reads the contact cadence, not the window span.** A regression once made the caption describe the window; it now reflects the contact's true intended cadence (fixed live during UAT, commit `84e4013`).
 11. **Do not make Digest a second History reader.** It can reuse presentation helpers and `week-window`, but its app-wide aggregate and group-parent deduplication remain a distinct read boundary.
+12. **Do not display raw local timestamp storage.** Explicit timestamp consumers use the shared minute formatter; relative formatters and stored/structured values remain unchanged.
 
 - **Truthful Detail projection.** The initial Group Event Detail supplied a static Allow-AI value and displayed seconds as minutes. Gap closure reads the stored child flag and reuses the shared duration formatter.
 
@@ -161,3 +168,4 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | 2026-09-02 | 34 | Replaced the detailed-log placeholder with the canonical Log Interaction form while preserving typed date prefill. |
 | 2026-09-02 | 36 | Emitted and restored the persisted History lens and cycle-preset preferences in backup format v5. |
 | 2026-09-02 | 38 | Exposed shared local week-window and heatmap presentation seams for Digest without changing contact-scoped History reads. |
+| 2026-09-19 | 38.1 | Made the Year heatmap vertical and routed the audited explicit timestamp displays through the shared minute-precision formatter. |
