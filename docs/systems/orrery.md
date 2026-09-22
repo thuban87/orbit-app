@@ -1,8 +1,8 @@
 # Orrery
 
-**Last updated:** 2026-09-17
+**Last updated:** 2026-09-19
 
-**Updated by phase:** 30-orrery-systems
+**Updated by phase:** 38.1-profile-presentation-polish
 
 **Evidence:** automated implementation/SQLite/controller tests plus physical-Pixel authoring, management, accessibility and switch-choreography acceptance recorded in [30-UAT](../../.planning/phases/30-orrery-systems/30-UAT.md) and [30-12-DEVICE](../../.planning/phases/30-orrery-systems/30-12-DEVICE.md).
 
@@ -120,6 +120,8 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 
 ## Decisions
 
+- **ADR-149:** Orrery-Specific Translucent Overlay Treatment and Icon Controls — gives floating Orrery surfaces an AA-proven semantic `GlassSurface` treatment and separates Contacts, Recenter, and Center North into accessible icon controls.
+
 - **ADR-046:** Query-Time Orrery Placement and Transactional Ring Ordering — keeps placement derived and rank writes guarded; Phase 29 narrows a reorder to validated visible System slots while preserving the complete order.
 - **ADR-047:** App-Level Assignable Sun and Themed Self Identity — keeps global sun identity independent of System membership.
 - **ADR-077:** Single Canonical Orrery with a Constrained Inspection Camera — supplies the single status world and bounded camera model.
@@ -131,6 +133,8 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 - **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — defines UID-backed Category rule selection and the constrained three-group System selector.
 
 ## Deferred seams and evidence limits
+
+The `orrery-overlay` treatment is a controlled-canvas exception to ordinary card composition: it remains translucent in every package/mode combination, preserves the shared 0.92 visibility ceiling, and never changes `CARD_GLASS_OPACITY`. `OrreryContactsSheet` remains a modal `Sheet`, not a floating-overlay consumer.
 
 - Phase 36 owns portable preference emission and coordinated backup compatibility/versioning.
 - Phase 37 owns Category CRUD and deletion fallout; this consumer uses actual UID records and explicit missing-category recovery.
@@ -150,3 +154,4 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 | 2026-09-02 | 30 | Added migration-backed custom Systems, rule and override resolution, authoring/management/preview surfaces, revision-guarded selection, and owner-approved staged switching. |
 | 2026-09-17 | 37.1 | Added complete UID-backed Category rule authoring, exact grouped selection, canonical Needs Attention, and deleted-category fallback through durable All Contacts selection. |
 | 2026-09-02 | 37 | Added a Settings Orrery category bound to the existing preference store and Systems management routes. |
+| 2026-09-19 | 38.1 | Added the semantic AA-proven floating-overlay treatment and three uniform icon-only navigation controls without changing the Orrery world or ordinary card opacity. |
