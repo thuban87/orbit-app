@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 29 of
-  139 ADRs are superseded in whole or in part.
+  141 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -170,3 +170,5 @@ not something you can pattern-match against.
 | 137 | Structured Personalization and Explicit Context Capacity | Accepted | 36-ai-configuration-prompting | — | — | — | 5 | `src/ai`, `src/db` |
 | 138 | Complete Portable Backup Format v5 | Accepted | 36-ai-configuration-prompting | — | — | — | 5 | `src/backup`, `src/services/photos` |
 | 139 | Loopback-Only OpenRouter Authorization Callback | Accepted | 36-ai-configuration-prompting | — | — | — | 4 | `modules/orbit-openrouter-loopback/android/src/main/java/expo/modules/orbitopenrouterloopback`, `modules/orbit-openrouter-loopback/src`, `src/ai` +1 |
+| 140 | Navigation-First Settings Directory and Canonical Sub-Routes | Accepted | 37-settings-personalization | — | — | — | 5 | `src/navigation`, `src/navigation/tabs`, `src/screens` |
+| 141 | Explicit-Host Dual-Home Backup Navigation | Accepted | 37-settings-personalization | — | — | — | 6 | `src/navigation/tabs`, `src/screens` |

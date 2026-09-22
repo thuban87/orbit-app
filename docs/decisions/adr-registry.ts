@@ -149,5 +149,7 @@
 // NOTE: ADR-0137 [ACCEPTED] Structured Personalization and Explicit Context Capacity
 // NOTE: ADR-0138 [ACCEPTED] Complete Portable Backup Format v5
 // NOTE: ADR-0139 [ACCEPTED] Loopback-Only OpenRouter Authorization Callback
+// NOTE: ADR-0140 [ACCEPTED] Navigation-First Settings Directory and Canonical Sub-Routes
+// NOTE: ADR-0141 [ACCEPTED] Explicit-Host Dual-Home Backup Navigation
 
-export const ADR_COUNT = 139;
+export const ADR_COUNT = 141;
