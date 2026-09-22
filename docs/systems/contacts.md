@@ -242,6 +242,9 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 - **ADR-071:** User-Attested Handoff-Time Interaction Logging Through the Sole Recency Writer — assist confirmation recomputes `last_contact` through the same sole recomputer without a bespoke write.
 - **ADR-073:** Merge-Reparented, Purge-Cascaded Interaction Assists — purge removes pending assists via FK cascade; merge reparents them to the survivor.
 - **ADR-103:** Atomic Composed Dashboard Bulk Mutations — requires Dashboard batches to compose contact cores in one transaction without rank or lifecycle shortcuts.
+- **ADR-142:** User-Owned Categories with Stable Identity and Canonical Ordering — preserves category assignment through rename using local IDs rather than display names.
+- **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — reassigns affected contacts atomically to a selected survivor or Uncategorized.
+- **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — requires mutable category selections to refresh and validate before contact writes.
 - **[ADR-028: Per-Item Conversational Fuel with Fixed Kinds](../decisions/ADR-028-per-item-conversational-fuel-with-fixed-kinds.md)** — governs `src/screens/ContactProfileScreen.tsx`.
 - **[ADR-029: In-Query Fuel Eligibility and a Shared Ranked Projection](../decisions/ADR-029-in-query-fuel-eligibility-and-a-shared-ranked-projection.md)** — governs `src/screens/ContactProfileScreen.tsx`.
 - **[ADR-030: Explicit Confirmation of AI-Proposed Fuel](../decisions/ADR-030-explicit-confirmation-of-ai-proposed-fuel.md)** — governs `src/screens/ContactProfileScreen.tsx`.
