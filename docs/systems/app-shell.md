@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 35-messaging-ai-compose
+**Updated by phase:** 37-settings-personalization
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -30,7 +30,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | Backup-share gate | `src/navigation/backup-share-intent.ts` | Holds a narrow inbound backup-file intent until the backup restore surface is ready. |
 | Notification gate | `src/navigation/notification-gate.tsx` | Converts warm and cold local-notification responses into ready-gated actions or navigation. |
 | Widget gate | `src/navigation/widget-linking.ts` | Converts narrowly accepted widget `orbit://` links into ready-gated Dashboard-rooted resets. |
-| Settings surface | `src/screens/SettingsHubScreen.tsx`, `src/screens/SettingsAppearanceScreen.tsx` | Hosts the settings index and live package, mode, accent, and System-background controls. |
+| Settings surface | `src/screens/SettingsHubScreen.tsx`, `src/screens/settings-hub-model.ts`, `src/navigation/settings-routes.ts`, `src/screens/Settings*Screen.tsx` | Hosts the navigation-first directory, its runtime registration contract, and focused categories over canonical feature controls. |
 | Systems workflow | `src/screens/SystemsManagementScreen.tsx`, `src/screens/SystemBuilderScreen.tsx` | Provides one management destination and one focused authoring workflow from both the Orrery and Settings stacks. |
 | Theme contract | `src/theme/` | Defines four semantic palettes, curated accents, typography and motion tokens, local background/surface primitives, and their sole palette values. |
 | Interaction primitives | `src/components/icons/`, `src/components/ui/` | Provides semantic icons, non-colour status glyphs, scalable text, and shared action/overlay contracts. |
@@ -63,6 +63,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
 | `src/screens/DigestScreen.tsx` | Provides the live weekly retrospective destination with its own themed Back chrome. |
 | `src/screens/SettingsHubScreen.tsx` | Provides the distinct settings home and routes to focused settings pages. |
+| `src/screens/settings-hub-model.ts` | Defines the ordered category and utility-action rows without exposing live preference values. |
+| `src/navigation/settings-routes.ts` | Supplies the runtime Settings registration contract used by the hub and registration test. |
 | `src/screens/SettingsAppearanceScreen.tsx` | Provides immediate package, mode, accent, and grouped System-background selection. |
 | `src/screens/SystemsManagementScreen.tsx` | Provides the shared flat System catalog and guarded management actions from either owning stack. |
 | `src/screens/SystemBuilderScreen.tsx` | Provides the focused custom-definition and immutable-base override workflow with discard protection. |
@@ -114,7 +116,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 1. Dashboard presents co-equal Your Week and Group Events header destinations. `ShellAppBar` measures the available bar and active text scale; both labels render only when both fit, otherwise both remain accessible icon-only controls.
 2. Dashboard’s fixed overflow is Group Events, Unbound Contacts, Archived Contacts, Select Contacts, and Reset Dashboard View. Select Contacts persists Card View before entering its in-memory frozen selection session; Reset persists its query reset before clearing session state.
 3. Archived remains the same destructive surface reached from Dashboard and Settings, while Unbound is a Dashboard child route. Both use shared child chrome, and their stack origin determines Back behavior after opening a Profile.
-4. Settings exposes low-traffic lifecycle and configuration controls in its own remembered tab stack. Its Appearance section changes package, mode, and curated accent live, then persists the active package's values through the validated settings DAO.
+4. Settings is a navigation-first directory in its own remembered tab stack. Its ordered category routes reuse canonical managers and preference writers; the root shows title/subtitle rows rather than live values, and the widget remains a utility action rather than a category.
 5. Root tabs use branded/destination app bars without Back; child routes use a title and Back control. Native stack headers remain disabled so no duplicate chrome appears.
 
 ### Handing off detailed Dashboard logging
@@ -124,9 +126,10 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 ### Opening Backup & Restore
 
-1. Backup / Restore is a top-level tab with its own root and remembered child stack.
+1. Backup / Restore can be reached from its top-level tab or Settings → Data & Backup through one canonical screen tree.
 2. `Backup` owns manual export, file selection, and health actions. Its child settings, preview, and result routes retain only serializable aggregate or opaque-token parameters.
-3. `App.tsx` registers backup and restore-photo recovery hooks after migration readiness, before the foreground launch-sweep trigger runs.
+3. An explicit host contract selects the correct Back chrome, post-restore destination, and single shared-backup consumer for each mount; host identity is never inferred from nested navigation state.
+4. `App.tsx` registers backup and restore-photo recovery hooks after migration readiness, before the foreground launch-sweep trigger runs.
 
 ### Composing from a contact
 
@@ -302,6 +305,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-135:** Multi-Connection AI Configuration and Fail-Closed Readiness — adds the routed AI hub, connection/model routes, and repair navigation.
 - **ADR-136:** Permission-Bounded Prompt Assembly and AI Transparency — adds Settings permissions and prompt-preview routes.
 - **ADR-139:** Loopback-Only OpenRouter Authorization Callback — keeps the `orbit://openrouter-auth` intent as a credential-free foreground wake only.
+- **ADR-140:** Navigation-First Settings Directory and Canonical Sub-Routes — keeps category routes registered, typed, and bound to their canonical managers.
+- **ADR-141:** Explicit-Host Dual-Home Backup Navigation — keeps the shared Backup tree origin-aware without duplicating it.
 - **ADR-054:** Live Weekly Digest Retrospective and Overlooked Relationship Read — adds the self-fetching Digest route and dashboard entry.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the dashboard-rooted Digest notification reset and ready-gated schedule hook.
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — adds the Backup destination and ready-gated foreground automatic work.
@@ -382,6 +387,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 35. **Avoid Android elevation on translucent Galaxy cards.** It renders an opaque inner rectangle; the iOS shadow remains independently supported.
 36. **Register `EditInteraction` and `LogContact` in every Profile-hosting stack.** A Profile is reachable from Dashboard, Orrery, and Settings; a route registered in only one stack throws when a Settings-originated Profile navigates to it. The Settings stack also needs `ThingsToRemember`/`MemoryHistory` for History Detail Sheet knowledge edits.
 37. **Visible capture labels are product copy.** Keep the internal `LogContact` route identifier for typed compatibility, but show Log Interaction consistently in the dial, accessibility label, and focused form title.
+38. **Types do not prove Settings registration.** A Settings route advertised by the hub must appear in the runtime registration contract and as a real `<Stack.Screen>`; a type-only route may be intentionally reserved.
 38. **Keep AI routes typed and content-free.** Route parameters identify a screen or focus only; keys, prompt text, personalization bodies, and callback material remain in their owning local state.
 
 - **Types do not register native routes.** A shared type intersection cannot prove that a route is mounted in each hosting stack; Group Event routes require all three runtime registrations.
@@ -445,3 +451,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 33 | Replaced Group Log/browse placeholders with cross-stack Group Event routes and awaited, failure-preserving multi-select confirmation. |
 | 2026-09-02 | 34 | Replaced ordinary capture placeholders with Log Interaction, Update Contact, and Memory routes; finalized the visible Log Interaction label and post-log Add Note path. |
 | 2026-09-02 | 35 | Added origin-aware session-scoped Compose navigation, dual-stack Compose Research registration, and durable-mode-free route parameters. |
+| 2026-09-02 | 37 | Replaced the Settings monolith with a navigation-first category directory and registered the canonical Backup tree in the Settings stack through explicit host semantics. |
