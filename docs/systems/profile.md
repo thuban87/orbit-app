@@ -1,7 +1,7 @@
 # Profile presentation
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 37-settings-personalization
+**Last updated:** 2026-09-19
+**Updated by phase:** 38.1-profile-presentation-polish
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
 ## Purpose
@@ -66,6 +66,10 @@ The module registry owns persisted semantic IDs, not component names. Relationsh
 
 Things to Remember is a one-column, source-owned presentation. Its cards emit owner targets for Memory, relationships, current state, normalized custom fields/history, and fuel; Profile does not reinterpret or directly mutate them. Ordinary Off Limits stays local caution content with no sparkle and no inferred permission. There is no Profile AI-draft entry: Compose remains the sole AI-suggestion invocation surface under ADR-079.
 
+Section headings identify their section only. Module bodies own values, empty states, and distinct subsections, so nested renderers never repeat a parent heading or place inferred state beside it. Temporal current-state knowledge renders one Most Recent item and at most five non-current Previous items; full history remains in Memory History. Heading actions open source-owned editors: existing Edit Contact for relationships/custom fields and the scoped Off Limits editor for fuel. Its controller filters reads, forces `off_limits` writes, validates delete IDs against the filtered collection, and reloads controlled items after successful mutations.
+
+Unbind remains a confirmed lifecycle action for Bound contacts but lives in the Profile overflow; the meaningful Bind experience remains visible for Unbound contacts. Relationship Overview retains the existing compact/wide preference, then derives only a visual full-row span for compact row orphans. It preserves configured order and semantic size while centering every tile's content.
+
 Interaction History renders the full History & Insights section (Heatmap, Intensity, Rolodex, Detail Sheet) behind the stable `interaction-history` semantic key via `ProfileModuleHost.renderHistory()`; the replacement of the earlier bounded stub migrated no layouts or collapse state. Knowledge-change rows in its Detail Sheet route back through the screen's existing knowledge navigation via a threaded `onOpenKnowledgeChange`. See `interaction-history.md`.
 
 ### Customization and reset
@@ -103,6 +107,8 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 - **ADR-123:** Profile History Section Replacing the Vertical Timeline — mounts the full History & Insights section behind the `interaction-history` renderer seam without migrating layout/collapse state; the knowledge-change edit reuses the screen's existing navigation.
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — Profile supplies the origin-aware Message entry into session-only Compose.
 - **ADR-138:** Complete Portable Backup Format v5 — carries the complete Profile presentation graph and staged background bytes by durable parent UID.
+- **ADR-150:** Semantic Profile Hierarchy and Source-Owned Knowledge Editing — assigns heading/body ownership, bounded temporal preview, source-owned edit routes, and overflow Unbind placement.
+- **ADR-151:** Visual-Only Relationship Overview Orphan Packing — fills row-local compact gaps without changing persisted layout semantics.
 
 ## Gotchas
 
@@ -118,6 +124,9 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 10. **Compose completion must pop to the originating Profile.** Do not reset a Profile-originated, confirmed Compose flow to Dashboard or leave the finished draft in Back history.
 11. **Presentation backup is not a path backup.** Restore must use embedded background bytes and UID-keyed staging; source-device image paths never cross the portable boundary.
 12. **Keep Settings global-only.** A Settings default must not become a shortcut to a contact-specific layout or background manager.
+13. **Do not turn heading metadata into content state.** Normal headings have no duplicated values or inferred empty caption; render meaningful state in the semantic body.
+14. **Scoped Off Limits writes stay scoped.** Filtering UI items is insufficient: force the kind and validate deletions at the controller/DAO boundary, then reload the controlled collection.
+15. **Orphan span is not layout persistence.** The computed stretch must not rewrite the compact/wide preference or reorder modules.
 
 ## Related systems
 
@@ -143,3 +152,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-09-17 | 37.1 | Added complete bounded real-category assignment, rename-stable inheritance, and atomic deletion cleanup with fallback to the next presentation axis. |
 | 2026-09-02 | 35 | Profile Message now passes a Compose origin so Back and confirmed handoff completion return to the launching Profile. |
 | 2026-09-02 | 37 | Exposed global layout/background defaults in Settings while retaining per-contact template managers on Profile. |
+| 2026-09-19 | 38.1 | Made headings identifier-only, added bounded temporal knowledge/edit routes, moved Unbind to overflow, and added visual-only orphan packing with centered Overview cards. |
