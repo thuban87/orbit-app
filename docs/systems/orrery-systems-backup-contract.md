@@ -83,6 +83,11 @@ it must never leave an FK-invalid local row behind.
   to All Contacts after that safe fallback, rather than assuming an earlier
   fallback or retaining a permanently orphaned active choice.
 
+## Decisions
+
+- **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — removes only a proven deleted category's rule and ref-keyed System state.
+- **ADR-145:** Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore — uses category tombstones to suppress only dependents proven obsolete during merge.
+
 ## Related systems
 
 - [Orrery](orrery.md) owns live System resolution, including missing custom
