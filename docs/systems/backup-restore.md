@@ -129,6 +129,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — declares Compose message-mode keys without prematurely changing the backup wire format.
 - **ADR-138:** Complete Portable Backup Format v5 — emits/restores the complete non-secret milestone settings and entity graph, including Profile presentation and background bytes.
 - **ADR-141:** Explicit-Host Dual-Home Backup Navigation — mounts one Backup tree in both navigation homes with deterministic origin behavior.
+- **ADR-145:** Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore — introduces format v6 category tombstones, merge repair, and exact zero-category Replace-all restoration.
 - **[ADR-118: Bind/Unbind Immutable Lifecycle Events Without a Migration](../decisions/ADR-118-bind-unbind-immutable-lifecycle-events-without-a-migration.md)** — governs `src/backup/restore-apply.ts`.
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/db/tombstones-dao.ts`.
 - **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/backup/export-manifest.ts`, `src/db/tombstones-dao.ts`.
