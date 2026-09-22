@@ -88,6 +88,8 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 
 ## Decisions
 
+- **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — removes the deleted Category presentation assignment so inherited axes fall through.
+- **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — keeps Profile category assignment real-only and complete at arbitrary catalog size.
 - **ADR-108:** Durable Independent-Axis Profile Presentation and Inheritance — owns the normalized template/assignment/override model, precedence, collapse persistence, and presentation-only reset.
 - **ADR-109:** Fixed-Hero Semantic Profile Composition and Focused Accessible Editors — fixes Hero geometry and constrains the semantic body and editor workflows.
 - **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — keeps one local snapshot while preserving each knowledge source's ownership and permission semantics.
