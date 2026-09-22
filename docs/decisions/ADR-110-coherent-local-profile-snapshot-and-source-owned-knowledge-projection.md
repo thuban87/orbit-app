@@ -61,4 +61,4 @@ Profile-only adapters shape compact presentation and source-owner action targets
 - `src/components/profile/ThingsToRemember.tsx` — renders source-owned knowledge and management targets.
 
 **Depends on:** ADR-088 (Additive Contact-Knowledge Schema and Application-Owned Memory Registry); ADR-090 (Additive Custom-Field Value History and Deferred Contact Scope)
-**Required by:** None
+**Required by:** ADR-150 (Semantic Profile Hierarchy and Source-Owned Knowledge Editing)

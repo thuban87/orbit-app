@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** None
+**Superseded by:** ADR-153 (partial — normal Grid card context row)
 
 ## Context
 
@@ -50,4 +50,4 @@ The system uses a responsive, avatar-first CardGrid over the shared `DashboardRo
 - `src/screens/HomeScreen.tsx` — supplies shared rows, descriptors, host-owned navigation, and favourite mutation.
 
 **Depends on:** ADR-075 (Binary Favourite Membership Without a User-Facing Order); ADR-086 (Semantic Icons and Accessible Interaction Primitives); ADR-092 (Durable Shared Dashboard Query State); ADR-093 (Scoped Composable Dashboard Population and Filter Model); ADR-094 (Eligibility-Scoped Semantic Dashboard Search)
-**Required by:** None
+**Required by:** ADR-153 (Two-Row Normal Contacts Grid)

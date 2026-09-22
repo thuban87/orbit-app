@@ -63,4 +63,4 @@ Layout and template editing runs in focused Profile-owned overlay sheets. Editor
 - `src/navigation/types.ts` — preserves typed Profile origins without carrying presentation drafts.
 
 **Depends on:** ADR-079 (On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation); ADR-086 (Semantic Icons and Accessible Interaction Primitives); ADR-088 (Additive Contact-Knowledge Schema and Application-Owned Memory Registry)
-**Required by:** None
+**Required by:** ADR-150 (Semantic Profile Hierarchy and Source-Owned Knowledge Editing); ADR-151 (Visual-Only Relationship Overview Orphan Packing)

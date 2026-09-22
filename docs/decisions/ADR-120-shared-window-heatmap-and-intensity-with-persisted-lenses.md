@@ -53,4 +53,4 @@ The Heatmap is a static, **count-only**, DB-free presentational component with f
 - `src/db/app-settings-dao.ts` — threads `historyLens`/`historyCycleCount` through every closed seam with bounded-value validators; emission deferred.
 
 **Depends on:** ADR-119 (Reusable Count-Only History Aggregation and Canonical History Read); ADR-084 (Four Semantic Theme Palettes, Curated Accents, and Contrast Validation)
-**Required by:** ADR-123 (Profile History Section Replacing the Vertical Timeline); ADR-148 (Portable Your Week Period and Group-Deduplicated Activity Aggregation)
+**Required by:** ADR-123 (Profile History Section Replacing the Vertical Timeline); ADR-148 (Portable Your Week Period and Group-Deduplicated Activity Aggregation); ADR-152 (Vertical History Heatmap and Minute-Precision Timestamps)

@@ -54,4 +54,4 @@ The system uses independent tokenized layers for background visibility and conte
 - `src/screens/HomeScreen.tsx` — applies protected count and empty-state chrome on the primary presentation route.
 
 **Depends on:** ADR-114 (Route-Aware App-Wide System Background Composition)
-**Required by:** None
+**Required by:** ADR-149 (Orrery-Specific Translucent Overlay Treatment and Icon Controls)
