@@ -1,7 +1,7 @@
 # Profile presentation
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 35-messaging-ai-compose
+**Updated by phase:** 37-settings-personalization
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
 ## Purpose
@@ -50,6 +50,7 @@ The stable migration object is `profilePresentationMigration`; `src/db/database.
 | `src/components/profile/ProfileLayoutEditor.tsx` | Draft-only complete-layout editor with drag and Move alternatives. |
 | `src/components/profile/ProfileTemplateManager.tsx` | Reusable layout templates, assignments, usage, and deletion fallback. |
 | `src/components/profile/ProfileBackgroundManager.tsx` | Local picker/crop/template/assignment workflow. |
+| `src/screens/SettingsAppearanceScreen.tsx` | Exposes only the global layout/background defaults; per-contact managers remain Profile-scoped. |
 
 ## Behavior contracts
 
@@ -83,7 +84,7 @@ Both template managers obtain categories in canonical order and use a bounded co
 
 Backup format v5 emits and restores both nullable global Profile preference keys, reusable layout/background templates, and the `profile_contact_presentation` / `profile_category_presentation` assignment rows. Presentation rows travel under their parent contact or Category UID; freeform layout JSON and collapse JSON remain intact. Each background template also carries its image bytes, which restore stages before the database transaction and rehydrates after commit to the UID-derived `profile-backgrounds/<uid>.jpg` path.
 
-The full History UX is owned by the History & Insights subsystem and mounts behind the preserved `interaction-history` key. Phase 37 may reuse the Profile template managers from Settings and owns Category CRUD; its Category deletion must preserve this resolver's fallout contract. Phase 40 owns background-image memory/performance hardening.
+The full History UX is owned by the History & Insights subsystem and mounts behind the preserved `interaction-history` key. Settings exposes the nullable global layout/background defaults but does not link the per-contact managers; Category management remains a separate lifecycle concern. Phase 40 owns background-image memory/performance hardening.
 
 ## Decisions
 
@@ -114,6 +115,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 9. **Keep bundled slots out of Profile templates.** System backgrounds are settings-owned packaged assets, while Profile templates are app-owned photo derivatives with independent assignment and cleanup.
 10. **Compose completion must pop to the originating Profile.** Do not reset a Profile-originated, confirmed Compose flow to Dashboard or leave the finished draft in Back history.
 11. **Presentation backup is not a path backup.** Restore must use embedded background bytes and UID-keyed staging; source-device image paths never cross the portable boundary.
+12. **Keep Settings global-only.** A Settings default must not become a shortcut to a contact-specific layout or background manager.
 
 ## Related systems
 
@@ -138,3 +140,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-09-02 | 32 | `ProfileModuleHost.renderHistory()` now mounts the full History & Insights section behind the preserved `interaction-history` key (replacing the bounded stub, no layout/collapse migration); threaded `onOpenKnowledgeChange` for Detail Sheet knowledge rows. |
 | 2026-09-17 | 37.1 | Added complete bounded real-category assignment, rename-stable inheritance, and atomic deletion cleanup with fallback to the next presentation axis. |
 | 2026-09-02 | 35 | Profile Message now passes a Compose origin so Back and confirmed handoff completion return to the launching Profile. |
+| 2026-09-02 | 37 | Exposed global layout/background defaults in Settings while retaining per-contact template managers on Profile. |
