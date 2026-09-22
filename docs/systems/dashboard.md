@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 38-your-week
+**Last updated:** 2026-09-19
+**Updated by phase:** 38.1-profile-presentation-polish
 **Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/stores/dashboard-selection-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
@@ -119,8 +119,8 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 ### Rendering and acting from a Card
 
 1. `HomeScreen` passes the same shared rows, local read time, candidates, and search descriptors to `CardGrid`; Card View does not issue a renderer-specific query.
-2. `CardGrid` remounts its keyed `FlatList` when width or font scale changes the responsive column count. `GridCard` presents name, recency, and one compact context item; it uses a status ring plus glyph, neutralizes the ring with a snooze glyph when snoozed, and suppresses the glyph for a never-contacted row.
-3. The Card star uses the host-owned optimistic binary favourite path. Card context and search retain the shared semantic priorities and descriptors; compactness only breaks ties within a context tier.
+2. `CardGrid` remounts its keyed `FlatList` when width or font scale changes the responsive column count. In normal mode `GridCard` presents name and recency only; it uses a status ring plus glyph, neutralizes the ring with a snooze glyph when snoozed, and suppresses the glyph for a never-contacted row.
+3. The Card star uses the host-owned optimistic binary favourite path. Search may render its own third-line match explanation; ordinary List retains the selected context/excerpt path, while normal Grid does not.
 4. A normal tap opens Profile. Long-press and equivalent accessibility actions expose the fixed per-contact action menu; Card View does not copy List swipe gestures.
 
 ### Selecting and applying bulk actions
@@ -174,6 +174,7 @@ The Group Events header and redundant overflow entries navigate to the local rev
 - **ADR-099:** Durable Global Dashboard Right-Swipe Action — adds the constrained persisted logging choice used by List gestures.
 - **ADR-100:** Relevance-First, Visibility-Safe Dashboard List Search — preserves scorer order and confines List search to visible local knowledge.
 - **ADR-101:** Avatar-First Accessible Dashboard Card Renderer — establishes the shared-model Card renderer and compact presentation rules.
+- **ADR-153:** Two-Row Normal Contacts Grid — limits ordinary Grid cards to identity and recency while preserving List excerpts and search explanations.
 - **ADR-102:** Frozen-Universe Dashboard Multi-Select — makes selection the Dashboard bulk-management surface and records its routing boundary.
 - **ADR-103:** Atomic Composed Dashboard Bulk Mutations — requires host orchestration to call the invariant-preserving batch composers.
 - **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — removes deleted category filters only through the committed aggregate.
@@ -211,6 +212,7 @@ The Group Events header and redundant overflow entries navigate to the local rev
 14. **A stale Favourite write can still be durable.** Every successful settlement updates the base membership, even if a newer optimistic intent remains over it.
 15. **Do not re-seed selection after entry.** The store membership guard and render-side frozen-universe filter both matter; only a committed archive removes IDs.
 16. **Do not use public single-contact writers inside a batch.** They own their own transaction; Dashboard bulk actions call the composed DAO instead.
+17. **Search context is not ordinary card context.** A Grid search explanation may use the third line even though the normal Grid card does not.
 
 ## Related Systems
 
@@ -242,3 +244,4 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | 2026-09-17 | 37.1 | Closed category filters to positive IDs plus `uncategorized`, added searchable stale-safe bulk assignment, and reconciled deleted filters after committed shell refresh. |
 | 2026-09-02 | 33 | Connected existing Group Events discovery and count-aware participant handoff to canonical event-first Group Log and local browse surfaces. |
 | 2026-09-02 | 38 | Relabelled the user-facing root as Contacts, removed promoted shortcuts, and aligned the exact opted-in Unbound Never Contacted population with Digest preview and drill-through. |
+| 2026-09-19 | 38.1 | Removed routine normal-Grid excerpts; List excerpts and Grid search explanations remain independent paths. |
