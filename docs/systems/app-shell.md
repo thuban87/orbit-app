@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 38-your-week
+**Last updated:** 2026-09-19
+**Updated by phase:** 38.1-profile-presentation-polish
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -195,6 +195,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 4. `densityForRoute()` selects presentation, comfortable, or dense treatment. `systemBackgroundSlotOverride()` forces solid only for the actual `Orrery` route; browse routes reached through the Orrery stack continue to show the System background, while System Builder keeps its own opaque authoring canvas.
 5. The host veil controls artwork contribution independently from cards. `GlassSurface` is glassy when the package artwork tone matches the resolved mode and opaque when it does not; `ChromeScrim` protects bare-on-background chrome.
 6. Screens use semantic registry names and shared UI primitives rather than base-family icon names or ad-hoc action/overlay implementations. `AppText` preserves OS text scaling, and destructive controls do not rely on colour alone.
+7. Orrery floating controls opt into `GlassSurface`'s dedicated `orrery-overlay` treatment; this controlled-canvas exception is not an ordinary route/card opacity change.
 
 ### Applying relationship-state emphasis
 
@@ -228,6 +229,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 1. A contact profile in either the Dashboard or Orrery stack opens `ThingsToRemember` with a serializable contact ID.
 2. Both stacks also register typed `RecentlyDeleted` and `MemoryHistory` destinations, preserving native Back behavior for their origin. The Settings stack additionally registers `ThingsToRemember` and `MemoryHistory` so a Settings-originated Profile (Archived → Profile) can resolve a History Detail Sheet knowledge-change edit.
 3. Each destination self-fetches its local SQLite projection; route parameters carry no Memory content or callbacks.
+4. Profile heading actions preserve source ownership: relationships and custom fields open existing `EditContact` routes, while Off Limits opens the typed `OffLimitsEditor { contactId }` route. Dashboard, Orrery, Digest, Events, and Settings Profile hosts register the destinations required by their Profile origins.
 
 ### Navigating interaction history
 
@@ -273,6 +275,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-084:** Four Semantic Theme Palettes, Curated Accents, and Contrast Validation — supplies the four-palette and live-accent contract.
 - **ADR-086:** Semantic Icons and Accessible Interaction Primitives — supplies registry, typography, status, action, and overlay seams.
 - **ADR-087:** Bundled Background Presets and Package-Specific Surface Treatment — supplies tokenized local background and surface primitives for later screen adoption.
+- **ADR-149:** Orrery-Specific Translucent Overlay Treatment and Icon Controls — adds the controlled-canvas overlay treatment without changing ordinary card composition.
+- **ADR-150:** Semantic Profile Hierarchy and Source-Owned Knowledge Editing — registers Profile-origin editor destinations while preserving their owning model and writer boundaries.
 - **ADR-113:** Persistent Shared System Background Selection — exposes every approved local slot and persists an independent active-package choice.
 - **ADR-114:** Route-Aware App-Wide System Background Composition — mounts one fixed shell host with route density and explicit Profile/Orrery/SystemBuilder precedence.
 - **ADR-115:** Visible Mode-Aware Background Surface Composition — separates veil, chrome, and card treatment so selected art remains visible and readable.
@@ -454,3 +458,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 35 | Added origin-aware session-scoped Compose navigation, dual-stack Compose Research registration, and durable-mode-free route parameters. |
 | 2026-09-02 | 37 | Replaced the Settings monolith with a navigation-first category directory and registered the canonical Backup tree in the Settings stack through explicit host semantics. |
 | 2026-09-02 | 38 | Replaced the four-tab shell with Contacts, Events, Digest, Orrery, and Settings; made Digest the default root, removed the Backup tab, and moved external Digest routing to the semantic tab root. |
+| 2026-09-19 | 38.1 | Registered Profile-origin knowledge editors across their host stacks and documented the Orrery-specific overlay surface exception. |
