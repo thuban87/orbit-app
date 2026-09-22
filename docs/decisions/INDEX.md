@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 29 of
-  134 ADRs are superseded in whole or in part.
+  139 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -165,3 +165,8 @@ not something you can pattern-match against.
 | 132 | Focused Rapid Capture Workflows | Accepted | 34-rapid-capture-update-flows | ADR-082 (partial — the visible “Log Contact” action name and its placeholder workflow) | — | — | 8 | `src/components`, `src/screens`, `src/services` |
 | 133 | Session-Scoped Compose Modes and Truthful External Handoff | Accepted | 35-messaging-ai-compose | — | — | — | 7 | `src/db`, `src/db/migrations`, `src/logic` +3 |
 | 134 | Read-Only Compose Research and Permission-Bounded Message Focus | Accepted | 35-messaging-ai-compose | — | — | — | 7 | `src/ai`, `src/db`, `src/screens` +1 |
+| 135 | Multi-Connection AI Configuration and Fail-Closed Readiness | Accepted | 36-ai-configuration-prompting | — | — | — | 5 | `src/db`, `src/db/migrations`, `src/logic` +1 |
+| 136 | Permission-Bounded Prompt Assembly and AI Transparency | Accepted | 36-ai-configuration-prompting | — | — | — | 5 | `src/ai`, `src/components`, `src/db` +1 |
+| 137 | Structured Personalization and Explicit Context Capacity | Accepted | 36-ai-configuration-prompting | — | — | — | 5 | `src/ai`, `src/db` |
+| 138 | Complete Portable Backup Format v5 | Accepted | 36-ai-configuration-prompting | — | — | — | 5 | `src/backup`, `src/services/photos` |
+| 139 | Loopback-Only OpenRouter Authorization Callback | Accepted | 36-ai-configuration-prompting | — | — | — | 4 | `modules/orbit-openrouter-loopback/android/src/main/java/expo/modules/orbitopenrouterloopback`, `modules/orbit-openrouter-loopback/src`, `src/ai` +1 |

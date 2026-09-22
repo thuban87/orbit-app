@@ -144,5 +144,10 @@
 // NOTE: ADR-0132 [ACCEPTED] Focused Rapid Capture Workflows
 // NOTE: ADR-0133 [ACCEPTED] Session-Scoped Compose Modes and Truthful External Handoff
 // NOTE: ADR-0134 [ACCEPTED] Read-Only Compose Research and Permission-Bounded Message Focus
+// NOTE: ADR-0135 [ACCEPTED] Multi-Connection AI Configuration and Fail-Closed Readiness
+// NOTE: ADR-0136 [ACCEPTED] Permission-Bounded Prompt Assembly and AI Transparency
+// NOTE: ADR-0137 [ACCEPTED] Structured Personalization and Explicit Context Capacity
+// NOTE: ADR-0138 [ACCEPTED] Complete Portable Backup Format v5
+// NOTE: ADR-0139 [ACCEPTED] Loopback-Only OpenRouter Authorization Callback
 
-export const ADR_COUNT = 134;
+export const ADR_COUNT = 139;

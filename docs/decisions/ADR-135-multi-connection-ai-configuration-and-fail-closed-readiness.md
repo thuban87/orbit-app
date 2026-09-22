@@ -48,4 +48,4 @@ The system uses durable non-secret connection metadata with one lane-stable acti
 - `src/services/AiService.ts` — resolves generation from the active connection.
 
 **Depends on:** ADR-049 (BYO-Key AI Configuration and Credential Boundary)
-**Required by:** None
+**Required by:** ADR-137 (Structured Personalization and Explicit Context Capacity); ADR-139 (Loopback-Only OpenRouter Authorization Callback)

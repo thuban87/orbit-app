@@ -47,4 +47,4 @@ The system uses four BYO-key providers—OpenAI, Anthropic, Gemini, and HTTPS-on
 - `src/services/ai-types.ts` — defines the closed provider and configuration types.
 
 **Depends on:** ADR-005 (AiService Port Omits the Local/LAN Provider)
-**Required by:** None
+**Required by:** ADR-135 (Multi-Connection AI Configuration and Fail-Closed Readiness)
