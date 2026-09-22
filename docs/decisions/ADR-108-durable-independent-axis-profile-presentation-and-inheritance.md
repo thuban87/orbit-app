@@ -62,4 +62,4 @@ Migration 024 introduces the schema through the forward-only migration runner. P
 - `src/db/bulk-actions-dao.ts` — applies the same inheritance contract to bulk Category changes.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations); ADR-083 (Durable Multi-Package Theme Configuration and Restore-Before-Paint)
-**Required by:** ADR-112 (App-Owned Profile Background Derivatives and Launch Reconciliation); ADR-123 (Profile History Section Replacing the Vertical Timeline)
+**Required by:** ADR-112 (App-Owned Profile Background Derivatives and Launch Reconciliation); ADR-123 (Profile History Section Replacing the Vertical Timeline); ADR-143 (Lock-Time-Revalidated Atomic Category Deletion and System Fallout)

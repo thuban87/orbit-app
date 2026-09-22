@@ -48,4 +48,4 @@ The system uses backup format v3 to carry `trackingEnabled`, nullable `intervalD
 - `src/db/migrations/011-contact-lifecycle-schema.ts` — provides the durable cadence constraints restored rows must satisfy.
 
 **Depends on:** ADR-057 (Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots); ADR-060 (Versioned Portable Method Graph and Collision-Normalized Restoration); ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment)
-**Required by:** None.
+**Required by:** ADR-145 (Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore)
