@@ -176,6 +176,8 @@ The Group Events header and redundant overflow entries navigate to the local rev
 - **ADR-101:** Avatar-First Accessible Dashboard Card Renderer — establishes the shared-model Card renderer and compact presentation rules.
 - **ADR-102:** Frozen-Universe Dashboard Multi-Select — makes selection the Dashboard bulk-management surface and records its routing boundary.
 - **ADR-103:** Atomic Composed Dashboard Bulk Mutations — requires host orchestration to call the invariant-preserving batch composers.
+- **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — removes deleted category filters only through the committed aggregate.
+- **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — supplies the complete stale-safe category chooser for Dashboard bulk assignment.
 - **[ADR-041: Notification Settings, Privacy Channels, and Birthday Alerts](../decisions/ADR-041-notification-settings-privacy-channels-and-birthday-alerts.md)** — governs `src/db/app-settings-dao.ts`.
 - **[ADR-047: App-Level Assignable Sun and Themed Self Identity](../decisions/ADR-047-app-level-assignable-sun-and-themed-self-identity.md)** — governs `src/db/app-settings-dao.ts`.
 - **[ADR-049: BYO-Key AI Configuration and Credential Boundary](../decisions/ADR-049-byo-key-ai-configuration-and-credential-boundary.md)** — governs `src/db/app-settings-dao.ts`.
