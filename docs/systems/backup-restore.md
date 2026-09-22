@@ -1,7 +1,7 @@
 # Backup & Restore
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 35-messaging-ai-compose
+**Updated by phase:** 37-settings-personalization
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -55,10 +55,17 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | `src/db/tombstones-dao.ts` | Records merge-safe hard deletions. |
 | `src/db/restore-photo-journal-dao.ts` | Persists committed photo recovery work. |
 | `src/screens/BackupScreen.tsx` | Provides the health/action landing and restore entry. |
+| `src/screens/backup-dualhome-logic.ts` | Defines explicit host-specific return, chrome, and shared-backup-consumption behavior. |
 | `docs/systems/orrery-systems-backup-contract.md` | Records the Phase-30 stable-UID entity, validation, and orphan-repair contract consumed by the coordinated Systems wire implementation. |
 | `src/db/group-events-dao.ts` | Owns local Group Event deletion evidence and detach semantics. |
 
 ## How It Works
+
+### Opening the canonical tree
+
+1. Backup / Restore is reachable from both the Backup tab and Settings → Data & Backup, but both entries mount the same screen tree.
+2. Per-stack wrappers pass an explicit host value. The host chooses child versus root chrome, post-restore return, and the one mount permitted to consume a native shared-backup intent.
+3. A missing host keeps the established tab behavior rather than inferring nested navigator state.
 
 ### Exporting a snapshot
 
@@ -121,6 +128,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 - **ADR-130:** Durable Scoped Default Interaction Channel — declares validated camelCase restore keys without an in-phase wire-format bump.
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — declares Compose message-mode keys without prematurely changing the backup wire format.
 - **ADR-138:** Complete Portable Backup Format v5 — emits/restores the complete non-secret milestone settings and entity graph, including Profile presentation and background bytes.
+- **ADR-141:** Explicit-Host Dual-Home Backup Navigation — mounts one Backup tree in both navigation homes with deterministic origin behavior.
 - **[ADR-118: Bind/Unbind Immutable Lifecycle Events Without a Migration](../decisions/ADR-118-bind-unbind-immutable-lifecycle-events-without-a-migration.md)** — governs `src/backup/restore-apply.ts`.
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/db/tombstones-dao.ts`.
 - **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/backup/export-manifest.ts`, `src/db/tombstones-dao.ts`.
@@ -148,6 +156,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 16. **Restore is a separate interaction writer.** `restore-apply` writes `interactions` without going through migration 025, so it must consume the same `interaction-vocabulary.ts` remap and force `allow_ai=0` on its merge arm; otherwise the restore backdoor re-opens the vocabulary miscount or a stale AI-permissive row (SQLite's column `DEFAULT` fires only on fresh INSERT, not `ON CONFLICT` update).
 17. **Allowlisting is not emission.** A key in `PORTABLE_SETTINGS_KEYS` can be accepted and validated before its format-specific export/restore projection exists; do not mistake the Phase-35 Compose declaration for a format bump.
 18. **AI connection metadata is portable but credentials are not.** A restored lane can remain selected yet must resolve Needs Attention until its device-local SecureStore credential is supplied.
+19. **Do not infer a Backup host from navigator state.** Both mounts need an explicit host so restore return, app-bar chrome, and shared-backup consumption cannot drift.
 
 - **Phase-33 compatibility was deliberately temporary.** Dissolve/delete initially made format-4 export fail validation. Gap closure filtered only unsupported parent tombstones at the export boundary; it preserved durable local evidence and did not complete the portable Group Event graph.
 
@@ -163,6 +172,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 - **Contact Import** — retains local-only recovery sessions that Replace-all intentionally clears.
 - **Interaction Assist & Reach Out** — its `interactionAssistEnabled` preference rides in the portable manifest; its assist rows do not.
 - **Orrery** — owns live System definitions and membership; its backup contract distinguishes portable authored rules and overrides from derived resolved membership.
+- **App shell** — mounts the same Backup tree from both Settings and the temporary tab home.
 
 ## Changelog
 
@@ -185,4 +195,5 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 | 2026-09-02 | 35 | Declared Compose default/remembered message-mode keys without emitting them or changing the backup format. |
 | 2026-09-17 | 37.1 | Bumped to format 6 for category tombstones; merge nulls only proven deleted-category dependents, while Replace-all restores the exact taxonomy including zero and never reseeds defaults. |
 | 2026-09-02 | 33 | Recorded deferred UID-based Group Event wire/restore contract, owner-locked orphan detachment, and temporary format-4 export guard without weakening local tombstones. |
+| 2026-09-02 | 37 | Added Settings → Data & Backup as a second host for the canonical Backup tree with explicit origin-aware behavior. |
 Category relationships are portable by UID, never local integer ID. Format 6 adds category tombstones with a minimal v5→v6 version relabel. Merge maps a winning deleted category only to Uncategorized and suppresses only dependents proven to reference that UID. Replace-all removes destination-only categories through the canonical fallout transaction, restores the exact incoming order—including an empty taxonomy—clears tombstones for live restored categories, and never replays migration-001 seeds.
