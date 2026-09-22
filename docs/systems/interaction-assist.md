@@ -1,7 +1,7 @@
 # Interaction Assist & Reach Out
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 35-messaging-ai-compose
+**Updated by phase:** 37-settings-personalization
 **Owners:** `src/db/interaction-assist-dao.ts`, `src/db/interaction-assist-read.ts`, `src/logic/assist-eligibility.ts`, `src/services/reach-out/handoff.ts`, `src/services/interaction-assist-sweep.ts`, `src/stores/assist-store.ts`, `src/components/ReachOutRouter.tsx`, `src/components/EndpointSelector.tsx`, `src/components/AssistBanner.tsx`, `src/components/AssistConfirmation.tsx`, `src/components/PendingConfirmationsSheet.tsx`
 
 ## Purpose
@@ -50,6 +50,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | `src/components/AssistConfirmation.tsx` | Presentational attestation controls (Yes / No answer / Don't log) + optional Notes expander. |
 | `src/components/PendingConfirmationsSheet.tsx` | Transient multi-item pending-queue review surface. |
 | `src/screens/ComposeScreen.tsx` | Compose-attached Yes / Not yet panel that supplements, never replaces, the durable queue surfaces. |
+| `src/screens/SettingsInteractionsScreen.tsx` | Hosts the toggle through the specialized queue-clearing settings writer. |
 
 ## How It Works
 
@@ -78,7 +79,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 
 - **Cap:** every `createPendingAssist` expires all but the 5 newest pending rows.
 - **Eligibility / expiry:** a pending assist is eligible 15s–24h after `handoff_at`; the foreground `interaction-assist-sweep` (registered at launch, never a timer) expires aged pending rows and prunes terminal rows after 30 days.
-- **Toggle off:** disabling Interaction Assist in Settings expires every pending row in one transaction and refreshes the banner immediately — "off means off"; re-enabling starts fresh (no resurrection).
+- **Toggle off:** `SettingsInteractionsScreen` routes disabling through `setInteractionAssistEnabled`, which expires every pending row in one transaction, then re-reads settings and refreshes the banner immediately — "off means off"; generic settings persistence is forbidden here and re-enabling starts fresh (no resurrection).
 - **Merge / purge:** a merge reparents pending assists to the survivor inside the merge transaction; a purge removes them via the FK cascade (see `contacts.md` / `contact-reconciliation.md`, ADR-073).
 
 ## Configuration
@@ -98,6 +99,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 - **ADR-073:** Merge-Reparented, Purge-Cascaded Interaction Assists — redirect-to-survivor without a lazy lookup.
 - **ADR-074:** Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe — the widget entry into this router.
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — adds a Compose-attached confirmation without weakening the durable assist lifecycle.
+- **ADR-140:** Navigation-First Settings Directory and Canonical Sub-Routes — moves the toggle to Interactions while retaining ADR-070's specialized write path.
 
 ## Gotchas
 
@@ -108,6 +110,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 5. **`endpoint_value` is not history.** It exists only to perform the handoff; the interaction row records the coarse `channel` only. Do not add endpoint/provider columns to `interactions` — that is explicitly out of scope.
 6. **Failed = the native launch threw**, not "the user didn't send." `expo-sms` returns `unknown` on Android and `tel:`/`mailto:` only report that some app can handle them, so "sent" is never observable — confirmation is user attestation.
 7. **Not yet is not Don't log.** The Compose panel must not call `markAssistDismissed`; durable dismissal remains available from the pending-confirmations sheet.
+8. **Do not use generic settings persistence for this toggle.** It would skip the atomic pending-row expiry and immediate banner refresh required by ADR-070.
 
 ## Related Systems
 
@@ -124,3 +127,4 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 |------|-------|--------------|
 | 2026-08-31 | 21-interaction-assist-reach-out | New subsystem: migration 014 `interaction_assists` + `interaction_assist_enabled`; shared Reach Out router + native handoff; app-global assist banner; durable lifecycle (cap-5 / 15s–24h / 30-day sweep); attestation logging through the sole recency writer; merge/purge wiring; widget `Contact` deep-link. |
 | 2026-09-02 | 35 | Added the Compose-attached confirmation panel while preserving the banner, sheet, dismissal path, and handoff-time interaction write. |
+| 2026-09-02 | 37 | Moved the toggle to Interactions and preserved its specialized opt-out writer and banner refresh. |
