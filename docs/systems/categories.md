@@ -79,6 +79,10 @@ Backup format 6 exports category tombstones alongside stable-UID rows and depend
 ## Decisions
 
 - Phase 37.1 owner-approved dossier — single-category membership, zero-category validity, stable identity, dynamic deletion, complete selectors, and exact restore.
+- **ADR-142:** User-Owned Categories with Stable Identity and Canonical Ordering — makes Categories a mutable, ordered, UID-safe user taxonomy.
+- **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — requires previewed, parent-last, revision-once deletion with complete local repair.
+- **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — defines complete local selection and the constrained Orrery selector grouping.
+- **ADR-145:** Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore — adds deletion evidence and exact portable taxonomy restoration.
 - **ADR-056:** Tombstone-Backed UID Reconciliation for Portable Restores — category deletion evidence uses the existing generic mechanism.
 - **ADR-057/058:** Versioned atomic backup and restore — category rows and dependents are validated before mutation and applied transactionally.
 - **ADR-104:** Durable Orrery Preferences and Live System Scope — Category Systems use stable UID references.
