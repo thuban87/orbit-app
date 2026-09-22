@@ -127,6 +127,8 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 - **ADR-105:** Scoped Relationship Satellites for System-Member Context — renders unlinked relationship moons only as optional, subordinate member context.
 - **ADR-106:** Derived Orrery Gravity Visual Mass and Accessible Context — permits bounded derived Gravity body mass and companion context while partially superseding ADR-027's display restriction.
 - **ADR-140:** Navigation-First Settings Directory and Canonical Sub-Routes — makes the Settings Orrery entry reuse the existing preference source and Systems manager.
+- **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — removes only the deleted category's System state and routes active selection to All Contacts.
+- **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — defines UID-backed Category rule selection and the constrained three-group System selector.
 
 ## Deferred seams and evidence limits
 
