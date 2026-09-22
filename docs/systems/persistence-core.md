@@ -211,6 +211,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/db/group-events-dao.ts`.
 - **[ADR-128: Same-Group Contact Merge Refusal with Remediation](../decisions/ADR-128-same-group-contact-merge-refusal-with-remediation.md)** — governs `src/db/migrations/026-group-events-schema.ts`.
 - **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/db/group-events-dao.ts`.
+- **ADR-142:** User-Owned Categories with Stable Identity and Canonical Ordering — keeps category mutation in runtime DAO code without reseeding migration-001 taxonomy.
+- **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — uses one non-reentrant writer transaction and existing tombstone infrastructure without a schema migration.
 
 ## Gotchas
 
