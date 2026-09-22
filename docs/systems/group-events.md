@@ -1,7 +1,7 @@
 # Group Events
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 33-group-interaction-logging
+**Updated by phase:** 38-your-week
 **Owners:** `src/db/group-events-dao.ts`, `src/db/group-events-read.ts`, `src/logic/group-inheritance.ts`, `src/screens/GroupLogScreen.tsx`, `src/screens/GroupEventDetailScreen.tsx`
 
 ## Purpose
@@ -101,12 +101,18 @@ No Group Event Zustand store or background scheduler is required; screens hold u
 
 ### Browsing, inspecting, and choosing edit scope
 
-1. Dashboard header and overflow open `GroupEventsScreen`. `listGroupEvents` sorts newest occurrence first with a deterministic ID tie-break.
+1. The Events root opens `GroupEventsScreen`. `listGroupEvents` sorts newest occurrence first with a deterministic ID tie-break.
 2. `searchGroupEvents` binds an escaped literal LIKE term against title and participant name; EXISTS prevents duplicate parent rows.
 3. Detail shows shared fields and compact participant cards. Card tap opens that child’s canonical Interaction Detail with its own note plus distinctly labeled Group Note.
 4. `buildGroupEventDetailInteraction` preserves the stored child Allow-AI state; duration display uses `formatDurationLabel` through the Detail helper.
-5. Group-linked Edit asks individual versus Group Event scope. Detail and focused editors are registered in Dashboard, Orrery, and Settings profile-hosting stacks.
+5. Group-linked Edit asks individual versus Group Event scope. Detail and focused editors are registered in the Events stack and every profile-hosting stack that can preserve an origin-local return.
 6. Parent records never enter contact aggregation as extra interactions; contact consumers continue reading child rows only.
+
+### Contributing to Digest activity
+
+1. Digest reads a Group Event parent as one event record for metrics, heatmap activity, and selected-day detail.
+2. Its aggregate excludes linked child interactions from event activity, preventing one event from appearing once per participant.
+3. Unique non-archived participants may still contribute to the separate People reached metric; this read never changes canonical Group Event persistence.
 
 ### Removing, dissolving, deleting, and converting
 
@@ -151,6 +157,7 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 - **[ADR-127: Canonical Event-First Group Logging and Explicit Child Edit Scope](../decisions/ADR-127-canonical-event-first-group-logging-and-explicit-child-edit-scope.md)** — governs `src/components/ContactPicker.tsx`, `src/db/group-events-read.ts`, `src/screens/EditGroupEventScreen.tsx`, `src/screens/EditParticipantScreen.tsx`, `src/screens/GroupEventDetailScreen.tsx`, `src/screens/GroupEventsScreen.tsx`, `src/screens/GroupLogScreen.tsx`, `src/screens/group-event-detail-logic.ts`.
 - **[ADR-128: Same-Group Contact Merge Refusal with Remediation](../decisions/ADR-128-same-group-contact-merge-refusal-with-remediation.md)** — governs `src/db/migrations/026-group-events-schema.ts`.
 - **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/db/group-events-dao.ts`, `src/db/tombstones-dao.ts`.
+- **ADR-148:** Portable Your Week Period and Group-Deduplicated Activity Aggregation — projects each parent as one Digest event while leaving participant child history canonical.
 
 ## Gotchas
 
@@ -162,6 +169,7 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 6. **Detail units and consent were repaired.** Initial raw seconds/minutes display and static consent were replaced with the shared formatter and stored child permission read-through.
 7. **Do not reconcile a merge collision silently.** Same-event duplicate contacts require typed refusal and explicit membership remediation.
 8. **Native verification has limits.** Final Pixel UAT records three passes. Its long-content case has three participants; this is not large-list performance evidence. The phase’s full suite had an unrelated Orrery parser failure despite passing targeted checks.
+9. **Do not use participant children as Digest event rows.** The aggregate must count the Group Event parent once; participant identity belongs only in People reached semantics.
 
 ## Related Systems
 
@@ -169,7 +177,8 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 - **[Interaction history](interaction-history.md)** — presents local group context and explicit child/event edit scope.
 - **[Contacts](contacts.md)** — owns participant identity, archive state, and contact purge.
 - **[Contact reconciliation](contact-reconciliation.md)** — refuses same-event membership collisions losslessly.
-- **[Dashboard](dashboard.md)** and **[App shell](app-shell.md)** — provide discovery, preloaded capture, shared picker, and stack registrations.
+- **[Contacts](dashboard.md)** and **[App shell](app-shell.md)** — provide preloaded capture, shared picker, and stack registrations.
+- **[Digest](digest.md)** — aggregates each parent once for Your Week while preserving child history elsewhere.
 - **[Backup & restore](backup-restore.md)** — consumes the deferred stable-UID entity and orphan contract.
 - **[AI suggestions](ai-suggestions.md)** — cannot authorize Group Note egress.
 
@@ -178,3 +187,4 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-09-02 | 33 | Introduced event-first Group Event parents, canonical children, live inheritance, explicit lifecycle/scope, local browse/detail, atomic saved additions, and portability handoff. |
+| 2026-09-02 | 38 | Documented the read-only Your Week parent-once activity projection and Events-detail Profile return path. |

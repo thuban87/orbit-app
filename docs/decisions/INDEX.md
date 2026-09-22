@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 30 of
-  145 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 35 of
+  148 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -84,7 +84,7 @@ not something you can pattern-match against.
 | 051 | Public-HTTPS Custom AI Egress Guard | Accepted | 14-ai-message-suggestions | — | — | — | 5 | `modules/orbit-secure-fetch/src`, `src/ai`, `src/ai/__fixtures__` +1 |
 | 052 | Compose-Owned AI Draft Lifecycle and Acknowledged Egress | Accepted | 14-ai-message-suggestions | — | ADR-079 (partial — acknowledgement and Profile entry) | — | 4/5 live | `src/db`, `src/logic`, `src/screens` |
 | 053 | Local-First LiteLLM AI Model Catalog | Accepted | 14-ai-message-suggestions | — | — | — | 4/5 live | `scripts`, `src/ai` |
-| 054 | Live Weekly Digest Retrospective and Overlooked Relationship Read | Accepted | 15-weekly-digest | — | — | — | 4 | `src/db`, `src/logic`, `src/screens` |
+| 054 | Live Weekly Digest Retrospective and Overlooked Relationship Read | Accepted | 15-weekly-digest | — | ADR-147 (partial) | — | 4 | `src/db`, `src/logic`, `src/screens` |
 | 055 | Dedicated Weekly Digest Scheduling and Persisted Notification Policy | Accepted | 15-weekly-digest | — | — | — | 6/7 live | `src/db`, `src/db/migrations`, `src/services/notifications` |
 | 056 | Tombstone-Backed UID Reconciliation for Portable Restores | Accepted | 17-backup-export-restore | — | ADR-060 (partial) | — | 6 | `src/backup`, `src/db`, `src/db/migrations` |
 | 057 | Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots | Accepted | 17-backup-export-restore | — | — | — | 7 | `src/backup`, `src/services`, `src/services/backup` |
@@ -92,7 +92,7 @@ not something you can pattern-match against.
 | 059 | Normalized Contact Methods, Canonical Actionability, and Local Provenance | Accepted | 18.1-contact-method-normalization | ADR-008 (partial) | — | — | 9 | `src/db`, `src/db/migrations`, `src/logic` +1 |
 | 060 | Versioned Portable Method Graph and Collision-Normalized Restoration | Accepted | 18.1-contact-method-normalization | ADR-056 (partial) | ADR-063 (partial) | — | 7 | `src/backup`, `src/db` |
 | 061 | DAO-Selected Actionable Primary SMS Handoff | Accepted | 18.1-contact-method-normalization | ADR-035 (partial) | — | — | 5 | `src/db`, `src/logic`, `src/screens` |
-| 062 | Bound/Unbound Lifecycle and One-Way Cadence Assignment | Accepted | 18.2-bound-unbound-lifecycle | — | — | — | 7 | `src/db`, `src/db/migrations`, `src/services` +1 |
+| 062 | Bound/Unbound Lifecycle and One-Way Cadence Assignment | Accepted | 18.2-bound-unbound-lifecycle | — | ADR-147 (partial) | — | 7 | `src/db`, `src/db/migrations`, `src/services` +1 |
 | 063 | Versioned Lifecycle Backup and Dormant-Cadence Restore | Accepted | 18.2-bound-unbound-lifecycle | ADR-060 (partial) | ADR-145 (partial) | — | 5 | `src/backup`, `src/db/migrations` |
 | 064 | Permissionless Android 17 System-Contact Snapshot Acquisition | Accepted | 19-system-contact-import | — | — | — | 4 | `modules/orbit-contact-picker`, `modules/orbit-contact-picker/android/src/main`, `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker` +1 |
 | 065 | Durable Resumable Contact-Import Sessions with Failure-Isolated Photos | Accepted | 19-system-contact-import | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` +1 |
@@ -110,7 +110,7 @@ not something you can pattern-match against.
 | 077 | Single Canonical Orrery with a Constrained Inspection Camera | Accepted | milestone-2 | ADR-048 (partial — dual view/morph) | — | — | 4 | `src/components`, `src/components/orrery`, `src/screens` |
 | 078 | Negative-Constraint Off Limits and Gated Recent-Interaction AI Context | Accepted | milestone-2 | ADR-050 (partial — Off Limits and permitted interaction notes); ADR-036 (partial — Off Limits visible on the Research side) | ADR-107 (partial — Off Limits AI egress reversed; the gated recent-interaction-note carry and the Group Notes ban below remain in force) | — | 5 | `src/ai`, `src/db`, `src/screens` |
 | 079 | On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation | Accepted | milestone-2 | ADR-052 (partial — acknowledgement and Profile entry) | — | — | 4/5 live | `src/db`, `src/logic`, `src/screens` |
-| 080 | Four-Tab Bottom Navigation Shell with Per-Tab Stacks | Accepted | milestone-2 | ADR-019 (partial — root shell); ADR-018 (note — Archived list entry points only; gate unchanged) | — | — | 3/4 live | `src/navigation`, `src/screens` |
+| 080 | Four-Tab Bottom Navigation Shell with Per-Tab Stacks | Accepted | milestone-2 | ADR-019 (partial — root shell); ADR-018 (note — Archived list entry points only; gate unchanged) | ADR-146 (partial) | — | 3/4 live | `src/navigation`, `src/screens` |
 | 081 | Retire AI-Proposed Fuel for Explicit Per-Item Permission | Accepted | 24.2-contact-knowledge-egress-search-types | ADR-030 | — | — | 2 | `src/db`, `src/db/migrations` |
 | 082 | Universal Capture FAB, Canonical Picker, and Truthful Quick Log | Accepted | 22-app-shell-navigation | — | ADR-132 (partial — the visible “Log Contact” action name and its placeholder workflow) | — | 6 | `src/components`, `src/db` |
 | 083 | Durable Multi-Package Theme Configuration and Restore-Before-Paint | Accepted | 23-theme-visual-system | ADR-006 (partial) | — | — | 7 | `src/backup`, `src/db`, `src/db/migrations` +2 |
@@ -171,8 +171,11 @@ not something you can pattern-match against.
 | 138 | Complete Portable Backup Format v5 | Accepted | 36-ai-configuration-prompting | — | — | — | 5 | `src/backup`, `src/services/photos` |
 | 139 | Loopback-Only OpenRouter Authorization Callback | Accepted | 36-ai-configuration-prompting | — | — | — | 4 | `modules/orbit-openrouter-loopback/android/src/main/java/expo/modules/orbitopenrouterloopback`, `modules/orbit-openrouter-loopback/src`, `src/ai` +1 |
 | 140 | Navigation-First Settings Directory and Canonical Sub-Routes | Accepted | 37-settings-personalization | — | — | — | 5 | `src/navigation`, `src/navigation/tabs`, `src/screens` |
-| 141 | Explicit-Host Dual-Home Backup Navigation | Accepted | 37-settings-personalization | — | — | — | 6 | `src/navigation/tabs`, `src/screens` |
+| 141 | Explicit-Host Dual-Home Backup Navigation | Accepted | 37-settings-personalization | — | ADR-146 (partial) | — | 6 | `src/navigation/tabs`, `src/screens` |
 | 142 | User-Owned Categories with Stable Identity and Canonical Ordering | Accepted | 37.1-category-management | — | — | — | 5 | `src/db`, `src/logic`, `src/navigation` +1 |
 | 143 | Lock-Time-Revalidated Atomic Category Deletion and System Fallout | Accepted | 37.1-category-management | — | — | — | 6 | `src/db`, `src/logic` |
 | 144 | Complete Category Selection and Grouped Orrery System Discovery | Accepted | 37.1-category-management | — | — | — | 8 | `src/components/category`, `src/components/orrery`, `src/logic` +2 |
-| 145 | Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore | Accepted | 37.1-category-management | ADR-063 (partial) | — | — | 6 | `src/backup`, `src/db` |
+| 145 | Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore | Accepted | 37.1-category-management | ADR-063 (partial) | ADR-148 (partial) | — | 6 | `src/backup`, `src/db` |
+| 146 | Digest-Centered Five-Tab Shell and Semantic Root Routing | Accepted | 38-your-week | ADR-080 (partial); ADR-141 (partial) | — | — | 6 | `src/components`, `src/navigation`, `src/navigation/tabs` |
+| 147 | Derived Digest Composition and Canonical Contacts Drill-Through | Accepted | 38-your-week | ADR-054 (partial); ADR-062 (partial) | — | — | 7 | `src/components/digest`, `src/db`, `src/logic` +1 |
+| 148 | Portable Your Week Period and Group-Deduplicated Activity Aggregation | Accepted | 38-your-week | ADR-145 (partial) | — | — | 8 | `src/backup`, `src/components/digest`, `src/db` +2 |

@@ -1,7 +1,7 @@
 # Notifications
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 37-settings-personalization
+**Updated by phase:** 38-your-week
 **Owners:** `src/db/notification-read.ts`, `src/db/snooze-dao.ts`, `src/services/notifications/`, `src/navigation/notification-gate.tsx`
 
 ## Purpose
@@ -91,7 +91,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 
 1. A decay body tap checks current lifecycle before routing. A now-Unbound contact opens Profile instead of Compose; a live Bound contact uses the typed nested Dashboard-tab Compose reset.
 2. A birthday body tap navigates to that contact's Profile.
-3. A digest body tap resets the stack to Dashboard then Digest, guaranteeing Back returns to Dashboard on warm and cold starts.
+3. A digest body tap resets to the semantic Digest root, guaranteeing warm and cold starts do not recreate the retired Dashboard-child route shape.
 4. The response gate reads a cold-start response once, clears it after handling, and waits for navigation readiness before applying a queued body-tap intent.
 
 ### Cleaning up a purge
@@ -121,6 +121,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **ADR-039:** Pre-Scheduled Inexact Decay Reminders — reconciles generic, per-contact reminders without exact alarms or frozen fuel.
 - **ADR-040:** Exactly-Once Notification Actions and Dashboard-Rooted Tap Routing — keeps action writes DAO-owned and makes navigation deterministic.
 - **ADR-080:** Four-Tab Bottom Navigation Shell with Per-Tab Stacks — preserves the notification Dashboard fallback through the nested tab tree.
+- **ADR-146:** Digest-Centered Five-Tab Shell and Semantic Root Routing — updates Digest responses to the current semantic root while retaining ready-gated routing.
 - **ADR-041:** Notification Settings, Privacy Channels, and Birthday Alerts — persists policy in SQLite and uses versioned privacy channels.
 - **ADR-045:** Event-Driven Widget Refresh and Boot Recovery — keeps the widget current after a notification mark commits.
 - **ADR-055:** Dedicated Weekly Digest Scheduling and Persisted Notification Policy — adds the independent Sunday digest request, private channel, durable toggle, and dashboard-rooted tap reset.
@@ -141,9 +142,10 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 9. **Do not put digest counts in the notification body.** Scheduled content is frozen; the live Digest screen is the payload.
 10. **Do not migrate national endpoints with a guessed headless region.** The action path uses the shared platform region provider; an unavailable region leaves a national method non-actionable rather than inventing canonical identity.
 11. **Recheck lifecycle at delivered ingress.** A notification can outlive an Unbind; Mark may record real history, but stale decay Compose and Snooze actions must not revive cadence work.
-12. **Do not restore flat root routes in a notification response.** The response gate must use the shared nested Dashboard reset builders after the tab-shell conversion.
+12. **Do not restore flat or obsolete root routes in a notification response.** The response gate must use the shared nested semantic reset builders after the shell transition.
 13. **Pending UI is not event deduplication.** Repeated explicit Snooze/Unsnooze invocations remain auditable; only an accidental concurrent press is suppressed in the Profile sheet.
 14. **Keep the permission row independent.** OS delivery permission is distinct from Orbit's durable master toggle and must be read fresh when the category receives focus.
+15. **Keep DEV probes out of production ownership.** Phase-38 UAT uses `digest:uat:*` identifiers and never cancels `digest:weekly`; repeated probes must clean every matching DEV request.
 
 ## Related Systems
 
@@ -167,3 +169,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-09-02 | 22 | Re-expressed body-tap destinations as typed nested Dashboard-tab resets without changing notification policy. |
 | 2026-09-02 | 31 | Routed Profile Frequency and Snooze controls through the existing composed effects and immutable-event contracts. |
 | 2026-09-02 | 37 | Moved notification policy and permission visibility into the dedicated Settings category without changing scheduler ownership. |
+| 2026-09-02 | 38 | Routed Digest notification taps to the semantic Digest root and documented isolated DEV-only Digest UAT identifiers. |

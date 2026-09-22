@@ -1,7 +1,7 @@
 # Persistence Core
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 35-messaging-ai-compose
+**Updated by phase:** 38-your-week
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -22,7 +22,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - `group_events` — UID-bearing encounter parents with shared Channel, Tone, Duration, and distinct Group Note; the parent itself never counts as a contact interaction.
 - `contact_links`, `events`, `custom_field_defs`, `field_history`, `fuel` — durable supporting data introduced in the first schema.
 - `custom_field_values` — migration-006 normalized uid-bearing custom-field current state, unique per contact-and-definition pair.
-- `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. Migration 028 adds `default_message_mode` (the `remember`/`text`/`email` preference) and concrete `remembered_message_mode` for Compose; their backup declaration intentionally precedes a later format emission. It never contains an API key, passphrase, or palette hex.
+- `app_settings` — a singleton SQLite row for non-secret preferences, a monotonic exportable-data revision, and device-local backup health/configuration. Migration 030 adds the validated portable `your_week_period` choice; it never contains an API key, passphrase, or palette hex.
 - `tombstones` — indefinitely retained type-and-UID deletion evidence for portable reconciliation.
 - `restore_photo_journal` — committed restore-photo finalization and cleanup work.
 - `contact_methods` — ordered UID-bearing phone/email rows with canonical/actionability data, optional label, and durable display order.
@@ -68,6 +68,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/026-group-events-schema.ts` | Adds Group Event parents, nullable child linkage, three follow flags, and partial membership uniqueness. |
 | Migration | `src/db/migrations/027-default-interaction-channel.ts` | Adds validated ordinary interaction-channel preference and remembered-channel columns. |
 | Migration | `src/db/migrations/028-compose-message-mode.ts` | Adds validated Compose default/remembered message-mode settings without a new entity table. |
+| Migration | `src/db/migrations/030-your-week-period.ts` | Adds the validated portable Rolling 7 Days / Calendar Week setting. |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Systems DAO | `src/db/systems-dao.ts` | Owns transactional System definitions, rules, overrides, preferences, delete/Undo, and selection-aware lifecycle composites. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
@@ -106,6 +107,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/023-orrery-system-selection-revision.ts` | Adds a nonnegative `orrery_system_selection_revision` to the settings singleton. |
 | `src/db/migrations/profile-presentation.ts` | Exports migration 024 and its schema version for Profile templates, assignments, overrides, collapse state, and global preference UIDs. |
 | `src/db/migrations/027-default-interaction-channel.ts` | Adds `default_interaction_channel` and `remembered_interaction_channel` as validated, non-null singleton settings. |
+| `src/db/migrations/030-your-week-period.ts` | Adds `your_week_period` additively with a safe Rolling 7 Days default. |
 | `src/db/systems-dao.ts` | Sole mutation boundary for System metadata and ref-keyed customization. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
@@ -145,6 +147,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 25. Migration 023 adds an internal selection revision. Explicit System selections advance it, and delete/Undo compares both the stored token and revision so an Undo cannot replace a selection made after deletion.
 26. Migration 024 adds independent Profile layout/background templates, Category/contact presentation rows, and nullable global template UIDs. The database target imports the migration's exported version instead of repeating a numeric literal.
 27. Migration 029 adds non-secret multi-lane AI settings, the `ai_connections` table, and ordered `personalization_sections`. The active lane is durable text rather than a local row ID; credentials remain outside SQLite in SecureStore.
+28. Migration 030 additively adds the checked `your_week_period` singleton setting with a Rolling 7 Days default. It carries a user preference only; Digest activity remains derived from canonical tables.
 
 ### Running launch maintenance
 
@@ -163,7 +166,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
-| `TARGET_VERSION` | `29` | `src/db/database.ts` | Current registered schema head; Phase 37.1 category management adds no migration. |
+| `TARGET_VERSION` | `30` | `src/db/database.ts` | Current registered schema head, including the portable Your Week period setting. |
 
 ## Decisions
 
@@ -173,6 +176,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-130:** Durable Scoped Default Interaction Channel — migration 027 adds the ordinary channel preference without changing Group Log defaults.
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — migration 028 adds the portable Compose mode preference boundary.
 - **ADR-135:** Multi-Connection AI Configuration and Fail-Closed Readiness — migration 029 adds non-secret lane configuration while preserving the credential boundary.
+- **ADR-148:** Portable Your Week Period and Group-Deduplicated Activity Aggregation — migration 030 adds only the validated portable period preference, not Digest-domain state.
 - **ADR-012:** Opt-Out Android Backup for Third-Party PII — persistent contact data is excluded from Android Auto Backup.
 - **ADR-001:** Normalized Custom-Field Values — migration 006 atomically establishes normalized custom-field pairs.
 - **ADR-013:** Runtime Two-Table Custom Fields with Whitelist-Constructed DDL — superseded by ADR-001.
@@ -245,6 +249,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 26. **Do not duplicate the Profile migration number.** Import `PROFILE_PRESENTATION_SCHEMA_VERSION` and `profilePresentationMigration`; a literal target can drift from the registered step.
 27. **Keep the remembered Compose value concrete.** `default_message_mode` may be the `remember` sentinel, but `remembered_message_mode` is read as `text` or `email`; do not use it as a second free-form preference.
 28. **AI metadata is not credential material.** Migration 029 may store lane, model, endpoint, preferences, and permission defaults, but no key-shaped value belongs in `app_settings`, `ai_connections`, or backup.
+29. **Do not turn `your_week_period` into a Digest cache.** Migration 030 persists a bounded app setting; metrics, heatmap, and detail remain read-time derivations.
 
 - **FK detachment needs explicit cleanup.** `ON DELETE SET NULL` clears only the link. Lifecycle writers and the locked orphan contract clear all three follow flags together with the reference.
 
@@ -259,6 +264,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **AI suggestions** — persists non-secret settings and acknowledgement state through migration 004 while keeping credentials outside SQLite.
 - **AI suggestions** — persists non-secret multi-connection, personalization, and permission-default metadata through migration 029 while keeping credentials outside SQLite.
 - **Digest** — reads the migration-005 scheduling preference and registers a post-migration launch-sweep reconcile.
+- **Digest** — also reads the migration-030 period preference while keeping its data derived.
 - **Backup & Restore** — uses migrations 007/008, revisions, snapshots, and launch recovery without a backend.
 - **Contact Import** — uses migration 012, serial write cores, and foreground recovery hooks for accepted selected-contact work.
 - **Contact Reconciliation** — uses migration 013, serial write cores, and foreground recovery for durable linked-contact review.
@@ -294,3 +300,4 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | 2026-09-02 | 34 | Added migration 027's validated ordinary default/remembered interaction-channel settings. |
 | 2026-09-02 | 35 | Added migration 028's durable default/remembered Compose message-mode settings. |
 | 2026-09-02 | 36 | Added migration 029's non-secret AI connection, personalization, and permission-default schema. |
+| 2026-09-02 | 38 | Added migration 030's validated portable Your Week period preference without adding Digest-domain storage. |

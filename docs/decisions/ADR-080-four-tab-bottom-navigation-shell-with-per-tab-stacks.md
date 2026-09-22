@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** ADR-019 (partial — root shell); ADR-018 (note — Archived list entry points only; gate unchanged)
-**Superseded by:** None
+**Superseded by:** ADR-146 (partial)
 
 ## Context
 
@@ -52,4 +52,4 @@ The root navigation shell is a four-tab bottom navigator — Dashboard, Orrery, 
 - `src/screens/HomeScreen.tsx` — becomes the Dashboard tab root and hosts the overflow entry to Archived Contacts.
 
 **Depends on:** ADR-006 (Theme-Token Architecture); ADR-009 (Crash-Safe Forward-Only SQLite Migrations)
-**Required by:** ADR-082 (Universal Capture FAB, Canonical Picker, and Truthful Quick Log); ADR-096 (Dashboard Header and Overflow Discovery Paths); ADR-140 (Navigation-First Settings Directory and Canonical Sub-Routes); ADR-141 (Explicit-Host Dual-Home Backup Navigation)
+**Required by:** ADR-082 (Universal Capture FAB, Canonical Picker, and Truthful Quick Log); ADR-096 (Dashboard Header and Overflow Discovery Paths); ADR-140 (Navigation-First Settings Directory and Canonical Sub-Routes); ADR-141 (Explicit-Host Dual-Home Backup Navigation); ADR-146 (Digest-Centered Five-Tab Shell and Semantic Root Routing)

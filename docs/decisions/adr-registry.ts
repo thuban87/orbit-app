@@ -63,7 +63,7 @@
 // NOTE: ADR-0051 [ACCEPTED] Public-HTTPS Custom AI Egress Guard
 // IMPORTANT: ADR-0052 [SUPERSEDED BY ADR-079 (partial — acknowledgement and Profile entry)] Compose-Owned AI Draft Lifecycle and Acknowledged Egress
 // NOTE: ADR-0053 [ACCEPTED] Local-First LiteLLM AI Model Catalog
-// NOTE: ADR-0054 [ACCEPTED] Live Weekly Digest Retrospective and Overlooked Relationship Read
+// IMPORTANT: ADR-0054 [SUPERSEDED BY ADR-147 (partial)] Live Weekly Digest Retrospective and Overlooked Relationship Read
 // NOTE: ADR-0055 [ACCEPTED] Dedicated Weekly Digest Scheduling and Persisted Notification Policy
 // IMPORTANT: ADR-0056 [SUPERSEDED BY ADR-060 (partial)] Tombstone-Backed UID Reconciliation for Portable Restores
 // NOTE: ADR-0057 [ACCEPTED] Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots
@@ -71,7 +71,7 @@
 // NOTE: ADR-0059 [ACCEPTED] Normalized Contact Methods, Canonical Actionability, and Local Provenance
 // IMPORTANT: ADR-0060 [SUPERSEDED BY ADR-063 (partial)] Versioned Portable Method Graph and Collision-Normalized Restoration
 // NOTE: ADR-0061 [ACCEPTED] DAO-Selected Actionable Primary SMS Handoff
-// NOTE: ADR-0062 [ACCEPTED] Bound/Unbound Lifecycle and One-Way Cadence Assignment
+// IMPORTANT: ADR-0062 [SUPERSEDED BY ADR-147 (partial)] Bound/Unbound Lifecycle and One-Way Cadence Assignment
 // IMPORTANT: ADR-0063 [SUPERSEDED BY ADR-145 (partial)] Versioned Lifecycle Backup and Dormant-Cadence Restore
 // NOTE: ADR-0064 [ACCEPTED] Permissionless Android 17 System-Contact Snapshot Acquisition
 // NOTE: ADR-0065 [ACCEPTED] Durable Resumable Contact-Import Sessions with Failure-Isolated Photos
@@ -89,7 +89,7 @@
 // NOTE: ADR-0077 [ACCEPTED] Single Canonical Orrery with a Constrained Inspection Camera
 // IMPORTANT: ADR-0078 [SUPERSEDED BY ADR-107 (partial — Off Limits AI egress reversed; the gated recent-interaction-note carry and the Group Notes ban below remain in force)] Negative-Constraint Off
 // NOTE: ADR-0079 [ACCEPTED] On-Demand AI Transparency and Compose-Only Three-Suggestion Invocation
-// NOTE: ADR-0080 [ACCEPTED] Four-Tab Bottom Navigation Shell with Per-Tab Stacks
+// IMPORTANT: ADR-0080 [SUPERSEDED BY ADR-146 (partial)] Four-Tab Bottom Navigation Shell with Per-Tab Stacks
 // NOTE: ADR-0081 [ACCEPTED] Retire AI-Proposed Fuel for Explicit Per-Item Permission
 // IMPORTANT: ADR-0082 [SUPERSEDED BY ADR-132 (partial — the visible “Log Contact” action name and its placeholder workflow)] Universal Capture FAB, Canonical Picker, and Truthful Quick Log
 // NOTE: ADR-0083 [ACCEPTED] Durable Multi-Package Theme Configuration and Restore-Before-Paint
@@ -150,10 +150,13 @@
 // NOTE: ADR-0138 [ACCEPTED] Complete Portable Backup Format v5
 // NOTE: ADR-0139 [ACCEPTED] Loopback-Only OpenRouter Authorization Callback
 // NOTE: ADR-0140 [ACCEPTED] Navigation-First Settings Directory and Canonical Sub-Routes
-// NOTE: ADR-0141 [ACCEPTED] Explicit-Host Dual-Home Backup Navigation
+// IMPORTANT: ADR-0141 [SUPERSEDED BY ADR-146 (partial)] Explicit-Host Dual-Home Backup Navigation
 // NOTE: ADR-0142 [ACCEPTED] User-Owned Categories with Stable Identity and Canonical Ordering
 // NOTE: ADR-0143 [ACCEPTED] Lock-Time-Revalidated Atomic Category Deletion and System Fallout
 // NOTE: ADR-0144 [ACCEPTED] Complete Category Selection and Grouped Orrery System Discovery
-// NOTE: ADR-0145 [ACCEPTED] Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore
+// IMPORTANT: ADR-0145 [SUPERSEDED BY ADR-148 (partial)] Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore
+// NOTE: ADR-0146 [ACCEPTED] Digest-Centered Five-Tab Shell and Semantic Root Routing
+// NOTE: ADR-0147 [ACCEPTED] Derived Digest Composition and Canonical Contacts Drill-Through
+// NOTE: ADR-0148 [ACCEPTED] Portable Your Week Period and Group-Deduplicated Activity Aggregation
 
-export const ADR_COUNT = 145;
+export const ADR_COUNT = 148;

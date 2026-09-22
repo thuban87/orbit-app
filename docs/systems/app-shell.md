@@ -1,12 +1,12 @@
 # App Shell
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 37-settings-personalization
+**Updated by phase:** 38-your-week
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
 
-The app shell holds Orbit’s ready-gated four-tab navigation tree and reusable navigation chrome. It preserves a stack per top-level section, gives external entry points a safe Dashboard fallback, and exposes capture actions without mounting any local read surface before SQLite migration completes.
+The app shell holds Orbit’s ready-gated five-tab navigation tree and reusable navigation chrome. It preserves an independent stack per top-level section, gives external entry points semantic root destinations, and exposes capture actions without mounting any local read surface before SQLite migration completes.
 
 ## Architecture
 
@@ -19,10 +19,10 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | Layer | File | Responsibility |
 |-------|------|----------------|
 | Bootstrap | `App.tsx`, `src/theme/hydrate-theme-at-boot.ts` | Opens and migrates SQLite, imports legacy theme state once, hydrates the theme store, then mounts the navigator; renders accurate classified or generic startup failure copy when opening fails. |
-| Navigator | `src/navigation/RootNavigator.tsx` | Mounts the fixed Dashboard, Orrery, Backup, and Settings tabs with a native stack for each. |
+| Navigator | `src/navigation/RootNavigator.tsx` | Mounts the fixed Contacts, Events, Digest, Orrery, and Settings tabs with a native stack for each. |
 | Background shell | `src/components/ui/BackgroundHost.tsx`, `src/navigation/focused-route-classification.ts`, `src/stores/focused-route-store.ts` | Renders one fixed local System background, selects a density from the deepest focused route, and suppresses the image only on the Orrery visualization. |
 | Route types | `src/navigation/types.ts` | Defines serializable tab and per-stack route parameters. |
-| Reset intents | `src/navigation/reset-intents.ts` | Sole owner of typed nested Dashboard-root reset states for external and completion paths. |
+| Reset intents | `src/navigation/reset-intents.ts` | Sole owner of typed nested semantic tab-root reset states for external and completion paths. |
 | Transient/back state | `src/stores/shell-transient-store.ts`, `src/navigation/back-intent.ts` | Registers executable overlay dismissal callbacks and resolves transient-first Back behavior. |
 | Shell chrome | `src/components/ShellAppBar.tsx`, `src/navigation/use-bottom-clearance.ts` | Provides themed root/child app bars, measured compact trailing content, and shared tab/FAB clearance. |
 | Capture | `src/components/UniversalFab.tsx`, `src/services/quick-log-command.ts`, `src/components/ContactPicker.tsx`, `src/components/Snackbar.tsx` | Provides the universal action dial, shared Quick Log command, local contact selection, and commit-truthful feedback. |
@@ -40,7 +40,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | File | Role |
 |---|---|
 | `App.tsx` | Readiness gate, theme hydration before first main paint, startup-failure presentation, navigation mount point, gesture root, and photo/notification lifecycle registration. |
-| `src/navigation/RootNavigator.tsx` | Four-tab root, semantic registry tab icons, fade transition, focused-route and keyboard visibility, transient-first retap, and system-Back boundary. |
+| `src/navigation/RootNavigator.tsx` | Five-tab root, semantic registry tab icons, fade transition, focused-route and keyboard visibility, transient-first retap, and system-Back boundary. |
 | `src/navigation/focused-route-classification.ts` | Maps the deepest route to background density and the Orrery-only solid override. |
 | `src/theme/navigation-theme.ts` | Makes navigator scene layers reveal the shell host through the theme boundary. |
 | `src/components/ui/BackgroundHost.tsx` | Renders the fixed local background, density veil, Profile override, and solid failure fallback. |
@@ -51,7 +51,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/screens/ThingsToRememberScreen.tsx` | Contact-knowledge surface reached from either contact-profile stack. |
 | `src/screens/RecentlyDeletedScreen.tsx` | Typed Memory recovery and confirmed permanent-delete destination. |
 | `src/screens/MemoryHistoryScreen.tsx` | Typed retained-current-state history destination. |
-| `src/navigation/reset-intents.ts` | Builds the only root-level Dashboard reset states. |
+| `src/navigation/reset-intents.ts` | Builds typed semantic tab-root reset states. |
 | `src/components/UniversalFab.tsx` | Mounts the six-action shell capture dial once above browse/read surfaces. |
 | `src/services/quick-log-command.ts` | Shares commit-truthful Quick Log behavior between the universal FAB and Dashboard List gestures. |
 | `src/components/ShellAppBar.tsx` | Supplies accessible themed root and child app bars, including measured icon-only fallback for constrained root destinations. |
@@ -60,8 +60,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/navigation/notification-gate.tsx` | Owns warm/cold notification-response handling once navigation is ready. |
 | `src/navigation/widget-linking.ts` | Owns the separate, strict widget URI bridge without consuming native share state. |
 | `src/screens/CaptureScreen.tsx` | Provides the in-app target for a pending Android text share. |
-| `src/screens/HomeScreen.tsx` | Provides the dashboard Home and its destination entries. |
-| `src/screens/DigestScreen.tsx` | Provides the live weekly retrospective destination with its own themed Back chrome. |
+| `src/screens/HomeScreen.tsx` | Provides the Contacts root and its existing browse controls. |
+| `src/screens/DigestScreen.tsx` | Provides the default Digest root and its fixed live modules. |
 | `src/screens/SettingsHubScreen.tsx` | Provides the distinct settings home and routes to focused settings pages. |
 | `src/screens/settings-hub-model.ts` | Defines the ordered category and utility-action rows without exposing live preference values. |
 | `src/navigation/settings-routes.ts` | Supplies the runtime Settings registration contract used by the hub and registration test. |
@@ -93,10 +93,10 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 ### Moving through the shell
 
-1. The fixed root tabs are Dashboard, Orrery, Backup / Restore, and Settings. Each renders a separate native stack, so switching tabs preserves its in-tab history.
+1. The fixed root tabs are Contacts, Events, Digest, Orrery, and Settings. Digest is the centered initial tab on a fresh launch; each renders a separate native stack, so switching tabs preserves its in-tab history.
 2. A retap on the active tab dismisses the top shell transient first; a subsequent retap pops that tab to its root. Focused workflows and an open software keyboard hide the tab bar and universal FAB.
-3. `ShellAppBar` and Android Back resolve a shell transient before ordinary stack navigation. Dashboard control panels register a dismiss callback as that transient; completed edits replace or focus their destination so Back never replays a finished workflow.
-4. `reset-intents.ts` expresses notification, widget, Compose, import, reconcile, merge, and other external fallbacks as nested Dashboard-tab states. An in-app Profile Back instead remains origin-aware through its owning stack.
+3. `ShellAppBar` and Android Back resolve a shell transient before ordinary stack navigation. Contacts control panels register a dismiss callback as that transient; completed edits replace or focus their destination so Back never replays a finished workflow.
+4. `reset-intents.ts` expresses notification, widget, Compose, import, reconcile, merge, and other external fallbacks as nested semantic tab states. An in-app Profile Back instead remains origin-aware through its owning stack.
 
 ### Managing Orrery Systems
 
@@ -113,9 +113,9 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 ### Navigating dashboard and settings
 
-1. Dashboard presents co-equal Your Week and Group Events header destinations. `ShellAppBar` measures the available bar and active text scale; both labels render only when both fit, otherwise both remain accessible icon-only controls.
-2. Dashboard’s fixed overflow is Group Events, Unbound Contacts, Archived Contacts, Select Contacts, and Reset Dashboard View. Select Contacts persists Card View before entering its in-memory frozen selection session; Reset persists its query reset before clearing session state.
-3. Archived remains the same destructive surface reached from Dashboard and Settings, while Unbound is a Dashboard child route. Both use shared child chrome, and their stack origin determines Back behavior after opening a Profile.
+1. Contacts keeps its existing browse/search/filter/sort/list/grid/bulk behavior without a promoted-header shortcut cluster; Events is the existing Group Events browse/create/detail/edit flow promoted to its own root.
+2. Contacts’ fixed overflow retains Unbound Contacts, Archived Contacts, Select Contacts, and Reset Contacts View. Select Contacts persists Card View before entering its in-memory frozen selection session; Reset persists its query reset before clearing session state.
+3. Archived remains the same destructive surface reached from Contacts and Settings, while Unbound is a Contacts child route. Both use shared child chrome, and their stack origin determines Back behavior after opening a Profile.
 4. Settings is a navigation-first directory in its own remembered tab stack. Its ordered category routes reuse canonical managers and preference writers; the root shows title/subtitle rows rather than live values, and the widget remains a utility action rather than a category.
 5. Root tabs use branded/destination app bars without Back; child routes use a title and Back control. Native stack headers remain disabled so no duplicate chrome appears.
 
@@ -126,9 +126,9 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 ### Opening Backup & Restore
 
-1. Backup / Restore can be reached from its top-level tab or Settings → Data & Backup through one canonical screen tree.
+1. Backup / Restore is reached from Settings → Data & Backup through one canonical screen tree; it is no longer a bottom tab.
 2. `Backup` owns manual export, file selection, and health actions. Its child settings, preview, and result routes retain only serializable aggregate or opaque-token parameters.
-3. An explicit host contract selects the correct Back chrome, post-restore destination, and single shared-backup consumer for each mount; host identity is never inferred from nested navigation state.
+3. The surviving Settings host selects Back chrome, post-restore destination, and the single shared-backup consumer; host identity is never inferred from nested navigation state.
 4. `App.tsx` registers backup and restore-photo recovery hooks after migration readiness, before the foreground launch-sweep trigger runs.
 
 ### Composing from a contact
@@ -139,8 +139,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 ### Opening the weekly digest
 
-1. The dashboard's “Your week” action navigates to the param-less `Digest` route; the screen rereads its local data on focus.
-2. A digest notification body tap resets the stack to Home then Digest, so Back always lands on the dashboard regardless of the warm stack.
+1. Digest is a param-less root tab; its screen rereads local data on focus.
+2. A digest notification body tap resets to the Digest root, so it never reconstructs the retired Contacts-child route shape.
 3. `App.tsx` registers the digest schedule hook after database readiness, alongside other ready-gated notification initialization.
 
 ### Configuring AI settings
@@ -265,7 +265,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-015:** Lossless Field Changes with Quarantine and Launch-Time Retention Sweep — keeps launch-time cleanup inside the ready-gated application shell.
 - **ADR-018:** Archive-Gated Contact Purge with Explicit Fan-Out — destructive controls use the dedicated danger token.
 - **ADR-019:** Native Stack Contact Lifecycle Navigation — replaces temporary Home-local routing with native-stack navigation.
-- **ADR-080:** Four-Tab Bottom Navigation Shell with Per-Tab Stacks — supersedes the flat root shell while retaining the migration gate and Dashboard fallback.
+- **ADR-080:** Four-Tab Bottom Navigation Shell with Per-Tab Stacks — partially superseded by the five-tab semantic shell; its migration gate and independent-stack boundary remain.
+- **ADR-146:** Digest-Centered Five-Tab Shell and Semantic Root Routing — establishes the five equal roots, default Digest, semantic resets, and Settings-only Backup host.
 - **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — fixes shell capture actions, local target selection, and commit-only feedback.
 - **ADR-132:** Focused Rapid Capture Workflows — supplies the real Log Interaction, Update Contact, and Memory targets while preserving the shell action contract.
 - **ADR-083:** Durable Multi-Package Theme Configuration and Restore-Before-Paint — moves theme selection to SQLite and gates first main paint on its hydration.
@@ -361,7 +362,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 11. **Keep widget links separate from React Navigation linking configuration.** A second initial-intent consumer can race `ShareIntentGate`; the explicit widget gate handles only `orbit://`.
 12. **Do not put Orrery sun assignment on the canvas.** Settings owns the Sun / centre picker; canvas long-press conflicts with the radial reorder gesture.
 13. **Keep Compose route parameters serializable and minimal.** They identify the contact and origin only; drafts, focus, prompt context, credentials, and callbacks stay out of navigation state.
-14. **Reset digest notification taps instead of navigating onto a warm stack.** The Home/Digest reset is what makes the Digest screen's Back destination stable.
+14. **Reset digest notification taps instead of navigating onto a warm stack.** The semantic Digest-root reset is what makes the destination stable.
 15. **Do not mount navigation after a bootstrap failure.** A classified migration failure has rolled back unchanged; generic failure copy must not promise unavailable support or recovery.
 16. **Restore route parameters must be content-free.** Pass only an opaque in-memory cache token and aggregate preview; never put a file URI, manifest, callback, or passphrase in navigation state.
 17. **Every possible first opener needs the migration region.** `openAndMigrate()` can run before React mounts from headless notification or widget work; database bootstrap itself stays free of native localization imports for node-testability.
@@ -452,3 +453,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 34 | Replaced ordinary capture placeholders with Log Interaction, Update Contact, and Memory routes; finalized the visible Log Interaction label and post-log Add Note path. |
 | 2026-09-02 | 35 | Added origin-aware session-scoped Compose navigation, dual-stack Compose Research registration, and durable-mode-free route parameters. |
 | 2026-09-02 | 37 | Replaced the Settings monolith with a navigation-first category directory and registered the canonical Backup tree in the Settings stack through explicit host semantics. |
+| 2026-09-02 | 38 | Replaced the four-tab shell with Contacts, Events, Digest, Orrery, and Settings; made Digest the default root, removed the Backup tab, and moved external Digest routing to the semantic tab root. |

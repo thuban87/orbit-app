@@ -7,7 +7,7 @@
 **Reversibility:** costly
 **Migration:** None
 **Supersedes:** ADR-063 (partial)
-**Superseded by:** None
+**Superseded by:** ADR-148 (partial)
 
 ## Context
 
@@ -50,4 +50,4 @@ The system uses portable backup format v6 with category tombstones and a minimal
 - `src/db/categories-dao.ts` — supplies the transaction-composable category fallout core reused by restore.
 
 **Depends on:** ADR-057 (Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots); ADR-063 (Versioned Lifecycle Backup and Dormant-Cadence Restore); ADR-143 (Lock-Time-Revalidated Atomic Category Deletion and System Fallout)
-**Required by:** None.
+**Required by:** ADR-148 (Portable Your Week Period and Group-Deduplicated Activity Aggregation).

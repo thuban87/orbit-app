@@ -28,14 +28,14 @@ Read the relevant system doc *before* making changes to that subsystem.
 | Interaction history & insights | `interaction-history.md` | `db/history-read.ts`, `db/interaction-edit-read.ts`, `services/history/`, `components/history/`, `screens/EditInteractionScreen.tsx` | 32 |
 | Conversational fuel | `conversational-fuel.md` | `db/fuel-dao.ts`, `db/fuel-read.ts`, `services/fuel-age.ts`, `services/fuel-ranking.ts` | 07 |
 | Photos | `photos.md` | `db/photo-dao.ts`, `db/photo-relative-path.ts`, `services/photos/` | 05 |
-| Dashboard | `dashboard.md` | `db/dashboard-read.ts`, `screens/dashboard-search-row-logic.ts` | 08 |
+| Contacts (internal Dashboard query subsystem) | `dashboard.md` | `db/dashboard-read.ts`, `logic/dashboard-query-logic.ts`, `screens/HomeScreen.tsx` | 08, 38 |
 | Orrery | `orrery.md` | `db/orrery-read.ts`, `db/ring-seq-dao.ts`, `db/sun-picker-read.ts` | 13 |
 | Capture | `capture.md` | `db/capture-dao.ts`, `db/capture-read.ts` | 10 |
 | Notifications | `notifications.md` | `db/notification-read.ts`, `db/snooze-dao.ts`, `services/notifications/` | 11 |
 | Widget | `widget.md` | `services/widget/` | 12 |
 | Profile presentation | `profile.md` | `screens/ContactProfileScreen.tsx`, `db/profile-read.ts`, `db/profile-presentation-*.ts`, `profile/`, `components/profile/` | 31 |
 | AI suggestions | `ai-suggestions.md` | `ai/`, `services/AiService.ts`, `services/ai-key-store.ts`, `db/ai-context-read.ts`, `db/app-settings-dao.ts`, `logic/ai-suggestion-logic.ts`, `screens/SettingsScreen.tsx`, `screens/ComposeScreen.tsx` (sole user-configured network path) | 14 |
-| Digest | `digest.md` | `db/digest-read.ts` | 15 |
+| Digest | `digest.md` | `db/digest-read.ts`, `db/up-next-read.ts`, `db/your-week-read.ts`, `logic/digest-composition.ts` | 15, 38 |
 | Backup & restore | `backup-restore.md` | `services/backup/`, `services/backup-sweep.ts`, `db/restore-photo-journal-dao.ts`, `db/app-settings-dao.ts`, `db/data-revision-dao.ts` | 17 |
 | Contact import | `contact-import.md` | `db/imported-contact-dao.ts`, `db/import-session-dao.ts`, `db/import-session-read.ts`, `db/unbound-read.ts`, `services/import/` | 19 |
 | Contact reconciliation | `contact-reconciliation.md` | merge/dedupe logic + `screens/DuplicateReviewScreen.tsx` (exact DAOs to confirm when authored) | 20 |

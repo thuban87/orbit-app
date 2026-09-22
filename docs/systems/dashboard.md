@@ -1,12 +1,12 @@
-# Dashboard
+# Contacts
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 33-group-interaction-logging
+**Updated by phase:** 38-your-week
 **Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/stores/dashboard-selection-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
 
-The Dashboard is Orbit's everyday local contact browser and detail-entry surface. It projects one shared eligible universe for List and Card renderers, then lets a person narrow it with populations, filters, sorting, and semantic search without exposing archived or Unbound contacts. Its List renderer is a scan-first three-line local contact browser with accessible status and gesture equivalents.
+Contacts is Orbit's everyday local contact browser and detail-entry root. It projects one shared eligible universe for List and Card renderers, then lets a person narrow it with populations, filters, sorting, and semantic search without exposing archived or Unbound contacts. Its internal Dashboard names remain implementation identities; its List renderer is a scan-first three-line local contact browser with accessible status and gesture equivalents.
 
 ## Architecture
 
@@ -134,8 +134,8 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 ### Retired legacy Dashboard surfaces
 
 1. Favourites are binary membership; the widget reads Favorites in shared Default order instead of user-visible rank order.
-2. The permanent birthday banner is absent. Birthdays remain reachable through the next-30-days population; richer upcoming-birthday presentation belongs to Your Week.
-3. The standalone Never Contacted screen and Settings toggle are retired. The Not Contacted data path remains for the next control-surface phase, and `countNeverContacted()` remains a Digest input.
+2. The permanent birthday banner is absent. Birthdays remain reachable through the next-30-days population; Horizon owns the richer next-seven-days presentation.
+3. The standalone Never Contacted screen is retired. The `not-contacted` population is the shared Digest preview/drill path and includes opted-in Unbound contacts only when `include_unbound_never_contacted = 1`.
 4. Unbound contacts remain outside the Dashboard universe. Their child browse route now filters its loaded local rows by name and distinguishes a true empty state from no matching rows.
 
 ### Handing selected contacts to canonical Group Log
@@ -178,6 +178,7 @@ The Group Events header and redundant overflow entries navigate to the local rev
 - **ADR-103:** Atomic Composed Dashboard Bulk Mutations — requires host orchestration to call the invariant-preserving batch composers.
 - **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — removes deleted category filters only through the committed aggregate.
 - **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — supplies the complete stale-safe category chooser for Dashboard bulk assignment.
+- **ADR-147:** Derived Digest Composition and Canonical Contacts Drill-Through — requires Digest drills to persist both canonical query axes and narrowly extends opted-in Unbound semantics to `not-contacted`.
 - **[ADR-041: Notification Settings, Privacy Channels, and Birthday Alerts](../decisions/ADR-041-notification-settings-privacy-channels-and-birthday-alerts.md)** — governs `src/db/app-settings-dao.ts`.
 - **[ADR-047: App-Level Assignable Sun and Themed Self Identity](../decisions/ADR-047-app-level-assignable-sun-and-themed-self-identity.md)** — governs `src/db/app-settings-dao.ts`.
 - **[ADR-049: BYO-Key AI Configuration and Credential Boundary](../decisions/ADR-049-byo-key-ai-configuration-and-credential-boundary.md)** — governs `src/db/app-settings-dao.ts`.
@@ -200,7 +201,7 @@ The Group Events header and redundant overflow entries navigate to the local rev
 4. **Search accepts only fully filtered IDs.** Passing a pre-Gravity or global ID set leaks results outside the visible Dashboard universe.
 5. **Do not reintroduce FTS5 or a search index.** Dashboard typo tolerance stays bounded TypeScript scoring under ADR-031.
 6. **`favourite_rank` remains storage, not product order.** Internal readers still use it, so it is not dropped or repurposed here.
-7. **Upcoming birthdays have an intentional coverage gap.** Until Your Week lands, the 30-day population is the only Dashboard birthday surface.
+7. **Do not broaden the Unbound exception.** `include_unbound_never_contacted` affects only the exact `not-contacted` population; active-cadence populations remain Bound-only.
 8. **Keep the panel presentation separate from option content.** A future HUD may replace the container, but it must not reimplement query state, persistence, or option semantics.
 9. **Search collapse clears the term.** Leaving a hidden session term active would make a filtered list look unexplained; do not retain it without a visible active indication.
 10. **Long filter content must scroll.** The panel cap is deliberate, but clipping lower filter families or Clear filters makes the live controls unreachable.
@@ -218,8 +219,8 @@ The Group Events header and redundant overflow entries navigate to the local rev
 - **Contacts** — owns contact lifecycle, favourite writes, and profile destinations.
 - **Status engine** — supplies query-time status/progress and Needs Attention inputs.
 - **Widget** — mirrors Favorites population Default order without a second ordering model.
-- **Digest** — retains the never-contacted count while its prior screen destination is retired.
-- **App shell** — owns the retired route and Settings-row navigation cleanup.
+- **Digest** — consumes canonical `not-contacted` query state for Horizon preview and drill-through.
+- **App shell** — presents this system as Contacts and owns root navigation cleanup.
 
 ## Changelog
 
@@ -240,3 +241,4 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | 2026-09-02 | 28 | Added the responsive Card renderer, frozen-universe multi-select, explicit bulk controls, and count-aware detailed-log handoff. |
 | 2026-09-17 | 37.1 | Closed category filters to positive IDs plus `uncategorized`, added searchable stale-safe bulk assignment, and reconciled deleted filters after committed shell refresh. |
 | 2026-09-02 | 33 | Connected existing Group Events discovery and count-aware participant handoff to canonical event-first Group Log and local browse surfaces. |
+| 2026-09-02 | 38 | Relabelled the user-facing root as Contacts, removed promoted shortcuts, and aligned the exact opted-in Unbound Never Contacted population with Digest preview and drill-through. |

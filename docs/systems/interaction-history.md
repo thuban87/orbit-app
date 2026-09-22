@@ -1,7 +1,7 @@
 # Interaction History & Insights
 
 **Last updated:** 2026-09-02
-**Updated by phase:** 33-group-interaction-logging
+**Updated by phase:** 38-your-week
 **Owners:** `src/db/history-read.ts`, `src/db/interaction-edit-read.ts`, `src/services/history/` (`window.ts`, `buckets.ts`, `cycles.ts`, `intensity-window.ts`), `src/components/history/`, `src/screens/EditInteractionScreen.tsx`, `src/screens/edit-interaction-logic.ts`
 
 ## Purpose
@@ -55,6 +55,7 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 | `src/components/history/GroupScopePrompt.tsx` | Explicit individual-vs-group edit scope prompt. |
 | `src/screens/EditInteractionScreen.tsx` | The one canonical Edit Interaction route, saving via `editTouchpointFull`. |
 | `src/db/history-read.ts` | Projects canonical child rows plus local parent context without double counting. |
+| `src/services/history/week-window.ts` | Defines the shared local Rolling 7 Days and locale-aware Calendar Week bounds consumed by Digest. |
 
 ## How It Works
 
@@ -70,6 +71,12 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 1. Changing the lens or preset writes it through `updateAppSettings({historyLens, historyCycleCount})` (global, not per contact) and re-renders both surfaces over the new window.
 2. Tapping a cell opens `HeatmapContextCard` first (count + `See details`, or `0 interactions` + `Log interaction`) — never the large sheet directly.
 3. `See details` opens the shared `DateDetailSheet`; `Log interaction` routes the typed `LogContact { contactId, prefillDate }` contract to the canonical detailed form. The prefilled day remains editable.
+
+### Sharing history language with Digest
+
+1. Digest reuses `classifyHeatmapCell`, theme heatmap tokens, and accessible structural selection from this subsystem rather than recreating a second visual grammar.
+2. `week-window.ts` owns Digest’s two app-wide period boundaries; it does not alter the Profile History lens or its contact-scoped reads.
+3. Digest’s aggregate DAO owns its own app-wide metrics and group-parent projection, while this subsystem retains the contact-scoped history and detail contract.
 
 ### Rolodex browsing
 
@@ -100,6 +107,7 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | `history_lens` default | `'cycles'` | `src/db/migrations/025-interaction-history-schema.ts` | Default Heatmap lens. |
 | `history_cycle_count` default | `10` | `src/db/migrations/025-interaction-history-schema.ts` | Default Cycles preset (options 5/10/15/20). |
 | Rolodex year range | 30 years back, capped at today's year | `src/components/history/rolodex-logic.ts` | Browsable Year span. |
+| Your Week periods | Rolling 7 Days / locale-aware Calendar Week | `src/services/history/week-window.ts` | Shared app-wide local-date window vocabulary. |
 
 ## Decisions
 
@@ -108,6 +116,7 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 - **ADR-121:** Rolodex Month/Day/Year History Browser — Reanimated/Gesture-only wheels (no Skia), Day-primary with leap-aware clamp and today-as-max, silhouette markers, and a no-auto-open drawer.
 - **ADR-122:** Canonical Interaction Detail, Edit Route, and Shared Date Detail Sheet — one inspection/correction surface through the sole recency writer with hard-delete.
 - **ADR-123:** Profile History Section Replacing the Vertical Timeline — the assembled section behind the ProfileModuleHost seam and the typed `LogContact` backfill contract. Partially supersedes ADR-024's profile-timeline refinement surface.
+- **ADR-148:** Portable Your Week Period and Group-Deduplicated Activity Aggregation — reuses this system’s heatmap language and owns the shared week-window definition without changing Profile History scope.
 - **ADR-132:** Focused Rapid Capture Workflows — fulfills the typed detailed-log target while retaining the History-owned backfill route contract.
 - **ADR-116 / ADR-117:** the interaction vocabulary/duration and Allow-AI gate this surface renders (see `interaction-log.md`, `ai-suggestions.md`).
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/components/history/HistorySection.tsx`.
@@ -128,6 +137,7 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 9. **The History date is only an initial value.** The detailed Log Interaction form may edit it; a multi-day History range must never invent an exact day.
 9. **Worklet-forward-ref safety.** The Rolodex depth worklet is defined above its caller; a worklet calling a helper defined later crashes undefined-on-device on Hermes and vitest cannot catch it.
 10. **IntensityChart caption reads the contact cadence, not the window span.** A regression once made the caption describe the window; it now reflects the contact's true intended cadence (fixed live during UAT, commit `84e4013`).
+11. **Do not make Digest a second History reader.** It can reuse presentation helpers and `week-window`, but its app-wide aggregate and group-parent deduplication remain a distinct read boundary.
 
 - **Truthful Detail projection.** The initial Group Event Detail supplied a static Allow-AI value and displayed seconds as minutes. Gap closure reads the stored child flag and reuses the shared duration formatter.
 
@@ -138,7 +148,8 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 - **Contact knowledge** — supplies the knowledge-change record family via `getCurrentStateHistory` and receives knowledge-row edit navigation.
 - **AI suggestions** — owns the `allow_ai` egress posture the sparkle reflects and serializes only the bounded opted-in recent-note projection.
 - **Status engine** — Status/Gravity/Intensity semantics are unchanged; interaction `duration` never weights them.
-- **Backup & restore** — format v5 emits and restores the durable lens/preset preferences with the complete milestone settings set.
+- **Backup & restore** — format v7 emits and restores the durable lens/preset preferences with the complete milestone settings set.
+- **Digest** — reuses heatmap language and `week-window` for app-wide Your Week reflection.
 - **App shell** — registers the Edit Interaction and LogContact routes and owns the heatmap/marker theme tokens.
 
 ## Changelog
@@ -149,3 +160,4 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | 2026-09-02 | 33 | Activated local group context, explicit child/event edit scope, identity-preserving conversion, and truthful participant Detail projection. |
 | 2026-09-02 | 34 | Replaced the detailed-log placeholder with the canonical Log Interaction form while preserving typed date prefill. |
 | 2026-09-02 | 36 | Emitted and restored the persisted History lens and cycle-preset preferences in backup format v5. |
+| 2026-09-02 | 38 | Exposed shared local week-window and heatmap presentation seams for Digest without changing contact-scoped History reads. |
