@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 35 of
-  148 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 36 of
+  153 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -131,7 +131,7 @@ not something you can pattern-match against.
 | 098 | Scan-First, Accessible Dashboard List Rows | Accepted | 27-dashboard-list-view | — | — | — | 7 | `src/components`, `src/components/icons`, `src/db` +2 |
 | 099 | Durable Global Dashboard Right-Swipe Action | Accepted | 27-dashboard-list-view | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` +2 |
 | 100 | Relevance-First, Visibility-Safe Dashboard List Search | Accepted | 27-dashboard-list-view | — | — | — | 6 | `src/components`, `src/db`, `src/logic` +1 |
-| 101 | Avatar-First Accessible Dashboard Card Renderer | Accepted | 28-dashboard-card-view | — | — | — | 5 | `src/components`, `src/components/icons`, `src/logic` +1 |
+| 101 | Avatar-First Accessible Dashboard Card Renderer | Accepted | 28-dashboard-card-view | — | ADR-153 (partial — normal Grid card context row) | — | 5 | `src/components`, `src/components/icons`, `src/logic` +1 |
 | 102 | Frozen-Universe Dashboard Multi-Select | Accepted | 28-dashboard-card-view | — | — | — | 5 | `src/components`, `src/navigation`, `src/screens` +1 |
 | 103 | Atomic Composed Dashboard Bulk Mutations | Accepted | 28-dashboard-card-view | — | — | — | 6 | `src/db` |
 | 104 | Durable Orrery Preferences and Live System Scope | Accepted | 29-orrery-camera-scale-exploration | — | — | — | 5 | `src/db`, `src/db/migrations`, `src/logic` +1 |
@@ -179,3 +179,8 @@ not something you can pattern-match against.
 | 146 | Digest-Centered Five-Tab Shell and Semantic Root Routing | Accepted | 38-your-week | ADR-080 (partial); ADR-141 (partial) | — | — | 6 | `src/components`, `src/navigation`, `src/navigation/tabs` |
 | 147 | Derived Digest Composition and Canonical Contacts Drill-Through | Accepted | 38-your-week | ADR-054 (partial); ADR-062 (partial) | — | — | 7 | `src/components/digest`, `src/db`, `src/logic` +1 |
 | 148 | Portable Your Week Period and Group-Deduplicated Activity Aggregation | Accepted | 38-your-week | ADR-145 (partial) | — | — | 8 | `src/backup`, `src/components/digest`, `src/db` +2 |
+| 149 | Orrery-Specific Translucent Overlay Treatment and Icon Controls | Accepted | 38.1-profile-presentation-polish | — | — | — | 8 | `src/components/orrery`, `src/components/ui`, `src/theme/tokens` |
+| 150 | Semantic Profile Hierarchy and Source-Owned Knowledge Editing | Accepted | 38.1-profile-presentation-polish | — | — | — | 8 | `src/components/profile`, `src/db`, `src/navigation` +2 |
+| 151 | Visual-Only Relationship Overview Orphan Packing | Accepted | 38.1-profile-presentation-polish | — | — | — | 2 | `src/components/profile`, `src/profile` |
+| 152 | Vertical History Heatmap and Minute-Precision Timestamps | Accepted | 38.1-profile-presentation-polish | — | — | — | 5 | `src/components/history`, `src/db`, `src/screens` +1 |
+| 153 | Two-Row Normal Contacts Grid | Accepted | 38.1-profile-presentation-polish | ADR-101 (partial — normal Grid card context row) | — | — | 2 | `src/components`, `src/screens` |

@@ -110,7 +110,7 @@
 // NOTE: ADR-0098 [ACCEPTED] Scan-First, Accessible Dashboard List Rows
 // NOTE: ADR-0099 [ACCEPTED] Durable Global Dashboard Right-Swipe Action
 // NOTE: ADR-0100 [ACCEPTED] Relevance-First, Visibility-Safe Dashboard List Search
-// NOTE: ADR-0101 [ACCEPTED] Avatar-First Accessible Dashboard Card Renderer
+// IMPORTANT: ADR-0101 [SUPERSEDED BY ADR-153 (partial — normal Grid card context row)] Avatar-First Accessible Dashboard Card Renderer
 // NOTE: ADR-0102 [ACCEPTED] Frozen-Universe Dashboard Multi-Select
 // NOTE: ADR-0103 [ACCEPTED] Atomic Composed Dashboard Bulk Mutations
 // NOTE: ADR-0104 [ACCEPTED] Durable Orrery Preferences and Live System Scope
@@ -158,5 +158,10 @@
 // NOTE: ADR-0146 [ACCEPTED] Digest-Centered Five-Tab Shell and Semantic Root Routing
 // NOTE: ADR-0147 [ACCEPTED] Derived Digest Composition and Canonical Contacts Drill-Through
 // NOTE: ADR-0148 [ACCEPTED] Portable Your Week Period and Group-Deduplicated Activity Aggregation
+// NOTE: ADR-0149 [ACCEPTED] Orrery-Specific Translucent Overlay Treatment and Icon Controls
+// NOTE: ADR-0150 [ACCEPTED] Semantic Profile Hierarchy and Source-Owned Knowledge Editing
+// NOTE: ADR-0151 [ACCEPTED] Visual-Only Relationship Overview Orphan Packing
+// NOTE: ADR-0152 [ACCEPTED] Vertical History Heatmap and Minute-Precision Timestamps
+// NOTE: ADR-0153 [ACCEPTED] Two-Row Normal Contacts Grid
 
-export const ADR_COUNT = 148;
+export const ADR_COUNT = 153;
