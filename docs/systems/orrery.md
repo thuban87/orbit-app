@@ -14,6 +14,8 @@ ADR-077 partially supersedes ADR-048: the Status/Relationship toggle and relatio
 
 ADR-104 defines the durable preference boundary and live System scope. ADR-105 limits relationship satellites to optional context for current System-member parents. ADR-106 partially supersedes ADR-027 only for modest derived Gravity body mass and named companion context; it leaves every other Gravity and Intensity policy intact.
 
+Settings duplicates only the user-configurable density and satellite controls through `useOrreryPreferencesStore`; it does not expose last active System as a setting or create a second writer.
+
 ## Architecture and ownership
 
 | Owner | Contract |
@@ -33,6 +35,7 @@ ADR-104 defines the durable preference boundary and live System scope. ADR-105 l
 | `src/db/orrery-action-read.ts`, `src/logic/orrery-focus-logic.ts` | `readOrreryContactTargetValidation(exec, system, target)` freshly validates ID/UID/member/global-sun under one snapshot; `createOrreryFocusController` checks action and scene generations around each await. |
 | `src/stores/orrery-system-store.ts` | Requested versus successful System identity, A→B→A generations, inert retained refresh errors, typed missing-category result, retry and successful-selection persistence. |
 | `src/stores/orrery-preferences-store.ts` | Serialized commit-before-publish choices, failed-read protection, no-op saves and retry intent. |
+| `src/screens/SettingsOrreryScreen.tsx` | Exposes the same density and satellite preferences plus Systems management routing without a Settings-only preference model. |
 | `src/stores/orrery-session-store.ts`, `src/logic/orrery-session-logic.ts` | Memory-only route-key-aware Profile Back/background capture and valid-focus restoration. Fresh visits reset Home. |
 | `src/db/ring-seq-dao.ts` | `commitRingReorder(exec, request, now, isCurrent?)` validates lock-time population/order/sun/identities, merges only visible slots, then preserves uniqueness/count/scoped-update guards. |
 | `src/db/orrery-satellites-read.ts`, `src/logic/orrery-satellite-logic.ts` | Current unlinked visible relationship rows belonging to selected System members; subordinate moon placement and discriminated context-only actions. |
@@ -123,6 +126,7 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 - **ADR-104:** Durable Orrery Preferences and Live System Scope — adds validated migration-021 preferences and coherent live System snapshots.
 - **ADR-105:** Scoped Relationship Satellites for System-Member Context — renders unlinked relationship moons only as optional, subordinate member context.
 - **ADR-106:** Derived Orrery Gravity Visual Mass and Accessible Context — permits bounded derived Gravity body mass and companion context while partially superseding ADR-027's display restriction.
+- **ADR-140:** Navigation-First Settings Directory and Canonical Sub-Routes — makes the Settings Orrery entry reuse the existing preference source and Systems manager.
 
 ## Deferred seams and evidence limits
 
@@ -143,3 +147,4 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 | 2026-09-02 | 29 | Replaced dual-view rendering with canonical world/camera/Systems; added preferences, sessions, guarded filtered ordering, relationship moons, and ADR-104–106 decision records. |
 | 2026-09-02 | 30 | Added migration-backed custom Systems, rule and override resolution, authoring/management/preview surfaces, revision-guarded selection, and owner-approved staged switching. |
 | 2026-09-17 | 37.1 | Added complete UID-backed Category rule authoring, exact grouped selection, canonical Needs Attention, and deleted-category fallback through durable All Contacts selection. |
+| 2026-09-02 | 37 | Added a Settings Orrery category bound to the existing preference store and Systems management routes. |
