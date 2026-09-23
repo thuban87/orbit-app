@@ -1091,11 +1091,52 @@ Plans:
 
 **Goal**: Harden persistence, native trust boundaries, restore/merge behavior, file ownership, import/export lifecycle, notification lifecycle, and transactional edit semantics across failure, retry, deletion, restore, and process-lifecycle boundaries — without weakening restore completeness guards, deletion evidence, SecureStore separation, endpoint binding, or native destination controls.
 **Depends on**: Phase 38.1
-**Requirements**: TBD — defined at planning from the covered remediation groups (RG-001–007, 009–018, 043); preserve RG + packet-qualified finding IDs
+**Requirements**: RG-001, RG-002, RG-003, RG-004, RG-005, RG-006, RG-007, RG-009, RG-010, RG-011, RG-012, RG-013, RG-014, RG-015, RG-016, RG-017, RG-018, RG-043 (preserve RG + packet-qualified finding IDs)
 **Success Criteria**: Defined at planning; each RG's STATIC/RUNTIME/DEVICE verification expectations carried forward (real restore/export flows, failure injection, commit → failed read → retry)
 **Scope source**: docs/dossier/milestone-2/phase-38.2-audit-remediation-data-security-lifecycle-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; SYNTHESIS "Constraints that must survive remediation"
-**Plans**: TBD
+**Plans**: 16 plans in 8 waves
+
+Plans:
+**Wave 1**
+
+- [ ] 38.2-01-PLAN.md — Maintenance runner & bootstrap fault containment; per-pass backup hold (RG-016, D-18)
+- [ ] 38.2-02-PLAN.md — Notification readback, weekly-grid fidelity, presented-reminder retirement (RG-015)
+- [ ] 38.2-03-PLAN.md — Contact edit history/lifecycle parity and committed-baseline retry (RG-017, RG-018)
+- [ ] 38.2-04-PLAN.md — Reconcile choice identity and bulk ambiguity exclusion (RG-043, D-15)
+- [ ] 38.2-05-PLAN.md — Widget snapshot boundary: inline bitmaps, exported provider removed (RG-001)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 38.2-06-PLAN.md — Canonical photo ownership primitives: owned master, reference-safe intents, in-flight staging (RG-010)
+- [ ] 38.2-07-PLAN.md — Backup ingress bounds and export staging lifetime (RG-002 ungated, RG-014, D-13)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 38.2-08-PLAN.md — Restore graph integrity, deterministic pair completion, migration 031 (RG-009, D-11, D-21)
+- [ ] 38.2-09-PLAN.md — Legacy credential investigation/remediation and provider-scoped drafts (RG-005, RG-006, D-05, D-08)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 38.2-10-PLAN.md — Bounded, cancellable photo and Custom AI transfers (RG-003, RG-004, D-20)
+- [ ] 38.2-11-PLAN.md — Restore media ownership and honest restore outcome (RG-010, RG-011)
+- [ ] 38.2-12-PLAN.md — Merge photo re-homing, deletion intents, legacy alias repair (RG-010, D-17)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 38.2-13-PLAN.md — Import consent, photo retry and purge retirement (RG-007, RG-012, D-07, D-14)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 38.2-14-PLAN.md — Generated derivative and picker-copy lifetime (RG-013, D-16)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 38.2-15-PLAN.md — Backup ingress ceiling: measure → owner sign-off → enforce (RG-002, D-19; checkpoint)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 38.2-16-PLAN.md — Phase gate and batched Pixel device UAT (all DEVICE-dimension RGs)
 
 > **Ready to discuss — dossier authored 2026-09-23 (owner + codex) from the 2026-09 pre-release audit campaign. Run gsd-discuss-phase first (see `38.2-CONTEXT.md` shim, open owner items: RG-007 retrospective consent, RG-005 outcome, RG-010 filename policy, possible backup-format bump). RG-005 is investigation-gated.**
 

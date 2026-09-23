@@ -4,16 +4,16 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.2
 current_phase_name: Data Integrity, Security & Lifecycle Hardening
-status: planning
-stopped_at: Phase 38.2 context gathered
-last_updated: "2026-09-23T19:26:08.131Z"
+status: ready_to_execute
+stopped_at: Phase 38.2 planned (16 plans, 8 waves)
+last_updated: "2026-09-23T21:11:22.437Z"
 last_activity: 2026-09-23
 last_activity_desc: Inserted audit-remediation Phases 38.2, 38.3, 38.4 before Phase 39
-state_head: fc7051c5077dfb8a34850da4ee3f89db5dbb2cff
+state_head: 98ced925234591175688e95d2464a1f5179d3d78
 progress:
   total_phases: 26
   completed_phases: 15
-  total_plans: 186
+  total_plans: 202
   completed_plans: 184
 carried_forward:
 
@@ -36,9 +36,9 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 38.2 — Data Integrity, Security & Lifecycle Hardening (INSERTED; first of three audit-remediation phases 38.2 → 38.3 → 38.4, then 39)
+Phase: 38.2 (Data Integrity, Security & Lifecycle Hardening) — READY TO EXECUTE
 Plan: Not started
-Status: Ready to discuss (pre-discuss CONTEXT shim points at the dossier + docs/audits/2026-09-pre-release/)
+Status: Ready to execute — 16 plans in 8 waves, plan-checker passed, decision coverage 21/21
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
