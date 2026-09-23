@@ -70,6 +70,34 @@ so ambiguity never becomes an unintended NULL/clear.
 generation with synthetic keys and recording transport. If disproven,
 document and close; if confirmed, remediate here.
 
+## Owner Decisions (discuss session)
+
+-   **[DECIDED · 2026-09-23] RG-007 retrospective consent --- leave
+    existing rows as-is.** New imports (single, bulk, consolidated)
+    start AI-off regardless of the general Memory default. No migration
+    or sweep changes `allow_ai` on already-stored imported notes; the
+    per-item toggle is the correction path.
+-   **[DECIDED · 2026-09-23] RG-005 if confirmed --- preserve
+    provenance, else require re-entry.** Bind a legacy unbound Custom
+    key to its original endpoint before restore replaces endpoint
+    metadata; when that endpoint cannot be established, the key fails
+    closed and must be re-entered. No blanket credential deletion. If
+    disproven, document and close.
+-   **[DECIDED · 2026-09-23] RG-010 keeps ADR-021 identity-derived
+    photo filenames.** Merge re-homes absorbed photo bytes into the
+    survivor's derived paths with crash-safe swap/reconcile. Any naming
+    change comes back to the owner.
+-   **[DECIDED · 2026-09-23] No backup format bump pre-approved.** Plan
+    RG-009/RG-010 within `BACKUP_FORMAT_VERSION` 7; if a bump proves
+    necessary, stop and escalate.
+-   **[DECIDED · 2026-09-23] Triage selection.** This dossier's
+    Coverage list is the owner's remediation selection for 38.2
+    (recorded in the audit `TRIAGE.md`).
+
+Planner discretion (enforcement, not reversal): a forward-only
+migration may seed missing NULL global custom-field pairs in databases
+already damaged by Merge (RG-009), preserving existing pair UIDs.
+
 ## Explicitly Out of Scope
 
 RN-013 Assist write-failure feedback remains deferred. Also excluded:
@@ -95,3 +123,9 @@ Treat this as one phase with several plans, not eighteen mini-phases.
 RG-009/RG-010 are the most sensitive cluster and require explicit
 regression coverage. Preserve original RG/finding IDs in plans for later
 verification.
+
+## Revision Log
+
+-   2026-09-23 --- discuss session: recorded owner decisions on RG-007
+    retrospective consent, RG-005 remediation policy, RG-010 filename
+    policy, backup format, and triage selection (38.2 CONTEXT D-07..D-12).

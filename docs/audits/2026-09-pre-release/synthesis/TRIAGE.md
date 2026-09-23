@@ -8,24 +8,24 @@ Choose a destination for a group (select, defer, accept, investigate), record th
 
 | Group | Highest | Decision context | Owner decision / notes |
 |---|---|---|---|
-| [RG-001](REMEDIATION-GROUPS.md#rg-001) — Widget image access boundary | S1 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-002](REMEDIATION-GROUPS.md#rg-002) — Bounded and defensive Android backup ingress | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-003](REMEDIATION-GROUPS.md#rg-003) — Photo download cancellation and resource bounds | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-004](REMEDIATION-GROUPS.md#rg-004) — Custom AI native response ownership | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-005](REMEDIATION-GROUPS.md#rg-005) — Legacy credential binding across restore investigation | S1 | Investigation only; synthetic-key supported upgrade/restore reproduction first. | Pending |
-| [RG-006](REMEDIATION-GROUPS.md#rg-006) — Provider-scoped credential drafts | S1 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-007](REMEDIATION-GROUPS.md#rg-007) — Imported-note consent provenance | S1 | Existing imported permission flags need a separate owner policy if retrospective repair is proposed. | Pending |
+| [RG-001](REMEDIATION-GROUPS.md#rg-001) — Widget image access boundary | S1 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-002](REMEDIATION-GROUPS.md#rg-002) — Bounded and defensive Android backup ingress | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-003](REMEDIATION-GROUPS.md#rg-003) — Photo download cancellation and resource bounds | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-004](REMEDIATION-GROUPS.md#rg-004) — Custom AI native response ownership | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-005](REMEDIATION-GROUPS.md#rg-005) — Legacy credential binding across restore investigation | S1 | Investigation only; synthetic-key supported upgrade/restore reproduction first. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-006](REMEDIATION-GROUPS.md#rg-006) — Provider-scoped credential drafts | S1 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-007](REMEDIATION-GROUPS.md#rg-007) — Imported-note consent provenance | S1 | Existing imported permission flags need a separate owner policy if retrospective repair is proposed. | Selected → Phase 38.2 (2026-09-23) |
 | [RG-008](REMEDIATION-GROUPS.md#rg-008) — Current AI configuration and truthful permission presentation | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-009](REMEDIATION-GROUPS.md#rg-009) — Restore reconciliation and committed graph integrity | S1 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-010](REMEDIATION-GROUPS.md#rg-010) — Canonical photo ownership across restore, merge and deletion | S1 | Coordinate canonical byte ownership; any filename-policy reversal needs owner approval. | Pending |
-| [RG-011](REMEDIATION-GROUPS.md#rg-011) — Restore publication and partial-success reporting | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-012](REMEDIATION-GROUPS.md#rg-012) — Import workflow retention, purge and photo retry | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-013](REMEDIATION-GROUPS.md#rg-013) — Generated photo derivative lifetime | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-014](REMEDIATION-GROUPS.md#rg-014) — Manual export staging lifetime | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-015](REMEDIATION-GROUPS.md#rg-015) — Notification scheduling, readback and deletion lifecycle | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-016](REMEDIATION-GROUPS.md#rg-016) — Bootstrap and foreground maintenance failure boundaries | S1 | Separate recoverable image faults from integrity failures; preserve recovery prerequisites. | Pending |
-| [RG-017](REMEDIATION-GROUPS.md#rg-017) — Consistent history semantics for contact edits | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-018](REMEDIATION-GROUPS.md#rg-018) — Committed contact-editor baselines and retry | S1 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
+| [RG-009](REMEDIATION-GROUPS.md#rg-009) — Restore reconciliation and committed graph integrity | S1 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-010](REMEDIATION-GROUPS.md#rg-010) — Canonical photo ownership across restore, merge and deletion | S1 | Coordinate canonical byte ownership; any filename-policy reversal needs owner approval. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-011](REMEDIATION-GROUPS.md#rg-011) — Restore publication and partial-success reporting | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-012](REMEDIATION-GROUPS.md#rg-012) — Import workflow retention, purge and photo retry | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-013](REMEDIATION-GROUPS.md#rg-013) — Generated photo derivative lifetime | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-014](REMEDIATION-GROUPS.md#rg-014) — Manual export staging lifetime | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-015](REMEDIATION-GROUPS.md#rg-015) — Notification scheduling, readback and deletion lifecycle | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-016](REMEDIATION-GROUPS.md#rg-016) — Bootstrap and foreground maintenance failure boundaries | S1 | Separate recoverable image faults from integrity failures; preserve recovery prerequisites. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-017](REMEDIATION-GROUPS.md#rg-017) — Consistent history semantics for contact edits | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
+| [RG-018](REMEDIATION-GROUPS.md#rg-018) — Committed contact-editor baselines and retry | S1 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
 | [RG-019](REMEDIATION-GROUPS.md#rg-019) — Group-event draft, override and post-commit recovery | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
 | [RG-020](REMEDIATION-GROUPS.md#rg-020) — Dashboard panel settlement and accessible traversal | S1 | Confirmed dismissal fix plus U22 native traversal investigation; select subsets explicitly. | Pending |
 | [RG-021](REMEDIATION-GROUPS.md#rg-021) — Semantic tab roots and shared Profile destinations | S1 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
@@ -50,11 +50,15 @@ Choose a destination for a group (select, defer, accept, investigate), record th
 | [RG-040](REMEDIATION-GROUPS.md#rg-040) — Production overlay permission inventory | S3 | Owner security-posture decision on unnecessary overlay permission. | Pending |
 | [RG-041](REMEDIATION-GROUPS.md#rg-041) — Orbit launcher identity | S3 | Owner must select/approve launcher artwork. | Pending |
 | [RG-042](REMEDIATION-GROUPS.md#rg-042) — Cold/warm notification navigation chronology | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-043](REMEDIATION-GROUPS.md#rg-043) — Source-reconciliation choice identity | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
+| [RG-043](REMEDIATION-GROUPS.md#rg-043) — Source-reconciliation choice identity | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
 
 ## Selected for Remediation
 
-None. Add only after an owner decision, including selected findings/constraints and a link to that decision. A group may later span several phases or share a phase with another group; this document creates none.
+Add only after an owner decision, including selected findings/constraints and a link to that decision. A group may later span several phases or share a phase with another group.
+
+| Groups | Destination | Decision / constraints |
+|---|---|---|
+| RG-001, 002, 003, 004, 005 (investigate first), 006, 007, 009, 010, 011, 012, 013, 014, 015, 016, 017, 018, 043 | Phase 38.2 — Data Integrity, Security & Lifecycle Hardening | Owner selection 2026-09-23 via the [38.2 dossier](../../../dossier/milestone-2/phase-38.2-audit-remediation-data-security-lifecycle-dossier.md) and discuss session (38.2 CONTEXT D-07..D-12): RG-007 existing imported flags left as-is; RG-005 if confirmed → preserve provenance else re-entry; RG-010 keeps ADR-021 filenames; no backup format bump pre-approved. |
 
 ## Deferred
 
