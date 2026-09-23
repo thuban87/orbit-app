@@ -157,6 +157,9 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [ ] **Phase 37.1: Category Management** (INSERTED) - Category CRUD (create/rename/delete) over the read-only `categories` table + the deletion-cascade fallout to Orrery Systems, custom-System rules, Profile category assignments, and backup; consumes the route name/IA slot Phase 37 reserves (D-03, owner-approved 2026-09-14 to schedule now, before Phase 38)
 - [x] **Phase 38: Digest & Navigation Restructure** - Completed 2026-09-19 — verifier passed all S-01…S-15; physical Pixel UAT passed all nine mandatory checks; 406 files / 3,807 tests, TypeScript, colors, validation, and security gates passed. Three advisory code/UI warnings remain documented in the phase review artifacts.
 - [x] **Phase 38.1: Profile & Presentation Polish** (INSERTED) - Completed 2026-09-20 by owner acceptance: bounded presentation polish, audit, and release-APK UAT complete with two explicitly recorded (not passed) waivers — no-data Profile fixture and Off Limits device DB-preservation backstop. No schema/format change.
+- [ ] **Phase 38.2: Data Integrity, Security & Lifecycle Hardening** (INSERTED) - Pre-release audit remediation (RG-001–007, 009–018, 043): native trust/resource boundaries, restore/merge/photo-ownership integrity, import/temp-copy/notification lifecycle, startup-maintenance fault containment, transactional edit retry safety (owner-scheduled 2026-09-23, before Phase 39)
+- [ ] **Phase 38.3: Runtime Correctness, Navigation & State Coherence** (INSERTED) - Pre-release audit remediation (RG-019–026, 035, 042): participant editing, Dashboard shell/navigation, refresh ownership, Assist/Profile/Digest post-commit publication, truthful async states, notification tap chronology (owner-scheduled 2026-09-23)
+- [ ] **Phase 38.4: UI Consistency, Accessibility, Performance & Release Polish** (INSERTED) - Pre-release audit remediation (RG-008, 027–034, 036–041): AI permission presentation, bounded Orrery/Your Week resources, contrast + shared controls, contact/widget accessibility, narrow-width/large-text, Settings/forms/timestamps, FAB a11y investigation, overlay permission + launcher artwork (owner-scheduled 2026-09-23)
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
 
@@ -1082,7 +1085,45 @@ Plans:
 
 > **Completed 2026-09-20 by owner acceptance.** The bounded audit and owner release-APK UAT are recorded in `38.1-UAT.md`; the no-data Profile fixture and the debug-only Off Limits DB-preservation check are OWNER-WAIVED, not passed. Formal verification is retained in `38.1-VERIFICATION.md`.
 
-> **Ready to plan — dossier authored 2026-09-19 (owner + codex), grounded against the post-Phase-38 repo 2026-09-19; discuss session complete 2026-09-19 (see `38.1-CONTEXT.md`, D-01..D-08). Plan against the dossier as the authoritative contract; CONTEXT D-NN are the enforced guards. The two grounding flags are resolved: (1) Orrery overlays stay translucent in all theme/mode combos via a NEW token treatment in `src/theme/tokens/surface.ts`, AA-proven, not a `GlassSurface` fork or a change to content-card opacity (D-04); (2) the existing compact/wide toggle in `ProfileLayoutEditor.tsx:149-164` is KEPT — orphan-stretch is visual-only and never overrides an explicit compact choice (D-05). Deferred: the user-choosable 12/24h time-format setting → own phase (candidate 38.2) / Settings pass (D-08); 38.1 stays no-schema.**
+> **Ready to plan — dossier authored 2026-09-19 (owner + codex), grounded against the post-Phase-38 repo 2026-09-19; discuss session complete 2026-09-19 (see `38.1-CONTEXT.md`, D-01..D-08). Plan against the dossier as the authoritative contract; CONTEXT D-NN are the enforced guards. The two grounding flags are resolved: (1) Orrery overlays stay translucent in all theme/mode combos via a NEW token treatment in `src/theme/tokens/surface.ts`, AA-proven, not a `GlassSurface` fork or a change to content-card opacity (D-04); (2) the existing compact/wide toggle in `ProfileLayoutEditor.tsx:149-164` is KEPT — orphan-stretch is visual-only and never overrides an explicit compact choice (D-05). Deferred: the user-choosable 12/24h time-format setting → own future phase / Settings pass (D-08) — the 38.2 slot later went to audit remediation (2026-09-23), which keeps 12/24h out of scope; 38.1 stays no-schema.**
+
+### Phase 38.2: Data Integrity, Security & Lifecycle Hardening (INSERTED)
+
+**Goal**: Harden persistence, native trust boundaries, restore/merge behavior, file ownership, import/export lifecycle, notification lifecycle, and transactional edit semantics across failure, retry, deletion, restore, and process-lifecycle boundaries — without weakening restore completeness guards, deletion evidence, SecureStore separation, endpoint binding, or native destination controls.
+**Depends on**: Phase 38.1
+**Requirements**: TBD — defined at planning from the covered remediation groups (RG-001–007, 009–018, 043); preserve RG + packet-qualified finding IDs
+**Success Criteria**: Defined at planning; each RG's STATIC/RUNTIME/DEVICE verification expectations carried forward (real restore/export flows, failure injection, commit → failed read → retry)
+**Scope source**: docs/dossier/milestone-2/phase-38.2-audit-remediation-data-security-lifecycle-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
+**Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; SYNTHESIS "Constraints that must survive remediation"
+**Plans**: TBD
+
+> **Ready to discuss — dossier authored 2026-09-23 (owner + codex) from the 2026-09 pre-release audit campaign. Run gsd-discuss-phase first (see `38.2-CONTEXT.md` shim, open owner items: RG-007 retrospective consent, RG-005 outcome, RG-010 filename policy, possible backup-format bump). RG-005 is investigation-gated.**
+
+### Phase 38.3: Runtime Correctness, Navigation & State Coherence (INSERTED)
+
+**Goal**: Make live UI, navigation, async workflows, and post-commit publication agree about current state, so committed actions reach relevant screens and native ingress paths without stale publication, replay, lost drafts, misleading empty states, or broken navigation semantics — preserving independent tab histories, Digest landing, and transient-first Back.
+**Depends on**: Phase 38.2
+**Requirements**: TBD — defined at planning from the covered remediation groups (RG-019–026, 035, 042); preserve RG + packet-qualified finding IDs
+**Success Criteria**: Defined at planning; mounted/runtime flows (rapid navigation, foreground/resume, delayed/rejected reads, commit → failed read → retry, cold/warm notification ordering)
+**Scope source**: docs/dossier/milestone-2/phase-38.3-audit-remediation-runtime-state-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
+**Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md
+**UI hint**: yes
+**Plans**: TBD
+
+> **Ready to discuss — dossier authored 2026-09-23 (owner + codex). Run gsd-discuss-phase first (see `38.3-CONTEXT.md` shim). RG-020 accessibility subset is investigation-gated; the Phase 22 ContactPicker read-error fallback (CF-02) is held unless the owner supersedes it; RN-013 stays deferred.**
+
+### Phase 38.4: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
+
+**Goal**: Resolve remaining code-detectable UI/design-system inconsistencies, accessibility defects, bounded performance/resource issues, and small production-hygiene problems without redesigning Orbit or reopening accepted visual/product decisions.
+**Depends on**: Phase 38.3
+**Requirements**: TBD — defined at planning from the covered remediation groups (RG-008, 027–034, 036–041); preserve RG + packet-qualified finding IDs
+**Success Criteria**: Defined at planning; targeted Android manual visual/device pass (narrow widths, large text, Standard/Galaxy, TalkBack, touch targets, widget semantics, FAB states, launcher); performance claims from physical-device measurement only
+**Scope source**: docs/dossier/milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
+**Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; ADR-115 + ADR-087 (surface/glass authority)
+**UI hint**: yes
+**Plans**: TBD
+
+> **Ready to discuss — dossier authored 2026-09-23 (owner + codex). Run gsd-discuss-phase first (see `38.4-CONTEXT.md` shim). RG-034 and RG-039 are investigation-gated; RG-041 needs owner-supplied launcher artwork; Phase 40's remaining scope should be re-confirmed once 38.4 is planned.**
 
 ### Phase 39: Onboarding
 
@@ -1131,6 +1172,9 @@ Plans:
 | 36. AI Configuration & Prompting | 11/11 | Complete | 2026-09-14 |
 | 37. Settings & Personalization | 8/8 | Complete | 2026-09-14 |
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
+| 38.2 Data Integrity, Security & Lifecycle Hardening | 0/TBD | Ready to discuss | - |
+| 38.3 Runtime Correctness, Navigation & State Coherence | 0/TBD | Ready to discuss | - |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 0/TBD | Ready to discuss | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
