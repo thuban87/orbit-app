@@ -66,9 +66,14 @@ so ambiguity never becomes an unintended NULL/clear.
 
 ## Investigation Gate
 
-**RG-005:** reproduce legacy-key → migration/restore → readiness →
+**[SUPERSEDED by D-23 (owner, 2026-09-23)]** Orbit has no shipped users, so work whose only purpose is pre-38.2 state is cut.
+No reachability investigation or harness runs; a stored Custom
+credential that is not a bound record is never used (reads fail closed)
+and the user re-enters it.
+
+~~**RG-005:** reproduce legacy-key → migration/restore → readiness →
 generation with synthetic keys and recording transport. If disproven,
-document and close; if confirmed, remediate here.
+document and close; if confirmed, remediate here.~~
 
 ## Owner Decisions (discuss session)
 
@@ -77,7 +82,11 @@ document and close; if confirmed, remediate here.
     start AI-off regardless of the general Memory default. No migration
     or sweep changes `allow_ai` on already-stored imported notes; the
     per-item toggle is the correction path.
--   **[DECIDED · 2026-09-23] RG-005 if confirmed --- preserve
+-   **[SUPERSEDED by D-23 (owner, 2026-09-23)]** Orbit has no shipped users, so work whose only purpose is pre-38.2 state is cut.
+    No legacy adoption or re-entry marker; unbound stored Custom keys
+    are simply never used (fail closed) and overwritten on re-entry.
+    Original entry, kept for the record:
+    **[DECIDED · 2026-09-23] RG-005 if confirmed --- preserve
     provenance, else require re-entry.** Bind a legacy unbound Custom
     key to its original endpoint before restore replaces endpoint
     metadata; when that endpoint cannot be established, the key fails
@@ -108,7 +117,10 @@ document and close; if confirmed, remediate here.
 -   **[DECIDED · 2026-09-23] RG-013:** scope is derivatives plus the
     contact-picker raw copies. The image-picker and photo-dl copies are
     follow-ups.
--   **[DECIDED · 2026-09-23] RG-010:** a one-shot, bounded,
+-   **[SUPERSEDED by D-23 (owner, 2026-09-23)]** Orbit has no shipped users, so work whose only purpose is pre-38.2 state is cut.
+    No legacy alias re-home sweep; aliases left by pre-fix merges are
+    not repaired (test devices are reset). Original entry, kept for the
+    record: **[DECIDED · 2026-09-23] RG-010:** a one-shot, bounded,
     journaled, idempotent foreground sweep re-homes legacy aliased
     custom-photo references. ADR-021 filenames are unchanged.
 -   **[DECIDED · 2026-09-23] RG-016:** within each pass, recovery runs
@@ -120,9 +132,27 @@ document and close; if confirmed, remediate here.
     test host may be used for device proof, with synthetic payloads
     only.
 
-Planner discretion (enforcement, not reversal): a forward-only
-migration may seed missing NULL global custom-field pairs in databases
-already damaged by Merge (RG-009), preserving existing pair UIDs.
+**[SUPERSEDED by D-23 (owner, 2026-09-23)]** Orbit has no shipped users, so work whose only purpose is pre-38.2 state is cut.
+No repair migration (no 031); runtime pair completion inside each
+restore keeps D-21's deterministic identity. Original text, kept for
+the record: Planner discretion (enforcement, not reversal): a
+forward-only migration may seed missing NULL global custom-field pairs
+in databases already damaged by Merge (RG-009), preserving existing
+pair UIDs.
+
+## Owner Decisions (plan review, 2026-09-23)
+
+-   **[DECIDED · 2026-09-23] D-23 --- no legacy-state repair.** Orbit
+    has no shipped users; the only existing installs are the owner's two
+    test phones. Work whose sole purpose is repairing or adopting state
+    written by pre-38.2 builds is out of scope; test phones carrying
+    pre-38.2 damage are reset or re-seeded by the owner. Forward
+    correctness (preventing new damage, crash safety, locking,
+    cancellation, honest reporting, restart cleanup of state future
+    crashes can leave) stays. Supersedes the RG-005 investigation gate
+    and policy (D-08, D-22, the RG-005 half of D-05), the RG-010 legacy
+    alias sweep (D-17), and the RG-009 repair migration (D-11, the
+    migration half of D-21).
 
 ## Explicitly Out of Scope
 
@@ -160,3 +190,7 @@ verification.
     RG-013 scope, RG-010 legacy alias sweep, RG-016 backup hold, RG-002
     ingress cap process, RG-003/004 device test endpoint (38.2 CONTEXT
     D-13..D-21).
+-   2026-09-23 --- plan review: recorded owner ruling D-23 (no
+    legacy-state repair); marked the RG-005 investigation gate and
+    policy, the RG-010 legacy alias sweep and the RG-009 repair
+    migration discretion superseded (38.2 CONTEXT D-23).
