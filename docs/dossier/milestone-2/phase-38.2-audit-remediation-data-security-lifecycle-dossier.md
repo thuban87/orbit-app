@@ -94,6 +94,32 @@ document and close; if confirmed, remediate here.
     Coverage list is the owner's remediation selection for 38.2
     (recorded in the audit `TRIAGE.md`).
 
+## Owner Decisions (plan-phase research batch, 2026-09-23)
+
+-   **[DECIDED · 2026-09-23] RG-014:** retire a handed-off export at the
+    first foreground sweep at least 24 h after creation, or on the next
+    manual export. Never touch user-owned backups.
+-   **[DECIDED · 2026-09-23] RG-012:** minimal photo-retry surface.
+    Reuse the ImportComplete Retry with photo-only eligibility, plus one
+    "Skip remaining photos" discard.
+-   **[DECIDED · 2026-09-23] RG-043:** multi-option birthday/name fields
+    are excluded from bulk apply. The card stays partial for per-field
+    review.
+-   **[DECIDED · 2026-09-23] RG-013:** scope is derivatives plus the
+    contact-picker raw copies. The image-picker and photo-dl copies are
+    follow-ups.
+-   **[DECIDED · 2026-09-23] RG-010:** a one-shot, bounded,
+    journaled, idempotent foreground sweep re-homes legacy aliased
+    custom-photo references. ADR-021 filenames are unchanged.
+-   **[DECIDED · 2026-09-23] RG-016:** within each pass, recovery runs
+    before auto-backup. There is no state-based indefinite backup hold.
+-   **[DECIDED · 2026-09-23] RG-002:** measure real export sizes and
+    parse memory, propose the ingress cap, and get owner sign-off at a
+    decision checkpoint before enforcing it.
+-   **[DECIDED · 2026-09-23] RG-003/RG-004:** a third-party public HTTPS
+    test host may be used for device proof, with synthetic payloads
+    only.
+
 Planner discretion (enforcement, not reversal): a forward-only
 migration may seed missing NULL global custom-field pairs in databases
 already damaged by Merge (RG-009), preserving existing pair UIDs.
@@ -129,3 +155,8 @@ verification.
 -   2026-09-23 --- discuss session: recorded owner decisions on RG-007
     retrospective consent, RG-005 remediation policy, RG-010 filename
     policy, backup format, and triage selection (38.2 CONTEXT D-07..D-12).
+-   2026-09-23 --- plan-phase research batch: recorded owner decisions on
+    RG-014 export TTL, RG-012 retry surface, RG-043 bulk exclusion,
+    RG-013 scope, RG-010 legacy alias sweep, RG-016 backup hold, RG-002
+    ingress cap process, RG-003/004 device test endpoint (38.2 CONTEXT
+    D-13..D-21).
