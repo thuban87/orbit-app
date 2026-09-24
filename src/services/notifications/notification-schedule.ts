@@ -77,7 +77,7 @@ import { daysUntilBirthday } from "@/logic/birthday-logic";
 import { registerSweepHook } from "@/services/launch-sweep";
 import { formatLocalDate } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
-import { nextAllowedFireInstant, nextNudgeDate } from "./fire-instant";
+import { nextAllowedFireInstant, nextGridFireInstant } from "./fire-instant";
 import {
   BIRTHDAY_CHANNEL,
   birthdayBody,
@@ -224,13 +224,14 @@ function buildDecayRequest(
     }
   }
 
-  const fireInstant = nextAllowedFireInstant(
-    nextNudgeDate(base, now, RE_NAG_DAYS),
+  const fireInstant = nextGridFireInstant(
+    base,
+    now,
+    RE_NAG_DAYS,
     settings.deliveryHour,
     settings.quietStartHour,
     settings.quietEndHour,
     staggerFor(c.id),
-    now,
   );
 
   const occurrenceKey = formatLocalDate(fireInstant);

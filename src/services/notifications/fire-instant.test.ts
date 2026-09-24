@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   clampHour,
   nextAllowedFireInstant,
+  nextGridFireInstant,
   nextNudgeDate,
 } from "./fire-instant";
 
@@ -34,6 +35,45 @@ describe("clampHour — 0–23 integer coercion (T-11-05 defense-in-depth)", () 
     expect(clampHour(0)).toBe(0);
     expect(clampHour(9)).toBe(9);
     expect(clampHour(23)).toBe(23);
+  });
+});
+
+describe("nextGridFireInstant — stateless weekly decay slots", () => {
+  it("skips a fired slot to the next weekly tick", () => {
+    const fire = nextGridFireInstant(
+      new Date(2026, 8, 22),
+      new Date(2026, 8, 22, 12),
+      7,
+      9,
+      21,
+      8,
+      5,
+    );
+    expect(fire).toEqual(new Date(2026, 8, 29, 9, 5));
+  });
+
+  it("keeps yesterday's tick when its evening slot rolled into this morning", () => {
+    const due = new Date(2026, 8, 22);
+    expect(
+      nextGridFireInstant(due, new Date(2026, 8, 23, 7), 7, 22, 21, 8, 0),
+    ).toEqual(new Date(2026, 8, 23, 8));
+    expect(
+      nextGridFireInstant(due, new Date(2026, 8, 23, 8, 30), 7, 22, 21, 8, 0),
+    ).toEqual(new Date(2026, 8, 30, 8));
+  });
+
+  it("steps by local calendar days across DST", () => {
+    const due = new Date(2026, 2, 7);
+    const fire = nextGridFireInstant(
+      due,
+      new Date(2026, 2, 7, 12),
+      7,
+      9,
+      21,
+      8,
+      5,
+    );
+    expect(fire).toEqual(new Date(2026, 2, 14, 9, 5));
   });
 });
 

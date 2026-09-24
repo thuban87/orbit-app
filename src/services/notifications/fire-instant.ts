@@ -8,9 +8,8 @@
  * CLAUDE.md already fixed once and forbids reintroducing.
  *
  * Android has NO time-of-day / quiet-hours trigger, so this is Orbit's own
- * logic. The scheduler composes `nextNudgeDate()` (which day) then
- * `nextAllowedFireInstant()` (which instant on that day) to produce each
- * notification's DATE trigger.
+ * logic. Decay walks `nextGridFireInstant()` over weekly grid ticks, while
+ * birthdays use `nextAllowedFireInstant()` for their date-specific slot.
  *
  * Two invariants this module enforces:
  *   - T-11-05 (Tampering/DoS): every hour argument is `clampHour`-coerced to an
@@ -223,4 +222,67 @@ export function nextNudgeDate(
     );
   }
   return cursor;
+}
+
+/**
+ * First future quiet-rolled slot on the stateless due-date cadence grid.
+ * Inspect one tick before today's next grid tick: an evening slot can roll
+ * through midnight and still be pending early the following morning.
+ */
+export function nextGridFireInstant(
+  dueDate: Date,
+  now: Date,
+  cadenceDays: number,
+  deliveryHour: number,
+  quietStartHour: number,
+  quietEndHour: number,
+  staggerMinutes: number,
+): Date {
+  const step =
+    Number.isFinite(cadenceDays) && cadenceDays >= 1
+      ? Math.trunc(cadenceDays)
+      : 1;
+  const due = new Date(
+    dueDate.getFullYear(),
+    dueDate.getMonth(),
+    dueDate.getDate(),
+  );
+  const next = nextNudgeDate(due, now, step);
+  const previous = new Date(
+    next.getFullYear(),
+    next.getMonth(),
+    next.getDate() - step,
+  );
+  let cursor = previous.getTime() >= due.getTime() ? previous : next;
+  const nowMs = now.getTime();
+  const dh = clampHour(deliveryHour);
+  const qs = clampHour(quietStartHour);
+  const qe = clampHour(quietEndHour);
+  const stagger = clampStagger(staggerMinutes);
+  for (let i = 0; i < MAX_STEPS; i++) {
+    const slot = allowedSlotForDay(
+      cursor.getFullYear(),
+      cursor.getMonth(),
+      cursor.getDate(),
+      dh,
+      qs,
+      qe,
+      stagger,
+    );
+    if (slot.getTime() > nowMs) return slot;
+    cursor = new Date(
+      cursor.getFullYear(),
+      cursor.getMonth(),
+      cursor.getDate() + step,
+    );
+  }
+  return allowedSlotForDay(
+    cursor.getFullYear(),
+    cursor.getMonth(),
+    cursor.getDate(),
+    dh,
+    qs,
+    qe,
+    stagger,
+  );
 }
