@@ -5,6 +5,7 @@ export type SecureFetchProbeCase =
   | "delayed_body"
   | "cancel_after_headers"
   | "oversized_body"
+  | "truncated_body"
   | "non_2xx";
 
 /** Synthetic-only D-20 probe. Host must be a public HTTPS test service; no app data is read. */
@@ -27,6 +28,7 @@ export async function runSecureFetchProbe(
     cancel_after_headers: "/drip?duration=10&numbytes=1024&delay=0",
     // httpbin.org caps /bytes responses at 100 KiB, below the native 1 MiB cap.
     oversized_body: "https://speed.cloudflare.com/__down?bytes=1048577",
+    truncated_body: "/response-headers?Content-Length=999",
     non_2xx: "/status/503",
   };
   const controller = new AbortController();

@@ -31,6 +31,7 @@ export function registerUatProbes(): void {
     "delayed_body",
     "cancel_after_headers",
     "oversized_body",
+    "truncated_body",
     "non_2xx",
   ] as const;
   for (const caseName of cases) {
