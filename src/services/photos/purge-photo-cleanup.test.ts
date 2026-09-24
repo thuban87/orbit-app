@@ -59,6 +59,22 @@ async function def(col: string, type: string): Promise<number> {
 }
 
 describe("durable purge photo cleanup", () => {
+  it("executes a stored safe path even when it is not identity-derived", async () => {
+    const id = await seed();
+    const stored = "avatars/legacy-safe.jpg";
+    h.fs!.files.set(stored, "old bytes");
+    await exec.runAsync("UPDATE contacts SET photo = ? WHERE id = ?", [
+      stored,
+      id,
+    ]);
+    await purgeContact(exec, id, {
+      now: NOW,
+      onPurgeExtensions: buildPhotoPurgeCleanup(exec),
+    });
+    expect(h.fs!.files.has(stored)).toBe(false);
+    expect(await listJournalEntriesCore(exec)).toEqual([]);
+  });
+
   it("deletes main and cv files for photo, type-changed text and quarantined definitions", async () => {
     const id = await seed();
     for (const [col, type] of [
