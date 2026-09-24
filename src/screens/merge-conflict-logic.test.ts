@@ -13,7 +13,17 @@ describe("hasResolvedMergeConflicts", () => {
       photoChoice: "survivor",
     };
 
-    expect(hasResolvedMergeConflicts({ ...base, primaryChoices: { phone: "survivor" } })).toBe(false);
-    expect(hasResolvedMergeConflicts({ ...base, primaryChoices: { phone: "survivor", email: "absorbed" } })).toBe(true);
+    expect(
+      hasResolvedMergeConflicts({
+        ...base,
+        primaryChoices: { phone: "survivor" },
+      }),
+    ).toBe(false);
+    expect(
+      hasResolvedMergeConflicts({
+        ...base,
+        primaryChoices: { phone: "survivor", email: "absorbed" },
+      }),
+    ).toBe(true);
   });
 });

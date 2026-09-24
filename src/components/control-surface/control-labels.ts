@@ -33,7 +33,10 @@ export const FILTER_FAMILY_LABELS: Record<DashboardFilterFamily, string> = {
   "contact-frequency": "Contact Frequency",
 };
 
-const FILTER_OPTION_LABELS: Record<Exclude<DashboardFilterFamily, "category">, Record<string, string>> = {
+const FILTER_OPTION_LABELS: Record<
+  Exclude<DashboardFilterFamily, "category">,
+  Record<string, string>
+> = {
   "social-battery": {
     Charger: "Charger",
     Neutral: "Neutral",

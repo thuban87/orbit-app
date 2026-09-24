@@ -99,7 +99,11 @@ describe("applyContactMethodDiff", () => {
     await applyContactMethodDiff(exec, {
       contactId,
       seeded: [],
-      current: [first, duplicate, email("person@example.com", { label: "Work" })],
+      current: [
+        first,
+        duplicate,
+        email("person@example.com", { label: "Work" }),
+      ],
       now: NOW,
       effectivePhoneRegion: "US",
     });
@@ -432,15 +436,19 @@ describe("applyContactMethodDiff (extra)", () => {
       });
       expect(duplicate.status).toBe("canonicalDuplicate");
       const [stored] = await listContactMethods(exec, contactId);
-      await expect(applyContactMethodDiff(exec, {
-        contactId,
-        seeded: [{ ...stored, id: 99999, uid: "missing-seeded-method" }],
-        current: [phone("773 555 1234")],
-        now: NOW,
-        effectivePhoneRegion: "US",
-      })).rejects.toThrow();
+      await expect(
+        applyContactMethodDiff(exec, {
+          contactId,
+          seeded: [{ ...stored, id: 99999, uid: "missing-seeded-method" }],
+          current: [phone("773 555 1234")],
+          now: NOW,
+          effectivePhoneRegion: "US",
+        }),
+      ).rejects.toThrow();
 
-      const logged = [error, warn, debug].flatMap((spy) => spy.mock.calls.flat());
+      const logged = [error, warn, debug].flatMap((spy) =>
+        spy.mock.calls.flat(),
+      );
       expect(logged).not.toContain(invalid);
       expect(logged).not.toContain(canonical);
     } finally {

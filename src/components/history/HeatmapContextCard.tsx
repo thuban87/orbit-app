@@ -20,8 +20,8 @@
 import { StyleSheet, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
-import { SPACING } from "@/theme/tokens/spacing";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
 
 export interface HeatmapContextCardProps {
   /** Line 1 — the tapped cell's date or date range, e.g. "Aug 4" or "Aug 4 – Aug 17". */

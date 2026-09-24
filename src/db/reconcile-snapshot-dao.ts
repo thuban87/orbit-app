@@ -1,7 +1,11 @@
-import { newUid } from "@/db/uid";
-import { serializeMethodFamily, type ReconcileFieldFamily, type ReconcileMethod } from "@/logic/reconcile-diff";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
+import { newUid } from "@/db/uid";
+import {
+  type ReconcileFieldFamily,
+  type ReconcileMethod,
+  serializeMethodFamily,
+} from "@/logic/reconcile-diff";
 
 export interface UpsertReviewedSnapshotInput {
   externalContactLinkId: number;
@@ -11,9 +15,14 @@ export interface UpsertReviewedSnapshotInput {
   reviewedAt: string;
 }
 
-export type ReviewedSnapshotMap = Partial<Record<ReconcileFieldFamily, string | null>>;
+export type ReviewedSnapshotMap = Partial<
+  Record<ReconcileFieldFamily, string | null>
+>;
 
-function assertOneChange(changes: number, input: UpsertReviewedSnapshotInput): void {
+function assertOneChange(
+  changes: number,
+  input: UpsertReviewedSnapshotInput,
+): void {
   if (changes !== 1) {
     throw new Error(
       `upsertReviewedSnapshot: expected one ${input.fieldFamily} row for link=${input.externalContactLinkId} (changed ${changes})`,
@@ -30,7 +39,9 @@ export function reviewedValueFor(
       throw new Error(`method family value is invalid for ${fieldFamily}`);
     }
     const type = fieldFamily === "phones" ? "phone" : "email";
-    return serializeMethodFamily(value.filter((method) => method.type === type));
+    return serializeMethodFamily(
+      value.filter((method) => method.type === type),
+    );
   }
   return value;
 }
@@ -40,7 +51,10 @@ export async function upsertReviewedSnapshotCore(
   exec: SqlExecutor,
   input: UpsertReviewedSnapshotInput,
 ): Promise<void> {
-  const reviewedValue = reviewedValueFor(input.fieldFamily, input.reviewedValue);
+  const reviewedValue = reviewedValueFor(
+    input.fieldFamily,
+    input.reviewedValue,
+  );
   const result = await exec.runAsync(
     `INSERT INTO reconcile_source_snapshot
        (uid, external_contact_link_id, field_family, reviewed_value, reviewed_at)
@@ -63,7 +77,9 @@ export function upsertReviewedSnapshot(
   exec: SqlExecutor,
   input: UpsertReviewedSnapshotInput,
 ): Promise<void> {
-  return inWriteTransaction(exec, () => upsertReviewedSnapshotCore(exec, input));
+  return inWriteTransaction(exec, () =>
+    upsertReviewedSnapshotCore(exec, input),
+  );
 }
 
 /** Read shape consumed directly by classifyReconciliation's `lastReviewed` input. */

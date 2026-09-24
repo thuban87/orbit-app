@@ -30,8 +30,9 @@
  * SECURITY: every value is bound with `?`; only static column names and the
  * closed preset→modifier constants are literal text.
  */
-import { recordEventCore } from "@/db/events-dao";
+
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { recordEventCore } from "@/db/events-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -61,7 +62,8 @@ export interface SnoozeContactInput {
 }
 
 /** Resolved input for a caller that already owns the write transaction. */
-export interface SnoozeContactCoreInput extends Omit<SnoozeContactInput, "preset"> {
+export interface SnoozeContactCoreInput
+  extends Omit<SnoozeContactInput, "preset"> {
   until: string;
 }
 
@@ -90,7 +92,8 @@ export async function resolveSnoozeUntil(
     "SELECT date('now','localtime', ?) AS until",
     [PRESET_MODIFIERS[preset]],
   );
-  if (!dateRow?.until) throw new Error("snoozeContact: could not resolve local target date");
+  if (!dateRow?.until)
+    throw new Error("snoozeContact: could not resolve local target date");
   return dateRow.until;
 }
 

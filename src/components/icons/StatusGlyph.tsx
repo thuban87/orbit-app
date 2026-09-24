@@ -16,13 +16,13 @@
  */
 import { View } from "react-native";
 import {
-  statusGlyph,
   type StatusDisplayState,
+  statusGlyph,
 } from "@/components/contact-card-ring";
-import { Icon } from "./Icon";
-import { statusDisplayLabel } from "./status-display-label";
 import type { IconSizeToken } from "@/theme/tokens/icon-size";
+import { Icon } from "./Icon";
 import type { StatusTone } from "./icon-registry";
+import { statusDisplayLabel } from "./status-display-label";
 
 export { statusDisplayLabel } from "./status-display-label";
 

@@ -99,21 +99,51 @@ async function migrateToV25(): Promise<void> {
 
 describe("migration 025 — Tone/channel value remap", () => {
   it("remaps every legacy quality value and passes NULL/other through", async () => {
-    const positive = await seedContactAndInteraction("good", "unspecified", "n1");
-    const neutral = await seedContactAndInteraction("fine", "unspecified", "n2");
-    const negative = await seedContactAndInteraction("hard", "unspecified", "n3");
-    const nullQuality = await seedContactAndInteraction(null, "unspecified", "n4");
-    const otherQuality = await seedContactAndInteraction("other", "unspecified", "n5");
+    const positive = await seedContactAndInteraction(
+      "good",
+      "unspecified",
+      "n1",
+    );
+    const neutral = await seedContactAndInteraction(
+      "fine",
+      "unspecified",
+      "n2",
+    );
+    const negative = await seedContactAndInteraction(
+      "hard",
+      "unspecified",
+      "n3",
+    );
+    const nullQuality = await seedContactAndInteraction(
+      null,
+      "unspecified",
+      "n4",
+    );
+    const otherQuality = await seedContactAndInteraction(
+      "other",
+      "unspecified",
+      "n5",
+    );
 
     await migrateToV25();
 
-    expect((await readInteraction(positive.interactionUid)).quality).toBe("Positive");
-    expect((await readInteraction(neutral.interactionUid)).quality).toBe("Neutral");
-    expect((await readInteraction(negative.interactionUid)).quality).toBe("Negative");
+    expect((await readInteraction(positive.interactionUid)).quality).toBe(
+      "Positive",
+    );
+    expect((await readInteraction(neutral.interactionUid)).quality).toBe(
+      "Neutral",
+    );
+    expect((await readInteraction(negative.interactionUid)).quality).toBe(
+      "Negative",
+    );
     // NULL is NOT coerced to a Tone value.
-    expect((await readInteraction(nullQuality.interactionUid)).quality).toBeNull();
+    expect(
+      (await readInteraction(nullQuality.interactionUid)).quality,
+    ).toBeNull();
     // A non-legacy value passes through unchanged.
-    expect((await readInteraction(otherQuality.interactionUid)).quality).toBe("other");
+    expect((await readInteraction(otherQuality.interactionUid)).quality).toBe(
+      "other",
+    );
   });
 
   it("remaps every legacy channel value and passes other/unspecified through", async () => {
@@ -122,16 +152,28 @@ describe("migration 025 — Tone/channel value remap", () => {
     const call = await seedContactAndInteraction(null, "call", null);
     const inPerson = await seedContactAndInteraction(null, "in-person", null);
     const other = await seedContactAndInteraction(null, "other", null);
-    const unspecified = await seedContactAndInteraction(null, "unspecified", null);
+    const unspecified = await seedContactAndInteraction(
+      null,
+      "unspecified",
+      null,
+    );
 
     await migrateToV25();
 
-    expect((await readInteraction(text.interactionUid)).channel).toBe("Message");
-    expect((await readInteraction(email.interactionUid)).channel).toBe("Message");
+    expect((await readInteraction(text.interactionUid)).channel).toBe(
+      "Message",
+    );
+    expect((await readInteraction(email.interactionUid)).channel).toBe(
+      "Message",
+    );
     expect((await readInteraction(call.interactionUid)).channel).toBe("Call");
-    expect((await readInteraction(inPerson.interactionUid)).channel).toBe("In Person");
+    expect((await readInteraction(inPerson.interactionUid)).channel).toBe(
+      "In Person",
+    );
     expect((await readInteraction(other.interactionUid)).channel).toBe("other");
-    expect((await readInteraction(unspecified.interactionUid)).channel).toBe("unspecified");
+    expect((await readInteraction(unspecified.interactionUid)).channel).toBe(
+      "unspecified",
+    );
   });
 
   it("never rewrites the free-text note column", async () => {
@@ -141,7 +183,9 @@ describe("migration 025 — Tone/channel value remap", () => {
       "NOTE_PRESERVED_MARKER",
     );
     await migrateToV25();
-    expect((await readInteraction(interactionUid)).note).toBe("NOTE_PRESERVED_MARKER");
+    expect((await readInteraction(interactionUid)).note).toBe(
+      "NOTE_PRESERVED_MARKER",
+    );
   });
 
   it("pins the frozen migration CASE outputs equal to the shared vocabulary helpers", async () => {
@@ -225,7 +269,11 @@ describe("migration 025 — new columns", () => {
   });
 
   it("leaves duration NULL when absent (never 0)", async () => {
-    const { interactionUid } = await seedContactAndInteraction("good", "text", null);
+    const { interactionUid } = await seedContactAndInteraction(
+      "good",
+      "text",
+      null,
+    );
     await migrateToV25();
     expect((await readInteraction(interactionUid)).duration).toBeNull();
   });
@@ -235,8 +283,13 @@ describe("migration 025 — new columns", () => {
     const settings = await exec.getFirstAsync<{
       history_lens: string;
       history_cycle_count: number;
-    }>("SELECT history_lens, history_cycle_count FROM app_settings WHERE id = 1");
-    expect(settings).toEqual({ history_lens: "cycles", history_cycle_count: 10 });
+    }>(
+      "SELECT history_lens, history_cycle_count FROM app_settings WHERE id = 1",
+    );
+    expect(settings).toEqual({
+      history_lens: "cycles",
+      history_cycle_count: 10,
+    });
   });
 
   it("resolves the exported version constant to 25", () => {
@@ -254,9 +307,7 @@ describe("migration 025 — source discipline (D-07/D-12, review cycle-2)", () =
   );
   // Strip block + line comments — the doc comment legitimately explains WHY the
   // migration avoids these patterns, so grep the executable CODE only.
-  const code = source
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/\/\/.*$/gm, "");
+  const code = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
 
   it("contains no note rewrite, no table rebuild, and no group-event schema", () => {
     expect(code).not.toMatch(/SET\s+note/i);

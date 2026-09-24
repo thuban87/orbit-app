@@ -7,7 +7,10 @@ import type { BulkAction } from "@/components/CandidateCardGrid";
 export function isBulkActionAvailable<T>(
   action: BulkAction,
   selectedItems: readonly T[],
-  isActionEligible?: (action: BulkAction, selectedItems: readonly T[]) => boolean,
+  isActionEligible?: (
+    action: BulkAction,
+    selectedItems: readonly T[],
+  ) => boolean,
 ): boolean {
   return isActionEligible ? isActionEligible(action, selectedItems) : true;
 }

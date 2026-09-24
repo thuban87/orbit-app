@@ -1,5 +1,5 @@
-import { Image } from "expo-image";
 import { useFocusEffect } from "@react-navigation/native";
+import { Image } from "expo-image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AppState,
@@ -177,10 +177,7 @@ export function LegacyContactPickerScreen({
   }
 
   return (
-    <View
-      testID="legacy-contact-picker-screen"
-      style={styles.root}
-    >
+    <View testID="legacy-contact-picker-screen" style={styles.root}>
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"

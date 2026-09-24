@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { UnboundRow } from "@/db/unbound-read";
-import {
-  filterUnboundByName,
-  unboundCountLabel,
-} from "./unbound-list-logic";
+import { filterUnboundByName, unboundCountLabel } from "./unbound-list-logic";
 
 function row(id: number, name: string): UnboundRow {
   return {
@@ -27,7 +24,9 @@ describe("filterUnboundByName", () => {
   });
 
   it("matches name substrings case-insensitively", () => {
-    expect(filterUnboundByName(rows, "ann").map(({ id }) => id)).toEqual([1, 2]);
+    expect(filterUnboundByName(rows, "ann").map(({ id }) => id)).toEqual([
+      1, 2,
+    ]);
   });
 
   it("preserves surviving input order without mutating the input", () => {

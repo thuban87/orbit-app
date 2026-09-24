@@ -36,10 +36,7 @@ describe("resolveWidgetUri — accepted forms (all RESET onto [Home, target])", 
     expect(resolveWidgetUri("orbit://compose/7")).toEqual({
       type: "reset",
       index: 1,
-      routes: [
-        { name: "Home" },
-        { name: "Compose", params: { contactId: 7 } },
-      ],
+      routes: [{ name: "Home" }, { name: "Compose", params: { contactId: 7 } }],
     });
   });
 
@@ -156,10 +153,7 @@ describe("subscribeToWidgetUrls", () => {
     expect(enqueue).toHaveBeenCalledWith({
       type: "reset",
       index: 1,
-      routes: [
-        { name: "Home" },
-        { name: "Profile", params: { contactId: 8 } },
-      ],
+      routes: [{ name: "Home" }, { name: "Profile", params: { contactId: 8 } }],
     });
     unsubscribe();
     expect(remove).toHaveBeenCalledOnce();

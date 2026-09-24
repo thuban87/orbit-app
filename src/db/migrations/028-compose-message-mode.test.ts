@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-sqlite", () => ({}));
 
-import { assertRememberedMessageMode } from "@/db/app-settings-dao";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { assertRememberedMessageMode } from "@/db/app-settings-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { COMPOSE_MESSAGE_MODE_SCHEMA_VERSION } from "@/db/migrations/028-compose-message-mode";
 import { runMigrations } from "@/db/migrations/runner";

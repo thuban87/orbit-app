@@ -126,7 +126,8 @@ export function resolveBackupNudge(
     Number.isFinite(lastSuccessMs) &&
     now.getTime() - lastSuccessMs >= NUDGE_STALE_MS;
   const condition =
-    input.hasMeaningfulData && (!input.lastAutomaticBackupAt || staleLongEnough);
+    input.hasMeaningfulData &&
+    (!input.lastAutomaticBackupAt || staleLongEnough);
 
   return {
     shouldShow: condition && !input.dismissed,

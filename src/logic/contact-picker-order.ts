@@ -20,7 +20,10 @@ export interface PickerRowMarkers {
 /** A blank query means the normal, non-archived picker list. */
 export function matchPickerRow(row: PickerOrderRow, term: string): boolean {
   const normalizedTerm = term.trim().toLocaleLowerCase();
-  return normalizedTerm.length === 0 || row.name.toLocaleLowerCase().includes(normalizedTerm);
+  return (
+    normalizedTerm.length === 0 ||
+    row.name.toLocaleLowerCase().includes(normalizedTerm)
+  );
 }
 
 /**
@@ -48,19 +51,26 @@ function localDate(): string {
  * Favourites are a boolean membership band only. Within each membership band,
  * most recent interaction wins; null recency is last, then name breaks ties.
  */
-export function orderPickerRows<TRow extends PickerOrderRow>(rows: TRow[]): TRow[] {
+export function orderPickerRows<TRow extends PickerOrderRow>(
+  rows: TRow[],
+): TRow[] {
   return [...rows].sort((left, right) => {
-    const favouriteDelta = Number(left.favourite_rank === null) - Number(right.favourite_rank === null);
+    const favouriteDelta =
+      Number(left.favourite_rank === null) -
+      Number(right.favourite_rank === null);
     if (favouriteDelta !== 0) return favouriteDelta;
 
-    const nullRecencyDelta = Number(left.last_contact === null) - Number(right.last_contact === null);
+    const nullRecencyDelta =
+      Number(left.last_contact === null) - Number(right.last_contact === null);
     if (nullRecencyDelta !== 0) return nullRecencyDelta;
 
     if (left.last_contact !== right.last_contact) {
       return (right.last_contact ?? "").localeCompare(left.last_contact ?? "");
     }
 
-    return left.name.localeCompare(right.name, undefined, { sensitivity: "accent" });
+    return left.name.localeCompare(right.name, undefined, {
+      sensitivity: "accent",
+    });
   });
 }
 
@@ -68,9 +78,14 @@ export function orderPickerRows<TRow extends PickerOrderRow>(rows: TRow[]): TRow
  * An archived contact is intentionally hidden in the default list. It may be
  * displayed only after an explicit search term matches its name.
  */
-export function filterPicker<TRow extends PickerOrderRow>(rows: TRow[], term: string): TRow[] {
+export function filterPicker<TRow extends PickerOrderRow>(
+  rows: TRow[],
+  term: string,
+): TRow[] {
   const hasSearch = term.trim().length > 0;
   return orderPickerRows(
-    rows.filter((row) => (!row.archived_at || hasSearch) && matchPickerRow(row, term)),
+    rows.filter(
+      (row) => (!row.archived_at || hasSearch) && matchPickerRow(row, term),
+    ),
   );
 }

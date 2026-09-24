@@ -11,7 +11,8 @@ import { describe, expect, it } from "vitest";
 import { buckets, heatmapLevel } from "@/services/history/buckets";
 import { buildWindow } from "@/services/history/window";
 
-const rows = (...dates: string[]) => dates.map((occurredAt) => ({ occurredAt }));
+const rows = (...dates: string[]) =>
+  dates.map((occurredAt) => ({ occurredAt }));
 
 describe("buckets — count-only per-cell", () => {
   it("counts interactions per date and yields 0 for empty dates", () => {
@@ -34,7 +35,10 @@ describe("buckets — count-only per-cell", () => {
 
   it("ignores interactions outside the window bounds", () => {
     const w = buildWindow("7days", "2026-03-15", "2026-12-31");
-    const counts = buckets(w, rows("2026-01-01 12:00:00", "2026-03-14 12:00:00"));
+    const counts = buckets(
+      w,
+      rows("2026-01-01 12:00:00", "2026-03-14 12:00:00"),
+    );
     expect(counts.get("2026-03-14")).toBe(1);
     expect(counts.has("2026-01-01")).toBe(false);
   });

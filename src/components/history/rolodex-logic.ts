@@ -65,7 +65,11 @@ export function parseWheelDate(ymd: string): WheelDate {
   if (!match) {
     throw new Error(`rolodex-logic: expected YYYY-MM-DD, got "${ymd}"`);
   }
-  return { year: Number(match[1]), month: Number(match[2]), day: Number(match[3]) };
+  return {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+  };
 }
 
 /** Whole days in a 1-based month (leap-aware via the local Date rollover). */
@@ -152,12 +156,16 @@ export function rollDate(
     case "month": {
       const monthIndex = current.month - 1 + delta;
       const year = current.year + Math.floor(monthIndex / 12);
-      const month = ((monthIndex % 12) + 12) % 12 + 1;
+      const month = (((monthIndex % 12) + 12) % 12) + 1;
       next = clampDate({ year, month, day: current.day });
       break;
     }
     case "year": {
-      next = clampDate({ year: current.year + delta, month: current.month, day: current.day });
+      next = clampDate({
+        year: current.year + delta,
+        month: current.month,
+        day: current.day,
+      });
       break;
     }
   }
@@ -182,13 +190,20 @@ export function markerFor(
 ): WheelMarker {
   const entry = markers.get(date);
   if (!entry) {
-    return { kind: "none", interactionCount: 0, lifecycleCount: 0, a11yLabel: "" };
+    return {
+      kind: "none",
+      interactionCount: 0,
+      lifecycleCount: 0,
+      a11yLabel: "",
+    };
   }
   const kind: WheelMarkerKind =
     entry.kind === "lifecycle-only" ? "lifecycle" : entry.kind;
   const parts: string[] = [];
   if (entry.interactionCount > 0) {
-    parts.push(countLabel(entry.interactionCount, "interaction", "interactions"));
+    parts.push(
+      countLabel(entry.interactionCount, "interaction", "interactions"),
+    );
   }
   if (entry.lifecycleCount > 0) {
     parts.push(countLabel(entry.lifecycleCount, "event", "events"));
@@ -211,7 +226,11 @@ export function formatDrawerSummary(marker: WheelMarker): DrawerSummary {
   if (!hasRecords) {
     return { text: "0 events logged", hasRecords: false };
   }
-  const interactions = countLabel(marker.interactionCount, "interaction", "interactions");
+  const interactions = countLabel(
+    marker.interactionCount,
+    "interaction",
+    "interactions",
+  );
   const events = countLabel(marker.lifecycleCount, "event", "events");
   return { text: `${interactions} · ${events}`, hasRecords: true };
 }

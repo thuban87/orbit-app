@@ -62,7 +62,14 @@ describe("manual-only custom System resolver", () => {
       {
         rules: [],
         overrides: [
-          { id: 1, uid: "exclude", systemRef: "custom:test", contactId, mode: "exclude", createdAt: NOW },
+          {
+            id: 1,
+            uid: "exclude",
+            systemRef: "custom:test",
+            contactId,
+            mode: "exclude",
+            createdAt: NOW,
+          },
         ],
         now: NOW,
       },
@@ -73,7 +80,14 @@ describe("manual-only custom System resolver", () => {
       {
         rules: [],
         overrides: [
-          { id: 2, uid: "include", systemRef: "custom:test", contactId, mode: "include", createdAt: NOW },
+          {
+            id: 2,
+            uid: "include",
+            systemRef: "custom:test",
+            contactId,
+            mode: "include",
+            createdAt: NOW,
+          },
         ],
         now: NOW,
       },

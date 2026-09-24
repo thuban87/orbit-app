@@ -13,7 +13,8 @@ export async function bumpDataRevisionCore(exec: SqlExecutor): Promise<void> {
     // compatibility branch keeps older isolated DAO fixtures usable; it must
     // never hide a real SQLite failure on the migrated production schema.
     const message = error instanceof Error ? error.message : "";
-    if (/no such (table|column): (app_settings|data_revision)/i.test(message)) return;
+    if (/no such (table|column): (app_settings|data_revision)/i.test(message))
+      return;
     throw error;
   }
   if (result.changes !== 1) {

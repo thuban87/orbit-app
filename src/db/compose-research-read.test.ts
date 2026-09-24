@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-sqlite", () => ({}));
 
-import { readComposeResearch } from "@/db/compose-research-read";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { readComposeResearch } from "@/db/compose-research-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -248,7 +248,9 @@ describe("compose-research-read — normalized ResearchItem projection", () => {
     expect(items.some((item) => item.label === "Hidden Pat")).toBe(false);
 
     // Only the current value renders — the superseded one never leaks.
-    const location = items.find((item) => item.id === "current:current_location");
+    const location = items.find(
+      (item) => item.id === "current:current_location",
+    );
     expect(location?.value).toBe("New city");
     expect(items.some((item) => item.value === "Old town")).toBe(false);
   });

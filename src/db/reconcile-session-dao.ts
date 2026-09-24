@@ -63,7 +63,9 @@ export function createReconcileSession(
   exec: SqlExecutor,
   input: CreateReconcileSessionInput,
 ): Promise<number> {
-  return inWriteTransaction(exec, () => createReconcileSessionCore(exec, input));
+  return inWriteTransaction(exec, () =>
+    createReconcileSessionCore(exec, input),
+  );
 }
 
 async function resolveSessionId(
@@ -72,7 +74,9 @@ async function resolveSessionId(
 ): Promise<number> {
   if (input.sessionId != null) return input.sessionId;
   if (input.sessionUid == null) {
-    throw new Error("insertReconcileCardCore: sessionId or sessionUid is required");
+    throw new Error(
+      "insertReconcileCardCore: sessionId or sessionUid is required",
+    );
   }
   const session = await exec.getFirstAsync<{ id: number }>(
     "SELECT id FROM reconciliation_sessions WHERE uid = ?",
@@ -195,7 +199,9 @@ export async function discardSessionCore(
   sessionId: number,
   now: string,
 ): Promise<string[]> {
-  const cards = await exec.getAllAsync<{ staged_photo_rel_path: string | null }>(
+  const cards = await exec.getAllAsync<{
+    staged_photo_rel_path: string | null;
+  }>(
     `SELECT staged_photo_rel_path FROM reconciliation_session_cards
      WHERE session_id = ? AND card_status IN ('unresolved', 'partial')`,
     [sessionId],
@@ -222,5 +228,7 @@ export function discardSession(
   sessionId: number,
   now: string,
 ): Promise<string[]> {
-  return inWriteTransaction(exec, () => discardSessionCore(exec, sessionId, now));
+  return inWriteTransaction(exec, () =>
+    discardSessionCore(exec, sessionId, now),
+  );
 }

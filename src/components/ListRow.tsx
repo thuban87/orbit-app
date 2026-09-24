@@ -4,15 +4,15 @@
  */
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
-import { StatusGlyph } from "@/components/icons/StatusGlyph";
-import { Icon } from "@/components/icons/Icon";
 import {
   ringVisual,
   type StatusDisplayState,
 } from "@/components/contact-card-ring";
+import { Icon } from "@/components/icons/Icon";
+import type { IconName } from "@/components/icons/icon-registry";
+import { StatusGlyph } from "@/components/icons/StatusGlyph";
 import type { ProfileStatus } from "@/db/contact-status-read";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
-import type { IconName } from "@/components/icons/icon-registry";
 import { useTheme } from "@/theme";
 import { ICON_SIZE } from "@/theme/tokens/icon-size";
 import { RADII } from "@/theme/tokens/radii";
@@ -21,9 +21,9 @@ import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { isSnoozed } from "@/utils/dates";
 import {
   buildRowAccessibilityDescription,
+  formatListRecency,
   formatMatchCategories,
   formatMatchExplanation,
-  formatListRecency,
 } from "./list-row-content";
 
 function HighlightedSnippet({
@@ -32,16 +32,24 @@ function HighlightedSnippet({
   color,
 }: {
   text: string;
-  highlights: ReadonlyArray<{ readonly start: number; readonly length: number }>;
+  highlights: ReadonlyArray<{
+    readonly start: number;
+    readonly length: number;
+  }>;
   color: string;
 }) {
-  const sorted = [...highlights].sort((left, right) => left.start - right.start);
+  const sorted = [...highlights].sort(
+    (left, right) => left.start - right.start,
+  );
   let cursor = 0;
   return (
     <>
       {sorted.map((highlight, index) => {
         const start = Math.max(cursor, Math.min(highlight.start, text.length));
-        const end = Math.max(start, Math.min(start + highlight.length, text.length));
+        const end = Math.max(
+          start,
+          Math.min(start + highlight.length, text.length),
+        );
         const before = text.slice(cursor, start);
         const matched = text.slice(start, end);
         cursor = end;
@@ -125,7 +133,9 @@ export function ListRow({
     ? formatMatchExplanation(
         searchResult?.totalMatchCount ?? 1,
         searchResult
-          ? formatMatchCategories(searchResult.matches.map((match) => match.sourceKind))
+          ? formatMatchCategories(
+              searchResult.matches.map((match) => match.sourceKind),
+            )
           : [],
         searchResult?.moreMatchesLabel,
       )
@@ -190,13 +200,19 @@ export function ListRow({
               testID={`dashboard-list-row-meta-${contactId}`}
               numberOfLines={1}
               ellipsizeMode="tail"
-              style={[styles.meta, styles.recency, { color: colors.textSecondary }]}
+              style={[
+                styles.meta,
+                styles.recency,
+                { color: colors.textSecondary },
+              ]}
             >
               {recency}
             </Text>
             {categoryLabel !== null ? (
               <>
-                <Text style={[styles.meta, { color: colors.textSecondary }]}>·</Text>
+                <Text style={[styles.meta, { color: colors.textSecondary }]}>
+                  ·
+                </Text>
                 <View
                   testID={`dashboard-list-row-category-${contactId}`}
                   style={[
@@ -222,7 +238,11 @@ export function ListRow({
               testID={`dashboard-list-row-search-snippet-${contactId}`}
               numberOfLines={1}
               ellipsizeMode="tail"
-              style={[styles.meta, styles.line3Text, { color: colors.textSecondary }]}
+              style={[
+                styles.meta,
+                styles.line3Text,
+                { color: colors.textSecondary },
+              ]}
             >
               <HighlightedSnippet
                 text={displayedSearchSnippet}
@@ -240,7 +260,11 @@ export function ListRow({
               testID={`dashboard-list-row-line3-${contactId}`}
               numberOfLines={1}
               ellipsizeMode="tail"
-              style={[styles.meta, styles.line3Text, { color: colors.textSecondary }]}
+              style={[
+                styles.meta,
+                styles.line3Text,
+                { color: colors.textSecondary },
+              ]}
             >
               {line3?.text ?? ""}
             </Text>
@@ -251,7 +275,9 @@ export function ListRow({
         <Pressable
           testID={`dashboard-list-row-favourite-${contactId}`}
           accessibilityRole="button"
-          accessibilityLabel={isFavourite ? "Remove favourite" : "Add favourite"}
+          accessibilityLabel={
+            isFavourite ? "Remove favourite" : "Add favourite"
+          }
           accessibilityState={{ selected: isFavourite }}
           hitSlop={SPACING.sm}
           onPress={onToggleFavourite}

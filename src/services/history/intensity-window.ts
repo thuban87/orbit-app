@@ -30,9 +30,12 @@
  * transaction. Local date math only — never UTC ISO slicing.
  */
 import type { ImpactInputs } from "@/db/impact-read";
-import { calendarDaysBetween, parseLocalMs } from "@/utils/dates";
-import { computeIntensity, type IntensityResult } from "@/services/intensity-logic";
 import type { HistoryWindow } from "@/services/history/window";
+import {
+  computeIntensity,
+  type IntensityResult,
+} from "@/services/intensity-logic";
+import { calendarDaysBetween, parseLocalMs } from "@/utils/dates";
 
 /**
  * A window-scoped intensity result, or the tagged no-cadence unavailable marker.
@@ -44,7 +47,10 @@ import type { HistoryWindow } from "@/services/history/window";
  * contact has a non-null `intervalDays`; Unbound short-circuits to unavailable).
  */
 export type IntensityWindowResult =
-  | (IntensityResult & { readonly available: true; readonly cadenceDays: number })
+  | (IntensityResult & {
+      readonly available: true;
+      readonly cadenceDays: number;
+    })
   | { readonly available: false };
 
 /**
@@ -55,7 +61,10 @@ export type IntensityWindowResult =
  * interactions to the window bounds and delegates to the pure `computeIntensity`
  * with effectiveNow = window-end-of-day and periodDays = window day-span.
  */
-export function intensityWindow(inputs: ImpactInputs, window: HistoryWindow): IntensityWindowResult {
+export function intensityWindow(
+  inputs: ImpactInputs,
+  window: HistoryWindow,
+): IntensityWindowResult {
   // VERBATIM impact.ts guard — never touch cadence math for an Unbound contact.
   if (inputs.trackingEnabled !== 1 || inputs.intervalDays === null) {
     return { available: false };
@@ -78,7 +87,12 @@ export function intensityWindow(inputs: ImpactInputs, window: HistoryWindow): In
   // filtered (in-window) qualifying row is counted.
   const periodDays = calendarDaysBetween(startMs, endMs) + 1;
 
-  const result = computeIntensity(filtered, periodDays, inputs.rarelyResponds, effectiveNow);
+  const result = computeIntensity(
+    filtered,
+    periodDays,
+    inputs.rarelyResponds,
+    effectiveNow,
+  );
   // `periodDays` (in `result`) is the window span; `cadenceDays` carries the
   // contact's real interval so the caption reports the contact's TRUE cadence,
   // not the window span (Phase 32 review #1). intervalDays is non-null here — the

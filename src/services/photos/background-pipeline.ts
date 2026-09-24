@@ -1,6 +1,4 @@
-import {
-  type BackgroundCropRect,
-} from "./background-crop-geometry";
+import type { BackgroundCropRect } from "./background-crop-geometry";
 
 /** The screen-class derivative dimensions, derived from the actual Profile host. */
 export interface BackgroundDerivativeSize {

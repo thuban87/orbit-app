@@ -15,8 +15,9 @@
  * the passed palette, which sources it from theme-presets — the ONE sanctioned
  * colour-literal file. NO React theme hook is imported.
  */
-import { DEFAULT_PRESET_ID, resolvePalette } from "@/theme/theme-presets";
+
 import type { ProfileStatus } from "@/db/contact-status-read";
+import { DEFAULT_PRESET_ID, resolvePalette } from "@/theme/theme-presets";
 import type { ThemePalette } from "@/theme/theme-types";
 
 /** The palette shape the headless widget render resolves colours from. */

@@ -20,8 +20,9 @@
  * This module builds NO SQL and performs NO interactions write — it maps values
  * for the DAO, which is the single chokepoint.
  */
-import { FUTURE_DATETIME_MESSAGE } from "@/components/touchpoint-refine-logic";
+
 import type { TouchpointRefineValue } from "@/components/TouchpointRefineForm";
+import { FUTURE_DATETIME_MESSAGE } from "@/components/touchpoint-refine-logic";
 import type { InteractionForEdit } from "@/db/interaction-edit-read";
 import { rejectFutureOccurredAt } from "@/db/log-guards";
 import type { EditTouchpointFullInput } from "@/db/recency-dao";
@@ -41,7 +42,9 @@ export interface EditInteractionIds {
 }
 
 /** Seed the controlled refine value from a loaded interaction (every editable field). */
-export function seedRefineValue(loaded: InteractionForEdit): TouchpointRefineValue {
+export function seedRefineValue(
+  loaded: InteractionForEdit,
+): TouchpointRefineValue {
   return {
     occurredAt: loaded.occurredAt,
     channel: loaded.channel,

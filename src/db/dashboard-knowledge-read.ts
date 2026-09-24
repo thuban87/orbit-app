@@ -148,7 +148,8 @@ function compareCandidate(left: Line3Candidate, right: Line3Candidate): number {
   const leftDate = left.meaningfulDate ?? "";
   const rightDate = right.meaningfulDate ?? "";
   if (leftDate !== rightDate) return rightDate.localeCompare(leftDate);
-  if (left.createdAt !== right.createdAt) return right.createdAt.localeCompare(left.createdAt);
+  if (left.createdAt !== right.createdAt)
+    return right.createdAt.localeCompare(left.createdAt);
   if (left.id !== right.id) return right.id - left.id;
   return left.kind.localeCompare(right.kind);
 }
@@ -166,9 +167,18 @@ export async function readLine3Candidates(
   if (uniqueContactIds.length === 0) return [];
 
   const [memoryRows, relationshipRows, currentStateRows] = await Promise.all([
-    exec.getAllAsync<MemoryCandidateRow>(memorySql(uniqueContactIds), uniqueContactIds),
-    exec.getAllAsync<RelationshipCandidateRow>(relationshipSql(uniqueContactIds), uniqueContactIds),
-    exec.getAllAsync<CurrentStateCandidateRow>(currentStateSql(uniqueContactIds), uniqueContactIds),
+    exec.getAllAsync<MemoryCandidateRow>(
+      memorySql(uniqueContactIds),
+      uniqueContactIds,
+    ),
+    exec.getAllAsync<RelationshipCandidateRow>(
+      relationshipSql(uniqueContactIds),
+      uniqueContactIds,
+    ),
+    exec.getAllAsync<CurrentStateCandidateRow>(
+      currentStateSql(uniqueContactIds),
+      uniqueContactIds,
+    ),
   ]);
 
   const visibleCandidates: Line3Candidate[] = [
@@ -216,6 +226,8 @@ export async function readLine3Candidates(
   }
 
   return uniqueContactIds.flatMap((contactId) =>
-    (candidatesByContact.get(contactId) ?? []).sort(compareCandidate).slice(0, CANDIDATE_BUDGET),
+    (candidatesByContact.get(contactId) ?? [])
+      .sort(compareCandidate)
+      .slice(0, CANDIDATE_BUDGET),
   );
 }

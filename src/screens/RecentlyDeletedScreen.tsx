@@ -38,7 +38,11 @@ export function RecentlyDeletedScreen({
     useCallback(() => {
       let cancelled = false;
       void load(() => cancelled).catch((error) => {
-        Logger.error(LOG_SCOPE, "failed to load recently deleted memories", error);
+        Logger.error(
+          LOG_SCOPE,
+          "failed to load recently deleted memories",
+          error,
+        );
         if (!cancelled) setRows([]);
       });
       return () => {
@@ -49,19 +53,27 @@ export function RecentlyDeletedScreen({
 
   const reload = () =>
     void load().catch((error) =>
-      Logger.error(LOG_SCOPE, "failed to refresh recently deleted memories", error),
+      Logger.error(
+        LOG_SCOPE,
+        "failed to refresh recently deleted memories",
+        error,
+      ),
     );
   const restore = (id: number) =>
     void restoreMemory(getExecutor(), { id, contactId, now: localDateTime() })
       .then(reload)
-      .catch((error) => Logger.error(LOG_SCOPE, "failed to restore memory", error));
+      .catch((error) =>
+        Logger.error(LOG_SCOPE, "failed to restore memory", error),
+      );
   const confirmPurge = () => {
     if (!pendingPurge) return;
     const memory = pendingPurge;
     setPendingPurge(null);
     void purgeMemoryPermanently(getExecutor(), { id: memory.id, contactId })
       .then(reload)
-      .catch((error) => Logger.error(LOG_SCOPE, "failed to purge memory", error));
+      .catch((error) =>
+        Logger.error(LOG_SCOPE, "failed to purge memory", error),
+      );
   };
 
   return (
@@ -84,12 +96,19 @@ export function RecentlyDeletedScreen({
           <View style={styles.empty}>
             <AppText role="heading">Recently Deleted is empty</AppText>
             <AppText role="body" style={{ color: colors.textSecondary }}>
-              Deleted memories appear here and are removed automatically after {MEMORY_TRASH_WINDOW_DAYS} days.
+              Deleted memories appear here and are removed automatically after{" "}
+              {MEMORY_TRASH_WINDOW_DAYS} days.
             </AppText>
           </View>
         ) : (
           rows.map((memory) => (
-            <View key={memory.id} style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View
+              key={memory.id}
+              style={[
+                styles.row,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+              ]}
+            >
               <View style={styles.copy}>
                 <AppText role="body">{memoryLabel(memory)}</AppText>
                 <AppText role="caption" style={{ color: colors.textSecondary }}>
@@ -97,8 +116,16 @@ export function RecentlyDeletedScreen({
                 </AppText>
               </View>
               <View style={styles.actions}>
-                <Button role="primary" label="Restore" onPress={() => restore(memory.id)} />
-                <Button role="secondary" label="Delete permanently" onPress={() => setPendingPurge(memory)} />
+                <Button
+                  role="primary"
+                  label="Restore"
+                  onPress={() => restore(memory.id)}
+                />
+                <Button
+                  role="secondary"
+                  label="Delete permanently"
+                  onPress={() => setPendingPurge(memory)}
+                />
               </View>
             </View>
           ))
@@ -120,11 +147,26 @@ export function RecentlyDeletedScreen({
 
 const styles = StyleSheet.create({
   actions: { gap: SPACING.sm },
-  back: { borderRadius: 8, borderWidth: StyleSheet.hairlineWidth, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm },
+  back: {
+    borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+  },
   content: { gap: SPACING.md, padding: SPACING.base },
   copy: { flex: 1, gap: SPACING.xs },
   empty: { gap: SPACING.sm, paddingTop: SPACING.xl },
-  header: { alignItems: "center", flexDirection: "row", gap: SPACING.md, padding: SPACING.base },
+  header: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: SPACING.md,
+    padding: SPACING.base,
+  },
   root: { flex: 1 },
-  row: { borderRadius: 12, borderWidth: StyleSheet.hairlineWidth, gap: SPACING.md, padding: SPACING.base },
+  row: {
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: SPACING.md,
+    padding: SPACING.base,
+  },
 });

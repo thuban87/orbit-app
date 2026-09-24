@@ -1,7 +1,11 @@
 import type { StatusDisplayState } from "@/components/contact-card-ring";
 import { statusDisplayLabel } from "@/components/icons/status-display-label";
 import type { DashboardSearchSourceKind } from "@/logic/dashboard-search-match";
-import { calendarDaysBetween, formatLocalDate, parseLocalMs } from "@/utils/dates";
+import {
+  calendarDaysBetween,
+  formatLocalDate,
+  parseLocalMs,
+} from "@/utils/dates";
 
 /** Compact, local-calendar recency copy for the dashboard List row. */
 export function formatListRecency(
@@ -13,7 +17,9 @@ export function formatListRecency(
   try {
     const contactMs = parseLocalMs(lastContact);
     const nowMs = parseLocalMs(now);
-    if (formatLocalDate(new Date(contactMs)) === formatLocalDate(new Date(nowMs))) {
+    if (
+      formatLocalDate(new Date(contactMs)) === formatLocalDate(new Date(nowMs))
+    ) {
       return "Today";
     }
 

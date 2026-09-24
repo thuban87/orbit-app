@@ -170,7 +170,12 @@ describe("computeContactGravity — orchestration + rarely-responds connected fi
 
   it("returns the lowest tier for a contact with no interactions", () => {
     const g = computeContactGravity(
-      { trackingEnabled: 1, intervalDays: 30, rarelyResponds: 0, interactions: [] },
+      {
+        trackingEnabled: 1,
+        intervalDays: 30,
+        rarelyResponds: 0,
+        interactions: [],
+      },
       NOW,
     );
     expect(g.raw).toBe(0);

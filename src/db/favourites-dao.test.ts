@@ -33,7 +33,20 @@ beforeEach(async () => {
   uidCounter = 0;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, [migration001, migration002, migration003, migration004, migration005, migration006, migration007], 7, { now: NOW, newUid: uid });
+  await runMigrations(
+    exec,
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+    ],
+    7,
+    { now: NOW, newUid: uid },
+  );
 });
 
 async function seedContact(name = "Alex"): Promise<number> {

@@ -225,11 +225,9 @@ describe("Profile presentation read model", () => {
 
 describe("Profile presentation mutation API", () => {
   it("creates, edits, and assigns templates atomically with one revision per public write", async () => {
-    const before = (
-      await exec.getFirstAsync<{ data_revision: number }>(
-        "SELECT data_revision FROM app_settings WHERE id=1",
-      )
-    )!.data_revision;
+    const before = (await exec.getFirstAsync<{ data_revision: number }>(
+      "SELECT data_revision FROM app_settings WHERE id=1",
+    ))!.data_revision;
     await createProfileLayoutTemplate(exec, {
       uid: "layout",
       name: "Close Friends",
@@ -237,11 +235,9 @@ describe("Profile presentation mutation API", () => {
       now: NOW,
     });
     expect(
-      (
-        await exec.getFirstAsync<{ data_revision: number }>(
-          "SELECT data_revision FROM app_settings WHERE id=1",
-        )
-      )!.data_revision,
+      (await exec.getFirstAsync<{ data_revision: number }>(
+        "SELECT data_revision FROM app_settings WHERE id=1",
+      ))!.data_revision,
     ).toBe(before + 1);
     await expect(
       createProfileLayoutTemplate(exec, {
@@ -274,7 +270,9 @@ describe("Profile presentation mutation API", () => {
       factoryLayout: FACTORY_PROFILE_LAYOUT,
       themeBackground: "theme:galaxy",
     });
-    expect(resolveProfilePresentation(input).layout.document.topLevel[0]?.visible).toBe(false);
+    expect(
+      resolveProfilePresentation(input).layout.document.topLevel[0]?.visible,
+    ).toBe(false);
   });
 
   it("clears collapse on an explicit layout switch and reset deletes only contact presentation", async () => {
@@ -453,7 +451,10 @@ describe("Profile presentation mutation API", () => {
       themeBackground: "theme:galaxy",
     });
     expect(resolveProfilePresentation(input)).toMatchObject({
-      background: { source: "category", templateUid: "clear-category-background" },
+      background: {
+        source: "category",
+        templateUid: "clear-category-background",
+      },
       layout: { source: "contact-freeform" },
       collapse: { "relationship-overview": false },
     });
@@ -572,10 +573,12 @@ describe("Profile presentation mutation API", () => {
       templateUid: "background-a",
       now: NOW,
     });
-    expect(await deleteProfileBackgroundTemplate(exec, "background-a", NOW)).toBeNull();
-    expect(await deleteProfileBackgroundTemplate(exec, "background-b", NOW)).toBe(
-      "profile-backgrounds/shared.webp",
-    );
+    expect(
+      await deleteProfileBackgroundTemplate(exec, "background-a", NOW),
+    ).toBeNull();
+    expect(
+      await deleteProfileBackgroundTemplate(exec, "background-b", NOW),
+    ).toBe("profile-backgrounds/shared.webp");
     expect(
       await exec.getFirstAsync<{ freeform_layout_json: string | null }>(
         "SELECT freeform_layout_json FROM profile_contact_presentation WHERE contact_id=?",
@@ -591,7 +594,10 @@ describe("Profile presentation mutation API", () => {
         ["category", "Friends", 0, NOW, NOW],
       )
     ).lastInsertRowId;
-    await exec.runAsync("UPDATE contacts SET category_id=? WHERE id=?", [categoryId, contactId]);
+    await exec.runAsync("UPDATE contacts SET category_id=? WHERE id=?", [
+      categoryId,
+      contactId,
+    ]);
     await assignCategoryProfilePresentation(exec, {
       categoryId,
       layoutTemplateUid: null,
@@ -599,7 +605,10 @@ describe("Profile presentation mutation API", () => {
       now: NOW,
     });
     await exec.execAsync("BEGIN");
-    await exec.runAsync("UPDATE contacts SET category_id=NULL WHERE category_id=?", [categoryId]);
+    await exec.runAsync(
+      "UPDATE contacts SET category_id=NULL WHERE category_id=?",
+      [categoryId],
+    );
     await exec.runAsync("DELETE FROM categories WHERE id=?", [categoryId]);
     await exec.execAsync("COMMIT");
     expect(

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { filterByGravity } from "@/logic/dashboard-gravity-filter";
 import type { ImpactInputs } from "@/db/impact-read";
+import { filterByGravity } from "@/logic/dashboard-gravity-filter";
 
 const NOW = "2026-09-04 10:00:00";
 
@@ -34,9 +34,9 @@ describe("filterByGravity", () => {
     const loadInputs = vi.fn();
     const candidateIds = [9, 2, 5];
 
-    await expect(filterByGravity(candidateIds, [], loadInputs, NOW)).resolves.toEqual(
-      candidateIds,
-    );
+    await expect(
+      filterByGravity(candidateIds, [], loadInputs, NOW),
+    ).resolves.toEqual(candidateIds);
     expect(loadInputs).not.toHaveBeenCalled();
   });
 

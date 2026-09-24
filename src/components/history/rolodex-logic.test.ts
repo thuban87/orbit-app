@@ -50,12 +50,16 @@ describe("rolodex-logic date roll", () => {
   });
 
   it("rolls Month and carries the Year at the Dec/Jan seam", () => {
-    expect(rollDate(parseWheelDate("2021-12-15"), "month", 1, NEUTRAL_TODAY)).toEqual({
+    expect(
+      rollDate(parseWheelDate("2021-12-15"), "month", 1, NEUTRAL_TODAY),
+    ).toEqual({
       year: 2022,
       month: 1,
       day: 15,
     });
-    expect(rollDate(parseWheelDate("2021-01-15"), "month", -1, NEUTRAL_TODAY)).toEqual({
+    expect(
+      rollDate(parseWheelDate("2021-01-15"), "month", -1, NEUTRAL_TODAY),
+    ).toEqual({
       year: 2020,
       month: 12,
       day: 15,
@@ -64,12 +68,16 @@ describe("rolodex-logic date roll", () => {
 
   it("clamps the day conventionally when a Month roll lands on a shorter month", () => {
     // Aug 31 -> Feb clamps to 29 in a leap year, 28 otherwise.
-    expect(rollDate(parseWheelDate("2020-08-31"), "month", -6, NEUTRAL_TODAY)).toEqual({
+    expect(
+      rollDate(parseWheelDate("2020-08-31"), "month", -6, NEUTRAL_TODAY),
+    ).toEqual({
       year: 2020,
       month: 2,
       day: 29,
     });
-    expect(rollDate(parseWheelDate("2021-08-31"), "month", -6, NEUTRAL_TODAY)).toEqual({
+    expect(
+      rollDate(parseWheelDate("2021-08-31"), "month", -6, NEUTRAL_TODAY),
+    ).toEqual({
       year: 2021,
       month: 2,
       day: 28,
@@ -77,7 +85,9 @@ describe("rolodex-logic date roll", () => {
   });
 
   it("clamps Feb 29 down to Feb 28 when a Year roll lands on a non-leap year", () => {
-    expect(rollDate(parseWheelDate("2020-02-29"), "year", 1, NEUTRAL_TODAY)).toEqual({
+    expect(
+      rollDate(parseWheelDate("2020-02-29"), "year", 1, NEUTRAL_TODAY),
+    ).toEqual({
       year: 2021,
       month: 2,
       day: 28,
@@ -120,15 +130,21 @@ describe("rolodex-logic today-as-max clamp", () => {
   const today = { year: 2026, month: 9, day: 11 };
 
   it("clamps a forward Day roll that would pass today back to today", () => {
-    expect(rollDate({ year: 2026, month: 9, day: 10 }, "day", 5, today)).toEqual(today);
+    expect(
+      rollDate({ year: 2026, month: 9, day: 10 }, "day", 5, today),
+    ).toEqual(today);
   });
 
   it("clamps a forward Year roll into the future back to today", () => {
-    expect(rollDate({ year: 2026, month: 9, day: 11 }, "year", 10, today)).toEqual(today);
+    expect(
+      rollDate({ year: 2026, month: 9, day: 11 }, "year", 10, today),
+    ).toEqual(today);
   });
 
   it("does not clamp a roll that stays in the past", () => {
-    expect(rollDate({ year: 2026, month: 9, day: 11 }, "day", -3, today)).toEqual({
+    expect(
+      rollDate({ year: 2026, month: 9, day: 11 }, "day", -3, today),
+    ).toEqual({
       year: 2026,
       month: 9,
       day: 8,
@@ -150,20 +166,32 @@ describe("rolodex-logic min-year floor clamp (BROWSE_YEARS_BACK)", () => {
   });
 
   it("floors a multi-step Year roll far below minYear back to minYear (onStep delta)", () => {
-    const rolled = rollDate({ year: minYear + 2, month: 3, day: 15 }, "year", -10, today);
+    const rolled = rollDate(
+      { year: minYear + 2, month: 3, day: 15 },
+      "year",
+      -10,
+      today,
+    );
     expect(rolled.year).toBe(minYear);
     expect(rolled.year - minYear).toBeGreaterThanOrEqual(0);
   });
 
   it("floors a day-axis roll that carries the year below minYear back to minYear", () => {
     // Jan 1 of the floor year, one day back would land in Dec of minYear-1.
-    const rolled = rollDate({ year: minYear, month: 1, day: 1 }, "day", -1, today);
+    const rolled = rollDate(
+      { year: minYear, month: 1, day: 1 },
+      "day",
+      -1,
+      today,
+    );
     expect(rolled.year).toBe(minYear);
     expect(rolled.year - minYear).toBeGreaterThanOrEqual(0);
   });
 
   it("leaves a year at or above minYear untouched", () => {
-    expect(rollDate({ year: minYear + 5, month: 6, day: 1 }, "year", -1, today)).toEqual({
+    expect(
+      rollDate({ year: minYear + 5, month: 6, day: 1 }, "year", -1, today),
+    ).toEqual({
       year: minYear + 4,
       month: 6,
       day: 1,
@@ -172,7 +200,9 @@ describe("rolodex-logic min-year floor clamp (BROWSE_YEARS_BACK)", () => {
 
   it("clamps a Feb 29 floor-crossing to a valid day of minYear (leap-aware)", () => {
     // minYear (1996) IS a leap year, so Feb 29 survives; the clamp preserves it.
-    expect(clampToMinYear({ year: minYear - 3, month: 2, day: 29 }, today)).toEqual({
+    expect(
+      clampToMinYear({ year: minYear - 3, month: 2, day: 29 }, today),
+    ).toEqual({
       year: minYear,
       month: 2,
       day: 29,
@@ -182,7 +212,9 @@ describe("rolodex-logic min-year floor clamp (BROWSE_YEARS_BACK)", () => {
 
 describe("rolodex-logic formatWheelDate", () => {
   it("formats a zero-padded local YYYY-MM-DD (no UTC slicing)", () => {
-    expect(formatWheelDate({ year: 2026, month: 1, day: 5 })).toBe("2026-01-05");
+    expect(formatWheelDate({ year: 2026, month: 1, day: 5 })).toBe(
+      "2026-01-05",
+    );
   });
 });
 
@@ -235,12 +267,14 @@ describe("rolodex-logic markerFor classification", () => {
 
 describe("rolodex-logic formatDrawerSummary", () => {
   it("summarizes a populated date with interaction + event counts", () => {
-    const summary = formatDrawerSummary(markerFor("x", new Map()) && {
-      kind: "multiple",
-      interactionCount: 2,
-      lifecycleCount: 1,
-      a11yLabel: "2 interactions, 1 event",
-    });
+    const summary = formatDrawerSummary(
+      markerFor("x", new Map()) && {
+        kind: "multiple",
+        interactionCount: 2,
+        lifecycleCount: 1,
+        a11yLabel: "2 interactions, 1 event",
+      },
+    );
     expect(summary.hasRecords).toBe(true);
     expect(summary.text).toBe("2 interactions · 1 event");
   });

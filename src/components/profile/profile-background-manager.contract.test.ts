@@ -11,9 +11,7 @@ describe("ProfileBackgroundManager crop workspace contract", () => {
 
     expect(source).toContain('cropTouchSurface: { flex: 1, width: "100%" }');
     expect(source).toContain("cropSpace.width / source.width");
-    expect(source).toContain(
-      "(cropSpace.width - source.width * scale) / 2",
-    );
+    expect(source).toContain("(cropSpace.width - source.width * scale) / 2");
     expect(source).not.toContain("viewportWidth / source.width");
   });
 
@@ -40,7 +38,9 @@ describe("ProfileBackgroundManager crop workspace contract", () => {
     );
 
     expect(source).toContain("const opening = !wasVisibleRef.current");
-    expect(source).toContain("shouldResetBackgroundManagerViewOnOpen(managerState)");
+    expect(source).toContain(
+      "shouldResetBackgroundManagerViewOnOpen(managerState)",
+    );
     expect(source).toContain('setPage("list")');
     expect(source).toContain("setSelectedUid(null)");
   });

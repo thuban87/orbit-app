@@ -131,8 +131,12 @@ export function pinchResizeBackgroundCropSelection(
   const scale = Number.isFinite(pinchScale) && pinchScale > 0 ? pinchScale : 1;
   const width = normalized.width / scale;
   const height = width / safeAspect(aspect);
-  const focalX = Number.isFinite(focal.x) ? focal.x : normalized.originX + normalized.width / 2;
-  const focalY = Number.isFinite(focal.y) ? focal.y : normalized.originY + normalized.height / 2;
+  const focalX = Number.isFinite(focal.x)
+    ? focal.x
+    : normalized.originX + normalized.width / 2;
+  const focalY = Number.isFinite(focal.y)
+    ? focal.y
+    : normalized.originY + normalized.height / 2;
   const xRatio = (focalX - normalized.originX) / normalized.width;
   const yRatio = (focalY - normalized.originY) / normalized.height;
   return clampBackgroundCropSelection(

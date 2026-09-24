@@ -48,11 +48,15 @@ export interface KnowledgeSearchEntryMatch<T extends SearchableKnowledgeEntry> {
   readonly score: number;
 }
 
-export interface CoverageRankedCandidate<T extends SearchableKnowledgeCandidate> {
+export interface CoverageRankedCandidate<
+  T extends SearchableKnowledgeCandidate,
+> {
   readonly candidate: T;
   readonly coverage: number;
   readonly score: number;
-  readonly matches: ReadonlyArray<KnowledgeSearchEntryMatch<T["entries"][number]>>;
+  readonly matches: ReadonlyArray<
+    KnowledgeSearchEntryMatch<T["entries"][number]>
+  >;
 }
 
 /**
@@ -199,11 +203,13 @@ export function matchCandidateEntries<T extends SearchableKnowledgeEntry>(
       return bestScore === null ? [] : [{ term, score: bestScore, highlights }];
     });
     if (termMatches.length === 0) return [];
-    return [{
-      entry,
-      termMatches,
-      score: termMatches.reduce((total, match) => total + match.score, 0),
-    }];
+    return [
+      {
+        entry,
+        termMatches,
+        score: termMatches.reduce((total, match) => total + match.score, 0),
+      },
+    ];
   });
 }
 
@@ -212,10 +218,9 @@ export function matchCandidateEntries<T extends SearchableKnowledgeEntry>(
  * secondary, and partial matches intentionally remain in the result set.
  * Legacy `rankCandidates` retains its all-terms-required behavior unchanged.
  */
-export function rankCandidatesWithCoverage<T extends SearchableKnowledgeCandidate>(
-  query: string,
-  candidates: readonly T[],
-): CoverageRankedCandidate<T>[] {
+export function rankCandidatesWithCoverage<
+  T extends SearchableKnowledgeCandidate,
+>(query: string, candidates: readonly T[]): CoverageRankedCandidate<T>[] {
   return candidates
     .map((candidate, index) => {
       const matches = matchCandidateEntries(query, candidate.entries);

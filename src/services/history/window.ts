@@ -85,7 +85,11 @@ function realCell(date: string, today: string): WindowCell {
   return { date, isPlaceholder: false, isFuture: date > today };
 }
 
-const PLACEHOLDER: WindowCell = { date: null, isPlaceholder: true, isFuture: false };
+const PLACEHOLDER: WindowCell = {
+  date: null,
+  isPlaceholder: true,
+  isFuture: false,
+};
 
 function buildSevenDays(refDate: string, today: string): HistoryWindow {
   // Rolling last 7 local days ending at the reference date, clamped so no cell
@@ -110,7 +114,12 @@ function buildMonth(refDate: string, today: string): HistoryWindow {
     cells.push(PLACEHOLDER);
   }
   for (let day = 1; day <= dim; day++) {
-    cells.push(realCell(`${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`, today));
+    cells.push(
+      realCell(
+        `${y}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+        today,
+      ),
+    );
   }
   // Trailing placeholders complete the final week.
   while (cells.length % 7 !== 0) {
@@ -146,7 +155,11 @@ function buildYear(refDate: string, today: string): HistoryWindow {
  * 'year'  -> the reference year's dense daily grid (weeks-as-columns).
  * Real dates strictly after `today` are flagged `isFuture` (never counted).
  */
-export function buildWindow(lens: DateLens, refDate: string, today: string): HistoryWindow {
+export function buildWindow(
+  lens: DateLens,
+  refDate: string,
+  today: string,
+): HistoryWindow {
   switch (lens) {
     case "7days":
       return buildSevenDays(refDate, today);
@@ -158,7 +171,10 @@ export function buildWindow(lens: DateLens, refDate: string, today: string): His
 }
 
 /** Navigate to the previous window of the same lens (no clamp needed — always in the past). */
-export function prevWindow(window: HistoryWindow, today: string): HistoryWindow {
+export function prevWindow(
+  window: HistoryWindow,
+  today: string,
+): HistoryWindow {
   switch (window.lens) {
     case "7days":
       return buildWindow("7days", addLocalDays(window.end, -7), today);
@@ -166,15 +182,26 @@ export function prevWindow(window: HistoryWindow, today: string): HistoryWindow 
       // Any day in the previous month == the day before the 1st of this month.
       return buildWindow("month", addLocalDays(window.start, -1), today);
     case "year":
-      return buildWindow("year", `${parseYMD(window.start).y - 1}-01-01`, today);
+      return buildWindow(
+        "year",
+        `${parseYMD(window.start).y - 1}-01-01`,
+        today,
+      );
   }
 }
 
 /** Navigate to the next window, clamped so it can never advance wholly past today. */
-export function nextWindow(window: HistoryWindow, today: string): HistoryWindow {
+export function nextWindow(
+  window: HistoryWindow,
+  today: string,
+): HistoryWindow {
   switch (window.lens) {
     case "7days":
-      return buildWindow("7days", minDate(addLocalDays(window.end, 7), today), today);
+      return buildWindow(
+        "7days",
+        minDate(addLocalDays(window.end, 7), today),
+        today,
+      );
     case "month": {
       // First day of the next month; clamped to today so a wholly-future month
       // collapses back to today's month.

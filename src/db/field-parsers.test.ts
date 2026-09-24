@@ -69,7 +69,10 @@ describe("parsers.url / email / phone — permissive raw-TEXT validation", () =>
     expectOk(parsers.url("https://example.com"), "https://example.com");
     expectOk(parsers.url("example.com"), "example.com");
     expectOk(parsers.url(localDev), localDev);
-    expectOk(parsers.url("mailto:person@example.com"), "mailto:person@example.com");
+    expectOk(
+      parsers.url("mailto:person@example.com"),
+      "mailto:person@example.com",
+    );
     expect(parsers.url("not a url with spaces only")).toEqual({ ok: false });
   });
 

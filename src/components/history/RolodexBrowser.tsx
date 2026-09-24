@@ -21,11 +21,14 @@
  * events}"), distinct from the interaction-only heatmap card (D-10). Every colour
  * resolves through theme tokens; there is no Skia and no colour literal.
  */
+
+import { useIsFocused } from "@react-navigation/native";
 import { useEffect, useMemo, useState } from "react";
 import { AppState, StyleSheet, View } from "react-native";
-import { useIsFocused } from "@react-navigation/native";
-import { useReducedMotionShared } from "@/theme/use-reduced-motion";
-import type { HistoryDateMarker } from "@/db/history-read";
+import {
+  RolodexWheel,
+  type WheelItem,
+} from "@/components/history/RolodexWheel";
 import {
   daysInMonth,
   formatDrawerSummary,
@@ -36,11 +39,12 @@ import {
   rollDate,
   type WheelDate,
 } from "@/components/history/rolodex-logic";
-import { RolodexWheel, type WheelItem } from "@/components/history/RolodexWheel";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
-import { SPACING } from "@/theme/tokens/spacing";
+import type { HistoryDateMarker } from "@/db/history-read";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
+import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 
 const MONTHS = [
   "Jan",
@@ -94,7 +98,9 @@ export function RolodexBrowser({
 
   // --- Pause-on-blur lifecycle (this component owns it) ----------------------
   const isFocused = useIsFocused();
-  const [appActive, setAppActive] = useState(AppState.currentState === "active");
+  const [appActive, setAppActive] = useState(
+    AppState.currentState === "active",
+  );
   const [measured, setMeasured] = useState(false);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -117,8 +123,16 @@ export function RolodexBrowser({
     const count = daysInMonth(selected.year, selected.month);
     const items: WheelItem[] = [];
     for (let d = 1; d <= count; d++) {
-      const date = formatWheelDate({ year: selected.year, month: selected.month, day: d });
-      items.push({ key: `d${d}`, label: String(d), marker: markerFor(date, markers) });
+      const date = formatWheelDate({
+        year: selected.year,
+        month: selected.month,
+        day: d,
+      });
+      items.push({
+        key: `d${d}`,
+        label: String(d),
+        marker: markerFor(date, markers),
+      });
     }
     return items;
   }, [selected.year, selected.month, markers]);
@@ -194,7 +208,10 @@ export function RolodexBrowser({
 
       {/* Drawer — summarizes the selected date; explicit actions only. */}
       <View
-        style={[styles.drawer, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        style={[
+          styles.drawer,
+          { backgroundColor: colors.surface, borderColor: colors.border },
+        ]}
         testID={`${testID}-drawer`}
       >
         <AppText role="heading" style={{ color: colors.textPrimary }}>

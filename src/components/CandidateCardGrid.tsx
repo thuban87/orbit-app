@@ -144,9 +144,7 @@ export function CandidateCardGrid({
   if (scoring) {
     return (
       <View style={styles.progress}>
-        <Text style={{ color: colors.textSecondary }}>
-          {scoringLabel}
-        </Text>
+        <Text style={{ color: colors.textSecondary }}>{scoringLabel}</Text>
       </View>
     );
   }
@@ -207,9 +205,14 @@ export function CandidateCardGrid({
               {item.chipLabel ? (
                 <View
                   accessibilityLabel={item.chipLabel}
-                  style={[styles.chip, { backgroundColor: colors.surfaceElevated }]}
+                  style={[
+                    styles.chip,
+                    { backgroundColor: colors.surfaceElevated },
+                  ]}
                 >
-                  <Text style={[styles.chipLabel, { color: colors.textSecondary }]}>
+                  <Text
+                    style={[styles.chipLabel, { color: colors.textSecondary }]}
+                  >
                     {item.chipLabel}
                   </Text>
                 </View>
@@ -280,16 +283,16 @@ export function CandidateCardGrid({
                 isBulkActionAvailable(action, selectedItems, isActionEligible),
               )
               .map((action) => (
-              <Pressable
-                key={action}
-                accessibilityRole="button"
-                onPress={() => void runBulkAction(action)}
-                style={[styles.option, { borderColor: colors.border }]}
-              >
-                <Text style={{ color: colors.textPrimary }}>
-                  {actionLabels[action]}
-                </Text>
-              </Pressable>
+                <Pressable
+                  key={action}
+                  accessibilityRole="button"
+                  onPress={() => void runBulkAction(action)}
+                  style={[styles.option, { borderColor: colors.border }]}
+                >
+                  <Text style={{ color: colors.textPrimary }}>
+                    {actionLabels[action]}
+                  </Text>
+                </Pressable>
               ))}
           </View>
         </View>

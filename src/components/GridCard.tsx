@@ -8,9 +8,9 @@ import {
   ringVisual,
   type StatusDisplayState,
 } from "@/components/contact-card-ring";
-import { StatusGlyph } from "@/components/icons/StatusGlyph";
 import { Icon } from "@/components/icons/Icon";
 import type { IconName } from "@/components/icons/icon-registry";
+import { StatusGlyph } from "@/components/icons/StatusGlyph";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import type { ProfileStatus } from "@/db/contact-status-read";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
@@ -22,9 +22,9 @@ import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { isSnoozed } from "@/utils/dates";
 import {
   buildRowAccessibilityDescription,
+  formatListRecency,
   formatMatchCategories,
   formatMatchExplanation,
-  formatListRecency,
 } from "./list-row-content";
 
 function HighlightedSnippet({
@@ -207,7 +207,11 @@ export function GridCard({
       onLongPress={selectionMode ? undefined : onLongPress}
       style={styles.card}
     >
-      <GlassSurface blurAvailable={false} density="dense" style={styles.surface}>
+      <GlassSurface
+        blurAvailable={false}
+        density="dense"
+        style={styles.surface}
+      >
         {selectionMode ? (
           <Pressable
             testID={`dashboard-grid-card-select-${contactId}`}
@@ -245,7 +249,9 @@ export function GridCard({
           <Pressable
             testID={`dashboard-grid-card-favourite-${contactId}`}
             accessibilityRole="button"
-            accessibilityLabel={isFavourite ? "Remove favourite" : "Add favourite"}
+            accessibilityLabel={
+              isFavourite ? "Remove favourite" : "Add favourite"
+            }
             accessibilityState={{ selected: isFavourite }}
             hitSlop={SPACING.sm}
             onPress={onToggleFavourite}

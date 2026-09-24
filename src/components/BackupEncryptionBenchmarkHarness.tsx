@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { measureBackupEncryptionCandidates, type BackupEncryptionBenchmarkResult } from "@/services/backup/encryption-benchmark";
+import {
+  type BackupEncryptionBenchmarkResult,
+  measureBackupEncryptionCandidates,
+} from "@/services/backup/encryption-benchmark";
 import { useTheme } from "@/theme";
 
 /**
@@ -9,7 +12,9 @@ import { useTheme } from "@/theme";
  */
 export function BackupEncryptionBenchmarkHarness() {
   const { colors } = useTheme();
-  const [results, setResults] = useState<readonly BackupEncryptionBenchmarkResult[] | null>(null);
+  const [results, setResults] = useState<
+    readonly BackupEncryptionBenchmarkResult[] | null
+  >(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -22,15 +27,31 @@ export function BackupEncryptionBenchmarkHarness() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      <Text style={[styles.title, { color: colors.textPrimary }]}>Backup encryption benchmark</Text>
-      <Text style={[styles.detail, { color: colors.textSecondary }]}>RNQC PBKDF2-HMAC-SHA256 · five measured samples after one warmup</Text>
-      {failed ? <Text style={[styles.result, { color: colors.danger }]}>Benchmark failed</Text> : null}
+      <Text style={[styles.title, { color: colors.textPrimary }]}>
+        Backup encryption benchmark
+      </Text>
+      <Text style={[styles.detail, { color: colors.textSecondary }]}>
+        RNQC PBKDF2-HMAC-SHA256 · five measured samples after one warmup
+      </Text>
+      {failed ? (
+        <Text style={[styles.result, { color: colors.danger }]}>
+          Benchmark failed
+        </Text>
+      ) : null}
       {results?.map((result) => (
-        <Text key={result.iterations} style={[styles.result, { color: colors.textPrimary }]}>
-          {result.iterations} iterations: {result.samplesMs.join(", ")} ms · median {result.medianMs} ms
+        <Text
+          key={result.iterations}
+          style={[styles.result, { color: colors.textPrimary }]}
+        >
+          {result.iterations} iterations: {result.samplesMs.join(", ")} ms ·
+          median {result.medianMs} ms
         </Text>
       ))}
-      {!results && !failed ? <Text style={[styles.detail, { color: colors.textSecondary }]}>Measuring…</Text> : null}
+      {!results && !failed ? (
+        <Text style={[styles.detail, { color: colors.textSecondary }]}>
+          Measuring…
+        </Text>
+      ) : null}
     </View>
   );
 }

@@ -20,33 +20,99 @@ export interface ResumeReconcilePromptProps {
 }
 
 /** App-root, explicit-action-only recovery sheet for a durable check. */
-export function ResumeReconcilePrompt({ resumable, onDismiss, onDiscarded }: ResumeReconcilePromptProps) {
+export function ResumeReconcilePrompt({
+  resumable,
+  onDismiss,
+  onDiscarded,
+}: ResumeReconcilePromptProps) {
   const { colors } = useTheme();
   const navigation = useNavigation<RootNavigation>();
   if (!resumable) return null;
   const discard = async () => {
     try {
-      const stagedPaths = await discardSession(getExecutor(), resumable.sessionId, localDateTime());
-      cleanupDiscardedReconcileStagedPhotos({ deleteReconcileStaging }, stagedPaths);
+      const stagedPaths = await discardSession(
+        getExecutor(),
+        resumable.sessionId,
+        localDateTime(),
+      );
+      cleanupDiscardedReconcileStagedPhotos(
+        { deleteReconcileStaging },
+        stagedPaths,
+      );
       onDismiss();
       onDiscarded?.();
     } catch (error) {
       Logger.error("resume-reconcile-prompt", "could not discard check", error);
     }
   };
-  return <Modal visible transparent animationType="fade" onRequestClose={() => undefined}>
-    <View style={styles.modalRoot}>
-      <View style={[StyleSheet.absoluteFill, styles.scrim, { backgroundColor: colors.background }]} />
-      <View style={[styles.sheet, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }]}>
-        <Text style={[styles.heading, { color: colors.textPrimary }]}>Resume your check?</Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          {resumable.discardOnly ? "This saved check can’t be resumed. You can discard its unresolved contacts. Changes you already applied stay applied." : "Unresolved contacts are saved. Changes you already applied stay applied."}
-        </Text>
-        {!resumable.discardOnly ? <Pressable accessibilityRole="button" accessibilityLabel="Resume check" onPress={() => { navigation.navigate("SettingsTab", { screen: "ReconcileGrid", params: { sessionId: resumable.sessionId } }); onDismiss(); }} style={[styles.button, { backgroundColor: colors.accent }]}><Text style={[styles.buttonLabel, { color: colors.background }]}>Resume</Text></Pressable> : null}
-        <Pressable accessibilityRole="button" accessibilityLabel="Discard check" onPress={() => void discard()} style={[styles.button, styles.discardButton, { borderColor: colors.danger }]}><Text style={[styles.buttonLabel, { color: colors.danger }]}>Discard</Text></Pressable>
+  return (
+    <Modal
+      visible
+      transparent
+      animationType="fade"
+      onRequestClose={() => undefined}
+    >
+      <View style={styles.modalRoot}>
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            styles.scrim,
+            { backgroundColor: colors.background },
+          ]}
+        />
+        <View
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: colors.surfaceElevated,
+              borderColor: colors.border,
+            },
+          ]}
+        >
+          <Text style={[styles.heading, { color: colors.textPrimary }]}>
+            Resume your check?
+          </Text>
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            {resumable.discardOnly
+              ? "This saved check can’t be resumed. You can discard its unresolved contacts. Changes you already applied stay applied."
+              : "Unresolved contacts are saved. Changes you already applied stay applied."}
+          </Text>
+          {!resumable.discardOnly ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Resume check"
+              onPress={() => {
+                navigation.navigate("SettingsTab", {
+                  screen: "ReconcileGrid",
+                  params: { sessionId: resumable.sessionId },
+                });
+                onDismiss();
+              }}
+              style={[styles.button, { backgroundColor: colors.accent }]}
+            >
+              <Text style={[styles.buttonLabel, { color: colors.background }]}>
+                Resume
+              </Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Discard check"
+            onPress={() => void discard()}
+            style={[
+              styles.button,
+              styles.discardButton,
+              { borderColor: colors.danger },
+            ]}
+          >
+            <Text style={[styles.buttonLabel, { color: colors.danger }]}>
+              Discard
+            </Text>
+          </Pressable>
+        </View>
       </View>
-    </View>
-  </Modal>;
+    </Modal>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -55,7 +121,13 @@ const styles = StyleSheet.create({
   sheet: { gap: 14, padding: 20, borderWidth: 1, borderRadius: 12 },
   heading: { fontSize: 18, fontWeight: "700" },
   body: { fontSize: 15, lineHeight: 22 },
-  button: { minHeight: 44, borderRadius: 10, alignItems: "center", justifyContent: "center", paddingHorizontal: 16 },
+  button: {
+    minHeight: 44,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
   discardButton: { borderWidth: 1 },
   buttonLabel: { fontSize: 16, fontWeight: "700" },
 });

@@ -25,20 +25,34 @@ describe("selectLine3", () => {
       [
         candidate({ id: 1, value: "Ordinary context" }),
         candidate({ id: 2, value: "Pinned context", pinned: true }),
-        candidate({ id: 3, value: "Upcoming trip", meaningfulDate: "2026-09-09" }),
+        candidate({
+          id: 3,
+          value: "Upcoming trip",
+          meaningfulDate: "2026-09-09",
+        }),
       ],
       7,
       "Alex",
       NOW,
     );
 
-    expect(selected).toMatchObject({ kind: "candidate", text: "Upcoming trip", type: "general" });
+    expect(selected).toMatchObject({
+      kind: "candidate",
+      text: "Upcoming trip",
+      type: "general",
+    });
   });
 
   it("never selects birthday knowledge, including when it would otherwise be imminent", () => {
     const selected = selectLine3(
       [
-        candidate({ id: 1, type: "birthday", value: "Birthday", meaningfulDate: "2026-09-07", pinned: true }),
+        candidate({
+          id: 1,
+          type: "birthday",
+          value: "Birthday",
+          meaningfulDate: "2026-09-07",
+          pinned: true,
+        }),
         candidate({ id: 2, value: "Ordinary context" }),
       ],
       7,
@@ -46,16 +60,31 @@ describe("selectLine3", () => {
       NOW,
     );
 
-    expect(selected).toMatchObject({ kind: "candidate", text: "Ordinary context" });
+    expect(selected).toMatchObject({
+      kind: "candidate",
+      text: "Ordinary context",
+    });
   });
 
   it("breaks equal-tier ties by stable identity rather than input ordering", () => {
-    const older = candidate({ id: 3, value: "Older id", createdAt: "2026-09-01 12:00:00" });
-    const newer = candidate({ id: 8, value: "Newer id", createdAt: "2026-09-01 12:00:00" });
+    const older = candidate({
+      id: 3,
+      value: "Older id",
+      createdAt: "2026-09-01 12:00:00",
+    });
+    const newer = candidate({
+      id: 8,
+      value: "Newer id",
+      createdAt: "2026-09-01 12:00:00",
+    });
     const reversed = [newer, older];
 
-    expect(selectLine3([older, newer], 7, "Alex", NOW)).toMatchObject({ text: "Newer id" });
-    expect(selectLine3(reversed, 7, "Alex", NOW)).toMatchObject({ text: "Newer id" });
+    expect(selectLine3([older, newer], 7, "Alex", NOW)).toMatchObject({
+      text: "Newer id",
+    });
+    expect(selectLine3(reversed, 7, "Alex", NOW)).toMatchObject({
+      text: "Newer id",
+    });
   });
 
   it("uses a stable per-contact completeness prompt when no useful context exists", () => {

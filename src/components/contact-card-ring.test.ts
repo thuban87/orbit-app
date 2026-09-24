@@ -7,10 +7,7 @@
  * `StatusGlyph.tsx` (the presentational render) is device-UAT, not node-tested.
  */
 import { describe, expect, it } from "vitest";
-import {
-  statusGlyph,
-  type StatusDisplayState,
-} from "./contact-card-ring";
+import { type StatusDisplayState, statusGlyph } from "./contact-card-ring";
 
 /** The full six-state display domain (ProfileStatus + snoozed + null). */
 const ALL_STATES: readonly StatusDisplayState[] = [

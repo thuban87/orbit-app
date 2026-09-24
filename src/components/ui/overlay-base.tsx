@@ -97,13 +97,24 @@ export function BaseOverlay({
           and official Modal guidance requires its own full-height root. */}
       <GestureHandlerRootView style={styles.root}>
         <View style={[styles.root, { justifyContent: justify }]}>
-        {dismissable ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={scrimAccessibilityLabel ?? "Dismiss"}
-            style={StyleSheet.absoluteFill}
-            onPress={onRequestClose}
-          >
+          {dismissable ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={scrimAccessibilityLabel ?? "Dismiss"}
+              style={StyleSheet.absoluteFill}
+              onPress={onRequestClose}
+            >
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  styles.scrim,
+                  { backgroundColor: colors.background },
+                ]}
+              />
+            </Pressable>
+          ) : (
+            // Inert scrim (no onPress): a scrim-tap cannot dismiss a destructive
+            // confirmation.
             <View
               style={[
                 StyleSheet.absoluteFill,
@@ -111,21 +122,10 @@ export function BaseOverlay({
                 { backgroundColor: colors.background },
               ]}
             />
-          </Pressable>
-        ) : (
-          // Inert scrim (no onPress): a scrim-tap cannot dismiss a destructive
-          // confirmation.
-          <View
-            style={[
-              StyleSheet.absoluteFill,
-              styles.scrim,
-              { backgroundColor: colors.background },
-            ]}
-          />
-        )}
-        <View ref={contentRef} collapsable={false} style={contentStyle}>
-          {children}
-        </View>
+          )}
+          <View ref={contentRef} collapsable={false} style={contentStyle}>
+            {children}
+          </View>
         </View>
       </GestureHandlerRootView>
     </RNModal>

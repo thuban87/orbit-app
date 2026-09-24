@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  runQuickLog,
   type QuickLogSnackbar,
   type RunQuickLogDeps,
+  runQuickLog,
 } from "./quick-log-command";
 
 function deferred<T>() {
@@ -84,7 +84,10 @@ describe("runQuickLog", () => {
     runQuickLog(deps, 7);
     await vi.waitFor(() => expect(snackbars).toHaveLength(1));
 
-    expect(snackbars[0]).toMatchObject({ kind: "error", label: "Couldn't log" });
+    expect(snackbars[0]).toMatchObject({
+      kind: "error",
+      label: "Couldn't log",
+    });
     expect(snackbars[0].secondaryAction).toBeUndefined();
     expect(deps.openPostLogEditor).not.toHaveBeenCalled();
   });
@@ -93,7 +96,10 @@ describe("runQuickLog", () => {
     // pref 'remember' → the remembered value; a concrete pref → that channel.
     const remembered = createDeps({
       readChannelPreference: vi.fn(() =>
-        Promise.resolve({ pref: "remember" as const, remembered: "Call" as const }),
+        Promise.resolve({
+          pref: "remember" as const,
+          remembered: "Call" as const,
+        }),
       ),
     });
     runQuickLog(remembered.deps, 7);
@@ -124,11 +130,16 @@ describe("runQuickLog", () => {
     // resolved channel is used without any write-back surface on the deps.
     const { deps } = createDeps({
       readChannelPreference: vi.fn(() =>
-        Promise.resolve({ pref: "remember" as const, remembered: "In Person" as const }),
+        Promise.resolve({
+          pref: "remember" as const,
+          remembered: "In Person" as const,
+        }),
       ),
     });
     runQuickLog(deps, 7);
-    await vi.waitFor(() => expect(deps.recordTouchpoint).toHaveBeenCalledOnce());
+    await vi.waitFor(() =>
+      expect(deps.recordTouchpoint).toHaveBeenCalledOnce(),
+    );
     expect(deps.recordTouchpoint).toHaveBeenCalledWith(
       expect.objectContaining({ channel: "In Person" }),
     );
@@ -137,14 +148,18 @@ describe("runQuickLog", () => {
 
   it("ignores a second request while the consumer's write is pending", async () => {
     const write = deferred<{ interactionId: number }>();
-    const { deps } = createDeps({ recordTouchpoint: vi.fn(() => write.promise) });
+    const { deps } = createDeps({
+      recordTouchpoint: vi.fn(() => write.promise),
+    });
 
     runQuickLog(deps, 7);
     runQuickLog(deps, 7);
 
     // The second call is rejected synchronously by pendingRef before it can reach
     // the (async) write, so recordTouchpoint runs exactly once.
-    await vi.waitFor(() => expect(deps.recordTouchpoint).toHaveBeenCalledOnce());
+    await vi.waitFor(() =>
+      expect(deps.recordTouchpoint).toHaveBeenCalledOnce(),
+    );
     write.resolve({ interactionId: 12 });
   });
 
@@ -156,7 +171,10 @@ describe("runQuickLog", () => {
     runQuickLog(deps, 7);
     await vi.waitFor(() => expect(snackbars).toHaveLength(1));
 
-    expect(snackbars[0]).toMatchObject({ kind: "error", label: "Couldn't log" });
+    expect(snackbars[0]).toMatchObject({
+      kind: "error",
+      label: "Couldn't log",
+    });
     await vi.waitFor(() => expect(deps.pendingRef.current).toBe(false));
   });
 
@@ -173,7 +191,9 @@ describe("runQuickLog", () => {
         interactionId: 12,
       }),
     );
-    await vi.waitFor(() => expect(deps.notifyWidgetDataChanged).toHaveBeenCalledTimes(2));
+    await vi.waitFor(() =>
+      expect(deps.notifyWidgetDataChanged).toHaveBeenCalledTimes(2),
+    );
     expect(deps.bumpShellRefresh).toHaveBeenCalledTimes(2);
   });
 });

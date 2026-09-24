@@ -13,14 +13,21 @@ const target = profileBackgroundTarget({ width: 1080, height: 2400 });
 const aspect = target.preview.width / target.preview.height;
 
 function expectBounded(
-  selection: { originX: number; originY: number; width: number; height: number },
+  selection: {
+    originX: number;
+    originY: number;
+    width: number;
+    height: number;
+  },
   source: { width: number; height: number },
 ) {
   expect(selection.width / selection.height).toBeCloseTo(aspect, 8);
   expect(selection.originX).toBeGreaterThanOrEqual(0);
   expect(selection.originY).toBeGreaterThanOrEqual(0);
   expect(selection.originX + selection.width).toBeLessThanOrEqual(source.width);
-  expect(selection.originY + selection.height).toBeLessThanOrEqual(source.height);
+  expect(selection.originY + selection.height).toBeLessThanOrEqual(
+    source.height,
+  );
 }
 
 describe("Profile background source-selection geometry", () => {

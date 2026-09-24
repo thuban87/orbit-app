@@ -1,7 +1,7 @@
 /** Read-only projections for retained current-state values (KNOW-03). */
 import {
-  isCurrentStateFieldKey,
   type CurrentStateFieldKey,
+  isCurrentStateFieldKey,
 } from "@/db/memory-registry";
 import type { SqlExecutor } from "@/db/types";
 
@@ -48,7 +48,8 @@ export async function getCurrentStateValues(
       WHERE contact_id = ? AND is_current = 1`,
     [contactId],
   );
-  const values: Partial<Record<CurrentStateFieldKey, CurrentStateEntryRow>> = {};
+  const values: Partial<Record<CurrentStateFieldKey, CurrentStateEntryRow>> =
+    {};
   for (const row of rows) {
     if (isCurrentStateFieldKey(row.field_key)) {
       values[row.field_key] = row;

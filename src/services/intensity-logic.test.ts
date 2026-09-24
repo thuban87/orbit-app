@@ -207,7 +207,12 @@ describe("computeContactIntensity — orchestration over impact inputs", () => {
 
   it("handles a contact with no interactions (currentCount 0, cadence null)", () => {
     const r = computeContactIntensity(
-      { trackingEnabled: 1, intervalDays: 30, rarelyResponds: 0, interactions: [] },
+      {
+        trackingEnabled: 1,
+        intervalDays: 30,
+        rarelyResponds: 0,
+        interactions: [],
+      },
       NOW,
     );
     if ("available" in r) throw new Error("expected a Bound intensity result");

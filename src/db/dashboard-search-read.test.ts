@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { composeDashboardSearch } from "@/db/dashboard-search-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { addFuel } from "@/db/fuel-dao";
-import { composeDashboardSearch } from "@/db/dashboard-search-read";
 import { addMemory } from "@/db/memories-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -31,7 +31,10 @@ beforeEach(async () => {
   });
 });
 
-async function contact(name: string, favouriteRank: number | null = null): Promise<number> {
+async function contact(
+  name: string,
+  favouriteRank: number | null = null,
+): Promise<number> {
   const result = await exec.runAsync(
     `INSERT INTO contacts
        (uid, name, interval_days, last_contact, favourite_rank, created_at, modified_at)
@@ -68,7 +71,12 @@ describe("composeDashboardSearch", () => {
       now: NOW,
     });
 
-    const rows = await composeDashboardSearch(exec, active, "lambda sigma", NOW);
+    const rows = await composeDashboardSearch(
+      exec,
+      active,
+      "lambda sigma",
+      NOW,
+    );
 
     expect(rows.map((entry) => entry.row.id)).toEqual([
       moreRelevant,
@@ -76,7 +84,10 @@ describe("composeDashboardSearch", () => {
       fuelOnly,
     ]);
     expect(rows.slice(0, 2).every((entry) => entry.match !== null)).toBe(true);
-    expect(rows[2]).toMatchObject({ match: null, row: { snippet: "lambda sigma" } });
+    expect(rows[2]).toMatchObject({
+      match: null,
+      row: { snippet: "lambda sigma" },
+    });
   });
 
   it("surfaces memory-only matches but never lets them bypass the eligible universe", async () => {
@@ -98,7 +109,9 @@ describe("composeDashboardSearch", () => {
       match: {
         contactId: favourite,
         totalMatchCount: 1,
-        matches: [expect.objectContaining({ sourceKind: "memory-or-custom-field" })],
+        matches: [
+          expect.objectContaining({ sourceKind: "memory-or-custom-field" }),
+        ],
       },
     });
     expect(rows.map((entry) => entry.row.id)).not.toContain(excluded);
@@ -106,6 +119,8 @@ describe("composeDashboardSearch", () => {
 
   it("returns no results for a blank term", async () => {
     await contact("Anything");
-    await expect(composeDashboardSearch(exec, active, "  \n", NOW)).resolves.toEqual([]);
+    await expect(
+      composeDashboardSearch(exec, active, "  \n", NOW),
+    ).resolves.toEqual([]);
   });
 });

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  type AiDiagnosticInput,
   buildAiDiagnostic,
   classifyAiFailure,
   failureMessage,
-  type AiDiagnosticInput,
 } from "@/logic/ai-diagnostics";
 
 describe("AI diagnostics — strict safe-metadata allowlist", () => {
@@ -54,7 +54,11 @@ describe("AI diagnostics — strict safe-metadata allowlist", () => {
 describe("AI failures — eight human-readable categories", () => {
   const cases = [
     [{ code: "unauthorized" }, "openai", "connection"],
-    [{ status: 404, code: "model_not_found" }, "openrouter", "model-unavailable"],
+    [
+      { status: 404, code: "model_not_found" },
+      "openrouter",
+      "model-unavailable",
+    ],
     [{ status: 429 }, "anthropic", "rate-limit"],
     [{ status: 402 }, "openrouter", "billing"],
     [{ code: "context_length_exceeded" }, "google", "context"],
@@ -77,6 +81,8 @@ describe("AI failures — eight human-readable categories", () => {
       "openai",
     );
     expect(failure).toEqual({ category: "generic", status: "unknown" });
-    expect(JSON.stringify(failure)).not.toContain("PRIVATE RAW PROVIDER RESPONSE");
+    expect(JSON.stringify(failure)).not.toContain(
+      "PRIVATE RAW PROVIDER RESPONSE",
+    );
   });
 });

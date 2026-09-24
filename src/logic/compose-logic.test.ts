@@ -197,14 +197,14 @@ describe("resolveComposeControls — Text/Email mode (COMP-03, HIGH-2)", () => {
         expect(() =>
           resolveComposeControls(false, smsAvailable, mode, false),
         ).not.toThrow();
-        expect(resolveComposeControls(false, smsAvailable, mode, false)).toEqual(
-          {
-            send: "hidden",
-            copyEmphasis: "primary",
-            addNumber: true,
-            smsUnavailableHelper: false,
-          },
-        );
+        expect(
+          resolveComposeControls(false, smsAvailable, mode, false),
+        ).toEqual({
+          send: "hidden",
+          copyEmphasis: "primary",
+          addNumber: true,
+          smsUnavailableHelper: false,
+        });
       }
     }
   });
@@ -272,7 +272,9 @@ describe("resolveCopyTargets — body-only vs subject-only Copy targets (COMP-04
       "the subject",
     );
     // Text mode has no Subject affordance → the target is null (not offered).
-    expect(resolveCopyTargets("text", "the body", "the subject").subject).toBeNull();
+    expect(
+      resolveCopyTargets("text", "the body", "the subject").subject,
+    ).toBeNull();
   });
 });
 

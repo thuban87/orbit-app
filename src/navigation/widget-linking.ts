@@ -90,8 +90,7 @@ export type WidgetNavIntent =
         { name: "Home" },
         { name: "Compose"; params: { contactId: number } },
       ];
-    }
-  ;
+    };
 
 type WidgetUrlEvent = { url: string };
 

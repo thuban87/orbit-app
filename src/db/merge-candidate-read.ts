@@ -22,7 +22,10 @@ const MERGE_CANDIDATE_SELECT = `SELECT c.id, c.name, c.photo, c.created_at AS cr
   FROM contacts AS c`;
 
 /** Every live contact is eligible for a profile-initiated merge, Bound or Unbound. */
-export function listMergeCandidates(exec: SqlExecutor, excludeContactId: number): Promise<MergeCandidate[]> {
+export function listMergeCandidates(
+  exec: SqlExecutor,
+  excludeContactId: number,
+): Promise<MergeCandidate[]> {
   return exec.getAllAsync<MergeCandidate>(
     `${MERGE_CANDIDATE_SELECT}
       WHERE c.archived_at IS NULL AND c.id <> ?

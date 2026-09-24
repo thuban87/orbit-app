@@ -29,9 +29,10 @@
  *
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
-import { inWriteTransaction } from "@/db/transaction";
+
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 /**

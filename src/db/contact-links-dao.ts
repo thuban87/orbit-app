@@ -28,9 +28,10 @@
  *
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
-import { inWriteTransaction } from "@/db/transaction";
+
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 /** A stored link row, as returned by `listLinks`. */
@@ -138,7 +139,12 @@ async function updateLinkCore(
 /** DELETE the matching (id, contact_id) + assertOneChange. */
 async function removeLinkCore(
   exec: SqlExecutor,
-  params: { id: number; contactId: number; now: string; bumpRevision?: boolean },
+  params: {
+    id: number;
+    contactId: number;
+    now: string;
+    bumpRevision?: boolean;
+  },
 ): Promise<void> {
   const target = await exec.getFirstAsync<{ uid: string }>(
     "SELECT uid FROM contact_links WHERE id = ? AND contact_id = ?",
@@ -148,11 +154,15 @@ async function removeLinkCore(
     assertOneChange("removeLink", params.id, params.contactId, 0);
     return;
   }
-  await insertTombstoneCore(exec, {
-    entityType: "contact_link",
-    entityUid: target.uid,
-    deletedAt: params.now,
-  }, { bumpRevision: params.bumpRevision });
+  await insertTombstoneCore(
+    exec,
+    {
+      entityType: "contact_link",
+      entityUid: target.uid,
+      deletedAt: params.now,
+    },
+    { bumpRevision: params.bumpRevision },
+  );
   const result = await exec.runAsync(
     "DELETE FROM contact_links WHERE id = ? AND contact_id = ?",
     [params.id, params.contactId],
@@ -243,13 +253,15 @@ export function applyLinkDiff(
     // (a) INSERT id-less current rows (append order via MAX+1 in the core).
     for (const row of current) {
       if (row.id == null) {
-        addedIds.push(await addLinkCore(exec, {
-          uid: row.uid,
-          contactId,
-          url: row.url,
-          label: row.label,
-          now,
-        }));
+        addedIds.push(
+          await addLinkCore(exec, {
+            uid: row.uid,
+            contactId,
+            url: row.url,
+            label: row.label,
+            now,
+          }),
+        );
         changed = true;
       }
     }

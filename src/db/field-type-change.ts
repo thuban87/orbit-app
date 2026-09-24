@@ -45,8 +45,9 @@
  * Node-pure control flow: takes `exec: SqlExecutor` and imports the shared
  * `inWriteTransaction` — never expo `withTransactionAsync`.
  */
-import { isValueInOptions, parsers } from "@/db/field-parsers";
+
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { isValueInOptions, parsers } from "@/db/field-parsers";
 import type { CustomFieldDef } from "@/db/field-types";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -64,7 +65,10 @@ interface ValueRow {
  * can never influence SQL; no transaction is opened — this is the read the
  * pre-flights share.
  */
-function readValues(exec: SqlExecutor, fieldDefId: number): Promise<ValueRow[]> {
+function readValues(
+  exec: SqlExecutor,
+  fieldDefId: number,
+): Promise<ValueRow[]> {
   return exec.getAllAsync<ValueRow>(
     `SELECT contact_id, value
        FROM custom_field_values

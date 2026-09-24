@@ -59,17 +59,47 @@ export function orreryRingStyle(
   const { color, opacity, width } = ringVisual(status, colors);
   switch (status) {
     case "stable":
-      return { color, opacity, width, strokeStyle: "solid", bodyFill: colors.statusStable };
+      return {
+        color,
+        opacity,
+        width,
+        strokeStyle: "solid",
+        bodyFill: colors.statusStable,
+      };
     case "wobble":
-      return { color, opacity, width, strokeStyle: "dashed", bodyFill: colors.statusWobble };
+      return {
+        color,
+        opacity,
+        width,
+        strokeStyle: "dashed",
+        bodyFill: colors.statusWobble,
+      };
     case "decay":
-      return { color, opacity, width, strokeStyle: "faded", bodyFill: colors.statusDecay };
+      return {
+        color,
+        opacity,
+        width,
+        strokeStyle: "faded",
+        bodyFill: colors.statusDecay,
+      };
     case "rogue":
       // Ring stays warm rogue amber (from ringVisual); body is the cold fill.
-      return { color, opacity, width, strokeStyle: "faintTrace", bodyFill: colors.rogueExtinguished };
+      return {
+        color,
+        opacity,
+        width,
+        strokeStyle: "faintTrace",
+        bodyFill: colors.rogueExtinguished,
+      };
     default:
       // null / never-contacted → canonical neutral (colour = colors.border).
       // Never thrown; reused by sun-occupant-logic for a null-status sun (C2-2).
-      return { color, opacity, width, strokeStyle: "solid", bodyFill: colors.border };
+      return {
+        color,
+        opacity,
+        width,
+        strokeStyle: "solid",
+        bodyFill: colors.border,
+      };
   }
 }

@@ -22,8 +22,8 @@ import {
 import {
   type BrokenRule,
   resolveCustomSystemMembers,
-  type SystemGravityInputsLoader,
   type SystemDefinitionValidity,
+  type SystemGravityInputsLoader,
 } from "@/logic/system-rule-resolver";
 
 type FixedSystemRef = Exclude<OrrerySystemRef, { kind: "custom" }>;

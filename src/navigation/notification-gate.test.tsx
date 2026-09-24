@@ -30,9 +30,9 @@ describe("guardNotificationBodyIntent", () => {
   it("keeps Digest as a lookup-free promoted-tab intent", async () => {
     const lookup = vi.fn();
 
-    await expect(
-      guardNotificationBodyIntent(digest, lookup),
-    ).resolves.toEqual({ type: "select-digest" });
+    await expect(guardNotificationBodyIntent(digest, lookup)).resolves.toEqual({
+      type: "select-digest",
+    });
     expect(lookup).not.toHaveBeenCalled();
   });
   it("keeps a Bound decay tap on Compose", async () => {

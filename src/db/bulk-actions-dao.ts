@@ -22,8 +22,8 @@ import {
 import {
   clearSnoozeCore,
   resolveSnoozeUntil,
-  snoozeContactCore,
   type SnoozePreset,
+  snoozeContactCore,
 } from "@/db/snooze-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -36,7 +36,9 @@ export type QuickLogBatchReceipt = Array<{
 
 function rejectInvalidFrequency(intervalDays: number): void {
   if (!Number.isInteger(intervalDays) || intervalDays <= 0) {
-    throw new Error(`intervalDays must be a positive integer, got ${intervalDays}`);
+    throw new Error(
+      `intervalDays must be a positive integer, got ${intervalDays}`,
+    );
   }
 }
 
@@ -166,7 +168,8 @@ export function bulkSetCategory(
 ): Promise<void> {
   if (ids.length === 0) return Promise.resolve();
   return inWriteTransaction(exec, async () => {
-    for (const id of ids) await setContactCategoryCore(exec, id, categoryId, now);
+    for (const id of ids)
+      await setContactCategoryCore(exec, id, categoryId, now);
     await bumpDataRevisionCore(exec);
   });
 }

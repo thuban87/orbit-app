@@ -23,7 +23,9 @@
  *     FAIL this assertion.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   archiveContact,
@@ -40,9 +42,9 @@ import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { listFuelForEditor } from "@/db/fuel-read";
 import { listMemoriesForContact } from "@/db/memories-read";
-import { listRelationshipsForContact } from "@/db/relationships-read";
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
+import { listRelationshipsForContact } from "@/db/relationships-read";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { FACTORY_PROFILE_LAYOUT } from "@/profile/presentation-schema";
@@ -95,7 +97,9 @@ describe("updateContactFull — Profile inheritance boundary", () => {
       categoryId: null,
     });
     expect(
-      await exec.getFirstAsync("SELECT category_id FROM contacts WHERE id=?", [contactId]),
+      await exec.getFirstAsync("SELECT category_id FROM contacts WHERE id=?", [
+        contactId,
+      ]),
     ).toEqual({ category_id: null });
     expect(
       await exec.getFirstAsync(
@@ -112,54 +116,135 @@ describe("updateContactFull — Profile inheritance boundary", () => {
 describe("updateContactFull — lifecycle event and committed returns", () => {
   it("leaves shared metadata-core callers free of lifecycle events", async () => {
     const { contactId } = await createContactFull(exec, {
-      uid: uid(), name: "A", intervalDays: 30, trackingEnabled: false, now: NOW,
+      uid: uid(),
+      name: "A",
+      intervalDays: 30,
+      trackingEnabled: false,
+      now: NOW,
     });
-    await inWriteTransaction(exec, () => updateContactMetadataCore(exec, {
-      id: contactId, name: "A", intervalDays: 30, trackingEnabled: true,
-      rarelyResponds: 0, remindersOff: 0, now: NOW,
-    }));
-    expect(await exec.getAllAsync("SELECT id FROM events WHERE contact_id = ?", [contactId])).toEqual([]);
+    await inWriteTransaction(exec, () =>
+      updateContactMetadataCore(exec, {
+        id: contactId,
+        name: "A",
+        intervalDays: 30,
+        trackingEnabled: true,
+        rarelyResponds: 0,
+        remindersOff: 0,
+        now: NOW,
+      }),
+    );
+    expect(
+      await exec.getAllAsync("SELECT id FROM events WHERE contact_id = ?", [
+        contactId,
+      ]),
+    ).toEqual([]);
   });
 
   it("records one bind or unbind event only on a full-editor transition", async () => {
-    const { contactId } = await createContactFull(exec, { uid: uid(), name: "A", intervalDays: 30, trackingEnabled: false, now: NOW });
-    const base = { id: contactId, name: "A", intervalDays: 30, rarelyResponds: 0, remindersOff: 0, now: NOW };
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "A",
+      intervalDays: 30,
+      trackingEnabled: false,
+      now: NOW,
+    });
+    const base = {
+      id: contactId,
+      name: "A",
+      intervalDays: 30,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: NOW,
+    };
     await updateContactFull(exec, { ...base, trackingEnabled: true });
     await updateContactFull(exec, { ...base, trackingEnabled: true });
     await updateContactFull(exec, { ...base, trackingEnabled: false });
-    const events = await exec.getAllAsync<{ type: string; occurred_at: string }>(
-      "SELECT type, occurred_at FROM events WHERE contact_id = ? ORDER BY id", [contactId],
+    const events = await exec.getAllAsync<{
+      type: string;
+      occurred_at: string;
+    }>(
+      "SELECT type, occurred_at FROM events WHERE contact_id = ? ORDER BY id",
+      [contactId],
     );
-    expect(events).toEqual([{ type: "bind", occurred_at: NOW }, { type: "unbind", occurred_at: NOW }]);
+    expect(events).toEqual([
+      { type: "bind", occurred_at: NOW },
+      { type: "unbind", occurred_at: NOW },
+    ]);
   });
 
   it("rolls back a transition event with a later failing edit", async () => {
-    const { contactId } = await createContactFull(exec, { uid: uid(), name: "A", intervalDays: 30, trackingEnabled: false, now: NOW });
-    await expect(updateContactFull(exec, {
-      id: contactId, name: "A", intervalDays: 30, trackingEnabled: true,
-      rarelyResponds: 0, remindersOff: 0, now: NOW,
-      customValues: [{ fieldDefId: 999999, value: "fail" }],
-    })).rejects.toThrow();
-    expect(await exec.getFirstAsync("SELECT tracking_enabled FROM contacts WHERE id = ?", [contactId])).toEqual({ tracking_enabled: 0 });
-    expect(await exec.getAllAsync("SELECT id FROM events WHERE contact_id = ?", [contactId])).toEqual([]);
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "A",
+      intervalDays: 30,
+      trackingEnabled: false,
+      now: NOW,
+    });
+    await expect(
+      updateContactFull(exec, {
+        id: contactId,
+        name: "A",
+        intervalDays: 30,
+        trackingEnabled: true,
+        rarelyResponds: 0,
+        remindersOff: 0,
+        now: NOW,
+        customValues: [{ fieldDefId: 999999, value: "fail" }],
+      }),
+    ).rejects.toThrow();
+    expect(
+      await exec.getFirstAsync(
+        "SELECT tracking_enabled FROM contacts WHERE id = ?",
+        [contactId],
+      ),
+    ).toEqual({ tracking_enabled: 0 });
+    expect(
+      await exec.getAllAsync("SELECT id FROM events WHERE contact_id = ?", [
+        contactId,
+      ]),
+    ).toEqual([]);
   });
 
   it("returns in-transaction knowledge rows and index-ordered ids for duplicate content", async () => {
-    const { contactId } = await createContactFull(exec, { uid: uid(), name: "A", intervalDays: 30, now: NOW });
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(),
+      name: "A",
+      intervalDays: 30,
+      now: NOW,
+    });
     const result = await updateContactFull(exec, {
-      id: contactId, name: "A", intervalDays: 30, rarelyResponds: 0,
-      remindersOff: 0, now: NOW,
-      memories: { add: [{ type: "general", value: "Tea" }, { type: "general", value: "Tea" }] },
+      id: contactId,
+      name: "A",
+      intervalDays: 30,
+      rarelyResponds: 0,
+      remindersOff: 0,
+      now: NOW,
+      memories: {
+        add: [
+          { type: "general", value: "Tea" },
+          { type: "general", value: "Tea" },
+        ],
+      },
       relationships: { add: [{ personName: "Sam" }] },
       offLimits: { add: [{ kind: "off_limits", text: "Private" }] },
       currentStateEntries: [{ fieldKey: "last_talked_about", value: "Plans" }],
     });
     expect(result.addedIds.memories).toHaveLength(2);
     expect(new Set(result.addedIds.memories).size).toBe(2);
-    expect(result.addedIds.memories[0]).toBeLessThan(result.addedIds.memories[1] ?? 0);
-    expect(result.memories).toEqual(await listMemoriesForContact(exec, contactId));
-    expect(result.relationships).toEqual(await listRelationshipsForContact(exec, contactId));
-    expect(result.offLimits).toEqual((await listFuelForEditor(exec, contactId)).filter((row) => row.kind === "off_limits"));
+    expect(result.addedIds.memories[0]).toBeLessThan(
+      result.addedIds.memories[1] ?? 0,
+    );
+    expect(result.memories).toEqual(
+      await listMemoriesForContact(exec, contactId),
+    );
+    expect(result.relationships).toEqual(
+      await listRelationshipsForContact(exec, contactId),
+    );
+    expect(result.offLimits).toEqual(
+      (await listFuelForEditor(exec, contactId)).filter(
+        (row) => row.kind === "off_limits",
+      ),
+    );
     expect(result.currentState.last_talked_about).toEqual(
       await getCurrentStateValue(exec, contactId, "last_talked_about"),
     );
@@ -490,12 +575,17 @@ describe("createContactFull — custom values compose without deadlock (Pitfall 
     const globalDefId = await addDefinition("nickname");
     const contactDefId = await addDefinition("private_note", null, "contact");
     const { contactId } = await createContactFull(exec, {
-      uid: uid(), name: "Mara", intervalDays: 21, now: NOW,
+      uid: uid(),
+      name: "Mara",
+      intervalDays: 21,
+      now: NOW,
     });
-    expect(await exec.getAllAsync<{ field_def_id: number }>(
-      "SELECT field_def_id FROM custom_field_values WHERE contact_id = ? ORDER BY field_def_id",
-      [contactId],
-    )).toEqual([{ field_def_id: globalDefId }]);
+    expect(
+      await exec.getAllAsync<{ field_def_id: number }>(
+        "SELECT field_def_id FROM custom_field_values WHERE contact_id = ? ORDER BY field_def_id",
+        [contactId],
+      ),
+    ).toEqual([{ field_def_id: globalDefId }]);
     expect(contactDefId).toBeGreaterThan(globalDefId);
   });
 });
@@ -1263,7 +1353,9 @@ describe("updateContactFull — remaining knowledge subdomains (CAPT-04, §E)", 
     await updateContactFull(exec, {
       ...baseEdit(contactId),
       now: "2026-08-15 10:08:00",
-      currentStateEntries: [{ fieldKey: "last_talked_about", value: "changed" }],
+      currentStateEntries: [
+        { fieldKey: "last_talked_about", value: "changed" },
+      ],
     });
     expect(await countRows()).toBe(2);
     expect(
@@ -1720,9 +1812,10 @@ describe("createContactFull — Show More enrichment (CAPT-01, ADR-016)", () => 
     const relationship = await exec.getFirstAsync<{
       person_name: string;
       relation_type: string;
-    }>("SELECT person_name, relation_type FROM relationships WHERE contact_id = ?", [
-      contactId,
-    ]);
+    }>(
+      "SELECT person_name, relation_type FROM relationships WHERE contact_id = ?",
+      [contactId],
+    );
     expect(relationship?.person_name).toBe("Alex");
     expect(relationship?.relation_type).toBe("sibling");
 
@@ -1756,9 +1849,10 @@ describe("createContactFull — Show More enrichment (CAPT-01, ADR-016)", () => 
     const relationship = await exec.getFirstAsync<{
       created_at: string | null;
       modified_at: string | null;
-    }>("SELECT created_at, modified_at FROM relationships WHERE contact_id = ?", [
-      contactId,
-    ]);
+    }>(
+      "SELECT created_at, modified_at FROM relationships WHERE contact_id = ?",
+      [contactId],
+    );
     expect(relationship?.created_at).toBe(NOW);
     expect(relationship?.modified_at).toBe(NOW);
 

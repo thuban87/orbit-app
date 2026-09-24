@@ -9,7 +9,9 @@ export interface MergeConflictCompletionInput {
   hasPhotoConflict: boolean;
   scalarChoices: Readonly<Record<string, MergeConflictChoice | undefined>>;
   customFieldChoices: Readonly<Record<number, MergeConflictChoice | undefined>>;
-  primaryChoices: Readonly<Partial<Record<ContactMethodType, MergeConflictChoice>>>;
+  primaryChoices: Readonly<
+    Partial<Record<ContactMethodType, MergeConflictChoice>>
+  >;
   photoChoice: string | null;
 }
 
@@ -24,8 +26,10 @@ export function hasResolvedMergeConflicts({
   primaryChoices,
   photoChoice,
 }: MergeConflictCompletionInput): boolean {
-  return scalarKeys.every((key) => scalarChoices[key] != null) &&
+  return (
+    scalarKeys.every((key) => scalarChoices[key] != null) &&
     customFieldIds.every((id) => customFieldChoices[id] != null) &&
     primaryTypes.every((type) => primaryChoices[type] != null) &&
-    (!hasPhotoConflict || photoChoice != null);
+    (!hasPhotoConflict || photoChoice != null)
+  );
 }

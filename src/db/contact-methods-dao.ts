@@ -282,7 +282,8 @@ export async function applyContactMethodDiffCore(
     }
   }
 
-  if (changed && (params.bumpRevision ?? true)) await bumpDataRevisionCore(exec);
+  if (changed && (params.bumpRevision ?? true))
+    await bumpDataRevisionCore(exec);
   const methods = await listContactMethods(exec, params.contactId);
   return collision
     ? {

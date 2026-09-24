@@ -143,12 +143,9 @@ export function getFocusedContactContext(
   const tabRoute = focusedRoute(navigationState);
   if (
     !tabRoute ||
-    ![
-      "DashboardTab",
-      "EventsTab",
-      "DigestTab",
-      "OrreryTab",
-    ].includes(tabRoute.name)
+    !["DashboardTab", "EventsTab", "DigestTab", "OrreryTab"].includes(
+      tabRoute.name,
+    )
   ) {
     return { originContactId: null };
   }

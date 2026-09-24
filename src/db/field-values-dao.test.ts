@@ -31,13 +31,23 @@ beforeEach(async () => {
   exec = nodeSqliteExecutor(openTestDb());
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004, migration005, migration006, migration007],
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+    ],
     7,
     { now: NOW, newUid: uid },
   );
 });
 
-function def(overrides: Partial<CustomFieldDef> & { col_name: string }): CustomFieldDef {
+function def(
+  overrides: Partial<CustomFieldDef> & { col_name: string },
+): CustomFieldDef {
   return {
     id: ++idCounter,
     uid: uid(),
@@ -111,14 +121,27 @@ describe("normalized custom-value reads", () => {
     const visible = def({ col_name: "visible", share_with_ai: 1 });
     const quarantined = def({ col_name: "quarantined", quarantined_at: NOW });
     const privateDef = def({ col_name: "private", share_with_ai: 0 });
-    await Promise.all([persistDef(visible), persistDef(quarantined), persistDef(privateDef)]);
+    await Promise.all([
+      persistDef(visible),
+      persistDef(quarantined),
+      persistDef(privateDef),
+    ]);
     await Promise.all([
       upsertValue(exec, contactId, visible.id, uid(), "shown", NOW),
-      upsertValue(exec, contactId, quarantined.id, uid(), "hidden-quarantine", NOW),
+      upsertValue(
+        exec,
+        contactId,
+        quarantined.id,
+        uid(),
+        "hidden-quarantine",
+        NOW,
+      ),
       upsertValue(exec, contactId, privateDef.id, uid(), "hidden-private", NOW),
     ]);
 
-    await expect(getValuesForContact(exec, contactId, [visible])).resolves.toEqual({
+    await expect(
+      getValuesForContact(exec, contactId, [visible]),
+    ).resolves.toEqual({
       visible: "shown",
     });
     await expect(getValuesForContact(exec, contactId, [])).resolves.toEqual({});
@@ -131,7 +154,14 @@ describe("normalized custom-value UPSERT", () => {
     const definition = def({ col_name: "nickname" });
     await persistDef(definition);
     await upsertValue(exec, contactId, definition.id, "first-uid", "Ace", NOW);
-    await upsertValue(exec, contactId, definition.id, "second-uid", "Bee", LATER);
+    await upsertValue(
+      exec,
+      contactId,
+      definition.id,
+      "second-uid",
+      "Bee",
+      LATER,
+    );
 
     expect(await valueRow(contactId, definition.id)).toEqual({
       uid: "first-uid",
@@ -146,7 +176,14 @@ describe("normalized custom-value UPSERT", () => {
     const definition = def({ col_name: "nickname" });
     await persistDef(definition);
     await upsertValue(exec, contactId, definition.id, "pair-uid", "Ace", NOW);
-    await upsertValue(exec, contactId, definition.id, "ignored-uid", null, LATER);
+    await upsertValue(
+      exec,
+      contactId,
+      definition.id,
+      "ignored-uid",
+      null,
+      LATER,
+    );
 
     expect(await valueRow(contactId, definition.id)).toEqual({
       uid: "pair-uid",
@@ -161,7 +198,14 @@ describe("normalized custom-value UPSERT", () => {
     const definition = def({ col_name: "nickname" });
     await persistDef(definition);
 
-    await upsertValue(exec, contactId, definition.id, "new-pair-uid", "Ace", LATER);
+    await upsertValue(
+      exec,
+      contactId,
+      definition.id,
+      "new-pair-uid",
+      "Ace",
+      LATER,
+    );
 
     expect(await valueRow(contactId, definition.id)).toEqual({
       uid: "new-pair-uid",
@@ -174,7 +218,11 @@ describe("normalized custom-value UPSERT", () => {
 
 describe("visibility selectors — the three §14.7 surfaces (FLD-07)", () => {
   const onNew = def({ col_name: "nickname", show_on_new: 1, display_order: 2 });
-  const alwaysShown = def({ col_name: "birthday", always_show: 1, display_order: 0 });
+  const alwaysShown = def({
+    col_name: "birthday",
+    always_show: 1,
+    display_order: 0,
+  });
   const plain = def({ col_name: "city", display_order: 1 });
   const quarantined = def({
     col_name: "old_field",
@@ -184,14 +232,18 @@ describe("visibility selectors — the three §14.7 surfaces (FLD-07)", () => {
     quarantined_at: NOW,
   });
   const allDefs = [onNew, alwaysShown, plain, quarantined];
-  const cols = (defs: CustomFieldDef[]) => defs.map((definition) => definition.col_name);
+  const cols = (defs: CustomFieldDef[]) =>
+    defs.map((definition) => definition.col_name);
 
   it("preserves the existing pure create, edit, and profile placement rules", () => {
     expect(cols(defsForCreateForm(allDefs))).toEqual(["nickname"]);
-    expect(cols(defsForEditForm(allDefs))).toEqual(["birthday", "city", "nickname"]);
-    expect(cols(visibleDefsForProfile(allDefs, { city: "Leeds", nickname: null }))).toEqual([
+    expect(cols(defsForEditForm(allDefs))).toEqual([
       "birthday",
       "city",
+      "nickname",
     ]);
+    expect(
+      cols(visibleDefsForProfile(allDefs, { city: "Leeds", nickname: null })),
+    ).toEqual(["birthday", "city"]);
   });
 });

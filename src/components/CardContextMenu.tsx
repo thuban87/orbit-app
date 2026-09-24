@@ -101,11 +101,18 @@ export function CardContextMenu({
         edges={["bottom"]}
         style={[
           styles.sheet,
-          { backgroundColor: colors.surfaceElevated, borderColor: colors.border },
+          {
+            backgroundColor: colors.surfaceElevated,
+            borderColor: colors.border,
+          },
         ]}
       >
         <Text
-          testID={contactId === null ? undefined : `card-context-menu-title-${contactId}`}
+          testID={
+            contactId === null
+              ? undefined
+              : `card-context-menu-title-${contactId}`
+          }
           numberOfLines={1}
           style={[styles.title, { color: colors.textSecondary }]}
         >

@@ -20,11 +20,7 @@ describe("hasUnresolvedRows", () => {
 
   it("does not treat resolved skipped and linked rows as unresolved", () => {
     expect(
-      hasUnresolvedRows([
-        row("imported"),
-        row("skipped", null),
-        row("linked"),
-      ]),
+      hasUnresolvedRows([row("imported"), row("skipped", null), row("linked")]),
     ).toBe(false);
   });
 

@@ -36,7 +36,22 @@ vi.mock("@/db/interaction-assist-read", () => ({
 import { subscribeAppState, useAssistBanner } from "@/stores/assist-store";
 
 const now = "2026-08-31 12:00:30";
-const MIGRATIONS = [migration001, migration002, migration003, migration004, migration005, migration006, migration007, migration008, migration009, migration010, migration011, migration012, migration013, migration014];
+const MIGRATIONS = [
+  migration001,
+  migration002,
+  migration003,
+  migration004,
+  migration005,
+  migration006,
+  migration007,
+  migration008,
+  migration009,
+  migration010,
+  migration011,
+  migration012,
+  migration013,
+  migration014,
+];
 const queue = [
   {
     id: 2,

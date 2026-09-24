@@ -17,6 +17,7 @@ import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
 import { getValuesForContact, upsertValue } from "@/db/field-values-dao";
 import { addFuel } from "@/db/fuel-dao";
+import { createGroupEvent } from "@/db/group-events-dao";
 import { addMemory } from "@/db/memories-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
@@ -38,7 +39,6 @@ import {
   createContactWithInteraction,
   recordTouchpoint,
 } from "@/db/recency-dao";
-import { createGroupEvent } from "@/db/group-events-dao";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-14 12:00:00";
@@ -237,7 +237,9 @@ describe("readPromptContext — allowlist projection (H1)", () => {
     });
 
     expect((await readPromptContext(exec, c, NOW)).sharedMemories).toEqual([]);
-    await exec.runAsync("UPDATE memories SET allow_ai = 1 WHERE id = ?", [memoryId]);
+    await exec.runAsync("UPDATE memories SET allow_ai = 1 WHERE id = ?", [
+      memoryId,
+    ]);
     expect((await readPromptContext(exec, c, NOW)).sharedMemories).toEqual([
       // D-11 (34-02): the general Memory type now labels as "Memory" (was "General").
       { label: "Memory", value: "MEMORY_EGRESS_MARKER" },
@@ -392,14 +394,7 @@ describe("readPromptContext — allowlist projection (H1)", () => {
       share_with_ai: 1,
     });
     await persistDef(favoriteDrink);
-    await upsertValue(
-      exec,
-      c,
-      favoriteDrink.id,
-      uid(),
-      "Cold brew",
-      NOW,
-    );
+    await upsertValue(exec, c, favoriteDrink.id, uid(), "Cold brew", NOW);
 
     const ctx = await readPromptContext(exec, c, NOW);
     expect(ctx.sharedFields).toEqual([
@@ -457,9 +452,9 @@ describe("readPromptContext — allowlist projection (H1)", () => {
     await upsertValue(exec, c, quarantined.id, uid(), "RETIRED_MARKER", NOW);
 
     // This is the exact defs-filtered map supplied to readSharedFields.
-    const sharedDefs = (await listDefs(exec, { includeQuarantined: false })).filter(
-      (definition) => definition.share_with_ai === 1,
-    );
+    const sharedDefs = (
+      await listDefs(exec, { includeQuarantined: false })
+    ).filter((definition) => definition.share_with_ai === 1);
     expect(await getValuesForContact(exec, c, sharedDefs)).toEqual({
       shared_fact: "Lives near the lake",
       blank_fact: "",
@@ -596,9 +591,7 @@ describe("readPromptContext — gated recent-interaction notes (ADR-078 carry, D
     });
 
     // allow_ai defaults OFF (migration 025) → the note is NOT carried.
-    expect(
-      (await readPromptContext(exec, c, NOW)).recentInteractions,
-    ).toEqual([
+    expect((await readPromptContext(exec, c, NOW)).recentInteractions).toEqual([
       {
         occurredAt: "2026-08-10 10:00:00",
         channel: "Message",
@@ -610,9 +603,7 @@ describe("readPromptContext — gated recent-interaction notes (ADR-078 carry, D
     await exec.runAsync("UPDATE interactions SET allow_ai = 1 WHERE id = ?", [
       interactionId,
     ]);
-    expect(
-      (await readPromptContext(exec, c, NOW)).recentInteractions,
-    ).toEqual([
+    expect((await readPromptContext(exec, c, NOW)).recentInteractions).toEqual([
       {
         occurredAt: "2026-08-10 10:00:00",
         channel: "Message",
@@ -642,9 +633,7 @@ describe("readPromptContext — gated recent-interaction notes (ADR-078 carry, D
     await exec.runAsync("UPDATE interactions SET allow_ai = 1 WHERE id = ?", [
       interactionId,
     ]);
-    expect(
-      (await readPromptContext(exec, c, NOW)).recentInteractions,
-    ).toEqual([
+    expect((await readPromptContext(exec, c, NOW)).recentInteractions).toEqual([
       {
         occurredAt: "2026-08-10 10:00:00",
         channel: "Message",

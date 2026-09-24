@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   buildRowAccessibilityDescription,
-  formatMatchCategories,
-  formatMatchExplanation,
   formatLine2,
   formatListRecency,
+  formatMatchCategories,
+  formatMatchExplanation,
 } from "@/components/list-row-content";
 
 describe("ListRow content", () => {
@@ -17,16 +17,18 @@ describe("ListRow content", () => {
     expect(formatListRecency("2026-07-28", now)).toBe("18d ago");
   });
 
-  it.each([
-    "2026-08-15 99:00:00",
-    "2026-02-29 12:00:00",
-  ])("renders corrupt non-null last-contact %s as neutral recency", (lastContact) => {
-    expect(formatListRecency(lastContact, now)).toBe("No interactions yet");
-  });
+  it.each(["2026-08-15 99:00:00", "2026-02-29 12:00:00"])(
+    "renders corrupt non-null last-contact %s as neutral recency",
+    (lastContact) => {
+      expect(formatListRecency(lastContact, now)).toBe("No interactions yet");
+    },
+  );
 
   it("composes recency and the one displayed category", () => {
     expect(formatLine2("18d ago", "Friend")).toBe("18d ago · Friend");
-    expect(formatLine2("No interactions yet", null)).toBe("No interactions yet");
+    expect(formatLine2("No interactions yet", null)).toBe(
+      "No interactions yet",
+    );
   });
 
   it("formats pluralised corpus match explanations with the strongest categories", () => {
@@ -55,17 +57,20 @@ describe("ListRow content", () => {
     ["rogue", "Rogue"],
     ["snoozed", "Snoozed"],
     [null, "Not yet contacted"],
-  ] as const)("describes %s status without relying on colour", (displayState, label) => {
-    expect(
-      buildRowAccessibilityDescription({
-        name: "Ada Lovelace",
-        category: "Friend",
-        recency: "Yesterday",
-        isFavourite: true,
-        displayState,
-      }),
-    ).toBe(`Ada Lovelace. Friend. Yesterday. Favourite. ${label}.`);
-  });
+  ] as const)(
+    "describes %s status without relying on colour",
+    (displayState, label) => {
+      expect(
+        buildRowAccessibilityDescription({
+          name: "Ada Lovelace",
+          category: "Friend",
+          recency: "Yesterday",
+          isFavourite: true,
+          displayState,
+        }),
+      ).toBe(`Ada Lovelace. Friend. Yesterday. Favourite. ${label}.`);
+    },
+  );
 
   it("describes missing category and non-favourite membership", () => {
     expect(

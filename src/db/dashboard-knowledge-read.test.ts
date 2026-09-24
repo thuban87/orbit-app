@@ -131,7 +131,9 @@ describe("dashboard line-3 knowledge read", () => {
       meaningfulDate: "2026-09-08",
       pinned: 1,
     });
-    const relationshipId = await seedRelationship(contactId, { personName: "Sam" });
+    const relationshipId = await seedRelationship(contactId, {
+      personName: "Sam",
+    });
     const stateId = await seedCurrentState(contactId, "Austin", 1);
     const seen: Array<{ sql: string; params: readonly unknown[] }> = [];
     const countingExec: SqlExecutor = {
@@ -145,7 +147,9 @@ describe("dashboard line-3 knowledge read", () => {
     const candidates = await readLine3Candidates(countingExec, [contactId]);
 
     expect(seen).toHaveLength(3);
-    expect(seen.every(({ sql }) => sql.includes("contact_id IN (?)"))).toBe(true);
+    expect(seen.every(({ sql }) => sql.includes("contact_id IN (?)"))).toBe(
+      true,
+    );
     expect(seen.every(({ sql }) => !sql.includes("IN (1)"))).toBe(true);
     expect(seen.every(({ params }) => params.includes(contactId))).toBe(true);
     expect(candidates).toEqual(
@@ -183,7 +187,10 @@ describe("dashboard line-3 knowledge read", () => {
 
   it("filters each source by its own visibility and lifecycle rules", async () => {
     const contactId = await seedContact();
-    const visibleMemory = await seedMemory(contactId, { value: "Visible memory", hidden: 0 });
+    const visibleMemory = await seedMemory(contactId, {
+      value: "Visible memory",
+      hidden: 0,
+    });
     await seedMemory(contactId, { value: "Hidden memory", hidden: 1 });
     await seedMemory(contactId, { value: "Outdated memory", outdated: 1 });
     await seedMemory(contactId, { value: "Deleted memory", deletedAt: NOW });
@@ -191,19 +198,36 @@ describe("dashboard line-3 knowledge read", () => {
     const originalDefault = MEMORY_TYPE_REGISTRY.custom.visibilityDefault;
     MEMORY_TYPE_REGISTRY.custom.visibilityDefault = "hide";
     try {
-      await seedMemory(contactId, { type: "custom", value: "Registry hidden default" });
+      await seedMemory(contactId, {
+        type: "custom",
+        value: "Registry hidden default",
+      });
       const visibleRelationship = await seedRelationship(contactId, {
         personName: "Visible relationship",
         hidden: 0,
       });
-      await seedRelationship(contactId, { personName: "Hidden relationship", hidden: 1 });
-      await seedRelationship(contactId, { personName: "Deleted relationship", deletedAt: NOW });
-      const currentState = await seedCurrentState(contactId, "Current place", 1);
+      await seedRelationship(contactId, {
+        personName: "Hidden relationship",
+        hidden: 1,
+      });
+      await seedRelationship(contactId, {
+        personName: "Deleted relationship",
+        deletedAt: NOW,
+      });
+      const currentState = await seedCurrentState(
+        contactId,
+        "Current place",
+        1,
+      );
       await seedCurrentState(contactId, "Former place", 0);
 
       const candidates = await readLine3Candidates(exec, [contactId]);
       expect(candidates.map((candidate) => candidate.id)).toEqual(
-        expect.arrayContaining([visibleMemory, visibleRelationship, currentState]),
+        expect.arrayContaining([
+          visibleMemory,
+          visibleRelationship,
+          currentState,
+        ]),
       );
       expect(candidates.map((candidate) => candidate.value)).not.toEqual(
         expect.arrayContaining([
@@ -233,13 +257,19 @@ describe("dashboard line-3 knowledge read", () => {
     }
     await seedMemory(otherContact, { value: "Other contact survives" });
 
-    const candidates = await readLine3Candidates(exec, [deepContact, otherContact]);
-    expect(candidates.filter((candidate) => candidate.contactId === deepContact)).toHaveLength(
-      CANDIDATE_BUDGET,
-    );
+    const candidates = await readLine3Candidates(exec, [
+      deepContact,
+      otherContact,
+    ]);
+    expect(
+      candidates.filter((candidate) => candidate.contactId === deepContact),
+    ).toHaveLength(CANDIDATE_BUDGET);
     expect(candidates).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ contactId: otherContact, value: "Other contact survives" }),
+        expect.objectContaining({
+          contactId: otherContact,
+          value: "Other contact survives",
+        }),
       ]),
     );
   });
@@ -267,7 +297,9 @@ describe("dashboard line-3 knowledge read", () => {
           expect.objectContaining({ value: "Visible after hidden defaults" }),
         ]),
       );
-      expect(candidates.filter((candidate) => candidate.contactId === contactId)).toHaveLength(1);
+      expect(
+        candidates.filter((candidate) => candidate.contactId === contactId),
+      ).toHaveLength(1);
     } finally {
       MEMORY_TYPE_REGISTRY.custom.visibilityDefault = originalDefault;
     }

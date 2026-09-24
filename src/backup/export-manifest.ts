@@ -270,10 +270,10 @@ async function readManifest(
     profileContactPresentation,
     profileCategoryPresentation,
     tombstones: tombstones.map((row) => ({
-        entityType: row.entity_type,
-        entityUid: row.entity_uid,
-        deletedAt: row.deleted_at,
-      })),
+      entityType: row.entity_type,
+      entityUid: row.entity_uid,
+      deletedAt: row.deleted_at,
+    })),
   };
   assertNoLocalOnlyKeys(manifest);
   return parseBackupManifest(manifest);

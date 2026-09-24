@@ -21,8 +21,8 @@ import { migration005 } from "@/db/migrations/005-digest-settings";
 import { migration006 } from "@/db/migrations/006-normalize-custom-field-values";
 import { migration007 } from "@/db/migrations/007-tombstones";
 import { runMigrations } from "@/db/migrations/runner";
-import type { FieldType } from "@/schemas/types";
 import type { SqlExecutor } from "@/db/types";
+import type { FieldType } from "@/schemas/types";
 
 const NOW = "2026-08-24 12:00:00";
 const LATER = "2026-08-25 09:30:00";
@@ -38,7 +38,15 @@ beforeEach(async () => {
   exec = nodeSqliteExecutor(openTestDb());
   await runMigrations(
     exec,
-    [migration001, migration002, migration003, migration004, migration005, migration006, migration007],
+    [
+      migration001,
+      migration002,
+      migration003,
+      migration004,
+      migration005,
+      migration006,
+      migration007,
+    ],
     7,
     { now: NOW, newUid: uid },
   );
@@ -121,32 +129,41 @@ describe("preflightTypeChange — normalized raw-TEXT parser partitions", () => 
   }> = [
     { type: "text", clean: "about 60k", invalid: "also text" },
     { type: "textarea", clean: "line one\nline two", invalid: "also text" },
-    { type: "dropdown", clean: "out-of-list is parser-valid", invalid: "also text" },
+    {
+      type: "dropdown",
+      clean: "out-of-list is parser-valid",
+      invalid: "also text",
+    },
     { type: "photo", clean: "file:///orbit/photo.jpg", invalid: "also text" },
     { type: "number", clean: "1,000", invalid: "about 60k" },
     { type: "date", clean: "2026-08-24 trailing note", invalid: "not a date" },
     { type: "toggle", clean: "yes", invalid: "perhaps" },
   ];
 
-  it.each(parserCases)("uses the existing $type parser over raw normalized TEXT", async ({
-    type,
-    clean,
-    invalid,
-  }) => {
-    const definition = field({ col_name: `field_${type}` });
-    await persistField(definition);
-    const validContact = await contact(`${type} valid`);
-    const invalidContact = await contact(`${type} invalid`);
-    await value(validContact, definition.id, clean);
-    await value(invalidContact, definition.id, invalid);
+  it.each(parserCases)(
+    "uses the existing $type parser over raw normalized TEXT",
+    async ({ type, clean, invalid }) => {
+      const definition = field({ col_name: `field_${type}` });
+      await persistField(definition);
+      const validContact = await contact(`${type} valid`);
+      const invalidContact = await contact(`${type} invalid`);
+      await value(validContact, definition.id, clean);
+      await value(invalidContact, definition.id, invalid);
 
-    const identityParser = ["text", "textarea", "dropdown", "photo"].includes(type);
-    await expect(preflightTypeChange(exec, definition, type)).resolves.toEqual({
-      total: 2,
-      convert: identityParser ? [validContact, invalidContact] : [validContact],
-      flag: identityParser ? [] : [invalidContact],
-    });
-  });
+      const identityParser = ["text", "textarea", "dropdown", "photo"].includes(
+        type,
+      );
+      await expect(
+        preflightTypeChange(exec, definition, type),
+      ).resolves.toEqual({
+        total: 2,
+        convert: identityParser
+          ? [validContact, invalidContact]
+          : [validContact],
+        flag: identityParser ? [] : [invalidContact],
+      });
+    },
+  );
 
   it("uses the bound field_def_id, excludes NULL rows, and never reads a second field", async () => {
     const target = field({ col_name: "target" });
@@ -217,19 +234,23 @@ describe("applyTypeChange — metadata-only update and normalized audit snapshot
 
     await applyTypeChange(exec, definition, "text", LATER);
 
-    expect(await exec.getFirstAsync<{ type: string; modified_at: string }>(
-      "SELECT type, modified_at FROM custom_field_defs WHERE id = ?",
-      [definition.id],
-    )).toEqual({ type: "text", modified_at: LATER });
-    expect(await exec.getAllAsync<{
-      contact_id: number;
-      field_col_name: string;
-      old_value: string;
-      operation: string;
-      created_at: string;
-    }>(
-      "SELECT contact_id, field_col_name, old_value, operation, created_at FROM field_history ORDER BY contact_id",
-    )).toEqual([
+    expect(
+      await exec.getFirstAsync<{ type: string; modified_at: string }>(
+        "SELECT type, modified_at FROM custom_field_defs WHERE id = ?",
+        [definition.id],
+      ),
+    ).toEqual({ type: "text", modified_at: LATER });
+    expect(
+      await exec.getAllAsync<{
+        contact_id: number;
+        field_col_name: string;
+        old_value: string;
+        operation: string;
+        created_at: string;
+      }>(
+        "SELECT contact_id, field_col_name, old_value, operation, created_at FROM field_history ORDER BY contact_id",
+      ),
+    ).toEqual([
       {
         contact_id: a,
         field_col_name: "score",
@@ -247,13 +268,21 @@ describe("applyTypeChange — metadata-only update and normalized audit snapshot
     ]);
     expect(await rowsFor(definition.id)).toEqual(before);
     expect(await rowsFor(unrelated.id)).toEqual([
-      { contact_id: a, uid: "unrelated-uid", hx: "646F206E6F7420736E617073686F74" },
+      {
+        contact_id: a,
+        uid: "unrelated-uid",
+        hx: "646F206E6F7420736E617073686F74",
+      },
     ]);
   });
 });
 
 async function rowsFor(fieldDefId: number) {
-  return exec.getAllAsync<{ contact_id: number; uid: string; hx: string | null }>(
+  return exec.getAllAsync<{
+    contact_id: number;
+    uid: string;
+    hx: string | null;
+  }>(
     `SELECT contact_id, uid, hex(value) AS hx
        FROM custom_field_values
       WHERE field_def_id = ?

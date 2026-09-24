@@ -92,7 +92,11 @@ describe("setCurrentStateValue — new current + retained history", () => {
     });
 
     expect(await entries(contactId)).toEqual([
-      expect.objectContaining({ value: "Chicago", is_current: 1, created_at: NOW }),
+      expect.objectContaining({
+        value: "Chicago",
+        is_current: 1,
+        created_at: NOW,
+      }),
     ]);
   });
 
@@ -115,7 +119,11 @@ describe("setCurrentStateValue — new current + retained history", () => {
     const rows = await entries(contactId);
     expect(rows.filter((row) => row.is_current === 1)).toHaveLength(1);
     expect(rows).toEqual([
-      expect.objectContaining({ value: "Chicago", is_current: 0, created_at: NOW }),
+      expect.objectContaining({
+        value: "Chicago",
+        is_current: 0,
+        created_at: NOW,
+      }),
       expect.objectContaining({ value: "Madison", is_current: 1 }),
     ]);
   });
@@ -173,8 +181,16 @@ describe("promoteToCurrentValue and editHistoryEntry", () => {
 
     const rows = await entries(contactId);
     expect(rows).toEqual([
-      expect.objectContaining({ id: historicId, value: "Chicago", is_current: 1 }),
-      expect.objectContaining({ id: currentId, value: "Madison", is_current: 0 }),
+      expect.objectContaining({
+        id: historicId,
+        value: "Chicago",
+        is_current: 1,
+      }),
+      expect.objectContaining({
+        id: currentId,
+        value: "Madison",
+        is_current: 0,
+      }),
     ]);
     expect(rows.filter((row) => row.is_current === 1)).toHaveLength(1);
   });
@@ -192,7 +208,9 @@ describe("promoteToCurrentValue and editHistoryEntry", () => {
     });
 
     const after = await entries(contactId);
-    expect(after.map(({ id, value, is_current }) => ({ id, value, is_current }))).toEqual(
+    expect(
+      after.map(({ id, value, is_current }) => ({ id, value, is_current })),
+    ).toEqual(
       before.map(({ id, value, is_current }) => ({ id, value, is_current })),
     );
     expect(after.filter((row) => row.is_current === 1)).toHaveLength(1);
@@ -211,7 +229,11 @@ describe("promoteToCurrentValue and editHistoryEntry", () => {
     });
 
     expect(await entries(contactId)).toEqual([
-      expect.objectContaining({ id: historicId, value: "Milwaukee", is_current: 0 }),
+      expect.objectContaining({
+        id: historicId,
+        value: "Milwaukee",
+        is_current: 0,
+      }),
       expect.objectContaining({ value: "Madison", is_current: 1 }),
     ]);
   });
@@ -235,9 +257,9 @@ describe("promoteToCurrentValue and editHistoryEntry", () => {
       }),
     ).rejects.toThrow("promoteToCurrentValue");
 
-    expect((await entries(contactId)).find((row) => row.id === currentId)).toEqual(
-      expect.objectContaining({ is_current: 1, value: "Madison" }),
-    );
+    expect(
+      (await entries(contactId)).find((row) => row.id === currentId),
+    ).toEqual(expect.objectContaining({ is_current: 1, value: "Madison" }));
   });
 
   it("rolls back an edit misrouted to another current-state field", async () => {
@@ -265,11 +287,13 @@ describe("promoteToCurrentValue and editHistoryEntry", () => {
       }),
     ).rejects.toThrow("editHistoryEntry");
 
-    expect((await entries(contactId)).find((row) => row.id === locationId)).toEqual(
-      expect.objectContaining({ value: "Chicago", is_current: 1 }),
-    );
-    expect((await entries(contactId, "last_talked_about")).find((row) => row.id === topicId)).toEqual(
-      expect.objectContaining({ value: "Gardening", is_current: 1 }),
-    );
+    expect(
+      (await entries(contactId)).find((row) => row.id === locationId),
+    ).toEqual(expect.objectContaining({ value: "Chicago", is_current: 1 }));
+    expect(
+      (await entries(contactId, "last_talked_about")).find(
+        (row) => row.id === topicId,
+      ),
+    ).toEqual(expect.objectContaining({ value: "Gardening", is_current: 1 }));
   });
 });

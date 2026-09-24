@@ -62,11 +62,7 @@ export interface ProfileLayoutEditorProps {
   onSaveDraft?: (layout: ProfileLayoutDocument) => Promise<void>;
 }
 
-function RowDragHandle({
-  label,
-}: {
-  label: string;
-}) {
+function RowDragHandle({ label }: { label: string }) {
   const drag = useReorderableDrag();
 
   return (

@@ -1,9 +1,9 @@
 import { Linking, Pressable, StyleSheet, View } from "react-native";
+import type { MemoryRow } from "@/db/memories-read";
 import {
   MEMORY_TYPE_REGISTRY,
   PROVISIONAL_MEMORY_LABEL,
 } from "@/db/memory-registry";
-import type { MemoryRow } from "@/db/memories-read";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Icon } from "./icons/Icon";

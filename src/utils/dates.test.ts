@@ -68,12 +68,7 @@ describe("minute-precision display timestamps", () => {
   });
 
   it("exercises the 24-hour clock branch without mutable formatter state", () => {
-    expect(
-      formatMinuteClock(
-        { hour: 19, minute: 14 },
-        "24h",
-      ),
-    ).toBe("19:14");
+    expect(formatMinuteClock({ hour: 19, minute: 14 }, "24h")).toBe("19:14");
   });
 
   it("defaults the shared display formatter to the 12-hour clock", () => {
@@ -81,7 +76,9 @@ describe("minute-precision display timestamps", () => {
   });
 
   it("returns a neutral display label rather than the raw timestamp when parsing fails", () => {
-    expect(formatDateTimeMinuteOrFallback("not a timestamp")).toBe("Unknown time");
+    expect(formatDateTimeMinuteOrFallback("not a timestamp")).toBe(
+      "Unknown time",
+    );
     expect(formatDateTimeMinuteOrFallback("")).toBe("Unknown time");
   });
 });

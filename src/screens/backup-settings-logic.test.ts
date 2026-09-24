@@ -18,13 +18,15 @@ describe("validateWholeBackupDays — one DAO-owned 1..3650 boundary", () => {
   });
 
   it("keeps invalid fields out of the persistence patch", () => {
-    expect(buildBackupSettingsPatch({ intervalDays: "14", retentionDays: "90" }))
-      .toEqual({ patch: { backupIntervalDays: 14, backupRetentionDays: 90 } });
-    expect(buildBackupSettingsPatch({ intervalDays: "14.5", retentionDays: "90" }))
-      .toEqual({
-        errors: { intervalDays: BACKUP_DAYS_VALIDATION_COPY },
-        patch: null,
-      });
+    expect(
+      buildBackupSettingsPatch({ intervalDays: "14", retentionDays: "90" }),
+    ).toEqual({ patch: { backupIntervalDays: 14, backupRetentionDays: 90 } });
+    expect(
+      buildBackupSettingsPatch({ intervalDays: "14.5", retentionDays: "90" }),
+    ).toEqual({
+      errors: { intervalDays: BACKUP_DAYS_VALIDATION_COPY },
+      patch: null,
+    });
   });
 });
 
@@ -38,7 +40,11 @@ describe("validateEncryptionSetup — no passphrase echo or unsafe setup", () =>
       ok: false,
       error: "Passphrases don't match.",
     });
-    expect(validateEncryptionSetup("a long private passphrase", "a long private passphrase"))
-      .toEqual({ ok: true });
+    expect(
+      validateEncryptionSetup(
+        "a long private passphrase",
+        "a long private passphrase",
+      ),
+    ).toEqual({ ok: true });
   });
 });

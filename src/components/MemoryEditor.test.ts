@@ -6,7 +6,7 @@ vi.mock("react-native", () => ({
   Pressable: "Pressable",
   StyleSheet: {
     absoluteFill: {},
-    create: <T,>(styles: T) => styles,
+    create: <T>(styles: T) => styles,
     hairlineWidth: 1,
   },
   Switch: "Switch",
@@ -17,8 +17,8 @@ vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 vi.mock("./MemoryCard", () => ({ MemoryCard: "MemoryCard" }));
 vi.mock("./ui", () => ({ AppText: "AppText" }));
 
-import { initialDraft } from "./MemoryEditor";
 import type { MemoryRow } from "@/db/memories-read";
+import { initialDraft } from "./MemoryEditor";
 
 describe("initialDraft", () => {
   it("keeps a new Memory's visibility inherited", () => {

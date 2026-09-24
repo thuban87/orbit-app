@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-sqlite", () => ({}));
 
+import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import type { DashboardRow } from "@/db/dashboard-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { setFavouriteRank } from "@/db/favourites-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
@@ -93,9 +93,13 @@ describe("favourite optimistic reconciliation", () => {
     expect(rows[0].favourite_rank).toBeNull();
     expect(committed[0].favourite_rank).not.toBeNull();
     expect(store.resolve(8, generation, "success")).toBe("applied");
-    expect(store.overlayFor(8) ?? (committed[0].favourite_rank !== null)).toBe(true);
+    expect(store.overlayFor(8) ?? committed[0].favourite_rank !== null).toBe(
+      true,
+    );
 
-    expect(applyCommittedMembership(committed, 8, false)[0].favourite_rank).toBeNull();
+    expect(
+      applyCommittedMembership(committed, 8, false)[0].favourite_rank,
+    ).toBeNull();
   });
 
   it("keeps an older durable set after the latest clear rejects", async () => {
@@ -117,14 +121,18 @@ describe("favourite optimistic reconciliation", () => {
     store.resolve(contactId, setGeneration, "success", true);
     rows = applyCommittedMembership(rows, contactId, true);
 
-    expect(store.effectiveMembershipFor(contactId, rows[0].favourite_rank !== null)).toBe(false);
+    expect(
+      store.effectiveMembershipFor(contactId, rows[0].favourite_rank !== null),
+    ).toBe(false);
     expect(store.committedMembershipFor(contactId)).toBe(true);
 
     clearGate.reject(new Error("clear write failed"));
     await expect(clearGate.promise).rejects.toThrow("clear write failed");
     store.resolve(contactId, clearGeneration, "failure");
 
-    expect(store.effectiveMembershipFor(contactId, rows[0].favourite_rank !== null)).toBe(true);
+    expect(
+      store.effectiveMembershipFor(contactId, rows[0].favourite_rank !== null),
+    ).toBe(true);
     await expect(
       exec.getFirstAsync<{ favourite_rank: number | null }>(
         "SELECT favourite_rank FROM contacts WHERE id = ?",

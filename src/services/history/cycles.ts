@@ -43,7 +43,9 @@ export interface CyclesInput {
 }
 
 /** A bound result (blocks) or the tagged no-cadence fallback (mirrors impact.ts). */
-export type CyclesResult = { readonly available: true; readonly blocks: readonly CycleBlock[] } | { readonly available: false };
+export type CyclesResult =
+  | { readonly available: true; readonly blocks: readonly CycleBlock[] }
+  | { readonly available: false };
 
 const LOCAL_YMD = /^(\d{4})-(\d{2})-(\d{2})/;
 

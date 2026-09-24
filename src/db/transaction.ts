@@ -39,7 +39,10 @@ import type { SqlExecutor } from "@/db/types";
  * a structural guard against accidentally writing through the callback's
  * executor; a caller can still deliberately close over its outer executor.
  */
-export type ReadOnlyExecutor = Pick<SqlExecutor, "getFirstAsync" | "getAllAsync">;
+export type ReadOnlyExecutor = Pick<
+  SqlExecutor,
+  "getFirstAsync" | "getAllAsync"
+>;
 
 /**
  * Run `body` inside the shared mutex and a hand-rolled transaction. COMMIT on

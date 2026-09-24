@@ -545,10 +545,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
   // Empty-payload defensive branch: nothing usable to save → error state + Close.
   if (payload.displayText === null && payload.url === null) {
     return (
-      <View
-        testID="capture-picker-root"
-        style={styles.errorRoot}
-      >
+      <View testID="capture-picker-root" style={styles.errorRoot}>
         <Text
           testID="capture-error-state"
           style={[styles.errorText, { color: colors.danger }]}

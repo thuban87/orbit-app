@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { FUTURE_DATETIME_MESSAGE as SHIPPED } from "@/components/touchpoint-refine-logic";
 import type { TouchpointRefineValue } from "@/components/TouchpointRefineForm";
-import { rejectFutureOccurredAt } from "@/db/log-guards";
+import { FUTURE_DATETIME_MESSAGE as SHIPPED } from "@/components/touchpoint-refine-logic";
 import type { InteractionForEdit } from "@/db/interaction-edit-read";
+import { rejectFutureOccurredAt } from "@/db/log-guards";
 import {
   buildEditInput,
   canSave,
@@ -66,7 +66,9 @@ describe("edit-interaction-logic — pure edit save/validate model", () => {
 
   it("does not flag a past or equal occurred_at (agrees with the DAO guard)", () => {
     expect(isOccurredAtRejected(baseValue, NOW)).toBe(false);
-    expect(() => rejectFutureOccurredAt(baseValue.occurredAt, NOW)).not.toThrow();
+    expect(() =>
+      rejectFutureOccurredAt(baseValue.occurredAt, NOW),
+    ).not.toThrow();
     const equal = { ...baseValue, occurredAt: NOW };
     expect(isOccurredAtRejected(equal, NOW)).toBe(false);
     expect(() => rejectFutureOccurredAt(equal.occurredAt, NOW)).not.toThrow();

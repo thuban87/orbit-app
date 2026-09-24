@@ -1460,9 +1460,8 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     navigation: {
       navigate: (route) => navigation.navigate(route),
       openEvents: () => {
-        const parent = navigation.getParent<
-          BottomTabNavigationProp<TabParamList>
-        >();
+        const parent =
+          navigation.getParent<BottomTabNavigationProp<TabParamList>>();
         if (!parent) {
           if (__DEV__) {
             Logger.warn(LOG_SCOPE, "Events tab navigator is not mounted");
@@ -1650,11 +1649,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         importantForAccessibility={panelOpen ? "no-hide-descendants" : "auto"}
         pointerEvents={panelOpen ? "none" : "auto"}
       >
-        <ShellAppBar
-          variant="root"
-          title="Orbit"
-          overflow={overflowActions}
-        />
+        <ShellAppBar variant="root" title="Orbit" overflow={overflowActions} />
       </View>
       {selectionMode ? (
         <View

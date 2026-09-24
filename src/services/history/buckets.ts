@@ -27,7 +27,10 @@ export interface BucketInteraction {
 // the level caps at the table length. Day lenses use the 3-step ramp (levels
 // 0..3, capping at heatmapScale[3]); the cycle lens uses the full 4-step ramp
 // (levels 0..4). Editing these arrays is the entire saturation-tuning surface.
-const HEATMAP_THRESHOLDS: { readonly day: readonly number[]; readonly cycles: readonly number[] } = {
+const HEATMAP_THRESHOLDS: {
+  readonly day: readonly number[];
+  readonly cycles: readonly number[];
+} = {
   day: [1, 2, 3],
   cycles: [1, 2, 3, 4],
 };
@@ -75,7 +78,8 @@ export function buckets(
  * Level 0 is the empty/zero cell. Pure, total, and monotonic in `count`.
  */
 export function heatmapLevel(count: number, lens: HeatmapLens): number {
-  const table = lens === "cycles" ? HEATMAP_THRESHOLDS.cycles : HEATMAP_THRESHOLDS.day;
+  const table =
+    lens === "cycles" ? HEATMAP_THRESHOLDS.cycles : HEATMAP_THRESHOLDS.day;
   let level = 0;
   for (const threshold of table) {
     if (count >= threshold) {

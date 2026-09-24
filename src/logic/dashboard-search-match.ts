@@ -9,9 +9,9 @@ import type {
 } from "@/db/knowledge-search-read";
 import { MEMORY_TYPE_REGISTRY } from "@/db/memory-registry";
 import {
+  type KnowledgeSearchEntryMatch,
   matchCandidateEntries,
   rankCandidatesWithCoverage,
-  type KnowledgeSearchEntryMatch,
 } from "@/services/knowledge-search";
 
 export type DashboardSearchSourceKind =
@@ -24,7 +24,10 @@ export interface DashboardSearchMatch {
   readonly sourceKind: DashboardSearchSourceKind;
   readonly fieldLabel: string;
   readonly snippet: string;
-  readonly highlights: ReadonlyArray<{ readonly start: number; readonly length: number }>;
+  readonly highlights: ReadonlyArray<{
+    readonly start: number;
+    readonly length: number;
+  }>;
   readonly priority: number;
 }
 
@@ -74,7 +77,9 @@ function descriptor(
   match: KnowledgeSearchEntryMatch<KnowledgeSearchEntry>,
 ): DashboardSearchMatch {
   const kind = sourceKind(match.entry);
-  const highlights = match.termMatches.flatMap((termMatch) => termMatch.highlights);
+  const highlights = match.termMatches.flatMap(
+    (termMatch) => termMatch.highlights,
+  );
   const uniqueHighlights = highlights.filter(
     (highlight, index) =>
       highlights.findIndex(
@@ -141,8 +146,10 @@ export function searchDashboard(
       (left, right) =>
         right.coverage - left.coverage ||
         right.score - left.score ||
-        (dashboardRanks.get(left.candidate.contactId) ?? Number.MAX_SAFE_INTEGER) -
-          (dashboardRanks.get(right.candidate.contactId) ?? Number.MAX_SAFE_INTEGER),
+        (dashboardRanks.get(left.candidate.contactId) ??
+          Number.MAX_SAFE_INTEGER) -
+          (dashboardRanks.get(right.candidate.contactId) ??
+            Number.MAX_SAFE_INTEGER),
     )
     .map((ranked) =>
       buildResult(ranked.candidate, ranked.score, ranked.matches),

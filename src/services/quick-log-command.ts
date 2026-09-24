@@ -71,7 +71,9 @@ export interface QuickLogChannelPreference {
 export interface RunQuickLogDeps {
   pendingRef: { current: boolean };
   undoController: QuickLogUndoController;
-  recordTouchpoint: (input: QuickLogInput) => Promise<{ interactionId: number }>;
+  recordTouchpoint: (
+    input: QuickLogInput,
+  ) => Promise<{ interactionId: number }>;
   /**
    * Read the two channel-preference columns Quick Log seeds its channel from
    * (the SAME `app-settings` reads the detailed Log Interaction screen uses).
@@ -160,8 +162,7 @@ export function runQuickLog(deps: RunQuickLogDeps, contactId: number): void {
         secondaryAction: {
           label: "Add Note",
           accessibilityLabel: "Add a note to the logged interaction",
-          onPress: () =>
-            deps.openPostLogEditor({ interactionId, contactId }),
+          onPress: () => deps.openPostLogEditor({ interactionId, contactId }),
         },
       });
       void deps.notifySuccessHaptic();

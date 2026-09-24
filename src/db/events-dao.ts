@@ -29,8 +29,9 @@
  * SECURITY (T-06-04): every value is bound with `?` — no string interpolation of
  * any input anywhere in this module; only static column names are literal text.
  */
-import { inWriteTransaction } from "@/db/transaction";
+
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 /**

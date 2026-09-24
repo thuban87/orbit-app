@@ -271,7 +271,8 @@ export async function resolveMembershipFromDefinition(
     (row) => row.mode === "include",
   );
   return {
-    validity: hasMeaningfulRule || hasExplicitInclude ? "valid" : "needs-attention",
+    validity:
+      hasMeaningfulRule || hasExplicitInclude ? "valid" : "needs-attention",
     candidateIds,
     brokenRules: mapped.broken,
     ...applied,

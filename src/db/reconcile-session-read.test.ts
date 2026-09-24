@@ -8,13 +8,16 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { createReconcileSession, insertReconcileCard } from "@/db/reconcile-session-dao";
+import { runMigrations } from "@/db/migrations/runner";
+import {
+  createReconcileSession,
+  insertReconcileCard,
+} from "@/db/reconcile-session-dao";
 import {
   getNewestPendingReconcileSessionId,
   getResumableReconcileSession,
   reconcileCompletionCounts,
 } from "@/db/reconcile-session-read";
-import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-30 12:00:00";
@@ -28,7 +31,10 @@ beforeEach(async () => {
   await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid });
 });
 
-async function seedContact(target: SqlExecutor, name = "Linked"): Promise<number> {
+async function seedContact(
+  target: SqlExecutor,
+  name = "Linked",
+): Promise<number> {
   const result = await target.runAsync(
     `INSERT INTO contacts (uid, name, tracking_enabled, created_at, modified_at)
      VALUES (?, ?, ?, ?, ?)`,
@@ -51,7 +57,11 @@ async function seedSession(
 async function seedCard(
   target: SqlExecutor,
   sessionId: number,
-  status: "unresolved" | "partial" | "resolved" | "missing_source" = "unresolved",
+  status:
+    | "unresolved"
+    | "partial"
+    | "resolved"
+    | "missing_source" = "unresolved",
   disposition: "updated" | "kept-orbit" | null = null,
 ): Promise<void> {
   await insertReconcileCard(target, {
@@ -60,8 +70,10 @@ async function seedCard(
     contactId: await seedContact(target),
     cardStatus: status,
     diffJson: JSON.stringify({ completionDisposition: disposition }),
-    unresolvedCount: status === "resolved" || status === "missing_source" ? 0 : 1,
-    stagedPhotoRelPath: status === "unresolved" ? "reconcile-staging/card.jpg" : null,
+    unresolvedCount:
+      status === "resolved" || status === "missing_source" ? 0 : 1,
+    stagedPhotoRelPath:
+      status === "unresolved" ? "reconcile-staging/card.jpg" : null,
     now: NOW,
   });
 }
@@ -76,7 +88,10 @@ describe("reconcile-session-read", () => {
       first = new DatabaseSync(dbPath);
       first.exec("PRAGMA foreign_keys = ON");
       const firstExec = nodeSqliteExecutor(first);
-      await runMigrations(firstExec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid });
+      await runMigrations(firstExec, MIGRATIONS, TARGET_VERSION, {
+        now: NOW,
+        newUid,
+      });
       const sessionId = await seedSession(firstExec);
       await seedCard(firstExec, sessionId, "partial");
       first.close();
@@ -84,7 +99,10 @@ describe("reconcile-session-read", () => {
 
       reopened = new DatabaseSync(dbPath);
       reopened.exec("PRAGMA foreign_keys = ON");
-      const resumed = await getResumableReconcileSession(nodeSqliteExecutor(reopened), NOW);
+      const resumed = await getResumableReconcileSession(
+        nodeSqliteExecutor(reopened),
+        NOW,
+      );
       expect(resumed).toMatchObject({
         session: { id: sessionId, totalChecked: 2 },
         cards: [{ cardStatus: "partial", unresolvedCount: 1 }],
@@ -103,7 +121,9 @@ describe("reconcile-session-read", () => {
     const newest = await seedSession(exec, NOW);
     await seedCard(exec, newest);
 
-    await expect(getResumableReconcileSession(exec, NOW)).resolves.toMatchObject({
+    await expect(
+      getResumableReconcileSession(exec, NOW),
+    ).resolves.toMatchObject({
       session: { id: newest },
       sweptStagedPhotoRelPaths: ["reconcile-staging/card.jpg"],
     });
@@ -138,7 +158,9 @@ describe("reconcile-session-read", () => {
        VALUES (?, ?, ?, ?, ?, ?)`,
       [newUid(), newest, await seedContact(exec), "not-json", NOW, NOW],
     );
-    await expect(getNewestPendingReconcileSessionId(exec)).resolves.toBe(newest);
+    await expect(getNewestPendingReconcileSessionId(exec)).resolves.toBe(
+      newest,
+    );
     expect(older).toBeLessThan(newest);
   });
 });

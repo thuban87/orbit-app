@@ -1,17 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { addLink, applyLinkDiff, listLinks } from "@/db/contact-links-dao";
 import {
   archiveContact,
   createContactFull,
   restoreContact,
   updateContactFull,
 } from "@/db/contacts-dao";
-import { addLink, applyLinkDiff, listLinks } from "@/db/contact-links-dao";
 import { readDataRevision } from "@/db/data-revision-dao";
-import { createField } from "@/db/field-ddl";
-import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { clearFavouriteRank, setFavouriteRank } from "@/db/favourites-dao";
+import { createField } from "@/db/field-ddl";
 import { runMigrations } from "@/db/migrations/runner";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -25,7 +27,9 @@ beforeEach(async () => {
   counter = 0;
   exec = nodeSqliteExecutor(openTestDb());
   await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
-    now: NOW, newUid, defaultPhoneRegion: "US",
+    now: NOW,
+    newUid,
+    defaultPhoneRegion: "US",
   });
 });
 
@@ -67,7 +71,14 @@ describe("data revision outer-writer coalescing", () => {
       name: "Alex",
       intervalDays: 30,
       now: NOW,
-      firstInteraction: { uid: newUid(), occurredAt: NOW, channel: "other", connected: 1, quality: null, note: null },
+      firstInteraction: {
+        uid: newUid(),
+        occurredAt: NOW,
+        channel: "other",
+        connected: 1,
+        quality: null,
+        note: null,
+      },
     });
     expect(await readDataRevision(exec)).toBe(1);
 
@@ -88,24 +99,59 @@ describe("data revision outer-writer coalescing", () => {
   });
 
   it("coalesces fan-out field creation and a mixed link diff to one increment each", async () => {
-    const first = await createContactFull(exec, { uid: newUid(), name: "A", intervalDays: 30, now: NOW });
-    const second = await createContactFull(exec, { uid: newUid(), name: "B", intervalDays: 30, now: NOW });
+    const first = await createContactFull(exec, {
+      uid: newUid(),
+      name: "A",
+      intervalDays: 30,
+      now: NOW,
+    });
+    const second = await createContactFull(exec, {
+      uid: newUid(),
+      name: "B",
+      intervalDays: 30,
+      now: NOW,
+    });
     const beforeField = await readDataRevision(exec);
     await createField(exec, {
-      uid: newUid(), col_name: "nickname", label: "Nickname", type: "text", options: null,
-      show_on_new: 0, always_show: 0, display_order: 0, share_with_ai: 0, now: NOW,
+      uid: newUid(),
+      col_name: "nickname",
+      label: "Nickname",
+      type: "text",
+      options: null,
+      show_on_new: 0,
+      always_show: 0,
+      display_order: 0,
+      share_with_ai: 0,
+      now: NOW,
     });
     expect(await readDataRevision(exec)).toBe(beforeField + 1);
 
-    await addLink(exec, { uid: newUid(), contactId: first.contactId, url: "https://one.example", label: "One", now: NOW });
-    await addLink(exec, { uid: newUid(), contactId: first.contactId, url: "https://two.example", label: "Two", now: NOW });
+    await addLink(exec, {
+      uid: newUid(),
+      contactId: first.contactId,
+      url: "https://one.example",
+      label: "One",
+      now: NOW,
+    });
+    await addLink(exec, {
+      uid: newUid(),
+      contactId: first.contactId,
+      url: "https://two.example",
+      label: "Two",
+      now: NOW,
+    });
     const seeded = await listLinks(exec, first.contactId);
     const beforeDiff = await readDataRevision(exec);
     await applyLinkDiff(exec, {
       contactId: first.contactId,
       seeded,
       current: [
-        { id: seeded[0].id, uid: seeded[0].uid, url: "https://one-updated.example", label: "Updated" },
+        {
+          id: seeded[0].id,
+          uid: seeded[0].uid,
+          url: "https://one-updated.example",
+          label: "Updated",
+        },
         { uid: newUid(), url: "https://three.example", label: null },
       ],
       now: NOW,
@@ -115,7 +161,12 @@ describe("data revision outer-writer coalescing", () => {
   });
 
   it("advances once for each binary favourite membership write", async () => {
-    const contact = await createContactFull(exec, { uid: newUid(), name: "Favourite", intervalDays: 30, now: NOW });
+    const contact = await createContactFull(exec, {
+      uid: newUid(),
+      name: "Favourite",
+      intervalDays: 30,
+      now: NOW,
+    });
     const beforeMark = await readDataRevision(exec);
     await setFavouriteRank(exec, contact.contactId, NOW);
     expect(await readDataRevision(exec)).toBe(beforeMark + 1);
@@ -126,11 +177,20 @@ describe("data revision outer-writer coalescing", () => {
   });
 
   it("does not advance when a writer rolls back", async () => {
-    const contact = await createContactFull(exec, { uid: newUid(), name: "Guarded", intervalDays: 30, now: NOW });
+    const contact = await createContactFull(exec, {
+      uid: newUid(),
+      name: "Guarded",
+      intervalDays: 30,
+      now: NOW,
+    });
     const before = await readDataRevision(exec);
-    await expect(archiveContact(exec, contact.contactId, NOW)).resolves.toBeUndefined();
+    await expect(
+      archiveContact(exec, contact.contactId, NOW),
+    ).resolves.toBeUndefined();
     const archived = await readDataRevision(exec);
-    await expect(archiveContact(exec, contact.contactId, NOW)).rejects.toThrow(/no live contact/);
+    await expect(archiveContact(exec, contact.contactId, NOW)).rejects.toThrow(
+      /no live contact/,
+    );
     expect(await readDataRevision(exec)).toBe(archived);
     expect(archived).toBe(before + 1);
   });

@@ -38,8 +38,8 @@ import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
-  MemoryEditor,
   type MemoryDraft,
+  MemoryEditor,
   type MemoryEditPatch,
 } from "./MemoryEditor";
 import { AppText, Button, Sheet } from "./ui";
@@ -99,13 +99,10 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     };
   }, [target]);
 
-  const reReadCreatedMemory = useCallback(
-    async (id: number, cId: number) => {
-      const rows = await listMemoriesForContact(getExecutor(), cId);
-      return rows.find((row) => row.id === id) ?? null;
-    },
-    [],
-  );
+  const reReadCreatedMemory = useCallback(async (id: number, cId: number) => {
+    const rows = await listMemoriesForContact(getExecutor(), cId);
+    return rows.find((row) => row.id === id) ?? null;
+  }, []);
 
   const saveNote = useCallback(async () => {
     if (contactId === null || interactionId === null) return;

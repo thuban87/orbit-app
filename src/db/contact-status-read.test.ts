@@ -13,6 +13,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { beforeEach, describe, expect, it } from "vitest";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { getContactStatus } from "@/db/contact-status-read";
+import { createGroupEvent } from "@/db/group-events-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -26,7 +27,6 @@ import { migration011 } from "@/db/migrations/011-contact-lifecycle-schema";
 import { migration025 } from "@/db/migrations/025-interaction-history-schema";
 import { migration026 } from "@/db/migrations/026-group-events-schema";
 import { runMigrations } from "@/db/migrations/runner";
-import { createGroupEvent } from "@/db/group-events-dao";
 import { ROGUE_K } from "@/db/status";
 import type { SqlExecutor } from "@/db/types";
 import { formatLocalDate } from "@/utils/dates";
@@ -204,15 +204,29 @@ describe("getContactStatus", () => {
   });
 
   it("derives status recency from a lone Group Event child, never its parent", async () => {
-    const contactId = await seedContact({ name: "Group child", intervalDays: 30, lastContact: null });
+    const contactId = await seedContact({
+      name: "Group child",
+      intervalDays: 30,
+      lastContact: null,
+    });
     const occurredAt = "2026-08-10 12:00:00";
     await createGroupEvent(exec, {
-      uid: uid(), title: "Dinner", occurredAt, now: NOW,
+      uid: uid(),
+      title: "Dinner",
+      occurredAt,
+      now: NOW,
       participants: [{ contactId, uid: uid() }],
     });
     const status = await getContactStatus(exec, contactId);
     expect(status?.last_contact).toBe(occurredAt);
     expect(status?.status).not.toBeNull();
-    expect((await exec.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM interactions WHERE contact_id = ?", [contactId]))?.n).toBe(1);
+    expect(
+      (
+        await exec.getFirstAsync<{ n: number }>(
+          "SELECT COUNT(*) AS n FROM interactions WHERE contact_id = ?",
+          [contactId],
+        )
+      )?.n,
+    ).toBe(1);
   });
 });

@@ -233,10 +233,15 @@ describe("orrery-overlay treatment — AA over the raw brightest Orrery pixel (3
           opacity,
         );
 
-        assertForegroundsAA(composite, palette, `${pkg}/${mode} Orrery overlay`);
-        expect(opacity, `${pkg}/${mode}: overlay remains translucent`).toBeLessThan(
-          surfaceOpacityForDensity(pkg, "dense"),
+        assertForegroundsAA(
+          composite,
+          palette,
+          `${pkg}/${mode} Orrery overlay`,
         );
+        expect(
+          opacity,
+          `${pkg}/${mode}: overlay remains translucent`,
+        ).toBeLessThan(surfaceOpacityForDensity(pkg, "dense"));
         expect(
           opacity,
           `${pkg}/${mode}: overlay preserves a visible Orrery backdrop`,

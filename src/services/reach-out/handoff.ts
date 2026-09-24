@@ -52,7 +52,11 @@ function encodeMailtoRecipient(endpoint: string): string {
  * `Linking.openURL`, never a native mail-composer package (that richer composer
  * stays a deferred owner opt-in; none is installed here).
  */
-function buildMailtoUrl(endpoint: string, subject: string, body: string): string {
+function buildMailtoUrl(
+  endpoint: string,
+  subject: string,
+  body: string,
+): string {
   const params: string[] = [];
   if (subject) params.push(`subject=${encodeURIComponent(subject)}`);
   if (body) params.push(`body=${encodeURIComponent(body)}`);

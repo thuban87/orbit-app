@@ -24,20 +24,30 @@ describe("selectCardLine3", () => {
     const selection = selectCardLine3(
       [
         candidate({ id: 1, value: "Cat" }),
-        candidate({ id: 2, value: "Upcoming trip", meaningfulDate: "2026-09-09" }),
+        candidate({
+          id: 2,
+          value: "Upcoming trip",
+          meaningfulDate: "2026-09-09",
+        }),
       ],
       7,
       "Alex",
       NOW,
     );
 
-    expect(selection).toMatchObject({ kind: "candidate", text: "Upcoming trip" });
+    expect(selection).toMatchObject({
+      kind: "candidate",
+      text: "Upcoming trip",
+    });
   });
 
   it("prefers concise candidates only within the same tier", () => {
     const selection = selectCardLine3(
       [
-        candidate({ id: 1, value: "A very long detail about a project that needs more space" }),
+        candidate({
+          id: 1,
+          value: "A very long detail about a project that needs more space",
+        }),
         candidate({ id: 2, value: "Hiking" }),
       ],
       7,
@@ -51,7 +61,12 @@ describe("selectCardLine3", () => {
   it("excludes birthdays even when they are imminent", () => {
     const selection = selectCardLine3(
       [
-        candidate({ id: 1, type: "birthday", value: "Birthday", meaningfulDate: "2026-09-07" }),
+        candidate({
+          id: 1,
+          type: "birthday",
+          value: "Birthday",
+          meaningfulDate: "2026-09-07",
+        }),
         candidate({ id: 2, value: "Ordinary context" }),
       ],
       7,
@@ -59,15 +74,32 @@ describe("selectCardLine3", () => {
       NOW,
     );
 
-    expect(selection).toMatchObject({ kind: "candidate", text: "Ordinary context" });
+    expect(selection).toMatchObject({
+      kind: "candidate",
+      text: "Ordinary context",
+    });
   });
 
   it("uses stable keys rather than array order for equal compactness", () => {
-    const older = candidate({ id: 3, value: "Same", createdAt: "2026-09-01 12:00:00" });
-    const newer = candidate({ id: 8, value: "Same", createdAt: "2026-09-01 12:00:00" });
+    const older = candidate({
+      id: 3,
+      value: "Same",
+      createdAt: "2026-09-01 12:00:00",
+    });
+    const newer = candidate({
+      id: 8,
+      value: "Same",
+      createdAt: "2026-09-01 12:00:00",
+    });
 
-    expect(selectCardLine3([older, newer], 7, "Alex", NOW)).toMatchObject({ text: "Same", candidate: { id: 8 } });
-    expect(selectCardLine3([newer, older], 7, "Alex", NOW)).toMatchObject({ text: "Same", candidate: { id: 8 } });
+    expect(selectCardLine3([older, newer], 7, "Alex", NOW)).toMatchObject({
+      text: "Same",
+      candidate: { id: 8 },
+    });
+    expect(selectCardLine3([newer, older], 7, "Alex", NOW)).toMatchObject({
+      text: "Same",
+      candidate: { id: 8 },
+    });
   });
 
   it("returns a stable short, card-specific prompt when no candidate is useful", () => {
@@ -76,15 +108,25 @@ describe("selectCardLine3", () => {
 
     expect(first).toEqual({
       kind: "prompt",
-      text: CARD_PROMPTS[contactId % CARD_PROMPTS.length].replace("{name}", "Alex"),
+      text: CARD_PROMPTS[contactId % CARD_PROMPTS.length].replace(
+        "{name}",
+        "Alex",
+      ),
     });
     expect(selectCardLine3([], contactId, "Alex", NOW)).toEqual(first);
-    expect(CARD_PROMPTS).not.toContain("What should you remember about {name}?");
+    expect(CARD_PROMPTS).not.toContain(
+      "What should you remember about {name}?",
+    );
   });
 
   it("selects the only useful candidate directly", () => {
     expect(
-      selectCardLine3([candidate({ id: 1, value: "\ud83d\udc15 Luna" })], 7, "Alex", NOW),
+      selectCardLine3(
+        [candidate({ id: 1, value: "\ud83d\udc15 Luna" })],
+        7,
+        "Alex",
+        NOW,
+      ),
     ).toMatchObject({ kind: "candidate", text: "\ud83d\udc15 Luna" });
   });
 });

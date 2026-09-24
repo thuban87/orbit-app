@@ -4,6 +4,7 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { runMigrations } from "@/db/migrations/runner";
 import {
   addRelationship,
   deleteRelationship,
@@ -13,7 +14,6 @@ import {
   restoreRelationship,
 } from "@/db/relationships-dao";
 import type { SqlExecutor } from "@/db/types";
-import { runMigrations } from "@/db/migrations/runner";
 
 const NOW = "2026-09-04 12:00:00";
 let exec: SqlExecutor;
@@ -40,21 +40,73 @@ async function seedContact(name = "Alex"): Promise<number> {
 describe("relationships DAO", () => {
   it("marks manual permanent purges and successful stale expiry dirty for backup", async () => {
     const contactId = await seedContact();
-    const id = await addRelationship(exec, { contactId, personName: "Delete", createdAt: NOW, now: NOW });
-    const uid = (await exec.getFirstAsync<{ uid: string }>("SELECT uid FROM relationships WHERE id=?", [id]))!.uid;
+    const id = await addRelationship(exec, {
+      contactId,
+      personName: "Delete",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const uid = (await exec.getFirstAsync<{ uid: string }>(
+      "SELECT uid FROM relationships WHERE id=?",
+      [id],
+    ))!.uid;
     await deleteRelationship(exec, { id, contactId, now: NOW });
-    const beforePurge = (await exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1"))!.data_revision;
+    const beforePurge = (await exec.getFirstAsync<{ data_revision: number }>(
+      "SELECT data_revision FROM app_settings WHERE id=1",
+    ))!.data_revision;
     await purgeRelationshipPermanently(exec, { id, contactId });
-    await expect(exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1")).resolves.toEqual({ data_revision: beforePurge + 1 });
-    await expect(exec.getFirstAsync("SELECT entity_type,entity_uid,deleted_at FROM tombstones WHERE entity_type='relationship' AND entity_uid=?", [uid])).resolves.toEqual({ entity_type: "relationship", entity_uid: uid, deleted_at: NOW });
+    await expect(
+      exec.getFirstAsync<{ data_revision: number }>(
+        "SELECT data_revision FROM app_settings WHERE id=1",
+      ),
+    ).resolves.toEqual({ data_revision: beforePurge + 1 });
+    await expect(
+      exec.getFirstAsync(
+        "SELECT entity_type,entity_uid,deleted_at FROM tombstones WHERE entity_type='relationship' AND entity_uid=?",
+        [uid],
+      ),
+    ).resolves.toEqual({
+      entity_type: "relationship",
+      entity_uid: uid,
+      deleted_at: NOW,
+    });
 
-    const staleId = await addRelationship(exec, { contactId, personName: "Stale", createdAt: NOW, now: NOW });
-    const staleUid = (await exec.getFirstAsync<{ uid: string }>("SELECT uid FROM relationships WHERE id=?", [staleId]))!.uid;
-    await exec.runAsync("UPDATE relationships SET deleted_at=datetime('now','localtime', ?) WHERE id=?", ["-31 days", staleId]);
-    const beforeExpiry = (await exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1"))!.data_revision;
-    await expect(expireRelationshipIfStale(exec, { id: staleId, contactId }, "-30 days", NOW)).resolves.toBe(true);
-    await expect(exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1")).resolves.toEqual({ data_revision: beforeExpiry + 1 });
-    await expect(exec.getFirstAsync("SELECT entity_uid FROM tombstones WHERE entity_type='relationship' AND entity_uid=?", [staleUid])).resolves.toEqual({ entity_uid: staleUid });
+    const staleId = await addRelationship(exec, {
+      contactId,
+      personName: "Stale",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const staleUid = (await exec.getFirstAsync<{ uid: string }>(
+      "SELECT uid FROM relationships WHERE id=?",
+      [staleId],
+    ))!.uid;
+    await exec.runAsync(
+      "UPDATE relationships SET deleted_at=datetime('now','localtime', ?) WHERE id=?",
+      ["-31 days", staleId],
+    );
+    const beforeExpiry = (await exec.getFirstAsync<{ data_revision: number }>(
+      "SELECT data_revision FROM app_settings WHERE id=1",
+    ))!.data_revision;
+    await expect(
+      expireRelationshipIfStale(
+        exec,
+        { id: staleId, contactId },
+        "-30 days",
+        NOW,
+      ),
+    ).resolves.toBe(true);
+    await expect(
+      exec.getFirstAsync<{ data_revision: number }>(
+        "SELECT data_revision FROM app_settings WHERE id=1",
+      ),
+    ).resolves.toEqual({ data_revision: beforeExpiry + 1 });
+    await expect(
+      exec.getFirstAsync(
+        "SELECT entity_uid FROM tombstones WHERE entity_type='relationship' AND entity_uid=?",
+        [staleUid],
+      ),
+    ).resolves.toEqual({ entity_uid: staleUid });
   });
   it("adds a relationship with optional link fields and preserves multi-byte text", async () => {
     const contactId = await seedContact();
@@ -85,15 +137,17 @@ describe("relationships DAO", () => {
         pinned: number;
         hidden: number | null;
       }>("SELECT * FROM relationships WHERE id = ?", [id]),
-    ).toEqual(expect.objectContaining({
-      id,
-      uid: expect.any(String),
-      person_name: "Cafe\u0301 ☕️ 👨‍👩‍👧‍👦",
-      relation_type: "friend 🫶",
-      linked_contact_id: linkedContactId,
-      pinned: 0,
-      hidden: null,
-    }));
+    ).toEqual(
+      expect.objectContaining({
+        id,
+        uid: expect.any(String),
+        person_name: "Cafe\u0301 ☕️ 👨‍👩‍👧‍👦",
+        relation_type: "friend 🫶",
+        linked_contact_id: linkedContactId,
+        pinned: 0,
+        hidden: null,
+      }),
+    );
     expect(
       await exec.getFirstAsync<{ linked_contact_id: number | null }>(
         "SELECT linked_contact_id FROM relationships WHERE id = ?",
@@ -120,7 +174,9 @@ describe("relationships DAO", () => {
         createdAt: NOW,
         now: NOW,
       }),
-    ).rejects.toThrow("relationships-dao: a contact cannot be linked to itself");
+    ).rejects.toThrow(
+      "relationships-dao: a contact cannot be linked to itself",
+    );
     expect(
       await exec.getFirstAsync<{ count: number }>(
         "SELECT COUNT(*) AS count FROM relationships",
@@ -197,7 +253,9 @@ describe("relationships DAO", () => {
         linkedContactId: contactId,
         now: "2026-09-04 14:00:00",
       }),
-    ).rejects.toThrow("relationships-dao: a contact cannot be linked to itself");
+    ).rejects.toThrow(
+      "relationships-dao: a contact cannot be linked to itself",
+    );
 
     expect(
       await exec.getFirstAsync<{
@@ -207,13 +265,15 @@ describe("relationships DAO", () => {
         hidden: number | null;
         created_at: string;
       }>("SELECT * FROM relationships WHERE id = ?", [id]),
-    ).toEqual(expect.objectContaining({
-      person_name: "Sam",
-      relation_type: "Friend",
-      note: "Updated",
-      hidden: 1,
-      created_at: NOW,
-    }));
+    ).toEqual(
+      expect.objectContaining({
+        person_name: "Sam",
+        relation_type: "Friend",
+        note: "Updated",
+        hidden: 1,
+        created_at: NOW,
+      }),
+    );
   });
 
   it("soft-deletes, restores, and permanently purges only soft-deleted rows", async () => {
@@ -251,7 +311,9 @@ describe("relationships DAO", () => {
     });
     await purgeRelationshipPermanently(exec, { id, contactId });
     expect(
-      await exec.getFirstAsync("SELECT id FROM relationships WHERE id = ?", [id]),
+      await exec.getFirstAsync("SELECT id FROM relationships WHERE id = ?", [
+        id,
+      ]),
     ).toBeNull();
   });
 
@@ -279,16 +341,30 @@ describe("relationships DAO", () => {
     );
 
     await expect(
-      expireRelationshipIfStale(exec, { id: staleId, contactId }, "-30 days", NOW),
+      expireRelationshipIfStale(
+        exec,
+        { id: staleId, contactId },
+        "-30 days",
+        NOW,
+      ),
     ).resolves.toBe(true);
     await expect(
-      expireRelationshipIfStale(exec, { id: freshId, contactId }, "-30 days", NOW),
+      expireRelationshipIfStale(
+        exec,
+        { id: freshId, contactId },
+        "-30 days",
+        NOW,
+      ),
     ).resolves.toBe(false);
     expect(
-      await exec.getFirstAsync("SELECT id FROM relationships WHERE id = ?", [staleId]),
+      await exec.getFirstAsync("SELECT id FROM relationships WHERE id = ?", [
+        staleId,
+      ]),
     ).toBeNull();
     expect(
-      await exec.getFirstAsync("SELECT id FROM relationships WHERE id = ?", [freshId]),
+      await exec.getFirstAsync("SELECT id FROM relationships WHERE id = ?", [
+        freshId,
+      ]),
     ).not.toBeNull();
   });
 });

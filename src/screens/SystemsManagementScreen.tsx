@@ -549,10 +549,7 @@ export function SystemsManagementScreen() {
   const empty = rows.length === 0 && !error;
 
   return (
-    <View
-      testID="systems-management-screen"
-      style={styles.root}
-    >
+    <View testID="systems-management-screen" style={styles.root}>
       <ShellAppBar variant="child" title="Systems" />
       <View style={styles.content}>
         {error ? (

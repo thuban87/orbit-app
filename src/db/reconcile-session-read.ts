@@ -1,4 +1,8 @@
-import { discardSession, type ReconcileCardStatus, type ReconcileSessionStatus } from "@/db/reconcile-session-dao";
+import {
+  discardSession,
+  type ReconcileCardStatus,
+  type ReconcileSessionStatus,
+} from "@/db/reconcile-session-dao";
 import type { SqlExecutor } from "@/db/types";
 
 export interface ReconcileSession {
@@ -45,7 +49,9 @@ interface ReconcileCardDbRow {
   modified_at: string;
 }
 
-export function mapReconcileSession(row: ReconcileSessionDbRow): ReconcileSession {
+export function mapReconcileSession(
+  row: ReconcileSessionDbRow,
+): ReconcileSession {
   return {
     id: row.id,
     uid: row.uid,
@@ -119,7 +125,9 @@ export async function getResumableReconcileSession(
 
   const sweptStagedPhotoRelPaths: string[] = [];
   for (const stale of pending.slice(1)) {
-    sweptStagedPhotoRelPaths.push(...(await discardSession(exec, stale.id, now)));
+    sweptStagedPhotoRelPaths.push(
+      ...(await discardSession(exec, stale.id, now)),
+    );
   }
   return {
     session: mapReconcileSession(newest),

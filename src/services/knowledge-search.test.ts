@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import {
   boundedEditDistance,
-  matchCandidateEntries,
   MAX_TOKENIZE_LEN,
+  matchCandidateEntries,
   rankCandidates,
   rankCandidatesWithCoverage,
   searchKnowledge,
@@ -98,12 +98,17 @@ describe("knowledge search scorer", () => {
     const exactName = { entries: [{ text: "Alex", source: "name" }] };
     const substring = { entries: [{ text: "Alexandria" }] };
 
-    const ranked = rankCandidatesWithCoverage("garden birthday", [partial, full]);
+    const ranked = rankCandidatesWithCoverage("garden birthday", [
+      partial,
+      full,
+    ]);
     expect(ranked.map((result) => result.candidate)).toEqual([full, partial]);
     expect(ranked[1]).toMatchObject({ coverage: 1 });
     expect(rankCandidatesWithCoverage("birthdya", [typo])).toHaveLength(1);
-    expect(rankCandidatesWithCoverage("alex", [substring, exactName]).map(
-      (result) => result.candidate,
-    )).toEqual([exactName, substring]);
+    expect(
+      rankCandidatesWithCoverage("alex", [substring, exactName]).map(
+        (result) => result.candidate,
+      ),
+    ).toEqual([exactName, substring]);
   });
 });

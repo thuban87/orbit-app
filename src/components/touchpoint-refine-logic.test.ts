@@ -139,7 +139,9 @@ describe("parseCustomDurationMinutes", () => {
     expect(parseCustomDurationMinutes("-5")).toBeNull();
     expect(parseCustomDurationMinutes("0")).toBeNull();
     // Over 24h is rejected (never persists an out-of-range duration).
-    expect(parseCustomDurationMinutes(String(MAX_DURATION_SECONDS / 60 + 1))).toBeNull();
+    expect(
+      parseCustomDurationMinutes(String(MAX_DURATION_SECONDS / 60 + 1)),
+    ).toBeNull();
   });
 });
 

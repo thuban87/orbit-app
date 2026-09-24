@@ -40,7 +40,14 @@ describe("migration 010 — contact method labels", () => {
     );
     await exec.runAsync(
       "INSERT INTO contact_methods (uid, contact_id, method_type, raw_value, display_value, is_actionable, is_primary, display_order, created_at, modified_at) VALUES (?, ?, 'phone', ?, ?, 0, 1, 0, ?, ?)",
-      ["method-1", contact.lastInsertRowId, "not a number", "not a number", NOW, NOW],
+      [
+        "method-1",
+        contact.lastInsertRowId,
+        "not a number",
+        "not a number",
+        NOW,
+        NOW,
+      ],
     );
 
     await runMigrations(exec, [...migrations, migration010], 10, {

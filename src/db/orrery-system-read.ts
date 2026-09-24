@@ -30,8 +30,8 @@ import {
   type BrokenRule,
   resolveCustomSystemMembers,
   resolveMembershipFromDefinition,
-  type SystemGravityInputsLoader,
   type SystemDefinitionValidity,
+  type SystemGravityInputsLoader,
   type SystemRule,
 } from "@/logic/system-rule-resolver";
 

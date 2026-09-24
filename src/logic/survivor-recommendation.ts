@@ -61,7 +61,10 @@ export function recommendSurvivor(
 ): SurvivorRecommendation {
   const aResult = scoreCandidate(a, b);
   const bResult = scoreCandidate(b, a);
-  if (aResult.score > bResult.score || (aResult.score === bResult.score && a.id < b.id)) {
+  if (
+    aResult.score > bResult.score ||
+    (aResult.score === bResult.score && a.id < b.id)
+  ) {
     return { candidateId: a.id, signals: aResult.signals };
   }
   return { candidateId: b.id, signals: bResult.signals };

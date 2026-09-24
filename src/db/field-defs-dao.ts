@@ -35,8 +35,9 @@
  * TIMESTAMPS are local wall-clock supplied by the caller (never toISOString).
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
-import type { CustomFieldDef, SqliteBool } from "@/db/field-types";
+
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import type { CustomFieldDef, SqliteBool } from "@/db/field-types";
 import { upsertValueCore } from "@/db/field-values-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";

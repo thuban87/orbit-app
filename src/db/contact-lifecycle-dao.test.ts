@@ -240,7 +240,10 @@ describe("contact lifecycle DAO", () => {
     // exactly two events, and the bind row is byte-for-byte what it was.
     expect(afterUnbind).toHaveLength(2);
     expect(afterUnbind[0]).toEqual(bindEvent);
-    expect(afterUnbind[1]).toMatchObject({ type: "unbind", occurred_at: later2 });
+    expect(afterUnbind[1]).toMatchObject({
+      type: "unbind",
+      occurred_at: later2,
+    });
   });
 
   it("rejects nonexistent or wrong-state transition targets without advancing revision", async () => {

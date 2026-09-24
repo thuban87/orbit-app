@@ -32,19 +32,21 @@
  */
 
 /** Legacy `quality` value -> Tone value. `other`/`unspecified`/NULL are NOT here (pass through). */
-export const LEGACY_QUALITY_REMAP: Readonly<Record<string, string>> = Object.freeze({
-  good: "Positive",
-  fine: "Neutral",
-  hard: "Negative",
-});
+export const LEGACY_QUALITY_REMAP: Readonly<Record<string, string>> =
+  Object.freeze({
+    good: "Positive",
+    fine: "Neutral",
+    hard: "Negative",
+  });
 
 /** Legacy `channel` value -> user-facing label. `other`/`unspecified`/NULL are NOT here (pass through). */
-export const LEGACY_CHANNEL_REMAP: Readonly<Record<string, string>> = Object.freeze({
-  text: "Message",
-  email: "Message",
-  call: "Call",
-  "in-person": "In Person",
-});
+export const LEGACY_CHANNEL_REMAP: Readonly<Record<string, string>> =
+  Object.freeze({
+    text: "Message",
+    email: "Message",
+    call: "Call",
+    "in-person": "In Person",
+  });
 
 /**
  * Map a stored `quality` value to its Tone value, passing through any value not in

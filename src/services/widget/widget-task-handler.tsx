@@ -47,9 +47,9 @@
  */
 import type { WidgetTaskHandler } from "react-native-android-widget";
 import { getExecutor, localDateTime, openAndMigrate } from "@/db/database";
+import { getDeviceRegion } from "@/services/device-region";
 import { Logger } from "@/utils/logger";
 import { widgetMarkContacted } from "./widget-mark";
-import { getDeviceRegion } from "@/services/device-region";
 import { pushWidgetUpdate } from "./widget-refresh";
 import { renderFavourites } from "./widget-render";
 

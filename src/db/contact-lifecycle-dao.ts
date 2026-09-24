@@ -29,7 +29,12 @@ export async function recordLifecycleTransitionCore(
   now: string,
 ): Promise<void> {
   await recordEventCore(exec, {
-    uid: newUid(), contactId, type: direction, occurredAt: now, detail: null, now,
+    uid: newUid(),
+    contactId,
+    type: direction,
+    occurredAt: now,
+    detail: null,
+    now,
   });
 }
 

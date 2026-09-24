@@ -14,7 +14,9 @@ describe("shared Profile layout-template library contract", () => {
 
     expect(editor).toContain("onManageTemplates?: () => void");
     expect(editor).toContain('label="Layout templates"');
-    expect(profile).toContain('onManageTemplates={() => setOverlay("templates")}');
+    expect(profile).toContain(
+      'onManageTemplates={() => setOverlay("templates")}',
+    );
   });
 
   it("uses the canonical local picker to assign an explicit non-archived contact override", () => {
@@ -27,7 +29,7 @@ describe("shared Profile layout-template library contract", () => {
     expect(manager).toContain('label="Choose individual contact"');
     expect(manager).toContain("<ContactPicker");
     expect(manager).toContain("allowArchivedSearch={false}");
-    expect(manager).toContain("assign(\"contact\", selectedContactId)");
+    expect(manager).toContain('assign("contact", selectedContactId)');
     expect(manager).toContain("contactId: targetContactId");
     expect(picker).toContain("allowArchivedSearch?: boolean");
   });

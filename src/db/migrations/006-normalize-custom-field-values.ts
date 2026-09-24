@@ -108,7 +108,10 @@ async function loadAndValidateDefs(
 
   const definitionNames = new Set(defs.map((def) => def.col_name));
   for (const column of columns) {
-    if (FIXED_LEGACY_COLUMNS.has(column.name) || definitionNames.has(column.name)) {
+    if (
+      FIXED_LEGACY_COLUMNS.has(column.name) ||
+      definitionNames.has(column.name)
+    ) {
       continue;
     }
     await snapshotOrphanColumn(exec, column.name, now);
@@ -166,7 +169,10 @@ async function readLegacyRows(
   );
   const byContact = new Map<number, LegacyRow>();
   for (const row of rows) {
-    if (!Number.isInteger(row.contact_id) || typeof row.modified_at !== "string") {
+    if (
+      !Number.isInteger(row.contact_id) ||
+      typeof row.modified_at !== "string"
+    ) {
       fail("unreadable legacy value row metadata");
     }
     if (byContact.has(row.contact_id)) {
@@ -208,8 +214,13 @@ async function proveCopy(
         "SELECT value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
         [contact.id, def.id],
       );
-      if (!copied || assertTextValue(copied.value, def.col_name) !== expectedValue) {
-        fail(`post-copy value proof failed for contact ${contact.id} / ${def.id}`);
+      if (
+        !copied ||
+        assertTextValue(copied.value, def.col_name) !== expectedValue
+      ) {
+        fail(
+          `post-copy value proof failed for contact ${contact.id} / ${def.id}`,
+        );
       }
     }
   }

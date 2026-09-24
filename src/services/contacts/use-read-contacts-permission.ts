@@ -1,8 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert, Linking, PermissionsAndroid } from "react-native";
 import {
-  classifyPermissionResult,
   type ContactsPermissionVerdict,
+  classifyPermissionResult,
 } from "./read-contacts-permission-logic";
 
 const PERMANENT_DENIAL_KEY = "contacts_permission_permanent_v1";
@@ -14,7 +14,8 @@ export interface ContactsPermissionState {
   verdict: ContactsPermissionVerdict | "priming";
 }
 
-export interface ContactsPermissionRequestState extends ContactsPermissionState {
+export interface ContactsPermissionRequestState
+  extends ContactsPermissionState {
   granted: boolean;
 }
 
@@ -40,7 +41,10 @@ async function writeValue(key: string, value: string): Promise<void> {
 
 async function readDenyCount(): Promise<number> {
   try {
-    const value = Number.parseInt((await AsyncStorage.getItem(DENY_COUNT_KEY)) ?? "0", 10);
+    const value = Number.parseInt(
+      (await AsyncStorage.getItem(DENY_COUNT_KEY)) ?? "0",
+      10,
+    );
     return Number.isFinite(value) && value > 0 ? value : 0;
   } catch {
     return 0;

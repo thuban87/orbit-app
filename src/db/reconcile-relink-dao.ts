@@ -15,9 +15,15 @@ export type RelinkExternalSourceResult =
   | { kind: "duplicate-active-link"; otherContactId: number }
   | { kind: "already-active-link"; externalContactLinkId: number };
 
-function assertOneChange(result: { changes: number }, operation: string, id: number): void {
+function assertOneChange(
+  result: { changes: number },
+  operation: string,
+  id: number,
+): void {
   if (result.changes !== 1) {
-    throw new Error(`${operation}: no row matched id=${id} (changed ${result.changes})`);
+    throw new Error(
+      `${operation}: no row matched id=${id} (changed ${result.changes})`,
+    );
   }
 }
 
@@ -31,18 +37,27 @@ export function relinkExternalSource(
   input: RelinkExternalSourceInput,
 ): Promise<RelinkExternalSourceResult> {
   return inWriteTransaction(exec, async () => {
-    const existing = await exec.getFirstAsync<{ id: number; contact_id: number }>(
+    const existing = await exec.getFirstAsync<{
+      id: number;
+      contact_id: number;
+    }>(
       `SELECT id, contact_id FROM external_contact_links
        WHERE provider = ? AND external_contact_id = ? AND is_active = 1`,
       [input.newProvider, input.newExternalContactId],
     );
     if (existing && existing.contact_id !== input.contactId) {
-      return { kind: "duplicate-active-link", otherContactId: existing.contact_id };
+      return {
+        kind: "duplicate-active-link",
+        otherContactId: existing.contact_id,
+      };
     }
     // A second active source on this contact already owns the selected provider
     // identity; report it rather than provoking the global unique index.
     if (existing && existing.id !== input.staleLinkId) {
-      return { kind: "already-active-link", externalContactLinkId: existing.id };
+      return {
+        kind: "already-active-link",
+        externalContactLinkId: existing.id,
+      };
     }
 
     const retired = await exec.runAsync(
@@ -65,7 +80,10 @@ export function relinkExternalSource(
         input.now,
       ],
     );
-    return { kind: "relinked", externalContactLinkId: inserted.lastInsertRowId };
+    return {
+      kind: "relinked",
+      externalContactLinkId: inserted.lastInsertRowId,
+    };
   });
 }
 

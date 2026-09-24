@@ -17,9 +17,9 @@ describe("shellTransientStore", () => {
     expect(store.dismissTop()).toBe(true);
     expect(secondDismiss).toHaveBeenCalledOnce();
     expect(firstDismiss).not.toHaveBeenCalled();
-    expect(shellTransientStore.getState().entries.map((entry) => entry.id)).toEqual([
-      "first",
-    ]);
+    expect(
+      shellTransientStore.getState().entries.map((entry) => entry.id),
+    ).toEqual(["first"]);
 
     expect(shellTransientStore.getState().dismissTop()).toBe(true);
     expect(firstDismiss).toHaveBeenCalledOnce();

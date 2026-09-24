@@ -25,7 +25,9 @@ export function formatLocalDate(date: Date = new Date()): string {
 export function parseLocalMs(stored: string): number {
   const match = stored
     .trim()
-    .match(/^([0-9]{4})-([0-9]{2})-([0-9]{2})(?:[ T]([0-9]{2}):([0-9]{2})(?::([0-9]{2}))?)?$/);
+    .match(
+      /^([0-9]{4})-([0-9]{2})-([0-9]{2})(?:[ T]([0-9]{2}):([0-9]{2})(?::([0-9]{2}))?)?$/,
+    );
   if (!match) {
     throw new Error(`dates: unparseable timestamp "${stored}"`);
   }
@@ -151,7 +153,9 @@ export function calendarDaysBetween(createdMs: number, nowMs: number): number {
 export function isSnoozed(snoozeUntil: string | null, now: string): boolean {
   if (snoozeUntil === null) return false;
   try {
-    return calendarDaysBetween(parseLocalMs(now), parseLocalMs(snoozeUntil)) > 0;
+    return (
+      calendarDaysBetween(parseLocalMs(now), parseLocalMs(snoozeUntil)) > 0
+    );
   } catch {
     return false;
   }

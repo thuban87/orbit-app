@@ -27,7 +27,10 @@ function RestoreResultTabRoute(props: RootStackScreenProps<"RestoreResult">) {
 
 export function BackupStack() {
   return (
-    <Stack.Navigator initialRouteName="Backup" screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      initialRouteName="Backup"
+      screenOptions={{ headerShown: false }}
+    >
       <Stack.Screen name="Backup" component={BackupTabRoute} />
       <Stack.Screen name="BackupSettings" component={BackupSettingsScreen} />
       <Stack.Screen name="RestorePreview" component={RestorePreviewTabRoute} />

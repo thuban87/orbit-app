@@ -29,13 +29,13 @@
  */
 import { memo } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
-  type SharedValue,
   runOnJS,
+  type SharedValue,
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
-import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import type { WheelMarker } from "@/components/history/rolodex-logic";
 import { AppText } from "@/components/ui/AppText";
 import type { ThemePalette } from "@/theme/theme-types";
@@ -72,7 +72,10 @@ function rowDepthStyle(distance: number, reduced: boolean) {
   "worklet";
   const abs = Math.abs(distance);
   if (reduced) {
-    return { opacity: Math.max(0.35, 1 - abs * 0.2), transform: [{ scale: 1 }] };
+    return {
+      opacity: Math.max(0.35, 1 - abs * 0.2),
+      transform: [{ scale: 1 }],
+    };
   }
   return {
     opacity: Math.max(0.15, 1 - abs * 0.34),
@@ -134,7 +137,13 @@ const WheelRow = memo(function WheelRow({
 });
 
 /** Silhouette-primary date marker: filled dot / ring / filled + count. */
-function Marker({ marker, colors }: { marker: WheelMarker; colors: ThemePalette }) {
+function Marker({
+  marker,
+  colors,
+}: {
+  marker: WheelMarker;
+  colors: ThemePalette;
+}) {
   if (marker.kind === "none") {
     return <View style={styles.markerSlot} />;
   }
@@ -150,7 +159,10 @@ function Marker({ marker, colors }: { marker: WheelMarker; colors: ThemePalette 
         {/* Ring: no background fill (default) so the silhouette reads as an
             outline distinct from the filled interaction dot. */}
         <View
-          style={[dot, { borderWidth: 1.5, borderColor: colors.markerLifecycle }]}
+          style={[
+            dot,
+            { borderWidth: 1.5, borderColor: colors.markerLifecycle },
+          ]}
         />
       </View>
     );
@@ -198,7 +210,10 @@ export function RolodexWheel({
   // the parent commits a new selection (state), not per frame.
   const strip = useAnimatedStyle(() => ({
     transform: [
-      { translateY: CENTRE_Y - selectedIndex * WHEEL_GEOMETRY.itemHeight + offset.value },
+      {
+        translateY:
+          CENTRE_Y - selectedIndex * WHEEL_GEOMETRY.itemHeight + offset.value,
+      },
     ],
   }));
 

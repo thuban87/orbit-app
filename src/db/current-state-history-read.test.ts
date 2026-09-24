@@ -3,13 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
-import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { setCurrentStateValue } from "@/db/current-state-history-dao";
 import {
   getCurrentStateHistory,
   getCurrentStateValue,
   getCurrentStateValues,
 } from "@/db/current-state-history-read";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -21,7 +21,10 @@ let exec: SqlExecutor;
 beforeEach(async () => {
   uidCounter = 0;
   exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid: uid });
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+  });
 });
 
 async function makeContact(name = "Read contact"): Promise<number> {
@@ -37,8 +40,12 @@ describe("current-state history reads", () => {
   it("returns null and an empty history for an unpopulated field", async () => {
     const contactId = await makeContact();
 
-    await expect(getCurrentStateValue(exec, contactId, "current_location")).resolves.toBeNull();
-    await expect(getCurrentStateHistory(exec, contactId, "current_location")).resolves.toEqual([]);
+    await expect(
+      getCurrentStateValue(exec, contactId, "current_location"),
+    ).resolves.toBeNull();
+    await expect(
+      getCurrentStateHistory(exec, contactId, "current_location"),
+    ).resolves.toEqual([]);
   });
 
   it("returns a current-only value with no earlier entries", async () => {
@@ -50,12 +57,18 @@ describe("current-state history reads", () => {
       now: NOW,
     });
 
-    expect(await getCurrentStateValue(exec, contactId, "current_location")).toEqual(
+    expect(
+      await getCurrentStateValue(exec, contactId, "current_location"),
+    ).toEqual(expect.objectContaining({ value: "Chicago", is_current: 1 }));
+    const history = await getCurrentStateHistory(
+      exec,
+      contactId,
+      "current_location",
+    );
+    expect(history).toHaveLength(1);
+    expect(history[0]).toEqual(
       expect.objectContaining({ value: "Chicago", is_current: 1 }),
     );
-    const history = await getCurrentStateHistory(exec, contactId, "current_location");
-    expect(history).toHaveLength(1);
-    expect(history[0]).toEqual(expect.objectContaining({ value: "Chicago", is_current: 1 }));
     expect(history.filter((row) => row.is_current === 0)).toEqual([]);
   });
 
@@ -74,10 +87,11 @@ describe("current-state history reads", () => {
       now: "2026-09-05 12:00:00",
     });
 
-    expect((await getCurrentStateHistory(exec, contactId, "current_location")).map((row) => [
-      row.value,
-      row.is_current,
-    ])).toEqual([
+    expect(
+      (await getCurrentStateHistory(exec, contactId, "current_location")).map(
+        (row) => [row.value, row.is_current],
+      ),
+    ).toEqual([
       ["Madison", 1],
       ["Chicago", 0],
     ]);

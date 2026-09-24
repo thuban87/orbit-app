@@ -19,38 +19,42 @@ interface ShellTransientStore {
  * whose visibility lives in local React state cannot be closed by removing an
  * identifier alone.
  */
-export const shellTransientStore = create<ShellTransientStore>()((set, get) => ({
-  entries: [],
-  openTransient: (id, dismiss) => {
-    set((state) => {
-      const existingIndex = state.entries.findIndex((entry) => entry.id === id);
+export const shellTransientStore = create<ShellTransientStore>()(
+  (set, get) => ({
+    entries: [],
+    openTransient: (id, dismiss) => {
+      set((state) => {
+        const existingIndex = state.entries.findIndex(
+          (entry) => entry.id === id,
+        );
 
-      // Keep the original position when an open overlay re-registers after a
-      // render; its close callback changes, but its layer ordering does not.
-      if (existingIndex >= 0) {
-        return {
-          entries: state.entries.map((entry, index) =>
-            index === existingIndex ? { id, dismiss } : entry,
-          ),
-        };
-      }
+        // Keep the original position when an open overlay re-registers after a
+        // render; its close callback changes, but its layer ordering does not.
+        if (existingIndex >= 0) {
+          return {
+            entries: state.entries.map((entry, index) =>
+              index === existingIndex ? { id, dismiss } : entry,
+            ),
+          };
+        }
 
-      return { entries: [...state.entries, { id, dismiss }] };
-    });
-  },
-  closeTransient: (id) => {
-    set((state) => ({
-      entries: state.entries.filter((entry) => entry.id !== id),
-    }));
-  },
-  dismissTop: () => {
-    const top = get().entries.at(-1);
-    if (!top) return false;
+        return { entries: [...state.entries, { id, dismiss }] };
+      });
+    },
+    closeTransient: (id) => {
+      set((state) => ({
+        entries: state.entries.filter((entry) => entry.id !== id),
+      }));
+    },
+    dismissTop: () => {
+      const top = get().entries.at(-1);
+      if (!top) return false;
 
-    // Remove first so a callback that also calls closeTransient is harmless.
-    set((state) => ({ entries: state.entries.slice(0, -1) }));
-    top.dismiss();
-    return true;
-  },
-  isAnyOpen: () => get().entries.length > 0,
-}));
+      // Remove first so a callback that also calls closeTransient is harmless.
+      set((state) => ({ entries: state.entries.slice(0, -1) }));
+      top.dismiss();
+      return true;
+    },
+    isAnyOpen: () => get().entries.length > 0,
+  }),
+);

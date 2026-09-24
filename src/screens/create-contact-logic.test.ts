@@ -4,12 +4,12 @@ import type { LastSpokeValue } from "@/components/tri-state-last-spoke-logic";
 import {
   type BuildCreateInputDeps,
   buildCreateInput,
-  collectBlockingErrors,
-  coordinateBoundToggle,
-  coordinateCadenceSelection,
   CREATE_SECTION_FIELD_MAP,
   type CreateFormState,
   canSave,
+  collectBlockingErrors,
+  coordinateBoundToggle,
+  coordinateCadenceSelection,
   firstInteractionOccurredAt,
   resolveErrorSection,
 } from "./create-contact-logic";

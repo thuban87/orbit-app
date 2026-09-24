@@ -3,7 +3,9 @@ import { resolveBackIntent } from "./back-intent";
 
 describe("resolveBackIntent", () => {
   it("dismisses a transient before navigation", () => {
-    expect(resolveBackIntent({ anyTransientOpen: true })).toBe("dismiss-transient");
+    expect(resolveBackIntent({ anyTransientOpen: true })).toBe(
+      "dismiss-transient",
+    );
   });
 
   it("falls through to the navigator when no transient is open", () => {

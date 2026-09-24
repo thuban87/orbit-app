@@ -46,7 +46,9 @@ describe("buildWindow — Month lens", () => {
     expect(w.end).toBe("2026-02-28");
     // Whole-week alignment: total cells divisible by 7, placeholders carry no date.
     expect(w.cells.length % 7).toBe(0);
-    expect(w.cells.filter((c) => c.isPlaceholder).every((c) => c.date === null)).toBe(true);
+    expect(
+      w.cells.filter((c) => c.isPlaceholder).every((c) => c.date === null),
+    ).toBe(true);
   });
 
   it("flags in-month dates after today as future", () => {

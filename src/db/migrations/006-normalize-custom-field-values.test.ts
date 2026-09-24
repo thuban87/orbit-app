@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { readPromptContext } from "@/db/ai-context-read";
 import { getContactForEdit } from "@/db/contact-read";
 import {
@@ -6,11 +7,7 @@ import {
   deleteOrQuarantineField,
   expireFieldIfStale,
 } from "@/db/field-ddl";
-import {
-  listDefs,
-  quarantineField,
-  restoreField,
-} from "@/db/field-defs-dao";
+import { listDefs, quarantineField, restoreField } from "@/db/field-defs-dao";
 import { applyTypeChange, preflightTypeChange } from "@/db/field-type-change";
 import {
   defsForCreateForm,
@@ -18,7 +15,6 @@ import {
   upsertValue,
   visibleDefsForProfile,
 } from "@/db/field-values-dao";
-import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -136,7 +132,14 @@ async function definitionByColName(colName: string) {
     uid: string;
     col_name: string;
     label: string;
-    type: "text" | "textarea" | "dropdown" | "date" | "toggle" | "number" | "photo";
+    type:
+      | "text"
+      | "textarea"
+      | "dropdown"
+      | "date"
+      | "toggle"
+      | "number"
+      | "photo";
     options: string | null;
     show_on_new: 0 | 1;
     always_show: 0 | 1;
@@ -157,7 +160,11 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
     const casey = await addContact("Casey");
     const text = await addDefinition("nickname", "text");
     const textarea = await addDefinition("notes", "textarea");
-    const dropdown = await addDefinition("relationship", "dropdown", '["friend","work"]');
+    const dropdown = await addDefinition(
+      "relationship",
+      "dropdown",
+      '["friend","work"]',
+    );
     const date = await addDefinition("met_on", "date");
     const toggle = await addDefinition("opt_in", "toggle");
     const number = await addDefinition("score", "number");
@@ -205,7 +212,11 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
       ),
     ).toEqual({ n: 21 });
     expect(
-      await exec.getFirstAsync<{ value: string | null; created_at: string; modified_at: string }>(
+      await exec.getFirstAsync<{
+        value: string | null;
+        created_at: string;
+        modified_at: string;
+      }>(
         "SELECT value, created_at, modified_at FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
         [alex, photo],
       ),
@@ -251,7 +262,11 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
       ),
     ).toEqual({ value: "2025-03-04" });
     expect(
-      await exec.getFirstAsync<{ value: string | null; created_at: string; modified_at: string }>(
+      await exec.getFirstAsync<{
+        value: string | null;
+        created_at: string;
+        modified_at: string;
+      }>(
         "SELECT value, created_at, modified_at FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
         [casey, photo],
       ),
@@ -264,7 +279,9 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
       await exec.getFirstAsync<{ sql: string }>(
         "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'custom_field_values'",
       ),
-    ).toMatchObject({ sql: expect.stringContaining("UNIQUE(contact_id, field_def_id)") });
+    ).toMatchObject({
+      sql: expect.stringContaining("UNIQUE(contact_id, field_def_id)"),
+    });
     expect(
       await exec.getFirstAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'contact_custom_values'",
@@ -291,7 +308,11 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
         "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'contact_custom_values'",
       ),
     ).toEqual(before);
-    expect(await exec.getAllAsync<Record<string, unknown>>("SELECT * FROM contact_custom_values")).toEqual(beforeRows);
+    expect(
+      await exec.getAllAsync<Record<string, unknown>>(
+        "SELECT * FROM contact_custom_values",
+      ),
+    ).toEqual(beforeRows);
     expect(
       await exec.getFirstAsync<{ name: string }>(
         "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'custom_field_values'",
@@ -311,7 +332,12 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
 
     expect(await userVersion()).toBe(6);
     expect(
-      await exec.getFirstAsync<{ field_col_name: string; old_value: string; operation: string; created_at: string }>(
+      await exec.getFirstAsync<{
+        field_col_name: string;
+        old_value: string;
+        operation: string;
+        created_at: string;
+      }>(
         "SELECT field_col_name, old_value, operation, created_at FROM field_history WHERE contact_id = ?",
         [alex],
       ),
@@ -391,11 +417,24 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
     // The migration itself remains a v6 proof. Exercise its lifecycle callers
     // against the current production schema, where permanent deletes record
     // Phase-17 tombstones.
-    await runMigrations(exec, [...legacyMigrations, migration006, migration007, migration008, migration009, migration010, migration011], 11, {
-      now: MIGRATION_NOW,
-      newUid: uid,
-      defaultPhoneRegion: "US",
-    });
+    await runMigrations(
+      exec,
+      [
+        ...legacyMigrations,
+        migration006,
+        migration007,
+        migration008,
+        migration009,
+        migration010,
+        migration011,
+      ],
+      11,
+      {
+        now: MIGRATION_NOW,
+        newUid: uid,
+        defaultPhoneRegion: "US",
+      },
+    );
     await runMigrations(exec, [migration016, migration017, migration018], 18, {
       now: MIGRATION_NOW,
       newUid: uid,
@@ -417,11 +456,13 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
       score: "0042.50e-1",
       portrait: "custom-fields/1/portrait/photo.jpg",
     });
-    expect(defsForCreateForm(liveDefs).map((definition) => definition.col_name)).toEqual([
-      "nickname",
-    ]);
     expect(
-      visibleDefsForProfile(liveDefs, initial).map((definition) => definition.col_name),
+      defsForCreateForm(liveDefs).map((definition) => definition.col_name),
+    ).toEqual(["nickname"]);
+    expect(
+      visibleDefsForProfile(liveDefs, initial).map(
+        (definition) => definition.col_name,
+      ),
     ).toContain("portrait");
     expect(await getContactForEdit(exec, alex, liveDefs)).toMatchObject({
       values: expect.objectContaining({
@@ -431,14 +472,35 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
     });
 
     const nicknameDef = await definitionByColName("nickname");
-    const originalPair = await exec.getFirstAsync<{ uid: string; created_at: string }>(
+    const originalPair = await exec.getFirstAsync<{
+      uid: string;
+      created_at: string;
+    }>(
       "SELECT uid, created_at FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
       [alex, nicknameDef.id],
     );
-    await upsertValue(exec, alex, nicknameDef.id, "ignored-new-uid", "Aces", MIGRATION_NOW);
-    await upsertValue(exec, alex, nicknameDef.id, "ignored-new-uid", null, MIGRATION_NOW);
+    await upsertValue(
+      exec,
+      alex,
+      nicknameDef.id,
+      "ignored-new-uid",
+      "Aces",
+      MIGRATION_NOW,
+    );
+    await upsertValue(
+      exec,
+      alex,
+      nicknameDef.id,
+      "ignored-new-uid",
+      null,
+      MIGRATION_NOW,
+    );
     expect(
-      await exec.getFirstAsync<{ uid: string; created_at: string; value: string | null }>(
+      await exec.getFirstAsync<{
+        uid: string;
+        created_at: string;
+        value: string | null;
+      }>(
         "SELECT uid, created_at, value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
         [alex, nicknameDef.id],
       ),
@@ -457,7 +519,11 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
       ),
     ).toEqual(expect.objectContaining({ value: "maybe" }));
     expect(
-      await exec.getFirstAsync<{ field_col_name: string; old_value: string; operation: string }>(
+      await exec.getFirstAsync<{
+        field_col_name: string;
+        old_value: string;
+        operation: string;
+      }>(
         "SELECT field_col_name, old_value, operation FROM field_history WHERE contact_id = ? AND field_col_name = ?",
         [alex, "opt_in"],
       ),
@@ -505,19 +571,30 @@ describe("migration006 — lossless legacy custom-value normalization", () => {
       "UPDATE custom_field_defs SET share_with_ai = 0 WHERE col_name = ?",
       ["score"],
     );
-    await upsertValue(exec, alex, nicknameDef.id, uid(), "shared", MIGRATION_NOW);
+    await upsertValue(
+      exec,
+      alex,
+      nicknameDef.id,
+      uid(),
+      "shared",
+      MIGRATION_NOW,
+    );
     await upsertValue(exec, alex, scoreDef.id, uid(), "private", MIGRATION_NOW);
     await quarantineField(exec, portrait, MIGRATION_NOW);
     const prompt = await readPromptContext(exec, alex, MIGRATION_NOW);
-    expect(prompt.sharedFields).toEqual([{ label: "nickname", value: "shared" }]);
+    expect(prompt.sharedFields).toEqual([
+      { label: "nickname", value: "shared" },
+    ]);
     expect(JSON.stringify(prompt)).not.toContain("private");
-    expect(JSON.stringify(prompt)).not.toContain("custom-fields/1/portrait/photo.jpg");
+    expect(JSON.stringify(prompt)).not.toContain(
+      "custom-fields/1/portrait/photo.jpg",
+    );
     await restoreField(exec, portrait, MIGRATION_NOW);
 
     const emptyDef = await definitionByColName("after_quarantine");
-    expect(
-      await deleteOrQuarantineField(exec, emptyDef, MIGRATION_NOW),
-    ).toBe("deleted");
+    expect(await deleteOrQuarantineField(exec, emptyDef, MIGRATION_NOW)).toBe(
+      "deleted",
+    );
     await quarantineField(exec, scoreDef.id, MIGRATION_NOW);
     await exec.runAsync(
       "UPDATE custom_field_defs SET quarantined_at = datetime('now', 'localtime', '-31 days') WHERE id = ?",

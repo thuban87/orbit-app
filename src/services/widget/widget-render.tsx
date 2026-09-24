@@ -52,8 +52,8 @@ import {
   type WidgetInfo,
 } from "react-native-android-widget";
 import { getExecutor, openAndMigrate } from "@/db/database";
-import { Logger } from "@/utils/logger";
 import { getDeviceRegion } from "@/services/device-region";
+import { Logger } from "@/utils/logger";
 import {
   ringColor,
   ringWeight,

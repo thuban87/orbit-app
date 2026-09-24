@@ -34,7 +34,12 @@ export interface RelationshipCandidate {
   contactId: number;
 }
 
-function assertOneChange(op: string, id: number, contactId: number, changes: number): void {
+function assertOneChange(
+  op: string,
+  id: number,
+  contactId: number,
+  changes: number,
+): void {
   if (changes !== 1) {
     throw new Error(
       `${op}: no relationship matched id=${id} for contactId=${contactId} (changed ${changes})`,
@@ -139,7 +144,12 @@ export async function editRelationshipCore(
       WHERE id = ? AND contact_id = ?`,
     [...params, input.id, input.contactId],
   );
-  assertOneChange("editRelationship", input.id, input.contactId, result.changes);
+  assertOneChange(
+    "editRelationship",
+    input.id,
+    input.contactId,
+    result.changes,
+  );
 }
 
 /** Soft-delete a relationship while the caller owns the write transaction. */
@@ -153,7 +163,12 @@ export async function deleteRelationshipCore(
       WHERE id = ? AND contact_id = ?`,
     [input.now, input.now, input.id, input.contactId],
   );
-  assertOneChange("deleteRelationship", input.id, input.contactId, result.changes);
+  assertOneChange(
+    "deleteRelationship",
+    input.id,
+    input.contactId,
+    result.changes,
+  );
 }
 
 /** Restore a soft-deleted relationship while the caller owns the write transaction. */
@@ -167,7 +182,12 @@ export async function restoreRelationshipCore(
       WHERE id = ? AND contact_id = ?`,
     [input.now, input.id, input.contactId],
   );
-  assertOneChange("restoreRelationship", input.id, input.contactId, result.changes);
+  assertOneChange(
+    "restoreRelationship",
+    input.id,
+    input.contactId,
+    result.changes,
+  );
 }
 
 /** Physically remove a soft-deleted relationship while the caller owns the transaction. */
@@ -186,17 +206,29 @@ export async function purgeRelationshipPermanentlyCore(
   }
   await insertTombstoneCore(
     exec,
-    { entityType: "relationship", entityUid: target.uid, deletedAt: target.deleted_at },
+    {
+      entityType: "relationship",
+      entityUid: target.uid,
+      deletedAt: target.deleted_at,
+    },
     { bumpRevision: false },
   );
   const result = await exec.runAsync(
     "DELETE FROM relationships WHERE id = ? AND contact_id = ? AND deleted_at IS NOT NULL",
     [id, contactId],
   );
-  assertOneChange("purgeRelationshipPermanently", id, contactId, result.changes);
+  assertOneChange(
+    "purgeRelationshipPermanently",
+    id,
+    contactId,
+    result.changes,
+  );
 }
 
-export function addRelationship(exec: SqlExecutor, input: NewRelationshipInput): Promise<number> {
+export function addRelationship(
+  exec: SqlExecutor,
+  input: NewRelationshipInput,
+): Promise<number> {
   return inWriteTransaction(exec, async () => {
     const id = await addRelationshipCore(exec, input);
     await bumpDataRevisionCore(exec);
@@ -204,7 +236,10 @@ export function addRelationship(exec: SqlExecutor, input: NewRelationshipInput):
   });
 }
 
-export function editRelationship(exec: SqlExecutor, input: EditRelationshipInput): Promise<void> {
+export function editRelationship(
+  exec: SqlExecutor,
+  input: EditRelationshipInput,
+): Promise<void> {
   return inWriteTransaction(exec, async () => {
     await editRelationshipCore(exec, input);
     await bumpDataRevisionCore(exec);
@@ -237,7 +272,11 @@ export function purgeRelationshipPermanently(
   candidate: RelationshipCandidate,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    await purgeRelationshipPermanentlyCore(exec, candidate.id, candidate.contactId);
+    await purgeRelationshipPermanentlyCore(
+      exec,
+      candidate.id,
+      candidate.contactId,
+    );
     await bumpDataRevisionCore(exec);
   });
 }
@@ -262,7 +301,11 @@ export function expireRelationshipIfStale(
       [candidate.id, candidate.contactId, windowModifier],
     );
     if (stale === null) return false;
-    await purgeRelationshipPermanentlyCore(exec, candidate.id, candidate.contactId);
+    await purgeRelationshipPermanentlyCore(
+      exec,
+      candidate.id,
+      candidate.contactId,
+    );
     await bumpDataRevisionCore(exec);
     return true;
   });

@@ -19,8 +19,9 @@
  *
  * NODE-PURE: no UI-runtime import.
  */
-import type { OpenRouterModel } from "@/ai/openrouter-catalog";
+
 import { validateCustomEndpoint } from "@/ai/custom-endpoint";
+import type { OpenRouterModel } from "@/ai/openrouter-catalog";
 import type { ResolvedAiConnection } from "@/db/ai-connections-dao";
 import type { AiErrorCode } from "@/services/AiService";
 import type { AiCloudProviderId, AiProviderId } from "@/services/ai-types";

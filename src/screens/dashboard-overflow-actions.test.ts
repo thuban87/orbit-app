@@ -43,7 +43,9 @@ describe("buildDashboardOverflowActions", () => {
       "Your Week",
     ];
     for (const forbiddenLabel of forbiddenLabels) {
-      expect(actions.some(({ label }) => label.includes(forbiddenLabel))).toBe(false);
+      expect(actions.some(({ label }) => label.includes(forbiddenLabel))).toBe(
+        false,
+      );
     }
 
     actions[4]?.onPress();

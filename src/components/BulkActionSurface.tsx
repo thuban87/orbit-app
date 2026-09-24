@@ -151,7 +151,9 @@ export function BulkActionSurface({
           style={[styles.action, { borderColor: colors.border }]}
         >
           <Icon name="close" size="sm" tone="textPrimary" />
-          <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>Done</Text>
+          <Text style={[styles.actionLabel, { color: colors.textPrimary }]}>
+            Done
+          </Text>
         </Pressable>
       </View>
       <Sheet
@@ -200,7 +202,10 @@ const styles = StyleSheet.create({
     minHeight: 44,
     paddingHorizontal: SPACING.sm,
   },
-  actionLabel: { fontFamily: TYPOGRAPHY.label.family, fontSize: TYPOGRAPHY.label.size },
+  actionLabel: {
+    fontFamily: TYPOGRAPHY.label.family,
+    fontSize: TYPOGRAPHY.label.size,
+  },
   sheetTitle: {
     fontFamily: TYPOGRAPHY.label.family,
     fontSize: TYPOGRAPHY.label.size,

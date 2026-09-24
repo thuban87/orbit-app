@@ -12,16 +12,29 @@ const fs = vi.hoisted(() => ({
 
 vi.mock("expo-sqlite", () => ({}));
 vi.mock("expo-file-system", () => {
-  const joinUri = (parts: unknown[]) => parts
-    .map((part) => typeof part === "string" ? part : (part as { uri: string }).uri)
-    .map((part, index) => index === 0 ? part.replace(/\/+$/, "") : part.replace(/^\/+/, "").replace(/\/+$/, ""))
-    .join("/");
+  const joinUri = (parts: unknown[]) =>
+    parts
+      .map((part) =>
+        typeof part === "string" ? part : (part as { uri: string }).uri,
+      )
+      .map((part, index) =>
+        index === 0
+          ? part.replace(/\/+$/, "")
+          : part.replace(/^\/+/, "").replace(/\/+$/, ""),
+      )
+      .join("/");
 
   class File {
     uri: string;
-    constructor(...parts: unknown[]) { this.uri = joinUri(parts); }
-    get name(): string { return this.uri.split("/").at(-1)!; }
-    get exists(): boolean { return fs.bytes.has(this.uri); }
+    constructor(...parts: unknown[]) {
+      this.uri = joinUri(parts);
+    }
+    get name(): string {
+      return this.uri.split("/").at(-1)!;
+    }
+    get exists(): boolean {
+      return fs.bytes.has(this.uri);
+    }
     async copy(destination: File): Promise<void> {
       fs.operations.push(`copy ${this.uri} -> ${destination.uri}`);
       const value = fs.bytes.get(this.uri);
@@ -48,32 +61,46 @@ vi.mock("expo-file-system", () => {
 
   class Directory {
     uri: string;
-    constructor(...parts: unknown[]) { this.uri = joinUri(parts); }
+    constructor(...parts: unknown[]) {
+      this.uri = joinUri(parts);
+    }
     create(): void {}
-    get exists(): boolean { return [...fs.bytes.keys()].some((uri) => uri.startsWith(`${this.uri}/`)); }
+    get exists(): boolean {
+      return [...fs.bytes.keys()].some((uri) => uri.startsWith(`${this.uri}/`));
+    }
     list(): File[] {
       const prefix = `${this.uri}/`;
       return [...fs.bytes.keys()]
-        .filter((uri) => uri.startsWith(prefix) && !uri.slice(prefix.length).includes("/"))
+        .filter(
+          (uri) =>
+            uri.startsWith(prefix) && !uri.slice(prefix.length).includes("/"),
+        )
         .map((uri) => new File(uri));
     }
   }
 
   return { Directory, File, Paths: { document: { uri: "file:///doc" } } };
 });
-vi.mock("@/services/notifications/notification-schedule", () => ({ reconcileSchedule: async () => {} }));
-vi.mock("@/services/notifications/digest-schedule", () => ({ reconcileDigestSchedule: async () => {} }));
+vi.mock("@/services/notifications/notification-schedule", () => ({
+  reconcileSchedule: async () => {},
+}));
+vi.mock("@/services/notifications/digest-schedule", () => ({
+  reconcileDigestSchedule: async () => {},
+}));
 
 import { buildExportManifest } from "@/backup/export-manifest";
 import { applyRestore } from "@/backup/restore-apply";
-import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
-import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
 import { createAutomaticBackupService } from "@/services/backup/backup-service";
-import { createBackupEnvelopeCrypto, type BackupEncryptionBackend } from "@/services/backup/encryption";
+import {
+  type BackupEncryptionBackend,
+  createBackupEnvelopeCrypto,
+} from "@/services/backup/encryption";
 import { createBackupPassphraseStore } from "@/services/backup/passphrase-store";
+import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
 import * as photoStorage from "@/services/photos/photo-storage";
 import { registerRestorePhotoFinalizeSweep } from "@/services/photos/restore-photo-finalize-sweep";
 
@@ -89,20 +116,35 @@ function uidFactory() {
 
 async function db(): Promise<SqlExecutor> {
   const exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid: uidFactory() });
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uidFactory(),
+  });
   return exec;
 }
 
-async function insertContact(exec: SqlExecutor, uid: string, photo: string | null, modifiedAt: string): Promise<number> {
+async function insertContact(
+  exec: SqlExecutor,
+  uid: string,
+  photo: string | null,
+  modifiedAt: string,
+): Promise<number> {
   await exec.runAsync(
     "INSERT INTO contacts (uid,name,photo,interval_days,rarely_responds,reminders_off,created_at,modified_at) VALUES (?,?,?,?,?,?,?,?)",
     [uid, uid, photo, 7, 0, 0, NOW, modifiedAt],
   );
-  return (await exec.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid=?", [uid]))!.id;
+  return (await exec.getFirstAsync<{ id: number }>(
+    "SELECT id FROM contacts WHERE uid=?",
+    [uid],
+  ))!.id;
 }
 
-function file(relative: string): string { return `file:///doc/${relative}`; }
-function bytes(relative: string): Uint8Array | undefined { return fs.bytes.get(file(relative)); }
+function file(relative: string): string {
+  return `file:///doc/${relative}`;
+}
+function bytes(relative: string): Uint8Array | undefined {
+  return fs.bytes.get(file(relative));
+}
 
 beforeEach(() => {
   fs.bytes.clear();
@@ -118,57 +160,107 @@ describe("Phase 17 restore recovery through the production module boundaries", (
     await insertContact(source, "clear-photo", null, NEWER);
     const manifest = await buildExportManifest(source, {
       exportedAt: NOW,
-      readPhotoBase64: async (relative) => relative === "avatars/source.jpg" ? "bmV3LWJ5dGVz" : "",
+      readPhotoBase64: async (relative) =>
+        relative === "avatars/source.jpg" ? "bmV3LWJ5dGVz" : "",
     });
 
     const destination = await db();
-    await insertContact(destination, "clear-photo", "avatars/contact-old.jpg", OLDER);
+    await insertContact(
+      destination,
+      "clear-photo",
+      "avatars/contact-old.jpg",
+      OLDER,
+    );
     const legacyClearPath = "avatars/contact-old.jpg";
     fs.bytes.set(file(legacyClearPath), text.encode("old-clear-bytes"));
 
     const result = await applyRestore(destination, manifest, "merge", {
       sessionToken: "processkill",
-      persistPhoto: async () => { throw new Error("process killed after commit"); },
+      persistPhoto: async () => {
+        throw new Error("process killed after commit");
+      },
       deleteCanonicalPhoto: () => {},
       canonicalPhotoExists: () => true,
     });
-    expect(result).toMatchObject({ status: "applied", photosNeedingAttention: 1, photoCleanupPending: 1 });
-    await expect(destination.getAllAsync("SELECT relative_path,action FROM restore_photo_journal ORDER BY id")).resolves.toEqual([
-      { relative_path: "avatars/_restore_pending/contact-incoming-photo-processkill.jpg", action: "finalize" },
+    expect(result).toMatchObject({
+      status: "applied",
+      photosNeedingAttention: 1,
+      photoCleanupPending: 1,
+    });
+    await expect(
+      destination.getAllAsync(
+        "SELECT relative_path,action FROM restore_photo_journal ORDER BY id",
+      ),
+    ).resolves.toEqual([
+      {
+        relative_path:
+          "avatars/_restore_pending/contact-incoming-photo-processkill.jpg",
+        action: "finalize",
+      },
       { relative_path: `delete:${legacyClearPath}`, action: "delete" },
     ]);
 
     registerRestorePhotoFinalizeSweep(() => destination);
     await runLaunchSweep();
 
-    const incomingId = (await destination.getFirstAsync<{ id: number }>("SELECT id FROM contacts WHERE uid=?", ["incoming-photo"]))!.id;
-    expect(bytes(photoStorage.contactPhotoRelPath(incomingId))).toEqual(text.encode("new-bytes"));
+    const incomingId = (await destination.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contacts WHERE uid=?",
+      ["incoming-photo"],
+    ))!.id;
+    expect(bytes(photoStorage.contactPhotoRelPath(incomingId))).toEqual(
+      text.encode("new-bytes"),
+    );
     expect(bytes(legacyClearPath)).toBeUndefined();
-    await expect(destination.getAllAsync("SELECT * FROM restore_photo_journal")).resolves.toEqual([]);
+    await expect(
+      destination.getAllAsync("SELECT * FROM restore_photo_journal"),
+    ).resolves.toEqual([]);
     expect(photoStorage.listRestorePendingPhotos()).toEqual([]);
   });
 
   it("retains newer local canonical bytes when an older incoming photo loses reconciliation", async () => {
     const source = await db();
-    await insertContact(source, "same-contact", "avatars/stale-source.jpg", OLDER);
-    const manifest = await buildExportManifest(source, { exportedAt: NOW, readPhotoBase64: async () => "c3RhbGUtYnl0ZXM=" });
+    await insertContact(
+      source,
+      "same-contact",
+      "avatars/stale-source.jpg",
+      OLDER,
+    );
+    const manifest = await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "c3RhbGUtYnl0ZXM=",
+    });
 
     const destination = await db();
-    const id = await insertContact(destination, "same-contact", "avatars/local.jpg", NEWER);
+    const id = await insertContact(
+      destination,
+      "same-contact",
+      "avatars/local.jpg",
+      NEWER,
+    );
     const canonical = photoStorage.contactPhotoRelPath(id);
-    await destination.runAsync("UPDATE contacts SET photo=? WHERE id=?", [canonical, id]);
+    await destination.runAsync("UPDATE contacts SET photo=? WHERE id=?", [
+      canonical,
+      id,
+    ]);
     const original = text.encode("newer-local-bytes");
     fs.bytes.set(file(canonical), original);
 
-    await expect(applyRestore(destination, manifest, "merge", { sessionToken: "stale" })).resolves.toMatchObject({ status: "applied" });
+    await expect(
+      applyRestore(destination, manifest, "merge", { sessionToken: "stale" }),
+    ).resolves.toMatchObject({ status: "applied" });
     expect(bytes(canonical)).toEqual(original);
-    await expect(destination.getAllAsync("SELECT * FROM restore_photo_journal")).resolves.toEqual([]);
+    await expect(
+      destination.getAllAsync("SELECT * FROM restore_photo_journal"),
+    ).resolves.toEqual([]);
     expect(photoStorage.listRestorePendingPhotos()).toEqual([]);
   });
 
   it("garbage-collects an unjournaled staged file on launch without calling persistMaster", async () => {
     const exec = await db();
-    const orphan = photoStorage.restorePendingRelPath({ kind: "contact", uid: "rolled-back" }, "orphan");
+    const orphan = photoStorage.restorePendingRelPath(
+      { kind: "contact", uid: "rolled-back" },
+      "orphan",
+    );
     await photoStorage.stageRestorePendingBase64("b3JwaGFuLWJ5dGVz", orphan);
     const persist = vi.spyOn(photoStorage, "persistMaster");
 
@@ -183,7 +275,9 @@ describe("Phase 17 restore recovery through the production module boundaries", (
 describe("Phase 17 crypto failure boundaries", () => {
   it("fails an automatic encrypted write closed when the real SecureStore adapter becomes unavailable", async () => {
     const exec = await db();
-    await exec.runAsync("UPDATE app_settings SET encryption_enabled=1 WHERE id=1");
+    await exec.runAsync(
+      "UPDATE app_settings SET encryption_enabled=1 WHERE id=1",
+    );
     const cached = new Map([["orbit.backup.passphrase", "cached-passphrase"]]);
     const passphrases = createBackupPassphraseStore({
       getItemAsync: async () => {
@@ -201,31 +295,77 @@ describe("Phase 17 crypto failure boundaries", () => {
       readPhotoBase64: async () => "",
       directoryUri: "content://disposable-backup",
       retentionDays: 7,
-      storage: { writeVerified: writes, list: async () => [], remove: async () => {} },
-      encryption: { enabled: true, passphrase: await passphrases.getPassphrase(), encrypt: () => "must-not-run" },
+      storage: {
+        writeVerified: writes,
+        list: async () => [],
+        remove: async () => {},
+      },
+      encryption: {
+        enabled: true,
+        passphrase: await passphrases.getPassphrase(),
+        encrypt: () => "must-not-run",
+      },
     });
 
-    await expect(service.writeVerifiedSnapshot()).resolves.toEqual({ status: "blocked", reason: "passphrase-unavailable" });
+    await expect(service.writeVerifiedSnapshot()).resolves.toEqual({
+      status: "blocked",
+      reason: "passphrase-unavailable",
+    });
     expect(writes).not.toHaveBeenCalled();
-    await expect(exec.getFirstAsync<{ encryption_enabled: number }>("SELECT encryption_enabled FROM app_settings WHERE id=1")).resolves.toEqual({ encryption_enabled: 1 });
+    await expect(
+      exec.getFirstAsync<{ encryption_enabled: number }>(
+        "SELECT encryption_enabled FROM app_settings WHERE id=1",
+      ),
+    ).resolves.toEqual({ encryption_enabled: 1 });
   });
 
   it("rejects hostile KDF parameters and unknown envelope keys before the native PBKDF2 boundary", () => {
-    const profile = { formatVersion: 77, cipher: "AES-256-GCM" as const, kdf: { id: "PBKDF2-HMAC-SHA256" as const, iterations: 1_000, derivedKeyLength: 32 }, saltLength: 16, ivLength: 12, maxCiphertextBytes: 1_024 };
+    const profile = {
+      formatVersion: 77,
+      cipher: "AES-256-GCM" as const,
+      kdf: {
+        id: "PBKDF2-HMAC-SHA256" as const,
+        iterations: 1_000,
+        derivedKeyLength: 32,
+      },
+      saltLength: 16,
+      ivLength: 12,
+      maxCiphertextBytes: 1_024,
+    };
     const backend: BackupEncryptionBackend = {
       randomBytes: (size) => new Uint8Array(size),
       deriveKey: vi.fn(() => new Uint8Array(32)),
-      encryptGcm: () => ({ ciphertext: new Uint8Array([1]), tag: new Uint8Array(16) }),
+      encryptGcm: () => ({
+        ciphertext: new Uint8Array([1]),
+        tag: new Uint8Array(16),
+      }),
       decryptGcm: () => new Uint8Array([1]),
     };
     const crypto = createBackupEnvelopeCrypto({ profiles: [profile], backend });
-    const envelope = crypto.encrypt({ passphrase: "cached-passphrase", plaintext: new Uint8Array([1]), profile });
+    const envelope = crypto.encrypt({
+      passphrase: "cached-passphrase",
+      plaintext: new Uint8Array([1]),
+      profile,
+    });
     const derive = backend.deriveKey as ReturnType<typeof vi.fn>;
     derive.mockClear();
 
-    expect(() => crypto.decrypt({ passphrase: "cached-passphrase", envelope: { ...envelope, kdf: { ...envelope.kdf, iterations: 2 ** 31 } } })).toThrow();
+    expect(() =>
+      crypto.decrypt({
+        passphrase: "cached-passphrase",
+        envelope: {
+          ...envelope,
+          kdf: { ...envelope.kdf, iterations: 2 ** 31 },
+        },
+      }),
+    ).toThrow();
     expect(derive).not.toHaveBeenCalled();
-    expect(() => crypto.decrypt({ passphrase: "cached-passphrase", envelope: { ...envelope, unexpected: true } })).toThrow();
+    expect(() =>
+      crypto.decrypt({
+        passphrase: "cached-passphrase",
+        envelope: { ...envelope, unexpected: true },
+      }),
+    ).toThrow();
     expect(derive).not.toHaveBeenCalled();
   });
 });

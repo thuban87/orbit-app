@@ -32,7 +32,13 @@ async function seedContact(exec: SqlExecutor): Promise<number> {
 
 async function seedFuel(
   exec: SqlExecutor,
-  input: { uid: string; contactId: number; kind: string; text: string; source: string },
+  input: {
+    uid: string;
+    contactId: number;
+    kind: string;
+    text: string;
+    source: string;
+  },
 ): Promise<void> {
   await exec.runAsync(
     `INSERT INTO fuel (uid, contact_id, kind, text, url, created_at, source, modified_at)
@@ -60,7 +66,12 @@ describe("migration 017 — knowledge egress data move", () => {
       { uid: "share-two", text: "Prefers tea" },
     ];
     for (const row of shareRows) {
-      await seedFuel(exec, { ...row, contactId, kind: "topic", source: "share" });
+      await seedFuel(exec, {
+        ...row,
+        contactId,
+        kind: "topic",
+        source: "share",
+      });
     }
     await seedFuel(exec, {
       uid: "ordinary-fuel",
@@ -96,7 +107,11 @@ describe("migration 017 — knowledge egress data move", () => {
       dflt_value: string | null;
     }>("PRAGMA table_info(memories)");
     expect(info).toContainEqual(
-      expect.objectContaining({ name: "allow_ai", notnull: 1, dflt_value: "0" }),
+      expect.objectContaining({
+        name: "allow_ai",
+        notnull: 1,
+        dflt_value: "0",
+      }),
     );
 
     const memories = await exec.getAllAsync<{
@@ -108,9 +123,12 @@ describe("migration 017 — knowledge egress data move", () => {
       [contactId],
     );
     expect(memories).toHaveLength(4);
-    expect(memories.filter((row) => row.provenance === "share").map((row) => row.value).sort()).toEqual(
-      shareRows.map((row) => row.text).sort(),
-    );
+    expect(
+      memories
+        .filter((row) => row.provenance === "share")
+        .map((row) => row.value)
+        .sort(),
+    ).toEqual(shareRows.map((row) => row.text).sort());
     expect(memories).toEqual(
       expect.arrayContaining([
         { value: "AI proposal survives", provenance: "user", allow_ai: 0 },

@@ -77,7 +77,8 @@ export async function reconcileOrphanReconcileStagedPhotos(
     ),
   );
   for (const staged of fs.listReconcileStagingPhotos()) {
-    if (!livePaths.has(staged.relative)) fs.deleteReconcileStaging(staged.relative);
+    if (!livePaths.has(staged.relative))
+      fs.deleteReconcileStaging(staged.relative);
   }
 }
 
@@ -96,22 +97,37 @@ export function registerReconcileResumeSweep(
     try {
       const resumable = await getResumableReconcileSession(exec, now());
       if (resumable) {
-        cleanupDiscardedReconcileStagedPhotos(fs, resumable.sweptStagedPhotoRelPaths);
+        cleanupDiscardedReconcileStagedPhotos(
+          fs,
+          resumable.sweptStagedPhotoRelPaths,
+        );
         description = describeResumableReconcile(resumable);
       }
     } catch (error) {
-      Logger.error(LOG_SCOPE, "could not inspect resumable reconciliation", error);
+      Logger.error(
+        LOG_SCOPE,
+        "could not inspect resumable reconciliation",
+        error,
+      );
       try {
         const sessionId = await getNewestPendingReconcileSessionId(exec);
         if (sessionId !== null) description = { sessionId, discardOnly: true };
       } catch (fallbackError) {
-        Logger.error(LOG_SCOPE, "could not find corrupt reconciliation", fallbackError);
+        Logger.error(
+          LOG_SCOPE,
+          "could not find corrupt reconciliation",
+          fallbackError,
+        );
       }
     } finally {
       try {
         await reconcileOrphanReconcileStagedPhotos(exec, fs);
       } catch (error) {
-        Logger.error(LOG_SCOPE, "could not reconcile reconciliation staging", error);
+        Logger.error(
+          LOG_SCOPE,
+          "could not reconcile reconciliation staging",
+          error,
+        );
       }
       onResumable(description);
     }

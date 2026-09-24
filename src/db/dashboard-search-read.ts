@@ -4,17 +4,17 @@
  * duplicating SQL predicates or tokenizer behaviour.
  */
 import {
+  type DashboardRow,
   listDashboardSearch,
   listDashboardSearchEligible,
-  type DashboardRow,
 } from "@/db/dashboard-read";
 import { listKnowledgeSearchCandidates } from "@/db/knowledge-search-read";
 import type { SqlExecutor } from "@/db/types";
-import {
-  searchDashboard,
-  type DashboardSearchResult,
-} from "@/logic/dashboard-search-match";
 import type { DashboardQueryState } from "@/logic/dashboard-query-logic";
+import {
+  type DashboardSearchResult,
+  searchDashboard,
+} from "@/logic/dashboard-search-match";
 
 /** A Dashboard row plus its corpus descriptor; null retains the fuel fallback. */
 export interface DashboardSearchRow {

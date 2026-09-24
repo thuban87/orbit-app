@@ -4,6 +4,7 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { runMigrations } from "@/db/migrations/runner";
 import {
   createReconcileSession,
   createReconcileSessionCore,
@@ -15,7 +16,6 @@ import {
   markCardStatusCore,
   type ReconcileCardStatus,
 } from "@/db/reconcile-session-dao";
-import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -51,7 +51,8 @@ async function seedCard(
     contactId,
     cardStatus: status,
     diffJson: JSON.stringify({ fields: [] }),
-    unresolvedCount: status === "resolved" || status === "missing_source" ? 0 : 1,
+    unresolvedCount:
+      status === "resolved" || status === "missing_source" ? 0 : 1,
     stagedPhotoRelPath,
     now: NOW,
   });
@@ -111,14 +112,17 @@ describe("reconcile-session-dao", () => {
     const cardId = await seedCard(sessionId, await seedContact());
     await markCardStatus(exec, cardId, "partial", 2, "2026-08-30 12:01:00");
     expect(
-      await exec.getFirstAsync<{ card_status: string; unresolved_count: number }>(
+      await exec.getFirstAsync<{
+        card_status: string;
+        unresolved_count: number;
+      }>(
         "SELECT card_status, unresolved_count FROM reconciliation_session_cards WHERE id = ?",
         [cardId],
       ),
     ).toEqual({ card_status: "partial", unresolved_count: 2 });
-    await expect(markCardStatusCore(exec, 999, "resolved", 0, NOW)).rejects.toThrow(
-      "markCardStatusCore: no row matched id=999",
-    );
+    await expect(
+      markCardStatusCore(exec, 999, "resolved", 0, NOW),
+    ).rejects.toThrow("markCardStatusCore: no row matched id=999");
   });
 
   it("finalizes only when every card is terminal", async () => {
@@ -129,9 +133,13 @@ describe("reconcile-session-dao", () => {
     });
     const first = await seedCard(sessionId, await seedContact("First"));
     await seedCard(sessionId, await seedContact("Second"), "missing_source");
-    await expect(finalizeSessionIfTerminal(exec, sessionId, NOW)).resolves.toBe(false);
+    await expect(finalizeSessionIfTerminal(exec, sessionId, NOW)).resolves.toBe(
+      false,
+    );
     await markCardStatus(exec, first, "resolved", 0, NOW);
-    await expect(finalizeSessionIfTerminal(exec, sessionId, NOW)).resolves.toBe(true);
+    await expect(finalizeSessionIfTerminal(exec, sessionId, NOW)).resolves.toBe(
+      true,
+    );
     expect(
       await exec.getFirstAsync<{ status: string }>(
         "SELECT status FROM reconciliation_sessions WHERE id = ?",

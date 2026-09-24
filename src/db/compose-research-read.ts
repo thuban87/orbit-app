@@ -30,9 +30,7 @@
  *     shows conversation-relevant knowledge, not operational metadata (COMP-08).
  * =============================================================================
  */
-import {
-  getCurrentStateValues,
-} from "@/db/current-state-history-read";
+import { getCurrentStateValues } from "@/db/current-state-history-read";
 import {
   type FirstClassFields,
   getFirstClassFields,

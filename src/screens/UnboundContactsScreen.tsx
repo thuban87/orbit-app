@@ -61,10 +61,7 @@ export function UnboundContactsScreen({
   );
 
   return (
-    <View
-      testID="unbound-contacts-screen"
-      style={styles.root}
-    >
+    <View testID="unbound-contacts-screen" style={styles.root}>
       <ShellAppBar variant="child" title="Unbound contacts" />
 
       {error ? (
@@ -119,12 +116,16 @@ export function UnboundContactsScreen({
           {rows.length === 0 ? (
             <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
               <View testID="unbound-contacts-empty" style={styles.emptyState}>
-                <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
+                <Text
+                  style={[styles.emptyHeading, { color: colors.textPrimary }]}
+                >
                   No unbound contacts
                 </Text>
-                <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-                  Contacts you unbind stay here, with their details and history ready
-                  when you want to bind them again.
+                <Text
+                  style={[styles.emptyBody, { color: colors.textSecondary }]}
+                >
+                  Contacts you unbind stay here, with their details and history
+                  ready when you want to bind them again.
                 </Text>
               </View>
             </ChromeScrim>
@@ -142,11 +143,24 @@ export function UnboundContactsScreen({
               </ChromeScrim>
               {hasTerm && filteredRows.length === 0 ? (
                 <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
-                  <View testID="unbound-contacts-no-match" style={styles.emptyState}>
-                    <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
+                  <View
+                    testID="unbound-contacts-no-match"
+                    style={styles.emptyState}
+                  >
+                    <Text
+                      style={[
+                        styles.emptyHeading,
+                        { color: colors.textPrimary },
+                      ]}
+                    >
                       No matching unbound contacts
                     </Text>
-                    <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
+                    <Text
+                      style={[
+                        styles.emptyBody,
+                        { color: colors.textSecondary },
+                      ]}
+                    >
                       Try another name.
                     </Text>
                   </View>
@@ -160,7 +174,10 @@ export function UnboundContactsScreen({
                     <Pressable
                       testID={`unbound-contacts-row-${item.id}`}
                       accessibilityRole="button"
-                      accessibilityLabel={unboundRowAccessibilityLabel(item.name, null)}
+                      accessibilityLabel={unboundRowAccessibilityLabel(
+                        item.name,
+                        null,
+                      )}
                       onPress={() =>
                         navigation.navigate("Profile", { contactId: item.id })
                       }
@@ -182,7 +199,10 @@ export function UnboundContactsScreen({
                       <View style={styles.rowText}>
                         <Text
                           numberOfLines={1}
-                          style={[styles.rowName, { color: colors.textPrimary }]}
+                          style={[
+                            styles.rowName,
+                            { color: colors.textPrimary },
+                          ]}
                         >
                           {item.name}
                         </Text>

@@ -9,10 +9,7 @@ import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import { ADD_WIDGET_ACTION, pinResultCopy } from "./settings-add-widget";
-import {
-  type SettingsHubRow,
-  SETTINGS_HUB_ROWS,
-} from "./settings-hub-model";
+import { SETTINGS_HUB_ROWS, type SettingsHubRow } from "./settings-hub-model";
 
 const LOG_SCOPE = "settings-hub-screen";
 

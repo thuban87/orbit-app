@@ -9,11 +9,15 @@ describe("rowsForKnowledgeDisplay", () => {
       { id: "hidden-old", hidden: true },
     ];
 
-    expect(rowsForKnowledgeDisplay(rows, true, (row) => row.hidden).map((row) => row.id)).toEqual([
-      "hidden-pinned", "visible-unpinned", "hidden-old",
-    ]);
-    expect(rowsForKnowledgeDisplay(rows, false, (row) => row.hidden).map((row) => row.id)).toEqual([
-      "visible-unpinned",
-    ]);
+    expect(
+      rowsForKnowledgeDisplay(rows, true, (row) => row.hidden).map(
+        (row) => row.id,
+      ),
+    ).toEqual(["hidden-pinned", "visible-unpinned", "hidden-old"]);
+    expect(
+      rowsForKnowledgeDisplay(rows, false, (row) => row.hidden).map(
+        (row) => row.id,
+      ),
+    ).toEqual(["visible-unpinned"]);
   });
 });

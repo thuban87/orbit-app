@@ -8,13 +8,13 @@ import {
   TextInput,
   View,
 } from "react-native";
+import type { MemoryRow } from "@/db/memories-read";
 import {
   DEFAULT_MEMORY_TYPE_KEY,
   MEMORY_TYPE_REGISTRY,
-  PROVISIONAL_MEMORY_LABEL,
   type MemoryTypeKey,
+  PROVISIONAL_MEMORY_LABEL,
 } from "@/db/memory-registry";
-import type { MemoryRow } from "@/db/memories-read";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { MemoryCard } from "./MemoryCard";

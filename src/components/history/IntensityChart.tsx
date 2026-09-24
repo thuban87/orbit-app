@@ -28,8 +28,8 @@ import { StyleSheet, View } from "react-native";
 import { IntensityLine } from "@/components/IntensityLine";
 import { AppText } from "@/components/ui/AppText";
 import type { IntensityWindowResult } from "@/services/history/intensity-window";
-import { SPACING } from "@/theme/tokens/spacing";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
 
 export interface IntensityChartProps {
   /** The window-scoped intensity result the parent derived for the selected window. */
@@ -76,7 +76,10 @@ export function IntensityChart({
           stay window-scoped, but the "…intended" cadence must describe the
           CONTACT, so pass its real interval (cadenceDays) rather than let the
           caption read the window-span periodDays (Phase 32 review #1). */}
-      <IntensityLine intensity={intensity} cadenceDays={intensity.cadenceDays} />
+      <IntensityLine
+        intensity={intensity}
+        cadenceDays={intensity.cadenceDays}
+      />
       {/* Neutral progress bar (structure tokens only, never a warning hue). */}
       <View
         testID={`${testID}-bar-track`}

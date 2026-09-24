@@ -118,9 +118,9 @@ describe("computeAiAvailability — three-state derivation (D-12)", () => {
         }),
       ).toBe("ready");
     }
-    expect(
-      computeAiAvailability({ ...readyInput, hasCredential: false }),
-    ).toBe("needs-attention");
+    expect(computeAiAvailability({ ...readyInput, hasCredential: false })).toBe(
+      "needs-attention",
+    );
   });
 
   it("missing or unavailable selected model → 'needs-attention' without substitution", () => {

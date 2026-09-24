@@ -12,7 +12,12 @@ import { cycles } from "@/services/history/cycles";
 
 describe("cycles — bound contact", () => {
   it("builds `count` contiguous interval-length blocks, newest (current) last", () => {
-    const result = cycles({ intervalDays: 7, trackingEnabled: 1, count: 5, now: "2026-03-20 12:00:00" });
+    const result = cycles({
+      intervalDays: 7,
+      trackingEnabled: 1,
+      count: 5,
+      now: "2026-03-20 12:00:00",
+    });
     expect(result.available).toBe(true);
     if (!result.available) return;
     expect(result.blocks).toHaveLength(5);
@@ -41,29 +46,52 @@ describe("cycles — bound contact", () => {
     }
   });
 
-  it.each([5, 10, 15, 20])("produces exactly %i blocks for the preset", (count) => {
-    const result = cycles({ intervalDays: 30, trackingEnabled: 1, count, now: "2026-03-20" });
-    expect(result.available).toBe(true);
-    if (!result.available) return;
-    expect(result.blocks).toHaveLength(count);
-    expect(result.blocks[count - 1].isCurrent).toBe(true);
-    expect(result.blocks[count - 1].end).toBe("2026-03-20");
-  });
+  it.each([5, 10, 15, 20])(
+    "produces exactly %i blocks for the preset",
+    (count) => {
+      const result = cycles({
+        intervalDays: 30,
+        trackingEnabled: 1,
+        count,
+        now: "2026-03-20",
+      });
+      expect(result.available).toBe(true);
+      if (!result.available) return;
+      expect(result.blocks).toHaveLength(count);
+      expect(result.blocks[count - 1].isCurrent).toBe(true);
+      expect(result.blocks[count - 1].end).toBe("2026-03-20");
+    },
+  );
 });
 
 describe("cycles — no-cadence fallback (D-09)", () => {
   it("returns { available: false } for a null interval, never dividing by null", () => {
-    const result = cycles({ intervalDays: null, trackingEnabled: 1, count: 10, now: "2026-03-20" });
+    const result = cycles({
+      intervalDays: null,
+      trackingEnabled: 1,
+      count: 10,
+      now: "2026-03-20",
+    });
     expect(result).toEqual({ available: false });
   });
 
   it("returns { available: false } when tracking is disabled", () => {
-    const result = cycles({ intervalDays: 30, trackingEnabled: 0, count: 10, now: "2026-03-20" });
+    const result = cycles({
+      intervalDays: 30,
+      trackingEnabled: 0,
+      count: 10,
+      now: "2026-03-20",
+    });
     expect(result).toEqual({ available: false });
   });
 
   it("never yields NaN/Infinity for the fallback path", () => {
-    const result = cycles({ intervalDays: null, trackingEnabled: 0, count: 10, now: "2026-03-20" });
+    const result = cycles({
+      intervalDays: null,
+      trackingEnabled: 0,
+      count: 10,
+      now: "2026-03-20",
+    });
     expect(result.available).toBe(false);
     // Structural: the fallback carries no numeric block math at all.
     expect(JSON.stringify(result)).not.toMatch(/null|NaN|Infinity/i);

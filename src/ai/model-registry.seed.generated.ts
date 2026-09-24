@@ -13,10 +13,11 @@
 import type { ModelCatalog } from "./model-catalog-filter";
 
 export const MODEL_CATALOG_SEED: ModelCatalog = {
-  "source": "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
-  "generatedAt": "2026-08-22T06:58:19.661Z",
-  "models": {
-    "openai": [
+  source:
+    "https://raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json",
+  generatedAt: "2026-08-22T06:58:19.661Z",
+  models: {
+    openai: [
       "gpt-3.5-turbo",
       "gpt-3.5-turbo-0125",
       "gpt-3.5-turbo-1106",
@@ -87,9 +88,9 @@ export const MODEL_CATALOG_SEED: ModelCatalog = {
       "o4-mini-2025-04-16",
       "container",
       "gpt-5-search-api",
-      "gpt-5-search-api-2025-10-14"
+      "gpt-5-search-api-2025-10-14",
     ],
-    "anthropic": [
+    anthropic: [
       "claude-haiku-4-5-20251001",
       "claude-haiku-4-5",
       "claude-sonnet-4-5",
@@ -106,9 +107,9 @@ export const MODEL_CATALOG_SEED: ModelCatalog = {
       "claude-opus-5",
       "claude-opus-4-8",
       "claude-mythos-5",
-      "claude-mythos-preview"
+      "claude-mythos-preview",
     ],
-    "google": [
+    google: [
       "gemini-robotics-er-2-preview",
       "gemini-robotics-er-1.6-preview",
       "gemini-2.5-flash",
@@ -142,11 +143,11 @@ export const MODEL_CATALOG_SEED: ModelCatalog = {
       "gemini-3.1-flash-lite-preview",
       "gemini-2.5-flash-lite-preview-09-2025",
       "gemini-2.5-flash-preview-09-2025",
-      "gemini-robotics-er-1.5-preview"
-    ]
+      "gemini-robotics-er-1.5-preview",
+    ],
   },
-  "limits": {
-    "openai": {
+  limits: {
+    openai: {
       "gpt-3.5-turbo": 4096,
       "gpt-3.5-turbo-0125": 4096,
       "gpt-3.5-turbo-1106": 4096,
@@ -207,18 +208,18 @@ export const MODEL_CATALOG_SEED: ModelCatalog = {
       "gpt-5-mini-2025-08-07": 128000,
       "gpt-5-nano": 128000,
       "gpt-5-nano-2025-08-07": 128000,
-      "o1": 100000,
+      o1: 100000,
       "o1-2024-12-17": 100000,
-      "o3": 100000,
+      o3: 100000,
       "o3-2025-04-16": 100000,
       "o3-mini": 100000,
       "o3-mini-2025-01-31": 100000,
       "o4-mini": 100000,
       "o4-mini-2025-04-16": 100000,
       "gpt-5-search-api": 128000,
-      "gpt-5-search-api-2025-10-14": 128000
+      "gpt-5-search-api-2025-10-14": 128000,
     },
-    "anthropic": {
+    anthropic: {
       "claude-haiku-4-5-20251001": 64000,
       "claude-haiku-4-5": 64000,
       "claude-sonnet-4-5": 64000,
@@ -235,9 +236,9 @@ export const MODEL_CATALOG_SEED: ModelCatalog = {
       "claude-opus-5": 128000,
       "claude-opus-4-8": 128000,
       "claude-mythos-5": 128000,
-      "claude-mythos-preview": 128000
+      "claude-mythos-preview": 128000,
     },
-    "google": {
+    google: {
       "gemini-robotics-er-2-preview": 65536,
       "gemini-robotics-er-1.6-preview": 65536,
       "gemini-2.5-flash": 65535,
@@ -269,7 +270,7 @@ export const MODEL_CATALOG_SEED: ModelCatalog = {
       "gemini-3.1-flash-lite-preview": 65536,
       "gemini-2.5-flash-lite-preview-09-2025": 65535,
       "gemini-2.5-flash-preview-09-2025": 65535,
-      "gemini-robotics-er-1.5-preview": 65535
-    }
-  }
+      "gemini-robotics-er-1.5-preview": 65535,
+    },
+  },
 } as const;

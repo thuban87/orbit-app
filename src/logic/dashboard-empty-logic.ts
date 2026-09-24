@@ -83,7 +83,9 @@ export interface DashboardEmptyInput {
   populationCounts?: DashboardPopulationCounts;
 }
 
-function hasActiveDashboardFilters(filters: DashboardFilters | undefined): boolean {
+function hasActiveDashboardFilters(
+  filters: DashboardFilters | undefined,
+): boolean {
   return Object.values(filters ?? {}).some(
     (selections) => (selections?.length ?? 0) > 0,
   );
@@ -103,7 +105,10 @@ function selectPopulationEmptyState(
     "snoozed",
     "favourites",
   ] as const) {
-    if (!activePopulations.includes(population) || populationCounts[population] > 0)
+    if (
+      !activePopulations.includes(population) ||
+      populationCounts[population] > 0
+    )
       continue;
 
     switch (population) {

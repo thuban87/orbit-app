@@ -59,11 +59,14 @@ export const useDashboardSelectionStore = create<DashboardSelectionStore>()(
         return { selectedIds };
       });
     },
-    selectAll: () => set((state) => ({ selectedIds: new Set(state.frozenUniverse) })),
+    selectAll: () =>
+      set((state) => ({ selectedIds: new Set(state.frozenUniverse) })),
     removeFromUniverse: (ids) => {
       const idsToRemove = new Set(ids);
       set((state) => ({
-        frozenUniverse: state.frozenUniverse.filter((id) => !idsToRemove.has(id)),
+        frozenUniverse: state.frozenUniverse.filter(
+          (id) => !idsToRemove.has(id),
+        ),
         selectedIds: new Set(
           [...state.selectedIds].filter((id) => !idsToRemove.has(id)),
         ),

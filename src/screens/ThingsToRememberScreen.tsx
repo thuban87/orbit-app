@@ -9,40 +9,31 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { MemoryEditor, type MemoryDraft } from "@/components/MemoryEditor";
+import { type MemoryDraft, MemoryEditor } from "@/components/MemoryEditor";
 import {
-  RelationshipEditor,
   type RelationshipDraft,
+  RelationshipEditor,
 } from "@/components/RelationshipEditor";
 import { AppText } from "@/components/ui";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
+import { getAppSettings } from "@/db/app-settings-dao";
 import { setCurrentStateValue } from "@/db/current-state-history-dao";
 import {
-  getCurrentStateValues,
   type CurrentStateEntryRow,
+  getCurrentStateValues,
 } from "@/db/current-state-history-read";
 import { getExecutor, localDateTime } from "@/db/database";
-import { getAppSettings } from "@/db/app-settings-dao";
 import { listDefs } from "@/db/field-defs-dao";
 import {
   getValuesForContact,
   visibleDefsForProfile,
 } from "@/db/field-values-dao";
 import {
-  getFirstClassDerived,
-  getFirstClassFields,
   type FirstClassDerived,
   type FirstClassFields,
+  getFirstClassDerived,
+  getFirstClassFields,
 } from "@/db/first-class-knowledge-read";
-import {
-  CURRENT_STATE_FIELD_KEYS,
-  CURRENT_STATE_FIELD_REGISTRY,
-  KNOWLEDGE_GROUP_ORDER,
-  MEMORY_TYPE_REGISTRY,
-  PROVISIONAL_MEMORY_LABEL,
-  RELATIONSHIPS_GROUP,
-  type CurrentStateFieldKey,
-} from "@/db/memory-registry";
 import {
   addMemory,
   deleteMemory,
@@ -52,9 +43,18 @@ import {
 } from "@/db/memories-dao";
 import {
   listMemoriesForContact,
-  resolveVisibility,
   type MemoryRow,
+  resolveVisibility,
 } from "@/db/memories-read";
+import {
+  CURRENT_STATE_FIELD_KEYS,
+  CURRENT_STATE_FIELD_REGISTRY,
+  type CurrentStateFieldKey,
+  KNOWLEDGE_GROUP_ORDER,
+  MEMORY_TYPE_REGISTRY,
+  PROVISIONAL_MEMORY_LABEL,
+  RELATIONSHIPS_GROUP,
+} from "@/db/memory-registry";
 import {
   addRelationship,
   deleteRelationship,
@@ -63,8 +63,8 @@ import {
 } from "@/db/relationships-dao";
 import {
   listRelationshipsForContact,
-  resolveRelationshipVisibility,
   type RelationshipRow,
+  resolveRelationshipVisibility,
 } from "@/db/relationships-read";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { snackbarStore } from "@/stores/snackbar-store";
@@ -236,7 +236,8 @@ export function ThingsToRememberScreen({
   const relationships = rowsForKnowledgeDisplay(
     knowledge.relationships,
     includeHidden,
-    (relationship) => resolveRelationshipVisibility(relationship.hidden) === "hide",
+    (relationship) =>
+      resolveRelationshipVisibility(relationship.hidden) === "hide",
   );
   const groupedMemories = useMemo(() => {
     const groups = new Map<string, MemoryRow[]>();
@@ -256,8 +257,9 @@ export function ThingsToRememberScreen({
     !knowledge.firstClass?.socialBattery &&
     Object.keys(knowledge.currentValues).length === 0 &&
     knowledge.customValues.length === 0 &&
-    knowledge.relationships.every((relationship) =>
-      resolveRelationshipVisibility(relationship.hidden) === "hide",
+    knowledge.relationships.every(
+      (relationship) =>
+        resolveRelationshipVisibility(relationship.hidden) === "hide",
     ) &&
     knowledge.memories.every(
       (memory) => resolveVisibility(memory.type, memory.hidden) === "hide",
@@ -362,9 +364,7 @@ export function ThingsToRememberScreen({
       .catch((error) =>
         Logger.error(LOG_SCOPE, "failed to show memory on Profile", error),
       );
-  const addKeyPerson = async (
-    draft: RelationshipDraft,
-  ): Promise<boolean> => {
+  const addKeyPerson = async (draft: RelationshipDraft): Promise<boolean> => {
     try {
       const now = localDateTime();
       await addRelationship(getExecutor(), {

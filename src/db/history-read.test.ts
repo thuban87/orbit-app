@@ -13,10 +13,10 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
-import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { setCurrentStateValue } from "@/db/current-state-history-dao";
-import { isGroupLinked, readContactHistory } from "@/db/history-read";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { createGroupEvent } from "@/db/group-events-dao";
+import { isGroupLinked, readContactHistory } from "@/db/history-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -27,7 +27,10 @@ const uid = () => `history-read-uid-${++uidCounter}`;
 async function freshExec(): Promise<SqlExecutor> {
   uidCounter = 0;
   const exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid: uid });
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+  });
   return exec;
 }
 
@@ -128,15 +131,27 @@ describe("readContactHistory — interaction records + markers", () => {
   it("marks a multi-interaction date and orders same-timestamp rows by id DESC", async () => {
     const exec = await freshExec();
     const contactId = await makeContact(exec);
-    const first = await insertInteraction(exec, contactId, "2026-08-10 10:00:00");
-    const second = await insertInteraction(exec, contactId, "2026-08-10 10:00:00");
+    const first = await insertInteraction(
+      exec,
+      contactId,
+      "2026-08-10 10:00:00",
+    );
+    const second = await insertInteraction(
+      exec,
+      contactId,
+      "2026-08-10 10:00:00",
+    );
 
     const history = await readContactHistory(exec, contactId);
     // Same occurred_at → newest (higher id) first, stable.
     expect(history.interactions.map((r) => r.id)).toEqual([second, first]);
     const marker = history.markers.get("2026-08-10");
     expect(marker).toEqual(
-      expect.objectContaining({ interactionCount: 2, lifecycleCount: 0, kind: "multiple" }),
+      expect.objectContaining({
+        interactionCount: 2,
+        lifecycleCount: 0,
+        kind: "multiple",
+      }),
     );
   });
 
@@ -148,11 +163,19 @@ describe("readContactHistory — interaction records + markers", () => {
 
     const history = await readContactHistory(exec, contactId);
     expect(history.markers.get("2026-08-01")).toEqual(
-      expect.objectContaining({ interactionCount: 1, lifecycleCount: 0, kind: "interaction" }),
+      expect.objectContaining({
+        interactionCount: 1,
+        lifecycleCount: 0,
+        kind: "interaction",
+      }),
     );
     // Lifecycle-only date: a lifecycle marker with a ZERO interaction count.
     expect(history.markers.get("2026-08-03")).toEqual(
-      expect.objectContaining({ interactionCount: 0, lifecycleCount: 1, kind: "lifecycle-only" }),
+      expect.objectContaining({
+        interactionCount: 0,
+        lifecycleCount: 1,
+        kind: "lifecycle-only",
+      }),
     );
     expect(history.hasLifecycleRecords).toBe(true);
   });
@@ -189,7 +212,9 @@ describe("isGroupLinked — inert seam (D-12)", () => {
     await insertInteraction(exec, contactId, "2026-08-02 09:00:00");
 
     const history = await readContactHistory(exec, contactId);
-    expect(history.interactions.every((r) => r.groupLinked === false)).toBe(true);
+    expect(history.interactions.every((r) => r.groupLinked === false)).toBe(
+      true,
+    );
     // The predicate itself is hard-false: no group_event_id field exists.
     expect(isGroupLinked({})).toBe(false);
     expect(isGroupLinked({ groupEventId: undefined })).toBe(false);
@@ -201,13 +226,24 @@ describe("readContactHistory — Group Event local context", () => {
     const exec = await freshExec();
     const contactId = await makeContact(exec);
     const { groupEventId } = await createGroupEvent(exec, {
-      uid: uid(), title: "Dinner", occurredAt: "2026-09-01 18:00:00", now: NOW,
-      groupNote: "GROUP_NOTE_LOCAL_ONLY", participants: [{ contactId, uid: uid() }],
+      uid: uid(),
+      title: "Dinner",
+      occurredAt: "2026-09-01 18:00:00",
+      now: NOW,
+      groupNote: "GROUP_NOTE_LOCAL_ONLY",
+      participants: [{ contactId, uid: uid() }],
     });
     const history = await readContactHistory(exec, contactId);
     expect(history.interactions).toHaveLength(1);
-    expect(history.interactions[0]).toMatchObject({ groupLinked: true, groupEventId, groupTitle: "Dinner", groupNote: "GROUP_NOTE_LOCAL_ONLY" });
-    expect(history.markers.get("2026-09-01")).toMatchObject({ interactionCount: 1 });
+    expect(history.interactions[0]).toMatchObject({
+      groupLinked: true,
+      groupEventId,
+      groupTitle: "Dinner",
+      groupNote: "GROUP_NOTE_LOCAL_ONLY",
+    });
+    expect(history.markers.get("2026-09-01")).toMatchObject({
+      interactionCount: 1,
+    });
   });
 });
 
@@ -230,8 +266,14 @@ describe("readContactHistory — knowledge-change family (HIST-10)", () => {
 
     const history = await readContactHistory(exec, contactId);
     const fieldKeys = new Set(history.knowledgeChanges.map((r) => r.fieldKey));
-    expect(fieldKeys).toEqual(new Set(["last_talked_about", "current_location"]));
-    expect(history.knowledgeChanges.every((r) => typeof r.fieldKey === "string" && r.date.length === 10)).toBe(true);
+    expect(fieldKeys).toEqual(
+      new Set(["last_talked_about", "current_location"]),
+    );
+    expect(
+      history.knowledgeChanges.every(
+        (r) => typeof r.fieldKey === "string" && r.date.length === 10,
+      ),
+    ).toBe(true);
   });
 
   it("orders same-timestamp knowledge records stably across fields", async () => {

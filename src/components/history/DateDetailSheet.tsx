@@ -27,10 +27,10 @@
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
 import type { IconName } from "@/components/icons/icon-registry";
+import { EVENT_LABELS } from "@/components/TimelineRow";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
-import { EVENT_LABELS } from "@/components/TimelineRow";
 import type {
   HistoryInteractionRecord,
   HistoryKnowledgeRecord,
@@ -149,7 +149,10 @@ export function DateDetailSheet({
     <Sheet visible={visible} onRequestClose={onRequestClose} variant="detail">
       <AppText role="heading">{title}</AppText>
 
-      <ScrollView style={styles.list} contentContainerStyle={styles.listContent}>
+      <ScrollView
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+      >
         {items.length === 0 ? (
           <AppText role="caption" style={{ color: colors.textSecondary }}>
             No activity on this date.
@@ -198,11 +201,7 @@ function SheetRow({
   if (item.kind === "interaction") {
     const r = item.record;
     const icon = CHANNEL_ICON[r.channel] ?? "message";
-    const meta = [
-      r.direction,
-      r.connected === 0 ? "No reply" : null,
-      r.quality,
-    ]
+    const meta = [r.direction, r.connected === 0 ? "No reply" : null, r.quality]
       .filter((part): part is string => !!part)
       .join(" · ");
     return (

@@ -78,8 +78,26 @@ describe("knowledge search corpus read", () => {
         (uid, contact_id, method_type, raw_value, display_value, is_actionable, is_primary, display_order, created_at, modified_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        "phone-method", contactId, "phone", "+1 555 0100", "+1 555 0100", 1, 1, 0, NOW, NOW,
-        "email-method", contactId, "email", "alex@example.com", "alex@example.com", 1, 1, 0, NOW, NOW,
+        "phone-method",
+        contactId,
+        "phone",
+        "+1 555 0100",
+        "+1 555 0100",
+        1,
+        1,
+        0,
+        NOW,
+        NOW,
+        "email-method",
+        contactId,
+        "email",
+        "alex@example.com",
+        "alex@example.com",
+        1,
+        1,
+        0,
+        NOW,
+        NOW,
       ],
     );
     const memoryId = await addMemory(exec, {
@@ -167,16 +185,63 @@ describe("knowledge search corpus read", () => {
       expect(corpus[0]).toMatchObject({ contactId });
       expect(corpus[0].entries).toEqual(
         expect.arrayContaining([
-          expect.objectContaining({ source: "name", text: "Alex Example", label: "Name" }),
-          expect.objectContaining({ source: "phone", text: "+1 555 0100", label: "Phone" }),
-          expect.objectContaining({ source: "email", text: "alex@example.com", label: "Email" }),
-          expect.objectContaining({ source: "category", text: "Friends", label: "Category" }),
-          expect.objectContaining({ source: "memory", part: "memory-or-custom-field", memoryType: "general", text: "Weekend hobby" }),
-          expect.objectContaining({ source: "memory", part: "memory-or-custom-field", memoryType: "general", text: "Climbing on Sundays" }),
-          expect.objectContaining({ source: "memory", part: "note-or-body", memoryType: "general", text: "Indoor wall" }),
-          expect.objectContaining({ source: "relationship", part: "relationship", relationType: "friend", text: "Sam Rivera" }),
-          expect.objectContaining({ source: "relationship", part: "note-or-body", relationType: "friend", text: "Met through climbing" }),
-          expect.objectContaining({ source: "customField", fieldKey: "nickname", label: "nickname", part: "memory-or-custom-field", text: "Lex" }),
+          expect.objectContaining({
+            source: "name",
+            text: "Alex Example",
+            label: "Name",
+          }),
+          expect.objectContaining({
+            source: "phone",
+            text: "+1 555 0100",
+            label: "Phone",
+          }),
+          expect.objectContaining({
+            source: "email",
+            text: "alex@example.com",
+            label: "Email",
+          }),
+          expect.objectContaining({
+            source: "category",
+            text: "Friends",
+            label: "Category",
+          }),
+          expect.objectContaining({
+            source: "memory",
+            part: "memory-or-custom-field",
+            memoryType: "general",
+            text: "Weekend hobby",
+          }),
+          expect.objectContaining({
+            source: "memory",
+            part: "memory-or-custom-field",
+            memoryType: "general",
+            text: "Climbing on Sundays",
+          }),
+          expect.objectContaining({
+            source: "memory",
+            part: "note-or-body",
+            memoryType: "general",
+            text: "Indoor wall",
+          }),
+          expect.objectContaining({
+            source: "relationship",
+            part: "relationship",
+            relationType: "friend",
+            text: "Sam Rivera",
+          }),
+          expect.objectContaining({
+            source: "relationship",
+            part: "note-or-body",
+            relationType: "friend",
+            text: "Met through climbing",
+          }),
+          expect.objectContaining({
+            source: "customField",
+            fieldKey: "nickname",
+            label: "nickname",
+            part: "memory-or-custom-field",
+            text: "Lex",
+          }),
         ]),
       );
       expect(corpus.map((candidate) => candidate.contactId)).not.toContain(
@@ -254,8 +319,12 @@ describe("knowledge search corpus read", () => {
       createdAt: NOW,
       now: NOW,
     });
-    await exec.runAsync("UPDATE memories SET hidden = 1 WHERE id = ?", [hiddenMemory]);
-    await exec.runAsync("UPDATE memories SET outdated = 1 WHERE id = ?", [outdatedMemory]);
+    await exec.runAsync("UPDATE memories SET hidden = 1 WHERE id = ?", [
+      hiddenMemory,
+    ]);
+    await exec.runAsync("UPDATE memories SET outdated = 1 WHERE id = ?", [
+      outdatedMemory,
+    ]);
     const visibleRelationship = await addRelationship(exec, {
       contactId,
       personName: "Visible relationship marker",
@@ -268,7 +337,9 @@ describe("knowledge search corpus read", () => {
       createdAt: NOW,
       now: NOW,
     });
-    await exec.runAsync("UPDATE relationships SET hidden = 1 WHERE id = ?", [hiddenRelationship]);
+    await exec.runAsync("UPDATE relationships SET hidden = 1 WHERE id = ?", [
+      hiddenRelationship,
+    ]);
 
     const corpus = await listKnowledgeSearchCandidates(exec, {
       eligibleIds: [contactId],
@@ -293,9 +364,24 @@ describe("knowledge search corpus read", () => {
          (uid, contact_id, field_def_id, value, created_at, modified_at)
        VALUES (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?), (?, ?, ?, ?, ?, ?)`,
       [
-        "first-live", firstContact, liveDef, "First visible value", NOW, NOW,
-        "second-live", secondContact, liveDef, "Second visible value", NOW, NOW,
-        "first-quarantined", firstContact, quarantinedDef, "Quarantined value", NOW, NOW,
+        "first-live",
+        firstContact,
+        liveDef,
+        "First visible value",
+        NOW,
+        NOW,
+        "second-live",
+        secondContact,
+        liveDef,
+        "Second visible value",
+        NOW,
+        NOW,
+        "first-quarantined",
+        firstContact,
+        quarantinedDef,
+        "Quarantined value",
+        NOW,
+        NOW,
       ],
     );
     const getAllAsync = vi.spyOn(exec, "getAllAsync");
@@ -309,10 +395,13 @@ describe("knowledge search corpus read", () => {
         String(sql).includes("FROM custom_field_values AS values_table"),
       ),
     ).toHaveLength(1);
-    expect(corpus.find((candidate) => candidate.contactId === firstContact)?.entries)
-      .toContainEqual(expect.objectContaining({ text: "First visible value" }));
-    expect(corpus.find((candidate) => candidate.contactId === secondContact)?.entries)
-      .toContainEqual(expect.objectContaining({ text: "Second visible value" }));
+    expect(
+      corpus.find((candidate) => candidate.contactId === firstContact)?.entries,
+    ).toContainEqual(expect.objectContaining({ text: "First visible value" }));
+    expect(
+      corpus.find((candidate) => candidate.contactId === secondContact)
+        ?.entries,
+    ).toContainEqual(expect.objectContaining({ text: "Second visible value" }));
     expect(corpus.flatMap((candidate) => candidate.entries)).not.toContainEqual(
       expect.objectContaining({ text: "Quarantined value" }),
     );

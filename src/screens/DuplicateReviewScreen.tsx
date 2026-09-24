@@ -166,7 +166,10 @@ export function DuplicateReviewScreen({
             now,
           });
           if (result.skipped === "name-required") {
-            Alert.alert("Couldn't import — no name", "Add a name before importing.");
+            Alert.alert(
+              "Couldn't import — no name",
+              "Add a name before importing.",
+            );
           }
         } else if (action === "skip") {
           await markRowStatus(

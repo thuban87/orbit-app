@@ -350,7 +350,9 @@ describe("buildEditInput — knowledge-subdomain diffs (CAPT-04, §E)", () => {
   });
 
   it("omits a subdomain whose draft equals its seed (no add/edit/delete)", () => {
-    const seeded: MemoryDraftRow[] = [{ id: 1, type: "general", value: "same" }];
+    const seeded: MemoryDraftRow[] = [
+      { id: 1, type: "general", value: "same" },
+    ];
     const out = buildEditInput(
       state({ memories: [{ id: 1, type: "general", value: "same" }] }),
       deps({ seededMemories: seeded }),
@@ -373,14 +375,18 @@ describe("buildEditInput — knowledge-subdomain diffs (CAPT-04, §E)", () => {
       deps({ seededMemories: seeded }),
     );
 
-    expect(out.memories?.add).toEqual([{ type: "general", value: "brand new" }]);
+    expect(out.memories?.add).toEqual([
+      { type: "general", value: "brand new" },
+    ]);
     expect(out.memories?.edit).toEqual([
       { id: 1, type: "general", value: "edited" },
     ]);
     // Edited row is in `edit`, NOT `add` (no duplicate).
-    expect(out.memories?.add?.some((m) => (m as { value: string }).value === "edited")).toBe(
-      false,
-    );
+    expect(
+      out.memories?.add?.some(
+        (m) => (m as { value: string }).value === "edited",
+      ),
+    ).toBe(false);
     expect(out.memories?.delete).toEqual([{ id: 2 }]);
   });
 
@@ -395,7 +401,8 @@ describe("buildEditInput — knowledge-subdomain diffs (CAPT-04, §E)", () => {
 
     // blank -> omitted
     expect(
-      buildEditInput(state({ currentLocation: "   " }), deps()).currentStateEntries,
+      buildEditInput(state({ currentLocation: "   " }), deps())
+        .currentStateEntries,
     ).toBeUndefined();
 
     // changed -> emitted (trimmed)
@@ -427,14 +434,18 @@ describe("buildEditInput — knowledge-subdomain diffs (CAPT-04, §E)", () => {
     );
 
     expect(out.offLimits?.delete).toEqual([{ id: 10 }]); // only the off_limits row
-    expect(out.offLimits?.add).toEqual([{ kind: "off_limits", text: "religion" }]);
+    expect(out.offLimits?.add).toEqual([
+      { kind: "off_limits", text: "religion" },
+    ]);
     for (const add of out.offLimits?.add ?? []) {
       expect(add.kind).toBe("off_limits");
     }
   });
 
   it("off_limits edit in place forces kind:off_limits on the edit patch", () => {
-    const seeded: FuelDraftRow[] = [{ id: 20, kind: "off_limits", text: "old" }];
+    const seeded: FuelDraftRow[] = [
+      { id: 20, kind: "off_limits", text: "old" },
+    ];
     const out = buildEditInput(
       state({ offLimits: [{ id: 20, kind: "off_limits", text: "new" }] }),
       deps({ seededOffLimits: seeded }),
@@ -448,7 +459,9 @@ describe("buildEditInput — knowledge-subdomain diffs (CAPT-04, §E)", () => {
 describe("resolveErrorSection + collectEditBlockingErrors (reveal-and-focus)", () => {
   it("maps the first blocking error to its section id", () => {
     const errors = collectEditBlockingErrors(state({ name: "   " }));
-    expect(resolveErrorSection(errors, EDIT_SECTION_FIELD_MAP)).toBe("identity");
+    expect(resolveErrorSection(errors, EDIT_SECTION_FIELD_MAP)).toBe(
+      "identity",
+    );
   });
 
   it("maps a cadence error to the relationship section", () => {

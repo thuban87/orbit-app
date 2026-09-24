@@ -8,11 +8,8 @@
  */
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
-import {
-  MEMORY_TYPE_REGISTRY,
-  type MemoryTypeKey,
-} from "@/db/memory-registry";
 import { resolveVisibility } from "@/db/memories-read";
+import { MEMORY_TYPE_REGISTRY, type MemoryTypeKey } from "@/db/memory-registry";
 import { resolveRelationshipVisibility } from "@/db/relationships-read";
 import type { SqlExecutor } from "@/db/types";
 
@@ -229,7 +226,10 @@ export async function listKnowledgeSearchCandidates(
   const memoryTypes = searchableMemoryTypes();
   const [contacts, relationships, methods, defs, memories] = await Promise.all([
     exec.getAllAsync<ContactRow>(contactsSql(eligibleIds), eligibleIds),
-    exec.getAllAsync<RelationshipRow>(relationshipsSql(eligibleIds), eligibleIds),
+    exec.getAllAsync<RelationshipRow>(
+      relationshipsSql(eligibleIds),
+      eligibleIds,
+    ),
     exec.getAllAsync<ContactMethodRow>(contactMethodsSql(eligibleIds), [
       ...eligibleIds,
       "phone",
@@ -278,73 +278,72 @@ export async function listKnowledgeSearchCandidates(
   }
 
   return contacts.map((contact): KnowledgeSearchCandidate => {
-      const entries: KnowledgeSearchEntry[] = [
-        { source: "name", part: "identity", label: "Name", text: contact.name },
-      ];
-      if (contact.categoryLabel?.trim()) {
-        entries.push({
-          source: "category",
-          part: "identity",
-          label: "Category",
-          text: contact.categoryLabel,
-        });
-      }
-      for (const method of methodsByContact.get(contact.contactId) ?? []) {
-        entries.push({
-          source: method.methodType,
-          part: "identity",
-          label: method.methodType === "phone" ? "Phone" : "Email",
-          text: method.displayValue,
-        });
-      }
+    const entries: KnowledgeSearchEntry[] = [
+      { source: "name", part: "identity", label: "Name", text: contact.name },
+    ];
+    if (contact.categoryLabel?.trim()) {
+      entries.push({
+        source: "category",
+        part: "identity",
+        label: "Category",
+        text: contact.categoryLabel,
+      });
+    }
+    for (const method of methodsByContact.get(contact.contactId) ?? []) {
+      entries.push({
+        source: method.methodType,
+        part: "identity",
+        label: method.methodType === "phone" ? "Phone" : "Email",
+        text: method.displayValue,
+      });
+    }
 
-      for (const memory of memoriesByContact.get(contact.contactId) ?? []) {
-        if (
-          memory.outdated !== 1 &&
-          resolveVisibility(memory.type, memory.hidden) === "show"
-        ) {
-          appendMemoryEntries(entries, memory);
-        }
+    for (const memory of memoriesByContact.get(contact.contactId) ?? []) {
+      if (
+        memory.outdated !== 1 &&
+        resolveVisibility(memory.type, memory.hidden) === "show"
+      ) {
+        appendMemoryEntries(entries, memory);
       }
-      for (const relationship of relationshipsByContact.get(
-        contact.contactId,
-      ) ?? []) {
-        if (resolveRelationshipVisibility(relationship.hidden) !== "show") {
-          continue;
-        }
-        const label = relationship.relationType?.trim() || "Relationship";
+    }
+    for (const relationship of relationshipsByContact.get(contact.contactId) ??
+      []) {
+      if (resolveRelationshipVisibility(relationship.hidden) !== "show") {
+        continue;
+      }
+      const label = relationship.relationType?.trim() || "Relationship";
+      entries.push({
+        source: "relationship",
+        part: "relationship",
+        relationType: relationship.relationType,
+        label,
+        text: relationship.personName,
+      });
+      if (relationship.note?.trim()) {
         entries.push({
           source: "relationship",
-          part: "relationship",
+          part: "note-or-body",
           relationType: relationship.relationType,
           label,
-          text: relationship.personName,
+          text: relationship.note,
         });
-        if (relationship.note?.trim()) {
-          entries.push({
-            source: "relationship",
-            part: "note-or-body",
-            relationType: relationship.relationType,
-            label,
-            text: relationship.note,
-          });
-        }
       }
+    }
 
-      const values = valuesByContact.get(contact.contactId) ?? {};
-      for (const definition of defs) {
-        const value = values[definition.col_name];
-        if (isSearchableCustomFieldValue(definition, value)) {
-          entries.push({
-            source: "customField",
-            fieldKey: definition.col_name,
-            part: "memory-or-custom-field",
-            label: definition.label,
-            text: value,
-          });
-        }
+    const values = valuesByContact.get(contact.contactId) ?? {};
+    for (const definition of defs) {
+      const value = values[definition.col_name];
+      if (isSearchableCustomFieldValue(definition, value)) {
+        entries.push({
+          source: "customField",
+          fieldKey: definition.col_name,
+          part: "memory-or-custom-field",
+          label: definition.label,
+          text: value,
+        });
       }
+    }
 
-      return { contactId: contact.contactId, entries };
-    });
+    return { contactId: contact.contactId, entries };
+  });
 }

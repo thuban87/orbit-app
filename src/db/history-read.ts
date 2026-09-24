@@ -28,7 +28,10 @@
  * is the leading `YYYY-MM-DD`; never routed through UTC ISO slicing.
  */
 import { getCurrentStateHistory } from "@/db/current-state-history-read";
-import { CURRENT_STATE_FIELD_KEYS, type CurrentStateFieldKey } from "@/db/memory-registry";
+import {
+  CURRENT_STATE_FIELD_KEYS,
+  type CurrentStateFieldKey,
+} from "@/db/memory-registry";
 import type { ReadOnlyExecutor } from "@/db/transaction";
 
 /** A date-indexed interaction record surfaced to the History renderers. */
@@ -161,25 +164,32 @@ export async function readContactHistory(
   exec: ReadOnlyExecutor,
   contactId: number,
 ): Promise<ContactHistory> {
-  const interactionRows = await exec.getAllAsync<InteractionDbRow>(SELECT_INTERACTIONS, [contactId]);
-  const eventRows = await exec.getAllAsync<EventDbRow>(SELECT_EVENTS, [contactId]);
+  const interactionRows = await exec.getAllAsync<InteractionDbRow>(
+    SELECT_INTERACTIONS,
+    [contactId],
+  );
+  const eventRows = await exec.getAllAsync<EventDbRow>(SELECT_EVENTS, [
+    contactId,
+  ]);
 
-  const interactions: HistoryInteractionRecord[] = interactionRows.map((row) => ({
-    id: row.id,
-    occurredAt: row.occurred_at,
-    date: localDateOf(row.occurred_at),
-    channel: row.channel ?? "unspecified",
-    direction: row.direction,
-    connected: row.connected ?? 1,
-    quality: row.quality,
-    note: row.note,
-    duration: row.duration,
-    allowAi: row.allow_ai ?? 0,
-    groupEventId: row.group_event_id,
-    groupTitle: row.group_title,
-    groupNote: row.group_note,
-    groupLinked: isGroupLinked({ groupEventId: row.group_event_id }),
-  }));
+  const interactions: HistoryInteractionRecord[] = interactionRows.map(
+    (row) => ({
+      id: row.id,
+      occurredAt: row.occurred_at,
+      date: localDateOf(row.occurred_at),
+      channel: row.channel ?? "unspecified",
+      direction: row.direction,
+      connected: row.connected ?? 1,
+      quality: row.quality,
+      note: row.note,
+      duration: row.duration,
+      allowAi: row.allow_ai ?? 0,
+      groupEventId: row.group_event_id,
+      groupTitle: row.group_title,
+      groupNote: row.group_note,
+      groupLinked: isGroupLinked({ groupEventId: row.group_event_id }),
+    }),
+  );
 
   const lifecycleEvents: HistoryLifecycleRecord[] = eventRows.map((row) => ({
     id: row.id,
@@ -192,9 +202,15 @@ export async function readContactHistory(
   // Per-date markers. Interaction counts ONLY come from interaction rows (D-10);
   // lifecycle rows populate a separate lifecycleCount and never the interaction
   // count.
-  const counts = new Map<string, { interactionCount: number; lifecycleCount: number }>();
+  const counts = new Map<
+    string,
+    { interactionCount: number; lifecycleCount: number }
+  >();
   const bump = (date: string, key: "interactionCount" | "lifecycleCount") => {
-    const entry = counts.get(date) ?? { interactionCount: 0, lifecycleCount: 0 };
+    const entry = counts.get(date) ?? {
+      interactionCount: 0,
+      lifecycleCount: 0,
+    };
     entry[key]++;
     counts.set(date, entry);
   };
@@ -229,7 +245,10 @@ export async function readContactHistory(
   };
 }
 
-function markerKind(interactionCount: number, lifecycleCount: number): DateMarkerKind {
+function markerKind(
+  interactionCount: number,
+  lifecycleCount: number,
+): DateMarkerKind {
   if (interactionCount === 0) {
     return "lifecycle-only";
   }
@@ -256,7 +275,8 @@ async function readKnowledgeChanges(
   }
   // Deterministic flattened order: newest created_at first, then registry field
   // order, then id DESC — stable even when two fields change at the same instant.
-  const fieldOrder = (key: CurrentStateFieldKey) => CURRENT_STATE_FIELD_KEYS.indexOf(key);
+  const fieldOrder = (key: CurrentStateFieldKey) =>
+    CURRENT_STATE_FIELD_KEYS.indexOf(key);
   family.sort((a, b) => {
     if (a.createdAt !== b.createdAt) {
       return a.createdAt < b.createdAt ? 1 : -1;

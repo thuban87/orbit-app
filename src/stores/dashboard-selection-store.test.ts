@@ -49,7 +49,9 @@ describe("useDashboardSelectionStore", () => {
 
     useDashboardSelectionStore.getState().exitSelection();
     useDashboardSelectionStore.getState().enterSelection([1, 2, 2, 3], 2);
-    expect(useDashboardSelectionStore.getState().selectedIds).toEqual(new Set([2]));
+    expect(useDashboardSelectionStore.getState().selectedIds).toEqual(
+      new Set([2]),
+    );
   });
 
   it("toggles in-universe contacts idempotently and fences outsiders", () => {
@@ -62,7 +64,9 @@ describe("useDashboardSelectionStore", () => {
     );
 
     useDashboardSelectionStore.getState().toggle(1);
-    expect(useDashboardSelectionStore.getState().selectedIds).toEqual(new Set());
+    expect(useDashboardSelectionStore.getState().selectedIds).toEqual(
+      new Set(),
+    );
   });
 
   it("selects precisely the frozen universe, including an empty universe", () => {
@@ -76,7 +80,9 @@ describe("useDashboardSelectionStore", () => {
     useDashboardSelectionStore.getState().exitSelection();
     useDashboardSelectionStore.getState().enterSelection([]);
     useDashboardSelectionStore.getState().selectAll();
-    expect(useDashboardSelectionStore.getState().selectedIds).toEqual(new Set());
+    expect(useDashboardSelectionStore.getState().selectedIds).toEqual(
+      new Set(),
+    );
   });
 
   it("removes archived contacts from selection and its frozen universe", () => {
@@ -99,8 +105,8 @@ describe("useDashboardSelectionStore", () => {
       selectedIds: new Set(),
       frozenUniverse: [],
     });
-    expect(selectDashboardSelectionCount(useDashboardSelectionStore.getState())).toBe(
-      0,
-    );
+    expect(
+      selectDashboardSelectionCount(useDashboardSelectionStore.getState()),
+    ).toBe(0);
   });
 });

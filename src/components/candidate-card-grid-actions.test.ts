@@ -3,9 +3,14 @@ import { isBulkActionAvailable } from "@/components/candidate-card-grid-actions"
 
 describe("isBulkActionAvailable", () => {
   const allAdditive = [{ id: 1, additive: true }];
-  const mixed = [{ id: 1, additive: true }, { id: 2, additive: false }];
-  const eligibility = (_action: string, items: readonly { additive: boolean }[]) =>
-    items.every((item) => item.additive);
+  const mixed = [
+    { id: 1, additive: true },
+    { id: 2, additive: false },
+  ];
+  const eligibility = (
+    _action: string,
+    items: readonly { additive: boolean }[],
+  ) => items.every((item) => item.additive);
 
   it("blocks Use Contact Values for an ineligible live selection", () => {
     expect(

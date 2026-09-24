@@ -1,8 +1,13 @@
 /** Virtualized, responsive Dashboard card renderer over the shared result model. */
 import type { ReactElement } from "react";
-import { FlatList, RefreshControl, StyleSheet, useWindowDimensions } from "react-native";
-import type { DashboardRow } from "@/db/dashboard-read";
+import {
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  useWindowDimensions,
+} from "react-native";
 import type { IconName } from "@/components/icons/icon-registry";
+import type { DashboardRow } from "@/db/dashboard-read";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -93,7 +98,10 @@ export function CardGrid({
       numColumns={numColumns}
       keyExtractor={(item) => String(item.id)}
       columnWrapperStyle={styles.row}
-      contentContainerStyle={[styles.content, { paddingBottom: bottomClearance }]}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: bottomClearance },
+      ]}
       ListHeaderComponent={listHeader}
       ListEmptyComponent={showInitialSkeleton ? loadingSkeleton : listEmpty}
       refreshControl={
@@ -106,7 +114,7 @@ export function CardGrid({
       }
       renderItem={({ item }) => {
         const renderedMembership =
-          favouriteOverlay.get(item.id) ?? (item.favourite_rank !== null);
+          favouriteOverlay.get(item.id) ?? item.favourite_rank !== null;
         return (
           <GridCard
             contactId={item.id}
@@ -120,9 +128,7 @@ export function CardGrid({
             now={now}
             onPress={() => onPressContact(item.id)}
             onLongPress={
-              onLongPressContact
-                ? () => onLongPressContact(item.id)
-                : undefined
+              onLongPressContact ? () => onLongPressContact(item.id) : undefined
             }
             onViewProfile={
               onViewProfile ? () => onViewProfile(item.id) : undefined

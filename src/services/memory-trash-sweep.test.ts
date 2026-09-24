@@ -5,14 +5,11 @@ vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { addMemory } from "@/db/memories-dao";
-import { addRelationship } from "@/db/relationships-dao";
 import { runMigrations } from "@/db/migrations/runner";
+import { addRelationship } from "@/db/relationships-dao";
 import type { SqlExecutor } from "@/db/types";
+import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
 import { registerMemoryTrashSweep } from "@/services/memory-trash-sweep";
-import {
-  __resetSweepForTest,
-  runLaunchSweep,
-} from "@/services/launch-sweep";
 
 const NOW = "2026-09-04 12:00:00";
 let exec: SqlExecutor;
@@ -49,7 +46,10 @@ async function seedMemory(contactId: number, value: string): Promise<number> {
   });
 }
 
-async function seedRelationship(contactId: number, personName: string): Promise<number> {
+async function seedRelationship(
+  contactId: number,
+  personName: string,
+): Promise<number> {
   return addRelationship(exec, {
     contactId,
     personName,
@@ -72,7 +72,10 @@ async function ageRelationship(id: number, offset: string): Promise<void> {
   );
 }
 
-async function rowExists(table: "memories" | "relationships", id: number): Promise<boolean> {
+async function rowExists(
+  table: "memories" | "relationships",
+  id: number,
+): Promise<boolean> {
   return (
     (await exec.getFirstAsync<{ id: number }>(
       `SELECT id FROM ${table} WHERE id = ?`,
@@ -87,8 +90,14 @@ describe("memory trash sweep", () => {
     const staleMemory = await seedMemory(contactId, "Stale memory");
     const recentMemory = await seedMemory(contactId, "Recent memory");
     const edgeMemory = await seedMemory(contactId, "Edge memory");
-    const staleRelationship = await seedRelationship(contactId, "Stale relationship");
-    const recentRelationship = await seedRelationship(contactId, "Recent relationship");
+    const staleRelationship = await seedRelationship(
+      contactId,
+      "Stale relationship",
+    );
+    const recentRelationship = await seedRelationship(
+      contactId,
+      "Recent relationship",
+    );
     await ageMemory(staleMemory, "-31 days");
     await ageMemory(recentMemory, "-29 days");
     // SQLite evaluates its wall clock separately from this setup query. Keep
@@ -98,7 +107,10 @@ describe("memory trash sweep", () => {
     await ageRelationship(staleRelationship, "-31 days");
     await ageRelationship(recentRelationship, "-29 days");
 
-    registerMemoryTrashSweep(() => exec, () => NOW);
+    registerMemoryTrashSweep(
+      () => exec,
+      () => NOW,
+    );
     await runLaunchSweep();
 
     expect(await rowExists("memories", staleMemory)).toBe(false);
@@ -116,7 +128,10 @@ describe("memory trash sweep", () => {
     const contactId = await seedContact();
     const restoredMemory = await seedMemory(contactId, "Restored memory");
     const freshlyRedelMemory = await seedMemory(contactId, "Fresh memory");
-    const freshlyRedelRelationship = await seedRelationship(contactId, "Fresh relationship");
+    const freshlyRedelRelationship = await seedRelationship(
+      contactId,
+      "Fresh relationship",
+    );
     await ageMemory(restoredMemory, "-31 days");
     await ageMemory(freshlyRedelMemory, "-31 days");
     await ageRelationship(freshlyRedelRelationship, "-31 days");
@@ -129,9 +144,10 @@ describe("memory trash sweep", () => {
       async getAllAsync<T>(sql: string, params?: unknown[]): Promise<T[]> {
         const rows = await exec.getAllAsync<T>(sql, params);
         if (/FROM memories/.test(sql) && /deleted_at/.test(sql)) {
-          await exec.runAsync("UPDATE memories SET deleted_at = NULL WHERE id = ?", [
-            restoredMemory,
-          ]);
+          await exec.runAsync(
+            "UPDATE memories SET deleted_at = NULL WHERE id = ?",
+            [restoredMemory],
+          );
           await exec.runAsync(
             "UPDATE memories SET deleted_at = datetime('now', 'localtime', ?) WHERE id = ?",
             ["-1 days", freshlyRedelMemory],
@@ -147,11 +163,16 @@ describe("memory trash sweep", () => {
       },
     };
 
-    registerMemoryTrashSweep(() => proxy, () => NOW);
+    registerMemoryTrashSweep(
+      () => proxy,
+      () => NOW,
+    );
     await runLaunchSweep();
 
     expect(await rowExists("memories", restoredMemory)).toBe(true);
     expect(await rowExists("memories", freshlyRedelMemory)).toBe(true);
-    expect(await rowExists("relationships", freshlyRedelRelationship)).toBe(true);
+    expect(await rowExists("relationships", freshlyRedelRelationship)).toBe(
+      true,
+    );
   });
 });

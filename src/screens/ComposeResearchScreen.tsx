@@ -28,8 +28,8 @@ import { AppText } from "@/components/ui";
 import { Button } from "@/components/ui/Button";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import {
-  readComposeResearch,
   type ResearchItem,
+  readComposeResearch,
 } from "@/db/compose-research-read";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor } from "@/db/database";
@@ -222,11 +222,15 @@ function AddToAiToggle({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={selected ? "Added to AI — tap to remove" : "Add to AI"}
+      accessibilityLabel={
+        selected ? "Added to AI — tap to remove" : "Add to AI"
+      }
       style={[
         styles.toggle,
         {
-          backgroundColor: selected ? colors.surfaceElevated : colors.background,
+          backgroundColor: selected
+            ? colors.surfaceElevated
+            : colors.background,
           borderColor: selected ? colors.accentText : colors.background,
         },
       ]}

@@ -207,15 +207,21 @@ describe("listDashboardPopulation — Phase 25 Active universe", () => {
       snoozeUntil,
     });
 
-    const populationRow = (await listDashboardPopulation(exec, active, NOW)).find(
-      (row) => row.id === contact,
-    );
-    const searchRow = (await listDashboardSearch(exec, active, "projected", NOW)).find(
-      (row) => row.id === contact,
-    );
+    const populationRow = (
+      await listDashboardPopulation(exec, active, NOW)
+    ).find((row) => row.id === contact);
+    const searchRow = (
+      await listDashboardSearch(exec, active, "projected", NOW)
+    ).find((row) => row.id === contact);
 
-    expect(populationRow).toMatchObject({ last_contact: lastContact, snooze_until: snoozeUntil });
-    expect(searchRow).toMatchObject({ last_contact: lastContact, snooze_until: snoozeUntil });
+    expect(populationRow).toMatchObject({
+      last_contact: lastContact,
+      snooze_until: snoozeUntil,
+    });
+    expect(searchRow).toMatchObject({
+      last_contact: lastContact,
+      snooze_until: snoozeUntil,
+    });
   });
 
   it("returns a deduped Favourites and Not Contacted OR-union with match reasons", async () => {
@@ -549,7 +555,10 @@ describe("listDashboardSearch — population-aware search + A3 scope", () => {
   });
 
   it("shares the A3-aware, post-processed eligible universe without a term", async () => {
-    const never = await seedContact({ name: "Eligible Never", lastContact: null });
+    const never = await seedContact({
+      name: "Eligible Never",
+      lastContact: null,
+    });
     const snoozed = await seedContact({
       name: "Eligible Snoozed",
       lastContact: STABLE(),
@@ -575,15 +584,33 @@ describe("listDashboardSearch — population-aware search + A3 scope", () => {
   });
 
   it("keeps the name-and-fuel search projection golden after sharing its scope", async () => {
-    const nameMatch = await seedContact({ name: "Golden Name", lastContact: STABLE() });
-    const fuelMatch = await seedContact({ name: "Other", lastContact: STABLE() });
+    const nameMatch = await seedContact({
+      name: "Golden Name",
+      lastContact: STABLE(),
+    });
+    const fuelMatch = await seedContact({
+      name: "Other",
+      lastContact: STABLE(),
+    });
     await addFuelRow(fuelMatch, { text: "Golden fuel" });
 
     const rows = await listDashboardSearch(exec, active, "golden", NOW);
 
-    expect(rows.map(({ id, name, snippet, fuelText }) => ({ id, name, snippet, fuelText }))).toEqual([
+    expect(
+      rows.map(({ id, name, snippet, fuelText }) => ({
+        id,
+        name,
+        snippet,
+        fuelText,
+      })),
+    ).toEqual([
       { id: nameMatch, name: "Golden Name", snippet: null, fuelText: null },
-      { id: fuelMatch, name: "Other", snippet: "Golden fuel", fuelText: "Golden fuel" },
+      {
+        id: fuelMatch,
+        name: "Other",
+        snippet: "Golden fuel",
+        fuelText: "Golden fuel",
+      },
     ]);
   });
 
@@ -987,7 +1014,9 @@ describe("counts", () => {
       sort: "default",
     };
 
-    expect(ids(await listDashboardPopulation(exec, query, NOW))).toEqual([bound]);
+    expect(ids(await listDashboardPopulation(exec, query, NOW))).toEqual([
+      bound,
+    ]);
     await exec.runAsync(
       "UPDATE app_settings SET include_unbound_never_contacted = 1 WHERE id = 1",
     );

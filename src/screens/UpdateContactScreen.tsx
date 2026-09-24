@@ -63,16 +63,13 @@ import {
   listContactMethods,
 } from "@/db/contact-methods-dao";
 import { getContactHeader } from "@/db/contact-read";
-import { saveUserCustomValueEdit } from "@/db/custom-value-edit-dao";
 import { setCurrentStateValue } from "@/db/current-state-history-dao";
 import { getCurrentStateValue } from "@/db/current-state-history-read";
+import { saveUserCustomValueEdit } from "@/db/custom-value-edit-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
 import type { CustomFieldDef } from "@/db/field-types";
-import {
-  defsForEditForm,
-  getValuesForContact,
-} from "@/db/field-values-dao";
+import { defsForEditForm, getValuesForContact } from "@/db/field-values-dao";
 import { addFuel, deleteFuel, editFuel } from "@/db/fuel-dao";
 import { type FuelItem, listFuelForEditor } from "@/db/fuel-read";
 import type { CurrentStateFieldKey } from "@/db/memory-registry";

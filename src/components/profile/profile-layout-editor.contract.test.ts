@@ -12,7 +12,9 @@ describe("ProfileLayoutEditor direct reorder contract", () => {
     expect(source).toContain("ScrollViewContainer");
     expect(source).toContain("useReorderableDrag");
     expect(source).toContain("onReorder={({ from, to }) =>");
-    expect(source).toContain('type: "reorder", parent, id: items[from].id, toIndex: to');
+    expect(source).toContain(
+      'type: "reorder", parent, id: items[from].id, toIndex: to',
+    );
     expect(source).toContain("onLongPress={drag}");
     expect(source).not.toContain("PanResponder");
   });
@@ -22,7 +24,11 @@ describe("ProfileLayoutEditor direct reorder contract", () => {
 
     expect(source).toContain('label="Move up"');
     expect(source).toContain('label="Move down"');
-    expect(source).toContain("accessibilityLabel={`Move ${definition.label} up`}");
-    expect(source).toContain("accessibilityLabel={`Move ${definition.label} down`}");
+    expect(source).toContain(
+      "accessibilityLabel={`Move ${definition.label} up`}",
+    );
+    expect(source).toContain(
+      "accessibilityLabel={`Move ${definition.label} down`}",
+    );
   });
 });

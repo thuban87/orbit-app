@@ -144,7 +144,9 @@ export function resolveErrorSection(
  * Basics). Mirrors `canSave` — Unbound never blocks on cadence — but yields the
  * per-field detail `resolveErrorSection` routes to a section. Empty = savable.
  */
-export function collectBlockingErrors(state: CreateFormState): ValidationError[] {
+export function collectBlockingErrors(
+  state: CreateFormState,
+): ValidationError[] {
   const errors: ValidationError[] = [];
   if (state.name.trim().length === 0) {
     errors.push({ field: "name", message: "Enter a name to save." });

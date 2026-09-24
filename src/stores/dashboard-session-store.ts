@@ -18,10 +18,12 @@ interface DashboardSessionStore {
  * (population, filter, sort, and view axes) with clearSession() here. Phase 26
  * wires those two transitions through the Control Surface reset action.
  */
-export const useDashboardSessionStore = create<DashboardSessionStore>()((set) => ({
-  searchText: "",
-  scrollOffset: 0,
-  setSearchText: (searchText) => set({ searchText }),
-  setScrollOffset: (scrollOffset) => set({ scrollOffset }),
-  clearSession: () => set({ searchText: "", scrollOffset: 0 }),
-}));
+export const useDashboardSessionStore = create<DashboardSessionStore>()(
+  (set) => ({
+    searchText: "",
+    scrollOffset: 0,
+    setSearchText: (searchText) => set({ searchText }),
+    setScrollOffset: (scrollOffset) => set({ scrollOffset }),
+    clearSession: () => set({ searchText: "", scrollOffset: 0 }),
+  }),
+);

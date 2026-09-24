@@ -10,8 +10,8 @@ import {
   discardSession,
   finalizeSessionIfTerminal,
   markRowStatus,
-  retireRowStagedPhoto,
   resolveAlreadyLinkedCore,
+  retireRowStagedPhoto,
   setRowContactCore,
   setRowMatchOutcomeCore,
   setSessionBatchCategory,
@@ -242,11 +242,7 @@ describe("import-session-dao", () => {
       );
     });
 
-    await retireRowStagedPhoto(
-      exec,
-      accepted.rowIds[0],
-      "2026-08-29 12:01:00",
-    );
+    await retireRowStagedPhoto(exec, accepted.rowIds[0], "2026-08-29 12:01:00");
 
     expect(
       await exec.getFirstAsync<{

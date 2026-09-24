@@ -242,7 +242,9 @@ describe("atomic category deletion", () => {
       [corruptFilters],
     );
     const snapshot = async () => ({
-      categories: await exec.getAllAsync("SELECT * FROM categories ORDER BY id"),
+      categories: await exec.getAllAsync(
+        "SELECT * FROM categories ORDER BY id",
+      ),
       contacts: await exec.getAllAsync("SELECT * FROM contacts ORDER BY id"),
       imports: await exec.getAllAsync(
         "SELECT * FROM import_sessions ORDER BY id",
@@ -255,7 +257,9 @@ describe("atomic category deletion", () => {
       profile: await exec.getAllAsync(
         "SELECT * FROM profile_category_presentation ORDER BY category_id",
       ),
-      settings: await exec.getAllAsync("SELECT * FROM app_settings ORDER BY id"),
+      settings: await exec.getAllAsync(
+        "SELECT * FROM app_settings ORDER BY id",
+      ),
       tombstones: await exec.getAllAsync(
         "SELECT * FROM tombstones ORDER BY id",
       ),

@@ -57,12 +57,16 @@ export function normalizeContactMethod(
   }
 
   const explicitInternational = value.startsWith("+");
-  if (!explicitInternational && !input.defaultPhoneRegion) return raw(input.value);
+  if (!explicitInternational && !input.defaultPhoneRegion)
+    return raw(input.value);
   let parsed: PhoneNumber | undefined;
   try {
     parsed = parsePhoneNumberFromString(
       value,
-      explicitInternational ? undefined : (input.defaultPhoneRegion as CountryCode | null | undefined) ?? undefined,
+      explicitInternational
+        ? undefined
+        : ((input.defaultPhoneRegion as CountryCode | null | undefined) ??
+            undefined),
     );
   } catch {
     return raw(input.value);
@@ -72,7 +76,9 @@ export function normalizeContactMethod(
     rawValue: value,
     displayValue: parsed.formatNational(),
     canonicalValue: parsed.number,
-    canonicalRegion: parsed.country ?? (explicitInternational ? null : input.defaultPhoneRegion ?? null),
+    canonicalRegion:
+      parsed.country ??
+      (explicitInternational ? null : (input.defaultPhoneRegion ?? null)),
     extension: parsed.ext ?? null,
     isActionable: true,
   };

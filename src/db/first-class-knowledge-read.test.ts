@@ -19,7 +19,10 @@ let exec: SqlExecutor;
 beforeEach(async () => {
   uidCounter = 0;
   exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid: uid });
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+  });
 });
 
 async function makeContact(
@@ -102,8 +105,12 @@ describe("getFirstClassDerived", () => {
     await addInteraction(contactId);
 
     const result = await getFirstClassDerived(exec, contactId, NOW);
-    expect(result?.gravity).toEqual(expect.objectContaining({ tierName: expect.any(String) }));
-    expect(result?.intensity).toEqual(expect.objectContaining({ currentCount: 1 }));
+    expect(result?.gravity).toEqual(
+      expect.objectContaining({ tierName: expect.any(String) }),
+    );
+    expect(result?.intensity).toEqual(
+      expect.objectContaining({ currentCount: 1 }),
+    );
   });
 
   it("returns both derived values as null when a Bound contact has no history", async () => {
@@ -116,11 +123,16 @@ describe("getFirstClassDerived", () => {
   });
 
   it("keeps gravity but collapses Unbound intensity to null when history exists", async () => {
-    const contactId = await makeContact({ intervalDays: null, trackingEnabled: 0 });
+    const contactId = await makeContact({
+      intervalDays: null,
+      trackingEnabled: 0,
+    });
     await addInteraction(contactId);
 
     const result = await getFirstClassDerived(exec, contactId, NOW);
-    expect(result?.gravity).toEqual(expect.objectContaining({ tierName: expect.any(String) }));
+    expect(result?.gravity).toEqual(
+      expect.objectContaining({ tierName: expect.any(String) }),
+    );
     expect(result?.intensity).toBeNull();
   });
 

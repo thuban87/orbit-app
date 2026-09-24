@@ -69,9 +69,7 @@ export type PostLogSaveResult =
  * - kind "note" → a Note patch only; kind "memory" → an addMemory intent only.
  *   The two are structurally exclusive: a single result carries one `target`.
  */
-export function resolvePostLogSave(
-  input: PostLogSaveInput,
-): PostLogSaveResult {
+export function resolvePostLogSave(input: PostLogSaveInput): PostLogSaveResult {
   const text = input.text.trim();
   if (text.length === 0) {
     return { target: "noop" };

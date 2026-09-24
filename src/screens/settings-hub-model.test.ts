@@ -93,8 +93,7 @@ describe("Settings hub model", () => {
   it("renders no row targeting the reserved CategoryManagement route (D-03)", () => {
     const reserved = SETTINGS_HUB_ROWS.find(
       (row) =>
-        row.kind === "route" &&
-        (row.route as string) === "CategoryManagement",
+        row.kind === "route" && (row.route as string) === "CategoryManagement",
     );
     expect(
       reserved,

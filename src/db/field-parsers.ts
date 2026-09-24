@@ -68,7 +68,10 @@ export const parsers: Record<FieldType, (raw: string | null) => ParseResult> = {
   url: (r) => {
     if (r == null || r.trim() === "") return { ok: true, value: null };
     const hasScheme = /^[a-z][a-z0-9+.-]*:[^\s]+$/i.test(r);
-    const hasHost = /^(?:localhost(?::\d+)?|(?:[a-z0-9-]+\.)+[a-z0-9-]+)(?::\d+)?(?:[/?#][^\s]*)?$/i.test(r);
+    const hasHost =
+      /^(?:localhost(?::\d+)?|(?:[a-z0-9-]+\.)+[a-z0-9-]+)(?::\d+)?(?:[/?#][^\s]*)?$/i.test(
+        r,
+      );
     return hasScheme || hasHost ? { ok: true, value: r } : { ok: false };
   },
 

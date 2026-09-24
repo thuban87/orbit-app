@@ -7,8 +7,8 @@
  */
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import {
-  isCurrentStateFieldKey,
   type CurrentStateFieldKey,
+  isCurrentStateFieldKey,
 } from "@/db/memory-registry";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -44,7 +44,9 @@ function assertMeaningfulValue(value: string): void {
 
 function assertOneChange(op: string, changes: number): void {
   if (changes !== 1) {
-    throw new Error(`${op}: no current-state entry matched (changed ${changes})`);
+    throw new Error(
+      `${op}: no current-state entry matched (changed ${changes})`,
+    );
   }
 }
 
@@ -151,13 +153,7 @@ export async function editHistoryEntryCore(
     `UPDATE current_state_entries
         SET value = ?, modified_at = ?
       WHERE id = ? AND contact_id = ? AND field_key = ?`,
-    [
-      input.value,
-      input.now,
-      input.entryId,
-      input.contactId,
-      input.fieldKey,
-    ],
+    [input.value, input.now, input.entryId, input.contactId, input.fieldKey],
   );
   assertOneChange("editHistoryEntry", updated.changes);
 }

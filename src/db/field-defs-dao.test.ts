@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { createField } from "@/db/field-ddl";
 import {
   changeFieldOptions,
@@ -14,7 +17,6 @@ import {
   updateFieldShareWithAi,
 } from "@/db/field-defs-dao";
 import type { CustomFieldDef, NewFieldDef } from "@/db/field-types";
-import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 
@@ -26,7 +28,10 @@ let exec: SqlExecutor;
 beforeEach(async () => {
   uidCounter = 0;
   exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid: uid });
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+  });
 });
 
 async function makeDef(overrides: Partial<NewFieldDef> = {}): Promise<number> {

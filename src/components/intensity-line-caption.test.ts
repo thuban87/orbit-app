@@ -9,11 +9,11 @@
  * is testable without loading react-native.
  */
 import { describe, expect, it } from "vitest";
-import type { ImpactInputs } from "@/db/impact-read";
 import {
   intendedCaption,
   intendedLabel,
 } from "@/components/intensity-line-caption";
+import type { ImpactInputs } from "@/db/impact-read";
 import { intensityWindow } from "@/services/history/intensity-window";
 import { buildWindow } from "@/services/history/window";
 import { FREQUENCY_DAYS } from "@/types";
@@ -43,7 +43,9 @@ describe("intendedLabel / intendedCaption — the cadence describes the CONTACT"
   });
 
   it("appends the trailing-average clause only when known", () => {
-    expect(intendedCaption(FREQUENCY_DAYS.Monthly, null)).toBe("Monthly intended");
+    expect(intendedCaption(FREQUENCY_DAYS.Monthly, null)).toBe(
+      "Monthly intended",
+    );
     expect(intendedCaption(FREQUENCY_DAYS.Monthly, 12.4)).toBe(
       "Monthly intended · 12-day average",
     );
@@ -56,9 +58,21 @@ describe("window-scoped caption reports the contact's TRUE cadence (Phase 32 #1)
     const window = buildWindow("7days", "2020-03-15", "2020-03-15");
     const inputs = boundInputs(
       [
-        { occurredAt: "2020-03-10 10:00:00", connected: 1, direction: "outbound" },
-        { occurredAt: "2020-03-14 10:00:00", connected: 1, direction: "mutual" },
-        { occurredAt: "2020-02-01 10:00:00", connected: 1, direction: "outbound" }, // outside the window
+        {
+          occurredAt: "2020-03-10 10:00:00",
+          connected: 1,
+          direction: "outbound",
+        },
+        {
+          occurredAt: "2020-03-14 10:00:00",
+          connected: 1,
+          direction: "mutual",
+        },
+        {
+          occurredAt: "2020-02-01 10:00:00",
+          connected: 1,
+          direction: "outbound",
+        }, // outside the window
       ],
       { intervalDays: FREQUENCY_DAYS.Monthly },
     );
@@ -74,7 +88,10 @@ describe("window-scoped caption reports the contact's TRUE cadence (Phase 32 #1)
     // The contact's TRUE cadence is threaded through, decoupled from periodDays.
     expect(result.cadenceDays).toBe(FREQUENCY_DAYS.Monthly);
 
-    const caption = intendedCaption(result.cadenceDays, result.trailingAvgGapDays);
+    const caption = intendedCaption(
+      result.cadenceDays,
+      result.trailingAvgGapDays,
+    );
     expect(caption).toContain("Monthly intended"); // the CONTACT'S cadence
     expect(caption).not.toContain("Weekly"); // NOT the 7-day window span
     expect(caption).not.toContain("every 7 days");

@@ -1,11 +1,11 @@
 import { useNavigation } from "@react-navigation/native";
-import { useState, type ReactNode } from "react";
+import { type ReactNode, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { resolveBackIntent } from "@/navigation/back-intent";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { chromeScrimOpacity } from "@/theme/tokens/surface";
-import { OverflowMenu, type OverflowAction } from "./OverflowMenu";
+import { type OverflowAction, OverflowMenu } from "./OverflowMenu";
 
 interface TrailingFitOptions {
   /** True until the complete app bar has measured enough room for labels. */
@@ -47,9 +47,9 @@ export function ShellAppBar({
   const [titleWidth, setTitleWidth] = useState(0);
   const [labelWidths, setLabelWidths] = useState<Record<string, number>>({});
 
-  const labelsMeasured = trailingLabelProbe?.every(
-    (label) => labelWidths[label] !== undefined,
-  ) ?? false;
+  const labelsMeasured =
+    trailingLabelProbe?.every((label) => labelWidths[label] !== undefined) ??
+    false;
   const expandedTrailingWidth = trailingLabelProbe
     ? trailingLabelProbe.reduce(
         (total, label) => total + (labelWidths[label] ?? 0),
@@ -101,7 +101,10 @@ export function ShellAppBar({
         pointerEvents="none"
         style={[
           StyleSheet.absoluteFill,
-          { backgroundColor: colors.surface, opacity: chromeScrimOpacity(themePackage, mode) },
+          {
+            backgroundColor: colors.surface,
+            opacity: chromeScrimOpacity(themePackage, mode),
+          },
         ]}
       />
       {variant === "child" ? (
@@ -112,7 +115,9 @@ export function ShellAppBar({
           onPress={onBack}
           style={styles.back}
         >
-          <Text style={[styles.backLabel, { color: colors.textSecondary }]}>Back</Text>
+          <Text style={[styles.backLabel, { color: colors.textSecondary }]}>
+            Back
+          </Text>
         </Pressable>
       ) : null}
       <Text
@@ -130,8 +135,12 @@ export function ShellAppBar({
       >
         {title}
       </Text>
-      {trailingContent ? <View style={styles.trailing}>{trailingContent}</View> : null}
-      {overflow && overflow.length > 0 ? <OverflowMenu actions={overflow} /> : null}
+      {trailingContent ? (
+        <View style={styles.trailing}>{trailingContent}</View>
+      ) : null}
+      {overflow && overflow.length > 0 ? (
+        <OverflowMenu actions={overflow} />
+      ) : null}
       {trailingLabelProbe ? (
         <View
           accessible={false}

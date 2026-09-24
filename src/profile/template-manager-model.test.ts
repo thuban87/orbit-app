@@ -3,18 +3,18 @@ import { profileLayoutEditorReducer } from "./layout-editor-reducer";
 import { createLayoutTemplateIntent } from "./layout-editor-session";
 import { FACTORY_PROFILE_LAYOUT } from "./presentation-schema";
 import {
-  beginTemplateOperation,
   beginTemplateManagerListLoad,
+  beginTemplateOperation,
   createTemplateManagerListLoadState,
   createTemplateManagerState,
   describeTemplateAssignment,
+  finishTemplateManagerListLoad,
   managerBackIntent,
   openTemplateManagerPage,
   retainTemplateFailure,
   setTemplateDraft,
   setTemplateUsage,
   settleTemplateOperation,
-  finishTemplateManagerListLoad,
   templateLayoutForNewTemplate,
 } from "./template-manager-model";
 

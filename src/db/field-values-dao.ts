@@ -7,8 +7,9 @@
  * Every runtime SQL value is bound. The public writer owns the shared mutex;
  * its Core counterpart is deliberately non-mutexed for an existing transaction.
  */
-import type { CustomFieldDef } from "@/db/field-types";
+
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import type { CustomFieldDef } from "@/db/field-types";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -25,7 +26,10 @@ export async function getValuesForContact(
   if (defs.length === 0) return {};
 
   const placeholders = defs.map(() => "?").join(", ");
-  const rows = await exec.getAllAsync<{ col_name: string; value: string | null }>(
+  const rows = await exec.getAllAsync<{
+    col_name: string;
+    value: string | null;
+  }>(
     `SELECT defs.col_name, values_table.value
        FROM custom_field_values AS values_table
        JOIN custom_field_defs AS defs ON defs.id = values_table.field_def_id

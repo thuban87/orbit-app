@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 vi.mock("expo-sqlite", () => ({}));
+
+import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   bulkAddFavourites,
   bulkArchive,
@@ -11,7 +14,6 @@ import {
   bulkUnsnooze,
   undoBulkQuickLog,
 } from "@/db/bulk-actions-dao";
-import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { createContactFull } from "@/db/contacts-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
@@ -44,8 +46,12 @@ async function seedContact(name: string, rarelyResponds = 0): Promise<number> {
   return contactId;
 }
 
-async function count(table: "interactions" | "events" | "tombstones"): Promise<number> {
-  const row = await exec.getFirstAsync<{ n: number }>(`SELECT COUNT(*) AS n FROM ${table}`);
+async function count(
+  table: "interactions" | "events" | "tombstones",
+): Promise<number> {
+  const row = await exec.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM ${table}`,
+  );
   return row?.n ?? 0;
 }
 
@@ -64,11 +70,27 @@ describe("bulkQuickLog", () => {
     const receipt = await bulkQuickLog(exec, ids, NOW);
 
     expect(receipt.map((entry) => entry.contactId)).toEqual(ids);
-    expect(await exec.getAllAsync(
-      "SELECT contact_id, channel, direction, connected, quality, source FROM interactions ORDER BY contact_id",
-    )).toEqual([
-      { contact_id: ids[0], channel: "unspecified", direction: "outbound", connected: 1, quality: null, source: "manual" },
-      { contact_id: ids[1], channel: "unspecified", direction: "outbound", connected: 1, quality: null, source: "manual" },
+    expect(
+      await exec.getAllAsync(
+        "SELECT contact_id, channel, direction, connected, quality, source FROM interactions ORDER BY contact_id",
+      ),
+    ).toEqual([
+      {
+        contact_id: ids[0],
+        channel: "unspecified",
+        direction: "outbound",
+        connected: 1,
+        quality: null,
+        source: "manual",
+      },
+      {
+        contact_id: ids[1],
+        channel: "unspecified",
+        direction: "outbound",
+        connected: 1,
+        quality: null,
+        source: "manual",
+      },
     ]);
     expect(await Promise.all(ids.map(lastContact))).toEqual([NOW, NOW]);
   });
@@ -81,9 +103,9 @@ describe("bulkQuickLog", () => {
 
   it("rejects malformed current-time input before it opens a write transaction", async () => {
     const contactId = await seedContact("Guarded");
-    await expect(bulkQuickLog(exec, [contactId], "not-a-local-time")).rejects.toThrow(
-      /valid local/,
-    );
+    await expect(
+      bulkQuickLog(exec, [contactId], "not-a-local-time"),
+    ).rejects.toThrow(/valid local/);
     expect(await count("interactions")).toBe(0);
   });
 
@@ -112,7 +134,11 @@ describe("bulkQuickLog", () => {
     const ids = await Promise.all([seedContact("A"), seedContact("B")]);
     const receipt = await bulkQuickLog(exec, ids, NOW);
     await expect(
-      undoBulkQuickLog(exec, [receipt[0], { contactId: ids[1], interactionId: 9999 }], NOW),
+      undoBulkQuickLog(
+        exec,
+        [receipt[0], { contactId: ids[1], interactionId: 9999 }],
+        NOW,
+      ),
     ).rejects.toThrow(/no interaction matched/);
     expect(await count("interactions")).toBe(2);
     expect(await count("tombstones")).toBe(0);
@@ -128,7 +154,10 @@ describe("bulkSetCategory — Profile inheritance boundary", () => {
       )
     ).lastInsertRowId;
     const contactId = await seedContact("Inherited");
-    await exec.runAsync("UPDATE contacts SET category_id=? WHERE id=?", [categoryId, contactId]);
+    await exec.runAsync("UPDATE contacts SET category_id=? WHERE id=?", [
+      categoryId,
+      contactId,
+    ]);
     const freeform = JSON.stringify(FACTORY_PROFILE_LAYOUT);
     await exec.runAsync(
       "INSERT INTO profile_contact_presentation(contact_id,freeform_layout_json,collapse_json,created_at,modified_at) VALUES(?,?,?,?,?)",
@@ -136,7 +165,9 @@ describe("bulkSetCategory — Profile inheritance boundary", () => {
     );
     await bulkSetCategory(exec, [contactId], null, NOW);
     expect(
-      await exec.getFirstAsync("SELECT category_id FROM contacts WHERE id=?", [contactId]),
+      await exec.getFirstAsync("SELECT category_id FROM contacts WHERE id=?", [
+        contactId,
+      ]),
     ).toEqual({ category_id: null });
     expect(
       await exec.getFirstAsync(
@@ -152,17 +183,25 @@ describe("other bulk action composers", () => {
     const a = await seedContact("A");
     const b = await seedContact("B");
     await bulkArchive(exec, [a, b], NOW);
-    expect(await exec.getAllAsync("SELECT contact_id, type FROM events ORDER BY contact_id")).toEqual([
+    expect(
+      await exec.getAllAsync(
+        "SELECT contact_id, type FROM events ORDER BY contact_id",
+      ),
+    ).toEqual([
       { contact_id: a, type: "archive" },
       { contact_id: b, type: "archive" },
     ]);
 
     const c = await seedContact("C");
-    await expect(bulkArchive(exec, [c, a], NOW)).rejects.toThrow(/no live contact/);
-    expect(await exec.getFirstAsync<{ archived_at: string | null }>(
-      "SELECT archived_at FROM contacts WHERE id = ?",
-      [c],
-    )).toEqual({ archived_at: null });
+    await expect(bulkArchive(exec, [c, a], NOW)).rejects.toThrow(
+      /no live contact/,
+    );
+    expect(
+      await exec.getFirstAsync<{ archived_at: string | null }>(
+        "SELECT archived_at FROM contacts WHERE id = ?",
+        [c],
+      ),
+    ).toEqual({ archived_at: null });
     expect(await count("events")).toBe(2);
   });
 
@@ -170,31 +209,38 @@ describe("other bulk action composers", () => {
     const ids = await Promise.all([seedContact("A"), seedContact("B")]);
     await bulkAddFavourites(exec, ids, NOW);
     await bulkAddFavourites(exec, ids, NOW);
-    expect(await exec.getAllAsync("SELECT favourite_rank FROM contacts ORDER BY id")).toEqual([
+    expect(
+      await exec.getAllAsync("SELECT favourite_rank FROM contacts ORDER BY id"),
+    ).toEqual([
       { favourite_rank: expect.any(Number) },
       { favourite_rank: expect.any(Number) },
     ]);
     await bulkRemoveFavourites(exec, ids, NOW);
-    expect(await exec.getAllAsync("SELECT favourite_rank FROM contacts ORDER BY id")).toEqual([
-      { favourite_rank: null },
-      { favourite_rank: null },
-    ]);
+    expect(
+      await exec.getAllAsync("SELECT favourite_rank FROM contacts ORDER BY id"),
+    ).toEqual([{ favourite_rank: null }, { favourite_rank: null }]);
   });
 
   it("snoozes and unsnoozes with one immutable event per contact", async () => {
     const ids = await Promise.all([seedContact("A"), seedContact("B")]);
     await bulkSnooze(exec, ids, "1w", NOW);
-    expect(await exec.getAllAsync("SELECT snooze_until FROM contacts ORDER BY id")).toEqual([
+    expect(
+      await exec.getAllAsync("SELECT snooze_until FROM contacts ORDER BY id"),
+    ).toEqual([
       { snooze_until: expect.any(String) },
       { snooze_until: expect.any(String) },
     ]);
     await bulkUnsnooze(exec, ids, NOW);
-    expect(await exec.getAllAsync("SELECT snooze_until FROM contacts ORDER BY id")).toEqual([
-      { snooze_until: null },
-      { snooze_until: null },
-    ]);
-    expect(await exec.getAllAsync("SELECT type FROM events ORDER BY id")).toEqual([
-      { type: "snooze" }, { type: "snooze" }, { type: "unsnooze" }, { type: "unsnooze" },
+    expect(
+      await exec.getAllAsync("SELECT snooze_until FROM contacts ORDER BY id"),
+    ).toEqual([{ snooze_until: null }, { snooze_until: null }]);
+    expect(
+      await exec.getAllAsync("SELECT type FROM events ORDER BY id"),
+    ).toEqual([
+      { type: "snooze" },
+      { type: "snooze" },
+      { type: "unsnooze" },
+      { type: "unsnooze" },
     ]);
   });
 
@@ -207,7 +253,9 @@ describe("other bulk action composers", () => {
       getFirstAsync: async <T>(sql: string, params?: unknown[]) => {
         if (sql === "SELECT date('now','localtime', ?) AS until") {
           resolverCalls += 1;
-          return { until: resolverCalls === 1 ? "2026-09-13" : "2026-09-14" } as T;
+          return {
+            until: resolverCalls === 1 ? "2026-09-13" : "2026-09-14",
+          } as T;
         }
         return originalGetFirst<T>(sql, params);
       },
@@ -216,35 +264,51 @@ describe("other bulk action composers", () => {
     await bulkSnooze(resolvingExec, ids, "1w", NOW);
 
     expect(resolverCalls).toBe(1);
-    expect(await exec.getAllAsync("SELECT snooze_until FROM contacts ORDER BY id")).toEqual([
-      { snooze_until: "2026-09-13" },
-      { snooze_until: "2026-09-13" },
-    ]);
-    expect(await exec.getAllAsync("SELECT type FROM events ORDER BY id")).toEqual([
-      { type: "snooze" },
-      { type: "snooze" },
-    ]);
+    expect(
+      await exec.getAllAsync("SELECT snooze_until FROM contacts ORDER BY id"),
+    ).toEqual([{ snooze_until: "2026-09-13" }, { snooze_until: "2026-09-13" }]);
+    expect(
+      await exec.getAllAsync("SELECT type FROM events ORDER BY id"),
+    ).toEqual([{ type: "snooze" }, { type: "snooze" }]);
   });
 
   it("updates only category and validates positive integer frequencies", async () => {
     const contactId = await seedContact("Unchanged");
-    await exec.runAsync("UPDATE contacts SET social_battery = ? WHERE id = ?", ["high", contactId]);
+    await exec.runAsync("UPDATE contacts SET social_battery = ? WHERE id = ?", [
+      "high",
+      contactId,
+    ]);
     await bulkSetCategory(exec, [contactId], 2, NOW);
-    expect(await exec.getFirstAsync(
-      "SELECT name, category_id, interval_days, social_battery FROM contacts WHERE id = ?",
-      [contactId],
-    )).toEqual({ name: "Unchanged", category_id: 2, interval_days: 14, social_battery: "high" });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT name, category_id, interval_days, social_battery FROM contacts WHERE id = ?",
+        [contactId],
+      ),
+    ).toEqual({
+      name: "Unchanged",
+      category_id: 2,
+      interval_days: 14,
+      social_battery: "high",
+    });
 
     for (const intervalDays of [0, -1, 1.5]) {
-      await expect(bulkSetFrequency(exec, [contactId], intervalDays, NOW)).rejects.toThrow(
-        /positive integer/,
-      );
+      await expect(
+        bulkSetFrequency(exec, [contactId], intervalDays, NOW),
+      ).rejects.toThrow(/positive integer/);
     }
-    expect(await exec.getFirstAsync("SELECT interval_days FROM contacts WHERE id = ?", [contactId]))
-      .toEqual({ interval_days: 14 });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT interval_days FROM contacts WHERE id = ?",
+        [contactId],
+      ),
+    ).toEqual({ interval_days: 14 });
     await bulkSetFrequency(exec, [contactId], 1, NOW);
-    expect(await exec.getFirstAsync("SELECT interval_days FROM contacts WHERE id = ?", [contactId]))
-      .toEqual({ interval_days: 1 });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT interval_days FROM contacts WHERE id = ?",
+        [contactId],
+      ),
+    ).toEqual({ interval_days: 1 });
   });
 
   it("does no writes for empty selections and returns an empty quick-log receipt", async () => {
@@ -263,6 +327,9 @@ describe("other bulk action composers", () => {
       bulkSetCategory(exec, [], 2, NOW),
       bulkSetFrequency(exec, [], 1, NOW),
     ]);
-    expect({ interactions: await count("interactions"), events: await count("events") }).toEqual(before);
+    expect({
+      interactions: await count("interactions"),
+      events: await count("events"),
+    }).toEqual(before);
   });
 });

@@ -138,16 +138,16 @@ describe("migration 003 — orrery sun columns (forward-only, additive)", () => 
       "UPDATE app_settings SET sun_contact_id = ? WHERE id = 1",
       [cid],
     );
-    const assigned = await exec.getFirstAsync<{ sun_contact_id: number | null }>(
-      "SELECT sun_contact_id FROM app_settings WHERE id = 1",
-    );
+    const assigned = await exec.getFirstAsync<{
+      sun_contact_id: number | null;
+    }>("SELECT sun_contact_id FROM app_settings WHERE id = 1");
     expect(assigned?.sun_contact_id).toBe(cid);
 
     // Hard-purge the sun-contact — the FK must auto-revert the sun to self (NULL).
     await exec.runAsync("DELETE FROM contacts WHERE id = ?", [cid]);
-    const reverted = await exec.getFirstAsync<{ sun_contact_id: number | null }>(
-      "SELECT sun_contact_id FROM app_settings WHERE id = 1",
-    );
+    const reverted = await exec.getFirstAsync<{
+      sun_contact_id: number | null;
+    }>("SELECT sun_contact_id FROM app_settings WHERE id = 1");
     expect(reverted?.sun_contact_id).toBeNull();
   });
 });

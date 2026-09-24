@@ -13,8 +13,9 @@
  * ADR-075 retires rank as a user-facing order: this vestigial storage is retained
  * only for membership and internal picker reads, so no rank-rewrite writer exists.
  */
-import { inWriteTransaction } from "@/db/transaction";
+
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
 /**

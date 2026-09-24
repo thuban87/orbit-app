@@ -3,10 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
-import {
-  ABOUT_APP_NAME,
-  resolveAboutVersion,
-} from "./settings-about-model";
+import { ABOUT_APP_NAME, resolveAboutVersion } from "./settings-about-model";
 
 // The app icon (app.json `icon`). A static require resolves at bundle time; the
 // same asset the launcher shows, so About needs no separate artwork.
