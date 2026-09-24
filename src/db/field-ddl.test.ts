@@ -1,10 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import {
   resolveNewItemAiDefault,
   setAiPermissionDefault,
 } from "@/db/ai-permissions-dao";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
   createField,
   deleteOrQuarantineField,
@@ -13,8 +16,8 @@ import {
 } from "@/db/field-ddl";
 import { promoteFieldToGlobal } from "@/db/field-defs-dao";
 import type { NewFieldDef } from "@/db/field-types";
-import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
+import { listJournalEntriesCore } from "@/db/restore-photo-journal-dao";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-24 12:00:00";
@@ -25,7 +28,10 @@ let exec: SqlExecutor;
 beforeEach(async () => {
   uidCounter = 0;
   exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid: uid });
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+  });
 });
 
 function newDef(overrides: Partial<NewFieldDef> = {}): NewFieldDef {
@@ -115,11 +121,21 @@ describe("normalized field lifecycle", () => {
 
   it("rejects contact-scoped creation before inserting a definition or values", async () => {
     const contactId = await seedContact("Alex");
-    const beforeDefs = await exec.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM custom_field_defs");
-    const beforeValues = await exec.getFirstAsync<{ n: number }>("SELECT COUNT(*) AS n FROM custom_field_values");
-    await expect(createField(exec, newDef({ scope: "contact" }))).rejects.toThrow(/Phase 31/);
-    expect(await exec.getFirstAsync("SELECT COUNT(*) AS n FROM custom_field_defs")).toEqual(beforeDefs);
-    expect(await exec.getFirstAsync("SELECT COUNT(*) AS n FROM custom_field_values")).toEqual(beforeValues);
+    const beforeDefs = await exec.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM custom_field_defs",
+    );
+    const beforeValues = await exec.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM custom_field_values",
+    );
+    await expect(
+      createField(exec, newDef({ scope: "contact" })),
+    ).rejects.toThrow(/Phase 31/);
+    expect(
+      await exec.getFirstAsync("SELECT COUNT(*) AS n FROM custom_field_defs"),
+    ).toEqual(beforeDefs);
+    expect(
+      await exec.getFirstAsync("SELECT COUNT(*) AS n FROM custom_field_values"),
+    ).toEqual(beforeValues);
     expect(contactId).toBeGreaterThan(0);
   });
 
@@ -131,7 +147,22 @@ describe("normalized field lifecycle", () => {
          uid, col_name, label, type, options, show_on_new, always_show,
          display_order, share_with_ai, scope, history_retained, field_group, created_at, modified_at
        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [uid(), "private_note", "Private note", "text", null, 0, 0, 0, 0, "contact", 0, null, NOW, NOW],
+      [
+        uid(),
+        "private_note",
+        "Private note",
+        "text",
+        null,
+        0,
+        0,
+        0,
+        0,
+        "contact",
+        0,
+        null,
+        NOW,
+        NOW,
+      ],
     );
     await exec.runAsync(
       `INSERT INTO custom_field_values (uid, contact_id, field_def_id, value, created_at, modified_at)
@@ -139,14 +170,23 @@ describe("normalized field lifecycle", () => {
       [uid(), owner, def.lastInsertRowId, "owner value", NOW, NOW],
     );
 
-    await promoteFieldToGlobal(exec, { fieldDefId: def.lastInsertRowId, now: NOW });
+    await promoteFieldToGlobal(exec, {
+      fieldDefId: def.lastInsertRowId,
+      now: NOW,
+    });
 
-    expect(await exec.getFirstAsync("SELECT scope FROM custom_field_defs WHERE id = ?", [def.lastInsertRowId]))
-      .toEqual({ scope: "global" });
-    expect(await exec.getAllAsync(
-      "SELECT contact_id, value FROM custom_field_values WHERE field_def_id = ? ORDER BY contact_id",
-      [def.lastInsertRowId],
-    )).toEqual([
+    expect(
+      await exec.getFirstAsync(
+        "SELECT scope FROM custom_field_defs WHERE id = ?",
+        [def.lastInsertRowId],
+      ),
+    ).toEqual({ scope: "global" });
+    expect(
+      await exec.getAllAsync(
+        "SELECT contact_id, value FROM custom_field_values WHERE field_def_id = ? ORDER BY contact_id",
+        [def.lastInsertRowId],
+      ),
+    ).toEqual([
       { contact_id: owner, value: "owner value" },
       { contact_id: other, value: null },
     ]);
@@ -162,14 +202,24 @@ describe("normalized field lifecycle", () => {
        VALUES (?, ?, ?, ?, ?)`,
       [historyUid, contactId, fieldDefId, "prior", NOW],
     );
-    await dropField(exec, { id: fieldDefId, col_name: "nickname" }, "delete", NOW);
-    expect(await exec.getFirstAsync(
-      "SELECT id FROM custom_field_value_history WHERE uid = ?", [historyUid],
-    )).toBeNull();
-    expect(await exec.getFirstAsync(
-      "SELECT entity_uid FROM tombstones WHERE entity_type = 'custom_field_value_history' AND entity_uid = ?",
-      [historyUid],
-    )).toEqual({ entity_uid: historyUid });
+    await dropField(
+      exec,
+      { id: fieldDefId, col_name: "nickname" },
+      "delete",
+      NOW,
+    );
+    expect(
+      await exec.getFirstAsync(
+        "SELECT id FROM custom_field_value_history WHERE uid = ?",
+        [historyUid],
+      ),
+    ).toBeNull();
+    expect(
+      await exec.getFirstAsync(
+        "SELECT entity_uid FROM tombstones WHERE entity_type = 'custom_field_value_history' AND entity_uid = ?",
+        [historyUid],
+      ),
+    ).toEqual({ entity_uid: historyUid });
   });
 
   it("snapshots non-null normalized values before deleting pairs and the definition", async () => {
@@ -225,7 +275,11 @@ describe("normalized field lifecycle", () => {
         "SELECT entity_type, entity_uid, deleted_at FROM tombstones ORDER BY entity_type, entity_uid",
       ),
     ).toEqual([
-      { entity_type: "custom_field_def", entity_uid: definitionUid?.uid, deleted_at: NOW },
+      {
+        entity_type: "custom_field_def",
+        entity_uid: definitionUid?.uid,
+        deleted_at: NOW,
+      },
       ...valueUids.map(({ uid: entity_uid }) => ({
         entity_type: "custom_field_value",
         entity_uid,
@@ -245,7 +299,9 @@ describe("normalized field lifecycle", () => {
         NOW,
       ),
     ).toBe("deleted");
-    const tombstonesAfterPermanentDelete = await exec.getFirstAsync<{ n: number }>(
+    const tombstonesAfterPermanentDelete = await exec.getFirstAsync<{
+      n: number;
+    }>(
       "SELECT COUNT(*) AS n FROM tombstones WHERE entity_type IN ('custom_field_def', 'custom_field_value')",
     );
     await createField(exec, newDef({ col_name: "city", label: "City" }));
@@ -314,6 +370,29 @@ describe("normalized field lifecycle", () => {
         [fieldDefId],
       ),
     ).toEqual({ id: fieldDefId });
+  });
+
+  it("journals every value owner's derived file on definition deletion regardless of current type", async () => {
+    const first = await seedContact("First");
+    const second = await seedContact("Second");
+    await createField(exec, newDef({ col_name: "former_photo" }));
+    const id = await defId("former_photo");
+    await dropField(exec, { id, col_name: "former_photo" }, "delete", NOW);
+    const paths = (await listJournalEntriesCore(exec))
+      .filter((entry) => entry.action === "delete")
+      .map((entry) => entry.canonicalRelativePath);
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        `avatars/cv-${first}-former_photo.jpg`,
+        `avatars/cv-${second}-former_photo.jpg`,
+      ]),
+    );
+    expect(
+      await exec.getFirstAsync(
+        "SELECT id FROM custom_field_defs WHERE id = ?",
+        [id],
+      ),
+    ).toBeNull();
   });
 
   it("rolls back without deletion evidence when asked to permanently delete a missing definition", async () => {

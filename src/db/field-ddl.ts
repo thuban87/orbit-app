@@ -37,9 +37,12 @@
  * Node-pure control flow: takes `exec: SqlExecutor` as its first argument and
  * imports the shared `inWriteTransaction` — never expo `withTransactionAsync`.
  */
-import type { CustomFieldDef, NewFieldDef } from "@/db/field-types";
+
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import type { CustomFieldDef, NewFieldDef } from "@/db/field-types";
 import { upsertValueCore } from "@/db/field-values-dao";
+import { customFieldPhotoRelPath } from "@/db/photo-relative-path";
+import { enqueueDeleteIntentCore } from "@/db/restore-photo-journal-dao";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -57,9 +60,11 @@ export function createField(
   def: NewFieldDef,
 ): Promise<void> {
   if (def.scope === "contact") {
-    return Promise.reject(new Error(
-      "Contact-scoped custom-field creation, durable ownership, and owner-purge semantics are deferred to Phase 31.",
-    ));
+    return Promise.reject(
+      new Error(
+        "Contact-scoped custom-field creation, durable ownership, and owner-purge semantics are deferred to Phase 31.",
+      ),
+    );
   }
   return inWriteTransaction(exec, async () => {
     const result = await exec.runAsync(
@@ -125,10 +130,15 @@ async function dropFieldValues(
   if (definition === null) {
     throw new Error(`custom field definition ${def.id} no longer exists`);
   }
-  const values = await exec.getAllAsync<{ uid: string }>(
-    "SELECT uid FROM custom_field_values WHERE field_def_id = ? ORDER BY id",
+  const values = await exec.getAllAsync<{ uid: string; contact_id: number }>(
+    "SELECT uid, contact_id FROM custom_field_values WHERE field_def_id = ? ORDER BY id",
     [def.id],
   );
+  for (const value of values)
+    await enqueueDeleteIntentCore(
+      exec,
+      customFieldPhotoRelPath(value.contact_id, def.col_name),
+    );
   const valueHistory = await exec.getAllAsync<{ uid: string }>(
     "SELECT uid FROM custom_field_value_history WHERE field_def_id = ? ORDER BY id",
     [def.id],
@@ -179,13 +189,12 @@ async function dropFieldValues(
     [def.id],
   );
   if (deleted.changes !== 1) {
-    throw new Error(`expected to delete one custom field definition, got ${deleted.changes}`);
+    throw new Error(
+      `expected to delete one custom field definition, got ${deleted.changes}`,
+    );
   }
 
-  // A permanently deleted custom-PHOTO definition can leave at most one local
-  // photo file per contact. purge-photo-cleanup enumerates surviving definitions
-  // by col_name, so it cannot rediscover these files after this deletion; they
-  // remain bounded on-device orphans until a future history-driven cleanup.
+  // The foreground photo drain retries any pending delete after this commit.
 }
 
 /**

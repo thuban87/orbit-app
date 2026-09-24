@@ -17,7 +17,9 @@
  *     already gone when it runs), and a THROWING adapter does NOT undo the commit.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { archiveContact, createContactFull } from "@/db/contacts-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
@@ -27,6 +29,7 @@ import {
   impactSummaryLines,
   purgeContact,
 } from "@/db/purge-dao";
+import { listJournalEntriesCore } from "@/db/restore-photo-journal-dao";
 import type { SqlExecutor } from "@/db/types";
 
 const NOW = "2026-08-15 12:00:00";
@@ -42,7 +45,10 @@ beforeEach(async () => {
   customValueDefIds = undefined;
   const db = openTestDb();
   exec = nodeSqliteExecutor(db);
-  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid: uid });
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+  });
 });
 
 /** Insert a contact (archived by default) and return its id. */
@@ -90,10 +96,7 @@ async function seedLink(contactId: number): Promise<void> {
   );
 }
 
-async function seedDef(
-  colName: string,
-  displayOrder: number,
-): Promise<number> {
+async function seedDef(colName: string, displayOrder: number): Promise<number> {
   const result = await exec.runAsync(
     `INSERT INTO custom_field_defs
        (uid, col_name, label, type, options, show_on_new, always_show,
@@ -264,13 +267,18 @@ describe("purgeContact — retained custom-field history", () => {
       [historyUid, target, def, "prior", NOW],
     );
     await purgeContact(exec, target, { now: NOW });
-    expect(await exec.getFirstAsync(
-      "SELECT id FROM custom_field_value_history WHERE uid = ?", [historyUid],
-    )).toBeNull();
-    expect(await exec.getFirstAsync(
-      "SELECT entity_uid FROM tombstones WHERE entity_type = 'custom_field_value_history' AND entity_uid = ?",
-      [historyUid],
-    )).toEqual({ entity_uid: historyUid });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT id FROM custom_field_value_history WHERE uid = ?",
+        [historyUid],
+      ),
+    ).toBeNull();
+    expect(
+      await exec.getFirstAsync(
+        "SELECT entity_uid FROM tombstones WHERE entity_type = 'custom_field_value_history' AND entity_uid = ?",
+        [historyUid],
+      ),
+    ).toEqual({ entity_uid: historyUid });
   });
 
   it("skips the late-added history table cleanly on a pre-018 fixture", async () => {
@@ -286,7 +294,9 @@ describe("purgeContact — retained custom-field history", () => {
        VALUES (?, ?, ?, ?, ?, ?)`,
       [uid(), "Legacy", 30, NOW, NOW, NOW],
     );
-    await expect(purgeContact(legacy, contact.lastInsertRowId, { now: NOW })).resolves.toBeUndefined();
+    await expect(
+      purgeContact(legacy, contact.lastInsertRowId, { now: NOW }),
+    ).resolves.toBeUndefined();
   });
 });
 
@@ -408,11 +418,19 @@ describe("purgeContact — archived-guarded one-transaction fan-out (T-04-12/13)
     }
 
     expect(await computeImpact(exec, target)).toEqual(
-      expect.objectContaining({ memories: 1, relationships: 1, currentStateEntries: 1 }),
+      expect.objectContaining({
+        memories: 1,
+        relationships: 1,
+        currentStateEntries: 1,
+      }),
     );
     await purgeContact(exec, target, { now: NOW });
 
-    for (const table of ["memories", "relationships", "current_state_entries"] as const) {
+    for (const table of [
+      "memories",
+      "relationships",
+      "current_state_entries",
+    ] as const) {
       expect(
         await exec.getFirstAsync<{ n: number }>(
           `SELECT COUNT(*) AS n FROM ${table} WHERE contact_id = ?`,
@@ -427,13 +445,19 @@ describe("purgeContact — archived-guarded one-transaction fan-out (T-04-12/13)
       ),
     ).toEqual({ linked_contact_id: null });
     await expect(
-      exec.getAllAsync<{ entity_type: string; entity_uid: string; deleted_at: string }>(
+      exec.getAllAsync<{
+        entity_type: string;
+        entity_uid: string;
+        deleted_at: string;
+      }>(
         "SELECT entity_type,entity_uid,deleted_at FROM tombstones WHERE entity_uid IN (?,?) ORDER BY entity_type",
         revivedKnowledge.map((row) => row.entity_uid),
       ),
     ).resolves.toEqual(
       revivedKnowledge
-        .sort((left, right) => left.entity_type.localeCompare(right.entity_type))
+        .sort((left, right) =>
+          left.entity_type.localeCompare(right.entity_type),
+        )
         .map((row) => ({ ...row, deleted_at: NOW })),
     );
   });
@@ -551,6 +575,33 @@ describe("purgeContact — POST-COMMIT extension adapter (T-04-16)", () => {
 });
 
 describe("purgeContact — deletion evidence and merge-safe sun state", () => {
+  it("journals main, stored, and every definition path in the purge transaction", async () => {
+    const id = await seedContact("Photo");
+    await seedDef("former_photo", 0);
+    await seedDef("quarantined", 1);
+    await exec.runAsync(
+      "UPDATE custom_field_defs SET quarantined_at = ? WHERE col_name = 'quarantined'",
+      [NOW],
+    );
+    const stored = "avatars/legacy-safe.jpg";
+    await exec.runAsync("UPDATE contacts SET photo = ? WHERE id = ?", [
+      stored,
+      id,
+    ]);
+    await purgeContact(exec, id, { now: NOW });
+    const paths = (await listJournalEntriesCore(exec)).map(
+      (row) => row.canonicalRelativePath,
+    );
+    expect(paths).toEqual(
+      expect.arrayContaining([
+        `avatars/contact-${id}.jpg`,
+        stored,
+        `avatars/cv-${id}-former_photo.jpg`,
+        `avatars/cv-${id}-quarantined.jpg`,
+      ]),
+    );
+  });
+
   it("captures every mergeable UID before fan-out deletion, excluding field history", async () => {
     const contactId = await seedFullContact("Tombstoned");
     const expected = await exec.getAllAsync<{
@@ -584,17 +635,18 @@ describe("purgeContact — deletion evidence and merge-safe sun state", () => {
   it("clears the current sun with the caller-supplied modified_at in the purge transaction", async () => {
     const contactId = await seedFullContact("Sun");
     const suppliedNow = "2026-08-25 17:42:01";
-    await exec.runAsync("UPDATE app_settings SET sun_contact_id = ?, modified_at = ? WHERE id = 1", [
-      contactId,
-      NOW,
-    ]);
+    await exec.runAsync(
+      "UPDATE app_settings SET sun_contact_id = ?, modified_at = ? WHERE id = 1",
+      [contactId, NOW],
+    );
 
     await purgeContact(exec, contactId, { now: suppliedNow });
 
     expect(
-      await exec.getFirstAsync<{ sun_contact_id: number | null; modified_at: string }>(
-        "SELECT sun_contact_id, modified_at FROM app_settings WHERE id = 1",
-      ),
+      await exec.getFirstAsync<{
+        sun_contact_id: number | null;
+        modified_at: string;
+      }>("SELECT sun_contact_id, modified_at FROM app_settings WHERE id = 1"),
     ).toEqual({ sun_contact_id: null, modified_at: suppliedNow });
   });
 });

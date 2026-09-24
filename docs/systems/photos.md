@@ -36,7 +36,8 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | Pure path builders | `src/db/photo-relative-path.ts` | Derives ADR-021 filenames without importing native file APIs. |
 | URL service | `src/services/photos/url-image.ts` | Downloads a user-pasted HTTPS image once on the write path. |
 | Contact/profile DAOs | `src/db/contacts-dao.ts`, `src/db/profile-dao.ts` | Persist or clear the contact and self relative path with one-row guards. |
-| Purge extension | `src/services/photos/purge-photo-cleanup.ts` | Deletes derivable contact and custom-field files after database purge commits. |
+| Merge owner | `src/services/photos/merge-photo-rehome.ts` | Stages absorbed bytes, commits survivor-derived references and journal entries, then finalizes under the same path locks. |
+| Purge extension | `src/services/photos/purge-photo-cleanup.ts` | Executes the purge's committed, reference-checked delete intents after commit. |
 | Restore recovery | `src/services/photos/restore-photo-finalize-sweep.ts` | Finalizes or cleans up only committed journal-backed restore work. |
 
 ### Key Files
@@ -85,7 +86,14 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 
 1. Contact and profile removal clears the reference and enqueues a durable delete intent in one transaction before deleting the derivable file. Custom-field removal enqueues the intent while the form holds its value; Save or Cancel determines whether the reference predicate allows deletion.
 2. The launch sweep locks each canonical path and re-reads its sidecars after locking before repairing an interrupted replacement.
-3. An archived-contact purge invokes the post-commit cleanup extension. Because database rows are gone by then, it derives the main filename from `contactId` and custom-field filenames from the surviving photo definitions, including quarantined definitions.
+3. An archived-contact purge enqueues intents for its main path, stored safe reference, and every custom-field derived path inside the purge transaction. It includes fields of every type, since a former photo field may retain raw path text after a type change. The post-commit extension executes the committed intents; the foreground drain retries failures.
+4. Permanent definition deletion and quarantine expiry enqueue each value owner's derived `cv-` path before the value rows disappear. Changing a field's type never deletes its file or rewrites its raw TEXT. Every deletion checks current references before touching bytes.
+
+### Merging contact photos
+
+1. The merge owner locks absorbed sources, survivor destinations, and absorbed derived paths before staging. It settles earlier journal work, then stages any chosen or sole absorbed main photo and chosen photo-typed custom values.
+2. The merge transaction verifies the absorbed identity and references, writes survivor-derived paths, journals finalization and absorbed-path deletions, and deletes the absorbed contact. Navigation supplies only the photo choice; the database row supplies the source path.
+3. After commit, finalization and deletion run under the held locks. Failures remain in the durable journal for the foreground drain; the committed merge still navigates to the survivor. Reusing the absorbed integer ID cannot alias the survivor's new photo bytes. Pre-fix aliases are outside this forward-only repair and are not swept.
 
 ### Restoring backup photo bytes
 
@@ -156,7 +164,7 @@ The path lock is process-local. Crash safety comes from settling old journal row
 
 1. **Never store a cache URI or absolute sandbox path.** Cache is evictable and absolute paths fail on restore; store only a validated relative path.
 2. **Do not pre-delete a master before replacing it.** Native moves can be delete-then-rename, so the temporary-and-backup swap plus launch reconciliation is load-bearing.
-3. **Purge runs after database rows are deleted.** Filenames must stay derivable from the contact identity; custom cleanup must include quarantined photo definitions.
+3. **Purge journals paths before deleting database rows.** Filenames stay derivable from contact identity; intents include quarantined and type-changed definitions, while the post-commit adapter and foreground drain apply reference checks.
 4. **Custom photo fields have a cancel-path tradeoff.** Their stable canonical file can change before the form commits its value; backing out can retain changed bytes beneath the previous reference. The documented safe posture favors a bounded leak or changed file over deleting a possibly committed file.
 5. **Treat image cache replacement carefully across restart.** A same-second replace at a stable path has a narrow stale-decode risk after the in-memory revision resets.
 6. **Widget images are base64 only.** RemoteViews must not receive `file://` masters or an `http(s)` source; a failed encode is an initials fallback, not a grid failure.
@@ -190,3 +198,4 @@ The path lock is process-local. Crash safety comes from settling old journal row
 | 2026-09-02 | 31 | Added Profile-aspect background derivatives, safe app-owned storage, reference-aware cleanup, and launch reconciliation. |
 | 2026-09-02 | 36 | Added staged format-v5 Profile-background byte restore and committed-candidate reconciliation. |
 | 2026-09-23 | 38.2 | Added settle-before-write ownership, reference-safe delete intents, and staging guards for `reliability-testing/AUD-REL-003`. |
+| 2026-09-24 | 38.2 | Re-homed merged photos to survivor-derived masters and journaled purge/definition deletion for all derived paths. |
