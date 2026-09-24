@@ -63,9 +63,10 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 
 1. After migration and channel/category initialization, `App.tsx` registers the scheduler as a launch-sweep hook.
 2. `reconcileSchedule()` reads `app_settings`, Bound decay-eligible contacts, birthday candidates, and the current OS request set. The persisted birthday-Unbound setting controls only birthday eligibility.
-3. It derives a local due date, applies a future snooze as the minimum base, then calculates a quiet-windowed, staggered fire instant. A birthday stays on its birthday date or is skipped.
-4. The scheduler keeps requests inside a 35-day, 48-request bound, reserves within-horizon birthdays first, and uses a full-request diff to cancel or replace stale `decay:<id>` and `birthday:<id>` requests.
+3. It derives a local due date, applies a future snooze as the minimum base, then calculates a quiet-windowed, staggered fire instant on the stateless weekly decay grid. A birthday stays on its birthday date or is skipped.
+4. The scheduler keeps requests inside a 35-day, 48-request bound, reserves within-horizon birthdays first, and uses a full-request diff to cancel or replace stale `decay:<id>` and `birthday:<id>` requests. Android reads DATE triggers back with a millisecond `value`; unchanged requests remain armed.
 5. Concurrent callers coalesce through a DEFER-ONE coordinator; the final pass re-reads state so a committed mute or snooze cannot be undone by an older snapshot.
+6. Every pass checks presented decay and birthday notifications against live contact IDs and dismisses orphaned entries, even when scheduling is disabled. Failures are counted in the returned reconcile outcome. Digest and foreign notifications remain untouched.
 
 ### Changing notification preferences
 
@@ -97,7 +98,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 ### Cleaning up a purge
 
 1. `purgeContact()` commits its database fan-out before calling its extension hook.
-2. The notification cleanup reconstructs `decay:<id>` and `birthday:<id>` from the deleted contact ID and best-effort cancels both OS requests.
+2. The notification cleanup reconstructs `decay:<id>` and `birthday:<id>` from the deleted contact ID. It best-effort cancels both future OS requests and dismisses both already-presented shade entries; each operation is isolated so one native failure does not skip the rest.
 
 ### Applying Profile relationship actions
 
@@ -170,3 +171,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-09-02 | 31 | Routed Profile Frequency and Snooze controls through the existing composed effects and immutable-event contracts. |
 | 2026-09-02 | 37 | Moved notification policy and permission visibility into the dedicated Settings category without changing scheduler ownership. |
 | 2026-09-02 | 38 | Routed Digest notification taps to the semantic Digest root and documented isolated DEV-only Digest UAT identifiers. |
+| 2026-09-23 | 38.2 | Matched Android DATE trigger readback, kept decay re-nags on the stateless weekly grid, returned reconcile failure counts, and retired presented reminders after purge or during orphan sweeps. |

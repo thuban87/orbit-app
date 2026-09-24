@@ -39,13 +39,13 @@
  *     result SKIPS the candidate explicitly.
  *
  * CYCLE-3 HIGH (reconcile serialization race): `reconcileSchedule` is
- *   SELF-COORDINATING via a module-level DEFER-ONE guard (reconcileRunning /
+ *   SELF-COORDINATING via a module-level DEFER-ONE guard (reconcileInFlight /
  *   reconcilePending), mirroring launch-sweep.ts:49-90. Multiple fire-and-forget
  *   callers exist (the launch-sweep hook here + the in-app callers in 11-09 /
  *   11-11). Two invocations must NOT interleave: a stale in-flight reconcile that
  *   read the DB BEFORE a snooze/mute commit could otherwise finish AFTER a newer
  *   one and RE-ARM the cancelled notification (NOTIF-03 violation; T-11-RACE). On
- *   re-entry we coalesce (set pending + return); the in-flight run drains pending
+ *   re-entry we coalesce (set pending + await the shared result); the in-flight run drains pending
  *   with exactly one trailing pass that RE-READS app_settings + the candidate
  *   reads + getAllScheduledNotificationsAsync via the same stable `exec`, so it
  *   always reflects the NEWEST committed state. Coordination is INTERNAL — every
@@ -61,7 +61,9 @@
 
 import {
   cancelScheduledNotificationAsync,
+  dismissNotificationAsync,
   getAllScheduledNotificationsAsync,
+  getPresentedNotificationsAsync,
   SchedulableTriggerInputTypes,
   scheduleNotificationAsync,
 } from "expo-notifications";
@@ -393,6 +395,44 @@ async function cancelAllOwned(existing: ScheduledEntry[]): Promise<number> {
   return failures;
 }
 
+/** Retire delivered owned reminders whose contact row was already purged. */
+async function dismissPresentedOrphans(exec: SqlExecutor): Promise<number> {
+  let failures = 0;
+  const presented = await getPresentedNotificationsAsync();
+  const existsById = new Map<number, boolean>();
+  for (const notification of presented) {
+    const identifier = notification.request.identifier;
+    if (!isOwnedIdentifier(identifier)) continue;
+    const payloadId = notification.request.content.data?.contactId;
+    const parsedId = /^(?:decay|birthday):([1-9]\d*)$/.exec(identifier)?.[1];
+    const contactId =
+      typeof payloadId === "number" &&
+      Number.isSafeInteger(payloadId) &&
+      payloadId > 0
+        ? payloadId
+        : parsedId == null
+          ? null
+          : Number(parsedId);
+    if (contactId === null || !Number.isSafeInteger(contactId)) continue;
+    try {
+      let exists = existsById.get(contactId);
+      if (exists === undefined) {
+        exists =
+          (await exec.getFirstAsync<{ id: number }>(
+            "SELECT id FROM contacts WHERE id = ?",
+            [contactId],
+          )) !== null;
+        existsById.set(contactId, exists);
+      }
+      if (!exists) await dismissNotificationAsync(identifier);
+    } catch (err) {
+      failures++;
+      Logger.error(LOG_SCOPE, `orphan dismiss failed for ${identifier}`, err);
+    }
+  }
+  return failures;
+}
+
 /**
  * One full reconcile pass — RE-READS all inputs via the stable `exec` so the
  * DEFER-ONE trailing pass reflects the newest committed state.
@@ -407,6 +447,8 @@ async function runReconcilePass(exec: SqlExecutor): Promise<ReconcileOutcome> {
   const settings = await getAppSettings(exec);
   const existing =
     (await getAllScheduledNotificationsAsync()) as unknown as ScheduledEntry[];
+
+  counts.dismissFailures += await dismissPresentedOrphans(exec);
 
   // (1) Master off → cancel every owned identifier and schedule nothing.
   if (!settings.notificationsEnabled) {

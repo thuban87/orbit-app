@@ -7,7 +7,10 @@
  * second and never rejects the adapter (best-effort / error-resilient, mirroring
  * the photo cleanup contract).
  */
-import { cancelScheduledNotificationAsync } from "expo-notifications";
+import {
+  cancelScheduledNotificationAsync,
+  dismissNotificationAsync,
+} from "expo-notifications";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { birthdayIdentifier, decayIdentifier } from "./notification-ids";
 import { buildNotificationPurgeCleanup } from "./purge-notification-cleanup";
@@ -15,6 +18,7 @@ import { buildNotificationPurgeCleanup } from "./purge-notification-cleanup";
 vi.mock("expo-notifications");
 
 const cancel = vi.mocked(cancelScheduledNotificationAsync);
+const dismiss = vi.mocked(dismissNotificationAsync);
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -30,6 +34,10 @@ describe("buildNotificationPurgeCleanup — post-commit decay+birthday cancel", 
     expect(ids).toContain(decayIdentifier(42));
     expect(ids).toContain(birthdayIdentifier(42));
     expect(cancel).toHaveBeenCalledTimes(2);
+    expect(dismiss.mock.calls.map((c) => c[0])).toEqual([
+      decayIdentifier(42),
+      birthdayIdentifier(42),
+    ]);
   });
 
   it("still attempts the birthday cancel after the decay cancel rejects, and does not reject", async () => {
@@ -43,6 +51,7 @@ describe("buildNotificationPurgeCleanup — post-commit decay+birthday cancel", 
     expect(ids).toContain(decayIdentifier(7));
     expect(ids).toContain(birthdayIdentifier(7));
     expect(cancel).toHaveBeenCalledTimes(2);
+    expect(dismiss).toHaveBeenCalledTimes(2);
   });
 
   it("does not reject when both cancels reject", async () => {
@@ -52,5 +61,15 @@ describe("buildNotificationPurgeCleanup — post-commit decay+birthday cancel", 
 
     await expect(cleanup(9)).resolves.toBeUndefined();
     expect(cancel).toHaveBeenCalledTimes(2);
+    expect(dismiss).toHaveBeenCalledTimes(2);
+  });
+
+  it("still dismisses birthday after decay dismissal fails", async () => {
+    dismiss.mockRejectedValueOnce(new Error("decay dismiss failed"));
+    await expect(buildNotificationPurgeCleanup()(7)).resolves.toBeUndefined();
+    expect(dismiss.mock.calls.map((c) => c[0])).toEqual([
+      decayIdentifier(7),
+      birthdayIdentifier(7),
+    ]);
   });
 });

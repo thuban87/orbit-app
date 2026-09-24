@@ -13,7 +13,9 @@
  */
 import {
   cancelScheduledNotificationAsync,
+  dismissNotificationAsync,
   getAllScheduledNotificationsAsync,
+  getPresentedNotificationsAsync,
   scheduleNotificationAsync,
 } from "expo-notifications";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -84,6 +86,8 @@ vi.mock("expo-notifications");
 const scheduleMock = vi.mocked(scheduleNotificationAsync);
 const cancelMock = vi.mocked(cancelScheduledNotificationAsync);
 const getAllMock = vi.mocked(getAllScheduledNotificationsAsync);
+const getPresentedMock = vi.mocked(getPresentedNotificationsAsync);
+const dismissMock = vi.mocked(dismissNotificationAsync);
 
 const NOW = "2026-08-16 12:00:00";
 let exec: SqlExecutor;
@@ -907,6 +911,46 @@ describe("reconcileSchedule — stale cancel + full-request diff", () => {
 // ============================================================================
 
 describe("reconcileSchedule — gating", () => {
+  it("dismisses only presented owned orphans even with notifications disabled", async () => {
+    const live = await seedContact({ name: "Live" });
+    const presented = (identifier: string, contactId?: number) => ({
+      request: {
+        identifier,
+        content: { data: contactId == null ? {} : { contactId } },
+      },
+    });
+    getPresentedMock.mockResolvedValueOnce([
+      presented(decayIdentifier(999), 999),
+      presented(birthdayIdentifier(998)),
+      presented(decayIdentifier(live), live),
+      presented(DIGEST_IDENTIFIER),
+      presented("foreign-id"),
+    ] as Awaited<ReturnType<typeof getPresentedNotificationsAsync>>);
+
+    expect(await reconcileSchedule(exec)).toMatchObject({
+      dismissFailures: 0,
+      incomplete: false,
+    });
+    expect(dismissMock.mock.calls.map((c) => c[0])).toEqual([
+      decayIdentifier(999),
+      birthdayIdentifier(998),
+    ]);
+  });
+
+  it("counts a failed orphan dismissal without skipping the next orphan", async () => {
+    getPresentedMock.mockResolvedValueOnce([
+      { request: { identifier: decayIdentifier(999), content: { data: {} } } },
+      {
+        request: { identifier: birthdayIdentifier(998), content: { data: {} } },
+      },
+    ] as Awaited<ReturnType<typeof getPresentedNotificationsAsync>>);
+    dismissMock.mockRejectedValueOnce(new Error("native dismissal failed"));
+    expect(await reconcileSchedule(exec)).toMatchObject({
+      dismissFailures: 1,
+      incomplete: true,
+    });
+    expect(dismissMock).toHaveBeenCalledTimes(2);
+  });
   it("cancels all owned ids and schedules nothing when notifications are off", async () => {
     // Default settings: notificationsEnabled = 0.
     await seedContact({

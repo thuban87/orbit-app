@@ -1,6 +1,6 @@
 /**
  * Post-commit notification purge cleanup — the `onPurgeExtensions` adapter that
- * cancels a purged contact's scheduled decay + birthday notifications.
+ * cancels scheduled and dismisses presented decay + birthday notifications.
  *
  * =============================================================================
  * WHY IDENTIFIERS ARE REBUILT FROM contactId — READ BEFORE EDITING:
@@ -22,15 +22,18 @@
  *   Runs post-commit, NEVER inside the transaction/mutex — a cancel is an OS-side
  *   side effect that cannot be rolled back. Each cancel is idempotent (cancelling
  *   an already-absent identifier is a harmless no-op on the OS side) and
- *   internally error-resilient: a throw from one cancel is logged and does NOT
- *   skip the other or reject the adapter. The outer purge hook already
+ *   internally error-resilient: a throw from one OS operation is logged and
+ *   does NOT skip the others or reject the adapter. The outer purge hook already
  *   try/catch-logs, but this stays resilient on its own (mirrors the photo
  *   adapter contract).
  *
- * PURE-OS, NO exec: unlike the photo adapter there is no DB read — the cancel is
+ * PURE-OS, NO exec: unlike the photo adapter there is no DB read — cleanup is
  *   entirely OS-side — so the builder takes no `SqlExecutor`.
  */
-import { cancelScheduledNotificationAsync } from "expo-notifications";
+import {
+  cancelScheduledNotificationAsync,
+  dismissNotificationAsync,
+} from "expo-notifications";
 import { Logger } from "@/utils/logger";
 import { birthdayIdentifier, decayIdentifier } from "./notification-ids";
 
@@ -45,10 +48,23 @@ async function safeCancel(identifier: string): Promise<void> {
   }
 }
 
+/** Retire a delivered shade entry independently from its scheduled alarm. */
+async function safeDismiss(identifier: string): Promise<void> {
+  try {
+    await dismissNotificationAsync(identifier);
+  } catch (err) {
+    Logger.error(
+      LOG_SCOPE,
+      `best-effort dismiss failed for ${identifier}`,
+      err,
+    );
+  }
+}
+
 /**
  * Build the `PurgeOptions.onPurgeExtensions` adapter for the notification
  * subsystem. The returned function, given a purged `contactId`, cancels that
- * contact's scheduled decay AND birthday notifications, both identifiers derived
+ * contact's scheduled and presented decay AND birthday notifications, both identifiers derived
  * from `contactId` alone (post-commit; the row is already gone). Idempotent and
  * best-effort — one cancel failing never skips the other or throws out.
  */
@@ -58,5 +74,7 @@ export function buildNotificationPurgeCleanup(): (
   return async (contactId: number): Promise<void> => {
     await safeCancel(decayIdentifier(contactId));
     await safeCancel(birthdayIdentifier(contactId));
+    await safeDismiss(decayIdentifier(contactId));
+    await safeDismiss(birthdayIdentifier(contactId));
   };
 }
