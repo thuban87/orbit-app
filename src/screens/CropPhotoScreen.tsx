@@ -65,10 +65,12 @@ import { getExecutor, localDateTime } from "@/db/database";
 import { setProfilePhoto } from "@/db/profile-dao";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { cropRectFromTransform } from "@/services/photos/crop-geometry";
+import { withCanonicalPathLock } from "@/services/photos/owned-master";
 import {
   PhotoPipelineError,
   persistCroppedMaster,
 } from "@/services/photos/photo-pipeline";
+import { relPathForTarget } from "@/services/photos/photo-storage";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { bumpPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import { publishCropResult } from "@/stores/photo-result-store";
@@ -272,48 +274,54 @@ export function CropPhotoScreen({
       const capturedUid = route.params.contactUid;
       if (target.kind !== "profile" && !capturedUid)
         throw new Error("contact photo target missing");
-      const relative = await persistCroppedMaster({
-        exec,
-        authorize:
-          target.kind === "profile"
-            ? undefined
-            : async (lockedExec) =>
-                (await getContactPhotoIdentity(
-                  lockedExec,
-                  target.contactId,
-                )) === capturedUid,
-        rawUri: sourceUri,
-        cropRect,
-        target,
-      });
+      await withCanonicalPathLock(
+        relPathForTarget(target),
+        async (lockToken) => {
+          const relative = await persistCroppedMaster({
+            exec,
+            lockToken,
+            authorize:
+              target.kind === "profile"
+                ? undefined
+                : async (lockedExec) =>
+                    (await getContactPhotoIdentity(
+                      lockedExec,
+                      target.contactId,
+                    )) === capturedUid,
+            rawUri: sourceUri,
+            cropRect,
+            target,
+          });
 
-      const now = localDateTime();
-      if (target.kind === "contact" && capturedUid) {
-        await setContactPhotoForUid(
-          exec,
-          target.contactId,
-          capturedUid,
-          relative,
-          now,
-        );
-        // Sub-second cache-bust: a same-second replace shares `modified_at`, so
-        // the per-write revision is what forces the returning Avatar to redecode.
-        bumpPhotoCacheBust(relative);
-        // A contact photo is widget-visible (the tile avatar). Profile/customField
-        // photos are NOT, so this publish lives inside the contact branch only.
-        notifyWidgetDataChanged();
-      } else if (target.kind === "profile") {
-        await setProfilePhoto(exec, relative, now);
-        bumpPhotoCacheBust(relative);
-      } else if (target.kind === "customField" && route.params.requestId) {
-        // customField: the master is already persisted at its derivable cv- path;
-        // no DB write here (the field value is set through the edit form's Save).
-        // Publish the crop-success on the serializable requestId (the cv- relPath)
-        // so the awaiting widget sets its value on focus, and bump the cache-bust
-        // token (requestId IS the relPath) so a same-second re-crop redecodes.
-        publishCropResult(route.params.requestId, true);
-        bumpPhotoCacheBust(route.params.requestId);
-      }
+          const now = localDateTime();
+          if (target.kind === "contact" && capturedUid) {
+            await setContactPhotoForUid(
+              exec,
+              target.contactId,
+              capturedUid,
+              relative,
+              now,
+            );
+            // Sub-second cache-bust: a same-second replace shares `modified_at`, so
+            // the per-write revision is what forces the returning Avatar to redecode.
+            bumpPhotoCacheBust(relative);
+            // A contact photo is widget-visible (the tile avatar). Profile/customField
+            // photos are NOT, so this publish lives inside the contact branch only.
+            notifyWidgetDataChanged();
+          } else if (target.kind === "profile") {
+            await setProfilePhoto(exec, relative, now);
+            bumpPhotoCacheBust(relative);
+          } else if (target.kind === "customField" && route.params.requestId) {
+            // customField: the master is already persisted at its derivable cv- path;
+            // no DB write here (the field value is set through the edit form's Save).
+            // Publish the crop-success on the serializable requestId (the cv- relPath)
+            // so the awaiting widget sets its value on focus, and bump the cache-bust
+            // token (requestId IS the relPath) so a same-second re-crop redecodes.
+            publishCropResult(route.params.requestId, true);
+            bumpPhotoCacheBust(route.params.requestId);
+          }
+        },
+      );
       navigation.goBack();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to save cropped photo", err);

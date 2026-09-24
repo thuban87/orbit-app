@@ -26,7 +26,12 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import type { SqlExecutor } from "@/db/types";
 import { Logger } from "@/utils/logger";
 import type { CropRect } from "./crop-geometry";
-import { type OwnedWriteOptions, persistOwnedMaster } from "./owned-master";
+import {
+  type CanonicalLockToken,
+  type OwnedWriteOptions,
+  persistOwnedMaster,
+  persistOwnedMasterLocked,
+} from "./owned-master";
 import { type PhotoTargetDescriptor, relPathForTarget } from "./photo-storage";
 
 const LOG_SCOPE = "photo-pipeline";
@@ -53,6 +58,7 @@ export class PhotoPipelineError extends Error {
 export interface PersistCroppedMasterArgs {
   exec: SqlExecutor;
   authorize?: OwnedWriteOptions["authorize"];
+  lockToken?: CanonicalLockToken;
   /** The ORIGINAL source URI (library-cache or downloaded-cache) to crop. */
   rawUri: string;
   /** The source-pixel crop rectangle from `crop-geometry.cropRectFromTransform`. */
@@ -74,6 +80,7 @@ export interface PersistCroppedMasterArgs {
 export async function persistCroppedMaster({
   exec,
   authorize,
+  lockToken,
   rawUri,
   cropRect,
   target,
@@ -100,6 +107,10 @@ export async function persistCroppedMaster({
   // Copy out of evictable cache into the document dir (crash-safe .bak swap) and
   // return ONLY the relative path — never the manipulator's cache/absolute URI.
   const relative = relPathForTarget(target);
-  await persistOwnedMaster(exec, out.uri, relative, { authorize });
+  if (lockToken)
+    await persistOwnedMasterLocked(exec, lockToken, out.uri, relative, {
+      authorize,
+    });
+  else await persistOwnedMaster(exec, out.uri, relative, { authorize });
   return relative;
 }
