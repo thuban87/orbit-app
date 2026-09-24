@@ -24,11 +24,15 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
+  type CredentialDraft,
   CustomCredentialCompensationError,
   connectionCardState,
+  editDraft,
   removeLaneCredential,
   saveCustomConnection,
   saveDirectCredential,
+  submitDraft,
+  switchLane,
 } from "./ai-connection-logic";
 import { CUSTOM_RETENTION_CAVEAT } from "./settings-ai-logic";
 
@@ -57,7 +61,7 @@ export function AIConnectionScreen({
   const [expanded, setExpanded] = useState<AiCloudProviderId | null>(
     "openrouter",
   );
-  const [keyInput, setKeyInput] = useState("");
+  const [credentialDraft, setCredentialDraft] = useState<CredentialDraft>(null);
   const [endpoint, setEndpoint] = useState("");
   const [customCredential, setCustomCredential] = useState("");
   const [customModel, setCustomModel] = useState("");
@@ -104,17 +108,21 @@ export function AIConnectionScreen({
 
   async function configureDirect(lane: (typeof DIRECT_LANES)[number]) {
     if (pending) return;
+    const submittedDraft = credentialDraft;
+    const submittedValue = submitDraft(submittedDraft, lane);
     setPending(lane);
     setError(null);
     try {
-      await saveDirectCredential(aiKeyStore, lane, keyInput);
+      await saveDirectCredential(aiKeyStore, lane, submittedValue ?? "");
       const previous = byLane.get(lane);
       await upsertAiConnection(getExecutor(), {
         lane,
         rememberedModel: previous?.rememberedModel ?? "",
         now: localDateTime(),
       });
-      setKeyInput("");
+      setCredentialDraft((current) =>
+        current === submittedDraft ? null : current,
+      );
       await load();
       if (previous?.rememberedModel.trim()) {
         await activateAiConnection(getExecutor(), lane, localDateTime());
@@ -123,10 +131,10 @@ export function AIConnectionScreen({
         onChooseModel(lane);
       }
     } catch (caught) {
-      Logger.error(LOG_SCOPE, "failed to configure direct connection", caught);
+      Logger.error(LOG_SCOPE, "failed to configure direct connection");
       setError(
-        caught instanceof Error
-          ? caught.message
+        caught instanceof Error && caught.message === "Enter an API key."
+          ? "Enter an API key."
           : "Couldn't save that connection.",
       );
     } finally {
@@ -203,7 +211,7 @@ export function AIConnectionScreen({
       setCustomCredential("");
       await load();
     } catch (caught) {
-      Logger.error(LOG_SCOPE, "failed to configure custom connection", caught);
+      Logger.error(LOG_SCOPE, "failed to configure custom connection");
       setError(
         caught instanceof CustomCredentialCompensationError
           ? caught.message
@@ -241,7 +249,10 @@ export function AIConnectionScreen({
           accessibilityRole="button"
           accessibilityState={{ expanded: isExpanded, selected: state.active }}
           accessibilityLabel={`${LANE_NAMES[lane]} connection`}
-          onPress={() => setExpanded(isExpanded ? null : lane)}
+          onPress={() => {
+            setCredentialDraft(switchLane(lane));
+            setExpanded(isExpanded ? null : lane);
+          }}
           style={styles.cardHeader}
         >
           <View style={styles.copy}>
@@ -350,8 +361,12 @@ export function AIConnectionScreen({
                   placeholder="Paste API key"
                   placeholderTextColor={colors.textSecondary}
                   secureTextEntry
-                  value={expanded === lane ? keyInput : ""}
-                  onChangeText={setKeyInput}
+                  value={
+                    credentialDraft?.lane === lane ? credentialDraft.value : ""
+                  }
+                  onChangeText={(value) =>
+                    setCredentialDraft(editDraft(lane, value))
+                  }
                   style={[
                     styles.input,
                     {

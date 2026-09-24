@@ -63,13 +63,42 @@ interface KeyWriter {
   ): Promise<void>;
 }
 
+export type DirectCredentialLane = Exclude<
+  AiCloudProviderId,
+  "custom" | "openrouter"
+>;
+
+export type CredentialDraft = {
+  readonly lane: DirectCredentialLane;
+  readonly value: string;
+} | null;
+
+export function editDraft(
+  lane: DirectCredentialLane,
+  value: string,
+): CredentialDraft {
+  return { lane, value };
+}
+
+/** Switching cards discards the unsaved direct-provider secret. */
+export function switchLane(_lane: AiCloudProviderId): CredentialDraft {
+  return null;
+}
+
+export function submitDraft(
+  draft: CredentialDraft,
+  lane: DirectCredentialLane,
+): string | null {
+  return draft?.lane === lane ? draft.value : null;
+}
+
 interface KeyDeleter {
   deleteKey(provider: AiCloudProviderId): Promise<void>;
 }
 
 export async function saveDirectCredential(
   keyStore: KeyWriter,
-  lane: Exclude<AiCloudProviderId, "custom" | "openrouter">,
+  lane: DirectCredentialLane,
   rawKey: string,
 ): Promise<void> {
   const key = rawKey.trim();

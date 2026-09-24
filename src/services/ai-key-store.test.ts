@@ -112,7 +112,7 @@ describe("ai-key-store — provider isolation", () => {
     await expect(store.getKey("custom")).resolves.toBeNull();
     expect(write).not.toHaveBeenCalled();
     expect(remove).not.toHaveBeenCalled();
-    expect(backend.store.get(keyItemName("custom"))).toBe(raw);
+    expect(backend.store.get(keyItemName("custom")) === raw).toBe(true);
   });
 
   it("re-entry replaces an unbound item with an endpoint-bound credential", async () => {
@@ -126,9 +126,10 @@ describe("ai-key-store — provider isolation", () => {
       "SYNTHETIC-NEW-KEY-DO-NOT-USE",
       "https://old.example.com/v1",
     );
-    await expect(
-      store.getKey("custom", "https://old.example.com/v1"),
-    ).resolves.toBe("SYNTHETIC-NEW-KEY-DO-NOT-USE");
+    expect(
+      (await store.getKey("custom", "https://old.example.com/v1")) ===
+        "SYNTHETIC-NEW-KEY-DO-NOT-USE",
+    ).toBe(true);
     await expect(
       store.getKey("custom", "https://new.example.com/v1"),
     ).resolves.toBeNull();
@@ -148,7 +149,7 @@ describe("ai-key-store — provider isolation", () => {
       "https://new.example.com/v1",
     );
     await store.restoreRawCustomItem(snapshot);
-    expect(backend.store.get(keyItemName("custom"))).toBe(raw);
+    expect(backend.store.get(keyItemName("custom")) === raw).toBe(true);
     backend.getItemAsync = vi.fn().mockRejectedValue(new Error("read failed"));
     await expect(store.readRawCustomItem()).rejects.toThrow("read failed");
   });

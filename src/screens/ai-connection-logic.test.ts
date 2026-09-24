@@ -4,11 +4,14 @@ import {
   beginConnectionSetup,
   CustomCredentialCompensationError,
   connectionCardState,
+  editDraft,
   finishConnectionSetup,
   removeLaneCredential,
   repairForAvailability,
   saveCustomConnection,
   saveDirectCredential,
+  submitDraft,
+  switchLane,
 } from "@/screens/ai-connection-logic";
 import {
   createAiKeyStore,
@@ -136,7 +139,7 @@ describe("credential boundary and endpoint guard", () => {
           },
         ),
       ).rejects.toThrow("sqlite failed");
-      expect(items.get(keyItemName("custom")) ?? null).toBe(raw);
+      expect((items.get(keyItemName("custom")) ?? null) === raw).toBe(true);
       expect(backend.deleteItemAsync).toHaveBeenCalledTimes(
         raw === null ? 1 : 0,
       );
@@ -215,6 +218,69 @@ describe("credential boundary and endpoint guard", () => {
     await removeLaneCredential({ deleteKey }, "anthropic");
     expect(deleteKey).toHaveBeenCalledTimes(1);
     expect(deleteKey).toHaveBeenCalledWith("anthropic");
+  });
+});
+
+describe("direct-provider credential draft ownership", () => {
+  it("does not submit A's draft under B after a card switch", async () => {
+    const saved = new Map<string, string>();
+    const keyStore = {
+      setKey: vi.fn(async (lane: string, value: string) => {
+        saved.set(lane, value);
+      }),
+    };
+    let draft = editDraft("openai", "SYNTHETIC-A-KEY-DO-NOT-USE");
+    draft = switchLane("anthropic");
+    expect(submitDraft(draft, "anthropic")).toBeNull();
+    await expect(
+      saveDirectCredential(
+        keyStore,
+        "anthropic",
+        submitDraft(draft, "anthropic") ?? "",
+      ),
+    ).rejects.toThrow("Enter an API key.");
+    expect(keyStore.setKey).not.toHaveBeenCalled();
+    expect(saved.has("anthropic")).toBe(false);
+  });
+
+  it("keeps B's new draft while A's captured save completes and routes headers by lane", async () => {
+    const saved = new Map<string, string>();
+    let release: (() => void) | undefined;
+    const paused = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const keyStore = {
+      setKey: vi.fn(async (lane: string, value: string) => {
+        await paused;
+        saved.set(lane, value);
+      }),
+    };
+    let draft = editDraft("openai", "SYNTHETIC-A-KEY-DO-NOT-USE");
+    const submittedDraft = draft;
+    const submittedValue = submitDraft(submittedDraft, "openai");
+    const saving = saveDirectCredential(
+      keyStore,
+      "openai",
+      submittedValue ?? "",
+    );
+    draft = switchLane("anthropic");
+    draft = editDraft("anthropic", "SYNTHETIC-B-KEY-DO-NOT-USE");
+    release?.();
+    await saving;
+    draft = draft === submittedDraft ? null : draft;
+    expect(draft?.lane).toBe("anthropic");
+    expect(draft?.value).not.toContain("SYNTHETIC-A-KEY-DO-NOT-USE");
+    expect(saved.get("openai") === "SYNTHETIC-A-KEY-DO-NOT-USE").toBe(true);
+    expect(saved.has("anthropic")).toBe(false);
+    const transport = vi.fn((lane: string) => ({
+      authorization: `Bearer ${saved.get(lane) ?? ""}`,
+    }));
+    expect(transport("anthropic").authorization).not.toContain(
+      "SYNTHETIC-A-KEY-DO-NOT-USE",
+    );
+    expect(transport("openai").authorization).not.toContain(
+      "SYNTHETIC-B-KEY-DO-NOT-USE",
+    );
   });
 });
 
