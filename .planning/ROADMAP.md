@@ -1114,7 +1114,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [ ] 38.2-08-PLAN.md — Restore graph integrity, deterministic pair completion, migration 031 (RG-009, D-11, D-21)
-- [x] 38.2-09-PLAN.md — Legacy credential investigation/remediation and provider-scoped drafts (RG-005, RG-006, D-05, D-08)
+- [x] 38.2-09-PLAN.md — Fail-closed Custom credential binding and provider-scoped drafts (RG-005, RG-006, D-23)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
