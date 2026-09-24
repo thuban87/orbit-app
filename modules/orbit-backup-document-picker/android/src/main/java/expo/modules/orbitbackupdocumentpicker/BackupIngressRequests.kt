@@ -12,7 +12,7 @@ import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.atomic.AtomicLong
 
-// Plan 15 measures and obtains owner sign-off before enabling this ingress limit.
+// D-19: owner-approved no total acquisition deadline (2026-09-24).
 internal val BACKUP_INGRESS_ACQUIRE_MS: Long? = null
 internal const val MAX_CONCURRENT_INGRESS = 4
 

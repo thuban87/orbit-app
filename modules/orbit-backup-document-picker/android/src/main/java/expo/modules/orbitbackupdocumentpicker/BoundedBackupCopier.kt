@@ -11,12 +11,14 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 // A no-progress limit, not a limit on the duration of a progressing backup.
 internal const val BACKUP_INGRESS_STALL_MS = 30_000L
+// D-19: owner-approved 100 MiB ingress ceiling (2026-09-24).
+internal const val MAX_BACKUP_INGRESS_BYTES = 104_857_600L
 
 /** Pure stream copier. Closing a blocked read is best effort; request ownership
  * ensures any late return is discarded even if a provider ignores close(). */
 internal class BoundedBackupCopier(
   private val stallMs: Long = BACKUP_INGRESS_STALL_MS,
-  private val ceilingBytes: Long? = null,
+  private val ceilingBytes: Long? = MAX_BACKUP_INGRESS_BYTES,
   private val clock: () -> Long = System::currentTimeMillis,
 ) {
   fun copy(input: InputStream, destination: File, owns: () -> Boolean = { true }): File {

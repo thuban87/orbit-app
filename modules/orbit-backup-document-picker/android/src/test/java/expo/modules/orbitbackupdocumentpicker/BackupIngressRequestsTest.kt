@@ -64,7 +64,7 @@ class BackupIngressRequestsTest {
     release.countDown(); requests.destroyAll()
   }
 
-  @Test fun defaultHasNoAcquisitionDeadline() {
+  @Test fun ownerApprovedProductionPolicyHasNoAcquisitionDeadline() {
     assertNull(BACKUP_INGRESS_ACQUIRE_MS)
     val entered = CountDownLatch(1)
     val release = CountDownLatch(1)

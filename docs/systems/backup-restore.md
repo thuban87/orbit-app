@@ -86,7 +86,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 ### Previewing and restoring
 
 1. The landing screen reads a picker cache copy immediately, decrypts if necessary, parses, validates the complete graph, and stores the valid candidate in a process-local cache.
-   The native receiver detects a JSON share without reading it on the main or JS thread. An owned background request acquires and copies the provider stream; a no-progress watchdog closes stalled reads and failed partial copies are deleted. The optional acquisition deadline and byte ceiling remain disabled pending the measured owner sign-off in Plan 15 (D-19). The consumed `restore-share-*.json` copy is deleted after its read, including on read failure. A foreground sweep retires only `restore-share-*.json` files predating this process. Copies left by older versions under provider `DISPLAY_NAME` are not swept because that name is not an app-owned namespace.
+   The native receiver detects a JSON share without reading it on the main or JS thread. An owned background request acquires and copies the provider stream; a no-progress watchdog closes stalled reads and failed partial copies are deleted. The owner-approved 100 MiB ceiling is counted from bytes actually copied, then checked again against the app-cache file size before JS reads it (D-19). There is no total acquisition deadline; supersession and destroy cancel a pending request. The consumed `restore-share-*.json` copy is deleted after its read, including on read failure. A foreground sweep retires only `restore-share-*.json` files predating this process. Copies left by older versions under provider `DISPLAY_NAME` are not swept because that name is not an app-owned namespace.
 2. `RestorePreviewScreen` shows aggregate metadata only. Merge is the default; Replace-all requires an impact confirmation and, with a configured destination, a fresh verified pre-restore snapshot.
 3. `applyRestore()` reconciles UID rows and tombstones, remaps portable parent UIDs to destination row IDs, normalizes method/link natural-key collisions before writing, remaps any legacy interaction Tone/channel vocabulary on ingest through the shared map, forces `allow_ai=0` on the interactions merge/update arm, recomputes contact recency, and registers committed photo-finalization work in one transaction.
 4. Post-commit photo, background, and schedule work is retryable. Avatar work uses committed journal rows; background work uses retained UID-keyed restore-pending bytes and a launch re-drive after sidecar recovery.
@@ -111,10 +111,13 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 | PBKDF2 iterations | `600000` | `src/services/backup/encryption.ts` | Approved passphrase derivation cost. |
 | Backup days | `1..3650`, defaults `1` / `7` | `src/db/app-settings-dao.ts` | Automatic cadence and retention bounds. |
 | `BACKUP_INGRESS_STALL_MS` | `30000` | `modules/orbit-backup-document-picker/.../BoundedBackupCopier.kt` | No-progress stream watchdog. |
-| `BACKUP_INGRESS_ACQUIRE_MS` | `null` | `modules/orbit-backup-document-picker/.../BackupIngressRequests.kt` | Disabled until Plan 15's D-19 sign-off. |
+| `MAX_BACKUP_INGRESS_BYTES` / `MAX_RESTORE_DOCUMENT_BYTES` | `104857600` (100 MiB) | Native copier / `src/screens/backup-restore-document.ts` | Owner-approved copy and pre-read bounds. |
+| `BACKUP_INGRESS_ACQUIRE_MS` | `null` | `modules/orbit-backup-document-picker/.../BackupIngressRequests.kt` | Owner-approved no total acquisition deadline. |
 | `EXPORT_STAGING_GRACE_MS` | `24 h` | `src/services/backup/backup-cache-sweep.ts` | Foreground retirement of handed-off export staging (D-13). |
 
 ## Decisions
+
+- **D-19 (2026-09-24):** The owner approved a 100 MiB backup ingress ceiling, 30-second no-progress stall deadline, and no total acquisition deadline after the Plan 15 Pixel measurements. Backups larger than 100 MiB, including some Orbit-produced photo-heavy backups, will be rejected until restore is redesigned to use less memory. The measured 101.9 MB preview succeeded on the Pixel; a 123.8 MB preview exhausted its Java heap. This boundary is a resource limit, not a guarantee that every smaller backup will preview on every device.
 
 - **ADR-108:** Durable Independent-Axis Profile Presentation and Inheritance — defines the Profile presentation graph now carried by format v5.
 
@@ -210,4 +213,5 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 | 2026-09-23 | 38.2 | Bounded off-thread backup ingress and app-owned restore-copy cleanup (`security/AUD-SEC-002`); ignored non-text input in the general share module (`security/AUD-SEC-003`); retired manual export staging per D-13 (`data-privacy/AUD-DPI-013`). |
 | 2026-09-24 | 38.2 | Completed global custom-field pairs after Merge (`data-privacy/AUD-DPI-002`), planned restore against committing local state (`data-privacy/AUD-DPI-003`), and persisted tombstone-only evidence (`data-privacy/AUD-DPI-006`). |
 | 2026-09-24 | 38.2 | Restored custom-photo bytes from UID-linked definitions, made photo finalization and cleanup journal-owned, published committed appearance, and exposed pending recovery counts after restore. |
+| 2026-09-24 | 38.2 | Recorded D-19 owner sign-off and enforced the 100 MiB native/JS ingress ceiling with a 30-second stall watchdog and no total acquisition deadline. |
 Category relationships are portable by UID, never local integer ID. Format 6 adds category tombstones with a minimal v5→v6 version relabel. Merge maps a winning deleted category only to Uncategorized and suppresses only dependents proven to reference that UID. Replace-all removes destination-only categories through the canonical fallout transaction, restores the exact incoming order—including an empty taxonomy—clears tombstones for live restored categories, and never replays migration-001 seeds.

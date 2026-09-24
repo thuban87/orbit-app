@@ -32,6 +32,7 @@ class OrbitBackupDocumentPickerModule : Module() {
 
   private fun requests(): BackupIngressRequests = ingress ?: BackupIngressRequests(
     opener = { source -> context.contentResolver.openInputStream(Uri.parse(source)) },
+    copier = BoundedBackupCopier(ceilingBytes = MAX_BACKUP_INGRESS_BYTES),
     onMeasured = { acquisitionMs, copyMs, bytes ->
       if (BuildConfig.DEBUG) Log.i("OrbitBackupIngressMeasure", "acquisitionMs=$acquisitionMs copyMs=$copyMs bytes=$bytes")
     },
