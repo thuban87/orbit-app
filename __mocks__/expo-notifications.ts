@@ -11,7 +11,7 @@
  * It stubs only the surface those suites drive. `getAllScheduledNotificationsAsync`
  * has a test-seedable backing array whose entries mirror the real request shape
  * (`{ identifier, content: { data, body, categoryIdentifier }, trigger: {
- * channelId, date } }`) so 11-10's full-request reconcile diff — including the
+ * channelId, value } }` for DATE) so 11-10's full-request reconcile diff — including the
  * item-F stale-body facet — can be exercised. `__reset()` clears every stub's
  * call history AND the backing array between tests.
  */
@@ -58,6 +58,9 @@ export interface ScheduledRequestDouble {
   trigger: {
     channelId?: string;
     date?: number | Date;
+    type?: string;
+    repeats?: boolean;
+    value?: number;
     // 15-03 WEEKLY-trigger facets — the digest reconcile diffs weekday/hour to
     // detect a delivery-hour / weekday drift under the singleton digest id.
     weekday?: number;
@@ -98,7 +101,15 @@ export const scheduleNotificationAsync = vi.fn(
       scheduled.push({
         identifier: req.identifier,
         content: { ...(req.content ?? {}) },
-        trigger: { ...(req.trigger ?? {}) },
+        trigger:
+          req.trigger?.type === SchedulableTriggerInputTypes.DATE
+            ? {
+                type: "date",
+                repeats: false,
+                value: new Date(req.trigger.date ?? Number.NaN).getTime(),
+                channelId: req.trigger.channelId,
+              }
+            : { ...(req.trigger ?? {}) },
       });
     }
     return "mock-id";

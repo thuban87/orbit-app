@@ -639,13 +639,13 @@ describe("reconcileSchedule — stale cancel + full-request diff", () => {
         },
         trigger: {
           channelId: DECAY_PRIVATE_CHANNEL,
-          date: new Date(
+          value: new Date(
             day.getFullYear(),
             day.getMonth(),
             day.getDate(),
             9,
             0,
-          ),
+          ).getTime(),
         },
       },
     ]);
@@ -683,13 +683,13 @@ describe("reconcileSchedule — stale cancel + full-request diff", () => {
         },
         trigger: {
           channelId: DECAY_PRIVATE_CHANNEL,
-          date: new Date(
+          value: new Date(
             day.getFullYear(),
             day.getMonth(),
             day.getDate(),
             9,
             staggerFor(id),
-          ),
+          ).getTime(),
         },
       },
     ]);
@@ -725,13 +725,13 @@ describe("reconcileSchedule — stale cancel + full-request diff", () => {
         },
         trigger: {
           channelId: DECAY_PRIVATE_CHANNEL,
-          date: new Date(
+          value: new Date(
             day.getFullYear(),
             day.getMonth(),
             day.getDate(),
             9,
             staggerFor(id) + 3, // off-by-minutes, same hour
-          ),
+          ).getTime(),
         },
       },
     ]);
@@ -764,13 +764,13 @@ describe("reconcileSchedule — stale cancel + full-request diff", () => {
         },
         trigger: {
           channelId: DECAY_PRIVATE_CHANNEL,
-          date: new Date(
+          value: new Date(
             day.getFullYear(),
             day.getMonth(),
             day.getDate(),
             9,
             staggerFor(id),
-          ),
+          ).getTime(),
         },
       },
     ]);
@@ -779,6 +779,84 @@ describe("reconcileSchedule — stale cancel + full-request diff", () => {
 
     expect(scheduleMock).not.toHaveBeenCalled();
     expect(cancelMock).not.toHaveBeenCalled();
+  });
+
+  it("round-trips Android's native DATE trigger and leaves a second identical pass untouched", async () => {
+    await enable();
+    const id = await seedContact({
+      name: "Native",
+      lastContact: dateOffset(-10),
+      intervalDays: 30,
+    });
+    expect((await reconcileSchedule(exec)).incomplete).toBe(false);
+    const entries = await getAllMock();
+    const entry = entries.find((e) => e.identifier === decayIdentifier(id));
+    expect(entry?.trigger).toMatchObject({
+      type: "date",
+      repeats: false,
+      value: expect.any(Number),
+      channelId: DECAY_PRIVATE_CHANNEL,
+    });
+    expect(
+      (entry as unknown as ScheduledRequestDouble)?.trigger.date,
+    ).toBeUndefined();
+
+    scheduleMock.mockClear();
+    cancelMock.mockClear();
+    expect(await reconcileSchedule(exec)).toEqual({
+      cancelFailures: 0,
+      scheduleFailures: 0,
+      buildFailures: 0,
+      dismissFailures: 0,
+      incomplete: false,
+    });
+    expect(scheduleMock).not.toHaveBeenCalled();
+    expect(cancelMock).not.toHaveBeenCalled();
+  });
+
+  it("reports a native schedule failure and re-arms on the next pass", async () => {
+    await enable();
+    const id = await seedContact({ lastContact: dateOffset(-10) });
+    scheduleMock.mockRejectedValueOnce(new Error("native failure"));
+
+    expect(await reconcileSchedule(exec)).toMatchObject({
+      scheduleFailures: 1,
+      incomplete: true,
+    });
+    expect(
+      (await getAllMock()).some((e) => e.identifier === decayIdentifier(id)),
+    ).toBe(false);
+    expect(await reconcileSchedule(exec)).toMatchObject({
+      scheduleFailures: 0,
+      incomplete: false,
+    });
+    expect(
+      (await getAllMock()).some((e) => e.identifier === decayIdentifier(id)),
+    ).toBe(true);
+  });
+
+  it("reports cancel-then-schedule failure and repairs the request on the next pass", async () => {
+    await enable();
+    const id = await seedContact({ lastContact: dateOffset(-10) });
+    await reconcileSchedule(exec);
+    await enable({ deliveryHour: 10 });
+    scheduleMock.mockRejectedValueOnce(new Error("native failure"));
+
+    expect(await reconcileSchedule(exec)).toMatchObject({
+      scheduleFailures: 1,
+      incomplete: true,
+    });
+    expect(cancelledIds()).toContain(decayIdentifier(id));
+    expect(
+      (await getAllMock()).some((e) => e.identifier === decayIdentifier(id)),
+    ).toBe(false);
+    expect(await reconcileSchedule(exec)).toMatchObject({
+      scheduleFailures: 0,
+      incomplete: false,
+    });
+    expect(
+      (await getAllMock()).some((e) => e.identifier === decayIdentifier(id)),
+    ).toBe(true);
   });
 
   it("reschedules to the PUBLIC channel when lockscreen_public flips on", async () => {
@@ -804,13 +882,13 @@ describe("reconcileSchedule — stale cancel + full-request diff", () => {
         },
         trigger: {
           channelId: DECAY_PRIVATE_CHANNEL,
-          date: new Date(
+          value: new Date(
             day.getFullYear(),
             day.getMonth(),
             day.getDate(),
             9,
             staggerFor(id),
-          ),
+          ).getTime(),
         },
       },
     ]);
@@ -871,6 +949,24 @@ describe("reconcileSchedule — gating", () => {
 // ============================================================================
 
 describe("reconcileSchedule — DEFER-ONE coalescing (cycle-3)", () => {
+  it("gives a coalesced caller the final pass outcome", async () => {
+    await enable();
+    await seedContact({ lastContact: dateOffset(-10) });
+    scheduleMock.mockRejectedValueOnce(new Error("first pass fails"));
+    const first = reconcileSchedule(exec);
+    const second = reconcileSchedule(exec);
+
+    expect(await first).toMatchObject({
+      scheduleFailures: 0,
+      incomplete: false,
+    });
+    expect(await second).toMatchObject({
+      scheduleFailures: 0,
+      incomplete: false,
+    });
+    expect(getAllMock).toHaveBeenCalledTimes(2);
+    expect(scheduleMock).toHaveBeenCalledTimes(2);
+  });
   it("coalesces overlapping calls to one trailing pass reflecting the newest state", async () => {
     await enable();
     // Eligible + currently scheduled, so a stale reconcile would RE-ARM it.
@@ -952,7 +1048,7 @@ describe("requestsEqual", () => {
     },
     trigger: {
       channelId: DECAY_PRIVATE_CHANNEL,
-      date: new Date(2027, 0, 15, 9, 5), // different minute, same hour
+      value: new Date(2027, 0, 15, 9, 5).getTime(), // different minute, same hour
     },
   };
 
@@ -964,7 +1060,10 @@ describe("requestsEqual", () => {
     expect(
       requestsEqual(base, {
         ...existing,
-        trigger: { ...existing.trigger, date: new Date(2027, 0, 15, 10, 5) },
+        trigger: {
+          ...existing.trigger,
+          value: new Date(2027, 0, 15, 10, 5).getTime(),
+        },
       }),
     ).toBe(false);
   });

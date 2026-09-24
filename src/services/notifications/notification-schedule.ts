@@ -159,7 +159,22 @@ interface ScheduledEntry {
   trigger?: {
     channelId?: string;
     date?: number | Date;
+    value?: number;
   };
+}
+
+export type ReconcileOutcome = {
+  cancelFailures: number;
+  scheduleFailures: number;
+  buildFailures: number;
+  dismissFailures: number;
+  incomplete: boolean;
+};
+
+type FailureCounts = Omit<ReconcileOutcome, "incomplete">;
+
+function finishOutcome(counts: FailureCounts): ReconcileOutcome {
+  return { ...counts, incomplete: Object.values(counts).some((n) => n > 0) };
 }
 
 /** Parse a stored `YYYY-MM-DD` (or `YYYY-MM-DD HH:MM:SS`) as a LOCAL midnight. */
@@ -309,8 +324,7 @@ export function requestsEqual(
   desired: DesiredRequest,
   existing: ScheduledEntry,
 ): boolean {
-  const existingDate =
-    existing.trigger?.date != null ? new Date(existing.trigger.date) : null;
+  const existingDate = readDateTriggerInstant(existing.trigger);
   if (existingDate === null || Number.isNaN(existingDate.getTime())) {
     return false;
   }
@@ -335,6 +349,14 @@ export function requestsEqual(
   );
 }
 
+/** Android's DateTrigger.toBundle() reads back `value` in milliseconds. */
+function readDateTriggerInstant(
+  trigger: ScheduledEntry["trigger"],
+): Date | null {
+  const raw = trigger?.value ?? trigger?.date;
+  return raw == null ? null : new Date(raw);
+}
+
 /** Schedule one desired request (DATE trigger, stable identifier, generic body). */
 async function scheduleOne(req: DesiredRequest): Promise<void> {
   await scheduleNotificationAsync({
@@ -356,30 +378,39 @@ async function scheduleOne(req: DesiredRequest): Promise<void> {
 }
 
 /** Cancel every owned (decay:/birthday:) identifier currently scheduled. */
-async function cancelAllOwned(existing: ScheduledEntry[]): Promise<void> {
+async function cancelAllOwned(existing: ScheduledEntry[]): Promise<number> {
+  let failures = 0;
   for (const entry of existing) {
     if (!isOwnedIdentifier(entry.identifier)) continue;
     try {
       await cancelScheduledNotificationAsync(entry.identifier);
     } catch (err) {
+      failures++;
       Logger.error(LOG_SCOPE, `cancel failed for ${entry.identifier}`, err);
     }
   }
+  return failures;
 }
 
 /**
  * One full reconcile pass — RE-READS all inputs via the stable `exec` so the
  * DEFER-ONE trailing pass reflects the newest committed state.
  */
-async function runReconcilePass(exec: SqlExecutor): Promise<void> {
+async function runReconcilePass(exec: SqlExecutor): Promise<ReconcileOutcome> {
+  const counts: FailureCounts = {
+    cancelFailures: 0,
+    scheduleFailures: 0,
+    buildFailures: 0,
+    dismissFailures: 0,
+  };
   const settings = await getAppSettings(exec);
   const existing =
     (await getAllScheduledNotificationsAsync()) as unknown as ScheduledEntry[];
 
   // (1) Master off → cancel every owned identifier and schedule nothing.
   if (!settings.notificationsEnabled) {
-    await cancelAllOwned(existing);
-    return;
+    counts.cancelFailures += await cancelAllOwned(existing);
+    return finishOutcome(counts);
   }
 
   const now = new Date();
@@ -403,6 +434,7 @@ async function runReconcilePass(exec: SqlExecutor): Promise<void> {
       const req = buildDecayRequest(c, settings, now);
       if (req) decayRequests.push(req);
     } catch (err) {
+      counts.buildFailures++;
       Logger.error(LOG_SCOPE, `decay build failed for contact ${c.id}`, err);
     }
   }
@@ -412,6 +444,7 @@ async function runReconcilePass(exec: SqlExecutor): Promise<void> {
       const req = buildBirthdayRequest(c, settings, now, today);
       if (req) birthdayRequests.push(req);
     } catch (err) {
+      counts.buildFailures++;
       Logger.error(LOG_SCOPE, `birthday build failed for contact ${c.id}`, err);
     }
   }
@@ -453,6 +486,7 @@ async function runReconcilePass(exec: SqlExecutor): Promise<void> {
     try {
       await cancelScheduledNotificationAsync(entry.identifier);
     } catch (err) {
+      counts.cancelFailures++;
       Logger.error(LOG_SCOPE, `cancel failed for ${entry.identifier}`, err);
     }
   }
@@ -463,19 +497,25 @@ async function runReconcilePass(exec: SqlExecutor): Promise<void> {
   for (const entry of existing) existingById.set(entry.identifier, entry);
 
   for (const req of desired.values()) {
-    try {
-      const current = existingById.get(req.identifier);
-      if (!current) {
-        await scheduleOne(req);
-      } else if (!requestsEqual(req, current)) {
+    const current = existingById.get(req.identifier);
+    if (current && requestsEqual(req, current)) continue;
+    if (current) {
+      try {
         await cancelScheduledNotificationAsync(req.identifier);
-        await scheduleOne(req);
+      } catch (err) {
+        counts.cancelFailures++;
+        Logger.error(LOG_SCOPE, `cancel failed for ${req.identifier}`, err);
+        continue;
       }
-      // else: identical request → leave untouched (occurrenceKey stays constant).
+    }
+    try {
+      await scheduleOne(req);
     } catch (err) {
+      counts.scheduleFailures++;
       Logger.error(LOG_SCOPE, `schedule failed for ${req.identifier}`, err);
     }
   }
+  return finishOutcome(counts);
 }
 
 // Module-level DEFER-ONE coordinator (cycle-3 HIGH / T-11-RACE), mirroring
@@ -483,7 +523,7 @@ async function runReconcilePass(exec: SqlExecutor): Promise<void> {
 // NOT interleave — it requests exactly ONE trailing pass, so a burst of
 // fire-and-forget callers coalesces to a single follow-up that reflects the
 // newest committed state (never re-arming a just-cancelled notification).
-let reconcileRunning = false;
+let reconcileInFlight: Promise<ReconcileOutcome> | null = null;
 let reconcilePending = false;
 
 /**
@@ -492,23 +532,30 @@ let reconcilePending = false;
  * overlapping calls coalesce to one trailing pass. Read-only on the DB (never
  * nest a DAO write mutex here).
  */
-export async function reconcileSchedule(exec: SqlExecutor): Promise<void> {
-  if (reconcileRunning) {
+export function reconcileSchedule(
+  exec: SqlExecutor,
+): Promise<ReconcileOutcome> & Promise<void> {
+  if (reconcileInFlight) {
     reconcilePending = true;
-    return;
+    return reconcileInFlight as Promise<ReconcileOutcome> & Promise<void>;
   }
-  reconcileRunning = true;
-  try {
-    do {
-      // Reset before the pass so an overlapping call DURING it is captured for
-      // exactly one more pass (coalescing a burst into a single trailing pass).
+  const run = async (): Promise<ReconcileOutcome> => {
+    try {
+      let outcome: ReconcileOutcome;
+      do {
+        reconcilePending = false;
+        outcome = await runReconcilePass(exec);
+      } while (reconcilePending);
+      return outcome;
+    } finally {
+      reconcileInFlight = null;
       reconcilePending = false;
-      await runReconcilePass(exec);
-    } while (reconcilePending);
-  } finally {
-    reconcileRunning = false;
-    reconcilePending = false;
-  }
+    }
+  };
+  reconcileInFlight = run();
+  // Existing fire-and-forget dependency slots require Promise<void>; the value
+  // remains available to callers that inspect the aggregate result.
+  return reconcileInFlight as Promise<ReconcileOutcome> & Promise<void>;
 }
 
 /**
@@ -524,7 +571,11 @@ export function registerNotificationScheduleSweep(
     try {
       await reconcileSchedule(getExec());
     } catch (error) {
-      Logger.error("notification-schedule", "launch schedule reconcile failed", error);
+      Logger.error(
+        "notification-schedule",
+        "launch schedule reconcile failed",
+        error,
+      );
     }
   });
 }
@@ -534,6 +585,6 @@ export function registerNotificationScheduleSweep(
  * Not part of the runtime surface.
  */
 export function __resetReconcileForTest(): void {
-  reconcileRunning = false;
+  reconcileInFlight = null;
   reconcilePending = false;
 }
