@@ -1095,12 +1095,12 @@ Plans:
 **Success Criteria**: Defined at planning; each RG's STATIC/RUNTIME/DEVICE verification expectations carried forward (real restore/export flows, failure injection, commit → failed read → retry)
 **Scope source**: docs/dossier/milestone-2/phase-38.2-audit-remediation-data-security-lifecycle-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; SYNTHESIS "Constraints that must survive remediation"
-**Plans**: 16 plans in 8 waves
+**Plans**: 1/16 plans executed in 8 waves
 
 Plans:
 **Wave 1**
 
-- [ ] 38.2-01-PLAN.md — Maintenance runner & bootstrap fault containment; per-pass backup hold (RG-016, D-18)
+- [x] 38.2-01-PLAN.md — Maintenance runner & bootstrap fault containment; per-pass backup hold (RG-016, D-18)
 - [ ] 38.2-02-PLAN.md — Notification readback, weekly-grid fidelity, presented-reminder retirement (RG-015)
 - [ ] 38.2-03-PLAN.md — Contact edit history/lifecycle parity and committed-baseline retry (RG-017, RG-018)
 - [ ] 38.2-04-PLAN.md — Reconcile choice identity and bulk ambiguity exclusion (RG-043, D-15)
@@ -1213,7 +1213,7 @@ Plans:
 | 36. AI Configuration & Prompting | 11/11 | Complete | 2026-09-14 |
 | 37. Settings & Personalization | 8/8 | Complete | 2026-09-14 |
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
-| 38.2 Data Integrity, Security & Lifecycle Hardening | 0/TBD | Ready to discuss | - |
+| 38.2 Data Integrity, Security & Lifecycle Hardening | 1/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 0/TBD | Ready to discuss | - |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 0/TBD | Ready to discuss | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
