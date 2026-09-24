@@ -39,13 +39,26 @@
  *   builders. Writes are confined to `Paths.document/avatars`.
  */
 import { Directory, File, Paths } from "expo-file-system";
-import { isSafeColName } from "@/db/col-name";
 import {
   assertSafeImportStagingRelative,
   assertSafeReconcileStagingRelative,
   assertSafeRelative,
   assertSafeRestorePendingRelative,
+  SAFE_RELATIVE,
 } from "@/db/photo-relative-path";
+
+export type {
+  PhotoTargetDescriptor,
+  RestorePendingTarget,
+} from "@/db/photo-relative-path";
+export {
+  contactPhotoRelPath,
+  customFieldPhotoRelPath,
+  profilePhotoRelPath,
+  relPathForTarget,
+  restorePendingRelPath,
+} from "@/db/photo-relative-path";
+
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "photo-storage";
@@ -60,15 +73,6 @@ const RECONCILE_STAGING_DIR = "reconcile-staging";
  * The photo write target. Each maps to a `contactId`-derivable (or fixed, for
  * self) relative filename via the single `relPathForTarget` switch.
  */
-export type PhotoTargetDescriptor =
-  | { kind: "contact"; contactId: number }
-  | { kind: "profile" }
-  | { kind: "customField"; contactId: number; colName: string };
-
-export type RestorePendingTarget =
-  | { kind: "contact"; uid: string }
-  | { kind: "profile" }
-  | { kind: "customField"; uid: string; colName: string };
 
 // The `avatars/<name>.<ext>` allowlist guard (`assertSafeRelative`) lives in the
 // node-pure `@/db/photo-relative-path` module so the FS chokepoint here and the
@@ -77,76 +81,6 @@ export type RestorePendingTarget =
 // positive-int/`isSafeColName` builder throws below.
 
 /** A positive integer contactId is required before it reaches a filename. */
-function assertContactId(contactId: number): void {
-  if (!Number.isInteger(contactId) || contactId <= 0) {
-    throw new Error(`invalid contactId: ${JSON.stringify(contactId)}`);
-  }
-}
-
-/** `avatars/contact-<id>.jpg` — the main contact photo master. */
-export function contactPhotoRelPath(contactId: number): string {
-  assertContactId(contactId);
-  return `${AVATARS_DIR}/contact-${contactId}.jpg`;
-}
-
-/** `avatars/cv-<id>-<col>.jpg` — a custom photo-field master. */
-export function customFieldPhotoRelPath(
-  contactId: number,
-  colName: string,
-): string {
-  assertContactId(contactId);
-  if (!isSafeColName(colName)) {
-    throw new Error(`unsafe custom-field col_name: ${JSON.stringify(colName)}`);
-  }
-  return `${AVATARS_DIR}/cv-${contactId}-${colName}.jpg`;
-}
-
-/**
- * `avatars/profile.jpg` — the self record is single-row and never purged, so a
- * fixed name is correct and intentional.
- */
-export function profilePhotoRelPath(): string {
-  return `${AVATARS_DIR}/profile.jpg`;
-}
-
-/** Map a target descriptor to its relative filename via the single switch. */
-export function relPathForTarget(target: PhotoTargetDescriptor): string {
-  switch (target.kind) {
-    case "contact":
-      return contactPhotoRelPath(target.contactId);
-    case "profile":
-      return profilePhotoRelPath();
-    case "customField":
-      return customFieldPhotoRelPath(target.contactId, target.colName);
-  }
-}
-
-/** A session-scoped staging name that can never be mistaken for a canonical DB path. */
-export function restorePendingRelPath(
-  target: RestorePendingTarget,
-  sessionToken: string,
-): string {
-  if (!/^[A-Za-z0-9_-]+$/.test(sessionToken)) {
-    throw new Error("unsafe restore session token");
-  }
-  let name: string;
-  switch (target.kind) {
-    case "contact":
-      name = `contact-${target.uid}-${sessionToken}`;
-      break;
-    case "profile":
-      name = `profile-${sessionToken}`;
-      break;
-    case "customField":
-      if (!isSafeColName(target.colName))
-        throw new Error("unsafe custom-field col_name");
-      name = `cv-${target.uid}-${target.colName}-${sessionToken}`;
-      break;
-  }
-  const relative = `${RESTORE_PENDING_DIR}/${name}.jpg`;
-  assertSafeRestorePendingRelative(relative);
-  return relative;
-}
 
 /** A flat, session-scoped staging name for an evictable picker-cache photo. */
 export function importStagingRelPath(
@@ -511,12 +445,30 @@ export function reconcilePhotoDir(entries: string[]): ReconcileAction[] {
  * yet), plan via the pure `reconcilePhotoDir`, and apply each action
  * best-effort/idempotent. Keeps every FS call inside this one file.
  */
-export async function reconcilePhotoWrites(): Promise<void> {
+export function listCanonicalSidecarPaths(): string[] {
+  const dir = new Directory(Paths.document, AVATARS_DIR);
+  if (!dir.exists) return [];
+  const entries = dir.list().map((entry) => entry.name);
+  const canonical = entries
+    .filter((entry) => entry.endsWith(".tmp") || entry.endsWith(".bak"))
+    .map((entry) => `avatars/${entry.slice(0, -4)}`);
+  return [...new Set(canonical)].filter((path) => SAFE_RELATIVE.test(path));
+}
+
+/** Re-read sidecars after the caller acquires the canonical path lock. */
+export async function reconcilePhotoWritesForCanonical(
+  canonical: string,
+): Promise<void> {
+  assertSafeRelative(canonical);
   const dir = new Directory(Paths.document, AVATARS_DIR);
   if (!dir.exists) return;
-
   const entries = dir.list().map((entry) => entry.name);
-  const actions = reconcilePhotoDir(entries);
+  const actions = reconcilePhotoDir(entries).filter((action) =>
+    action.kind === "restoreBak"
+      ? action.to === canonical
+      : action.relative === `${canonical}.tmp` ||
+        action.relative === `${canonical}.bak`,
+  );
 
   for (const action of actions) {
     try {
@@ -535,4 +487,10 @@ export async function reconcilePhotoWrites(): Promise<void> {
       );
     }
   }
+}
+
+/** Compatibility entry point; production launch sweep uses the locked owner. */
+export async function reconcilePhotoWrites(): Promise<void> {
+  for (const canonical of listCanonicalSidecarPaths())
+    await reconcilePhotoWritesForCanonical(canonical);
 }

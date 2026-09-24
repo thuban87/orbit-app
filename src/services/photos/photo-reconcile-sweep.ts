@@ -19,7 +19,7 @@
  */
 
 import { registerSweepHook } from "@/services/launch-sweep";
-import { reconcilePhotoWrites } from "@/services/photos/photo-storage";
+import { reconcilePhotoWritesOwned } from "@/services/photos/owned-master";
 import { Logger } from "@/utils/logger";
 
 /**
@@ -29,7 +29,7 @@ import { Logger } from "@/utils/logger";
 export function registerPhotoReconcileSweep(): void {
   registerSweepHook(async () => {
     try {
-      await reconcilePhotoWrites();
+      await reconcilePhotoWritesOwned();
     } catch (error) {
       Logger.error(
         "photo-reconcile-sweep",

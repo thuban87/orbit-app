@@ -96,3 +96,69 @@ export function assertSafeReconcileStagingRelative(relative: string): void {
     );
   }
 }
+
+import { isSafeColName } from "@/db/col-name";
+
+export type PhotoTargetDescriptor =
+  | { kind: "contact"; contactId: number }
+  | { kind: "profile" }
+  | { kind: "customField"; contactId: number; colName: string };
+export type RestorePendingTarget =
+  | { kind: "contact"; uid: string }
+  | { kind: "profile" }
+  | { kind: "customField"; uid: string; colName: string };
+
+function assertContactId(contactId: number): void {
+  if (!Number.isInteger(contactId) || contactId <= 0)
+    throw new Error(`invalid contactId: ${JSON.stringify(contactId)}`);
+}
+export function contactPhotoRelPath(contactId: number): string {
+  assertContactId(contactId);
+  return `avatars/contact-${contactId}.jpg`;
+}
+export function customFieldPhotoRelPath(
+  contactId: number,
+  colName: string,
+): string {
+  assertContactId(contactId);
+  if (!isSafeColName(colName))
+    throw new Error(`unsafe custom-field col_name: ${JSON.stringify(colName)}`);
+  return `avatars/cv-${contactId}-${colName}.jpg`;
+}
+export function profilePhotoRelPath(): string {
+  return "avatars/profile.jpg";
+}
+export function relPathForTarget(target: PhotoTargetDescriptor): string {
+  switch (target.kind) {
+    case "contact":
+      return contactPhotoRelPath(target.contactId);
+    case "profile":
+      return profilePhotoRelPath();
+    case "customField":
+      return customFieldPhotoRelPath(target.contactId, target.colName);
+  }
+}
+export function restorePendingRelPath(
+  target: RestorePendingTarget,
+  sessionToken: string,
+): string {
+  if (!/^[A-Za-z0-9_-]+$/.test(sessionToken))
+    throw new Error("unsafe restore session token");
+  let name: string;
+  switch (target.kind) {
+    case "contact":
+      name = `contact-${target.uid}-${sessionToken}`;
+      break;
+    case "profile":
+      name = `profile-${sessionToken}`;
+      break;
+    case "customField":
+      if (!isSafeColName(target.colName))
+        throw new Error("unsafe custom-field col_name");
+      name = `cv-${target.uid}-${target.colName}-${sessionToken}`;
+      break;
+  }
+  const relative = `avatars/_restore_pending/${name}.jpg`;
+  assertSafeRestorePendingRelative(relative);
+  return relative;
+}

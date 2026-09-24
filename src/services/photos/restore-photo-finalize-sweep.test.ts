@@ -11,12 +11,51 @@ const h = vi.hoisted(() => ({
   existingCanonical: new Set<string>(),
   deleteLeavesCanonical: false,
   rows: new Map<string, unknown>(),
+  afterList: null as null | (() => Promise<void>),
 }));
 
 vi.mock("@/db/restore-photo-journal-dao", () => ({
-  listJournalEntriesCore: async () => h.entries,
+  listJournalEntriesCore: async () => {
+    const snapshot = [...h.entries];
+    await h.afterList?.();
+    return snapshot;
+  },
+  journalPathExistsCore: async (_exec: unknown, path: string) =>
+    h.entries.some((entry) => entry.relativePath === path),
   deleteJournalEntryCore: async (_exec: unknown, path: string) => {
     h.deletedJournal.push(path);
+  },
+}));
+vi.mock("@/services/photos/owned-master", () => ({
+  finalizeJournalEntryOwned: async (
+    _exec: unknown,
+    entry: Record<string, unknown>,
+  ) => {
+    if (
+      (entry.targetKind === "contact" &&
+        !h.rows.has(`contact:${entry.contactUid}`)) ||
+      (entry.targetKind === "customField" &&
+        !h.rows.has(`value:${entry.valueUid}:${entry.fieldDefUid}`))
+    ) {
+      h.deletedPending.push(entry.relativePath as string);
+      h.deletedJournal.push(entry.relativePath as string);
+      return;
+    }
+    if (h.pending.some((item) => item.relative === entry.relativePath)) {
+      h.persisted.push([
+        `file:///doc/${entry.relativePath}`,
+        entry.canonicalRelativePath as string,
+      ]);
+      if (h.persistThrows) throw new Error("disk unavailable");
+      h.deletedPending.push(entry.relativePath as string);
+    }
+    h.deletedJournal.push(entry.relativePath as string);
+  },
+  executeDeleteIntentOwned: async (_exec: unknown, path: string) => {
+    h.deletedPhoto.push(path);
+    if (!h.deleteLeavesCanonical) h.existingCanonical.delete(path);
+    if (h.existingCanonical.has(path)) throw new Error("deletion needs retry");
+    h.deletedJournal.push(`delete:${path}`);
   },
 }));
 vi.mock("@/services/photos/photo-storage", () => ({
@@ -49,6 +88,11 @@ import {
   drainRestorePhotoJournal,
   registerRestorePhotoFinalizeSweep,
 } from "@/services/photos/restore-photo-finalize-sweep";
+import {
+  __resetStagingSessionsForTest,
+  beginStagingSession,
+  endStagingSession,
+} from "@/services/photos/staging-sessions";
 
 const finalize = (overrides: Record<string, unknown> = {}) => ({
   relativePath: "avatars/_restore_pending/contact-a-s.jpg",
@@ -64,6 +108,7 @@ const finalize = (overrides: Record<string, unknown> = {}) => ({
 
 beforeEach(() => {
   __resetSweepForTest();
+  __resetStagingSessionsForTest();
   h.entries = [];
   h.pending = [];
   h.deletedPending = [];
@@ -74,6 +119,7 @@ beforeEach(() => {
   h.existingCanonical = new Set();
   h.deleteLeavesCanonical = false;
   h.rows = new Map();
+  h.afterList = null;
 });
 
 function exec() {
@@ -212,5 +258,53 @@ describe("restore photo finalization sweep", () => {
       "avatars/_restore_pending/partial.jpg.stage-tmp",
     ]);
     expect(h.persisted).toEqual([]);
+  });
+  it("keeps ready and stage-tmp bytes while their staging session is active", async () => {
+    beginStagingSession("s");
+    h.pending = [
+      {
+        relative: "avatars/_restore_pending/contact-a-s.jpg",
+        isStageTmpOrphan: false,
+      },
+      {
+        relative: "avatars/_restore_pending/contact-a-s.jpg.stage-tmp",
+        isStageTmpOrphan: true,
+      },
+    ];
+    await drainRestorePhotoJournal(exec());
+    expect(h.deletedPending).toEqual([]);
+    endStagingSession("s");
+    await drainRestorePhotoJournal(exec());
+    expect(h.deletedPending).toEqual(h.pending.map((item) => item.relative));
+  });
+  it("does not orphan-sweep a finalize committed after the pass snapshot", async () => {
+    const path = "avatars/_restore_pending/contact-a-s.jpg";
+    beginStagingSession("s");
+    h.pending = [{ relative: path, isStageTmpOrphan: false }];
+    h.afterList = async () => {
+      h.entries.push(finalize());
+      h.rows.set("contact:contact-a", { id: 1 });
+      endStagingSession("s");
+      h.afterList = null;
+    };
+    await drainRestorePhotoJournal(exec());
+    expect(h.deletedPending).toEqual([]);
+    expect(h.entries).toHaveLength(1);
+    await drainRestorePhotoJournal(exec());
+    expect(h.persisted).toEqual([
+      [`file:///doc/${path}`, "avatars/contact-1.jpg"],
+    ]);
+  });
+  it("uses a fresh journal check after a simulated restart loses session memory", async () => {
+    const path = "avatars/_restore_pending/contact-a-s.jpg";
+    beginStagingSession("s");
+    h.pending = [{ relative: path, isStageTmpOrphan: false }];
+    h.afterList = async () => {
+      h.entries.push(finalize());
+      __resetStagingSessionsForTest();
+      h.afterList = null;
+    };
+    await drainRestorePhotoJournal(exec());
+    expect(h.deletedPending).toEqual([]);
   });
 });
