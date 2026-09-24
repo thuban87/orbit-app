@@ -10,7 +10,6 @@ import java.net.InetAddress
 import java.net.Proxy
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import okhttp3.Call
@@ -62,7 +61,7 @@ class OrbitSecureFetchModule : Module() {
   // In-flight calls keyed by requestId, plus a cancelled-requestId tombstone set
   // so a cancel racing ahead of Call registration still aborts (C2-M1).
   private val inFlight = ConcurrentHashMap<String, Call>()
-  private val cancelled: MutableSet<String> = Collections.synchronizedSet(mutableSetOf())
+  private val cancelled = CancelTombstones()
 
   private val secureDns = object : Dns {
     override fun lookup(hostname: String): List<InetAddress> {
@@ -151,6 +150,10 @@ class OrbitSecureFetchModule : Module() {
       builder.addHeader(name, value)
     }
 
+    val settled = SettleOnce<Map<String, Any>>(
+      onResolve = { promise.resolve(it) },
+      onReject = { promise.reject(it, "Request failed.", null) },
+    )
     val call = client.newCall(builder.build())
     inFlight[requestId] = call
 
@@ -162,28 +165,33 @@ class OrbitSecureFetchModule : Module() {
 
     call.enqueue(object : Callback {
       override fun onFailure(call: Call, e: java.io.IOException) {
-        settle(requestId)
         val code = when {
-          call.isCanceled() -> ERR_CANCELLED
+          call.isCanceled() || cancelled.contains(requestId) -> ERR_CANCELLED
           e is PrivateAddressException -> ERR_PRIVATE_ADDRESS
           e is SocketTimeoutException || e is InterruptedIOException -> ERR_TIMEOUT
           else -> ERR_TRANSPORT
         }
-        promise.reject(code, "Request failed.", null)
+        settled.reject(code)
+        settle(requestId)
       }
 
       override fun onResponse(call: Call, response: Response) {
-        settle(requestId)
-        response.use { res ->
+        try { response.use { res ->
           // followRedirects(false) surfaces a 3xx as a normal response — reject it
           // rather than let the prompt be redirected off the vetted origin.
           if (res.code in 300..399) {
-            promise.reject(ERR_REDIRECT, "Redirect refused.", null)
+            settled.reject(if (call.isCanceled() || cancelled.contains(requestId)) ERR_CANCELLED else ERR_REDIRECT)
             return
           }
-          val text = res.body?.string() ?: ""
+          val text = readBounded(
+            res.body,
+            if (res.isSuccessful) MAX_RESPONSE_BYTES else MAX_ERROR_BODY_BYTES,
+            { call.isCanceled() || cancelled.contains(requestId) },
+            truncateOnLimit = !res.isSuccessful,
+          )
+          if (call.isCanceled() || cancelled.contains(requestId)) throw ResponseCancelledException()
           val finalHost = res.request.url.host
-          promise.resolve(
+          settled.resolve(
             mapOf(
               "status" to res.code,
               "ok" to res.isSuccessful,
@@ -191,7 +199,15 @@ class OrbitSecureFetchModule : Module() {
               "finalUrlHost" to finalHost,
             ),
           )
-        }
+        } } catch (failure: Throwable) {
+          val code = when {
+            call.isCanceled() || cancelled.contains(requestId) || failure is ResponseCancelledException -> ERR_CANCELLED
+            failure is ResponseTooLargeException -> ERR_RESPONSE_TOO_LARGE
+            failure is SocketTimeoutException || failure is InterruptedIOException -> ERR_TIMEOUT
+            else -> ERR_TRANSPORT
+          }
+          settled.reject(code)
+        } finally { settle(requestId) }
       }
     })
   }
