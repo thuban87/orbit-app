@@ -117,6 +117,46 @@ class BackupIngressRequestsTest {
     assertTrue(streams.all { it.closed })
   }
 
+  @Test fun destroyClosesCopyAndDiscardsReadyShareAndLateAcquisition() {
+    val acquiring = CountDownLatch(1)
+    val releaseAcquisition = CountDownLatch(1)
+    val copying = CountDownLatch(1)
+    val copyClosed = CountDownLatch(1)
+    val late = TrackingStream("late")
+    val copyingStream = object : InputStream() {
+      var first = true
+      override fun read(): Int = throw UnsupportedOperationException()
+      override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+        if (first) {
+          first = false
+          buffer[offset] = 65
+          return 1
+        }
+        copying.countDown()
+        waitForProvider(copyClosed)
+        throw java.io.IOException("closed")
+      }
+      override fun close() { copyClosed.countDown() }
+    }
+    val requests = BackupIngressRequests(opener = { source -> when (source) {
+      "blocked" -> { acquiring.countDown(); waitForProvider(releaseAcquisition); late }
+      "copying" -> copyingStream
+      else -> ByteArrayInputStream("ready".toByteArray())
+    } })
+    val abandoned = file(); requests.submitShare("blocked", abandoned)
+    assertTrue(acquiring.await(1, TimeUnit.SECONDS))
+    val ready = file(); requests.submitShare("ready", ready).await()
+    val partial = file(); val pendingPick = requests.submitPick("copying", partial)
+    assertTrue(copying.await(1, TimeUnit.SECONDS))
+    requests.destroyAll()
+    assertTrue(pendingPick.await().failed)
+    releaseAcquisition.countDown()
+    Thread.sleep(50)
+    assertEquals(0L, copyClosed.count)
+    assertTrue(late.closed)
+    assertFalse(abandoned.exists()); assertFalse(ready.exists()); assertFalse(partial.exists())
+  }
+
   private class TrackingStream(value: String) : ByteArrayInputStream(value.toByteArray()) {
     var closed = false
     override fun close() { closed = true; super.close() }
