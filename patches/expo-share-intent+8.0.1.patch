@@ -19,7 +19,7 @@ index ff5b100..7540a55 100644
              }
 -            if (intent.type == null) return
 -            if (intent.type!!.startsWith("text/plain")) {
-+            if (intent.type.startsWith("text/plain")) {
++            if (intent.type?.startsWith("text/plain") == true) {
                  // text / urls
                  if (intent.action == Intent.ACTION_SEND) {
                      notifyShareIntent(mapOf(
