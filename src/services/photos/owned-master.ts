@@ -268,6 +268,8 @@ export function finalizeJournalEntryOwned(
 
 export interface OwnedWriteOptions {
   authorize?: (exec: SqlExecutor) => Promise<boolean>;
+  /** Test boundary for the native file writer; production uses persistMaster. */
+  persist?: (sourceUri: string, canonical: string) => Promise<string>;
 }
 export async function persistOwnedMasterLocked(
   exec: SqlExecutor,
@@ -280,7 +282,9 @@ export async function persistOwnedMasterLocked(
   await settleCanonicalLocked(exec, token, canonical);
   if (opts.authorize && !(await opts.authorize(exec)))
     throw new PhotoWriteUnauthorizedError(`photo target changed: ${canonical}`);
-  const result = await persistMaster(srcUri, canonical);
+  const result = opts.persist
+    ? await opts.persist(srcUri, canonical)
+    : await persistMaster(srcUri, canonical);
   bump(canonical);
   return result;
 }

@@ -184,6 +184,19 @@ describe("contact-import-resume-sweep", () => {
     expect(fs.deleted).toEqual(["import-staging/import-orphan.jpg"]);
   });
 
+  it("keeps photo work after a contact committed, even in a completed session", async () => {
+    const accepted = await acceptRows(["photo-outstanding"]);
+    const contactId = await seedContact();
+    await setRowContact(exec, accepted.rowIds[0], contactId, "imported", NOW);
+    await exec.runAsync(
+      "UPDATE import_sessions SET status = 'complete' WHERE id = ?",
+      [accepted.sessionId],
+    );
+    const fs = stagingFs(["import-staging/import-photo-outstanding.jpg"]);
+    await reconcileOrphanStagedPhotos(exec, fs);
+    expect(fs.deleted).toEqual([]);
+  });
+
   it("deletes completed and skipped staging while retaining needs-review retry input", async () => {
     const accepted = await acceptRows([
       "imported",

@@ -9,10 +9,14 @@ import {
   sessionRowCounts,
   sessionSummaryCounts,
 } from "@/db/import-session-read";
-import type { RootStackScreenProps } from "@/navigation/types";
 import { navigationRef } from "@/navigation/linking";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
+import type { RootStackScreenProps } from "@/navigation/types";
 import { runImportBatch } from "@/services/import/import-driver";
+import {
+  retryImportedPhoto,
+  retryPhotoFs,
+} from "@/services/import/import-photo-retry";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -30,6 +34,7 @@ export function ImportCompleteScreen({
   const { colors } = useTheme();
   const [counts, setCounts] = useState<SessionSummaryCounts | null>(null);
   const [hasFailures, setHasFailures] = useState(false);
+  const [photoRows, setPhotoRows] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
   const [error, setError] = useState(false);
@@ -62,6 +67,16 @@ export function ImportCompleteScreen({
     );
     setCounts(next);
     setHasFailures(rawCounts.failed > 0);
+    setPhotoRows(
+      rows
+        .filter(
+          (row) =>
+            row.rowStatus === "imported" &&
+            row.contactId !== null &&
+            row.photoRelPath !== null,
+        )
+        .map((row) => row.id),
+    );
     setError(false);
   }, [route.params.sessionId]);
 
@@ -91,6 +106,9 @@ export function ImportCompleteScreen({
         now: localDateTime(),
         eligibleStatuses: ["pending", "failed"],
       });
+      for (const rowId of photoRows) {
+        await retryImportedPhoto(exec, retryPhotoFs, rowId, localDateTime());
+      }
       await finalizeSessionIfTerminal(
         exec,
         route.params.sessionId,
@@ -103,7 +121,7 @@ export function ImportCompleteScreen({
     } finally {
       setRetrying(false);
     }
-  }, [load, route.params.sessionId]);
+  }, [load, photoRows, route.params.sessionId]);
 
   if (loading) {
     return (
@@ -129,10 +147,7 @@ export function ImportCompleteScreen({
   }
 
   return (
-    <View
-      testID="import-complete-screen"
-      style={styles.root}
-    >
+    <View testID="import-complete-screen" style={styles.root}>
       <Text
         accessibilityRole="header"
         style={[styles.title, { color: colors.textPrimary }]}
@@ -221,10 +236,12 @@ export function ImportCompleteScreen({
         </View>
       </View>
 
-      {hasFailures ? (
+      {hasFailures || photoRows.length > 0 ? (
         <View style={styles.retryBlock}>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            Some contacts couldn&apos;t be imported.
+            {hasFailures
+              ? "Some contacts couldn't be imported."
+              : "Some contact photos still need to be added."}
           </Text>
           <Pressable
             testID="import-complete-retry"

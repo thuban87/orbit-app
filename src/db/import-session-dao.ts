@@ -24,6 +24,10 @@
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
+/** A committed contact can still own unfinished photo work. */
+export const PHOTO_OUTSTANDING =
+  "r.row_status = 'imported' AND r.contact_id IS NOT NULL AND r.photo_rel_path IS NOT NULL";
+
 export type ImportSessionMode = "single" | "bulk";
 export type ImportSessionRowStatus =
   | "pending"

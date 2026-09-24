@@ -1,5 +1,8 @@
 import { getExecutor, localDateTime } from "@/db/database";
-import type { ImportSessionMode } from "@/db/import-session-dao";
+import {
+  type ImportSessionMode,
+  PHOTO_OUTSTANDING,
+} from "@/db/import-session-dao";
 import {
   getResumableSession,
   type ImportSession,
@@ -94,9 +97,10 @@ export async function reconcileOrphanStagedPhotos(
     `SELECT r.photo_rel_path
        FROM import_session_rows r
        JOIN import_sessions s ON s.id = r.session_id
-      WHERE s.status != 'discarded'
-        AND r.row_status IN ('pending', 'needs_review', 'failed')
-        AND r.photo_rel_path IS NOT NULL`,
+      WHERE r.photo_rel_path IS NOT NULL
+        AND (s.status != 'discarded'
+          AND r.row_status IN ('pending', 'needs_review', 'failed')
+          OR (${PHOTO_OUTSTANDING}))`,
   );
   const livePaths = new Set(
     liveRows.flatMap(({ photo_rel_path }) =>
