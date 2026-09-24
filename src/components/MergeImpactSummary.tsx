@@ -5,11 +5,11 @@ import { getExecutor, localDateTime } from "@/db/database";
 import {
   GroupMergeCollisionError,
   type MergeResolutions,
-  mergeContacts,
 } from "@/db/merge-dao";
 import { navigationRef } from "@/navigation/linking";
 import { resetToDashboardWith } from "@/navigation/reset-intents";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { mergeContactsWithPhotoOwnership } from "@/services/photos/merge-photo-rehome";
 import { useTheme } from "@/theme";
 
 type Counts = {
@@ -73,7 +73,7 @@ export function MergeImpactSummary({
         text: "Merge",
         style: "destructive",
         onPress: () => {
-          void mergeContacts(getExecutor(), {
+          void mergeContactsWithPhotoOwnership(getExecutor(), {
             survivorId,
             absorbedId,
             resolutions: typedResolutions,

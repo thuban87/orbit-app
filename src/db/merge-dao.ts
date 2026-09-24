@@ -5,7 +5,16 @@ import {
   updateContactMetadataCore,
 } from "@/db/contacts-dao";
 import { upsertValueCore } from "@/db/field-values-dao";
+import {
+  contactPhotoRelPath,
+  customFieldPhotoRelPath,
+} from "@/db/photo-relative-path";
 import { recomputeLastContactCore } from "@/db/recency-dao";
+import {
+  enqueueDeleteIntentCore,
+  insertFinalizeEntryCore,
+  type RestorePhotoJournalEntry,
+} from "@/db/restore-photo-journal-dao";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -48,7 +57,7 @@ export interface MergeResolutions {
   >;
   customFields?: Record<number, MergeChoice>;
   primaryMethod?: Partial<Record<ContactMethodType, MergeChoice>>;
-  photo?: "keep-survivor" | { choice: "absorbed"; relative: string };
+  photo?: "keep-survivor" | { choice: "absorbed" };
 }
 
 /** Normalize untrusted UI state to the deliberately small, durable merge contract. */
@@ -111,12 +120,8 @@ export function normalizeMergeResolutions(input: unknown): MergeResolutions {
       ? "keep-survivor"
       : raw.photo &&
           typeof raw.photo === "object" &&
-          (raw.photo as Record<string, unknown>).choice === "absorbed" &&
-          typeof (raw.photo as Record<string, unknown>).relative === "string"
-        ? {
-            choice: "absorbed" as const,
-            relative: (raw.photo as Record<string, string>).relative,
-          }
+          (raw.photo as Record<string, unknown>).choice === "absorbed"
+        ? { choice: "absorbed" as const }
         : undefined;
   return {
     ...(Object.keys(scalars).length ? { scalars } : {}),
@@ -152,6 +157,19 @@ type MethodRow = {
   is_primary: number;
 };
 
+export interface MergePhotoTransfer {
+  kind: "contact" | "customField";
+  source: string;
+  destination: string;
+  absorbedUid: string;
+  sourceGeneration: number;
+  fieldDefId?: number;
+  fieldDefUid?: string;
+  valueUid?: string;
+  adoption?: boolean;
+  journal: RestorePhotoJournalEntry;
+}
+
 async function snapshot(
   exec: SqlExecutor,
   contactId: number,
@@ -186,12 +204,17 @@ export async function mergeContacts(
     absorbedId: number;
     resolutions?: MergeResolutions;
     now: string;
+    photoTransfers?: readonly MergePhotoTransfer[];
+    generationOf?: (source: string) => number;
   },
-): Promise<void> {
+): Promise<{
+  deletePaths: string[];
+  finalizeEntries: RestorePhotoJournalEntry[];
+}> {
   if (input.survivorId === input.absorbedId)
     throw new Error("mergeContacts: a contact cannot absorb itself");
   const resolutions = normalizeMergeResolutions(input.resolutions);
-  await inWriteTransaction(exec, async () => {
+  return inWriteTransaction(exec, async () => {
     const columns =
       "id, uid, name, category_id, interval_days, tracking_enabled, social_battery, birthday, photo, rarely_responds, reminders_off, favourite_rank, ring_seq, snooze_until, archived_at";
     const survivor = await exec.getFirstAsync<ContactRow>(
@@ -216,6 +239,58 @@ export async function mergeContacts(
     );
     if (retired)
       throw new Error("mergeContacts: absorbed contact is already tombstoned");
+
+    const transfers = input.photoTransfers ?? [];
+    for (const transfer of transfers) {
+      if (
+        transfer.absorbedUid !== absorbed.uid ||
+        input.generationOf?.(transfer.source) !== transfer.sourceGeneration ||
+        transfer.destination !==
+          (transfer.kind === "contact"
+            ? contactPhotoRelPath(survivor.id)
+            : customFieldPhotoRelPath(
+                survivor.id,
+                (
+                  await exec.getFirstAsync<{ col_name: string }>(
+                    "SELECT col_name FROM custom_field_defs WHERE id = ? AND uid = ? AND type = 'photo'",
+                    [transfer.fieldDefId, transfer.fieldDefUid],
+                  )
+                )?.col_name ?? "",
+              ))
+      )
+        throw new Error("mergeContacts: photo transfer identity changed");
+      if (transfer.kind === "contact") {
+        if (
+          absorbed.photo !== transfer.source ||
+          (transfer.adoption && survivor.photo !== null)
+        )
+          throw new Error("mergeContacts: main photo changed during transfer");
+      } else {
+        const current = await exec.getFirstAsync<{
+          uid: string;
+          value: string | null;
+        }>(
+          "SELECT uid, value FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
+          [absorbed.id, transfer.fieldDefId],
+        );
+        if (
+          current?.uid !== transfer.valueUid ||
+          current?.value !== transfer.source
+        )
+          throw new Error(
+            "mergeContacts: custom photo changed during transfer",
+          );
+      }
+    }
+    const mainTransfer = transfers.find(
+      (transfer) => transfer.kind === "contact",
+    );
+    const photoWanted =
+      resolutions.photo !== "keep-survivor" &&
+      (resolutions.photo?.choice === "absorbed" ||
+        (survivor.photo === null && absorbed.photo !== null));
+    if (mainTransfer && !photoWanted)
+      throw new Error("mergeContacts: main photo choice changed");
 
     const methods = await exec.getAllAsync<MethodRow>(
       "SELECT id, uid, contact_id, method_type, canonical_value, is_primary FROM contact_methods WHERE contact_id IN (?, ?)",
@@ -300,6 +375,9 @@ export async function mergeContacts(
       ]);
     }
 
+    const fieldTypes = await exec.getAllAsync<{ id: number; type: string }>(
+      "SELECT id, type FROM custom_field_defs",
+    );
     const survivorValues = await exec.getAllAsync<{
       field_def_id: number;
       value: string | null;
@@ -318,6 +396,20 @@ export async function mergeContacts(
       const own = survivorValues.find(
         (value) => value.field_def_id === other.field_def_id,
       );
+      const isPhoto = fieldTypes.some(
+        (def) => def.id === other.field_def_id && def.type === "photo",
+      );
+      const transfer = transfers.find(
+        (item) =>
+          item.kind === "customField" && item.fieldDefId === other.field_def_id,
+      );
+      if (isPhoto && !own && !transfer) {
+        await exec.runAsync(
+          "DELETE FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
+          [absorbed.id, other.field_def_id],
+        );
+        continue;
+      }
       if (!own) continue;
       // An explicit choice always wins. In the absence of one, retain an
       // informative absorbed value instead of replacing it with an empty survivor
@@ -327,6 +419,13 @@ export async function mergeContacts(
         (resolutions.customFields?.[other.field_def_id] == null &&
           isEmptyMergeValue(own.value) &&
           !isEmptyMergeValue(other.value));
+      if (isPhoto && takeAbsorbed && !transfer) {
+        await exec.runAsync(
+          "DELETE FROM custom_field_values WHERE contact_id = ? AND field_def_id = ?",
+          [absorbed.id, other.field_def_id],
+        );
+        continue;
+      }
       if (takeAbsorbed) {
         await snapshot(
           exec,
@@ -480,13 +579,39 @@ export async function mergeContacts(
       )
     )
       await updateContactMetadataCore(exec, next);
-    if (resolutions.photo && resolutions.photo !== "keep-survivor")
+    if (mainTransfer)
       await setContactPhotoCore(
         exec,
         survivor.id,
-        resolutions.photo.relative,
+        mainTransfer.destination,
         input.now,
       );
+    for (const transfer of transfers.filter(
+      (item) => item.kind === "customField",
+    ))
+      await upsertValueCore(
+        exec,
+        survivor.id,
+        transfer.fieldDefId!,
+        newUid(),
+        transfer.destination,
+        input.now,
+      );
+    for (const transfer of transfers)
+      await insertFinalizeEntryCore(exec, transfer.journal);
+
+    const defs = await exec.getAllAsync<{ col_name: string }>(
+      "SELECT col_name FROM custom_field_defs",
+    );
+    const deletePaths = [
+      ...new Set([
+        contactPhotoRelPath(absorbed.id),
+        ...defs.map((def) =>
+          customFieldPhotoRelPath(absorbed.id, def.col_name),
+        ),
+      ]),
+    ];
+    for (const path of deletePaths) await enqueueDeleteIntentCore(exec, path);
 
     await exec.runAsync(
       "UPDATE app_settings SET sun_contact_id = ?, modified_at = ? WHERE id = 1 AND sun_contact_id = ?",
@@ -538,5 +663,9 @@ export async function mergeContacts(
         `mergeContacts: expected one absorbed contact deleted, got ${deleted.changes}`,
       );
     await recomputeLastContactCore(exec, survivor.id, input.now);
+    return {
+      deletePaths,
+      finalizeEntries: transfers.map((transfer) => transfer.journal),
+    };
   });
 }

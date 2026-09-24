@@ -401,6 +401,66 @@ describe("mergeContacts", () => {
     });
   });
 
+  it("treats an injected photo relative path as a choice only", () => {
+    expect(
+      normalizeMergeResolutions({
+        photo: { choice: "absorbed", relative: "avatars/contact-999.jpg" },
+      }),
+    ).toEqual({ photo: { choice: "absorbed" } });
+  });
+
+  it("rejects a staged photo when its source generation moved despite the same path", async () => {
+    const survivor = await contact("Survivor");
+    const absorbed = await contact("Absorbed");
+    const source = `avatars/contact-${absorbed}.jpg`;
+    const destination = `avatars/contact-${survivor}.jpg`;
+    await exec.runAsync("UPDATE contacts SET photo = ? WHERE id = ?", [
+      source,
+      absorbed,
+    ]);
+    const absorbedUid = (await exec.getFirstAsync<{ uid: string }>(
+      "SELECT uid FROM contacts WHERE id = ?",
+      [absorbed],
+    ))!.uid;
+    const survivorUid = (await exec.getFirstAsync<{ uid: string }>(
+      "SELECT uid FROM contacts WHERE id = ?",
+      [survivor],
+    ))!.uid;
+    await expect(
+      mergeContacts(exec, {
+        survivorId: survivor,
+        absorbedId: absorbed,
+        now: NOW,
+        photoTransfers: [
+          {
+            kind: "contact",
+            source,
+            destination,
+            absorbedUid,
+            sourceGeneration: 1,
+            adoption: true,
+            journal: {
+              relativePath: "avatars/_restore_pending/contact-test-pending.jpg",
+              action: "finalize",
+              targetKind: "contact",
+              contactUid: survivorUid,
+              fieldDefUid: null,
+              valueUid: null,
+              canonicalRelativePath: destination,
+              createdAt: NOW,
+            },
+          },
+        ],
+        generationOf: () => 2,
+      }),
+    ).rejects.toThrow("identity changed");
+    expect(
+      await exec.getFirstAsync("SELECT id FROM contacts WHERE id = ?", [
+        absorbed,
+      ]),
+    ).not.toBeNull();
+  });
+
   it("rejects a same-Group-Event merge without mutating either contact or child", async () => {
     const survivor = await contact("Survivor");
     const absorbed = await contact("Absorbed");
