@@ -9,6 +9,9 @@ const photoMocks = vi.hoisted(() => ({
   deletedPending: [] as string[],
   persistFails: false,
   deleteLeavesFile: false,
+  fs: null as
+    | import("@/services/photos/__testkit__/fake-photo-fs").FakePhotoFs
+    | null,
 }));
 const backgroundMocks = vi.hoisted(() => ({
   staged: [] as Array<[string, string, string]>,
@@ -50,15 +53,23 @@ vi.mock("@/services/photos/photo-storage", () => ({
   profilePhotoRelPath: () => "avatars/profile.jpg",
   deletePhoto: (path: string) => {
     photoMocks.deleted.push(path);
+    if (!photoMocks.deleteLeavesFile) photoMocks.fs?.files.delete(path);
   },
   deleteRestorePending: (relative: string) => {
     photoMocks.deletedPending.push(relative);
+    photoMocks.fs?.files.delete(relative);
   },
+  listRestorePendingPhotos: () => photoMocks.fs?.pending() ?? [],
   persistMaster: async (source: string, destination: string) => {
     photoMocks.persisted.push([source, destination]);
     if (photoMocks.persistFails) throw new Error("disk unavailable");
+    return photoMocks.fs!.persist(
+      source.replace("file:///doc/", ""),
+      destination,
+    );
   },
-  photoFileExists: () => photoMocks.deleteLeavesFile,
+  photoFileExists: (path: string) =>
+    photoMocks.deleteLeavesFile || (photoMocks.fs?.files.has(path) ?? false),
   resolveRestorePendingUri: (relative: string) => `file:///doc/${relative}`,
   restorePendingRelPath: (
     target: { kind: string; uid?: string },
@@ -67,6 +78,7 @@ vi.mock("@/services/photos/photo-storage", () => ({
     `avatars/_restore_pending/${target.kind}-${target.uid ?? "profile"}-${session}.jpg`,
   stageRestorePendingBase64: async (base64: string, relative: string) => {
     photoMocks.staged.push([base64, relative]);
+    photoMocks.fs?.files.set(relative, base64);
   },
 }));
 vi.mock("@/services/notifications/notification-schedule", () => ({
@@ -125,6 +137,9 @@ import {
 } from "@/db/relationships-dao";
 import type { SqlExecutor } from "@/db/types";
 import { computeAiAvailability } from "@/logic/ai-availability";
+import { FakePhotoFs } from "@/services/photos/__testkit__/fake-photo-fs";
+import { persistOwnedMaster } from "@/services/photos/owned-master";
+import { drainRestorePhotoJournal } from "@/services/photos/restore-photo-finalize-sweep";
 
 const NOW = "2026-08-25 12:00:00";
 let uid = 0;
@@ -183,10 +198,348 @@ beforeEach(() => {
   photoMocks.deletedPending = [];
   photoMocks.persistFails = false;
   photoMocks.deleteLeavesFile = false;
+  photoMocks.fs = new FakePhotoFs();
   backgroundMocks.staged = [];
   backgroundMocks.persisted = [];
   backgroundMocks.deleted = [];
   backgroundMocks.bytes = new Map();
+});
+
+it("Replace-all retains incoming avatar bytes when old contacts reuse their paths", async () => {
+  const source = await db();
+  const destination = await db();
+  for (const [exec, rows] of [
+    [
+      source,
+      [
+        ["incoming-a", "A"],
+        ["incoming-b", "B"],
+      ],
+    ],
+    [
+      destination,
+      [
+        ["old-b", "B"],
+        ["old-a", "A"],
+      ],
+    ],
+  ] as const) {
+    for (const [uid, name] of rows)
+      await exec.runAsync(
+        "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES(?,?,?,30,?,?)",
+        [uid, name, null, NOW, NOW],
+      );
+    for (const [index, [uid]] of rows.entries())
+      await exec.runAsync("UPDATE contacts SET photo=? WHERE uid=?", [
+        `avatars/contact-${index + 1}.jpg`,
+        uid,
+      ]);
+  }
+  photoMocks.fs!.files.set("avatars/contact-1.jpg", "old-b");
+  photoMocks.fs!.files.set("avatars/contact-2.jpg", "old-a");
+  const manifest = await buildExportManifest(source, {
+    exportedAt: NOW,
+    readPhotoBase64: async (path) =>
+      path.includes("contact-1") ? "YQ==" : "Yg==",
+  });
+  expect(
+    (await applyRestore(destination, manifest, "replace-all")).status,
+  ).toBe("applied");
+  for (const [uid, bytes] of [
+    ["incoming-a", "YQ=="],
+    ["incoming-b", "Yg=="],
+  ] as const) {
+    const row = await destination.getFirstAsync<{ id: number; photo: string }>(
+      "SELECT id,photo FROM contacts WHERE uid=?",
+      [uid],
+    );
+    expect(row?.photo).toBe(`avatars/contact-${row?.id}.jpg`);
+    expect(photoMocks.fs!.files.get(row!.photo)).toBe(bytes);
+  }
+});
+
+it("removes stale other-person bytes when a Replace-all finalize cannot finish", async () => {
+  const source = await db();
+  const destination = await db();
+  await source.runAsync(
+    "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('new-owner','New','avatars/contact-1.jpg',30,?,?)",
+    [NOW, NOW],
+  );
+  await destination.runAsync(
+    "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('old-owner','Old','avatars/contact-1.jpg',30,?,?)",
+    [NOW, NOW],
+  );
+  photoMocks.fs!.files.set("avatars/contact-1.jpg", "old-person");
+  photoMocks.persistFails = true;
+  const manifest = await buildExportManifest(source, {
+    exportedAt: NOW,
+    readPhotoBase64: async () => "YQ==",
+  });
+  expect(
+    await applyRestore(destination, manifest, "replace-all"),
+  ).toMatchObject({ status: "applied", photosNeedingAttention: 1 });
+  expect(photoMocks.fs!.files.has("avatars/contact-1.jpg")).toBe(false);
+  expect(
+    await destination.getFirstAsync(
+      "SELECT 1 FROM restore_photo_journal WHERE action='finalize'",
+    ),
+  ).not.toBeNull();
+});
+
+it("tolerates an older delete intent and captures cascaded contact photo paths", async () => {
+  const source = await db();
+  const destination = await db();
+  await destination.runAsync(
+    "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('gone','Gone','avatars/contact-1.jpg',30,?,?)",
+    [NOW, NOW],
+  );
+  await destination.runAsync(
+    "INSERT INTO custom_field_defs(uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES('def','portrait','Portrait','photo',0,0,0,0,'global',?,?)",
+    [NOW, NOW],
+  );
+  const ids = await destination.getFirstAsync<{ contact: number; def: number }>(
+    "SELECT c.id AS contact,d.id AS def FROM contacts c CROSS JOIN custom_field_defs d WHERE c.uid='gone' AND d.uid='def'",
+  );
+  await destination.runAsync(
+    "INSERT INTO custom_field_values(uid,contact_id,field_def_id,value,created_at,modified_at) VALUES('value',?,?,?, ?, ?)",
+    [
+      ids!.contact,
+      ids!.def,
+      `avatars/cv-${ids!.contact}-portrait.jpg`,
+      NOW,
+      NOW,
+    ],
+  );
+  photoMocks.fs!.files.set(`avatars/contact-${ids!.contact}.jpg`, "old-avatar");
+  photoMocks.fs!.files.set(
+    `avatars/cv-${ids!.contact}-portrait.jpg`,
+    "old-custom",
+  );
+  await destination.runAsync(
+    "INSERT INTO restore_photo_journal(relative_path,action,target_kind,canonical_relative_path,created_at) VALUES(?, 'delete','contact',?,?)",
+    [
+      `delete:avatars/contact-${ids!.contact}.jpg`,
+      `avatars/contact-${ids!.contact}.jpg`,
+      NOW,
+    ],
+  );
+  const manifest = await buildExportManifest(source, {
+    exportedAt: NOW,
+    readPhotoBase64: async () => "",
+  });
+  expect(
+    (await applyRestore(destination, manifest, "replace-all")).status,
+  ).toBe("applied");
+  expect(photoMocks.fs!.files.has(`avatars/contact-${ids!.contact}.jpg`)).toBe(
+    false,
+  );
+  expect(
+    photoMocks.fs!.files.has(`avatars/cv-${ids!.contact}-portrait.jpg`),
+  ).toBe(false);
+  expect(
+    await destination.getAllAsync("SELECT * FROM restore_photo_journal"),
+  ).toEqual([]);
+});
+
+it("a restart retires an interrupted cleanup without deleting a new owner's bytes", async () => {
+  const source = await db();
+  const destination = await db();
+  await destination.runAsync(
+    "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('old','Old','avatars/contact-1.jpg',30,?,?)",
+    [NOW, NOW],
+  );
+  photoMocks.fs!.files.set("avatars/contact-1.jpg", "old bytes");
+  const manifest = await buildExportManifest(source, {
+    exportedAt: NOW,
+    readPhotoBase64: async () => "",
+  });
+  const originalRun = destination.runAsync.bind(destination);
+  let interrupted = false;
+  destination.runAsync = async (sql, params) => {
+    if (
+      !interrupted &&
+      sql.includes("DELETE FROM restore_photo_journal WHERE relative_path") &&
+      params?.[0] === "delete:avatars/contact-1.jpg"
+    ) {
+      interrupted = true;
+      throw new Error("process killed after file removal");
+    }
+    return originalRun(sql, params);
+  };
+  expect(
+    await applyRestore(destination, manifest, "replace-all"),
+  ).toMatchObject({ status: "applied", photoCleanupPending: 1 });
+  expect(photoMocks.fs!.files.has("avatars/contact-1.jpg")).toBe(false);
+  destination.runAsync = originalRun;
+  await destination.runAsync(
+    "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('new','New','avatars/contact-1.jpg',30,?,?)",
+    [NOW, NOW],
+  );
+  photoMocks.fs!.files.set("avatars/contact-1.jpg", "new bytes");
+  await drainRestorePhotoJournal(destination);
+  expect(photoMocks.fs!.files.get("avatars/contact-1.jpg")).toBe("new bytes");
+  expect(
+    await destination.getAllAsync("SELECT * FROM restore_photo_journal"),
+  ).toEqual([]);
+});
+
+it("a definition tombstone enqueues cleanup for its cascaded custom-photo value", async () => {
+  const source = await db();
+  const destination = await db();
+  await source.runAsync(
+    "INSERT INTO tombstones(entity_type,entity_uid,deleted_at) VALUES('custom_field_def','obsolete','2026-08-26 00:00:00')",
+  );
+  await destination.runAsync(
+    "INSERT INTO contacts(uid,name,interval_days,created_at,modified_at) VALUES('owner','Owner',30,?,?)",
+    [NOW, NOW],
+  );
+  await destination.runAsync(
+    "INSERT INTO custom_field_defs(uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES('obsolete','portrait','Portrait','photo',0,0,0,0,'global',?,?)",
+    [NOW, NOW],
+  );
+  const ids = await destination.getFirstAsync<{ contact: number; def: number }>(
+    "SELECT c.id AS contact,d.id AS def FROM contacts c CROSS JOIN custom_field_defs d WHERE c.uid='owner' AND d.uid='obsolete'",
+  );
+  const canonical = `avatars/cv-${ids!.contact}-portrait.jpg`;
+  await destination.runAsync(
+    "INSERT INTO custom_field_values(uid,contact_id,field_def_id,value,created_at,modified_at) VALUES('value',?,?,?, ?, ?)",
+    [ids!.contact, ids!.def, canonical, NOW, NOW],
+  );
+  photoMocks.fs!.files.set(canonical, "old custom");
+  const manifest = await buildExportManifest(source, {
+    exportedAt: NOW,
+    readPhotoBase64: async () => "",
+  });
+  expect((await applyRestore(destination, manifest, "merge")).status).toBe(
+    "applied",
+  );
+  expect(photoMocks.fs!.files.has(canonical)).toBe(false);
+  expect(
+    await destination.getFirstAsync(
+      "SELECT 1 FROM custom_field_values WHERE uid='value'",
+    ),
+  ).toBeNull();
+});
+
+it("keeps a failed finalize for drain and a repeated restore does not replay it", async () => {
+  const source = await db();
+  const destination = await db();
+  await source.runAsync(
+    "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('owner','Owner','avatars/source.jpg',30,?,?)",
+    [NOW, NOW],
+  );
+  const manifest = await buildExportManifest(source, {
+    exportedAt: NOW,
+    readPhotoBase64: async () => "YQ==",
+  });
+  photoMocks.persistFails = true;
+  const first = await applyRestore(destination, manifest, "merge");
+  expect(first).toMatchObject({ status: "applied", photosNeedingAttention: 1 });
+  photoMocks.persistFails = false;
+  expect(await drainRestorePhotoJournal(destination)).toEqual({
+    unrecoveredFinalize: 0,
+    failed: 0,
+  });
+  const owner = await destination.getFirstAsync<{ photo: string }>(
+    "SELECT photo FROM contacts WHERE uid='owner'",
+  );
+  expect(photoMocks.fs!.files.get(owner!.photo)).toBe("YQ==");
+  await applyRestore(destination, manifest, "merge");
+  expect(
+    await destination.getAllAsync("SELECT * FROM restore_photo_journal"),
+  ).toEqual([]);
+});
+
+it("replays the same staged bytes after a replacement crash, then lets a newer crop win", async () => {
+  const source = await db();
+  const destination = await db();
+  await source.runAsync(
+    "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('owner','Owner','avatars/source.jpg',30,?,?)",
+    [NOW, NOW],
+  );
+  const manifest = await buildExportManifest(source, {
+    exportedAt: NOW,
+    readPhotoBase64: async () => "YQ==",
+  });
+  let crashes = 0;
+  photoMocks.fs!.barrier = async (stage) => {
+    if (stage === "replace" && crashes++ === 0)
+      throw new Error("process killed");
+  };
+  const first = await applyRestore(destination, manifest, "merge");
+  expect(first).toMatchObject({ status: "applied", photosNeedingAttention: 1 });
+  const canonical = (await destination.getFirstAsync<{ photo: string }>(
+    "SELECT photo FROM contacts WHERE uid='owner'",
+  ))!.photo;
+  expect(photoMocks.fs!.files.get(canonical)).toBe("YQ==");
+  photoMocks.fs!.barrier = undefined;
+  expect(await drainRestorePhotoJournal(destination)).toEqual({
+    unrecoveredFinalize: 0,
+    failed: 0,
+  });
+  expect(photoMocks.fs!.files.get(canonical)).toBe("YQ==");
+  expect(
+    await destination.getAllAsync("SELECT * FROM restore_photo_journal"),
+  ).toEqual([]);
+
+  await source.runAsync(
+    "UPDATE contacts SET modified_at='2026-08-25 12:02:00' WHERE uid='owner'",
+  );
+  photoMocks.fs!.barrier = async (stage) => {
+    if (stage === "replace") throw new Error("process killed");
+  };
+  await applyRestore(
+    destination,
+    await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "Yg==",
+    }),
+    "merge",
+  );
+  photoMocks.fs!.barrier = undefined;
+  photoMocks.fs!.files.set("crop", "Yw==");
+  await persistOwnedMaster(destination, "crop", canonical);
+  await drainRestorePhotoJournal(destination);
+  expect(photoMocks.fs!.files.get(canonical)).toBe("Yw==");
+  expect(
+    await destination.getAllAsync("SELECT * FROM restore_photo_journal"),
+  ).toEqual([]);
+});
+
+it("a later restore supersedes an earlier unfinished finalize for the same path", async () => {
+  const source = await db();
+  const destination = await db();
+  await source.runAsync(
+    "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('owner','Owner','avatars/source.jpg',30,?,?)",
+    [NOW, NOW],
+  );
+  photoMocks.persistFails = true;
+  const first = await buildExportManifest(source, {
+    exportedAt: NOW,
+    readPhotoBase64: async () => "YQ==",
+  });
+  expect(await applyRestore(destination, first, "merge")).toMatchObject({
+    photosNeedingAttention: 1,
+  });
+  await source.runAsync(
+    "UPDATE contacts SET modified_at='2026-08-25 12:02:00' WHERE uid='owner'",
+  );
+  photoMocks.persistFails = false;
+  const second = await buildExportManifest(source, {
+    exportedAt: NOW,
+    readPhotoBase64: async () => "Yg==",
+  });
+  expect((await applyRestore(destination, second, "merge")).status).toBe(
+    "applied",
+  );
+  await drainRestorePhotoJournal(destination);
+  const canonical = (await destination.getFirstAsync<{ photo: string }>(
+    "SELECT photo FROM contacts WHERE uid='owner'",
+  ))!.photo;
+  expect(photoMocks.fs!.files.get(canonical)).toBe("Yg==");
+  expect(
+    await destination.getAllAsync("SELECT * FROM restore_photo_journal"),
+  ).toEqual([]);
 });
 
 it.each(["merge", "replace-all"] as const)(

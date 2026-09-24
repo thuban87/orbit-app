@@ -30,18 +30,21 @@ import {
   remapLegacyQuality,
 } from "@/db/interaction-vocabulary";
 import { completeGlobalPairsCore } from "@/db/pair-matrix";
+import { SAFE_RELATIVE } from "@/db/photo-relative-path";
 import { recomputeLastContactCore } from "@/db/recency-dao";
 import {
-  deleteJournalEntryCore,
+  enqueueDeleteIntentCore,
   insertFinalizeEntryCore,
-  insertJournalEntryCore,
   type RestorePhotoJournalEntry,
 } from "@/db/restore-photo-journal-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 import { reconcileDigestSchedule } from "@/services/notifications/digest-schedule";
-import { reconcileSchedule } from "@/services/notifications/notification-schedule";
+import {
+  type ReconcileOutcome,
+  reconcileSchedule,
+} from "@/services/notifications/notification-schedule";
 import { finalizeBackgroundRestoreCandidate } from "@/services/photos/background-finalization";
 import {
   backgroundDerivativeRelPath,
@@ -49,15 +52,18 @@ import {
   stageBackgroundRestorePendingBase64,
 } from "@/services/photos/background-storage";
 import {
+  executeDeleteIntentOwned,
+  finalizeJournalEntryOwned,
+  withCanonicalPathLock,
+} from "@/services/photos/owned-master";
+import {
   contactPhotoRelPath,
   customFieldPhotoRelPath,
   deletePhoto,
   deleteRestorePending,
-  persistMaster,
   photoFileExists,
   profilePhotoRelPath,
   type RestorePendingTarget,
-  resolveRestorePendingUri,
   restorePendingRelPath,
   stageRestorePendingBase64,
 } from "@/services/photos/photo-storage";
@@ -90,7 +96,7 @@ export interface RestoreApplyDependencies {
   deleteStagedBackground?: (relativePath: string) => void;
   deleteCanonicalPhoto?: (canonicalRelativePath: string) => void;
   canonicalPhotoExists?: (canonicalRelativePath: string) => boolean;
-  reconcileNotificationSchedule?: () => Promise<void>;
+  reconcileNotificationSchedule?: () => Promise<ReconcileOutcome | undefined>;
   reconcileDigestSchedule?: () => Promise<void>;
   sessionToken?: string;
 }
@@ -127,6 +133,18 @@ type BackgroundFinalizeCandidate = {
   uid: string;
   pendingRelativePath: string;
 };
+type IncomingDef = { colName: string; type: string };
+function incomingPhotoDefs(manifest: BackupManifest): Map<string, IncomingDef> {
+  const defs = new Map<string, IncomingDef>();
+  for (const row of manifest.customFieldDefs)
+    if (
+      typeof row.uid === "string" &&
+      typeof row.colName === "string" &&
+      typeof row.type === "string"
+    )
+      defs.set(row.uid, { colName: row.colName, type: row.type });
+  return defs;
+}
 
 const entities: readonly MergeableEntityType[] = [
   "categories",
@@ -1000,20 +1018,37 @@ async function upsertChildren(exec: SqlExecutor, plan: Plan): Promise<void> {
     );
   }
 }
-function targetFor(entity: MergeableEntityType, row: Row): PhotoTarget | null {
+async function targetFor(
+  exec: SqlExecutor,
+  entity: MergeableEntityType,
+  row: Row,
+  incomingDefs: ReadonlyMap<string, IncomingDef>,
+): Promise<PhotoTarget | null> {
   if (entity === "profile") return { kind: "profile" };
   if (entity === "contacts") return { kind: "contact", uid: row.uid };
   if (
-    entity === "custom_field_values" &&
-    row.fieldType === "photo" &&
-    typeof row.contactUid === "string" &&
-    typeof row.fieldDefUid === "string" &&
-    typeof row.colName === "string"
+    entity !== "custom_field_values" ||
+    typeof row.contactUid !== "string" ||
+    typeof row.fieldDefUid !== "string"
+  )
+    return null;
+  const incoming = incomingDefs.get(row.fieldDefUid);
+  const local = incoming
+    ? null
+    : await exec.getFirstAsync<{ col_name: string; type: string }>(
+        "SELECT col_name,type FROM custom_field_defs WHERE uid=?",
+        [row.fieldDefUid],
+      );
+  const colName = incoming?.colName ?? local?.col_name;
+  if (
+    typeof colName === "string" &&
+    (typeof row.photoBase64 === "string" ||
+      (incoming?.type ?? local?.type) === "photo")
   )
     return {
       kind: "customField",
       uid: row.contactUid,
-      colName: row.colName,
+      colName,
       valueUid: row.uid,
       fieldDefUid: row.fieldDefUid,
     };
@@ -1043,7 +1078,7 @@ async function oldPhoto(
   return (
     (
       await exec.getFirstAsync<{ value: string | null }>(
-        "SELECT v.value FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id JOIN custom_field_defs d ON d.id=v.field_def_id WHERE v.uid=? AND c.uid=? AND d.uid=? AND d.type='photo'",
+        "SELECT v.value FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id JOIN custom_field_defs d ON d.id=v.field_def_id WHERE v.uid=? AND c.uid=? AND d.uid=?",
         [target.valueUid, target.uid, target.fieldDefUid],
       )
     )?.value ?? null
@@ -1062,17 +1097,19 @@ async function canonicalFor(
     return row ? contactPhotoRelPath(row.id) : null;
   }
   const row = await exec.getFirstAsync<{ id: number; col_name: string }>(
-    "SELECT c.id,d.col_name FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id JOIN custom_field_defs d ON d.id=v.field_def_id WHERE v.uid=? AND c.uid=? AND d.uid=? AND d.type='photo'",
+    "SELECT c.id,d.col_name FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id JOIN custom_field_defs d ON d.id=v.field_def_id WHERE v.uid=? AND c.uid=? AND d.uid=?",
     [target.valueUid, target.uid, target.fieldDefUid],
   );
   return row ? customFieldPhotoRelPath(row.id, row.col_name) : null;
 }
 async function stageCandidates(
+  exec: SqlExecutor,
   manifest: BackupManifest,
   session: string,
   stage: RestoreApplyDependencies["stagePhoto"],
   staged: Map<string, FinalizeCandidate>,
 ): Promise<void> {
+  const incomingDefs = incomingPhotoDefs(manifest);
   const reservedUids = new Set([
     ...manifest.contacts.map((row) => row.uid),
     ...manifest.customFieldValues.map((row) => row.contactUid),
@@ -1080,7 +1117,7 @@ async function stageCandidates(
   let slot = 0;
   for (const entity of ["profile", "contacts", "custom_field_values"] as const)
     for (const row of incomingRows(manifest, entity)) {
-      const target = targetFor(entity, row);
+      const target = await targetFor(exec, entity, row, incomingDefs);
       if (!target || typeof row.photoBase64 !== "string") continue;
       // An arbitrary wire UID may contain punctuation. Keep safe existing
       // staging names; give unsafe ones a collision-free disposable slot.
@@ -1100,15 +1137,17 @@ async function stageCandidates(
 }
 async function planPhotoCandidates(
   exec: SqlExecutor,
+  manifest: BackupManifest,
   plan: Plan,
   staged: ReadonlyMap<string, FinalizeCandidate>,
 ): Promise<{ finalize: FinalizeCandidate[]; deletes: DeleteCandidate[] }> {
+  const incomingDefs = incomingPhotoDefs(manifest);
   const finalize: FinalizeCandidate[] = [];
   const deletes: DeleteCandidate[] = [];
   for (const entity of ["profile", "contacts", "custom_field_values"] as const)
     for (const a of plan[entity]) {
       if (!a.row) continue;
-      const target = targetFor(entity, a.row as Row);
+      const target = await targetFor(exec, entity, a.row as Row, incomingDefs);
       if (!target) continue;
       const photoPresent = Object.hasOwn(a.row, "photoBase64");
       if (
@@ -1125,7 +1164,7 @@ async function planPhotoCandidates(
           a.row.photoBase64 === null)
       ) {
         const existing = await oldPhoto(exec, target);
-        if (existing)
+        if (existing && SAFE_RELATIVE.test(existing))
           deletes.push({
             target,
             canonicalRelativePath: existing,
@@ -1172,41 +1211,10 @@ function entry(
 async function replaceAllReset(
   exec: SqlExecutor,
   manifest: BackupManifest,
-  deletes: DeleteCandidate[],
 ): Promise<void> {
   await exec.runAsync(
     "UPDATE app_settings SET sun_contact_id=NULL,profile_layout_template_uid=NULL,profile_background_template_uid=NULL WHERE id=1",
   );
-  for (const r of await exec.getAllAsync<{ uid: string; photo: string | null }>(
-    "SELECT uid,photo FROM contacts",
-  ))
-    if (r.photo)
-      deletes.push({
-        target: { kind: "contact", uid: r.uid },
-        canonicalRelativePath: r.photo,
-        clearReference: false,
-      });
-  for (const r of await exec.getAllAsync<{
-    uid: string;
-    contact_uid: string;
-    field_def_uid: string;
-    col_name: string;
-    value: string | null;
-  }>(
-    "SELECT v.uid,c.uid AS contact_uid,d.uid AS field_def_uid,d.col_name,v.value FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id JOIN custom_field_defs d ON d.id=v.field_def_id WHERE d.type='photo'",
-  ))
-    if (r.value)
-      deletes.push({
-        target: {
-          kind: "customField",
-          uid: r.contact_uid,
-          colName: r.col_name,
-          valueUid: r.uid,
-          fieldDefUid: r.field_def_uid,
-        },
-        canonicalRelativePath: r.value,
-        clearReference: false,
-      });
   const resetSources: Record<
     MergeableEntityType,
     readonly [string, string] | null
@@ -1317,6 +1325,100 @@ async function replaceAllReset(
     await exec.runAsync(`DELETE FROM ${table}`);
 }
 
+function addStoredPath(paths: Set<string>, value: string | null): void {
+  if (value && SAFE_RELATIVE.test(value)) paths.add(value);
+}
+
+/** Capture file ownership before SQL deletes and cascades erase the evidence. */
+async function captureRestoreDeletes(
+  exec: SqlExecutor,
+  plan: Plan,
+  mode: RestoreMode,
+): Promise<{ paths: Set<string>; oldOwners: Map<string, Set<string>> }> {
+  const paths = new Set<string>();
+  const oldOwners = new Map<string, Set<string>>();
+  const rememberOwner = (path: string | null, uid: string) => {
+    if (!path || !SAFE_RELATIVE.test(path)) return;
+    const owners = oldOwners.get(path) ?? new Set<string>();
+    owners.add(uid);
+    oldOwners.set(path, owners);
+  };
+  const contacts = await exec.getAllAsync<{
+    id: number;
+    uid: string;
+    photo: string | null;
+  }>("SELECT id,uid,photo FROM contacts");
+  const defs = await exec.getAllAsync<{
+    id: number;
+    uid: string;
+    col_name: string;
+  }>("SELECT id,uid,col_name FROM custom_field_defs");
+  const values = await exec.getAllAsync<{
+    uid: string;
+    contact_id: number;
+    field_def_id: number;
+    value: string | null;
+  }>("SELECT uid,contact_id,field_def_id,value FROM custom_field_values");
+  const deletedContacts = new Set(
+    plan.contacts.filter((a) => a.kind === "delete").map((a) => a.uid),
+  );
+  const rewrittenContacts = new Set(
+    plan.contacts.filter((a) => a.kind === "update").map((a) => a.uid),
+  );
+  const deletedValues = new Set(
+    plan.custom_field_values
+      .filter((a) => a.kind === "delete")
+      .map((a) => a.uid),
+  );
+  const rewrittenValues = new Set(
+    plan.custom_field_values
+      .filter((a) => a.kind === "update")
+      .map((a) => a.uid),
+  );
+  const deletedDefs = new Set(
+    plan.custom_field_defs.filter((a) => a.kind === "delete").map((a) => a.uid),
+  );
+  const contactById = new Map(contacts.map((row) => [row.id, row]));
+  const defById = new Map(defs.map((row) => [row.id, row]));
+  for (const contact of contacts) {
+    rememberOwner(contact.photo, contact.uid);
+    if (rewrittenContacts.has(contact.uid)) addStoredPath(paths, contact.photo);
+    if (mode !== "replace-all" && !deletedContacts.has(contact.uid)) continue;
+    addStoredPath(paths, contact.photo);
+    paths.add(contactPhotoRelPath(contact.id));
+    for (const def of defs)
+      paths.add(customFieldPhotoRelPath(contact.id, def.col_name));
+  }
+  for (const value of values) {
+    const contact = contactById.get(value.contact_id);
+    const def = defById.get(value.field_def_id);
+    if (!contact || !def) continue;
+    rememberOwner(value.value, contact.uid);
+    if (rewrittenValues.has(value.uid)) addStoredPath(paths, value.value);
+    if (
+      mode === "replace-all" ||
+      deletedContacts.has(contact.uid) ||
+      deletedValues.has(value.uid) ||
+      deletedDefs.has(def.uid)
+    ) {
+      addStoredPath(paths, value.value);
+      paths.add(customFieldPhotoRelPath(contact.id, def.col_name));
+    }
+  }
+  if (mode === "replace-all") {
+    const profile = await exec.getFirstAsync<{ photo: string | null }>(
+      "SELECT photo FROM profile WHERE id=1",
+    );
+    addStoredPath(paths, profile?.photo ?? null);
+  } else if (plan.profile.some((action) => action.kind === "update")) {
+    const profile = await exec.getFirstAsync<{ photo: string | null }>(
+      "SELECT photo FROM profile WHERE id=1",
+    );
+    addStoredPath(paths, profile?.photo ?? null);
+  }
+  return { paths, oldOwners };
+}
+
 async function clearLiveCategoryTombstones(
   exec: SqlExecutor,
   categoryUids: ReadonlySet<string>,
@@ -1390,6 +1492,7 @@ export async function applyRestore(
   const committedBackgroundUids = new Set<string>();
   try {
     await stageCandidates(
+      exec,
       manifest,
       restoreSessionToken,
       deps.stagePhoto ?? stageRestorePendingBase64,
@@ -1541,7 +1644,13 @@ export async function applyRestore(
             preRestoreSnapshotCreated,
           },
         };
-      const candidates = await planPhotoCandidates(exec, plan, stagedPhotos);
+      const fileDeletes = await captureRestoreDeletes(exec, plan, mode);
+      const candidates = await planPhotoCandidates(
+        exec,
+        manifest,
+        plan,
+        stagedPhotos,
+      );
       const backgroundCandidates = stagedBackgrounds.filter((candidate) =>
         writes(plan, "profile_background_templates").some(
           (action) => action.uid === candidate.uid,
@@ -1578,7 +1687,7 @@ export async function applyRestore(
           recencyUids.add(action.row.contactUid);
       }
       if (mode === "replace-all") {
-        await replaceAllReset(exec, manifest, candidates.deletes);
+        await replaceAllReset(exec, manifest);
         await clearLiveCategoryTombstones(
           exec,
           survivors.categories ?? new Set(),
@@ -1633,36 +1742,29 @@ export async function applyRestore(
         if (contact)
           await recomputeLastContactCore(exec, contact.id, contact.modified_at);
       }
+      const finalizeEntries: RestorePhotoJournalEntry[] = [];
       for (const candidate of candidates.finalize) {
         const canonical = await canonicalFor(exec, candidate.target);
         if (!canonical)
           throw new Error("restore photo target disappeared before commit");
         await writePhotoReference(exec, candidate.target, canonical);
-        await insertFinalizeEntryCore(
-          exec,
-          entry(
-            "finalize",
-            candidate.relativePath,
-            candidate.target,
-            canonical,
-            manifest.metadata.exportedAt,
-          ),
+        const journalEntry = entry(
+          "finalize",
+          candidate.relativePath,
+          candidate.target,
+          canonical,
+          manifest.metadata.exportedAt,
         );
+        await insertFinalizeEntryCore(exec, journalEntry);
+        finalizeEntries.push(journalEntry);
       }
       for (const candidate of candidates.deletes)
         if (candidate.clearReference)
           await writePhotoReference(exec, candidate.target, null);
       for (const candidate of candidates.deletes)
-        await insertJournalEntryCore(
-          exec,
-          entry(
-            "delete",
-            `delete:${candidate.canonicalRelativePath}`,
-            candidate.target,
-            candidate.canonicalRelativePath,
-            manifest.metadata.exportedAt,
-          ),
-        );
+        fileDeletes.paths.add(candidate.canonicalRelativePath);
+      for (const canonical of fileDeletes.paths)
+        await enqueueDeleteIntentCore(exec, canonical);
       if (applySettings) {
         const uid = manifest.appSettings.sunContactUid;
         const sun =
@@ -1681,10 +1783,23 @@ export async function applyRestore(
         );
       }
       await bumpDataRevisionCore(exec);
-      return { result: null, candidates, backgroundCandidates, totals };
+      return {
+        result: null,
+        candidates,
+        backgroundCandidates,
+        totals,
+        finalizeEntries,
+        fileDeletes,
+      };
     });
     if (prepared.result) return prepared.result;
-    const { candidates, backgroundCandidates, totals } = prepared;
+    const {
+      candidates,
+      backgroundCandidates,
+      totals,
+      finalizeEntries,
+      fileDeletes,
+    } = prepared;
     const committedPaths = new Set(
       candidates.finalize.map((candidate) => candidate.relativePath),
     );
@@ -1693,31 +1808,42 @@ export async function applyRestore(
         committedPhotoKeys.add(key);
     for (const candidate of backgroundCandidates)
       committedBackgroundUids.add(candidate.uid);
-    const persist = deps.persistPhoto ?? persistMaster;
     const remove = deps.deleteCanonicalPhoto ?? deletePhoto;
     const exists = deps.canonicalPhotoExists ?? photoFileExists;
     let photosNeedingAttention = 0;
     let photoCleanupPending = 0;
-    for (const candidate of candidates.finalize) {
-      const canonical = await canonicalFor(exec, candidate.target);
-      if (!canonical) {
-        try {
-          deleteRestorePending(candidate.relativePath);
-        } catch {
-          /* best effort */
-        }
-        await deleteJournalEntryCore(exec, candidate.relativePath);
-        continue;
-      }
+    for (const journalEntry of finalizeEntries) {
       try {
-        await persist(
-          resolveRestorePendingUri(candidate.relativePath),
-          canonical,
-        );
-        deleteRestorePending(candidate.relativePath);
-        await deleteJournalEntryCore(exec, candidate.relativePath);
+        await finalizeJournalEntryOwned(exec, journalEntry, deps.persistPhoto);
       } catch {
         photosNeedingAttention += 1;
+        const oldOwners = fileDeletes.oldOwners.get(
+          journalEntry.canonicalRelativePath,
+        );
+        if (
+          mode === "replace-all" &&
+          oldOwners &&
+          [...oldOwners].some((uid) => uid !== journalEntry.contactUid)
+        ) {
+          try {
+            await withCanonicalPathLock(
+              journalEntry.canonicalRelativePath,
+              async () => {
+                const owner = await exec.getFirstAsync<{ uid: string }>(
+                  "SELECT uid FROM contacts WHERE photo=? UNION ALL SELECT c.uid FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id WHERE v.value=? LIMIT 1",
+                  [
+                    journalEntry.canonicalRelativePath,
+                    journalEntry.canonicalRelativePath,
+                  ],
+                );
+                if (owner?.uid === journalEntry.contactUid)
+                  remove(journalEntry.canonicalRelativePath);
+              },
+            );
+          } catch {
+            photoCleanupPending += 1;
+          }
+        }
       }
     }
     for (const candidate of backgroundCandidates) {
@@ -1737,21 +1863,20 @@ export async function applyRestore(
         photosNeedingAttention += 1;
       }
     }
-    for (const candidate of candidates.deletes) {
-      const key = `delete:${candidate.canonicalRelativePath}`;
+    for (const canonical of fileDeletes.paths) {
       try {
-        remove(candidate.canonicalRelativePath);
-        if (exists(candidate.canonicalRelativePath)) photoCleanupPending += 1;
-        else await deleteJournalEntryCore(exec, key);
+        // The owned helper rechecks mayDeleteCanonicalCore under the path lock.
+        await executeDeleteIntentOwned(exec, canonical, remove, exists);
       } catch {
         photoCleanupPending += 1;
       }
     }
     let scheduleResyncPending = false;
     try {
-      await (
+      const outcome = await (
         deps.reconcileNotificationSchedule ?? (() => reconcileSchedule(exec))
       )();
+      if (outcome?.incomplete) scheduleResyncPending = true;
     } catch {
       scheduleResyncPending = true;
     }

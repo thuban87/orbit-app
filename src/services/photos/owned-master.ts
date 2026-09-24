@@ -23,6 +23,12 @@ import {
 const tails = new Map<string, Promise<void>>();
 const generations = new Map<string, number>();
 const invoking = new Set<string>();
+type PersistCanonical = (
+  sourceUri: string,
+  canonical: string,
+) => Promise<unknown>;
+type DeleteCanonical = (canonical: string) => void;
+type CanonicalExists = (canonical: string) => boolean;
 export class PhotoRecoveryPendingError extends Error {}
 export class PhotoWriteUnauthorizedError extends Error {}
 
@@ -118,7 +124,7 @@ async function referenceMatches(
     (await exec.getFirstAsync(
       `SELECT 1 FROM custom_field_values v JOIN contacts c ON c.id = v.contact_id
      JOIN custom_field_defs d ON d.id = v.field_def_id
-     WHERE v.uid = ? AND c.uid = ? AND d.uid = ? AND d.type = 'photo' AND v.value = ?`,
+     WHERE v.uid = ? AND c.uid = ? AND d.uid = ? AND v.value = ?`,
       [entry.valueUid, entry.contactUid, entry.fieldDefUid, path],
     )) !== null
   );
@@ -128,6 +134,8 @@ export async function executeDeleteIntentLocked(
   exec: SqlExecutor,
   token: CanonicalLockToken,
   canonical: string,
+  remove: DeleteCanonical = deletePhoto,
+  exists: CanonicalExists = photoFileExists,
 ): Promise<void> {
   requireLock(token, canonical);
   const relative = `delete:${canonical}`;
@@ -150,8 +158,8 @@ export async function executeDeleteIntentLocked(
     }
   }
   if (await mayDeleteCanonicalCore(exec, canonical)) {
-    deletePhoto(canonical);
-    if (photoFileExists(canonical))
+    remove(canonical);
+    if (exists(canonical))
       throw new PhotoRecoveryPendingError(
         `photo deletion needs retry: ${canonical}`,
       );
@@ -161,9 +169,11 @@ export async function executeDeleteIntentLocked(
 export function executeDeleteIntentOwned(
   exec: SqlExecutor,
   canonical: string,
+  remove?: DeleteCanonical,
+  exists?: CanonicalExists,
 ): Promise<void> {
   return withCanonicalPathLock(canonical, (token) =>
-    executeDeleteIntentLocked(exec, token, canonical),
+    executeDeleteIntentLocked(exec, token, canonical, remove, exists),
   );
 }
 
@@ -172,6 +182,7 @@ async function settleRowLocked(
   token: CanonicalLockToken,
   entry: RestorePhotoJournalEntry & { id: number },
   superseded = false,
+  persist: PersistCanonical = persistMaster,
 ): Promise<void> {
   if (entry.action === "delete")
     return executeDeleteIntentLocked(exec, token, entry.canonicalRelativePath);
@@ -191,7 +202,7 @@ async function settleRowLocked(
   // A missing pending file means a previous finalization reached the canonical
   // but died before row cleanup. The row may safely retire.
   try {
-    await persistMaster(
+    await persist(
       resolveRestorePendingUri(entry.relativePath),
       entry.canonicalRelativePath,
     );
@@ -227,6 +238,7 @@ export async function finalizeJournalEntryLocked(
   exec: SqlExecutor,
   token: CanonicalLockToken,
   entry: RestorePhotoJournalEntry,
+  persist: PersistCanonical = persistMaster,
 ): Promise<void> {
   requireLock(token, entry.canonicalRelativePath);
   const rows = await listJournalForCanonicalCore(
@@ -242,14 +254,15 @@ export async function finalizeJournalEntryLocked(
     if (row.id >= target.id) break;
     await settleRowLocked(exec, token, row, row.action === "finalize");
   }
-  await settleRowLocked(exec, token, target, newer);
+  await settleRowLocked(exec, token, target, newer, persist);
 }
 export function finalizeJournalEntryOwned(
   exec: SqlExecutor,
   entry: RestorePhotoJournalEntry,
+  persist?: PersistCanonical,
 ): Promise<void> {
   return withCanonicalPathLock(entry.canonicalRelativePath, (token) =>
-    finalizeJournalEntryLocked(exec, token, entry),
+    finalizeJournalEntryLocked(exec, token, entry, persist),
   );
 }
 

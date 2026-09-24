@@ -71,7 +71,23 @@ vi.mock("@/services/notifications/notification-schedule", () => ({
 vi.mock("@/services/notifications/digest-schedule", () => ({
   reconcileDigestSchedule: async () => {},
 }));
-vi.mock("@/services/photos/photo-storage", () => ({}));
+vi.mock("@/services/photos/photo-storage", async () => {
+  const paths = await vi.importActual<
+    typeof import("@/db/photo-relative-path")
+  >("@/db/photo-relative-path");
+  return {
+    contactPhotoRelPath: paths.contactPhotoRelPath,
+    customFieldPhotoRelPath: paths.customFieldPhotoRelPath,
+    profilePhotoRelPath: paths.profilePhotoRelPath,
+    restorePendingRelPath: paths.restorePendingRelPath,
+    deletePhoto: () => {},
+    photoFileExists: () => false,
+    listRestorePendingPhotos: () => [],
+    deleteRestorePending: () => {},
+    resolveRestorePendingUri: (relative: string) => relative,
+    persistMaster: async () => "",
+  };
+});
 
 const NOW = "2026-09-07 12:00:00";
 const LATER = "2026-09-08 12:00:00";

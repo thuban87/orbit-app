@@ -1,5 +1,7 @@
 import { expect, it, vi } from "vitest";
 
+const photo = vi.hoisted(() => ({ files: new Map<string, string>() }));
+
 vi.mock("expo-sqlite", () => ({}));
 vi.mock("@/services/photos/photo-storage", async () => {
   const paths = await vi.importActual<
@@ -10,13 +12,28 @@ vi.mock("@/services/photos/photo-storage", async () => {
     customFieldPhotoRelPath: (id: number, colName: string) =>
       `avatars/cv-${id}-${colName}.jpg`,
     profilePhotoRelPath: () => "avatars/profile.jpg",
-    deletePhoto: () => {},
-    deleteRestorePending: () => {},
-    photoFileExists: () => false,
-    persistMaster: async () => {},
+    deletePhoto: (path: string) => {
+      photo.files.delete(path);
+    },
+    deleteRestorePending: (path: string) => {
+      photo.files.delete(path);
+    },
+    listRestorePendingPhotos: () =>
+      [...photo.files.keys()]
+        .filter((path) => path.startsWith("avatars/_restore_pending/"))
+        .map((relative) => ({ relative, isStageTmpOrphan: false })),
+    photoFileExists: (path: string) => photo.files.has(path),
+    persistMaster: async (source: string, canonical: string) => {
+      const bytes = photo.files.get(source);
+      if (bytes === undefined) throw new Error("pending photo missing");
+      photo.files.set(canonical, bytes);
+      return canonical;
+    },
     resolveRestorePendingUri: (path: string) => path,
     restorePendingRelPath: paths.restorePendingRelPath,
-    stageRestorePendingBase64: async () => {},
+    stageRestorePendingBase64: async (base64: string, path: string) => {
+      photo.files.set(path, base64);
+    },
   };
 });
 vi.mock("@/services/photos/background-storage", () => ({
@@ -86,6 +103,81 @@ async function exported(exec: Awaited<ReturnType<typeof db>>) {
     }),
   );
 }
+
+it.each(["merge", "replace-all"] as const)(
+  "restores real exported custom-photo bytes from wire UIDs in %s",
+  async (mode) => {
+    photo.files.clear();
+    const source = await db();
+    const destination = await db();
+    await contact(source, "incoming-photo-owner");
+    await source.runAsync(
+      "INSERT INTO custom_field_defs(uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,quarantined_at,created_at,modified_at) VALUES('photo-def','portrait','Portrait','photo',0,0,0,0,'global',?,?,?)",
+      [NOW, NOW, NOW],
+    );
+    const sourceIds = await source.getFirstAsync<{
+      contact: number;
+      def: number;
+    }>(
+      "SELECT c.id AS contact,d.id AS def FROM contacts c CROSS JOIN custom_field_defs d WHERE c.uid='incoming-photo-owner' AND d.uid='photo-def'",
+    );
+    await source.runAsync(
+      "INSERT INTO custom_field_values(uid,contact_id,field_def_id,value,created_at,modified_at) VALUES('photo-value',?,?,?, ?, ?)",
+      [sourceIds!.contact, sourceIds!.def, "avatars/source.jpg", NOW, NOW],
+    );
+    await contact(destination, "old-id-owner");
+    const manifest = await exported(source);
+    const wire = manifest.customFieldValues.find(
+      (row) => row.uid === "photo-value",
+    )!;
+    expect(wire).not.toHaveProperty("fieldType");
+    expect(wire).not.toHaveProperty("colName");
+    expect(wire.photoBase64).toBe("AQID");
+    expect((await applyRestore(destination, manifest, mode)).status).toBe(
+      "applied",
+    );
+    const restored = await destination.getFirstAsync<{
+      id: number;
+      value: string;
+    }>(
+      "SELECT c.id,v.value FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id WHERE v.uid='photo-value'",
+    );
+    if (mode === "merge") expect(restored!.id).not.toBe(sourceIds!.contact);
+    expect(restored!.value).toBe(`avatars/cv-${restored!.id}-portrait.jpg`);
+    expect(photo.files.get(restored!.value)).toBe("AQID");
+  },
+);
+
+it("keeps incoming photo bytes when the winning local definition is text", async () => {
+  photo.files.clear();
+  const source = await db();
+  const destination = await db();
+  await contact(source, "owner");
+  await source.runAsync(
+    "INSERT INTO custom_field_defs(uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES('def','portrait','Portrait','photo',0,0,0,0,'global',?,?)",
+    [NOW, NOW],
+  );
+  const ids = await source.getFirstAsync<{ contact: number; def: number }>(
+    "SELECT c.id AS contact,d.id AS def FROM contacts c CROSS JOIN custom_field_defs d WHERE c.uid='owner' AND d.uid='def'",
+  );
+  await source.runAsync(
+    "INSERT INTO custom_field_values(uid,contact_id,field_def_id,value,created_at,modified_at) VALUES('value',?,?,?, ?, ?)",
+    [ids!.contact, ids!.def, "avatars/source.jpg", NOW, NOW],
+  );
+  const manifest = await exported(source);
+  await destination.runAsync(
+    "INSERT INTO custom_field_defs(uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES('def','portrait','Portrait','text',0,0,0,0,'global',?,?)",
+    [NOW, "2026-09-02 00:00:00"],
+  );
+  expect((await applyRestore(destination, manifest, "merge")).status).toBe(
+    "applied",
+  );
+  const value = await destination.getFirstAsync<{ value: string }>(
+    "SELECT value FROM custom_field_values WHERE uid='value'",
+  );
+  expect(value?.value).toMatch(/^avatars\/cv-\d+-portrait\.jpg$/);
+  expect(photo.files.get(value!.value)).toBe("AQID");
+});
 
 it("Merge with local definitions completes all global pairs and its real export restores", async () => {
   const source = await db();
