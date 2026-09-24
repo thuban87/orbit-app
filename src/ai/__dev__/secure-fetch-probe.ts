@@ -23,9 +23,10 @@ export async function runSecureFetchProbe(
     throw new Error("Public HTTPS test host required");
   const paths: Record<SecureFetchProbeCase, string> = {
     delayed_headers: "/delay/2",
-    delayed_body: "/drip?duration=2&numbytes=256",
-    cancel_after_headers: "/drip?duration=10&numbytes=1024",
-    oversized_body: "/bytes/1048577",
+    delayed_body: "/drip?duration=2&numbytes=256&delay=0",
+    cancel_after_headers: "/drip?duration=10&numbytes=1024&delay=0",
+    // httpbin.org caps /bytes responses at 100 KiB, below the native 1 MiB cap.
+    oversized_body: "https://speed.cloudflare.com/__down?bytes=1048577",
     non_2xx: "/status/503",
   };
   const controller = new AbortController();
@@ -39,12 +40,10 @@ export async function runSecureFetchProbe(
   try {
     const result = await secureCustomFetch({
       url: new URL(paths[caseName], base).toString(),
-      method: "POST",
+      method: "GET",
       headers: {
-        Authorization: "Bearer synthetic-probe-only",
-        "Content-Type": "application/json",
+        "X-Orbit-Probe": "synthetic-only",
       },
-      body: JSON.stringify({ probe: "synthetic" }),
       signal: controller.signal,
     });
     outcome = `http_${result.status}`;
