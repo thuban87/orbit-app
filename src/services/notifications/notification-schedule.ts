@@ -155,7 +155,7 @@ interface ScheduledEntry {
   content?: {
     data?: Partial<NotificationData>;
     body?: string;
-    title?: string;
+    title?: string | null;
     categoryIdentifier?: string;
   };
   trigger?: {
@@ -339,8 +339,12 @@ export function requestsEqual(
   }
   if (desired.body !== existing.content?.body) return false;
   // title is never set by this engine — compare so a real frozen title still
-  // forces a refresh if it ever diverges (both undefined → equal).
-  if ((desired as { title?: string }).title !== existing.content?.title) {
+  // forces a refresh if it ever diverges. Android reads an unset title back as
+  // null, so null and undefined are both "no title" (else every pass churns).
+  if (
+    ((desired as { title?: string }).title ?? null) !==
+    (existing.content?.title ?? null)
+  ) {
     return false;
   }
 

@@ -1142,6 +1142,24 @@ describe("requestsEqual", () => {
     ).toBe(false);
   });
 
+  it("treats Android's serialized null title as matching (no churn)", () => {
+    expect(
+      requestsEqual(base, {
+        ...existing,
+        content: { ...existing.content, title: null },
+      }),
+    ).toBe(true);
+  });
+
+  it("still catches a real frozen title", () => {
+    expect(
+      requestsEqual(base, {
+        ...existing,
+        content: { ...existing.content, title: "Stale" },
+      }),
+    ).toBe(false);
+  });
+
   it("treats a missing trigger date as a mismatch", () => {
     expect(
       requestsEqual(base, {
