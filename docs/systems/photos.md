@@ -46,6 +46,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 |---|---|
 | `src/services/photos/photo-storage.ts` | The relative-path and crash-safe file-lifecycle chokepoint. |
 | `src/services/photos/photo-pipeline.ts` | Crops and encodes the single JPEG master. |
+| `src/services/photos/derivative-cache.ts` | Retires generated cache copies and sweeps prior-process orphans within guarded cache namespaces. |
 | `src/services/widget/widget-photo.ts` | Downscales a local master to a transient base64 widget thumbnail. |
 | `src/services/photos/background-storage.ts` | Owns staged replacement and safe cleanup for shared Profile background derivatives. |
 | `src/services/photos/background-reconcile-sweep.ts` | Reconciles interrupted Profile background writes against live database references. |
@@ -78,9 +79,15 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 ### Rendering a widget thumbnail
 
 1. The Widget renderer passes the stored contact-relative path to `encodeWidgetThumb()`.
-2. The encoder resolves the existing 512px local master, downsizes it to a bounded JPEG, and returns a base64 `data:` URI without writing another file or table row.
+2. The encoder resolves the existing 512px local master and downsizes it to a bounded JPEG. Installed `expo-image-manipulator` writes a temporary `cache/ImageManipulator/` file even for `base64: true`; the encoder discards it after reading base64 and returns only a `data:` URI. It writes no table row or persistent thumbnail.
 3. A missing, evicted, corrupt, or non-base64 result returns `null`; that tile renders deterministic initials instead of a `file://`, network, or broken image source.
 4. Contact photo set and clear paths publish a best-effort widget refresh only after their own persistence succeeds.
+
+### Temporary photo-copy lifetime
+
+The crop, import, reconcile, widget, and Profile-background producers discard each ImageManipulator output after its consumer finishes, including failure paths. The crop screen holds its decode-fallback copy only while that source is in use, then discards it on replacement or unmount. Contact Picker's `contact-picker-*.photo` raw copies are discarded after import or reconciliation stages or skips them. Cleanup errors never change a photo operation's result.
+
+A once-per-process cold-start sweep removes files left by an earlier process in `cache/ImageManipulator/`, `cache/photo-dl/`, and cache-root `contact-picker-*.photo`. The deletion guard rejects document-directory masters, `.tmp`/`.bak` sidecars, staging files, and other cache names. `photo-dl` per-operation retention belongs to URL-download handling; this sweep is its restart backstop. `expo-image-picker` source copies remain a follow-up under D-16.
 
 ### Removing and purging photos
 
@@ -199,3 +206,4 @@ The path lock is process-local. Crash safety comes from settling old journal row
 | 2026-09-02 | 36 | Added staged format-v5 Profile-background byte restore and committed-candidate reconciliation. |
 | 2026-09-23 | 38.2 | Added settle-before-write ownership, reference-safe delete intents, and staging guards for `reliability-testing/AUD-REL-003`. |
 | 2026-09-24 | 38.2 | Re-homed merged photos to survivor-derived masters and journaled purge/definition deletion for all derived paths. |
+| 2026-09-24 | 38.2 | Corrected the widget thumbnail description against installed native ImageManipulator behavior and added guarded derivative/picker-copy retirement with a cold-start orphan sweep (`data-privacy/AUD-DPI-011`, RG-013). |

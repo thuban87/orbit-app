@@ -24,6 +24,10 @@ vi.mock("@/services/photos/photo-storage", () => ({
   importStagingRelPath,
   stageImportPhoto,
 }));
+const { discardDerivative } = vi.hoisted(() => ({
+  discardDerivative: vi.fn(),
+}));
+vi.mock("@/services/photos/derivative-cache", () => ({ discardDerivative }));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { readPromptContext } from "@/db/ai-context-read";
@@ -46,6 +50,7 @@ const uid = () => `acquire-test-${++counter}`;
 beforeEach(async () => {
   counter = 0;
   vi.clearAllMocks();
+  discardDerivative.mockReset();
   exec = nodeSqliteExecutor(openTestDb());
   await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
     now: NOW,
@@ -66,17 +71,52 @@ describe("import acquisition", () => {
       displayName: " ",
       methods: [],
       birthday: null,
-      photoTempUri: "file:///cache/nameless.jpg",
+      photoTempUri: "file:///cache/contact-picker-nameless.photo",
     };
 
     await acceptPickedContacts(exec, [nameless], { ...options, mode: "bulk" });
     expect(stageImportPhoto).not.toHaveBeenCalled();
+    expect(discardDerivative).toHaveBeenCalledWith(nameless.photoTempUri);
 
     await acceptPickedContacts(exec, [nameless], {
       ...options,
       mode: "single",
     });
     expect(stageImportPhoto).toHaveBeenCalledTimes(1);
+    expect(discardDerivative).toHaveBeenCalledTimes(2);
+  });
+
+  it("retires every accepted or skipped picker copy and keeps accepted rows when cleanup fails", async () => {
+    discardDerivative.mockImplementation(() => {
+      throw new Error("delete failed");
+    });
+    const picked = [
+      {
+        lookupKey: "one",
+        displayName: "One",
+        methods: [],
+        birthday: null,
+        photoTempUri: "file:///cache/contact-picker-one.photo",
+      },
+      {
+        lookupKey: "two",
+        displayName: "Two",
+        methods: [],
+        birthday: null,
+        photoTempUri: "file:///cache/contact-picker-two.photo",
+      },
+    ];
+    stageImportPhoto.mockRejectedValueOnce(new Error("copy failed"));
+    const sessionId = await acceptPickedContacts(exec, picked, {
+      mode: "bulk",
+      batchCategoryId: null,
+      effectivePhoneRegion: "US",
+      now: NOW,
+    });
+    expect(await listSessionRows(exec, sessionId)).toHaveLength(2);
+    expect(discardDerivative).toHaveBeenCalledTimes(2);
+    expect(discardDerivative).toHaveBeenCalledWith(picked[0].photoTempUri);
+    expect(discardDerivative).toHaveBeenCalledWith(picked[1].photoTempUri);
   });
 
   it("single pick → one session + one row → one Unbound contact + row resolved imported + session complete", async () => {

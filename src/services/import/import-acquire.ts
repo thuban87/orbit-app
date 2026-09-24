@@ -25,6 +25,7 @@ import {
   importedPhotoFs,
   persistImportedPhotoPostCommit,
 } from "@/services/import/import-photo";
+import { discardDerivative } from "@/services/photos/derivative-cache";
 import {
   importStagingRelPath,
   stageImportPhoto,
@@ -68,35 +69,45 @@ export async function acceptPickedContacts(
   const sessionUid = newUid();
   const rows = await Promise.all(
     picked.map(async (contact) => {
-      const mapped = mapPickedContact(contact, {
-        categoryId: options.batchCategoryId,
-        effectivePhoneRegion: options.effectivePhoneRegion,
-      });
-      const rowUid = newUid();
-      let photoRelPath: string | null = null;
-      if (
-        mapped.photoTempUri !== null &&
-        !(options.mode === "bulk" && mapped.nameRequired)
-      ) {
-        try {
-          const relative = importStagingRelPath(sessionUid, rowUid);
-          await stageImportPhoto(mapped.photoTempUri, relative);
-          photoRelPath = relative;
-        } catch {
-          // A photo is optional. The contact snapshot remains useful without it.
+      try {
+        const mapped = mapPickedContact(contact, {
+          categoryId: options.batchCategoryId,
+          effectivePhoneRegion: options.effectivePhoneRegion,
+        });
+        const rowUid = newUid();
+        let photoRelPath: string | null = null;
+        if (
+          mapped.photoTempUri !== null &&
+          !(options.mode === "bulk" && mapped.nameRequired)
+        ) {
+          try {
+            const relative = importStagingRelPath(sessionUid, rowUid);
+            await stageImportPhoto(mapped.photoTempUri, relative);
+            photoRelPath = relative;
+          } catch {
+            // A photo is optional. The contact snapshot remains useful without it.
+          }
+        }
+        return {
+          uid: rowUid,
+          externalContactId: mapped.externalContactId,
+          sourcePayload: JSON.stringify({
+            displayName: contact.displayName,
+            methods: contact.methods,
+            birthday: contact.birthday,
+            note: contact.note,
+          }),
+          photoRelPath,
+        };
+      } finally {
+        if (contact.photoTempUri) {
+          try {
+            discardDerivative(contact.photoTempUri);
+          } catch {
+            Logger.warn("import-acquire", "picker photo cleanup failed");
+          }
         }
       }
-      return {
-        uid: rowUid,
-        externalContactId: mapped.externalContactId,
-        sourcePayload: JSON.stringify({
-          displayName: contact.displayName,
-          methods: contact.methods,
-          birthday: contact.birthday,
-          note: contact.note,
-        }),
-        photoRelPath,
-      };
     }),
   );
 

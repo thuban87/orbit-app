@@ -115,7 +115,11 @@ export async function persistCroppedMaster({
       });
     else await persistOwnedMaster(exec, out.uri, relative, { authorize });
   } finally {
-    discardDerivative(out.uri);
+    try {
+      discardDerivative(out.uri);
+    } catch {
+      Logger.warn(LOG_SCOPE, "crop derivative cleanup failed");
+    }
   }
   return relative;
 }

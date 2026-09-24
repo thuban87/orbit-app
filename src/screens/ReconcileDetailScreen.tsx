@@ -46,6 +46,7 @@ import {
   ensureReadContactsPermission,
   openContactsSettings,
 } from "@/services/contacts/use-read-contacts-permission";
+import { discardDerivative } from "@/services/photos/derivative-cache";
 import {
   deleteReconcileStaging,
   resolveReconcileStagingUri,
@@ -136,13 +137,19 @@ export function ReconcileDetailScreen({
       );
     let stagedRelative: string | null = null;
     let photoHash: string | null = null;
-    if (firstPhoto?.picked.photoTempUri) {
-      const staged = await stageReconcileSourcePhoto(
-        firstPhoto.picked.photoTempUri,
-        `contact-${contactId}-link-${firstPhoto.link.id}`,
-      );
-      stagedRelative = staged.stagedRelative;
-      photoHash = staged.contentHash;
+    try {
+      if (firstPhoto?.picked.photoTempUri) {
+        const staged = await stageReconcileSourcePhoto(
+          firstPhoto.picked.photoTempUri,
+          `contact-${contactId}-link-${firstPhoto.link.id}`,
+        );
+        stagedRelative = staged.stagedRelative;
+        photoHash = staged.contentHash;
+      }
+    } finally {
+      for (const picked of read.contacts) {
+        if (picked.photoTempUri) discardDerivative(picked.photoTempUri);
+      }
     }
     const sources: ReconcileSource[] = links.flatMap((link) => {
       const picked = pickedByKey.get(link.external_contact_id);
@@ -255,8 +262,9 @@ export function ReconcileDetailScreen({
   const relinkMissingSource = useCallback(async () => {
     const staleLink = scan?.links[0];
     if (!staleLink) return;
+    let selected: PickedContact | undefined;
     try {
-      const [selected] = await pickContacts({ multiple: false });
+      [selected] = await pickContacts({ multiple: false });
       if (!selected) return;
       const result = await relinkExternalSource(getExecutor(), {
         contactId,
@@ -293,6 +301,8 @@ export function ReconcileDetailScreen({
       setMessage(
         "Could not relink this source. Your Orbit contact was kept safe.",
       );
+    } finally {
+      if (selected?.photoTempUri) discardDerivative(selected.photoTempUri);
     }
   }, [contactId, load, navigation, scan?.links]);
 

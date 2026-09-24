@@ -1,5 +1,4 @@
 /** Best-effort retirement of app-owned, evictable photo copies (RG-013). */
-import { Directory, File, Paths } from "expo-file-system";
 import { registerSweepHook } from "@/services/launch-sweep";
 import { Logger } from "@/utils/logger";
 
@@ -19,24 +18,26 @@ export interface DerivativeCacheFs {
 }
 
 function productionFs(): DerivativeCacheFs {
+  // Keep the native module lazy so node-pure import/reconcile callers can load
+  // this helper without loading React Native's file-system runtime.
+  const { Directory, File, Paths } =
+    require("expo-file-system") as typeof import("expo-file-system");
   return {
     cacheUri: Paths.cache.uri,
     delete: (uri) => new File(uri).delete(),
     list: (uri) => {
       const directory = new Directory(uri);
       if (!directory.exists) return [];
-      return directory
-        .list()
-        .flatMap((entry) =>
-          entry instanceof File
-            ? [
-                {
-                  uri: entry.uri,
-                  modificationTime: entry.info().modificationTime ?? null,
-                },
-              ]
-            : [],
-        );
+      return directory.list().flatMap((entry) =>
+        entry instanceof File
+          ? [
+              {
+                uri: entry.uri,
+                modificationTime: entry.info().modificationTime ?? null,
+              },
+            ]
+          : [],
+      );
     },
   };
 }
@@ -70,15 +71,16 @@ function allowedUri(uri: string, cacheUri: string): string | null {
 /** Never throw: cache cleanup cannot change a successful save or mask its error. */
 export function discardDerivative(
   uri: string,
-  fs: DerivativeCacheFs = productionFs(),
+  fs?: DerivativeCacheFs,
 ): boolean {
   try {
-    const safe = allowedUri(uri, fs.cacheUri);
+    const boundary = fs ?? productionFs();
+    const safe = allowedUri(uri, boundary.cacheUri);
     if (!safe) {
       Logger.warn(LOG_SCOPE, "cache discard refused outside owned namespace");
       return false;
     }
-    fs.delete(safe);
+    boundary.delete(safe);
     return true;
   } catch {
     Logger.warn(LOG_SCOPE, "cache discard failed");

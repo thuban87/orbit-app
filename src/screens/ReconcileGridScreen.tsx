@@ -38,6 +38,7 @@ import {
   ensureReadContactsPermission,
   openContactsSettings,
 } from "@/services/contacts/use-read-contacts-permission";
+import { discardDerivative } from "@/services/photos/derivative-cache";
 import { deleteReconcileStaging } from "@/services/photos/photo-storage";
 import { stageReconcileSourcePhoto } from "@/services/photos/reconcile-photo";
 import { useTheme } from "@/theme";
@@ -163,7 +164,6 @@ export function ReconcileGridScreen({
         ...(linksByContact.get(link.contact_id) ?? []),
         link,
       ]);
-    const settings = await getAppSettings(exec);
     const stagedForCleanup: string[] = [];
     const built: Array<{
       contactId: number;
@@ -171,6 +171,7 @@ export function ReconcileGridScreen({
       stagedPhotoRelPath: string | null;
     }> = [];
     try {
+      const settings = await getAppSettings(exec);
       for (const contact of contacts) {
         const contactLinks = linksByContact.get(contact.id) ?? [];
         const methods = await listContactMethods(exec, contact.id);
@@ -277,6 +278,9 @@ export function ReconcileGridScreen({
       for (const relative of stagedForCleanup) deleteReconcileStaging(relative);
       throw error;
     } finally {
+      for (const picked of sourceRead.contacts) {
+        if (picked.photoTempUri) discardDerivative(picked.photoTempUri);
+      }
       setScoring(false);
     }
   }, [refreshCards]);
