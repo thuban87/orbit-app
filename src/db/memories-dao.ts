@@ -1,10 +1,7 @@
 /** Mutexed writer for typed Memory rows. */
 import { resolveNewItemAiDefault } from "@/db/ai-permissions-dao";
-import {
-  MEMORY_TYPE_REGISTRY,
-  type MemoryTypeKey,
-} from "@/db/memory-registry";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { MEMORY_TYPE_REGISTRY, type MemoryTypeKey } from "@/db/memory-registry";
 import { insertTombstoneCore } from "@/db/tombstones-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
@@ -103,9 +100,12 @@ export async function addMemoryCore(
   if (value === null && customLabel === null) {
     throw new Error("memories-dao: memory value or custom label is required");
   }
-  // The durable category default supersedes the registry's static `aiDefault`
-  // for NEW rows. Both ship OFF until the user deliberately changes the setting.
-  const allowAi = await resolveNewItemAiDefault(exec, "memory");
+  // ADR-091: third-party imported notes require per-item opt-in even if the
+  // user's general new-Memory default is on. Existing rows are untouched.
+  const allowAi =
+    input.provenance === "import"
+      ? 0
+      : await resolveNewItemAiDefault(exec, "memory");
 
   const result = await exec.runAsync(
     `INSERT INTO memories
@@ -123,7 +123,11 @@ export async function addMemoryCore(
       normalizeOptional(input.meaningfulDate),
       input.pinned ? 1 : 0,
       input.outdated ? 1 : 0,
-      input.hidden === null || input.hidden === undefined ? null : input.hidden ? 1 : 0,
+      input.hidden === null || input.hidden === undefined
+        ? null
+        : input.hidden
+          ? 1
+          : 0,
       input.provenance ?? "user",
       input.createdAt,
       input.now,
@@ -144,7 +148,12 @@ export async function setMemoryAllowAiCore(
       WHERE id = ? AND contact_id = ?`,
     [input.allow ? 1 : 0, input.now, input.id, input.contactId],
   );
-  assertOneChange("setMemoryAllowAi", input.id, input.contactId, result.changes);
+  assertOneChange(
+    "setMemoryAllowAi",
+    input.id,
+    input.contactId,
+    result.changes,
+  );
 }
 
 /**
@@ -286,7 +295,11 @@ export async function purgeMemoryPermanentlyCore(
   }
   await insertTombstoneCore(
     exec,
-    { entityType: "memory", entityUid: target.uid, deletedAt: target.deleted_at },
+    {
+      entityType: "memory",
+      entityUid: target.uid,
+      deletedAt: target.deleted_at,
+    },
     { bumpRevision: false },
   );
   const result = await exec.runAsync(

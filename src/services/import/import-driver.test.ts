@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { readPromptContext } from "@/db/ai-context-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
   acceptImportSessionWithRows,
@@ -74,6 +75,29 @@ async function createLinkedContact(externalContactId: string): Promise<number> {
 }
 
 describe("runImportBatch", () => {
+  it("keeps a bulk-imported note out of AI context under the ON default", async () => {
+    await exec.runAsync(
+      "UPDATE app_settings SET ai_default_memory_allow = 1 WHERE id = 1",
+    );
+    const session = await createSession([
+      {
+        externalContactId: "note",
+        sourcePayload: payload("Note Person", [], "Private note"),
+      },
+    ]);
+    await runImportBatch(exec, { sessionId: session.sessionId, now: NOW });
+    const row = (await listSessionRows(exec, session.sessionId))[0];
+    if (row.contactId === null) throw new Error("bulk import did not commit");
+    expect(
+      await exec.getFirstAsync<{ allow_ai: number }>(
+        "SELECT allow_ai FROM memories WHERE contact_id = ?",
+        [row.contactId],
+      ),
+    ).toEqual({ allow_ai: 0 });
+    expect(
+      (await readPromptContext(exec, row.contactId, NOW)).sharedMemories,
+    ).toEqual([]);
+  });
   it("imports safe rows, atomically classifies linked and ambiguous rows, and isolates failures", async () => {
     const linkedContactId = await createLinkedContact("already-linked");
     await importContactRecord(exec, {

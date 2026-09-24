@@ -12,10 +12,12 @@ vi.mock("@/services/photos/photo-storage", () => ({
 }));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { readPromptContext } from "@/db/ai-context-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { acceptImportSessionWithRows } from "@/db/import-session-dao";
 import { getSessionById, listSessionRows } from "@/db/import-session-read";
 import { importContactRecord } from "@/db/imported-contact-dao";
+import { setMemoryAllowAi } from "@/db/memories-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { findActiveExternalLink } from "@/services/import/duplicate-evidence";
@@ -89,6 +91,9 @@ beforeEach(async () => {
 
 describe("source consolidation", () => {
   it("uses the first non-blank note from real accepted picker rows", async () => {
+    await exec.runAsync(
+      "UPDATE app_settings SET ai_default_memory_allow = 1 WHERE id = 1",
+    );
     const sessionId = await acceptPickedContacts(
       exec,
       [
@@ -135,6 +140,28 @@ describe("source consolidation", () => {
         type: "imported",
         value: "First imported cluster note",
         allow_ai: 0,
+      },
+    ]);
+    expect(
+      (await readPromptContext(exec, result.contactId, NOW)).sharedMemories,
+    ).toEqual([]);
+    const memory = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM memories WHERE contact_id = ?",
+      [result.contactId],
+    );
+    if (!memory) throw new Error("missing consolidated note");
+    await setMemoryAllowAi(exec, {
+      id: memory.id,
+      contactId: result.contactId,
+      allow: true,
+      now: NOW,
+    });
+    expect(
+      (await readPromptContext(exec, result.contactId, NOW)).sharedMemories,
+    ).toEqual([
+      {
+        label: "Imported from Contacts App",
+        value: "First imported cluster note",
       },
     ]);
   });

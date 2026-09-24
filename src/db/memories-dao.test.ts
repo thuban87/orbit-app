@@ -41,6 +41,35 @@ async function seedContact(name = "Alex"): Promise<number> {
 }
 
 describe("memories DAO", () => {
+  it("keeps new import-provenance notes AI-off under an ON default while user-provenance imported types inherit it", async () => {
+    const contactId = await seedContact();
+    await setAiPermissionDefault(exec, "memory", 1, NOW);
+    const imported = await addMemory(exec, {
+      contactId,
+      type: "imported",
+      provenance: "import",
+      value: "Third-party note",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const owned = await addMemory(exec, {
+      contactId,
+      type: "imported",
+      provenance: "user",
+      value: "My note",
+      createdAt: NOW,
+      now: NOW,
+    });
+    expect(
+      await exec.getAllAsync<{ id: number; allow_ai: number }>(
+        "SELECT id, allow_ai FROM memories WHERE id IN (?, ?) ORDER BY id",
+        [imported, owned],
+      ),
+    ).toEqual([
+      { id: imported, allow_ai: 0 },
+      { id: owned, allow_ai: 1 },
+    ]);
+  });
   it("applies the durable Memory default only to rows created afterward", async () => {
     const contactId = await seedContact();
     const first = await addMemory(exec, {
@@ -88,11 +117,9 @@ describe("memories DAO", () => {
       ),
     ).resolves.toEqual({ allow_ai: 0 });
 
-    const before = (
-      await exec.getFirstAsync<{ data_revision: number }>(
-        "SELECT data_revision FROM app_settings WHERE id = 1",
-      )
-    )!.data_revision;
+    const before = (await exec.getFirstAsync<{ data_revision: number }>(
+      "SELECT data_revision FROM app_settings WHERE id = 1",
+    ))!.data_revision;
     await setMemoryAllowAi(exec, {
       id,
       contactId,
@@ -129,21 +156,72 @@ describe("memories DAO", () => {
 
   it("marks manual permanent purges and successful stale expiry dirty for backup", async () => {
     const contactId = await seedContact();
-    const id = await addMemory(exec, { contactId, type: "custom", customLabel: "Note", value: "Delete", createdAt: NOW, now: NOW });
-    const uid = (await exec.getFirstAsync<{ uid: string }>("SELECT uid FROM memories WHERE id=?", [id]))!.uid;
+    const id = await addMemory(exec, {
+      contactId,
+      type: "custom",
+      customLabel: "Note",
+      value: "Delete",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const uid = (await exec.getFirstAsync<{ uid: string }>(
+      "SELECT uid FROM memories WHERE id=?",
+      [id],
+    ))!.uid;
     await deleteMemory(exec, { id, contactId, now: NOW });
-    const beforePurge = (await exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1"))!.data_revision;
+    const beforePurge = (await exec.getFirstAsync<{ data_revision: number }>(
+      "SELECT data_revision FROM app_settings WHERE id=1",
+    ))!.data_revision;
     await purgeMemoryPermanently(exec, { id, contactId });
-    await expect(exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1")).resolves.toEqual({ data_revision: beforePurge + 1 });
-    await expect(exec.getFirstAsync("SELECT entity_type,entity_uid,deleted_at FROM tombstones WHERE entity_type='memory' AND entity_uid=?", [uid])).resolves.toEqual({ entity_type: "memory", entity_uid: uid, deleted_at: NOW });
+    await expect(
+      exec.getFirstAsync<{ data_revision: number }>(
+        "SELECT data_revision FROM app_settings WHERE id=1",
+      ),
+    ).resolves.toEqual({ data_revision: beforePurge + 1 });
+    await expect(
+      exec.getFirstAsync(
+        "SELECT entity_type,entity_uid,deleted_at FROM tombstones WHERE entity_type='memory' AND entity_uid=?",
+        [uid],
+      ),
+    ).resolves.toEqual({
+      entity_type: "memory",
+      entity_uid: uid,
+      deleted_at: NOW,
+    });
 
-    const staleId = await addMemory(exec, { contactId, type: "custom", customLabel: "Note", value: "Stale", createdAt: NOW, now: NOW });
-    const staleUid = (await exec.getFirstAsync<{ uid: string }>("SELECT uid FROM memories WHERE id=?", [staleId]))!.uid;
-    await exec.runAsync("UPDATE memories SET deleted_at=datetime('now','localtime', ?) WHERE id=?", ["-31 days", staleId]);
-    const beforeExpiry = (await exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1"))!.data_revision;
-    await expect(expireMemoryIfStale(exec, { id: staleId, contactId }, "-30 days", NOW)).resolves.toBe(true);
-    await expect(exec.getFirstAsync<{ data_revision: number }>("SELECT data_revision FROM app_settings WHERE id=1")).resolves.toEqual({ data_revision: beforeExpiry + 1 });
-    await expect(exec.getFirstAsync("SELECT entity_uid FROM tombstones WHERE entity_type='memory' AND entity_uid=?", [staleUid])).resolves.toEqual({ entity_uid: staleUid });
+    const staleId = await addMemory(exec, {
+      contactId,
+      type: "custom",
+      customLabel: "Note",
+      value: "Stale",
+      createdAt: NOW,
+      now: NOW,
+    });
+    const staleUid = (await exec.getFirstAsync<{ uid: string }>(
+      "SELECT uid FROM memories WHERE id=?",
+      [staleId],
+    ))!.uid;
+    await exec.runAsync(
+      "UPDATE memories SET deleted_at=datetime('now','localtime', ?) WHERE id=?",
+      ["-31 days", staleId],
+    );
+    const beforeExpiry = (await exec.getFirstAsync<{ data_revision: number }>(
+      "SELECT data_revision FROM app_settings WHERE id=1",
+    ))!.data_revision;
+    await expect(
+      expireMemoryIfStale(exec, { id: staleId, contactId }, "-30 days", NOW),
+    ).resolves.toBe(true);
+    await expect(
+      exec.getFirstAsync<{ data_revision: number }>(
+        "SELECT data_revision FROM app_settings WHERE id=1",
+      ),
+    ).resolves.toEqual({ data_revision: beforeExpiry + 1 });
+    await expect(
+      exec.getFirstAsync(
+        "SELECT entity_uid FROM tombstones WHERE entity_type='memory' AND entity_uid=?",
+        [staleUid],
+      ),
+    ).resolves.toEqual({ entity_uid: staleUid });
   });
   it("adds and reads distinct typed memories in deterministic order", async () => {
     const contactId = await seedContact();
@@ -166,23 +244,28 @@ describe("memories DAO", () => {
     });
 
     const rows = await listMemoriesForContact(exec, contactId);
-    expect(rows.map((row) => row.value)).toEqual(["Pinned memory", "First memory"]);
+    expect(rows.map((row) => row.value)).toEqual([
+      "Pinned memory",
+      "First memory",
+    ]);
     expect(rows).toHaveLength(2);
     expect(rows[0]?.uid).toBeTruthy();
   });
 
   it("rejects a wholly blank draft before any row is written", async () => {
     const contactId = await seedContact();
-    await expect(addMemory(exec, {
-      contactId,
-      type: "general",
-      value: "   ",
-      note: "\t",
-      url: "",
-      customLabel: "\n",
-      createdAt: NOW,
-      now: NOW,
-    })).rejects.toThrow("memory value or custom label is required");
+    await expect(
+      addMemory(exec, {
+        contactId,
+        type: "general",
+        value: "   ",
+        note: "\t",
+        url: "",
+        customLabel: "\n",
+        createdAt: NOW,
+        now: NOW,
+      }),
+    ).rejects.toThrow("memory value or custom label is required");
     expect(await listMemoriesForContact(exec, contactId)).toEqual([]);
   });
 
@@ -415,10 +498,14 @@ describe("memories DAO", () => {
     await purgeMemoryPermanently(exec, { id: deletedId, contactId });
 
     expect(
-      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [liveId]),
+      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [
+        liveId,
+      ]),
     ).toEqual({ id: liveId });
     expect(
-      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [deletedId]),
+      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [
+        deletedId,
+      ]),
     ).toBeNull();
   });
 
@@ -463,17 +550,28 @@ describe("memories DAO", () => {
       expireMemoryIfStale(exec, { id: recentId, contactId }, "-30 days", NOW),
     ).resolves.toBe(false);
     await expect(
-      expireMemoryIfStale(exec, { id: reDeletedId, contactId }, "-30 days", NOW),
+      expireMemoryIfStale(
+        exec,
+        { id: reDeletedId, contactId },
+        "-30 days",
+        NOW,
+      ),
     ).resolves.toBe(false);
 
     expect(
-      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [staleId]),
+      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [
+        staleId,
+      ]),
     ).toBeNull();
     expect(
-      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [recentId]),
+      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [
+        recentId,
+      ]),
     ).toEqual({ id: recentId });
     expect(
-      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [reDeletedId]),
+      await exec.getFirstAsync("SELECT id FROM memories WHERE id = ?", [
+        reDeletedId,
+      ]),
     ).toEqual({ id: reDeletedId });
   });
 });

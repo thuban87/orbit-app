@@ -26,8 +26,10 @@ vi.mock("@/services/photos/photo-storage", () => ({
 }));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { readPromptContext } from "@/db/ai-context-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { getSessionById, listSessionRows } from "@/db/import-session-read";
+import { setMemoryAllowAi } from "@/db/memories-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import {
@@ -70,11 +72,17 @@ describe("import acquisition", () => {
     await acceptPickedContacts(exec, [nameless], { ...options, mode: "bulk" });
     expect(stageImportPhoto).not.toHaveBeenCalled();
 
-    await acceptPickedContacts(exec, [nameless], { ...options, mode: "single" });
+    await acceptPickedContacts(exec, [nameless], {
+      ...options,
+      mode: "single",
+    });
     expect(stageImportPhoto).toHaveBeenCalledTimes(1);
   });
 
   it("single pick → one session + one row → one Unbound contact + row resolved imported + session complete", async () => {
+    await exec.runAsync(
+      "UPDATE app_settings SET ai_default_memory_allow = 1 WHERE id = 1",
+    );
     const sessionId = await acceptPickedContacts(
       exec,
       [
@@ -133,12 +141,32 @@ describe("import acquisition", () => {
         "SELECT type, value, allow_ai FROM memories WHERE contact_id = ?",
         [contactId],
       ),
+    ).toEqual([{ type: "imported", value: "Single review note", allow_ai: 0 }]);
+    expect(
+      (await readPromptContext(exec, contactId, NOW)).sharedMemories,
+    ).toEqual([]);
+    const memory = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM memories WHERE contact_id = ?",
+      [contactId],
+    );
+    if (!memory) throw new Error("missing imported note");
+    await setMemoryAllowAi(exec, {
+      id: memory.id,
+      contactId,
+      allow: true,
+      now: NOW,
+    });
+    expect(
+      (await readPromptContext(exec, contactId, NOW)).sharedMemories,
     ).toEqual([
-      { type: "imported", value: "Single review note", allow_ai: 0 },
+      { label: "Imported from Contacts App", value: "Single review note" },
     ]);
   });
 
   it("preserves a bulk note through the real session serialization and driver replay", async () => {
+    await exec.runAsync(
+      "UPDATE app_settings SET ai_default_memory_allow = 1 WHERE id = 1",
+    );
     const sessionId = await acceptPickedContacts(
       exec,
       [
@@ -178,6 +206,25 @@ describe("import acquisition", () => {
       ),
     ).toEqual([
       { type: "imported", value: "Raw bulk provider note", allow_ai: 0 },
+    ]);
+    expect(
+      (await readPromptContext(exec, result.contactId, NOW)).sharedMemories,
+    ).toEqual([]);
+    const memory = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM memories WHERE contact_id = ?",
+      [result.contactId],
+    );
+    if (!memory) throw new Error("missing bulk note");
+    await setMemoryAllowAi(exec, {
+      id: memory.id,
+      contactId: result.contactId,
+      allow: true,
+      now: NOW,
+    });
+    expect(
+      (await readPromptContext(exec, result.contactId, NOW)).sharedMemories,
+    ).toEqual([
+      { label: "Imported from Contacts App", value: "Raw bulk provider note" },
     ]);
   });
 });

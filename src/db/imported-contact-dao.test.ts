@@ -128,6 +128,9 @@ describe("importContactRecord", () => {
   });
 
   it("writes a raw imported note AI-off and omits blank notes", async () => {
+    await exec.runAsync(
+      "UPDATE app_settings SET ai_default_memory_allow = 1 WHERE id = 1",
+    );
     const noted = await importContactRecord(exec, {
       input: unboundInput("Noted Person"),
       externalLinks: [],

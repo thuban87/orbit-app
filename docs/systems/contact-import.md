@@ -81,14 +81,14 @@ Category choices use the canonical ordered catalog and switch to the complete se
 1. One accepted row opens `ImportReviewScreen`, where the user can choose Bound or Unbound, category, selected/primary methods, birthday, and photo before writing.
 2. The DAO rejects an invalid non-null birthday before opening its transaction; the screen keeps invalid raw input visible and disables Import. The mapper accepts supported year-less and unambiguous slash formats, while still-unreadable values remain flagged rather than coerced.
 3. A deterministic active external link resolves as already in Orbit. Advisory matches require an explicit Link to Existing, Import as New, or Skip choice and never overwrite an existing name.
-4. A successful new-contact create preserves a raw Note as an `imported`, import-provenance, default-AI-off Memory in the same transaction as contact data, links, and method provenance. An already-linked outcome deliberately writes no Note.
+4. A successful new-contact create preserves a raw Note as an `imported`, import-provenance Memory with stored AI permission off, regardless of the general new-Memory default. The per-item toggle is the opt-in path. An already-linked outcome deliberately writes no Note.
 
 ### Processing bulk work and recovery
 
 1. A multi-selection opens `BulkImportSetupScreen` with shared Unbound and Uncategorized defaults and an optional category override, not per-person controls.
 2. `runImportBatch()` processes each safe row independently; ambiguous rows persist candidate evidence for later review and cannot block safe rows. A nameless bulk row is terminally skipped before it can wedge a resumable session or stage a photo.
-3. `ImportCompleteScreen` reads durable Imported, Already in Orbit, Need review, Failed, nameless-skipped, and unreadable-birthday counts. Retry targets only genuinely failed rows; a completed batch can open Unbound contacts.
-4. The launch sweep offers Resume or Discard for pending work. Discard removes only unresolved rows and staging; contacts already committed stay in Orbit.
+3. `ImportCompleteScreen` reads durable Imported, Already in Orbit, Need review, Failed, nameless-skipped, and unreadable-birthday counts. Retry handles failed contact rows and committed contacts with outstanding photos through separate paths; Skip remaining photos explicitly retires photo work. A completed batch can open Unbound contacts.
+4. The launch sweep offers Resume for pending work and for completed sessions with outstanding photos. Discard removes only unresolved rows and staging; contacts and their outstanding photo work stay in Orbit.
 
 ### Reviewing unreadable imported birthdays
 
@@ -99,7 +99,7 @@ Category choices use the canonical ordered catalog and switch to the complete se
 ### Handling photos and source consolidation
 
 1. After an imported contact commits, `import-photo.ts` converts the staged source into Orbit's usual master photo and sets the contact photo path.
-2. On success, the row's staging reference is retired before best-effort raw-file deletion. A failed photo leaves the contact imported and retains the staged input for Retry.
+2. On success, the row's staging reference is retired before best-effort raw-file deletion. A failed or interrupted photo leaves the contact imported and its staged input live for photo-only Retry, including after relaunch. Retry checks the contact UID, row ownership, existing photo and canonical generation under the photo path lock before writing. Purge retires the contact's import workflow copies in its transaction.
 3. Before a bulk driver starts, source rows sharing a canonical phone or email may be shown in `ConsolidationPrompt`; only an explicit Combine into one creates one contact with multiple external links.
 4. Consolidation chooses the first non-blank imported Note and writes it atomically with the combined new contact; it never uses provider metadata to enable AI.
 
@@ -159,3 +159,4 @@ Category choices use the canonical ordered catalog and switch to the complete se
 | 2026-08-26 | 20 | Added reconcile-only API-37+ permission handling and durable unreadable-birthday Fix/Ignore review. |
 | 2026-09-03 | 24.2 | Added Note MIME acquisition and durable AI-off imported-Memory writes for new-contact imports. |
 | 2026-09-17 | 37.1 | Made category selection complete and stale-safe; category deletion reassigns pending, complete, and discarded sessions to the same target. |
+| 2026-09-24 | 38.2 | RG-007 forces new imported notes AI-off regardless of the general Memory default. RG-012 retains post-commit photo retry input, offers photo-only Retry and explicit Skip, and retires workflow copies on contact purge. |
