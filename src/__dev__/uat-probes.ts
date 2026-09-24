@@ -6,6 +6,33 @@ let registered = false;
 export function registerUatProbes(): void {
   if (!__DEV__ || registered) return;
   registered = true;
+  DevSettings.addMenuItem("Enable debug logging", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Logger } =
+      require("@/utils/logger") as typeof import("@/utils/logger");
+    Logger.setLevel("debug");
+    console.log("uat-probe logger level", Logger.getLevel());
+  });
+  DevSettings.addMenuItem("Dump scheduled notifications", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getAllScheduledNotificationsAsync } =
+      require("expo-notifications") as typeof import("expo-notifications");
+    void getAllScheduledNotificationsAsync().then((entries) => {
+      for (const entry of entries.slice(0, 4)) {
+        console.log(
+          "uat-probe scheduled",
+          JSON.stringify({
+            identifier: entry.identifier,
+            trigger: entry.trigger,
+            categoryIdentifier: entry.content.categoryIdentifier,
+            title: entry.content.title,
+            data: entry.content.data,
+          }),
+        );
+      }
+      console.log("uat-probe scheduled count", entries.length);
+    });
+  });
   DevSettings.addMenuItem("Measure backup ingress", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { runIngressMeasure } =
