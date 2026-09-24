@@ -1,7 +1,7 @@
 # AI Suggestions
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 37-settings-personalization
+**Last updated:** 2026-09-23
+**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
 **Owners:** `src/services/AiService.ts`, `src/services/ai-key-store.ts`, `src/ai/`, `src/db/ai-context-read.ts`, `src/db/app-settings-dao.ts`, `src/logic/ai-suggestion-logic.ts`, `src/screens/SettingsAIScreen.tsx`, `src/screens/ComposeScreen.tsx`
 
 ## Purpose
@@ -62,6 +62,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 2. The user configures the recommended OpenRouter lane or an Advanced direct/Custom lane. A new lane does not replace the active connection until it has a selected model and activates successfully; inactive saved lanes retain their remembered models.
 3. SecureStore writes or removes provider-specific credentials directly. OpenRouter authorizes through its one-shot loopback callback; Custom endpoint validation rejects malformed, credentialed, local, cleartext, and non-public literal URLs.
 4. OpenRouter cards use cached/live catalog metadata and real input/output pricing. Direct lanes use the LiteLLM seed/cache and manual model entry; a missing or unavailable model is Needs Attention rather than a fallback.
+5. A Custom SecureStore value without an endpoint-bound record fails closed for every endpoint. It remains stored until the user re-enters the credential; re-entry replaces it with a bound record. A failed Custom metadata save restores the exact raw SecureStore item that existed before the attempt, including an unbound or absent item. This follows D-23 (`security/AUD-SEC-006`).
 
 ### Resolving and sending a suggestion
 
@@ -143,3 +144,4 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | 2026-09-02 | 35 | Added three-state Compose availability, three non-destructive suggestions, carry-only gated interaction notes, and ADR-107's total Off Limits exclusion. |
 | 2026-09-02 | 36 | Added multi-lane connection configuration, OpenRouter authorization/catalog, permission-bounded prompt assembly, personalization, transparency, diagnostics, and model-aware capacity handling. |
 | 2026-09-02 | 37 | Replaced the monolithic Settings entry with the AI category, preserving the existing configuration hierarchy and local availability read. |
+| 2026-09-23 | 38.2 | Per D-23 (`security/AUD-SEC-006`), unbound Custom values fail closed and require re-entry; failed saves restore the prior raw SecureStore item. |

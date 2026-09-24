@@ -63,13 +63,6 @@ interface KeyWriter {
   ): Promise<void>;
 }
 
-interface KeyReader {
-  getKey(
-    provider: AiCloudProviderId,
-    customEndpoint?: string,
-  ): Promise<string | null>;
-}
-
 interface KeyDeleter {
   deleteKey(provider: AiCloudProviderId): Promise<void>;
 }
@@ -98,7 +91,9 @@ export interface CustomConnectionInput {
   readonly model: string;
 }
 
-export interface CustomConnectionDeps extends KeyWriter, KeyReader, KeyDeleter {
+export interface CustomConnectionDeps extends KeyWriter {
+  readRawCustomItem(): Promise<string | null>;
+  restoreRawCustomItem(raw: string | null): Promise<void>;
   persistConnection(input: { endpoint: string; model: string }): Promise<void>;
 }
 
@@ -129,27 +124,17 @@ export async function saveCustomConnection(
   if (model === "") return { ok: false, reason: "Enter a model id." };
   const credential = input.credential.trim();
   if (credential === "") {
-    // Reading first safely upgrades any legacy plaintext key into an endpoint-
-    // bound credential. It therefore cannot silently follow an endpoint edit.
-    await deps.getKey("custom", input.previousEndpoint);
     await deps.persistConnection({ endpoint: validation.url, model });
     return { ok: true };
   }
 
-  const previousCredential = await deps.getKey(
-    "custom",
-    input.previousEndpoint,
-  );
+  const previousRawItem = await deps.readRawCustomItem();
   await deps.setKey("custom", credential, validation.url);
   try {
     await deps.persistConnection({ endpoint: validation.url, model });
   } catch (persistError) {
     try {
-      if (previousCredential === null) {
-        await deps.deleteKey("custom");
-      } else {
-        await deps.setKey("custom", previousCredential, input.previousEndpoint);
-      }
+      await deps.restoreRawCustomItem(previousRawItem);
     } catch {
       throw new CustomCredentialCompensationError();
     }

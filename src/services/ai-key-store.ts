@@ -59,6 +59,10 @@ export interface AiKeyStore {
   ): Promise<void>;
   /** Remove one provider's key. Idempotent — deleting a missing key is fine. */
   deleteKey(provider: AiCloudProviderId): Promise<void>;
+  /** Snapshot the Custom item verbatim before replacing it. Read failures throw. */
+  readRawCustomItem(): Promise<string | null>;
+  /** Restore exactly that snapshot after a failed metadata write. */
+  restoreRawCustomItem(raw: string | null): Promise<void>;
 }
 
 interface BoundCustomCredential {
@@ -90,7 +94,7 @@ function parseBoundCustomCredential(raw: string): BoundCustomCredential | null {
       return parsed as BoundCustomCredential;
     }
   } catch {
-    // A pre-Phase-36 plaintext value is a legacy credential, handled below.
+    // Unbound values fail closed and remain stored until explicit re-entry.
   }
   return null;
 }
@@ -144,19 +148,7 @@ export function createAiKeyStore(
         const endpoint = normalizeCustomEndpoint(customEndpoint);
         if (endpoint === null) return null;
         const bound = parseBoundCustomCredential(stored);
-        if (bound !== null) {
-          return bound.endpoint === endpoint ? bound.credential : null;
-        }
-
-        // Legacy Custom keys predate endpoint binding. Bind the plaintext key
-        // to the currently persisted, already-validated endpoint on first read.
-        // If the durable upgrade fails, fail closed instead of returning an
-        // unbound secret that could later be paired with a different endpoint.
-        await backend.setItemAsync(
-          keyItemName(provider),
-          encodeBoundCustomCredential(endpoint, stored),
-        );
-        return stored;
+        return bound?.endpoint === endpoint ? bound.credential : null;
       } catch {
         // A read failure (item absent, keystore reset on uninstall) is an
         // ordinary "not configured" state — degrade to null, never throw.
@@ -185,6 +177,16 @@ export function createAiKeyStore(
     },
     async deleteKey(provider: AiCloudProviderId): Promise<void> {
       await backend.deleteItemAsync(keyItemName(provider));
+    },
+    async readRawCustomItem(): Promise<string | null> {
+      return backend.getItemAsync(keyItemName("custom"));
+    },
+    async restoreRawCustomItem(raw: string | null): Promise<void> {
+      if (raw === null) {
+        await backend.deleteItemAsync(keyItemName("custom"));
+      } else {
+        await backend.setItemAsync(keyItemName("custom"), raw);
+      }
     },
   };
 }

@@ -71,7 +71,13 @@ describe("ai-key-store — provider isolation", () => {
   it("exposes no bulk/all-keys accessor on the repository surface", () => {
     const store = createAiKeyStore(backend);
     const keys = Object.keys(store);
-    expect(keys.sort()).toEqual(["deleteKey", "getKey", "setKey"]);
+    expect(keys.sort()).toEqual([
+      "deleteKey",
+      "getKey",
+      "readRawCustomItem",
+      "restoreRawCustomItem",
+      "setKey",
+    ]);
   });
 
   it("returns a Custom credential only for its normalized bound endpoint", async () => {
@@ -91,27 +97,60 @@ describe("ai-key-store — provider isolation", () => {
     await expect(store.getKey("custom")).resolves.toBeNull();
   });
 
-  it("durably binds a legacy plaintext Custom key on first safe read", async () => {
-    backend.store.set(keyItemName("custom"), "legacy-secret");
+  it("never reads, rewrites, or deletes an unbound Custom item", async () => {
+    const raw = "SYNTHETIC-UNBOUND-KEY-DO-NOT-USE";
+    backend.store.set(keyItemName("custom"), raw);
+    const write = vi.spyOn(backend, "setItemAsync");
+    const remove = vi.spyOn(backend, "deleteItemAsync");
     const store = createAiKeyStore(backend);
-
     await expect(
       store.getKey("custom", "https://old.example.com/v1"),
-    ).resolves.toBe("legacy-secret");
-    expect(backend.store.get(keyItemName("custom"))).not.toBe("legacy-secret");
+    ).resolves.toBeNull();
+    await expect(
+      store.getKey("custom", "http://127.0.0.1/v1"),
+    ).resolves.toBeNull();
+    await expect(store.getKey("custom")).resolves.toBeNull();
+    expect(write).not.toHaveBeenCalled();
+    expect(remove).not.toHaveBeenCalled();
+    expect(backend.store.get(keyItemName("custom"))).toBe(raw);
+  });
+
+  it("re-entry replaces an unbound item with an endpoint-bound credential", async () => {
+    backend.store.set(
+      keyItemName("custom"),
+      "SYNTHETIC-UNBOUND-KEY-DO-NOT-USE",
+    );
+    const store = createAiKeyStore(backend);
+    await store.setKey(
+      "custom",
+      "SYNTHETIC-NEW-KEY-DO-NOT-USE",
+      "https://old.example.com/v1",
+    );
+    await expect(
+      store.getKey("custom", "https://old.example.com/v1"),
+    ).resolves.toBe("SYNTHETIC-NEW-KEY-DO-NOT-USE");
     await expect(
       store.getKey("custom", "https://new.example.com/v1"),
     ).resolves.toBeNull();
+    await expect(
+      store.setKey("custom", "SYNTHETIC-KEY-DO-NOT-USE"),
+    ).rejects.toThrow();
   });
 
-  it("fails closed when a legacy key cannot be durably endpoint-bound", async () => {
-    backend.store.set(keyItemName("custom"), "legacy-secret");
-    backend.setItemAsync = vi.fn().mockRejectedValue(new Error("write failed"));
+  it("raw snapshot throws on read failure and restores the exact item", async () => {
     const store = createAiKeyStore(backend);
-
-    await expect(
-      store.getKey("custom", "https://old.example.com/v1"),
-    ).resolves.toBeNull();
+    const raw = "SYNTHETIC-UNBOUND-KEY-DO-NOT-USE";
+    backend.store.set(keyItemName("custom"), raw);
+    const snapshot = await store.readRawCustomItem();
+    await store.setKey(
+      "custom",
+      "SYNTHETIC-NEW-KEY-DO-NOT-USE",
+      "https://new.example.com/v1",
+    );
+    await store.restoreRawCustomItem(snapshot);
+    expect(backend.store.get(keyItemName("custom"))).toBe(raw);
+    backend.getItemAsync = vi.fn().mockRejectedValue(new Error("read failed"));
+    await expect(store.readRawCustomItem()).rejects.toThrow("read failed");
   });
 });
 

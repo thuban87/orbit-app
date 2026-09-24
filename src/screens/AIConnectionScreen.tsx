@@ -174,11 +174,10 @@ export function AIConnectionScreen({
     try {
       const result = await saveCustomConnection(
         {
-          getKey: (provider, customEndpoint) =>
-            aiKeyStore.getKey(provider, customEndpoint),
           setKey: (provider, key, customEndpoint) =>
             aiKeyStore.setKey(provider, key, customEndpoint),
-          deleteKey: (provider) => aiKeyStore.deleteKey(provider),
+          readRawCustomItem: () => aiKeyStore.readRawCustomItem(),
+          restoreRawCustomItem: (raw) => aiKeyStore.restoreRawCustomItem(raw),
           persistConnection: async (input) => {
             await upsertAiConnection(getExecutor(), {
               lane: "custom",

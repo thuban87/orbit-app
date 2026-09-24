@@ -10,6 +10,11 @@ import {
   saveCustomConnection,
   saveDirectCredential,
 } from "@/screens/ai-connection-logic";
+import {
+  createAiKeyStore,
+  keyItemName,
+  type SecureKeyBackend,
+} from "@/services/ai-key-store";
 
 describe("AI connection switching", () => {
   const initial = {
@@ -52,11 +57,11 @@ describe("credential boundary and endpoint guard", () => {
 
   it("validates a custom URL before writing either config or credential", async () => {
     const setKey = vi.fn(async () => undefined);
-    const getKey = vi.fn(async () => null);
-    const deleteKey = vi.fn(async () => undefined);
+    const readRawCustomItem = vi.fn(async () => null);
+    const restoreRawCustomItem = vi.fn(async () => undefined);
     const persistConnection = vi.fn(async () => undefined);
     const invalid = await saveCustomConnection(
-      { setKey, getKey, deleteKey, persistConnection },
+      { setKey, readRawCustomItem, restoreRawCustomItem, persistConnection },
       {
         endpoint: "http://127.0.0.1/v1",
         previousEndpoint: "",
@@ -69,7 +74,7 @@ describe("credential boundary and endpoint guard", () => {
     expect(persistConnection).not.toHaveBeenCalled();
 
     const valid = await saveCustomConnection(
-      { setKey, getKey, deleteKey, persistConnection },
+      { setKey, readRawCustomItem, restoreRawCustomItem, persistConnection },
       {
         endpoint: "https://api.example.com/v1",
         previousEndpoint: "",
@@ -89,86 +94,120 @@ describe("credential boundary and endpoint guard", () => {
     });
   });
 
-  it("restores the previous custom credential when metadata persistence fails", async () => {
+  it.each([
+    ["unbound", "SYNTHETIC-UNBOUND-KEY-DO-NOT-USE"],
+    [
+      "bound",
+      JSON.stringify({
+        version: 1,
+        endpoint: "https://old.example.com/v1",
+        credential: "SYNTHETIC-BOUND-KEY-DO-NOT-USE",
+      }),
+    ],
+    ["absent", null],
+  ])(
+    "restores the %s raw Custom item after a failed save",
+    async (_state, raw) => {
+      const items = new Map<string, string>();
+      if (raw !== null) items.set(keyItemName("custom"), raw);
+      const backend: SecureKeyBackend = {
+        getItemAsync: vi.fn(async (name) => items.get(name) ?? null),
+        setItemAsync: vi.fn(async (name, value) => {
+          items.set(name, value);
+        }),
+        deleteItemAsync: vi.fn(async (name) => {
+          items.delete(name);
+        }),
+      };
+      const store = createAiKeyStore(backend);
+      await expect(
+        saveCustomConnection(
+          {
+            ...store,
+            persistConnection: vi.fn(async () => {
+              throw new Error("sqlite failed");
+            }),
+          },
+          {
+            endpoint: "https://new.example.com/v1",
+            previousEndpoint: "https://old.example.com/v1",
+            credential: "SYNTHETIC-NEW-KEY-DO-NOT-USE",
+            model: "new-model",
+          },
+        ),
+      ).rejects.toThrow("sqlite failed");
+      expect(items.get(keyItemName("custom")) ?? null).toBe(raw);
+      expect(backend.deleteItemAsync).toHaveBeenCalledTimes(
+        raw === null ? 1 : 0,
+      );
+    },
+  );
+
+  it("aborts before writing if raw snapshot read fails", async () => {
     const setKey = vi.fn(async () => undefined);
-    const persistError = new Error("sqlite failed");
     await expect(
       saveCustomConnection(
         {
-          getKey: vi.fn(async () => "old-secret"),
           setKey,
-          deleteKey: vi.fn(async () => undefined),
-          persistConnection: vi.fn(async () => {
-            throw persistError;
+          readRawCustomItem: vi.fn(async () => {
+            throw new Error("read failed");
           }),
+          restoreRawCustomItem: vi.fn(async () => undefined),
+          persistConnection: vi.fn(async () => undefined),
         },
         {
           endpoint: "https://new.example.com/v1",
-          previousEndpoint: "https://old.example.com/v1",
-          credential: "new-secret",
-          model: "new-model",
+          previousEndpoint: "",
+          credential: "SYNTHETIC-NEW-KEY-DO-NOT-USE",
+          model: "model",
         },
       ),
-    ).rejects.toBe(persistError);
-    expect(setKey).toHaveBeenNthCalledWith(
-      1,
-      "custom",
-      "new-secret",
-      "https://new.example.com/v1",
-    );
-    expect(setKey).toHaveBeenNthCalledWith(
-      2,
-      "custom",
-      "old-secret",
-      "https://old.example.com/v1",
-    );
+    ).rejects.toThrow("read failed");
+    expect(setKey).not.toHaveBeenCalled();
   });
 
-  it("deletes a newly staged credential when there was no previous key", async () => {
-    const deleteKey = vi.fn(async () => undefined);
+  it("raises an explicit hard error if raw restoration fails", async () => {
     await expect(
       saveCustomConnection(
         {
-          getKey: vi.fn(async () => null),
           setKey: vi.fn(async () => undefined),
-          deleteKey,
+          readRawCustomItem: vi.fn(async () => "SYNTHETIC-OLD-KEY-DO-NOT-USE"),
+          restoreRawCustomItem: vi.fn(async () => {
+            throw new Error("restore failed");
+          }),
           persistConnection: vi.fn(async () => {
             throw new Error("sqlite failed");
           }),
         },
         {
           endpoint: "https://new.example.com/v1",
-          previousEndpoint: "https://old.example.com/v1",
-          credential: "new-secret",
-          model: "new-model",
-        },
-      ),
-    ).rejects.toThrow("sqlite failed");
-    expect(deleteKey).toHaveBeenCalledWith("custom");
-  });
-
-  it("raises an explicit hard error if credential compensation also fails", async () => {
-    await expect(
-      saveCustomConnection(
-        {
-          getKey: vi.fn(async () => "old-secret"),
-          setKey: vi
-            .fn()
-            .mockResolvedValueOnce(undefined)
-            .mockRejectedValueOnce(new Error("restore failed")),
-          deleteKey: vi.fn(async () => undefined),
-          persistConnection: vi.fn(async () => {
-            throw new Error("sqlite failed");
-          }),
-        },
-        {
-          endpoint: "https://new.example.com/v1",
-          previousEndpoint: "https://old.example.com/v1",
-          credential: "new-secret",
-          model: "new-model",
+          previousEndpoint: "",
+          credential: "SYNTHETIC-NEW-KEY-DO-NOT-USE",
+          model: "model",
         },
       ),
     ).rejects.toBeInstanceOf(CustomCredentialCompensationError);
+  });
+
+  it("saves a blank credential without touching SecureStore", async () => {
+    const setKey = vi.fn(async () => undefined);
+    const readRawCustomItem = vi.fn(async () => null);
+    await saveCustomConnection(
+      {
+        setKey,
+        readRawCustomItem,
+        restoreRawCustomItem: vi.fn(async () => undefined),
+        persistConnection: vi.fn(async () => undefined),
+      },
+      {
+        endpoint: "https://new.example.com/v1",
+        previousEndpoint: "",
+        credential: "",
+        model: "model",
+      },
+    );
+    expect(setKey).not.toHaveBeenCalled();
+    expect(readRawCustomItem).not.toHaveBeenCalled();
   });
 
   it("removes only the requested lane credential", async () => {
