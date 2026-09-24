@@ -1,0 +1,238 @@
+diff --git a/node_modules/react-native-android-widget/android/src/main/AndroidManifest.xml b/node_modules/react-native-android-widget/android/src/main/AndroidManifest.xml
+index c156499..d225283 100644
+--- a/node_modules/react-native-android-widget/android/src/main/AndroidManifest.xml
++++ b/node_modules/react-native-android-widget/android/src/main/AndroidManifest.xml
+@@ -1,10 +1,4 @@
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+           package="com.reactnativeandroidwidget">
+-    <application>
+-        <provider
+-            android:name=".RNWidgetImageProvider"
+-            android:authorities="${applicationId}.rnwidget.imageprovider"
+-            android:exported="true" 
+-        />
+-    </application>
++    <application />
+ </manifest>
+diff --git a/node_modules/react-native-android-widget/android/src/main/AndroidManifestNew.xml b/node_modules/react-native-android-widget/android/src/main/AndroidManifestNew.xml
+index 18d20bf..b1a6d83 100644
+--- a/node_modules/react-native-android-widget/android/src/main/AndroidManifestNew.xml
++++ b/node_modules/react-native-android-widget/android/src/main/AndroidManifestNew.xml
+@@ -1,9 +1,3 @@
+ <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+-    <application>
+-        <provider
+-            android:name=".RNWidgetImageProvider"
+-            android:authorities="${applicationId}.rnwidget.imageprovider"
+-            android:exported="true"
+-        />
+-    </application>
++    <application />
+ </manifest>
+diff --git a/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java b/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java
+index a7079f9..e5a5f37 100644
+--- a/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java
++++ b/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidget.java
+@@ -60,6 +60,7 @@ public class RNWidget {
+     }
+ 
+     public void drawWidget(int widgetId) throws Exception {
++        RNWidgetImageProvider.deleteAllImages(appContext);
+         ReadableMap light = config.getMap("light");
+         ReadableMap dark = config.getMap("dark");
+ 
+@@ -74,15 +75,15 @@ public class RNWidget {
+         );
+ 
+         Bitmap bitmap = drawViewToBitmap(widgetWithViews.getRootView());
+-        Uri bitmapUri = saveBitmapToDisk(widgetId, "light", bitmap);
+-        remoteWidgetView.setImageViewUri(R.id.rn_widget_image_light, bitmapUri);
++        remoteWidgetView.setImageViewBitmap(R.id.rn_widget_image_light, bitmap);
+ 
+         if (widgetWithViews.getRootAccessibilityLabel() != null) {
+             remoteWidgetView.setContentDescription(R.id.rn_widget_clickable_container, widgetWithViews.getRootAccessibilityLabel());
+         }
+ 
++        WidgetWithViews darkWidgetWithViews = null;
+         if (dark != null) {
+-            WidgetWithViews darkWidgetWithViews = WidgetFactory.buildWidgetFromRoot(
++            darkWidgetWithViews = WidgetFactory.buildWidgetFromRoot(
+                 appContext,
+                 Arguments.makeNativeMap(dark.toHashMap()),
+                 RNWidgetUtil.getWidgetWidth(appContext, widgetId),
+@@ -90,31 +91,16 @@ public class RNWidget {
+             );
+ 
+             Bitmap darkBitmap = drawViewToBitmap(darkWidgetWithViews.getRootView());
+-            Uri darkBitmapUri = saveBitmapToDisk(widgetId, "dark", darkBitmap);
+-            remoteWidgetView.setImageViewUri(R.id.rn_widget_image_dark, darkBitmapUri);
++            remoteWidgetView.setImageViewBitmap(R.id.rn_widget_image_dark, darkBitmap);
+ 
+-            List<CollectionView> lightCollectionViews = widgetWithViews.getCollectionViews();
+-            List<CollectionView> darkCollectionViews = darkWidgetWithViews.getCollectionViews();
+-
+-            for (int i = 0; i < Math.min(darkCollectionViews.size(), RNWidgetCollectionService.MAX_COLLECTION_WIDGETS); i++) {
+-                RNWidgetCollectionService.storeCollection(appContext, widgetId, i, lightCollectionViews.get(i).getRenderedViews(), "light");
+-                RNWidgetCollectionService.storeCollection(appContext, widgetId, i, darkCollectionViews.get(i).getRenderedViews(), "dark");
+-            }
+         } else {
+-            remoteWidgetView.setImageViewUri(R.id.rn_widget_image_dark, bitmapUri);
+-
+-            List<CollectionView> collectionViews = widgetWithViews.getCollectionViews();
+-            for (int i = 0; i < Math.min(collectionViews.size(), RNWidgetCollectionService.MAX_COLLECTION_WIDGETS); i++) {
+-                CollectionView collectionView = collectionViews.get(i);
+-                RNWidgetCollectionService.storeCollection(appContext, widgetId, i, collectionView.getRenderedViews(), "light");
+-                RNWidgetCollectionService.storeCollection(appContext, widgetId, i, collectionView.getRenderedViews(), "dark");
+-            }
++            remoteWidgetView.setImageViewBitmap(R.id.rn_widget_image_dark, bitmap);
+         }
+ 
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+             addClickableAreas(widgetId, remoteWidgetView, widgetWithViews);
+         }
+-        addCollectionViews(widgetId, remoteWidgetView, widgetWithViews);
++        addCollectionViews(widgetId, remoteWidgetView, widgetWithViews, darkWidgetWithViews);
+ 
+         AppWidgetManager.getInstance(appContext)
+             .updateAppWidget(widgetId, remoteWidgetView);
+@@ -145,12 +131,6 @@ public class RNWidget {
+         return bitmap;
+     }
+ 
+-    private Uri saveBitmapToDisk(int widgetId, String mode, Bitmap bitmap) {
+-        String fileName = "widget_" + widgetId + "_mode_" + mode + ".png";
+-        RNWidgetImageProvider.writeImage(appContext, fileName, bitmap);
+-        return RNWidgetImageProvider.getImageUri(appContext, fileName);
+-    }
+-
+     @RequiresApi(Build.VERSION_CODES.N)
+     private void addClickableAreas(int widgetId, RemoteViews remoteWidgetView, WidgetWithViews widgetWithViews) {
+         remoteWidgetView.removeAllViews(R.id.rn_widget_clickable_container);
+@@ -215,18 +195,20 @@ public class RNWidget {
+         widgetView.setOnClickPendingIntent(button, pendingIntent);
+     }
+ 
+-    private void addCollectionViews(int widgetId, RemoteViews remoteWidgetView, WidgetWithViews widgetWithViews) {
++    private void addCollectionViews(int widgetId, RemoteViews remoteWidgetView, WidgetWithViews widgetWithViews, WidgetWithViews darkWidgetWithViews) {
+         remoteWidgetView.removeAllViews(R.id.rn_widget_collection_container);
+         ViewGroup rootView = (ViewGroup) widgetWithViews.getRootView();
+         List<CollectionView> collectionViews = widgetWithViews.getCollectionViews();
+ 
+         for (int i = 0; i < Math.min(collectionViews.size(), RNWidgetCollectionService.MAX_COLLECTION_WIDGETS); i++) {
+             CollectionView collectionView = collectionViews.get(i);
+-            addCollectionView(remoteWidgetView, rootView, collectionView, widgetId, i);
++            CollectionView darkCollectionView = darkWidgetWithViews != null && i < darkWidgetWithViews.getCollectionViews().size()
++                ? darkWidgetWithViews.getCollectionViews().get(i) : null;
++            addCollectionView(remoteWidgetView, rootView, collectionView, darkCollectionView, widgetId, i);
+         }
+     }
+ 
+-    private void addCollectionView(RemoteViews remoteWidgetView, ViewGroup rootView, CollectionView collectionView, int widgetId, int collectionId) {
++    private void addCollectionView(RemoteViews remoteWidgetView, ViewGroup rootView, CollectionView collectionView, CollectionView darkCollectionView, int widgetId, int collectionId) {
+         View collectionWidget = collectionView.getView();
+         Rect offsetViewBounds = new Rect();
+         collectionWidget.getDrawingRect(offsetViewBounds);
+@@ -249,7 +231,7 @@ public class RNWidget {
+         }
+ 
+         PendingIntent collectionPendingIntentTemplate = createCollectionPendingIntentTemplate(widgetId);
+-        Intent remoteAdapterIntent = createCollectionRemoteAdapterIntent(widgetId, collectionId, collectionView);
++        Intent remoteAdapterIntent = createCollectionRemoteAdapterIntent(widgetId, collectionId, collectionView, darkCollectionView);
+ 
+         collectionRemoteView.setPendingIntentTemplate(lists[collectionId], collectionPendingIntentTemplate);
+ 
+@@ -257,7 +239,7 @@ public class RNWidget {
+         remoteWidgetView.setRemoteAdapter(lists[collectionId], remoteAdapterIntent);
+     }
+ 
+-    private Intent createCollectionRemoteAdapterIntent(int widgetId, int collectionId, CollectionView collectionView) {
++    private Intent createCollectionRemoteAdapterIntent(int widgetId, int collectionId, CollectionView collectionView, CollectionView darkCollectionView) {
+         List<CollectionViewItem> collectionItems = collectionView.getRenderedViews();
+         Intent intent = new Intent(appContext, RNWidgetCollectionService.class);
+         intent.putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, widgetId);
+@@ -275,8 +257,11 @@ public class RNWidget {
+             bundle.putString("clickAction", collectionViewItem.getClickAction());
+             bundle.putBundle("clickActionData", Arguments.toBundle(collectionViewItem.getClickActionData()));
+             bundle.putInt("imageWidth", collectionViewItem.getBitmap().getWidth());
+-            bundle.putString("lightImageName", RNWidgetCollectionService.getImageName(widgetId, collectionId, i, "light"));
+-            bundle.putString("darkImageName", RNWidgetCollectionService.getImageName(widgetId, collectionId, i, "dark"));
++            bundle.putParcelable("lightBitmap", collectionViewItem.getBitmap());
++            Bitmap darkBitmap = darkCollectionView != null && i < darkCollectionView.getRenderedViews().size()
++                ? darkCollectionView.getRenderedViews().get(i).getBitmap()
++                : collectionViewItem.getBitmap();
++            bundle.putParcelable("darkBitmap", darkBitmap);
+             
+             // Add item accessibility label if available
+             if (collectionViewItem.getItemAccessibilityLabel() != null) {
+diff --git a/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetCollectionService.java b/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetCollectionService.java
+index f818d97..f021790 100644
+--- a/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetCollectionService.java
++++ b/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetCollectionService.java
+@@ -5,7 +5,7 @@ import android.appwidget.AppWidgetManager;
+ import android.content.ComponentName;
+ import android.content.Context;
+ import android.content.Intent;
+-import android.net.Uri;
++import android.graphics.Bitmap;
+ import android.os.Build;
+ import android.os.Bundle;
+ import android.util.TypedValue;
+@@ -14,8 +14,6 @@ import android.widget.RemoteViewsService;
+ 
+ import androidx.annotation.RequiresApi;
+ 
+-import com.facebook.react.bridge.ReactApplicationContext;
+-import com.reactnativeandroidwidget.builder.CollectionViewItem;
+ 
+ import java.util.ArrayList;
+ import java.util.List;
+@@ -23,19 +21,6 @@ import java.util.List;
+ public class RNWidgetCollectionService extends RemoteViewsService {
+     public static final int MAX_COLLECTION_WIDGETS = 2;
+ 
+-    public static void storeCollection(ReactApplicationContext context, int widgetId, int collectionId, List<CollectionViewItem> collectionViewItems, String mode) {
+-        RNWidgetImageProvider.deleteCollectionImages(context, widgetId, collectionId, mode);
+-        for (int i = 0; i < collectionViewItems.size(); i++) {
+-            CollectionViewItem item = collectionViewItems.get(i);
+-
+-            RNWidgetImageProvider.writeImage(context, getImageName(widgetId, collectionId, i, mode), item.getBitmap());
+-        }
+-    }
+-
+-    static String getImageName(int widgetId, int collectionId, int position, String mode) {
+-        return "widget_" + widgetId + "_mode_" + mode + "_collection_" + collectionId + "_" + position + ".png";
+-    }
+-
+     @Override
+     public RemoteViewsFactory onGetViewFactory(Intent intent) {
+         return new ListRemoteViewsFactory(this.getApplicationContext(), intent);
+@@ -73,10 +58,10 @@ class ListRemoteViewsFactory implements RemoteViewsService.RemoteViewsFactory {
+ 
+         RemoteViews listItemView = new RemoteViews(mContext.getPackageName(), R.layout.rn_widget_list_item);
+         listItemView.removeAllViews(R.id.rn_widget_list_item_clickable_container);
+-        Uri lightImageUri = RNWidgetImageProvider.getImageUri(mContext, bundle.getString("lightImageName"));
+-        listItemView.setImageViewUri(R.id.rn_widget_list_item_light, lightImageUri);
+-        Uri darkImageUri = RNWidgetImageProvider.getImageUri(mContext, bundle.getString("darkImageName"));
+-        listItemView.setImageViewUri(R.id.rn_widget_list_item_dark, darkImageUri);
++        Bitmap lightBitmap = bundle.getParcelable("lightBitmap");
++        Bitmap darkBitmap = bundle.getParcelable("darkBitmap");
++        listItemView.setImageViewBitmap(R.id.rn_widget_list_item_light, lightBitmap);
++        listItemView.setImageViewBitmap(R.id.rn_widget_list_item_dark, darkBitmap);
+ 
+         // Set item accessibility label on ImageViews if available
+         if (bundle.getString("itemAccessibilityLabel", null) != null) {
+diff --git a/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetImageProvider.java b/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetImageProvider.java
+index 0f963f0..5ad1b36 100644
+--- a/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetImageProvider.java
++++ b/node_modules/react-native-android-widget/android/src/main/java/com/reactnativeandroidwidget/RNWidgetImageProvider.java
+@@ -69,6 +69,10 @@ public class RNWidgetImageProvider extends ContentProvider {
+         deleteImages(context, "widget_" + widgetId + "_");
+     }
+ 
++    static void deleteAllImages(Context context) {
++        deleteImages(context, "");
++    }
++
+     static void deleteCollectionImages(Context context, int widgetId, int collectionId, String mode) {
+         deleteImages(context, "widget_" + widgetId + "_mode_" + mode + "_collection_" + collectionId + "_");
+     }
