@@ -33,6 +33,33 @@ export function registerUatProbes(): void {
       console.log("uat-probe scheduled count", entries.length);
     });
   });
+  DevSettings.addMenuItem("Probe presented notifications", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { dismissNotificationAsync, getPresentedNotificationsAsync } =
+      require("expo-notifications") as typeof import("expo-notifications");
+    void (async () => {
+      const presented = await getPresentedNotificationsAsync();
+      for (const notification of presented) {
+        const identifier = notification.request.identifier;
+        console.log(
+          "uat-probe presented",
+          JSON.stringify({ identifier, data: notification.request.content.data }),
+        );
+        if (!identifier.startsWith("decay:")) continue;
+        try {
+          await dismissNotificationAsync(identifier);
+          console.log("uat-probe dismiss resolved", identifier);
+        } catch (error) {
+          console.log("uat-probe dismiss rejected", identifier, String(error));
+        }
+      }
+      const after = await getPresentedNotificationsAsync();
+      console.log(
+        "uat-probe presented after",
+        JSON.stringify(after.map((n) => n.request.identifier)),
+      );
+    })();
+  });
   DevSettings.addMenuItem("Measure backup ingress", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { runIngressMeasure } =
