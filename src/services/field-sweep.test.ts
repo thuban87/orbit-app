@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
 vi.mock("expo-sqlite", () => ({}));
+
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { createField } from "@/db/field-ddl";
 import { restoreField } from "@/db/field-defs-dao";
 import type { NewFieldDef } from "@/db/field-types";
-import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { registerFieldSweep } from "@/services/field-sweep";
@@ -14,7 +16,7 @@ import {
   runLaunchSweep,
 } from "@/services/launch-sweep";
 
-const NOW = "2026-08-24 12:00:00";
+let NOW = "";
 const clock = () => NOW;
 let uidCounter = 0;
 const uid = () => `uid-${++uidCounter}`;
@@ -24,7 +26,13 @@ beforeEach(async () => {
   uidCounter = 0;
   __resetSweepForTest();
   exec = nodeSqliteExecutor(openTestDb());
-  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, { now: NOW, newUid: uid });
+  NOW = (await exec.getFirstAsync<{ now: string }>(
+    "SELECT datetime('now', 'localtime') AS now",
+  ))!.now;
+  await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+    now: NOW,
+    newUid: uid,
+  });
 });
 
 afterEach(() => __resetSweepForTest());
