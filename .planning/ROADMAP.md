@@ -1095,7 +1095,7 @@ Plans:
 **Success Criteria**: Defined at planning; each RG's STATIC/RUNTIME/DEVICE verification expectations carried forward (real restore/export flows, failure injection, commit → failed read → retry)
 **Scope source**: docs/dossier/milestone-2/phase-38.2-audit-remediation-data-security-lifecycle-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; SYNTHESIS "Constraints that must survive remediation"
-**Plans**: 14/16 plans executed in 8 waves
+**Plans**: 15/16 plans executed in 8 waves
 
 Plans:
 **Wave 1**
@@ -1132,7 +1132,7 @@ Plans:
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 38.2-15-PLAN.md — Backup ingress ceiling: measure → owner sign-off → enforce (RG-002, D-19; checkpoint)
+- [x] 38.2-15-PLAN.md — Backup ingress ceiling: measure → owner sign-off → enforce (RG-002, D-19; checkpoint)
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
@@ -1213,7 +1213,7 @@ Plans:
 | 36. AI Configuration & Prompting | 11/11 | Complete | 2026-09-14 |
 | 37. Settings & Personalization | 8/8 | Complete | 2026-09-14 |
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
-| 38.2 Data Integrity, Security & Lifecycle Hardening | 14/16 | In Progress|  |
+| 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 0/TBD | Ready to discuss | - |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 0/TBD | Ready to discuss | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
