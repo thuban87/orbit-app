@@ -1,8 +1,11 @@
+import type {
+  ReconciliationRow,
+  ReconciliationTombstone,
+} from "@/backup/types";
 import {
   RESERVED_CATEGORY_UIDS,
   RESERVED_PROFILE_UID,
 } from "@/db/migrations/007-tombstones";
-import type { ReconciliationRow, ReconciliationTombstone } from "@/backup/types";
 import { categoryNameKey } from "@/logic/category-logic";
 import { BUILTIN_SYSTEM_LABELS } from "@/logic/orrery-system-logic";
 
@@ -85,7 +88,9 @@ export interface EntityPolicy {
  * hard-delete writer exists yet, so backup restore and future sync share one
  * exhaustive contract rather than a tombstone-writer subset.
  */
-export const ENTITY_POLICIES: Readonly<Record<MergeableEntityType, EntityPolicy>> = {
+export const ENTITY_POLICIES: Readonly<
+  Record<MergeableEntityType, EntityPolicy>
+> = {
   contacts: { writeMode: "lww" },
   contact_methods: {
     writeMode: "lww",
@@ -99,7 +104,11 @@ export const ENTITY_POLICIES: Readonly<Record<MergeableEntityType, EntityPolicy>
     writeMode: "lww",
     parentFields: [
       { field: "method_id", entityType: "contact_methods" },
-      { field: "external_contact_link_id", entityType: "external_contact_links", optional: true },
+      {
+        field: "external_contact_link_id",
+        entityType: "external_contact_links",
+        optional: true,
+      },
     ],
   },
   interactions: {
@@ -137,9 +146,18 @@ export const ENTITY_POLICIES: Readonly<Record<MergeableEntityType, EntityPolicy>
       { field: "field_def_id", entityType: "custom_field_defs" },
     ],
   },
-  memories: { writeMode: "lww", parentFields: [{ field: "contact_id", entityType: "contacts" }] },
-  relationships: { writeMode: "lww", parentFields: [{ field: "contact_id", entityType: "contacts" }] },
-  current_state_entries: { writeMode: "lww", parentFields: [{ field: "contact_id", entityType: "contacts" }] },
+  memories: {
+    writeMode: "lww",
+    parentFields: [{ field: "contact_id", entityType: "contacts" }],
+  },
+  relationships: {
+    writeMode: "lww",
+    parentFields: [{ field: "contact_id", entityType: "contacts" }],
+  },
+  current_state_entries: {
+    writeMode: "lww",
+    parentFields: [{ field: "contact_id", entityType: "contacts" }],
+  },
   categories: {
     writeMode: "lww",
     reservedUids: Object.values(RESERVED_CATEGORY_UIDS),
@@ -262,10 +280,14 @@ type TombstoneCandidate = {
   source: "local" | "incoming";
 };
 
-function assertUniqueRows(rows: readonly ReconciliationRow[], label: string): void {
+function assertUniqueRows(
+  rows: readonly ReconciliationRow[],
+  label: string,
+): void {
   const seen = new Set<string>();
   for (const row of rows) {
-    if (seen.has(row.uid)) throw new Error(`duplicate live UID in ${label}: ${row.uid}`);
+    if (seen.has(row.uid))
+      throw new Error(`duplicate live UID in ${label}: ${row.uid}`);
     seen.add(row.uid);
   }
 }
@@ -277,7 +299,9 @@ function assertUniqueTombstones(
   const seen = new Set<string>();
   for (const tombstone of tombstones) {
     if (seen.has(tombstone.entity_uid)) {
-      throw new Error(`duplicate tombstone UID in ${label}: ${tombstone.entity_uid}`);
+      throw new Error(
+        `duplicate tombstone UID in ${label}: ${tombstone.entity_uid}`,
+      );
     }
     seen.add(tombstone.entity_uid);
   }
@@ -291,7 +315,9 @@ export function compareRowAndTombstone(
   return row.modified_at > tombstone.deleted_at ? "row" : "tombstone";
 }
 
-function newestRow(candidates: readonly RowCandidate[]): RowCandidate | undefined {
+function newestRow(
+  candidates: readonly RowCandidate[],
+): RowCandidate | undefined {
   return candidates.reduce<RowCandidate | undefined>(
     (winner, candidate) =>
       winner === undefined || candidate.row.modified_at > winner.row.modified_at
@@ -306,7 +332,8 @@ function newestTombstone(
 ): TombstoneCandidate | undefined {
   return candidates.reduce<TombstoneCandidate | undefined>(
     (winner, candidate) =>
-      winner === undefined || candidate.tombstone.deleted_at > winner.tombstone.deleted_at
+      winner === undefined ||
+      candidate.tombstone.deleted_at > winner.tombstone.deleted_at
         ? candidate
         : winner,
     undefined,
@@ -321,13 +348,18 @@ export function sameFileSurvivorUids(
   assertUniqueRows(liveRows, "same-file rows");
   assertUniqueTombstones(tombstones, "same-file tombstones");
   const rows = new Map(liveRows.map((row) => [row.uid, row]));
-  const deleted = new Map(tombstones.map((tombstone) => [tombstone.entity_uid, tombstone]));
+  const deleted = new Map(
+    tombstones.map((tombstone) => [tombstone.entity_uid, tombstone]),
+  );
   const allUids = new Set([...rows.keys(), ...deleted.keys()]);
   const survivors = new Set<string>();
   for (const uid of allUids) {
     const row = rows.get(uid);
     const tombstone = deleted.get(uid);
-    if (row && (!tombstone || compareRowAndTombstone(row, tombstone) === "row")) {
+    if (
+      row &&
+      (!tombstone || compareRowAndTombstone(row, tombstone) === "row")
+    ) {
       survivors.add(uid);
     }
   }
@@ -340,11 +372,15 @@ export function referenceOrFallback<T>(
   survivingParentUids: ReadonlySet<string>,
   fallback: T,
 ): string | null | T {
-  if (referenceUid === null || survivingParentUids.has(referenceUid)) return referenceUid;
+  if (referenceUid === null || survivingParentUids.has(referenceUid))
+    return referenceUid;
   return fallback;
 }
 
-function readParentUid(row: ReconciliationRow, field: string): string | undefined {
+function readParentUid(
+  row: ReconciliationRow,
+  field: string,
+): string | undefined {
   const aliases: Record<string, string> = {
     contact_id: "contactUid",
     field_def_id: "fieldDefUid",
@@ -366,7 +402,11 @@ function rowHasLostParent(
   for (const parent of policy.parentFields ?? []) {
     const survivors = parentSurvivors?.[parent.entityType];
     const uid = readParentUid(row, parent.field);
-    if (survivors && ((!uid && !parent.optional) || (uid && !survivors.has(uid)))) return parent.field;
+    if (
+      survivors &&
+      ((!uid && !parent.optional) || (uid && !survivors.has(uid)))
+    )
+      return parent.field;
   }
   return undefined;
 }
@@ -410,7 +450,9 @@ function normalizeAiConnectionIdentity(
 function pairKey(row: ReconciliationRow): string | undefined {
   const contactUid = readParentUid(row, "contact_id");
   const fieldDefUid = readParentUid(row, "field_def_id");
-  return contactUid && fieldDefUid ? `${contactUid}\u0000${fieldDefUid}` : undefined;
+  return contactUid && fieldDefUid
+    ? `${contactUid}\u0000${fieldDefUid}`
+    : undefined;
 }
 
 function incompatibleRows(
@@ -436,7 +478,9 @@ function incompatibleRows(
       if (key && current && current.uid !== incoming.uid) {
         incompatibilities.push({
           kind,
-          entityType: input.entityType as "custom_field_values" | "custom_field_defs",
+          entityType: input.entityType as
+            | "custom_field_values"
+            | "custom_field_defs",
           key,
           localUid: current.uid,
           incomingUid: incoming.uid,
@@ -446,9 +490,13 @@ function incompatibleRows(
       }
     }
   };
-  if (input.entityType === "custom_field_values") compare(pairKey, "pair-key-collision");
+  if (input.entityType === "custom_field_values")
+    compare(pairKey, "pair-key-collision");
   if (input.entityType === "custom_field_defs") {
-    compare((row) => (typeof row.col_name === "string" ? row.col_name : undefined), "col-name-collision");
+    compare((row) => {
+      const key = row.colName ?? row.col_name;
+      return typeof key === "string" ? key : undefined;
+    }, "col-name-collision");
   }
   return { incompatibilities, uids };
 }
@@ -457,7 +505,9 @@ function incompatibleRows(
  * Pure two-sided UID reconciliation. Parent callers run first, then provide
  * survivor sets for child calls; this function never maps UIDs to local IDs.
  */
-export function reconcileEntity(rawInput: ReconcileEntityInput): ReconciliationResult {
+export function reconcileEntity(
+  rawInput: ReconcileEntityInput,
+): ReconciliationResult {
   assertUniqueRows(rawInput.localRows, "local rows");
   assertUniqueRows(rawInput.incomingRows, "incoming rows");
   const input = normalizeAiConnectionIdentity(rawInput);
@@ -471,7 +521,9 @@ export function reconcileEntity(rawInput: ReconcileEntityInput): ReconciliationR
   const collision = incompatibleRows(input, policy);
   const localRows = new Map(input.localRows.map((row) => [row.uid, row]));
   const incomingRows = new Map(input.incomingRows.map((row) => [row.uid, row]));
-  const localDeleted = new Map(localTombstones.map((tombstone) => [tombstone.entity_uid, tombstone]));
+  const localDeleted = new Map(
+    localTombstones.map((tombstone) => [tombstone.entity_uid, tombstone]),
+  );
   const incomingDeleted = new Map(
     incomingTombstones.map((tombstone) => [tombstone.entity_uid, tombstone]),
   );
@@ -495,18 +547,24 @@ export function reconcileEntity(rawInput: ReconcileEntityInput): ReconciliationR
     );
     const tombstoneWinner = newestTombstone(
       [
-        localDeleted.get(uid) && { tombstone: localDeleted.get(uid)!, source: "local" as const },
+        localDeleted.get(uid) && {
+          tombstone: localDeleted.get(uid)!,
+          source: "local" as const,
+        },
         incomingDeleted.get(uid) && {
           tombstone: incomingDeleted.get(uid)!,
           source: "incoming" as const,
         },
-      ].filter((candidate): candidate is TombstoneCandidate => Boolean(candidate)),
+      ].filter((candidate): candidate is TombstoneCandidate =>
+        Boolean(candidate),
+      ),
     );
     if (!rowWinner && !tombstoneWinner) continue;
     const rowSurvives =
       rowWinner !== undefined &&
       (tombstoneWinner === undefined ||
-        compareRowAndTombstone(rowWinner.row, tombstoneWinner.tombstone) === "row");
+        compareRowAndTombstone(rowWinner.row, tombstoneWinner.tombstone) ===
+          "row");
     if (!rowSurvives) {
       if (localRow) actions.push({ kind: "delete", uid });
       else actions.push({ kind: "retain", uid });
@@ -514,13 +572,30 @@ export function reconcileEntity(rawInput: ReconcileEntityInput): ReconciliationR
     }
 
     const mergeableRow = withoutDerivedFields(input.entityType, rowWinner.row);
-    const lostParent = rowHasLostParent(mergeableRow, policy, input.parentSurvivors);
+    const lostParent = rowHasLostParent(
+      mergeableRow,
+      policy,
+      input.parentSurvivors,
+    );
     if (lostParent) {
-      actions.push({ kind: "blocked", uid, row: mergeableRow, reason: `missing parent ${lostParent}` });
+      actions.push({
+        kind: "blocked",
+        uid,
+        row: mergeableRow,
+        reason: `missing parent ${lostParent}`,
+      });
     } else if (policy.writeMode === "insert-if-missing" && localRow) {
-      actions.push({ kind: "retain", uid, row: withoutDerivedFields(input.entityType, localRow) });
+      actions.push({
+        kind: "retain",
+        uid,
+        row: withoutDerivedFields(input.entityType, localRow),
+      });
     } else if (rowWinner.source === "incoming") {
-      actions.push({ kind: localRow ? "update" : "insert", uid, row: mergeableRow });
+      actions.push({
+        kind: localRow ? "update" : "insert",
+        uid,
+        row: mergeableRow,
+      });
     } else {
       actions.push({ kind: "retain", uid, row: mergeableRow });
     }
@@ -530,7 +605,8 @@ export function reconcileEntity(rawInput: ReconcileEntityInput): ReconciliationR
     actions
       .filter(
         (action) =>
-          ["insert", "update", "retain"].includes(action.kind) && action.row !== undefined,
+          ["insert", "update", "retain"].includes(action.kind) &&
+          action.row !== undefined,
       )
       .map((action) => action.uid),
   );
@@ -542,5 +618,10 @@ export function reconcileEntity(rawInput: ReconcileEntityInput): ReconciliationR
     blocked: 0,
   };
   for (const action of actions) totals[action.kind] += 1;
-  return { actions, incompatibilities: collision.incompatibilities, totals, survivors };
+  return {
+    actions,
+    incompatibilities: collision.incompatibilities,
+    totals,
+    survivors,
+  };
 }

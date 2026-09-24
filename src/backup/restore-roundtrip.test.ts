@@ -1,19 +1,24 @@
 import { expect, it, vi } from "vitest";
 
 vi.mock("expo-sqlite", () => ({}));
-vi.mock("@/services/photos/photo-storage", () => ({
-  contactPhotoRelPath: (id: number) => `avatars/contact-${id}.jpg`,
-  customFieldPhotoRelPath: (id: number, colName: string) =>
-    `avatars/cv-${id}-${colName}.jpg`,
-  profilePhotoRelPath: () => "avatars/profile.jpg",
-  deletePhoto: () => {},
-  deleteRestorePending: () => {},
-  photoFileExists: () => false,
-  persistMaster: async () => {},
-  resolveRestorePendingUri: (path: string) => path,
-  restorePendingRelPath: () => "avatars/_restore_pending/test.jpg",
-  stageRestorePendingBase64: async () => {},
-}));
+vi.mock("@/services/photos/photo-storage", async () => {
+  const paths = await vi.importActual<
+    typeof import("@/db/photo-relative-path")
+  >("@/db/photo-relative-path");
+  return {
+    contactPhotoRelPath: (id: number) => `avatars/contact-${id}.jpg`,
+    customFieldPhotoRelPath: (id: number, colName: string) =>
+      `avatars/cv-${id}-${colName}.jpg`,
+    profilePhotoRelPath: () => "avatars/profile.jpg",
+    deletePhoto: () => {},
+    deleteRestorePending: () => {},
+    photoFileExists: () => false,
+    persistMaster: async () => {},
+    resolveRestorePendingUri: (path: string) => path,
+    restorePendingRelPath: paths.restorePendingRelPath,
+    stageRestorePendingBase64: async () => {},
+  };
+});
 vi.mock("@/services/photos/background-storage", () => ({
   backgroundDerivativeRelPath: (uid: string) =>
     `profile-backgrounds/${uid}.jpg`,
@@ -33,9 +38,14 @@ import { parseBackupManifest } from "@/backup/backup-schema";
 import { buildExportManifest } from "@/backup/export-manifest";
 import { applyRestore } from "@/backup/restore-apply";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { updateAppSettings } from "@/db/app-settings-dao";
+import { archiveContact } from "@/db/contacts-dao";
+import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import { completeGlobalPairsCore } from "@/db/pair-matrix";
+import { purgeContact } from "@/db/purge-dao";
+import { snoozeContact } from "@/db/snooze-dao";
 
 const NOW = "2026-09-01 00:00:00";
 let next = 0;
@@ -102,6 +112,31 @@ it("Merge with local definitions completes all global pairs and its real export 
   ).toBe("applied");
 });
 
+it("stages a valid photo-bearing wire UID with punctuation under a safe temporary slot", async () => {
+  const source = await db();
+  const destination = await db();
+  await contact(source, "a:b");
+  await source.runAsync(
+    "UPDATE contacts SET photo='avatars/source.jpg' WHERE uid='a:b'",
+  );
+  const staged: string[] = [];
+  const result = await applyRestore(
+    destination,
+    await exported(source),
+    "merge",
+    {
+      stagePhoto: async (_bytes, relative) => {
+        staged.push(relative);
+      },
+    },
+  );
+  expect(result.status).toBe("applied");
+  expect(staged).toHaveLength(1);
+  expect(staged[0]).toMatch(
+    /^avatars\/_restore_pending\/contact-slot0-[A-Za-z0-9_-]+\.jpg$/,
+  );
+});
+
 it("Merge with incoming definitions completes local archived contacts and independently seeded pairs reconcile", async () => {
   const source = await db();
   const destination = await db();
@@ -122,4 +157,289 @@ it("Merge with incoming definitions completes local archived contacts and indepe
   expect(
     (await applyRestore(source, await exported(destination), "merge")).status,
   ).toBe("applied");
+});
+
+it("conflates equal own UIDs and keeps one deterministic pair", async () => {
+  const first = await db();
+  const second = await db();
+  for (const exec of [first, second]) {
+    await contact(exec, "same-contact");
+    await def(exec, "same-def");
+    await completeGlobalPairsCore(exec);
+  }
+  expect(
+    (await applyRestore(second, await exported(first), "merge")).status,
+  ).toBe("applied");
+  expect(
+    await second.getAllAsync<{ uid: string }>(
+      "SELECT uid FROM custom_field_values",
+    ),
+  ).toEqual([
+    {
+      uid: `pair:${Buffer.from("same-contact").toString("hex").toUpperCase()}:${Buffer.from("same-def").toString("hex").toUpperCase()}`,
+    },
+  ]);
+});
+
+it("refuses distinct value identities for one pair without changing the destination", async () => {
+  const source = await db();
+  const destination = await db();
+  for (const exec of [source, destination]) {
+    await contact(exec, "same-contact");
+    await def(exec, "same-def");
+  }
+  const pairIds = async (exec: Awaited<ReturnType<typeof db>>) => ({
+    contact: (await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM contacts WHERE uid='same-contact'",
+    ))!.id,
+    def: (await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM custom_field_defs WHERE uid='same-def'",
+    ))!.id,
+  });
+  for (const [exec, uid] of [
+    [source, "wire-a"],
+    [destination, "wire-b"],
+  ] as const) {
+    const ids = await pairIds(exec);
+    await exec.runAsync(
+      "INSERT INTO custom_field_values(uid,contact_id,field_def_id,value,created_at,modified_at) VALUES(?,?,?,NULL,?,?)",
+      [uid, ids.contact, ids.def, NOW, NOW],
+    );
+  }
+  const before = await destination.getAllAsync(
+    "SELECT * FROM custom_field_values",
+  );
+  expect(
+    (await applyRestore(destination, await exported(source), "merge")).status,
+  ).toBe("incompatible-destination");
+  expect(
+    await destination.getAllAsync("SELECT * FROM custom_field_values"),
+  ).toEqual(before);
+});
+
+it("refuses two definition UIDs that claim the same column name", async () => {
+  const source = await db();
+  const destination = await db();
+  await def(source, "source-def");
+  await destination.runAsync(
+    "INSERT INTO custom_field_defs(uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES('destination-def','source-def','Clash','text',0,0,0,0,'global',?,?)",
+    [NOW, NOW],
+  );
+  expect(
+    (await applyRestore(destination, await exported(source), "merge")).status,
+  ).toBe("incompatible-destination");
+});
+
+it("seeds a fallback UID when a wire value occupies the missing pair's deterministic slot", async () => {
+  const source = await db();
+  const destination = await db();
+  await contact(source, "source-contact");
+  await def(source, "source-def");
+  await contact(destination, "destination-contact");
+  await def(destination, "destination-def");
+  await completeGlobalPairsCore(destination);
+  const sourceContactId = (await source.getFirstAsync<{ id: number }>(
+    "SELECT id FROM contacts WHERE uid='source-contact'",
+  ))!.id;
+  const sourceDefId = (await source.getFirstAsync<{ id: number }>(
+    "SELECT id FROM custom_field_defs WHERE uid='source-def'",
+  ))!.id;
+  const occupied = `pair:${Buffer.from("destination-contact").toString("hex").toUpperCase()}:${Buffer.from("source-def").toString("hex").toUpperCase()}`;
+  await source.runAsync(
+    "INSERT INTO custom_field_values(uid,contact_id,field_def_id,value,created_at,modified_at) VALUES(?,?,?,?,?,?)",
+    [occupied, sourceContactId, sourceDefId, "keep", NOW, NOW],
+  );
+  expect(
+    (await applyRestore(destination, await exported(source), "merge")).status,
+  ).toBe("applied");
+  const original = await destination.getFirstAsync<{
+    value: string;
+    uid: string;
+  }>(
+    "SELECT v.value,v.uid FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id JOIN custom_field_defs d ON d.id=v.field_def_id WHERE c.uid='source-contact' AND d.uid='source-def'",
+  );
+  expect(original).toEqual({ value: "keep", uid: occupied });
+  const fallback = await destination.getFirstAsync<{ uid: string }>(
+    "SELECT v.uid FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id JOIN custom_field_defs d ON d.id=v.field_def_id WHERE c.uid='destination-contact' AND d.uid='source-def'",
+  );
+  expect(fallback?.uid).toMatch(/^pairx:[0-9a-f]{32}$/);
+});
+
+it("persists tombstone-only parent and child evidence, bumps revision, and blocks older resurrection", async () => {
+  const source = await db();
+  const oldSource = await db();
+  const destination = await db();
+  await contact(oldSource, "deleted-contact");
+  const olderSnapshot = await exported(oldSource);
+  for (const entityType of ["contact", "fuel"]) {
+    await source.runAsync(
+      "INSERT INTO tombstones(entity_type,entity_uid,deleted_at) VALUES(?,?,?)",
+      [entityType, `deleted-${entityType}`, "2026-09-02 00:00:00"],
+    );
+  }
+  const before = await readDataRevision(destination);
+  expect(
+    (await applyRestore(destination, await exported(source), "merge")).status,
+  ).toBe("applied");
+  expect(await readDataRevision(destination)).toBe(before + 1);
+  expect(
+    await destination.getAllAsync(
+      "SELECT entity_type,entity_uid FROM tombstones WHERE entity_uid LIKE 'deleted-%' ORDER BY entity_type",
+    ),
+  ).toEqual([
+    { entity_type: "contact", entity_uid: "deleted-contact" },
+    { entity_type: "fuel", entity_uid: "deleted-fuel" },
+  ]);
+  expect((await applyRestore(destination, olderSnapshot, "merge")).status).toBe(
+    "applied",
+  );
+  expect(
+    await destination.getFirstAsync(
+      "SELECT uid FROM contacts WHERE uid='deleted-contact'",
+    ),
+  ).toBeNull();
+});
+
+it("reconciles against snooze and settings writes committed while incoming bytes stage", async () => {
+  const source = await db();
+  const destination = await db();
+  await contact(source, "shared");
+  await contact(destination, "shared");
+  await source.runAsync(
+    "UPDATE contacts SET photo='avatars/source.jpg' WHERE uid='shared'",
+  );
+  const manifest = await exported(source);
+  const local = await destination.getFirstAsync<{ id: number }>(
+    "SELECT id FROM contacts WHERE uid='shared'",
+  );
+  const result = await applyRestore(destination, manifest, "merge", {
+    stagePhoto: async () => {
+      await snoozeContact(destination, {
+        contactId: local!.id,
+        uid: "snooze-event",
+        preset: "1w",
+        now: "2026-09-03 00:00:00",
+      });
+      await updateAppSettings(
+        destination,
+        { digestEnabled: 1 },
+        "2026-09-03 00:00:00",
+      );
+    },
+  });
+  expect(result.status).toBe("applied");
+  expect(
+    await destination.getFirstAsync<{
+      snooze_until: string;
+      modified_at: string;
+    }>("SELECT snooze_until,modified_at FROM contacts WHERE uid='shared'"),
+  ).toMatchObject({ modified_at: "2026-09-03 00:00:00" });
+  expect(
+    await destination.getFirstAsync<{
+      modified_at: string;
+      digest_enabled: number;
+    }>("SELECT modified_at,digest_enabled FROM app_settings WHERE id=1"),
+  ).toMatchObject({ modified_at: "2026-09-03 00:00:00", digest_enabled: 1 });
+  expect(
+    await destination.getFirstAsync(
+      "SELECT uid FROM events WHERE uid='snooze-event'",
+    ),
+  ).toBeTruthy();
+});
+
+it("retains a contact purge committed during staging instead of resurrecting the incoming row", async () => {
+  const source = await db();
+  const destination = await db();
+  await contact(source, "purged", true);
+  await contact(destination, "purged", true);
+  await source.runAsync(
+    "UPDATE contacts SET photo='avatars/source.jpg' WHERE uid='purged'",
+  );
+  const manifest = await exported(source);
+  const local = await destination.getFirstAsync<{ id: number }>(
+    "SELECT id FROM contacts WHERE uid='purged'",
+  );
+  expect(
+    (
+      await applyRestore(destination, manifest, "merge", {
+        stagePhoto: async () =>
+          purgeContact(destination, local!.id, { now: "2026-09-03 00:00:00" }),
+      })
+    ).status,
+  ).toBe("applied");
+  expect(
+    await destination.getFirstAsync(
+      "SELECT uid FROM contacts WHERE uid='purged'",
+    ),
+  ).toBeNull();
+  expect(
+    await destination.getFirstAsync(
+      "SELECT entity_uid FROM tombstones WHERE entity_type='contact' AND entity_uid='purged'",
+    ),
+  ).toBeTruthy();
+});
+
+it("retains a contact archive committed during staging", async () => {
+  const source = await db();
+  const destination = await db();
+  await contact(source, "archived");
+  await contact(destination, "archived");
+  await source.runAsync(
+    "UPDATE contacts SET photo='avatars/source.jpg' WHERE uid='archived'",
+  );
+  const manifest = await exported(source);
+  const local = await destination.getFirstAsync<{ id: number }>(
+    "SELECT id FROM contacts WHERE uid='archived'",
+  );
+  expect(
+    (
+      await applyRestore(destination, manifest, "merge", {
+        stagePhoto: async () =>
+          archiveContact(destination, local!.id, "2026-09-03 00:00:00"),
+      })
+    ).status,
+  ).toBe("applied");
+  expect(
+    await destination.getFirstAsync<{
+      archived_at: string;
+      modified_at: string;
+    }>("SELECT archived_at,modified_at FROM contacts WHERE uid='archived'"),
+  ).toEqual({
+    archived_at: "2026-09-03 00:00:00",
+    modified_at: "2026-09-03 00:00:00",
+  });
+});
+
+it("imports a newer tombstone with no row action and lets equal-second deletion win", async () => {
+  const source = await db();
+  const destination = await db();
+  await source.runAsync(
+    "INSERT INTO tombstones(entity_type,entity_uid,deleted_at) VALUES('contact','gone','2026-09-03 00:00:00')",
+  );
+  await destination.runAsync(
+    "INSERT INTO tombstones(entity_type,entity_uid,deleted_at) VALUES('contact','gone','2026-09-02 00:00:00')",
+  );
+  const before = await readDataRevision(destination);
+  expect(
+    (await applyRestore(destination, await exported(source), "merge")).status,
+  ).toBe("applied");
+  expect(await readDataRevision(destination)).toBe(before + 1);
+  expect(
+    await destination.getFirstAsync<{ deleted_at: string }>(
+      "SELECT deleted_at FROM tombstones WHERE entity_type='contact' AND entity_uid='gone'",
+    ),
+  ).toEqual({ deleted_at: "2026-09-03 00:00:00" });
+  const older = await db();
+  await contact(older, "gone");
+  await older.runAsync(
+    "UPDATE contacts SET modified_at='2026-09-03 00:00:00' WHERE uid='gone'",
+  );
+  expect(
+    (await applyRestore(destination, await exported(older), "merge")).status,
+  ).toBe("applied");
+  expect(
+    await destination.getFirstAsync(
+      "SELECT uid FROM contacts WHERE uid='gone'",
+    ),
+  ).toBeNull();
 });

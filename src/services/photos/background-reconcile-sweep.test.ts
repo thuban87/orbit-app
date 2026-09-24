@@ -98,11 +98,21 @@ import {
   registerBackgroundReconcileSweep,
   runBackgroundReconciliation,
 } from "./background-reconcile-sweep";
+import {
+  __resetStagingSessionsForTest,
+  beginStagingSession,
+  endStagingSession,
+} from "./staging-sessions";
 
 beforeEach(() => {
+  h.entries = [];
+  h.pending = [];
+  h.bytes = new Map();
+  h.operations = [];
   h.pendingRead = null;
   h.fail.clear();
   __resetSweepForTest();
+  __resetStagingSessionsForTest();
 });
 
 function execFor(imagePaths: Record<string, string>) {
@@ -141,6 +151,53 @@ function pending(uid: string, bytes: string, session = "session") {
 }
 
 describe("background launch reconciliation plan", () => {
+  it("keeps a canonical file committed after the pass-start row snapshot", async () => {
+    h.entries = ["new.jpg"];
+    h.bytes.set("profile-backgrounds/new.jpg", "new bytes");
+    let reads = 0;
+    const exec = {
+      getAllAsync: async () => {
+        reads += 1;
+        return reads === 1
+          ? []
+          : [{ uid: "new", imagePath: "profile-backgrounds/new.jpg" }];
+      },
+      getFirstAsync: async () => null,
+      runAsync: async () => ({ changes: 0 }),
+      execAsync: async () => undefined,
+    } as never;
+    await runBackgroundReconciliation(exec);
+    expect(h.bytes.get("profile-backgrounds/new.jpg")).toBe("new bytes");
+    expect(h.operations).not.toContain(
+      "deleteCanonical profile-backgrounds/new.jpg",
+    );
+  });
+
+  it("skips pending bytes owned by an active restore staging session", async () => {
+    h.entries = [];
+    h.pending = [];
+    const relative = pending("active", "staged bytes", "session-active");
+    beginStagingSession("session-active");
+    try {
+      await runBackgroundReconciliation(execFor({}));
+      expect(h.pending.some((entry) => entry.relative === relative)).toBe(true);
+      expect(h.operations).not.toContain(`deletePending ${relative}`);
+    } finally {
+      endStagingSession("session-active");
+    }
+  });
+
+  it("keeps pending bytes from a session that starts and ends after the pass began", async () => {
+    const relative = pending("transient", "staged bytes", "transient-session");
+    h.pendingRead = async () => {
+      beginStagingSession("transient-session");
+      endStagingSession("transient-session");
+      return [...h.pending];
+    };
+    await runBackgroundReconciliation(execFor({}));
+    expect(h.pending.some((entry) => entry.relative === relative)).toBe(true);
+    expect(h.operations).not.toContain(`deletePending ${relative}`);
+  });
   it("keeps a path while any template row can still reach it through global, Category, or contact assignment", () => {
     const path = "profile-backgrounds/shared.jpg";
     const plan = planBackgroundReconciliation({

@@ -20,7 +20,7 @@ export interface BackgroundFinalizationDependencies {
 export type BackgroundFinalizationResult = "finalized" | "stale";
 
 /** Serialize ownership check, file swap, row CAS, and cleanup for one template. */
-function withBackgroundFinalizationLock<T>(
+export function withBackgroundFinalizationLock<T>(
   templateUid: string,
   operation: () => Promise<T>,
 ): Promise<T> {

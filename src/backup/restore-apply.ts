@@ -33,6 +33,7 @@ import { completeGlobalPairsCore } from "@/db/pair-matrix";
 import { recomputeLastContactCore } from "@/db/recency-dao";
 import {
   deleteJournalEntryCore,
+  insertFinalizeEntryCore,
   insertJournalEntryCore,
   type RestorePhotoJournalEntry,
 } from "@/db/restore-photo-journal-dao";
@@ -44,6 +45,7 @@ import { reconcileSchedule } from "@/services/notifications/notification-schedul
 import { finalizeBackgroundRestoreCandidate } from "@/services/photos/background-finalization";
 import {
   backgroundDerivativeRelPath,
+  deleteBackgroundRestorePending,
   stageBackgroundRestorePendingBase64,
 } from "@/services/photos/background-storage";
 import {
@@ -59,6 +61,10 @@ import {
   restorePendingRelPath,
   stageRestorePendingBase64,
 } from "@/services/photos/photo-storage";
+import {
+  beginStagingSession,
+  endStagingSession,
+} from "@/services/photos/staging-sessions";
 
 export type RestoreMode = "merge" | "replace-all";
 export type PreRestoreSnapshotResult =
@@ -1062,10 +1068,40 @@ async function canonicalFor(
   return row ? customFieldPhotoRelPath(row.id, row.col_name) : null;
 }
 async function stageCandidates(
-  exec: SqlExecutor,
-  plan: Plan,
+  manifest: BackupManifest,
   session: string,
   stage: RestoreApplyDependencies["stagePhoto"],
+  staged: Map<string, FinalizeCandidate>,
+): Promise<void> {
+  const reservedUids = new Set([
+    ...manifest.contacts.map((row) => row.uid),
+    ...manifest.customFieldValues.map((row) => row.contactUid),
+  ]);
+  let slot = 0;
+  for (const entity of ["profile", "contacts", "custom_field_values"] as const)
+    for (const row of incomingRows(manifest, entity)) {
+      const target = targetFor(entity, row);
+      if (!target || typeof row.photoBase64 !== "string") continue;
+      // An arbitrary wire UID may contain punctuation. Keep safe existing
+      // staging names; give unsafe ones a collision-free disposable slot.
+      // Canonical paths remain ADR-021's contact-ID/field-derived names.
+      let stagingTarget: PhotoTarget = target;
+      if (target.kind !== "profile" && !/^[A-Za-z0-9_-]+$/.test(target.uid)) {
+        let safeUid: string;
+        do {
+          safeUid = `slot${slot++}`;
+        } while (reservedUids.has(safeUid));
+        stagingTarget = { ...target, uid: safeUid };
+      }
+      const relativePath = restorePendingRelPath(stagingTarget, session);
+      staged.set(`${entity}\0${row.uid}`, { target, relativePath });
+      await stage!(row.photoBase64, relativePath);
+    }
+}
+async function planPhotoCandidates(
+  exec: SqlExecutor,
+  plan: Plan,
+  staged: ReadonlyMap<string, FinalizeCandidate>,
 ): Promise<{ finalize: FinalizeCandidate[]; deletes: DeleteCandidate[] }> {
   const finalize: FinalizeCandidate[] = [];
   const deletes: DeleteCandidate[] = [];
@@ -1079,9 +1115,9 @@ async function stageCandidates(
         (a.kind === "insert" || a.kind === "update") &&
         typeof a.row.photoBase64 === "string"
       ) {
-        const relativePath = restorePendingRelPath(target, session);
-        await stage!(a.row.photoBase64, relativePath);
-        finalize.push({ target, relativePath });
+        const candidate = staged.get(`${entity}\0${a.uid}`);
+        if (!candidate) throw new Error("winning photo was not staged");
+        finalize.push(candidate);
       } else if (
         a.kind === "delete" ||
         ((a.kind === "insert" || a.kind === "update") &&
@@ -1100,21 +1136,19 @@ async function stageCandidates(
   return { finalize, deletes };
 }
 async function stageBackgroundCandidates(
-  plan: Plan,
+  manifest: BackupManifest,
   sessionToken: string,
   stage: NonNullable<RestoreApplyDependencies["stageBackground"]>,
-): Promise<BackgroundFinalizeCandidate[]> {
-  const candidates: BackgroundFinalizeCandidate[] = [];
-  for (const action of writes(plan, "profile_background_templates")) {
-    const row = action.row!;
+  candidates: BackgroundFinalizeCandidate[],
+): Promise<void> {
+  for (const row of incomingRows(manifest, "profile_background_templates")) {
     if (typeof row.imageBase64 !== "string") continue;
-    await stage(row.imageBase64, row.uid, sessionToken);
     candidates.push({
       uid: row.uid,
       pendingRelativePath: `profile-backgrounds/_restore_pending/${row.uid}/${sessionToken}.jpg`,
     });
+    await stage(row.imageBase64, row.uid, sessionToken);
   }
-  return candidates;
 }
 function entry(
   action: "finalize" | "delete",
@@ -1348,334 +1382,419 @@ export async function applyRestore(
       return { status: "pre-restore-snapshot-failed" };
     preRestoreSnapshotCreated = true;
   }
-  const [settings, local] = await Promise.all([
-    getPortableSettingsSnapshot(exec),
-    Promise.all(
-      entities.map(
-        async (entity) =>
-          [
-            entity,
-            await localRows(exec, entity),
-            await tombstones(exec, entity),
-          ] as const,
-      ),
-    ),
-  ]);
-  const plan = {} as Plan;
-  const survivors: Partial<Record<MergeableEntityType, ReadonlySet<string>>> =
-    {};
-  let incompatibilities = 0;
-  if (mode === "replace-all")
-    for (const entity of entities) {
-      plan[entity] = incomingRows(manifest, entity).map((row) => ({
-        kind: "insert",
-        uid: row.uid,
-        row,
-      }));
-      survivors[entity] = new Set(plan[entity].map((a) => a.uid));
-    }
-  else
-    for (const entity of entities) {
-      const [, rows, deleted] = local.find(
-        ([candidate]) => candidate === entity,
-      )!;
-      const result = reconcileEntity({
-        entityType: entity,
-        localRows: rows,
-        incomingRows: incomingRows(manifest, entity),
-        localTombstones: deleted,
-        incomingTombstones: incomingTombstones(manifest, entity),
-        parentSurvivors: survivors,
-      });
-      plan[entity] = result.actions;
-      survivors[entity] = result.survivors;
-      incompatibilities += result.incompatibilities.length;
-    }
-  if (incompatibilities)
-    return { status: "incompatible-destination", incompatibilities };
-  normalizePlan(plan);
-  if (mode === "merge") {
-    const deletedCategoryUids = new Set(
-      plan.categories
-        .filter((action) => action.kind === "delete")
-        .map((action) => action.uid),
+  const restoreSessionToken = deps.sessionToken ?? newUid();
+  beginStagingSession(restoreSessionToken);
+  const stagedPhotos = new Map<string, FinalizeCandidate>();
+  const stagedBackgrounds: BackgroundFinalizeCandidate[] = [];
+  const committedPhotoKeys = new Set<string>();
+  const committedBackgroundUids = new Set<string>();
+  try {
+    await stageCandidates(
+      manifest,
+      restoreSessionToken,
+      deps.stagePhoto ?? stageRestorePendingBase64,
+      stagedPhotos,
     );
-    suppressCategoryTombstoneDependents(plan, deletedCategoryUids);
-  }
-  if (mode === "merge") {
-    const [, contacts] = local.find(([entity]) => entity === "contacts")!;
-    retainAssignedCadence(plan, new Map(contacts.map((row) => [row.uid, row])));
-  }
-  for (const entity of entities) survivors[entity] = survivorSet(plan[entity]);
-  const finalCategories = plan.categories
-    .filter(
-      (action) =>
-        action.row && ["insert", "update", "retain"].includes(action.kind),
-    )
-    .map((action) => action.row!);
-  const finalSystems = plan.systems
-    .filter(
-      (action) =>
-        action.row && ["insert", "update", "retain"].includes(action.kind),
-    )
-    .map((action) => action.row!);
-  const visibleNameCollisions = findVisibleNameCollisions(
-    finalCategories,
-    finalSystems,
-  );
-  if (visibleNameCollisions.length)
-    return {
-      status: "incompatible-destination",
-      incompatibilities: visibleNameCollisions.length,
-    };
-  const totals = entities.reduce(
-    (out, entity) => {
-      for (const action of plan[entity]) out[action.kind] += 1;
-      return out;
-    },
-    { insert: 0, update: 0, retain: 0, delete: 0, blocked: 0 },
-  );
-  const applySettings =
-    mode === "replace-all" ||
-    (manifest.appSettings.modifiedAt as string) > settings.modifiedAt;
-  if (totals.insert + totals.update + totals.delete === 0 && !applySettings)
+    await stageBackgroundCandidates(
+      manifest,
+      restoreSessionToken,
+      deps.stageBackground ?? stageBackgroundRestorePendingBase64,
+      stagedBackgrounds,
+    );
+    const prepared = await inWriteTransaction(exec, async () => {
+      const [settings, local] = await Promise.all([
+        getPortableSettingsSnapshot(exec),
+        Promise.all(
+          entities.map(
+            async (entity) =>
+              [
+                entity,
+                await localRows(exec, entity),
+                await tombstones(exec, entity),
+              ] as const,
+          ),
+        ),
+      ]);
+      const plan = {} as Plan;
+      const survivors: Partial<
+        Record<MergeableEntityType, ReadonlySet<string>>
+      > = {};
+      let incompatibilities = 0;
+      if (mode === "replace-all")
+        for (const entity of entities) {
+          plan[entity] = incomingRows(manifest, entity).map((row) => ({
+            kind: "insert",
+            uid: row.uid,
+            row,
+          }));
+          survivors[entity] = new Set(plan[entity].map((a) => a.uid));
+        }
+      else
+        for (const entity of entities) {
+          const [, rows, deleted] = local.find(
+            ([candidate]) => candidate === entity,
+          )!;
+          const result = reconcileEntity({
+            entityType: entity,
+            localRows: rows,
+            incomingRows: incomingRows(manifest, entity),
+            localTombstones: deleted,
+            incomingTombstones: incomingTombstones(manifest, entity),
+            parentSurvivors: survivors,
+          });
+          plan[entity] = result.actions;
+          survivors[entity] = result.survivors;
+          incompatibilities += result.incompatibilities.length;
+        }
+      if (incompatibilities)
+        return {
+          result: {
+            status: "incompatible-destination" as const,
+            incompatibilities,
+          },
+        };
+      normalizePlan(plan);
+      if (mode === "merge") {
+        const deletedCategoryUids = new Set(
+          plan.categories
+            .filter((action) => action.kind === "delete")
+            .map((action) => action.uid),
+        );
+        suppressCategoryTombstoneDependents(plan, deletedCategoryUids);
+      }
+      if (mode === "merge") {
+        const [, contacts] = local.find(([entity]) => entity === "contacts")!;
+        retainAssignedCadence(
+          plan,
+          new Map(contacts.map((row) => [row.uid, row])),
+        );
+      }
+      for (const entity of entities)
+        survivors[entity] = survivorSet(plan[entity]);
+      const finalCategories = plan.categories
+        .filter(
+          (action) =>
+            action.row && ["insert", "update", "retain"].includes(action.kind),
+        )
+        .map((action) => action.row!);
+      const finalSystems = plan.systems
+        .filter(
+          (action) =>
+            action.row && ["insert", "update", "retain"].includes(action.kind),
+        )
+        .map((action) => action.row!);
+      const visibleNameCollisions = findVisibleNameCollisions(
+        finalCategories,
+        finalSystems,
+      );
+      if (visibleNameCollisions.length)
+        return {
+          result: {
+            status: "incompatible-destination" as const,
+            incompatibilities: visibleNameCollisions.length,
+          },
+        };
+      const totals = entities.reduce(
+        (out, entity) => {
+          for (const action of plan[entity]) out[action.kind] += 1;
+          return out;
+        },
+        { insert: 0, update: 0, retain: 0, delete: 0, blocked: 0 },
+      );
+      const applySettings =
+        mode === "replace-all" ||
+        (manifest.appSettings.modifiedAt as string) > settings.modifiedAt;
+      const tombstonesByKey = new Map(
+        local.flatMap(([entity, , deleted]) =>
+          deleted.map(
+            (item) =>
+              [
+                `${tombstoneEntity[entity]}\0${item.entity_uid}`,
+                item.deleted_at,
+              ] as const,
+          ),
+        ),
+      );
+      const novelTombstone = manifest.tombstones.some((item) => {
+        const current = tombstonesByKey.get(
+          `${item.entityType}\0${item.entityUid}`,
+        );
+        return current === undefined || item.deletedAt > current;
+      });
+      if (
+        totals.insert + totals.update + totals.delete === 0 &&
+        !applySettings &&
+        !novelTombstone
+      )
+        return {
+          result: {
+            status: "applied" as const,
+            mode,
+            inserted: 0,
+            updated: 0,
+            retained: totals.retain,
+            deleted: 0,
+            blocked: totals.blocked,
+            photosNeedingAttention: 0,
+            photoCleanupPending: 0,
+            scheduleResyncPending: false,
+            preRestoreSnapshotCreated,
+          },
+        };
+      const candidates = await planPhotoCandidates(exec, plan, stagedPhotos);
+      const backgroundCandidates = stagedBackgrounds.filter((candidate) =>
+        writes(plan, "profile_background_templates").some(
+          (action) => action.uid === candidate.uid,
+        ),
+      );
+      const backgroundPendingByUid = new Map(
+        backgroundCandidates.map((candidate) => [
+          candidate.uid,
+          candidate.pendingRelativePath,
+        ]),
+      );
+      // ADR-010/ADR-056: child winners are independent of metadata winners.
+      // Include every changed contact (including qualification-flag changes) and
+      // capture old interaction parents before deletes/reparenting lose them.
+      const recencyUids = new Set(
+        writes(plan, "contacts").map((action) => action.uid),
+      );
+      for (const action of plan.interactions) {
+        if (
+          action.kind !== "insert" &&
+          action.kind !== "update" &&
+          action.kind !== "delete"
+        )
+          continue;
+        const oldParent = await exec.getFirstAsync<{ uid: string }>(
+          "SELECT c.uid FROM interactions i JOIN contacts c ON c.id=i.contact_id WHERE i.uid=?",
+          [action.uid],
+        );
+        if (oldParent) recencyUids.add(oldParent.uid);
+        if (
+          action.kind !== "delete" &&
+          typeof action.row?.contactUid === "string"
+        )
+          recencyUids.add(action.row.contactUid);
+      }
+      if (mode === "replace-all") {
+        await replaceAllReset(exec, manifest, candidates.deletes);
+        await clearLiveCategoryTombstones(
+          exec,
+          survivors.categories ?? new Set(),
+        );
+      } else {
+        for (const action of plan.categories)
+          if (action.kind === "delete") {
+            const row = await exec.getFirstAsync<{ id: number }>(
+              "SELECT id FROM categories WHERE uid=?",
+              [action.uid],
+            );
+            if (!row) continue;
+            const preview = await readCategoryDeletionPreviewCore(exec, row.id);
+            if (!preview) continue;
+            const timestamps = [
+              ...manifest.tombstones
+                .filter(
+                  (item) =>
+                    item.entityType === "category" &&
+                    item.entityUid === action.uid,
+                )
+                .map((item) => item.deletedAt),
+              ...(local.find(([entity]) => entity === "categories")?.[2] ?? [])
+                .filter((item) => item.entity_uid === action.uid)
+                .map((item) => item.deleted_at),
+            ].sort();
+            await applyCategoryDeletionFalloutCore(exec, {
+              preview,
+              targetCategoryId: null,
+              now: timestamps.at(-1) ?? manifest.metadata.exportedAt,
+              mode: "merge-null-only",
+            });
+          }
+        for (const entity of [...entities].reverse()) {
+          if (entity === "categories") continue;
+          await deleteActions(exec, entity, plan[entity]);
+        }
+      }
+      await importTombstones(exec, manifest);
+      await upsertParents(exec, plan, backgroundPendingByUid);
+      await upsertContacts(exec, plan);
+      await upsertChildren(exec, plan);
+      await completeGlobalPairsCore(exec);
+      const contacts = await idMap(exec, "contacts");
+      for (const uid of recencyUids) {
+        // Read after all writes: only surviving parents are recomputed, and the
+        // core must preserve the winning metadata stamp rather than re-date it.
+        const contact = await exec.getFirstAsync<{
+          id: number;
+          modified_at: string;
+        }>("SELECT id,modified_at FROM contacts WHERE uid=?", [uid]);
+        if (contact)
+          await recomputeLastContactCore(exec, contact.id, contact.modified_at);
+      }
+      for (const candidate of candidates.finalize) {
+        const canonical = await canonicalFor(exec, candidate.target);
+        if (!canonical)
+          throw new Error("restore photo target disappeared before commit");
+        await writePhotoReference(exec, candidate.target, canonical);
+        await insertFinalizeEntryCore(
+          exec,
+          entry(
+            "finalize",
+            candidate.relativePath,
+            candidate.target,
+            canonical,
+            manifest.metadata.exportedAt,
+          ),
+        );
+      }
+      for (const candidate of candidates.deletes)
+        if (candidate.clearReference)
+          await writePhotoReference(exec, candidate.target, null);
+      for (const candidate of candidates.deletes)
+        await insertJournalEntryCore(
+          exec,
+          entry(
+            "delete",
+            `delete:${candidate.canonicalRelativePath}`,
+            candidate.target,
+            candidate.canonicalRelativePath,
+            manifest.metadata.exportedAt,
+          ),
+        );
+      if (applySettings) {
+        const uid = manifest.appSettings.sunContactUid;
+        const sun =
+          typeof uid === "string" && survivors.contacts?.has(uid)
+            ? (contacts.get(uid) ?? null)
+            : null;
+        const patch = Object.fromEntries(
+          Object.entries(manifest.appSettings).filter(
+            ([key]) => key !== "modifiedAt" && key !== "sunContactUid",
+          ),
+        ) as AppSettingsPatch;
+        await updateAppSettingsCore(
+          exec,
+          { ...patch, sunContactId: sun },
+          manifest.appSettings.modifiedAt as string,
+        );
+      }
+      await bumpDataRevisionCore(exec);
+      return { result: null, candidates, backgroundCandidates, totals };
+    });
+    if (prepared.result) return prepared.result;
+    const { candidates, backgroundCandidates, totals } = prepared;
+    const committedPaths = new Set(
+      candidates.finalize.map((candidate) => candidate.relativePath),
+    );
+    for (const [key, candidate] of stagedPhotos)
+      if (committedPaths.has(candidate.relativePath))
+        committedPhotoKeys.add(key);
+    for (const candidate of backgroundCandidates)
+      committedBackgroundUids.add(candidate.uid);
+    const persist = deps.persistPhoto ?? persistMaster;
+    const remove = deps.deleteCanonicalPhoto ?? deletePhoto;
+    const exists = deps.canonicalPhotoExists ?? photoFileExists;
+    let photosNeedingAttention = 0;
+    let photoCleanupPending = 0;
+    for (const candidate of candidates.finalize) {
+      const canonical = await canonicalFor(exec, candidate.target);
+      if (!canonical) {
+        try {
+          deleteRestorePending(candidate.relativePath);
+        } catch {
+          /* best effort */
+        }
+        await deleteJournalEntryCore(exec, candidate.relativePath);
+        continue;
+      }
+      try {
+        await persist(
+          resolveRestorePendingUri(candidate.relativePath),
+          canonical,
+        );
+        deleteRestorePending(candidate.relativePath);
+        await deleteJournalEntryCore(exec, candidate.relativePath);
+      } catch {
+        photosNeedingAttention += 1;
+      }
+    }
+    for (const candidate of backgroundCandidates) {
+      try {
+        await finalizeBackgroundRestoreCandidate(
+          exec,
+          {
+            uid: candidate.uid,
+            pendingRelativePath: candidate.pendingRelativePath,
+          },
+          {
+            persist: deps.persistBackground,
+            deletePending: deps.deleteStagedBackground,
+          },
+        );
+      } catch {
+        photosNeedingAttention += 1;
+      }
+    }
+    for (const candidate of candidates.deletes) {
+      const key = `delete:${candidate.canonicalRelativePath}`;
+      try {
+        remove(candidate.canonicalRelativePath);
+        if (exists(candidate.canonicalRelativePath)) photoCleanupPending += 1;
+        else await deleteJournalEntryCore(exec, key);
+      } catch {
+        photoCleanupPending += 1;
+      }
+    }
+    let scheduleResyncPending = false;
+    try {
+      await (
+        deps.reconcileNotificationSchedule ?? (() => reconcileSchedule(exec))
+      )();
+    } catch {
+      scheduleResyncPending = true;
+    }
+    try {
+      await (
+        deps.reconcileDigestSchedule ?? (() => reconcileDigestSchedule(exec))
+      )();
+    } catch {
+      scheduleResyncPending = true;
+    }
     return {
       status: "applied",
       mode,
-      inserted: 0,
-      updated: 0,
+      inserted: totals.insert,
+      updated: totals.update,
       retained: totals.retain,
-      deleted: 0,
+      deleted: totals.delete,
       blocked: totals.blocked,
-      photosNeedingAttention: 0,
-      photoCleanupPending: 0,
-      scheduleResyncPending: false,
+      photosNeedingAttention,
+      photoCleanupPending,
+      scheduleResyncPending,
       preRestoreSnapshotCreated,
     };
-  const restoreSessionToken = deps.sessionToken ?? newUid();
-  const candidates = await stageCandidates(
-    exec,
-    plan,
-    restoreSessionToken,
-    deps.stagePhoto ?? stageRestorePendingBase64,
-  );
-  const backgroundCandidates = await stageBackgroundCandidates(
-    plan,
-    restoreSessionToken,
-    deps.stageBackground ?? stageBackgroundRestorePendingBase64,
-  );
-  const backgroundPendingByUid = new Map(
-    backgroundCandidates.map((candidate) => [
-      candidate.uid,
-      candidate.pendingRelativePath,
-    ]),
-  );
-  await inWriteTransaction(exec, async () => {
-    // ADR-010/ADR-056: child winners are independent of metadata winners.
-    // Include every changed contact (including qualification-flag changes) and
-    // capture old interaction parents before deletes/reparenting lose them.
-    const recencyUids = new Set(
-      writes(plan, "contacts").map((action) => action.uid),
-    );
-    for (const action of plan.interactions) {
-      if (
-        action.kind !== "insert" &&
-        action.kind !== "update" &&
-        action.kind !== "delete"
-      )
-        continue;
-      const oldParent = await exec.getFirstAsync<{ uid: string }>(
-        "SELECT c.uid FROM interactions i JOIN contacts c ON c.id=i.contact_id WHERE i.uid=?",
-        [action.uid],
-      );
-      if (oldParent) recencyUids.add(oldParent.uid);
-      if (
-        action.kind !== "delete" &&
-        typeof action.row?.contactUid === "string"
-      )
-        recencyUids.add(action.row.contactUid);
-    }
-    if (mode === "replace-all") {
-      await replaceAllReset(exec, manifest, candidates.deletes);
-      await clearLiveCategoryTombstones(
-        exec,
-        survivors.categories ?? new Set(),
-      );
-    } else {
-      for (const action of plan.categories)
-        if (action.kind === "delete") {
-          const row = await exec.getFirstAsync<{ id: number }>(
-            "SELECT id FROM categories WHERE uid=?",
-            [action.uid],
-          );
-          if (!row) continue;
-          const preview = await readCategoryDeletionPreviewCore(exec, row.id);
-          if (!preview) continue;
-          const timestamps = [
-            ...manifest.tombstones
-              .filter(
-                (item) =>
-                  item.entityType === "category" &&
-                  item.entityUid === action.uid,
-              )
-              .map((item) => item.deletedAt),
-            ...(local.find(([entity]) => entity === "categories")?.[2] ?? [])
-              .filter((item) => item.entity_uid === action.uid)
-              .map((item) => item.deleted_at),
-          ].sort();
-          await applyCategoryDeletionFalloutCore(exec, {
-            preview,
-            targetCategoryId: null,
-            now: timestamps.at(-1) ?? manifest.metadata.exportedAt,
-            mode: "merge-null-only",
-          });
-        }
-      for (const entity of [...entities].reverse()) {
-        if (entity === "categories") continue;
-        await deleteActions(exec, entity, plan[entity]);
+  } finally {
+    for (const [key, candidate] of stagedPhotos) {
+      // A committed finalize owns its pending file until finalization/drain.
+      if (committedPhotoKeys.has(key)) continue;
+      try {
+        deleteRestorePending(candidate.relativePath);
+      } catch {
+        /* best effort */
       }
     }
-    await importTombstones(exec, manifest);
-    await upsertParents(exec, plan, backgroundPendingByUid);
-    await upsertContacts(exec, plan);
-    await upsertChildren(exec, plan);
-    await completeGlobalPairsCore(exec);
-    const contacts = await idMap(exec, "contacts");
-    for (const uid of recencyUids) {
-      // Read after all writes: only surviving parents are recomputed, and the
-      // core must preserve the winning metadata stamp rather than re-date it.
-      const contact = await exec.getFirstAsync<{
-        id: number;
-        modified_at: string;
-      }>("SELECT id,modified_at FROM contacts WHERE uid=?", [uid]);
-      if (contact)
-        await recomputeLastContactCore(exec, contact.id, contact.modified_at);
+    for (const candidate of stagedBackgrounds) {
+      if (committedBackgroundUids.has(candidate.uid)) continue;
+      try {
+        (deps.deleteStagedBackground ?? deleteBackgroundRestorePending)(
+          candidate.pendingRelativePath,
+        );
+      } catch {
+        /* best effort */
+      }
     }
-    for (const candidate of candidates.finalize) {
-      const canonical = await canonicalFor(exec, candidate.target);
-      if (!canonical)
-        throw new Error("restore photo target disappeared before commit");
-      await writePhotoReference(exec, candidate.target, canonical);
-      await insertJournalEntryCore(
-        exec,
-        entry(
-          "finalize",
-          candidate.relativePath,
-          candidate.target,
-          canonical,
-          manifest.metadata.exportedAt,
-        ),
-      );
-    }
-    for (const candidate of candidates.deletes)
-      if (candidate.clearReference)
-        await writePhotoReference(exec, candidate.target, null);
-    for (const candidate of candidates.deletes)
-      await insertJournalEntryCore(
-        exec,
-        entry(
-          "delete",
-          `delete:${candidate.canonicalRelativePath}`,
-          candidate.target,
-          candidate.canonicalRelativePath,
-          manifest.metadata.exportedAt,
-        ),
-      );
-    if (applySettings) {
-      const uid = manifest.appSettings.sunContactUid;
-      const sun =
-        typeof uid === "string" && survivors.contacts?.has(uid)
-          ? (contacts.get(uid) ?? null)
-          : null;
-      const patch = Object.fromEntries(
-        Object.entries(manifest.appSettings).filter(
-          ([key]) => key !== "modifiedAt" && key !== "sunContactUid",
-        ),
-      ) as AppSettingsPatch;
-      await updateAppSettingsCore(
-        exec,
-        { ...patch, sunContactId: sun },
-        manifest.appSettings.modifiedAt as string,
-      );
-    }
-    await bumpDataRevisionCore(exec);
-  });
-  const persist = deps.persistPhoto ?? persistMaster;
-  const remove = deps.deleteCanonicalPhoto ?? deletePhoto;
-  const exists = deps.canonicalPhotoExists ?? photoFileExists;
-  let photosNeedingAttention = 0;
-  let photoCleanupPending = 0;
-  for (const candidate of candidates.finalize) {
-    const canonical = await canonicalFor(exec, candidate.target);
-    if (!canonical) {
-      deleteRestorePending(candidate.relativePath);
-      await deleteJournalEntryCore(exec, candidate.relativePath);
-      continue;
-    }
-    try {
-      await persist(
-        resolveRestorePendingUri(candidate.relativePath),
-        canonical,
-      );
-      deleteRestorePending(candidate.relativePath);
-      await deleteJournalEntryCore(exec, candidate.relativePath);
-    } catch {
-      photosNeedingAttention += 1;
-    }
+    endStagingSession(restoreSessionToken);
   }
-  for (const candidate of backgroundCandidates) {
-    try {
-      await finalizeBackgroundRestoreCandidate(
-        exec,
-        {
-          uid: candidate.uid,
-          pendingRelativePath: candidate.pendingRelativePath,
-        },
-        {
-          persist: deps.persistBackground,
-          deletePending: deps.deleteStagedBackground,
-        },
-      );
-    } catch {
-      photosNeedingAttention += 1;
-    }
-  }
-  for (const candidate of candidates.deletes) {
-    const key = `delete:${candidate.canonicalRelativePath}`;
-    try {
-      remove(candidate.canonicalRelativePath);
-      if (exists(candidate.canonicalRelativePath)) photoCleanupPending += 1;
-      else await deleteJournalEntryCore(exec, key);
-    } catch {
-      photoCleanupPending += 1;
-    }
-  }
-  let scheduleResyncPending = false;
-  try {
-    await (
-      deps.reconcileNotificationSchedule ?? (() => reconcileSchedule(exec))
-    )();
-  } catch {
-    scheduleResyncPending = true;
-  }
-  try {
-    await (
-      deps.reconcileDigestSchedule ?? (() => reconcileDigestSchedule(exec))
-    )();
-  } catch {
-    scheduleResyncPending = true;
-  }
-  return {
-    status: "applied",
-    mode,
-    inserted: totals.insert,
-    updated: totals.update,
-    retained: totals.retain,
-    deleted: totals.delete,
-    blocked: totals.blocked,
-    photosNeedingAttention,
-    photoCleanupPending,
-    scheduleResyncPending,
-    preRestoreSnapshotCreated,
-  };
 }

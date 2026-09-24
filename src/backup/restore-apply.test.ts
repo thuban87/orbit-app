@@ -6,6 +6,7 @@ const photoMocks = vi.hoisted(() => ({
   staged: [] as Array<[string, string]>,
   persisted: [] as Array<[string, string]>,
   deleted: [] as string[],
+  deletedPending: [] as string[],
   persistFails: false,
   deleteLeavesFile: false,
 }));
@@ -50,7 +51,9 @@ vi.mock("@/services/photos/photo-storage", () => ({
   deletePhoto: (path: string) => {
     photoMocks.deleted.push(path);
   },
-  deleteRestorePending: () => {},
+  deleteRestorePending: (relative: string) => {
+    photoMocks.deletedPending.push(relative);
+  },
   persistMaster: async (source: string, destination: string) => {
     photoMocks.persisted.push([source, destination]);
     if (photoMocks.persistFails) throw new Error("disk unavailable");
@@ -177,6 +180,7 @@ beforeEach(() => {
   photoMocks.staged = [];
   photoMocks.persisted = [];
   photoMocks.deleted = [];
+  photoMocks.deletedPending = [];
   photoMocks.persistFails = false;
   photoMocks.deleteLeavesFile = false;
   backgroundMocks.staged = [];
@@ -607,11 +611,16 @@ describe("applyRestore", () => {
       deletedAt: "2026-08-25 12:01:00",
     });
 
-    await expect(applyRestore(destination, manifest, "merge")).resolves.toMatchObject({
+    await expect(
+      applyRestore(destination, manifest, "merge"),
+    ).resolves.toMatchObject({
       status: "applied",
     });
     await expect(
-      destination.getAllAsync<{ status: string; batch_category_id: number | null }>(
+      destination.getAllAsync<{
+        status: string;
+        batch_category_id: number | null;
+      }>(
         "SELECT status,batch_category_id FROM import_sessions ORDER BY status",
       ),
     ).resolves.toEqual([
@@ -1757,7 +1766,10 @@ describe("applyRestore", () => {
     await expect(
       applyRestore(destination, manifest, "merge"),
     ).resolves.toMatchObject({ status: "applied" });
-    expect(photoMocks.staged).toEqual([]);
+    // Staging is manifest-driven; the winning row is selected under the write lock.
+    expect(photoMocks.staged).toHaveLength(1);
+    expect(photoMocks.persisted).toEqual([]);
+    expect(photoMocks.deletedPending).toContain(photoMocks.staged[0]![1]);
     await expect(
       destination.getAllAsync("SELECT * FROM restore_photo_journal"),
     ).resolves.toEqual([]);

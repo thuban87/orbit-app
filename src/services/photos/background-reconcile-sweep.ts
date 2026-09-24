@@ -1,6 +1,9 @@
 import type { SqlExecutor } from "@/db/types";
 import { registerSweepHook, SWEEP_IDS } from "@/services/launch-sweep";
-import { finalizeBackgroundRestoreCandidate } from "@/services/photos/background-finalization";
+import {
+  finalizeBackgroundRestoreCandidate,
+  withBackgroundFinalizationLock,
+} from "@/services/photos/background-finalization";
 import {
   applyBackgroundReconcileAction,
   backgroundDerivativeRelPath,
@@ -8,6 +11,11 @@ import {
   listBackgroundRestorePendingEntries,
   listBackgroundStorageEntries,
 } from "@/services/photos/background-storage";
+import {
+  pendingBelongsToActiveSession,
+  sessionTouchedSince,
+  stagingPassMark,
+} from "@/services/photos/staging-sessions";
 import { Logger } from "@/utils/logger";
 import { planBackgroundReconciliation } from "./background-reconcile-model";
 
@@ -18,6 +26,7 @@ export { planBackgroundReconciliation } from "./background-reconcile-model";
 export async function runBackgroundReconciliation(
   exec: SqlExecutor,
 ): Promise<{ failed: number }> {
+  const passMark = stagingPassMark();
   const rows = await exec.getAllAsync<{
     uid: string;
     imagePath: string;
@@ -45,7 +54,31 @@ export async function runBackgroundReconciliation(
   for (const action of plan.actions) {
     try {
       if (action.kind === "deleteCanonical") {
-        deleteBackgroundDerivative(action.relative, true);
+        const uid = action.relative.match(
+          /^profile-backgrounds\/([A-Za-z0-9_-]+)\.jpg$/,
+        )?.[1];
+        if (!uid) throw new Error("unsafe background canonical path");
+        await withBackgroundFinalizationLock(uid, async () => {
+          const fresh = await exec.getAllAsync<{
+            uid: string;
+            imagePath: string;
+          }>(
+            "SELECT uid,image_path AS imagePath FROM profile_background_templates WHERE uid=? OR image_path=?",
+            [uid, action.relative],
+          );
+          if (
+            fresh.some(
+              (row) =>
+                row.imagePath === action.relative ||
+                (row.uid === uid &&
+                  row.imagePath.startsWith(
+                    `profile-backgrounds/_restore_pending/${uid}/`,
+                  )),
+            )
+          )
+            return;
+          deleteBackgroundDerivative(action.relative, true);
+        });
       } else {
         await applyBackgroundReconcileAction(action);
       }
@@ -59,6 +92,11 @@ export async function runBackgroundReconciliation(
   // irrelevant: it may contain stale bytes from a same-uid replacement.
   const recoveredPaths = new Set<string>();
   for (const pending of await listBackgroundRestorePendingEntries()) {
+    if (
+      pendingBelongsToActiveSession(pending.relative) ||
+      sessionTouchedSince(pending.relative, passMark)
+    )
+      continue;
     try {
       const result = await finalizeBackgroundRestoreCandidate(exec, {
         uid: pending.templateUid,
