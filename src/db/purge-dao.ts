@@ -212,7 +212,10 @@ export interface PurgeOptions {
    * Idempotent best-effort OS cleanup (photo unlink, notification cancels), run
    * POST-COMMIT in its own try/catch — never awaited inside the transaction.
    */
-  onPurgeExtensions?: (contactId: number) => Promise<void> | void;
+  onPurgeExtensions?: (
+    contactId: number,
+    retired: { importStagingPaths: string[] },
+  ) => Promise<void> | void;
 }
 
 /** `"1 thing"` / `"N things"`. */
@@ -390,6 +393,59 @@ export function purgeContact(
     if (row.photo && SAFE_RELATIVE.test(row.photo)) photoPaths.add(row.photo);
     for (const path of photoPaths) await enqueueDeleteIntentCore(exec, path);
 
+    // Workflow snapshots are local-only copies. Match the contact's direct
+    // rows and every source identity owned by its external links before those
+    // links disappear below; pending rows stay available for review.
+    const ownedRows = await exec.getAllAsync<{
+      id: number;
+      photo_rel_path: string | null;
+    }>(
+      `SELECT r.id, r.photo_rel_path FROM import_session_rows r
+        WHERE r.row_status IN ('imported', 'linked', 'skipped')
+          AND (r.contact_id = ?
+            OR (r.row_status = 'skipped' AND r.matched_contact_id = ?)
+            OR (r.contact_id IS NULL AND r.external_contact_id IN
+              (SELECT l.external_contact_id FROM external_contact_links l
+                WHERE l.contact_id = ? AND l.provider = 'android')))`,
+      [contactId, contactId, contactId],
+    );
+    for (const owned of ownedRows) {
+      await exec.runAsync("DELETE FROM import_session_rows WHERE id = ?", [
+        owned.id,
+      ]);
+    }
+    const candidates = await exec.getAllAsync<{
+      id: number;
+      candidates_json: string | null;
+    }>(
+      `SELECT id, candidates_json FROM import_session_rows
+        WHERE row_status IN ('pending', 'needs_review')
+          AND candidates_json IS NOT NULL`,
+    );
+    for (const candidate of candidates) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(candidate.candidates_json ?? "null");
+      } catch {
+        parsed = null;
+      }
+      const filtered = Array.isArray(parsed)
+        ? parsed.filter(
+            (item) =>
+              typeof item !== "object" ||
+              item === null ||
+              (item as { contactId?: unknown }).contactId !== contactId,
+          )
+        : null;
+      const next = filtered === null ? null : JSON.stringify(filtered);
+      if (next !== candidate.candidates_json) {
+        await exec.runAsync(
+          "UPDATE import_session_rows SET candidates_json = ?, modified_at = ? WHERE id = ?",
+          [next, opts.now, candidate.id],
+        );
+      }
+    }
+
     // (2) Capture every mergeable UID before deleting it. field_history has no
     //     merge identity and remains deliberately excluded from evidence.
     for (const [entityType, source] of Object.entries(PURGE_CHILDREN) as Array<
@@ -461,12 +517,17 @@ export function purgeContact(
         `purgeContact: expected exactly one contacts row deleted for id=${contactId} (deleted ${deleted.changes})`,
       );
     }
-  }).then(async () => {
+    return {
+      importStagingPaths: ownedRows.flatMap((owned) =>
+        owned.photo_rel_path ? [owned.photo_rel_path] : [],
+      ),
+    };
+  }).then(async (retired) => {
     // POST-COMMIT best-effort cleanup — the transaction has committed and the
     // mutex is released. A throwing adapter is logged, never fatal, and cannot
     // undo the deletes above.
     try {
-      await opts.onPurgeExtensions?.(contactId);
+      await opts.onPurgeExtensions?.(contactId, retired);
     } catch (err) {
       Logger.error(
         LOG_SCOPE,

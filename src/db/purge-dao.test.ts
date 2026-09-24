@@ -23,6 +23,7 @@ vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { archiveContact, createContactFull } from "@/db/contacts-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { acceptImportSessionWithRows } from "@/db/import-session-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import {
   computeImpact,
@@ -50,6 +51,28 @@ beforeEach(async () => {
     newUid: uid,
   });
 });
+
+async function seedImportRows(
+  names: string[],
+): Promise<{ sessionId: number; ids: number[] }> {
+  const accepted = await acceptImportSessionWithRows(exec, {
+    session: {
+      uid: uid(),
+      mode: "bulk",
+      batchCategoryId: null,
+      batchTrackingEnabled: false,
+      phoneRegion: "US",
+      now: NOW,
+    },
+    rows: names.map((name) => ({
+      uid: uid(),
+      externalContactId: name,
+      sourcePayload: JSON.stringify({ note: `marker-${name}` }),
+      photoRelPath: `import-staging/${name}.jpg`,
+    })),
+  });
+  return { sessionId: accepted.sessionId, ids: accepted.rowIds };
+}
 
 /** Insert a contact (archived by default) and return its id. */
 async function seedContact(
@@ -569,7 +592,7 @@ describe("purgeContact — POST-COMMIT extension adapter (T-04-16)", () => {
       purgeContact(exec, id, { now: NOW, onPurgeExtensions: adapter }),
     ).resolves.toBeUndefined();
 
-    expect(adapter).toHaveBeenCalledWith(id);
+    expect(adapter).toHaveBeenCalledWith(id, { importStagingPaths: [] });
     expect(await ownedRowCount(id)).toBe(0);
   });
 });
@@ -648,5 +671,79 @@ describe("purgeContact — deletion evidence and merge-safe sun state", () => {
         modified_at: string;
       }>("SELECT sun_contact_id, modified_at FROM app_settings WHERE id = 1"),
     ).toEqual({ sun_contact_id: null, modified_at: suppliedNow });
+  });
+
+  it("retires five owned workflow origins, scrubs candidates, and preserves another photo retry", async () => {
+    const target = await seedContact("Purge target");
+    const other = await seedContact("Other contact");
+    const names = [
+      "direct",
+      "linked",
+      "already",
+      "consolidated",
+      "merged",
+      "pending",
+      "other",
+    ];
+    const { ids } = await seedImportRows(names);
+    for (const [index, status] of [
+      "imported",
+      "linked",
+      "skipped",
+      "imported",
+      "imported",
+    ].entries()) {
+      await exec.runAsync(
+        "UPDATE import_session_rows SET row_status = ?, contact_id = ?, matched_contact_id = ? WHERE id = ?",
+        [
+          status,
+          index < 2 ? target : null,
+          index === 2 ? target : null,
+          ids[index],
+        ],
+      );
+    }
+    for (const name of ["consolidated", "merged"]) {
+      await exec.runAsync(
+        "INSERT INTO external_contact_links (uid, contact_id, provider, external_contact_id, is_active, created_at, modified_at) VALUES (?, ?, 'android', ?, 1, ?, ?)",
+        [uid(), target, name, NOW, NOW],
+      );
+    }
+    await exec.runAsync(
+      "UPDATE import_session_rows SET row_status = 'needs_review', candidates_json = ? WHERE id = ?",
+      [JSON.stringify([{ contactId: target }, { contactId: other }]), ids[5]],
+    );
+    await exec.runAsync(
+      "UPDATE import_session_rows SET row_status = 'imported', contact_id = ? WHERE id = ?",
+      [other, ids[6]],
+    );
+    const cleanup: string[][] = [];
+    await purgeContact(exec, target, {
+      now: NOW,
+      onPurgeExtensions: async (_id, { importStagingPaths }) => {
+        cleanup.push(importStagingPaths);
+      },
+    });
+    for (const name of names.slice(0, 5)) {
+      expect(
+        await exec.getFirstAsync<{ n: number }>(
+          "SELECT COUNT(*) AS n FROM import_session_rows WHERE source_payload LIKE ?",
+          [`%marker-${name}%`],
+        ),
+      ).toEqual({ n: 0 });
+    }
+    expect(cleanup[0]).toHaveLength(5);
+    expect(
+      await exec.getFirstAsync<{ candidates_json: string }>(
+        "SELECT candidates_json FROM import_session_rows WHERE id = ?",
+        [ids[5]],
+      ),
+    ).toEqual({ candidates_json: JSON.stringify([{ contactId: other }]) });
+    expect(
+      await exec.getFirstAsync<{ photo_rel_path: string }>(
+        "SELECT photo_rel_path FROM import_session_rows WHERE id = ?",
+        [ids[6]],
+      ),
+    ).toEqual({ photo_rel_path: "import-staging/other.jpg" });
   });
 });

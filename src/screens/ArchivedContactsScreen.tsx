@@ -41,6 +41,7 @@ import {
 } from "@/db/purge-dao";
 import type { RootStackParamList } from "@/navigation/types";
 import { buildNotificationPurgeCleanup } from "@/services/notifications/purge-notification-cleanup";
+import { deleteImportStaging } from "@/services/photos/photo-storage";
 import { buildPhotoPurgeCleanup } from "@/services/photos/purge-photo-cleanup";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useTheme } from "@/theme";
@@ -154,7 +155,16 @@ export function ArchivedContactsScreen() {
         const notifCleanup = buildNotificationPurgeCleanup();
         await purgeContact(exec, id, {
           now: localDateTime(),
-          onPurgeExtensions: async (purgedId) => {
+          onPurgeExtensions: async (purgedId, { importStagingPaths }) => {
+            try {
+              for (const path of importStagingPaths) deleteImportStaging(path);
+            } catch (err) {
+              Logger.error(
+                LOG_SCOPE,
+                "post-commit import staging cleanup failed",
+                err,
+              );
+            }
             try {
               await photoCleanup(purgedId);
             } catch (err) {
@@ -181,18 +191,15 @@ export function ArchivedContactsScreen() {
   );
 
   return (
-    <View
-      testID="archived-contacts-screen"
-      style={{ flex: 1 }}
-    >
+    <View testID="archived-contacts-screen" style={{ flex: 1 }}>
       <ShellAppBar variant="child" title="Archived" />
-      <ScrollView
-        contentContainerStyle={styles.content}
-      >
+      <ScrollView contentContainerStyle={styles.content}>
         {rows.length === 0 ? (
           <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
             <View testID="archived-empty" style={styles.emptyState}>
-              <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
+              <Text
+                style={[styles.emptyHeading, { color: colors.textPrimary }]}
+              >
                 No archived contacts
               </Text>
               <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>

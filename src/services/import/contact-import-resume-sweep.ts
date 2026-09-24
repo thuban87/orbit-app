@@ -10,6 +10,7 @@ import {
   type SessionRowCounts,
   sessionRowCounts,
 } from "@/db/import-session-read";
+import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { registerSweepHook } from "@/services/launch-sweep";
 import {
@@ -127,6 +128,40 @@ export async function reconcileOrphanStagedPhotos(
   }
 }
 
+/** Forward cleanup for terminal workflow copies detached by older purges. */
+export async function retireDetachedImportRows(
+  exec: SqlExecutor,
+  fs: Pick<
+    ImportStagingFileSystem,
+    "deleteImportStaging"
+  > = nativeImportStagingFs,
+): Promise<number> {
+  const detached = await inWriteTransaction(exec, async () => {
+    const rows = await exec.getAllAsync<{
+      id: number;
+      photo_rel_path: string | null;
+    }>(
+      `SELECT r.id, r.photo_rel_path FROM import_session_rows r
+        WHERE ((r.row_status IN ('imported', 'linked') AND r.contact_id IS NULL)
+          OR (r.row_status = 'skipped' AND r.match_outcome = 'already_linked'
+              AND r.matched_contact_id IS NULL))
+          AND NOT EXISTS (SELECT 1 FROM external_contact_links l
+            WHERE l.provider = 'android'
+              AND l.external_contact_id = r.external_contact_id)`,
+    );
+    for (const row of rows) {
+      await exec.runAsync("DELETE FROM import_session_rows WHERE id = ?", [
+        row.id,
+      ]);
+    }
+    return rows;
+  });
+  for (const row of detached) {
+    if (row.photo_rel_path) fs.deleteImportStaging(row.photo_rel_path);
+  }
+  return detached.length;
+}
+
 /**
  * Register one foreground-only resume sweep. Importing this module performs no
  * work; App.tsx registers it after migration readiness under its one-shot guard.
@@ -142,6 +177,11 @@ export function registerImportResumeSweep(
   registerSweepHook(async () => {
     const exec = getExec();
     let description: ResumableImport | null = null;
+    try {
+      await retireDetachedImportRows(exec, fs);
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "could not retire detached import rows", error);
+    }
     try {
       const resumable = await getResumableSession(exec, now());
       if (resumable) {

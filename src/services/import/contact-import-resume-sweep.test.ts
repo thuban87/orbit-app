@@ -22,6 +22,7 @@ import {
   type ResumableImport,
   reconcileOrphanStagedPhotos,
   registerImportResumeSweep,
+  retireDetachedImportRows,
 } from "@/services/import/contact-import-resume-sweep";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
 
@@ -195,6 +196,51 @@ describe("contact-import-resume-sweep", () => {
     const fs = stagingFs(["import-staging/import-photo-outstanding.jpg"]);
     await reconcileOrphanStagedPhotos(exec, fs);
     expect(fs.deleted).toEqual([]);
+  });
+
+  it("retireDetachedImportRows removes old detached copies but keeps a merged origin with a live link", async () => {
+    const accepted = await acceptRows([
+      "detached",
+      "merged",
+      "already",
+      "user-skipped",
+    ]);
+    const gone = await seedContact();
+    const survivor = await seedContact();
+    await setRowContact(exec, accepted.rowIds[0], gone, "imported", NOW);
+    await setRowContact(exec, accepted.rowIds[1], gone, "imported", NOW);
+    await exec.runAsync(
+      "INSERT INTO external_contact_links (uid, contact_id, provider, external_contact_id, is_active, created_at, modified_at) VALUES (?, ?, 'android', 'merged', 1, ?, ?)",
+      [uid(), survivor, NOW, NOW],
+    );
+    await exec.runAsync(
+      "UPDATE import_session_rows SET row_status = 'skipped', match_outcome = 'already_linked', matched_contact_id = ? WHERE id = ?",
+      [gone, accepted.rowIds[2]],
+    );
+    await exec.runAsync(
+      "UPDATE import_session_rows SET row_status = 'skipped' WHERE id = ?",
+      [accepted.rowIds[3]],
+    );
+    await exec.runAsync("DELETE FROM contacts WHERE id = ?", [gone]);
+    const fs = stagingFs([
+      "import-staging/import-detached.jpg",
+      "import-staging/import-merged.jpg",
+      "import-staging/import-already.jpg",
+    ]);
+    expect(await retireDetachedImportRows(exec, fs)).toBe(2);
+    expect(fs.deleted).toEqual([
+      "import-staging/import-detached.jpg",
+      "import-staging/import-already.jpg",
+    ]);
+    expect(
+      await exec.getAllAsync<{ external_contact_id: string }>(
+        "SELECT external_contact_id FROM import_session_rows ORDER BY id",
+      ),
+    ).toEqual([
+      { external_contact_id: "merged" },
+      { external_contact_id: "user-skipped" },
+    ]);
+    expect(await retireDetachedImportRows(exec, fs)).toBe(0);
   });
 
   it("deletes completed and skipped staging while retaining needs-review retry input", async () => {
