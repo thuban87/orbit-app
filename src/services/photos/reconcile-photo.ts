@@ -1,11 +1,13 @@
 import type * as ExpoImageManipulator from "expo-image-manipulator";
 import { assertSafeRelative } from "@/db/photo-relative-path";
+import { discardDerivative } from "@/services/photos/derivative-cache";
 import {
   contactPhotoRelPath,
   reconcileStagingRelPath,
   resolveReconcileStagingUri,
   stageReconcilePhoto,
 } from "@/services/photos/photo-storage";
+import { Logger } from "@/utils/logger";
 
 const MASTER_SIZE = 512;
 const MASTER_COMPRESS = 0.75;
@@ -17,6 +19,7 @@ export interface ReconcilePhotoFs {
   resizeToMaster: (uri: string) => Promise<string>;
   persistMaster: (uri: string, relative: string) => Promise<string>;
   contactPhotoRelPath: (contactId: number) => string;
+  discardDerivative: (uri: string) => boolean;
 }
 
 /**
@@ -81,6 +84,7 @@ export const reconcilePhotoFs: ReconcilePhotoFs = {
     return persistOwnedMaster(getExecutor(), uri, relative);
   },
   contactPhotoRelPath,
+  discardDerivative,
 };
 
 /** Stage the only selected source photo before it enters reconciliation state. */
@@ -107,5 +111,13 @@ export async function promoteReconcilePhoto(
   const resized = await fs.resizeToMaster(
     await fs.resolveStaged(params.stagedRelative),
   );
-  return fs.persistMaster(resized, relative);
+  try {
+    return await fs.persistMaster(resized, relative);
+  } finally {
+    try {
+      fs.discardDerivative(resized);
+    } catch {
+      Logger.warn("reconcile-photo", "reconcile derivative cleanup failed");
+    }
+  }
 }

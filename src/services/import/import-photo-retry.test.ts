@@ -1,7 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const h = vi.hoisted(() => ({ files: new Map<string, string>() }));
+const h = vi.hoisted(() => ({
+  files: new Map<string, string>(),
+  discards: [] as string[],
+}));
 vi.mock("expo-sqlite", () => ({}));
+vi.mock("@/services/photos/derivative-cache", () => ({
+  discardDerivative: () => true,
+}));
 vi.mock("@/services/photos/photo-storage", () => ({
   persistMaster: async (source: string, path: string) => {
     h.files.set(path, h.files.get(source) ?? source);
@@ -64,6 +70,10 @@ function fs(resize?: () => Promise<string>): RetryPhotoFs {
     deleteImportStaging: (path) => {
       h.files.delete(path);
     },
+    discardDerivative: (uri) => {
+      h.discards.push(uri);
+      return true;
+    },
     setContactPhoto: async () => {
       throw new Error("retry must publish itself");
     },
@@ -91,6 +101,7 @@ async function photo() {
 }
 
 beforeEach(async () => {
+  h.discards.length = 0;
   h.files.clear();
   serial = 0;
   exec = nodeSqliteExecutor(openTestDb());
@@ -134,6 +145,7 @@ describe("photo-only import retry", () => {
     expect(await photo()).toMatchObject({ photo: canonical() });
     expect(await row()).toMatchObject({ photo_rel_path: null });
     expect(h.files.get(canonical())).toBe("imported-bytes");
+    expect(h.discards).toEqual(["resized"]);
     expect(
       (
         await exec.getFirstAsync<{ n: number }>(

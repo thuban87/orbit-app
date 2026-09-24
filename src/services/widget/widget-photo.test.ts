@@ -25,7 +25,6 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock("expo-image-manipulator", () => {
-  class SaveFormat {}
   return {
     SaveFormat: { JPEG: "jpeg" },
     ImageManipulator: {
@@ -38,7 +37,10 @@ vi.mock("expo-image-manipulator", () => {
             if (h.cfg.renderThrows) throw new Error("mock decode failed");
             return {
               async saveAsync(_opts: unknown) {
-                return { uri: "file:///cache/thumb.jpg", base64: h.cfg.saveBase64 };
+                return {
+                  uri: "file:///cache/thumb.jpg",
+                  base64: h.cfg.saveBase64,
+                };
               },
             };
           },
@@ -52,6 +54,9 @@ vi.mock("expo-image-manipulator", () => {
 // Mock photo-storage so resolvePhotoUri never loads native expo-file-system.
 vi.mock("@/services/photos/photo-storage", () => ({
   resolvePhotoUri: (relative: string) => `file:///documents/${relative}`,
+}));
+vi.mock("@/services/photos/derivative-cache", () => ({
+  discardDerivative: vi.fn(),
 }));
 
 import { encodeWidgetThumb } from "./widget-photo";
@@ -73,6 +78,33 @@ describe("encodeWidgetThumb", () => {
     h.cfg = { saveBase64: "QUJD" };
     const out = await encodeWidgetThumb("avatars/contact-1.jpg");
     expect(out).toBe("data:image/jpeg;base64,QUJD");
+  });
+
+  it("discards the native cache file after returning unchanged base64", async () => {
+    const discard = vi.fn(() => true);
+    await expect(
+      encodeWidgetThumb("avatars/contact-1.jpg", discard),
+    ).resolves.toBe("data:image/jpeg;base64,QUJD");
+    expect(discard).toHaveBeenCalledOnce();
+    expect(discard).toHaveBeenCalledWith("file:///cache/thumb.jpg");
+  });
+
+  it("keeps base64 success when headless cleanup throws", async () => {
+    const discard = vi.fn(() => {
+      throw new Error("delete");
+    });
+    await expect(
+      encodeWidgetThumb("avatars/contact-1.jpg", discard),
+    ).resolves.toBe("data:image/jpeg;base64,QUJD");
+  });
+
+  it("discards an output with missing base64", async () => {
+    h.cfg = { saveBase64: undefined };
+    const discard = vi.fn(() => true);
+    await expect(
+      encodeWidgetThumb("avatars/contact-1.jpg", discard),
+    ).resolves.toBeNull();
+    expect(discard).toHaveBeenCalledWith("file:///cache/thumb.jpg");
   });
 
   it("returns null (not a rejection) when the manipulator throws", async () => {

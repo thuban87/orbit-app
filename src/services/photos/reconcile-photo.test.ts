@@ -18,6 +18,9 @@ vi.mock("@/services/photos/photo-storage", () => ({
   stageReconcilePhoto: vi.fn(),
   persistMaster: vi.fn(),
 }));
+vi.mock("@/services/photos/derivative-cache", () => ({
+  discardDerivative: vi.fn(),
+}));
 
 import { assertSafeRelative } from "@/db/photo-relative-path";
 import { persistOwnedMaster } from "@/services/photos/owned-master";
@@ -46,6 +49,10 @@ function fs(): ReconcilePhotoFs & { calls: string[] } {
       return relative;
     },
     contactPhotoRelPath: (contactId) => `avatars/contact-${contactId}.jpg`,
+    discardDerivative: (uri) => {
+      calls.push(`discard:${uri}`);
+      return true;
+    },
   };
 }
 
@@ -91,6 +98,35 @@ describe("reconcile photo staging", () => {
     expect(boundary.calls).toEqual([
       "resize:file:///documents/reconcile-staging/reconcile-link-1.jpg",
       "persist:file:///cache/resized.jpg:avatars/contact-42.jpg",
+      "discard:file:///cache/resized.jpg",
     ]);
+  });
+
+  it("discards after failed persist without masking the error", async () => {
+    const boundary = fs();
+    const original = new Error("persist");
+    boundary.persistMaster = async () => {
+      throw original;
+    };
+    await expect(
+      promoteReconcilePhoto(boundary, {
+        contactId: 42,
+        stagedRelative: "reconcile-staging/a.jpg",
+      }),
+    ).rejects.toBe(original);
+    expect(boundary.calls).toContain("discard:file:///cache/resized.jpg");
+  });
+
+  it("returns the persisted path despite a failing discard", async () => {
+    const boundary = fs();
+    boundary.discardDerivative = () => {
+      throw new Error("delete");
+    };
+    await expect(
+      promoteReconcilePhoto(boundary, {
+        contactId: 42,
+        stagedRelative: "reconcile-staging/a.jpg",
+      }),
+    ).resolves.toBe("avatars/contact-42.jpg");
   });
 });

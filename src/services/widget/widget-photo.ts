@@ -26,6 +26,7 @@
  * runs per user action, this runs per tile in a batch render.
  */
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
+import { discardDerivative } from "@/services/photos/derivative-cache";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
 import { Logger } from "@/utils/logger";
 
@@ -57,6 +58,7 @@ const THUMB_Q = 0.6;
  */
 export async function encodeWidgetThumb(
   relativePath: string | null,
+  discard: (uri: string) => boolean = discardDerivative,
 ): Promise<string | null> {
   if (!relativePath) return null;
 
@@ -71,18 +73,23 @@ export async function encodeWidgetThumb(
       base64: true,
     });
 
-    // GUARD: only emit a URI when base64 is a non-empty string. A malformed
-    // native result (base64 undefined/empty) must degrade to the initials
-    // fallback, never emit "…base64,undefined".
-    if (typeof out.base64 === "string" && out.base64.length > 0) {
-      return `data:image/jpeg;base64,${out.base64}`;
+    try {
+      // Native saveAsync writes a cache file even with base64:true.
+      if (typeof out.base64 === "string" && out.base64.length > 0) {
+        return `data:image/jpeg;base64,${out.base64}`;
+      }
+      Logger.warn(
+        LOG_SCOPE,
+        "saveAsync resolved without a base64 payload; falling back to initials",
+      );
+      return null;
+    } finally {
+      try {
+        discard(out.uri);
+      } catch {
+        Logger.warn(LOG_SCOPE, "thumbnail cache cleanup failed");
+      }
     }
-
-    Logger.warn(
-      LOG_SCOPE,
-      `saveAsync resolved without a base64 payload for ${relativePath}; falling back to initials`,
-    );
-    return null;
   } catch (error) {
     // A corrupt/evicted master makes the manipulator throw. Swallow to null (the
     // no-photo signal) rather than rethrowing — a per-tile throw would reject the

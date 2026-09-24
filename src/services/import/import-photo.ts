@@ -9,6 +9,7 @@ import type * as ExpoImageManipulator from "expo-image-manipulator";
 import { setContactPhoto } from "@/db/contacts-dao";
 import { retireRowStagedPhoto } from "@/db/import-session-dao";
 import type { SqlExecutor } from "@/db/types";
+import { discardDerivative } from "@/services/photos/derivative-cache";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "import-photo";
@@ -21,6 +22,7 @@ export interface ImportedPhotoFs {
   resizeToMaster: (stagedPhotoPath: string) => Promise<string>;
   persistMaster: (sourceUri: string, relative: string) => Promise<string>;
   deleteImportStaging: (relative: string) => void | Promise<void>;
+  discardDerivative: (uri: string) => boolean;
   setContactPhoto: (
     exec: SqlExecutor,
     contactId: number,
@@ -80,6 +82,7 @@ export const importedPhotoFs: ImportedPhotoFs = {
   resizeToMaster,
   persistMaster: persistPhotoMaster,
   deleteImportStaging: deleteStagedPhoto,
+  discardDerivative,
   setContactPhoto,
 };
 
@@ -112,7 +115,15 @@ export async function persistImportedPhotoPostCommit(
     const relative = await fs.contactPhotoRelPath(params.contactId);
     const stagedUri = await fs.resolveStagedPhotoPath(params.stagedPhotoPath);
     const resizedUri = await fs.resizeToMaster(stagedUri);
-    await fs.persistMaster(resizedUri, relative);
+    try {
+      await fs.persistMaster(resizedUri, relative);
+    } finally {
+      try {
+        fs.discardDerivative(resizedUri);
+      } catch {
+        Logger.warn(LOG_SCOPE, "import derivative cleanup failed");
+      }
+    }
     await fs.setContactPhoto(exec, params.contactId, relative, params.now);
     await retireRowStagedPhoto(exec, params.rowId, params.now);
     try {

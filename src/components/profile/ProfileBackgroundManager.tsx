@@ -63,6 +63,7 @@ import {
   persistBackgroundDerivative,
   resolveBackgroundUri,
 } from "@/services/photos/background-storage";
+import { discardDerivative } from "@/services/photos/derivative-cache";
 import { profileBackgroundTarget } from "@/services/photos/profile-background-target";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
@@ -410,8 +411,14 @@ export function ProfileBackgroundManager({
           });
           return {
             uri: saved.uri,
-            release: () =>
-              (rendered as unknown as { release?: () => void }).release?.(),
+            release: () => {
+              discardDerivative(saved.uri);
+              try {
+                (rendered as unknown as { release?: () => void }).release?.();
+              } catch {
+                Logger.warn(LOG_SCOPE, "background image release failed");
+              }
+            },
           };
         },
         persist: (preparedUri) =>

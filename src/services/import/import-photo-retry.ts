@@ -105,65 +105,81 @@ export async function retryImportedPhoto(
     return false; // Keep the durable staging reference for a later Retry.
   }
 
-  let published = false;
-  await withCanonicalPathLock(canonical, async (token) => {
-    const eligible = async () => {
-      const current = await readRetryRow(exec, rowId);
-      return (
-        current?.contact_uid === row.contact_uid &&
-        current?.contact_id === row.contact_id &&
-        current?.photo_rel_path === row.photo_rel_path &&
-        current?.contact_photo === null &&
-        canonicalGeneration(canonical) === generation
-      );
-    };
-    try {
-      await persistOwnedMasterLocked(exec, token, resized, canonical, {
-        authorize: eligible,
-        persist: fs.persistMaster,
-      });
-    } catch (error) {
-      if (!(error instanceof PhotoWriteUnauthorizedError)) throw error;
-      await removeRetiredStaging(fs, row, await retireMatching(exec, row, now));
-      return;
-    }
+  try {
+    let published = false;
+    await withCanonicalPathLock(canonical, async (token) => {
+      const eligible = async () => {
+        const current = await readRetryRow(exec, rowId);
+        return (
+          current?.contact_uid === row.contact_uid &&
+          current?.contact_id === row.contact_id &&
+          current?.photo_rel_path === row.photo_rel_path &&
+          current?.contact_photo === null &&
+          canonicalGeneration(canonical) === generation
+        );
+      };
+      try {
+        await persistOwnedMasterLocked(exec, token, resized, canonical, {
+          authorize: eligible,
+          persist: fs.persistMaster,
+        });
+      } catch (error) {
+        if (!(error instanceof PhotoWriteUnauthorizedError)) throw error;
+        await removeRetiredStaging(
+          fs,
+          row,
+          await retireMatching(exec, row, now),
+        );
+        return;
+      }
 
-    try {
-      await inWriteTransaction(exec, async () => {
-        const contact = await exec.runAsync(
-          `UPDATE contacts SET photo = ?, modified_at = ?
+      try {
+        await inWriteTransaction(exec, async () => {
+          const contact = await exec.runAsync(
+            `UPDATE contacts SET photo = ?, modified_at = ?
             WHERE id = ? AND uid = ? AND photo IS NULL`,
-          [canonical, now, row.contact_id, row.contact_uid],
-        );
-        if (contact.changes !== 1)
-          throw new PhotoWriteUnauthorizedError("contact changed");
-        const retired = await exec.runAsync(
-          `UPDATE import_session_rows SET photo_rel_path = NULL, photo_failed = 0, modified_at = ?
+            [canonical, now, row.contact_id, row.contact_uid],
+          );
+          if (contact.changes !== 1)
+            throw new PhotoWriteUnauthorizedError("contact changed");
+          const retired = await exec.runAsync(
+            `UPDATE import_session_rows SET photo_rel_path = NULL, photo_failed = 0, modified_at = ?
             WHERE id = ? AND contact_id = ? AND photo_rel_path = ? AND row_status = 'imported'`,
-          [now, row.id, row.contact_id, row.photo_rel_path],
+            [now, row.id, row.contact_id, row.photo_rel_path],
+          );
+          if (retired.changes !== 1)
+            throw new PhotoWriteUnauthorizedError("import row changed");
+        });
+        published = true;
+      } catch (error) {
+        // A purge or competing row transition may have committed during the file write.
+        await inWriteTransaction(exec, () =>
+          enqueueDeleteIntentCore(exec, canonical),
         );
-        if (retired.changes !== 1)
-          throw new PhotoWriteUnauthorizedError("import row changed");
-      });
-      published = true;
-    } catch (error) {
-      // A purge or competing row transition may have committed during the file write.
-      await inWriteTransaction(exec, () =>
-        enqueueDeleteIntentCore(exec, canonical),
-      );
-      await executeDeleteIntentLocked(
-        exec,
-        token,
-        canonical,
-        fs.deleteCanonical ?? deletePhoto,
-        fs.canonicalExists ?? photoFileExists,
-      );
-      if (!(error instanceof PhotoWriteUnauthorizedError)) throw error;
-      await removeRetiredStaging(fs, row, await retireMatching(exec, row, now));
+        await executeDeleteIntentLocked(
+          exec,
+          token,
+          canonical,
+          fs.deleteCanonical ?? deletePhoto,
+          fs.canonicalExists ?? photoFileExists,
+        );
+        if (!(error instanceof PhotoWriteUnauthorizedError)) throw error;
+        await removeRetiredStaging(
+          fs,
+          row,
+          await retireMatching(exec, row, now),
+        );
+      }
+    });
+    if (published) await fs.deleteImportStaging(row.photo_rel_path);
+    return published;
+  } finally {
+    try {
+      fs.discardDerivative(resized);
+    } catch {
+      /* best-effort cache cleanup */
     }
-  });
-  if (published) await fs.deleteImportStaging(row.photo_rel_path);
-  return published;
+  }
 }
 
 /** An explicit user action retires all remaining imported photo work. */

@@ -22,7 +22,10 @@ vi.mock("@/services/photos/photo-storage", () => ({
     `file:///documents/${relative}`,
 }));
 vi.mock("@/utils/logger", () => ({
-  Logger: { error: vi.fn() },
+  Logger: { error: vi.fn(), warn: vi.fn() },
+}));
+vi.mock("@/services/photos/derivative-cache", () => ({
+  discardDerivative: vi.fn(),
 }));
 
 import { retireRowStagedPhoto } from "@/db/import-session-dao";
@@ -51,6 +54,7 @@ function createFs(overrides: Partial<ImportedPhotoFs> = {}): ImportedPhotoFs {
     persistMaster: vi.fn().mockResolvedValue("avatars/contact-42.jpg"),
     setContactPhoto: vi.fn().mockResolvedValue(undefined),
     deleteImportStaging: vi.fn(),
+    discardDerivative: vi.fn(() => true),
     ...overrides,
   };
 }
@@ -85,6 +89,9 @@ describe("persistImportedPhotoPostCommit", () => {
     expect(fs.persistMaster).toHaveBeenCalledWith(
       "file:///cache/master.jpg",
       "avatars/contact-42.jpg",
+    );
+    expect(fs.discardDerivative).toHaveBeenCalledWith(
+      "file:///cache/master.jpg",
     );
     expect(fs.setContactPhoto).toHaveBeenCalledWith(
       expect.anything(),
@@ -138,6 +145,42 @@ describe("persistImportedPhotoPostCommit", () => {
     expect(fs.persistMaster).toHaveBeenCalled();
     expect(retireRowStagedPhoto).not.toHaveBeenCalled();
     expect(fs.deleteImportStaging).not.toHaveBeenCalled();
+    expect(fs.discardDerivative).toHaveBeenCalledWith(
+      "file:///cache/master.jpg",
+    );
+  });
+
+  it("discards after persist failure and keeps photo_failed outcome", async () => {
+    const fs = createFs({
+      persistMaster: vi.fn().mockRejectedValue(new Error("persist")),
+    });
+    await expect(
+      persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
+        contactId: 42,
+        rowId: 7,
+        stagedPhotoPath: "import-staging/a.jpg",
+        now: NOW,
+      }),
+    ).resolves.toEqual({ ok: false });
+    expect(fs.discardDerivative).toHaveBeenCalledWith(
+      "file:///cache/master.jpg",
+    );
+  });
+
+  it("reports a successful save despite a failed discard", async () => {
+    const fs = createFs({
+      discardDerivative: vi.fn(() => {
+        throw new Error("delete");
+      }),
+    });
+    await expect(
+      persistImportedPhotoPostCommit({} as SqlExecutor, fs, {
+        contactId: 42,
+        rowId: 7,
+        stagedPhotoPath: "import-staging/a.jpg",
+        now: NOW,
+      }),
+    ).resolves.toEqual({ ok: true });
   });
 
   it("null staged photo is a skipped no-op", async () => {

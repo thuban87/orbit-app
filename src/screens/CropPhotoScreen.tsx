@@ -65,6 +65,7 @@ import { getExecutor, localDateTime } from "@/db/database";
 import { setProfilePhoto } from "@/db/profile-dao";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { cropRectFromTransform } from "@/services/photos/crop-geometry";
+import { discardDerivative } from "@/services/photos/derivative-cache";
 import { withCanonicalPathLock } from "@/services/photos/owned-master";
 import {
   PhotoPipelineError,
@@ -122,6 +123,15 @@ export function CropPhotoScreen({
   // for a downscaled copy ONLY if the raw source fails to decode (A4). Keeping
   // preview + crop on the SAME uri keeps the crop-rect coordinate space matched.
   const [sourceUri, setSourceUri] = useState(rawUri);
+  const fallbackUriRef = useRef<string | null>(null);
+  useEffect(() => {
+    setSourceUri(rawUri);
+    setDownscaleTried(false);
+    return () => {
+      if (fallbackUriRef.current) discardDerivative(fallbackUriRef.current);
+      fallbackUriRef.current = null;
+    };
+  }, [rawUri]);
   const [downscaleTried, setDownscaleTried] = useState(false);
   const image = useImage(sourceUri);
 
@@ -180,6 +190,7 @@ export function CropPhotoScreen({
     if (image || downscaleTried) {
       return;
     }
+    let active = true;
     const timer = setTimeout(() => {
       void (async () => {
         try {
@@ -190,15 +201,25 @@ export function CropPhotoScreen({
             format: SaveFormat.JPEG,
             compress: 0.9,
           });
-          setSourceUri(out.uri);
+          if (!active) {
+            discardDerivative(out.uri);
+          } else {
+            if (fallbackUriRef.current)
+              discardDerivative(fallbackUriRef.current);
+            fallbackUriRef.current = out.uri;
+            setSourceUri(out.uri);
+          }
         } catch (err) {
           Logger.error(LOG_SCOPE, `decode-fallback downscale failed`, err);
         } finally {
-          setDownscaleTried(true);
+          if (active) setDownscaleTried(true);
         }
       })();
     }, DECODE_FALLBACK_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
   }, [image, downscaleTried, rawUri]);
 
   // Skia transform: scale about the square centre, then apply the pan (screen px).

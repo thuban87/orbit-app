@@ -25,11 +25,18 @@ function productionFs(): DerivativeCacheFs {
     list: (uri) => {
       const directory = new Directory(uri);
       if (!directory.exists) return [];
-      return directory.list().flatMap((entry) =>
-        entry instanceof File
-          ? [{ uri: entry.uri, modificationTime: entry.info().modificationTime ?? null }]
-          : [],
-      );
+      return directory
+        .list()
+        .flatMap((entry) =>
+          entry instanceof File
+            ? [
+                {
+                  uri: entry.uri,
+                  modificationTime: entry.info().modificationTime ?? null,
+                },
+              ]
+            : [],
+        );
     },
   };
 }
@@ -39,7 +46,8 @@ function resolvedFileUri(input: string): string | null {
   try {
     if (input.includes("%")) return null;
     const url = new URL(input);
-    if (url.protocol !== "file:" || url.host || url.search || url.hash) return null;
+    if (url.protocol !== "file:" || url.host || url.search || url.hash)
+      return null;
     return url.href.replace(/\/$/, "");
   } catch {
     return null;

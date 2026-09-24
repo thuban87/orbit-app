@@ -75,6 +75,7 @@ function photoFs(overrides: Partial<ImportedPhotoFs> = {}): ImportedPhotoFs {
     persistMaster: async () => "saved",
     setContactPhoto: async () => {},
     deleteImportStaging: () => {},
+    discardDerivative: () => true,
     ...overrides,
   };
 }
