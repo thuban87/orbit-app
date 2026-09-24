@@ -47,6 +47,7 @@
  * Node-pure: takes `exec: SqlExecutor`; imports the shared `inWriteTransaction`.
  */
 
+import { recordLifecycleTransitionCore } from "@/db/contact-lifecycle-dao";
 import {
   applyContactMethodDiffCore,
   type ContactMethodDraft,
@@ -59,43 +60,49 @@ import {
   type SetCurrentStateValueInput,
   setCurrentStateValueCore,
 } from "@/db/current-state-history-dao";
-import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import {
+  type CurrentStateEntryRow,
+  getCurrentStateValue,
+  getCurrentStateValues,
+} from "@/db/current-state-history-read";
 import { applyUserCustomValueEditCore } from "@/db/custom-value-edit-dao";
-import { recordLifecycleTransitionCore } from "@/db/contact-lifecycle-dao";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { recordEventCore } from "@/db/events-dao";
 import { listDefs } from "@/db/field-defs-dao";
 import { upsertValueCore } from "@/db/field-values-dao";
-import { getCurrentStateValue, getCurrentStateValues, type CurrentStateEntryRow } from "@/db/current-state-history-read";
 import {
   addFuelCore,
   deleteFuelCore,
-  editFuelCore,
   type EditFuelInput,
+  editFuelCore,
   type NewFuelItem,
 } from "@/db/fuel-dao";
+import { type FuelItem, listFuelForEditor } from "@/db/fuel-read";
 import {
   addMemoryCore,
   deleteMemoryCore,
-  editMemoryCore,
   type EditMemoryInput,
+  editMemoryCore,
   type NewMemoryInput,
 } from "@/db/memories-dao";
 import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
-import {
-  addRelationshipCore,
-  deleteRelationshipCore,
-  editRelationshipCore,
-  type EditRelationshipInput,
-  type NewRelationshipInput,
-} from "@/db/relationships-dao";
-import { listRelationshipsForContact, type RelationshipRow } from "@/db/relationships-read";
-import { listFuelForEditor, type FuelItem } from "@/db/fuel-read";
 import { assertSafeRelative } from "@/db/photo-relative-path";
 import {
   type FirstInteractionInput,
   insertInteractionCore,
   recomputeLastContactCore,
 } from "@/db/recency-dao";
+import {
+  addRelationshipCore,
+  deleteRelationshipCore,
+  type EditRelationshipInput,
+  editRelationshipCore,
+  type NewRelationshipInput,
+} from "@/db/relationships-dao";
+import {
+  listRelationshipsForContact,
+  type RelationshipRow,
+} from "@/db/relationships-read";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
@@ -276,7 +283,9 @@ export async function createContactFullCore(
   // quarantined globals. Directly-present Phase-31 contact defs must never
   // fan out to a newly-created contact.
   const definitions = await listDefs(exec, { includeQuarantined: true });
-  for (const definition of definitions.filter((definition) => definition.scope === "global")) {
+  for (const definition of definitions.filter(
+    (definition) => definition.scope === "global",
+  )) {
     await upsertValueCore(
       exec,
       contactId,
@@ -547,7 +556,9 @@ export async function setContactFrequencyCore(
   now: string,
 ): Promise<void> {
   if (!Number.isInteger(intervalDays) || intervalDays <= 0) {
-    throw new Error(`intervalDays must be a positive integer, got ${intervalDays}`);
+    throw new Error(
+      `intervalDays must be a positive integer, got ${intervalDays}`,
+    );
   }
   const result = await exec.runAsync(
     "UPDATE contacts SET interval_days = ?, modified_at = ? WHERE id = ?",
@@ -580,14 +591,24 @@ async function applyKnowledgeDiffsCore(
   exec: SqlExecutor,
   contactId: number,
   input: UpdateContactFullInput,
-): Promise<{ memories: number[]; relationships: number[]; offLimits: number[] }> {
+): Promise<{
+  memories: number[];
+  relationships: number[];
+  offLimits: number[];
+}> {
   const now = input.now;
-  const addedIds = { memories: [] as number[], relationships: [] as number[], offLimits: [] as number[] };
+  const addedIds = {
+    memories: [] as number[],
+    relationships: [] as number[],
+    offLimits: [] as number[],
+  };
 
   // --- Memories -------------------------------------------------------------
   if (input.memories) {
     for (const add of input.memories.add ?? []) {
-      addedIds.memories.push(await addMemoryCore(exec, { ...add, contactId, createdAt: now, now }));
+      addedIds.memories.push(
+        await addMemoryCore(exec, { ...add, contactId, createdAt: now, now }),
+      );
     }
     for (const patch of input.memories.edit ?? []) {
       await editMemoryCore(exec, { ...patch, contactId, now });
@@ -600,7 +621,14 @@ async function applyKnowledgeDiffsCore(
   // --- Key People / Relationships ------------------------------------------
   if (input.relationships) {
     for (const add of input.relationships.add ?? []) {
-      addedIds.relationships.push(await addRelationshipCore(exec, { ...add, contactId, createdAt: now, now }));
+      addedIds.relationships.push(
+        await addRelationshipCore(exec, {
+          ...add,
+          contactId,
+          createdAt: now,
+          now,
+        }),
+      );
     }
     for (const patch of input.relationships.edit ?? []) {
       await editRelationshipCore(exec, { ...patch, contactId, now });
@@ -621,19 +649,26 @@ async function applyKnowledgeDiffsCore(
   if (input.offLimits) {
     for (const add of input.offLimits.add ?? []) {
       // FORCE kind:"off_limits" — the diff can only ever add an off_limits row.
-      addedIds.offLimits.push(await addFuelCore(exec, {
-        ...add,
-        kind: "off_limits",
-        uid: newUid(),
-        contactId,
-        createdAt: now,
-        source: "user",
-        now,
-      }));
+      addedIds.offLimits.push(
+        await addFuelCore(exec, {
+          ...add,
+          kind: "off_limits",
+          uid: newUid(),
+          contactId,
+          createdAt: now,
+          source: "user",
+          now,
+        }),
+      );
     }
     for (const patch of input.offLimits.edit ?? []) {
       // FORCE kind:"off_limits" — an edit can never change a row to another kind.
-      await editFuelCore(exec, { ...patch, kind: "off_limits", contactId, now });
+      await editFuelCore(exec, {
+        ...patch,
+        kind: "off_limits",
+        contactId,
+        now,
+      });
     }
     for (const ref of input.offLimits.delete ?? []) {
       // Suppress the tombstone self-bump so the aggregate bumps exactly once.
@@ -662,8 +697,14 @@ export function updateContactFull(
   memories: MemoryRow[];
   relationships: RelationshipRow[];
   offLimits: FuelItem[];
-  currentState: Partial<Record<"last_talked_about" | "current_location", CurrentStateEntryRow>>;
-  addedIds: { memories: number[]; relationships: number[]; offLimits: number[] };
+  currentState: Partial<
+    Record<"last_talked_about" | "current_location", CurrentStateEntryRow>
+  >;
+  addedIds: {
+    memories: number[];
+    relationships: number[];
+    offLimits: number[];
+  };
 }> {
   // A requested Bound state needs a positive cadence. Unbound accepts NULL for
   // never-assigned contacts and positive dormant cadence otherwise.
@@ -725,8 +766,16 @@ export function updateContactFull(
     // Metadata UPDATE (never writes last_contact). Runs FIRST so a later recompute
     // reads the NEW rarely_responds flag.
     await updateContactMetadataCore(exec, lifecycleInput);
-    if (input.trackingEnabled !== undefined && (input.trackingEnabled ? 1 : 0) !== stored.tracking_enabled) {
-      await recordLifecycleTransitionCore(exec, input.id, trackingEnabled ? "bind" : "unbind", input.now);
+    if (
+      input.trackingEnabled !== undefined &&
+      (input.trackingEnabled ? 1 : 0) !== stored.tracking_enabled
+    ) {
+      await recordLifecycleTransitionCore(
+        exec,
+        input.id,
+        trackingEnabled ? "bind" : "unbind",
+        input.now,
+      );
     }
 
     // UPSERT value pairs instead of deleting/re-keying them. A fresh uid is only
@@ -798,10 +847,13 @@ export function updateContactFull(
     const fuel = await listFuelForEditor(exec, input.id);
     const currentState = await getCurrentStateValues(exec, input.id);
     return {
-      methods: methodSaveResult?.methods ?? [], methodSaveResult,
-      memories, relationships,
+      methods: methodSaveResult?.methods ?? [],
+      methodSaveResult,
+      memories,
+      relationships,
       offLimits: fuel.filter((row) => row.kind === "off_limits"),
-      currentState, addedIds,
+      currentState,
+      addedIds,
     };
   });
 }
@@ -999,28 +1051,65 @@ export function setContactPhoto(
   relative: string,
   now: string,
 ): Promise<void> {
-  return inWriteTransaction(exec, () => setContactPhotoCore(exec, id, relative, now));
+  return inWriteTransaction(exec, () =>
+    setContactPhotoCore(exec, id, relative, now),
+  );
+}
+
+export async function getContactPhotoIdentity(
+  exec: SqlExecutor,
+  id: number,
+): Promise<string | null> {
+  const row = await exec.getFirstAsync<{ uid: string }>(
+    "SELECT uid FROM contacts WHERE id = ?",
+    [id],
+  );
+  return row?.uid ?? null;
+}
+
+export function setContactPhotoForUid(
+  exec: SqlExecutor,
+  id: number,
+  uid: string,
+  relative: string,
+  now: string,
+): Promise<void> {
+  assertSafeRelative(relative);
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      "UPDATE contacts SET photo = ?, modified_at = ? WHERE id = ? AND uid = ?",
+      [relative, now, id, uid],
+    );
+    if (result.changes !== 1) throw new Error("contact photo target changed");
+    await bumpDataRevisionCore(exec);
+  });
 }
 
 /**
  * Clear a contact's photo (`photo = NULL`) + bump `modified_at`. Asserts exactly
  * one row changed (a bad id throws → rollback). `last_contact` untouched.
  */
+export async function clearContactPhotoCore(
+  exec: SqlExecutor,
+  id: number,
+  now: string,
+): Promise<void> {
+  const result = await exec.runAsync(
+    "UPDATE contacts SET photo = NULL, modified_at = ? WHERE id = ?",
+    [now, id],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `clearContactPhoto: no contact matched id=${id} (changed ${result.changes})`,
+    );
+  }
+  await bumpDataRevisionCore(exec);
+}
+
 export function clearContactPhoto(
   exec: SqlExecutor,
   id: number,
   now: string,
 ): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    const result = await exec.runAsync(
-      "UPDATE contacts SET photo = NULL, modified_at = ? WHERE id = ?",
-      [now, id],
-    );
-    if (result.changes !== 1) {
-      throw new Error(
-        `clearContactPhoto: no contact matched id=${id} (changed ${result.changes})`,
-      );
-    }
-    await bumpDataRevisionCore(exec);
-  });
+  return inWriteTransaction(exec, () => clearContactPhotoCore(exec, id, now));
 }

@@ -1,7 +1,7 @@
 # Photos
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 36-ai-configuration-prompting
+**Last updated:** 2026-09-23
+**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
 **Owners:** `src/services/photos/`, `src/db/contacts-dao.ts`, `src/db/profile-dao.ts`, `src/components/Avatar.tsx`, `src/components/PhotoSourcePicker.tsx`
 
 ## Purpose
@@ -17,7 +17,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 **Tables:**
 - `contacts` — its nullable `photo` (`TEXT`) holds a relative `avatars/contact-<id>.jpg` path.
 - `profile` — its nullable `photo` (`TEXT`) holds the fixed relative `avatars/profile.jpg` path.
-- `contact_custom_values` — a `photo`-type field holds its derivable `avatars/cv-<contactId>-<colName>.jpg` path in its existing `TEXT` column.
+- `custom_field_values` — a `photo`-type field holds its derivable `avatars/cv-<contactId>-<colName>.jpg` path in its raw `value` text column.
 - `restore_photo_journal` — committed restore work that finalizes or removes a canonical master after the database transaction.
 - `import_session_rows` — a local-only retryable `photo_rel_path` reference to a selected-contact source staged under `import-staging/`.
 
@@ -32,6 +32,8 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | Crop UI | `src/screens/CropPhotoScreen.tsx` | Uses Skia and Reanimated shared values for a themed square crop. |
 | Pipeline | `src/services/photos/photo-pipeline.ts` | Crops the original source, produces the 512px JPEG, and returns a relative path. |
 | Storage | `src/services/photos/photo-storage.ts` | Validates paths, derives names, persists masters, deletes files, and reconciles interrupted writes. |
+| Canonical owner | `src/services/photos/owned-master.ts` | Locks each master path, settles older journal work before writes, and applies reference-safe delete intents. |
+| Pure path builders | `src/db/photo-relative-path.ts` | Derives ADR-021 filenames without importing native file APIs. |
 | URL service | `src/services/photos/url-image.ts` | Downloads a user-pasted HTTPS image once on the write path. |
 | Contact/profile DAOs | `src/db/contacts-dao.ts`, `src/db/profile-dao.ts` | Persist or clear the contact and self relative path with one-row guards. |
 | Purge extension | `src/services/photos/purge-photo-cleanup.ts` | Deletes derivable contact and custom-field files after database purge commits. |
@@ -67,7 +69,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 
 ### Persisting and rendering the master
 
-1. `photo-storage` copies the cache output into the document directory through a temporary-file and `.bak` swap; it never pre-deletes the existing master.
+1. `owned-master` acquires the canonical path lock and settles every older journal row before a new write. `photo-storage` then copies the cache output through a temporary-file and `.bak` swap; it never pre-deletes the existing master.
 2. Contact and profile DAOs store the relative filename; custom fields retain the same derivable value through the existing guarded value writer.
 3. `Avatar` resolves the relative path to a local `file://` URI. It renders with `expo-image`, or falls back to initials when the value is absent or the load fails.
 4. A photo-write revision changes the image cache discriminator after set, clear, or replace.
@@ -81,8 +83,8 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 
 ### Removing and purging photos
 
-1. Contact and profile removal clears the database reference, then deletes the derivable file best-effort.
-2. The launch sweep reconciles interrupted temporary or backup files from a prior replacement.
+1. Contact and profile removal clears the reference and enqueues a durable delete intent in one transaction before deleting the derivable file. Custom-field removal enqueues the intent while the form holds its value; Save or Cancel determines whether the reference predicate allows deletion.
+2. The launch sweep locks each canonical path and re-reads its sidecars after locking before repairing an interrupted replacement.
 3. An archived-contact purge invokes the post-commit cleanup extension. Because database rows are gone by then, it derives the main filename from `contactId` and custom-field filenames from the surviving photo definitions, including quarantined definitions.
 
 ### Restoring backup photo bytes
@@ -90,6 +92,18 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 1. Backup serializes image bytes, never the device-local relative path as portable authority.
 2. Restore stages validated bytes under the guarded restore-pending namespace before its database transaction.
 3. A committed journal row authorizes the finalizer to write the fresh canonical relative master or verify a stale master is absent; launch recovery ignores uncommitted work.
+4. A foreground drain skips staged files owned by an active session and checks each apparent orphan against the current journal before deleting it.
+
+### Crash ordering for a newer normal write
+
+The path lock is process-local. Crash safety comes from settling old journal rows before the new swap; no journal retirement follows the new replacement.
+
+| Interruption point | State after launch reconciliation and journal drain |
+|---|---|
+| Before settle finishes | Prior master and retry row remain; recovery can retry. |
+| After settle, before swap | Recovered master remains; old row is gone. |
+| During `.tmp` copy or after prior master moves to `.bak` | Recovered master remains or is restored from `.bak`; old row is gone. |
+| After replacement | New master remains; old row is gone. |
 
 ### Importing a selected contact photo
 
@@ -152,6 +166,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 10. **Guard WebCrypto in Hermes.** Reconciliation photo hashing must fall back to RNQC when `globalThis.crypto` is unavailable; the original unguarded digest blocked photo-bearing scans before its Phase-20 fix.
 11. **A Profile background is shared template data.** Never apply the avatar pipeline's single-owner deletion assumption; re-read every live template reference first.
 12. **Background restore is not contact-photo journaling.** Its UID-derived pending/finalization path must retain the incoming bytes until the committed template owns the candidate.
+13. **Canonical masters have one owner.** New writes, recovery, removal, and sidecar reconciliation acquire the same path lock. Delete intents are idempotent and delete only when no live contact, profile, custom-field value, or pending finalize references the exact path.
 
 ## Related Systems
 
@@ -174,3 +189,4 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 | 2026-08-26 | 20 | Added hashed reconciliation staging and post-commit chosen-source photo promotion. |
 | 2026-09-02 | 31 | Added Profile-aspect background derivatives, safe app-owned storage, reference-aware cleanup, and launch reconciliation. |
 | 2026-09-02 | 36 | Added staged format-v5 Profile-background byte restore and committed-candidate reconciliation. |
+| 2026-09-23 | 38.2 | Added settle-before-write ownership, reference-safe delete intents, and staging guards for `reliability-testing/AUD-REL-003`. |

@@ -6,6 +6,10 @@ vi.mock("expo-image-manipulator", () => ({
   SaveFormat: { JPEG: "jpeg" },
 }));
 vi.mock("@/db/contacts-dao", () => ({ setContactPhoto: vi.fn() }));
+vi.mock("@/db/database", () => ({ getExecutor: () => ({ marker: "db" }) }));
+vi.mock("@/services/photos/owned-master", () => ({
+  persistOwnedMaster: vi.fn().mockResolvedValue("avatars/contact-42.jpg"),
+}));
 vi.mock("@/db/import-session-dao", () => ({
   retireRowStagedPhoto: vi.fn().mockResolvedValue(undefined),
 }));
@@ -21,11 +25,13 @@ vi.mock("@/utils/logger", () => ({
   Logger: { error: vi.fn() },
 }));
 
+import { retireRowStagedPhoto } from "@/db/import-session-dao";
 import {
   type ImportedPhotoFs,
+  importedPhotoFs,
   persistImportedPhotoPostCommit,
 } from "@/services/import/import-photo";
-import { retireRowStagedPhoto } from "@/db/import-session-dao";
+import { persistOwnedMaster } from "@/services/photos/owned-master";
 
 const NOW = "2026-08-29 12:00:00";
 
@@ -50,6 +56,17 @@ function createFs(overrides: Partial<ImportedPhotoFs> = {}): ImportedPhotoFs {
 }
 
 describe("persistImportedPhotoPostCommit", () => {
+  it("routes the production master boundary through the canonical owner", async () => {
+    await importedPhotoFs.persistMaster(
+      "file:///cache/master.jpg",
+      "avatars/contact-42.jpg",
+    );
+    expect(persistOwnedMaster).toHaveBeenCalledWith(
+      { marker: "db" },
+      "file:///cache/master.jpg",
+      "avatars/contact-42.jpg",
+    );
+  });
   it("persists a stable 512px master and records the contact photo", async () => {
     const fs = createFs();
 

@@ -2,7 +2,6 @@ import type * as ExpoImageManipulator from "expo-image-manipulator";
 import { assertSafeRelative } from "@/db/photo-relative-path";
 import {
   contactPhotoRelPath,
-  persistMaster,
   reconcileStagingRelPath,
   resolveReconcileStagingUri,
   stageReconcilePhoto,
@@ -32,12 +31,19 @@ export interface ReconcilePhotoFs {
 async function digest(bytes: Uint8Array): Promise<string> {
   const webCrypto = globalThis.crypto;
   if (webCrypto?.subtle) {
-    const hash = await webCrypto.subtle.digest("SHA-256", bytes as unknown as BufferSource);
-    return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, "0")).join("");
+    const hash = await webCrypto.subtle.digest(
+      "SHA-256",
+      bytes as unknown as BufferSource,
+    );
+    return Array.from(new Uint8Array(hash), (byte) =>
+      byte.toString(16).padStart(2, "0"),
+    ).join("");
   }
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const quickCrypto = require("react-native-quick-crypto") as {
-    createHash(algorithm: string): { update(data: Uint8Array): { digest(encoding: string): string } };
+    createHash(algorithm: string): {
+      update(data: Uint8Array): { digest(encoding: string): string };
+    };
   };
   return quickCrypto.createHash("sha256").update(bytes).digest("hex");
 }
@@ -48,9 +54,18 @@ async function readStagedBytes(uri: string): Promise<Uint8Array> {
 }
 
 async function resizeToMaster(uri: string): Promise<string> {
-  const { ImageManipulator, SaveFormat } = (await import("expo-image-manipulator")) as typeof ExpoImageManipulator;
-  const rendered = await ImageManipulator.manipulate(uri).resize({ width: MASTER_SIZE, height: MASTER_SIZE }).renderAsync();
-  return (await rendered.saveAsync({ format: SaveFormat.JPEG, compress: MASTER_COMPRESS })).uri;
+  const { ImageManipulator, SaveFormat } = (await import(
+    "expo-image-manipulator"
+  )) as typeof ExpoImageManipulator;
+  const rendered = await ImageManipulator.manipulate(uri)
+    .resize({ width: MASTER_SIZE, height: MASTER_SIZE })
+    .renderAsync();
+  return (
+    await rendered.saveAsync({
+      format: SaveFormat.JPEG,
+      compress: MASTER_COMPRESS,
+    })
+  ).uri;
 }
 
 export const reconcilePhotoFs: ReconcilePhotoFs = {
@@ -58,7 +73,13 @@ export const reconcilePhotoFs: ReconcilePhotoFs = {
   resolveStaged: resolveReconcileStagingUri,
   readBytes: readStagedBytes,
   resizeToMaster,
-  persistMaster,
+  persistMaster: async (uri, relative) => {
+    const { getExecutor } = await import("@/db/database");
+    const { persistOwnedMaster } = await import(
+      "@/services/photos/owned-master"
+    );
+    return persistOwnedMaster(getExecutor(), uri, relative);
+  },
   contactPhotoRelPath,
 };
 
@@ -70,7 +91,9 @@ export async function stageReconcileSourcePhoto(
 ): Promise<{ stagedRelative: string; contentHash: string }> {
   const stagedRelative = reconcileStagingRelPath(token);
   await fs.stage(cacheUri, stagedRelative);
-  const contentHash = await digest(await fs.readBytes(await fs.resolveStaged(stagedRelative)));
+  const contentHash = await digest(
+    await fs.readBytes(await fs.resolveStaged(stagedRelative)),
+  );
   return { stagedRelative, contentHash };
 }
 
@@ -81,6 +104,8 @@ export async function promoteReconcilePhoto(
 ): Promise<string> {
   const relative = fs.contactPhotoRelPath(params.contactId);
   assertSafeRelative(relative);
-  const resized = await fs.resizeToMaster(await fs.resolveStaged(params.stagedRelative));
+  const resized = await fs.resizeToMaster(
+    await fs.resolveStaged(params.stagedRelative),
+  );
   return fs.persistMaster(resized, relative);
 }

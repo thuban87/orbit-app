@@ -61,8 +61,9 @@ async function persistPhotoMaster(
   sourceUri: string,
   relative: string,
 ): Promise<string> {
-  const { persistMaster } = await import("@/services/photos/photo-storage");
-  return persistMaster(sourceUri, relative);
+  const { persistOwnedMaster } = await import("@/services/photos/owned-master");
+  const { getExecutor } = await import("@/db/database");
+  return persistOwnedMaster(getExecutor(), sourceUri, relative);
 }
 
 async function deleteStagedPhoto(relative: string): Promise<void> {

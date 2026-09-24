@@ -127,22 +127,27 @@ export async function setProfileName(
  * Clear the self photo (`photo = NULL`) + bump `modified_at`. Asserts exactly one
  * row changed.
  */
+export async function clearProfilePhotoCore(
+  exec: SqlExecutor,
+  now: string,
+): Promise<void> {
+  const result = await exec.runAsync(
+    "UPDATE profile SET photo = NULL, modified_at = ? WHERE id = 1",
+    [now],
+  );
+  if (result.changes !== 1) {
+    throw new Error(
+      `clearProfilePhoto: profile row id=1 not updated (changed ${result.changes})`,
+    );
+  }
+  await bumpDataRevisionCore(exec);
+}
+
 export function clearProfilePhoto(
   exec: SqlExecutor,
   now: string,
 ): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    const result = await exec.runAsync(
-      "UPDATE profile SET photo = NULL, modified_at = ? WHERE id = 1",
-      [now],
-    );
-    if (result.changes !== 1) {
-      throw new Error(
-        `clearProfilePhoto: profile row id=1 not updated (changed ${result.changes})`,
-      );
-    }
-    await bumpDataRevisionCore(exec);
-  });
+  return inWriteTransaction(exec, () => clearProfilePhotoCore(exec, now));
 }
 
 /** Read the self photo's stored relative filename, or null when unset. */

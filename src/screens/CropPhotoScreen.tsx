@@ -57,7 +57,10 @@ import {
 } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useDerivedValue, useSharedValue } from "react-native-reanimated";
-import { setContactPhoto } from "@/db/contacts-dao";
+import {
+  getContactPhotoIdentity,
+  setContactPhotoForUid,
+} from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { setProfilePhoto } from "@/db/profile-dao";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -265,16 +268,34 @@ export function CropPhotoScreen({
         ty: ty.value,
       });
       // Crop the SAME uri the preview decoded (rawUri, or the A4 downscale).
+      const exec = getExecutor();
+      const capturedUid = route.params.contactUid;
+      if (target.kind !== "profile" && !capturedUid)
+        throw new Error("contact photo target missing");
       const relative = await persistCroppedMaster({
+        exec,
+        authorize:
+          target.kind === "profile"
+            ? undefined
+            : async (lockedExec) =>
+                (await getContactPhotoIdentity(
+                  lockedExec,
+                  target.contactId,
+                )) === capturedUid,
         rawUri: sourceUri,
         cropRect,
         target,
       });
 
       const now = localDateTime();
-      const exec = getExecutor();
-      if (target.kind === "contact") {
-        await setContactPhoto(exec, target.contactId, relative, now);
+      if (target.kind === "contact" && capturedUid) {
+        await setContactPhotoForUid(
+          exec,
+          target.contactId,
+          capturedUid,
+          relative,
+          now,
+        );
         // Sub-second cache-bust: a same-second replace shares `modified_at`, so
         // the per-write revision is what forces the returning Avatar to redecode.
         bumpPhotoCacheBust(relative);
@@ -314,13 +335,11 @@ export function CropPhotoScreen({
     tx,
     ty,
     route.params.requestId,
+    route.params.contactUid,
   ]);
 
   return (
-    <View
-      testID="crop-photo-screen"
-      style={styles.root}
-    >
+    <View testID="crop-photo-screen" style={styles.root}>
       <View style={styles.header}>
         <Text
           accessibilityRole="header"

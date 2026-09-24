@@ -114,6 +114,19 @@ describe("owned canonical master", () => {
     });
     expect(await listJournalEntriesCore(exec)).toEqual([]);
   });
+  it("retires an older pre-upgrade finalize before applying the later row", async () => {
+    await stage();
+    const later = {
+      ...entry,
+      relativePath: "avatars/_restore_pending/contact-u1-s2.jpg",
+    };
+    h.fs!.files.set(later.relativePath, "later");
+    await inWriteTransaction(exec, () => insertJournalEntryCore(exec, later));
+    await finalizeJournalEntryOwned(exec, later);
+    expect(h.fs!.files.get(canonical)).toBe("later");
+    expect(h.fs!.writes).toEqual([canonical]);
+    expect(await listJournalEntriesCore(exec)).toEqual([]);
+  });
 
   it("leaves the journal and prior canonical untouched when settle fails", async () => {
     await stage();

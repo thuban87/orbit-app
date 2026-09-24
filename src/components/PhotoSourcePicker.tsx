@@ -12,11 +12,9 @@
  * target so Plan 08's widget can correlate the crop-success. A canceled pick is
  * silent.
  *
- * Remove switches on `target.kind` and deletes the correct derivable file inline
- * (non-undoable, best-effort/idempotent), never dereferencing a missing contactId:
- *   - contact     → `clearContactPhoto` + `deletePhoto(contactPhotoRelPath(id))`
- *   - profile     → `clearProfilePhoto` + `deletePhoto(profilePhotoRelPath())`
- *   - customField → `deletePhoto(customFieldPhotoRelPath(id, col))` + `onValueChange(null)`
+ * Remove switches on `target.kind` and uses the owned-master path. Contact and
+ * profile clear their reference with a durable delete intent in one transaction;
+ * custom-field Remove enqueues only the intent until the form Save clears value.
  * The contact/profile branches write the DB here, then call `onChanged()`; the
  * customField branch NEVER touches SQL — the field value is cleared through the
  * edit form's guarded upsert on Save (the widget wires `onValueChange` to its
@@ -39,14 +37,20 @@ import {
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
-import { clearContactPhoto } from "@/db/contacts-dao";
+import {
+  clearContactPhotoCore,
+  getContactPhotoIdentity,
+} from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
-import { clearProfilePhoto } from "@/db/profile-dao";
+import { clearProfilePhotoCore } from "@/db/profile-dao";
 import type { RootStackParamList } from "@/navigation/types";
+import {
+  enqueueRemovalIntentOwned,
+  removeOwnedMaster,
+} from "@/services/photos/owned-master";
 import {
   contactPhotoRelPath,
   customFieldPhotoRelPath,
-  deletePhoto,
   type PhotoTargetDescriptor,
   profilePhotoRelPath,
 } from "@/services/photos/photo-storage";
@@ -56,6 +60,7 @@ import {
   UrlImageError,
 } from "@/services/photos/url-image";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { markPhotoStaged } from "@/stores/photo-result-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -128,6 +133,13 @@ export function PhotoSourcePicker({
   // customField pick threads its derivable cv- relPath as the requestId.
   const pickFromLibrary = useCallback(async () => {
     try {
+      const contactUid =
+        target.kind === "profile"
+          ? undefined
+          : ((await getContactPhotoIdentity(getExecutor(), target.contactId)) ??
+            undefined);
+      if (target.kind !== "profile" && !contactUid)
+        throw new Error("contact photo target missing");
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: false,
@@ -143,6 +155,7 @@ export function PhotoSourcePicker({
       navigation.navigate("CropPhoto", {
         rawUri,
         target,
+        contactUid,
         requestId:
           target.kind === "customField"
             ? customFieldPhotoRelPath(target.contactId, target.colName)
@@ -165,25 +178,32 @@ export function PhotoSourcePicker({
       const now = localDateTime();
       switch (target.kind) {
         case "contact":
-          await clearContactPhoto(exec, target.contactId, now);
-          deletePhoto(contactPhotoRelPath(target.contactId));
+          await removeOwnedMaster(exec, contactPhotoRelPath(target.contactId), {
+            clearReferenceCore: (tx) =>
+              clearContactPhotoCore(tx, target.contactId, now),
+          });
           onChanged?.();
           // A contact photo is widget-visible (the tile avatar); clearing it must
           // refresh the widget. Profile/customField cases are not widget-visible.
           notifyWidgetDataChanged();
           break;
         case "profile":
-          await clearProfilePhoto(exec, now);
-          deletePhoto(profilePhotoRelPath());
+          await removeOwnedMaster(exec, profilePhotoRelPath(), {
+            clearReferenceCore: (tx) => clearProfilePhotoCore(tx, now),
+          });
           onChanged?.();
           break;
-        case "customField":
+        case "customField": {
           // No SQL here — the field value clears through the edit form's Save.
-          deletePhoto(
-            customFieldPhotoRelPath(target.contactId, target.colName),
+          const relative = customFieldPhotoRelPath(
+            target.contactId,
+            target.colName,
           );
+          await enqueueRemovalIntentOwned(exec, relative);
+          markPhotoStaged(relative);
           onValueChange?.(null);
           break;
+        }
       }
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to remove photo", err);
@@ -209,10 +229,18 @@ export function PhotoSourcePicker({
     }
     setSubmittingUrl(true);
     try {
+      const contactUid =
+        target.kind === "profile"
+          ? undefined
+          : ((await getContactPhotoIdentity(getExecutor(), target.contactId)) ??
+            undefined);
+      if (target.kind !== "profile" && !contactUid)
+        throw new Error("contact photo target missing");
       const rawUri = await downloadImageToCache(url);
       navigation.navigate("CropPhoto", {
         rawUri,
         target,
+        contactUid,
         requestId:
           target.kind === "customField"
             ? customFieldPhotoRelPath(target.contactId, target.colName)

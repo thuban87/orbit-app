@@ -7,31 +7,27 @@
  * at full fidelity — NEVER a Skia `makeImageSnapshot()` (that rasterizes at lossy
  * screen resolution; 05-RESEARCH Anti-Patterns). The manipulator writes to
  * EVICTABLE cache, so its output is immediately copied out into the persistent
- * document dir via `photo-storage.persistMaster` (T-05-05: cache eviction would
+ * document dir via `persistOwnedMaster` (T-05-05: cache eviction would
  * otherwise silently lose avatars), and only the RELATIVE path it returns is
  * handed back — never the cache/absolute URI (05-RESEARCH Pitfalls 1 & 3).
  *
  * `persistMaster` is Plan 02's crash-safe copy-to-`.tmp` → move-prior-to-`.bak` →
  * move-`.tmp`-into-place swap; it NEVER pre-deletes the destination, so neither a
- * failed copy nor a crash can destroy the prior master. This pipeline calls it
- * UNCHANGED and inherits that safety — it must add NO destination delete/pre-delete
+ * failed copy nor a crash can destroy the prior master. The owner settles older
+ * journal work before calling that swap; the pipeline adds NO destination pre-delete
  * of its own (addresses review [codex/HIGH→MED 05-04 replacement order + cycle-2
  * HIGH atomicity]).
  *
- * DB-DECOUPLED BY DESIGN: this pipeline imports no DAO and performs no DB write.
- * It returns the relative path; the CALLER persists it per target kind (contact
- * and profile write immediately; a custom-field defers to the form save). That
- * keeps the DAO write — and thus the inline old-file delete on replace — at the
- * call site, out of this service.
+ * The pipeline takes the caller's executor for ownership settlement but does
+ * not publish a photo reference. Contact/profile publication remains at the
+ * call site; custom-field values still wait for the form Save.
  */
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
+import type { SqlExecutor } from "@/db/types";
 import { Logger } from "@/utils/logger";
 import type { CropRect } from "./crop-geometry";
-import {
-  type PhotoTargetDescriptor,
-  persistMaster,
-  relPathForTarget,
-} from "./photo-storage";
+import { type OwnedWriteOptions, persistOwnedMaster } from "./owned-master";
+import { type PhotoTargetDescriptor, relPathForTarget } from "./photo-storage";
 
 const LOG_SCOPE = "photo-pipeline";
 
@@ -55,6 +51,8 @@ export class PhotoPipelineError extends Error {
 
 /** Inputs to the crop→master→persist pipeline. */
 export interface PersistCroppedMasterArgs {
+  exec: SqlExecutor;
+  authorize?: OwnedWriteOptions["authorize"];
   /** The ORIGINAL source URI (library-cache or downloaded-cache) to crop. */
   rawUri: string;
   /** The source-pixel crop rectangle from `crop-geometry.cropRectFromTransform`. */
@@ -74,6 +72,8 @@ export interface PersistCroppedMasterArgs {
  * pre-deletes it.
  */
 export async function persistCroppedMaster({
+  exec,
+  authorize,
   rawUri,
   cropRect,
   target,
@@ -100,6 +100,6 @@ export async function persistCroppedMaster({
   // Copy out of evictable cache into the document dir (crash-safe .bak swap) and
   // return ONLY the relative path — never the manipulator's cache/absolute URI.
   const relative = relPathForTarget(target);
-  await persistMaster(out.uri, relative);
+  await persistOwnedMaster(exec, out.uri, relative, { authorize });
   return relative;
 }

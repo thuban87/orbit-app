@@ -102,8 +102,7 @@ import {
   isDuplicateName,
   listCategories,
 } from "@/db/contact-read";
-import { updateContactFull } from "@/db/contacts-dao";
-import { runEditContactSave, type EditContactBaselines } from "./edit-contact-save-coordinator";
+import type { updateContactFull } from "@/db/contacts-dao";
 import { getCurrentStateValues } from "@/db/current-state-history-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
@@ -130,7 +129,10 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { applyLifecycleTransitionEffects } from "@/services/contact-lifecycle-effects";
 import { getDeviceRegion } from "@/services/device-region";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
-import { deletePhoto } from "@/services/photos/photo-storage";
+import {
+  deleteStagedPhotosOwned,
+  executeDeleteIntentOwned,
+} from "@/services/photos/owned-master";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { takeStagedPhotos } from "@/stores/photo-result-store";
 import { useTheme } from "@/theme";
@@ -151,6 +153,10 @@ import {
   resolveErrorSection,
   seedEditState,
 } from "./edit-contact-logic";
+import {
+  type EditContactBaselines,
+  runEditContactSave,
+} from "./edit-contact-save-coordinator";
 
 const LOG_SCOPE = "edit-contact";
 
@@ -665,10 +671,24 @@ export function EditContactScreen({
           (v): v is string => v != null,
         ),
       );
-      for (const relPath of staged) {
-        if (!committed.has(relPath)) {
-          deletePhoto(relPath);
-        }
+      const orphanCandidates = staged.filter(
+        (relPath) => !committed.has(relPath),
+      );
+      if (orphanCandidates.length > 0) {
+        void deleteStagedPhotosOwned(getExecutor(), orphanCandidates).catch(
+          (error) => {
+            Logger.error("edit-contact", "staged photo cleanup failed", error);
+          },
+        );
+      }
+      for (const path of staged.filter((relPath) => committed.has(relPath))) {
+        void executeDeleteIntentOwned(getExecutor(), path).catch((error) => {
+          Logger.error(
+            "edit-contact",
+            "photo removal intent cleanup failed",
+            error,
+          );
+        });
       }
     };
   }, []);
@@ -876,9 +896,11 @@ export function EditContactScreen({
     setLinksDraft(baseline.linksDraft);
     setForm({
       ...baseline.form,
-      methods: JSON.stringify(baseline.form.methods) === JSON.stringify(submittedForm.methods)
-        ? committedMethods
-        : baseline.form.methods,
+      methods:
+        JSON.stringify(baseline.form.methods) ===
+        JSON.stringify(submittedForm.methods)
+          ? committedMethods
+          : baseline.form.methods,
     });
     setNeverContacted(baseline.neverContacted);
     setInitialTrackingEnabled(baseline.initialTrackingEnabled);
@@ -890,7 +912,9 @@ export function EditContactScreen({
       offLimits: baseline.offLimits,
       lastTalkedAbout: baseline.currentState.last_talked_about ?? "",
       currentLocation: baseline.currentState.current_location ?? "",
-      lastSpoke: baseline.neverContacted ? submittedForm.lastSpoke : { kind: "not-yet" },
+      lastSpoke: baseline.neverContacted
+        ? submittedForm.lastSpoke
+        : { kind: "not-yet" },
       methods: committedMethods,
     };
     seedInputRef.current = editInputSignature(committedForm, {
@@ -946,7 +970,9 @@ export function EditContactScreen({
       const lifecycleDirection =
         submittedForm.trackingEnabled === initialTrackingEnabled
           ? null
-          : submittedForm.trackingEnabled ? "bind" : "unbind";
+          : submittedForm.trackingEnabled
+            ? "bind"
+            : "unbind";
       const outcome = await runEditContactSave({
         exec,
         input,
@@ -965,10 +991,18 @@ export function EditContactScreen({
         toOffLimitsDraft: fuelItemToDraftRow,
         afterMetadataCommit: () => {
           if (lifecycleDirection) {
-            void applyLifecycleTransitionEffects(contactId, lifecycleDirection, { exec });
+            void applyLifecycleTransitionEffects(
+              contactId,
+              lifecycleDirection,
+              { exec },
+            );
           } else {
             void reconcileSchedule(exec).catch((error) =>
-              Logger.error(LOG_SCOPE, "reconcile after edit-save failed", error),
+              Logger.error(
+                LOG_SCOPE,
+                "reconcile after edit-save failed",
+                error,
+              ),
             );
             notifyWidgetDataChanged();
           }
@@ -979,20 +1013,34 @@ export function EditContactScreen({
         },
       });
       if (outcome.status === "metadataFailed") {
-        Logger.error(LOG_SCOPE, "failed to save contact metadata", outcome.error);
+        Logger.error(
+          LOG_SCOPE,
+          "failed to save contact metadata",
+          outcome.error,
+        );
         Alert.alert("Couldn't save contact. Please try again.");
         return;
       }
-      applyCommittedBaseline(outcome.baseline, submittedForm, outcome.metadata.methods);
+      applyCommittedBaseline(
+        outcome.baseline,
+        submittedForm,
+        outcome.metadata.methods,
+      );
       if (outcome.status === "linksFailed") {
-        Logger.error(LOG_SCOPE, "links save failed (metadata committed)", outcome.error);
+        Logger.error(
+          LOG_SCOPE,
+          "links save failed (metadata committed)",
+          outcome.error,
+        );
         Alert.alert("Contact saved — some links couldn't be saved. Try again.");
         return;
       }
       if (outcome.status === "refreshFailed") {
         setStale(true);
         Logger.error(LOG_SCOPE, "saved contact refresh failed", outcome.error);
-        Alert.alert("Contact saved, but the form couldn't refresh. Reopen it before saving again.");
+        Alert.alert(
+          "Contact saved, but the form couldn't refresh. Reopen it before saving again.",
+        );
         return;
       }
       if (outcome.status === "canonicalDuplicate") {
@@ -1000,10 +1048,17 @@ export function EditContactScreen({
         if (duplicate?.status !== "canonicalDuplicate") {
           throw new Error("canonical duplicate result missing method type");
         }
-        setField("methods", seedMethodGroups({
-          phone: outcome.metadata.methods.filter((method) => method.method_type === "phone"),
-          email: outcome.metadata.methods.filter((method) => method.method_type === "email"),
-        }));
+        setField(
+          "methods",
+          seedMethodGroups({
+            phone: outcome.metadata.methods.filter(
+              (method) => method.method_type === "phone",
+            ),
+            email: outcome.metadata.methods.filter(
+              (method) => method.method_type === "email",
+            ),
+          }),
+        );
         setDuplicateHelper({
           type: duplicate.methodType,
           copy: canonicalDuplicateCopy(duplicate.methodType),

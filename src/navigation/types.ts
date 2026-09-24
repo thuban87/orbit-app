@@ -89,6 +89,7 @@ export type DashboardStackParamList = {
     rawUri: string;
     target: PhotoTargetDescriptor;
     requestId?: string;
+    contactUid?: string;
   };
   /** Dedicated neutral browse surface for live contacts outside the active orbit. */
   UnboundContacts: undefined;
@@ -193,6 +194,7 @@ export type OrreryStackParamList = {
     rawUri: string;
     target: PhotoTargetDescriptor;
     requestId?: string;
+    contactUid?: string;
   };
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
@@ -239,6 +241,7 @@ export type DigestStackParamList = {
     rawUri: string;
     target: PhotoTargetDescriptor;
     requestId?: string;
+    contactUid?: string;
   };
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
@@ -272,6 +275,7 @@ export type EventsStackParamList = {
     rawUri: string;
     target: PhotoTargetDescriptor;
     requestId?: string;
+    contactUid?: string;
   };
   SurvivorSelect: { firstContactId: number; secondContactId?: number };
   MergeConflicts: { survivorId: number; absorbedId: number };
@@ -379,6 +383,7 @@ export type SettingsStackParamList = {
     rawUri: string;
     target: PhotoTargetDescriptor;
     requestId?: string;
+    contactUid?: string;
   };
   LegacyContactPicker: undefined;
   ImportReview: { sessionId: number };
