@@ -1,8 +1,28 @@
 diff --git a/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt b/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
-index ff5b100..f5e37f6 100644
+index ff5b100..7540a55 100644
 --- a/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
 +++ b/node_modules/expo-share-intent/android/src/main/java/expo/modules/shareintent/ExpoShareIntentModule.kt
-@@ -129,7 +129,7 @@ class ExpoShareIntentModule : Module() {
+@@ -112,6 +112,10 @@ class ExpoShareIntentModule : Module() {
+         }
+ 
+         fun handleShareIntent(intent: Intent) {
++            // Orbit's general receiver owns text only. The dedicated backup
++            // module owns JSON streams; do not inspect or copy any file here.
++            if (intent.type?.startsWith("text/plain") != true) return
++            try {
+             val activity = instance?.currentActivity
+             if (activity != null && !activity.isTaskRoot) {
+                 val newIntent = Intent(intent).apply {
+@@ -121,15 +125,14 @@ class ExpoShareIntentModule : Module() {
+                 activity.finish()
+                 return
+             }
+-            if (intent.type == null) return
+-            if (intent.type!!.startsWith("text/plain")) {
++            if (intent.type.startsWith("text/plain")) {
+                 // text / urls
+                 if (intent.action == Intent.ACTION_SEND) {
+                     notifyShareIntent(mapOf(
                          "text" to intent.getStringExtra(Intent.EXTRA_TEXT),
                          "type" to "text",
                          "meta" to mapOf(
@@ -11,3 +31,13 @@ index ff5b100..f5e37f6 100644
                          )
                      ))
                  } else if (intent.action == Intent.ACTION_VIEW) {
+@@ -157,6 +160,9 @@ class ExpoShareIntentModule : Module() {
+                     notifyError("Invalid action for file sharing: " + intent.action)
+                 }
+             }
++            } catch (_: Exception) {
++                notifyError("Could not read shared text")
++            }
+         }
+ 
+         /*

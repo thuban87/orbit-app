@@ -2,7 +2,7 @@ import type { NavigationContainerRef } from "@react-navigation/native";
 import { useShareIntentContext } from "expo-share-intent";
 import { createRef, useEffect } from "react";
 import { hasSharedBackup } from "../../modules/orbit-backup-document-picker";
-import { isBackupShareIntent } from "./backup-share-intent";
+import { shouldRouteBackupShare } from "./backup-share-intent";
 import type { TabParamList } from "./types";
 
 /**
@@ -50,8 +50,7 @@ export const navigationRef = createRef<NavigationContainerRef<TabParamList>>();
  * as the readiness trigger.
  */
 export function ShareIntentGate({ isReady }: { isReady: boolean }) {
-  const { hasShareIntent, resetShareIntent, shareIntent } =
-    useShareIntentContext();
+  const { hasShareIntent, resetShareIntent } = useShareIntentContext();
 
   useEffect(() => {
     // Query unconditionally: expo-share-intent's cold-start state can settle
@@ -59,10 +58,7 @@ export function ShareIntentGate({ isReady }: { isReady: boolean }) {
     // is the authoritative proof that Android granted one backup document.
     const backupReady = hasSharedBackup();
     if (isReady) {
-      if (
-        backupReady &&
-        (isBackupShareIntent(shareIntent) || !hasShareIntent)
-      ) {
+      if (shouldRouteBackupShare(backupReady, hasShareIntent)) {
         resetShareIntent();
         navigationRef.current?.navigate("SettingsTab", { screen: "Backup" });
         return;
@@ -71,7 +67,7 @@ export function ShareIntentGate({ isReady }: { isReady: boolean }) {
         navigationRef.current?.navigate("DashboardTab", { screen: "Capture" });
       }
     }
-  }, [hasShareIntent, isReady, resetShareIntent, shareIntent]);
+  }, [hasShareIntent, isReady, resetShareIntent]);
 
   return null;
 }
