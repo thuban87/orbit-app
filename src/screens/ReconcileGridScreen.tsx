@@ -1,11 +1,14 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { CandidateCardGrid, type CandidateItem } from "@/components/CandidateCardGrid";
-import { applyReconcileSelections, type ReconcileSelection } from "@/db/reconcile-apply";
-import { listContactMethods } from "@/db/contact-methods-dao";
+import {
+  CandidateCardGrid,
+  type CandidateItem,
+} from "@/components/CandidateCardGrid";
 import { getAppSettings } from "@/db/app-settings-dao";
+import { listContactMethods } from "@/db/contact-methods-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { applyReconcileSelections } from "@/db/reconcile-apply";
 import {
   createReconcileSessionCore,
   finalizeSessionIfTerminal,
@@ -24,27 +27,48 @@ import { isAdditiveOnlySelection } from "@/logic/reconcile-bulk-eligibility";
 import {
   classifyReconciliation,
   type ReconcileDiffResult,
-  type ReconcileFieldDiff,
   type ReconcileSource,
 } from "@/logic/reconcile-diff";
+import {
+  buildReconcileSelections,
+  remainingReconcileFields,
+} from "@/logic/reconcile-selection";
 import type { RootStackScreenProps } from "@/navigation/types";
-import { ensureReadContactsPermission, openContactsSettings } from "@/services/contacts/use-read-contacts-permission";
+import {
+  ensureReadContactsPermission,
+  openContactsSettings,
+} from "@/services/contacts/use-read-contacts-permission";
 import { deleteReconcileStaging } from "@/services/photos/photo-storage";
 import { stageReconcileSourcePhoto } from "@/services/photos/reconcile-photo";
 import { useTheme } from "@/theme";
-import { readAllContacts, type PickedContact } from "../../modules/orbit-contact-picker";
+import {
+  type PickedContact,
+  readAllContacts,
+} from "../../modules/orbit-contact-picker";
 
 type StoredDiff = ReconcileDiffResult & {
   completionDisposition?: "updated" | "kept-orbit" | null;
 };
 type GridCard = { card: ReconcileSessionCard; diff: StoredDiff };
-type LinkedContact = { id: number; name: string; birthday: string | null; photo: string | null; modified_at: string };
-type Link = { id: number; contact_id: number; external_contact_id: string; provider: string };
+type LinkedContact = {
+  id: number;
+  name: string;
+  birthday: string | null;
+  photo: string | null;
+  modified_at: string;
+};
+type Link = {
+  id: number;
+  contact_id: number;
+  external_contact_id: string;
+  provider: string;
+};
 
 function parseDiff(value: string): StoredDiff | null {
   try {
     const parsed: unknown = JSON.parse(value);
-    if (typeof parsed !== "object" || parsed === null || !("fields" in parsed)) return null;
+    if (typeof parsed !== "object" || parsed === null || !("fields" in parsed))
+      return null;
     return parsed as StoredDiff;
   } catch {
     return null;
@@ -53,84 +77,55 @@ function parseDiff(value: string): StoredDiff | null {
 
 function chipLabel(diff: ReconcileDiffResult): string {
   if (diff.missingSource) return "Source missing";
-  if (diff.fields.every((field) => field.outcome === "additive" && field.fieldFamily !== "photo")) return "Add";
-  if (diff.fields.every((field) => field.outcome === "removed-from-source")) return "Keep Orbit";
+  if (
+    diff.fields.every(
+      (field) => field.outcome === "additive" && field.fieldFamily !== "photo",
+    )
+  )
+    return "Add";
+  if (diff.fields.every((field) => field.outcome === "removed-from-source"))
+    return "Keep Orbit";
   return "Manual review";
 }
 
-function sourceMethods(field: ReconcileFieldDiff) {
-  if (field.fieldFamily !== "phones" && field.fieldFamily !== "emails") return undefined;
-  return field.sourceOptions.map((option) => ({
-    type: field.fieldFamily === "phones" ? ("phone" as const) : ("email" as const),
-    value: option.value ?? "",
-  }));
-}
-
-function selectionsFor(
-  action: "apply-recommendation" | "keep-orbit" | "use-contact-values",
-  diff: ReconcileDiffResult,
-): ReconcileSelection[] {
-  return diff.fields
-    .filter((field) => {
-      if (action === "keep-orbit") return true;
-      // Source photo is never bulk-selected. It stays in the card for the
-      // explicit PhotoChoice in ReconcileDetailScreen.
-      return field.outcome === "additive" && field.fieldFamily !== "photo";
-    })
-    .map((field) => ({
-      fieldFamily: field.fieldFamily,
-      baseline: field.orbitBaseline,
-      useSource: action !== "keep-orbit",
-      sourceValue: field.sourceValue,
-      sourceMethods: sourceMethods(field),
-      sourceLinkIds: field.sourceOptions.flatMap((option) => option.sourceLinkIds),
-      reviewedValue: field.sourceValue,
-      stagedPhotoRelative: field.sourceOptions[0]?.stagedPhotoRelative ?? null,
-      photoContentHash: field.sourceValue,
-    }));
-}
-
-function remainingAfter(
-  action: "apply-recommendation" | "keep-orbit" | "use-contact-values",
-  diff: ReconcileDiffResult,
-  staleFields: readonly string[],
-): number {
-  if (action === "keep-orbit") return staleFields.length;
-  return diff.fields.filter(
-    (field) =>
-      field.fieldFamily === "photo" ||
-      field.outcome !== "additive" ||
-      staleFields.includes(field.fieldFamily),
-  ).length;
-}
-
 /** Reused CandidateCardGrid workspace for one durable bulk reconciliation check. */
-export function ReconcileGridScreen({ navigation, route }: RootStackScreenProps<"ReconcileGrid">) {
+export function ReconcileGridScreen({
+  navigation,
+  route,
+}: RootStackScreenProps<"ReconcileGrid">) {
   const { colors } = useTheme();
-  const [sessionId, setSessionId] = useState<number | null>(route.params?.sessionId ?? null);
+  const [sessionId, setSessionId] = useState<number | null>(
+    route.params?.sessionId ?? null,
+  );
   const [cards, setCards] = useState<GridCard[]>([]);
   const [scoring, setScoring] = useState(route.params?.sessionId == null);
   const [message, setMessage] = useState<string | null>(null);
   const [needsContactsAccess, setNeedsContactsAccess] = useState(false);
 
-  const refreshCards = useCallback(async (id: number) => {
-    const rows = await listReconcileSessionCards(getExecutor(), id);
-    const next = rows.flatMap((card) => {
-      const diff = parseDiff(card.diffJson);
-      return diff && (card.cardStatus === "unresolved" || card.cardStatus === "partial")
-        ? [{ card, diff }]
-        : [];
-    });
-    setCards(next);
-    const session = await getReconcileSessionById(getExecutor(), id);
-    if (session?.status === "complete" && next.length === 0) {
-      navigation.replace("ReconcileComplete", { sessionId: id });
-    }
-  }, [navigation]);
+  const refreshCards = useCallback(
+    async (id: number) => {
+      const rows = await listReconcileSessionCards(getExecutor(), id);
+      const next = rows.flatMap((card) => {
+        const diff = parseDiff(card.diffJson);
+        return diff &&
+          (card.cardStatus === "unresolved" || card.cardStatus === "partial")
+          ? [{ card, diff }]
+          : [];
+      });
+      setCards(next);
+      const session = await getReconcileSessionById(getExecutor(), id);
+      if (session?.status === "complete" && next.length === 0) {
+        navigation.replace("ReconcileComplete", { sessionId: id });
+      }
+    },
+    [navigation],
+  );
 
   const scan = useCallback(async () => {
     const exec = getExecutor();
-    setScoring(true); setMessage(null); setNeedsContactsAccess(false);
+    setScoring(true);
+    setMessage(null);
+    setNeedsContactsAccess(false);
     const contacts = await exec.getAllAsync<LinkedContact>(
       `SELECT c.id, c.name, c.birthday, c.photo, c.modified_at
        FROM contacts c
@@ -147,47 +142,94 @@ export function ReconcileGridScreen({ navigation, route }: RootStackScreenProps<
       const access = await ensureReadContactsPermission();
       if (!access.granted) {
         setNeedsContactsAccess(true);
-        setMessage(access.verdict === "permanent"
-          ? "Orbit needs Contacts access to check linked contacts. Enable it in Settings."
-          : "Orbit needs Contacts access to check linked contacts.");
+        setMessage(
+          access.verdict === "permanent"
+            ? "Orbit needs Contacts access to check linked contacts. Enable it in Settings."
+            : "Orbit needs Contacts access to check linked contacts.",
+        );
         setScoring(false);
         return;
       }
     }
-    const sourceRead = await readAllContacts(links.map((link) => link.external_contact_id));
-    const pickedByKey = new Map(sourceRead.contacts.map((picked) => [picked.lookupKey, picked]));
+    const sourceRead = await readAllContacts(
+      links.map((link) => link.external_contact_id),
+    );
+    const pickedByKey = new Map(
+      sourceRead.contacts.map((picked) => [picked.lookupKey, picked]),
+    );
     const linksByContact = new Map<number, Link[]>();
-    for (const link of links) linksByContact.set(link.contact_id, [...(linksByContact.get(link.contact_id) ?? []), link]);
+    for (const link of links)
+      linksByContact.set(link.contact_id, [
+        ...(linksByContact.get(link.contact_id) ?? []),
+        link,
+      ]);
     const settings = await getAppSettings(exec);
     const stagedForCleanup: string[] = [];
-    const built: Array<{ contactId: number; diff: StoredDiff; stagedPhotoRelPath: string | null }> = [];
+    const built: Array<{
+      contactId: number;
+      diff: StoredDiff;
+      stagedPhotoRelPath: string | null;
+    }> = [];
     try {
       for (const contact of contacts) {
         const contactLinks = linksByContact.get(contact.id) ?? [];
         const methods = await listContactMethods(exec, contact.id);
-        const pickedLinks = contactLinks.map((link) => ({ link, picked: pickedByKey.get(link.external_contact_id) }));
-        const firstPhoto = pickedLinks.find((item): item is { link: Link; picked: PickedContact } => item.picked?.photoTempUri != null);
+        const pickedLinks = contactLinks.map((link) => ({
+          link,
+          picked: pickedByKey.get(link.external_contact_id),
+        }));
+        const firstPhoto = pickedLinks.find(
+          (item): item is { link: Link; picked: PickedContact } =>
+            item.picked?.photoTempUri != null,
+        );
         let stagedPhotoRelPath: string | null = null;
         let photoContentHash: string | null = null;
         if (firstPhoto?.picked.photoTempUri) {
           // The picker cache URI is consumed only at this durable staging boundary.
-          const staged = await stageReconcileSourcePhoto(firstPhoto.picked.photoTempUri, `contact-${contact.id}-link-${firstPhoto.link.id}`);
+          const staged = await stageReconcileSourcePhoto(
+            firstPhoto.picked.photoTempUri,
+            `contact-${contact.id}-link-${firstPhoto.link.id}`,
+          );
           stagedPhotoRelPath = staged.stagedRelative;
           photoContentHash = staged.contentHash;
           stagedForCleanup.push(stagedPhotoRelPath);
         }
-        const sources: ReconcileSource[] = pickedLinks.flatMap(({ link, picked }) => picked ? [{
-          externalContactLinkId: link.id,
-          displayName: picked.displayName,
-          methods: picked.methods,
-          birthday: picked.birthday,
-          provenanceLabel: `Contacts (${link.provider})`,
-          ...(link.id === firstPhoto?.link.id ? { stagedPhotoRelative: stagedPhotoRelPath, photoContentHash } : {}),
-        }] : []);
-        const snapshots = await Promise.all(contactLinks.map((link) => getReviewedSnapshots(exec, link.id)));
+        const sources: ReconcileSource[] = pickedLinks.flatMap(
+          ({ link, picked }) =>
+            picked
+              ? [
+                  {
+                    externalContactLinkId: link.id,
+                    displayName: picked.displayName,
+                    methods: picked.methods,
+                    birthday: picked.birthday,
+                    provenanceLabel: `Contacts (${link.provider})`,
+                    ...(link.id === firstPhoto?.link.id
+                      ? {
+                          stagedPhotoRelative: stagedPhotoRelPath,
+                          photoContentHash,
+                        }
+                      : {}),
+                  },
+                ]
+              : [],
+        );
+        const snapshots = await Promise.all(
+          contactLinks.map((link) => getReviewedSnapshots(exec, link.id)),
+        );
         const lastReviewed = Object.assign({}, ...snapshots);
         const diff = classifyReconciliation({
-          orbit: { name: contact.name, birthday: contact.birthday, photo: contact.photo, methods: methods.map((method) => ({ type: method.method_type, value: method.raw_value, label: method.label })), modifiedAt: contact.modified_at },
+          orbit: {
+            name: contact.name,
+            birthday: contact.birthday,
+            photo: contact.photo,
+            methods: methods.map((method) => ({
+              type: method.method_type,
+              value: method.raw_value,
+              label: method.label,
+            })),
+            modifiedAt: contact.modified_at,
+          },
           sources,
           lastReviewed,
           omittedCount: pickedLinks.some((item) => !item.picked) ? 1 : 0,
@@ -197,19 +239,31 @@ export function ReconcileGridScreen({ navigation, route }: RootStackScreenProps<
           if (stagedPhotoRelPath) deleteReconcileStaging(stagedPhotoRelPath);
           continue;
         }
-        built.push({ contactId: contact.id, diff: { ...diff, completionDisposition: null }, stagedPhotoRelPath });
+        built.push({
+          contactId: contact.id,
+          diff: { ...diff, completionDisposition: null },
+          stagedPhotoRelPath,
+        });
       }
       const now = localDateTime();
       const id = await inWriteTransaction(exec, async () => {
-        const nextSessionId = await createReconcileSessionCore(exec, { uid: newUid(), totalChecked: contacts.length, now });
+        const nextSessionId = await createReconcileSessionCore(exec, {
+          uid: newUid(),
+          totalChecked: contacts.length,
+          now,
+        });
         for (const entry of built) {
           await insertReconcileCardCore(exec, {
-            uid: newUid(), sessionId: nextSessionId, contactId: entry.contactId,
+            uid: newUid(),
+            sessionId: nextSessionId,
+            contactId: entry.contactId,
             // Missing sources stay visible for an explicit Keep Orbit/relink
             // decision; `missing_source` is the terminal state after review.
             cardStatus: "unresolved",
             diffJson: JSON.stringify(entry.diff),
-            unresolvedCount: entry.diff.missingSource ? 0 : entry.diff.fields.length,
+            unresolvedCount: entry.diff.missingSource
+              ? 0
+              : entry.diff.fields.length,
             stagedPhotoRelPath: entry.stagedPhotoRelPath,
             now,
           });
@@ -222,20 +276,35 @@ export function ReconcileGridScreen({ navigation, route }: RootStackScreenProps<
     } catch (error) {
       for (const relative of stagedForCleanup) deleteReconcileStaging(relative);
       throw error;
-    } finally { setScoring(false); }
+    } finally {
+      setScoring(false);
+    }
   }, [refreshCards]);
 
   useEffect(() => {
-    void (route.params?.sessionId != null ? refreshCards(route.params.sessionId) : scan()).catch(() => {
-      setMessage("Could not check linked contacts right now."); setScoring(false);
+    void (
+      route.params?.sessionId != null
+        ? refreshCards(route.params.sessionId)
+        : scan()
+    ).catch(() => {
+      setMessage("Could not check linked contacts right now.");
+      setScoring(false);
     });
   }, [refreshCards, route.params?.sessionId, scan]);
 
-  useFocusEffect(useCallback(() => {
-    if (sessionId !== null) void refreshCards(sessionId).catch(() => setMessage("Could not refresh this check."));
-  }, [refreshCards, sessionId]));
+  useFocusEffect(
+    useCallback(() => {
+      if (sessionId !== null)
+        void refreshCards(sessionId).catch(() =>
+          setMessage("Could not refresh this check."),
+        );
+    }, [refreshCards, sessionId]),
+  );
 
-  const itemById = useMemo(() => new Map(cards.map((entry) => [entry.card.id, entry])), [cards]);
+  const itemById = useMemo(
+    () => new Map(cards.map((entry) => [entry.card.id, entry])),
+    [cards],
+  );
   const items: CandidateItem[] = cards.map(({ card, diff }) => ({
     id: card.id,
     name: `Contact ${card.contactId}`,
@@ -245,54 +314,150 @@ export function ReconcileGridScreen({ navigation, route }: RootStackScreenProps<
     photoUri: null,
   }));
 
-  const onBulkAction = useCallback(async (action: "apply-recommendation" | "keep-orbit" | "use-contact-values", targets: CandidateItem[]) => {
-    const exec = getExecutor(); const now = localDateTime(); const failures: number[] = [];
-    for (const target of targets) {
-      const entry = itemById.get(Number(target.id)); if (!entry) continue;
-      try {
-        let removeStaged: string | null = null;
-        await inWriteTransaction(exec, async () => {
-          const result = await applyReconcileSelections(exec, { contactId: entry.card.contactId, now, selections: selectionsFor(action, entry.diff) });
-          const remaining = remainingAfter(action, entry.diff, result.staleFields);
-          const status = remaining === 0
-            ? (entry.diff.missingSource ? "missing_source" : "resolved")
-            : "partial";
-          await markCardStatusCore(exec, entry.card.id, status, remaining, now);
-          const disposition = action === "keep-orbit" ? "kept-orbit" : "updated";
-          await exec.runAsync(
-            `UPDATE reconciliation_session_cards
+  const onBulkAction = useCallback(
+    async (
+      action: "apply-recommendation" | "keep-orbit" | "use-contact-values",
+      targets: CandidateItem[],
+    ) => {
+      const exec = getExecutor();
+      const now = localDateTime();
+      const failures: number[] = [];
+      for (const target of targets) {
+        const entry = itemById.get(Number(target.id));
+        if (!entry) continue;
+        try {
+          let removeStaged: string | null = null;
+          await inWriteTransaction(exec, async () => {
+            const result = await applyReconcileSelections(exec, {
+              contactId: entry.card.contactId,
+              now,
+              selections: buildReconcileSelections(entry.diff, action),
+            });
+            const remaining = remainingReconcileFields(
+              action,
+              entry.diff,
+              result.staleFields,
+            );
+            const status =
+              remaining === 0
+                ? entry.diff.missingSource
+                  ? "missing_source"
+                  : "resolved"
+                : "partial";
+            await markCardStatusCore(
+              exec,
+              entry.card.id,
+              status,
+              remaining,
+              now,
+            );
+            const disposition =
+              action === "keep-orbit" ? "kept-orbit" : "updated";
+            await exec.runAsync(
+              `UPDATE reconciliation_session_cards
              SET diff_json = json_set(diff_json, '$.completionDisposition', ?),
                  staged_photo_rel_path = CASE WHEN ? = 'resolved' THEN NULL ELSE staged_photo_rel_path END,
                  modified_at = ? WHERE id = ?`,
-            [disposition, status, now, entry.card.id],
-          );
-          if (status === "resolved") removeStaged = entry.card.stagedPhotoRelPath;
-        });
-        if (removeStaged) deleteReconcileStaging(removeStaged);
-      } catch { failures.push(entry.card.id); }
-    }
-    if (sessionId !== null) {
-      await finalizeSessionIfTerminal(exec, sessionId, now);
-      await refreshCards(sessionId);
-    }
-    setMessage(failures.length ? `${failures.length} card${failures.length === 1 ? "" : "s"} could not be applied. Try again.` : null);
-  }, [itemById, refreshCards, sessionId]);
+              [disposition, status, now, entry.card.id],
+            );
+            if (status === "resolved")
+              removeStaged = entry.card.stagedPhotoRelPath;
+          });
+          if (removeStaged) deleteReconcileStaging(removeStaged);
+        } catch {
+          failures.push(entry.card.id);
+        }
+      }
+      if (sessionId !== null) {
+        await finalizeSessionIfTerminal(exec, sessionId, now);
+        await refreshCards(sessionId);
+      }
+      setMessage(
+        failures.length
+          ? `${failures.length} card${failures.length === 1 ? "" : "s"} could not be applied. Try again.`
+          : null,
+      );
+    },
+    [itemById, refreshCards, sessionId],
+  );
 
-  return <View style={styles.root}>
-    <Text style={[styles.title, { color: colors.textPrimary }]}>Check linked contacts</Text>
-    {message ? <Text style={[styles.message, { color: colors.textSecondary }]}>{message}</Text> : null}
-    {needsContactsAccess ? <Pressable onPress={() => { void openContactsSettings(); }} style={[styles.settingsButton, { borderColor: colors.border }]}><Text style={{ color: colors.textPrimary }}>Open Settings</Text></Pressable> : null}
-    <CandidateCardGrid
-      items={items}
-      bulkActions={["apply-recommendation", "keep-orbit", "use-contact-values"]}
-      recommendationExcludes="needs_review"
-      scoring={scoring}
-      scoringLabel="Checking linked contacts…"
-      isActionEligible={(action, selected) => action !== "use-contact-values" || isAdditiveOnlySelection(selected.flatMap((item) => { const entry = itemById.get(Number(item.id)); return entry ? [entry.diff] : []; }))}
-      onInspect={(item) => { const entry = itemById.get(Number(item.id)); if (entry && sessionId !== null) navigation.navigate("ReconcileDetail", { contactId: entry.card.contactId, sessionId, cardId: entry.card.id }); }}
-      onBulkAction={(action, selected) => onBulkAction(action as "apply-recommendation" | "keep-orbit" | "use-contact-values", selected)}
-    />
-  </View>;
+  return (
+    <View style={styles.root}>
+      <Text style={[styles.title, { color: colors.textPrimary }]}>
+        Check linked contacts
+      </Text>
+      {message ? (
+        <Text style={[styles.message, { color: colors.textSecondary }]}>
+          {message}
+        </Text>
+      ) : null}
+      {needsContactsAccess ? (
+        <Pressable
+          onPress={() => {
+            void openContactsSettings();
+          }}
+          style={[styles.settingsButton, { borderColor: colors.border }]}
+        >
+          <Text style={{ color: colors.textPrimary }}>Open Settings</Text>
+        </Pressable>
+      ) : null}
+      <CandidateCardGrid
+        items={items}
+        bulkActions={[
+          "apply-recommendation",
+          "keep-orbit",
+          "use-contact-values",
+        ]}
+        recommendationExcludes="needs_review"
+        scoring={scoring}
+        scoringLabel="Checking linked contacts…"
+        isActionEligible={(action, selected) =>
+          action !== "use-contact-values" ||
+          isAdditiveOnlySelection(
+            selected.flatMap((item) => {
+              const entry = itemById.get(Number(item.id));
+              return entry ? [entry.diff] : [];
+            }),
+          )
+        }
+        onInspect={(item) => {
+          const entry = itemById.get(Number(item.id));
+          if (entry && sessionId !== null)
+            navigation.navigate("ReconcileDetail", {
+              contactId: entry.card.contactId,
+              sessionId,
+              cardId: entry.card.id,
+            });
+        }}
+        onBulkAction={(action, selected) =>
+          onBulkAction(
+            action as
+              | "apply-recommendation"
+              | "keep-orbit"
+              | "use-contact-values",
+            selected,
+          )
+        }
+      />
+    </View>
+  );
 }
 
-const styles = StyleSheet.create({ root: { flex: 1 }, title: { fontSize: 24, fontWeight: "700", paddingHorizontal: 16, paddingTop: 16 }, message: { fontSize: 14, paddingHorizontal: 16, paddingTop: 8 }, settingsButton: { marginHorizontal: 16, marginTop: 12, borderWidth: 1, borderRadius: 8, paddingVertical: 10, alignItems: "center" } });
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  title: {
+    fontSize: 24,
+    fontWeight: "700",
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  message: { fontSize: 14, paddingHorizontal: 16, paddingTop: 8 },
+  settingsButton: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: "center",
+  },
+});

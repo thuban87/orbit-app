@@ -311,7 +311,7 @@ export function ReconcileDetailScreen({
         try {
           const relative = await promoteReconcilePhoto(reconcilePhotoFs, {
             contactId,
-            stagedRelative: result.pendingPhoto.stagedPhotoRelative,
+            stagedRelative: pendingPhoto.stagedPhotoRelative,
           });
           await setContactPhoto(exec, contactId, relative, now);
           await inWriteTransaction(exec, async () => {
@@ -324,7 +324,7 @@ export function ReconcileDetailScreen({
               });
           });
         } finally {
-          deleteReconcileStaging(result.pendingPhoto.stagedPhotoRelative);
+          deleteReconcileStaging(pendingPhoto.stagedPhotoRelative);
         }
       }
       if (cardId != null && sessionId != null) {

@@ -27,6 +27,8 @@ export interface ReconcileSelection {
   baseline: string | null;
   /** A user-selected source value; false means the user chose Keep Orbit. */
   useSource: boolean;
+  /** Stable classifier option selected in the UI, when useSource is true. */
+  sourceOptionId?: string;
   sourceValue: string | null;
   sourceMethods?: readonly ReconcileMethod[];
   sourceLinkIds: readonly number[];

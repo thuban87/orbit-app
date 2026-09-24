@@ -58,6 +58,7 @@ export function buildReconcileSelections(
         fieldFamily: field.fieldFamily,
         baseline: field.orbitBaseline,
         useSource,
+        sourceOptionId: chosenOption?.optionId,
         sourceValue:
           (field.fieldFamily === "name" || field.fieldFamily === "birthday") &&
           useSource

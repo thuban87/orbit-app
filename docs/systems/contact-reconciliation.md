@@ -1,7 +1,7 @@
 # Contact Reconciliation
 
-**Last updated:** 2026-09-03
-**Updated by phase:** 24.1-contact-knowledge-foundation
+**Last updated:** 2026-09-23
+**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
 **Owners:** `src/db/reconcile-apply.ts`, `src/db/reconcile-session-dao.ts`, `src/db/reconcile-session-read.ts`, `src/db/reconcile-snapshot-dao.ts`, `src/db/reconcile-relink-dao.ts`, `src/db/merge-dao.ts`, `src/logic/reconcile-diff.ts`
 
 ## Purpose
@@ -67,7 +67,9 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 1. A user taps `Update from Contacts` on a linked profile or `Check linked contacts` in Settings; the API-37+ read requests Contacts access in context before querying the linked source records.
 2. `classifyReconciliation()` compares name, methods, birthday, and photo identity against Orbit using canonical method equality. It emits additive, conflict, removed-from-source, or distinct missing-source outcomes.
 3. The detail flow applies only selected values. It re-reads scalar baselines before writing, snapshots overwritten local values, and records the source value reviewed for that link and family.
+   Each source option has a stable ID. The selected birthday or name reaches the writer exactly, while the reviewed snapshot records the comparable for all linked source options. A null source scalar is rejected as stale and cannot clear an Orbit value.
 4. A batch scan persists only changed contacts as cards in one session. Additive, non-photo selections can use a safe bulk source-values action; conflict and removed cases remain manually reviewed.
+   Bulk source-value actions also leave name or birthday fields with multiple source options for explicit detail review; those cards remain partial.
 5. A card remains until all actionable differences resolve. Completion reports durable disposition counts; pending work survives process death and offers Resume or Discard on a later foreground launch.
 
 ### Handling a missing source
@@ -138,3 +140,4 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 | 2026-08-31 | 21 | Extended the merge reparent loop to pending `interaction_assists` so a merged target's later confirmation logs against the survivor. |
 | 2026-09-03 | 24.1 | Extended merge reparenting with typed contact-knowledge rows, self-link safety, and current-state collision preservation. |
 | 2026-09-02 | 33 | Added owner-locked same-event merge refusal before reparenting and user-visible membership remediation. |
+| 2026-09-23 | 38.2 | Preserved source-option identity through reconciliation, recorded the complete reviewed comparable, and excluded ambiguous scalars from bulk source apply. |

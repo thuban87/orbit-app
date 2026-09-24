@@ -40,6 +40,7 @@ describe("buildReconcileSelections", () => {
         birthday: `source:${option.optionId}`,
       });
       expect(selection.sourceValue).toBe(option.value);
+      expect(selection.sourceOptionId).toBe(option.optionId);
       expect(selection.reviewedValue).toBe(birthday.reviewedComparable);
       expect(selection.sourceLinkIds).toEqual([1, 2]);
     }
