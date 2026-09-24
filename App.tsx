@@ -61,6 +61,7 @@ import {
   registerBackgroundReconcileSweep,
   runBackgroundReconciliation,
 } from "@/services/photos/background-reconcile-sweep";
+import { registerDerivativeCacheSweep } from "@/services/photos/derivative-cache";
 import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-sweep";
 import { registerRestorePhotoFinalizeSweep } from "@/services/photos/restore-photo-finalize-sweep";
 import { registerWidgetSweep } from "@/services/widget/widget-refresh";
@@ -122,6 +123,7 @@ let backupCacheSweepRegistered = false;
 // One-shot guard for the photo-write reconciliation hook (PHOTO-03/05), on the
 // SAME registry and under the SAME re-entrancy reasoning as the field sweep.
 let photoReconcileRegistered = false;
+let derivativeCacheSweepRegistered = false;
 let backgroundReconcileRegistered = false;
 let restorePhotoFinalizeSweepRegistered = false;
 // One-shot guard for the notification-schedule reconcile hook (NOTIF-01/04), on the
@@ -246,6 +248,10 @@ function AppShell() {
     if (!photoReconcileRegistered) {
       registerPhotoReconcileSweep();
       photoReconcileRegistered = true;
+    }
+    if (!derivativeCacheSweepRegistered) {
+      registerDerivativeCacheSweep();
+      derivativeCacheSweepRegistered = true;
     }
     // Profile image derivatives use their own UID-derived namespace and must
     // reconcile only after migrations expose template referrers. Register before

@@ -26,6 +26,7 @@ import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import type { SqlExecutor } from "@/db/types";
 import { Logger } from "@/utils/logger";
 import type { CropRect } from "./crop-geometry";
+import { discardDerivative } from "./derivative-cache";
 import {
   type CanonicalLockToken,
   type OwnedWriteOptions,
@@ -107,10 +108,14 @@ export async function persistCroppedMaster({
   // Copy out of evictable cache into the document dir (crash-safe .bak swap) and
   // return ONLY the relative path — never the manipulator's cache/absolute URI.
   const relative = relPathForTarget(target);
-  if (lockToken)
-    await persistOwnedMasterLocked(exec, lockToken, out.uri, relative, {
-      authorize,
-    });
-  else await persistOwnedMaster(exec, out.uri, relative, { authorize });
+  try {
+    if (lockToken)
+      await persistOwnedMasterLocked(exec, lockToken, out.uri, relative, {
+        authorize,
+      });
+    else await persistOwnedMaster(exec, out.uri, relative, { authorize });
+  } finally {
+    discardDerivative(out.uri);
+  }
   return relative;
 }
