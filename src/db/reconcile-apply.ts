@@ -1,16 +1,23 @@
 import {
   applyContactMethodDiffCore,
-  listContactMethods,
   type ContactMethodDraft,
   type ContactMethodRow,
+  listContactMethods,
 } from "@/db/contact-methods-dao";
 import { updateContactMetadataCore } from "@/db/contacts-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { upsertReviewedSnapshotCore } from "@/db/reconcile-snapshot-dao";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
-import { buildDesiredMethodList, type ReconcileFieldFamily, type ReconcileMethod } from "@/logic/reconcile-diff";
-import { isBirthdayUnreadable, mapBirthdayForStorage } from "@/logic/picked-contact-map";
+import {
+  isBirthdayUnreadable,
+  mapBirthdayForStorage,
+} from "@/logic/picked-contact-map";
+import {
+  buildDesiredMethodList,
+  type ReconcileFieldFamily,
+  type ReconcileMethod,
+} from "@/logic/reconcile-diff";
 
 type ReconcileWriteField = "name" | "birthday" | "phones" | "emails" | "photo";
 
@@ -56,7 +63,10 @@ interface ContactApplyRow {
   modified_at: string;
 }
 
-function scalarLiveValue(row: ContactApplyRow, field: "name" | "birthday"): string | null {
+function scalarLiveValue(
+  row: ContactApplyRow,
+  field: "name" | "birthday",
+): string | null {
   return field === "name" ? row.name : row.birthday;
 }
 
@@ -92,7 +102,9 @@ async function writeReviewedSnapshots(
   now: string,
 ): Promise<void> {
   if (selection.fieldFamily === "photo") return;
-  for (const externalContactLinkId of [...selection.sourceLinkIds].sort((a, b) => a - b)) {
+  for (const externalContactLinkId of [...selection.sourceLinkIds].sort(
+    (a, b) => a - b,
+  )) {
     await upsertReviewedSnapshotCore(exec, {
       externalContactLinkId,
       fieldFamily: selection.fieldFamily as ReconcileFieldFamily,
@@ -117,7 +129,10 @@ export async function applyReconcileSelections(
        FROM contacts WHERE id = ?`,
     [input.contactId],
   );
-  if (!contact) throw new Error(`applyReconcileSelections: contact ${input.contactId} missing`);
+  if (!contact)
+    throw new Error(
+      `applyReconcileSelections: contact ${input.contactId} missing`,
+    );
 
   const staleFields: ReconcileWriteField[] = [];
   const fresh: ReconcileSelection[] = [];
@@ -126,14 +141,23 @@ export async function applyReconcileSelections(
       fresh.push(selection);
       continue;
     }
-    if (selection.fieldFamily === "phones" || selection.fieldFamily === "emails") {
+    if (
+      selection.fieldFamily === "phones" ||
+      selection.fieldFamily === "emails"
+    ) {
       // Method freshness is protected by the complete seeded desired list. A future
       // durable-card shape supplies a serialized method baseline; this thin slice
       // uses the same current list as the seed and never removes a method.
       fresh.push(selection);
       continue;
     }
-    if (scalarLiveValue(contact, selection.fieldFamily) !== selection.baseline) {
+    if (selection.useSource && selection.sourceValue == null) {
+      staleFields.push(selection.fieldFamily);
+      continue;
+    }
+    if (
+      scalarLiveValue(contact, selection.fieldFamily) !== selection.baseline
+    ) {
       staleFields.push(selection.fieldFamily);
     } else {
       fresh.push(selection);
@@ -141,15 +165,20 @@ export async function applyReconcileSelections(
   }
 
   const scalarSelections = fresh.filter(
-    (selection): selection is ReconcileSelection & { fieldFamily: "name" | "birthday" } =>
+    (
+      selection,
+    ): selection is ReconcileSelection & { fieldFamily: "name" | "birthday" } =>
       selection.fieldFamily === "name" || selection.fieldFamily === "birthday",
   );
-  const sourceScalars = scalarSelections.filter((selection) => selection.useSource);
+  const sourceScalars = scalarSelections.filter(
+    (selection) => selection.useSource,
+  );
   let scalarChanged = false;
   let name = contact.name;
   let birthday = contact.birthday;
   for (const selection of sourceScalars) {
-    if (selection.fieldFamily === "name" && selection.sourceValue != null) name = selection.sourceValue;
+    if (selection.fieldFamily === "name" && selection.sourceValue != null)
+      name = selection.sourceValue;
     if (selection.fieldFamily === "birthday") {
       if (isBirthdayUnreadable(selection.sourceValue)) {
         staleFields.push("birthday");
@@ -162,10 +191,25 @@ export async function applyReconcileSelections(
   if (scalarChanged) {
     for (const selection of sourceScalars) {
       if (selection.fieldFamily === "name" && name !== contact.name) {
-        await snapshotPriorScalar(exec, input.contactId, "name", contact.name, input.now);
+        await snapshotPriorScalar(
+          exec,
+          input.contactId,
+          "name",
+          contact.name,
+          input.now,
+        );
       }
-      if (selection.fieldFamily === "birthday" && birthday !== contact.birthday) {
-        await snapshotPriorScalar(exec, input.contactId, "birthday", contact.birthday, input.now);
+      if (
+        selection.fieldFamily === "birthday" &&
+        birthday !== contact.birthday
+      ) {
+        await snapshotPriorScalar(
+          exec,
+          input.contactId,
+          "birthday",
+          contact.birthday,
+          input.now,
+        );
       }
     }
     await updateContactMetadataCore(exec, {
@@ -184,15 +228,24 @@ export async function applyReconcileSelections(
   }
 
   const methodSelections = fresh.filter(
-    (selection) => selection.fieldFamily === "phones" || selection.fieldFamily === "emails",
+    (selection) =>
+      selection.fieldFamily === "phones" || selection.fieldFamily === "emails",
   );
-  if (methodSelections.some((selection) => selection.useSource && selection.sourceMethods?.length)) {
+  if (
+    methodSelections.some(
+      (selection) => selection.useSource && selection.sourceMethods?.length,
+    )
+  ) {
     const seeded = await listContactMethods(exec, input.contactId);
     const additions = methodSelections.flatMap((selection) =>
-      selection.useSource ? selection.sourceMethods ?? [] : [],
+      selection.useSource ? (selection.sourceMethods ?? []) : [],
     );
     const desired = buildDesiredMethodList(
-      seeded.map((row) => ({ type: row.method_type, value: row.raw_value, label: row.label })),
+      seeded.map((row) => ({
+        type: row.method_type,
+        value: row.raw_value,
+        label: row.label,
+      })),
       additions,
       input.effectivePhoneRegion,
     );
@@ -201,7 +254,14 @@ export async function applyReconcileSelections(
       const existing = seededByCanonical.find(
         (draft) => draft.type === method.type && draft.value === method.value,
       );
-      return existing ?? { uid: newUid(), type: method.type, value: method.value, label: method.label ?? null };
+      return (
+        existing ?? {
+          uid: newUid(),
+          type: method.type,
+          value: method.value,
+          label: method.label ?? null,
+        }
+      );
     });
     await applyContactMethodDiffCore(exec, {
       contactId: input.contactId,
@@ -219,6 +279,9 @@ export async function applyReconcileSelections(
   }
   return {
     staleFields,
-    pendingPhoto: fresh.find((selection) => selection.fieldFamily === "photo" && selection.useSource) ?? null,
+    pendingPhoto:
+      fresh.find(
+        (selection) => selection.fieldFamily === "photo" && selection.useSource,
+      ) ?? null,
   };
 }

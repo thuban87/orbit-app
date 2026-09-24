@@ -1,6 +1,6 @@
 import {
-  normalizeContactMethod,
   type ContactMethodType,
+  normalizeContactMethod,
 } from "@/logic/contact-method-normalization";
 
 export const RECONCILE_FIELD_FAMILIES = [
@@ -46,6 +46,7 @@ export interface ReconcileOrbitContact {
 }
 
 export interface ReconcileFieldOption {
+  optionId: string;
   value: string | null;
   sourceLinkIds: number[];
   provenanceLabels: string[];
@@ -57,6 +58,8 @@ export interface ReconcileFieldDiff {
   outcome: ReconcileOutcome;
   orbitBaseline: string | null;
   sourceValue: string | null;
+  /** Canonical memory of all source options, independent of the chosen value. */
+  reviewedComparable: string | null;
   sourceOptions: ReconcileFieldOption[];
   reviewedValue: string | null;
 }
@@ -103,7 +106,8 @@ export function serializeMethodFamily(
   return methods
     .map((method) => ({
       type: method.type,
-      canonical: canonicalMethod(method, effectivePhoneRegion) ?? method.value.trim(),
+      canonical:
+        canonicalMethod(method, effectivePhoneRegion) ?? method.value.trim(),
       label: method.label?.trim() ?? "",
     }))
     .sort(
@@ -143,10 +147,11 @@ function stableOptions(
         ? source.displayName
         : field === "birthday"
           ? source.birthday
-          : source.photoContentHash ?? null;
+          : (source.photoContentHash ?? null);
     if (value == null || value.trim() === "") continue;
     const key = value;
     const option = byValue.get(key) ?? {
+      optionId: `${field}:${encodeURIComponent(value)}`,
       value,
       sourceLinkIds: [],
       provenanceLabels: [],
@@ -155,7 +160,8 @@ function stableOptions(
         : {}),
     };
     option.sourceLinkIds.push(source.externalContactLinkId);
-    if (source.provenanceLabel) option.provenanceLabels.push(source.provenanceLabel);
+    if (source.provenanceLabel)
+      option.provenanceLabels.push(source.provenanceLabel);
     byValue.set(key, option);
   }
   return [...byValue.values()].sort((left, right) =>
@@ -169,11 +175,14 @@ function classifyScalar(
   sourceOptions: ReconcileFieldOption[],
   reviewedValue: string | null,
 ): ReconcileFieldDiff | null {
-  const sourceValue = sourceOptions.length === 1 ? sourceOptions[0].value : null;
+  const sourceValue =
+    sourceOptions.length === 1 ? sourceOptions[0].value : null;
   const sourceComparable =
     fieldFamily === "photo"
       ? sourceValue
-      : sourceOptions.map((option) => option.value).join(SERIALIZE_TUPLE_SEPARATOR);
+      : sourceOptions
+          .map((option) => option.value)
+          .join(SERIALIZE_TUPLE_SEPARATOR);
 
   if (sourceComparable != null && reviewedValue === sourceComparable) {
     return {
@@ -181,6 +190,7 @@ function classifyScalar(
       outcome: "unchanged-since-review",
       orbitBaseline,
       sourceValue,
+      reviewedComparable: sourceComparable,
       sourceOptions,
       reviewedValue,
     };
@@ -193,6 +203,7 @@ function classifyScalar(
       outcome: "removed-from-source",
       orbitBaseline,
       sourceValue: null,
+      reviewedComparable: sourceComparable,
       sourceOptions,
       reviewedValue,
     };
@@ -204,6 +215,7 @@ function classifyScalar(
       outcome: "additive",
       orbitBaseline,
       sourceValue,
+      reviewedComparable: sourceComparable,
       sourceOptions,
       reviewedValue,
     };
@@ -215,6 +227,7 @@ function classifyScalar(
     outcome: "conflict",
     orbitBaseline,
     sourceValue,
+    reviewedComparable: sourceComparable,
     sourceOptions,
     reviewedValue,
   };
@@ -234,7 +247,10 @@ function classifyMethodFamily(
       .filter((method) => method.type === type)
       .map((method) => ({ source, method })),
   );
-  const source = new Map<string, { source: ReconcileSource; method: ReconcileMethod }>();
+  const source = new Map<
+    string,
+    { source: ReconcileSource; method: ReconcileMethod }
+  >();
   for (const item of sourceMethods) {
     const canonical = canonicalMethod(item.method, effectivePhoneRegion);
     if (canonical && !source.has(canonical)) source.set(canonical, item);
@@ -245,9 +261,12 @@ function classifyMethodFamily(
   );
   const sourceOptions = [...source.entries()]
     .map(([value, item]) => ({
+      optionId: `${fieldFamily}:${encodeURIComponent(value)}`,
       value,
       sourceLinkIds: [item.source.externalContactLinkId],
-      provenanceLabels: item.source.provenanceLabel ? [item.source.provenanceLabel] : [],
+      provenanceLabels: item.source.provenanceLabel
+        ? [item.source.provenanceLabel]
+        : [],
     }))
     .sort((left, right) => (left.value ?? "").localeCompare(right.value ?? ""));
 
@@ -255,15 +274,23 @@ function classifyMethodFamily(
     return {
       fieldFamily,
       outcome: "unchanged-since-review",
-      orbitBaseline: serializeMethodFamily(orbitMethods.filter((method) => method.type === type), effectivePhoneRegion),
+      orbitBaseline: serializeMethodFamily(
+        orbitMethods.filter((method) => method.type === type),
+        effectivePhoneRegion,
+      ),
       sourceValue: sourceSerialization,
+      reviewedComparable: sourceSerialization,
       sourceOptions,
       reviewedValue,
     };
   }
 
-  const additions = [...source.keys()].filter((canonical) => !orbit.has(canonical));
-  const removals = [...orbit.keys()].filter((canonical) => !source.has(canonical));
+  const additions = [...source.keys()].filter(
+    (canonical) => !orbit.has(canonical),
+  );
+  const removals = [...orbit.keys()].filter(
+    (canonical) => !source.has(canonical),
+  );
   if (additions.length === 0 && removals.length === 0) return null;
   return {
     fieldFamily,
@@ -273,8 +300,12 @@ function classifyMethodFamily(
         : additions.length === 0
           ? "removed-from-source"
           : "conflict",
-    orbitBaseline: serializeMethodFamily(orbitMethods.filter((method) => method.type === type), effectivePhoneRegion),
+    orbitBaseline: serializeMethodFamily(
+      orbitMethods.filter((method) => method.type === type),
+      effectivePhoneRegion,
+    ),
     sourceValue: sourceSerialization,
+    reviewedComparable: sourceSerialization,
     sourceOptions,
     reviewedValue,
   };
@@ -294,6 +325,7 @@ export function classifyReconciliation(
           outcome: "missing-source",
           orbitBaseline: input.orbit.name,
           sourceValue: null,
+          reviewedComparable: null,
           sourceOptions: [],
           reviewedValue: input.lastReviewed.name ?? null,
         },
@@ -346,7 +378,8 @@ export function buildDesiredMethodList<T extends ReconcileMethod>(
 ): T[] {
   const desired = new Map<string, T>();
   for (const method of [...current, ...acceptedAdditions]) {
-    const canonical = canonicalMethod(method, effectivePhoneRegion) ?? method.value.trim();
+    const canonical =
+      canonicalMethod(method, effectivePhoneRegion) ?? method.value.trim();
     const key = `${method.type}\u0000${canonical}`;
     if (!desired.has(key)) desired.set(key, method);
   }

@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  isAdditiveOnlySelection,
-} from "@/logic/reconcile-bulk-eligibility";
+import { isAdditiveOnlySelection } from "@/logic/reconcile-bulk-eligibility";
 import type { ReconcileDiffResult } from "@/logic/reconcile-diff";
 
 function card(
@@ -16,6 +14,7 @@ function card(
         outcome,
         orbitBaseline: null,
         sourceValue: "Contacts name",
+        reviewedComparable: "Contacts name",
         sourceOptions: [],
         reviewedValue: null,
       },
@@ -29,7 +28,9 @@ describe("isAdditiveOnlySelection", () => {
   });
 
   it("rejects a selection containing a conflict", () => {
-    expect(isAdditiveOnlySelection([card("additive"), card("conflict")])).toBe(false);
+    expect(isAdditiveOnlySelection([card("additive"), card("conflict")])).toBe(
+      false,
+    );
   });
 
   it("rejects a removed-from-source card", () => {
