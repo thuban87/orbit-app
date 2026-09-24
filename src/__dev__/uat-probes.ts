@@ -1,0 +1,44 @@
+import { DevSettings } from "react-native";
+
+let registered = false;
+
+/** Dev menu only. Each action uses synthetic input and logs numeric observations. */
+export function registerUatProbes(): void {
+  if (!__DEV__ || registered) return;
+  registered = true;
+  DevSettings.addMenuItem("Measure backup ingress", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { runIngressMeasure } =
+      require("@/services/backup/__dev__/ingress-measure") as typeof import("@/services/backup/__dev__/ingress-measure");
+    void runIngressMeasure();
+  });
+  for (const candidateMiB of [8, 16, 32, 64, 96] as const) {
+    DevSettings.addMenuItem(`Measure backup ${candidateMiB} MiB`, () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { runIngressMeasureCandidate } =
+        require("@/services/backup/__dev__/ingress-measure") as typeof import("@/services/backup/__dev__/ingress-measure");
+      void runIngressMeasureCandidate(candidateMiB);
+    });
+  }
+  DevSettings.addMenuItem("Measure encrypted backup 4 MiB", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { runIngressMeasureEncrypted } =
+      require("@/services/backup/__dev__/ingress-measure") as typeof import("@/services/backup/__dev__/ingress-measure");
+    void runIngressMeasureEncrypted();
+  });
+  const cases = [
+    "delayed_headers",
+    "delayed_body",
+    "cancel_after_headers",
+    "oversized_body",
+    "non_2xx",
+  ] as const;
+  for (const caseName of cases) {
+    DevSettings.addMenuItem(`Secure fetch: ${caseName}`, () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { runSecureFetchProbe } =
+        require("@/ai/__dev__/secure-fetch-probe") as typeof import("@/ai/__dev__/secure-fetch-probe");
+      void runSecureFetchProbe(caseName, "https://httpbin.org");
+    });
+  }
+}

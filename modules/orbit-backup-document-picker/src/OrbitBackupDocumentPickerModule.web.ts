@@ -9,7 +9,13 @@ class OrbitBackupDocumentPickerModule extends NativeModule<
     return { uri: null };
   }
 
-  hasSharedBackup(): boolean { return false; }
+  hasSharedBackup(): boolean {
+    return false;
+  }
+
+  sampleProcessPssKb(): number | null {
+    return null;
+  }
 
   async pickBackupDocument(): Promise<ConsumedBackupShare> {
     return { uri: null };

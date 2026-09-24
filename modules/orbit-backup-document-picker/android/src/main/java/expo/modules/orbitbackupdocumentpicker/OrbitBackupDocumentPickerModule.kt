@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Debug
+import android.util.Log
 import java.io.File
 import java.util.Locale
 import java.util.UUID
@@ -30,10 +32,18 @@ class OrbitBackupDocumentPickerModule : Module() {
 
   private fun requests(): BackupIngressRequests = ingress ?: BackupIngressRequests(
     opener = { source -> context.contentResolver.openInputStream(Uri.parse(source)) },
+    onMeasured = { acquisitionMs, copyMs, bytes ->
+      if (BuildConfig.DEBUG) Log.i("OrbitBackupIngressMeasure", "acquisitionMs=$acquisitionMs copyMs=$copyMs bytes=$bytes")
+    },
   ).also { ingress = it }
 
   override fun definition() = ModuleDefinition {
     Name("OrbitBackupDocumentPicker")
+
+    Function("sampleProcessPssKb") {
+      if (!BuildConfig.DEBUG) null
+      else Debug.MemoryInfo().also(Debug::getMemoryInfo).totalPss
+    }
 
     OnCreate { appContext.currentActivity?.intent?.let(::captureBackupShare) }
     OnNewIntent { intent -> captureBackupShare(intent) }

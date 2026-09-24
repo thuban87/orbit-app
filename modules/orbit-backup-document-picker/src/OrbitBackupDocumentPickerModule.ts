@@ -8,6 +8,7 @@ declare class OrbitBackupDocumentPickerModule extends NativeModule<
   consumeSharedBackup(): Promise<ConsumedBackupShare>;
   hasSharedBackup(): boolean;
   pickBackupDocument(): Promise<ConsumedBackupShare>;
+  sampleProcessPssKb(): number | null;
 }
 
 export default requireNativeModule<OrbitBackupDocumentPickerModule>(

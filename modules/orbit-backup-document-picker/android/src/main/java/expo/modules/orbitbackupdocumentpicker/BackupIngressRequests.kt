@@ -28,6 +28,7 @@ internal class BackupIngressRequests(
   private val scheduler: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor(),
   workers: Int = MAX_CONCURRENT_INGRESS,
   private val cap: Int = MAX_CONCURRENT_INGRESS,
+  private val onMeasured: ((Long, Long, Long) -> Unit)? = null,
 ) {
   private inner class Request(
     val generation: Long,
@@ -103,6 +104,7 @@ internal class BackupIngressRequests(
     try {
       if (!owns(request)) return
       val input = opener(request.source) ?: throw IllegalStateException("Missing backup stream")
+      val acquiredAt = clock()
       synchronized(this) {
         if (!owns(request) || (acquisitionMs != null && clock() - request.submittedAt >= acquisitionMs)) {
           input.close()
@@ -113,6 +115,7 @@ internal class BackupIngressRequests(
         request.ready = true
       }
       copier.copy(input, request.destination) { owns(request) }
+      onMeasured?.invoke(acquiredAt - request.submittedAt, clock() - acquiredAt, request.destination.length())
       synchronized(this) {
         if (owns(request)) {
           request.result.complete(IngressResult(request.destination))

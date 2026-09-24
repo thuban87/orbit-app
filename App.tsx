@@ -217,6 +217,12 @@ function AppShell() {
   //    `ready`), so its immediate cold-start sweep never precedes the DB.
   useEffect(() => {
     if (!ready) return;
+    if (__DEV__) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { registerUatProbes } =
+        require("@/__dev__/uat-probes") as typeof import("@/__dev__/uat-probes");
+      registerUatProbes();
+    }
     // The confirmation queue has its own per-return subscription: unlike the
     // launch sweep, it refreshes for every real background-to-active return.
     void useAssistBanner.getState().refresh();

@@ -28,3 +28,8 @@ export function hasSharedBackup(): boolean {
 export function pickBackupDocument(): Promise<ConsumedBackupShare> {
   return OrbitBackupDocumentPickerModule.pickBackupDocument();
 }
+
+/** Debug-only, point-in-time Android process PSS for the synthetic ingress probe. */
+export function sampleBackupProcessPssKb(): number | null {
+  return OrbitBackupDocumentPickerModule.sampleProcessPssKb();
+}
