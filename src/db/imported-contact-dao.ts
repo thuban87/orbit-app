@@ -8,6 +8,7 @@ import {
 } from "@/db/contacts-dao";
 import {
   type ImportMatchOutcome,
+  retireRowStagedPhotoCore,
   setRowContactCore,
   setRowMatchOutcomeCore,
 } from "@/db/import-session-dao";
@@ -16,6 +17,7 @@ import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 import { isValidStoredBirthday } from "@/logic/birthday-logic";
+import { Logger } from "@/utils/logger";
 
 export class NameRequiredError extends Error {
   constructor() {
@@ -62,6 +64,8 @@ export interface LinkExistingContactToRowInput {
   now: string;
   /** Optional method IDs newly observed while linking an existing contact. */
   methodIds?: number[];
+  /** Node-test boundary; production deletes staging after commit. */
+  deleteStagedPhoto?: (relative: string) => void | Promise<void>;
 }
 
 export async function insertExternalContactLinkCore(
@@ -115,10 +119,7 @@ export function importContactRecord(
   if (params.input.name.trim() === "") {
     return Promise.reject(new NameRequiredError());
   }
-  if (
-    params.birthday !== null &&
-    !isValidStoredBirthday(params.birthday)
-  ) {
+  if (params.birthday !== null && !isValidStoredBirthday(params.birthday)) {
     return Promise.reject(new InvalidImportBirthdayError());
   }
 
@@ -204,11 +205,15 @@ export function importContactRecord(
  * Attach a selected source record to an existing Orbit contact without ever
  * modifying the existing contact's metadata or name.
  */
-export function linkExistingContactToRow(
+export async function linkExistingContactToRow(
   exec: SqlExecutor,
   params: LinkExistingContactToRowInput,
 ): Promise<void> {
-  return inWriteTransaction(exec, async () => {
+  const staged = await inWriteTransaction(exec, async () => {
+    const row = await exec.getFirstAsync<{ photo_rel_path: string | null }>(
+      "SELECT photo_rel_path FROM import_session_rows WHERE id = ?",
+      [params.rowId],
+    );
     const externalContactLinkId = await insertExternalContactLinkCore(exec, {
       contactId: params.contactId,
       provider: params.provider,
@@ -237,5 +242,22 @@ export function linkExistingContactToRow(
       null,
       params.now,
     );
+    if (row?.photo_rel_path)
+      await retireRowStagedPhotoCore(exec, params.rowId, params.now);
+    return row?.photo_rel_path ?? null;
   });
+  if (staged) {
+    try {
+      const remove =
+        params.deleteStagedPhoto ??
+        (await import("@/services/photos/photo-storage")).deleteImportStaging;
+      await remove(staged);
+    } catch (error) {
+      Logger.error(
+        "imported-contact-dao",
+        "could not delete linked staging photo",
+        error,
+      );
+    }
+  }
 }

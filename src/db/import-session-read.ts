@@ -3,6 +3,7 @@ import {
   type ImportMatchOutcome,
   type ImportSessionMode,
   type ImportSessionRowStatus,
+  PHOTO_OUTSTANDING,
 } from "@/db/import-session-dao";
 import type { SqlExecutor } from "@/db/types";
 import { isBirthdayUnreadable } from "@/logic/picked-contact-map";
@@ -110,17 +111,21 @@ export async function getResumableSession(
   exec: SqlExecutor,
   now: string,
 ): Promise<{ session: ImportSession; sweptPhotoRelPaths: string[] } | null> {
-  const pending = await exec.getAllAsync<ImportSessionDbRow>(
+  const candidates = await exec.getAllAsync<ImportSessionDbRow>(
     `SELECT id, uid, mode, status, batch_category_id, batch_tracking_enabled,
             phone_region, total_rows, created_at, modified_at
-     FROM import_sessions WHERE status = 'pending'
+     FROM import_sessions s WHERE status = 'pending'
+       OR EXISTS (SELECT 1 FROM import_session_rows r
+                   WHERE r.session_id = s.id AND ${PHOTO_OUTSTANDING})
      ORDER BY created_at DESC, id DESC`,
   );
-  const newest = pending[0];
+  const newest = candidates[0];
   if (!newest) return null;
 
   const sweptPhotoRelPaths: string[] = [];
-  for (const stale of pending.slice(1)) {
+  for (const stale of candidates
+    .slice(1)
+    .filter((session) => session.status === "pending")) {
     sweptPhotoRelPaths.push(...(await discardSession(exec, stale.id, now)));
   }
   return { session: mapSession(newest), sweptPhotoRelPaths };

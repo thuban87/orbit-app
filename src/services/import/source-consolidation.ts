@@ -7,6 +7,7 @@ import { createContactFullCore } from "@/db/contacts-dao";
 import {
   finalizeSessionIfTerminal,
   markRowPhotoFailed,
+  retireRowStagedPhotoCore,
   setRowContactCore,
   setRowMatchOutcomeCore,
 } from "@/db/import-session-dao";
@@ -199,72 +200,97 @@ export async function combineCluster(
     );
   const photoRow = mappedRows.find(({ row }) => row.photoRelPath !== null)?.row;
 
-  const { contactId } = await inWriteTransaction(exec, async () => {
-    const created = await createContactFullCore(exec, {
-      ...mappedRows[0].mapped.input,
-      name,
-      now: params.now,
-      categoryId: params.batchCategoryId,
-      trackingEnabled: false,
-      intervalDays: null,
-      methodDrafts: methods,
-      methodNormalization: { effectivePhoneRegion: params.phoneRegion },
-    });
-    if (birthday) {
-      await exec.runAsync(
-        "UPDATE contacts SET birthday = ?, modified_at = ? WHERE id = ?",
-        [birthday, params.now, created.contactId],
-      );
-    }
-    if (note) {
-      await addMemoryCore(exec, {
-        contactId: created.contactId,
-        type: "imported",
-        provenance: "import",
-        value: note,
-        createdAt: params.now,
+  const { contactId, retiredPaths } = await inWriteTransaction(
+    exec,
+    async () => {
+      const created = await createContactFullCore(exec, {
+        ...mappedRows[0].mapped.input,
+        name,
         now: params.now,
+        categoryId: params.batchCategoryId,
+        trackingEnabled: false,
+        intervalDays: null,
+        methodDrafts: methods,
+        methodNormalization: { effectivePhoneRegion: params.phoneRegion },
       });
-    }
-
-    const linksByRowId = new Map<number, number>();
-    for (const { row } of mappedRows) {
-      linksByRowId.set(
-        row.id,
-        await insertExternalContactLinkCore(exec, {
-          contactId: created.contactId,
-          provider: "android",
-          externalContactId: row.externalContactId,
-          now: params.now,
-        }),
-      );
-    }
-    for (const method of created.methods) {
-      const sourceRow = methodSourceRow.get(method.uid);
-      const externalContactLinkId = sourceRow
-        ? linksByRowId.get(sourceRow.id)
-        : undefined;
-      if (externalContactLinkId !== undefined) {
-        await insertMethodProvenanceCore(
-          exec,
-          method.id,
-          externalContactLinkId,
-          params.now,
+      if (birthday) {
+        await exec.runAsync(
+          "UPDATE contacts SET birthday = ?, modified_at = ? WHERE id = ?",
+          [birthday, params.now, created.contactId],
         );
       }
-    }
-    for (const { row } of mappedRows) {
-      await setRowContactCore(
-        exec,
-        row.id,
-        created.contactId,
-        "imported",
-        params.now,
+      if (note) {
+        await addMemoryCore(exec, {
+          contactId: created.contactId,
+          type: "imported",
+          provenance: "import",
+          value: note,
+          createdAt: params.now,
+          now: params.now,
+        });
+      }
+
+      const linksByRowId = new Map<number, number>();
+      for (const { row } of mappedRows) {
+        linksByRowId.set(
+          row.id,
+          await insertExternalContactLinkCore(exec, {
+            contactId: created.contactId,
+            provider: "android",
+            externalContactId: row.externalContactId,
+            now: params.now,
+          }),
+        );
+      }
+      for (const method of created.methods) {
+        const sourceRow = methodSourceRow.get(method.uid);
+        const externalContactLinkId = sourceRow
+          ? linksByRowId.get(sourceRow.id)
+          : undefined;
+        if (externalContactLinkId !== undefined) {
+          await insertMethodProvenanceCore(
+            exec,
+            method.id,
+            externalContactLinkId,
+            params.now,
+          );
+        }
+      }
+      for (const { row } of mappedRows) {
+        await setRowContactCore(
+          exec,
+          row.id,
+          created.contactId,
+          "imported",
+          params.now,
+        );
+        await setRowMatchOutcomeCore(exec, row.id, "new", null, params.now);
+        if (row.id !== photoRow?.id && row.photoRelPath !== null) {
+          await retireRowStagedPhotoCore(exec, row.id, params.now);
+        }
+      }
+      return {
+        contactId: created.contactId,
+        retiredPaths: mappedRows.flatMap(({ row }) =>
+          row.id !== photoRow?.id && row.photoRelPath !== null
+            ? [row.photoRelPath]
+            : [],
+        ),
+      };
+    },
+  );
+
+  for (const path of retiredPaths) {
+    try {
+      await fs.deleteImportStaging(path);
+    } catch (error) {
+      Logger.error(
+        "source-consolidation",
+        "could not delete retired staging photo",
+        error,
       );
-      await setRowMatchOutcomeCore(exec, row.id, "new", null, params.now);
     }
-    return { contactId: created.contactId };
-  });
+  }
 
   const photo = photoRow
     ? await persistImportedPhotoPostCommit(exec, fs, {

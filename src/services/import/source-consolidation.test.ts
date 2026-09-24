@@ -18,8 +18,8 @@ import { getSessionById, listSessionRows } from "@/db/import-session-read";
 import { importContactRecord } from "@/db/imported-contact-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
-import { acceptPickedContacts } from "@/services/import/import-acquire";
 import { findActiveExternalLink } from "@/services/import/duplicate-evidence";
+import { acceptPickedContacts } from "@/services/import/import-acquire";
 import type { ImportedPhotoFs } from "@/services/import/import-photo";
 import {
   combineCluster,
@@ -242,6 +242,47 @@ describe("source consolidation", () => {
     );
   });
 
+  it("retires all non-selected cluster staging in the commit transaction", async () => {
+    const session = await createSession([
+      {
+        externalContactId: "one",
+        sourcePayload: payload("Taylor", [
+          { type: "phone", value: "312 555 0100" },
+        ]),
+        photoRelPath: "import-staging/one.jpg",
+      },
+      {
+        externalContactId: "two",
+        sourcePayload: payload("Taylor", [
+          { type: "phone", value: "312 555 0100" },
+        ]),
+        photoRelPath: "import-staging/two.jpg",
+      },
+    ]);
+    const deleted: string[] = [];
+    await combineCluster(
+      exec,
+      photoFs({
+        resizeToMaster: async () => {
+          throw new Error("keep selected photo outstanding");
+        },
+        deleteImportStaging: (relative) => {
+          deleted.push(relative);
+        },
+      }),
+      {
+        rows: session.rows,
+        batchCategoryId: null,
+        phoneRegion: "US",
+        now: NOW,
+      },
+    );
+    const rows = await listSessionRows(exec, session.sessionId);
+    expect(rows.filter((row) => row.photoRelPath !== null)).toHaveLength(1);
+    expect(rows[0].photoRelPath).toBe("import-staging/one.jpg");
+    expect(deleted).toEqual(["import-staging/two.jpg"]);
+  });
+
   it("rolls back contact and row resolutions for an in-transaction failure, while photo failure is post-commit only", async () => {
     await importContactRecord(exec, {
       input: {
@@ -356,9 +397,18 @@ describe("source consolidation", () => {
     });
     expect(await listSessionRows(exec, session.sessionId)).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ externalContactId: "one", rowStatus: "imported" }),
-        expect.objectContaining({ externalContactId: "two", rowStatus: "imported" }),
-        expect.objectContaining({ externalContactId: "three", rowStatus: "pending" }),
+        expect.objectContaining({
+          externalContactId: "one",
+          rowStatus: "imported",
+        }),
+        expect.objectContaining({
+          externalContactId: "two",
+          rowStatus: "imported",
+        }),
+        expect.objectContaining({
+          externalContactId: "three",
+          rowStatus: "pending",
+        }),
       ]),
     );
     await expect(getSessionById(exec, session.sessionId)).resolves.toEqual(

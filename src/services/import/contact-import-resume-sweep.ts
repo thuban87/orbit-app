@@ -39,6 +39,7 @@ export interface ResumableImport {
   counts: SessionRowCounts;
   /** A corrupt durable snapshot can be safely discarded but never resumed. */
   discardOnly: boolean;
+  photoOutstanding?: number;
 }
 
 export interface RegisterImportResumeSweepOptions {
@@ -73,6 +74,7 @@ export async function describeResumable(
     listSessionRows(exec, session.id),
   ]);
   const discardOnly = rows.some((row) => {
+    if (row.rowStatus === "imported") return false;
     try {
       JSON.parse(row.sourcePayload);
       return false;
@@ -80,7 +82,19 @@ export async function describeResumable(
       return true;
     }
   });
-  return { sessionId: session.id, mode: session.mode, counts, discardOnly };
+  const photoOutstanding = rows.filter(
+    (row) =>
+      row.rowStatus === "imported" &&
+      row.contactId !== null &&
+      row.photoRelPath !== null,
+  ).length;
+  return {
+    sessionId: session.id,
+    mode: session.mode,
+    counts,
+    discardOnly,
+    ...(photoOutstanding > 0 ? { photoOutstanding } : {}),
+  };
 }
 
 /**

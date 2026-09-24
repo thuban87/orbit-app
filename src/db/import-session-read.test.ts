@@ -14,6 +14,7 @@ import {
   deferNeedsReview,
   markRowStatus,
   resolveAlreadyLinked,
+  setRowContact,
   setSessionBatchCategory,
 } from "@/db/import-session-dao";
 import {
@@ -258,6 +259,53 @@ describe("import-session-read", () => {
     await expect(getSessionById(exec, older.sessionId)).resolves.toMatchObject({
       status: "discarded",
     });
+  });
+
+  it("surfaces complete photo work and preserves it through stale and explicit discard", async () => {
+    const old = await acceptRows(exec, ["committed"], "2026-08-29 10:00:00");
+    const contactId = await seedContact(exec);
+    await setRowContact(exec, old.rowIds[0], contactId, "imported", NOW);
+    await exec.runAsync(
+      "UPDATE import_sessions SET status = 'complete' WHERE id = ?",
+      [old.sessionId],
+    );
+    expect(await getResumableSession(exec, NOW)).toMatchObject({
+      session: { id: old.sessionId, status: "complete" },
+    });
+    const newest = await acceptRows(exec, ["newer"], NOW);
+    expect(await getResumableSession(exec, NOW)).toMatchObject({
+      session: { id: newest.sessionId },
+    });
+    await exec.runAsync(
+      "UPDATE import_sessions SET status = 'discarded' WHERE id = ?",
+      [newest.sessionId],
+    );
+    expect(await getResumableSession(exec, NOW)).toMatchObject({
+      session: { id: old.sessionId, status: "complete" },
+    });
+  });
+
+  it("stale-session auto-discard keeps imported photo work reachable", async () => {
+    const old = await acceptRows(exec, ["committed"], "2026-08-29 10:00:00");
+    const contactId = await seedContact(exec);
+    await setRowContact(exec, old.rowIds[0], contactId, "imported", NOW);
+    const newer = await acceptRows(exec, ["newer"], NOW);
+    expect((await getResumableSession(exec, NOW))?.session.id).toBe(
+      newer.sessionId,
+    );
+    expect(await getSessionById(exec, old.sessionId)).toMatchObject({
+      status: "discarded",
+    });
+    expect((await listSessionRows(exec, old.sessionId))[0]).toMatchObject({
+      photoRelPath: "import-staging/committed.jpg",
+    });
+    await exec.runAsync(
+      "UPDATE import_sessions SET status = 'discarded' WHERE id = ?",
+      [newer.sessionId],
+    );
+    expect((await getResumableSession(exec, NOW))?.session.id).toBe(
+      old.sessionId,
+    );
   });
 
   it("keeps runtime import sessions out of the portable export manifest", async () => {

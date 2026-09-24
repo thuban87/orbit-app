@@ -75,6 +75,10 @@ export function ResumeImportPrompt({
   if (!resumable) return null;
 
   const discard = async () => {
+    if (resumable.photoOutstanding) {
+      onDismiss();
+      return;
+    }
     try {
       const stagedPaths = await discardSession(
         getExecutor(),
@@ -119,9 +123,11 @@ export function ResumeImportPrompt({
             Resume your import?
           </Text>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            {resumable.discardOnly
-              ? "This saved import can’t be resumed. You can discard its unresolved items. Contacts already imported stay in Orbit."
-              : "Unresolved items are saved. Contacts already imported stay in Orbit."}
+            {resumable.photoOutstanding && !resumable.discardOnly
+              ? "Imported contacts have photos waiting to be added. Continue to retry or skip them."
+              : resumable.discardOnly
+                ? "This saved import can’t be resumed. You can discard its unresolved items. Contacts already imported stay in Orbit."
+                : "Unresolved items are saved. Contacts already imported stay in Orbit."}
           </Text>
           {!resumable.discardOnly ? (
             <Pressable
@@ -140,7 +146,9 @@ export function ResumeImportPrompt({
           ) : null}
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Discard import"
+            accessibilityLabel={
+              resumable.photoOutstanding ? "Later" : "Discard import"
+            }
             onPress={() => void discard()}
             style={[
               styles.button,
@@ -149,7 +157,7 @@ export function ResumeImportPrompt({
             ]}
           >
             <Text style={[styles.buttonLabel, { color: colors.danger }]}>
-              Discard import
+              {resumable.photoOutstanding ? "Later" : "Discard import"}
             </Text>
           </Pressable>
         </View>

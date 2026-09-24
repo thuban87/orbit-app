@@ -144,7 +144,13 @@ describe("importContactRecord", () => {
     } as Parameters<typeof importContactRecord>[1]);
 
     expect(
-      await exec.getAllAsync<{ contact_id: number; type: string; provenance: string; value: string; allow_ai: number }>(
+      await exec.getAllAsync<{
+        contact_id: number;
+        type: string;
+        provenance: string;
+        value: string;
+        allow_ai: number;
+      }>(
         "SELECT contact_id, type, provenance, value, allow_ai FROM memories ORDER BY contact_id",
       ),
     ).toEqual([
@@ -321,5 +327,36 @@ describe("linkExistingContactToRow", () => {
       contact_id: existing.lastInsertRowId,
       match_outcome: "probable",
     });
+  });
+
+  it("retires linked staging in the link transaction and removes its file after commit", async () => {
+    const existing = await exec.runAsync(
+      "INSERT INTO contacts (uid, name, tracking_enabled, created_at, modified_at) VALUES (?, 'Existing', 0, ?, ?)",
+      [uid(), NOW, NOW],
+    );
+    const rowId = await acceptRow("with-photo");
+    await exec.runAsync(
+      "UPDATE import_session_rows SET photo_rel_path = 'import-staging/linked.jpg' WHERE id = ?",
+      [rowId],
+    );
+    const deleted: string[] = [];
+    await linkExistingContactToRow(exec, {
+      rowId,
+      contactId: existing.lastInsertRowId,
+      provider: "android",
+      externalContactId: "with-photo",
+      matchOutcome: "probable",
+      now: NOW,
+      deleteStagedPhoto: async (path) => {
+        expect(
+          await exec.getFirstAsync(
+            "SELECT 1 FROM import_session_rows WHERE id = ? AND photo_rel_path IS NULL",
+            [rowId],
+          ),
+        ).not.toBeNull();
+        deleted.push(path);
+      },
+    });
+    expect(deleted).toEqual(["import-staging/linked.jpg"]);
   });
 });

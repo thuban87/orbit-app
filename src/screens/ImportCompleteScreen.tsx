@@ -16,6 +16,7 @@ import { runImportBatch } from "@/services/import/import-driver";
 import {
   retryImportedPhoto,
   retryPhotoFs,
+  skipRemainingPhotos,
 } from "@/services/import/import-photo-retry";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -122,6 +123,24 @@ export function ImportCompleteScreen({
       setRetrying(false);
     }
   }, [load, photoRows, route.params.sessionId]);
+
+  const skipPhotos = useCallback(async () => {
+    setRetrying(true);
+    try {
+      await skipRemainingPhotos(
+        getExecutor(),
+        retryPhotoFs,
+        route.params.sessionId,
+        localDateTime(),
+      );
+      await load();
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "could not skip remaining import photos", err);
+      setError(true);
+    } finally {
+      setRetrying(false);
+    }
+  }, [load, route.params.sessionId]);
 
   if (loading) {
     return (
@@ -255,6 +274,20 @@ export function ImportCompleteScreen({
               {retrying ? "Retrying…" : "Retry"}
             </Text>
           </Pressable>
+          {photoRows.length > 0 ? (
+            <Pressable
+              testID="import-complete-skip-photos"
+              accessibilityRole="button"
+              accessibilityLabel="Skip remaining photos"
+              disabled={retrying}
+              onPress={() => void skipPhotos()}
+              style={[styles.secondaryButton, { borderColor: colors.border }]}
+            >
+              <Text style={{ color: colors.textPrimary }}>
+                Skip remaining photos
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
