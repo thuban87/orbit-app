@@ -1419,15 +1419,18 @@ async function captureRestoreDeletes(
   return { paths, oldOwners };
 }
 
-async function clearLiveCategoryTombstones(
-  exec: SqlExecutor,
-  categoryUids: ReadonlySet<string>,
-): Promise<void> {
-  for (const uid of categoryUids)
+async function clearReplacedLiveTombstones(exec: SqlExecutor): Promise<void> {
+  // Replace-all resets rows before reinserting the backup graph. Resetting
+  // records deletion evidence for old rows, including UIDs that return as live
+  // rows. Clear only those collisions after every incoming row is written.
+  for (const entity of entities) {
+    const type = tombstoneEntity[entity];
+    if (!type) continue;
     await exec.runAsync(
-      "DELETE FROM tombstones WHERE entity_type='category' AND entity_uid=?",
-      [uid],
+      `DELETE FROM tombstones WHERE entity_type=? AND entity_uid IN (SELECT uid FROM ${tableOf[entity]})`,
+      [type],
     );
+  }
 }
 async function importTombstones(
   exec: SqlExecutor,
@@ -1688,10 +1691,6 @@ export async function applyRestore(
       }
       if (mode === "replace-all") {
         await replaceAllReset(exec, manifest);
-        await clearLiveCategoryTombstones(
-          exec,
-          survivors.categories ?? new Set(),
-        );
       } else {
         for (const action of plan.categories)
           if (action.kind === "delete") {
@@ -1731,6 +1730,7 @@ export async function applyRestore(
       await upsertContacts(exec, plan);
       await upsertChildren(exec, plan);
       await completeGlobalPairsCore(exec);
+      if (mode === "replace-all") await clearReplacedLiveTombstones(exec);
       const contacts = await idMap(exec, "contacts");
       for (const uid of recencyUids) {
         // Read after all writes: only surviving parents are recomputed, and the

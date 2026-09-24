@@ -104,6 +104,65 @@ async function exported(exec: Awaited<ReturnType<typeof db>>) {
   );
 }
 
+it("keeps restored live UIDs exportable across repeated Replace-all restores", async () => {
+  const destination = await db();
+  await contact(destination, "alpha");
+  await contact(destination, "beta");
+  const alpha = await destination.getFirstAsync<{ id: number }>(
+    "SELECT id FROM contacts WHERE uid='alpha'",
+  );
+  await destination.runAsync(
+    "INSERT INTO interactions(uid,contact_id,occurred_at,recorded_at,channel,connected,quality,source,modified_at) VALUES(?,?,?,?,?,?,?,?,?)",
+    [
+      "alpha-interaction",
+      alpha!.id,
+      NOW,
+      NOW,
+      "text",
+      1,
+      "good",
+      "manual",
+      NOW,
+    ],
+  );
+  const saved = await exported(destination);
+  await contact(destination, "gamma");
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    expect(await applyRestore(destination, saved, "replace-all")).toMatchObject(
+      {
+        status: "applied",
+      },
+    );
+    expect(
+      await destination.getAllAsync<{ uid: string }>(
+        "SELECT uid FROM contacts ORDER BY uid",
+      ),
+    ).toEqual([{ uid: "alpha" }, { uid: "beta" }]);
+    expect(
+      await destination.getAllAsync<{
+        entity_type: string;
+        entity_uid: string;
+      }>(
+        "SELECT t.entity_type,t.entity_uid FROM tombstones t WHERE (t.entity_type='contact' AND EXISTS (SELECT 1 FROM contacts c WHERE c.uid=t.entity_uid)) OR (t.entity_type='interaction' AND EXISTS (SELECT 1 FROM interactions i WHERE i.uid=t.entity_uid))",
+      ),
+    ).toEqual([]);
+    const reexported = await exported(destination);
+    expect(reexported.contacts.map((row) => row.uid).sort()).toEqual([
+      "alpha",
+      "beta",
+    ]);
+    expect(reexported.interactions.map((row) => row.uid)).toEqual([
+      "alpha-interaction",
+    ]);
+  }
+  expect(
+    await destination.getFirstAsync<{ entity_uid: string }>(
+      "SELECT entity_uid FROM tombstones WHERE entity_type='contact' AND entity_uid='gamma'",
+    ),
+  ).toEqual({ entity_uid: "gamma" });
+});
+
 it.each(["merge", "replace-all"] as const)(
   "restores real exported custom-photo bytes from wire UIDs in %s",
   async (mode) => {

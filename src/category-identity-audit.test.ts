@@ -237,7 +237,7 @@ describe("category identity repository audit", () => {
     }
     const restore = source("src/backup/restore-apply.ts");
     expect(restore).toContain('if (entity === "categories") continue');
-    expect(restore).toContain("clearLiveCategoryTombstones");
+    expect(restore).toContain("clearReplacedLiveTombstones(exec)");
   });
 
   it("keeps production component SQL at the one audited merge exception", () => {
