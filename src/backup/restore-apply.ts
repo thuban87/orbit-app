@@ -4,9 +4,9 @@
  * exact pending path committed into each background row own crash recovery.
  */
 import {
+  findVisibleNameCollisions,
   type MergeableEntityType,
   type ReconciliationAction,
-  findVisibleNameCollisions,
   reconcileEntity,
   suppressCategoryTombstoneDependents,
 } from "@/backup/reconciliation";
@@ -20,15 +20,16 @@ import {
   getPortableSettingsSnapshot,
   updateAppSettingsCore,
 } from "@/db/app-settings-dao";
-import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import {
   applyCategoryDeletionFalloutCore,
   readCategoryDeletionPreviewCore,
 } from "@/db/categories-dao";
+import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import {
   remapLegacyChannel,
   remapLegacyQuality,
 } from "@/db/interaction-vocabulary";
+import { completeGlobalPairsCore } from "@/db/pair-matrix";
 import { recomputeLastContactCore } from "@/db/recency-dao";
 import {
   deleteJournalEntryCore,
@@ -1518,9 +1519,9 @@ export async function applyRestore(
                   item.entityUid === action.uid,
               )
               .map((item) => item.deletedAt),
-            ...((local.find(([entity]) => entity === "categories")?.[2] ?? [])
+            ...(local.find(([entity]) => entity === "categories")?.[2] ?? [])
               .filter((item) => item.entity_uid === action.uid)
-              .map((item) => item.deleted_at)),
+              .map((item) => item.deleted_at),
           ].sort();
           await applyCategoryDeletionFalloutCore(exec, {
             preview,
@@ -1538,6 +1539,7 @@ export async function applyRestore(
     await upsertParents(exec, plan, backgroundPendingByUid);
     await upsertContacts(exec, plan);
     await upsertChildren(exec, plan);
+    await completeGlobalPairsCore(exec);
     const contacts = await idMap(exec, "contacts");
     for (const uid of recencyUids) {
       // Read after all writes: only surviving parents are recomputed, and the
