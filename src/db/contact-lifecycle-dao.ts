@@ -21,6 +21,18 @@ function assertPositiveCadence(intervalDays: number): void {
   }
 }
 
+/** Record the immutable transition inside the caller's existing transaction. */
+export async function recordLifecycleTransitionCore(
+  exec: SqlExecutor,
+  contactId: number,
+  direction: "bind" | "unbind",
+  now: string,
+): Promise<void> {
+  await recordEventCore(exec, {
+    uid: newUid(), contactId, type: direction, occurredAt: now, detail: null, now,
+  });
+}
+
 /**
  * Make an Unbound contact Bound. A dormant positive cadence is retained. A
  * never-assigned cadence must be provided for the first bind; this makes the
@@ -82,14 +94,7 @@ export function bindContact(
     // the NON-mutexed core inside this ALREADY-OPEN transaction — never a nested
     // inWriteTransaction (the write mutex is non-reentrant; nesting hangs). The
     // event's occurredAt is the bind moment `now`, not invented from another field.
-    await recordEventCore(exec, {
-      uid: newUid(),
-      contactId: id,
-      type: "bind",
-      occurredAt: now,
-      detail: null,
-      now,
-    });
+    await recordLifecycleTransitionCore(exec, id, "bind", now);
     await bumpDataRevisionCore(exec);
   });
 }
@@ -118,14 +123,7 @@ export function unbindContact(
     // Record the immutable 'unbind' lifecycle moment (D-08, ADR-025). Same
     // composition rule as bindContact: NON-mutexed core inside this already-open
     // transaction, occurredAt = the unbind moment `now`.
-    await recordEventCore(exec, {
-      uid: newUid(),
-      contactId: id,
-      type: "unbind",
-      occurredAt: now,
-      detail: null,
-      now,
-    });
+    await recordLifecycleTransitionCore(exec, id, "unbind", now);
     await bumpDataRevisionCore(exec);
   });
 }

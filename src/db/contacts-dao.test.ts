@@ -108,6 +108,48 @@ describe("updateContactFull — Profile inheritance boundary", () => {
   });
 });
 
+describe("updateContactFull — lifecycle event and committed returns", () => {
+  it("records one bind or unbind event only on a full-editor transition", async () => {
+    const { contactId } = await createContactFull(exec, { uid: uid(), name: "A", intervalDays: 30, trackingEnabled: false, now: NOW });
+    const base = { id: contactId, name: "A", intervalDays: 30, rarelyResponds: 0, remindersOff: 0, now: NOW };
+    await updateContactFull(exec, { ...base, trackingEnabled: true });
+    await updateContactFull(exec, { ...base, trackingEnabled: true });
+    await updateContactFull(exec, { ...base, trackingEnabled: false });
+    const events = await exec.getAllAsync<{ type: string; occurred_at: string }>(
+      "SELECT type, occurred_at FROM events WHERE contact_id = ? ORDER BY id", [contactId],
+    );
+    expect(events).toEqual([{ type: "bind", occurred_at: NOW }, { type: "unbind", occurred_at: NOW }]);
+  });
+
+  it("rolls back a transition event with a later failing edit", async () => {
+    const { contactId } = await createContactFull(exec, { uid: uid(), name: "A", intervalDays: 30, trackingEnabled: false, now: NOW });
+    await expect(updateContactFull(exec, {
+      id: contactId, name: "A", intervalDays: 30, trackingEnabled: true,
+      rarelyResponds: 0, remindersOff: 0, now: NOW,
+      customValues: [{ fieldDefId: 999999, value: "fail" }],
+    })).rejects.toThrow();
+    expect(await exec.getFirstAsync("SELECT tracking_enabled FROM contacts WHERE id = ?", [contactId])).toEqual({ tracking_enabled: 0 });
+    expect(await exec.getAllAsync("SELECT id FROM events WHERE contact_id = ?", [contactId])).toEqual([]);
+  });
+
+  it("returns in-transaction knowledge rows and index-ordered ids for duplicate content", async () => {
+    const { contactId } = await createContactFull(exec, { uid: uid(), name: "A", intervalDays: 30, now: NOW });
+    const result = await updateContactFull(exec, {
+      id: contactId, name: "A", intervalDays: 30, rarelyResponds: 0,
+      remindersOff: 0, now: NOW,
+      memories: { add: [{ type: "general", value: "Tea" }, { type: "general", value: "Tea" }] },
+      relationships: { add: [{ personName: "Sam" }] },
+      offLimits: { add: [{ kind: "off_limits", text: "Private" }] },
+    });
+    expect(result.addedIds.memories).toHaveLength(2);
+    expect(new Set(result.addedIds.memories).size).toBe(2);
+    expect(result.addedIds.memories[0]).toBeLessThan(result.addedIds.memories[1] ?? 0);
+    expect(result.memories).toEqual(await listMemoriesForContact(exec, contactId));
+    expect(result.relationships).toEqual(await listRelationshipsForContact(exec, contactId));
+    expect(result.offLimits).toEqual((await listFuelForEditor(exec, contactId)).filter((row) => row.kind === "off_limits"));
+  });
+});
+
 /** Add a normalized definition directly, independent of Plan 03's DDL work. */
 async function addDefinition(
   colName: string,

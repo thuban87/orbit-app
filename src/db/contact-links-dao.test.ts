@@ -283,7 +283,7 @@ describe("applyLinkDiff — one atomic seeded-vs-current diff", () => {
         await exec.execAsync(sql);
       },
     };
-    await applyLinkDiff(countingExec, {
+    const committed = await applyLinkDiff(countingExec, {
       contactId: cid,
       seeded,
       current,
@@ -291,6 +291,8 @@ describe("applyLinkDiff — one atomic seeded-vs-current diff", () => {
     });
 
     const after = await listLinks(exec, cid);
+    expect(committed.links).toEqual(after);
+    expect(committed.addedIds).toEqual([after[1].id]);
     // L1 updated, L2 gone, L3 appended at MAX+1.
     expect(after.map((l) => l.url)).toEqual([
       "https://l1-edited",

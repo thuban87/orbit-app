@@ -228,10 +228,11 @@ export function applyLinkDiff(
     current: DraftLink[];
     now: string;
   },
-): Promise<void> {
+): Promise<{ links: ContactLinkRow[]; addedIds: number[] }> {
   const { contactId, seeded, current, now } = params;
   return inWriteTransaction(exec, async () => {
     let changed = false;
+    const addedIds: number[] = [];
     const seededById = new Map(seeded.map((l) => [l.id, l]));
     const currentIds = new Set(
       current
@@ -242,13 +243,13 @@ export function applyLinkDiff(
     // (a) INSERT id-less current rows (append order via MAX+1 in the core).
     for (const row of current) {
       if (row.id == null) {
-        await addLinkCore(exec, {
+        addedIds.push(await addLinkCore(exec, {
           uid: row.uid,
           contactId,
           url: row.url,
           label: row.label,
           now,
-        });
+        }));
         changed = true;
       }
     }
@@ -286,6 +287,7 @@ export function applyLinkDiff(
     if (changed) {
       await bumpDataRevisionCore(exec);
     }
+    return { links: await listLinks(exec, contactId), addedIds };
   });
 }
 

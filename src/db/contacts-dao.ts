@@ -61,10 +61,11 @@ import {
 } from "@/db/current-state-history-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
 import { applyUserCustomValueEditCore } from "@/db/custom-value-edit-dao";
+import { recordLifecycleTransitionCore } from "@/db/contact-lifecycle-dao";
 import { recordEventCore } from "@/db/events-dao";
 import { listDefs } from "@/db/field-defs-dao";
 import { upsertValueCore } from "@/db/field-values-dao";
-import { getCurrentStateValue } from "@/db/current-state-history-read";
+import { getCurrentStateValue, getCurrentStateValues, type CurrentStateEntryRow } from "@/db/current-state-history-read";
 import {
   addFuelCore,
   deleteFuelCore,
@@ -79,6 +80,7 @@ import {
   type EditMemoryInput,
   type NewMemoryInput,
 } from "@/db/memories-dao";
+import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
 import {
   addRelationshipCore,
   deleteRelationshipCore,
@@ -86,6 +88,8 @@ import {
   type EditRelationshipInput,
   type NewRelationshipInput,
 } from "@/db/relationships-dao";
+import { listRelationshipsForContact, type RelationshipRow } from "@/db/relationships-read";
+import { listFuelForEditor, type FuelItem } from "@/db/fuel-read";
 import { assertSafeRelative } from "@/db/photo-relative-path";
 import {
   type FirstInteractionInput,
@@ -574,13 +578,14 @@ async function applyKnowledgeDiffsCore(
   exec: SqlExecutor,
   contactId: number,
   input: UpdateContactFullInput,
-): Promise<void> {
+): Promise<{ memories: number[]; relationships: number[]; offLimits: number[] }> {
   const now = input.now;
+  const addedIds = { memories: [] as number[], relationships: [] as number[], offLimits: [] as number[] };
 
   // --- Memories -------------------------------------------------------------
   if (input.memories) {
     for (const add of input.memories.add ?? []) {
-      await addMemoryCore(exec, { ...add, contactId, createdAt: now, now });
+      addedIds.memories.push(await addMemoryCore(exec, { ...add, contactId, createdAt: now, now }));
     }
     for (const patch of input.memories.edit ?? []) {
       await editMemoryCore(exec, { ...patch, contactId, now });
@@ -593,7 +598,7 @@ async function applyKnowledgeDiffsCore(
   // --- Key People / Relationships ------------------------------------------
   if (input.relationships) {
     for (const add of input.relationships.add ?? []) {
-      await addRelationshipCore(exec, { ...add, contactId, createdAt: now, now });
+      addedIds.relationships.push(await addRelationshipCore(exec, { ...add, contactId, createdAt: now, now }));
     }
     for (const patch of input.relationships.edit ?? []) {
       await editRelationshipCore(exec, { ...patch, contactId, now });
@@ -614,7 +619,7 @@ async function applyKnowledgeDiffsCore(
   if (input.offLimits) {
     for (const add of input.offLimits.add ?? []) {
       // FORCE kind:"off_limits" — the diff can only ever add an off_limits row.
-      await addFuelCore(exec, {
+      addedIds.offLimits.push(await addFuelCore(exec, {
         ...add,
         kind: "off_limits",
         uid: newUid(),
@@ -622,7 +627,7 @@ async function applyKnowledgeDiffsCore(
         createdAt: now,
         source: "user",
         now,
-      });
+      }));
     }
     for (const patch of input.offLimits.edit ?? []) {
       // FORCE kind:"off_limits" — an edit can never change a row to another kind.
@@ -638,6 +643,7 @@ async function applyKnowledgeDiffsCore(
       });
     }
   }
+  return addedIds;
 }
 
 /**
@@ -651,6 +657,11 @@ export function updateContactFull(
 ): Promise<{
   methods: ContactMethodRow[];
   methodSaveResult: ContactMethodSaveResult | null;
+  memories: MemoryRow[];
+  relationships: RelationshipRow[];
+  offLimits: FuelItem[];
+  currentState: Partial<Record<"last_talked_about" | "current_location", CurrentStateEntryRow>>;
+  addedIds: { memories: number[]; relationships: number[]; offLimits: number[] };
 }> {
   // A requested Bound state needs a positive cadence. Unbound accepts NULL for
   // never-assigned contacts and positive dormant cadence otherwise.
@@ -712,6 +723,9 @@ export function updateContactFull(
     // Metadata UPDATE (never writes last_contact). Runs FIRST so a later recompute
     // reads the NEW rarely_responds flag.
     await updateContactMetadataCore(exec, lifecycleInput);
+    if (input.trackingEnabled !== undefined && (input.trackingEnabled ? 1 : 0) !== stored.tracking_enabled) {
+      await recordLifecycleTransitionCore(exec, input.id, trackingEnabled ? "bind" : "unbind", input.now);
+    }
 
     // UPSERT value pairs instead of deleting/re-keying them. A fresh uid is only
     // relevant to a missing pair's INSERT branch; an existing pair retains it.
@@ -754,7 +768,7 @@ export function updateContactFull(
     // Knowledge-subdomain edits (CAPT-04, dossier §E) — composed INSIDE this same
     // metadata transaction so an interrupted edit rolls back the contact AND every
     // knowledge row. No bump here; updateContactFull owns the single bump below.
-    await applyKnowledgeDiffsCore(exec, input.id, input);
+    const addedIds = await applyKnowledgeDiffsCore(exec, input.id, input);
 
     const methodSaveResult =
       input.methodDrafts === undefined
@@ -777,7 +791,18 @@ export function updateContactFull(
     // suppressed — so a knowledge-only edit and an unchanged-method edit both advance
     // backup-freshness by EXACTLY 1, and no path double-bumps.
     await bumpDataRevisionCore(exec);
-    return { methods: methodSaveResult?.methods ?? [], methodSaveResult };
+    const [memories, relationships, fuel, currentState] = await Promise.all([
+      listMemoriesForContact(exec, input.id),
+      listRelationshipsForContact(exec, input.id),
+      listFuelForEditor(exec, input.id),
+      getCurrentStateValues(exec, input.id),
+    ]);
+    return {
+      methods: methodSaveResult?.methods ?? [], methodSaveResult,
+      memories, relationships,
+      offLimits: fuel.filter((row) => row.kind === "off_limits"),
+      currentState, addedIds,
+    };
   });
 }
 
