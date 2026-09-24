@@ -461,6 +461,24 @@ describe("mergeContacts", () => {
     ).not.toBeNull();
   });
 
+  it("rejects a reused absorbed id whose durable uid changed", async () => {
+    const survivor = await contact("Survivor");
+    const absorbed = await contact("Replacement");
+    await expect(
+      mergeContacts(exec, {
+        survivorId: survivor,
+        absorbedId: absorbed,
+        now: NOW,
+        expectedAbsorbedUid: "old-absorbed-uid",
+      }),
+    ).rejects.toThrow("absorbed identity changed");
+    expect(
+      await exec.getFirstAsync("SELECT id FROM contacts WHERE id = ?", [
+        absorbed,
+      ]),
+    ).not.toBeNull();
+  });
+
   it("rejects a same-Group-Event merge without mutating either contact or child", async () => {
     const survivor = await contact("Survivor");
     const absorbed = await contact("Absorbed");

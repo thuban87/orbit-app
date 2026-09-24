@@ -206,6 +206,8 @@ export async function mergeContacts(
     now: string;
     photoTransfers?: readonly MergePhotoTransfer[];
     generationOf?: (source: string) => number;
+    expectedAbsorbedUid?: string;
+    expectedAbsorbedPhoto?: string | null;
   },
 ): Promise<{
   deletePaths: string[];
@@ -233,6 +235,16 @@ export async function mergeContacts(
     ) {
       throw new Error("mergeContacts: both contacts must be live");
     }
+    if (
+      input.expectedAbsorbedUid !== undefined &&
+      absorbed.uid !== input.expectedAbsorbedUid
+    )
+      throw new Error("mergeContacts: absorbed identity changed");
+    if (
+      input.expectedAbsorbedPhoto !== undefined &&
+      absorbed.photo !== input.expectedAbsorbedPhoto
+    )
+      throw new Error("mergeContacts: absorbed photo reference changed");
     const retired = await exec.getFirstAsync<{ id: number }>(
       "SELECT id FROM tombstones WHERE entity_type = 'contact' AND entity_uid = ?",
       [absorbed.uid],
@@ -588,15 +600,18 @@ export async function mergeContacts(
       );
     for (const transfer of transfers.filter(
       (item) => item.kind === "customField",
-    ))
+    )) {
+      if (transfer.fieldDefId === undefined)
+        throw new Error("mergeContacts: missing photo field identity");
       await upsertValueCore(
         exec,
         survivor.id,
-        transfer.fieldDefId!,
+        transfer.fieldDefId,
         newUid(),
         transfer.destination,
         input.now,
       );
+    }
     for (const transfer of transfers)
       await insertFinalizeEntryCore(exec, transfer.journal);
 

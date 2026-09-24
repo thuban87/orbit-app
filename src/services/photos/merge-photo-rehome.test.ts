@@ -257,6 +257,35 @@ describe("merge photo ownership", () => {
     expect(h.fs!.files.has(a.path)).toBe(false);
   });
 
+  it("a second merge settles an older failed survivor finalize and keeps the newest bytes", async () => {
+    const s = await contact("Survivor");
+    const first = await contact("First", true);
+    const second = await contact("Second", true);
+    h.fs!.barrier = async (point, path) => {
+      if (point === "tmp" && path === s.path)
+        throw new Error("finalize unavailable");
+    };
+    expect(
+      (
+        await mergeContactsWithPhotoOwnership(exec, {
+          survivorId: s.id,
+          absorbedId: first.id,
+          now: NOW,
+        })
+      ).recoveryPending,
+    ).toBe(true);
+    h.fs!.barrier = undefined;
+    await mergeContactsWithPhotoOwnership(exec, {
+      survivorId: s.id,
+      absorbedId: second.id,
+      now: NOW,
+      resolutions: { photo: { choice: "absorbed" } },
+    });
+    await drainRestorePhotoJournal(exec);
+    expect(h.fs!.files.get(s.path)).toBe("Second");
+    expect(await listJournalEntriesCore(exec)).toEqual([]);
+  });
+
   it("a crop requested during staging waits and is refused after merge", async () => {
     const s = await contact("Survivor");
     const a = await contact("Absorbed", true);

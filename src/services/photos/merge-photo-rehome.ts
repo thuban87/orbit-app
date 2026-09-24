@@ -81,9 +81,8 @@ export async function mergeContactsWithPhotoOwnership(
       const own = ownById.get(def.id);
       const chosen = resolutions.customFields?.[def.id];
       return other?.value &&
-        (chosen === "absorbed" ||
-          (chosen == null && (!own?.value || !own.value.trim())))
-        ? [{ def, other }]
+        (chosen === "absorbed" || (chosen == null && !own?.value?.trim()))
+        ? [{ def, other, source: other.value }]
         : [];
     });
   const absorbedDerived = [
@@ -95,8 +94,8 @@ export async function mergeContactsWithPhotoOwnership(
     contactPhotoRelPath(survivor.id),
     ...(absorbed.photo ? [absorbed.photo] : []),
     ...(survivor.photo ? [survivor.photo] : []),
-    ...selected.flatMap(({ def, other }) => [
-      other.value!,
+    ...selected.flatMap(({ def, source }) => [
+      source,
       customFieldPhotoRelPath(survivor.id, def.col_name),
     ]),
   ];
@@ -158,9 +157,9 @@ export async function mergeContactsWithPhotoOwnership(
           ...extra,
         });
       };
-      if (photoWanted)
+      if (photoWanted && absorbed.photo)
         await stage(
-          absorbed.photo!,
+          absorbed.photo,
           contactPhotoRelPath(survivor.id),
           { kind: "contact", contactUid: survivor.uid },
           {
@@ -170,10 +169,10 @@ export async function mergeContactsWithPhotoOwnership(
               resolutions.photo?.choice !== "absorbed",
           },
         );
-      for (const { def, other } of selected) {
+      for (const { def, other, source } of selected) {
         const own = ownById.get(def.id);
         await stage(
-          other.value!,
+          source,
           customFieldPhotoRelPath(survivor.id, def.col_name),
           {
             kind: "customField",
@@ -190,6 +189,8 @@ export async function mergeContactsWithPhotoOwnership(
         resolutions,
         photoTransfers: transfers,
         generationOf: canonicalGeneration,
+        expectedAbsorbedUid: absorbed.uid,
+        expectedAbsorbedPhoto: absorbed.photo,
       });
       committed = true;
       for (const entry of result.finalizeEntries) {
