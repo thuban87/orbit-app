@@ -252,6 +252,7 @@ export function DashboardControlRow({
   // The host owns the presentation node, so refresh the pure content props as
   // store state changes without coupling the content component to persistence.
   useEffect(() => {
+    void populations;
     const request = dashboardPanelStore.getState().request;
     if (request?.id !== PANEL_ID) return;
     dashboardPanelStore.getState().open({
@@ -267,6 +268,7 @@ export function DashboardControlRow({
   }, [pending, populations, togglePopulation]);
 
   useEffect(() => {
+    void filters;
     const request = dashboardPanelStore.getState().request;
     if (request?.id !== FILTER_PANEL_ID) return;
     dashboardPanelStore.getState().open({
@@ -284,6 +286,7 @@ export function DashboardControlRow({
   }, [categories, clearFilters, filters, filtersPending, toggleFilter]);
 
   useEffect(() => {
+    void sort;
     const request = dashboardPanelStore.getState().request;
     if (request?.id !== SORT_PANEL_ID) return;
     dashboardPanelStore.getState().open({

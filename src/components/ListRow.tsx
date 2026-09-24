@@ -44,7 +44,7 @@ function HighlightedSnippet({
   let cursor = 0;
   return (
     <>
-      {sorted.map((highlight, index) => {
+      {sorted.map((highlight) => {
         const start = Math.max(cursor, Math.min(highlight.start, text.length));
         const end = Math.max(
           start,
@@ -54,7 +54,7 @@ function HighlightedSnippet({
         const matched = text.slice(start, end);
         cursor = end;
         return (
-          <Text key={`${highlight.start}-${highlight.length}-${index}`}>
+          <Text key={`${highlight.start}-${highlight.length}`}>
             {before}
             <Text style={[styles.highlight, { color }]}>{matched}</Text>
           </Text>

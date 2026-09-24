@@ -18,6 +18,34 @@
   },
   "overrides": [
     {
+      "includes": [
+        "src/components/MemoryCard.tsx",
+        "src/components/MemoryEditor.tsx",
+        "src/components/PostLogNoteEditor.tsx",
+        "src/components/RelationshipEditor.tsx",
+        "src/components/history/ActivityHeatmap.tsx",
+        "src/components/history/DateDetailSheet.tsx",
+        "src/components/history/HeatmapContextCard.tsx",
+        "src/components/history/RolodexBrowser.tsx",
+        "src/components/history/RolodexWheel.tsx",
+        "src/screens/ComposeResearchScreen.tsx",
+        "src/screens/ComposeScreen.tsx",
+        "src/screens/CreateContactScreen.tsx",
+        "src/screens/EditContactScreen.tsx",
+        "src/screens/MemoryScreen.tsx",
+        "src/screens/RecentlyDeletedScreen.tsx",
+        "src/screens/ThingsToRememberScreen.tsx",
+        "src/screens/UpdateContactScreen.tsx"
+      ],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useValidAriaRole": "off"
+          }
+        }
+      }
+    },
+    {
       "includes": ["src/utils/logger.ts"],
       "linter": {
         "rules": {

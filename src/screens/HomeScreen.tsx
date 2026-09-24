@@ -282,7 +282,11 @@ function SwipeableListRow({
   openRowRef: { current: SwipeableMethods | null };
 }) {
   const swipeableRef = useRef<SwipeableMethods | null>(null);
-  const isThisRowOpen = () => openRowRef.current === swipeableRef.current;
+  const isThisRowOpen = useCallback(
+    () => openRowRef.current === swipeableRef.current,
+    [openRowRef],
+  );
+  const rowOnPress = rowProps.onPress;
 
   const onWillOpen = useCallback(() => {
     const previousRow = openRowRef.current;
@@ -294,7 +298,7 @@ function SwipeableListRow({
 
   const onClose = useCallback(() => {
     if (isThisRowOpen()) openRowRef.current = null;
-  }, [openRowRef]);
+  }, [isThisRowOpen, openRowRef]);
 
   const onPress = useCallback(() => {
     if (isThisRowOpen()) {
@@ -302,8 +306,8 @@ function SwipeableListRow({
       openRowRef.current = null;
       return;
     }
-    rowProps.onPress();
-  }, [openRowRef, rowProps]);
+    rowOnPress();
+  }, [isThisRowOpen, openRowRef, rowOnPress]);
 
   const onSwipeableOpen = useCallback(
     (direction: "left" | "right") => {
