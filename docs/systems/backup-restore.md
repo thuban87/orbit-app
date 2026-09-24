@@ -1,7 +1,7 @@
 # Backup & Restore
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 38-your-week
+**Last updated:** 2026-09-23
+**Updated by phase:** 38.2
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -40,6 +40,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 | Secret boundary | `src/services/backup/passphrase-store.ts` | Stores a passphrase and re-encryption journal only in SecureStore. |
 | SAF boundary | `src/services/backup/saf-storage.ts` | Owns selected-folder reads, writes, verification, and replacement. |
 | Launch work | `src/services/backup-sweep.ts` | Runs due automatic snapshots on a foreground launch. |
+| Cache retirement | `src/services/backup/backup-cache-sweep.ts` | Retires app-owned export staging and orphaned restore copies on foreground launch. |
 
 ### Key Files
 
@@ -72,6 +73,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 1. `BackupScreen` invokes the manual export service; it does not alter automatic-backup health.
 2. `buildExportManifest()` reads every portable table and photo/background bytes under `inReadSnapshot()` so the manifest is coherent with serialized writers. Format 7 includes Memory/interaction permission, custom-field scope/history/group metadata, Systems, Group Events, AI configuration metadata, personalization, Profile presentation, category tombstones, and `yourWeekPeriod`.
 3. The service writes the local file, reads it back, parses it again, and only then opens Android's share sheet.
+4. The manual export service deletes a staged file if validation, sharing availability, or the share handoff fails. A handed-off staging file remains available to the receiver until the first foreground sweep at least 24 hours after creation, or until the next manual export starts, whichever comes first (D-13). These operations touch only `cache/backup-exports/orbit-backup-*.json`, never the user-selected SAF backup folder or any external backup.
 4. The normalized method graph retains nullable labels and canonical regions; v1 scalar endpoint data forward-migrates to deterministic legacy method UIDs rather than reintroducing a scalar authority.
 4. When automatic backup is configured, `registerBackupSweep()` checks cadence and `data_revision` at a foreground launch, writes and verifies a new SAF file, records success, then prunes eligible owned copies.
 
@@ -84,6 +86,7 @@ The backup manifest is a versioned wire model separate from SQLite's schema vers
 ### Previewing and restoring
 
 1. The landing screen reads a picker cache copy immediately, decrypts if necessary, parses, validates the complete graph, and stores the valid candidate in a process-local cache.
+   The native receiver detects a JSON share without reading it on the main or JS thread. An owned background request acquires and copies the provider stream; a no-progress watchdog closes stalled reads and failed partial copies are deleted. The optional acquisition deadline and byte ceiling remain disabled pending the measured owner sign-off in Plan 15 (D-19). The consumed `restore-share-*.json` copy is deleted after its read, including on read failure. A foreground sweep retires only `restore-share-*.json` files predating this process. Copies left by older versions under provider `DISPLAY_NAME` are not swept because that name is not an app-owned namespace.
 2. `RestorePreviewScreen` shows aggregate metadata only. Merge is the default; Replace-all requires an impact confirmation and, with a configured destination, a fresh verified pre-restore snapshot.
 3. `applyRestore()` reconciles UID rows and tombstones, remaps portable parent UIDs to destination row IDs, normalizes method/link natural-key collisions before writing, remaps any legacy interaction Tone/channel vocabulary on ingest through the shared map, forces `allow_ai=0` on the interactions merge/update arm, recomputes contact recency, and registers committed photo-finalization work in one transaction.
 4. Post-commit photo, background, and schedule work is retryable. Avatar work uses committed journal rows; background work uses retained UID-keyed restore-pending bytes and a launch re-drive after sidecar recovery.
@@ -107,6 +110,9 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 | `BACKUP_ENVELOPE_VERSION` | `1` | `src/backup/types.ts` | Encrypted-container compatibility version. |
 | PBKDF2 iterations | `600000` | `src/services/backup/encryption.ts` | Approved passphrase derivation cost. |
 | Backup days | `1..3650`, defaults `1` / `7` | `src/db/app-settings-dao.ts` | Automatic cadence and retention bounds. |
+| `BACKUP_INGRESS_STALL_MS` | `30000` | `modules/orbit-backup-document-picker/.../BoundedBackupCopier.kt` | No-progress stream watchdog. |
+| `BACKUP_INGRESS_ACQUIRE_MS` | `null` | `modules/orbit-backup-document-picker/.../BackupIngressRequests.kt` | Disabled until Plan 15's D-19 sign-off. |
+| `EXPORT_STAGING_GRACE_MS` | `24 h` | `src/services/backup/backup-cache-sweep.ts` | Foreground retirement of handed-off export staging (D-13). |
 
 ## Decisions
 
@@ -201,4 +207,5 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 | 2026-09-02 | 33 | Recorded deferred UID-based Group Event wire/restore contract, owner-locked orphan detachment, and temporary format-4 export guard without weakening local tombstones. |
 | 2026-09-02 | 37 | Added Settings → Data & Backup as a second host for the canonical Backup tree with explicit origin-aware behavior. |
 | 2026-09-02 | 38 | Removed the Backup tab and advanced to format v7 so `yourWeekPeriod` exports, restores, and defaults safely from v6. |
+| 2026-09-23 | 38.2 | Bounded off-thread backup ingress and app-owned restore-copy cleanup (`security/AUD-SEC-002`); ignored non-text input in the general share module (`security/AUD-SEC-003`); retired manual export staging per D-13 (`data-privacy/AUD-DPI-013`). |
 Category relationships are portable by UID, never local integer ID. Format 6 adds category tombstones with a minimal v5→v6 version relabel. Merge maps a winning deleted category only to Uncategorized and suppresses only dependents proven to reference that UID. Replace-all removes destination-only categories through the canonical fallout transaction, restores the exact incoming order—including an empty taxonomy—clears tombstones for live restored categories, and never replays migration-001 seeds.

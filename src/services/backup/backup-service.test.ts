@@ -44,8 +44,11 @@ describe("manual backup service", () => {
       exportedAt: manifest.metadata.exportedAt,
       readPhotoBase64: async () => "",
       files: {
+        retireAll: async () => {},
+        retireStale: async () => {},
         create: async () => ({
           uri: "file:///export.json",
+          delete: async () => {},
           write: async () => {
             steps.push("write");
           },
@@ -74,8 +77,11 @@ describe("manual backup service", () => {
       exportedAt: manifest.metadata.exportedAt,
       readPhotoBase64: async () => "",
       files: {
+        retireAll: async () => {},
+        retireStale: async () => {},
         create: async () => ({
           uri: "file:///export.json",
+          delete: async () => {},
           write: async () => {},
           read: async () => JSON.stringify(manifest),
         }),
@@ -99,8 +105,11 @@ describe("manual backup service", () => {
       exportedAt: manifest.metadata.exportedAt,
       readPhotoBase64: async () => "",
       files: {
+        retireAll: async () => {},
+        retireStale: async () => {},
         create: async () => ({
           uri: "file:///export.json",
+          delete: async () => {},
           write: async () => {},
           read: async () => JSON.stringify(manifest),
         }),
@@ -121,8 +130,11 @@ describe("manual backup service", () => {
       exportedAt: manifest.metadata.exportedAt,
       readPhotoBase64: async () => "",
       files: {
+        retireAll: async () => {},
+        retireStale: async () => {},
         create: async () => ({
           uri: "file:///export.json",
+          delete: async () => {},
           write: async () => {},
           read: async () => "{}",
         }),
@@ -146,8 +158,11 @@ describe("manual backup service", () => {
       exportedAt: manifest.metadata.exportedAt,
       readPhotoBase64: async () => "",
       files: {
+        retireAll: async () => {},
+        retireStale: async () => {},
         create: async () => ({
           uri: "file:///export.json",
+          delete: async () => {},
           write: async () => {},
           read: async () => JSON.stringify(manifest),
         }),
@@ -160,6 +175,111 @@ describe("manual backup service", () => {
     });
     release();
     await expect(first).resolves.toEqual({ status: "shared" });
+  });
+
+  for (const encrypted of [false, true]) {
+    for (const outcome of [
+      "shared",
+      "sharing-unavailable",
+      "share-failed",
+      "export-failed",
+    ] as const) {
+      it(`${encrypted ? "encrypted" : "readable"} ${outcome} ${outcome === "shared" ? "retains" : "deletes"} staging`, async () => {
+        const remove = vi.fn(async () => {});
+        const retireAll = vi.fn(async () => {});
+        const crypto = {
+          encrypt: () => ({ encrypted: true }),
+          decrypt: () => new TextEncoder().encode(JSON.stringify(manifest)),
+        };
+        const service = createManualExportService({
+          exec: {} as never,
+          exportedAt: manifest.metadata.exportedAt,
+          readPhotoBase64: async () => "",
+          files: {
+            retireAll,
+            retireStale: async () => {},
+            create: async () => ({
+              uri: "file:///export.json",
+              write: async () => {
+                if (outcome === "export-failed")
+                  throw new Error("write failed");
+              },
+              read: async () =>
+                encrypted
+                  ? JSON.stringify({ encrypted: true })
+                  : JSON.stringify(manifest),
+              delete: remove,
+            }),
+          },
+          share: {
+            isAvailable: async () => outcome !== "sharing-unavailable",
+            open: async () => {
+              if (outcome === "share-failed") throw new Error("share failed");
+            },
+          },
+          encryption: encrypted
+            ? {
+                enabled: true,
+                passphrase: { status: "present", passphrase: "secret" },
+                crypto: crypto as never,
+                profile: {} as never,
+              }
+            : undefined,
+        });
+        await expect(service.shareExport()).resolves.toEqual({
+          status: outcome,
+        });
+        expect(retireAll).toHaveBeenCalledOnce();
+        expect(remove).toHaveBeenCalledTimes(outcome === "shared" ? 0 : 1);
+      });
+    }
+  }
+
+  it("retires prior staging at the start of each manual export", async () => {
+    const retireAll = vi.fn(async () => {});
+    const service = createManualExportService({
+      exec: {} as never,
+      exportedAt: manifest.metadata.exportedAt,
+      readPhotoBase64: async () => "",
+      files: {
+        retireAll,
+        retireStale: async () => {},
+        create: async () => ({
+          uri: "file:///export.json",
+          write: async () => {},
+          read: async () => JSON.stringify(manifest),
+          delete: async () => {},
+        }),
+      },
+      share: { isAvailable: async () => true, open: async () => {} },
+    });
+    await service.shareExport();
+    await service.shareExport();
+    expect(retireAll).toHaveBeenCalledTimes(2);
+  });
+
+  it("deletes a staged export when read-back validation rejects it", async () => {
+    const remove = vi.fn(async () => {});
+    const service = createManualExportService({
+      exec: {} as never,
+      exportedAt: manifest.metadata.exportedAt,
+      readPhotoBase64: async () => "",
+      files: {
+        retireAll: async () => {},
+        retireStale: async () => {},
+        create: async () => ({
+          uri: "file:///export.json",
+          write: async () => {},
+          read: async () => "{}",
+          delete: remove,
+        }),
+      },
+      share: { isAvailable: async () => true, open: async () => {} },
+    });
+    await expect(service.shareExport()).resolves.toEqual({
+      status: "export-failed",
+    });
+    expect(remove).toHaveBeenCalledOnce();
   });
 });
 

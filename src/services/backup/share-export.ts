@@ -6,19 +6,30 @@ import type {
   LocalExportFile,
   LocalExportFiles,
 } from "@/services/backup/backup-service";
-import { resolvePhotoUri } from "@/services/photos/photo-storage";
 import { resolveBackgroundUri } from "@/services/photos/background-storage";
+import { resolvePhotoUri } from "@/services/photos/photo-storage";
 
 const EXPORT_DIRECTORY = "backup-exports";
 
 export function createLocalExportFiles(
   now: () => number = Date.now,
 ): LocalExportFiles {
+  const directory = () => new Directory(Paths.cache, EXPORT_DIRECTORY);
+  const stagedFiles = (): File[] => {
+    const dir = directory();
+    if (!dir.exists) return [];
+    return dir
+      .list()
+      .filter(
+        (item): item is File =>
+          item instanceof File && /^orbit-backup-\d+\.json$/.test(item.name),
+      );
+  };
   return {
     async create(): Promise<LocalExportFile> {
-      const directory = new Directory(Paths.cache, EXPORT_DIRECTORY);
-      directory.create({ intermediates: true, idempotent: true });
-      const file = new File(directory, `orbit-backup-${now()}.json`);
+      const dir = directory();
+      dir.create({ intermediates: true, idempotent: true });
+      const file = new File(dir, `orbit-backup-${now()}.json`);
       return {
         uri: file.uri,
         async write(contents) {
@@ -27,7 +38,20 @@ export function createLocalExportFiles(
         read() {
           return file.text();
         },
+        async delete() {
+          if (file.exists) file.delete();
+        },
       };
+    },
+    async retireAll() {
+      for (const file of stagedFiles()) file.delete();
+    },
+    async retireStale(nowMs, graceMs) {
+      for (const file of stagedFiles()) {
+        const stamp = Number(/^orbit-backup-(\d+)\.json$/.exec(file.name)?.[1]);
+        const created = Number.isFinite(stamp) ? stamp : file.modificationTime;
+        if (created != null && nowMs - created >= graceMs) file.delete();
+      }
     },
   };
 }

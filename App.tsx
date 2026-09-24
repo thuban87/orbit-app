@@ -26,6 +26,7 @@ import { navigationRef, ShareIntentGate } from "@/navigation/linking";
 import { NotificationResponseGate } from "@/navigation/notification-gate";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { WidgetLinkingGate } from "@/navigation/widget-linking";
+import { registerBackupCacheSweep } from "@/services/backup/backup-cache-sweep";
 import { registerBackupSweep } from "@/services/backup-sweep";
 import { runBootstrapSequence } from "@/services/bootstrap-sequence";
 import { getDeviceRegion } from "@/services/device-region";
@@ -117,6 +118,7 @@ Notifications.setNotificationHandler({
 let fieldSweepRegistered = false;
 let memoryTrashSweepRegistered = false;
 let backupSweepRegistered = false;
+let backupCacheSweepRegistered = false;
 // One-shot guard for the photo-write reconciliation hook (PHOTO-03/05), on the
 // SAME registry and under the SAME re-entrancy reasoning as the field sweep.
 let photoReconcileRegistered = false;
@@ -264,6 +266,10 @@ function AppShell() {
     if (!backupSweepRegistered) {
       registerBackupSweep(getExecutor);
       backupSweepRegistered = true;
+    }
+    if (!backupCacheSweepRegistered) {
+      registerBackupCacheSweep();
+      backupCacheSweepRegistered = true;
     }
     // Register the notification-schedule reconcile (NOTIF-01/04) on the SAME
     // registry, once only, BEFORE the trigger fires its cold-start sweep. The exec
