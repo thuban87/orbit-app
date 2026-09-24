@@ -396,53 +396,63 @@ export function purgeContact(
     // Workflow snapshots are local-only copies. Match the contact's direct
     // rows and every source identity owned by its external links before those
     // links disappear below; pending rows stay available for review.
-    const ownedRows = await exec.getAllAsync<{
+    let ownedRows: Array<{
       id: number;
       photo_rel_path: string | null;
-    }>(
-      `SELECT r.id, r.photo_rel_path FROM import_session_rows r
+    }> = [];
+    // Migration-chain tests also exercise purge on pre-import schemas.
+    const importTable = await exec.getFirstAsync(
+      "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'import_session_rows'",
+    );
+    if (importTable) {
+      ownedRows = await exec.getAllAsync<{
+        id: number;
+        photo_rel_path: string | null;
+      }>(
+        `SELECT r.id, r.photo_rel_path FROM import_session_rows r
         WHERE r.row_status IN ('imported', 'linked', 'skipped')
           AND (r.contact_id = ?
             OR (r.row_status = 'skipped' AND r.matched_contact_id = ?)
             OR (r.contact_id IS NULL AND r.external_contact_id IN
               (SELECT l.external_contact_id FROM external_contact_links l
                 WHERE l.contact_id = ? AND l.provider = 'android')))`,
-      [contactId, contactId, contactId],
-    );
-    for (const owned of ownedRows) {
-      await exec.runAsync("DELETE FROM import_session_rows WHERE id = ?", [
-        owned.id,
-      ]);
-    }
-    const candidates = await exec.getAllAsync<{
-      id: number;
-      candidates_json: string | null;
-    }>(
-      `SELECT id, candidates_json FROM import_session_rows
+        [contactId, contactId, contactId],
+      );
+      for (const owned of ownedRows) {
+        await exec.runAsync("DELETE FROM import_session_rows WHERE id = ?", [
+          owned.id,
+        ]);
+      }
+      const candidates = await exec.getAllAsync<{
+        id: number;
+        candidates_json: string | null;
+      }>(
+        `SELECT id, candidates_json FROM import_session_rows
         WHERE row_status IN ('pending', 'needs_review')
           AND candidates_json IS NOT NULL`,
-    );
-    for (const candidate of candidates) {
-      let parsed: unknown;
-      try {
-        parsed = JSON.parse(candidate.candidates_json ?? "null");
-      } catch {
-        parsed = null;
-      }
-      const filtered = Array.isArray(parsed)
-        ? parsed.filter(
-            (item) =>
-              typeof item !== "object" ||
-              item === null ||
-              (item as { contactId?: unknown }).contactId !== contactId,
-          )
-        : null;
-      const next = filtered === null ? null : JSON.stringify(filtered);
-      if (next !== candidate.candidates_json) {
-        await exec.runAsync(
-          "UPDATE import_session_rows SET candidates_json = ?, modified_at = ? WHERE id = ?",
-          [next, opts.now, candidate.id],
-        );
+      );
+      for (const candidate of candidates) {
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(candidate.candidates_json ?? "null");
+        } catch {
+          parsed = null;
+        }
+        const filtered = Array.isArray(parsed)
+          ? parsed.filter(
+              (item) =>
+                typeof item !== "object" ||
+                item === null ||
+                (item as { contactId?: unknown }).contactId !== contactId,
+            )
+          : null;
+        const next = filtered === null ? null : JSON.stringify(filtered);
+        if (next !== candidate.candidates_json) {
+          await exec.runAsync(
+            "UPDATE import_session_rows SET candidates_json = ?, modified_at = ? WHERE id = ?",
+            [next, opts.now, candidate.id],
+          );
+        }
       }
     }
 
