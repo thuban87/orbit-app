@@ -155,7 +155,10 @@ describe("Custom egress routes ONLY through secureCustomFetch (H3)", () => {
 
 describe("Custom endpoint is validated before transport (H2)", () => {
   it("refuses an http:// endpoint before any transport call", async () => {
-    const p = new CustomProvider("http://api.custom.example/v1", staticKey("k"));
+    const p = new CustomProvider(
+      "http://api.custom.example/v1",
+      staticKey("k"),
+    );
     await expect(
       p.generate(inputFor("hi", new AbortController().signal)),
     ).rejects.toMatchObject({ code: "invalid_endpoint" });
@@ -203,7 +206,9 @@ describe("Custom listModels is non-networked (C4-M1)", () => {
 
 describe("native errors map to sanitized codes with no leakage (T-14-05)", () => {
   it("a redirect rejection maps to blocked with no endpoint/body/header text", async () => {
-    secureCustomFetchMock.mockRejectedValueOnce(new SecureFetchError("redirect"));
+    secureCustomFetchMock.mockRejectedValueOnce(
+      new SecureFetchError("redirect"),
+    );
     const p = new CustomProvider(GOOD_ENDPOINT, staticKey("secret-key-123"));
 
     let caught: unknown;
@@ -234,11 +239,26 @@ describe("native errors map to sanitized codes with no leakage (T-14-05)", () =>
   });
 
   it("a native timeout maps to timeout", async () => {
-    secureCustomFetchMock.mockRejectedValueOnce(new SecureFetchError("timeout"));
+    secureCustomFetchMock.mockRejectedValueOnce(
+      new SecureFetchError("timeout"),
+    );
     const p = new CustomProvider(GOOD_ENDPOINT, staticKey("k"));
     await expect(
       p.generate(inputFor("hi", new AbortController().signal)),
     ).rejects.toMatchObject({ code: "timeout" });
+  });
+
+  it("an oversized native response maps to invalid_response", async () => {
+    secureCustomFetchMock.mockRejectedValueOnce(
+      new SecureFetchError("response_too_large"),
+    );
+    const p = new CustomProvider(GOOD_ENDPOINT, staticKey("k"));
+    await expect(
+      p.generate(inputFor("hi", new AbortController().signal)),
+    ).rejects.toMatchObject({
+      code: "invalid_response",
+      message: "invalid_response",
+    });
   });
 
   it("a non-ok native status maps to a sanitized HTTP code", async () => {

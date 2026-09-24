@@ -203,6 +203,8 @@ function mapSecureFetchError(err: unknown, signal: AbortSignal): AiError {
         return new AiError("blocked");
       case "timeout":
         return new AiError("timeout");
+      case "response_too_large":
+        return new AiError("invalid_response");
       case "cancelled":
         return new AiError("cancelled");
       default:

@@ -145,3 +145,4 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | 2026-09-02 | 36 | Added multi-lane connection configuration, OpenRouter authorization/catalog, permission-bounded prompt assembly, personalization, transparency, diagnostics, and model-aware capacity handling. |
 | 2026-09-02 | 37 | Replaced the monolithic Settings entry with the AI category, preserving the existing configuration hierarchy and local availability read. |
 | 2026-09-23 | 38.2 | Per D-23 (`security/AUD-SEC-006`), unbound Custom values fail closed and require re-entry; failed saves restore the prior raw SecureStore item. |
+| 2026-09-23 | 38.2 | Bounded Custom transport response bodies, retained call ownership through body consumption, and mapped oversized responses to `invalid_response`. |

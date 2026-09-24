@@ -21,7 +21,10 @@
  * co-located node tests mock native and only prove this wrapper's own logic.
  */
 import { validateCustomEndpoint } from "@/ai/custom-endpoint";
-import { cancel as nativeCancel, request as nativeRequest } from "../../modules/orbit-secure-fetch";
+import {
+  cancel as nativeCancel,
+  request as nativeRequest,
+} from "../../modules/orbit-secure-fetch";
 
 /** Stable, sanitized failure taxonomy — safe to surface to the UI/logs. */
 export type SecureFetchErrorCode =
@@ -31,6 +34,7 @@ export type SecureFetchErrorCode =
   | "redirect"
   | "transport"
   | "timeout"
+  | "response_too_large"
   | "cancelled"
   | "host_mismatch";
 
@@ -69,9 +73,7 @@ function generateRequestId(): string {
 
 /** Strip WHATWG URL bracket notation from an IPv6 hostname (`[::1]` -> `::1`). */
 function stripBrackets(host: string): string {
-  return host.startsWith("[") && host.endsWith("]")
-    ? host.slice(1, -1)
-    : host;
+  return host.startsWith("[") && host.endsWith("]") ? host.slice(1, -1) : host;
 }
 
 /** Map a native rejection to a stable sanitized code (no detail leaks). */
@@ -87,6 +89,8 @@ function mapNativeError(err: unknown): SecureFetchError {
       return new SecureFetchError("redirect");
     case "ERR_TIMEOUT":
       return new SecureFetchError("timeout");
+    case "ERR_RESPONSE_TOO_LARGE":
+      return new SecureFetchError("response_too_large");
     case "ERR_CANCELLED":
       return new SecureFetchError("cancelled");
     case "ERR_INVALID_URL":

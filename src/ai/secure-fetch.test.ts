@@ -72,7 +72,10 @@ describe("secureCustomFetch — success normalization", () => {
     const res = await secureCustomFetch({ url: OK_URL });
     expect(res).toEqual({ status: 200, ok: true, bodyText: '{"choices":[]}' });
     expect(nativeRequest).toHaveBeenCalledTimes(1);
-    const arg = nativeRequest.mock.calls[0][0] as { requestId: string; url: string };
+    const arg = nativeRequest.mock.calls[0][0] as {
+      requestId: string;
+      url: string;
+    };
     expect(typeof arg.requestId).toBe("string");
     expect(arg.url).toBe(OK_URL);
   });
@@ -91,6 +94,7 @@ describe("secureCustomFetch — sanitized error mapping", () => {
     ["ERR_PRIVATE_ADDRESS", "private_address"],
     ["ERR_TRANSPORT", "transport"],
     ["ERR_TIMEOUT", "timeout"],
+    ["ERR_RESPONSE_TOO_LARGE", "response_too_large"],
     ["unsupported_platform", "unsupported_platform"],
   ];
 
@@ -126,7 +130,9 @@ describe("secureCustomFetch — sanitized error mapping", () => {
 
 describe("secureCustomFetch — host mismatch (defense-in-depth)", () => {
   it("rejects when the native finalUrlHost differs from the requested host", async () => {
-    nativeRequest.mockResolvedValue(okResult({ finalUrlHost: "evil.example.net" }));
+    nativeRequest.mockResolvedValue(
+      okResult({ finalUrlHost: "evil.example.net" }),
+    );
     const err = await secureCustomFetch({ url: OK_URL }).catch((e) => e);
     expect(err).toBeInstanceOf(SecureFetchError);
     expect(err.code).toBe("host_mismatch");
@@ -137,7 +143,10 @@ describe("secureCustomFetch — abort / cancellation", () => {
   it("issues native cancel and rejects when the signal aborts in flight", async () => {
     let rejectNative: (e: unknown) => void = () => {};
     nativeRequest.mockImplementation(
-      () => new Promise((_res, rej) => { rejectNative = rej; }),
+      () =>
+        new Promise((_res, rej) => {
+          rejectNative = rej;
+        }),
     );
     const ac = new AbortController();
     const p = secureCustomFetch({ url: OK_URL, signal: ac.signal });
@@ -154,9 +163,10 @@ describe("secureCustomFetch — abort / cancellation", () => {
   it("never issues a native request for an already-aborted signal", async () => {
     const ac = new AbortController();
     ac.abort();
-    const err = await secureCustomFetch({ url: OK_URL, signal: ac.signal }).catch(
-      (e) => e,
-    );
+    const err = await secureCustomFetch({
+      url: OK_URL,
+      signal: ac.signal,
+    }).catch((e) => e);
     expect(err).toBeInstanceOf(SecureFetchError);
     expect(err.code).toBe("cancelled");
     expect(nativeRequest).not.toHaveBeenCalled();
@@ -176,7 +186,10 @@ describe("secureCustomFetch — abort / cancellation", () => {
   it("consumes a post-abort native rejection without an unhandled rejection", async () => {
     let rejectNative: (e: unknown) => void = () => {};
     nativeRequest.mockImplementation(
-      () => new Promise((_res, rej) => { rejectNative = rej; }),
+      () =>
+        new Promise((_res, rej) => {
+          rejectNative = rej;
+        }),
     );
     const ac = new AbortController();
     const p = secureCustomFetch({ url: OK_URL, signal: ac.signal });
