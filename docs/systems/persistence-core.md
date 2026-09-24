@@ -152,8 +152,9 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 ### Running launch maintenance
 
 1. After the migrated database is ready, the app registers maintenance hooks against the launch-sweep registry.
-2. The trigger runs each hook once for the foreground launch, after database access is available.
-3. A hook that writes obtains its own `inWriteTransaction()`; it must not nest that non-reentrant boundary inside another hook transaction.
+2. The trigger runs hooks sequentially once per foreground launch, after database access is available. Each hook has its own failure boundary, so a failed hook does not starve later independent hooks. An overlapping launch queues one follow-up pass.
+3. Hooks may declare `id` and `requires` when registering. A failed or skipped prerequisite skips its dependents for that pass. Background reconciliation and restore-photo finalization run before automatic backup; backup is held only when either recovery hook fails in that same pass. No durable hold flag or pending-row scan controls backup.
+4. A hook that writes obtains its own `inWriteTransaction()`; it must not nest that non-reentrant boundary inside another hook transaction. Migration and theme hydration still gate the first render, while recoverable background image faults are logged and retried by the foreground sweep.
 
 ### Group Event schema and composed writes
 
@@ -275,6 +276,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 
 | Date | Phase | What Changed |
 |------|-------|--------------|
+| 2026-09-23 | 38.2 | Isolated launch hooks and image candidates, added per-pass backup recovery prerequisites, and contained recoverable background faults at boot. |
 | 2026-08-14 | 02 | Created the SQLite bootstrap, migration-1 contract, and shared write serialization. |
 | 2026-08-14 | 03 | Added the shared transaction entry point and launch-sweep integration for runtime custom-field maintenance. |
 | 2026-08-16 | 11 | Added migration 002 and the validated SQLite app-settings policy boundary. |

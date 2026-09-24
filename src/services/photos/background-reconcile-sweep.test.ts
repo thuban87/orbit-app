@@ -8,6 +8,7 @@ const h = vi.hoisted(() => ({
   }>,
   bytes: new Map<string, string>(),
   operations: [] as string[],
+  fail: new Set<string>(),
   pendingRead: null as
     | null
     | (() => Promise<Array<{ relative: string; templateUid: string }>>),
@@ -54,14 +55,20 @@ vi.mock("@/services/photos/background-storage", () => ({
   resolveBackgroundRestorePendingUri: (relative: string) =>
     `pending:${relative}`,
   persistBackgroundDerivative: async (source: string, destination: string) => {
+    if (h.fail.has(`persist:${source}`))
+      throw new Error("injected copy failure");
     h.operations.push(`persist ${source} -> ${destination}`);
     h.bytes.set(destination, h.bytes.get(source)!);
   },
   deleteBackgroundRestorePending: (relative: string) => {
+    if (h.fail.has(`deletePending:${relative}`))
+      throw new Error("injected delete failure");
     h.operations.push(`deletePending ${relative}`);
     h.pending = h.pending.filter((entry) => entry.relative !== relative);
   },
   deleteBackgroundDerivative: (relative: string) => {
+    if (h.fail.has(`deleteCanonical:${relative}`))
+      throw new Error("injected delete failure");
     h.operations.push(`deleteCanonical ${relative}`);
     h.bytes.delete(relative);
   },
@@ -71,18 +78,31 @@ vi.mock("@/services/photos/background-storage", () => ({
     to?: string;
     relative?: string;
   }) => {
+    if (h.fail.has(`action:${action.kind}`))
+      throw new Error("injected action failure");
     h.operations.push(action.kind);
     if (action.kind === "restoreBak")
       h.bytes.set(action.to!, h.bytes.get(action.from!)!);
   },
 }));
 
+import {
+  __resetSweepForTest,
+  registerSweepHook,
+  runLaunchSweep,
+  SWEEP_IDS,
+} from "@/services/launch-sweep";
 import { finalizeBackgroundRestoreCandidate } from "./background-finalization";
 import { planBackgroundReconciliation } from "./background-reconcile-model";
-import { runBackgroundReconciliation } from "./background-reconcile-sweep";
+import {
+  registerBackgroundReconcileSweep,
+  runBackgroundReconciliation,
+} from "./background-reconcile-sweep";
 
 beforeEach(() => {
   h.pendingRead = null;
+  h.fail.clear();
+  __resetSweepForTest();
 });
 
 function execFor(imagePaths: Record<string, string>) {
@@ -165,6 +185,89 @@ describe("background launch reconciliation plan", () => {
 });
 
 describe("background restore-pending crash recovery", () => {
+  it("holds a dependent only in the failed recovery pass", async () => {
+    h.entries = ["orphan.jpg"];
+    h.pending = [];
+    h.operations = [];
+    h.fail.add("deleteCanonical:profile-backgrounds/orphan.jpg");
+    const calls: string[] = [];
+    registerBackgroundReconcileSweep(() => execFor({}));
+    registerSweepHook(
+      async () => {
+        calls.push("backup");
+      },
+      {
+        requires: [SWEEP_IDS.backgroundReconcile],
+      },
+    );
+    await runLaunchSweep();
+    expect(calls).toEqual([]);
+    h.fail.clear();
+    await runLaunchSweep();
+    expect(calls).toEqual(["backup"]);
+  });
+
+  it("isolates a failed canonical delete and retries it on a later pass", async () => {
+    h.entries = ["orphan.jpg", "other.jpg"];
+    h.pending = [];
+    h.operations = [];
+    h.fail.add("deleteCanonical:profile-backgrounds/orphan.jpg");
+    expect(await runBackgroundReconciliation(execFor({}))).toEqual({
+      failed: 1,
+    });
+    expect(h.operations).toContain(
+      "deleteCanonical profile-backgrounds/other.jpg",
+    );
+    h.fail.clear();
+    expect(await runBackgroundReconciliation(execFor({}))).toEqual({
+      failed: 0,
+    });
+    expect(h.operations).toContain(
+      "deleteCanonical profile-backgrounds/orphan.jpg",
+    );
+  });
+
+  it("isolates failed sidecar actions and processes remaining actions", async () => {
+    h.entries = ["bad.jpg.tmp", "good.jpg.bak"];
+    h.pending = [];
+    h.operations = [];
+    h.fail.add("action:deleteTmp");
+    expect(
+      await runBackgroundReconciliation(
+        execFor({ good: "profile-backgrounds/good.jpg" }),
+      ),
+    ).toEqual({ failed: 1 });
+    expect(h.operations).toContain("restoreBak");
+    h.fail.clear();
+    expect(
+      await runBackgroundReconciliation(
+        execFor({ good: "profile-backgrounds/good.jpg" }),
+      ),
+    ).toEqual({ failed: 0 });
+  });
+
+  it.each(["copy", "cleanup"])(
+    "continues after a failed pending %s",
+    async (kind) => {
+      h.entries = [];
+      h.pending = [];
+      h.operations = [];
+      const bad = pending("bad", "BAD");
+      const good = pending("good", "GOOD");
+      h.fail.add(
+        kind === "copy" ? `persist:pending:${bad}` : `deletePending:${bad}`,
+      );
+      const exec = execFor({ bad, good });
+      expect(await runBackgroundReconciliation(exec)).toEqual({ failed: 1 });
+      expect(h.operations).toContain(
+        `finalize ${good} -> profile-backgrounds/good.jpg`,
+      );
+      h.fail.clear();
+      expect(await runBackgroundReconciliation(exec)).toEqual({ failed: 0 });
+      expect(h.pending).toEqual([]);
+    },
+  );
+
   it("re-checks sweep A after restore B finalizes while A is paused after discovery", async () => {
     h.entries = ["same.jpg"];
     h.pending = [];

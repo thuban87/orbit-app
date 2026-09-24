@@ -27,6 +27,7 @@ import { NotificationResponseGate } from "@/navigation/notification-gate";
 import { RootNavigator } from "@/navigation/RootNavigator";
 import { WidgetLinkingGate } from "@/navigation/widget-linking";
 import { registerBackupSweep } from "@/services/backup-sweep";
+import { runBootstrapSequence } from "@/services/bootstrap-sequence";
 import { getDeviceRegion } from "@/services/device-region";
 import { registerFieldSweep } from "@/services/field-sweep";
 import {
@@ -168,8 +169,20 @@ function AppShell() {
   //    state instead of hanging on the spinner with an unhandled rejection.
   useEffect(() => {
     let active = true;
-    openAndMigrate(getDeviceRegion())
-      .then(async () => {
+    runBootstrapSequence({
+      openAndMigrate: () => openAndMigrate(getDeviceRegion()),
+      hydrateThemeAtBoot: () =>
+        hydrateThemeAtBoot({
+          getItem: (key) => AsyncStorage.getItem(key),
+          removeItem: (key) => AsyncStorage.removeItem(key),
+          getAppSettings: () => getAppSettings(getExecutor()),
+          updateAppSettings: (patch) =>
+            updateAppSettings(getExecutor(), patch, localDateTime()),
+        }),
+      loadAppFonts,
+      reconcileBackgrounds: () => runBackgroundReconciliation(getExecutor()),
+    })
+      .then((settings) => {
         // After migration 015 is committed, run the one-time legacy orbit-theme
         // import + read the durable theme selection, THEN hydrate the store, THEN
         // flip `ready` — so the first painted MAIN frame carries the saved palette
@@ -182,20 +195,6 @@ function AppShell() {
         // `loadAppFonts()` RESOLVES even on a font-load failure (degrade to the
         // system font), so it can never reach this effect's `.catch` or block
         // boot in the startup-error state (REVIEWS 23-02 MEDIUM).
-        const [settings] = await Promise.all([
-          hydrateThemeAtBoot({
-            getItem: (key) => AsyncStorage.getItem(key),
-            removeItem: (key) => AsyncStorage.removeItem(key),
-            getAppSettings: () => getAppSettings(getExecutor()),
-            updateAppSettings: (patch) =>
-              updateAppSettings(getExecutor(), patch, localDateTime()),
-          }),
-          loadAppFonts(),
-          // A committed restore may temporarily point image_path at its exact
-          // pending artifact. Reconcile before the main tree can read template
-          // paths; later foreground sweeps remain the ongoing recovery path.
-          runBackgroundReconciliation(getExecutor()),
-        ]);
         if (!active) return;
         useThemeStore.getState().hydrate(themeSelectionFromSettings(settings));
         setReady(true);

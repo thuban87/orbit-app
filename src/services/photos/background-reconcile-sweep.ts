@@ -1,5 +1,5 @@
 import type { SqlExecutor } from "@/db/types";
-import { registerSweepHook } from "@/services/launch-sweep";
+import { registerSweepHook, SWEEP_IDS } from "@/services/launch-sweep";
 import { finalizeBackgroundRestoreCandidate } from "@/services/photos/background-finalization";
 import {
   applyBackgroundReconcileAction,
@@ -17,7 +17,7 @@ export { planBackgroundReconciliation } from "./background-reconcile-model";
 
 export async function runBackgroundReconciliation(
   exec: SqlExecutor,
-): Promise<void> {
+): Promise<{ failed: number }> {
   const rows = await exec.getAllAsync<{
     uid: string;
     imagePath: string;
@@ -41,11 +41,17 @@ export async function runBackgroundReconciliation(
     entries: listBackgroundStorageEntries(),
     referencedPaths,
   });
+  let failed = 0;
   for (const action of plan.actions) {
-    if (action.kind === "deleteCanonical") {
-      deleteBackgroundDerivative(action.relative);
-    } else {
-      await applyBackgroundReconcileAction(action);
+    try {
+      if (action.kind === "deleteCanonical") {
+        deleteBackgroundDerivative(action.relative, true);
+      } else {
+        await applyBackgroundReconcileAction(action);
+      }
+    } catch {
+      failed += 1;
+      Logger.error(LOG_SCOPE, `action failed: ${action.kind}`);
     }
   }
   // The listing must be fresh and the re-drive must be the final canonical
@@ -53,36 +59,39 @@ export async function runBackgroundReconciliation(
   // irrelevant: it may contain stale bytes from a same-uid replacement.
   const recoveredPaths = new Set<string>();
   for (const pending of await listBackgroundRestorePendingEntries()) {
-    const result = await finalizeBackgroundRestoreCandidate(exec, {
-      uid: pending.templateUid,
-      pendingRelativePath: pending.relative,
-    });
-    if (result === "finalized") {
-      recoveredPaths.add(backgroundDerivativeRelPath(pending.templateUid));
+    try {
+      const result = await finalizeBackgroundRestoreCandidate(exec, {
+        uid: pending.templateUid,
+        pendingRelativePath: pending.relative,
+      });
+      if (result === "finalized") {
+        recoveredPaths.add(backgroundDerivativeRelPath(pending.templateUid));
+      }
+    } catch {
+      failed += 1;
+      Logger.error(LOG_SCOPE, "pending candidate failed");
     }
   }
   for (const relative of plan.missingReferences) {
     if (recoveredPaths.has(relative)) continue;
     Logger.error(
       LOG_SCOPE,
-      `missing durable background referenced by template: ${relative}`,
+      "missing durable background referenced by template",
     );
   }
+  return { failed };
 }
 
 /** Registers one ready-gated launch sweep; importing this module runs nothing. */
 export function registerBackgroundReconcileSweep(
   getExecutor: () => SqlExecutor,
 ): void {
-  registerSweepHook(async () => {
-    try {
-      await runBackgroundReconciliation(getExecutor());
-    } catch (error) {
-      Logger.error(
-        LOG_SCOPE,
-        "background reconciliation failed (best-effort)",
-        error,
-      );
-    }
-  });
+  registerSweepHook(
+    async () => {
+      const summary = await runBackgroundReconciliation(getExecutor());
+      if (summary.failed > 0)
+        throw new Error("background reconciliation incomplete");
+    },
+    { id: SWEEP_IDS.backgroundReconcile },
+  );
 }

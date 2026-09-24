@@ -223,12 +223,16 @@ export function persistBackgroundDerivative(
   });
 }
 
-export function deleteBackgroundDerivative(relative: string): void {
+export function deleteBackgroundDerivative(
+  relative: string,
+  strict = false,
+): void {
   assertBackgroundRelative(relative);
   try {
     new File(Paths.document, relative).delete();
-  } catch (error) {
-    Logger.error(LOG_SCOPE, `background delete failed for ${relative}`, error);
+  } catch {
+    if (strict) throw new Error("background canonical delete failed");
+    Logger.error(LOG_SCOPE, "background delete failed");
   }
 }
 
@@ -283,11 +287,7 @@ export async function applyBackgroundReconcileAction(
       assertBackgroundSidecar(action.relative);
       new File(Paths.document, action.relative).delete();
     }
-  } catch (error) {
-    Logger.error(
-      LOG_SCOPE,
-      `background reconciliation failed: ${JSON.stringify(action)}`,
-      error,
-    );
+  } catch {
+    throw new Error("background reconcile action failed");
   }
 }
