@@ -233,10 +233,28 @@ does not regenerate the provider, widget-info XML, manifest receiver, or native 
    APK is not `run-as` debuggable, so killed-app widget marks must be counted with debug.
 3. After prebuild, assert the manifest preserves `allowBackup="false"`, portrait orientation,
    and `singleTask`, and adds the `OrbitFavourites` provider, exactly one non-exported
-   `OrbitWidgetBootReceiver`, and `RECEIVE_BOOT_COMPLETED`.
+   `OrbitWidgetBootReceiver`, and `RECEIVE_BOOT_COMPLETED`. Inspect the **built APK's merged
+   manifest**, not only the library source manifest:
+
+   ```cmd
+   "%ANDROID_HOME%\build-tools\35.0.0\aapt2.exe" dump xmltree --file AndroidManifest.xml "C:\Users\bwales\projects\orbit-app\android\app\build\outputs\apk\debug\app-debug.apk" > "%TEMP%\orbit-manifest.txt"
+   findstr /i "rnwidget.imageprovider RNWidgetImageProvider" "%TEMP%\orbit-manifest.txt"
+   "%ANDROID_HOME%\build-tools\35.0.0\aapt2.exe" dump xmltree --file AndroidManifest.xml "C:\Users\bwales\projects\orbit-app\android\app\build\outputs\apk\release\app-release.apk" > "%TEMP%\orbit-release-manifest.txt"
+   findstr /i "rnwidget.imageprovider RNWidgetImageProvider" "%TEMP%\orbit-release-manifest.txt"
+   ```
+
+   Each `findstr` command must return no matches (exit code 1). The `allowBackup`, widget
+   receiver, and boot receiver assertions above must still hold in both dumps.
 4. On the Pixel, verify the grid's status rings, base64 photo and initials fallback, the
    empty Choose favourites state, pin request/fallback, Profile and Compose links with
-   Dashboard-rooted Back, and small/large resize layouts.
+   Dashboard-rooted Back, and small/large resize layouts. At the largest resize, check
+   both light and dark modes, a refresh, and a reboot: inline bitmaps must still render.
+   Then run the following from this Linux box; it must fail with an unknown-authority
+   error. The exact widget ID is immaterial because the authority must not exist.
+
+   ```bash
+   ~/.local/bin/adb shell content read --uri content://com.bwales.orbit.rnwidget.imageprovider/widget_1_mode_light.png
+   ```
 5. On the debug build, kill the app, tap a mark region, and inspect the new interaction row:
    it must have `source='widget'`, outbound/connected one-tap defaults, a recomputed
    `last_contact`, and exactly one row for the tap. Measure a worst-capacity tap-to-update

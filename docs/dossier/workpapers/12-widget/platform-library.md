@@ -16,12 +16,13 @@ published source and docs, for the favourites-grid home-screen widget design.
 ## Architecture (the single most design-relevant fact)
 
 **The widget is not live RemoteViews of your components. The library renders your
-entire widget tree to a native View hierarchy off-screen, rasterises it to ONE PNG
-bitmap, writes that PNG to disk, and shows it in the widget as a single
-`ImageView` via `setImageViewUri(content://…)`. Tappable regions are transparent
-RemoteViews rectangles overlaid on top of that image.**
+entire widget tree to a native View hierarchy off-screen and rasterises it to a
+bitmap. Tappable regions are transparent RemoteViews rectangles overlaid on top
+of that image.** The unpatched 0.22.0 package wrote the bitmap to disk and used
+`setImageViewUri(content://…)`; Phase 38.2 RG-001 replaces that delivery with inline
+`setImageViewBitmap` and removes the exported image provider.
 
-Evidence: `RNWidget.java:76-78` — `drawViewToBitmap(rootView)` → `saveBitmapToDisk` →
+Original-package evidence: `RNWidget.java:76-78` — `drawViewToBitmap(rootView)` → `saveBitmapToDisk` →
 `remoteWidgetView.setImageViewUri(R.id.rn_widget_image_light, bitmapUri)`.
 `RNWidget.java:115` `addClickableAreas(...)` overlays the tap targets.
 `private.types.ts` confirms the model: a widget is `{ base64Image, clickableAreas[], collectionAreas[] }`.
@@ -31,13 +32,12 @@ Consequences that shape the design:
 - **Text/photos are baked into a picture.** Fine for display. It also means **there is
   no text input and no live/scrollable content except via the `ListWidget` collection
   path** (which uses real RemoteViews collections — see below).
-- **The classic ~1 MB RemoteViews Binder bitmap limit is largely side-stepped** for the
-  main widget image: the bitmap goes to disk and is served through a read-only
+- **Historical package behavior (replaced by 38.2):** the disk-backed, exported
   `ContentProvider` (`RNWidgetImageProvider.java:26-54`, authority
-  `<pkg>.rnwidget.imageprovider`); only a small `content://` URI crosses Binder. So a
-  dense favourites grid with many photos is bounded by **memory + the 30 s task budget**,
-  not by the Binder transaction cap. (No explicit byte ceiling is documented or enforced
-  in source — flagged as "not found," not "unlimited.")
+  `<pkg>.rnwidget.imageprovider`) sidestepped RemoteViews bitmap transport limits but
+  let unrelated apps read predictable contact snapshots. The patched app delivers
+  bitmaps through the OS widget binding. Bitmap memory and Binder capacity now require
+  physical-device proof at maximum size; the host-grant fallback is an owner decision.
 
 ---
 
@@ -189,11 +189,11 @@ for that `widgetId`, replacing the tile's content in place (Q3). Caveats the des
 ---
 
 ## What I could NOT verify / flags
-- **No explicit image byte/Binder ceiling** is documented or enforced in source. The main
-  widget bitmap avoids the Binder cap (served from disk via ContentProvider), but I could
-  not find a stated max for base64 payloads or per-item collection images. Treat as
-  memory-/timeout-bound and pre-scale thumbnails; validate on the physical Pixel 6 Pro
-  (the emulator on this box cannot run, and perf/Skia claims are invalid there anyway).
+- **No explicit image byte/Binder ceiling** was documented or enforced in the unpatched
+  source. Its main bitmap avoided Binder transport through the disk provider. The 38.2
+  patch moves light/dark bitmaps into RemoteViews, so memory and transport limits now
+  require a physical Pixel check at maximum size. Base64 input and the 30 s render budget
+  still require pre-scaled thumbnails.
 - **`ListWidget` collection cap = 2 per widget**: `RNWidgetCollectionService.MAX_COLLECTION_WIDGETS = 2`
   (`RNWidgetCollectionService.java:24`). A favourites grid built as a real scrollable
   collection is limited to 2 `ListWidget`s per widget instance. A non-scrolling

@@ -1,7 +1,7 @@
 # Widget
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
+**Last updated:** 2026-09-23
+**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
 **Owners:** `src/services/widget/`, `src/navigation/widget-linking.ts`, `src/services/widget/widget-quick-action-guard.ts`, `plugins/withWidgetBootReceiver.js`
 
 ## Purpose
@@ -58,6 +58,7 @@ The widget owns no table, migration, or per-instance state. It reads the Dashboa
 3. The tile shaper preserves Dashboard Default order and nullable query-time status; it never recalculates either value.
 4. Each local photo master is downsized and encoded as a base64 `data:` URI. A missing or failed thumbnail falls back to deterministic themed initials rather than blanking the grid.
 5. The renderer selects the small mark grid or larger fuel-and-action layout from widget width, then rasterises the RemoteViews tree with palette tokens.
+6. The patched `react-native-android-widget` module passes light and dark bitmaps inline with `RemoteViews.setImageViewBitmap`. Android's AppWidgetService delivers those views only to hosts bound to the widget ID. The library's unauthenticated image ContentProvider is absent from both library manifests, and each render deletes leftover app-private `files/widget_images/*` snapshots. The base64 photo input contract and visible fuel/action content are unchanged.
 
 ### Marking and opening a contact
 
@@ -74,6 +75,8 @@ The widget owns no table, migration, or per-instance state. It reads the Dashboa
 3. The native boot receiver handles only `BOOT_COMPLETED` and asks the widget library to update placed `OrbitFavourites` instances. No widget timer or polling period runs.
 
 ## Configuration
+
+Inline delivery consumes RemoteViews bitmap memory and may hit a launcher or Binder limit at the largest widget size. Verify light/dark rendering, refresh, and reboot on the physical Pixel using the build runbook. If inline delivery fails, the provider-and-host-grant fallback requires an owner decision about trusted launcher packages; do not silently restore an exported provider or reduce widget content.
 
 | Constant | Value | File | Purpose |
 |---|---|---|---|
@@ -136,3 +139,4 @@ The widget owns no table, migration, or per-instance state. It reads the Dashboa
 | 2026-09-02 | 25 | Repointed tiles to Favorites population Default order and made the favourites deep link safely reset Home. |
 | 2026-09-02 | 28 | Documented one post-commit refresh for Dashboard bulk batches. |
 | 2026-09-02 | 31 | Verified and restored consumed-once widget Reach Out handling through the rebuilt Profile controller. |
+| 2026-09-23 | 38.2 | Patched `security/AUD-SEC-001` / RG-001: inline light/dark widget bitmaps, removed the exported snapshot provider, and delete stale private snapshots on render; Pixel rendering proof follows in Plan 16. |
