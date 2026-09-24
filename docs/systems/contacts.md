@@ -345,3 +345,4 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 | 2026-09-17 | 37.1 | Added mutable single-category assignment with stale-target validation and atomic delete reassignment to a survivor or Uncategorized. |
 | 2026-09-02 | 33 | Documented owner-accepted archived participation, Group Event parent survival on purge, and lossless same-event merge refusal. |
 | 2026-09-02 | 34 | Made Add Contact progressively disclosed, made no-cadence creation Unbound, and composed complete-edit knowledge diffs in the atomic contact writer. |
+| 2026-09-23 | 38.2 | Recorded full-editor Bind/Unbind events in the contact transaction and advanced Edit Contact knowledge/link baselines from committed write returns, preserving safe retries after partial saves. |

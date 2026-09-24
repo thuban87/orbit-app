@@ -302,11 +302,13 @@ function diffKnowledgeCollection<TRow extends { id?: number }, TAdd, TEdit>(
   }
 
   const add: TAdd[] = [];
+  const addTempIds: number[] = [];
   const edit: TEdit[] = [];
   const draftIds = new Set<number>();
   for (const row of draft) {
     if (row.id == null) {
       add.push(toAdd(row));
+      if (row.id !== undefined) addTempIds.push(row.id);
       continue;
     }
     draftIds.add(row.id);
@@ -314,6 +316,7 @@ function diffKnowledgeCollection<TRow extends { id?: number }, TAdd, TEdit>(
     if (seeded === undefined) {
       // An id with no seeded match (should not happen) — treat as a new add.
       add.push(toAdd(row));
+      if (row.id !== undefined) addTempIds.push(row.id);
       continue;
     }
     if (rowSignature(seeded) !== rowSignature(row)) {
@@ -330,6 +333,7 @@ function diffKnowledgeCollection<TRow extends { id?: number }, TAdd, TEdit>(
     return undefined;
   const result: KnowledgeCollectionDiff<TAdd, TEdit> = {};
   if (add.length > 0) result.add = add;
+  if (addTempIds.length > 0) result.addTempIds = addTempIds;
   if (edit.length > 0) result.edit = edit;
   if (del.length > 0) result.delete = del;
   return result;

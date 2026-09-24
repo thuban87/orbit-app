@@ -33,6 +33,7 @@ import {
   setContactCategoryCore,
   setContactFrequencyCore,
   updateContactFull,
+  updateContactMetadataCore,
 } from "@/db/contacts-dao";
 import { getCurrentStateValue } from "@/db/current-state-history-read";
 import { readDataRevision } from "@/db/data-revision-dao";
@@ -109,6 +110,17 @@ describe("updateContactFull — Profile inheritance boundary", () => {
 });
 
 describe("updateContactFull — lifecycle event and committed returns", () => {
+  it("leaves shared metadata-core callers free of lifecycle events", async () => {
+    const { contactId } = await createContactFull(exec, {
+      uid: uid(), name: "A", intervalDays: 30, trackingEnabled: false, now: NOW,
+    });
+    await inWriteTransaction(exec, () => updateContactMetadataCore(exec, {
+      id: contactId, name: "A", intervalDays: 30, trackingEnabled: true,
+      rarelyResponds: 0, remindersOff: 0, now: NOW,
+    }));
+    expect(await exec.getAllAsync("SELECT id FROM events WHERE contact_id = ?", [contactId])).toEqual([]);
+  });
+
   it("records one bind or unbind event only on a full-editor transition", async () => {
     const { contactId } = await createContactFull(exec, { uid: uid(), name: "A", intervalDays: 30, trackingEnabled: false, now: NOW });
     const base = { id: contactId, name: "A", intervalDays: 30, rarelyResponds: 0, remindersOff: 0, now: NOW };
@@ -140,6 +152,7 @@ describe("updateContactFull — lifecycle event and committed returns", () => {
       memories: { add: [{ type: "general", value: "Tea" }, { type: "general", value: "Tea" }] },
       relationships: { add: [{ personName: "Sam" }] },
       offLimits: { add: [{ kind: "off_limits", text: "Private" }] },
+      currentStateEntries: [{ fieldKey: "last_talked_about", value: "Plans" }],
     });
     expect(result.addedIds.memories).toHaveLength(2);
     expect(new Set(result.addedIds.memories).size).toBe(2);
@@ -147,6 +160,9 @@ describe("updateContactFull — lifecycle event and committed returns", () => {
     expect(result.memories).toEqual(await listMemoriesForContact(exec, contactId));
     expect(result.relationships).toEqual(await listRelationshipsForContact(exec, contactId));
     expect(result.offLimits).toEqual((await listFuelForEditor(exec, contactId)).filter((row) => row.kind === "off_limits"));
+    expect(result.currentState.last_talked_about).toEqual(
+      await getCurrentStateValue(exec, contactId, "last_talked_about"),
+    );
   });
 });
 

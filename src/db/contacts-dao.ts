@@ -418,6 +418,8 @@ export interface KnowledgeDeleteRef {
  */
 export interface KnowledgeCollectionDiff<TAdd, TEdit> {
   add?: TAdd[];
+  /** Synthetic draft ids parallel to `add`, for committed-id remapping only. */
+  addTempIds?: number[];
   edit?: TEdit[];
   delete?: KnowledgeDeleteRef[];
 }
@@ -791,12 +793,10 @@ export function updateContactFull(
     // suppressed — so a knowledge-only edit and an unchanged-method edit both advance
     // backup-freshness by EXACTLY 1, and no path double-bumps.
     await bumpDataRevisionCore(exec);
-    const [memories, relationships, fuel, currentState] = await Promise.all([
-      listMemoriesForContact(exec, input.id),
-      listRelationshipsForContact(exec, input.id),
-      listFuelForEditor(exec, input.id),
-      getCurrentStateValues(exec, input.id),
-    ]);
+    const memories = await listMemoriesForContact(exec, input.id);
+    const relationships = await listRelationshipsForContact(exec, input.id);
+    const fuel = await listFuelForEditor(exec, input.id);
+    const currentState = await getCurrentStateValues(exec, input.id);
     return {
       methods: methodSaveResult?.methods ?? [], methodSaveResult,
       memories, relationships,

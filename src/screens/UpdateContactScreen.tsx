@@ -701,6 +701,7 @@ function CustomFieldFocusedEditor({
 
   useEffect(() => {
     let cancelled = false;
+    setSeedReady(false);
     void getValuesForContact(getExecutor(), contactId, [def])
       .then((values) => {
         if (!cancelled) {

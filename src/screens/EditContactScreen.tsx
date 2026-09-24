@@ -103,6 +103,7 @@ import {
   listCategories,
 } from "@/db/contact-read";
 import { updateContactFull } from "@/db/contacts-dao";
+import { runEditContactSave, type EditContactBaselines } from "./edit-contact-save-coordinator";
 import { getCurrentStateValues } from "@/db/current-state-history-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { listDefs } from "@/db/field-defs-dao";
@@ -416,6 +417,7 @@ export function EditContactScreen({
   const [initialTrackingEnabled, setInitialTrackingEnabled] = useState(true);
   const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [stale, setStale] = useState(false);
   const [effectivePhoneRegion, setEffectivePhoneRegion] = useState<
     string | null
   >(getDeviceRegion());
@@ -431,6 +433,8 @@ export function EditContactScreen({
   // the photo without reseeding — and discarding — unsaved form edits.
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoModifiedAt, setPhotoModifiedAt] = useState<string | undefined>();
+  const formRef = useRef<EditFormState | null>(null);
+  const linksDraftRef = useRef<LinkDraft[]>([]);
   // The custom-field values actually COMMITTED to the DB — seeded pre-edit, and
   // updated on a successful Save. The teardown reconcile (below) deletes only the
   // staged cv- files this session persisted that NO committed value references, so
@@ -501,7 +505,7 @@ export function EditContactScreen({
   // returns NONE of these, so each needs its OWN explicit read. Off Limits is
   // FILTERED to `kind === "off_limits"` here (listFuelForEditor returns every kind
   // — a DATA-LOSS guard, Review cycle-4 MEDIUM #3). Used by initial hydration AND
-  // the links-failure partial reseed.
+  // initial hydration. Later saves advance from their transactional returns.
   const readKnowledgeSeeds = useCallback(async (): Promise<KnowledgeSeeds> => {
     const exec = getExecutor();
     const [memoryRows, relationshipRows, fuelRows, currentValues] =
@@ -589,6 +593,7 @@ export function EditContactScreen({
       setSeededOffLimits(knowledge.offLimits);
       setSeededCurrentState(knowledge.currentState);
       setForm(nextForm);
+      setStale(false);
       setInitialTrackingEnabled(result.contact.trackingEnabled === 1);
       setEffectivePhoneRegion(nextPhoneRegion);
       seedInputRef.current = editInputSignature(nextForm, {
@@ -848,78 +853,66 @@ export function EditContactScreen({
   }, []);
 
   const savable = useMemo(
-    () => form !== null && canSave(form) && !saving,
-    [form, saving],
+    () => form !== null && canSave(form) && !saving && !stale,
+    [form, saving, stale],
   );
+  formRef.current = form;
+  linksDraftRef.current = linksDraft;
 
-  // Re-seed the metadata form AND every knowledge subdomain from the just-committed
-  // rows after a partial save (links failed but metadata+knowledge committed) — so
-  // the user never sees a stale or rolled-back view and a retry neither re-adds
-  // already-persisted knowledge rows nor mis-detects them. Deliberately leaves
-  // `linksDraft` INTACT for retry. The off-limits re-read stays FILTERED to
-  // `kind === "off_limits"` (same DATA-LOSS guard as the initial seed).
-  async function reseedMetadataAfterPartialSave() {
-    try {
-      const exec = getExecutor();
-      const defs = await listDefs(exec, { includeQuarantined: false });
-      const [result, knowledge] = await Promise.all([
-        getContactForEdit(exec, contactId, defs),
-        readKnowledgeSeeds(),
-      ]);
-      if (result) {
-        const nextEditDefs = defsForEditForm(defs);
-        const nextNeverContacted = isNeverContacted(result);
-        const nextForm: EditFormState = {
-          ...seedEditState(result),
-          memories: knowledge.memories,
-          relationships: knowledge.relationships,
-          offLimits: knowledge.offLimits,
-          lastTalkedAbout: knowledge.currentState.last_talked_about ?? "",
-          currentLocation: knowledge.currentState.current_location ?? "",
-        };
-        memoryAllowAiRef.current = knowledge.memoryAllowAi;
-        relationshipLinkedNamesRef.current = knowledge.relationshipLinkedNames;
-        setEditDefs(nextEditDefs);
-        setNeverContacted(nextNeverContacted);
-        setSeededMemories(knowledge.memories);
-        setSeededRelationships(knowledge.relationships);
-        setSeededOffLimits(knowledge.offLimits);
-        setSeededCurrentState(knowledge.currentState);
-        setForm(nextForm);
-        committedValuesRef.current = { ...result.values };
-        seedInputRef.current = editInputSignature(nextForm, {
-          contactId,
-          editDefs: nextEditDefs,
-          neverContacted: nextNeverContacted,
-          effectivePhoneRegion,
-          seededMemories: knowledge.memories,
-          seededRelationships: knowledge.relationships,
-          seededOffLimits: knowledge.offLimits,
-          seededCurrentState: knowledge.currentState,
-        });
-        // seededLinks is unchanged: applyLinkDiff rolled back, so the DB links
-        // still equal the original baseline — keep it as the retry diff baseline.
-      }
-    } catch (err) {
-      Logger.error(LOG_SCOPE, "failed to re-seed after partial save", err);
-    }
+  function applyCommittedBaseline(
+    baseline: EditContactBaselines,
+    submittedForm: EditFormState,
+    methods: Awaited<ReturnType<typeof updateContactFull>>["methods"],
+  ) {
+    const committedMethods = seedMethodGroups({
+      phone: methods.filter((method) => method.method_type === "phone"),
+      email: methods.filter((method) => method.method_type === "email"),
+    });
+    setSeededMemories(baseline.memories);
+    setSeededRelationships(baseline.relationships);
+    setSeededOffLimits(baseline.offLimits);
+    setSeededCurrentState(baseline.currentState);
+    setSeededLinks(baseline.links);
+    setLinksDraft(baseline.linksDraft);
+    setForm({
+      ...baseline.form,
+      methods: JSON.stringify(baseline.form.methods) === JSON.stringify(submittedForm.methods)
+        ? committedMethods
+        : baseline.form.methods,
+    });
+    setNeverContacted(baseline.neverContacted);
+    setInitialTrackingEnabled(baseline.initialTrackingEnabled);
+    committedValuesRef.current = { ...submittedForm.values };
+    const committedForm: EditFormState = {
+      ...submittedForm,
+      memories: baseline.memories,
+      relationships: baseline.relationships,
+      offLimits: baseline.offLimits,
+      lastTalkedAbout: baseline.currentState.last_talked_about ?? "",
+      currentLocation: baseline.currentState.current_location ?? "",
+      lastSpoke: baseline.neverContacted ? submittedForm.lastSpoke : { kind: "not-yet" },
+      methods: committedMethods,
+    };
+    seedInputRef.current = editInputSignature(committedForm, {
+      contactId,
+      editDefs,
+      neverContacted: baseline.neverContacted,
+      effectivePhoneRegion,
+      seededMemories: baseline.memories,
+      seededRelationships: baseline.relationships,
+      seededOffLimits: baseline.offLimits,
+      seededCurrentState: baseline.currentState,
+    });
   }
 
   async function handleSave() {
-    if (!form || saving) {
-      return;
-    }
-    // Blocking validation reveals + focuses the erroring accordion (via the tested
-    // resolveErrorSection resolver + the AccordionSection interface) rather than
-    // silently no-op'ing; the form state is preserved and no completion is shown
-    // (CAPT-14, dossier §AD).
+    if (!form || saving || stale) return;
     const blocking = collectEditBlockingErrors(form);
     if (blocking.length > 0) {
       const sectionId = resolveErrorSection(blocking, EDIT_SECTION_FIELD_MAP);
       if (sectionId) revealAndFocus(sectionId);
       return;
     }
-    const trimmed = form.name.trim();
     setSaving(true);
     try {
       const exec = getExecutor();
@@ -932,123 +925,88 @@ export function EditContactScreen({
       if (currentCategoryId !== form.categoryId) {
         setField("categoryId", currentCategoryId);
       }
-      // Duplicate-name warning fires on save (non-blocking), excluding self.
+      const trimmed = form.name.trim();
       if (await isDuplicateName(exec, trimmed, contactId)) {
-        if (!(await confirmDuplicate(trimmed))) {
-          return; // Cancel — nothing is written.
-        }
+        if (!(await confirmDuplicate(trimmed))) return;
       }
+      const submittedForm = { ...form, categoryId: currentCategoryId };
       const now = localDateTime();
+      const input = buildEditInput(submittedForm, {
+        now,
+        contactId,
+        interactionUid: newUid(),
+        editDefs,
+        neverContacted,
+        effectivePhoneRegion,
+        seededMemories,
+        seededRelationships,
+        seededOffLimits,
+        seededCurrentState,
+      });
       const lifecycleDirection =
-        form.trackingEnabled === initialTrackingEnabled
+        submittedForm.trackingEnabled === initialTrackingEnabled
           ? null
-          : form.trackingEnabled
-            ? "bind"
-            : "unbind";
-      const input = buildEditInput(
-        { ...form, categoryId: currentCategoryId },
-        {
-          now,
-          contactId,
-          interactionUid: newUid(),
-          editDefs,
-          neverContacted,
-          effectivePhoneRegion,
-          seededMemories,
-          seededRelationships,
-          seededOffLimits,
-          seededCurrentState,
+          : submittedForm.trackingEnabled ? "bind" : "unbind";
+      const outcome = await runEditContactSave({
+        exec,
+        input,
+        submittedForm,
+        getCurrentForm: () => formRef.current ?? submittedForm,
+        submittedLinks: buildLinksForDiff(linksDraft),
+        getCurrentLinks: () => buildLinksForDiff(linksDraftRef.current),
+        seededLinks,
+        seededMemories,
+        seededRelationships,
+        seededOffLimits,
+        initialTrackingEnabled,
+        neverContacted,
+        toMemoryDraft: memoryRowToDraftRow,
+        toRelationshipDraft: relationshipRowToDraftRow,
+        toOffLimitsDraft: fuelItemToDraftRow,
+        afterMetadataCommit: () => {
+          if (lifecycleDirection) {
+            void applyLifecycleTransitionEffects(contactId, lifecycleDirection, { exec });
+          } else {
+            void reconcileSchedule(exec).catch((error) =>
+              Logger.error(LOG_SCOPE, "reconcile after edit-save failed", error),
+            );
+            notifyWidgetDataChanged();
+          }
         },
-      );
-
-      // TWO-TRANSACTION BOUNDARY (by design): metadata + ALL knowledge subdomains
-      // (updateContactFull, one txn) and links (applyLinkDiff, second txn) are
-      // SEPARATE transactions, so link writes never bloat the metadata transaction.
-      // Metadata + knowledge FIRST.
-      let saveResult: Awaited<ReturnType<typeof updateContactFull>>;
-      try {
-        saveResult = await updateContactFull(exec, input);
-      } catch (err) {
-        // Metadata failed → NOTHING persisted. Generic save-failure copy.
-        Logger.error(LOG_SCOPE, "failed to save contact metadata", err);
+        refresh: async () => {
+          const result = await getContactForEdit(exec, contactId, editDefs);
+          if (!result) throw new Error("saved contact missing during refresh");
+        },
+      });
+      if (outcome.status === "metadataFailed") {
+        Logger.error(LOG_SCOPE, "failed to save contact metadata", outcome.error);
         Alert.alert("Couldn't save contact. Please try again.");
         return;
       }
-
-      // Custom values (incl. any cv- photo path) are now COMMITTED — update the
-      // orphan-cleanup baseline so the teardown reconcile keeps the saved photo.
-      committedValuesRef.current = { ...form.values };
-
-      // RECONCILE-AFTER-SAVE (review item B): reminders_off + interval_days are
-      // now persisted (updateContactFull committed above). After H5/A a future
-      // decay notification is pre-parked per eligible contact, so muting a contact
-      // or changing its interval must cancel/re-arm the OS schedule IMMEDIATELY —
-      // the launch-only reconcile would let the stale notification fire first
-      // (NOTIF-03). Fire-and-forget + Logger-guarded: it must NOT block the save or
-      // the navigation, and a stale/purged row or OS hiccup must not surface as an
-      // unhandled rejection. Placed here so it runs on a successful metadata commit
-      // even if the later links diff fails (the mute/interval change is already
-      // persisted). reconcileSchedule is self-coordinating (concurrent calls
-      // coalesce), and the app is alive here so channels exist — a full reconcile
-      // is safe, exactly as the settings-change reconcile does.
-      if (lifecycleDirection) {
-        void applyLifecycleTransitionEffects(contactId, lifecycleDirection, {
-          exec,
-        });
-      } else {
-        void reconcileSchedule(exec).catch((e) =>
-          Logger.error(LOG_SCOPE, "reconcile after edit-save failed", e),
-        );
-        notifyWidgetDataChanged();
-      }
-
-      // Metadata (incl. the first interaction) is now COMMITTED and last_contact
-      // is set. Clear the never-contacted first-interaction intent in LOCAL STATE
-      // immediately, independent of the links diff or any reseed. This is the
-      // load-bearing guard against re-emitting firstInteraction on a retry: if we
-      // instead relied on the best-effort reseedMetadataAfterPartialSave() below
-      // and that reseed itself threw, a retry would re-emit firstInteraction, the
-      // DAO would reject the double-log, and the form would wedge until remount.
-      if (neverContacted && input.firstInteraction) {
-        setNeverContacted(false);
-        setField("lastSpoke", { kind: "not-yet" });
-      }
-
-      // Metadata is COMMITTED. Now the links diff in its own transaction.
-      try {
-        await applyLinkDiff(exec, {
-          contactId,
-          seeded: seededLinks,
-          current: buildLinksForDiff(linksDraft),
-          now,
-        });
-      } catch (err) {
-        // PARTIAL SAVE: the links diff rolled back atomically, but the contact
-        // METADATA + KNOWLEDGE STAY COMMITTED. Do NOT show the generic "Couldn't
-        // save contact" copy (it would falsely imply nothing saved). Re-seed the
-        // metadata + knowledge from the committed rows, KEEP linksDraft for retry,
-        // and STAY on the form (no navigation).
-        Logger.error(LOG_SCOPE, "links save failed (metadata committed)", err);
-        await reseedMetadataAfterPartialSave();
+      applyCommittedBaseline(outcome.baseline, submittedForm, outcome.metadata.methods);
+      if (outcome.status === "linksFailed") {
+        Logger.error(LOG_SCOPE, "links save failed (metadata committed)", outcome.error);
         Alert.alert("Contact saved — some links couldn't be saved. Try again.");
         return;
       }
-
-      if (saveResult.methodSaveResult?.status === "canonicalDuplicate") {
-        setField(
-          "methods",
-          seedMethodGroups({
-            phone: saveResult.methods.filter(
-              (method) => method.method_type === "phone",
-            ),
-            email: saveResult.methods.filter(
-              (method) => method.method_type === "email",
-            ),
-          }),
-        );
+      if (outcome.status === "refreshFailed") {
+        setStale(true);
+        Logger.error(LOG_SCOPE, "saved contact refresh failed", outcome.error);
+        Alert.alert("Contact saved, but the form couldn't refresh. Reopen it before saving again.");
+        return;
+      }
+      if (outcome.status === "canonicalDuplicate") {
+        const duplicate = outcome.metadata.methodSaveResult;
+        if (duplicate?.status !== "canonicalDuplicate") {
+          throw new Error("canonical duplicate result missing method type");
+        }
+        setField("methods", seedMethodGroups({
+          phone: outcome.metadata.methods.filter((method) => method.method_type === "phone"),
+          email: outcome.metadata.methods.filter((method) => method.method_type === "email"),
+        }));
         setDuplicateHelper({
-          type: saveResult.methodSaveResult.methodType,
-          copy: canonicalDuplicateCopy(saveResult.methodSaveResult.methodType),
+          type: duplicate.methodType,
+          copy: canonicalDuplicateCopy(duplicate.methodType),
         });
         return;
       }
