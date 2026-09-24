@@ -23,10 +23,10 @@
  * All colours via `useTheme().colors.*` (check:colors); 44px touch targets; copy
  * verbatim from the 05-UI-SPEC Copywriting Contract.
  */
-import { useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import * as ImagePicker from "expo-image-picker";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -37,6 +37,7 @@ import {
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
+import { runUrlSubmit } from "@/components/photo-url-submit";
 import {
   clearContactPhotoCore,
   getContactPhotoIdentity,
@@ -54,11 +55,7 @@ import {
   type PhotoTargetDescriptor,
   profilePhotoRelPath,
 } from "@/services/photos/photo-storage";
-import {
-  downloadImageToCache,
-  isImageUrl,
-  UrlImageError,
-} from "@/services/photos/url-image";
+import { isImageUrl } from "@/services/photos/url-image";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { markPhotoStaged } from "@/stores/photo-result-store";
 import { useTheme } from "@/theme";
@@ -120,6 +117,13 @@ export function PhotoSourcePicker({
   const [urlEntryOpen, setUrlEntryOpen] = useState(false);
   const [urlText, setUrlText] = useState("");
   const [submittingUrl, setSubmittingUrl] = useState(false);
+  const urlController = useRef<AbortController | null>(null);
+  const abortUrl = useCallback(() => {
+    urlController.current?.abort();
+    urlController.current = null;
+  }, []);
+  useEffect(() => abortUrl, [abortUrl]);
+  useFocusEffect(useCallback(() => abortUrl, [abortUrl]));
 
   // Stable recycling identity for the preview Avatar across the three kinds.
   const avatarId =
@@ -228,6 +232,9 @@ export function PhotoSourcePicker({
       return;
     }
     setSubmittingUrl(true);
+    abortUrl();
+    const controller = new AbortController();
+    urlController.current = controller;
     try {
       const contactUid =
         target.kind === "profile"
@@ -236,27 +243,46 @@ export function PhotoSourcePicker({
             undefined);
       if (target.kind !== "profile" && !contactUid)
         throw new Error("contact photo target missing");
-      const rawUri = await downloadImageToCache(url);
-      navigation.navigate("CropPhoto", {
-        rawUri,
-        target,
-        contactUid,
-        requestId:
-          target.kind === "customField"
-            ? customFieldPhotoRelPath(target.contactId, target.colName)
-            : undefined,
+      if (controller.signal.aborted) return;
+      const result = await runUrlSubmit({
+        url,
+        signal: controller.signal,
+        navigate: (rawUri) =>
+          navigation.navigate("CropPhoto", {
+            rawUri,
+            target,
+            contactUid,
+            requestId:
+              target.kind === "customField"
+                ? customFieldPhotoRelPath(target.contactId, target.colName)
+                : undefined,
+          }),
       });
+      if (result.status === "aborted") return;
+      if (result.status === "error") throw result.cause;
+      if (controller.signal.aborted) return;
       // Collapse the entry on a successful hand-off to the crop screen.
       setUrlEntryOpen(false);
       setUrlText("");
     } catch (err) {
+      if (controller.signal.aborted) return;
       Logger.error(LOG_SCOPE, "failed to download image from url", err);
-      if (err instanceof UrlImageError && err.kind === "network") {
+      if (
+        err &&
+        typeof err === "object" &&
+        "kind" in err &&
+        err.kind === "network"
+      ) {
         Alert.alert(
           "Couldn't fetch that image.",
           "Check your connection or try a different link.",
         );
-      } else if (err instanceof UrlImageError && err.kind === "invalid") {
+      } else if (
+        err &&
+        typeof err === "object" &&
+        "kind" in err &&
+        err.kind === "invalid"
+      ) {
         Alert.alert(
           "That doesn't look like an image URL.",
           "Check the link and try again.",
@@ -266,9 +292,10 @@ export function PhotoSourcePicker({
         Alert.alert("That image couldn't be used.", "Try a JPEG or PNG.");
       }
     } finally {
-      setSubmittingUrl(false);
+      if (urlController.current === controller) urlController.current = null;
+      if (!controller.signal.aborted) setSubmittingUrl(false);
     }
-  }, [submittingUrl, urlText, navigation, target]);
+  }, [submittingUrl, urlText, navigation, target, abortUrl]);
 
   const hasPhoto = photo != null;
 

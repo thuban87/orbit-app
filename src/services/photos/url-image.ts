@@ -63,6 +63,7 @@ const CACHE_SUBDIR = "photo-dl";
  * the cap (H1) — never by buffering the whole body into memory.
  */
 const MAX_DOWNLOAD_BYTES = 8 * 1024 * 1024; // 8 MB
+const DOWNLOAD_DEADLINE_MS = 45_000;
 
 /**
  * Content-Type MIME → file extension. RASTER-ONLY: this map is the accepted set
@@ -241,17 +242,15 @@ async function readCappedStream(
 async function downloadCappedToFile(
   finalUrl: string,
   dest: File,
+  signal: AbortSignal,
 ): Promise<void> {
+  if (signal.aborted) throw new DOMException("Aborted", "AbortError");
   const downloaded = await File.downloadFileAsync(finalUrl, dest, {
     idempotent: true,
+    signal,
   });
+  if (signal.aborted) throw new DOMException("Aborted", "AbortError");
   if (downloaded.size > MAX_DOWNLOAD_BYTES) {
-    try {
-      downloaded.delete();
-    } catch {
-      // Best-effort: the cache subdir is evictable, so a stray oversized file is
-      // reclaimed by the OS even if this delete fails.
-    }
     throw new UrlImageError(
       "content",
       `download exceeds ${MAX_DOWNLOAD_BYTES}-byte cap (native)`,
@@ -277,125 +276,173 @@ async function downloadCappedToFile(
  *
  * @throws {UrlImageError} with the `kind` the UI maps to the 05-UI-SPEC copy.
  */
-export async function downloadImageToCache(url: string): Promise<string> {
-  // (1) Submitted-scheme allowlist.
-  if (!isImageUrl(url)) {
-    throw new UrlImageError(
-      "invalid",
-      `not an https url: ${JSON.stringify(url)}`,
-    );
-  }
-
-  // (2) Fetch (follows redirects). Only a genuine transport failure is `network`.
-  let response: Response;
+export async function downloadImageToCache(
+  url: string,
+  opts?: { signal?: AbortSignal },
+): Promise<string> {
+  let controller = new AbortController();
+  const onAbort = () => controller.abort();
+  opts?.signal?.addEventListener("abort", onAbort, { once: true });
+  if (opts?.signal?.aborted) controller.abort();
+  const timer = setTimeout(() => controller.abort(), DOWNLOAD_DEADLINE_MS);
+  let succeeded = false;
+  let destFile: File | undefined;
+  const aborted = () => new UrlImageError("network", "image download aborted");
   try {
-    response = await fetch(url);
-  } catch (error) {
-    Logger.error(LOG_SCOPE, `fetch failed for ${url}`, error);
-    throw new UrlImageError("network", "image fetch failed", { cause: error });
-  }
+    // (1) Submitted-scheme allowlist.
+    if (!isImageUrl(url)) {
+      throw new UrlImageError(
+        "invalid",
+        `not an https url: ${JSON.stringify(url)}`,
+      );
+    }
 
-  // (3) Re-validate the REDIRECT-RESOLVED final url is STILL https. `response.url`
-  //     is the final url after any redirects — a redirect to http/file/another
-  //     scheme is rejected here (the submitted-scheme check alone cannot see it).
-  //     UNCONDITIONAL (M2): an empty/blank `response.url` (some RN fetch runtimes
-  //     report `""`) FAILS CLOSED rather than skipping the re-check — never accept
-  //     a final url the runtime cannot expose and re-validate.
-  if (!isImageUrl(response.url)) {
-    throw new UrlImageError(
-      "invalid",
-      `redirect resolved to a non-https / unverifiable url: ${JSON.stringify(response.url)}`,
-    );
-  }
+    // (2) Fetch (follows redirects). Only a genuine transport failure is `network`.
+    let response: Response;
+    try {
+      response = await fetch(url, { signal: controller.signal });
+    } catch (error) {
+      if (controller.signal.aborted) throw aborted();
+      Logger.error(LOG_SCOPE, `fetch failed for ${url}`, error);
+      throw new UrlImageError("network", "image fetch failed", {
+        cause: error,
+      });
+    }
 
-  // (4) HTTP status.
-  if (!response.ok) {
-    throw new UrlImageError("network", `http ${response.status}`);
-  }
+    // (3) Re-validate the REDIRECT-RESOLVED final url is STILL https. `response.url`
+    //     is the final url after any redirects — a redirect to http/file/another
+    //     scheme is rejected here (the submitted-scheme check alone cannot see it).
+    //     UNCONDITIONAL (M2): an empty/blank `response.url` (some RN fetch runtimes
+    //     report `""`) FAILS CLOSED rather than skipping the re-check — never accept
+    //     a final url the runtime cannot expose and re-validate.
+    if (!isImageUrl(response.url)) {
+      throw new UrlImageError(
+        "invalid",
+        `redirect resolved to a non-https / unverifiable url: ${JSON.stringify(response.url)}`,
+      );
+    }
 
-  // (5) content-type must be in the finite RASTER allowlist (M3) — not just an
-  //     `image/*` family prefix (which would admit SVG/TIFF/AVIF and unknown
-  //     subtypes). Only JPEG/PNG/WebP, which the downstream manipulator decodes.
-  const contentType = response.headers.get("content-type") ?? "";
-  if (!isAcceptedRasterContentType(contentType)) {
+    // (4) HTTP status.
+    if (!response.ok) {
+      throw new UrlImageError("network", `http ${response.status}`);
+    }
+
+    // (5) content-type must be in the finite RASTER allowlist (M3) — not just an
+    //     `image/*` family prefix (which would admit SVG/TIFF/AVIF and unknown
+    //     subtypes). Only JPEG/PNG/WebP, which the downstream manipulator decodes.
+    const contentType = response.headers.get("content-type") ?? "";
+    if (!isAcceptedRasterContentType(contentType)) {
+      throw new UrlImageError(
+        "content",
+        `content-type not in the raster allowlist: ${JSON.stringify(contentType)}`,
+      );
+    }
+    const ext = extFromContentType(contentType);
+
+    // (6) Prepare the evictable cache destination (never the document dir).
+    try {
+      new Directory(Paths.cache, CACHE_SUBDIR).create({
+        intermediates: true,
+        idempotent: true,
+      });
+      destFile = new File(
+        Paths.cache,
+        CACHE_SUBDIR,
+        `download-${Date.now()}.${ext}`,
+      );
+    } catch (error) {
+      Logger.error(LOG_SCOPE, `cache dir prep failed for ${url}`, error);
+      throw new UrlImageError("content", "could not prepare download cache", {
+        cause: error,
+      });
+    }
+
+    // (7) Transfer the body under the byte cap, MEMORY-SAFELY (H1). Three cases:
+    //   - readable stream available -> stream + abort at the cap (never fully buffered);
+    //   - no stream but a native downloader -> stream to disk, then stat + delete-if-over-cap;
+    //   - NEITHER -> FAIL CLOSED. We NEVER `arrayBuffer()` an unbounded body behind a
+    //     spoofable content-length (the OOM this replaces).
+    const reader = response.body?.getReader?.();
+    if (reader) {
+      let bytes: Uint8Array;
+      try {
+        bytes = await readCappedStream(reader);
+      } catch (error) {
+        if (controller.signal.aborted) throw aborted();
+        if (error instanceof UrlImageError) {
+          throw error; // over-cap → surface the `content` kind unchanged.
+        }
+        Logger.error(LOG_SCOPE, `stream read failed for ${url}`, error);
+        throw new UrlImageError("content", "could not read downloaded image", {
+          cause: error,
+        });
+      }
+      if (controller.signal.aborted) throw aborted();
+      try {
+        destFile.create({ overwrite: true });
+        destFile.write(bytes);
+      } catch (error) {
+        try {
+          destFile.delete();
+        } catch {
+          /* best effort */
+        }
+        Logger.error(LOG_SCOPE, `cache write failed for ${url}`, error);
+        throw new UrlImageError("content", "could not write downloaded image", {
+          cause: error,
+        });
+      }
+      if (controller.signal.aborted) {
+        try {
+          destFile.delete();
+        } catch {
+          /* best effort */
+        }
+        throw aborted();
+      }
+      succeeded = true;
+      return destFile.uri;
+    }
+
+    if (typeof File.downloadFileAsync === "function") {
+      // No readable stream: download the already-validated final url natively to
+      // disk (memory-safe), then stat + delete-if-over-cap inside the helper.
+      // The first fetch has finished serving its policy role; stop its transfer.
+      const fetchController = controller;
+      controller = new AbortController();
+      if (opts?.signal?.aborted) controller.abort();
+      fetchController.abort();
+      try {
+        await downloadCappedToFile(response.url, destFile, controller.signal);
+        if (controller.signal.aborted) throw aborted();
+      } catch (error) {
+        try {
+          destFile.delete();
+        } catch {
+          /* best effort */
+        }
+        if (controller.signal.aborted) throw aborted();
+        if (error instanceof UrlImageError) {
+          throw error; // over-cap → surface the `content` kind unchanged.
+        }
+        Logger.error(LOG_SCOPE, `native download failed for ${url}`, error);
+        throw new UrlImageError("content", "could not download image", {
+          cause: error,
+        });
+      }
+      succeeded = true;
+      return destFile.uri;
+    }
+
+    // Neither a readable stream NOR a native downloader is available: FAIL CLOSED.
+    // Buffering an unbounded body into the JS heap is never an option.
     throw new UrlImageError(
       "content",
-      `content-type not in the raster allowlist: ${JSON.stringify(contentType)}`,
+      "no memory-safe download path available (no readable stream, no native downloader)",
     );
+  } finally {
+    clearTimeout(timer);
+    opts?.signal?.removeEventListener("abort", onAbort);
+    if (!succeeded) controller.abort();
   }
-  const ext = extFromContentType(contentType);
-
-  // (6) Prepare the evictable cache destination (never the document dir).
-  let destFile: File;
-  try {
-    new Directory(Paths.cache, CACHE_SUBDIR).create({
-      intermediates: true,
-      idempotent: true,
-    });
-    destFile = new File(
-      Paths.cache,
-      CACHE_SUBDIR,
-      `download-${Date.now()}.${ext}`,
-    );
-  } catch (error) {
-    Logger.error(LOG_SCOPE, `cache dir prep failed for ${url}`, error);
-    throw new UrlImageError("content", "could not prepare download cache", {
-      cause: error,
-    });
-  }
-
-  // (7) Transfer the body under the byte cap, MEMORY-SAFELY (H1). Three cases:
-  //   - readable stream available -> stream + abort at the cap (never fully buffered);
-  //   - no stream but a native downloader -> stream to disk, then stat + delete-if-over-cap;
-  //   - NEITHER -> FAIL CLOSED. We NEVER `arrayBuffer()` an unbounded body behind a
-  //     spoofable content-length (the OOM this replaces).
-  const reader = response.body?.getReader?.();
-  if (reader) {
-    let bytes: Uint8Array;
-    try {
-      bytes = await readCappedStream(reader);
-    } catch (error) {
-      if (error instanceof UrlImageError) {
-        throw error; // over-cap → surface the `content` kind unchanged.
-      }
-      Logger.error(LOG_SCOPE, `stream read failed for ${url}`, error);
-      throw new UrlImageError("content", "could not read downloaded image", {
-        cause: error,
-      });
-    }
-    try {
-      destFile.create({ overwrite: true });
-      destFile.write(bytes);
-    } catch (error) {
-      Logger.error(LOG_SCOPE, `cache write failed for ${url}`, error);
-      throw new UrlImageError("content", "could not write downloaded image", {
-        cause: error,
-      });
-    }
-    return destFile.uri;
-  }
-
-  if (typeof File.downloadFileAsync === "function") {
-    // No readable stream: download the already-validated final url natively to
-    // disk (memory-safe), then stat + delete-if-over-cap inside the helper.
-    try {
-      await downloadCappedToFile(response.url, destFile);
-    } catch (error) {
-      if (error instanceof UrlImageError) {
-        throw error; // over-cap → surface the `content` kind unchanged.
-      }
-      Logger.error(LOG_SCOPE, `native download failed for ${url}`, error);
-      throw new UrlImageError("content", "could not download image", {
-        cause: error,
-      });
-    }
-    return destFile.uri;
-  }
-
-  // Neither a readable stream NOR a native downloader is available: FAIL CLOSED.
-  // Buffering an unbounded body into the JS heap is never an option.
-  throw new UrlImageError(
-    "content",
-    "no memory-safe download path available (no readable stream, no native downloader)",
-  );
 }

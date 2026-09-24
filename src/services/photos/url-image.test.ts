@@ -23,6 +23,8 @@ const fs = vi.hoisted(() => ({
       ) => Promise<{ uri: string; size: number; delete: () => void }>),
   deleted: [] as string[],
   written: [] as { uri: string; byteLength: number }[],
+  failWrite: false,
+  failCreate: false,
 }));
 
 vi.mock("expo-file-system", () => {
@@ -36,7 +38,9 @@ vi.mock("expo-file-system", () => {
     constructor(...parts: unknown[]) {
       this.uri = joinUri(parts);
     }
-    create(): void {}
+    create(): void {
+      if (fs.failCreate) throw new Error("cache unavailable");
+    }
   }
   class File {
     uri: string;
@@ -48,6 +52,7 @@ vi.mock("expo-file-system", () => {
     }
     create(): void {}
     write(bytes: Uint8Array): void {
+      if (fs.failWrite) throw new Error("write failed");
       fs.written.push({ uri: this.uri, byteLength: bytes.byteLength });
     }
     delete(): void {
@@ -117,10 +122,114 @@ beforeEach(() => {
   fs.downloadFileAsync = undefined;
   fs.deleted = [];
   fs.written = [];
+  fs.failWrite = false;
+  fs.failCreate = false;
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
+});
+
+describe("transfer ownership", () => {
+  it.each([
+    ["final URL", makeResponse({ url: "http://example.com/a" })],
+    ["non-2xx", makeResponse({ ok: false })],
+    ["MIME", makeResponse({ contentType: "text/html" })],
+  ])("aborts fetch after %s rejection", async (_, response) => {
+    let signal!: AbortSignal;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, opts: { signal: AbortSignal }) => {
+        signal = opts.signal;
+        return response;
+      }),
+    );
+    await expect(
+      downloadImageToCache("https://example.com/a"),
+    ).rejects.toBeInstanceOf(Error);
+    expect(signal.aborted).toBe(true);
+  });
+
+  it("aborts fetch on cache preparation failure", async () => {
+    fs.failCreate = true;
+    let signal!: AbortSignal;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, opts: { signal: AbortSignal }) => {
+        signal = opts.signal;
+        return makeResponse({});
+      }),
+    );
+    await expect(
+      downloadImageToCache("https://example.com/a"),
+    ).rejects.toBeInstanceOf(Error);
+    expect(signal.aborted).toBe(true);
+  });
+
+  it("deletes a partial file on write failure", async () => {
+    fs.failWrite = true;
+    stubFetch(makeResponse({ reader: makeChunkReader(1, 1) }));
+    await expect(
+      downloadImageToCache("https://example.com/a"),
+    ).rejects.toBeInstanceOf(Error);
+    expect(fs.deleted).toHaveLength(1);
+  });
+
+  it("cancels the second native transfer on caller abort", async () => {
+    const caller = new AbortController();
+    let nativeSignal!: AbortSignal;
+    fs.downloadFileAsync = vi.fn(async (_url, _dest, opts) => {
+      nativeSignal = (opts as { signal: AbortSignal }).signal;
+      caller.abort();
+      throw new DOMException("aborted", "AbortError");
+    });
+    stubFetch(makeResponse({}));
+    await expect(
+      downloadImageToCache("https://example.com/a", { signal: caller.signal }),
+    ).rejects.toBeInstanceOf(Error);
+    expect(nativeSignal.aborted).toBe(true);
+    expect(fs.deleted).toHaveLength(1);
+  });
+
+  it("cancels the second native transfer at the shared deadline", async () => {
+    vi.useFakeTimers();
+    let nativeSignal!: AbortSignal;
+    fs.downloadFileAsync = vi.fn(
+      (_url, _dest, opts) =>
+        new Promise<{ uri: string; size: number; delete: () => void }>(
+          (_, reject) => {
+            nativeSignal = (opts as { signal: AbortSignal }).signal;
+            nativeSignal.addEventListener(
+              "abort",
+              () => reject(new DOMException("aborted", "AbortError")),
+              { once: true },
+            );
+          },
+        ),
+    );
+    stubFetch(makeResponse({}));
+    const result = downloadImageToCache("https://example.com/a");
+    const assertion = expect(result).rejects.toMatchObject({ kind: "network" });
+    await vi.waitFor(() => expect(nativeSignal).toBeDefined());
+    await vi.advanceTimersByTimeAsync(45_000);
+    await assertion;
+    expect(nativeSignal.aborted).toBe(true);
+    expect(fs.deleted).toHaveLength(1);
+  });
+
+  it("discards a native transfer that resolves in the same tick as caller abort", async () => {
+    const caller = new AbortController();
+    fs.downloadFileAsync = vi.fn(async (_url, dest) => {
+      caller.abort();
+      return { uri: dest.uri, size: 1, delete: () => {} };
+    });
+    stubFetch(makeResponse({}));
+    await expect(
+      downloadImageToCache("https://example.com/a", { signal: caller.signal }),
+    ).rejects.toMatchObject({ kind: "network" });
+    expect(fs.deleted).toHaveLength(1);
+  });
 });
 
 describe("isImageUrl — https-only positive allowlist (T-05-02)", () => {
