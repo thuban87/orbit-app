@@ -63,6 +63,7 @@ import {
   listContactMethods,
 } from "@/db/contact-methods-dao";
 import { getContactHeader } from "@/db/contact-read";
+import { saveUserCustomValueEdit } from "@/db/custom-value-edit-dao";
 import { setCurrentStateValue } from "@/db/current-state-history-dao";
 import { getCurrentStateValue } from "@/db/current-state-history-read";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -71,7 +72,6 @@ import type { CustomFieldDef } from "@/db/field-types";
 import {
   defsForEditForm,
   getValuesForContact,
-  upsertValue,
 } from "@/db/field-values-dao";
 import { addFuel, deleteFuel, editFuel } from "@/db/fuel-dao";
 import { type FuelItem, listFuelForEditor } from "@/db/fuel-read";
@@ -696,35 +696,38 @@ function CustomFieldFocusedEditor({
   const [value, setValue] = useState<string | null>(null);
   const [error, setError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [seedReady, setSeedReady] = useState(false);
   const savingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     void getValuesForContact(getExecutor(), contactId, [def])
       .then((values) => {
-        if (!cancelled) setValue(values[def.col_name] ?? null);
+        if (!cancelled) {
+          setValue(values[def.col_name] ?? null);
+          setSeedReady(true);
+        }
       })
-      .catch((cause) =>
-        Logger.error(LOG_SCOPE, "failed to seed custom field value", cause),
-      );
+      .catch((cause) => {
+        Logger.error(LOG_SCOPE, "failed to seed custom field value", cause);
+        if (!cancelled) setError(true);
+      });
     return () => {
       cancelled = true;
     };
   }, [contactId, def]);
 
   const save = async () => {
-    if (!beginInFlight(savingRef)) return;
+    if (!seedReady || !beginInFlight(savingRef)) return;
     setSaving(true);
     setError(false);
     try {
-      await upsertValue(
-        getExecutor(),
+      await saveUserCustomValueEdit(getExecutor(), {
         contactId,
-        def.id,
-        newUid(),
+        fieldDefId: def.id,
         value,
-        localDateTime(),
-      );
+        now: localDateTime(),
+      });
       onSaved();
     } catch (cause) {
       Logger.error(LOG_SCOPE, "failed to save custom field value", cause);
@@ -750,7 +753,7 @@ function CustomFieldFocusedEditor({
       />
       <PrimaryButton
         label="Save"
-        disabled={saving}
+        disabled={saving || !seedReady}
         onPress={() => void save()}
       />
     </EditorFrame>

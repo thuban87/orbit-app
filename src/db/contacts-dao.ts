@@ -60,12 +60,10 @@ import {
   setCurrentStateValueCore,
 } from "@/db/current-state-history-dao";
 import { bumpDataRevisionCore } from "@/db/data-revision-dao";
+import { applyUserCustomValueEditCore } from "@/db/custom-value-edit-dao";
 import { recordEventCore } from "@/db/events-dao";
 import { listDefs } from "@/db/field-defs-dao";
-import {
-  assertContactScopedWriteAllowedCore,
-  upsertValueCore,
-} from "@/db/field-values-dao";
+import { upsertValueCore } from "@/db/field-values-dao";
 import { getCurrentStateValue } from "@/db/current-state-history-read";
 import {
   addFuelCore,
@@ -88,7 +86,6 @@ import {
   type EditRelationshipInput,
   type NewRelationshipInput,
 } from "@/db/relationships-dao";
-import { maybeAppendPriorValueHistoryCore } from "@/db/value-history-dao";
 import { assertSafeRelative } from "@/db/photo-relative-path";
 import {
   type FirstInteractionInput,
@@ -720,25 +717,12 @@ export function updateContactFull(
     // relevant to a missing pair's INSERT branch; an existing pair retains it.
     const customValues = input.customValues ?? [];
     for (const customValue of customValues) {
-      await assertContactScopedWriteAllowedCore(
-        exec,
-        input.id,
-        customValue.fieldDefId,
-      );
-      await maybeAppendPriorValueHistoryCore(exec, {
+      await applyUserCustomValueEditCore(exec, {
         contactId: input.id,
         fieldDefId: customValue.fieldDefId,
-        incomingValue: customValue.value,
+        value: customValue.value,
         now: input.now,
       });
-      await upsertValueCore(
-        exec,
-        input.id,
-        customValue.fieldDefId,
-        newUid(),
-        customValue.value,
-        input.now,
-      );
     }
 
     // FIRST-INTERACTION-ON-EDIT (owner ruling): honoured ONLY when the stored

@@ -51,9 +51,9 @@ export function upsertValue(
   now: string,
 ): Promise<void> {
   return inWriteTransaction(exec, async () => {
-    // Production edit history is composed in updateContactFull before this pure
-    // primitive overwrites a pair. Keeping this wrapper history-free preserves
-    // create-time null seeding and first-set semantics.
+    // User edits go through saveUserCustomValueEdit or
+    // applyUserCustomValueEditCore, which retain prior-value history. This
+    // primitive stays history-free for seeding and tests.
     await upsertValueCore(exec, contactId, fieldDefId, uid, value, now);
     await bumpDataRevisionCore(exec);
   });

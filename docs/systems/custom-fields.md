@@ -212,3 +212,4 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | 2026-09-02 | 31 | Added typed grouped custom-field and retained-history consumption to the coherent Profile snapshot. |
 | 2026-09-02 | 34 | Added Update Contact discovery of applicable named fields plus the generic Custom Fields value-edit path. |
 | 2026-09-02 | 36 | Added new-definition AI sharing defaults and contact/value-scoped permission review for field definitions. |
+| 2026-09-23 | 38.2 | Routed rapid and full user edits through one custom-value core so retained prior values and pair identity behave alike; rapid unchanged saves do not write. |
