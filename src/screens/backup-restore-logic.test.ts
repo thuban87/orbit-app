@@ -27,13 +27,18 @@ describe("restore preview route safety", () => {
   it("hands navigation only an opaque token and aggregate preview", () => {
     const cache = createRestorePreviewCache();
     const route = cache.store({
-      manifest: { private: "never routed" } as unknown as import("@/backup/types").BackupManifest,
+      manifest: {
+        private: "never routed",
+      } as unknown as import("@/backup/types").BackupManifest,
       preview,
     });
 
     expect(route).toEqual({ token: expect.any(String), preview });
     expect(Object.values(route).flat()).not.toContain("never routed");
-    expect(cache.read(route.token)).toMatchObject({ preview, manifest: { private: "never routed" } });
+    expect(cache.read(route.token)).toMatchObject({
+      preview,
+      manifest: { private: "never routed" },
+    });
   });
 
   it("treats an unresolvable process-death token as expired rather than stale preview data", () => {
@@ -43,7 +48,11 @@ describe("restore preview route safety", () => {
   });
 
   it("identifies only the encrypted envelope flag before requesting a passphrase", () => {
-    expect(isEncryptedBackupEnvelope('{"encrypted":true,"metadata":{"not":"shown"}}')).toBe(true);
+    expect(
+      isEncryptedBackupEnvelope(
+        '{"encrypted":true,"metadata":{"not":"shown"}}',
+      ),
+    ).toBe(true);
     expect(isEncryptedBackupEnvelope('{"encrypted":false}')).toBe(false);
     expect(isEncryptedBackupEnvelope("not json")).toBe(false);
   });
@@ -51,17 +60,20 @@ describe("restore preview route safety", () => {
   it("maps pre-preview validation errors to the calm documented recovery point", () => {
     expect(restorePreviewFailure("wrong-passphrase")).toEqual({
       step: "passphrase",
-      message: "That passphrase doesn't unlock this backup. Your local data hasn't changed.",
+      message:
+        "That passphrase doesn't unlock this backup. Your local data hasn't changed.",
       action: "Try passphrase again",
     });
     expect(restorePreviewFailure("damaged-or-incomplete")).toEqual({
       step: "selection",
-      message: "This backup is damaged or incomplete. Your local data hasn't changed.",
+      message:
+        "This backup is damaged or incomplete. Your local data hasn't changed.",
       action: "Choose another file",
     });
     expect(restorePreviewFailure("newer-app")).toEqual({
       step: "selection",
-      message: "This backup was made by a newer version of Orbit. Update Orbit, then try again. Your local data hasn't changed.",
+      message:
+        "This backup was made by a newer version of Orbit. Update Orbit, then try again. Your local data hasn't changed.",
       action: "Choose another file",
     });
   });
@@ -82,11 +94,15 @@ describe("restore apply decisions", () => {
   it("keeps a validated preview available while Replace-all awaits its confirmation", async () => {
     const cache = createRestorePreviewCache();
     const route = cache.store({
-      manifest: { private: "validated-before-confirmation" } as unknown as import("@/backup/types").BackupManifest,
+      manifest: {
+        private: "validated-before-confirmation",
+      } as unknown as import("@/backup/types").BackupManifest,
       preview,
     });
     let accept!: (accepted: boolean) => void;
-    const waitingForConfirmation = new Promise<boolean>((resolve) => { accept = resolve; });
+    const waitingForConfirmation = new Promise<boolean>((resolve) => {
+      accept = resolve;
+    });
 
     const result = confirmReplaceAllRestore(
       cache,
@@ -107,12 +123,20 @@ describe("restore apply decisions", () => {
     let readDestinationCalls = 0;
     let confirmationCalls = 0;
 
-    await expect(confirmReplaceAllRestore(
-      createRestorePreviewCache(),
-      "missing-token",
-      async () => { readDestinationCalls += 1; return true; },
-      async () => { confirmationCalls += 1; return true; },
-    )).resolves.toEqual({ status: "expired" });
+    await expect(
+      confirmReplaceAllRestore(
+        createRestorePreviewCache(),
+        "missing-token",
+        async () => {
+          readDestinationCalls += 1;
+          return true;
+        },
+        async () => {
+          confirmationCalls += 1;
+          return true;
+        },
+      ),
+    ).resolves.toEqual({ status: "expired" });
 
     expect(readDestinationCalls).toBe(0);
     expect(confirmationCalls).toBe(0);
@@ -121,23 +145,31 @@ describe("restore apply decisions", () => {
   it("cancels Replace-all without consuming its validated candidate", async () => {
     const cache = createRestorePreviewCache();
     const route = cache.store({
-      manifest: { private: "keep-after-cancel" } as unknown as import("@/backup/types").BackupManifest,
+      manifest: {
+        private: "keep-after-cancel",
+      } as unknown as import("@/backup/types").BackupManifest,
       preview,
     });
 
-    await expect(confirmReplaceAllRestore(
-      cache,
-      route.token,
-      async () => false,
-      async () => false,
-    )).resolves.toEqual({ status: "cancelled" });
-    expect(cache.read(route.token)).toMatchObject({ manifest: { private: "keep-after-cancel" } });
+    await expect(
+      confirmReplaceAllRestore(
+        cache,
+        route.token,
+        async () => false,
+        async () => false,
+      ),
+    ).resolves.toEqual({ status: "cancelled" });
+    expect(cache.read(route.token)).toMatchObject({
+      manifest: { private: "keep-after-cancel" },
+    });
   });
 
   it("shares one pending apply promise and never persists an applying state for a cold start", async () => {
     let calls = 0;
     let release: (() => void) | undefined;
-    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
     const apply = createRestoreApplySingleFlight(async () => {
       calls += 1;
       await pending;
@@ -152,24 +184,29 @@ describe("restore apply decisions", () => {
     await first;
   });
 
-  it("projects only committed aggregate totals into the result route", () => {
-    expect(toRestoreResultParams({
-      status: "applied",
-      mode: "replace-all",
-      inserted: 3,
-      updated: 2,
-      retained: 4,
-      deleted: 1,
-      blocked: 0,
-      photosNeedingAttention: 0,
-      photoCleanupPending: 0,
-      scheduleResyncPending: false,
-      preRestoreSnapshotCreated: true,
-    })).toEqual({
+  it("projects committed totals and recovery state into the result route", () => {
+    expect(
+      toRestoreResultParams({
+        status: "applied",
+        mode: "replace-all",
+        inserted: 3,
+        updated: 2,
+        retained: 4,
+        deleted: 1,
+        blocked: 0,
+        photosNeedingAttention: 2,
+        photoCleanupPending: 1,
+        scheduleResyncPending: true,
+        preRestoreSnapshotCreated: true,
+      }),
+    ).toEqual({
       added: 3,
       updated: 2,
       newerLocalKept: 4,
       deletionsApplied: 1,
+      photosNeedingAttention: 2,
+      photoCleanupPending: 1,
+      scheduleResyncPending: true,
       replaceSafetySnapshot: "verified",
     });
   });
@@ -177,8 +214,11 @@ describe("restore apply decisions", () => {
   it("keeps pre-commit apply failures on the preview with no optimistic result", () => {
     expect(restoreApplyRecovery("pre-restore-snapshot-failed")).toEqual({
       step: "preview",
-      message: "Couldn't restore this backup. Your local data hasn't changed. Please try again.",
+      message:
+        "Couldn't restore this backup. Your local data hasn't changed. Please try again.",
     });
-    expect(restoreApplyRecovery("incompatible-destination").step).toBe("preview");
+    expect(restoreApplyRecovery("incompatible-destination").step).toBe(
+      "preview",
+    );
   });
 });

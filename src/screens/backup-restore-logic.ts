@@ -74,42 +74,52 @@ export function isEncryptedBackupEnvelope(contents: string): boolean {
   try {
     const value: unknown = JSON.parse(contents);
     return Boolean(
-      value
-      && typeof value === "object"
-      && (value as Record<string, unknown>).encrypted === true,
+      value &&
+        typeof value === "object" &&
+        (value as Record<string, unknown>).encrypted === true,
     );
   } catch {
     return false;
   }
 }
 
-export function restorePreviewFailure(reason: RestorePreviewFailureReason): RestorePreviewFailure {
+export function restorePreviewFailure(
+  reason: RestorePreviewFailureReason,
+): RestorePreviewFailure {
   if (reason === "wrong-passphrase") {
     return {
       step: "passphrase",
-      message: "That passphrase doesn't unlock this backup. Your local data hasn't changed.",
+      message:
+        "That passphrase doesn't unlock this backup. Your local data hasn't changed.",
       action: "Try passphrase again",
     };
   }
   if (reason === "newer-app") {
     return {
       step: "selection",
-      message: "This backup was made by a newer version of Orbit. Update Orbit, then try again. Your local data hasn't changed.",
+      message:
+        "This backup was made by a newer version of Orbit. Update Orbit, then try again. Your local data hasn't changed.",
       action: "Choose another file",
     };
   }
   return {
     step: "selection",
-    message: "This backup is damaged or incomplete. Your local data hasn't changed.",
+    message:
+      "This backup is damaged or incomplete. Your local data hasn't changed.",
     action: "Choose another file",
   };
 }
 
-export function restoreApplyLabel(mode: RestoreMode): "Merge backup" | "Replace and restore" {
+export function restoreApplyLabel(
+  mode: RestoreMode,
+): "Merge backup" | "Replace and restore" {
   return mode === "merge" ? "Merge backup" : "Replace and restore";
 }
 
-export function replaceAllConfirmation(destinationConfigured: boolean): { title: string; message: string } {
+export function replaceAllConfirmation(destinationConfigured: boolean): {
+  title: string;
+  message: string;
+} {
   return {
     title: "Replace all local data?",
     message: destinationConfigured
@@ -118,7 +128,9 @@ export function replaceAllConfirmation(destinationConfigured: boolean): { title:
   };
 }
 
-export function createRestoreApplySingleFlight<T>(operation: () => Promise<T>): () => Promise<T> {
+export function createRestoreApplySingleFlight<T>(
+  operation: () => Promise<T>,
+): () => Promise<T> {
   let pending: Promise<T> | null = null;
   return () => {
     if (pending) return pending;
@@ -134,15 +146,23 @@ export function initialRestoreApplyState(): "idle" {
   return "idle";
 }
 
-export function toRestoreResultParams(result: Extract<RestoreApplyResult, { status: "applied" }>) {
+export function toRestoreResultParams(
+  result: Extract<RestoreApplyResult, { status: "applied" }>,
+) {
   return {
     added: result.inserted,
     updated: result.updated,
     newerLocalKept: result.retained,
     deletionsApplied: result.deleted,
-    replaceSafetySnapshot: result.mode === "replace-all"
-      ? (result.preRestoreSnapshotCreated ? "verified" as const : "not-configured" as const)
-      : null,
+    photosNeedingAttention: result.photosNeedingAttention,
+    photoCleanupPending: result.photoCleanupPending,
+    scheduleResyncPending: result.scheduleResyncPending,
+    replaceSafetySnapshot:
+      result.mode === "replace-all"
+        ? result.preRestoreSnapshotCreated
+          ? ("verified" as const)
+          : ("not-configured" as const)
+        : null,
   };
 }
 
@@ -151,6 +171,7 @@ export function restoreApplyRecovery(
 ): { step: "preview"; message: string } {
   return {
     step: "preview",
-    message: "Couldn't restore this backup. Your local data hasn't changed. Please try again.",
+    message:
+      "Couldn't restore this backup. Your local data hasn't changed. Please try again.",
   };
 }

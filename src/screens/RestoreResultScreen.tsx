@@ -19,8 +19,20 @@ export function RestoreResultScreen({
     updated,
     newerLocalKept,
     deletionsApplied,
+    photosNeedingAttention,
+    photoCleanupPending,
+    scheduleResyncPending,
     replaceSafetySnapshot,
   } = route.params;
+  const pending = [
+    photosNeedingAttention > 0
+      ? `${photosNeedingAttention} photo${photosNeedingAttention === 1 ? "" : "s"}`
+      : null,
+    photoCleanupPending > 0 ? "photo cleanup" : null,
+    scheduleResyncPending ? "reminders" : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
   const returnLabel = restoreReturnLabel(host);
   return (
     <ScrollView
@@ -43,6 +55,12 @@ export function RestoreResultScreen({
           Added: {added} · Updated: {updated} · Newer local kept:{" "}
           {newerLocalKept} · Deletions applied: {deletionsApplied}
         </Text>
+        {pending ? (
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            Your data is restored. {pending} will be retried the next time Orbit
+            opens.
+          </Text>
+        ) : null}
         {replaceSafetySnapshot === "verified" ? (
           <Text style={[styles.body, { color: colors.textSecondary }]}>
             A verified backup of this device was created first.

@@ -214,6 +214,9 @@ export type BackupStackParamList = {
     updated: number;
     newerLocalKept: number;
     deletionsApplied: number;
+    photosNeedingAttention: number;
+    photoCleanupPending: number;
+    scheduleResyncPending: boolean;
     replaceSafetySnapshot: "verified" | "not-configured" | null;
   };
 };
@@ -325,6 +328,9 @@ export type SettingsStackParamList = {
     updated: number;
     newerLocalKept: number;
     deletionsApplied: number;
+    photosNeedingAttention: number;
+    photoCleanupPending: number;
+    scheduleResyncPending: boolean;
     replaceSafetySnapshot: "verified" | "not-configured" | null;
   };
   /**
