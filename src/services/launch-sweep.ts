@@ -1,3 +1,5 @@
+import { Logger } from "@/utils/logger";
+
 /**
  * Launch sweep — the once-per-foreground-launch hook registry (DATA-06).
  *
@@ -27,6 +29,22 @@
 export type SweepHook = () => Promise<void>;
 
 /**
+ * Recovery producers run before backup. A future hook that can create recovery
+ * work after the restore-photo drain must register between that drain and backup,
+ * and be added to backup's `requires` list.
+ */
+export const SWEEP_IDS = {
+  backgroundReconcile: "background-reconcile",
+  restorePhotoFinalize: "restore-photo-finalize",
+  backup: "backup",
+} as const;
+
+export interface SweepHookOptions {
+  id?: string;
+  requires?: readonly string[];
+}
+
+/**
  * The minimal `AppState`-like surface `installSweepTrigger` depends on. Matches
  * react-native's `AppState.addEventListener("change", cb)` shape without
  * importing it, so the module is node-testable via a hand-rolled fake.
@@ -39,11 +57,14 @@ export interface AppStateLike {
 }
 
 // EMPTY in Phase 2 — later phases push their responsibilities here.
-const hooks: SweepHook[] = [];
+const hooks: Array<{ fn: SweepHook; options: SweepHookOptions }> = [];
 
 /** Register a hook to run on each real foreground launch (registration order). */
-export function registerSweepHook(fn: SweepHook): void {
-  hooks.push(fn);
+export function registerSweepHook(
+  fn: SweepHook,
+  options: SweepHookOptions = {},
+): void {
+  hooks.push({ fn, options });
 }
 
 // Module-level re-entrancy guard: keeps a single launch from double-running.
@@ -79,13 +100,29 @@ export async function runLaunchSweep(): Promise<void> {
       // Reset before the pass so any overlapping call DURING it is captured for
       // exactly one more pass (coalescing a burst into a single follow-up).
       pendingRerun = false;
-      for (const hook of hooks) {
-        await hook();
+      const unavailable = new Set<string>();
+      for (const { fn, options } of hooks) {
+        if (options.requires?.some((id) => unavailable.has(id))) {
+          if (options.id) unavailable.add(options.id);
+          Logger.warn(
+            "launch-sweep",
+            `hook skipped: ${options.id ?? "anonymous"}`,
+          );
+          continue;
+        }
+        try {
+          await fn();
+        } catch {
+          if (options.id) unavailable.add(options.id);
+          Logger.error(
+            "launch-sweep",
+            `hook failed: ${options.id ?? "anonymous"}`,
+          );
+        }
       }
     } while (pendingRerun);
   } finally {
     running = false;
-    pendingRerun = false;
   }
 }
 
@@ -103,12 +140,16 @@ export function installSweepTrigger(appState: AppStateLike): {
   remove(): void;
 } {
   // Cold-start foreground launch.
-  void runLaunchSweep();
+  void runLaunchSweep().catch(() => {
+    Logger.error("launch-sweep", "cold-start trigger failed");
+  });
 
   let previous = "active";
   return appState.addEventListener("change", (next) => {
     if (previous === "background" && next === "active") {
-      void runLaunchSweep();
+      void runLaunchSweep().catch(() => {
+        Logger.error("launch-sweep", "foreground trigger failed");
+      });
     }
     previous = next;
   });

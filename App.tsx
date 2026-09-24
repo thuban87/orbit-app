@@ -254,18 +254,17 @@ function AppShell() {
       registerBackgroundReconcileSweep(getExecutor);
       backgroundReconcileRegistered = true;
     }
-    // Backup runs only after background reconciliation. A committed restore
-    // marker is an internal crash-recovery state and must never be exported as
-    // a portable image path on cold start or a later foreground launch.
-    if (!backupSweepRegistered) {
-      registerBackupSweep(getExecutor);
-      backupSweepRegistered = true;
-    }
     // A committed restore-photo journal is drained only on real foreground
     // launches, after migration readiness and before the cold-start sweep fires.
     if (!restorePhotoFinalizeSweepRegistered) {
       registerRestorePhotoFinalizeSweep(getExecutor);
       restorePhotoFinalizeSweepRegistered = true;
+    }
+    // Backup follows both background reconciliation and restore-photo recovery.
+    // Its declared prerequisites hold it only when recovery failed this pass.
+    if (!backupSweepRegistered) {
+      registerBackupSweep(getExecutor);
+      backupSweepRegistered = true;
     }
     // Register the notification-schedule reconcile (NOTIF-01/04) on the SAME
     // registry, once only, BEFORE the trigger fires its cold-start sweep. The exec

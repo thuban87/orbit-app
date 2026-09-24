@@ -15,22 +15,40 @@ const h = vi.hoisted(() => ({
 
 vi.mock("@/db/restore-photo-journal-dao", () => ({
   listJournalEntriesCore: async () => h.entries,
-  deleteJournalEntryCore: async (_exec: unknown, path: string) => { h.deletedJournal.push(path); },
+  deleteJournalEntryCore: async (_exec: unknown, path: string) => {
+    h.deletedJournal.push(path);
+  },
 }));
 vi.mock("@/services/photos/photo-storage", () => ({
   listRestorePendingPhotos: () => h.pending,
-  deleteRestorePending: (path: string) => { h.deletedPending.push(path); },
+  deleteRestorePending: (path: string) => {
+    h.deletedPending.push(path);
+  },
   resolveRestorePendingUri: (path: string) => `file:///doc/${path}`,
   persistMaster: async (source: string, destination: string) => {
     h.persisted.push([source, destination]);
     if (h.persistThrows) throw new Error("disk unavailable");
   },
-  deletePhoto: (path: string) => { h.deletedPhoto.push(path); if (!h.deleteLeavesCanonical) h.existingCanonical.delete(path); },
+  deletePhoto: (path: string) => {
+    h.deletedPhoto.push(path);
+    if (!h.deleteLeavesCanonical) h.existingCanonical.delete(path);
+  },
   photoFileExists: (path: string) => h.existingCanonical.has(path),
 }));
-vi.mock("@/utils/logger", () => ({ Logger: { error: vi.fn() } }));
+vi.mock("@/utils/logger", () => ({
+  Logger: { error: vi.fn(), warn: vi.fn() },
+}));
 
-import { drainRestorePhotoJournal } from "@/services/photos/restore-photo-finalize-sweep";
+import {
+  __resetSweepForTest,
+  registerSweepHook,
+  runLaunchSweep,
+  SWEEP_IDS,
+} from "@/services/launch-sweep";
+import {
+  drainRestorePhotoJournal,
+  registerRestorePhotoFinalizeSweep,
+} from "@/services/photos/restore-photo-finalize-sweep";
 
 const finalize = (overrides: Record<string, unknown> = {}) => ({
   relativePath: "avatars/_restore_pending/contact-a-s.jpg",
@@ -45,6 +63,7 @@ const finalize = (overrides: Record<string, unknown> = {}) => ({
 });
 
 beforeEach(() => {
+  __resetSweepForTest();
   h.entries = [];
   h.pending = [];
   h.deletedPending = [];
@@ -60,22 +79,62 @@ beforeEach(() => {
 function exec() {
   return {
     getFirstAsync: async (sql: string, params?: unknown[]) => {
-      if (sql.includes("FROM contacts")) return h.rows.get(`contact:${params?.[0]}`) ?? null;
-      if (sql.includes("FROM custom_field_values")) return h.rows.get(`value:${params?.[0]}:${params?.[1]}`) ?? null;
+      if (sql.includes("FROM contacts"))
+        return h.rows.get(`contact:${params?.[0]}`) ?? null;
+      if (sql.includes("FROM custom_field_values"))
+        return h.rows.get(`value:${params?.[0]}:${params?.[1]}`) ?? null;
       return null;
     },
   } as never;
 }
 
 describe("restore photo finalization sweep", () => {
+  it("holds a dependent during an unrecovered finalize, then releases it next pass", async () => {
+    h.entries = [finalize()];
+    h.pending = [
+      {
+        relative: "avatars/_restore_pending/contact-a-s.jpg",
+        isStageTmpOrphan: false,
+      },
+    ];
+    h.rows.set("contact:contact-a", { id: 1 });
+    h.persistThrows = true;
+    let dependentCalls = 0;
+    registerRestorePhotoFinalizeSweep(exec);
+    registerSweepHook(
+      async () => {
+        dependentCalls += 1;
+      },
+      { requires: [SWEEP_IDS.restorePhotoFinalize] },
+    );
+    await runLaunchSweep();
+    expect(dependentCalls).toBe(0);
+    h.persistThrows = false;
+    await runLaunchSweep();
+    expect(dependentCalls).toBe(1);
+  });
   it("finalizes a committed live contact entry then removes both recovery artifacts", async () => {
     h.entries = [finalize()];
-    h.pending = [{ relative: "avatars/_restore_pending/contact-a-s.jpg", isStageTmpOrphan: false }];
+    h.pending = [
+      {
+        relative: "avatars/_restore_pending/contact-a-s.jpg",
+        isStageTmpOrphan: false,
+      },
+    ];
     h.rows.set("contact:contact-a", { id: 1 });
     await drainRestorePhotoJournal(exec());
-    expect(h.persisted).toEqual([["file:///doc/avatars/_restore_pending/contact-a-s.jpg", "avatars/contact-1.jpg"]]);
-    expect(h.deletedPending).toEqual(["avatars/_restore_pending/contact-a-s.jpg"]);
-    expect(h.deletedJournal).toEqual(["avatars/_restore_pending/contact-a-s.jpg"]);
+    expect(h.persisted).toEqual([
+      [
+        "file:///doc/avatars/_restore_pending/contact-a-s.jpg",
+        "avatars/contact-1.jpg",
+      ],
+    ]);
+    expect(h.deletedPending).toEqual([
+      "avatars/_restore_pending/contact-a-s.jpg",
+    ]);
+    expect(h.deletedJournal).toEqual([
+      "avatars/_restore_pending/contact-a-s.jpg",
+    ]);
   });
 
   it("cleans an already-finalized row without retrying persistMaster when its staged source is gone", async () => {
@@ -83,20 +142,34 @@ describe("restore photo finalization sweep", () => {
     h.rows.set("contact:contact-a", { id: 1 });
     await drainRestorePhotoJournal(exec());
     expect(h.persisted).toEqual([]);
-    expect(h.deletedJournal).toEqual(["avatars/_restore_pending/contact-a-s.jpg"]);
+    expect(h.deletedJournal).toEqual([
+      "avatars/_restore_pending/contact-a-s.jpg",
+    ]);
   });
 
   it("garbage-collects an unlive target without applying its staged bytes", async () => {
     h.entries = [finalize({ valueUid: "value-a", targetKind: "customField" })];
-    h.pending = [{ relative: "avatars/_restore_pending/contact-a-s.jpg", isStageTmpOrphan: false }];
+    h.pending = [
+      {
+        relative: "avatars/_restore_pending/contact-a-s.jpg",
+        isStageTmpOrphan: false,
+      },
+    ];
     await drainRestorePhotoJournal(exec());
     expect(h.persisted).toEqual([]);
-    expect(h.deletedPending).toEqual(["avatars/_restore_pending/contact-a-s.jpg"]);
-    expect(h.deletedJournal).toEqual(["avatars/_restore_pending/contact-a-s.jpg"]);
+    expect(h.deletedPending).toEqual([
+      "avatars/_restore_pending/contact-a-s.jpg",
+    ]);
+    expect(h.deletedJournal).toEqual([
+      "avatars/_restore_pending/contact-a-s.jpg",
+    ]);
   });
 
   it("keeps a delete row when deletePhoto returns but the canonical file still exists", async () => {
-    const entry = finalize({ relativePath: "avatars/_restore_pending/delete-a.jpg", action: "delete" });
+    const entry = finalize({
+      relativePath: "avatars/_restore_pending/delete-a.jpg",
+      action: "delete",
+    });
     h.entries = [entry];
     h.existingCanonical.add("avatars/contact-1.jpg");
     // Simulate the real deletePhoto contract failing internally: it returns normally.
@@ -108,7 +181,12 @@ describe("restore photo finalization sweep", () => {
 
   it("keeps a committed finalize entry for retry when persistMaster fails", async () => {
     h.entries = [finalize()];
-    h.pending = [{ relative: "avatars/_restore_pending/contact-a-s.jpg", isStageTmpOrphan: false }];
+    h.pending = [
+      {
+        relative: "avatars/_restore_pending/contact-a-s.jpg",
+        isStageTmpOrphan: false,
+      },
+    ];
     h.rows.set("contact:contact-a", { id: 1 });
     h.persistThrows = true;
     await drainRestorePhotoJournal(exec());
@@ -119,8 +197,14 @@ describe("restore photo finalization sweep", () => {
 
   it("deletes unjournaled ready files and incomplete stage-tmp files without finalizing either", async () => {
     h.pending = [
-      { relative: "avatars/_restore_pending/rolled-back.jpg", isStageTmpOrphan: false },
-      { relative: "avatars/_restore_pending/partial.jpg.stage-tmp", isStageTmpOrphan: true },
+      {
+        relative: "avatars/_restore_pending/rolled-back.jpg",
+        isStageTmpOrphan: false,
+      },
+      {
+        relative: "avatars/_restore_pending/partial.jpg.stage-tmp",
+        isStageTmpOrphan: true,
+      },
     ];
     await drainRestorePhotoJournal(exec());
     expect(h.deletedPending).toEqual([

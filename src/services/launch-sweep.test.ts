@@ -61,6 +61,89 @@ afterEach(() => {
 });
 
 describe("runLaunchSweep — hook registry", () => {
+  it.each([0, 1])(
+    "isolates a failing hook at position %i",
+    async (failureIndex) => {
+      const calls: number[] = [];
+      for (let index = 0; index < 3; index += 1) {
+        registerSweepHook(
+          async () => {
+            calls.push(index);
+            if (index === failureIndex) throw new Error("private content");
+          },
+          { id: `hook-${index}` },
+        );
+      }
+      await expect(runLaunchSweep()).resolves.toBeUndefined();
+      expect(calls).toEqual([0, 1, 2]);
+    },
+  );
+
+  it("skips dependent hooks transitively, then retries them on the next pass", async () => {
+    const calls: string[] = [];
+    let fail = true;
+    registerSweepHook(
+      async () => {
+        calls.push("recovery");
+        if (fail) throw new Error("failure");
+      },
+      { id: "recovery" },
+    );
+    registerSweepHook(
+      async () => {
+        calls.push("dependent");
+      },
+      { id: "dependent", requires: ["recovery"] },
+    );
+    registerSweepHook(
+      async () => {
+        calls.push("transitive");
+      },
+      { requires: ["dependent"] },
+    );
+    registerSweepHook(
+      async () => {
+        calls.push("independent");
+      },
+      { requires: ["absent"] },
+    );
+    await runLaunchSweep();
+    expect(calls).toEqual(["recovery", "independent"]);
+    fail = false;
+    await runLaunchSweep();
+    expect(calls).toEqual([
+      "recovery",
+      "independent",
+      "recovery",
+      "dependent",
+      "transitive",
+      "independent",
+    ]);
+  });
+
+  it("drains a queued rerun after a failing in-flight hook", async () => {
+    let calls = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    registerSweepHook(
+      async () => {
+        calls += 1;
+        if (calls === 1) {
+          await gate;
+          throw new Error("failure");
+        }
+      },
+      { id: "recovery" },
+    );
+    const first = runLaunchSweep();
+    await runLaunchSweep();
+    release();
+    await first;
+    expect(calls).toBe(2);
+  });
+
   it("runs registered hooks in registration order", async () => {
     const order: string[] = [];
     registerSweepHook(async () => {
@@ -151,6 +234,20 @@ describe("no module-scope side effect", () => {
 });
 
 describe("installSweepTrigger — AppState gating", () => {
+  it("handles failures from both cold-start and foreground triggers", async () => {
+    const fake = makeFakeAppState();
+    let calls = 0;
+    registerSweepHook(async () => {
+      calls += 1;
+      throw new Error("failure");
+    });
+    installSweepTrigger(fake.appState);
+    await flush();
+    fake.fire("background");
+    fake.fire("active");
+    await flush();
+    expect(calls).toBe(2);
+  });
   it("fires the sweep once on cold start and returns the subscription remover", async () => {
     let calls = 0;
     registerSweepHook(async () => {
