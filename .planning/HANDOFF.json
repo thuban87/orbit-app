@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-09-24T18:33:36.846Z",
+  "phase": "38.2",
+  "phase_name": "audit-remediation-data-security-lifecycle",
+  "phase_dir": ".planning/phases/38.2-audit-remediation-data-security-lifecycle",
+  "plan": 16,
+  "task": 2,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": 1, "name": "Automated phase gate, release manifest assertions and coverage map", "status": "done", "commit": "117a946"},
+    {"id": 2, "name": "Device UAT — restore, merge, photos, import, notifications, maintenance, reconcile", "status": "in_progress", "progress": "Isolated synthetic restore roundtrip and theme retest completed; required subcases and most device rows remain open."},
+    {"id": 3, "name": "Device UAT — widget, backup ingress and network transfers", "status": "in_progress", "progress": "RG-001..004 recorded; truncated-body probe added but not exercised on-device."}
+  ],
+  "remaining_tasks": [
+    {"id": 2, "name": "Finish required isolated/device UAT rows and update UAT/VALIDATION", "status": "in_progress"},
+    {"id": 3, "name": "Finish widget, ingress and network UAT rows", "status": "in_progress"}
+  ],
+  "blockers": [
+    {"description": "Required device UAT rows remain OPEN; no owner risk acceptance recorded.", "type": "human_action", "workaround": "Continue with isolated synthetic package where possible; never mutate com.bwales.orbit without owner direction."},
+    {"description": "Existing com.bwales.orbit data is not confirmed disposable.", "type": "human_action", "workaround": "Use com.bwales.orbit.uat synthetic data only."}
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [],
+  "decisions": [
+    {"decision": "Use a 100 MiB backup ingress ceiling with a 30 second stall deadline.", "rationale": "Owner approved proceeding with the cap for now.", "phase": "38.2"},
+    {"decision": "Do not repair already-damaged databases; repair Replace-all runtime behavior and retest fresh synthetic data.", "rationale": "Preserves D-23 and avoids a repair migration while fixing the newly identified live-tombstone defect.", "phase": "38.2"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Read this handoff, then inspect the post-fix notes in 38.2-UAT.md and 38.2-VALIDATION.md; continue isolated com.bwales.orbit.uat UAT and update the remaining rows with evidence.",
+  "context_notes": "Commit 8d8476a clears Replace-all tombstones that collide with live restored UIDs. Commit 444b57a adds a debug-only truncated HTTPS response probe. Commit 209a53c records post-fix isolated restore evidence. Full local gate passes: 4,035 tests, tsc, colors, Biome. Do not report phase complete while required device rows remain OPEN. Never push, branch, or create worktrees."
+}
