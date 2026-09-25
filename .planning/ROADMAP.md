@@ -1144,14 +1144,49 @@ Plans:
 
 **Goal**: Make live UI, navigation, async workflows, and post-commit publication agree about current state, so committed actions reach relevant screens and native ingress paths without stale publication, replay, lost drafts, misleading empty states, or broken navigation semantics — preserving independent tab histories, Digest landing, and transient-first Back.
 **Depends on**: Phase 38.2
-**Requirements**: TBD — defined at planning from the covered remediation groups (RG-019–026, 035, 042); preserve RG + packet-qualified finding IDs
+**Requirements**: RG-019, RG-020, RG-021, RG-022, RG-023, RG-024, RG-025, RG-026, RG-035, RG-042 (preserve RG + packet-qualified finding IDs; RN-013 folded into RG-023 by D-08; Phase 38 WR-01 closed by RG-026/D-16)
 **Success Criteria**: Defined at planning; mounted/runtime flows (rapid navigation, foreground/resume, delayed/rejected reads, commit → failed read → retry, cold/warm notification ordering)
 **Scope source**: docs/dossier/milestone-2/phase-38.3-audit-remediation-runtime-state-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md
 **UI hint**: yes
-**Plans**: TBD
+**Plans**: 16 plans in 6 waves
 
-> **Ready to discuss — dossier authored 2026-09-23 (owner + codex). Run gsd-discuss-phase first (see `38.3-CONTEXT.md` shim). RG-020 accessibility subset is investigation-gated; the Phase 22 ContactPicker read-error fallback (CF-02) is held unless the owner supersedes it; RN-013 stays deferred.**
+Plans:
+**Wave 1**
+
+- [ ] 38.3-01-PLAN.md — Freshness primitives: post-sweep foreground tick, latest-request authority, warm notification publication, dev fault registry (RG-022, RG-024, RG-026; D-14, D-22)
+- [ ] 38.3-02-PLAN.md — Dashboard panel settlement: capture-before-clear dismissal, derived panelOpen (RG-020 RN-001; D-05 gate kept open)
+- [ ] 38.3-03-PLAN.md — Shared participant override patch builder (RG-019 REL-006; ADR-125)
+- [ ] 38.3-04-PLAN.md — Cold/warm notification chronology (RG-042)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 38.3-05-PLAN.md — Assist post-commit publisher + RN-013 failure handling + Post-Log Note publication (RG-023; D-08, D-21)
+- [ ] 38.3-06-PLAN.md — Group Event draft preservation + committed-add refresh recovery (RG-019 REL-007/008; D-17/18/19)
+- [ ] 38.3-07-PLAN.md — Truthful read states: BackupSettings, ReconcileComplete, Memory (RG-035; D-24)
+- [ ] 38.3-08-PLAN.md — Profile snapshot/History coherence + day rollover (RG-024; D-12)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 38.3-09-PLAN.md — Cross-tab semantic-root entry helper (RG-021 RN-002; D-26)
+- [ ] 38.3-10-PLAN.md — Settings host parity + Message eligibility (RG-021 RN-004; D-09, D-24, D-25)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 38.3-11-PLAN.md — Import fatal state + DuplicateReview read errors (RG-035; D-20, D-26)
+- [ ] 38.3-12-PLAN.md — Dashboard refresh scheduler + latest-result ownership (RG-022; D-14, D-23)
+- [ ] 38.3-13-PLAN.md — Profile History destinations + selector retry settlement (RG-021 ARCH-008, RG-025; D-10, D-11)
+- [ ] 38.3-14-PLAN.md — Live Digest: shell/foreground refresh, Your Week re-window, list transition (RG-026; D-13, D-14, D-15)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 38.3-15-PLAN.md — Your Week day-detail truth (RG-026 REL-014; D-16; closes Phase 38 WR-01)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 38.3-16-PLAN.md — Phase gate + batched Pixel device UAT incl. D-05 TalkBack gate (all RGs)
+
+> **Planned 2026-09-25 — 16 plans, 6 waves; run gsd-execute-phase 38.3. RG-020 accessibility subset is investigation-gated; the Phase 22 ContactPicker read-error fallback (CF-02) is kept (D-07); RN-013 was reopened into RG-023 (D-08).**
 
 ### Phase 38.4: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
 
@@ -1214,7 +1249,7 @@ Plans:
 | 37. Settings & Personalization | 8/8 | Complete | 2026-09-14 |
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
-| 38.3 Runtime Correctness, Navigation & State Coherence | 0/TBD | Ready to discuss | - |
+| 38.3 Runtime Correctness, Navigation & State Coherence | 0/16 | Planned | - |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 0/TBD | Ready to discuss | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |

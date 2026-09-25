@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 38.2
-current_phase_name: Data Integrity, Security & Lifecycle Hardening
-status: phase-complete
-stopped_at: Phase 38.3 context gathered
-last_updated: "2026-09-25T19:40:39.079Z"
+current_phase: 38.3
+current_phase_name: Runtime Correctness, Navigation & State Coherence
+status: ready-to-execute
+stopped_at: Phase 38.3 planned (16 plans, 6 waves)
+last_updated: "2026-09-25T21:03:43.343Z"
 last_activity: 2026-09-25
-last_activity_desc: Phase 38.2 closed after Pixel device UAT with owner dispositions
-state_head: ae4e0495f3feb6a636e4cc723e282d437ed310be
+last_activity_desc: Phase 38.3 planned — research, patterns, 16 plans, checker passed (0 blockers); owner ruling D-25
+state_head: 1f9e975e3abc3656f3161d440924360fdb776dea
 progress:
   total_phases: 26
   completed_phases: 16
-  total_plans: 202
+  total_plans: 218
   completed_plans: 200
 carried_forward:
 
@@ -39,9 +39,9 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 38.2 (Data Integrity, Security & Lifecycle Hardening) — COMPLETE (2026-09-25)
-Plan: 16 of 16
-Status: Phase complete — next: Phase 38.3 (Runtime Correctness, Navigation & State Coherence)
+Phase: 38.3 (Runtime Correctness, Navigation & State Coherence) — READY TO EXECUTE
+Plan: 0 of 16
+Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
