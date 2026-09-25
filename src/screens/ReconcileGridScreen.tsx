@@ -35,6 +35,7 @@ import {
   buildReconcileSelections,
   remainingReconcileFields,
 } from "@/logic/reconcile-selection";
+import { reconcileSourceLabels } from "@/logic/reconcile-source-label";
 import type { RootStackScreenProps } from "@/navigation/types";
 import {
   ensureReadContactsPermission,
@@ -209,6 +210,15 @@ export function ReconcileGridScreen({
           photoContentHash = staged.contentHash;
           stagedForCleanup.push(stagedPhotoRelPath);
         }
+        const readPicked = pickedLinks.filter(({ picked }) => picked);
+        const labels = reconcileSourceLabels(
+          readPicked.map(({ picked }) => ({
+            displayName: picked?.displayName ?? null,
+          })),
+        );
+        const labelByLinkId = new Map(
+          readPicked.map(({ link }, index) => [link.id, labels[index]]),
+        );
         const sources: ReconcileSource[] = pickedLinks.flatMap(
           ({ link, picked }) =>
             picked
@@ -218,7 +228,8 @@ export function ReconcileGridScreen({
                     displayName: picked.displayName,
                     methods: picked.methods,
                     birthday: picked.birthday,
-                    provenanceLabel: `Contacts (${link.provider})`,
+                    provenanceLabel:
+                      labelByLinkId.get(link.id) ?? "Phone contact",
                     ...(link.id === firstPhoto?.link.id
                       ? {
                           stagedPhotoRelative: stagedPhotoRelPath,

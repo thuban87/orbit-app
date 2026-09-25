@@ -41,6 +41,7 @@ import {
   buildReconcileSelections,
   type ReconcileChoice,
 } from "@/logic/reconcile-selection";
+import { reconcileSourceLabels } from "@/logic/reconcile-source-label";
 import type { RootStackScreenProps } from "@/navigation/types";
 import {
   ensureReadContactsPermission,
@@ -153,6 +154,18 @@ export function ReconcileDetailScreen({
         if (picked.photoTempUri) discardDerivative(picked.photoTempUri);
       }
     }
+    const readLinks = links.filter((link) =>
+      pickedByKey.has(link.external_contact_id),
+    );
+    const labels = reconcileSourceLabels(
+      readLinks.map((link) => ({
+        displayName:
+          pickedByKey.get(link.external_contact_id)?.displayName ?? null,
+      })),
+    );
+    const labelByLinkId = new Map(
+      readLinks.map((link, index) => [link.id, labels[index]]),
+    );
     const sources: ReconcileSource[] = links.flatMap((link) => {
       const picked = pickedByKey.get(link.external_contact_id);
       return picked
@@ -162,7 +175,7 @@ export function ReconcileDetailScreen({
               displayName: picked.displayName,
               methods: picked.methods,
               birthday: picked.birthday,
-              provenanceLabel: `Contacts (${link.provider})`,
+              provenanceLabel: labelByLinkId.get(link.id) ?? "Phone contact",
               ...(link.id === firstPhoto?.link.id
                 ? {
                     stagedPhotoRelative: stagedRelative,
