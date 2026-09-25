@@ -455,6 +455,18 @@ export function CropPhotoScreen({
         </Canvas>
       </GestureDetector>
 
+      {!image && downscaleTried ? (
+        // Neither the source nor its one-time downscale decoded: say so instead
+        // of leaving "Use photo" silently disabled with an empty viewport.
+        <Text
+          testID="crop-photo-undecodable"
+          accessibilityRole="alert"
+          style={[styles.undecodable, { color: colors.textSecondary }]}
+        >
+          That image couldn't be used. Try a JPEG or PNG.
+        </Text>
+      ) : null}
+
       <View style={styles.footer}>
         <Pressable
           testID="crop-photo-cancel"
@@ -510,6 +522,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "700",
+  },
+  undecodable: {
+    fontSize: 16,
+    textAlign: "center",
+    paddingHorizontal: 16,
   },
   footer: {
     flexDirection: "row",
