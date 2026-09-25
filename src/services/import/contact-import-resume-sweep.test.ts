@@ -24,6 +24,7 @@ import {
   registerImportResumeSweep,
   retireDetachedImportRows,
 } from "@/services/import/contact-import-resume-sweep";
+import { withImportFlowActive } from "@/services/import/import-flow-guard";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
 
 const NOW = "2026-08-29 12:00:00";
@@ -123,6 +124,28 @@ describe("contact-import-resume-sweep", () => {
       },
       discardOnly: false,
     });
+  });
+
+  it("does not prompt or reconcile staging while a picker import is still acquiring", async () => {
+    await acceptRows(["live"], { mode: "single" });
+    const onResumable = vi.fn<(value: ResumableImport | null) => void>();
+    const fs = stagingFs(["import-staging/not-yet-committed.jpg"]);
+    registerImportResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      fs,
+      now: () => NOW,
+    });
+
+    // The picker round-trip backgrounds Orbit, so the foreground sweep fires
+    // while the import that created this session is still in flight.
+    await withImportFlowActive(() => runLaunchSweep());
+
+    expect(onResumable).not.toHaveBeenCalled();
+    expect(fs.deleted).toEqual([]);
+
+    // Once the flow has handed off, a real foreground pass behaves normally.
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenCalledOnce();
   });
 
   it("sweeps older pending sessions and deletes their returned staged files in the same launch", async () => {

@@ -3,6 +3,7 @@ import type { SqlExecutor } from "@/db/types";
 import type { RootStackParamList } from "@/navigation/types";
 import type { ContactImportMode } from "@/screens/use-contact-import-mode";
 import { routePickedImport } from "@/services/import/import-acquire";
+import { withImportFlowActive } from "@/services/import/import-flow-guard";
 import type { PickedContact } from "../../../modules/orbit-contact-picker";
 
 type AppNavigate = NativeStackNavigationProp<RootStackParamList>["navigate"];
@@ -49,17 +50,19 @@ export async function startContactImport({
     return;
   }
 
-  const picked = await withNotes(
-    await pick(),
-    ensureNotesAccess,
-    readByLookupKeys,
-  );
-  await routePickedImport(
-    exec,
-    picked,
-    { effectivePhoneRegion, now },
-    { navigate: (route, params) => navigate(route, params) },
-  );
+  await withImportFlowActive(async () => {
+    const picked = await withNotes(
+      await pick(),
+      ensureNotesAccess,
+      readByLookupKeys,
+    );
+    await routePickedImport(
+      exec,
+      picked,
+      { effectivePhoneRegion, now },
+      { navigate: (route, params) => navigate(route, params) },
+    );
+  });
 }
 
 /** Merge provider-read notes into picked contacts; never blocks the import. */

@@ -12,6 +12,7 @@ import {
 } from "@/db/import-session-read";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
+import { isImportFlowActive } from "@/services/import/import-flow-guard";
 import { registerSweepHook } from "@/services/launch-sweep";
 import {
   deleteImportStaging,
@@ -175,6 +176,10 @@ export function registerImportResumeSweep(
   }: RegisterImportResumeSweepOptions = {},
 ): void {
   registerSweepHook(async () => {
+    // A picker/permission round-trip backgrounds Orbit mid-import; this pass
+    // must neither prompt to resume that live session nor treat its not-yet-
+    // committed staged photos as orphans. The next real foreground runs it.
+    if (isImportFlowActive()) return;
     const exec = getExec();
     let description: ResumableImport | null = null;
     try {
