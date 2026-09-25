@@ -26,6 +26,12 @@ export interface StartContactImportOptions {
   readByLookupKeys?: (
     lookupKeys: readonly string[],
   ) => Promise<PickedContact[]>;
+  /**
+   * Discard an app-cache photo copy. The provider re-read copies each contact's
+   * photo into `contact-picker-*.photo`; only notes are used, so those copies are
+   * retired immediately (AUD-DPI-011 / D-16).
+   */
+  discardPhotoCopy?: (uri: string) => void;
   /** Wider than PickedImportNavigator so it can open LegacyContactPicker too. */
   navigate: AppNavigate;
 }
@@ -43,6 +49,7 @@ export async function startContactImport({
   pick,
   ensureNotesAccess,
   readByLookupKeys,
+  discardPhotoCopy,
   navigate,
 }: StartContactImportOptions): Promise<void> {
   if (mode === "legacy") {
@@ -55,6 +62,7 @@ export async function startContactImport({
       await pick(),
       ensureNotesAccess,
       readByLookupKeys,
+      discardPhotoCopy,
     );
     await routePickedImport(
       exec,
@@ -70,6 +78,7 @@ async function withNotes(
   picked: PickedContact[],
   ensureNotesAccess: StartContactImportOptions["ensureNotesAccess"],
   readByLookupKeys: StartContactImportOptions["readByLookupKeys"],
+  discardPhotoCopy: StartContactImportOptions["discardPhotoCopy"],
 ): Promise<PickedContact[]> {
   if (picked.length === 0 || !ensureNotesAccess || !readByLookupKeys) {
     return picked;
@@ -77,6 +86,14 @@ async function withNotes(
   try {
     if (!(await ensureNotesAccess())) return picked;
     const read = await readByLookupKeys(picked.map((c) => c.lookupKey));
+    for (const copy of read) {
+      if (!copy.photoTempUri) continue;
+      try {
+        discardPhotoCopy?.(copy.photoTempUri);
+      } catch {
+        // Best-effort: the cold-start cache sweep retires any survivor.
+      }
+    }
     const notes = new Map(read.map((c) => [c.lookupKey, c.note ?? null]));
     return picked.map((c) =>
       c.note == null && notes.get(c.lookupKey)

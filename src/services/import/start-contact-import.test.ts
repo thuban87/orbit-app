@@ -54,9 +54,14 @@ describe("startContactImport", () => {
   it("merges provider notes after an in-context grant (API-37 picker omits notes)", async () => {
     const pick = vi.fn().mockResolvedValue(picked);
     const ensureNotesAccess = vi.fn().mockResolvedValue(true);
-    const readByLookupKeys = vi
-      .fn()
-      .mockResolvedValue([{ ...picked[0], note: "Met at PyCon" }]);
+    const readByLookupKeys = vi.fn().mockResolvedValue([
+      {
+        ...picked[0],
+        note: "Met at PyCon",
+        photoTempUri: "file:///cache/contact-picker-1.photo",
+      },
+    ]);
+    const discardPhotoCopy = vi.fn();
 
     await startContactImport({
       mode: "system",
@@ -66,10 +71,15 @@ describe("startContactImport", () => {
       pick,
       ensureNotesAccess,
       readByLookupKeys,
+      discardPhotoCopy,
       navigate,
     });
 
     expect(readByLookupKeys).toHaveBeenCalledWith(["legacy-contact-1"]);
+    // The re-read's own photo copy is retired; the picked photo is untouched.
+    expect(discardPhotoCopy).toHaveBeenCalledWith(
+      "file:///cache/contact-picker-1.photo",
+    );
     expect(routePickedImport.mock.calls[0][1]).toEqual([
       { ...picked[0], note: "Met at PyCon" },
     ]);

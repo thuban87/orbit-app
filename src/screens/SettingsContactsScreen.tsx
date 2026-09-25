@@ -34,6 +34,7 @@ import {
 import { getDeviceRegion } from "@/services/device-region";
 import type { ResumableReconcile } from "@/services/import/reconcile-resume-sweep";
 import { startContactImport } from "@/services/import/start-contact-import";
+import { discardDerivative } from "@/services/photos/derivative-cache";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import {
@@ -136,6 +137,7 @@ export function SettingsContactsScreen({
           (await ensureReadContactsPermission()).granted,
         readByLookupKeys: async (keys) =>
           (await readAllContacts(keys)).contacts,
+        discardPhotoCopy: discardDerivative,
         navigate: navigation.navigate,
       });
     } catch {
