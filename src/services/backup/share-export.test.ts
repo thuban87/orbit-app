@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   names: [] as string[],
   removed: [] as string[],
+  events: [] as string[],
 }));
 vi.mock("expo-file-system", () => {
   class File {
@@ -16,6 +17,7 @@ vi.mock("expo-file-system", () => {
     }
     delete() {
       state.removed.push(this.name);
+      state.events.push(`delete:${this.name}`);
     }
     write() {}
     text() {
@@ -31,9 +33,12 @@ vi.mock("expo-file-system", () => {
   }
   return { File, Directory, Paths: { cache: "file:///cache" } };
 });
-vi.mock("expo-sharing", () => ({
-  isAvailableAsync: vi.fn(),
-  shareAsync: vi.fn(),
+vi.mock("react-native", () => ({ Platform: { OS: "android" } }));
+vi.mock("../../../modules/orbit-backup-share", () => ({
+  shareBackupExport: vi.fn(),
+  revokeBackupExportShare: (uri: string) => {
+    state.events.push(`revoke:${uri.split("/").pop()}`);
+  },
 }));
 vi.mock("@/services/photos/photo-storage", () => ({
   resolvePhotoUri: vi.fn(),
@@ -48,6 +53,7 @@ describe("local export staging", () => {
   beforeEach(() => {
     state.names = [];
     state.removed = [];
+    state.events = [];
   });
 
   it("retires only owned files at the 24-hour grace boundary", async () => {
@@ -67,5 +73,14 @@ describe("local export staging", () => {
     state.names = ["orbit-backup-123.json", "unrelated.json"];
     await createLocalExportFiles().retireAll();
     expect(state.removed).toEqual(["orbit-backup-123.json"]);
+  });
+
+  it("revokes the chosen share target's grant before deleting (ADR-155)", async () => {
+    state.names = ["orbit-backup-123.json"];
+    await createLocalExportFiles().retireAll();
+    expect(state.events).toEqual([
+      "revoke:orbit-backup-123.json",
+      "delete:orbit-backup-123.json",
+    ]);
   });
 });

@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 36 of
-  154 ADRs are superseded in whole or in part.
+  155 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -185,3 +185,4 @@ not something you can pattern-match against.
 | 152 | Vertical History Heatmap and Minute-Precision Timestamps | Accepted | 38.1-profile-presentation-polish | — | — | — | 5 | `src/components/history`, `src/db`, `src/screens` +1 |
 | 153 | Two-Row Normal Contacts Grid | Accepted | 38.1-profile-presentation-polish | ADR-101 (partial — normal Grid card context row) | — | — | 2 | `src/components`, `src/screens` |
 | 154 | API-37 Import Requests Contacts Access for Notes | Accepted | 38.2-audit-remediation-data-security-lifecycle | ADR-002 (partial — API-37+ import is no longer strictly permissionless) | — | — | 3 | `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker`, `src/screens`, `src/services/import` |
+| 155 | Backup Share Grants Only the Chosen App | Accepted | 38.2-audit-remediation-data-security-lifecycle | — | — | — | 1/3 live | `src/services/backup` |

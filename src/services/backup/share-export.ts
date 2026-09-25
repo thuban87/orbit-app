@@ -1,6 +1,6 @@
 /** Native file/share adapters live here so the service remains node-testable. */
 import { Directory, File, Paths } from "expo-file-system";
-import * as Sharing from "expo-sharing";
+import { Platform } from "react-native";
 import type {
   ExportShareAdapter,
   LocalExportFile,
@@ -8,8 +8,18 @@ import type {
 } from "@/services/backup/backup-service";
 import { resolveBackgroundUri } from "@/services/photos/background-storage";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
+import {
+  revokeBackupExportShare,
+  shareBackupExport,
+} from "../../../modules/orbit-backup-share";
 
 const EXPORT_DIRECTORY = "backup-exports";
+
+/** Revoke the chosen share target's grant (ADR-155), then delete the file. */
+function retire(file: File): void {
+  revokeBackupExportShare(file.uri);
+  file.delete();
+}
 
 export function createLocalExportFiles(
   now: () => number = Date.now,
@@ -44,13 +54,13 @@ export function createLocalExportFiles(
       };
     },
     async retireAll() {
-      for (const file of stagedFiles()) file.delete();
+      for (const file of stagedFiles()) retire(file);
     },
     async retireStale(nowMs, graceMs) {
       for (const file of stagedFiles()) {
         const stamp = Number(/^orbit-backup-(\d+)\.json$/.exec(file.name)?.[1]);
         const created = Number.isFinite(stamp) ? stamp : file.modificationTime;
-        if (created != null && nowMs - created >= graceMs) file.delete();
+        if (created != null && nowMs - created >= graceMs) retire(file);
       }
     },
   };
@@ -64,14 +74,14 @@ export function readStoredPhotoBase64(relativePath: string): Promise<string> {
   return new File(uri).base64();
 }
 
-/** The sole expo-sharing integration: its local-file URI becomes a platform sheet. */
+/**
+ * The sole outbound backup share. A staged export becomes the system chooser,
+ * and read access is granted only to the app the user picks (ADR-155) so
+ * targets that upload in the background (Google Drive) can still read it.
+ */
 export function createExpoShareAdapter(): ExportShareAdapter {
   return {
-    isAvailable: () => Sharing.isAvailableAsync(),
-    open: (uri) =>
-      Sharing.shareAsync(uri, {
-        mimeType: "application/json",
-        dialogTitle: "Export Orbit backup",
-      }),
+    isAvailable: async () => Platform.OS === "android",
+    open: (uri) => shareBackupExport(uri, "Export Orbit backup"),
   };
 }

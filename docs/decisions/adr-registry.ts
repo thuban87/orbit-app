@@ -164,5 +164,6 @@
 // NOTE: ADR-0152 [ACCEPTED] Vertical History Heatmap and Minute-Precision Timestamps
 // NOTE: ADR-0153 [ACCEPTED] Two-Row Normal Contacts Grid
 // NOTE: ADR-0154 [ACCEPTED] API-37 Import Requests Contacts Access for Notes
+// NOTE: ADR-0155 [ACCEPTED] Backup Share Grants Only the Chosen App
 
-export const ADR_COUNT = 154;
+export const ADR_COUNT = 155;
