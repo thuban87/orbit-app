@@ -157,6 +157,18 @@ basis. The full rulings, with code anchors, are in `38.3-CONTEXT.md`
     -   honest error/loading states for the remaining RG-035 surfaces;
     -   RecentlyDeleted registered under the Settings Profile host;
     -   stale cold notification results dropped.
+-   **[DECIDED · 2026-09-25 · plan-phase] D-25 --- Message disabled on
+    Settings-hosted Profiles (OD-1).** A non-archived Profile is
+    reachable inside the Settings stack (via Archived → Profile →
+    History → group event → participant). Compose is not registered
+    there, so Message was a silent no-op. Message renders disabled with
+    a reason line on any Profile hosted in the Settings stack, using the
+    same mechanism as D-09. Compose stays unregistered under Settings.
+-   Recorded planner calls at plan-phase (D-26): after a fatal import,
+    Import Complete's Retry condition includes pending rows (fits D-20);
+    the import/reconcile resume prompts route through the shared
+    cross-tab entry helper (RN-002); whether a selected Your Week day
+    survives a tab return is planner discretion within D-15.
 
 ## Revision Log
 
@@ -164,4 +176,5 @@ basis. The full rulings, with code anchors, are in `38.3-CONTEXT.md`
     present); owner decisions D-07..D-20; recorded calls D-21..D-24;
     RN-013 reopened into RG-023; triage selection recorded in
     `TRIAGE.md`.
-
+-   2026-09-25 --- plan-phase: owner ruling D-25 (OD-1, Settings-host
+    Message disabled); recorded planner calls D-26.
