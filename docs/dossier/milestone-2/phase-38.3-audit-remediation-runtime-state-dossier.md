@@ -164,6 +164,10 @@ basis. The full rulings, with code anchors, are in `38.3-CONTEXT.md`
     there, so Message was a silent no-op. Message renders disabled with
     a reason line on any Profile hosted in the Settings stack, using the
     same mechanism as D-09. Compose stays unregistered under Settings.
+-   **[DECIDED · 2026-09-25 · plan-phase] D-27 --- Native SMS stays
+    enabled for archived contacts.** D-09 disables only the hero
+    Message (Compose). The Contact Methods row's Message, which hands
+    off to the native SMS app like Call, is unchanged.
 -   Recorded planner calls at plan-phase (D-26): after a fatal import,
     Import Complete's Retry condition includes pending rows (fits D-20);
     the import/reconcile resume prompts route through the shared
