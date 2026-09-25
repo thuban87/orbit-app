@@ -107,10 +107,7 @@ async function copyAndProve(
     });
   }
 
-  if (
-    copied.length !== sourceRows.length ||
-    new Set(copied.map((row) => row.fuelUid)).size !== sourceRows.length
-  ) {
+  if (copied.length !== sourceRows.length || new Set(copied.map((row) => row.fuelUid)).size !== sourceRows.length) {
     fail("source-to-memory mapping is incomplete");
   }
   for (const row of copied) {
@@ -118,15 +115,8 @@ async function copyAndProve(
       uid: string;
       value: string | null;
       allow_ai: number;
-    }>("SELECT uid, value, allow_ai FROM memories WHERE uid = ?", [
-      row.memoryUid,
-    ]);
-    if (
-      !memory ||
-      memory.uid !== row.memoryUid ||
-      memory.value !== row.value ||
-      memory.allow_ai !== 0
-    ) {
+    }>("SELECT uid, value, allow_ai FROM memories WHERE uid = ?", [row.memoryUid]);
+    if (!memory || memory.uid !== row.memoryUid || memory.value !== row.value || memory.allow_ai !== 0) {
       fail(`post-copy proof failed for fuel ${row.fuelUid}`);
     }
   }
@@ -138,9 +128,7 @@ async function deleteCopiedRows(
   copied: CopiedRow[],
 ): Promise<void> {
   for (const row of copied) {
-    const result = await exec.runAsync("DELETE FROM fuel WHERE id = ?", [
-      row.fuelId,
-    ]);
+    const result = await exec.runAsync("DELETE FROM fuel WHERE id = ?", [row.fuelId]);
     if (result.changes !== 1) {
       fail(`copied fuel row disappeared before deletion: ${row.fuelUid}`);
     }
