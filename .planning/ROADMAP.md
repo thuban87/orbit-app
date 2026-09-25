@@ -157,7 +157,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [ ] **Phase 37.1: Category Management** (INSERTED) - Category CRUD (create/rename/delete) over the read-only `categories` table + the deletion-cascade fallout to Orrery Systems, custom-System rules, Profile category assignments, and backup; consumes the route name/IA slot Phase 37 reserves (D-03, owner-approved 2026-09-14 to schedule now, before Phase 38)
 - [x] **Phase 38: Digest & Navigation Restructure** - Completed 2026-09-19 — verifier passed all S-01…S-15; physical Pixel UAT passed all nine mandatory checks; 406 files / 3,807 tests, TypeScript, colors, validation, and security gates passed. Three advisory code/UI warnings remain documented in the phase review artifacts.
 - [x] **Phase 38.1: Profile & Presentation Polish** (INSERTED) - Completed 2026-09-20 by owner acceptance: bounded presentation polish, audit, and release-APK UAT complete with two explicitly recorded (not passed) waivers — no-data Profile fixture and Off Limits device DB-preservation backstop. No schema/format change.
-- [ ] **Phase 38.2: Data Integrity, Security & Lifecycle Hardening** (INSERTED) - Pre-release audit remediation (RG-001–007, 009–018, 043): native trust/resource boundaries, restore/merge/photo-ownership integrity, import/temp-copy/notification lifecycle, startup-maintenance fault containment, transactional edit retry safety (owner-scheduled 2026-09-23, before Phase 39)
+- [x] **Phase 38.2: Data Integrity, Security & Lifecycle Hardening** (INSERTED) - Completed 2026-09-25: 16/16 plans; verification passed 22/22 with Pixel device UAT (isolated synthetic package) for RG-003/004/009–013/015/016/043; eleven device-found defects fixed (incl. Android 17 import picker, reminder reschedule churn, reconcile identity pulled forward from 38.4). Explicitly recorded owner dispositions (not passes): RG-001 remaining widget checks deferred to a widget-overhaul phase; RG-002 hostile-provider ingress and RG-014 Drive/Files/natural-24 h subcases waived. No schema change (TARGET_VERSION 30), backup format 7.
 - [ ] **Phase 38.3: Runtime Correctness, Navigation & State Coherence** (INSERTED) - Pre-release audit remediation (RG-019–026, 035, 042): participant editing, Dashboard shell/navigation, refresh ownership, Assist/Profile/Digest post-commit publication, truthful async states, notification tap chronology (owner-scheduled 2026-09-23)
 - [ ] **Phase 38.4: UI Consistency, Accessibility, Performance & Release Polish** (INSERTED) - Pre-release audit remediation (RG-008, 027–034, 036–041): AI permission presentation, bounded Orrery/Your Week resources, contrast + shared controls, contact/widget accessibility, narrow-width/large-text, Settings/forms/timestamps, FAB a11y investigation, overlay permission + launcher artwork (owner-scheduled 2026-09-23)
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
@@ -1095,7 +1095,7 @@ Plans:
 **Success Criteria**: Defined at planning; each RG's STATIC/RUNTIME/DEVICE verification expectations carried forward (real restore/export flows, failure injection, commit → failed read → retry)
 **Scope source**: docs/dossier/milestone-2/phase-38.2-audit-remediation-data-security-lifecycle-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; SYNTHESIS "Constraints that must survive remediation"
-**Plans**: 15/16 plans executed in 8 waves
+**Plans**: 16/16 plans executed in 8 waves
 
 Plans:
 **Wave 1**
@@ -1136,7 +1136,7 @@ Plans:
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 38.2-16-PLAN.md — Phase gate and batched Pixel device UAT (all DEVICE-dimension RGs)
+- [x] 38.2-16-PLAN.md — Phase gate and batched Pixel device UAT (all DEVICE-dimension RGs)
 
 > **Ready to discuss — dossier authored 2026-09-23 (owner + codex) from the 2026-09 pre-release audit campaign. Run gsd-discuss-phase first (see `38.2-CONTEXT.md` shim, open owner items: RG-007 retrospective consent, RG-005 outcome, RG-010 filename policy, possible backup-format bump). RG-005 is investigation-gated.**
 

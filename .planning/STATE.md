@@ -4,18 +4,22 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.2
 current_phase_name: Data Integrity, Security & Lifecycle Hardening
-status: executing
-stopped_at: Completed 38.2-15-PLAN.md; next 38.2-16
-last_updated: "2026-09-24T11:50:34.551Z"
-last_activity: 2026-09-23
-last_activity_desc: Phase 38.2 execution started
+status: phase-complete
+stopped_at: Phase 38.2 complete (16/16, verification passed 22/22); next Phase 38.3
+last_updated: "2026-09-25T18:00:00.000Z"
+last_activity: 2026-09-25
+last_activity_desc: Phase 38.2 closed after Pixel device UAT with owner dispositions
 state_head: fe3aed185aa88c8fc387a3d54e7e1b7cbadd137f
 progress:
   total_phases: 26
-  completed_phases: 15
+  completed_phases: 16
   total_plans: 202
-  completed_plans: 199
+  completed_plans: 200
 carried_forward:
+
+  - "WIDGET OVERHAUL (owner 2026-09-25): owner wants a dedicated widget phase (dislikes current widget in several ways). RG-001 remaining checks (max-size resize, visible explicit refresh) are DEFERRED there — not passes."
+  - "38.2 owner waivers (2026-09-25, not passes): RG-002 hostile-provider ingress subcases (no test-provider APK built); RG-014 completed Drive upload (Drive stalls for any app's share on the test Pixel — environmental), Files target, natural 24 h retirement."
+  - "Owner call pending: pre-session commit 25063ad (Biome format pass) reformatted shipped migrations 006/009/017 — token-identical apart from whitespace/import order, no SQL change, but breaks the letter of 'never edit a shipped migration'. Consider excluding src/db/migrations/** from Biome formatting."
 
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."
   - "PARKED (owner decision 2026-09-11): 'merge theme into mode' — collapse Galaxy/Standard package into a single Dark/Light appearance switch (Dark=galaxy visuals, Light=standard visuals). Reverses ADR-087 'each package remembers its own mode'; owner chose it but deferred as its own future phase (data-layer migration + theme-store + Settings UI + palette resolution). Rides with it: card-blend (translucent content cards), background-picker filtering, and Deep Space/Starfield removal. Do NOT start unprompted — needs discuss→plan. See memory theme-merge-into-mode-parked."
@@ -36,9 +40,9 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 38.2 (Data Integrity, Security & Lifecycle Hardening) — EXECUTING
+Phase: 38.2 (Data Integrity, Security & Lifecycle Hardening) — COMPLETE (2026-09-25)
 Plan: 16 of 16
-Status: Ready to execute
+Status: Phase complete — next: Phase 38.3 (Runtime Correctness, Navigation & State Coherence)
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
