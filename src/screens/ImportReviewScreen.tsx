@@ -56,6 +56,7 @@ import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS } from "@/types";
 import { Logger } from "@/utils/logger";
 import { useImportLeaveGuard } from "./use-import-leave-guard";
+import { useOpenImportSession } from "./use-open-import-session";
 
 const LOG_SCOPE = "import-review";
 
@@ -80,6 +81,7 @@ export function ImportReviewScreen({
   navigation,
   route,
 }: RootStackScreenProps<"ImportReview">) {
+  useOpenImportSession(route.params.sessionId);
   const { colors } = useTheme();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

@@ -20,6 +20,7 @@ import {
 } from "@/services/import/import-photo-retry";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { useOpenImportSession } from "./use-open-import-session";
 
 const LOG_SCOPE = "import-complete";
 
@@ -32,6 +33,7 @@ export function ImportCompleteScreen({
   navigation,
   route,
 }: RootStackScreenProps<"ImportComplete">) {
+  useOpenImportSession(route.params.sessionId);
   const { colors } = useTheme();
   const [counts, setCounts] = useState<SessionSummaryCounts | null>(null);
   const [hasFailures, setHasFailures] = useState(false);

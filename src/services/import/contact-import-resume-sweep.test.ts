@@ -24,7 +24,10 @@ import {
   registerImportResumeSweep,
   retireDetachedImportRows,
 } from "@/services/import/contact-import-resume-sweep";
-import { withImportFlowActive } from "@/services/import/import-flow-guard";
+import {
+  markImportSessionOpen,
+  withImportFlowActive,
+} from "@/services/import/import-flow-guard";
 import { __resetSweepForTest, runLaunchSweep } from "@/services/launch-sweep";
 
 const NOW = "2026-08-29 12:00:00";
@@ -146,6 +149,25 @@ describe("contact-import-resume-sweep", () => {
     // Once the flow has handed off, a real foreground pass behaves normally.
     await runLaunchSweep();
     expect(onResumable).toHaveBeenCalledOnce();
+  });
+
+  it("does not offer to resume the session an import screen is showing", async () => {
+    const accepted = await acceptRows(["on-screen"], { mode: "single" });
+    const onResumable = vi.fn<(value: ResumableImport | null) => void>();
+    registerImportResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      now: () => NOW,
+    });
+
+    const release = markImportSessionOpen(accepted.sessionId);
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(null);
+
+    release();
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(
+      expect.objectContaining({ sessionId: accepted.sessionId }),
+    );
   });
 
   it("sweeps older pending sessions and deletes their returned staged files in the same launch", async () => {

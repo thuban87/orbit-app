@@ -25,6 +25,7 @@ import { importRowAsNew } from "@/services/import/import-driver";
 import { resolveImportStagingUri } from "@/services/photos/photo-storage";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { useOpenImportSession } from "./use-open-import-session";
 
 const LOG_SCOPE = "duplicate-review";
 
@@ -78,6 +79,7 @@ export function DuplicateReviewScreen({
   navigation,
   route,
 }: RootStackScreenProps<"DuplicateReview">) {
+  useOpenImportSession(route.params.sessionId);
   const { colors } = useTheme();
   const [session, setSession] = useState<ImportSession | null>(null);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);

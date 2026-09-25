@@ -12,7 +12,10 @@ import {
 } from "@/db/import-session-read";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
-import { isImportFlowActive } from "@/services/import/import-flow-guard";
+import {
+  isImportFlowActive,
+  isImportSessionOpen,
+} from "@/services/import/import-flow-guard";
 import { registerSweepHook } from "@/services/launch-sweep";
 import {
   deleteImportStaging,
@@ -193,7 +196,9 @@ export function registerImportResumeSweep(
         // getResumableSession's stale-session discard has committed before it
         // returns these paths, so file cleanup cannot race the DB transaction.
         cleanupDiscardedStagedPhotos(fs, resumable.sweptPhotoRelPaths);
-        description = await describeResumable(exec, resumable.session);
+        // The session an import screen is already showing is not "resumable".
+        if (!isImportSessionOpen(resumable.session.id))
+          description = await describeResumable(exec, resumable.session);
       }
     } catch (error) {
       Logger.error(LOG_SCOPE, "could not inspect resumable import", error);

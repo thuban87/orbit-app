@@ -6,6 +6,7 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { runImportBatch } from "@/services/import/import-driver";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { useOpenImportSession } from "./use-open-import-session";
 
 const LOG_SCOPE = "import-progress";
 
@@ -14,6 +15,7 @@ export function ImportProgressScreen({
   navigation,
   route,
 }: RootStackScreenProps<"ImportProgress">) {
+  useOpenImportSession(route.params.sessionId);
   const { colors } = useTheme();
   const mounted = useRef(false);
   const [done, setDone] = useState(0);

@@ -33,6 +33,7 @@ import {
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import { useImportLeaveGuard } from "./use-import-leave-guard";
+import { useOpenImportSession } from "./use-open-import-session";
 
 const LOG_SCOPE = "bulk-import-setup";
 
@@ -45,6 +46,7 @@ export function BulkImportSetupScreen({
   navigation,
   route,
 }: RootStackScreenProps<"BulkImportSetup">) {
+  useOpenImportSession(route.params.sessionId);
   const { colors } = useTheme();
   const [count, setCount] = useState(0);
   const [categories, setCategories] = useState<
