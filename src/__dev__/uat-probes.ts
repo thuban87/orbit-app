@@ -13,6 +13,20 @@ export function registerUatProbes(): void {
     Logger.setLevel("debug");
     console.log("uat-probe logger level", Logger.getLevel());
   });
+  DevSettings.addMenuItem("UAT: fail first sweep hook (next pass)", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { __armUatSweepFault } =
+      require("@/services/launch-sweep") as typeof import("@/services/launch-sweep");
+    __armUatSweepFault({ failFirstHook: true });
+    console.log("uat-probe armed first-hook failure");
+  });
+  DevSettings.addMenuItem("UAT: slow next sweep pass (8s)", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { __armUatSweepFault } =
+      require("@/services/launch-sweep") as typeof import("@/services/launch-sweep");
+    __armUatSweepFault({ slowPassMs: 8_000 });
+    console.log("uat-probe armed slow pass");
+  });
   DevSettings.addMenuItem("Dump scheduled notifications", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getAllScheduledNotificationsAsync } =

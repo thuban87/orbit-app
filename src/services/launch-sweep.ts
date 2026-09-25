@@ -67,6 +67,21 @@ export function registerSweepHook(
   hooks.push({ fn, options });
 }
 
+// Debug-only UAT fault injection (38.2-16, RG-016). Inert unless a dev-menu
+// probe arms it in a __DEV__ build; production passes never read these.
+type UatSweepFault = { failFirstHook: boolean; slowPassMs: number };
+const uatFault: UatSweepFault = { failFirstHook: false, slowPassMs: 0 };
+let uatPassCount = 0;
+function isDevBuild(): boolean {
+  return typeof __DEV__ !== "undefined" && __DEV__ === true;
+}
+
+/** Debug builds only: arm a one-shot first-hook failure and/or a slow pass. */
+export function __armUatSweepFault(fault: Partial<UatSweepFault>): void {
+  if (!isDevBuild()) return;
+  Object.assign(uatFault, fault);
+}
+
 // Module-level re-entrancy guard: keeps a single launch from double-running.
 let running = false;
 // DEFER-ONE (WR-03): a real background→active launch that overlaps an in-flight
@@ -101,7 +116,14 @@ export async function runLaunchSweep(): Promise<void> {
       // exactly one more pass (coalescing a burst into a single follow-up).
       pendingRerun = false;
       const unavailable = new Set<string>();
-      for (const { fn, options } of hooks) {
+      const uatPass = isDevBuild() ? ++uatPassCount : 0;
+      if (uatPass) console.log("uat-sweep pass start", uatPass);
+      if (isDevBuild() && uatFault.slowPassMs > 0) {
+        const ms = uatFault.slowPassMs;
+        uatFault.slowPassMs = 0;
+        await new Promise((resolve) => setTimeout(resolve, ms));
+      }
+      for (const [index, { fn, options }] of hooks.entries()) {
         if (options.requires?.some((id) => unavailable.has(id))) {
           if (options.id) unavailable.add(options.id);
           Logger.warn(
@@ -111,6 +133,10 @@ export async function runLaunchSweep(): Promise<void> {
           continue;
         }
         try {
+          if (index === 0 && isDevBuild() && uatFault.failFirstHook) {
+            uatFault.failFirstHook = false;
+            throw new Error("uat injected first-hook failure");
+          }
           await fn();
         } catch {
           if (options.id) unavailable.add(options.id);
@@ -120,6 +146,7 @@ export async function runLaunchSweep(): Promise<void> {
           );
         }
       }
+      if (uatPass) console.log("uat-sweep pass end", uatPass);
     } while (pendingRerun);
   } finally {
     running = false;
