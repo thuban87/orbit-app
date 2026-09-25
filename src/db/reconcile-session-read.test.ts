@@ -16,6 +16,7 @@ import {
 import {
   getNewestPendingReconcileSessionId,
   getResumableReconcileSession,
+  listReconcileCardIdentities,
   reconcileCompletionCounts,
 } from "@/db/reconcile-session-read";
 import type { SqlExecutor } from "@/db/types";
@@ -162,5 +163,32 @@ describe("reconcile-session-read", () => {
       newest,
     );
     expect(older).toBeLessThan(newest);
+  });
+});
+
+describe("listReconcileCardIdentities", () => {
+  it("names review cards by the live contact, never a database id", async () => {
+    const ada = await seedContact(exec, "Ada Lovelace");
+    const grace = await seedContact(exec, "Grace Hopper");
+    await exec.runAsync("UPDATE contacts SET photo = ? WHERE id = ?", [
+      `avatars/contact-${grace}.jpg`,
+      grace,
+    ]);
+
+    const identities = await listReconcileCardIdentities(exec, [
+      ada,
+      grace,
+      ada,
+      999,
+    ]);
+
+    expect(identities.get(ada)).toEqual({
+      contactId: ada,
+      name: "Ada Lovelace",
+      photo: null,
+    });
+    expect(identities.get(grace)?.photo).toBe(`avatars/contact-${grace}.jpg`);
+    expect(identities.has(999)).toBe(false);
+    expect(await listReconcileCardIdentities(exec, [])).toEqual(new Map());
   });
 });

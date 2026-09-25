@@ -102,6 +102,39 @@ export async function listReconcileSessionCards(
   return rows.map(mapCard);
 }
 
+/** Display identity for review cards: the live contact's name and stored photo. */
+export interface ReconcileCardIdentity {
+  contactId: number;
+  name: string;
+  photo: string | null;
+}
+
+/**
+ * Resolve review-card identity from the live contact rows (RG-031,
+ * AUD-UIA-019). Cards must name the real person, never a database id.
+ */
+export async function listReconcileCardIdentities(
+  exec: SqlExecutor,
+  contactIds: readonly number[],
+): Promise<Map<number, ReconcileCardIdentity>> {
+  const ids = [...new Set(contactIds)];
+  if (ids.length === 0) return new Map();
+  const rows = await exec.getAllAsync<{
+    id: number;
+    name: string;
+    photo: string | null;
+  }>(
+    `SELECT id, name, photo FROM contacts WHERE id IN (${ids.map(() => "?").join(",")})`,
+    ids,
+  );
+  return new Map(
+    rows.map((row) => [
+      row.id,
+      { contactId: row.id, name: row.name, photo: row.photo },
+    ]),
+  );
+}
+
 /**
  * Return the one newest pending session and terminally sweep older work.
  * Card payloads are intentionally never parsed in this sweep; cleanup only

@@ -66,6 +66,8 @@ import {
 type Choice = ReconcileChoice;
 type ActiveLink = { id: number; external_contact_id: string; provider: string };
 interface ScanState {
+  /** The Orbit contact under review — the screen must name the real person. */
+  contactName: string;
   diff: ReconcileDiffResult;
   sourcePhotoUri: string | null;
   links: ActiveLink[];
@@ -204,6 +206,7 @@ export function ReconcileDetailScreen({
     );
     if (diff.fields.length === 0) setMessage("No changes from Contacts.");
     setScan({
+      contactName: contact.name,
       diff,
       sourcePhotoUri: stagedRelative
         ? resolveReconcileStagingUri(stagedRelative)
@@ -405,6 +408,9 @@ export function ReconcileDetailScreen({
           <Text style={[styles.title, { color: colors.textPrimary }]}>
             Update from Contacts
           </Text>
+          <Text style={[styles.subject, { color: colors.textSecondary }]}>
+            {scan.contactName}
+          </Text>
         </View>
         <View style={styles.missingSource}>
           <View
@@ -455,6 +461,9 @@ export function ReconcileDetailScreen({
         </Pressable>
         <Text style={[styles.title, { color: colors.textPrimary }]}>
           Update from Contacts
+        </Text>
+        <Text style={[styles.subject, { color: colors.textSecondary }]}>
+          {scan.contactName}
         </Text>
         <Pressable
           onPress={() =>
@@ -582,6 +591,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, padding: 16, gap: 16 },
   header: { gap: 10 },
   title: { fontSize: 24, fontWeight: "600" },
+  subject: { fontSize: 18 },
   content: { gap: 16, paddingBottom: 24 },
   apply: {
     minHeight: 44,

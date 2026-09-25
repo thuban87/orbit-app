@@ -43,7 +43,10 @@ export function registerUatProbes(): void {
         const identifier = notification.request.identifier;
         console.log(
           "uat-probe presented",
-          JSON.stringify({ identifier, data: notification.request.content.data }),
+          JSON.stringify({
+            identifier,
+            data: notification.request.content.data,
+          }),
         );
         if (!identifier.startsWith("decay:")) continue;
         try {

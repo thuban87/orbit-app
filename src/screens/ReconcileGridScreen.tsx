@@ -17,7 +17,9 @@ import {
 } from "@/db/reconcile-session-dao";
 import {
   getReconcileSessionById,
+  listReconcileCardIdentities,
   listReconcileSessionCards,
+  type ReconcileCardIdentity,
   type ReconcileSessionCard,
 } from "@/db/reconcile-session-read";
 import { getReviewedSnapshots } from "@/db/reconcile-snapshot-dao";
@@ -39,7 +41,10 @@ import {
   openContactsSettings,
 } from "@/services/contacts/use-read-contacts-permission";
 import { discardDerivative } from "@/services/photos/derivative-cache";
-import { deleteReconcileStaging } from "@/services/photos/photo-storage";
+import {
+  deleteReconcileStaging,
+  resolvePhotoUri,
+} from "@/services/photos/photo-storage";
 import { stageReconcileSourcePhoto } from "@/services/photos/reconcile-photo";
 import { useTheme } from "@/theme";
 import {
@@ -99,6 +104,9 @@ export function ReconcileGridScreen({
     route.params?.sessionId ?? null,
   );
   const [cards, setCards] = useState<GridCard[]>([]);
+  const [identities, setIdentities] = useState<
+    Map<number, ReconcileCardIdentity>
+  >(new Map());
   const [scoring, setScoring] = useState(route.params?.sessionId == null);
   const [message, setMessage] = useState<string | null>(null);
   const [needsContactsAccess, setNeedsContactsAccess] = useState(false);
@@ -113,6 +121,12 @@ export function ReconcileGridScreen({
           ? [{ card, diff }]
           : [];
       });
+      setIdentities(
+        await listReconcileCardIdentities(
+          getExecutor(),
+          next.map(({ card }) => card.contactId),
+        ),
+      );
       setCards(next);
       const session = await getReconcileSessionById(getExecutor(), id);
       if (session?.status === "complete" && next.length === 0) {
@@ -309,14 +323,17 @@ export function ReconcileGridScreen({
     () => new Map(cards.map((entry) => [entry.card.id, entry])),
     [cards],
   );
-  const items: CandidateItem[] = cards.map(({ card, diff }) => ({
-    id: card.id,
-    name: `Contact ${card.contactId}`,
-    outcome: "needs_review",
-    chipLabel: chipLabel(diff),
-    evidenceHint: `${card.unresolvedCount} difference${card.unresolvedCount === 1 ? "" : "s"} left`,
-    photoUri: null,
-  }));
+  const items: CandidateItem[] = cards.map(({ card, diff }) => {
+    const identity = identities.get(card.contactId);
+    return {
+      id: card.id,
+      name: identity?.name ?? "Contact no longer in Orbit",
+      outcome: "needs_review",
+      chipLabel: chipLabel(diff),
+      evidenceHint: `${card.unresolvedCount} difference${card.unresolvedCount === 1 ? "" : "s"} left`,
+      photoUri: identity?.photo ? resolvePhotoUri(identity.photo) : null,
+    };
+  });
 
   const onBulkAction = useCallback(
     async (
