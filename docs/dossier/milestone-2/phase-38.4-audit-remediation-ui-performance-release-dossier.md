@@ -47,6 +47,12 @@ search/selection/decision context; stop substituting DB IDs for people;
 use registered semantic fonts where required; author accessible names
 for native widget action overlays.
 
+> **2026-09-25 — pulled forward into 38.2 (`1e0139c`):** the visible half of
+> `ui-accessibility/AUD-UIA-019` — reconciliation grid cards now show the live
+> contact's name and photo instead of `Contact <id>`, and the detail screen names
+> the contact. The accessible-representation findings (AUD-UIA-007/008) and the
+> font mapping (AUD-UIA-015) remain here.
+
 ## Workstream E --- Responsive Layout and Large Text
 
 **RG-033, RG-034.** Keep heatmaps within supported narrow widths; make
