@@ -511,7 +511,10 @@ export function ReconcileDetailScreen({
                   id: "source",
                   uri: scan.sourcePhotoUri,
                   name: "Contacts photo",
-                  provenance: "Contacts",
+                  // Name the linked phone contact the photo came from (RG-031).
+                  provenance:
+                    field.sourceOptions[0]?.provenanceLabels.join(", ") ||
+                    "Phone contact",
                 },
               ]}
               mode={field.outcome === "conflict" ? "conflict" : "additive"}
