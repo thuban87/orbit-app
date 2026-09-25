@@ -4,6 +4,10 @@ import {
   getResumableReconcileSession,
 } from "@/db/reconcile-session-read";
 import type { SqlExecutor } from "@/db/types";
+import {
+  isReconcileFlowActive,
+  isReconcileSessionOpen,
+} from "@/services/import/reconcile-flow-guard";
 import { registerSweepHook } from "@/services/launch-sweep";
 import {
   deleteReconcileStaging,
@@ -92,6 +96,9 @@ export function registerReconcileResumeSweep(
   }: RegisterReconcileResumeSweepOptions = {},
 ): void {
   registerSweepHook(async () => {
+    // A permission round-trip backgrounds Orbit mid-scan: skip this pass so it
+    // neither prompts for the live check nor deletes not-yet-committed staging.
+    if (isReconcileFlowActive()) return;
     const exec = getExec();
     let description: ResumableReconcile | null = null;
     try {
@@ -101,7 +108,9 @@ export function registerReconcileResumeSweep(
           fs,
           resumable.sweptStagedPhotoRelPaths,
         );
-        description = describeResumableReconcile(resumable);
+        // The check a reconcile screen is showing is not "resumable".
+        if (!isReconcileSessionOpen(resumable.session.id))
+          description = describeResumableReconcile(resumable);
       }
     } catch (error) {
       Logger.error(

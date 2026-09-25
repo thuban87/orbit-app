@@ -1,5 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -47,6 +47,10 @@ import {
   ensureReadContactsPermission,
   openContactsSettings,
 } from "@/services/contacts/use-read-contacts-permission";
+import {
+  markReconcileSessionOpen,
+  withReconcileFlowActive,
+} from "@/services/import/reconcile-flow-guard";
 import { discardDerivative } from "@/services/photos/derivative-cache";
 import {
   deleteReconcileStaging,
@@ -81,152 +85,161 @@ export function ReconcileDetailScreen({
 }: RootStackScreenProps<"ReconcileDetail">) {
   const { colors } = useTheme();
   const { contactId, sessionId, cardId } = route.params;
+  useEffect(
+    () => (sessionId == null ? undefined : markReconcileSessionOpen(sessionId)),
+    [sessionId],
+  );
   const [scan, setScan] = useState<ScanState | null>(null);
   const [choices, setChoices] = useState<Partial<Record<string, Choice>>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [needsContactsAccess, setNeedsContactsAccess] = useState(false);
   const [applying, setApplying] = useState(false);
 
-  const load = useCallback(async () => {
-    setScan(null);
-    setMessage(null);
-    setNeedsContactsAccess(false);
-    const exec = getExecutor();
-    const [contact, links, methods] = await Promise.all([
-      exec.getFirstAsync<{
-        name: string;
-        birthday: string | null;
-        photo: string | null;
-        modified_at: string;
-      }>(
-        "SELECT name, birthday, photo, modified_at FROM contacts WHERE id = ?",
-        [contactId],
-      ),
-      exec.getAllAsync<ActiveLink>(
-        "SELECT id, external_contact_id, provider FROM external_contact_links WHERE contact_id = ? AND is_active = 1 ORDER BY id ASC",
-        [contactId],
-      ),
-      listContactMethods(exec, contactId),
-    ]);
-    if (!contact || links.length === 0) {
-      setMessage("No linked Contacts source is available.");
-      return;
-    }
-    // ADR-003: reconcile reads ContactsContract directly; ensure READ_CONTACTS first (in-context of this tap).
-    const access = await ensureReadContactsPermission();
-    if (!access.granted) {
-      setNeedsContactsAccess(true);
-      setMessage(
-        access.verdict === "permanent"
-          ? "Orbit needs Contacts access to check for changes. Enable it in Settings."
-          : "Orbit needs Contacts access to check for changes.",
-      );
-      return;
-    }
-    const read = await readAllContacts(
-      links.map((link) => link.external_contact_id),
-    );
-    const pickedByKey = new Map(
-      read.contacts.map((picked) => [picked.lookupKey, picked]),
-    );
-    const firstPhoto = links
-      .map((link) => ({
-        link,
-        picked: pickedByKey.get(link.external_contact_id),
-      }))
-      .find(
-        (item): item is { link: ActiveLink; picked: PickedContact } =>
-          item.picked?.photoTempUri != null,
-      );
-    let stagedRelative: string | null = null;
-    let photoHash: string | null = null;
-    try {
-      if (firstPhoto?.picked.photoTempUri) {
-        const staged = await stageReconcileSourcePhoto(
-          firstPhoto.picked.photoTempUri,
-          `contact-${contactId}-link-${firstPhoto.link.id}`,
+  const load = useCallback(
+    () =>
+      withReconcileFlowActive(async () => {
+        setScan(null);
+        setMessage(null);
+        setNeedsContactsAccess(false);
+        const exec = getExecutor();
+        const [contact, links, methods] = await Promise.all([
+          exec.getFirstAsync<{
+            name: string;
+            birthday: string | null;
+            photo: string | null;
+            modified_at: string;
+          }>(
+            "SELECT name, birthday, photo, modified_at FROM contacts WHERE id = ?",
+            [contactId],
+          ),
+          exec.getAllAsync<ActiveLink>(
+            "SELECT id, external_contact_id, provider FROM external_contact_links WHERE contact_id = ? AND is_active = 1 ORDER BY id ASC",
+            [contactId],
+          ),
+          listContactMethods(exec, contactId),
+        ]);
+        if (!contact || links.length === 0) {
+          setMessage("No linked Contacts source is available.");
+          return;
+        }
+        // ADR-003: reconcile reads ContactsContract directly; ensure READ_CONTACTS first (in-context of this tap).
+        const access = await ensureReadContactsPermission();
+        if (!access.granted) {
+          setNeedsContactsAccess(true);
+          setMessage(
+            access.verdict === "permanent"
+              ? "Orbit needs Contacts access to check for changes. Enable it in Settings."
+              : "Orbit needs Contacts access to check for changes.",
+          );
+          return;
+        }
+        const read = await readAllContacts(
+          links.map((link) => link.external_contact_id),
         );
-        stagedRelative = staged.stagedRelative;
-        photoHash = staged.contentHash;
-      }
-    } finally {
-      for (const picked of read.contacts) {
-        if (picked.photoTempUri) discardDerivative(picked.photoTempUri);
-      }
-    }
-    const readLinks = links.filter((link) =>
-      pickedByKey.has(link.external_contact_id),
-    );
-    const labels = reconcileSourceLabels(
-      readLinks.map((link) => ({
-        displayName:
-          pickedByKey.get(link.external_contact_id)?.displayName ?? null,
-      })),
-    );
-    const labelByLinkId = new Map(
-      readLinks.map((link, index) => [link.id, labels[index]]),
-    );
-    const sources: ReconcileSource[] = links.flatMap((link) => {
-      const picked = pickedByKey.get(link.external_contact_id);
-      return picked
-        ? [
-            {
-              externalContactLinkId: link.id,
-              displayName: picked.displayName,
-              methods: picked.methods,
-              birthday: picked.birthday,
-              provenanceLabel: labelByLinkId.get(link.id) ?? "Phone contact",
-              ...(link.id === firstPhoto?.link.id
-                ? {
-                    stagedPhotoRelative: stagedRelative,
-                    photoContentHash: photoHash,
-                  }
-                : {}),
-            },
-          ]
-        : [];
-    });
-    const snapshots = await Promise.all(
-      links.map((link) => getReviewedSnapshots(exec, link.id)),
-    );
-    const diff = classifyReconciliation({
-      orbit: {
-        name: contact.name,
-        birthday: contact.birthday,
-        photo: contact.photo,
-        methods: methods.map((method) => ({
-          type: method.method_type,
-          value: method.raw_value,
-          label: method.label,
-        })),
-        modifiedAt: contact.modified_at,
-      },
-      sources,
-      lastReviewed: snapshots[0] ?? {},
-      omittedCount: read.omittedCount,
-    });
-    setChoices(
-      Object.fromEntries(
-        diff.fields
-          .filter((field) => field.outcome !== "conflict")
-          .map((field) => [
-            field.fieldFamily,
-            field.outcome === "additive" && field.sourceOptions[0]
-              ? `source:${field.sourceOptions[0].optionId}`
-              : "orbit",
-          ]),
-      ),
-    );
-    if (diff.fields.length === 0) setMessage("No changes from Contacts.");
-    setScan({
-      contactName: contact.name,
-      diff,
-      sourcePhotoUri: stagedRelative
-        ? resolveReconcileStagingUri(stagedRelative)
-        : null,
-      links,
-    });
-  }, [contactId]);
+        const pickedByKey = new Map(
+          read.contacts.map((picked) => [picked.lookupKey, picked]),
+        );
+        const firstPhoto = links
+          .map((link) => ({
+            link,
+            picked: pickedByKey.get(link.external_contact_id),
+          }))
+          .find(
+            (item): item is { link: ActiveLink; picked: PickedContact } =>
+              item.picked?.photoTempUri != null,
+          );
+        let stagedRelative: string | null = null;
+        let photoHash: string | null = null;
+        try {
+          if (firstPhoto?.picked.photoTempUri) {
+            const staged = await stageReconcileSourcePhoto(
+              firstPhoto.picked.photoTempUri,
+              `contact-${contactId}-link-${firstPhoto.link.id}`,
+            );
+            stagedRelative = staged.stagedRelative;
+            photoHash = staged.contentHash;
+          }
+        } finally {
+          for (const picked of read.contacts) {
+            if (picked.photoTempUri) discardDerivative(picked.photoTempUri);
+          }
+        }
+        const readLinks = links.filter((link) =>
+          pickedByKey.has(link.external_contact_id),
+        );
+        const labels = reconcileSourceLabels(
+          readLinks.map((link) => ({
+            displayName:
+              pickedByKey.get(link.external_contact_id)?.displayName ?? null,
+          })),
+        );
+        const labelByLinkId = new Map(
+          readLinks.map((link, index) => [link.id, labels[index]]),
+        );
+        const sources: ReconcileSource[] = links.flatMap((link) => {
+          const picked = pickedByKey.get(link.external_contact_id);
+          return picked
+            ? [
+                {
+                  externalContactLinkId: link.id,
+                  displayName: picked.displayName,
+                  methods: picked.methods,
+                  birthday: picked.birthday,
+                  provenanceLabel:
+                    labelByLinkId.get(link.id) ?? "Phone contact",
+                  ...(link.id === firstPhoto?.link.id
+                    ? {
+                        stagedPhotoRelative: stagedRelative,
+                        photoContentHash: photoHash,
+                      }
+                    : {}),
+                },
+              ]
+            : [];
+        });
+        const snapshots = await Promise.all(
+          links.map((link) => getReviewedSnapshots(exec, link.id)),
+        );
+        const diff = classifyReconciliation({
+          orbit: {
+            name: contact.name,
+            birthday: contact.birthday,
+            photo: contact.photo,
+            methods: methods.map((method) => ({
+              type: method.method_type,
+              value: method.raw_value,
+              label: method.label,
+            })),
+            modifiedAt: contact.modified_at,
+          },
+          sources,
+          lastReviewed: snapshots[0] ?? {},
+          omittedCount: read.omittedCount,
+        });
+        setChoices(
+          Object.fromEntries(
+            diff.fields
+              .filter((field) => field.outcome !== "conflict")
+              .map((field) => [
+                field.fieldFamily,
+                field.outcome === "additive" && field.sourceOptions[0]
+                  ? `source:${field.sourceOptions[0].optionId}`
+                  : "orbit",
+              ]),
+          ),
+        );
+        if (diff.fields.length === 0) setMessage("No changes from Contacts.");
+        setScan({
+          contactName: contact.name,
+          diff,
+          sourcePhotoUri: stagedRelative
+            ? resolveReconcileStagingUri(stagedRelative)
+            : null,
+          links,
+        });
+      }),
+    [contactId],
+  );
   useFocusEffect(
     useCallback(() => {
       void load().catch(() => setMessage("Could not read Contacts right now."));

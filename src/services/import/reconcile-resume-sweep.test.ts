@@ -15,6 +15,10 @@ import {
 } from "@/db/reconcile-session-dao";
 import type { SqlExecutor } from "@/db/types";
 import {
+  markReconcileSessionOpen,
+  withReconcileFlowActive,
+} from "@/services/import/reconcile-flow-guard";
+import {
   type ReconcileStagingFileSystem,
   type ResumableReconcile,
   reconcileOrphanReconcileStagedPhotos,
@@ -96,6 +100,43 @@ describe("reconcile-resume-sweep", () => {
     await runLaunchSweep();
 
     expect(onResumable).toHaveBeenCalledWith({ sessionId, discardOnly: false });
+  });
+
+  it("skips the pass entirely while a scan is reading sources", async () => {
+    await seedCard();
+    const onResumable = vi.fn<(value: ResumableReconcile | null) => void>();
+    const fs = stagingFs(["reconcile-staging/not-yet-committed.jpg"]);
+    registerReconcileResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      fs,
+      now: () => NOW,
+    });
+
+    await withReconcileFlowActive(() => runLaunchSweep());
+
+    expect(onResumable).not.toHaveBeenCalled();
+    expect(fs.deleted).toEqual([]);
+  });
+
+  it("does not offer to resume the check a reconcile screen is showing", async () => {
+    const sessionId = await seedCard();
+    const onResumable = vi.fn<(value: ResumableReconcile | null) => void>();
+    registerReconcileResumeSweep(onResumable, {
+      getExecutor: () => exec,
+      fs: stagingFs(["reconcile-staging/live.jpg"]),
+      now: () => NOW,
+    });
+
+    const release = markReconcileSessionOpen(sessionId);
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith(null);
+
+    release();
+    await runLaunchSweep();
+    expect(onResumable).toHaveBeenLastCalledWith({
+      sessionId,
+      discardOnly: false,
+    });
   });
 
   it("turns a malformed card into a discard-only descriptor via the tolerant id read", async () => {
