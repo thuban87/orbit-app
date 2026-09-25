@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 36 of
-  153 ADRs are superseded in whole or in part.
+  154 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -32,7 +32,7 @@ not something you can pattern-match against.
 | # | Title | Status | Phase | Supersedes | Superseded by | Subsystems | Key files | Directories |
 |---|-------|--------|-------|------------|---------------|------------|-----------|-------------|
 | 001 | Normalized Custom-Field Values | Accepted | 16-custom-field-value-normalization | ADR-013; ADR-014 (partial); ADR-015 (partial) | — | — | 9 | `src/db`, `src/db/migrations` |
-| 002 | Cross-Version Contact Import — Hybrid Two-Picker | Accepted | 19.1-older-android-contact-picker-hybrid-two-picker-adr-002 | — | ADR-003 (partial) | — | 10/12 live | `modules/orbit-contact-picker`, `modules/orbit-contact-picker/android/src/main`, `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker` +5 |
+| 002 | Cross-Version Contact Import — Hybrid Two-Picker | Accepted | 19.1-older-android-contact-picker-hybrid-two-picker-adr-002 | — | ADR-003 (partial), ADR-154 (partial) | — | 10/12 live | `modules/orbit-contact-picker`, `modules/orbit-contact-picker/android/src/main`, `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker` +5 |
 | 003 | `READ_CONTACTS` on API 37+ for Reconcile | Accepted | 20-contact-reconciliation-merge | ADR-002 (partial) | — | — | 5 | `modules/orbit-contact-picker/android/src/main`, `plugins`, `src/screens` +1 |
 | 004 | Flat Single-App Repository | Accepted | 01-project-scaffold-portable-code | — | — | — | 1 | `src/db` |
 | 005 | AiService Port Omits the Local/LAN (Ollama) Provider | Accepted | 01-project-scaffold-portable-code | — | — | — | 3 | `src/services` |
@@ -184,3 +184,4 @@ not something you can pattern-match against.
 | 151 | Visual-Only Relationship Overview Orphan Packing | Accepted | 38.1-profile-presentation-polish | — | — | — | 2 | `src/components/profile`, `src/profile` |
 | 152 | Vertical History Heatmap and Minute-Precision Timestamps | Accepted | 38.1-profile-presentation-polish | — | — | — | 5 | `src/components/history`, `src/db`, `src/screens` +1 |
 | 153 | Two-Row Normal Contacts Grid | Accepted | 38.1-profile-presentation-polish | ADR-101 (partial — normal Grid card context row) | — | — | 2 | `src/components`, `src/screens` |
+| 154 | API-37 Import Requests Contacts Access for Notes | Accepted | 38.2-audit-remediation-data-security-lifecycle | ADR-002 (partial — API-37+ import is no longer strictly permissionless) | — | — | 3 | `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker`, `src/screens`, `src/services/import` |

@@ -26,6 +26,7 @@ import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
   type ContactsPermissionState,
+  ensureReadContactsPermission,
   getContactsPermissionState,
   openContactsSettings,
   requestContactsPermission,
@@ -35,7 +36,10 @@ import type { ResumableReconcile } from "@/services/import/reconcile-resume-swee
 import { startContactImport } from "@/services/import/start-contact-import";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
-import { pickContacts } from "../../modules/orbit-contact-picker";
+import {
+  pickContacts,
+  readAllContacts,
+} from "../../modules/orbit-contact-picker";
 import {
   isActiveContactsRow,
   SETTINGS_CONTACTS_SECTIONS,
@@ -128,6 +132,10 @@ export function SettingsContactsScreen({
           currentSettings.phoneRegionOverride ?? getDeviceRegion(),
         now: localDateTime(),
         pick: () => pickContacts({ multiple: true }),
+        ensureNotesAccess: async () =>
+          (await ensureReadContactsPermission()).granted,
+        readByLookupKeys: async (keys) =>
+          (await readAllContacts(keys)).contacts,
         navigate: navigation.navigate,
       });
     } catch {

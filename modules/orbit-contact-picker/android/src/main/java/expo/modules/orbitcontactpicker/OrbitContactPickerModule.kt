@@ -93,7 +93,9 @@ class OrbitContactPickerModule : Module() {
             ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
             ContactsContract.CommonDataKinds.Email.CONTENT_ITEM_TYPE,
             ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
-            ContactsContract.CommonDataKinds.Note.CONTENT_ITEM_TYPE,
+            // Note is NOT requestable: the API-37 system picker rejects the whole
+            // intent ("unsupported mimetype") and closes. Notes are read after the
+            // pick via readContactsByLookupKeys under READ_CONTACTS instead (ADR-154).
             ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE,
           ),
         )

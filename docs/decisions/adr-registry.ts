@@ -11,7 +11,7 @@
  */
 
 // NOTE: ADR-0001 [ACCEPTED] Normalized Custom-Field Values
-// IMPORTANT: ADR-0002 [SUPERSEDED BY ADR-003 (partial)] Cross-Version Contact Import — Hybrid Two-Picker
+// IMPORTANT: ADR-0002 [SUPERSEDED BY ADR-003 (partial), ADR-154 (partial)] Cross-Version Contact Import — Hybrid Two-Picker
 // NOTE: ADR-0003 [ACCEPTED] `READ_CONTACTS` on API 37+ for Reconcile
 // NOTE: ADR-0004 [ACCEPTED] Flat Single-App Repository
 // NOTE: ADR-0005 [ACCEPTED] AiService Port Omits the Local/LAN (Ollama) Provider
@@ -163,5 +163,6 @@
 // NOTE: ADR-0151 [ACCEPTED] Visual-Only Relationship Overview Orphan Packing
 // NOTE: ADR-0152 [ACCEPTED] Vertical History Heatmap and Minute-Precision Timestamps
 // NOTE: ADR-0153 [ACCEPTED] Two-Row Normal Contacts Grid
+// NOTE: ADR-0154 [ACCEPTED] API-37 Import Requests Contacts Access for Notes
 
-export const ADR_COUNT = 153;
+export const ADR_COUNT = 154;

@@ -13,6 +13,18 @@ export interface StartContactImportOptions {
   effectivePhoneRegion: string | null;
   now: string;
   pick: () => Promise<PickedContact[]>;
+  /**
+   * Notes enrichment for the API-37 system picker, which cannot supply notes
+   * (requesting the note mimetype makes it reject the whole pick). After a
+   * non-empty pick, `ensureNotesAccess` asks for READ_CONTACTS in context
+   * (ADR-003's existing grant, ADR-154); when granted, `readByLookupKeys` re-reads the
+   * picked contacts and their notes are merged in. Denied → import proceeds
+   * without notes.
+   */
+  ensureNotesAccess?: () => Promise<boolean>;
+  readByLookupKeys?: (
+    lookupKeys: readonly string[],
+  ) => Promise<PickedContact[]>;
   /** Wider than PickedImportNavigator so it can open LegacyContactPicker too. */
   navigate: AppNavigate;
 }
@@ -28,6 +40,8 @@ export async function startContactImport({
   effectivePhoneRegion,
   now,
   pick,
+  ensureNotesAccess,
+  readByLookupKeys,
   navigate,
 }: StartContactImportOptions): Promise<void> {
   if (mode === "legacy") {
@@ -35,11 +49,38 @@ export async function startContactImport({
     return;
   }
 
-  const picked = await pick();
+  const picked = await withNotes(
+    await pick(),
+    ensureNotesAccess,
+    readByLookupKeys,
+  );
   await routePickedImport(
     exec,
     picked,
     { effectivePhoneRegion, now },
     { navigate: (route, params) => navigate(route, params) },
   );
+}
+
+/** Merge provider-read notes into picked contacts; never blocks the import. */
+async function withNotes(
+  picked: PickedContact[],
+  ensureNotesAccess: StartContactImportOptions["ensureNotesAccess"],
+  readByLookupKeys: StartContactImportOptions["readByLookupKeys"],
+): Promise<PickedContact[]> {
+  if (picked.length === 0 || !ensureNotesAccess || !readByLookupKeys) {
+    return picked;
+  }
+  try {
+    if (!(await ensureNotesAccess())) return picked;
+    const read = await readByLookupKeys(picked.map((c) => c.lookupKey));
+    const notes = new Map(read.map((c) => [c.lookupKey, c.note ?? null]));
+    return picked.map((c) =>
+      c.note == null && notes.get(c.lookupKey)
+        ? { ...c, note: notes.get(c.lookupKey) }
+        : c,
+    );
+  } catch {
+    return picked;
+  }
 }
