@@ -33,7 +33,7 @@ export function RelationshipOverview({
   snapshot: ProfileSnapshot;
   modules: ProfileLayoutDocument["overview"];
   onOpenSheet: (sheet: RelationshipSheetId) => void;
-  onOpenHistory: () => void;
+  onOpenHistory?: () => void;
 }) {
   const { colors } = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -93,7 +93,7 @@ export function RelationshipOverview({
         : "Not snoozed",
     },
   };
-  const action: Record<ProfileOverviewModuleId, () => void> = {
+  const action: Record<ProfileOverviewModuleId, (() => void) | undefined> = {
     "orbit-status": () => onOpenSheet("status"),
     gravity: () => onOpenSheet("gravity"),
     intensity: () => onOpenSheet("intensity"),

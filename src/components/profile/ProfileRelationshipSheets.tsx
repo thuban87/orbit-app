@@ -39,7 +39,7 @@ export function ProfileRelationshipSheets({
   snapshot: ProfileSnapshot;
   todayLocal: string;
   onClose: () => void;
-  onOpenHistory: () => void;
+  onOpenHistory?: () => void;
   onOpenInsights?: () => void;
   onSetFrequency: (days: number) => Promise<void>;
   onSnooze: (

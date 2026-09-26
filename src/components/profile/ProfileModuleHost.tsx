@@ -1,6 +1,11 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import { HistorySection } from "@/components/history/HistorySection";
 import { Icon } from "@/components/icons/Icon";
 import { AppText } from "@/components/ui/AppText";
@@ -13,7 +18,12 @@ import {
   setProfileCollapseOverride,
 } from "@/db/profile-presentation-dao";
 import type { ProfileSnapshot } from "@/db/profile-read";
-import { resolveProfileModuleHostState } from "@/profile/module-host-model";
+import {
+  createHistoryRevealScroll,
+  type HistoryRevealScroll,
+  resolveHistoryReveal,
+  resolveProfileModuleHostState,
+} from "@/profile/module-host-model";
 import {
   PROFILE_MODULE_REGISTRY,
   PROFILE_MODULE_RENDERERS,
@@ -133,7 +143,13 @@ export interface ProfileModuleHostProps {
    * re-reads on every change, so History and the metrics share one trigger.
    */
   historyRevision: number;
-  onOpenHistory: () => void;
+  /**
+   * Scroll the Profile's own ScrollView to a content y (38.3 RG-021, D-10). The
+   * Last Interaction tile and the Status sheet's "View history" reveal the
+   * in-Profile History section through it — no route, no timeline (ADR-123).
+   * The screen owns reduced motion.
+   */
+  onRequestScrollTo: (y: number) => void;
   onOpenInsights?: () => void;
   onSetFrequency: (days: number) => Promise<void>;
   onSnooze: (
@@ -174,7 +190,7 @@ export function ProfileModuleHost({
   presentation,
   todayLocal,
   historyRevision,
-  onOpenHistory,
+  onRequestScrollTo,
   onOpenInsights,
   onSetFrequency,
   onSnooze,
@@ -199,9 +215,14 @@ export function ProfileModuleHost({
 
   useEffect(() => setCollapse(presentation.collapse), [presentation.collapse]);
 
+  // Resolves to the committed collapse map, or null when nothing was written
+  // (already pending, or the write failed and the section shows Retry).
   const toggle = useCallback(
-    async ({ id, expanded: defaultExpanded }: CollapsePlacement) => {
-      if (pending.has(id)) return;
+    async ({
+      id,
+      expanded: defaultExpanded,
+    }: CollapsePlacement): Promise<ProfileCollapseMap | null> => {
+      if (pending.has(id)) return null;
       setPending((current) => new Set(current).add(id));
       setFailed((current) => (current === id ? null : current));
       try {
@@ -219,8 +240,10 @@ export function ProfileModuleHost({
         );
         setCollapse(readback);
         onCollapseCommitted?.(readback);
+        return readback;
       } catch {
         setFailed(id);
+        return null;
       } finally {
         setPending((current) => {
           const next = new Set(current);
@@ -245,10 +268,41 @@ export function ProfileModuleHost({
     [presentation.layout.document.thingsToRemember],
   );
   const closeRelationshipSheet = () => setActiveSheet(null);
-  const openHistory = () => {
+
+  // 38.3 RG-021 (D-10, D-11, D-28): Last Interaction and Status → View history
+  // reveal the in-Profile History section. Offered only when the layout shows
+  // History; a collapsed History expands through the SAME persisted `toggle` a
+  // header tap uses (D-28), and History's period/selection is never touched.
+  const historyReveal = resolveHistoryReveal({ topLevel, collapse });
+  const historyExpanded = historyReveal.available && !historyReveal.needsExpand;
+  const requestScroll = useRef(onRequestScrollTo);
+  requestScroll.current = onRequestScrollTo;
+  const revealScroll = useRef<HistoryRevealScroll | null>(null);
+  if (revealScroll.current === null) {
+    revealScroll.current = createHistoryRevealScroll((y) =>
+      requestScroll.current(y),
+    );
+  }
+  const scroller = revealScroll.current;
+  const revealHistory = () => {
     closeRelationshipSheet();
-    onOpenHistory();
+    scroller.reveal(historyReveal.needsExpand);
+    if (!historyReveal.needsExpand) return;
+    void toggle({
+      id: "interaction-history",
+      expanded: historyReveal.defaultExpanded,
+    }).then((readback) =>
+      scroller.expandSettled(
+        readback !== null &&
+          resolveProfileModuleHostState({
+            id: "interaction-history",
+            defaultExpanded: historyReveal.defaultExpanded,
+            collapse: readback,
+          }).expanded,
+      ),
+    );
   };
+  const openHistory = historyReveal.available ? revealHistory : undefined;
   const openInsights = () => {
     closeRelationshipSheet();
     onOpenInsights?.();
@@ -401,7 +455,13 @@ export function ProfileModuleHost({
   };
 
   return (
-    <View testID="profile-module-host" style={styles.stack}>
+    <View
+      testID="profile-module-host"
+      style={styles.stack}
+      onLayout={(event: LayoutChangeEvent) =>
+        scroller.hostLayout(event.nativeEvent.layout.y)
+      }
+    >
       {topLevel.map((placement) => {
         const id = placement.id;
         const renderer = PROFILE_MODULE_RENDERERS[id];
@@ -463,22 +523,32 @@ export function ProfileModuleHost({
           );
         }
         return (
-          <ProfileSection
+          <View
             key={id}
-            id={id}
-            defaultExpanded={placement.expanded}
-            collapse={collapse}
-            pending={pending.has(id)}
-            failed={failed === id}
-            errorMessage={
-              snapshot.history.status === "error"
-                ? snapshot.history.message
-                : undefined
+            testID="profile-history-anchor"
+            onLayout={(event: LayoutChangeEvent) =>
+              scroller.historyLayout(
+                event.nativeEvent.layout.y,
+                historyExpanded,
+              )
             }
-            onToggle={toggle}
           >
-            {renderHistory()}
-          </ProfileSection>
+            <ProfileSection
+              id={id}
+              defaultExpanded={placement.expanded}
+              collapse={collapse}
+              pending={pending.has(id)}
+              failed={failed === id}
+              errorMessage={
+                snapshot.history.status === "error"
+                  ? snapshot.history.message
+                  : undefined
+              }
+              onToggle={toggle}
+            >
+              {renderHistory()}
+            </ProfileSection>
+          </View>
         );
       })}
       <ProfileRelationshipSheets

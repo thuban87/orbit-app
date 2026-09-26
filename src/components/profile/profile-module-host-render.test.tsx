@@ -311,6 +311,11 @@ describe("ProfileModuleHost History reveal", () => {
   }
 
   const layout = (y: number) => ({ nativeEvent: { layout: { y } } });
+  const handler = <T,>(node: Node | undefined, prop: string): T => {
+    const value = node?.props[prop];
+    if (typeof value !== "function") throw new Error(`${prop} is missing`);
+    return value as T;
+  };
 
   it("hands both History actions a reveal handler when the layout shows History", () => {
     const nodes = historyHostNodes(
@@ -350,14 +355,16 @@ describe("ProfileModuleHost History reveal", () => {
       historyPresentation({ visible: true, expanded: true }),
       onRequestScrollTo,
     );
-    const host = nodes.find((node) => node.props.testID === "profile-module-host");
+    const host = nodes.find(
+      (node) => node.props.testID === "profile-module-host",
+    );
     const anchor = nodes.find(
       (node) => node.props.testID === "profile-history-anchor",
     );
-    (host?.props.onLayout as (event: unknown) => void)(layout(240));
-    (anchor?.props.onLayout as (event: unknown) => void)(layout(600));
+    handler<(event: unknown) => void>(host, "onLayout")(layout(240));
+    handler<(event: unknown) => void>(anchor, "onLayout")(layout(600));
     const overview = nodes.find((node) => node.type === "RelationshipOverview");
-    (overview?.props.onOpenHistory as () => void)();
+    handler<() => void>(overview, "onOpenHistory")();
 
     expect(onRequestScrollTo).toHaveBeenCalledExactlyOnceWith(840);
     // Already expanded: the reveal writes nothing (no reset of History state).
@@ -382,7 +389,7 @@ describe("ProfileModuleHost History reveal", () => {
     const sheets = nodes.find(
       (node) => node.type === "ProfileRelationshipSheets",
     );
-    (sheets?.props.onOpenHistory as () => void)();
+    handler<() => void>(sheets, "onOpenHistory")();
     await vi.waitFor(() =>
       expect(setProfileCollapseOverride).toHaveBeenCalledWith(undefined, {
         contactId: 7,

@@ -58,6 +58,7 @@ import {
 } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { useReducedMotion } from "@/theme/use-reduced-motion";
 import { formatLocalDate } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 
@@ -90,6 +91,10 @@ export function ContactProfileScreen({
   const [transitioning, setTransitioning] = useState(false);
   const [reachOutOpen, setReachOutOpen] = useState(false);
   const [assistEnabled, setAssistEnabled] = useState(false);
+  // 38.3 RG-021 (D-10): History actions scroll this ScrollView to the
+  // in-Profile History section — instant under reduced motion.
+  const scrollRef = useRef<ScrollView>(null);
+  const reducedMotion = useReducedMotion();
 
   // The Profile is the single invalidation owner for its two projections
   // (38.3 RG-024): every current snapshot publication bumps `historyRevision`,
@@ -420,7 +425,7 @@ export function ContactProfileScreen({
             />
           </View>
         ) : null}
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView ref={scrollRef} contentContainerStyle={styles.content}>
           {loading && !snapshot ? <AppText>Loading Profile…</AppText> : null}
           {error ? <AppText>{error}</AppText> : null}
           {snapshot && presentation ? (
@@ -485,8 +490,8 @@ export function ContactProfileScreen({
                 presentation={presentation}
                 todayLocal={todayLocal}
                 historyRevision={historyRevision}
-                onOpenHistory={() =>
-                  navigation.navigate("ThingsToRemember", { contactId })
+                onRequestScrollTo={(y) =>
+                  scrollRef.current?.scrollTo({ y, animated: !reducedMotion })
                 }
                 onSetFrequency={setFrequency}
                 onSnooze={snooze}
