@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.4
 current_phase_name: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
 status: executing
-stopped_at: Completed 38.4-05-PLAN.md
-last_updated: "2026-09-26T19:14:28.000Z"
+stopped_at: Completed 38.4-06-PLAN.md
+last_updated: "2026-09-26T19:29:12.381Z"
 last_activity: 2026-09-26
-last_activity_desc: 38.4-05 complete — Backup/Restore filled actions label with onAccent (onDanger on the Replace-all danger fill), five visible passphrase labels, minute-formatted restore source date (RG-029 UIA-002, RG-036, RG-038); E-7 resolved by owner ruling D-28 (coral light tone #B03A26 -> #AC3925)
-state_head: 40a95e6fffbfd6174c7c00ba34fd0b8bccd319e8
+last_activity_desc: 38.4-06 complete — RelationshipEditor themed switches + constant Hide from Profile (D-20), selector value/selected-state semantics via selector-a11y (dropdown incl. out-of-list, Fuel kind, Last-spoke date), touchpoint date/time minute-formatted + announced, duration chips at 44dp (RG-030 UIA-003/005/006, RG-038 UIA-018)
+state_head: a5f6eebcfff7114398425093e7b1200fcdeb88df
 progress:
   total_phases: 26
   completed_phases: 17
   total_plans: 235
-  completed_plans: 221
+  completed_plans: 222
 carried_forward:
 
   - "38.3 owner dispositions (2026-09-26, not passes): UAT-023a widget leg DEFERRED to the widget-overhaul phase; UAT-042 A-then-B chronology, UAT-024b month/year rollover, UAT-026b in-range keep and UAT-022 warm-Mark-while-backgrounded ACCEPTED-RISK (unit tests only). O-3 → homed in 38.4 Workstream I (D-10)."
@@ -42,7 +42,7 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 38.4 (UI Consistency, Accessibility, Performance & Release Polish (INSERTED)) — EXECUTING
-Plan: 6 of 17
+Plan: 7 of 17
 Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
@@ -50,7 +50,7 @@ FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-26 — 38.4-05 complete: Backup/Restore role foregrounds (onAccent; onDanger on Replace-all, Galaxy Dark ~3.91:1 ADR-084 limitation kept), Backup settings fills background→onAccent (Rule 2), five visible passphrase labels, restore source date via formatDateTimeMinuteOrFallback (RG-029 UIA-002, RG-036, RG-038); 4597 tests, tsc/colors clean, biome 0 errors. Earlier: 38.4-03 complete: both-extrema proof + Standard-Light glass foreground scope, lightness-only variants incl. all eight accentText (D-26), textPlaceholder, overlay scope reset (RG-029 UIA-001); 4578 tests, tsc/colors/biome clean; E-7 Galaxy Light coral held for owner (since resolved by D-28: coral light tone #B03A26 -> #AC3925, 4.48 -> 4.63), F-1 to Plan 17 (D-27). Earlier: 38.4-04 complete: Memory hosts use isAiMasterEnabled (ADR-135), permission summary separates access totals from the filtered view, model picker marks the saved model (RG-008, RG-030); 4527 tests, tsc/colors/biome clean. Earlier: 38.4-01 complete: migration 031 occurred_at indexes (schema head 31), Your Week reads range-bounded with oracle parity (RG-028); 4425 tests, tsc/colors/biome clean
+Last activity: 2026-09-26 — 38.4-06 complete: RelationshipEditor switches themed, visibility text constant "Hide from Profile" (D-20); selector-a11y helpers (selectorItems out-of-list preserved, selectorAccessibilityValue); dropdown/Fuel kind options carry selected state + filled select glyph, triggers expose value; Last-spoke date announced, segments vertical-only hitSlop; touchpoint date/time via formatDateTimeMinuteOrFallback + accessibilityValue, duration chips MIN_TOUCH_TARGET (RG-030 UIA-003/005/006, RG-038 UIA-018); 4618 tests, tsc/colors clean, biome 0 errors. Earlier: 38.4-05 complete: Backup/Restore role foregrounds (onAccent; onDanger on Replace-all, Galaxy Dark ~3.91:1 ADR-084 limitation kept), Backup settings fills background→onAccent (Rule 2), five visible passphrase labels, restore source date via formatDateTimeMinuteOrFallback (RG-029 UIA-002, RG-036, RG-038); 4597 tests, tsc/colors clean, biome 0 errors. Earlier: 38.4-03 complete: both-extrema proof + Standard-Light glass foreground scope, lightness-only variants incl. all eight accentText (D-26), textPlaceholder, overlay scope reset (RG-029 UIA-001); 4578 tests, tsc/colors/biome clean; E-7 Galaxy Light coral held for owner (since resolved by D-28: coral light tone #B03A26 -> #AC3925, 4.48 -> 4.63), F-1 to Plan 17 (D-27). Earlier: 38.4-04 complete: Memory hosts use isAiMasterEnabled (ADR-135), permission summary separates access totals from the filtered view, model picker marks the saved model (RG-008, RG-030); 4527 tests, tsc/colors/biome clean. Earlier: 38.4-01 complete: migration 031 occurred_at indexes (schema head 31), Your Week reads range-bounded with oracle parity (RG-028); 4425 tests, tsc/colors/biome clean
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: Run Phase 37.1 verification against the complete nine-plan implementation and retained physical-device evidence.
 
@@ -373,6 +373,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.4 P04 | 13min | 3 tasks | 16 files |
 | Phase 38.4 P03 | 48min | 3 tasks | 22 files |
 | Phase 38.4 P05 | 9min | 3 tasks | 6 files |
+| Phase 38.4 P06 | 8min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -826,6 +827,9 @@ Foundational decisions affecting current work:
 - [Phase 38.4]: 38.4-05: Restore Preview source date shows the shared formatter's neutral "Unknown time" for foreign/empty exportedAt, never the raw string (D-07)
 - [Phase 38.4]: 38.4-05: Replace-all apply label uses onDanger on the danger fill; Galaxy Dark ~3.91:1 is the ADR-084 owner-accepted limitation, not retuned (D-12)
 - [Phase 38.4]: 38.4-05: Backup settings' three accent-filled actions moved colors.background → onAccent (same AUD-UIA-002 misrole class, Rule 2)
+- [Phase 38.4]: 38.4-06: Fuel kind trigger label 'Kind' + accessibilityValue current kind (not 'Kind: X' + value, which double-announces), matching 38.4-04 MemoryEditor TypePicker (RG-030)
+- [Phase 38.4]: 38.4-06: TriStateLastSpoke hitSlop 8 -> vertical-only {top:8,bottom:8} so adjacent segments' hit regions never overlap across the 8dp gap (RG-030)
+- [Phase 38.4]: 38.4-06: RelationshipEditor saved-row 'Show on Profile' unhide button kept; D-20 targets only the flipping switch-row text
 
 ### Pending Todos
 
@@ -892,8 +896,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-26T19:14:28.000Z
-**Stopped at:** Completed 38.4-05-PLAN.md
+**Last session:** 2026-09-26T19:28:19.237Z
+**Stopped at:** Completed 38.4-06-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None

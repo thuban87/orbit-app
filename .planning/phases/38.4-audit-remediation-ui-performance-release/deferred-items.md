@@ -29,3 +29,13 @@
   5.62 / 6.24 / 6.14 (background / surface / elevated). The held proof exclusion is removed, so the
   proof asserts coral everywhere. Commits `f446484` (test) and `d8a9ba1` (fix). Details:
   `38.4-RG029-INVENTORY.md` §4 E-7; device check in §6.
+
+## From Plan 06 (2026-09-26)
+
+- **Touchpoint duration chips: selection shown by border colour only.** `TouchpointRefineForm.tsx`
+  preset/None chips carry `accessibilityState.selected` (so TalkBack is correct), but the visible
+  selected mark is only the `colors.accent` border. Not among the AUD-UIA-005 cited sites and not in
+  Plan 06's behavior list, so it was left as is. Candidate fix: a filled `select` glyph or a fill
+  change on the selected chip.
+- **`RelationshipEditor.tsx` unused `Pressable` import** (biome `noUnusedImports` warning). It predates
+  Plan 06 and Plan 06 did not cause it. It was left alone to keep the task diff scoped.
