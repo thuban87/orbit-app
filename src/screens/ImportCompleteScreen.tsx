@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { finalizeSessionIfTerminal } from "@/db/import-session-dao";
@@ -21,6 +21,7 @@ import {
 } from "@/services/import/import-photo-retry";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { runSingleFlight } from "@/utils/single-flight";
 import { importCompleteRetryState } from "./import-complete-logic";
 import { useOpenImportSession } from "./use-open-import-session";
 
@@ -45,6 +46,12 @@ export function ImportCompleteScreen({
   const [photoRows, setPhotoRows] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
+  // 38.3 review B-WR-03: `disabled={retrying}` is async React state, so two
+  // same-tick taps started two runImportBatch runs over one pending snapshot;
+  // the loser hit the external-link UNIQUE index and the driver re-marked the
+  // winner's imported row "failed". One synchronous slot covers Retry and
+  // Skip remaining photos.
+  const actionInFlight = useRef(false);
   const [error, setError] = useState(false);
   const [alreadyLinkedContactId, setAlreadyLinkedContactId] = useState<
     number | null
@@ -109,47 +116,51 @@ export function ImportCompleteScreen({
   }, [load]);
 
   const retry = useCallback(async () => {
-    setRetrying(true);
-    try {
-      const exec = getExecutor();
-      await runImportBatch(exec, {
-        sessionId: route.params.sessionId,
-        now: localDateTime(),
-        eligibleStatuses: ["pending", "failed"],
-      });
-      for (const rowId of photoRows) {
-        await retryImportedPhoto(exec, retryPhotoFs, rowId, localDateTime());
+    await runSingleFlight(actionInFlight, async () => {
+      setRetrying(true);
+      try {
+        const exec = getExecutor();
+        await runImportBatch(exec, {
+          sessionId: route.params.sessionId,
+          now: localDateTime(),
+          eligibleStatuses: ["pending", "failed"],
+        });
+        for (const rowId of photoRows) {
+          await retryImportedPhoto(exec, retryPhotoFs, rowId, localDateTime());
+        }
+        await finalizeSessionIfTerminal(
+          exec,
+          route.params.sessionId,
+          localDateTime(),
+        );
+        await load();
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "failed to retry import", err);
+        setError(true);
+      } finally {
+        setRetrying(false);
       }
-      await finalizeSessionIfTerminal(
-        exec,
-        route.params.sessionId,
-        localDateTime(),
-      );
-      await load();
-    } catch (err) {
-      Logger.error(LOG_SCOPE, "failed to retry import", err);
-      setError(true);
-    } finally {
-      setRetrying(false);
-    }
+    });
   }, [load, photoRows, route.params.sessionId]);
 
   const skipPhotos = useCallback(async () => {
-    setRetrying(true);
-    try {
-      await skipRemainingPhotos(
-        getExecutor(),
-        retryPhotoFs,
-        route.params.sessionId,
-        localDateTime(),
-      );
-      await load();
-    } catch (err) {
-      Logger.error(LOG_SCOPE, "could not skip remaining import photos", err);
-      setError(true);
-    } finally {
-      setRetrying(false);
-    }
+    await runSingleFlight(actionInFlight, async () => {
+      setRetrying(true);
+      try {
+        await skipRemainingPhotos(
+          getExecutor(),
+          retryPhotoFs,
+          route.params.sessionId,
+          localDateTime(),
+        );
+        await load();
+      } catch (err) {
+        Logger.error(LOG_SCOPE, "could not skip remaining import photos", err);
+        setError(true);
+      } finally {
+        setRetrying(false);
+      }
+    });
   }, [load, route.params.sessionId]);
 
   const retryState = importCompleteRetryState({
