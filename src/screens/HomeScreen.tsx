@@ -16,10 +16,12 @@
  *
  * READS (threat T-08-16/17): every read is async on-device SQLite (the D-12
  * `listDashboardPopulation` / `listDashboardSearch` read + the counts via
- * `getExecutor()`) guarded by a `cancelled` flag so a stale
- * async result can never clobber a newer one; no network sits on the read path,
- * and the DAO already scopes off_limits / unconfirmed-ai / archived rows in-query
- * (this screen performs no `.filter()` on private data).
+ * `getExecutor()`) issued by the one `createDashboardRefreshScheduler` and
+ * published only through `publishDashboardRead`, whose latest-request token
+ * means a stale async result can never clobber a newer one (RG-022, D-23); no
+ * network sits on the read path, and the DAO already scopes off_limits /
+ * unconfirmed-ai / archived rows in-query (this screen performs no `.filter()`
+ * on private data).
  *
  * The empty-state decision is delegated to the pure, node-tested
  * `selectDashboardEmptyState` (08-07 Task 1) — no inline count arithmetic here
@@ -141,6 +143,14 @@ import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { DashboardScreenProps, TabParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { buildDashboardOverflowActions } from "@/screens/dashboard-overflow-actions";
+import {
+  createDashboardRefreshScheduler,
+  type DashboardReadOutcome,
+  type DashboardReadSinks,
+  type DashboardRefreshScheduler,
+  type DashboardRefreshSource,
+  publishDashboardRead,
+} from "@/screens/dashboard-refresh-scheduler";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { runQuickLog } from "@/services/quick-log-command";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
@@ -697,186 +707,230 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     void useDashboardQueryStore.getState().setViewMode(getExecutor(), mode);
   }, []);
 
+  // Animation/lifecycle state is read through refs at publication time and is
+  // NEVER a reload dependency (performance/AUD-PERF-002, D-23): toggling reduced
+  // motion or crossing a background/foreground edge must schedule zero reads.
+  const isFocusedRef = useRef(isFocused);
+  isFocusedRef.current = isFocused;
+  const appActiveRef = useRef(appActive);
+  appActiveRef.current = appActive;
+  const reducedMotionRef = useRef(reducedMotion);
+  reducedMotionRef.current = reducedMotion;
+
   /**
-   * The single load: the D-12 read (`listDashboardSearch` when a term is present,
-   * else `listDashboardPopulation`) + the header counts + the COMPLETE 5-key
-   * populationCounts, guarded by a `cancelled` flag it returns as its canceller.
-   * The DEBOUNCE (not this flag) collapses a keystroke burst to ONE read — the
-   * cancelled flag only drops a stale async result so a newer query is never
-   * clobbered. ONE `now` is captured per reload and threaded to every
-   * birthday-resolving read/count (the list read AND countBirthdayPopulation) so
-   * the birthday list and its empty-state count can't disagree across local
-   * midnight (D-12; cross-AI review CYCLE-3).
+   * The single read body: the D-12 read (`composeDashboardSearch` when a term is
+   * present, else `listDashboardPopulation`) + the header counts + the COMPLETE
+   * 5-key populationCounts. The DEBOUNCE collapses a keystroke burst to ONE
+   * read; the scheduler token (not a per-source `cancelled` closure) decides
+   * whether this read may publish, across every source. ONE `now` is captured
+   * per read and threaded to every birthday-resolving read/count (the list read
+   * AND countBirthdayPopulation) so the birthday list and its empty-state count
+   * can't disagree across local midnight (D-12; cross-AI review CYCLE-3).
+   *
+   * Assigned every render so the once-created scheduler always reads the
+   * CURRENT query/search (the `use-category-catalog-refresh` ref idiom).
    */
-  const reload = useCallback(() => {
-    let cancelled = false;
+  const schedulerRef = useRef<DashboardRefreshScheduler | null>(null);
+  const readRef = useRef<
+    (token: number, source: DashboardRefreshSource) => Promise<void>
+  >(async () => {});
+  readRef.current = async (token) => {
     const now = localDateTime();
     const term = debouncedSearchText.trim();
     const isSearch = term !== "";
-    (async () => {
-      try {
-        const exec = getExecutor();
-        const [
-          searchRead,
-          live,
-          neverContacted,
-          snoozed,
-          archived,
-          unbound,
-          birthdays,
-          favourites,
-          allContacts,
-        ] = await Promise.all([
-          isSearch
-            ? composeDashboardSearch(exec, query, term, now).then(
-                (searchRows) => ({
-                  rows: searchRows.map((searchRow) => searchRow.row),
-                  resultsByContactId: new Map(
-                    searchRows.map((searchRow) => [
-                      searchRow.row.id,
-                      searchRow.match,
-                    ]),
-                  ),
-                }),
-              )
-            : (term !== ""
-                ? listDashboardSearch(exec, query, term, now)
-                : listDashboardPopulation(exec, query, now)
-              ).then((rows) => ({
-                rows,
-                resultsByContactId: new Map<
-                  number,
-                  DashboardSearchResult | null
-                >(),
-              })),
-          countLiveContacts(exec),
-          countNeverContacted(exec),
-          countSnoozed(exec),
-          countArchived(exec),
-          countUnbound(exec),
-          countBirthdayPopulation(exec, now),
-          countFavourites(exec),
-          countAllContacts(exec),
-        ]);
-        const list = searchRead.rows;
-        const nextLine3ByContactId = new Map<number, ListRowLine3>();
-        if (query.viewMode === "list" && !isSearch) {
-          const candidates = await readLine3Candidates(
-            exec,
-            list.map((row) => row.id),
-          );
-          const candidatesByContactId = new Map<number, typeof candidates>();
-          for (const candidate of candidates) {
-            const forContact =
-              candidatesByContactId.get(candidate.contactId) ?? [];
-            forContact.push(candidate);
-            candidatesByContactId.set(candidate.contactId, forContact);
-          }
-          const selectionNow = new Date(parseLocalMs(now));
-          for (const row of list) {
-            const selection = selectLine3(
-              candidatesByContactId.get(row.id) ?? [],
-              row.id,
-              row.name,
-              selectionNow,
-            );
-            nextLine3ByContactId.set(row.id, {
-              text: selection.text,
-              ...(selection.kind === "candidate" && isIconName(selection.type)
-                ? { iconName: selection.type }
-                : {}),
-            });
-          }
+    const sinks: DashboardReadSinks<
+      DashboardRow,
+      ListRowLine3,
+      DashboardSearchResult,
+      PopulationCounts,
+      DashboardPopulationCounts
+    > = {
+      setRows,
+      setLine3: setLine3ByContactId,
+      setSearchMatches: setSearchResultsByContactId,
+      setListNow,
+      setCounts,
+      setPopulationCounts,
+      setError,
+      setFadeStart: (value) => {
+        resultProgress.value = value;
+      },
+      bumpResultGeneration: () =>
+        setResultGeneration((generation) => generation + 1),
+      setRefreshing,
+      setInitialLoad,
+    };
+    const isCurrent = (candidate: number) =>
+      schedulerRef.current?.isCurrent(candidate) === true;
+    let outcome: DashboardReadOutcome<
+      DashboardRow,
+      ListRowLine3,
+      DashboardSearchResult,
+      PopulationCounts,
+      DashboardPopulationCounts
+    >;
+    try {
+      const exec = getExecutor();
+      const [
+        searchRead,
+        live,
+        neverContacted,
+        snoozed,
+        archived,
+        unbound,
+        birthdays,
+        favourites,
+        allContacts,
+      ] = await Promise.all([
+        isSearch
+          ? composeDashboardSearch(exec, query, term, now).then(
+              (searchRows) => ({
+                rows: searchRows.map((searchRow) => searchRow.row),
+                resultsByContactId: new Map(
+                  searchRows.map((searchRow) => [
+                    searchRow.row.id,
+                    searchRow.match,
+                  ]),
+                ),
+              }),
+            )
+          : (term !== ""
+              ? listDashboardSearch(exec, query, term, now)
+              : listDashboardPopulation(exec, query, now)
+            ).then((rows) => ({
+              rows,
+              resultsByContactId: new Map<
+                number,
+                DashboardSearchResult | null
+              >(),
+            })),
+        countLiveContacts(exec),
+        countNeverContacted(exec),
+        countSnoozed(exec),
+        countArchived(exec),
+        countUnbound(exec),
+        countBirthdayPopulation(exec, now),
+        countFavourites(exec),
+        countAllContacts(exec),
+      ]);
+      // A superseded read skips the line-3 enrichment read entirely.
+      if (!isCurrent(token)) return;
+      const list = searchRead.rows;
+      const nextLine3ByContactId = new Map<number, ListRowLine3>();
+      if (query.viewMode === "list" && !isSearch) {
+        const candidates = await readLine3Candidates(
+          exec,
+          list.map((row) => row.id),
+        );
+        const candidatesByContactId = new Map<number, typeof candidates>();
+        for (const candidate of candidates) {
+          const forContact =
+            candidatesByContactId.get(candidate.contactId) ?? [];
+          forContact.push(candidate);
+          candidatesByContactId.set(candidate.contactId, forContact);
         }
-        if (cancelled) return;
-        setRows(list);
-        setLine3ByContactId(nextLine3ByContactId);
-        setSearchResultsByContactId(searchRead.resultsByContactId);
-        setListNow(now);
-        setCounts({ live, neverContacted, snoozed, archived, unbound });
-        setPopulationCounts({
+        const selectionNow = new Date(parseLocalMs(now));
+        for (const row of list) {
+          const selection = selectLine3(
+            candidatesByContactId.get(row.id) ?? [],
+            row.id,
+            row.name,
+            selectionNow,
+          );
+          nextLine3ByContactId.set(row.id, {
+            text: selection.text,
+            ...(selection.kind === "candidate" && isIconName(selection.type)
+              ? { iconName: selection.type }
+              : {}),
+          });
+        }
+      }
+      outcome = {
+        kind: "ok",
+        rows: list,
+        line3: nextLine3ByContactId,
+        searchMatches: searchRead.resultsByContactId,
+        listNow: now,
+        counts: { live, neverContacted, snoozed, archived, unbound },
+        populationCounts: {
           "all-contacts": allContacts,
           favourites,
           birthdays,
           "not-contacted": neverContacted,
           snoozed,
-        });
-        setError(false);
-        resultProgress.value = isFocused && appActive && !reducedMotion ? 0 : 1;
-        setResultGeneration((generation) => generation + 1);
-      } catch (err) {
-        Logger.error(LOG_SCOPE, "failed to load dashboard", err);
-        if (!cancelled) {
-          setRows([]);
-          setLine3ByContactId(new Map());
-          setSearchResultsByContactId(new Map());
-          setError(true);
-        }
-      } finally {
-        if (!cancelled) {
-          setRefreshing(false);
-          setInitialLoad(false);
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    appActive,
-    debouncedSearchText,
-    isFocused,
-    query,
-    reducedMotion,
-    resultProgress,
-  ]);
+        },
+        fadeStart:
+          isFocusedRef.current &&
+          appActiveRef.current &&
+          !reducedMotionRef.current
+            ? 0
+            : 1,
+      };
+    } catch (err) {
+      Logger.error(LOG_SCOPE, "failed to load dashboard", err);
+      outcome = { kind: "error" };
+    }
+    publishDashboardRead({ token, outcome, isCurrent, sinks });
+  };
+
+  // ONE scheduler + publication authority for every Home read (RG-022, D-23).
+  // Created once; `isVisible` defers shell/foreground reads while Home is hidden
+  // (the next focus read covers them). The debug marker names only the trigger.
+  if (schedulerRef.current === null) {
+    schedulerRef.current = createDashboardRefreshScheduler({
+      read: (token, source) => {
+        void readRef.current(token, source);
+      },
+      isVisible: () => isFocusedRef.current,
+      log: (source) => Logger.debug(LOG_SCOPE, "dashboard read bundle", source),
+    });
+  }
+  const scheduler = schedulerRef.current;
+
+  // `reload(source)` only requests a read; the read body above is the single
+  // owner of what is read and published.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: query/search changes intentionally re-issue the focus read
+  const reload = useCallback(
+    (source: DashboardRefreshSource) => scheduler.request(source),
+    [debouncedSearchText, query, scheduler],
+  );
 
   // Shell Quick Log/Undo originates outside this screen's focus lifecycle. This
   // in-process tick is intentionally distinct from the connection-scoped SQLite
   // subscription that this dashboard deliberately does not use (DASH-07).
-  useShellRefresh(reload);
+  const onShellRefresh = useCallback(() => {
+    reload("shell");
+  }, [reload]);
+  useShellRefresh(onShellRefresh);
 
-  // Freshness path 1 — re-query every time the dashboard regains focus.
+  // Freshness path 1 — re-query every time the dashboard regains focus, and
+  // whenever the query/search changes while focused (`reload` identity).
   useFocusEffect(
     useCallback(() => {
-      const cancel = reload();
-      return cancel;
+      reload("focus");
     }, [reload]),
   );
 
   // Freshness path 2 — re-query when the app returns to the foreground, so a
-  // headless "mark contacted" write made while backgrounded is reflected. The
-  // subscription (and any in-flight guard) is torn down on unmount.
+  // headless "mark contacted" write made while backgrounded is reflected.
   useEffect(() => {
-    let cancelCurrent: (() => void) | undefined;
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") {
-        cancelCurrent?.();
-        cancelCurrent = reload();
+        reload("foreground");
       }
     });
-    return () => {
-      cancelCurrent?.();
-      sub.remove();
-    };
+    return () => sub.remove();
   }, [reload]);
 
-  // Freshness path 3 — pull-to-refresh. Capture the returned canceller (like the
-  // focus + AppState paths) and hold it in a ref so an in-flight pull-refresh
-  // read is cancelled if a newer pull starts or the screen unmounts mid-read.
-  const pullCancelRef = useRef<(() => void) | undefined>(undefined);
+  // Freshness path 3 — pull-to-refresh. Supersession is the scheduler's job:
+  // a newer read from any source retires this one, and its settle still lands.
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    pullCancelRef.current?.();
-    pullCancelRef.current = reload();
+    reload("pull");
   }, [reload]);
 
-  // Tear down any in-flight pull-refresh read on unmount.
-  useEffect(() => {
-    return () => {
-      pullCancelRef.current?.();
-    };
-  }, []);
+  // Unmount: nothing outstanding may publish into a dead screen.
+  useEffect(() => () => scheduler.invalidate(), [scheduler]);
 
   const reportBulkFailure = useCallback(
     (operation: string, writeError: unknown, retry?: () => void) => {
@@ -940,7 +994,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           onPress: dismissSnackbar,
         },
       });
-      reload();
+      reload("shell");
     },
     [reload],
   );
@@ -974,7 +1028,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               },
             },
           });
-          reload();
+          reload("shell");
         })
         .catch((writeError: unknown) => {
           releaseBulkAction(claim);
@@ -1339,7 +1393,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   );
 
   const refreshAfterSnooze = useCallback(() => {
-    reload();
+    reload("snooze");
   }, [reload]);
 
   const snoozeContactWithPreset = useCallback(
