@@ -22,6 +22,7 @@ import {
   settleDayRead,
   startDayRead,
   type YourWeekControllerState,
+  yourWeekPresentation,
 } from "./your-week-section-logic";
 
 function deferred<T>(): {
@@ -422,5 +423,37 @@ describe("Your Week day detail (38.3 D-16, request-scoped)", () => {
     expect(cleared).toEqual({ status: "idle" });
     expect(settleDayRead(cleared, 1, rows)).toBe(cleared);
     expect(failDayRead(cleared, 1)).toBe(cleared);
+  });
+});
+
+describe("yourWeekPresentation (38.3 review B-WR-06)", () => {
+  it("keeps the loaded heatmap/detail on a refresh failure and adds a section notice", () => {
+    expect(
+      yourWeekPresentation({ hasLoaded: true, error: true, empty: false }),
+    ).toEqual({ body: "loaded", refreshNotice: true });
+  });
+
+  it("keeps a loaded quiet week on a refresh failure, with the notice", () => {
+    expect(
+      yourWeekPresentation({ hasLoaded: true, error: true, empty: true }),
+    ).toEqual({ body: "empty", refreshNotice: true });
+  });
+
+  it("uses the full error body only when nothing has loaded", () => {
+    expect(
+      yourWeekPresentation({ hasLoaded: false, error: true, empty: false }),
+    ).toEqual({ body: "error", refreshNotice: false });
+  });
+
+  it("renders nothing while the first read is pending", () => {
+    expect(
+      yourWeekPresentation({ hasLoaded: false, error: false, empty: false }),
+    ).toEqual({ body: "none", refreshNotice: false });
+  });
+
+  it("renders the loaded body without a notice on success", () => {
+    expect(
+      yourWeekPresentation({ hasLoaded: true, error: false, empty: false }),
+    ).toEqual({ body: "loaded", refreshNotice: false });
   });
 });

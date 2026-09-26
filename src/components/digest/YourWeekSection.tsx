@@ -19,9 +19,11 @@ import {
   type YourWeekControllerState,
   type YourWeekDayDetail,
   type YourWeekPeriodReader,
+  yourWeekPresentation,
 } from "@/components/digest/your-week-section-logic";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { AppText } from "@/components/ui/AppText";
+import { Button } from "@/components/ui/Button";
 import {
   getAppSettings,
   updateAppSettings,
@@ -79,6 +81,9 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
   const [dayDetail, setDayDetail] = useState<YourWeekDayDetail>(clearDayDetail);
   const dayDetailRef = useRef(dayDetail);
   const [error, setError] = useState(false);
+  // 38.3 review B-WR-06: a section-local, read-only Retry. Bumping it re-runs
+  // the same settings + period read the Digest refresh signal drives.
+  const [retryTick, setRetryTick] = useState(0);
 
   const commitController = useCallback((next: YourWeekControllerState) => {
     controllerRef.current = next;
@@ -182,7 +187,7 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
   // change. Keeps the chosen period and re-windows to today (D-15), adopting a
   // Settings-changed period only when no toggle is in flight (Pitfall 5). No
   // timer detects the new day — the signal does (D-22).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshSignal is the Digest-owned trigger; each change re-runs this read.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshSignal is the Digest-owned trigger and retryTick the section's read-only Retry; each change re-runs this read.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -219,7 +224,14 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
     return () => {
       cancelled = true;
     };
-  }, [clearDay, commitController, loadDay, loadPeriod, refreshSignal]);
+  }, [
+    clearDay,
+    commitController,
+    loadDay,
+    loadPeriod,
+    refreshSignal,
+    retryTick,
+  ]);
 
   const onPeriodChange = useCallback(
     async (period: YourWeekPeriod) => {
@@ -267,9 +279,17 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
     if (date !== null) void loadDay(date);
   }, [loadDay]);
 
+  const onRetryWeek = useCallback(() => setRetryTick((tick) => tick + 1), []);
+
   const metrics = loaded?.metrics ?? EMPTY_METRICS;
   const empty =
     loaded !== null && metrics.interactions === 0 && metrics.events === 0;
+  // A refresh failure keeps a loaded week on screen (B-WR-06).
+  const presentation = yourWeekPresentation({
+    hasLoaded: loaded !== null,
+    error,
+    empty,
+  });
 
   return (
     <View testID="your-week-section" style={styles.container}>
@@ -287,15 +307,33 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
         <Metric label="Interactions" value={metrics.interactions} />
         <Metric label="Events" value={metrics.events} />
       </View>
-      {error ? (
-        <View style={styles.message}>
-          {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
-          <AppText role="label">Couldn't load your Digest</AppText>
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            Try opening it again in a moment.
+      {presentation.refreshNotice ? (
+        <View testID="your-week-refresh-error" style={styles.notice}>
+          <AppText role="caption" style={{ color: colors.danger }}>
+            Couldn't refresh Your Week
           </AppText>
+          {/* biome-ignore lint/a11y/useValidAriaRole: Button role is the design-system hierarchy role. */}
+          <Button
+            role="tertiary"
+            label="Retry"
+            accessibilityLabel="Retry refreshing Your Week"
+            onPress={onRetryWeek}
+          />
         </View>
-      ) : empty ? (
+      ) : null}
+      {presentation.body === "error" ? (
+        <View testID="your-week-error" style={styles.message}>
+          {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
+          <AppText role="label">Couldn't load Your Week</AppText>
+          {/* biome-ignore lint/a11y/useValidAriaRole: Button role is the design-system hierarchy role. */}
+          <Button
+            role="tertiary"
+            label="Retry"
+            accessibilityLabel="Retry loading Your Week"
+            onPress={onRetryWeek}
+          />
+        </View>
+      ) : presentation.body === "empty" ? (
         <View style={styles.message}>
           {/* biome-ignore lint/a11y/useValidAriaRole: AppText role is a typography role. */}
           <AppText role="label">A quiet week</AppText>
@@ -303,7 +341,7 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
             No logged activity in this period yet.
           </AppText>
         </View>
-      ) : loaded ? (
+      ) : presentation.body === "loaded" && loaded ? (
         <>
           <YourWeekHeatmap
             window={loaded.window}
@@ -351,4 +389,10 @@ const styles = StyleSheet.create({
     borderRadius: SPACING.sm,
   },
   message: { gap: SPACING.xs },
+  notice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: SPACING.sm,
+  },
 });

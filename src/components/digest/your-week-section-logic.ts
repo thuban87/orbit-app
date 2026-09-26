@@ -260,3 +260,36 @@ export function directDateCounts(
   }
   return counts;
 }
+
+export interface YourWeekPresentationInput {
+  /** A period read has succeeded and its week is still held. */
+  hasLoaded: boolean;
+  /** The latest settings or period read failed. */
+  error: boolean;
+  /** The held week has no interactions and no events. */
+  empty: boolean;
+}
+
+export interface YourWeekPresentation {
+  body: "loaded" | "empty" | "error" | "none";
+  /** Show the compact "Couldn't refresh Your Week" notice with Retry. */
+  refreshNotice: boolean;
+}
+
+/**
+ * What Your Week renders (38.3 review B-WR-06; mirrors DigestScreen's
+ * `digestLoadStateOnFail`). A refresh failure never discards a loaded week:
+ * the heatmap and day detail stay, with a compact section notice. The full
+ * error body appears only when nothing has loaded.
+ */
+export function yourWeekPresentation(
+  input: YourWeekPresentationInput,
+): YourWeekPresentation {
+  if (input.hasLoaded) {
+    return {
+      body: input.empty ? "empty" : "loaded",
+      refreshNotice: input.error,
+    };
+  }
+  return { body: input.error ? "error" : "none", refreshNotice: false };
+}
