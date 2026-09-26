@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 62
+open_count: 61
 waived_count: 0
-fixed_count: 12
+fixed_count: 13
 total_count: 74
-last_updated: 2026-09-26T19:01:48.617Z
+last_updated: 2026-09-26T19:20:02.047Z
 ---
 
 # Broken Windows Ledger
@@ -88,7 +88,7 @@ last_updated: 2026-09-26T19:01:48.617Z
 | 71 | 36 | deviation | src/backup/backup-schema.ts |  | Preserved Group Event interaction follow-state semantics in the v5 backup inventory | fixed |  | 2026-09-14T09:25:13.286Z | 2026-09-14T09:26:16.160Z |
 | 72 | 36 | deviation | src/backup/orrery-preferences-portability.test.ts |  | Updated composed restore test boundaries for the v5 background persistence dependency | fixed |  | 2026-09-14T09:25:13.472Z | 2026-09-14T09:26:16.345Z |
 | 73 | 38.2 | unrun-verify | .planning/phases/38.2-audit-remediation-data-security-lifecycle/38.2-08-PLAN.md |  | Plan 08 Pixel export/Merge/re-export/Replace-all and notification snooze device backstop deferred to Plan 16 | open |  | 2026-09-24T04:53:41.068Z |  |
-| 74 | 38.4 | deviation | src/theme/tokens/surface.test.ts |  | E-7 held for owner: Galaxy Light coral accentText #B03A26 4.48:1 (<4.5) on the presentation-density card over the darkest Galaxy pixel; scoped proof exclusion until the owner rules (38.4-RG029-INVENTORY.md §4) | open |  | 2026-09-26T19:01:48.617Z |  |
+| 74 | 38.4 | deviation | src/theme/tokens/surface.test.ts |  | E-7 held for owner: Galaxy Light coral accentText #B03A26 4.48:1 (<4.5) on the presentation-density card over the darkest Galaxy pixel; scoped proof exclusion until the owner rules (38.4-RG029-INVENTORY.md §4) | fixed |  | 2026-09-26T19:01:48.617Z | 2026-09-26T19:20:02.047Z |
 
 ````json
 [
@@ -975,10 +975,10 @@ last_updated: 2026-09-26T19:01:48.617Z
     "file": "src/theme/tokens/surface.test.ts",
     "line": null,
     "description": "E-7 held for owner: Galaxy Light coral accentText #B03A26 4.48:1 (<4.5) on the presentation-density card over the darkest Galaxy pixel; scoped proof exclusion until the owner rules (38.4-RG029-INVENTORY.md §4)",
-    "status": "open",
+    "status": "fixed",
     "reason": "",
     "recorded_at": "2026-09-26T19:01:48.617Z",
-    "resolved_at": null
+    "resolved_at": "2026-09-26T19:20:02.047Z"
   }
 ]
 ````

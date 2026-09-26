@@ -20,9 +20,12 @@
   `38.4-RG029-INVENTORY.md` §5 and Table A (class *bare*). This goes to the owner and the Plan 17
   device pass.
 
-- **E-7 — Galaxy Light coral `accentText` on the presentation-density card: HELD for the owner.** Found
-  when D-26 put `accentText` under the both-extrema proof in every package and mode. `#B03A26` measures
-  4.48:1 (floor 4.5) against the 0.88 opaque Galaxy Light card over the darkest Galaxy pixel. Comfortable,
-  dense and chrome clear it. Fixing it means either retuning a curated accent tone in `accents.ts`,
-  widening the glass scope, or accepting an exception. All three are owner-bucket under the D-24 STOP
-  rule, so it is held as a scoped proof exclusion. Details: `38.4-RG029-INVENTORY.md` §4 E-7.
+- **E-7 — Galaxy Light coral `accentText` on the presentation-density card: RESOLVED (D-28, 2026-09-26).**
+  Found when D-26 put `accentText` under the both-extrema proof in every package and mode: `#B03A26`
+  measured 4.48:1 (floor 4.5) against the 0.88 opaque Galaxy Light card over the darkest Galaxy pixel.
+  The owner ruled (D-28) to darken coral's shared light tone about 1% HSL lightness, same hue and
+  saturation. `ACCENTS.coral.light.text` is now `#AC3925` (L 41.96 → 40.98). Galaxy Light: presentation
+  card 4.63, comfortable 5.18, dense 5.67, chrome 5.67. Standard Light opaque links (shared tone):
+  5.62 / 6.24 / 6.14 (background / surface / elevated). The held proof exclusion is removed, so the
+  proof asserts coral everywhere. Commits `f446484` (test) and `d8a9ba1` (fix). Details:
+  `38.4-RG029-INVENTORY.md` §4 E-7; device check in §6.

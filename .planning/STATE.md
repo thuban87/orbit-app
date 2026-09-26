@@ -8,7 +8,7 @@ status: executing
 stopped_at: Completed 38.4-05-PLAN.md
 last_updated: "2026-09-26T19:14:28.000Z"
 last_activity: 2026-09-26
-last_activity_desc: 38.4-05 complete — Backup/Restore filled actions label with onAccent (onDanger on the Replace-all danger fill), five visible passphrase labels, minute-formatted restore source date (RG-029 UIA-002, RG-036, RG-038); E-7 Galaxy Light coral still held for owner
+last_activity_desc: 38.4-05 complete — Backup/Restore filled actions label with onAccent (onDanger on the Replace-all danger fill), five visible passphrase labels, minute-formatted restore source date (RG-029 UIA-002, RG-036, RG-038); E-7 resolved by owner ruling D-28 (coral light tone #B03A26 -> #AC3925)
 state_head: 40a95e6fffbfd6174c7c00ba34fd0b8bccd319e8
 progress:
   total_phases: 26
@@ -50,7 +50,7 @@ FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-26 — 38.4-05 complete: Backup/Restore role foregrounds (onAccent; onDanger on Replace-all, Galaxy Dark ~3.91:1 ADR-084 limitation kept), Backup settings fills background→onAccent (Rule 2), five visible passphrase labels, restore source date via formatDateTimeMinuteOrFallback (RG-029 UIA-002, RG-036, RG-038); 4597 tests, tsc/colors clean, biome 0 errors. Earlier: 38.4-03 complete: both-extrema proof + Standard-Light glass foreground scope, lightness-only variants incl. all eight accentText (D-26), textPlaceholder, overlay scope reset (RG-029 UIA-001); 4578 tests, tsc/colors/biome clean; E-7 Galaxy Light coral held for owner, F-1 to Plan 17 (D-27). Earlier: 38.4-04 complete: Memory hosts use isAiMasterEnabled (ADR-135), permission summary separates access totals from the filtered view, model picker marks the saved model (RG-008, RG-030); 4527 tests, tsc/colors/biome clean. Earlier: 38.4-01 complete: migration 031 occurred_at indexes (schema head 31), Your Week reads range-bounded with oracle parity (RG-028); 4425 tests, tsc/colors/biome clean
+Last activity: 2026-09-26 — 38.4-05 complete: Backup/Restore role foregrounds (onAccent; onDanger on Replace-all, Galaxy Dark ~3.91:1 ADR-084 limitation kept), Backup settings fills background→onAccent (Rule 2), five visible passphrase labels, restore source date via formatDateTimeMinuteOrFallback (RG-029 UIA-002, RG-036, RG-038); 4597 tests, tsc/colors clean, biome 0 errors. Earlier: 38.4-03 complete: both-extrema proof + Standard-Light glass foreground scope, lightness-only variants incl. all eight accentText (D-26), textPlaceholder, overlay scope reset (RG-029 UIA-001); 4578 tests, tsc/colors/biome clean; E-7 Galaxy Light coral held for owner (since resolved by D-28: coral light tone #B03A26 -> #AC3925, 4.48 -> 4.63), F-1 to Plan 17 (D-27). Earlier: 38.4-04 complete: Memory hosts use isAiMasterEnabled (ADR-135), permission summary separates access totals from the filtered view, model picker marks the saved model (RG-008, RG-030); 4527 tests, tsc/colors/biome clean. Earlier: 38.4-01 complete: migration 031 occurred_at indexes (schema head 31), Your Week reads range-bounded with oracle parity (RG-028); 4425 tests, tsc/colors/biome clean
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: Run Phase 37.1 verification against the complete nine-plan implementation and retained physical-device evidence.
 
@@ -821,6 +821,7 @@ Foundational decisions affecting current work:
 - [Phase 38.4]: 38.4-03: Standard-Light glass accentText uses lightness-only variants for all eight accents incl. owner-accepted sub-12% aurora-teal/emerald (D-26), keyed by resolved accent id
 - [Phase 38.4]: 38.4-03: F-1 bare-on-art text not fixed; owner device review in Plan 17 (D-27)
 - [Phase 38.4]: 38.4-03: Galaxy Light coral accentText 4.48:1 on presentation card held for owner as scoped exclusion E-7; nothing retuned
+- [Phase 38.4]: 38.4-03 follow-up (owner D-28): coral's shared light link tone darkened ~1% HSL L, #B03A26 -> #AC3925 (Galaxy Light presentation card 4.63, Standard Light opaque 5.62+); E-7 exclusion removed, proof asserts coral everywhere
 - [Phase 38.4]: 38.4-03: overlay-base content, ConfirmDialog body and OverflowMenu sheet reset the glass scope (UnscopedTheme/useUnscopedTheme)
 - [Phase 38.4]: 38.4-05: Restore Preview source date shows the shared formatter's neutral "Unknown time" for foreign/empty exportedAt, never the raw string (D-07)
 - [Phase 38.4]: 38.4-05: Replace-all apply label uses onDanger on the danger fill; Galaxy Dark ~3.91:1 is the ADR-084 owner-accepted limitation, not retuned (D-12)
@@ -853,8 +854,6 @@ Foundational decisions affecting current work:
   ADR-bridge scripts (`docs/decisions/adr-registry.ts`, `scripts/normalize-graph-docrefs.ts`) and the
   build-blocking hooks are in place. Build **only** via `npm run graph:build` — the stock
   `graphify build` silently corrupts the graph and is blocked at the harness layer.
-
-- 38.4-03 E-7 (held for owner, NOT blocking): Galaxy Light coral accentText #B03A26 measures 4.48:1 (floor 4.5) on the presentation-density opaque card over the darkest Galaxy pixel; comfortable/dense/chrome pass. Found when D-26 put accentText under the proof everywhere. Fix options (retune coral's shared accents.ts light tone ~1% L, widen the glass scope, or accept an exception) are owner-bucket; held as a scoped proof exclusion. See 38.4-RG029-INVENTORY.md §4 E-7.
 
 ## Deferred Items
 
