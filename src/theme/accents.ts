@@ -88,7 +88,11 @@ export const ACCENTS: Record<AccentId, AccentToneSet> = {
   },
   coral: {
     dark: { fill: "#FF7A5C", onAccent: "#2E0A02", text: "#FF9377" },
-    light: { fill: "#C0402A", onAccent: "#FFFFFF", text: "#B03A26" },
+    // text: #B03A26 -> #AC3925 (HSL L 41.96 -> 40.98; hue/saturation kept
+    // within 8-bit rounding: H 8.70 -> 8.89, S 64.49 -> 64.59) so
+    // Galaxy Light presentation cards clear AA 4.5 (4.48 -> 4.63); owner ruling
+    // D-28 (38.4). Shared light tone, so Standard Light links move too.
+    light: { fill: "#C0402A", onAccent: "#FFFFFF", text: "#AC3925" },
   },
 };
 

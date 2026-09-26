@@ -85,7 +85,7 @@ export const STANDARD_LIGHT_GLASS_VARIANTS = {
  *   rose-quartz  #A8244D -> #541227   (L 20.0%)
  *   violet-haze  #5E37B5 -> #331E61   (L 24.9%)
  *   emerald      #106A33 -> #083319   (L 11.6%, owner-accepted sub-12%, D-26)
- *   coral        #B03A26 -> #501A11   (L 19.0%)
+ *   coral        #B03A26 -> #501A11   (L 19.0%; root now #AC3925, D-28)
  *
  * Ratios per asset are recorded in 38.4-RG029-INVENTORY.md; all eight are on
  * the owner's device-review list (Plan 17).
