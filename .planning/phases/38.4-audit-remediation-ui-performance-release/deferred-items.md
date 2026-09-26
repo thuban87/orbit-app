@@ -1,14 +1,17 @@
 # 38.4 deferred items (out-of-scope discoveries)
 
-**Dispositions (owner rulings 2026-09-26, D-29..D-33).** Every item below now has a home. None is left undispositioned.
+**Dispositions (owner rulings 2026-09-26, D-29..D-37).** Every item below now has a home. None is left undispositioned.
 
 | Item | Disposition |
 |---|---|
-| F-1 bare text on Standard art (Plan 03) | **Plan 16 Task 3** — fixed (D-29, supersedes D-27): scrim on Standard-Light Dusk/Mesh only |
+| F-1 bare text on Standard art (Plan 03) | **Plan 16 Task 3** — fixed (D-29, supersedes D-27): scrim on Standard-Light Dusk/Mesh, and on all four Standard backgrounds in Standard Dark (D-35) |
+| F-1 in Standard Dark (owner, 2026-09-26) | **Plan 16 Task 3** (D-35): bare-text scrim on Dawn, Paper, Dusk and Mesh in Standard Dark; Standard Light stays Dusk/Mesh only |
+| F-1 site list incomplete: §5 came from a six-token grep (owner, 2026-09-26) | **Plan 16 Task 3** (D-36): full AST enumeration first (inventory Table D), then wrap every failing site, plus a contract test |
 | E-7 Galaxy Light coral (Plan 03) | **Resolved** (D-28), commits `f446484`/`d8a9ba1` |
-| Touchpoint duration chips, border-only selection (Plan 06) | **Plan 16 Task 4** — filled accent chip + `onAccent` label (D-30) |
-| `RelationshipEditor.tsx` unused `Pressable` import (Plan 06) | **Plan 16 Task 4** (planner-bucket nit, CONTEXT recorded call) |
-| Bare `TYPOGRAPHY.<role>.family` outside the contact renderers (Plan 08) | **Plan 16 Task 4** (planner-bucket nit, CONTEXT recorded call) |
+| Touchpoint duration chips, border-only selection (Plan 06) | **Plan 20 Task 2** — filled accent chip + `onAccent` label (D-30; moved from Plan 16 by D-34) |
+| `RelationshipEditor.tsx` unused `Pressable` import (Plan 06) | **Plan 20 Task 3** (planner-bucket nit; moved from Plan 16 by D-34) |
+| Bare `TYPOGRAPHY.<role>.family` outside the contact renderers (Plan 08) | **Plan 20 Task 3** (planner-bucket nit; moved from Plan 16 by D-34) |
+| Glass-scope colours read above the scope, so the D-24 variants never render (owner, 2026-09-26) | **Plan 20 Task 1** (G3, D-34): read-site sweep plus an AST source contract |
 | Open FAB dial does not trap keyboard focus (Plan 11) | **Plan 12 Task 3** (D-31) |
 | `Sheet` detail variant clips its actions at large text (Plan 11) | **Plan 18** (G1, D-32) |
 | Stale Profile scroll after a warm deep link / Quick Log snackbar (Plan 11) | **Plan 19 Task 3**, check E (G2, D-33) |
@@ -16,8 +19,9 @@
 
 ## From Plan 03 (RG-029)
 
-- **F-1 — DISPOSITION: fixed in Plan 16 Task 3 (D-29, 2026-09-26; supersedes D-27).** A `ChromeScrim`
-  backing appears only on Standard-Light Dusk/Mesh; the text renders unchanged elsewhere. Plan 17 verifies it on device.
+- **F-1 — DISPOSITION: fixed in Plan 16 Task 3 (D-29, 2026-09-26; supersedes D-27; extended by D-35 and D-36).** A `ChromeScrim`
+  backing appears on Standard-Light Dusk/Mesh and on all four Standard backgrounds in Standard Dark (D-35). The text renders unchanged
+  elsewhere. The site list is the complete AST enumeration in inventory Table D (D-36), not the six-token §5 grep. Plan 17 verifies it on device.
   Original note follows. Functional text sits bare on the Standard-Light
   shell background (not glass). Owner ruling D-27 (2026-09-26): not fixed in Plan 03; the owner reviews
   it on the device in Plan 17 and then decides defer vs fix. Site list: `38.4-RG029-INVENTORY.md` §5. The RG-029
@@ -48,19 +52,19 @@
 
 ## From Plan 06 (2026-09-26)
 
-- **Touchpoint duration chips: selection shown by border colour only. DISPOSITION: Plan 16 Task 4 (D-30):
-  the selected chip is filled with the accent fill and gets an `onAccent` label.** `TouchpointRefineForm.tsx`
+- **Touchpoint duration chips: selection shown by border colour only. DISPOSITION: Plan 20 Task 2 (D-30; moved from
+  Plan 16 by D-34): the selected chip is filled with the accent fill and gets an `onAccent` label.** `TouchpointRefineForm.tsx`
   preset/None chips carry `accessibilityState.selected` (so TalkBack is correct), but the visible
   selected mark is only the `colors.accent` border. Not among the AUD-UIA-005 cited sites and not in
   Plan 06's behavior list, so it was left as is. Candidate fix: a filled `select` glyph or a fill
   change on the selected chip.
-- **`RelationshipEditor.tsx` unused `Pressable` import. DISPOSITION: Plan 16 Task 4** (biome `noUnusedImports` warning). It predates
+- **`RelationshipEditor.tsx` unused `Pressable` import. DISPOSITION: Plan 20 Task 3** (moved from Plan 16 by D-34; biome `noUnusedImports` warning). It predates
   Plan 06 and Plan 06 did not cause it. It was left alone to keep the task diff scoped.
 
 ## From Plan 08 (2026-09-26)
 
 - **Bare semantic `TYPOGRAPHY.<role>.family` still assigned outside the contact renderers. DISPOSITION:
-  Plan 16 Task 4** (swap plus typography source-scan extension). Plan 08
+  Plan 20 Task 3** (moved from Plan 16 by D-34; swap plus typography source-scan extension). Plan 08
   moved `resolveFontFamily` into `src/theme/tokens/typography.ts` and put `ListRow`/`GridCard` (the
   AUD-UIA-015 cited "contact renderers") on the registered keys. The same unregistered-family pattern
   remains in `HomeScreen.tsx` (selection count, selection action label, bulk-picker title/label),
@@ -101,3 +105,21 @@
   sort-order action at the top of the Contacts screen makes the app unresponsive: tabs cannot be switched and a
   force-restart is needed. The setting change is persisted. The owner reproduced it on the Pixel 3a by changing
   population. It was not tracked anywhere before. Plan 19 is investigation-first.
+
+## Owner findings (2026-09-26, after the D-29..D-33 replan)
+
+- **Glass-scope colours read above the scope. DISPOSITION: Plan 20 Task 1 (G3, D-34).**
+  - Plan 03's `GlassForegroundScope` changes only colours read by a hook called inside the scope. Many hosts read `colors`
+    at the top of the screen and use them inside a `GlassSurface`/`ChromeScrim`, so those foregrounds render the root tone.
+    The D-24 variants and the secondary→primary override never reach them.
+  - Confirmed: `AIPersonalizationScreen.tsx:139` → `:655` (`danger`), `DigestScreen.tsx:227` → `:249` (`danger`), and the
+    `GridCard` captions (the inventory §6 "secondary → primary" claim does not hold for them today).
+  - Planning-time AST scan: 48 out-of-scope reads in 17 files. The owner estimated about 77 across about 30 by a coarser grep.
+  - Plan 20 moves each read inside the scope (`ScopedPalette` or an extracted child) and adds an AST source contract.
+- **F-1 also fails in Standard Dark, on all four Standard backgrounds. DISPOSITION: Plan 16 Task 3 (D-35).** Bare
+  Standard Dark `textPrimary` measures 1.15–2.97:1 over the veiled art (numbers in CONTEXT D-35). The scrim there is opaque
+  `surface` (`chromeScrimOpacity` 1.0), giving 14.41:1.
+- **F-1 site list was incomplete. DISPOSITION: Plan 16 Task 3 (D-36).**
+  - The §5 list came from a grep of six tokens. Missed examples: `TouchpointRefineForm` labels under LogInteraction/EditInteraction,
+    the Your Week metric labels, the UpdateContact editor text and the "Add photo" link.
+  - Plan 16 enumerates every bare foreground by AST walk first (inventory Table D), wraps every failing site, and adds a contract test.

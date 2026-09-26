@@ -1197,7 +1197,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; ADR-115 + ADR-087 (surface/glass authority)
 **UI hint**: yes
-**Plans**: 10/19 plans executed in 6 waves
+**Plans**: 10/20 plans executed in 7 waves
 
 Plans:
 **Wave 1**
@@ -1231,15 +1231,23 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 38.4-16-PLAN.md — Glass-scope consumer follow-through (placeholder sweep + on-glass accent-text roles) + F-1 Dusk/Mesh scrim, filled duration chip, font/import nits (RG-029; D-24, D-29, D-30)
+- [ ] 38.4-16-PLAN.md — Glass-scope consumer follow-through (placeholder sweep + on-glass accent-text roles) + F-1 bare-text scrim: complete AST enumeration first, Standard-Light Dusk/Mesh and Standard Dark on all four (RG-029; D-24, D-29, D-35, D-36)
 
 **Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 38.4-20-PLAN.md — Gap G3: glass-scope read-site sweep + AST contract; filled duration chip, font/import nits moved from Plan 16 (D-34, D-30; RG-029, RG-030, RG-031)
+
+**Wave 7** *(blocked on Wave 6 completion and the D-37 phase code review/fix pass)*
 
 - [ ] 38.4-17-PLAN.md — Phase gate, debug + one release build, targeted device pass and owner checklist (all)
 
 > **Discussed 2026-09-26 — ready to plan once the owner supplies launcher artwork (D-08). See `38.4-CONTEXT.md` (D-08..D-20). RG-032 moved to the widget-overhaul phase; 38.3 loose ends folded in as Workstream I; Phase 40 keeps its stub list.**
 > **Planned 2026-09-26 — 17 plans, 5 waves. Investigation-first: RG-034/RG-039 (Plan 11) and W3 (Plan 15, D-25 owner checkpoint). Migration 031 (additive indexes). One release APK at the end (Plan 17).**
 > **Re-planned 2026-09-26 after Wave 1 (owner rulings D-29..D-33) — 19 plans, 6 waves.** Two gap plans were added: 18 (G1, Sheet large-text scroll) and 19 (G2, Contacts freeze, investigation-first). D-31 is folded into Plan 12. The F-1 Dusk/Mesh scrim (D-29), the filled duration chip (D-30) and the font/import nits are folded into Plan 16, which moves to wave 5 behind Plan 19. Plan 17 moves to wave 6.
+> **Re-planned 2026-09-26 (owner rulings D-34..D-37) — 20 plans, 7 waves.**
+> - Gap plan 20 (G3, D-34, wave 6) sweeps glass-scope colour reads made above the scope. It also takes the D-30 chip and the font/import nits from Plan 16.
+> - Plan 16's F-1 task now enumerates every bare foreground first (D-36), and also scrims Standard Dark on all four backgrounds (D-35).
+> - **Close-out order (D-37):** all code plans through 38.4-20 → the gsd code review of the phase, plus its fixes (run by the orchestrator between waves 6 and 7) → Plan 17's device pass on the reviewed code (wave 7; it re-runs the gate on HEAD but does not redo the review) → verification.
 
 ### Phase 39: Onboarding
 
@@ -1290,7 +1298,7 @@ Plans:
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
-| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 10/19 | In Progress|  |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 10/20 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
