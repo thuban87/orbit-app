@@ -15,6 +15,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildLogRoute,
   countByCycle,
+  type HistoryReadState,
+  historyReadStateOnFail,
+  historyReadStateOnPublish,
+  historyReadStateOnStart,
+  initialHistoryReadState,
   isEmptyHistory,
   resolveActiveWindow,
 } from "@/components/history/history-section-logic";
@@ -143,5 +148,56 @@ describe("countByCycle — per-cycle interaction counts", () => {
       0, 0, 0,
     ]);
     expect(countByCycle(blocks, [])).toEqual([0, 0, 0]);
+  });
+});
+
+describe("history read state (38.3 RG-024)", () => {
+  const initial: HistoryReadState<string> = initialHistoryReadState();
+
+  it("starts loading", () => {
+    expect(initial).toEqual({ phase: "loading" });
+  });
+
+  it("a failure before anything has loaded is the error state", () => {
+    expect(historyReadStateOnFail(initial)).toEqual({ phase: "error" });
+  });
+
+  it("a failed re-read keeps the loaded rows and flags the refresh notice", () => {
+    const loaded = historyReadStateOnPublish(initial, "rows-1");
+    expect(loaded).toEqual({
+      phase: "loaded",
+      data: "rows-1",
+      refreshError: false,
+    });
+    expect(historyReadStateOnFail(loaded)).toEqual({
+      phase: "loaded",
+      data: "rows-1",
+      refreshError: true,
+    });
+  });
+
+  it("initial success → new revision → failed read keeps old rows and flags; the next success clears", () => {
+    let state = historyReadStateOnPublish(initial, "rows-1");
+    state = historyReadStateOnStart(state);
+    state = historyReadStateOnFail(state);
+    expect(state).toEqual({
+      phase: "loaded",
+      data: "rows-1",
+      refreshError: true,
+    });
+    state = historyReadStateOnPublish(state, "rows-2");
+    expect(state).toEqual({
+      phase: "loaded",
+      data: "rows-2",
+      refreshError: false,
+    });
+  });
+
+  it("a retry from the error state shows loading; a loaded view is kept while re-reading", () => {
+    expect(historyReadStateOnStart(historyReadStateOnFail(initial))).toEqual({
+      phase: "loading",
+    });
+    const loaded = historyReadStateOnPublish(initial, "rows-1");
+    expect(historyReadStateOnStart(loaded)).toBe(loaded);
   });
 });

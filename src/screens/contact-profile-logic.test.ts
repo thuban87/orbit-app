@@ -5,6 +5,7 @@ import {
   closeTopmostProfileOverlay,
   commitProfileOverviewToggle,
   consumeProfileReachOutIntent,
+  createProfileSnapshotLoader,
   PROFILE_APP_BAR,
   profileKnowledgeDestination,
   profileLifecycleView,
@@ -312,5 +313,90 @@ describe("integrated Profile controller contracts", () => {
         hasReachRoute: true,
       }),
     ).toEqual({ clear: false, open: false });
+  });
+});
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+describe("createProfileSnapshotLoader (38.3 RG-024)", () => {
+  function harness() {
+    const reads: ReturnType<typeof deferred<string>>[] = [];
+    const publish = vi.fn();
+    const fail = vi.fn();
+    const settle = vi.fn();
+    const loader = createProfileSnapshotLoader<string>({
+      read: () => {
+        const next = deferred<string>();
+        reads.push(next);
+        return next.promise;
+      },
+      publish,
+      fail,
+      settle,
+    });
+    return { loader, reads, publish, fail, settle };
+  }
+
+  it("publishes only the newest read; an older resolution publishes nothing", async () => {
+    const { loader, reads, publish, settle } = harness();
+    const a = loader.load();
+    const b = loader.load();
+    reads[1].resolve("B");
+    await b;
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publish).toHaveBeenLastCalledWith("B", 1);
+    reads[0].resolve("A");
+    await a;
+    expect(publish).toHaveBeenCalledTimes(1);
+    expect(settle).toHaveBeenCalledTimes(1);
+  });
+
+  it("never fails from a stale rejection; a current rejection fails once without a revision", async () => {
+    const { loader, reads, publish, fail, settle } = harness();
+    const a = loader.load();
+    const b = loader.load();
+    reads[0].reject(new Error("stale"));
+    await a;
+    expect(fail).not.toHaveBeenCalled();
+    reads[1].reject(new Error("current"));
+    await b;
+    expect(fail).toHaveBeenCalledTimes(1);
+    expect(settle).toHaveBeenCalledTimes(1);
+    expect(publish).not.toHaveBeenCalled();
+    const c = loader.load();
+    reads[2].resolve("C");
+    await c;
+    expect(publish).toHaveBeenLastCalledWith("C", 1);
+  });
+
+  it("bumps the revision by exactly one per current successful publication", async () => {
+    const { loader, reads, publish } = harness();
+    for (let i = 0; i < 3; i++) {
+      const pending = loader.load();
+      reads[i].resolve(`v${i}`);
+      await pending;
+    }
+    expect(publish.mock.calls.map((call) => call[1])).toEqual([1, 2, 3]);
+  });
+
+  it("invalidate() retires every in-flight load", async () => {
+    const { loader, reads, publish, fail, settle } = harness();
+    const a = loader.load();
+    const b = loader.load();
+    loader.invalidate();
+    reads[0].resolve("A");
+    reads[1].reject(new Error("late"));
+    await Promise.all([a, b]);
+    expect(publish).not.toHaveBeenCalled();
+    expect(fail).not.toHaveBeenCalled();
+    expect(settle).not.toHaveBeenCalled();
   });
 });
