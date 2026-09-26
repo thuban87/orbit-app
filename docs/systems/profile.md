@@ -28,7 +28,7 @@ The stable migration object is `profilePresentationMigration`; `src/db/database.
 
 ### Read and render flow
 
-1. `ContactProfileScreen` runs `readProfileSnapshot()` on focus and shell-refresh events.
+1. `ContactProfileScreen` runs `readProfileSnapshot()` through `createProfileSnapshotLoader()` (`src/screens/contact-profile-logic.ts`). The load is latest-request gated, so an older read can never overwrite a newer snapshot or error. It runs on focus, on the shell tick (`useShellRefresh`), and on the post-sweep foreground tick (`useForegroundRefresh`, 38.3 D-14 ordering). Each current successful publication bumps `historyRevision`, which `ProfileModuleHost` passes to `HistorySection` as `revision`. The Profile snapshot is the single invalidation owner for both projections: Status, Gravity, Intensity and Last Interaction refresh from the same trigger as History (RG-024).
 2. The reader opens one local read snapshot, aggregates identity, methods, metrics inputs, knowledge, history, and presentation inputs, then classifies only explicitly optional knowledge/history failures.
 3. `resolveProfilePresentation()` resolves independent axes and records dangling template diagnostics without rewriting durable UIDs.
 4. The screen keeps `ProfileHero` structurally fixed and passes the snapshot plus resolved presentation to `ProfileModuleHost`.
@@ -153,3 +153,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-09-02 | 35 | Profile Message now passes a Compose origin so Back and confirmed handoff completion return to the launching Profile. |
 | 2026-09-02 | 37 | Exposed global layout/background defaults in Settings while retaining per-contact template managers on Profile. |
 | 2026-09-19 | 38.1 | Made headings identifier-only, added bounded temporal knowledge/edit routes, moved Unbind to overflow, and added visual-only orphan packing with centered Overview cards. |
+| 2026-09-25 | 38.3 | Coherent snapshot + History revision (RG-024): the snapshot load is latest-request gated and also refreshes on the post-sweep foreground tick; each successful publication bumps the History revision so the metrics and History share one trigger. |

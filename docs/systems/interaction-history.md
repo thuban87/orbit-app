@@ -62,9 +62,10 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 ### Rendering the History section
 
 1. `ProfileModuleHost.renderHistory()` mounts `HistorySection` (the interim bounded timeline stub is gone; profile layout persistence is untouched).
-2. On focus, `HistorySection` reads `getAppSettings` for the persisted lens/preset and calls `readContactHistory` for the contact's date-indexed records, markers, and `hasLifecycleRecords` signal.
-3. `resolveActiveWindow` maps the lens to a `HistoryWindow` (day lenses) or `null` (Cycles); the Heatmap renders `buckets`+`heatmapLevel`, the Intensity chart renders `intensityWindow` over the same window, and the Rolodex renders `history-read` markers.
-4. `isEmptyHistory` is true only when there are zero interactions **and** no lifecycle records — a lifecycle-only contact still shows the zero-count surfaces.
+2. `HistorySection` reads on mount and whenever the parent Profile's `revision` prop changes (38.3 RG-024). Profile focus always produces a new revision, so ADR-123's on-focus read is preserved; the shell tick and the post-sweep foreground tick now reach History the same way. Each read fetches `getAppSettings` for the persisted lens/preset and calls `readContactHistory` for the contact's date-indexed records, markers, and `hasLifecycleRecords` signal. Reads are latest-request gated (`createLatestRequestAuthority`). If the first read fails, History shows "Couldn't load history" with Retry rather than an endless "Loading history…". A failed re-read keeps the previous rows and shows a compact "Couldn't refresh history" notice with Retry (`historyReadStateOnFail` / `historyReadStateOnPublish`). A refresh never resets the open card, sheet or detail selection.
+3. On the same revision/mount event, "today" is re-evaluated with `formatLocalDate()` through `advanceHistoryDay` (38.3 D-12). The explicit `followingToday` flag in `HistoryDayState`, kept separate from `refDate`, decides rollover. A view showing the current window advances to the new today. A past window the user picked (Prev, or Next that stops short of today) stays put. A lens change, or Next back into the window containing today, resumes following. Today-bound limits always follow the new day: next-window navigation, the Rolodex max day, the empty-state Log prefill and cycles `now`. There is no timer (D-22). Day changes are seen on Profile focus, tab return, app resume and the shell tick.
+4. `resolveActiveWindow` maps the lens to a `HistoryWindow` (day lenses) or `null` (Cycles); the Heatmap renders `buckets`+`heatmapLevel`, the Intensity chart renders `intensityWindow` over the same window, and the Rolodex renders `history-read` markers.
+5. `isEmptyHistory` is true only when there are zero interactions **and** no lifecycle records — a lifecycle-only contact still shows the zero-count surfaces.
 
 ### Heatmap and Intensity (shared window)
 
@@ -93,7 +94,7 @@ Visible local timestamps use `formatDateTimeMinuteOrFallback()` from `src/utils/
 
 1. A `DateDetailSheet` row → `InteractionDetail`, which renders only present fields, a restrained AI sparkle strictly when `allow_ai === 1`, and Edit/Delete.
 2. Edit → `EditInteractionScreen`, seeded by `readInteractionForEdit`, saving every editable field through `editTouchpointFull` — the sole recency writer — with future dates rejected via the DAO's shared guard; a failed save preserves the form.
-3. Delete opens a destructive `ConfirmDialog` and calls `deleteTouchpoint` (tombstone + recompute in one transaction); a failure leaves the row and derived metrics intact with the control re-enabled.
+3. Delete opens a destructive `ConfirmDialog` and calls `deleteTouchpoint` (tombstone + recompute in one transaction); a failure leaves the row and derived metrics intact with the control re-enabled. On success, `InteractionDetail` publishes once to the widget (`notifyWidgetDataChanged`) and the shell tick (`bumpShellRefresh`) before `onDeleted`. The Profile snapshot, its History revision, Home, Digest and Orrery therefore all converge (38.3, architecture/AUD-ARCH-004). History's own `onDeleted` only closes the detail.
 4. Group-linked context and edit-scope routing are active through the Group Event routes; standalone interactions continue using the canonical Edit Interaction route.
 
 ### Inspecting and editing group-linked history
@@ -145,6 +146,7 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 10. **IntensityChart caption reads the contact cadence, not the window span.** A regression once made the caption describe the window; it now reflects the contact's true intended cadence (fixed live during UAT, commit `84e4013`).
 11. **Do not make Digest a second History reader.** It can reuse presentation helpers and `week-window`, but its app-wide aggregate and group-parent deduplication remain a distinct read boundary.
 12. **Do not display raw local timestamp storage.** Explicit timestamp consumers use the shared minute formatter; relative formatters and stored/structured values remain unchanged.
+13. **Never re-read History independently of the parent revision — the two projections must share one trigger.** History reads only on mount and on the Profile's `revision`. An independent focus, timer or post-delete re-read lets the metrics and History disagree (38.3 RG-024).
 
 - **Truthful Detail projection.** The initial Group Event Detail supplied a static Allow-AI value and displayed seconds as minutes. Gap closure reads the stored child flag and reuses the shared duration formatter.
 
@@ -169,3 +171,4 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | 2026-09-02 | 36 | Emitted and restored the persisted History lens and cycle-preset preferences in backup format v5. |
 | 2026-09-02 | 38 | Exposed shared local week-window and heatmap presentation seams for Digest without changing contact-scoped History reads. |
 | 2026-09-19 | 38.1 | Made the Year heatmap vertical and routed the audited explicit timestamp displays through the shared minute-precision formatter. |
+| 2026-09-25 | 38.3 | History now reads on the parent Profile revision rather than its own focus hook; ADR-123's on-focus read is preserved via that revision. Interaction deletes publish the shell tick. "Today" is re-evaluated per revision with `formatLocalDate`, and the explicit following-today state implements D-12 without timers. Read failures show error/refresh notices with Retry (RG-024). |
