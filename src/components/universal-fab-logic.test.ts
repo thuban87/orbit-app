@@ -186,6 +186,57 @@ describe("getFocusedContactContext", () => {
     },
   );
 
+  // RG-021 / react-native/AUD-RN-004 (D-24): Settings hosts Profile
+  // (Settings → Archived → Profile), so it preselects like the other tabs.
+  it("finds a Profile contact opened inside SettingsTab", () => {
+    expect(
+      getFocusedContactContext({
+        index: 0,
+        routes: [
+          {
+            name: "SettingsTab",
+            state: {
+              index: 2,
+              routes: [
+                { name: "Settings" },
+                { name: "Archived" },
+                { name: "Profile", params: { contactId: 12 } },
+              ],
+            },
+          },
+        ],
+      }),
+    ).toEqual({ originContactId: 12 });
+  });
+
+  it("returns no contact from the Settings hub or a non-Profile Settings child", () => {
+    expect(
+      getFocusedContactContext({
+        index: 0,
+        routes: [
+          {
+            name: "SettingsTab",
+            state: { index: 0, routes: [{ name: "Settings" }] },
+          },
+        ],
+      }),
+    ).toEqual({ originContactId: null });
+    expect(
+      getFocusedContactContext({
+        index: 0,
+        routes: [
+          {
+            name: "SettingsTab",
+            state: {
+              index: 1,
+              routes: [{ name: "Settings" }, { name: "Backup" }],
+            },
+          },
+        ],
+      }),
+    ).toEqual({ originContactId: null });
+  });
+
   it("is defensive around stale or malformed state", () => {
     expect(getFocusedContactContext(undefined)).toEqual({
       originContactId: null,
