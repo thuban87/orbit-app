@@ -387,7 +387,7 @@ export function UniversalFab() {
           ]}
         >
           <Animated.Text
-            style={[styles.glyph, glyphStyle, { color: colors.background }]}
+            style={[styles.glyph, glyphStyle, { color: colors.onAccent }]}
           >
             +
           </Animated.Text>
