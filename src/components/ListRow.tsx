@@ -21,6 +21,7 @@ import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { isSnoozed } from "@/utils/dates";
 import {
   buildRowAccessibilityDescription,
+  buildSearchRowContext,
   formatListRecency,
   formatMatchCategories,
   formatMatchExplanation,
@@ -120,13 +121,6 @@ export function ListRow({
     colors,
   );
   const recency = formatListRecency(lastContact, now);
-  const accessibilityLabel = buildRowAccessibilityDescription({
-    name,
-    category: categoryLabel,
-    recency,
-    isFavourite,
-    displayState,
-  });
   const isSearchMode = searchResult !== undefined;
   const strongestMatch = searchResult?.matches[0];
   const searchExplanation = isSearchMode
@@ -142,6 +136,18 @@ export function ListRow({
     : null;
   const displayedSearchSnippet =
     strongestMatch?.snippet ?? (searchResult === null ? searchSnippet : null);
+  // Announce exactly the context this row renders (RG-031 AUD-UIA-007): the
+  // search explanation + displayed snippet, else the adaptive line three.
+  const accessibilityLabel = buildRowAccessibilityDescription({
+    name,
+    category: categoryLabel,
+    recency,
+    isFavourite,
+    displayState,
+    context: isSearchMode
+      ? buildSearchRowContext(searchExplanation, displayedSearchSnippet)
+      : (line3?.text ?? null),
+  });
 
   return (
     <Pressable

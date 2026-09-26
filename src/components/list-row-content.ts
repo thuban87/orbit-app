@@ -76,17 +76,31 @@ interface RowAccessibilityDescriptionInput {
   recency: string;
   isFavourite: boolean;
   displayState: StatusDisplayState;
+  /**
+   * The distinguishing context the row ACTUALLY renders (search explanation +
+   * snippet, or the List-only adaptive line three). Announced after the
+   * identity summary; blank/absent context leaves the summary byte-identical.
+   * Never pass text the row does not display (RG-031 ui-accessibility/AUD-UIA-007).
+   */
+  context?: string | null;
 }
 
-/** A complete, colour-independent summary for a dashboard List row. */
+/** Terminal punctuation that already ends a spoken sentence. */
+const SENTENCE_END = /[.!?…]$/;
+
+/**
+ * A complete, colour-independent summary for a dashboard List row / Grid
+ * card: identity first, then the rendered context (if any) as one final part.
+ */
 export function buildRowAccessibilityDescription({
   name,
   category,
   recency,
   isFavourite,
   displayState,
+  context,
 }: RowAccessibilityDescriptionInput): string {
-  return [
+  const summary = [
     name,
     category ?? "No category",
     recency,
@@ -95,4 +109,23 @@ export function buildRowAccessibilityDescription({
   ]
     .map((part) => `${part}.`)
     .join(" ");
+  const trimmed = context?.trim() ?? "";
+  if (trimmed.length === 0) return summary;
+  return `${summary} ${SENTENCE_END.test(trimmed) ? trimmed : `${trimmed}.`}`;
+}
+
+/**
+ * The search-mode context a row/card renders: the match explanation, then the
+ * displayed snippet (quoted) when one is shown. Null when nothing is shown.
+ */
+export function buildSearchRowContext(
+  explanation: string | null,
+  snippet: string | null,
+): string | null {
+  const parts: string[] = [];
+  const shownExplanation = explanation?.trim() ?? "";
+  const shownSnippet = snippet?.trim() ?? "";
+  if (shownExplanation.length > 0) parts.push(shownExplanation);
+  if (shownSnippet.length > 0) parts.push(`"${shownSnippet}"`);
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
