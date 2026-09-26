@@ -21,6 +21,7 @@ import {
 } from "@/services/import/import-photo-retry";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { importCompleteRetryState } from "./import-complete-logic";
 import { useOpenImportSession } from "./use-open-import-session";
 
 const LOG_SCOPE = "import-complete";
@@ -37,7 +38,10 @@ export function ImportCompleteScreen({
   useOpenImportSession(route.params.sessionId);
   const { colors } = useTheme();
   const [counts, setCounts] = useState<SessionSummaryCounts | null>(null);
-  const [hasFailures, setHasFailures] = useState(false);
+  const [unfinishedRows, setUnfinishedRows] = useState({
+    failed: 0,
+    pending: 0,
+  });
   const [photoRows, setPhotoRows] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [retrying, setRetrying] = useState(false);
@@ -70,7 +74,10 @@ export function ImportCompleteScreen({
         : null,
     );
     setCounts(next);
-    setHasFailures(rawCounts.failed > 0);
+    setUnfinishedRows({
+      failed: rawCounts.failed,
+      pending: rawCounts.pending,
+    });
     setPhotoRows(
       rows
         .filter(
@@ -144,6 +151,12 @@ export function ImportCompleteScreen({
       setRetrying(false);
     }
   }, [load, route.params.sessionId]);
+
+  const retryState = importCompleteRetryState({
+    failed: unfinishedRows.failed,
+    pending: unfinishedRows.pending,
+    photoRows: photoRows.length,
+  });
 
   if (loading) {
     return (
@@ -258,17 +271,15 @@ export function ImportCompleteScreen({
         </View>
       </View>
 
-      {hasFailures || photoRows.length > 0 ? (
+      {retryState.visible ? (
         <View style={styles.retryBlock}>
           <Text style={[styles.body, { color: colors.textSecondary }]}>
-            {hasFailures
-              ? "Some contacts couldn't be imported."
-              : "Some contact photos still need to be added."}
+            {retryState.message}
           </Text>
           <Pressable
             testID="import-complete-retry"
             accessibilityRole="button"
-            accessibilityLabel="Retry failed imports"
+            accessibilityLabel="Retry unfinished imports"
             disabled={retrying}
             onPress={() => void retry()}
             style={[styles.secondaryButton, { borderColor: colors.accent }]}
