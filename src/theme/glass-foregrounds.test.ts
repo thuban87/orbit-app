@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { ACCENTS, applyAccent, DEFAULT_ACCENT, resolveAccent } from "./accents";
 import {
+  glassScopedTheme,
   OWNER_ACCEPTED_SUB12_ACCENT_TEXT,
   resolveGlassForegroundPalette,
   STANDARD_LIGHT_GLASS_ACCENT_TEXT,
   STANDARD_LIGHT_GLASS_VARIANTS,
+  unscopedTheme,
 } from "./glass-foregrounds";
 import { ACCENT_IDS, type AccentId } from "./theme-option-ids";
 import { resolvePalette } from "./theme-presets";
-import type { ResolvedMode, ThemePackage } from "./theme-types";
+import type { ResolvedMode, ResolvedTheme, ThemePackage } from "./theme-types";
 
 const PACKAGES: ThemePackage[] = ["galaxy", "standard"];
 const MODES: ResolvedMode[] = ["dark", "light"];
@@ -259,5 +261,93 @@ describe("Standard-Light glass accentText variants (D-24 / owner ruling D-26)", 
     expect(tampered?.accentText).toBe(
       STANDARD_LIGHT_GLASS_ACCENT_TEXT[DEFAULT_ACCENT.standard],
     );
+  });
+});
+
+describe("textPlaceholder token — own role, never glass-overridden (RG-029 Task 3 / Pitfall 9)", () => {
+  it("equals textSecondary in every (package, mode) root palette", () => {
+    for (const pkg of PACKAGES) {
+      for (const mode of MODES) {
+        const palette = resolvePalette(pkg, mode);
+        expect(palette.textPlaceholder, `${pkg}/${mode}`).toBe(
+          palette.textSecondary,
+        );
+      }
+    }
+  });
+
+  it("the glass resolver keeps textPlaceholder at the ROOT textSecondary, not the override", () => {
+    const palette = rootPalette("standard", "light");
+    const glass = resolveGlassForegroundPalette({
+      palette,
+      package: "standard",
+      mode: "light",
+      accentId: null,
+      backgroundIsAsset: true,
+    });
+    expect(glass?.textPlaceholder).toBe(palette.textSecondary);
+    expect(glass?.textPlaceholder).not.toBe(glass?.textSecondary);
+  });
+});
+
+describe("scoped-value helpers — what GlassForegroundScope / UnscopedTheme provide (RG-029 Task 3)", () => {
+  function themeFor(
+    pkg: ThemePackage,
+    mode: ResolvedMode,
+    backgroundIsAsset: boolean,
+  ): ResolvedTheme {
+    const colors = rootPalette(pkg, mode);
+    const glassColors = resolveGlassForegroundPalette({
+      palette: colors,
+      package: pkg,
+      mode,
+      accentId: null,
+      backgroundIsAsset,
+    });
+    return {
+      colors,
+      mode,
+      package: pkg,
+      ...(glassColors ? { glassColors } : {}),
+    };
+  }
+
+  it("glassScopedTheme provides the glass colors when the override is active", () => {
+    const root = themeFor("standard", "light", true);
+    const scoped = glassScopedTheme(root);
+    expect(scoped).not.toBe(root);
+    expect(scoped.colors).toBe(root.glassColors);
+    expect(scoped.mode).toBe(root.mode);
+    expect(scoped.package).toBe(root.package);
+  });
+
+  it("glassScopedTheme is a pass-through (same object) when the override is inactive", () => {
+    for (const [pkg, mode, asset] of [
+      ["galaxy", "dark", true],
+      ["galaxy", "light", true],
+      ["standard", "dark", true],
+      ["standard", "light", false],
+    ] as const) {
+      const root = themeFor(pkg, mode, asset);
+      expect(glassScopedTheme(root), `${pkg}/${mode}/${asset}`).toBe(root);
+    }
+  });
+
+  it("nested glass scopes are idempotent", () => {
+    const once = glassScopedTheme(themeFor("standard", "light", true));
+    expect(glassScopedTheme(once)).toBe(once);
+  });
+
+  it("unscopedTheme returns the ROOT theme under a glass scope (opaque overlays keep normal hierarchy)", () => {
+    const root = themeFor("standard", "light", true);
+    const scoped = glassScopedTheme(root);
+    const restored = unscopedTheme(scoped, root);
+    expect(restored).toBe(root);
+    expect(restored.colors.textSecondary).not.toBe(restored.colors.textPrimary);
+  });
+
+  it("unscopedTheme falls back to the current theme outside a provider", () => {
+    const current = themeFor("galaxy", "dark", true);
+    expect(unscopedTheme(current, null)).toBe(current);
   });
 });
