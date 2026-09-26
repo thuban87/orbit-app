@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import { beginInFlight, endInFlight, type InFlightRef } from "./single-flight";
+import {
+  beginInFlight,
+  endInFlight,
+  type InFlightRef,
+  runSingleFlight,
+} from "./single-flight";
 
 describe("single-flight guard", () => {
   it("claims a free ref and rejects a second synchronous claim", () => {
@@ -43,6 +48,34 @@ describe("single-flight guard", () => {
 
     expect(write).toHaveBeenCalledTimes(1);
     // The guard is re-armed once the single write settles.
+    expect(ref.current).toBe(false);
+  });
+});
+
+describe("runSingleFlight (38.3 review B-WR-02 / B-WR-03)", () => {
+  it("runs the work once for two same-tick calls and reports the dropped call", async () => {
+    const ref: InFlightRef = { current: false };
+    const gate = { release: () => {} };
+    const work = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          gate.release = resolve;
+        }),
+    );
+    const first = runSingleFlight(ref, work);
+    const second = runSingleFlight(ref, work);
+    expect(await second).toBe(false);
+    gate.release();
+    expect(await first).toBe(true);
+    expect(work).toHaveBeenCalledTimes(1);
+    expect(ref.current).toBe(false);
+  });
+
+  it("releases the slot when the work rejects, and propagates the rejection", async () => {
+    const ref: InFlightRef = { current: false };
+    await expect(
+      runSingleFlight(ref, () => Promise.reject(new Error("write"))),
+    ).rejects.toThrow("write");
     expect(ref.current).toBe(false);
   });
 });

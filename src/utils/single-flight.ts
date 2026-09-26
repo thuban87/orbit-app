@@ -35,3 +35,21 @@ export function beginInFlight(ref: InFlightRef): boolean {
 export function endInFlight(ref: InFlightRef): void {
   ref.current = false;
 }
+
+/**
+ * Run `work` only if the slot is free; release it in `finally`. Resolves `true`
+ * when the work ran and `false` when the call was dropped because another call
+ * was already in flight. A rejection from `work` propagates after the release.
+ */
+export async function runSingleFlight(
+  ref: InFlightRef,
+  work: () => Promise<unknown>,
+): Promise<boolean> {
+  if (!beginInFlight(ref)) return false;
+  try {
+    await work();
+    return true;
+  } finally {
+    endInFlight(ref);
+  }
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   type BulkAction,
@@ -25,6 +25,7 @@ import { importRowAsNew } from "@/services/import/import-driver";
 import { resolveImportStagingUri } from "@/services/photos/photo-storage";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { runSingleFlight } from "@/utils/single-flight";
 import {
   duplicateReviewView,
   runBulkResolveThenRecover,
@@ -92,6 +93,24 @@ export function DuplicateReviewScreen({
   const [loadError, setLoadError] = useState(false);
   const [linkQueue, setLinkQueue] = useState<ReviewItem[]>([]);
   const [currentLink, setCurrentLink] = useState<ReviewItem | null>(null);
+  // 38.3 review B-WR-02 (D-04): one synchronous latch over every resolve write.
+  // A same-tick double tap on a link choice otherwise ran the link twice: the
+  // second hit the external-link UNIQUE index and showed "Couldn't link" over
+  // the NEXT row for a link that committed, or advanced the queue twice.
+  const writeInFlight = useRef(false);
+  const [writing, setWriting] = useState(false);
+  const runLatchedWrite = useCallback(
+    (work: () => Promise<unknown>) =>
+      runSingleFlight(writeInFlight, async () => {
+        setWriting(true);
+        try {
+          await work();
+        } finally {
+          setWriting(false);
+        }
+      }),
+    [],
+  );
 
   const refresh = useCallback(async () => {
     const exec = getExecutor();
@@ -182,44 +201,50 @@ export function DuplicateReviewScreen({
     if (!session) return;
     // Only a row's own write can fail its resolve; the trailing finalize and
     // re-read go to the read error + read-only Retry (D-04).
-    await runBulkResolveThenRecover({
-      entries: selected,
-      writeOne: async (entry) => {
-        const now = localDateTime();
-        if (action === "import-new") {
-          const result = await importRowAsNew(getExecutor(), {
-            row: entry.row,
-            batchCategoryId: session.batchCategoryId,
-            phoneRegion: session.phoneRegion,
-            now,
-          });
-          if (result.skipped === "name-required") {
-            Alert.alert(
-              "Couldn't import — no name",
-              "Add a name before importing.",
+    await runLatchedWrite(() =>
+      runBulkResolveThenRecover({
+        entries: selected,
+        writeOne: async (entry) => {
+          const now = localDateTime();
+          if (action === "import-new") {
+            const result = await importRowAsNew(getExecutor(), {
+              row: entry.row,
+              batchCategoryId: session.batchCategoryId,
+              phoneRegion: session.phoneRegion,
+              now,
+            });
+            if (result.skipped === "name-required") {
+              Alert.alert(
+                "Couldn't import — no name",
+                "Add a name before importing.",
+              );
+            }
+          } else if (action === "skip") {
+            await markRowStatus(
+              getExecutor(),
+              entry.row.id,
+              "skipped",
+              null,
+              now,
             );
           }
-        } else if (action === "skip") {
-          await markRowStatus(
-            getExecutor(),
-            entry.row.id,
-            "skipped",
-            null,
-            now,
+        },
+        onRowError: (entry, error) => {
+          Logger.error(
+            LOG_SCOPE,
+            `could not resolve row ${entry.row.id}`,
+            error,
           );
-        }
-      },
-      onRowError: (entry, error) => {
-        Logger.error(LOG_SCOPE, `could not resolve row ${entry.row.id}`, error);
-        Alert.alert(
-          "Couldn't resolve this contact",
-          "The other selected contacts are still available.",
-        );
-      },
-      finalize: finalizeSession,
-      reread,
-      onRecoveryError: onReadError,
-    });
+          Alert.alert(
+            "Couldn't resolve this contact",
+            "The other selected contacts are still available.",
+          );
+        },
+        finalize: finalizeSession,
+        reread,
+        onRecoveryError: onReadError,
+      }),
+    );
   }
 
   async function chooseLink(choice: CandidateChoice) {
@@ -229,28 +254,30 @@ export function DuplicateReviewScreen({
     // "Please choose again" only when the link write itself rejected. Once it
     // commits the queue advances; finalize/re-read failures become the read
     // error with a read-only Retry, never a prompt to redo the link (D-04).
-    await runResolveThenRecover({
-      write: () =>
-        linkExistingContactToRow(getExecutor(), {
-          rowId: linking.row.id,
-          contactId: choice.contactId,
-          provider: "android",
-          externalContactId: linking.row.externalContactId,
-          matchOutcome: linking.row.matchOutcome,
-          now: localDateTime(),
-        }),
-      onWriteError: (error) => {
-        Logger.error(LOG_SCOPE, "could not link candidate", error);
-        Alert.alert("Couldn't link this contact", "Please choose again.");
-      },
-      onWritten: () => {
-        setCurrentLink(next);
-        setLinkQueue((queue) => queue.slice(1));
-      },
-      finalize: finalizeSession,
-      reread: next ? async () => undefined : reread,
-      onRecoveryError: onReadError,
-    });
+    await runLatchedWrite(() =>
+      runResolveThenRecover({
+        write: () =>
+          linkExistingContactToRow(getExecutor(), {
+            rowId: linking.row.id,
+            contactId: choice.contactId,
+            provider: "android",
+            externalContactId: linking.row.externalContactId,
+            matchOutcome: linking.row.matchOutcome,
+            now: localDateTime(),
+          }),
+        onWriteError: (error) => {
+          Logger.error(LOG_SCOPE, "could not link candidate", error);
+          Alert.alert("Couldn't link this contact", "Please choose again.");
+        },
+        onWritten: () => {
+          setCurrentLink(next);
+          setLinkQueue((queue) => queue.slice(1));
+        },
+        finalize: finalizeSession,
+        reread: next ? async () => undefined : reread,
+        onRecoveryError: onReadError,
+      }),
+    );
   }
 
   const view = duplicateReviewView({
@@ -343,6 +370,8 @@ export function DuplicateReviewScreen({
               <Pressable
                 key={choice.contactId}
                 accessibilityRole="button"
+                accessibilityState={{ disabled: writing }}
+                disabled={writing}
                 onPress={() => void chooseLink(choice)}
                 style={[styles.choice, { borderColor: colors.border }]}
               >
