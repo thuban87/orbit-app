@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.4
 current_phase_name: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
 status: executing
-stopped_at: Completed 38.4-10-PLAN.md
-last_updated: "2026-09-26T19:57:09.029Z"
+stopped_at: Completed 38.4-11-PLAN.md
+last_updated: "2026-09-26T21:15:31.777Z"
 last_activity: 2026-09-26
-last_activity_desc: 38.4-10 complete — seven header-chrome Settings children keep only the ShellAppBar header Back (onBack retired; settings-chrome-contract.test.ts guards it and 25 header-less screens keep in-body Back); hub rows show registry icon + title + subtitle + chevron on route rows only, accessible name title+subtitle; 5 Settings registry glyphs for owner device review (RG-037 UIA-016/017, D-15)
-state_head: 8742c04715da29b33027fba5727cc042dae9b219
+last_activity_desc: 38.4-11 complete — RG-039 CONFIRMED on the Pixel 3a (closed FAB dial had 7 invisible keyboard focus stops, ENTER invoked a hidden action) and fixed (scrim+rows no-hide-descendants + accessible/focusable follow open, FAB expanded state); FAB glyph on onAccent (D-20); RG-034 CONFIRMED at font_scale 2.0 × ≈320/≈349dp (Cancel crushed off-card) and fixed (measured row/stack actions + window-bounded scrolling body, ADR-086 non-dismissal kept); device settings restored exactly (38.4-INVESTIGATIONS.md)
+state_head: 1a7d2ae891ac5d45430300fca1c459adc0e6b1cf
 progress:
   total_phases: 26
   completed_phases: 17
   total_plans: 235
-  completed_plans: 225
+  completed_plans: 226
 carried_forward:
 
   - "38.3 owner dispositions (2026-09-26, not passes): UAT-023a widget leg DEFERRED to the widget-overhaul phase; UAT-042 A-then-B chronology, UAT-024b month/year rollover, UAT-026b in-range keep and UAT-022 warm-Mark-while-backgrounded ACCEPTED-RISK (unit tests only). O-3 → homed in 38.4 Workstream I (D-10)."
@@ -42,7 +42,7 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 38.4 (UI Consistency, Accessibility, Performance & Release Polish (INSERTED)) — EXECUTING
-Plan: 10 of 17
+Plan: 11 of 17
 Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
@@ -377,6 +377,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.4 P07 | 6min | 2 tasks | 8 files |
 | Phase 38.4 P08 | 8min | 3 tasks | 15 files |
 | Phase 38.4 P10 | 9min | 3 tasks | 16 files |
+| Phase 38.4 P11 | 76min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -838,6 +839,8 @@ Foundational decisions affecting current work:
 - [Phase 38.4]: 38.4-08: any <Text> styled from TYPOGRAPHY resolves fontFamily via resolveFontFamily (typography.ts); remaining bare-family sites in HomeScreen/CardContextMenu/BulkActionSurface deferred (deferred-items.md)
 - [Phase 38.4]: 38.4-10: D-15 Settings hub glyph picks appearance/contacts/message/notifications/orrery/backup/sparkle/about/widget are planner picks for owner device review (swap at icon-registry)
 - [Phase 38.4]: 38.4-10: header-chrome Settings children take no onBack; settings-chrome-contract.test.ts guards single header Back and 25 header-less screens keeping in-body Back
+- [Phase 38.4]: 38.4-11: RG-039 CONFIRMED on device (closed FAB dial = 7 invisible keyboard focus stops, ENTER invoked a hidden action); fix hides scrim+rows via importantForAccessibility no-hide-descendants/accessibilityElementsHidden AND accessible/focusable={open} (RN 0.86 focusable=false keeps native focusability); FAB accessibilityState expanded
+- [Phase 38.4]: 38.4-11: RG-034 CONFIRMED at font_scale 2.0 x ~320/~349dp (Cancel crushed to unlabelled ~17dp sliver); ConfirmDialog now measures actions (original row when both fit, full-width stack in reading order otherwise) and scrolls title/message inside a window-bounded card; dismissable={!destructive} unchanged (ADR-086). Narrow phones (3a) now stack even at default text
 
 ### Pending Todos
 
@@ -904,8 +907,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-26T19:57:00.319Z
-**Stopped at:** Completed 38.4-10-PLAN.md
+**Last session:** 2026-09-26T21:15:22.917Z
+**Stopped at:** Completed 38.4-11-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
