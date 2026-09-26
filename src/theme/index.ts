@@ -15,5 +15,6 @@ export {
   UnscopedTheme,
   useGlassForegroundColors,
   useTheme,
+  useUnscopedTheme,
 } from "./theme-provider";
 export * from "./theme-types";

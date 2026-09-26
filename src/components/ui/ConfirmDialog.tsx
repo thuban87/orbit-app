@@ -23,7 +23,7 @@
 // (same precedent as ThemePreviewScreen.tsx).
 import { StyleSheet, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
-import { useTheme } from "@/theme";
+import { useUnscopedTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { AppText } from "./AppText";
@@ -62,7 +62,9 @@ export function ConfirmDialog({
   destructive = false,
   confirmDisabled = false,
 }: ConfirmDialogProps) {
-  const { colors } = useTheme();
+  // The dialog is an opaque surface: read the ROOT palette so its body text
+  // keeps the secondary role even when opened from a glass scope (RG-029).
+  const { colors } = useUnscopedTheme();
   const cancel = onCancel ?? onRequestClose;
 
   return (

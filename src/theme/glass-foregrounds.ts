@@ -34,7 +34,12 @@
 
 import { DEFAULT_ACCENT } from "./accents";
 import { ACCENT_IDS, type AccentId } from "./theme-option-ids";
-import type { ResolvedMode, ThemePackage, ThemePalette } from "./theme-types";
+import type {
+  ResolvedMode,
+  ResolvedTheme,
+  ThemePackage,
+  ThemePalette,
+} from "./theme-types";
 
 /**
  * Darker Standard-Light-only variants for the non-text foregrounds the RG-029
@@ -140,6 +145,8 @@ export interface GlassForegroundInput {
  *
  * Active only for `package === "standard" && mode === "light" &&
  * backgroundIsAsset`. Returns a NEW palette; never mutates the input.
+ * `textPlaceholder` is deliberately NOT overridden: it keeps the root
+ * `textSecondary` so input placeholders stay visually secondary (Pitfall 9).
  */
 export function resolveGlassForegroundPalette(
   input: GlassForegroundInput,
@@ -163,4 +170,32 @@ export function resolveGlassForegroundPalette(
         resolvedAccentId(accentId, themePackage)
       ],
   };
+}
+
+/**
+ * The value `GlassForegroundScope` provides (RG-029 Task 3): the theme with
+ * `colors` swapped for `glassColors` when the override is active. Returns the
+ * SAME object when it is inactive (Galaxy, Standard Dark, the `none`
+ * background) or already applied, so nested scopes are idempotent and the
+ * scope can render its children unchanged. PURE (node-testable).
+ */
+export function glassScopedTheme(theme: ResolvedTheme): ResolvedTheme {
+  const { glassColors } = theme;
+  if (!glassColors || theme.colors === glassColors) {
+    return theme;
+  }
+  return { ...theme, colors: glassColors };
+}
+
+/**
+ * The value `UnscopedTheme` / `useUnscopedTheme` provide (RG-029 Task 3): the
+ * ROOT theme, so an opaque surface (sheet, dialog, overflow menu) rendered
+ * inside a glass scope keeps the normal text hierarchy. Outside a provider
+ * (`root === null`) the current theme is returned unchanged. PURE.
+ */
+export function unscopedTheme(
+  current: ResolvedTheme,
+  root: ResolvedTheme | null,
+): ResolvedTheme {
+  return root ?? current;
 }

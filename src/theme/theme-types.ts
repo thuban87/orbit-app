@@ -80,6 +80,14 @@ export interface ThemePalette {
   accentText: string;
   textPrimary: string;
   textSecondary: string;
+  /**
+   * Placeholder text for inputs (RG-029 / D-24). Equals `textSecondary` in every
+   * palette, but is its OWN role so the glass foreground scope never overrides
+   * it: inputs sit on their own surface, so a placeholder inside a Standard-Light
+   * glass card stays visually secondary instead of turning primary (research
+   * Pitfall 9). Consumers switch to it in Plan 16's placeholder sweep.
+   */
+  textPlaceholder: string;
   border: string;
   borderStrong: string;
   /**

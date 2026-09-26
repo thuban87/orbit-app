@@ -45,6 +45,7 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       accentText: "#8FA6FF",
       textPrimary: "#E6E9F5",
       textSecondary: "#8B93B0",
+      textPlaceholder: "#8B93B0",
       border: "#2A3048",
       borderStrong: "#3C4568",
       // Destructive FILL (owner-approved #E5484D, 2026-08-14) — immovable owner
@@ -147,6 +148,7 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       accentText: "#2A46C7",
       textPrimary: "#1A1F33",
       textSecondary: "#515A78",
+      textPlaceholder: "#515A78",
       border: "#D2D9EA",
       borderStrong: "#B4BFD8",
       // Authored destructive pair (AA path): a deep red fill so near-white
@@ -215,6 +217,7 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       accentText: "#9AA8E0",
       textPrimary: "#E9ECF1",
       textSecondary: "#9AA1AD",
+      textPlaceholder: "#9AA1AD",
       border: "#2E333C",
       borderStrong: "#424956",
       // Authored destructive pair (AA path): a light red fill so danger-as-text
@@ -274,6 +277,7 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       accentText: "#3C4AA0",
       textPrimary: "#1B1E26",
       textSecondary: "#565D6B",
+      textPlaceholder: "#565D6B",
       border: "#DADEE6",
       borderStrong: "#BCC3CF",
       // Authored destructive pair (AA path): deep red fill; near-white onDanger

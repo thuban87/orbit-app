@@ -58,6 +58,9 @@ vi.mock("@/theme", () => ({
     mode: "dark",
     package: "galaxy",
   }),
+  // overlay-base resets any glass scope for overlay content (RG-029); Galaxy
+  // has no glass override, so the reset is a pass-through here.
+  UnscopedTheme: ({ children }: { children?: ReactNode }) => children,
 }));
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/navigation/use-window-measurement", () => ({

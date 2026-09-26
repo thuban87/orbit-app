@@ -4,7 +4,11 @@ import { useColorScheme } from "react-native";
 import { useThemeStore } from "@/stores/theme-store";
 import { applyAccent, resolveAccent } from "./accents";
 import { resolveBackground } from "./backgrounds";
-import { resolveGlassForegroundPalette } from "./glass-foregrounds";
+import {
+  glassScopedTheme,
+  resolveGlassForegroundPalette,
+  unscopedTheme,
+} from "./glass-foregrounds";
 import {
   DEFAULT_PRESET_ID,
   resolveMode,
@@ -112,15 +116,8 @@ export function GlassForegroundScope({
   children?: React.ReactNode;
 }) {
   const theme = useTheme();
-  const glassColors = theme.glassColors;
-  const scoped = useMemo<ResolvedTheme | null>(
-    () =>
-      glassColors && theme.colors !== glassColors
-        ? { ...theme, colors: glassColors }
-        : null,
-    [theme, glassColors],
-  );
-  if (!scoped) {
+  const scoped = useMemo(() => glassScopedTheme(theme), [theme]);
+  if (scoped === theme) {
     return <>{children}</>;
   }
   return (
@@ -134,11 +131,23 @@ export function GlassForegroundScope({
  * Outside a provider it renders its children unchanged.
  */
 export function UnscopedTheme({ children }: { children?: React.ReactNode }) {
-  const root = useContext(RootThemeContext);
-  if (!root) {
+  const current = useTheme();
+  const value = unscopedTheme(current, useContext(RootThemeContext));
+  if (value === current) {
     return <>{children}</>;
   }
-  return <ThemeContext.Provider value={root}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
+}
+
+/**
+ * The ROOT theme for a component that paints an OPAQUE surface itself and reads
+ * colours above its own `UnscopedTheme` boundary (ConfirmDialog's body text,
+ * OverflowMenu's sheet). Same value `UnscopedTheme` provides.
+ */
+export function useUnscopedTheme(): ResolvedTheme {
+  return unscopedTheme(useTheme(), useContext(RootThemeContext));
 }
 
 /**

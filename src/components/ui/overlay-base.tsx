@@ -16,6 +16,10 @@
  *       dismissable=false → scrim is INERT and Back is a no-op, so a destructive
  *                           ConfirmDialog requires an explicit button choice.
  *
+ * Glass scope boundary (RG-029 / D-24): overlay content renders inside
+ * `UnscopedTheme`, so an overlay opened from a Standard-Light glass card or the
+ * app bar does not inherit the glass foreground palette.
+ *
  * No colour literal here (check:colors); this file is `.tsx` because it renders.
  */
 import { type ReactNode, useEffect, useRef } from "react";
@@ -30,7 +34,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useTheme } from "@/theme";
+import { UnscopedTheme, useTheme } from "@/theme";
 
 /** Scrim opacity applied to `colors.background` (the DropdownFieldWidget idiom). */
 export const SCRIM_OPACITY = 0.85;
@@ -124,7 +128,11 @@ export function BaseOverlay({
             />
           )}
           <View ref={contentRef} collapsable={false} style={contentStyle}>
-            {children}
+            {/* Overlays are opaque surfaces: reset any glass foreground scope
+                they were opened from so sheets/dialogs keep the normal text
+                hierarchy (RG-029 / D-24). A GlassSurface card inside an overlay
+                re-enters its own scope. */}
+            <UnscopedTheme>{children}</UnscopedTheme>
           </View>
         </View>
       </GestureHandlerRootView>

@@ -8,6 +8,9 @@
  * sheet over a `background` scrim at 0.85 opacity — no colour literal anywhere
  * (CLAUDE.md / check:colors). Each action is a `Pressable` row.
  *
+ * Glass scope (RG-029 / D-24): the trigger follows its host's scope; the sheet
+ * resets to the root palette via `UnscopedTheme` / `useUnscopedTheme`.
+ *
  * This phase's only action is "Archive" (reversible → deliberately NOT styled
  * destructive; purge lands on the Archived list in Plan 09, never here — the
  * two-stage guarantee keeps the irreversible action off the profile).
@@ -22,7 +25,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { useTheme } from "@/theme";
+import { UnscopedTheme, useTheme, useUnscopedTheme } from "@/theme";
 
 /** One row in the overflow sheet. */
 export interface OverflowAction {
@@ -37,7 +40,11 @@ export interface OverflowAction {
 }
 
 export function OverflowMenu({ actions }: { actions: OverflowAction[] }) {
+  // The trigger sits in its host's chrome (e.g. the ShellAppBar glass scope)
+  // and reads the scoped palette; the sheet is an opaque surface and reads the
+  // ROOT palette, so it keeps the normal hierarchy (RG-029 / D-24).
   const { colors } = useTheme();
+  const { colors: sheetColors } = useUnscopedTheme();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<View>(null);
 
@@ -71,58 +78,60 @@ export function OverflowMenu({ actions }: { actions: OverflowAction[] }) {
         animationType="fade"
         onRequestClose={close}
       >
-        <View accessibilityViewIsModal style={styles.modalRoot}>
-          <Pressable
-            accessibilityLabel="Dismiss actions"
-            style={StyleSheet.absoluteFill}
-            onPress={close}
-          >
+        <UnscopedTheme>
+          <View accessibilityViewIsModal style={styles.modalRoot}>
+            <Pressable
+              accessibilityLabel="Dismiss actions"
+              style={StyleSheet.absoluteFill}
+              onPress={close}
+            >
+              <View
+                style={[
+                  StyleSheet.absoluteFill,
+                  styles.scrim,
+                  { backgroundColor: sheetColors.background },
+                ]}
+              />
+            </Pressable>
+
             <View
               style={[
-                StyleSheet.absoluteFill,
-                styles.scrim,
-                { backgroundColor: colors.background },
+                styles.sheet,
+                {
+                  backgroundColor: sheetColors.surfaceElevated,
+                  borderColor: sheetColors.border,
+                },
               ]}
-            />
-          </Pressable>
-
-          <View
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: colors.surfaceElevated,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            {actions.map((action) => (
-              <Pressable
-                key={action.label}
-                testID={action.testID ?? `overflow-action-${action.label}`}
-                accessibilityRole="button"
-                accessibilityLabel={action.accessibilityLabel ?? action.label}
-                accessibilityState={{ disabled: action.disabled === true }}
-                disabled={action.disabled}
-                onPress={() => {
-                  if (action.disabled) return;
-                  close();
-                  action.onPress();
-                }}
-                style={[styles.option, { borderColor: colors.border }]}
-              >
-                <Text
-                  style={{
-                    color: action.disabled
-                      ? colors.textSecondary
-                      : colors.textPrimary,
+            >
+              {actions.map((action) => (
+                <Pressable
+                  key={action.label}
+                  testID={action.testID ?? `overflow-action-${action.label}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.accessibilityLabel ?? action.label}
+                  accessibilityState={{ disabled: action.disabled === true }}
+                  disabled={action.disabled}
+                  onPress={() => {
+                    if (action.disabled) return;
+                    close();
+                    action.onPress();
                   }}
+                  style={[styles.option, { borderColor: sheetColors.border }]}
                 >
-                  {action.label}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    style={{
+                      color: action.disabled
+                        ? sheetColors.textSecondary
+                        : sheetColors.textPrimary,
+                    }}
+                  >
+                    {action.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
-        </View>
+        </UnscopedTheme>
       </Modal>
     </>
   );
