@@ -181,23 +181,23 @@ describe("runParticipantAdd — commit vs refresh (D-19, reliability-testing/AUD
       { type: "initialLoaded", event: stale },
       { type: "participantsCommitted", contactIds: [2, 3] },
     ]);
-    expect(excludedParticipantIds(state.event, state.committedPendingIds)).toEqual(
-      [1, 2, 3],
-    );
+    expect(
+      excludedParticipantIds(state.event, state.committedPendingIds),
+    ).toEqual([1, 2, 3]);
 
     state = groupEventEditReducer(state, { type: "refreshFailed" });
-    expect(excludedParticipantIds(state.event, state.committedPendingIds)).toEqual(
-      [1, 2, 3],
-    );
+    expect(
+      excludedParticipantIds(state.event, state.committedPendingIds),
+    ).toEqual([1, 2, 3]);
 
     state = groupEventEditReducer(state, {
       type: "eventRefreshed",
       event: detail([participant(1), participant(2), participant(3)]),
     });
     expect(state.committedPendingIds).toEqual([]);
-    expect(excludedParticipantIds(state.event, state.committedPendingIds)).toEqual(
-      [1, 2, 3],
-    );
+    expect(
+      excludedParticipantIds(state.event, state.committedPendingIds),
+    ).toEqual([1, 2, 3]);
     expect(excludedParticipantIds(null, [])).toEqual([]);
   });
 

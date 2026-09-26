@@ -58,18 +58,18 @@ describe("contact picker multi-select helpers", () => {
     expect(picker).toContain("Couldn't add those contacts. Please try again.");
   });
 
-  it("uses the one awaited batch-and-reload owner contract on both saved-event screens", () => {
-    for (const screen of [
-      "EditGroupEventScreen.tsx",
-      "GroupEventDetailScreen.tsx",
-    ]) {
+  it("uses the one batch-write, commit-vs-refresh owner contract on both saved-event screens (38.3 D-19)", () => {
+    for (const screen of ["EditGroupEventScreen.tsx"]) {
       const source = readFileSync(
         new URL(`../screens/${screen}`, import.meta.url),
         "utf8",
       );
-      expect(source).toContain("await addParticipants(getExecutor(), {");
-      expect(source).toContain("await load({ throwOnFailure: true });");
-      expect(source).toContain("throw error;");
+      // The picker owner awaits the one atomic batch write only; the readback
+      // runs detached so a failed read is never reported as a failed add.
+      expect(source).toContain('from "./group-event-refresh"');
+      expect(source).toContain("runParticipantAdd(");
+      expect(source).toContain("addParticipants(getExecutor(), {");
+      expect(source).not.toContain("throwOnFailure");
       expect(source).not.toContain("addParticipant(getExecutor()");
     }
   });

@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit's Button and AppText use a
 // domain-specific semantic `role` prop, not a web ARIA role.
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -16,10 +16,7 @@ import {
   participantDraft,
 } from "@/components/group/ParticipantOverrideEditor";
 import { RemoveParticipantSheet } from "@/components/group/RemoveParticipantSheet";
-import {
-  TouchpointRefineForm,
-  type TouchpointRefineValue,
-} from "@/components/TouchpointRefineForm";
+import { TouchpointRefineForm } from "@/components/TouchpointRefineForm";
 import { AppText, Button, Sheet } from "@/components/ui";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -30,7 +27,6 @@ import {
   updateGroupEvent,
 } from "@/db/group-events-dao";
 import {
-  type GroupEventDetail,
   type GroupEventParticipant,
   readGroupEventDetail,
 } from "@/db/group-events-read";
@@ -43,29 +39,18 @@ import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { createLatestRequestAuthority } from "@/utils/latest-request";
+import {
+  createGroupEventRefreshController,
+  eventDraft,
+  excludedParticipantIds,
+  groupEventEditReducer,
+  initialGroupEventEditState,
+  isGroupEventDraftDirty,
+  runParticipantAdd,
+} from "./group-event-refresh";
 
 const GROUP_FUTURE_DATE_MESSAGE = "Group events can't be in the future.";
-
-interface EventDraft {
-  value: TouchpointRefineValue;
-  groupNote: string;
-}
-
-function eventDraft(event: GroupEventDetail): EventDraft {
-  return {
-    value: {
-      occurredAt: event.occurredAt,
-      channel: event.channel ?? "In Person",
-      quality: event.quality,
-      duration: event.duration,
-      direction: null,
-      connected: 1,
-      note: null,
-      allowAi: 0,
-    },
-    groupNote: event.groupNote ?? "",
-  };
-}
 
 export function EditGroupEventScreen({
   navigation,
@@ -73,8 +58,11 @@ export function EditGroupEventScreen({
 }: RootStackScreenProps<"EditGroupEvent">) {
   const { colors } = useTheme();
   const { groupEventId } = route.params;
-  const [event, setEvent] = useState<GroupEventDetail | null>(null);
-  const [draft, setDraft] = useState<EventDraft | null>(null);
+  const [state, dispatch] = useReducer(
+    groupEventEditReducer,
+    initialGroupEventEditState,
+  );
+  const { event, draft } = state;
   const [editing, setEditing] = useState<GroupEventParticipant | null>(null);
   const [participantDraftState, setParticipantDraftState] =
     useState<ParticipantEditDraft | null>(null);
@@ -82,36 +70,51 @@ export function EditGroupEventScreen({
   const [removing, setRemoving] = useState<GroupEventParticipant | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const baselineRef = useRef<string | null>(null);
   const bypassRef = useRef(false);
 
-  const load = useCallback(
-    async ({ throwOnFailure = false } = {}) => {
+  // Mount-only seed: the ONE path that sets the draft and its baseline (D-17).
+  useEffect(() => {
+    const authority = createLatestRequestAuthority();
+    const token = authority.begin();
+    const loadInitial = async () => {
       try {
         const loaded = await readGroupEventDetail(getExecutor(), {
           groupEventId,
         });
-        if (!loaded) {
-          throw new Error("This group event is no longer available.");
-        }
-        const nextDraft = eventDraft(loaded);
-        baselineRef.current = JSON.stringify(nextDraft);
-        setEvent(loaded);
-        setDraft(nextDraft);
-      } catch (error) {
-        setError("Couldn't load this group event. Please go back and retry.");
-        if (throwOnFailure) throw error;
+        if (!authority.isCurrent(token)) return;
+        dispatch(
+          loaded
+            ? { type: "initialLoaded", event: loaded }
+            : { type: "initialLoadFailed" },
+        );
+      } catch {
+        if (authority.isCurrent(token)) dispatch({ type: "initialLoadFailed" });
       }
-    },
+    };
+    void loadInitial();
+    return () => authority.invalidate();
+  }, [groupEventId]);
+
+  // Post-commit readback replaces the saved `event` only; never the draft.
+  const refreshController = useMemo(
+    () =>
+      createGroupEventRefreshController({
+        read: () => readGroupEventDetail(getExecutor(), { groupEventId }),
+        onRefreshed: (refreshed) =>
+          dispatch({ type: "eventRefreshed", event: refreshed }),
+        onRefreshFailed: () => dispatch({ type: "refreshFailed" }),
+      }),
     [groupEventId],
   );
+  useEffect(() => () => refreshController.invalidate(), [refreshController]);
+  const refreshEvent = refreshController.refresh;
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-  const hasUnsavedChanges =
-    draft !== null && JSON.stringify(draft) !== baselineRef.current;
+  const hasUnsavedChanges = isGroupEventDraftDirty(state);
   useDiscardKeepGuard({ hasUnsavedChanges, bypassRef });
+  const excludedIds = useMemo(
+    () => excludedParticipantIds(event, state.committedPendingIds),
+    [event, state.committedPendingIds],
+  );
 
   async function saveEvent() {
     if (!event || !draft || saving) return;
@@ -150,21 +153,22 @@ export function EditGroupEventScreen({
     }
   }
 
-  async function addSelected(contactIds: number[]) {
-    try {
-      await addParticipants(getExecutor(), {
-        groupEventId,
-        participants: contactIds.map((contactId) => ({
-          contactId,
-          uid: newUid(),
-        })),
-        now: localDateTime(),
-      });
-      await load({ throwOnFailure: true });
-    } catch (error) {
-      setError("Couldn't update the group event. Your changes weren't saved.");
-      throw error;
-    }
+  // Picker owner: only a rejected write reports failure (D-19, D-04).
+  function addSelected(contactIds: number[]) {
+    return runParticipantAdd({
+      add: () =>
+        addParticipants(getExecutor(), {
+          groupEventId,
+          participants: contactIds.map((contactId) => ({
+            contactId,
+            uid: newUid(),
+          })),
+          now: localDateTime(),
+        }),
+      onCommitted: () =>
+        dispatch({ type: "participantsCommitted", contactIds }),
+      refresh: refreshEvent,
+    });
   }
 
   async function removeParticipant(keep: boolean) {
@@ -185,7 +189,7 @@ export function EditGroupEventScreen({
         });
       }
       setRemoving(null);
-      await load();
+      void refreshEvent();
     } catch {
       setError("Couldn't update the group event. Your changes weren't saved.");
     }
@@ -206,7 +210,7 @@ export function EditGroupEventScreen({
       });
       setEditing(null);
       setParticipantDraftState(null);
-      await load();
+      void refreshEvent();
     } catch {
       setError("Couldn't save this participant. Please try again.");
     }
@@ -215,9 +219,9 @@ export function EditGroupEventScreen({
   if (!event || !draft) {
     return (
       <View style={styles.loading}>
-        {error ? (
+        {state.loadError ? (
           <AppText role="body" style={{ color: colors.danger }}>
-            {error}
+            Couldn't load this group event. Please go back and retry.
           </AppText>
         ) : (
           <ActivityIndicator color={colors.accent} />
@@ -242,7 +246,7 @@ export function EditGroupEventScreen({
           testID="edit-group-event-form"
           value={draft.value}
           onChange={(value) =>
-            setDraft((current) => (current ? { ...current, value } : current))
+            dispatch({ type: "draftChanged", draft: { ...draft, value } })
           }
           now={localDateTime()}
           visibleFields={["datetime", "channel", "tone", "duration"]}
@@ -256,9 +260,7 @@ export function EditGroupEventScreen({
             accessibilityLabel="Group Note"
             value={draft.groupNote}
             onChangeText={(groupNote) =>
-              setDraft((current) =>
-                current ? { ...current, groupNote } : current,
-              )
+              dispatch({ type: "draftChanged", draft: { ...draft, groupNote } })
             }
             multiline
             placeholder="Add shared context"
@@ -306,6 +308,19 @@ export function EditGroupEventScreen({
             onPress={() => setPickerVisible(true)}
           />
         </View>
+        {state.refreshError ? (
+          <View style={styles.refreshError}>
+            <AppText role="caption" style={{ color: colors.danger }}>
+              Couldn't refresh this event
+            </AppText>
+            <Button
+              role="tertiary"
+              label="Retry"
+              accessibilityLabel="Retry refreshing this event"
+              onPress={() => void refreshEvent()}
+            />
+          </View>
+        ) : null}
         {error ? (
           <AppText role="caption" style={{ color: colors.danger }}>
             {error}
@@ -321,9 +336,7 @@ export function EditGroupEventScreen({
       <ContactPicker
         mode="multi"
         visible={pickerVisible}
-        excludeContactIds={event.participants.map(
-          (participant) => participant.contactId,
-        )}
+        excludeContactIds={excludedIds}
         onDismiss={() => setPickerVisible(false)}
         onConfirm={addSelected}
       />
@@ -386,4 +399,9 @@ const styles = StyleSheet.create({
   participantRow: { gap: SPACING.xs, paddingVertical: SPACING.xs },
   rowActions: { flexDirection: "row", gap: SPACING.sm },
   inlineEditor: { gap: SPACING.base },
+  refreshError: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
 });
