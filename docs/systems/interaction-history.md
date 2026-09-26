@@ -1,7 +1,7 @@
 # Interaction History & Insights
 
-**Last updated:** 2026-09-19
-**Updated by phase:** 38.1-profile-presentation-polish
+**Last updated:** 2026-09-25
+**Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/db/history-read.ts`, `src/db/interaction-edit-read.ts`, `src/services/history/` (`window.ts`, `buckets.ts`, `cycles.ts`, `intensity-window.ts`), `src/components/history/`, `src/screens/EditInteractionScreen.tsx`, `src/screens/edit-interaction-logic.ts`
 
 ## Purpose
@@ -153,7 +153,7 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 ## Related Systems
 
 - **Interaction log** — owns the `interactions`/`events` tables, the recency spine (`editTouchpointFull`/`deleteTouchpoint`), and the vocabulary map this surface reads and writes through.
-- **Profile presentation** — hosts the History section via `ProfileModuleHost.renderHistory()` and owns show/hide/collapse/layout state.
+- **Profile presentation** — hosts the History section via `ProfileModuleHost.renderHistory()` and owns show/hide/collapse/layout state. Its Last Interaction tile and Orbit Status → View history reveal this section in place (scroll + persisted expand, no route); both are omitted when the layout hides History (38.3 RG-021, D-10/D-11).
 - **Contact knowledge** — supplies the knowledge-change record family via `getCurrentStateHistory` and receives knowledge-row edit navigation.
 - **AI suggestions** — owns the `allow_ai` egress posture the sparkle reflects and serializes only the bounded opted-in recent-note projection.
 - **Status engine** — Status/Gravity/Intensity semantics are unchanged; interaction `duration` never weights them.
@@ -172,3 +172,4 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | 2026-09-02 | 38 | Exposed shared local week-window and heatmap presentation seams for Digest without changing contact-scoped History reads. |
 | 2026-09-19 | 38.1 | Made the Year heatmap vertical and routed the audited explicit timestamp displays through the shared minute-precision formatter. |
 | 2026-09-25 | 38.3 | History now reads on the parent Profile revision rather than its own focus hook; ADR-123's on-focus read is preserved via that revision. Interaction deletes publish the shell tick. "Today" is re-evaluated per revision with `formatLocalDate`, and the explicit following-today state implements D-12 without timers. Read failures show error/refresh notices with Retry (RG-024). |
+| 2026-09-25 | 38.3 | Reveal entry points (RG-021, D-10, D-11, D-28): the Profile's Last Interaction tile and Orbit Status → View history now scroll to this section and expand it through the persisted collapse toggle, instead of routing to Things to Remember. The section's period/selection is never reset by the reveal. Neither entry point exists when the layout hides History. |

@@ -11,11 +11,18 @@ import type { ProfileSnapshot } from "@/db/profile-read";
 import type { SnoozePreset } from "@/db/snooze-dao";
 import {
   FREQUENCY_CHOICES,
+  type RelationshipSheetState,
   relationshipExplanation,
   relationshipSheetReducer,
   SNOOZE_CHOICES,
   validateCustomSnoozeDate,
 } from "@/profile/relationship-sheet-model";
+import {
+  createRelationshipSheetRunner,
+  type RelationshipSelector,
+  type RelationshipSelectorValues,
+  type RelationshipSheetRunner,
+} from "@/profile/relationship-sheet-runner";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -23,6 +30,14 @@ import { formatLocalDate } from "@/utils/dates";
 import type { RelationshipSheetId } from "./RelationshipOverview";
 
 type Operation = () => Promise<void>;
+type SelectorState<O extends RelationshipSelector> = RelationshipSheetState<
+  RelationshipSelectorValues[O]
+>;
+type SelectorStates = { [O in RelationshipSelector]: SelectorState<O> };
+
+function idleSelector<T>(value: T): RelationshipSheetState<T> {
+  return { committed: value, draft: value, pending: false, error: null };
+}
 
 export function ProfileRelationshipSheets({
   active,
@@ -48,29 +63,57 @@ export function ProfileRelationshipSheets({
   onUnsnooze: () => Promise<void>;
 }) {
   const { colors } = useTheme();
-  const [frequency, setFrequency] = useState({
-    committed: snapshot.identity.intervalDays,
-    draft: snapshot.identity.intervalDays,
-    pending: false,
-    error: null as string | null,
-  });
-  const [snooze, setSnooze] = useState({
-    committed: snapshot.identity.snoozeUntil,
-    draft: snapshot.identity.snoozeUntil,
-    pending: false,
-    error: null as string | null,
-  });
+  const [frequency, setFrequency] = useState(() =>
+    idleSelector(snapshot.identity.intervalDays),
+  );
+  const [snooze, setSnooze] = useState(() =>
+    idleSelector(snapshot.identity.snoozeUntil),
+  );
   const [customDate, setCustomDate] = useState(todayLocal);
   const [customOpen, setCustomOpen] = useState(false);
-  const retry = useRef<Operation | null>(null);
 
+  // Synchronous mirror of both selector states, so the runner's pending checks
+  // never read a stale render. Every selector state change goes through
+  // `applySelector`, which updates the mirror and the rendered state together.
+  const selectors = useRef<SelectorStates>({ frequency, snooze });
+  const applySelector = <O extends RelationshipSelector>(
+    owner: O,
+    update: (state: SelectorState<O>) => SelectorState<O>,
+  ) => {
+    const next = update(selectors.current[owner]);
+    selectors.current = { ...selectors.current, [owner]: next };
+    if (owner === "frequency") {
+      setFrequency(next as SelectorStates["frequency"]);
+    } else {
+      setSnooze(next as SelectorStates["snooze"]);
+    }
+  };
+  const latestOnClose = useRef(onClose);
+  latestOnClose.current = onClose;
+
+  // 38.3 RG-025 (D-24): saveFrequency, saveSnooze and Retry all settle through
+  // one owner-scoped runner — a Retry settles only the selector that failed.
+  const runnerRef = useRef<RelationshipSheetRunner | null>(null);
+  if (runnerRef.current === null) {
+    runnerRef.current = createRelationshipSheetRunner({
+      dispatch: (owner, action) =>
+        applySelector(owner, (state) =>
+          relationshipSheetReducer(state, action),
+        ),
+      isPending: (owner) => selectors.current[owner].pending,
+      onClose: () => latestOnClose.current(),
+    });
+  }
+  const runner = runnerRef.current;
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: applySelector only writes the mirror + state setters; the effect is keyed on the snapshot values.
   useEffect(() => {
-    setFrequency((state) => ({
+    applySelector("frequency", (state) => ({
       ...state,
       committed: snapshot.identity.intervalDays,
       draft: snapshot.identity.intervalDays,
     }));
-    setSnooze((state) => ({
+    applySelector("snooze", (state) => ({
       ...state,
       committed: snapshot.identity.snoozeUntil,
       draft: snapshot.identity.snoozeUntil,
@@ -78,52 +121,28 @@ export function ProfileRelationshipSheets({
   }, [snapshot.identity.intervalDays, snapshot.identity.snoozeUntil]);
 
   const close = () => {
-    if (frequency.pending || snooze.pending) return;
-    setFrequency((state) =>
+    if (
+      selectors.current.frequency.pending ||
+      selectors.current.snooze.pending
+    ) {
+      return;
+    }
+    applySelector("frequency", (state) =>
       relationshipSheetReducer(state, { type: "dismiss" }),
     );
-    setSnooze((state) => relationshipSheetReducer(state, { type: "dismiss" }));
-    retry.current = null;
+    applySelector("snooze", (state) =>
+      relationshipSheetReducer(state, { type: "dismiss" }),
+    );
+    runner.clear();
     setCustomOpen(false);
     onClose();
   };
 
-  const saveFrequency = async (days: number) => {
-    setFrequency((state) =>
-      relationshipSheetReducer(state, { type: "submit", value: days }),
-    );
-    const operation = () => onSetFrequency(days);
-    retry.current = operation;
-    try {
-      await operation();
-      setFrequency((state) =>
-        relationshipSheetReducer(state, { type: "success" }),
-      );
-      onClose();
-    } catch {
-      setFrequency((state) =>
-        relationshipSheetReducer(state, { type: "failure" }),
-      );
-    }
-  };
+  const saveFrequency = (days: number) =>
+    runner.submit("frequency", days, () => onSetFrequency(days));
 
-  const saveSnooze = async (operation: Operation, draft: string | null) => {
-    setSnooze((state) =>
-      relationshipSheetReducer(state, { type: "submit", value: draft }),
-    );
-    retry.current = operation;
-    try {
-      await operation();
-      setSnooze((state) =>
-        relationshipSheetReducer(state, { type: "success" }),
-      );
-      onClose();
-    } catch {
-      setSnooze((state) =>
-        relationshipSheetReducer(state, { type: "failure" }),
-      );
-    }
-  };
+  const saveSnooze = (operation: Operation, draft: string | null) =>
+    runner.submit("snooze", draft, operation);
 
   const explanation =
     active === "status"
@@ -286,29 +305,11 @@ export function ProfileRelationshipSheets({
             ) : null}
           </>
         ) : null}
-        {(frequency.error || snooze.error) && retry.current ? (
+        {(frequency.error || snooze.error) && runner.canRetry() ? (
           <Button
             role="secondary"
             label="Retry"
-            onPress={() => {
-              setFrequency((state) =>
-                relationshipSheetReducer(state, { type: "retry" }),
-              );
-              setSnooze((state) =>
-                relationshipSheetReducer(state, { type: "retry" }),
-              );
-              void retry
-                .current?.()
-                .then(onClose)
-                .catch(() => {
-                  setFrequency((state) =>
-                    relationshipSheetReducer(state, { type: "failure" }),
-                  );
-                  setSnooze((state) =>
-                    relationshipSheetReducer(state, { type: "failure" }),
-                  );
-                });
-            }}
+            onPress={() => void runner.retry()}
           />
         ) : null}
         <View style={styles.close}>

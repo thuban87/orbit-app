@@ -1,7 +1,7 @@
 # Profile presentation
 
-**Last updated:** 2026-09-19
-**Updated by phase:** 38.1-profile-presentation-polish
+**Last updated:** 2026-09-25
+**Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
 ## Purpose
@@ -46,7 +46,9 @@ The stable migration object is `profilePresentationMigration`; `src/db/database.
 | `src/profile/resolve-presentation.ts` | Pure independent-axis precedence and missing-reference diagnostics. |
 | `src/profile/module-registry.ts` | Closed renderer identities that protect the Phase 32 History replacement seam. |
 | `src/components/profile/ProfileHero.tsx` | Fixed identity and Message/Call/Favorite/overflow geometry. |
-| `src/components/profile/ProfileModuleHost.tsx` | Resolved semantic body and collapse readback host. |
+| `src/components/profile/ProfileModuleHost.tsx` | Resolved semantic body and collapse readback host; owns the in-Profile History reveal. |
+| `src/profile/module-host-model.ts` | Pure section-header state, `resolveHistoryReveal`, and the `createHistoryRevealScroll` scroll bookkeeping. |
+| `src/profile/relationship-sheet-runner.ts` | Owner-scoped submit/Retry settlement for the Contact Frequency and Snooze selectors. |
 | `src/components/profile/ProfileLayoutEditor.tsx` | Draft-only complete-layout editor with drag and Move alternatives. |
 | `src/components/profile/ProfileTemplateManager.tsx` | Reusable layout templates, assignments, usage, and deletion fallback. |
 | `src/components/profile/ProfileBackgroundManager.tsx` | Local picker/crop/template/assignment workflow. |
@@ -83,6 +85,21 @@ Section headings identify their section only. Module bodies own values, empty st
 Unbind remains a confirmed lifecycle action for Bound contacts but lives in the Profile overflow; the meaningful Bind experience remains visible for Unbound contacts. Relationship Overview retains the existing compact/wide preference, then derives only a visual full-row span for compact row orphans. It preserves configured order and semantic size while centering every tile's content.
 
 Interaction History renders the full History & Insights section (Heatmap, Intensity, Rolodex, Detail Sheet) behind the stable `interaction-history` semantic key via `ProfileModuleHost.renderHistory()`; the replacement of the earlier bounded stub migrated no layouts or collapse state. Knowledge-change rows in its Detail Sheet route back through the screen's existing knowledge navigation via a threaded `onOpenKnowledgeChange`. See `interaction-history.md`.
+
+### History actions reveal the in-Profile History section (38.3, RG-021)
+
+The Last Interaction overview tile and the Orbit Status sheet's **View history** both reveal the Profile's own History section (owner rulings D-10, D-11, D-28). There is no History route and no timeline screen — ADR-123 replaced the timeline with this section.
+
+- `resolveHistoryReveal({ topLevel, collapse })` decides availability from the resolved layout: History is available only when a visible `interaction-history` placement exists. Expanded state uses the section header's own rule, so the reveal and a header tap agree.
+- `revealHistory()` in `ProfileModuleHost` closes the relationship sheet first. If History is collapsed it expands through the **same persisted `toggle`** a header tap uses (D-28) — there is no temporary expansion state, and the user can collapse it again. It then asks the screen to scroll to host y + History y via `onRequestScrollTo`.
+- The header's y does not move on expand, but a ScrollView clamps `scrollTo` to its current content height. So an expanding reveal scrolls on the first expanded History layout (`createHistoryRevealScroll`), or immediately if the expand write failed; an already-expanded History scrolls at once.
+- `ContactProfileScreen` scrolls its single `ScrollView` by ref, instant when reduced motion is on (`useReducedMotion`). Every Profile host (Contacts, Events, Digest, Orrery, Settings) renders this same screen.
+- The reveal never resets History's period or selection. An expanded History is not written to or remounted; a collapsed one had no mounted state to keep.
+- **When the layout hides History, neither action is offered (D-11).** The host passes no History handler. The Last Interaction tile then renders as an informational `View` with the same content and label, no button role and no `onPress`. The Status explanation (`relationshipExplanation`, `historyAvailable: false`) omits its `history` route. Nothing mutates the layout or temporarily shows History.
+
+### Relationship selector settlement (38.3, RG-025)
+
+The Contact Frequency and Snooze sheets settle every write through `createRelationshipSheetRunner` (D-24). A submit records its selector and operation as the retry target. Submit and **Retry** share one `settle` path: start, await, then `success` and close, or `failure`. So a Retry touches only the selector that failed and always leaves it non-pending. Close/Back and a reopened sheet keep both selectors usable, and a repeated Retry failure stays recoverable. A submit or Retry for a selector that is already pending is ignored. Values are never deduped, so a repeated Snooze is a real event. The component keeps a synchronous mirror of both selector states so the runner's pending checks never read a stale render. Snooze semantics and choices are unchanged.
 
 ### Customization and reset
 
@@ -140,6 +157,8 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 14. **Scoped Off Limits writes stay scoped.** Filtering UI items is insufficient: force the kind and validate deletions at the controller/DAO boundary, then reload the controlled collection.
 15. **Orphan span is not layout persistence.** The computed stretch must not rewrite the compact/wide preference or reorder modules.
 16. **Do not make Message work in Settings by registering Compose there.** Settings-hosted Profiles disable Message by ruling (D-09, D-25, RG-021); registering Compose/ComposeResearch under Settings or adding a cross-tab jump reverses those rulings and is an owner decision.
+17. **History actions never navigate.** Last Interaction and Status → View history reveal the in-Profile History section (D-10). Routing them to Things to Remember, a new History route, or a timeline screen contradicts D-10 and ADR-123. When the layout hides History, omit the actions; never reveal History temporarily or edit the layout (D-11).
+18. **Selector Retry settles only its owner.** Route every Frequency/Snooze write and Retry through the relationship-sheet runner. A Retry that dispatches to both reducers, or that never dispatches `success`, leaves a selector `pending`, and `close()` then refuses to reset it (RG-025).
 
 ## Related systems
 
@@ -168,3 +187,5 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-09-19 | 38.1 | Made headings identifier-only, added bounded temporal knowledge/edit routes, moved Unbind to overflow, and added visual-only orphan packing with centered Overview cards. |
 | 2026-09-25 | 38.3 | Coherent snapshot + History revision (RG-024): the snapshot load is latest-request gated and also refreshes on the post-sweep foreground tick; each successful publication bumps the History revision so the metrics and History share one trigger. |
 | 2026-09-25 | 38.3 | Message eligibility by archive state and host (D-09, D-25, RG-021): hero Message is disabled with a reason for archived contacts in every host and for any Settings-hosted Profile; Compose stays unregistered under Settings, and Settings now registers `RecentlyDeleted`. |
+| 2026-09-25 | 38.3 | History actions reveal the in-Profile History section (RG-021, D-10, D-11, D-28): Last Interaction and Status → View history close the sheet, expand a collapsed History through the persisted collapse toggle, and scroll to it (instant under reduced motion). When the layout hides History, neither action is offered and the Last Interaction tile is informational. The Things to Remember history route is gone. |
+| 2026-09-25 | 38.3 | Selector Retry settlement (RG-025, D-24): Contact Frequency and Snooze submit/Retry settle through `createRelationshipSheetRunner`, so a Retry settles only the failed selector and both stay usable after reopening. |
