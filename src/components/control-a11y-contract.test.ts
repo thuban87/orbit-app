@@ -132,3 +132,37 @@ describe("Last-spoke tri-state date segment (AUD-UIA-005)", () => {
     );
   });
 });
+
+describe("Touchpoint refine form (AUD-UIA-005, AUD-UIA-006, AUD-UIA-018, D-07)", () => {
+  const form = source("src/components/TouchpointRefineForm.tsx");
+  const pressables = elementRegions(form, "Pressable");
+  const dateTime = pressables.find((region) => region.includes("-datetime`"));
+
+  it("exposes the date/time value and shows it through the shared minute formatter", () => {
+    expect(dateTime).toBeDefined();
+    expect(dateTime).toContain('accessibilityLabel="Correct date and time"');
+    expect(dateTime).toContain(
+      "accessibilityValue={{ text: occurredAtLabel }}",
+    );
+    expect(form).toContain(
+      "const occurredAtLabel = formatDateTimeMinuteOrFallback(value.occurredAt);",
+    );
+    expect(form).toContain("{occurredAtLabel}");
+    expect(form).not.toContain("{value.occurredAt}");
+  });
+
+  it("keeps full stored precision for the native picker seed", () => {
+    expect(form).toContain("parseLocalDateTime(value.occurredAt)");
+  });
+
+  it("raises the duration chips to the 44dp floor without hitSlop", () => {
+    expect(form).toMatch(/chip: \{[^}]*minHeight: MIN_TOUCH_TARGET/);
+    expect(form).not.toContain("minHeight: 40");
+    const chips = pressables.filter((region) => region.includes("styles.chip"));
+    expect(chips.length).toBeGreaterThanOrEqual(2);
+    for (const chip of chips) {
+      expect(chip).not.toContain("hitSlop");
+    }
+    expect(form).toMatch(/chipRow: \{[^}]*gap: 8/);
+  });
+});
