@@ -1,5 +1,5 @@
 import type { YourWeekPeriod } from "@/db/app-settings-dao";
-import type { YourWeekDateCount } from "@/db/your-week-read";
+import type { YourWeekDateCount, YourWeekDayRow } from "@/db/your-week-read";
 import type { HistoryWindow } from "@/services/history/window";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
 
@@ -192,6 +192,59 @@ export function selectYourWeekDay(
   date: string | null,
 ): YourWeekControllerState {
   return { ...state, selectedDay: date };
+}
+
+/**
+ * Selected-day detail (38.3 D-16; reliability-testing/AUD-REL-014; closes
+ * Phase 38 WR-01). A pending or failed read is never shown as "No activity":
+ * only `loaded` with zero rows is a truthful empty day.
+ *
+ * The stale guard is REQUEST-scoped, not date-only: every read (tap, Retry, a
+ * refresh that retained the day) starts with a fresh token, and only the
+ * current `loading` token may settle or fail — so an older read for the SAME
+ * date can never publish over a newer one.
+ */
+export type YourWeekDayDetail =
+  | { readonly status: "idle" }
+  | {
+      readonly status: "loading";
+      readonly date: string;
+      readonly token: number;
+    }
+  | {
+      readonly status: "loaded";
+      readonly date: string;
+      readonly rows: readonly YourWeekDayRow[];
+    }
+  | { readonly status: "error"; readonly date: string };
+
+export function clearDayDetail(): YourWeekDayDetail {
+  return { status: "idle" };
+}
+
+export function startDayRead(
+  _state: YourWeekDayDetail,
+  date: string,
+  token: number,
+): YourWeekDayDetail {
+  return { status: "loading", date, token };
+}
+
+export function settleDayRead(
+  state: YourWeekDayDetail,
+  token: number,
+  rows: readonly YourWeekDayRow[],
+): YourWeekDayDetail {
+  if (state.status !== "loading" || state.token !== token) return state;
+  return { status: "loaded", date: state.date, rows };
+}
+
+export function failDayRead(
+  state: YourWeekDayDetail,
+  token: number,
+): YourWeekDayDetail {
+  if (state.status !== "loading" || state.token !== token) return state;
+  return { status: "error", date: state.date };
 }
 
 export function directDateCounts(

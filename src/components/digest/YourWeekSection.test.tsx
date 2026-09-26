@@ -12,6 +12,7 @@ vi.mock("react", () => ({
   ],
 }));
 vi.mock("react-native", () => ({
+  ActivityIndicator: "ActivityIndicator",
   View: "View",
   StyleSheet: { create: (styles: unknown) => styles },
 }));
@@ -22,6 +23,7 @@ vi.mock("@/components/SegmentedControl", () => ({
   SegmentedControl: "SegmentedControl",
 }));
 vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
+vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
 vi.mock("@/components/digest/YourWeekHeatmap", () => ({
   YourWeekHeatmap: "YourWeekHeatmap",
 }));
@@ -47,6 +49,9 @@ vi.mock("@/services/history/week-window", () => ({
 }));
 vi.mock("@/utils/dates", () => ({ formatLocalDate: () => "2026-09-19" }));
 vi.mock("@/utils/logger", () => ({ Logger: { error: vi.fn() } }));
+vi.mock("@/utils/uat-faults", () => ({
+  applyUatFault: vi.fn(async () => undefined),
+}));
 
 const { YourWeekSection } = await import("./YourWeekSection");
 
@@ -87,5 +92,10 @@ describe("YourWeekSection", () => {
         "Events, 0",
       ]),
     );
+  });
+
+  it("renders no day detail while the day detail is idle (no selection)", () => {
+    const tree = nodes(YourWeekSection({ refreshSignal: 0 }));
+    expect(tree.some((node) => node.type === "DigestDayDetail")).toBe(false);
   });
 });

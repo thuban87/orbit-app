@@ -129,7 +129,8 @@ describe("DigestDayDetail", () => {
     expect(retry?.props.role).toBe("tertiary");
     expect(retry?.props.label).toBe("Retry");
     expect(retry?.props.accessibilityLabel).toBe("Retry loading this day");
-    (retry?.props.onPress as () => void)();
+    const onPress = retry?.props.onPress as (() => void) | undefined;
+    onPress?.();
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(tree.some((node) => node.type === "ActivityIndicator")).toBe(false);
   });

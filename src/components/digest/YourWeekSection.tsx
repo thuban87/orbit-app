@@ -4,15 +4,20 @@ import { DigestDayDetail } from "@/components/digest/DigestDayDetail";
 import { YourWeekHeatmap } from "@/components/digest/YourWeekHeatmap";
 import {
   beginYourWeekPeriodWrite,
+  clearDayDetail,
   createYourWeekPeriodReader,
   directDateCounts,
+  failDayRead,
   initialYourWeekState,
   persistYourWeekPeriodAccepted,
   persistYourWeekPeriodRejected,
   resolveYourWeekRefreshPeriod,
   retainYourWeekDay,
   selectYourWeekDay,
+  settleDayRead,
+  startDayRead,
   type YourWeekControllerState,
+  type YourWeekDayDetail,
   type YourWeekPeriodReader,
 } from "@/components/digest/your-week-section-logic";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -27,7 +32,6 @@ import {
   readYourWeekDateCounts,
   readYourWeekDay,
   readYourWeekMetrics,
-  type YourWeekDayRow,
   type YourWeekMetrics,
 } from "@/db/your-week-read";
 import {
@@ -38,7 +42,9 @@ import type { HistoryWindow } from "@/services/history/window";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatLocalDate } from "@/utils/dates";
+import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { Logger } from "@/utils/logger";
+import { applyUatFault } from "@/utils/uat-faults";
 
 const LOG_SCOPE = "your-week-section";
 const PERIOD_OPTIONS: { label: string; value: YourWeekPeriod }[] = [
@@ -70,13 +76,19 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
   );
   const controllerRef = useRef(controller);
   const [loaded, setLoaded] = useState<LoadedWeek | null>(null);
-  const [dayRows, setDayRows] = useState<readonly YourWeekDayRow[]>([]);
+  const [dayDetail, setDayDetail] = useState<YourWeekDayDetail>(clearDayDetail);
+  const dayDetailRef = useRef(dayDetail);
   const [error, setError] = useState(false);
 
   const commitController = useCallback((next: YourWeekControllerState) => {
     controllerRef.current = next;
     setController(next);
     return next;
+  }, []);
+
+  const commitDayDetail = useCallback((next: YourWeekDayDetail) => {
+    dayDetailRef.current = next;
+    setDayDetail(next);
   }, []);
 
   // ONE request authority for every period read (refresh signal, toggle,
@@ -125,16 +137,46 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
     [reader],
   );
 
-  // Day-detail read shared by a tap and a refresh that retained the day
-  // (Plan 15 replaces this with the D-16 state machine).
-  const loadDay = useCallback(async (date: string) => {
-    try {
-      const rows = await readYourWeekDay(getExecutor(), date);
-      if (controllerRef.current.selectedDay === date) setDayRows(rows);
-    } catch (cause) {
-      Logger.error(LOG_SCOPE, "failed to load Your Week day", cause);
-    }
-  }, []);
+  // Day-detail reads (38.3 D-16, closes Phase 38 WR-01). A tap, Retry and a
+  // refresh that retained the day ALL start a fresh request here, so the stale
+  // guard is request-scoped: an older read for any date — including the same
+  // date — can never publish rows or an error over a newer one. A pending or
+  // failed read renders as loading/error, never as "No activity".
+  const dayAuthorityRef = useRef<ReturnType<
+    typeof createLatestRequestAuthority
+  > | null>(null);
+  if (dayAuthorityRef.current === null) {
+    dayAuthorityRef.current = createLatestRequestAuthority();
+  }
+  const dayAuthority = dayAuthorityRef.current;
+  useEffect(() => () => dayAuthority.invalidate(), [dayAuthority]);
+
+  const loadDay = useCallback(
+    async (date: string) => {
+      const token = dayAuthority.begin();
+      commitDayDetail(startDayRead(dayDetailRef.current, date, token));
+      try {
+        // Debug-only one-shot delay/reject for Plan 16's device rows; inert
+        // (resolves immediately) outside __DEV__.
+        await applyUatFault("digest-day-read");
+        const rows = await readYourWeekDay(getExecutor(), date);
+        if (!dayAuthority.isCurrent(token)) return;
+        commitDayDetail(settleDayRead(dayDetailRef.current, token, rows));
+      } catch (cause) {
+        Logger.error(LOG_SCOPE, "failed to load Your Week day", cause);
+        if (!dayAuthority.isCurrent(token)) return;
+        commitDayDetail(failDayRead(dayDetailRef.current, token));
+      }
+    },
+    [commitDayDetail, dayAuthority],
+  );
+
+  // Selection cleared (period change, rollback, day outside the new window):
+  // retire any outstanding day read and return to idle.
+  const clearDay = useCallback(() => {
+    dayAuthority.invalidate();
+    commitDayDetail(clearDayDetail());
+  }, [commitDayDetail, dayAuthority]);
 
   // Digest-owned refresh (RG-026): on mount and on every `refreshSignal`
   // change. Keeps the chosen period and re-windows to today (D-15), adopting a
@@ -168,7 +210,7 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
       );
       const next = commitController(retainYourWeekDay(resolved.state, window));
       if (next.selectedDay === null) {
-        setDayRows([]);
+        clearDay();
       } else {
         void loadDay(next.selectedDay);
       }
@@ -177,14 +219,14 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
     return () => {
       cancelled = true;
     };
-  }, [commitController, loadDay, loadPeriod, refreshSignal]);
+  }, [clearDay, commitController, loadDay, loadPeriod, refreshSignal]);
 
   const onPeriodChange = useCallback(
     async (period: YourWeekPeriod) => {
       if (period === controllerRef.current.period) return;
       const next = beginYourWeekPeriodWrite(controllerRef.current, period);
       commitController(next);
-      setDayRows([]);
+      clearDay();
       setLoaded(null);
       void loadPeriod(period, next.generation);
       try {
@@ -204,21 +246,26 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
         );
         commitController(rolledBack);
         setLoaded(null);
-        setDayRows([]);
+        clearDay();
         void loadPeriod(rolledBack.period, rolledBack.generation);
       }
     },
-    [commitController, loadPeriod],
+    [clearDay, commitController, loadPeriod],
   );
 
   const onSelectDay = useCallback(
     async (date: string) => {
       commitController(selectYourWeekDay(controllerRef.current, date));
-      setDayRows([]);
       await loadDay(date);
     },
     [commitController, loadDay],
   );
+
+  // Retry re-reads the selected day with a NEW request (same date, new token).
+  const onRetryDay = useCallback(() => {
+    const date = controllerRef.current.selectedDay;
+    if (date !== null) void loadDay(date);
+  }, [loadDay]);
 
   const metrics = loaded?.metrics ?? EMPTY_METRICS;
   const empty =
@@ -264,8 +311,12 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
             selectedDate={controller.selectedDay}
             onSelectDay={onSelectDay}
           />
-          {controller.selectedDay ? (
-            <DigestDayDetail date={controller.selectedDay} rows={dayRows} />
+          {controller.selectedDay !== null && dayDetail.status !== "idle" ? (
+            <DigestDayDetail
+              date={dayDetail.date}
+              state={dayDetail}
+              onRetry={onRetryDay}
+            />
           ) : null}
         </>
       ) : null}
