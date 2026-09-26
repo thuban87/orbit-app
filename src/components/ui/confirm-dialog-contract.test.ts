@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { confirmActionsFit } from "./confirm-dialog-layout";
 
 /**
  * Source contract for the shared ConfirmDialog (RG-034
@@ -30,9 +31,14 @@ describe("ConfirmDialog large-text reachability (RG-034 ui-accessibility/AUD-UIA
 
   it("caps each choice at the card width so a long label wraps inside its button", () => {
     expect(styleEntry("action")).toContain('maxWidth: "100%"');
-    const actionWrappers =
-      dialog.match(/<View style=\{styles\.action\}>/g) ?? [];
-    expect(actionWrappers.length).toBe(2);
+  });
+
+  it("keeps the original single row when both choices fit, and stacks full-width when they do not", () => {
+    expect(styleEntry("actionsRow")).toContain('flexDirection: "row"');
+    expect(styleEntry("actionsRow")).not.toContain("flexWrap");
+    expect(styleEntry("actionsStacked")).toContain('flexDirection: "column"');
+    expect(styleEntry("actionsStacked")).toContain('alignItems: "stretch"');
+    expect(dialog).toContain("confirmActionsFit(");
   });
 
   it("scrolls the title and message inside a card bounded by the window", () => {
@@ -50,8 +56,37 @@ describe("ConfirmDialog large-text reachability (RG-034 ui-accessibility/AUD-UIA
 
   it("keeps the actions outside the scrolling body so both choices stay on-screen", () => {
     const scrollEnd = dialog.indexOf("</ScrollView>");
-    const actionsStart = dialog.indexOf("<View style={styles.actions}>");
+    const actionsStart = dialog.indexOf("<ConfirmActions");
     expect(scrollEnd).toBeGreaterThan(-1);
     expect(actionsStart).toBeGreaterThan(scrollEnd);
+  });
+});
+
+describe("confirmActionsFit", () => {
+  it("fits when both natural widths plus the gap are within the row", () => {
+    expect(
+      confirmActionsFit({ cancel: 245, confirm: 581, row: 848, gap: 22 }),
+    ).toBe(true);
+  });
+
+  it("tolerates sub-pixel rounding at an exactly full row", () => {
+    expect(
+      confirmActionsFit({ cancel: 245.4, confirm: 581.3, row: 848, gap: 22 }),
+    ).toBe(true);
+  });
+
+  it("stacks when a large-text label cannot share the row (Pixel 3a, font_scale 2.0, ≈320dp)", () => {
+    expect(
+      confirmActionsFit({ cancel: 245, confirm: 834, row: 834, gap: 27 }),
+    ).toBe(false);
+  });
+
+  it("does not decide before every width is measured", () => {
+    expect(
+      confirmActionsFit({ cancel: 0, confirm: 581, row: 848, gap: 22 }),
+    ).toBeNull();
+    expect(
+      confirmActionsFit({ cancel: 245, confirm: 581, row: 0, gap: 22 }),
+    ).toBeNull();
   });
 });

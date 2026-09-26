@@ -61,3 +61,16 @@
   part of the Plan 17 owner TalkBack check. Candidate fix: while open, mark the tab navigator /
   screen content `importantForAccessibility="no-hide-descendants"` (the 38.3 RG-020 shell-transient
   pattern) or close the dial when focus leaves it.
+- **`Sheet` `detail` variant clips its actions at large text, with no scroll.** At font_scale 2.0 on
+  the Pixel 3a (≈320dp and ≈349dp), InteractionDetail's detail sheet (`maxHeight: 60%`,
+  `overflow: "hidden"`, no ScrollView in `Sheet.tsx`/`InteractionDetail.tsx`) clips its Edit/Delete
+  row below the sheet edge. The buttons are absent from the accessibility dump and touch cannot
+  reach them. Only keyboard focus reaches them (`38.4-INVESTIGATIONS.md` RG-034,
+  `rg034-B-detail-sheet.xml`). Found while driving the RG-034 long-body confirmation. This is not the
+  ConfirmDialog defect, and no 38.4 plan owns `Sheet` large-text overflow. Candidate fix: a
+  ScrollView body for non-expanded Sheet variants (`Sheet.tsx` already notes the large-font clip
+  risk at `overlayContent`). It needs its own device check across the Sheet consumers.
+- **Stale profile scroll after a warm `orbit://contact/<id>` deep link (automation observation, not
+  triaged).** Twice in the Plan 11 session, a warm deep link or a Quick Log snackbar left the
+  profile ScrollView ignoring injected swipes until a cold start. It may be an adb-injection
+  artifact. Worth a finger check before treating it as an app bug.
