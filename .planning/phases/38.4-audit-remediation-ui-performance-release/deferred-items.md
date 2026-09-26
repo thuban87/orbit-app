@@ -50,3 +50,14 @@
   title). Not cited by AUD-UIA-015 and outside Plan 08's file scope. Candidate fix: the same one-line
   `fontFamily: resolveFontFamily(TYPOGRAPHY.<role>.family, TYPOGRAPHY.<role>.weight)` swap, plus
   extending the `typography.test.ts` source scan to cover those files.
+
+## From Plan 11 (2026-09-26)
+
+- **Open FAB dial does not trap keyboard focus.** With the speed dial OPEN, keyboard TAB still walks
+  the background screen (Digest filters, tab bar) before reaching the scrim and the six actions
+  (`ev11/rg039-fix-tab-open.log`). The dial's only modal marker is the iOS-only
+  `accessibilityViewIsModal`. This predates Plan 11 and is not the RG-039 closed-state defect
+  (AUD-UIA-023), which Plan 11 fixed. Whether TalkBack swipe traversal also escapes the open dial is
+  part of the Plan 17 owner TalkBack check. Candidate fix: while open, mark the tab navigator /
+  screen content `importantForAccessibility="no-hide-descendants"` (the 38.3 RG-020 shell-transient
+  pattern) or close the dial when focus leaves it.

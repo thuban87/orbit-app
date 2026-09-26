@@ -75,6 +75,7 @@ function UniversalFabActionRow({
   action,
   index,
   expanded,
+  open,
   pointerEvents,
   bottomOffset,
   onPress,
@@ -82,6 +83,7 @@ function UniversalFabActionRow({
   action: UniversalFabAction;
   index: number;
   expanded: SharedValue<number>;
+  open: boolean;
   pointerEvents: "auto" | "none";
   bottomOffset: number;
   onPress: () => void;
@@ -103,6 +105,12 @@ function UniversalFabActionRow({
       accessibilityLabel={
         ACTION_ACCESSIBILITY_LABELS[action.id].accessibilityLabel
       }
+      // RG-039 (ui-accessibility/AUD-UIA-023): a collapsed row was a native
+      // keyboard focus stop that ENTER could invoke; pointerEvents gates touch
+      // only. On Android `focusable={false}` drops the click listener and
+      // `accessible={false}` clears native focusability.
+      accessible={open}
+      focusable={open}
       pointerEvents={pointerEvents}
       onPress={onPress}
       style={[
@@ -349,6 +357,12 @@ export function UniversalFab() {
       <View pointerEvents="box-none" style={styles.overlay}>
         <AnimatedPressable
           accessibilityLabel="Dismiss capture actions"
+          // RG-039: while closed (and closing — `open` flips at the start of
+          // closeDial) the scrim is out of the accessibility tree and keyboard focus.
+          importantForAccessibility={open ? "auto" : "no-hide-descendants"}
+          accessibilityElementsHidden={!open}
+          accessible={open}
+          focusable={open}
           onPress={() => closeDial()}
           pointerEvents={scrimPointerEvents}
           style={[
@@ -359,6 +373,8 @@ export function UniversalFab() {
         />
         <View
           accessibilityViewIsModal
+          importantForAccessibility={open ? "auto" : "no-hide-descendants"}
+          accessibilityElementsHidden={!open}
           pointerEvents="box-none"
           style={styles.dial}
         >
@@ -369,6 +385,7 @@ export function UniversalFab() {
               expanded={expanded}
               index={index}
               key={action.id}
+              open={open}
               onPress={() => void dispatchAction(action)}
               pointerEvents={scrimPointerEvents}
             />
@@ -380,6 +397,7 @@ export function UniversalFab() {
           testID="dashboard-create-fab"
           accessibilityRole="button"
           accessibilityLabel="Add / capture"
+          accessibilityState={{ expanded: open }}
           onPress={() => (isOpenRef.current ? closeDial() : openDial())}
           style={[
             styles.base,

@@ -66,8 +66,12 @@ describe("UniversalFab closed-dial semantics (RG-039 ui-accessibility/AUD-UIA-02
   });
 
   it("takes the scrim and every action row out of keyboard focus while closed", () => {
+    // RN 0.86 Android: `focusable={false}` only drops the click listener;
+    // native keyboard focusability follows `accessible` (ReactViewManager).
     expect(scrim).toContain("focusable={open}");
     expect(row).toContain("focusable={open}");
+    expect(scrim).toContain("accessible={open}");
+    expect(row).toContain("accessible={open}");
   });
 
   it("keeps the existing touch gating (opacity + pointerEvents) on scrim and rows", () => {
