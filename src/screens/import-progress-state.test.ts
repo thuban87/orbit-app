@@ -3,9 +3,9 @@ import { classifyImportStop } from "./import-progress-state";
 
 describe("classifyImportStop (RG-035, D-20)", () => {
   it("offers the summary when the session is still readable", async () => {
-    await expect(
-      classifyImportStop(async () => ({ id: 7 })),
-    ).resolves.toBe("summary-available");
+    await expect(classifyImportStop(async () => ({ id: 7 }))).resolves.toBe(
+      "summary-available",
+    );
   });
 
   it("reports an unreadable session when the session is gone", async () => {
