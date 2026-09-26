@@ -226,13 +226,13 @@ export function RelationshipEditor({
               value={draft.pinned}
               onValueChange={(value) => update("pinned", value)}
               accessibilityLabel="Pin relationship"
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surfaceElevated}
             />
           </View>
           <View style={styles.switchRow}>
             <View style={styles.visibilityCopy}>
-              <AppText role="body">
-                {draft.hidden === 1 ? "Show on Profile" : "Hide from Profile"}
-              </AppText>
+              <AppText role="body">Hide from Profile</AppText>
               <AppText role="caption" style={{ color: colors.textSecondary }}>
                 Presentation only — this doesn't hide it from search or AH.
               </AppText>
@@ -241,6 +241,8 @@ export function RelationshipEditor({
               value={draft.hidden === 1}
               onValueChange={(value) => update("hidden", value ? 1 : 0)}
               accessibilityLabel="Hide from Profile"
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surfaceElevated}
             />
           </View>
           <Button
