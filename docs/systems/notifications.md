@@ -94,6 +94,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 2. A birthday body tap navigates to that contact's Profile.
 3. A digest body tap resets to the semantic Digest root, guaranteeing warm and cold starts do not recreate the retired Dashboard-child route shape.
 4. The response gate reads a cold-start response once, clears it after handling, and waits for navigation readiness before applying a queued body-tap intent.
+5. **Ingress chronology (RG-042):** across cold and warm ingress the latest accepted body tap wins. The cold launch response is by definition the oldest body tap, so once any warm body tap (`DEFAULT_ACTION_IDENTIFIER`) has been accepted — or the gate unmounts — a still-pending cold lookup is dropped instead of navigating. The drop is logged at debug level only, with a content-free message (no contact id or name). The rule lives in `createNotificationIngressChronology()` in `notification-gate.tsx` and mirrors `subscribeToWidgetUrls` in `widget-linking.ts` (a warm intent drops the initial URL). Action taps (Mark/Snooze) never count as a body tap, and the cold response is cleared in a `finally` whether it was routed, dropped, or failed, so a relaunch cannot replay it.
 
 ### Cleaning up a purge
 
@@ -172,3 +173,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-09-02 | 37 | Moved notification policy and permission visibility into the dedicated Settings category without changing scheduler ownership. |
 | 2026-09-02 | 38 | Routed Digest notification taps to the semantic Digest root and documented isolated DEV-only Digest UAT identifiers. |
 | 2026-09-23 | 38.2 | Matched Android DATE trigger readback, kept decay re-nags on the stateless weekly grid, returned reconcile failure counts, and retired presented reminders after purge or during orphan sweeps. |
+| 2026-09-25 | 38.3 | Cold/warm body-tap chronology (RG-042, react-native/AUD-RN-012, reliability-testing/AUD-REL-012): a warm body tap drops a pending cold result, and the cold clear runs even on failure. |
