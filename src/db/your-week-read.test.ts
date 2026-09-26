@@ -10,6 +10,7 @@ import {
   readYourWeekDateCounts,
   readYourWeekDay,
   readYourWeekMetrics,
+  YOUR_WEEK_METRICS_SQL,
 } from "@/db/your-week-read";
 
 const NOW = "2026-09-19 12:00:00";
@@ -120,5 +121,40 @@ describe("Your Week app-wide reads", () => {
     expect(await readYourWeekDay(exec, "2026-09-18")).toEqual([
       expect.objectContaining({ kind: "group_event", title: "Reunion" }),
     ]);
+  });
+});
+
+/** EXPLAIN QUERY PLAN detail rows for `sql` on the real migrated schema. */
+async function planDetails(sql: string, params: unknown[]): Promise<string[]> {
+  const rows = await exec.getAllAsync<{ detail: string }>(
+    `EXPLAIN QUERY PLAN ${sql}`,
+    params,
+  );
+  return rows.map((row) => row.detail);
+}
+
+/** True when some plan row is an unindexed full scan of alias `alias`. */
+function fullScanOf(details: readonly string[], alias: string): boolean {
+  const table = alias === "ge" ? "group_events" : "interactions";
+  return details.some((detail) =>
+    new RegExp(`^SCAN (${alias}|${table})( |$)`).test(detail),
+  );
+}
+
+describe("Your Week query plans (RG-028, performance/AUD-PERF-004)", () => {
+  it("metrics SEARCH the migration-031 occurred_at indexes instead of scanning history", async () => {
+    const details = await planDetails(YOUR_WEEK_METRICS_SQL, [
+      ...Array.from({ length: 3 }, () => [
+        "2026-09-14",
+        "2026-09-20",
+        "2026-09-14",
+        "2026-09-20",
+      ]).flat(),
+    ]);
+    const joined = details.join("\n");
+    expect(joined).toContain("idx_interactions_occurred_at");
+    expect(joined).toContain("idx_group_events_occurred_at");
+    expect(fullScanOf(details, "i"), joined).toBe(false);
+    expect(fullScanOf(details, "ge"), joined).toBe(false);
   });
 });

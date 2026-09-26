@@ -22,7 +22,7 @@ describe("migration 030 — Your Week period", () => {
     await runMigrations(exec, MIGRATIONS, TARGET_VERSION, deps);
 
     expect(await exec.getFirstAsync("PRAGMA user_version")).toEqual({
-      user_version: 30,
+      user_version: TARGET_VERSION,
     });
     expect(
       await exec.getFirstAsync(

@@ -1,9 +1,18 @@
 /**
  * App-wide, read-only Your Week aggregation (Phase 38, S-10/S-11/S-12).
  *
- * Stored timestamps are local wall-clock values, so SQL truncates them with
- * bare `date(column)`. Period bounds are always bound parameters. This module
- * performs async on-device reads only: no writer, transaction, or network.
+ * Stored timestamps are local wall-clock values (`YYYY-MM-DD HH:MM:SS` from
+ * every live writer). Each period predicate is two conjuncts (38.4 RG-028,
+ * `performance/AUD-PERF-004`, D-18):
+ *   1. a half-open string range `occurred_at >= date(?) AND occurred_at <
+ *      date(?, '+1 day')`, which lets SQLite SEARCH the migration-031
+ *      `idx_interactions_occurred_at` / `idx_group_events_occurred_at` indexes
+ *      instead of scanning lifetime history, and
+ *   2. the original `date(occurred_at)` residual, which keeps results exact
+ *      (e.g. a malformed value the range admits but `date()` rejects).
+ * Period bounds are always bound parameters; nothing is interpolated. There is
+ * no persisted cache (ADR-148). This module performs async on-device reads
+ * only: no writer, transaction, or network.
  */
 import type { SqlExecutor } from "@/db/types";
 
@@ -27,29 +36,40 @@ export interface YourWeekDayRow {
   readonly contactName: string | null;
 }
 
+/**
+ * Headline-count SQL, exported so the EXPLAIN proof runs the exact text the
+ * reader runs. Binds (12, statement order): per sub-select `start, end` for the
+ * range then `start, end` for the residual.
+ */
+export const YOUR_WEEK_METRICS_SQL = `SELECT
+       (SELECT COUNT(DISTINCT i.contact_id)
+          FROM interactions i
+          JOIN contacts c ON c.id = i.contact_id
+         WHERE c.archived_at IS NULL
+           AND i.occurred_at >= date(?) AND i.occurred_at < date(?, '+1 day')
+           AND date(i.occurred_at) BETWEEN date(?) AND date(?)) AS peopleReached,
+       (SELECT COUNT(*)
+          FROM interactions i
+          JOIN contacts c ON c.id = i.contact_id
+         WHERE c.archived_at IS NULL
+           AND i.occurred_at >= date(?) AND i.occurred_at < date(?, '+1 day')
+           AND date(i.occurred_at) BETWEEN date(?) AND date(?)) AS interactions,
+       (SELECT COUNT(*)
+          FROM group_events ge
+         WHERE ge.occurred_at >= date(?) AND ge.occurred_at < date(?, '+1 day')
+           AND date(ge.occurred_at) BETWEEN date(?) AND date(?)) AS events`;
+
 /** Headline counts: child interaction rows and parent events are distinct units. */
 export async function readYourWeekMetrics(
   exec: SqlExecutor,
   start: string,
   end: string,
 ): Promise<YourWeekMetrics> {
-  const row = await exec.getFirstAsync<YourWeekMetrics>(
-    `SELECT
-       (SELECT COUNT(DISTINCT i.contact_id)
-          FROM interactions i
-          JOIN contacts c ON c.id = i.contact_id
-         WHERE c.archived_at IS NULL
-           AND date(i.occurred_at) BETWEEN date(?) AND date(?)) AS peopleReached,
-       (SELECT COUNT(*)
-          FROM interactions i
-          JOIN contacts c ON c.id = i.contact_id
-         WHERE c.archived_at IS NULL
-           AND date(i.occurred_at) BETWEEN date(?) AND date(?)) AS interactions,
-       (SELECT COUNT(*)
-          FROM group_events ge
-         WHERE date(ge.occurred_at) BETWEEN date(?) AND date(?)) AS events`,
-    [start, end, start, end, start, end],
-  );
+  const row = await exec.getFirstAsync<YourWeekMetrics>(YOUR_WEEK_METRICS_SQL, [
+    ...[start, end, start, end],
+    ...[start, end, start, end],
+    ...[start, end, start, end],
+  ]);
   return row ?? { peopleReached: 0, interactions: 0, events: 0 };
 }
 
