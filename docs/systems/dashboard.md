@@ -74,6 +74,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | `src/components/control-surface/AnchoredPanel.tsx` | Renders the centered, in-tree floating control surface with a scroll cap, scrim, focus handoff, and reduced-motion-aware animation. |
 | `src/components/control-surface/DashboardControlRow.tsx` | Opens Population, Filters, and Sort, summarizes each axis, and sends intent-derived durable writes through the query store. |
 | `src/components/control-surface/DashboardOverlayHost.tsx` | Hosts the root-level in-tree Dashboard panel request. |
+| `src/components/control-surface/dashboard-panel-store.ts` | Single owner of panel open state: the request store, `selectPanelOpen`, and capture-before-clear `dismissDashboardPanel`. |
 | `src/screens/dashboard-overflow-actions.ts` | Defines the fixed Dashboard management and reset entries. |
 
 ## How It Works
@@ -213,6 +214,7 @@ The Group Events header and redundant overflow entries navigate to the local rev
 15. **Do not re-seed selection after entry.** The store membership guard and render-side frozen-universe filter both matter; only a committed archive removes IDs.
 16. **Do not use public single-contact writers inside a batch.** They own their own transaction; Dashboard bulk actions call the composed DAO instead.
 17. **Search context is not ordinary card context.** A Grid search explanation may use the third line even though the normal Grid card does not.
+18. **Panel open state has one owner — `dashboard-panel-store.ts`.** Home derives its background inertness with `selectPanelOpen`; never mirror it in component state, and when dismissing capture the request before `close()` (RG-020, react-native/AUD-RN-001). Scrim tap and Android Back reach the owner through `dismissDashboardPanel`; the trigger re-tap closes the store directly. The `accessible={!panelOpen}` grouping on Home's two wrappers is under the D-05 TalkBack investigation (ui-accessibility/AUD-UIA-022) and must not be changed without that on-device evidence; `no-hide-descendants` and `pointerEvents="none"` while a panel is open stay as ADR-095 isolation.
 
 ## Related Systems
 
@@ -245,3 +247,4 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | 2026-09-02 | 33 | Connected existing Group Events discovery and count-aware participant handoff to canonical event-first Group Log and local browse surfaces. |
 | 2026-09-02 | 38 | Relabelled the user-facing root as Contacts, removed promoted shortcuts, and aligned the exact opted-in Unbound Never Contacted population with Digest preview and drill-through. |
 | 2026-09-19 | 38.1 | Removed routine normal-Grid excerpts; List excerpts and Grid search explanations remain independent paths. |
+| 2026-09-26 | 38.3 | Panel dismissal single-owner fix (RG-020): the panel store owns open state, dismissal captures the request before clearing, and Home derives its inertness from the store. |
