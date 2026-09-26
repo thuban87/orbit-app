@@ -83,7 +83,8 @@ export function AssistBanner() {
           refreshQueue: refresh,
           logFailure,
         }),
-      onError: (kind) => {
+      onError: (kind, error) => {
+        logFailure("assist confirm failed", error);
         const copy = ASSIST_FAILURE_COPY.log[kind];
         Alert.alert(copy.title, copy.body);
       },
@@ -103,7 +104,8 @@ export function AssistBanner() {
         }),
       publish: () =>
         publishAssistDismissal({ refreshQueue: refresh, logFailure }),
-      onError: () => {
+      onError: (_kind, error) => {
+        logFailure("assist dismiss failed", error);
         const copy = ASSIST_FAILURE_COPY.dismiss.generic;
         Alert.alert(copy.title, copy.body);
       },
@@ -143,6 +145,7 @@ export function AssistBanner() {
           channel={newest.channel}
           onConfirm={confirm}
           onDismiss={dismiss}
+          pending={pending}
         />
       </View>
       <PendingConfirmationsSheet

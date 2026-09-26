@@ -125,8 +125,11 @@ export interface RunAssistActionInput {
   write(): Promise<void>;
   /** Post-commit publication; contractually never rejects. */
   publish(): Promise<void>;
-  /** Surface a WRITE failure to the user. Never called after a commit. */
-  onError(kind: AssistFailureKind): void;
+  /**
+   * Surface a WRITE failure to the user (and log it content-free). Never called
+   * after a commit. `error` is the raw rejection, for logging only.
+   */
+  onError(kind: AssistFailureKind, error: unknown): void;
   /** Optional: log a publish that broke its never-reject contract. */
   logFailure?(message: string, error: unknown): void;
 }
@@ -147,7 +150,7 @@ export async function runAssistAction(
     try {
       await input.write();
     } catch (error) {
-      input.onError(classifyAssistFailure(error));
+      input.onError(classifyAssistFailure(error), error);
       return "failed";
     }
     try {

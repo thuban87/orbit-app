@@ -2,11 +2,18 @@ import { useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import type { InteractionAssistChannel } from "@/db/interaction-assist-dao";
 import { useTheme } from "@/theme";
+import { Logger } from "@/utils/logger";
 
 type AssistConfirmationProps = {
   channel: InteractionAssistChannel;
   onConfirm: (connected: 0 | 1, note?: string) => void | Promise<void>;
   onDismiss: () => void | Promise<void>;
+  /**
+   * True while the owner's write is in flight (38.3 RG-023 / D-08): disables
+   * Yes / No answer / Don't log. The owner's synchronous latch is what actually
+   * guarantees write-once; this is the visible state.
+   */
+  pending?: boolean;
 };
 
 /** Presentational confirmation controls; persistence stays with the banner owner. */
@@ -14,13 +21,37 @@ export function AssistConfirmation({
   channel,
   onConfirm,
   onDismiss,
+  pending = false,
 }: AssistConfirmationProps) {
   const { colors } = useTheme();
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState("");
 
-  const confirm = (connected: 0 | 1) => {
-    void onConfirm(connected, note.trim() || undefined);
+  // Owners are expected never to reject (they surface failures themselves via
+  // the shared assist runner); awaiting + logging here is defense in depth so a
+  // rejection is never silently dropped (D-08).
+  const confirm = async (connected: 0 | 1) => {
+    try {
+      await onConfirm(connected, note.trim() || undefined);
+    } catch (error) {
+      Logger.error(
+        "assist-confirmation",
+        "confirmation handler rejected",
+        error,
+      );
+    }
+  };
+
+  const dismiss = async () => {
+    try {
+      await onDismiss();
+    } catch (error) {
+      Logger.error(
+        "assist-confirmation",
+        "confirmation handler rejected",
+        error,
+      );
+    }
   };
 
   return (
@@ -29,6 +60,8 @@ export function AssistConfirmation({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Yes"
+          accessibilityState={{ disabled: pending }}
+          disabled={pending}
           onPress={() => confirm(1)}
           style={[
             styles.button,
@@ -44,6 +77,8 @@ export function AssistConfirmation({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="No answer"
+            accessibilityState={{ disabled: pending }}
+            disabled={pending}
             onPress={() => confirm(0)}
             style={[
               styles.button,
@@ -62,7 +97,9 @@ export function AssistConfirmation({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Don't log"
-          onPress={() => void onDismiss()}
+          accessibilityState={{ disabled: pending }}
+          disabled={pending}
+          onPress={dismiss}
           style={[
             styles.button,
             { backgroundColor: colors.background, borderColor: colors.border },

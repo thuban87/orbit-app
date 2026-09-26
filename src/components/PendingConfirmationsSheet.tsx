@@ -1,4 +1,6 @@
+import { useRef, useState } from "react";
 import {
+  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -12,9 +14,24 @@ import {
   markAssistDismissed,
   markAssistLogged,
 } from "@/db/interaction-assist-dao";
+import {
+  ASSIST_FAILURE_COPY,
+  publishAssistCommit,
+  publishAssistDismissal,
+  runAssistAction,
+} from "@/services/assist-commit";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useAssistBanner } from "@/stores/assist-store";
+import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
+import { Logger } from "@/utils/logger";
+import type { InFlightRef } from "@/utils/single-flight";
+
+const LOG_SCOPE = "pending-confirmations";
+
+function logFailure(message: string, error: unknown): void {
+  Logger.error(LOG_SCOPE, message, error);
+}
 
 function questionFor(channel: "call" | "text" | "email", name: string): string {
   switch (channel) {
@@ -38,24 +55,84 @@ export function PendingConfirmationsSheet({
   const { colors } = useTheme();
   const queue = useAssistBanner((state) => state.queue);
   const refresh = useAssistBanner((state) => state.refresh);
+  // 38.3 RG-023 / D-08: one synchronous latch PER ASSIST (a double tap on one
+  // row is blocked; a different row stays usable), plus the pending uids for UI.
+  // Latches are kept for the sheet's lifetime; the queue holds at most five
+  // pending assists, so the map stays tiny.
+  const latchesRef = useRef(new Map<string, InFlightRef>());
+  const [pendingUids, setPendingUids] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
 
-  const confirm = async (uid: string, connected: 0 | 1, note?: string) => {
-    await markAssistLogged(getExecutor(), {
-      assistUid: uid,
-      connected,
-      note,
-      now: localDateTime(),
+  const latchFor = (uid: string): InFlightRef => {
+    let latch = latchesRef.current.get(uid);
+    if (!latch) {
+      latch = { current: false };
+      latchesRef.current.set(uid, latch);
+    }
+    return latch;
+  };
+
+  const markPending = (uid: string, isPending: boolean) => {
+    setPendingUids((previous) => {
+      if (previous.has(uid) === isPending) return previous;
+      const next = new Set(previous);
+      if (isPending) next.add(uid);
+      else next.delete(uid);
+      return next;
     });
-    notifyWidgetDataChanged();
-    await refresh();
+  };
+
+  // Same contract as AssistBanner (src/services/assist-commit.ts): handlers
+  // always resolve; a write failure shows an Alert and leaves the assist
+  // pending; a post-commit publication failure is logged only (D-04).
+  const confirm = async (uid: string, connected: 0 | 1, note?: string) => {
+    markPending(uid, true);
+    const result = await runAssistAction({
+      latch: latchFor(uid),
+      write: () =>
+        markAssistLogged(getExecutor(), {
+          assistUid: uid,
+          connected,
+          note,
+          now: localDateTime(),
+        }),
+      publish: () =>
+        publishAssistCommit({
+          notifyWidget: notifyWidgetDataChanged,
+          bumpShell: bumpShellRefresh,
+          refreshQueue: refresh,
+          logFailure,
+        }),
+      onError: (kind, error) => {
+        logFailure("assist confirm failed", error);
+        const copy = ASSIST_FAILURE_COPY.log[kind];
+        Alert.alert(copy.title, copy.body);
+      },
+      logFailure,
+    });
+    if (result !== "busy") markPending(uid, false);
   };
 
   const dismiss = async (uid: string) => {
-    await markAssistDismissed(getExecutor(), {
-      assistUid: uid,
-      now: localDateTime(),
+    markPending(uid, true);
+    const result = await runAssistAction({
+      latch: latchFor(uid),
+      write: () =>
+        markAssistDismissed(getExecutor(), {
+          assistUid: uid,
+          now: localDateTime(),
+        }),
+      publish: () =>
+        publishAssistDismissal({ refreshQueue: refresh, logFailure }),
+      onError: (_kind, error) => {
+        logFailure("assist dismiss failed", error);
+        const copy = ASSIST_FAILURE_COPY.dismiss.generic;
+        Alert.alert(copy.title, copy.body);
+      },
+      logFailure,
     });
-    await refresh();
+    if (result !== "busy") markPending(uid, false);
   };
 
   return (
@@ -122,6 +199,7 @@ export function PendingConfirmationsSheet({
                       confirm(assist.uid, connected, note)
                     }
                     onDismiss={() => dismiss(assist.uid)}
+                    pending={pendingUids.has(assist.uid)}
                   />
                 </View>
               ))}

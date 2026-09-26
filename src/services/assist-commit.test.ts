@@ -223,7 +223,10 @@ describe("runAssistAction", () => {
     });
     expect(result).toBe("failed");
     expect(onError).toHaveBeenCalledTimes(1);
-    expect(onError).toHaveBeenCalledWith("future-date");
+    expect(onError).toHaveBeenCalledWith(
+      "future-date",
+      expect.any(FutureOccurredAtError),
+    );
     expect(publish).not.toHaveBeenCalled();
     expect(latch.current).toBe(false);
   });
@@ -241,7 +244,7 @@ describe("runAssistAction", () => {
       onError,
     });
     expect(result).toBe("failed");
-    expect(onError).toHaveBeenCalledWith("generic");
+    expect(onError).toHaveBeenCalledWith("generic", expect.any(Error));
     expect(publish).not.toHaveBeenCalled();
   });
 

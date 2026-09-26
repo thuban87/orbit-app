@@ -142,13 +142,22 @@ import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import type { RootStackScreenProps, TabParamList } from "@/navigation/types";
 import { AiError, type AiErrorCode, AiService } from "@/services/AiService";
 import { aiKeyStore } from "@/services/ai-key-store";
+import {
+  ASSIST_FAILURE_COPY,
+  publishAssistCommit,
+  runAssistAction,
+} from "@/services/assist-commit";
 import { performReachOut } from "@/services/reach-out/handoff";
+import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useAiConfigStore } from "@/stores/ai-config-store";
+import { useAssistBanner } from "@/stores/assist-store";
 import { useComposeSession } from "@/stores/compose-session-store";
+import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { Logger } from "@/utils/logger";
+import type { InFlightRef } from "@/utils/single-flight";
 
 const LOG_SCOPE = "compose";
 
@@ -250,6 +259,10 @@ export function ComposeScreen({
   // the "Yes" write so a double-tap cannot double-log (T-35-05).
   const [confirm, setConfirm] = useState<{ assistUid: string } | null>(null);
   const [logging, setLogging] = useState(false);
+  // Synchronous double-tap latch for the "Yes" write (38.3 RG-023 / D-08): the
+  // `logging` state above only drives the disabled UI and cannot stop two taps
+  // dispatched in one tick; this ref can.
+  const confirmLatchRef = useRef<InFlightRef>({ current: false });
   // The count of populated Things-to-Remember Research items for this contact,
   // driving the compact 'Things to Remember · N' entry (COMP-08). A local SQLite
   // read on focus — never on the render path, never a blocking network call.
@@ -1063,32 +1076,60 @@ export function ComposeScreen({
   // this is the ONLY "finished" exit (COMP-14 / D-10): the disposition helper
   // clears the session and returns toward origin, removing the finished Compose
   // route from Back history so the sent draft can't resurrect (T-35-20).
+  //
+  // 38.3 RG-023 (architecture/AUD-ARCH-006, D-21): the write runs through the
+  // shared assist runner and, once committed, publishes through the SAME
+  // publisher as the banner and pending sheet — widget notify, shell tick and
+  // assist-queue refresh — before the exit. A publication failure is logged only
+  // and never reported as "couldn't log" (D-04).
   const onConfirmYes = useCallback(async () => {
-    if (logging || confirm === null) {
+    if (confirm === null) {
       return;
     }
+    const { assistUid } = confirm;
     setLogging(true);
-    try {
-      await markAssistLogged(getExecutor(), {
-        assistUid: confirm.assistUid,
-        connected: 1,
-        now: localDateTime(),
-      });
+    const result = await runAssistAction({
+      latch: confirmLatchRef.current,
+      write: () =>
+        markAssistLogged(getExecutor(), {
+          assistUid,
+          connected: 1,
+          now: localDateTime(),
+        }),
+      publish: () =>
+        publishAssistCommit({
+          notifyWidget: notifyWidgetDataChanged,
+          bumpShell: bumpShellRefresh,
+          refreshQueue: () => useAssistBanner.getState().refresh(),
+          logFailure: (message, error) =>
+            Logger.error(LOG_SCOPE, message, error),
+        }),
+      onError: (kind, err) => {
+        // The assist row persists (stamped at handoff_at); the app-global banner +
+        // pending sheet still offer logging later — no lost state, no false success.
+        // Keep the panel open so the user can retry without a re-query.
+        Logger.error(LOG_SCOPE, "failed to log interaction", err);
+        if (kind === "future-date") {
+          const copy = ASSIST_FAILURE_COPY.log["future-date"];
+          Alert.alert(copy.title, copy.body);
+          return;
+        }
+        Alert.alert(
+          "Couldn't log that yet",
+          "The reminder is saved — you can log it from the banner.",
+        );
+      },
+      logFailure: (message, error) => Logger.error(LOG_SCOPE, message, error),
+    });
+    if (result === "busy") {
+      return;
+    }
+    setLogging(false);
+    if (result === "done") {
       setConfirm(null);
       performExit("logged");
-    } catch (err) {
-      // The assist row persists (stamped at handoff_at); the app-global banner +
-      // pending sheet still offer logging later — no lost state, no false success.
-      // Keep the panel open so the user can retry without a re-query.
-      Logger.error(LOG_SCOPE, "failed to log interaction", err);
-      Alert.alert(
-        "Couldn't log that yet",
-        "The reminder is saved — you can log it from the banner.",
-      );
-    } finally {
-      setLogging(false);
     }
-  }, [logging, confirm, performExit]);
+  }, [confirm, performExit]);
 
   // "Not yet" — close ONLY the local panel and leave the durable assist row
   // PENDING (D-05). Do NOT call markAssistDismissed; the durable "Don't log" path

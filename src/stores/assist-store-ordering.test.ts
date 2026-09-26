@@ -149,15 +149,17 @@ describe("assist queue refresh — latest-request authority", () => {
   it("the AppState-driven refresh logs a rejection instead of leaving it unhandled", async () => {
     const errorSpy = vi.spyOn(Logger, "error").mockImplementation(() => {});
     mocks.listEligiblePendingAssists.mockRejectedValueOnce(new Error("boom"));
-    let listener: ((state: string) => void) | null = null;
+    const holder: { listener: ((state: string) => void) | null } = {
+      listener: null,
+    };
     subscribeAppState({
       addEventListener(_type, callback) {
-        listener = callback;
+        holder.listener = callback;
         return { remove: vi.fn() };
       },
     });
-    listener?.("background");
-    listener?.("active");
+    holder.listener?.("background");
+    holder.listener?.("active");
     await vi.waitFor(() => expect(errorSpy).toHaveBeenCalledTimes(1));
     expect(errorSpy.mock.calls[0][0]).toBe("assist-store");
     expect(errorSpy.mock.calls[0][1]).toBe("queue refresh failed");
