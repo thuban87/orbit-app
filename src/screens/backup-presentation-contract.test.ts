@@ -161,7 +161,7 @@ describe("Backup passphrase fields have persistent visible labels (RG-036 AUD-UI
     ["backup-settings-confirm-new-passphrase", "Confirm new passphrase"],
   ] as const;
 
-  function escape(text: string): string {
+  function escapeRegExp(text: string): string {
     return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   }
 
@@ -175,7 +175,7 @@ describe("Backup passphrase fields have persistent visible labels (RG-036 AUD-UI
       // rendered with it, so it stays visible before entry, after entry and
       // while an error is shown.
       const preceded = new RegExp(
-        `<AppText([^>]*)>\\s*${escape(label)}\\s*</AppText>\\s*<TextInput\\s+testID="${escape(testID)}"`,
+        `<AppText([^>]*)>\\s*${escapeRegExp(label)}\\s*</AppText>\\s*<TextInput\\s+testID="${escapeRegExp(testID)}"`,
       );
       const match = settings.match(preceded);
       expect(match, `no visible label before ${testID}`).not.toBeNull();
