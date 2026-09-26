@@ -574,7 +574,7 @@ export function BackupScreen({
                 },
               ]}
             >
-              <Text style={{ color: colors.textPrimary }}>
+              <Text style={{ color: colors.onAccent }}>
                 {restoreMessage
                   ? "Try passphrase again"
                   : "Continue to preview backup"}
