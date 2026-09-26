@@ -3,6 +3,7 @@ import type { OpenRouterModel } from "@/ai/openrouter-catalog";
 import {
   directCards,
   filterModelCards,
+  markRememberedModel,
   openRouterCards,
   orderOpenRouterModels,
 } from "@/screens/ai-model-picker-logic";
@@ -62,5 +63,57 @@ describe("curated-first model ordering", () => {
 
   it("direct cards carry no monetary estimate", () => {
     expect(directCards(["model-b", "model-a"], [])[0].pricing).toBeNull();
+  });
+});
+
+/**
+ * 38.4 RG-008 / ui-accessibility/AUD-UIA-020 (D-17): the lane's saved model is
+ * marked — a catalog card when the trimmed id matches exactly, otherwise a
+ * manual current-model row.
+ */
+describe("markRememberedModel", () => {
+  const cards = directCards(["gpt-x", "gpt-y"], []);
+  const current = (result: ReturnType<typeof markRememberedModel>) =>
+    result.cards.filter((card) => card.isCurrent).map((card) => card.id);
+
+  it("marks the card whose id equals the remembered model", () => {
+    const result = markRememberedModel(cards, "gpt-x");
+    expect(current(result)).toEqual(["gpt-x"]);
+    expect(result.cards).toHaveLength(2);
+    expect(result.manualCurrent).toBeNull();
+  });
+
+  it("trims surrounding whitespace before matching", () => {
+    const result = markRememberedModel(cards, "  gpt-x ");
+    expect(current(result)).toEqual(["gpt-x"]);
+    expect(result.manualCurrent).toBeNull();
+  });
+
+  it("reports a manual id that is not in the catalog", () => {
+    const result = markRememberedModel(cards, "my-custom-id");
+    expect(current(result)).toEqual([]);
+    expect(result.manualCurrent).toBe("my-custom-id");
+  });
+
+  it("marks nothing for a missing or blank remembered model", () => {
+    for (const remembered of [null, "", "   "]) {
+      const result = markRememberedModel(cards, remembered);
+      expect(current(result)).toEqual([]);
+      expect(result.manualCurrent).toBeNull();
+    }
+  });
+
+  it("matches on exact string equality only (case differs = no match)", () => {
+    const result = markRememberedModel(cards, "GPT-X");
+    expect(current(result)).toEqual([]);
+    expect(result.manualCurrent).toBe("GPT-X");
+  });
+
+  it("preserves every card field and order", () => {
+    const result = markRememberedModel(cards, "gpt-y");
+    expect(result.cards).toEqual([
+      { ...cards[0], isCurrent: false },
+      { ...cards[1], isCurrent: true },
+    ]);
   });
 });
