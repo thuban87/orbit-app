@@ -3,6 +3,7 @@ import type { ContactMethodGroups } from "@/db/contact-methods-read";
 import type { CurrentStateFieldKey } from "@/db/memory-registry";
 import type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 import type { ProfileCollapseMap } from "@/profile/persisted-contract";
+import { createLatestRequestAuthority } from "@/utils/latest-request";
 
 export type ProfileMethodType = "phone" | "email";
 
@@ -217,6 +218,49 @@ export async function commitProfileOverviewToggle(input: {
   } catch {
     return { ok: false, expanded: input.currentExpanded };
   }
+}
+
+export interface ProfileSnapshotLoader {
+  /** Start a read; only the newest (non-invalidated) one may publish. */
+  load(): Promise<void>;
+  /** Retire every in-flight load (unmount). */
+  invalidate(): void;
+}
+
+/**
+ * Latest-request gated Profile snapshot load (38.3 RG-024;
+ * architecture/AUD-ARCH-004, react-native/AUD-RN-008).
+ *
+ * The Profile screen is the single invalidation owner for its two projections:
+ * each CURRENT successful publication carries a monotonically increasing
+ * revision, and the History section re-reads on that revision. An older read
+ * can never overwrite a newer snapshot or error, and `publish`/`fail`/`settle`
+ * run only for the current token. A failed read never bumps the revision.
+ */
+export function createProfileSnapshotLoader<T>(input: {
+  read(): Promise<T>;
+  publish(value: T, revision: number): void;
+  fail(error: unknown): void;
+  settle(): void;
+}): ProfileSnapshotLoader {
+  const authority = createLatestRequestAuthority();
+  let revision = 0;
+  return {
+    async load() {
+      const token = authority.begin();
+      try {
+        const value = await input.read();
+        if (!authority.isCurrent(token)) return;
+        revision += 1;
+        input.publish(value, revision);
+      } catch (error) {
+        if (authority.isCurrent(token)) input.fail(error);
+      } finally {
+        if (authority.isCurrent(token)) input.settle();
+      }
+    },
+    invalidate: () => authority.invalidate(),
+  };
 }
 
 const typePresentation: Record<ProfileMethodType, string> = {

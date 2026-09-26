@@ -1,7 +1,7 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { ProfileBackgroundManager } from "@/components/profile/ProfileBackgroundManager";
@@ -37,6 +37,7 @@ import type { ProfileLayoutDocument } from "@/profile/types";
 import {
   closeTopmostProfileOverlay,
   consumeProfileReachOutIntent,
+  createProfileSnapshotLoader,
   PROFILE_APP_BAR,
   type ProfileOverlay,
   profileKnowledgeDestination,
@@ -51,7 +52,10 @@ import {
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
 import { resolveBackgroundUri } from "@/services/photos/background-storage";
 import { performReachOut } from "@/services/reach-out/handoff";
-import { useShellRefresh } from "@/stores/shell-refresh-store";
+import {
+  useForegroundRefresh,
+  useShellRefresh,
+} from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatLocalDate } from "@/utils/dates";
@@ -79,33 +83,55 @@ export function ContactProfileScreen({
   const [reachOutOpen, setReachOutOpen] = useState(false);
   const [assistEnabled, setAssistEnabled] = useState(false);
 
+  // The Profile is the single invalidation owner for its two projections
+  // (38.3 RG-024): every current snapshot publication bumps `historyRevision`,
+  // and HistorySection re-reads on it, so metrics and History converge from one
+  // trigger. The loader is latest-request gated — an older read never
+  // overwrites a newer snapshot or error.
+  const [historyRevision, setHistoryRevision] = useState(0);
+  const readInputs = useRef({ contactId, themePackage });
+  readInputs.current = { contactId, themePackage };
+  const [loader] = useState(() =>
+    createProfileSnapshotLoader({
+      read: () => {
+        const { contactId: id, themePackage: pkg } = readInputs.current;
+        return Promise.all([
+          readProfileSnapshot(getExecutor(), id, {
+            now: localDateTime(),
+            themeBackground: `theme:${pkg}`,
+          }),
+          getAppSettings(getExecutor()),
+        ]);
+      },
+      publish: ([next, settings], revision) => {
+        setAssistEnabled(settings.interactionAssistEnabled === 1);
+        if (!next) {
+          setSnapshot(null);
+          setError("This contact is no longer available.");
+        } else {
+          setSnapshot(next);
+        }
+        setHistoryRevision(revision);
+      },
+      fail: (cause) => {
+        Logger.error(LOG_SCOPE, "failed to load Profile snapshot", cause);
+        setError("Couldn't load this contact. Please go back and retry.");
+      },
+      settle: () => setLoading(false),
+    }),
+  );
+  useEffect(() => () => loader.invalidate(), [loader]);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: contactId/themePackage re-key the focus read; the loader reads them through `readInputs`.
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try {
-      const [next, settings] = await Promise.all([
-        readProfileSnapshot(getExecutor(), contactId, {
-          now: localDateTime(),
-          themeBackground: `theme:${themePackage}`,
-        }),
-        getAppSettings(getExecutor()),
-      ]);
-      setAssistEnabled(settings.interactionAssistEnabled === 1);
-      if (!next) {
-        setSnapshot(null);
-        setError("This contact is no longer available.");
-        return;
-      }
-      setSnapshot(next);
-    } catch (cause) {
-      Logger.error(LOG_SCOPE, "failed to load Profile snapshot", cause);
-      setError("Couldn't load this contact. Please go back and retry.");
-    } finally {
-      setLoading(false);
-    }
-  }, [contactId, themePackage]);
+    await loader.load();
+  }, [loader, contactId, themePackage]);
 
   useShellRefresh(load);
+  // D-14: the resume read runs after the launch/foreground sweep settles.
+  useForegroundRefresh(load);
   useFocusEffect(useCallback(() => void load(), [load]));
 
   const presentation = useMemo(
@@ -446,6 +472,7 @@ export function ContactProfileScreen({
                 snapshot={snapshot}
                 presentation={presentation}
                 todayLocal={todayLocal}
+                historyRevision={historyRevision}
                 onOpenHistory={() =>
                   navigation.navigate("ThingsToRemember", { contactId })
                 }

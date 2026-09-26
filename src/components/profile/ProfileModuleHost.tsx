@@ -128,6 +128,11 @@ export interface ProfileModuleHostProps {
   snapshot: ProfileSnapshot;
   presentation: ProfilePresentation;
   todayLocal: string;
+  /**
+   * The Profile snapshot's publication revision (38.3 RG-024). HistorySection
+   * re-reads on every change, so History and the metrics share one trigger.
+   */
+  historyRevision: number;
   onOpenHistory: () => void;
   onOpenInsights?: () => void;
   onSetFrequency: (days: number) => Promise<void>;
@@ -168,6 +173,7 @@ export function ProfileModuleHost({
   snapshot,
   presentation,
   todayLocal,
+  historyRevision,
   onOpenHistory,
   onOpenInsights,
   onSetFrequency,
@@ -385,6 +391,7 @@ export function ProfileModuleHost({
     return (
       <HistorySection
         contactId={snapshot.identity.id}
+        revision={historyRevision}
         intervalDays={snapshot.identity.intervalDays}
         trackingEnabled={snapshot.identity.trackingEnabled}
         impactInputs={snapshot.impactInputs}

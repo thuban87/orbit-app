@@ -11,8 +11,10 @@
  *   • the shared DateDetailSheet -> InteractionDetail (Edit / hard-delete)
  *
  * It owns the lens/window/cycle-preset state (persisted globally in
- * `app_settings` via the DAO), reads the canonical history once per focus, and
- * wires the cross-surface behaviors:
+ * `app_settings` via the DAO), reads the canonical history on mount and on every
+ * parent Profile revision (38.3 RG-024 — the Profile snapshot load is the single
+ * invalidation owner; Profile focus always produces a revision, so ADR-123's
+ * on-focus read is preserved), and wires the cross-surface behaviors:
  *   - a heatmap cell opens the context card FIRST; only its explicit "See
  *     details" opens the shared Detail Sheet, and only "Log interaction" routes
  *     the typed LogContact contract (never auto-opening the sheet, HIST-09/07).
@@ -38,9 +40,9 @@
  * children own their own colours; this shell adds none). Dates are local
  * `YYYY-MM-DD` via `formatLocalDate` — never UTC ISO slicing.
  */
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { GroupTitlePromptSheet } from "@/components/group/GroupTitlePromptSheet";
 import type { HeatmapCellTarget } from "@/components/history/ActivityHeatmap";
@@ -50,6 +52,11 @@ import { HeatmapContextCard } from "@/components/history/HeatmapContextCard";
 import {
   buildLogRoute,
   countByCycle,
+  type HistoryReadState,
+  historyReadStateOnFail,
+  historyReadStateOnPublish,
+  historyReadStateOnStart,
+  initialHistoryReadState,
   isEmptyHistory,
   resolveActiveWindow,
 } from "@/components/history/history-section-logic";
@@ -84,6 +91,10 @@ import {
 } from "@/services/history/window";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatLocalDate } from "@/utils/dates";
+import { createLatestRequestAuthority } from "@/utils/latest-request";
+import { Logger } from "@/utils/logger";
+
+const LOG_SCOPE = "history-section";
 
 const MONTHS = [
   "Jan",
@@ -124,6 +135,12 @@ interface SheetScope {
 
 export interface HistorySectionProps {
   contactId: number;
+  /**
+   * The parent Profile's snapshot publication revision (38.3 RG-024). History
+   * re-reads whenever it changes (and on mount), so History and the Profile
+   * metrics always refresh from the same trigger.
+   */
+  revision: number;
   /** Nullable cadence (null == Unbound / no cadence) — drives Cycles + Intensity. */
   intervalDays: number | null;
   /** 0/1 cadence tracking flag from the contact row. */
@@ -140,6 +157,7 @@ export interface HistorySectionProps {
 
 export function HistorySection({
   contactId,
+  revision,
   intervalDays,
   trackingEnabled,
   impactInputs,
@@ -153,7 +171,10 @@ export function HistorySection({
   const [lens, setLens] = useState<HistoryLens>("cycles");
   const [cycleCount, setCycleCount] = useState<HistoryCycleCount>(10);
   const [refDate, setRefDate] = useState(today);
-  const [history, setHistory] = useState<ContactHistory | null>(null);
+  const [readState, setReadState] = useState<HistoryReadState<ContactHistory>>(
+    initialHistoryReadState,
+  );
+  const history = readState.phase === "loaded" ? readState.data : null;
 
   const [card, setCard] = useState<HeatmapCellTarget | null>(null);
   const [sheet, setSheet] = useState<SheetScope | null>(null);
@@ -161,22 +182,39 @@ export function HistorySection({
   const [converting, setConverting] = useState(false);
   const [conversionError, setConversionError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    const exec = getExecutor();
-    const [settings, next] = await Promise.all([
-      getAppSettings(exec),
-      readContactHistory(exec, contactId),
-    ]);
-    setLens(settings.historyLens);
-    setCycleCount(settings.historyCycleCount);
-    setHistory(next);
-  }, [contactId]);
+  // One latest-request authority for this section's reads: an older read never
+  // publishes over a newer one, and nothing publishes after unmount.
+  const [authority] = useState(createLatestRequestAuthority);
+  useEffect(() => () => authority.invalidate(), [authority]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
-  );
+  const load = useCallback(async () => {
+    const token = authority.begin();
+    setReadState(historyReadStateOnStart);
+    try {
+      const exec = getExecutor();
+      const [settings, next] = await Promise.all([
+        getAppSettings(exec),
+        readContactHistory(exec, contactId),
+      ]);
+      if (!authority.isCurrent(token)) return;
+      setLens(settings.historyLens);
+      setCycleCount(settings.historyCycleCount);
+      setReadState((current) => historyReadStateOnPublish(current, next));
+    } catch {
+      if (!authority.isCurrent(token)) return;
+      // Content-free: no contact data in the log line.
+      Logger.error(LOG_SCOPE, "failed to read contact history");
+      setReadState(historyReadStateOnFail);
+    }
+  }, [authority, contactId]);
+
+  // Revision-driven read (38.3 RG-024): runs on mount (which also covers
+  // expand-after-collapse) and on every parent Profile publication. There is
+  // no independent focus read — the parent's focus load produces the revision.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `revision` is the re-read trigger.
+  useEffect(() => {
+    void load();
+  }, [load, revision]);
 
   // --- Persisted lens / preset (global app_settings, never per-contact) ------
   const onLensChange = useCallback(
@@ -288,6 +326,20 @@ export function HistorySection({
     };
   }, [sheet, history]);
 
+  if (readState.phase === "error") {
+    return (
+      <View testID={`${testID}-error`} style={styles.empty}>
+        <AppText role="caption">Couldn't load history</AppText>
+        <Button
+          role="tertiary"
+          label="Retry"
+          accessibilityLabel="Retry loading history"
+          onPress={() => void load()}
+        />
+      </View>
+    );
+  }
+
   if (!history) {
     return (
       <View testID={`${testID}-loading`} style={styles.stack}>
@@ -296,9 +348,23 @@ export function HistorySection({
     );
   }
 
+  const refreshNotice =
+    readState.phase === "loaded" && readState.refreshError ? (
+      <View testID={`${testID}-refresh-error`} style={styles.notice}>
+        <AppText role="caption">Couldn't refresh history</AppText>
+        <Button
+          role="tertiary"
+          label="Retry"
+          accessibilityLabel="Retry refreshing history"
+          onPress={() => void load()}
+        />
+      </View>
+    ) : null;
+
   if (isEmptyHistory(history)) {
     return (
       <View testID={`${testID}-empty`} style={styles.empty}>
+        {refreshNotice}
         <AppText role="heading">No history yet</AppText>
         <AppText role="caption">
           Log an interaction to start seeing activity here.
@@ -314,6 +380,7 @@ export function HistorySection({
 
   return (
     <View testID={testID} style={styles.stack}>
+      {refreshNotice}
       <ActivityHeatmap
         lens={lens}
         cycleCount={cycleCount}
@@ -440,4 +507,10 @@ export function HistorySection({
 const styles = StyleSheet.create({
   stack: { gap: SPACING.lg },
   empty: { gap: SPACING.sm },
+  notice: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: SPACING.sm,
+  },
 });

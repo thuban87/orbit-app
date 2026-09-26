@@ -109,3 +109,50 @@ export function countByCycle(
   }
   return counts;
 }
+
+/**
+ * History's own read state (38.3 RG-024, T-38.3-08-03). History re-reads on
+ * every parent Profile revision, so it must tell apart:
+ *   - `loading` — nothing has loaded yet (first read or a retry after error);
+ *   - `error`   — the first read failed: "Couldn't load history" + Retry, never
+ *                 an endless "Loading history…";
+ *   - `loaded`  — rows are shown; `refreshError` flags that the LATEST re-read
+ *                 failed, so the previous rows stay visible under a compact
+ *                 "Couldn't refresh history" + Retry notice (never silent).
+ */
+export type HistoryReadState<T> =
+  | { readonly phase: "loading" }
+  | { readonly phase: "error" }
+  | {
+      readonly phase: "loaded";
+      readonly data: T;
+      readonly refreshError: boolean;
+    };
+
+export function initialHistoryReadState<T>(): HistoryReadState<T> {
+  return { phase: "loading" };
+}
+
+/** A read begins: a loaded view is kept as-is; otherwise show loading. */
+export function historyReadStateOnStart<T>(
+  state: HistoryReadState<T>,
+): HistoryReadState<T> {
+  return state.phase === "loaded" ? state : { phase: "loading" };
+}
+
+/** The current read failed: keep loaded rows (flag the notice) or show error. */
+export function historyReadStateOnFail<T>(
+  state: HistoryReadState<T>,
+): HistoryReadState<T> {
+  return state.phase === "loaded"
+    ? { phase: "loaded", data: state.data, refreshError: true }
+    : { phase: "error" };
+}
+
+/** The current read succeeded: publish the rows and clear any refresh notice. */
+export function historyReadStateOnPublish<T>(
+  _state: HistoryReadState<T>,
+  data: T,
+): HistoryReadState<T> {
+  return { phase: "loaded", data, refreshError: false };
+}
