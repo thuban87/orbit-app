@@ -25,6 +25,11 @@ import { importRowAsNew } from "@/services/import/import-driver";
 import { resolveImportStagingUri } from "@/services/photos/photo-storage";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import {
+  duplicateReviewView,
+  runBulkResolveThenRecover,
+  runResolveThenRecover,
+} from "./duplicate-review-logic";
 import { useOpenImportSession } from "./use-open-import-session";
 
 const LOG_SCOPE = "duplicate-review";
@@ -84,6 +89,7 @@ export function DuplicateReviewScreen({
   const [session, setSession] = useState<ImportSession | null>(null);
   const [reviewItems, setReviewItems] = useState<ReviewItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [linkQueue, setLinkQueue] = useState<ReviewItem[]>([]);
   const [currentLink, setCurrentLink] = useState<ReviewItem | null>(null);
 
@@ -129,22 +135,39 @@ export function DuplicateReviewScreen({
     }
   }, [navigation, route.params.sessionId]);
 
-  useEffect(() => {
-    void refresh()
-      .catch((error) => {
-        Logger.error(LOG_SCOPE, "failed to load duplicate review", error);
-        Alert.alert("Couldn't load matches", "Please try again.");
-      })
-      .finally(() => setLoading(false));
+  // Read-only: a successful read clears the error; a failed one never falls
+  // through to "Nothing to review" (RG-035, D-24).
+  const reread = useCallback(async () => {
+    await refresh();
+    setLoadError(false);
   }, [refresh]);
 
-  async function finalizeAndRefresh() {
+  const onReadError = useCallback((error: unknown) => {
+    Logger.error(LOG_SCOPE, "failed to load duplicate review", error);
+    setLoadError(true);
+  }, []);
+
+  const loadMatches = useCallback(async () => {
+    setLoading(true);
+    try {
+      await reread();
+    } catch (error) {
+      onReadError(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [onReadError, reread]);
+
+  useEffect(() => {
+    void loadMatches();
+  }, [loadMatches]);
+
+  async function finalizeSession() {
     await finalizeSessionIfTerminal(
       getExecutor(),
       route.params.sessionId,
       localDateTime(),
     );
-    await refresh();
   }
 
   async function resolveAction(action: BulkAction, items: CandidateItem[]) {
@@ -157,8 +180,11 @@ export function DuplicateReviewScreen({
       return;
     }
     if (!session) return;
-    for (const entry of selected) {
-      try {
+    // Only a row's own write can fail its resolve; the trailing finalize and
+    // re-read go to the read error + read-only Retry (D-04).
+    await runBulkResolveThenRecover({
+      entries: selected,
+      writeOne: async (entry) => {
         const now = localDateTime();
         if (action === "import-new") {
           const result = await importRowAsNew(getExecutor(), {
@@ -182,44 +208,56 @@ export function DuplicateReviewScreen({
             now,
           );
         }
-      } catch (error) {
+      },
+      onRowError: (entry, error) => {
         Logger.error(LOG_SCOPE, `could not resolve row ${entry.row.id}`, error);
         Alert.alert(
           "Couldn't resolve this contact",
           "The other selected contacts are still available.",
         );
-      }
-    }
-    await finalizeAndRefresh();
+      },
+      finalize: finalizeSession,
+      reread,
+      onRecoveryError: onReadError,
+    });
   }
 
   async function chooseLink(choice: CandidateChoice) {
     if (!currentLink) return;
-    try {
-      const now = localDateTime();
-      await linkExistingContactToRow(getExecutor(), {
-        rowId: currentLink.row.id,
-        contactId: choice.contactId,
-        provider: "android",
-        externalContactId: currentLink.row.externalContactId,
-        matchOutcome: currentLink.row.matchOutcome,
-        now,
-      });
-      await finalizeSessionIfTerminal(
-        getExecutor(),
-        route.params.sessionId,
-        now,
-      );
-    } catch (error) {
-      Logger.error(LOG_SCOPE, "could not link candidate", error);
-      Alert.alert("Couldn't link this contact", "Please choose again.");
-      return;
-    }
+    const linking = currentLink;
     const next = linkQueue[0] ?? null;
-    setCurrentLink(next);
-    setLinkQueue((queue) => queue.slice(1));
-    if (!next) await refresh();
+    // "Please choose again" only when the link write itself rejected. Once it
+    // commits the queue advances; finalize/re-read failures become the read
+    // error with a read-only Retry, never a prompt to redo the link (D-04).
+    await runResolveThenRecover({
+      write: () =>
+        linkExistingContactToRow(getExecutor(), {
+          rowId: linking.row.id,
+          contactId: choice.contactId,
+          provider: "android",
+          externalContactId: linking.row.externalContactId,
+          matchOutcome: linking.row.matchOutcome,
+          now: localDateTime(),
+        }),
+      onWriteError: (error) => {
+        Logger.error(LOG_SCOPE, "could not link candidate", error);
+        Alert.alert("Couldn't link this contact", "Please choose again.");
+      },
+      onWritten: () => {
+        setCurrentLink(next);
+        setLinkQueue((queue) => queue.slice(1));
+      },
+      finalize: finalizeSession,
+      reread: next ? async () => undefined : reread,
+      onRecoveryError: onReadError,
+    });
   }
+
+  const view = duplicateReviewView({
+    loading,
+    loadError,
+    itemCount: reviewItems.length,
+  });
 
   const currentChoices = currentLink?.item.candidates ?? [];
   return (
@@ -237,7 +275,7 @@ export function DuplicateReviewScreen({
           Review matches
         </Text>
       </View>
-      {loading ? (
+      {view === "loading" ? (
         <CandidateCardGrid
           items={[]}
           bulkActions={[]}
@@ -246,7 +284,25 @@ export function DuplicateReviewScreen({
           recommendationExcludes="needs_review"
           scoring
         />
-      ) : reviewItems.length === 0 ? (
+      ) : view === "error" ? (
+        <View testID="duplicate-review-error" style={styles.empty}>
+          <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
+            Couldn't load matches
+          </Text>
+          <Text style={{ color: colors.textSecondary }}>
+            Contacts you already resolved are saved.
+          </Text>
+          <Pressable
+            testID="duplicate-review-retry"
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading matches"
+            onPress={() => void loadMatches()}
+            style={[styles.retry, { borderColor: colors.accent }]}
+          >
+            <Text style={{ color: colors.accent }}>Retry</Text>
+          </Pressable>
+        </View>
+      ) : view === "empty" ? (
         <View style={styles.empty}>
           <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>
             Nothing to review
@@ -321,6 +377,14 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: "600" },
   empty: { alignItems: "center", gap: 8, marginTop: 24, padding: 16 },
   emptyTitle: { fontSize: 18, fontWeight: "700" },
+  retry: {
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    minHeight: 44,
+    paddingHorizontal: 16,
+  },
   modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
   sheet: { borderRadius: 12, borderWidth: 1, gap: 8, padding: 16 },
   sheetTitle: { fontSize: 18, fontWeight: "700" },

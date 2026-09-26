@@ -1,7 +1,7 @@
 # Contact Import
 
-**Last updated:** 2026-08-26
-**Updated by phase:** 20-contact-reconciliation-merge
+**Last updated:** 2026-09-25
+**Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `modules/orbit-contact-picker/`, `src/db/import-session-dao.ts`, `src/db/imported-contact-dao.ts`, `src/services/import/`, `src/screens/ImportReviewScreen.tsx`
 
 ## Purpose
@@ -60,7 +60,7 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 | `src/screens/LegacyContactPickerScreen.tsx` | Browses lightweight contact summaries and reads full fields only for selected contacts. |
 | `src/screens/ImportReviewScreen.tsx` | Provides detailed single-contact review and explicit duplicate interrupt. |
 | `src/screens/BulkImportSetupScreen.tsx` | Shows shared Unbound/Uncategorized defaults, category override, and consolidation prompt. |
-| `src/screens/ImportProgressScreen.tsx` | Shows one determinate logical bulk import. |
+| `src/screens/ImportProgressScreen.tsx` | Shows one determinate logical bulk import, or a truthful "Import stopped" surface after a fatal setup/session failure. |
 | `src/screens/DuplicateReviewScreen.tsx` | Resolves advisory rows through explicit Link, Import as New, or Skip actions. |
 | `src/screens/ImportCompleteScreen.tsx` | Reports durable outcome buckets and offers review or Unbound navigation. |
 | `src/components/ResumeImportPrompt.tsx` | Offers explicit Resume or Discard after an interrupted import. |
@@ -87,8 +87,10 @@ Category choices use the canonical ordered catalog and switch to the complete se
 
 1. A multi-selection opens `BulkImportSetupScreen` with shared Unbound and Uncategorized defaults and an optional category override, not per-person controls.
 2. `runImportBatch()` processes each safe row independently; ambiguous rows persist candidate evidence for later review and cannot block safe rows. A nameless bulk row is terminally skipped before it can wedge a resumable session or stage a photo.
-3. `ImportCompleteScreen` reads durable Imported, Already in Orbit, Need review, Failed, nameless-skipped, and unreadable-birthday counts. Retry handles failed contact rows and committed contacts with outstanding photos through separate paths; Skip remaining photos explicitly retires photo work. A completed batch can open Unbound contacts.
-4. The launch sweep offers Resume for pending work and for completed sessions with outstanding photos. Discard removes only unresolved rows and staging; contacts and their outstanding photo work stay in Orbit.
+3. If setup or session access fails outside the driver's per-row isolation, `ImportProgressScreen` leaves "Importing… X of Y" for an "Import stopped" surface and never re-runs the batch. A still-readable session offers "View import summary" (replace to Import Complete); an unreadable session shows "Couldn't read this import" with Back. The stopped phase releases the `useOpenImportSession` hold (`useOpenImportSession(sessionId, active)`), so the next foreground sweep can offer the session again.
+4. `ImportCompleteScreen` reads durable Imported, Already in Orbit, Need review, Failed, nameless-skipped, and unreadable-birthday counts. `importCompleteRetryState()` shows Retry when rows are failed, still pending (the fatal-stop case), or committed contacts have outstanding photos. Retry runs only `pending`/`failed` rows (the driver also skips any row that already has a contact) plus photo-only retries; Skip remaining photos explicitly retires photo work. A completed batch can open Unbound contacts.
+5. The launch sweep offers Resume for pending work and for completed sessions with outstanding photos. Discard removes only unresolved rows and staging; contacts and their outstanding photo work stay in Orbit.
+6. `DuplicateReviewScreen` renders through `duplicateReviewView()`: a failed read shows "Couldn't load matches" with a Retry that only re-reads, never "Nothing to review". A resolve is complete when its write commits: only a rejected link/import/skip write raises the per-row Alert, while a failed finalize or follow-up re-read after a committed write becomes the read error (`runResolveThenRecover` / `runBulkResolveThenRecover`), so the write is never repeated.
 
 ### Reviewing unreadable imported birthdays
 
@@ -137,6 +139,8 @@ Category choices use the canonical ordered catalog and switch to the complete se
 8. **Fix and Ignore have different write scopes.** Fix must advance data revision with its birthday write; Ignore must only record the durable disposition.
 9. **Keep the Note in the session payload allowlist.** Adding it only to the native bridge loses it when bulk or review code reparses durable session JSON.
 10. **Already-linked imports do not append Notes.** This deliberate boundary prevents a re-import from duplicating unreviewed provider text on an existing contact.
+11. **Never auto-rerun a stopped import.** A fatal ImportProgress stop hands recovery to the user through Import Complete's explicit Retry; replaying a partially committed batch automatically risks duplicate contacts.
+12. **A post-write read failure is not a write failure.** In Duplicate Review, never tell the user to redo a committed link or import because finalize or the re-read failed; route it to the read error and its read-only Retry.
 
 ## Related Systems
 
@@ -160,3 +164,4 @@ Category choices use the canonical ordered catalog and switch to the complete se
 | 2026-09-03 | 24.2 | Added Note MIME acquisition and durable AI-off imported-Memory writes for new-contact imports. |
 | 2026-09-17 | 37.1 | Made category selection complete and stale-safe; category deletion reassigns pending, complete, and discarded sessions to the same target. |
 | 2026-09-24 | 38.2 | RG-007 forces new imported notes AI-off regardless of the general Memory default. RG-012 retains post-commit photo retry input, offers photo-only Retry and explicit Skip, and retires workflow copies on contact purge. |
+| 2026-09-25 | 38.3 | Truthful import stop + review read errors (RG-035): fatal ImportProgress stop with summary/Back and released session hold (D-20); Import Complete Retry includes pending rows (D-26); Duplicate Review read errors with read-only Retry, post-write recovery split from write failures (D-24, D-04). |
