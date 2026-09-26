@@ -4,19 +4,20 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.3
 current_phase_name: Runtime Correctness, Navigation & State Coherence (INSERTED)
-status: executing
-stopped_at: Completed 38.3-16-PLAN.md
-last_updated: "2026-09-26T06:12:00.000Z"
+status: phase-complete
+stopped_at: Phase 38.3 complete (16/16, verification passed 94/94); next Phase 38.4
+last_updated: "2026-09-26T15:00:00.000Z"
 last_activity: 2026-09-26
-last_activity_desc: 38.3-16 final gate + Pixel device UAT recorded; 6 device legs BLOCKED/OPEN pending owner human-checks
+last_activity_desc: Phase 38.3 closed after Pixel device UAT, post-review re-check and owner dispositions
 state_head: de965f4b1d6ac37f4ba0425a76739fc5f4a768b7
 progress:
   total_phases: 26
-  completed_phases: 16
+  completed_phases: 17
   total_plans: 218
   completed_plans: 216
 carried_forward:
 
+  - "38.3 owner dispositions (2026-09-26, not passes): UAT-023a widget leg DEFERRED to the widget-overhaul phase; UAT-042 A-then-B chronology, UAT-024b month/year rollover, UAT-026b in-range keep and UAT-022 warm-Mark-while-backgrounded ACCEPTED-RISK (unit tests only). O-3 (Import Complete Need-review count stale on return from DuplicateReview; reads on mount only) needs an owner/phase home."
   - "38.3 loose ends (owner 2026-09-26): 38.3 review A-WR-05 (Home favourite toggle bypasses the publication seam — not a widget item) and verifier W2/W3 (Digest/Profile background read on warm notification action; O-1 expo-sqlite 'shared object already released') need an owner/phase home."
   - "WIDGET OVERHAUL (owner 2026-09-25): owner wants a dedicated widget phase (dislikes current widget in several ways). RG-001 remaining checks (max-size resize, visible explicit refresh) are DEFERRED there — not passes."
   - "38.2 owner waivers (2026-09-25, not passes): RG-002 hostile-provider ingress subcases (no test-provider APK built); RG-014 completed Drive upload (Drive stalls for any app's share on the test Pixel — environmental), Files target, natural 24 h retirement."
@@ -40,9 +41,9 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 38.3 (Runtime Correctness, Navigation & State Coherence (INSERTED)) — EXECUTING
+Phase: 38.3 (Runtime Correctness, Navigation & State Coherence (INSERTED)) — COMPLETE (2026-09-26)
 Plan: 16 of 16 (all plans executed)
-Status: All 16 plans complete — ready for verification; device rows OPEN: UAT-020b (D-05 TalkBack), UAT-023a widget leg, UAT-023c clock rollback, UAT-024b month/year, UAT-026b in-range keep, UAT-042 cold/warm (owner human-checks in 38.3-UAT.md)
+Status: Phase complete — next: Phase 38.4 (UI Consistency, Accessibility, Performance & Release Polish)
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
