@@ -45,6 +45,88 @@ const STATUS_FGS = [
   "rogue",
 ] as const;
 
+/**
+ * NON-TEXT / LINK / DANGER foregrounds asserted over glass + chrome with the
+ * both-extrema + interval proof (RG-029 / D-24). Floors: status hues and rogue
+ * are glyph/large elements (AA_LARGE); `danger` renders as validation/warning
+ * TEXT, so it carries AA_NORMAL. The set comes from the committed inventory
+ * (.planning/phases/38.4-audit-remediation-ui-performance-release/
+ * 38.4-RG029-INVENTORY.md); anything not asserted is in PROOF_EXCLUSIONS below.
+ */
+const GLASS_NONTEXT_FGS: readonly {
+  token: keyof ThemePalette;
+  floor: number;
+}[] = [
+  ...STATUS_FGS.map((token) => ({ token, floor: AA_LARGE })),
+  { token: "danger", floor: AA_NORMAL },
+];
+
+/**
+ * Every narrowing of the asserted foreground set, written down (D-24: nothing
+ * narrowed silently). Each entry names the inventory row that justifies it.
+ */
+interface ProofExclusion {
+  token: keyof ThemePalette;
+  /** Omitted = every package. */
+  package?: ThemePackage;
+  /** Omitted = every mode. */
+  mode?: ResolvedMode;
+  justification: string;
+  inventoryRef: string;
+}
+
+const PROOF_EXCLUSIONS: readonly ProofExclusion[] = [
+  {
+    token: "danger",
+    package: "galaxy",
+    mode: "dark",
+    justification:
+      "ADR-084 owner-accepted Galaxy Dark danger (#E5484D) limitation: danger-as-text reaches 3.58-4.16:1 over the brightest Galaxy composites. D-24 keeps it as it is; it is never retuned here.",
+    inventoryRef: "E-1",
+  },
+  {
+    token: "accentText",
+    justification:
+      "HELD for the owner (D-24 STOP): accentText renders on Standard-Light glass, but the aurora-teal and emerald accents cannot pass the corrected proof by lightness alone without dropping below HSL L 12% (near-black). No accentText variant is committed until the owner rules; accentText was never asserted by this proof before RG-029.",
+    inventoryRef: "E-2",
+  },
+];
+
+function isExcluded(
+  token: keyof ThemePalette,
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+): boolean {
+  return PROOF_EXCLUSIONS.some(
+    (e) =>
+      e.token === token &&
+      (e.package === undefined || e.package === pkg) &&
+      (e.mode === undefined || e.mode === mode),
+  );
+}
+
+function assertNonTextClearsExtrema(
+  palette: ThemePalette,
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+  tint: string,
+  opacity: number,
+  slot: BackgroundAssetSlot,
+  label: string,
+) {
+  for (const { token, floor } of GLASS_NONTEXT_FGS) {
+    if (isExcluded(token, pkg, mode)) continue;
+    assertClearsExtrema(
+      palette[token] as string,
+      tint,
+      opacity,
+      slot,
+      floor,
+      `${label}: ${token}`,
+    );
+  }
+}
+
 function assertForegroundsAA(
   surfaceHex: string,
   palette: ThemePalette,
@@ -349,17 +431,15 @@ describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1
         }
       });
 
-      it(`${id} @ ${pkg}/${mode} (${regime}): status foregrounds over the card on the brightest pixel meet AA`, () => {
-        const palette = resolvePalette(pkg, mode);
-        const tint = palette[SURFACE[pkg].tintTokenKey];
-        const composite = alphaComposite(
-          tint,
-          slot.brightestPixel,
-          cardTintOpacity(pkg, mode, "presentation"),
-        );
-        assertForegroundsAA(
-          composite,
+      it(`${id} @ ${pkg}/${mode} (${regime}): status/rogue/danger over the card clear both extrema (RG-029 / D-24)`, () => {
+        const palette = effectiveGlassPalette(pkg, mode);
+        assertNonTextClearsExtrema(
           palette,
+          pkg,
+          mode,
+          palette[SURFACE[pkg].tintTokenKey],
+          cardTintOpacity(pkg, mode, "presentation"),
+          slot,
           `${id} @ ${pkg}/${mode} ${regime} card`,
         );
       });
@@ -477,15 +557,17 @@ describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)",
         }
       });
 
-      it(`${id} @ ${pkg}/${mode}: foregrounds over the chrome scrim on the brightest pixel meet AA`, () => {
-        const palette = resolvePalette(pkg, mode);
-        const tint = palette[SURFACE[pkg].tintTokenKey];
-        const chrome = alphaComposite(
-          tint,
-          slot.brightestPixel,
+      it(`${id} @ ${pkg}/${mode}: status/rogue/danger over the chrome scrim clear both extrema (RG-029 / D-24)`, () => {
+        const palette = effectiveGlassPalette(pkg, mode);
+        assertNonTextClearsExtrema(
+          palette,
+          pkg,
+          mode,
+          palette[SURFACE[pkg].tintTokenKey],
           chromeScrimOpacity(pkg, mode),
+          slot,
+          `${id} @ ${pkg}/${mode} chrome`,
         );
-        assertForegroundsAA(chrome, palette, `${id} @ ${pkg}/${mode} chrome`);
       });
     }
   }
@@ -611,5 +693,35 @@ describe("background-extrema regime table sync guard (RG-029 / D-12)", () => {
         `stale regime ${got.package}/${got.mode}/${got.treatment} ${got.tint}@${got.opacity}`,
       ).toBe(true);
     }
+  });
+});
+
+describe("proof exclusions are written down against the committed inventory (D-24)", () => {
+  const INVENTORY =
+    ".planning/phases/38.4-audit-remediation-ui-performance-release/38.4-RG029-INVENTORY.md";
+
+  it("every exclusion carries a justification and an inventory row that exists", () => {
+    const inventory = readFileSync(INVENTORY, "utf8");
+    expect(PROOF_EXCLUSIONS.length).toBeGreaterThan(0);
+    for (const e of PROOF_EXCLUSIONS) {
+      expect(e.justification.trim().length, e.token).toBeGreaterThan(40);
+      expect(
+        inventory.includes(`**${e.inventoryRef}**`),
+        `${e.token}: inventory row ${e.inventoryRef} missing`,
+      ).toBe(true);
+    }
+  });
+
+  it("the only non-Standard-Light exclusion is the ADR-084 Galaxy Dark danger limitation", () => {
+    const scoped = PROOF_EXCLUSIONS.filter(
+      (e) => e.package !== undefined || e.mode !== undefined,
+    );
+    expect(scoped).toEqual([
+      expect.objectContaining({
+        token: "danger",
+        package: "galaxy",
+        mode: "dark",
+      }),
+    ]);
   });
 });
