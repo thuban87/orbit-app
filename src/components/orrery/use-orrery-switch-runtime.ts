@@ -181,6 +181,33 @@ function mergeResources(
   ];
 }
 
+/**
+ * React resource list after a publication (RG-027, performance/AUD-PERF-001,
+ * D-19). Only a running switch keeps departed bodies (their geometry is still
+ * choreographed out); the generation-checked prune removes them on completion.
+ * A settled publication replaces the list with the current scene. Keys are
+ * stable, so bodies present on both sides keep their keyed media.
+ */
+export function nextOrreryResources(
+  current: readonly OrreryBodyResource[],
+  scene: OrrerySceneSnapshot,
+  isSwitch: boolean,
+): OrreryBodyResource[] {
+  return isSwitch && current.length > 0
+    ? mergeResources(current, scene)
+    : resourcesFor(scene);
+}
+
+/** Keeps only resources whose key is in the settled scene's world. */
+export function pruneOrreryResources(
+  current: readonly OrreryBodyResource[],
+  scene: OrrerySceneSnapshot,
+): OrreryBodyResource[] {
+  return current.filter((resource) =>
+    scene.world.some((body) => bodyKey(body) === resource.key),
+  );
+}
+
 export interface OrrerySwitchRuntime {
   transition: SharedValue<SwitchChoreography>;
   progress: SharedValue<number>;
@@ -217,9 +244,7 @@ export function useOrrerySwitchRuntime(
     setResources((current) => {
       const scene = latestScene.current;
       if (!scene || scene.generation !== generation) return current;
-      return current.filter((resource) =>
-        scene.world.some((body) => bodyKey(body) === resource.key),
-      );
+      return pruneOrreryResources(current, scene);
     });
   }, []);
 
@@ -263,9 +288,7 @@ export function useOrrerySwitchRuntime(
       destinationHome: CameraPose,
     ) => {
       latestScene.current = scene;
-      setResources((current) =>
-        current.length ? mergeResources(current, scene) : resourcesFor(scene),
-      );
+      setResources((current) => nextOrreryResources(current, scene, isSwitch));
       runOnUI(() => {
         "worklet";
         cancelAnimation(progress);
