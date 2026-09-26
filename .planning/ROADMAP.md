@@ -1149,7 +1149,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.3-audit-remediation-runtime-state-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md
 **UI hint**: yes
-**Plans**: 6/16 plans executed in 6 waves
+**Plans**: 7/16 plans executed in 6 waves
 
 Plans:
 **Wave 1**
@@ -1163,7 +1163,7 @@ Plans:
 
 - [x] 38.3-05-PLAN.md — Assist post-commit publisher + RN-013 failure handling + Post-Log Note publication (RG-023; D-08, D-21)
 - [x] 38.3-06-PLAN.md — Group Event draft preservation + committed-add refresh recovery (RG-019 REL-007/008; D-17/18/19)
-- [ ] 38.3-07-PLAN.md — Truthful read states: BackupSettings, ReconcileComplete, Memory (RG-035; D-24)
+- [x] 38.3-07-PLAN.md — Truthful read states: BackupSettings, ReconcileComplete, Memory (RG-035; D-24)
 - [ ] 38.3-08-PLAN.md — Profile snapshot/History coherence + day rollover (RG-024; D-12)
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -1249,7 +1249,7 @@ Plans:
 | 37. Settings & Personalization | 8/8 | Complete | 2026-09-14 |
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
-| 38.3 Runtime Correctness, Navigation & State Coherence | 6/16 | In Progress|  |
+| 38.3 Runtime Correctness, Navigation & State Coherence | 7/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 0/TBD | Ready to discuss | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
