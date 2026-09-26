@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-09-19
-**Updated by phase:** 38.1-profile-presentation-polish
+**Last updated:** 2026-09-26
+**Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/stores/dashboard-selection-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
@@ -41,6 +41,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | List selection | `src/logic/list-row-selection.ts` | Prioritizes imminent and pinned knowledge, then returns a stable completeness prompt when no candidate qualifies. |
 | Control surface | `src/components/control-surface/` | Separates option content from the floating panel presentation and durable query writes. |
 | Dashboard screen | `src/screens/HomeScreen.tsx` | Hosts controls, session search, refresh, List loading, Favourite reconciliation, destinations, and the List/Card renderer seam. |
+| Refresh scheduler | `src/screens/dashboard-refresh-scheduler.ts` | Issues every Home read with a latest-request token, defers hidden shell/foreground requests, and is the single publication seam (`publishDashboardRead`). |
 
 ### Key Files
 
@@ -76,6 +77,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 | `src/components/control-surface/DashboardOverlayHost.tsx` | Hosts the root-level in-tree Dashboard panel request. |
 | `src/components/control-surface/dashboard-panel-store.ts` | Single owner of panel open state: the request store, `selectPanelOpen`, and capture-before-clear `dismissDashboardPanel`. |
 | `src/screens/dashboard-overflow-actions.ts` | Defines the fixed Dashboard management and reset entries. |
+| `src/screens/dashboard-refresh-scheduler.ts` | `createDashboardRefreshScheduler` (request/isCurrent/invalidate) and `publishDashboardRead`, the one gated seam for every read publication. |
 
 ## How It Works
 
@@ -109,6 +111,16 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 3. A term relaxes only the implicit Active search scope to non-archived Bound contacts. Explicit populations and filters retain their selected boundaries, and all term matching remains LIKE-escaped and bound.
 4. The semantic reader still receives only fully filtered eligible IDs. It returns user-facing names, fields, semantic memories, relationships, searchable custom values, and notes; bounded TypeScript matching provides descriptors and highlights without FTS5.
 
+### Refreshing the Dashboard
+
+1. One scheduler (`createDashboardRefreshScheduler`) owns every Home read. `reload(source)` only requests; the read body sits behind a per-render ref so it always reads the current query and search. Triggers: `focus` (every Home focus, and a query or debounced-search change while focused), `shell` (the in-process shell tick after committed writes), `foreground` (the post-sweep foreground tick), `pull` (pull-to-refresh), and `snooze` (a card snooze or unsnooze).
+2. A `shell` or `foreground` request while Home is hidden is not run in the background. It returns no token, and the next Home focus read covers it. `focus`, `pull`, and `snooze` always issue.
+3. Resume freshness comes only from the foreground tick, which the launch/foreground sweep publishes after its purge and expiry writes settle (D-14). Home has no `AppState` read listener; that also keeps headless widget and notification writes visible after resume.
+4. Every request takes a latest-request token. `publishDashboardRead` is the only place a read reaches state: rows, line three, search matches, `listNow`, header and population counts, error, the result-fade start, the result-animation generation, and the refreshing and initial-load settle. It publishes all of them only while the token is current, so an older read can never overwrite a newer one from any source. A superseded read also skips its line-three enrichment read, and unmount retires every outstanding token.
+5. Animation-only and lifecycle state (`appActive`, `isFocused`, `reducedMotion`) is read through refs when a read publishes. None of it is a reload dependency, so changing reduced motion or crossing a background/foreground edge issues no read.
+6. A bulk commit or bulk Undo issues exactly one read, through the shell tick it already publishes. There is no second direct reload.
+7. Each issued read logs one content-free `Logger.debug` marker, `dashboard read bundle`, naming only its trigger, so a device run can count read bundles.
+
 ### Rendering and acting from a List row
 
 1. `HomeScreen` loads the shared Dashboard rows, batches line-three candidates for their IDs, and passes the selected deterministic context into `ListRow`; the row does not issue its own database reads.
@@ -129,7 +141,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 1. Select Contacts enters an in-memory session with an entry-time frozen eligible-ID universe. While active, the renderer filters refreshed rows to that universe, the normal query controls are replaced, and Select All uses only the snapshot.
 2. Card taps toggle selection, stars remain visible but non-interactive, and Back exits selection before route navigation. Ordinary committed operations retain the session; Archive removes only its committed IDs from both selection and frozen universe.
 3. The replacement control area exposes Quick Log, count-aware detailed logging, explicit favourite and snooze actions, category, Archive, and Frequency as the sole Sensitive Operation. Two or more detailed-log targets navigate with serializable `GroupLog.participantIds`; Group Event behavior remains outside Dashboard.
-4. Every writer is claimed synchronously before asynchronous work. Committed batches refresh Dashboard state and notify widget and shell consumers once; failures report without claiming a completed outcome.
+4. Every writer is claimed synchronously before asynchronous work. Committed batches notify widget and shell consumers once, and that single shell tick is also Home's one re-read; failures report without claiming a completed outcome.
 5. Category assignment uses the complete shared chooser, pins Uncategorized after real rows, and re-reads the catalog before calling `bulkSetCategory`; a stale real target fails without partially writing the batch.
 
 ### Retired legacy Dashboard surfaces
@@ -215,6 +227,7 @@ The Group Events header and redundant overflow entries navigate to the local rev
 16. **Do not use public single-contact writers inside a batch.** They own their own transaction; Dashboard bulk actions call the composed DAO instead.
 17. **Search context is not ordinary card context.** A Grid search explanation may use the third line even though the normal Grid card does not.
 18. **Panel open state has one owner — `dashboard-panel-store.ts`.** Home derives its background inertness with `selectPanelOpen`; never mirror it in component state, and when dismissing capture the request before `close()` (RG-020, react-native/AUD-RN-001). Scrim tap and Android Back reach the owner through `dismissDashboardPanel`; the trigger re-tap closes the store directly. The `accessible={!panelOpen}` grouping on Home's two wrappers is under the D-05 TalkBack investigation (ui-accessibility/AUD-UIA-022) and must not be changed without that on-device evidence; `no-hide-descendants` and `pointerEvents="none"` while a panel is open stay as ADR-095 isolation.
+19. **Home refresh has one owner — the refresh scheduler.** Never call a Home state setter from a read outside `publishDashboardRead`, never put `appActive`, `isFocused`, `reducedMotion` or `resultProgress` back into `reload`'s dependency list (a structural test pins this), never add a private `AppState` read listener (resume is the post-sweep foreground tick, D-14), and never follow a bulk `bumpShellRefresh()` with a direct `reload` (RG-022, D-23).
 
 ## Related Systems
 
@@ -248,3 +261,4 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | 2026-09-02 | 38 | Relabelled the user-facing root as Contacts, removed promoted shortcuts, and aligned the exact opted-in Unbound Never Contacted population with Digest preview and drill-through. |
 | 2026-09-19 | 38.1 | Removed routine normal-Grid excerpts; List excerpts and Grid search explanations remain independent paths. |
 | 2026-09-26 | 38.3 | Panel dismissal single-owner fix (RG-020): the panel store owns open state, dismissal captures the request before clearing, and Home derives its inertness from the store. |
+| 2026-09-26 | 38.3 | Refresh scheduler + latest-result ownership (RG-022): one scheduler issues every Home read, defers hidden shell/foreground requests, resumes on the post-sweep foreground tick, gates every publication on the latest token, and reads once per bulk commit or Undo. |

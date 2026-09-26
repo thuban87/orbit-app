@@ -6,13 +6,16 @@
  * collapsible session-backed search + List/Card toggle, a reliable freshness
  * path, and cause-aware empty/error states.
  *
- * FRESHNESS (DASH-07 / threat T-08-18): the list re-queries on `useFocusEffect`,
- * on an `AppState`→"active" listener, and via pull-to-refresh. It deliberately
+ * FRESHNESS (DASH-07 / threat T-08-18; RG-022, D-14, D-23): one scheduler
+ * (`createDashboardRefreshScheduler`) issues every read — on `useFocusEffect`
+ * (also re-issued by a query/search change), the shell tick, the post-sweep
+ * foreground tick, pull-to-refresh and card snooze. Shell/foreground requests
+ * while Home is hidden are deferred to the next focus read. It deliberately
  * does NOT subscribe to the connection-scoped SQLite change notification — that
  * mechanism is bound to this screen's own DB connection and is structurally blind
  * to the headless widget / notification "mark contacted" writes that happen on a
  * different connection, so it would silently miss cross-context updates. Focus +
- * foreground + pull is the only path that reflects those writes.
+ * foreground tick + pull is the only path that reflects those writes.
  *
  * READS (threat T-08-16/17): every read is async on-device SQLite (the D-12
  * `listDashboardPopulation` / `listDashboardSearch` read + the counts via
@@ -159,6 +162,7 @@ import { useDashboardSelectionStore } from "@/stores/dashboard-selection-store";
 import { useDashboardSessionStore } from "@/stores/dashboard-session-store";
 import {
   bumpShellRefresh,
+  useForegroundRefresh,
   useShellRefresh,
 } from "@/stores/shell-refresh-store";
 import { showSnackbar, snackbarStore } from "@/stores/snackbar-store";
@@ -895,13 +899,23 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     [debouncedSearchText, query, scheduler],
   );
 
-  // Shell Quick Log/Undo originates outside this screen's focus lifecycle. This
-  // in-process tick is intentionally distinct from the connection-scoped SQLite
-  // subscription that this dashboard deliberately does not use (DASH-07).
+  // Shell tick: committed in-process writes (Quick Log/Undo, bulk commits and
+  // bulk Undo, assist, …) — one read each. This in-process tick is intentionally
+  // distinct from the connection-scoped SQLite subscription that this dashboard
+  // deliberately does not use (DASH-07). Deferred while Home is hidden (D-23).
   const onShellRefresh = useCallback(() => {
     reload("shell");
   }, [reload]);
   useShellRefresh(onShellRefresh);
+
+  // Resume freshness (D-14): the post-sweep foreground tick, published after the
+  // launch/foreground sweep's purge/expiry writes settle, so the read sees them
+  // and reflects headless widget/notification writes made while backgrounded.
+  // Deferred while Home is hidden; the next focus read covers it (D-23).
+  const onForegroundRefresh = useCallback(() => {
+    reload("foreground");
+  }, [reload]);
+  useForegroundRefresh(onForegroundRefresh);
 
   // Freshness path 1 — re-query every time the dashboard regains focus, and
   // whenever the query/search changes while focused (`reload` identity).
@@ -911,18 +925,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     }, [reload]),
   );
 
-  // Freshness path 2 — re-query when the app returns to the foreground, so a
-  // headless "mark contacted" write made while backgrounded is reflected.
-  useEffect(() => {
-    const sub = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        reload("foreground");
-      }
-    });
-    return () => sub.remove();
-  }, [reload]);
-
-  // Freshness path 3 — pull-to-refresh. Supersession is the scheduler's job:
+  // Freshness path 2 — pull-to-refresh. Supersession is the scheduler's job:
   // a newer read from any source retires this one, and its settle still lands.
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -978,26 +981,23 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     if (claim) releaseBulkAction(claim);
   }, [releaseBulkAction]);
 
-  const commitBulkOutcome = useCallback(
-    (label: string) => {
-      // A bulk transaction is one durable commit: refresh shell consumers once,
-      // then re-read the fenced Dashboard model. Do not reseed frozenUniverse.
-      notifyWidgetDataChanged();
-      bumpShellRefresh();
-      AccessibilityInfo.announceForAccessibility(label);
-      showSnackbar({
-        kind: "success",
-        label,
-        action: {
-          label: "Dismiss",
-          accessibilityLabel: "Dismiss notification",
-          onPress: dismissSnackbar,
-        },
-      });
-      reload("shell");
-    },
-    [reload],
-  );
+  const commitBulkOutcome = useCallback((label: string) => {
+    // A bulk transaction is one durable commit: the single shell bump reaches
+    // Home's own subscriber (one fenced re-read) and every other shell
+    // consumer exactly once (D-23). Do not reseed frozenUniverse.
+    notifyWidgetDataChanged();
+    bumpShellRefresh();
+    AccessibilityInfo.announceForAccessibility(label);
+    showSnackbar({
+      kind: "success",
+      label,
+      action: {
+        label: "Dismiss",
+        accessibilityLabel: "Dismiss notification",
+        onPress: dismissSnackbar,
+      },
+    });
+  }, []);
 
   const performBulkQuickLog = useCallback(
     (ids: number[], claimed?: BulkActionClaim) => {
@@ -1028,7 +1028,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
               },
             },
           });
-          reload("shell");
         })
         .catch((writeError: unknown) => {
           releaseBulkAction(claim);
@@ -1041,7 +1040,6 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     [
       commitBulkOutcome,
       consumeBulkAction,
-      reload,
       releaseBulkAction,
       reportBulkFailure,
       tryAcquireBulkAction,
