@@ -6,8 +6,10 @@ import { buildYourWeekWindow } from "@/services/history/week-window";
 import type { HistoryWindow } from "@/services/history/window";
 import {
   beginYourWeekPeriodWrite,
+  clearDayDetail,
   createYourWeekPeriodReader,
   directDateCounts,
+  failDayRead,
   initialYourWeekState,
   isYourWeekDayInWindow,
   persistYourWeekPeriodAccepted,
@@ -17,6 +19,8 @@ import {
   retainYourWeekDay,
   selectYourWeekDay,
   selectYourWeekPeriod,
+  settleDayRead,
+  startDayRead,
   type YourWeekControllerState,
 } from "./your-week-section-logic";
 
@@ -344,5 +348,79 @@ describe("Your Week period reads share one request authority", () => {
     pending.resolve("late");
     await pendingDone;
     expect(h.accept).not.toHaveBeenCalled();
+  });
+});
+
+describe("Your Week day detail (38.3 D-16, request-scoped)", () => {
+  const rows = [
+    {
+      kind: "interaction" as const,
+      id: 8,
+      occurredAt: "2026-09-24 12:00:00",
+      title: null,
+      contactId: 2,
+      contactName: "Lin",
+    },
+  ];
+
+  it("starts a read as loading for the date and token", () => {
+    expect(startDayRead(clearDayDetail(), "2026-09-24", 1)).toEqual({
+      status: "loading",
+      date: "2026-09-24",
+      token: 1,
+    });
+  });
+
+  it("settles only the current token; an empty successful read is loaded, not loading", () => {
+    const loading = startDayRead(clearDayDetail(), "2026-09-24", 1);
+    expect(settleDayRead(loading, 1, [])).toEqual({
+      status: "loaded",
+      date: "2026-09-24",
+      rows: [],
+    });
+    const newer = startDayRead(loading, "2026-09-24", 2);
+    expect(settleDayRead(newer, 1, rows)).toBe(newer);
+  });
+
+  it("fails only the current token", () => {
+    const loading = startDayRead(clearDayDetail(), "2026-09-24", 1);
+    expect(failDayRead(loading, 1)).toEqual({
+      status: "error",
+      date: "2026-09-24",
+    });
+    const newer = startDayRead(loading, "2026-09-23", 2);
+    expect(failDayRead(newer, 1)).toBe(newer);
+  });
+
+  it("switching dates while pending: the earlier read is ignored, the newer can fail and recover by Retry", () => {
+    let state = startDayRead(clearDayDetail(), "2026-09-22", 1);
+    state = startDayRead(state, "2026-09-23", 2);
+    state = settleDayRead(state, 1, rows);
+    expect(state).toEqual({ status: "loading", date: "2026-09-23", token: 2 });
+    state = failDayRead(state, 2);
+    expect(state).toEqual({ status: "error", date: "2026-09-23" });
+    state = startDayRead(state, "2026-09-23", 3);
+    expect(state).toEqual({ status: "loading", date: "2026-09-23", token: 3 });
+    state = settleDayRead(state, 3, rows);
+    expect(state).toEqual({ status: "loaded", date: "2026-09-23", rows });
+  });
+
+  it("re-selecting the SAME date issues a new request; the older same-date read is ignored", () => {
+    let state = startDayRead(clearDayDetail(), "2026-09-24", 1);
+    state = startDayRead(state, "2026-09-24", 2);
+    expect(settleDayRead(state, 1, [])).toBe(state);
+    expect(failDayRead(state, 1)).toBe(state);
+    expect(settleDayRead(state, 2, rows)).toEqual({
+      status: "loaded",
+      date: "2026-09-24",
+      rows,
+    });
+  });
+
+  it("a late settle or failure after clearing publishes nothing", () => {
+    const cleared = clearDayDetail();
+    expect(cleared).toEqual({ status: "idle" });
+    expect(settleDayRead(cleared, 1, rows)).toBe(cleared);
+    expect(failDayRead(cleared, 1)).toBe(cleared);
   });
 });
