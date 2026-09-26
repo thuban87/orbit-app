@@ -1149,7 +1149,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.3-audit-remediation-runtime-state-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md
 **UI hint**: yes
-**Plans**: 11/16 plans executed in 6 waves
+**Plans**: 12/16 plans executed in 6 waves
 
 Plans:
 **Wave 1**
@@ -1174,7 +1174,7 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 38.3-11-PLAN.md — Import fatal state + DuplicateReview read errors (RG-035; D-20, D-26)
-- [ ] 38.3-12-PLAN.md — Dashboard refresh scheduler + latest-result ownership (RG-022; D-14, D-23)
+- [x] 38.3-12-PLAN.md — Dashboard refresh scheduler + latest-result ownership (RG-022; D-14, D-23)
 - [ ] 38.3-13-PLAN.md — Profile History destinations + selector retry settlement (RG-021 ARCH-008, RG-025; D-10, D-11)
 - [ ] 38.3-14-PLAN.md — Live Digest: shell/foreground refresh, Your Week re-window, list transition (RG-026; D-13, D-14, D-15)
 
@@ -1249,7 +1249,7 @@ Plans:
 | 37. Settings & Personalization | 8/8 | Complete | 2026-09-14 |
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
-| 38.3 Runtime Correctness, Navigation & State Coherence | 11/16 | In Progress|  |
+| 38.3 Runtime Correctness, Navigation & State Coherence | 12/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 0/TBD | Ready to discuss | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
