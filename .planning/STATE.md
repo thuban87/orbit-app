@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 38.3
-current_phase_name: Runtime Correctness, Navigation & State Coherence (INSERTED)
-status: phase-complete
-stopped_at: Phase 38.4 context gathered (discuss complete 2026-09-26); next plan-phase 38.4 once owner supplies launcher artwork (D-08)
-last_updated: "2026-09-26T15:00:00.000Z"
+current_phase: 38.4
+current_phase_name: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
+status: ready-to-execute
+stopped_at: Phase 38.4 planned (17 plans, 5 waves; plan-checker passed after 3 iterations); next execute-phase 38.4
+last_updated: "2026-09-26T12:04:02.678Z"
 last_activity: 2026-09-26
-last_activity_desc: Phase 38.3 closed after Pixel device UAT, post-review re-check and owner dispositions
-state_head: de965f4b1d6ac37f4ba0425a76739fc5f4a768b7
+last_activity_desc: Phase 38.4 planned — owner supplied launcher art + #1A2F8A bg (D-21), root-chrome rulings D-22/D-23, RG-029 inventory-then-darken (D-24), W3 native remedy held (D-25)
+state_head: c65865ac6fb2fa7bd87b4bc142930df956df45ba
 progress:
   total_phases: 26
   completed_phases: 17
-  total_plans: 218
+  total_plans: 235
   completed_plans: 216
 carried_forward:
 
@@ -41,9 +41,9 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 38.3 (Runtime Correctness, Navigation & State Coherence (INSERTED)) — COMPLETE (2026-09-26)
-Plan: 16 of 16 (all plans executed)
-Status: Phase complete — next: Phase 38.4 (UI Consistency, Accessibility, Performance & Release Polish)
+Phase: 38.4 (UI Consistency, Accessibility, Performance & Release Polish (INSERTED)) — READY TO EXECUTE
+Plan: 0 of 17
+Status: Ready to execute — owner stops built in: Plan 03 D-24 hue STOP, Plan 15 D-25 checkpoint (only if W3 persists), Plan 17 owner device-review rows
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
