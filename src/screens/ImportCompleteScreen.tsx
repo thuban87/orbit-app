@@ -11,6 +11,7 @@ import {
 } from "@/db/import-session-read";
 import { navigationRef } from "@/navigation/linking";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
+import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { runImportBatch } from "@/services/import/import-driver";
 import {
@@ -319,9 +320,11 @@ export function ImportCompleteScreen({
           accessibilityRole="button"
           accessibilityLabel="View Unbound contacts"
           onPress={() =>
-            navigationRef.current?.navigate("DashboardTab", {
-              screen: "UnboundContacts",
-            })
+            navigateIntoTab(
+              navigationRef.current,
+              "DashboardTab",
+              "UnboundContacts",
+            )
           }
           style={[
             styles.secondaryButton,
@@ -338,10 +341,14 @@ export function ImportCompleteScreen({
             accessibilityRole="button"
             accessibilityLabel="View contact"
             onPress={() =>
-              navigationRef.current?.navigate("DashboardTab", {
-                screen: "Profile",
-                params: { contactId: alreadyLinkedContactId },
-              })
+              navigateIntoTab(
+                navigationRef.current,
+                "DashboardTab",
+                "Profile",
+                {
+                  contactId: alreadyLinkedContactId,
+                },
+              )
             }
             style={[
               styles.secondaryButton,

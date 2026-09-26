@@ -94,6 +94,7 @@ import {
   systemRefId,
 } from "@/logic/orrery-system-logic";
 import { navigationRef } from "@/navigation/linking";
+import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { RootStackParamList } from "@/navigation/types";
 import { useWindowMeasurement } from "@/navigation/use-window-measurement";
 import {
@@ -1295,9 +1296,11 @@ export function OrreryScreen() {
                 role="secondary"
                 label="Add Contact"
                 onPress={() =>
-                  navigationRef.current?.navigate("DashboardTab", {
-                    screen: "Create",
-                  })
+                  navigateIntoTab(
+                    navigationRef.current,
+                    "DashboardTab",
+                    "Create",
+                  )
                 }
               />
             ) : null}

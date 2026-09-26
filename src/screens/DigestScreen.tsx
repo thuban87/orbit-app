@@ -32,6 +32,7 @@ import {
   neverContactedConditional,
   pickUpNext,
 } from "@/logic/digest-composition";
+import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { DigestStackParamList, TabParamList } from "@/navigation/types";
 import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
 import { showSnackbar } from "@/stores/snackbar-store";
@@ -140,7 +141,7 @@ export function DigestScreen({ navigation }: DigestScreenProps) {
         setPopulationsAndFilters:
           useDashboardQueryStore.getState().setPopulationsAndFilters,
         navigateToContacts: () =>
-          parent?.navigate("DashboardTab", { screen: "Home" }),
+          navigateIntoTab(parent, "DashboardTab", "Home"),
       }).catch((cause) => {
         Logger.error(LOG_SCOPE, "failed to open Contacts population", cause);
         showSnackbar({

@@ -137,6 +137,7 @@ import {
 } from "@/logic/favourite-optimistic";
 import { selectLine3 } from "@/logic/list-row-selection";
 import { navigationRef } from "@/navigation/linking";
+import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { DashboardScreenProps, TabParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { buildDashboardOverflowActions } from "@/screens/dashboard-overflow-actions";
@@ -196,10 +197,9 @@ function navigateDashboardContactAction(
   contactId: number,
   target: DashboardContactActionTarget,
 ): void {
-  navigationRef.current?.navigate("DashboardTab", {
-    screen: target,
-    params: { contactId },
-  } as never);
+  navigateIntoTab(navigationRef.current, "DashboardTab", target, {
+    contactId,
+  });
 }
 
 function SwipeActionSurface({
@@ -1478,7 +1478,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           }
           return;
         }
-        parent.navigate("EventsTab", { screen: "GroupEvents" });
+        navigateIntoTab(parent, "EventsTab", "GroupEvents");
       },
     },
     onReset,

@@ -53,6 +53,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `src/screens/RecentlyDeletedScreen.tsx` | Typed Memory recovery and confirmed permanent-delete destination. |
 | `src/screens/MemoryHistoryScreen.tsx` | Typed retained-current-state history destination. |
 | `src/navigation/reset-intents.ts` | Builds typed semantic tab-root reset states. |
+| `src/navigation/tab-entry.ts` | `navigateIntoTab` — the single cross-tab nested entry; always sends `initial: false` so a not-yet-mounted tab keeps its semantic root. |
 | `src/components/UniversalFab.tsx` | Mounts the six-action shell capture dial once above browse/read surfaces. |
 | `src/services/quick-log-command.ts` | Shares commit-truthful Quick Log behavior between the universal FAB and Dashboard List gestures. |
 | `src/components/ShellAppBar.tsx` | Supplies accessible themed root and child app bars, including measured icon-only fallback for constrained root destinations. |
@@ -98,6 +99,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 2. A retap on the active tab dismisses the top shell transient first; a subsequent retap pops that tab to its root. Focused workflows and an open software keyboard hide the tab bar and universal FAB.
 3. `ShellAppBar` and Android Back resolve a shell transient before ordinary stack navigation. Contacts control panels register a dismiss callback as that transient; completed edits replace or focus their destination so Back never replays a finished workflow.
 4. `reset-intents.ts` expresses notification, widget, Compose, import, reconcile, merge, and other external fallbacks as nested semantic tab states. An in-app Profile Back instead remains origin-aware through its owning stack.
+5. Every other cross-tab entry (FAB actions, share ingress, Compose AI repair, import/reconcile resume prompts, Orrery Add Contact, Import Complete links, Contacts detail actions and Events overflow, Digest drill-through) calls `navigateIntoTab`. Because tabs are lazy, a first visit that carried only a nested `screen` would build that tab's stack from the target alone; `initial: false` makes the stack start at its declared root with the target on top, so Back and active-tab reselect still reach the root. An already-mounted tab receives an ordinary navigate and keeps its history.
 
 ### Managing Orrery Systems
 
@@ -411,6 +413,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 
 - **Resume freshness comes from the foreground tick, not AppState.** A consumer that re-reads on its own `AppState` listener can race the launch sweep and show pre-purge data. Subscribe with `useForegroundRefresh`, which only fires after the owning sweep run settles. Never detect a day change with a timer.
 - **Types do not register native routes.** A shared type intersection cannot prove that a route is mounted in each hosting stack; Group Event routes require all three runtime registrations.
+- **Cross-tab nested entry always uses `navigateIntoTab` (`initial: false`) — never a bare nested `screen` payload and never a broad `reset` (RG-021, react-native/AUD-RN-002; ADR-146).** A bare payload into a tab the user has not visited yet initializes that stack as `[target]`; Create's post-save `replace("Profile")` then leaves `[Profile]` with no Home beneath, and reselect cannot recover it. A repository guard in `src/navigation/tab-entry.test.ts` fails on any direct `navigate`/`push`/`replace` into a tab name (or `intent.tab`) outside the helper. Deliberate external resets stay in `reset-intents.ts`.
 
 ## Related Systems
 
@@ -476,3 +479,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-19 | 38.1 | Registered Profile-origin knowledge editors across their host stacks and documented the Orrery-specific overlay surface exception. |
 | 2026-09-25 | 38.3 | Foreground refresh tick + warm notification publication: added a sweep-ordered foreground tick beside the shell tick, a shell tick for warm notification Mark/Snooze, and the shared latest-request authority consumer rule. |
 | 2026-09-25 | 38.3 | Shell-tick publisher list updated: Interaction Assist confirmations and Post-Log note/Memory writes now publish it (RG-023, D-21). |
+| 2026-09-25 | 38.3 | Cross-tab nested entry routed through `navigateIntoTab` (`initial: false`) at every caller so a first visit keeps the tab's semantic root; added a repository guard against direct tab navigation (RG-021, react-native/AUD-RN-002). |
