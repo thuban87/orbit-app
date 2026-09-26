@@ -26,7 +26,7 @@ export type TypographyRole =
   | "label"
   | "caption";
 
-/** Semantic font family — remapped to a loaded font key in AppText. */
+/** Semantic font family — remapped to a loaded font key by `resolveFontFamily`. */
 export type FontFamily = "Space Grotesk" | "Inter";
 
 /** The only two weights this phase ships. */
@@ -86,3 +86,22 @@ export const TYPOGRAPHY: Record<TypographyRole, TypographyStyle> = {
     colorToken: "textSecondary",
   },
 };
+
+/**
+ * Map the semantic family + weight to the concrete expo-font key registered in
+ * `src/theme/fonts.ts` (`Inter-Regular` / `Inter-SemiBold` /
+ * `SpaceGrotesk-SemiBold`). A distinct key per weight is required because
+ * Android will not reliably synthesize a weight from one custom family, and the
+ * bare semantic names ("Inter" / "Space Grotesk") are NOT registered. Every
+ * `<Text>` that styles from `TYPOGRAPHY` resolves its `fontFamily` here — AppText
+ * and the dashboard contact renderers alike (RG-031 ui-accessibility/AUD-UIA-015).
+ */
+export function resolveFontFamily(
+  family: FontFamily,
+  weight: FontWeight,
+): string {
+  if (family === "Space Grotesk") {
+    return "SpaceGrotesk-SemiBold";
+  }
+  return weight === 600 ? "Inter-SemiBold" : "Inter-Regular";
+}

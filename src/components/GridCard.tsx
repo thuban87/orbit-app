@@ -18,10 +18,11 @@ import { useTheme } from "@/theme";
 import { ICON_SIZE } from "@/theme/tokens/icon-size";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
-import { TYPOGRAPHY } from "@/theme/tokens/typography";
+import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
 import { isSnoozed } from "@/utils/dates";
 import {
   buildRowAccessibilityDescription,
+  buildSearchRowContext,
   formatListRecency,
   formatMatchCategories,
   formatMatchExplanation,
@@ -137,16 +138,6 @@ export function GridCard({
     colors,
   );
   const recency = formatListRecency(lastContact, now);
-  const baseAccessibilityLabel = buildRowAccessibilityDescription({
-    name,
-    category: categoryLabel,
-    recency,
-    isFavourite,
-    displayState,
-  });
-  const accessibilityLabel = selectionMode
-    ? `${baseAccessibilityLabel} ${selected ? "Selected." : "Not selected."}`
-    : baseAccessibilityLabel;
   const isSearchMode = searchResult !== undefined;
   const strongestMatch = searchResult?.matches[0];
   const searchExplanation = isSearchMode
@@ -162,6 +153,21 @@ export function GridCard({
     : null;
   const displayedSearchSnippet =
     strongestMatch?.snippet ?? (searchResult === null ? searchSnippet : null);
+  // Announce the search context this card renders (RG-031 AUD-UIA-007). Normal
+  // Grid intentionally omits List's adaptive line three (38.1), so it has none.
+  const baseAccessibilityLabel = buildRowAccessibilityDescription({
+    name,
+    category: categoryLabel,
+    recency,
+    isFavourite,
+    displayState,
+    context: isSearchMode
+      ? buildSearchRowContext(searchExplanation, displayedSearchSnippet)
+      : null,
+  });
+  const accessibilityLabel = selectionMode
+    ? `${baseAccessibilityLabel} ${selected ? "Selected." : "Not selected."}`
+    : baseAccessibilityLabel;
   const accessibilityActions = [
     onViewProfile && { name: "view-profile", label: "View Profile" },
     onQuickLog && { name: "quick-log", label: "Quick Log" },
@@ -410,14 +416,20 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   name: {
-    fontFamily: TYPOGRAPHY.label.family,
+    fontFamily: resolveFontFamily(
+      TYPOGRAPHY.label.family,
+      TYPOGRAPHY.label.weight,
+    ),
     fontSize: TYPOGRAPHY.label.size,
     fontWeight: TYPOGRAPHY.label.weight,
     lineHeight: TYPOGRAPHY.label.lineHeight,
     textAlign: "center",
   },
   recency: {
-    fontFamily: TYPOGRAPHY.caption.family,
+    fontFamily: resolveFontFamily(
+      TYPOGRAPHY.caption.family,
+      TYPOGRAPHY.caption.weight,
+    ),
     fontSize: TYPOGRAPHY.caption.size,
     fontWeight: TYPOGRAPHY.caption.weight,
     lineHeight: TYPOGRAPHY.caption.lineHeight,
@@ -427,7 +439,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   highlight: {
-    fontFamily: TYPOGRAPHY.label.family,
+    fontFamily: resolveFontFamily(
+      TYPOGRAPHY.label.family,
+      TYPOGRAPHY.label.weight,
+    ),
     fontSize: TYPOGRAPHY.label.size,
     fontWeight: TYPOGRAPHY.label.weight,
     lineHeight: TYPOGRAPHY.label.lineHeight,

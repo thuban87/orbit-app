@@ -39,3 +39,14 @@
   change on the selected chip.
 - **`RelationshipEditor.tsx` unused `Pressable` import** (biome `noUnusedImports` warning). It predates
   Plan 06 and Plan 06 did not cause it. It was left alone to keep the task diff scoped.
+
+## From Plan 08 (2026-09-26)
+
+- **Bare semantic `TYPOGRAPHY.<role>.family` still assigned outside the contact renderers.** Plan 08
+  moved `resolveFontFamily` into `src/theme/tokens/typography.ts` and put `ListRow`/`GridCard` (the
+  AUD-UIA-015 cited "contact renderers") on the registered keys. The same unregistered-family pattern
+  remains in `HomeScreen.tsx` (selection count, selection action label, bulk-picker title/label),
+  `CardContextMenu.tsx` (title, label) and `BulkActionSurface.tsx` (pending label, action label, sheet
+  title). Not cited by AUD-UIA-015 and outside Plan 08's file scope. Candidate fix: the same one-line
+  `fontFamily: resolveFontFamily(TYPOGRAPHY.<role>.family, TYPOGRAPHY.<role>.weight)` swap, plus
+  extending the `typography.test.ts` source scan to cover those files.

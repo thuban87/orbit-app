@@ -14,28 +14,19 @@
  * shrinking. A caller may still pass `numberOfLines`/tighter style for a genuine
  * utility/form case, but the primitive imposes none.
  *
- * The font FAMILY is semantic ("Inter" / "Space Grotesk"); it maps here to the
- * concrete loaded font key (a distinct file per weight — Android will not
- * reliably synthesize a weight from one custom family). Keys match the expo-font
- * map in `src/theme/fonts.ts`.
+ * The font FAMILY is semantic ("Inter" / "Space Grotesk"); the shared
+ * `resolveFontFamily` (typography tokens) maps it to the concrete loaded font key
+ * (a distinct file per weight — Android will not reliably synthesize a weight
+ * from one custom family). Keys match the expo-font map in `src/theme/fonts.ts`.
  */
 import type { ReactNode } from "react";
 import { Text, type TextProps, type TextStyle } from "react-native";
 import { useTheme } from "@/theme";
 import {
-  type FontFamily,
-  type FontWeight,
+  resolveFontFamily,
   TYPOGRAPHY,
   type TypographyRole,
 } from "@/theme/tokens/typography";
-
-/** Map the semantic family + weight to the loaded expo-font key (fonts.ts). */
-function resolveFontFamily(family: FontFamily, weight: FontWeight): string {
-  if (family === "Space Grotesk") {
-    return "SpaceGrotesk-SemiBold";
-  }
-  return weight === 600 ? "Inter-SemiBold" : "Inter-Regular";
-}
 
 // Omit RN's accessibility `role` so our semantic typography `role` owns the name
 // (callers needing the a11y role use `accessibilityRole`).
