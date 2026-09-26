@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.3
-current_phase_name: Runtime Correctness, Navigation & State Coherence
-status: ready-to-execute
+current_phase_name: Runtime Correctness, Navigation & State Coherence (INSERTED)
+status: executing
 stopped_at: Phase 38.3 planned (16 plans, 6 waves)
-last_updated: "2026-09-25T23:29:54.127Z"
+last_updated: "2026-09-26T00:13:58.810Z"
 last_activity: 2026-09-25
-last_activity_desc: Phase 38.3 plan-review convergence done (3 cross-AI cycles, 10→3→2 findings, all folded inline; post-convergence plan-checker 0 blockers); owner ruling D-28
-state_head: 096be7660844e777569f81a427535e480730c262
+last_activity_desc: Phase 38.3 execution started
+state_head: 2c972d06874cd91e86bd32287910f95da1cd99a0
 progress:
   total_phases: 26
   completed_phases: 16
@@ -35,20 +35,20 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 38.2 — Data Integrity, Security & Lifecycle Hardening
+**Current focus:** Phase 38.3 — Runtime Correctness, Navigation & State Coherence (INSERTED)
 
 ## Current Position
 
-Phase: 38.3 (Runtime Correctness, Navigation & State Coherence) — READY TO EXECUTE
-Plan: 0 of 16
-Status: Ready to execute
+Phase: 38.3 (Runtime Correctness, Navigation & State Coherence (INSERTED)) — EXECUTING
+Plan: 1 of 16
+Status: Executing Phase 38.3
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-23 — Phase 38.2 execution started
+Last activity: 2026-09-25 — Phase 38.3 execution started
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: Run Phase 37.1 verification against the complete nine-plan implementation and retained physical-device evidence.
 
