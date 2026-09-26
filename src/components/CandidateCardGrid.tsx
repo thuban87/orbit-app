@@ -12,8 +12,15 @@ import { Avatar } from "@/components/Avatar";
 import {
   ConfidenceChip,
   type ConfidenceOutcome,
+  confidenceLabel,
 } from "@/components/ConfidenceChip";
+import {
+  buildCandidateCardAccessibility,
+  CANDIDATE_CARD_FAILURE_COPY,
+  CANDIDATE_SELECTION_ACTION,
+} from "@/components/candidate-card-a11y";
 import { isBulkActionAvailable } from "@/components/candidate-card-grid-actions";
+import { Icon } from "@/components/icons/Icon";
 import { useTheme } from "@/theme";
 
 export type BulkAction =
@@ -160,10 +167,27 @@ export function CandidateCardGrid({
         renderItem={({ item }) => {
           const selected = selectedIds.has(item.id);
           const showPhoto = item.photoUri != null && !imageErrors.has(item.id);
+          const failed = failedIds.has(item.id);
+          // RG-031 AUD-UIA-008: announce what the card displays (name, chip,
+          // evidence, failure), selection state, and a long-press equivalent.
+          const a11y = buildCandidateCardAccessibility({
+            name: item.name,
+            recommendationText: item.chipLabel
+              ? item.chipLabel
+              : confidenceLabel(item.outcome),
+            evidenceHint: item.evidenceHint,
+            failureText: failed ? CANDIDATE_CARD_FAILURE_COPY : null,
+            selected,
+            selectionMode: multiSelect,
+          });
           return (
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={item.name}
+              {...a11y}
+              onAccessibilityAction={(event) => {
+                if (event.nativeEvent.actionName === CANDIDATE_SELECTION_ACTION)
+                  toggleSelection(item);
+              }}
               onPress={() =>
                 multiSelect ? toggleSelection(item) : onInspect(item)
               }
@@ -177,6 +201,23 @@ export function CandidateCardGrid({
                 selected && { borderWidth: 2 },
               ]}
             >
+              {multiSelect ? (
+                // Non-border selected mark (filled vs outline glyph); the
+                // state itself is announced via accessibilityState.
+                <View
+                  accessible={false}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={styles.selectionMark}
+                >
+                  <Icon
+                    name="select"
+                    state={selected ? "active" : "default"}
+                    size="md"
+                    tone={selected ? "accent" : "textSecondary"}
+                  />
+                </View>
+              ) : null}
               {showPhoto ? (
                 <Image
                   accessibilityLabel={`Photo of ${item.name}`}
@@ -226,9 +267,9 @@ export function CandidateCardGrid({
               >
                 {item.evidenceHint}
               </Text>
-              {failedIds.has(item.id) ? (
+              {failed ? (
                 <Text style={[styles.error, { color: colors.textSecondary }]}>
-                  This action could not be completed. Try again.
+                  {CANDIDATE_CARD_FAILURE_COPY}
                 </Text>
               ) : null}
             </Pressable>
@@ -314,6 +355,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   photo: { width: 48, height: 48, borderRadius: 24 },
+  selectionMark: { position: "absolute", right: 8, top: 8 },
   name: { fontSize: 15, fontWeight: "400" },
   hint: { fontSize: 13, fontWeight: "400" },
   chip: {

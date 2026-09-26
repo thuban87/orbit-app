@@ -128,6 +128,8 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 3. The Favourite star is binary membership. The screen keeps an optimistic per-contact overlay while a write is pending, records every successful durable settlement into the base row, and reveals that committed membership if a newer write fails.
 4. A closed row opens Profile. A partially open row closes first. Right swipe and its accessibility action read the global action only at commitment, then run shared Quick Log or navigate to Log Contact; left swipe and its accessibility action route to Edit Contact. Only one row remains open.
 5. Search keeps identity on line one and replaces normal secondary content with a compact match explanation and strongest highlighted descriptor. Relevance-ranked corpus matches stay in scorer order; name-only and fuel-only fallbacks append in Dashboard order.
+6. The row's accessible description is the identity summary (name, category, recency, favourite, status) followed by the context the row actually renders (RG-031, ui-accessibility/AUD-UIA-007). In search, that context is the match explanation plus the displayed snippet in quotes (`buildSearchRowContext`). Outside search, it is the adaptive line-three text. When no context is shown, the description is the unchanged identity summary. Text the row does not display is never passed as context.
+7. Row text resolves `fontFamily` through `resolveFontFamily` (`src/theme/tokens/typography.ts`), which AppText uses too. The result is always a key `fonts.ts` registers (`Inter-Regular`, `Inter-SemiBold`, `SpaceGrotesk-SemiBold`), never the bare semantic family (RG-031, ui-accessibility/AUD-UIA-015).
 
 ### Rendering and acting from a Card
 
@@ -135,6 +137,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 2. `CardGrid` remounts its keyed `FlatList` when width or font scale changes the responsive column count. In normal mode `GridCard` presents name and recency only; it uses a status ring plus glyph, neutralizes the ring with a snooze glyph when snoozed, and suppresses the glyph for a never-contacted row.
 3. The Card star uses the host-owned optimistic binary favourite path. Search may render its own third-line match explanation; ordinary List retains the selected context/excerpt path, while normal Grid does not.
 4. A normal tap opens Profile. Long-press and equivalent accessibility actions expose the fixed per-contact action menu; Card View does not copy List swipe gestures.
+5. `GridCard` uses the same description builder and registered-font mapping as `ListRow`. In search, the description includes the rendered explanation and snippet. Normal Grid announces no line-three context, because it renders none (38.1).
 
 ### Selecting and applying bulk actions
 
@@ -263,3 +266,4 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | 2026-09-26 | 38.3 | Panel dismissal single-owner fix (RG-020): the panel store owns open state, dismissal captures the request before clearing, and Home derives its inertness from the store. |
 | 2026-09-26 | 38.3 | Refresh scheduler + latest-result ownership (RG-022): one scheduler issues every Home read, defers hidden shell/foreground requests, resumes on the post-sweep foreground tick, gates every publication on the latest token, and reads once per bulk commit or Undo. |
 | 2026-09-26 | 38.3 | Home counts as hidden while the app is backgrounded (`isDashboardVisible`: focused and `AppState.currentState !== "background"`), so a warm notification action's shell tick no longer runs the Home read in the background; the post-sweep foreground tick reads on resume (review A-WR-01, D-23). |
+| 2026-09-26 | 38.4 | Row accessible context + registered fonts (RG-031 AUD-UIA-007/015): List rows and Grid cards announce the search or line-three context they render after the identity summary, and resolve fonts to registered keys through the shared `resolveFontFamily`. |

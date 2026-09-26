@@ -16,16 +16,21 @@ const labels: Record<ConfidenceOutcome, string> = {
   needs_review: "Needs review",
 };
 
+/** The chip copy for an outcome — shared with the card's accessible label. */
+export function confidenceLabel(outcome: ConfidenceOutcome): string {
+  return labels[outcome];
+}
+
 export function ConfidenceChip({ outcome }: { outcome: ConfidenceOutcome }) {
   const { colors } = useTheme();
 
   return (
     <View
-      accessibilityLabel={labels[outcome]}
+      accessibilityLabel={confidenceLabel(outcome)}
       style={[styles.chip, { backgroundColor: colors.surfaceElevated }]}
     >
       <Text style={[styles.label, { color: colors.textSecondary }]}>
-        {labels[outcome]}
+        {confidenceLabel(outcome)}
       </Text>
     </View>
   );

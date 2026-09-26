@@ -71,6 +71,7 @@ Migration 013 keeps reconciliation state in local SQLite. It does not create a g
 4. A batch scan persists only changed contacts as cards in one session. Additive, non-photo selections can use a safe bulk source-values action; conflict and removed cases remain manually reviewed.
    Bulk source-value actions also leave name or birthday fields with multiple source options for explicit detail review; those cards remain partial.
 5. A card remains until all actionable differences resolve. Completion reports durable disposition counts; pending work survives process death and offers Resume or Discard on a later foreground launch.
+6. The shared `CandidateCardGrid` review card (Reconcile Grid and Duplicate Review) has an accessible representation equal to what it shows (RG-031, ui-accessibility/AUD-UIA-008). `buildCandidateCardAccessibility` (`src/components/candidate-card-a11y.ts`) labels the card with the person's name, the displayed chip text (reconciliation advisory copy, or the import confidence label), the evidence line, and the per-card failure copy when it is shown. While the grid is selecting, the card exposes `accessibilityState.selected` and a filled/outline `select` glyph, so selection is not shown by border alone. A Select/Deselect custom action calls the same toggle as long-press. Tap keeps its meaning: inspect when not selecting, toggle when selecting. The chip stays advisory, and stable internal IDs are never helper inputs.
 
 ### Handling a missing source
 
@@ -142,3 +143,4 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 | 2026-09-02 | 33 | Added owner-locked same-event merge refusal before reparenting and user-visible membership remediation. |
 | 2026-09-23 | 38.2 | Preserved source-option identity through reconciliation, recorded the complete reviewed comparable, and excluded ambiguous scalars from bulk source apply. |
 | 2026-09-25 | 38.3 | Reconcile summary loading vs error (RG-035): Reconcile Complete shows a real loading state during its read and "Couldn't load the check summary" with a read-only Retry only after the read fails. |
+| 2026-09-26 | 38.4 | Review-card accessibility (RG-031 AUD-UIA-008): review cards announce name, advisory chip, evidence and failure copy; expose `selected` while selecting, with a non-border selected glyph; and offer a Select/Deselect action equivalent to long-press. |
