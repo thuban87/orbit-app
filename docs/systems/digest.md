@@ -45,7 +45,8 @@ Digest reads existing state and persists only the portable app-wide period prefe
 | `src/components/digest/UpNextSection.tsx` | Shows at most three explainable Profile-opening candidates without inline outreach writes. |
 | `src/components/digest/HorizonSection.tsx` | Shows separate conditional birthdays, overlooked, and Never Contacted groups. |
 | `src/components/digest/YourWeekSection.tsx` | Follows Digest's `refreshSignal`, synchronizes the period preference, and mounts selected-day detail inline. |
-| `src/components/digest/your-week-section-logic.ts` | Pure period controller: in-flight write marker, safe Settings adoption, re-window day retention, shared period-read authority. |
+| `src/components/digest/your-week-section-logic.ts` | Pure period controller: in-flight write marker, safe Settings adoption, re-window day retention, shared period-read authority; the token-scoped day-detail state machine (`startDayRead` / `settleDayRead` / `failDayRead` / `clearDayDetail`). |
+| `src/components/digest/DigestDayDetail.tsx` | Renders the selected day from its read state: inline loading indicator, "Couldn't load this day" with Retry, empty copy only after a successful empty read, or the day's rows. |
 | `src/components/digest/DigestListTransition.tsx` | The standard Up Next/Horizon list transition, skipped on first render and off under reduced motion. |
 | `src/components/digest/YourWeekHeatmap.tsx` | Reuses shared heatmap language with a non-colour-only selected state. |
 | `src/db/your-week-read.ts` | Excludes group-linked child interactions and includes each Group Event parent once. |
@@ -78,6 +79,7 @@ Digest reads existing state and persists only the portable app-wide period prefe
 4. Settings and the in-context toggle both write the same validated portable `your_week_period` setting; Horizon birthdays and weekly notification cadence do not use it.
 5. On each `refreshSignal`, Your Week keeps the chosen period and re-windows to the current local day (D-15). No timer detects the new day (D-22). A selected day survives while it is still a real day in the new window, including across a tab return (D-26), and is re-read; otherwise it clears.
 6. A period changed in Settings is adopted on the next refresh, but only when no in-context toggle write is in flight and no toggle has begun since that settings read started. A refresh can therefore never revert an in-flight toggle. Every period read (refresh, toggle, rollback) goes through one request authority, so the most recently begun read wins.
+7. Selected-day detail is an explicit `idle | loading | loaded | error` state (D-16). A heatmap tap, the detail's Retry, and a refresh that retained the day each start a **new** request with a fresh token from a latest-request authority; only the current `loading` token may settle or fail. The stale guard is therefore request-scoped, not date equality: re-selecting the same date or retrying makes any older read for that date — or any other — unable to publish rows or an error. Loading shows a small inline indicator; a failure shows "Couldn't load this day" with Retry; "No activity on this date." appears only after a successful empty read. Clearing the selection (period change, rollback, a day outside the new window) returns to `idle` and retires the outstanding read. A debug-only fault hook (`applyUatFault("digest-day-read")`, inert outside `__DEV__`) can delay or reject the next day read for device UAT.
 
 ### List transitions
 
@@ -115,7 +117,7 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 4. **Keep the Unbound exception exact.** It applies only to opted-in `not-contacted`, never to other active-cadence populations.
 5. **Do not double-count Group Events.** Exclude their linked child interactions from event activity and project the parent once.
 6. **Do not add a Digest trigger outside `DigestScreen`.** Sections follow Digest's refresh ownership; a section-level focus effect or private AppState listener reintroduces pre-sweep resume reads and double reads.
-7. **A selected day is not immediately empty.** Day detail remains asynchronous; preserve a loading/error state until its matching read completes.
+7. **A selected day is not immediately empty.** Day detail is `idle | loading | loaded | error`. A pending read shows the inline indicator, a failed one "Couldn't load this day" with Retry; never render "No activity on this date." for anything but a successful empty read. Every read (tap, Retry, retained-day refresh) takes a fresh request token. Never guard publication with `selectedDay === date` — a slower older read for the same date would overwrite the newer one.
 8. **Seven 44dp heatmap targets need compact-width treatment.** Fixed cells plus outer padding can overflow 360dp-or-narrower layouts.
 
 ## Related Systems
@@ -137,3 +139,4 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 | 2026-09-02 | 32 | Lockstepped the gentle-line count onto the migrated `Negative` Tone value. |
 | 2026-09-02 | 38 | Replaced the retrospective-first screen with fixed Up Next, Horizon, and Your Week modules; added portable period selection and group-deduplicated activity reads. |
 | 2026-09-25 | 38.3 | Live Digest refresh (RG-026, react-native/AUD-RN-006, reliability-testing/AUD-REL-013): focus, shell-tick and post-sweep foreground triggers with one authority; Your Week follows a Digest-owned signal and keeps its period across a new day (D-15); standard list transition for Up Next and Horizon (D-13). |
+| 2026-09-25 | 38.3 | Truthful day detail (RG-026, reliability-testing/AUD-REL-014; closes Phase 38 WR-01): explicit `idle \| loading \| loaded \| error` day-detail states with request-scoped tokens, inline loading indicator, "Couldn't load this day" + Retry, empty copy only after a successful empty read (D-16). |
