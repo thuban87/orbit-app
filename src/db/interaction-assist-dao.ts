@@ -67,9 +67,26 @@ export function createPendingAssist(
 }
 
 /**
+ * What a confirm actually did (38.3 review B-WR-05, D-04). Only `"logged"`
+ * wrote an interaction row. `"already-logged"` is a harmless repeat confirm of
+ * an assist an earlier confirm logged. `"closed"` means the assist was
+ * dismissed, expired, failed or gone, so NOTHING was written and the caller
+ * must not present the confirm as logged.
+ */
+export type AssistLogOutcome = "logged" | "already-logged" | "closed";
+
+function nonPendingOutcome(
+  row: PendingAssistRow | null | undefined,
+): AssistLogOutcome {
+  return row?.status === "logged" ? "already-logged" : "closed";
+}
+
+/**
  * Confirm an assist through the recency DAO's non-mutexed cores in one atomic
  * transaction. The pre-read only applies the LOG-06 guard; writes use the row
  * re-read inside the transaction so merges and purges cannot leave a stale FK.
+ * Resolves the {@link AssistLogOutcome}; the ADR-071 guard, the handoff-time
+ * `occurred_at` and the in-transaction pending recheck are unchanged.
  */
 export function markAssistLogged(
   exec: SqlExecutor,
@@ -79,22 +96,23 @@ export function markAssistLogged(
     note?: string | null;
     now: string;
   },
-): Promise<void> {
-  return (async () => {
+): Promise<AssistLogOutcome> {
+  return (async (): Promise<AssistLogOutcome> => {
     const assist = await exec.getFirstAsync<PendingAssistRow>(ASSIST_SELECT, [
       input.assistUid,
     ]);
-    if (assist?.status !== "pending") return;
+    if (assist?.status !== "pending") return nonPendingOutcome(assist);
 
     // Match every sibling interaction writer: validate before opening a txn.
     rejectFutureOccurredAt(assist.handoff_at, input.now);
 
-    await inWriteTransaction(exec, async () => {
+    return inWriteTransaction(exec, async (): Promise<AssistLogOutcome> => {
       const transactionAssist = await exec.getFirstAsync<PendingAssistRow>(
         ASSIST_SELECT,
         [input.assistUid],
       );
-      if (transactionAssist?.status !== "pending") return;
+      if (transactionAssist?.status !== "pending")
+        return nonPendingOutcome(transactionAssist);
 
       await insertInteractionCore(
         exec,
@@ -128,6 +146,7 @@ export function markAssistLogged(
           WHERE uid = ? AND status = 'pending'`,
         [input.now, input.now, input.assistUid],
       );
+      return "logged";
     });
   })();
 }

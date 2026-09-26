@@ -27,6 +27,7 @@
  * Node-testable by construction: no react-native, widget or store import —
  * callers inject the real side effects (the `quick-log-command.ts` pattern).
  */
+import type { AssistLogOutcome } from "@/db/interaction-assist-dao";
 import { FutureOccurredAtError } from "@/db/log-guards";
 import {
   beginInFlight,
@@ -45,6 +46,7 @@ export interface AssistFailureCopy {
 export const ASSIST_FAILURE_COPY: {
   log: Record<AssistFailureKind, AssistFailureCopy>;
   dismiss: { generic: AssistFailureCopy };
+  closed: AssistFailureCopy;
 } = {
   log: {
     "future-date": {
@@ -61,6 +63,12 @@ export const ASSIST_FAILURE_COPY: {
       title: "Couldn't dismiss that yet",
       body: "It's still pending — try again.",
     },
+  },
+  // 38.3 review B-WR-05: the assist was dismissed or expired before this
+  // confirm, so no interaction row was written.
+  closed: {
+    title: "Already closed",
+    body: "This reach-out was already closed, so nothing was logged.",
   },
 };
 
@@ -121,8 +129,11 @@ export async function publishAssistDismissal(
 export interface RunAssistActionInput {
   /** Per-surface (or per-assist) synchronous latch against double taps. */
   latch: InFlightRef;
-  /** The DAO write (`markAssistLogged` / `markAssistDismissed`). */
-  write(): Promise<void>;
+  /**
+   * The DAO write (`markAssistLogged` / `markAssistDismissed`). A log write
+   * resolves its `AssistLogOutcome`; `"closed"` means nothing was written.
+   */
+  write(): Promise<AssistLogOutcome | unknown>;
   /** Post-commit publication; contractually never rejects. */
   publish(): Promise<void>;
   /**
@@ -132,26 +143,50 @@ export interface RunAssistActionInput {
   onError(kind: AssistFailureKind, error: unknown): void;
   /** Optional: log a publish that broke its never-reject contract. */
   logFailure?(message: string, error: unknown): void;
+  /**
+   * Tell the user a confirm was a no-op because the assist was already closed
+   * (dismissed / expired / failed / gone). Never called for a real commit.
+   */
+  onClosed?(): void;
+  /** Queue-only refresh after a `"closed"` no-op; never rejects. */
+  publishClosed?(): Promise<void>;
 }
 
-export type AssistActionResult = "done" | "failed" | "busy";
+export type AssistActionResult = "done" | "failed" | "busy" | "closed";
 
 /**
  * Run one assist write under a synchronous in-flight latch, then publish.
  * Returns "busy" (no write) when the latch is held, "failed" after reporting a
- * write rejection, and "done" once the write committed — regardless of how the
- * publication went (D-04). The latch is released in `finally` on every path.
+ * write rejection, "closed" when the write resolved as a no-op because the
+ * assist was no longer pending (38.3 review B-WR-05: never presented as logged,
+ * and the commit publisher is not run), and "done" once the write committed —
+ * regardless of how the publication went (D-04). The latch is released in
+ * `finally` on every path.
  */
 export async function runAssistAction(
   input: RunAssistActionInput,
 ): Promise<AssistActionResult> {
   if (!beginInFlight(input.latch)) return "busy";
   try {
+    let outcome: unknown;
     try {
-      await input.write();
+      outcome = await input.write();
     } catch (error) {
       input.onError(classifyAssistFailure(error), error);
       return "failed";
+    }
+    if (outcome === "closed") {
+      try {
+        input.onClosed?.();
+      } catch (error) {
+        input.logFailure?.("assist closed notice failed", error);
+      }
+      try {
+        await input.publishClosed?.();
+      } catch (error) {
+        input.logFailure?.("assist queue refresh failed", error);
+      }
+      return "closed";
     }
     try {
       await input.publish();

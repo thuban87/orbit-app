@@ -335,6 +335,91 @@ describe("interaction assist write DAO", () => {
   });
 });
 
+describe("markAssistLogged outcome (38.3 review B-WR-05)", () => {
+  it("reports 'logged' for a pending assist and 'already-logged' for a repeat confirm", async () => {
+    const contactId = await contact();
+    const assistUid = await createPendingAssist(exec, {
+      contactId,
+      channel: "call",
+      endpointValue: null,
+      now: "2026-08-31 11:00:00",
+    });
+    await expect(
+      markAssistLogged(exec, { assistUid, connected: 1, now: NOW }),
+    ).resolves.toBe("logged");
+    await expect(
+      markAssistLogged(exec, { assistUid, connected: 1, now: NOW }),
+    ).resolves.toBe("already-logged");
+  });
+
+  it("reports 'closed' (no row written) for a dismissed, failed, expired or missing assist", async () => {
+    const contactId = await contact();
+    const dismissedUid = await createPendingAssist(exec, {
+      contactId,
+      channel: "text",
+      endpointValue: null,
+      now: "2026-08-31 11:00:00",
+    });
+    const failedUid = await createPendingAssist(exec, {
+      contactId,
+      channel: "text",
+      endpointValue: null,
+      now: "2026-08-31 11:00:01",
+    });
+    const expiredUid = await createPendingAssist(exec, {
+      contactId,
+      channel: "text",
+      endpointValue: null,
+      now: "2026-08-31 11:00:02",
+    });
+    await markAssistDismissed(exec, { assistUid: dismissedUid, now: NOW });
+    await markAssistFailed(exec, { assistUid: failedUid, now: NOW });
+    await exec.runAsync(
+      "UPDATE interaction_assists SET status = 'expired' WHERE uid = ?",
+      [expiredUid],
+    );
+    for (const assistUid of [dismissedUid, failedUid, expiredUid, "gone"]) {
+      await expect(
+        markAssistLogged(exec, { assistUid, connected: 1, now: NOW }),
+      ).resolves.toBe("closed");
+    }
+    expect(await exec.getAllAsync("SELECT id FROM interactions")).toEqual([]);
+  });
+
+  it("reports 'closed' when the in-transaction recheck finds it no longer pending", async () => {
+    const contactId = await contact();
+    const assistUid = await createPendingAssist(exec, {
+      contactId,
+      channel: "text",
+      endpointValue: null,
+      now: "2026-08-31 11:00:00",
+    });
+    const baseExec = exec;
+    let assistSelects = 0;
+    exec = {
+      ...baseExec,
+      async getFirstAsync<T>(
+        sql: string,
+        params?: unknown[],
+      ): Promise<T | null> {
+        if (sql.includes("FROM interaction_assists") && ++assistSelects === 2) {
+          await baseExec.runAsync(
+            "UPDATE interaction_assists SET status = 'dismissed' WHERE uid = ?",
+            [assistUid],
+          );
+        }
+        return baseExec.getFirstAsync<T>(sql, params);
+      },
+    };
+    await expect(
+      markAssistLogged(exec, { assistUid, connected: 1, now: NOW }),
+    ).resolves.toBe("closed");
+    expect(await baseExec.getAllAsync("SELECT id FROM interactions")).toEqual(
+      [],
+    );
+  });
+});
+
 /**
  * Phase-35 coexistence invariants (D-04/D-05/D-06, Trip-Wire 1 & 2). The Compose
  * "Did you send it?" panel REUSES this DAO unchanged; these tests fail loudly if a

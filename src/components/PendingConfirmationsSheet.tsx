@@ -109,6 +109,15 @@ export function PendingConfirmationsSheet({
         const copy = ASSIST_FAILURE_COPY.log[kind];
         Alert.alert(copy.title, copy.body);
       },
+      // 38.3 review B-WR-05: dismissed/expired before this confirm — nothing
+      // was logged, so say so and only refresh the queue.
+      onClosed: () =>
+        Alert.alert(
+          ASSIST_FAILURE_COPY.closed.title,
+          ASSIST_FAILURE_COPY.closed.body,
+        ),
+      publishClosed: () =>
+        publishAssistDismissal({ refreshQueue: refresh, logFailure }),
       logFailure,
     });
     if (result !== "busy") markPending(uid, false);

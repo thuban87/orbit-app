@@ -300,3 +300,47 @@ describe("runAssistAction", () => {
     expect(latch.current).toBe(false);
   });
 });
+
+describe("runAssistAction — a no-op log is not success (38.3 review B-WR-05, D-04)", () => {
+  it("write resolves 'closed' → returns 'closed', runs onClosed + the queue-only refresh, never the commit publisher", async () => {
+    const latch: InFlightRef = { current: false };
+    const deps = commitDeps();
+    const onError = vi.fn();
+    const onClosed = vi.fn();
+    const publishClosed = vi.fn(async () => {});
+    const result = await runAssistAction({
+      latch,
+      write: async () => "closed" as const,
+      publish: () => publishAssistCommit(deps),
+      onError,
+      onClosed,
+      publishClosed,
+    });
+    expect(result).toBe("closed");
+    expect(onClosed).toHaveBeenCalledTimes(1);
+    expect(publishClosed).toHaveBeenCalledTimes(1);
+    expect(deps.notifyWidget).not.toHaveBeenCalled();
+    expect(deps.bumpShell).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    expect(latch.current).toBe(false);
+  });
+
+  it("write resolves 'already-logged' → 'done' (a double confirm is harmless)", async () => {
+    const deps = commitDeps();
+    const onClosed = vi.fn();
+    const result = await runAssistAction({
+      latch: { current: false },
+      write: async () => "already-logged" as const,
+      publish: () => publishAssistCommit(deps),
+      onError: vi.fn(),
+      onClosed,
+    });
+    expect(result).toBe("done");
+    expect(onClosed).not.toHaveBeenCalled();
+  });
+
+  it("has content-free copy for an already-closed reach-out", () => {
+    expect(ASSIST_FAILURE_COPY.closed.title.length).toBeGreaterThan(0);
+    expect(ASSIST_FAILURE_COPY.closed.body).toMatch(/nothing was logged/i);
+  });
+});

@@ -146,6 +146,7 @@ import { aiKeyStore } from "@/services/ai-key-store";
 import {
   ASSIST_FAILURE_COPY,
   publishAssistCommit,
+  publishAssistDismissal,
   runAssistAction,
 } from "@/services/assist-commit";
 import { performReachOut } from "@/services/reach-out/handoff";
@@ -1118,12 +1119,30 @@ export function ComposeScreen({
           "The reminder is saved — you can log it from the banner.",
         );
       },
+      // 38.3 review B-WR-05: the assist was dismissed or expired before this
+      // confirm, so no interaction was written. Close the panel without the
+      // "logged" exit — the session stays as it is.
+      onClosed: () =>
+        Alert.alert(
+          ASSIST_FAILURE_COPY.closed.title,
+          ASSIST_FAILURE_COPY.closed.body,
+        ),
+      publishClosed: () =>
+        publishAssistDismissal({
+          refreshQueue: () => useAssistBanner.getState().refresh(),
+          logFailure: (message, error) =>
+            Logger.error(LOG_SCOPE, message, error),
+        }),
       logFailure: (message, error) => Logger.error(LOG_SCOPE, message, error),
     });
     if (result === "busy") {
       return;
     }
     setLogging(false);
+    if (result === "closed") {
+      setConfirm(null);
+      return;
+    }
     if (result === "done") {
       setConfirm(null);
       performExit("logged");
