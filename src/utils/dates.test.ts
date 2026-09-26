@@ -8,6 +8,8 @@ import {
   formatDateTimeMinuteOrFallback,
   formatLocalDate,
   formatMinuteClock,
+  formatTimeMinute,
+  formatTimeMinuteOrFallback,
   isSnoozed,
   parseLocalMs,
 } from "@/utils/dates";
@@ -80,6 +82,63 @@ describe("minute-precision display timestamps", () => {
       "Unknown time",
     );
     expect(formatDateTimeMinuteOrFallback("")).toBe("Unknown time");
+  });
+});
+
+/**
+ * RG-038 (ui-accessibility/AUD-UIA-018, D-07, ADR-152): the identical fixture
+ * set used across event, Digest, History and form consumers. Time-only and
+ * date-time displays share one clock contract, so they can never disagree.
+ */
+const SHARED_CLOCK_FIXTURES: ReadonlyArray<readonly [string, string]> = [
+  ["2026-09-16 00:00:00", "12:00 AM"],
+  ["2026-09-16 12:00:00", "12:00 PM"],
+  ["2026-09-16 23:59:59", "11:59 PM"],
+  ["2026-09-16 09:05:59", "9:05 AM"],
+  ["2026-09-16 09:06:00", "9:06 AM"],
+];
+
+describe("time-only minute display (RG-038)", () => {
+  it.each(SHARED_CLOCK_FIXTURES)(
+    "formats %s as %s with no seconds",
+    (stored, expected) => {
+      expect(formatTimeMinute(stored)).toBe(expected);
+      expect(formatTimeMinuteOrFallback(stored)).toBe(expected);
+    },
+  );
+
+  it("truncates seconds at the minute boundary (09:05:59 vs 09:06:00)", () => {
+    expect(formatTimeMinute("2026-09-16 09:05:59")).toBe("9:05 AM");
+    expect(formatTimeMinute("2026-09-16 09:06:00")).toBe("9:06 AM");
+  });
+
+  it("accepts the T-separated and minute-only stored forms parseLocalMs accepts", () => {
+    expect(formatTimeMinute("2026-09-16T14:30:15")).toBe("2:30 PM");
+    expect(formatTimeMinute("2026-09-16 14:30")).toBe("2:30 PM");
+  });
+
+  it.each(SHARED_CLOCK_FIXTURES)(
+    "agrees with the date-time formatter's clock for %s",
+    (stored, expected) => {
+      expect(formatDateTimeMinute(stored).endsWith(`, ${expected}`)).toBe(true);
+      expect(
+        formatDateTimeMinute(stored).endsWith(formatTimeMinute(stored)),
+      ).toBe(true);
+    },
+  );
+
+  it("throws on an unparseable value like formatDateTimeMinute", () => {
+    expect(() => formatTimeMinute("garbage")).toThrow(
+      "dates: unparseable timestamp",
+    );
+  });
+
+  it("returns the same neutral label as the date-time fallback", () => {
+    expect(formatTimeMinuteOrFallback("garbage")).toBe("Unknown time");
+    expect(formatTimeMinuteOrFallback("")).toBe("Unknown time");
+    expect(formatTimeMinuteOrFallback("2026-09-16 25:00:00")).toBe(
+      formatDateTimeMinuteOrFallback("2026-09-16 25:00:00"),
+    );
   });
 });
 
