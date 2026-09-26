@@ -1,7 +1,7 @@
 # Group Events
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 38-your-week
+**Last updated:** 2026-09-25
+**Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/db/group-events-dao.ts`, `src/db/group-events-read.ts`, `src/logic/group-inheritance.ts`, `src/screens/GroupLogScreen.tsx`, `src/screens/GroupEventDetailScreen.tsx`
 
 ## Purpose
@@ -43,6 +43,7 @@ All records live in on-device SQLite. Migration 026 adds the parent and nullable
 | Writer | `src/db/group-events-dao.ts` | Creates/edits parents and children, membership, lifecycle, and conversion under one outer transaction per operation. |
 | Read | `src/db/group-events-read.ts` | Parameter-bound parent browse/search/detail and ordinary child participant projections. |
 | Pure logic | `src/logic/group-inheritance.ts` | Follow-versus-override display and selective fan-out targets. |
+| Pure logic | `src/logic/group-participant-patch.ts` | The one follow/override and direct-field patch builder both participant editors use. |
 | Recency | `src/db/recency-dao.ts` | Non-mutexed canonical interaction cores and `last_contact` recomputation. |
 | Picker logic | `src/components/contact-picker-multiselect.ts` | Ordered selection, exclusions, and awaited owner outcomes. |
 | Presentation logic | `src/screens/group-event-detail-logic.ts` | Shared seconds-aware duration label and truthful child Detail projection. |
@@ -57,6 +58,7 @@ No Group Event Zustand store or background scheduler is required; screens hold u
 | `src/db/group-events-dao.ts` | Atomic persistence and lifecycle surface. |
 | `src/db/group-events-read.ts` | Local browse, literal-safe search, and participant Detail reads. |
 | `src/logic/group-inheritance.ts` | Three-field follow/override rules. |
+| `src/logic/group-participant-patch.ts` | Shared participant Save patch builders (`buildParticipantFollowPatch`, `buildParticipantFieldPatch`). |
 | `src/logic/group-log-participant-inputs.ts` | Distinct child UID builder. |
 | `src/screens/GroupLogScreen.tsx` | Required-title event-first create form and discard guard. |
 | `src/screens/EditGroupEventScreen.tsx` | Shared-value/date/note editing and saved-participant additions. |
@@ -90,6 +92,7 @@ No Group Event Zustand store or background scheduler is required; screens hold u
 3. `updateGroupEvent` composes full-edit recency cores inside one transaction, retaining untouched child fields and Allow-AI state. Group Note edits update only the parent.
 4. `ParticipantOverrideEditor` exposes Channel, Tone, Duration, Direction, Connected, and participant note. Title/date and Group Note are not participant-editable.
 5. Follow event clears an override and resumes live inheritance. `EditParticipantScreen` invokes `saveParticipantEdits` once so ordinary values and follow flags commit together.
+6. Both participant editors (`EditParticipantScreen` and the inline Sheet in `EditGroupEventScreen`) build that one Save's patch through `src/logic/group-participant-patch.ts`: a follow-flag change, or a value change on a field that was and still is overridden, becomes one op; unchanged fields emit nothing.
 
 ### Adding saved participants
 
@@ -170,6 +173,7 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 7. **Do not reconcile a merge collision silently.** Same-event duplicate contacts require typed refusal and explicit membership remediation.
 8. **Native verification has limits.** Final Pixel UAT records three passes. Its long-content case has three participants; this is not large-list performance evidence. The phase’s full suite had an unrelated Orrery parser failure despite passing targeted checks.
 9. **Do not use participant children as Digest event rows.** The aggregate must count the Group Event parent once; participant identity belongs only in People reached semantics.
+10. **Participant patches come from `src/logic/group-participant-patch.ts`.** A value edit on an already-overridden field is sent as `{ follow: false, value }`; follow is never inferred from equality (ADR-125). The earlier inline builders emitted a field only when its follow flag changed, so editing an existing override's value silently no-opped (reliability-testing/AUD-REL-006).
 
 ## Related Systems
 
@@ -188,3 +192,4 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 |---|---|---|
 | 2026-09-02 | 33 | Introduced event-first Group Event parents, canonical children, live inheritance, explicit lifecycle/scope, local browse/detail, atomic saved additions, and portability handoff. |
 | 2026-09-02 | 38 | Documented the read-only Your Week parent-once activity projection and Events-detail Profile return path. |
+| 2026-09-25 | 38.3 | Override value edits persist in both participant editors (RG-019, reliability-testing/AUD-REL-006). |

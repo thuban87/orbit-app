@@ -35,6 +35,10 @@ import {
   readGroupEventDetail,
 } from "@/db/group-events-read";
 import { newUid } from "@/db/uid";
+import {
+  buildParticipantFieldPatch,
+  buildParticipantFollowPatch,
+} from "@/logic/group-participant-patch";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
@@ -197,49 +201,8 @@ export function EditGroupEventScreen({
         contactId: editing.contactId,
         groupEventId,
         now: localDateTime(),
-        follow: {
-          ...(draftParticipant.follow.channel !== initial.follow.channel
-            ? {
-                channel: draftParticipant.follow.channel
-                  ? { follow: true as const }
-                  : {
-                      follow: false as const,
-                      value: draftParticipant.value.channel,
-                    },
-              }
-            : {}),
-          ...(draftParticipant.follow.quality !== initial.follow.quality
-            ? {
-                quality: draftParticipant.follow.quality
-                  ? { follow: true as const }
-                  : {
-                      follow: false as const,
-                      value: draftParticipant.value.quality,
-                    },
-              }
-            : {}),
-          ...(draftParticipant.follow.duration !== initial.follow.duration
-            ? {
-                duration: draftParticipant.follow.duration
-                  ? { follow: true as const }
-                  : {
-                      follow: false as const,
-                      value: draftParticipant.value.duration,
-                    },
-              }
-            : {}),
-        },
-        fields: {
-          ...(draftParticipant.value.direction !== initial.value.direction
-            ? { direction: draftParticipant.value.direction }
-            : {}),
-          ...(draftParticipant.value.connected !== initial.value.connected
-            ? { connected: draftParticipant.value.connected }
-            : {}),
-          ...(draftParticipant.value.note !== initial.value.note
-            ? { note: draftParticipant.value.note }
-            : {}),
-        },
+        follow: buildParticipantFollowPatch(initial, draftParticipant),
+        fields: buildParticipantFieldPatch(initial, draftParticipant),
       });
       setEditing(null);
       setParticipantDraftState(null);
