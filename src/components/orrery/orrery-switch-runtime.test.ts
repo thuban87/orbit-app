@@ -58,8 +58,10 @@ vi.mock("react-native-reanimated", () => ({
 import {
   beginOrrerySwitchRuntime,
   createSettledOrrerySwitchRuntime,
+  nextOrreryResources,
   type OrreryBodyResource,
   pauseOrrerySwitchRuntime,
+  pruneOrreryResources,
   useOrrerySwitchRuntime as renderOrrerySwitchRuntimeOnce,
   resumeOrrerySwitchRuntime,
   sampleOrrerySwitchRuntime,
@@ -295,5 +297,149 @@ describe("settled Orrery geometry retirement (RG-027, performance/AUD-PERF-001)"
     mounted.complete();
     expect(mounted.entryKeys()).toEqual(keysOf(cWorld));
     expect(mounted.resources().map(({ key }) => key)).toEqual(keysOf(cWorld));
+  });
+});
+
+const cWorldOf = (): WorldBody[] => [
+  { id: 0, kind: "sun", x: 0, y: 0, radius: 18, ringRadius: 0 },
+  { id: 3, kind: "contact", x: 0, y: -60, radius: 12, ringRadius: 60 },
+  { id: 5, kind: "contact", x: 70, y: 0, radius: 12, ringRadius: 70 },
+];
+const resourceKeys = (resources: readonly OrreryBodyResource[]) =>
+  resources.map(({ key }) => key);
+const generations = (resources: readonly OrreryBodyResource[]) => [
+  ...new Set(resources.map(({ scene }) => scene.generation)),
+];
+
+describe("Orrery resource cardinality (RG-027, performance/AUD-PERF-001)", () => {
+  const a = sceneOf(1, sourceWorld);
+  const b = sceneOf(2, destinationWorld);
+  const c = sceneOf(3, cWorldOf());
+
+  it("a settled publication replaces resources with the current scene", () => {
+    const current = nextOrreryResources([], a, false);
+    const next = nextOrreryResources(current, b, false);
+    expect(resourceKeys(next)).toEqual(keysOf(destinationWorld));
+    expect(generations(next)).toEqual([2]);
+  });
+
+  it("a running switch keeps departures until the prune, which leaves only the destination", () => {
+    const current = nextOrreryResources([], a, false);
+    const running = nextOrreryResources(current, b, true);
+    expect(resourceKeys(running)).toEqual([
+      "sun:0",
+      "contact:1",
+      "contact:2",
+      "contact:3",
+    ]);
+    const retained = running.find(({ key }) => key === "contact:2");
+    expect(retained?.scene).toBe(b);
+    const pruned = pruneOrreryResources(running, b);
+    expect(resourceKeys(pruned)).toEqual(keysOf(destinationWorld));
+    expect(generations(pruned)).toEqual([2]);
+    expect(nextOrreryResources([], b, true)).toEqual(
+      nextOrreryResources([], b, false),
+    );
+  });
+
+  it("A->B->C completed switches retain only C resources and C geometry", () => {
+    let resources = nextOrreryResources([], a, false);
+    for (const scene of [b, c]) {
+      resources = pruneOrreryResources(
+        nextOrreryResources(resources, scene, true),
+        scene,
+      );
+    }
+    expect(resourceKeys(resources)).toEqual(keysOf(cWorldOf()));
+    expect(generations(resources)).toEqual([3]);
+
+    const mounted = mountRuntime();
+    mounted.runtime.publish(a, false, 0, sourceCamera);
+    for (const scene of [b, c]) {
+      mounted.runtime.publish(scene, true, 1, homeCamera);
+      mounted.complete();
+      expect(mounted.entryKeys()).toEqual(keysOf(scene.world));
+      expect(resourceKeys(mounted.resources())).toEqual(keysOf(scene.world));
+      expect(mounted.runtime.transition.value.entries).toHaveLength(
+        mounted.resources().length,
+      );
+    }
+    expect(generations(mounted.resources())).toEqual([3]);
+  });
+
+  it("repeated same-System removals drop each removed body immediately", () => {
+    const mounted = mountRuntime();
+    let world = [...sourceWorld];
+    mounted.runtime.publish(sceneOf(1, world), false, 0, sourceCamera);
+    for (const [generation, removedId] of [
+      [2, 2],
+      [3, 1],
+    ] as const) {
+      world = world.filter((body) => body.id !== removedId);
+      mounted.runtime.publish(sceneOf(generation, world), false, 0, homeCamera);
+      expect(resourceKeys(mounted.resources())).toEqual(keysOf(world));
+      expect(mounted.entryKeys()).toEqual(keysOf(world));
+      expect(generations(mounted.resources())).toEqual([generation]);
+    }
+    expect(resourceKeys(mounted.resources())).toEqual(["sun:0"]);
+  });
+
+  it("an interrupted switch followed by a refresh leaves only the latest scene", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(a, false, 0, sourceCamera);
+    mounted.runtime.publish(b, true, 1, homeCamera);
+    mounted.runtime.progress.value = 0.35;
+    mounted.runtime.publish(c, true, 0.8, homeCamera);
+    expect(resourceKeys(mounted.resources())).toEqual(
+      expect.arrayContaining([
+        "contact:1",
+        "contact:2",
+        "contact:3",
+        "contact:5",
+      ]),
+    );
+    const refreshed = sceneOf(4, cWorldOf());
+    mounted.runtime.publish(refreshed, false, 0, homeCamera);
+    expect(resourceKeys(mounted.resources())).toEqual(keysOf(cWorldOf()));
+    expect(generations(mounted.resources())).toEqual([4]);
+    expect(mounted.entryKeys()).toEqual(keysOf(cWorldOf()));
+    expect(mounted.runtime.running.value).toBe(false);
+  });
+
+  it("reduced-motion completion retains only destination entries and resources", () => {
+    const published = mountRuntime();
+    published.reducedMotion.value = true;
+    published.runtime.publish(a, false, 0, sourceCamera);
+    published.runtime.publish(b, true, 1, homeCamera);
+    expect(published.runtime.transition.value.reducedMotion).toBe(true);
+    published.complete();
+    expect(published.entryKeys()).toEqual(keysOf(destinationWorld));
+    expect(published.runtime.transition.value.reducedMotion).toBe(true);
+    expect(resourceKeys(published.resources())).toEqual(
+      keysOf(destinationWorld),
+    );
+
+    const toggled = mountRuntime();
+    toggled.runtime.publish(a, false, 0, sourceCamera);
+    toggled.runtime.publish(b, true, 1, homeCamera);
+    toggled.runtime.progress.value = 0.3;
+    toggled.reducedMotion.value = true;
+    for (const react of harness.reactions) react(true, false);
+    expect(toggled.runtime.transition.value.reducedMotion).toBe(true);
+    toggled.complete();
+    expect(toggled.entryKeys()).toEqual(keysOf(destinationWorld));
+    expect(resourceKeys(toggled.resources())).toEqual(keysOf(destinationWorld));
+    expect(generations(toggled.resources())).toEqual([2]);
+  });
+
+  it("settling an empty world yields zero entries and no resources", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(a, false, 0, sourceCamera);
+    mounted.runtime.publish(sceneOf(2, []), true, 1, homeCamera);
+    mounted.complete();
+    expect(mounted.runtime.transition.value.entries).toEqual([]);
+    expect(mounted.resources()).toEqual([]);
+    mounted.runtime.publish(sceneOf(3, []), false, 0, homeCamera);
+    expect(mounted.resources()).toEqual([]);
   });
 });
