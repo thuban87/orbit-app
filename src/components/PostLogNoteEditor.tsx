@@ -30,6 +30,7 @@ import {
 } from "@/db/memories-dao";
 import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
 import { editTouchpointFull } from "@/db/recency-dao";
+import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import {
   commitThenReReadMemory,
   resolvePostCreateMemoryTarget,
@@ -88,8 +89,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     let cancelled = false;
     void (async () => {
       try {
-        const enabled =
-          (await getAppSettings(getExecutor())).aiProvider !== "none";
+        const enabled = isAiMasterEnabled(await getAppSettings(getExecutor()));
         if (!cancelled) setGlobalAiEnabled(enabled);
       } catch (err) {
         Logger.error(LOG_SCOPE, "failed to read AI availability", err);

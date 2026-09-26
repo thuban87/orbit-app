@@ -119,6 +119,7 @@ import {
 } from "@/db/relationships-read";
 import { newUid } from "@/db/uid";
 import { useCategoryCatalogRefresh } from "@/hooks/use-category-catalog-refresh";
+import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import {
   CATEGORY_SEARCH_THRESHOLD,
   resolveCategorySelection,
@@ -593,7 +594,7 @@ export function EditContactScreen({
       relationshipLinkedNamesRef.current = knowledge.relationshipLinkedNames;
       setEditDefs(nextEditDefs);
       setNeverContacted(nextNeverContacted);
-      setGlobalAiEnabled(settings.aiProvider !== "none");
+      setGlobalAiEnabled(isAiMasterEnabled(settings));
       setSeededMemories(knowledge.memories);
       setSeededRelationships(knowledge.relationships);
       setSeededOffLimits(knowledge.offLimits);
@@ -1588,8 +1589,9 @@ export function EditContactScreen({
       </AccordionSection>
 
       {/* -- Memories (§E). Seeded by its OWN read (listMemoriesForContact); the
-          Allow-AI control reflects the REAL app AI setting (getAppSettings), never a
-          hardcoded false (Review cycle-4 LOW #4 / D-04). -- */}
+          Allow-AI control reflects the canonical AI master (isAiMasterEnabled,
+          ADR-135 / 38.4 RG-008), never a hardcoded false or the retired
+          aiProvider field (Review cycle-4 LOW #4 / D-04). -- */}
       <AccordionSection
         sectionId="memories"
         title="Memories"

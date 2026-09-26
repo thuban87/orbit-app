@@ -18,8 +18,9 @@
  * general/custom/imported) via `addMemoryCore` — this screen adds NO create-time
  * AI control and does not extend the draft. The "Allow AI to use this" control
  * MemoryEditor renders only when editing an existing Memory; its `globalAiEnabled`
- * is derived from the real AI-provider setting (Review cycle-4 LOW #4), never a
- * stub, so it reflects the actual global AI posture (D-04, ADR-078).
+ * is derived from the canonical AI master (`isAiMasterEnabled`, ADR-135; 38.4
+ * RG-008), never a stub or the retired `aiProvider` field, so it reflects the
+ * actual global AI posture (D-04, ADR-078).
  *
  * Read tri-state (38.3 RG-035, D-24): the memories read drives a `ReadPhase` —
  * loading, then either the editor over SUCCESSFULLY read rows or a read-error
@@ -50,6 +51,7 @@ import {
   setMemoryAllowAi,
 } from "@/db/memories-dao";
 import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
+import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
 import type { DashboardScreenProps } from "@/navigation/types";
 import { showSnackbar } from "@/stores/snackbar-store";
@@ -71,7 +73,7 @@ export function MemoryScreen({
     useState<ReadPhase<MemoryRow[]>>(readLoading);
   // Only the latest load may publish; blur invalidates outstanding reads (D-23).
   const readAuthority = useMemo(() => createLatestRequestAuthority(), []);
-  // Derived from the real AI-provider setting — the edit-only "Allow AI" control
+  // Derived from the canonical AI master — the edit-only "Allow AI" control
   // must reflect the actual global posture, never a hardcoded stub (cycle-4 #4).
   const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
   // Single-flight guard: block a second concurrent write while one is in flight
@@ -98,7 +100,7 @@ export function MemoryScreen({
     const token = readAuthority.begin();
     let aiEnabled = false;
     try {
-      aiEnabled = (await getAppSettings(getExecutor())).aiProvider !== "none";
+      aiEnabled = isAiMasterEnabled(await getAppSettings(getExecutor()));
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to load AI availability", error);
     }

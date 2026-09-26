@@ -66,6 +66,7 @@ import {
   type RelationshipRow,
   resolveRelationshipVisibility,
 } from "@/db/relationships-read";
+import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -168,15 +169,15 @@ export function ThingsToRememberScreen({
     null,
   );
   const [currentDraft, setCurrentDraft] = useState("");
-  // Interim durable availability gate; Phase 36 will replace/compose this with
-  // the global AI master setting without changing the per-item wiring.
+  // The canonical AI master (ADR-135; 38.4 RG-008) gates the per-item Allow-AI
+  // control; per-item `allow_ai` consent stays separate and is never written here.
   const [globalAiEnabled, setGlobalAiEnabled] = useState(false);
 
   const load = useCallback(
     async (cancelled: () => boolean = () => false) => {
       const exec = getExecutor();
       try {
-        const aiEnabled = (await getAppSettings(exec)).aiProvider !== "none";
+        const aiEnabled = isAiMasterEnabled(await getAppSettings(exec));
         if (!cancelled()) setGlobalAiEnabled(aiEnabled);
       } catch (error) {
         Logger.error(LOG_SCOPE, "failed to load AI availability", error);
@@ -473,6 +474,8 @@ export function ThingsToRememberScreen({
             value={includeHidden}
             onValueChange={setIncludeHidden}
             accessibilityLabel="Show hidden items"
+            trackColor={{ false: colors.border, true: colors.accent }}
+            thumbColor={colors.surfaceElevated}
           />
         </View>
       </View>

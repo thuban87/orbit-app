@@ -17,6 +17,7 @@ import {
 } from "@/db/memory-registry";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { Icon } from "./icons/Icon";
 import { MemoryCard } from "./MemoryCard";
 import { AppText } from "./ui";
 
@@ -85,9 +86,13 @@ function TypePicker({
 
   return (
     <>
+      {/* The trigger exposes the current kind as its value (38.4 RG-030,
+          ui-accessibility/AUD-UIA-005), not only inside a combined label. */}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Memory type: ${selected}`}
+        accessibilityLabel="Memory type"
+        accessibilityValue={{ text: selected }}
+        accessibilityHint="Opens the memory type options"
         onPress={() => setOpen(true)}
         style={[
           styles.typeTrigger,
@@ -128,29 +133,40 @@ function TypePicker({
             <FlatList
               data={MEMORY_TYPE_OPTIONS}
               keyExtractor={(item) => item.type}
-              renderItem={({ item }) => (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={item.label}
-                  onPress={() => {
-                    onSelect(item.type);
-                    setOpen(false);
-                  }}
-                  style={[styles.option, { borderColor: colors.border }]}
-                >
-                  <AppText
-                    role="body"
-                    style={{
-                      color:
-                        item.type === value
-                          ? colors.accent
-                          : colors.textPrimary,
+              renderItem={({ item }) => {
+                const isSelected = item.type === value;
+                // Selection is announced (accessibilityState) and marked with a
+                // filled `select` glyph, never by colour alone (AUD-UIA-005).
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={item.label}
+                    accessibilityState={{ selected: isSelected }}
+                    onPress={() => {
+                      onSelect(item.type);
+                      setOpen(false);
                     }}
+                    style={[styles.option, { borderColor: colors.border }]}
                   >
-                    {item.label}
-                  </AppText>
-                </Pressable>
-              )}
+                    <AppText
+                      role="body"
+                      style={[
+                        styles.optionLabel,
+                        {
+                          color: isSelected
+                            ? colors.accent
+                            : colors.textPrimary,
+                        },
+                      ]}
+                    >
+                      {item.label}
+                    </AppText>
+                    {isSelected ? (
+                      <Icon name="select" state="active" tone="accent" />
+                    ) : null}
+                  </Pressable>
+                );
+              }}
             />
           </View>
         </View>
@@ -358,15 +374,21 @@ export function MemoryEditor({
           <View style={styles.toggleRow}>
             <AppText role="body">Pin memory</AppText>
             <Switch
+              accessibilityLabel="Pin memory"
               value={draft.pinned}
               onValueChange={(value) => update("pinned", value)}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surfaceElevated}
             />
           </View>
           <View style={styles.toggleRow}>
             <AppText role="body">Mark outdated</AppText>
             <Switch
+              accessibilityLabel="Mark outdated"
               value={draft.outdated}
               onValueChange={(value) => update("outdated", value)}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surfaceElevated}
             />
           </View>
           <View style={styles.toggleRow}>
@@ -377,8 +399,11 @@ export function MemoryEditor({
               </AppText>
             </View>
             <Switch
+              accessibilityLabel="Hide from Profile"
               value={draft.hidden === true}
               onValueChange={(value) => update("hidden", value)}
+              trackColor={{ false: colors.border, true: colors.accent }}
+              thumbColor={colors.surfaceElevated}
             />
           </View>
           {editing ? (
@@ -405,6 +430,8 @@ export function MemoryEditor({
                   );
                   onSetAllowAi(editing.id, allow);
                 }}
+                trackColor={{ false: colors.border, true: colors.accent }}
+                thumbColor={colors.surfaceElevated}
               />
             </View>
           ) : null}
@@ -513,11 +540,15 @@ const styles = StyleSheet.create({
   },
   multiline: { minHeight: 84, textAlignVertical: "top" },
   option: {
+    alignItems: "center",
     borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: SPACING.sm,
     minHeight: 44,
-    justifyContent: "center",
+    justifyContent: "space-between",
     paddingHorizontal: SPACING.base,
   },
+  optionLabel: { flex: 1 },
   scrim: { opacity: 0.82 },
   sheet: {
     borderRadius: SPACING.md,
