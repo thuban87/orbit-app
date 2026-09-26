@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
+import { ICON_REGISTRY } from "@/components/icons/icon-registry";
 import { SETTINGS_REGISTERED_ROUTES } from "@/navigation/settings-routes";
 import {
+  hubRowAccessibilityLabel,
+  hubRowShowsChevron,
   SETTINGS_CATEGORY_ORDER,
   SETTINGS_HUB_ROWS,
+  type SettingsHubRow,
 } from "./settings-hub-model";
 
 describe("Settings hub model", () => {
@@ -99,5 +103,95 @@ describe("Settings hub model", () => {
       reserved,
       "no hub row may target the inert CategoryManagement reservation",
     ).toBeUndefined();
+  });
+});
+
+/**
+ * Root-row anatomy (RG-037 ui-accessibility/AUD-UIA-017, D-15; Phase 37 root-row
+ * spec): icon + title + subtitle + navigation affordance, and no live values
+ * (ADR-140). Icons are registry semantic names only (ADR-086).
+ */
+describe("Settings hub row anatomy (RG-037 AUD-UIA-017, D-15)", () => {
+  it("gives every row a registered semantic icon (ADR-086)", () => {
+    for (const row of SETTINGS_HUB_ROWS) {
+      expect(
+        Object.keys(ICON_REGISTRY),
+        `hub row "${row.key}" icon "${row.icon}" is not a registry name`,
+      ).toContain(row.icon);
+    }
+  });
+
+  it("maps each row to its planner glyph pick", () => {
+    const icons = Object.fromEntries(
+      SETTINGS_HUB_ROWS.map((row) => [row.key, row.icon]),
+    );
+    expect(icons).toEqual({
+      appearance: "appearance",
+      contacts: "contacts",
+      interactions: "message",
+      notifications: "notifications",
+      orrery: "orrery",
+      "data-backup": "backup",
+      ai: "sparkle",
+      about: "about",
+      "add-widget": "widget",
+    });
+  });
+
+  it("shows a chevron on every navigation row and none on the utility action row", () => {
+    for (const row of SETTINGS_HUB_ROWS) {
+      expect(hubRowShowsChevron(row), row.key).toBe(row.kind === "route");
+    }
+    const widget = SETTINGS_HUB_ROWS.find((row) => row.key === "add-widget");
+    expect(widget?.kind).toBe("action");
+    if (widget) expect(hubRowShowsChevron(widget)).toBe(false);
+  });
+
+  it("edge: an action row has no chevron and no navigation target", () => {
+    const action: SettingsHubRow = {
+      kind: "action",
+      key: "probe",
+      title: "Probe",
+      subtitle: "Does something in place",
+      icon: "widget",
+      action: "probe",
+    };
+    expect(hubRowShowsChevron(action)).toBe(false);
+    expect("route" in action).toBe(false);
+  });
+
+  it("names each row with its title and subtitle", () => {
+    for (const row of SETTINGS_HUB_ROWS) {
+      expect(hubRowAccessibilityLabel(row)).toBe(
+        `${row.title}, ${row.subtitle}`,
+      );
+    }
+    const appearance = SETTINGS_HUB_ROWS[0];
+    expect(hubRowAccessibilityLabel(appearance)).toBe(
+      "Appearance, Theme, mode, accent, and background",
+    );
+  });
+
+  it("keeps rows free of live setting values (titles/subtitles unchanged, ADR-140)", () => {
+    expect(SETTINGS_HUB_ROWS.map((row) => [row.title, row.subtitle])).toEqual([
+      ["Appearance", "Theme, mode, accent, and background"],
+      [
+        "Contacts & Relationships",
+        "Contact sources, custom fields, and archived people",
+      ],
+      [
+        "Interactions",
+        "Message defaults, dashboard swipe, and Interaction Assist",
+      ],
+      [
+        "Notifications",
+        "Reminders, birthdays, weekly digest, and delivery time",
+      ],
+      ["Orrery", "Display density, relationship satellites, and Systems"],
+      ["Data & Backup", "Export, restore, encryption, and automatic backups"],
+      ["AI", "Connection, model, personalization, and data permissions"],
+      ["About Orbit", "App name and version"],
+      ["Add Orbit widget", "Pin the Orbit widget to your home screen"],
+    ]);
   });
 });

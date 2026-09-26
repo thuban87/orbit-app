@@ -48,6 +48,26 @@ const BASE_NAMES = [
   "sparkle",
 ] as const satisfies readonly IconName[];
 
+/**
+ * Settings directory row identities (RG-037 ui-accessibility/AUD-UIA-017, D-15).
+ * Planner glyph picks from the same Ionicons family; the owner reviews them on
+ * the device pass and can swap any glyph here without touching a screen.
+ */
+const SETTINGS_ROW_ICONS: Record<string, { outline: string; filled: string }> =
+  {
+    appearance: { outline: "color-palette-outline", filled: "color-palette" },
+    contacts: { outline: "people-circle-outline", filled: "people-circle" },
+    notifications: {
+      outline: "notifications-outline",
+      filled: "notifications",
+    },
+    about: {
+      outline: "information-circle-outline",
+      filled: "information-circle",
+    },
+    widget: { outline: "apps-outline", filled: "apps" },
+  };
+
 describe("ICON_REGISTRY", () => {
   it("maps every semantic name to a non-empty outline AND filled glyph", () => {
     for (const [name, pair] of Object.entries(ICON_REGISTRY)) {
@@ -84,6 +104,14 @@ describe("ICON_REGISTRY", () => {
     expect(ICON_REGISTRY["system-broken"].outline).not.toBe(
       ICON_REGISTRY["system-overrides"].outline,
     );
+  });
+
+  it("registers the Settings directory row identities as outline/filled pairs (RG-037, D-15)", () => {
+    const registry: Record<string, { outline: string; filled: string }> =
+      ICON_REGISTRY;
+    for (const [name, pair] of Object.entries(SETTINGS_ROW_ICONS)) {
+      expect(registry[name], `registry entry ${name}`).toEqual(pair);
+    }
   });
 
   it("reserves the `warning` name required by Plan 07 (REVIEWS 23-05 LOW)", () => {
