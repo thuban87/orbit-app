@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-sqlite", () => ({}));
@@ -13,12 +14,15 @@ import {
 } from "@/db/group-events-read";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
+import { resolveDisplay } from "@/logic/group-inheritance";
 import {
   createGroupEventRefreshController,
+  eventDraft,
   excludedParticipantIds,
   type GroupEventEditState,
   groupEventEditReducer,
   initialGroupEventEditState,
+  isGroupEventDraftDirty,
   runParticipantAdd,
 } from "./group-event-refresh";
 
@@ -274,6 +278,125 @@ describe("runParticipantAdd — commit vs refresh (D-19, reliability-testing/AUD
 
     expect(onRefreshed).not.toHaveBeenCalled();
     expect(onRefreshFailed).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("groupEventEditReducer — participant work preserves the parent draft (D-17, D-18, reliability-testing/AUD-REL-007)", () => {
+  const saved = detail([participant(1)]);
+
+  function editedState(): GroupEventEditState {
+    const seeded = groupEventEditReducer(initialGroupEventEditState, {
+      type: "initialLoaded",
+      event: saved,
+    });
+    const base = seeded.draft;
+    if (!base) throw new Error("expected a seeded draft");
+    return groupEventEditReducer(seeded, {
+      type: "draftChanged",
+      draft: {
+        value: { ...base.value, quality: "Negative" },
+        groupNote: "Unsaved note",
+      },
+    });
+  }
+
+  it("keeps the unsaved Group Note and Tone, the baseline and the dirty flag across a participant refresh", () => {
+    const edited = editedState();
+    expect(isGroupEventDraftDirty(edited)).toBe(true);
+
+    const refreshed = groupEventEditReducer(edited, {
+      type: "eventRefreshed",
+      event: detail([participant(1), participant(2)]),
+    });
+
+    expect(refreshed.draft).toBe(edited.draft);
+    expect(refreshed.baseline).toBe(edited.baseline);
+    expect(refreshed.draft?.groupNote).toBe("Unsaved note");
+    expect(refreshed.draft?.value.quality).toBe("Negative");
+    expect(isGroupEventDraftDirty(refreshed)).toBe(true);
+    expect(refreshed.event?.participants.map((p) => p.contactId)).toEqual([
+      1, 2,
+    ]);
+  });
+
+  it("never moves the baseline, even when the refreshed parent equals the draft (no accidental clean)", () => {
+    const edited = editedState();
+    const refreshed = groupEventEditReducer(edited, {
+      type: "eventRefreshed",
+      event: detail([participant(1)], {
+        quality: "Negative",
+        groupNote: "Unsaved note",
+      }),
+    });
+
+    expect(refreshed.baseline).toBe(edited.baseline);
+    expect(isGroupEventDraftDirty(refreshed)).toBe(true);
+  });
+
+  it("ignores a late or duplicate initial load once the draft is seeded", () => {
+    const edited = editedState();
+    const again = groupEventEditReducer(edited, {
+      type: "initialLoaded",
+      event: detail([participant(1), participant(2)], { groupNote: "Other" }),
+    });
+
+    expect(again).toBe(edited);
+    expect(
+      groupEventEditReducer(edited, { type: "initialLoadFailed" }).loadError,
+    ).toBe(false);
+  });
+
+  it("resolves a following participant against the SAVED event, not the unsaved draft (D-18)", () => {
+    const edited = groupEventEditReducer(editedState(), {
+      type: "eventRefreshed",
+      event: detail([participant(1), participant(2)]),
+    });
+    const event = edited.event;
+    if (!event) throw new Error("expected an event");
+    const follower = event.participants[1];
+
+    // The same resolution ParticipantOverrideEditor's participantDraft uses.
+    const display = resolveDisplay(follower, {
+      channel: event.channel ?? "In Person",
+      quality: event.quality,
+      duration: event.duration,
+    });
+
+    expect(display.quality).toMatchObject({
+      value: "Positive",
+      following: true,
+    });
+    expect(edited.draft?.value.quality).toBe("Negative");
+  });
+
+  it("computes the parent Save patch against the saved event, which participant work never changes", () => {
+    const edited = editedState();
+    const refreshed = groupEventEditReducer(edited, {
+      type: "eventRefreshed",
+      event: detail([participant(1), participant(2)]),
+    });
+    if (!refreshed.event || !refreshed.baseline) {
+      throw new Error("expected a seeded state");
+    }
+
+    expect(eventDraft(refreshed.event)).toEqual(JSON.parse(refreshed.baseline));
+    expect(eventDraft(refreshed.event).groupNote).toBe("Saved note");
+  });
+
+  it("EditGroupEventScreen has no reseeding reload after participant work", () => {
+    const source = readFileSync(
+      new URL("./EditGroupEventScreen.tsx", import.meta.url),
+      "utf8",
+    );
+
+    expect(source).not.toContain("baselineRef");
+    expect(source).not.toContain("setDraft(");
+    expect(source).not.toMatch(/\bawait load\(/);
+    expect(source.match(/type: "initialLoaded"/g)).toHaveLength(1);
+    expect(source).toContain('type: "draftChanged"');
+    expect(
+      source.match(/refreshEvent\(\)/g)?.length ?? 0,
+    ).toBeGreaterThanOrEqual(3);
   });
 });
 
