@@ -1,4 +1,9 @@
-import { type AppSettingsPatch, assertBackupDays } from "@/db/app-settings-dao";
+import {
+  type AppSettings,
+  type AppSettingsPatch,
+  assertBackupDays,
+} from "@/db/app-settings-dao";
+import type { ReadPhase } from "@/logic/read-phase";
 
 export const BACKUP_DAYS_VALIDATION_COPY =
   "Enter a whole number from 1 to 3650 days.";
@@ -83,4 +88,78 @@ export function validateEncryptionSetup(
     return { ok: false, error: "Passphrases don't match." };
   }
   return { ok: true };
+}
+
+export interface BackupSettingsPresentation {
+  /** Render the folder and encryption groups at all. */
+  readonly showGroups: boolean;
+  /** Null while settings are unknown — never a default "off" (D-24). */
+  readonly encryptionSummary: "on" | "off" | null;
+  readonly folderConfigured: boolean;
+  readonly folderAccessible: boolean;
+}
+
+/**
+ * Which backup-settings state the screen may present (38.3 RG-035, D-24).
+ * Everything is hidden/false/null unless the settings read has succeeded: an
+ * unread or unreadable settings row must never render as "Off — backups are
+ * readable JSON", a folder state, or the passphrase-setup flow, because the
+ * user decides whether backups need protection from what this screen claims.
+ * Presentation only — encryption itself is untouched.
+ */
+export function backupSettingsPresentation(
+  phase: ReadPhase<AppSettings>,
+): BackupSettingsPresentation {
+  if (phase.phase !== "loaded") {
+    return {
+      showGroups: false,
+      encryptionSummary: null,
+      folderConfigured: false,
+      folderAccessible: false,
+    };
+  }
+  const settings = phase.data;
+  return {
+    showGroups: true,
+    encryptionSummary: settings.encryptionEnabled === 1 ? "on" : "off",
+    folderConfigured:
+      settings.backupFolderUri !== null &&
+      settings.backupFolderUri !== undefined,
+    folderAccessible: settings.backupFolderAccessible === 1,
+  };
+}
+
+export type CommitThenRefreshOutcome =
+  | "committed"
+  | "nothing-committed"
+  | "commit-failed";
+
+export interface CommitThenRefreshSteps {
+  /** The write. Resolve `false` when nothing was written (e.g. picker cancelled). */
+  readonly commit: () => Promise<boolean>;
+  /** The post-write re-read; MUST never reject (use `runGatedRead`). */
+  readonly refresh: () => Promise<void>;
+  /** Report a failed WRITE (Alert / inline error). Never sees a re-read failure. */
+  readonly onCommitFailed: (error: unknown) => void;
+}
+
+/**
+ * Commit, then await the re-read (38.3 D-04). The re-read sits OUTSIDE the
+ * write's catch, so a failed re-read after a committed write can only surface
+ * as the read-error state — it is never reported as a failed write and the
+ * write is never retried. The handler resolves only after the re-read settles.
+ */
+export async function commitThenRefresh(
+  steps: CommitThenRefreshSteps,
+): Promise<CommitThenRefreshOutcome> {
+  let wrote: boolean;
+  try {
+    wrote = await steps.commit();
+  } catch (error) {
+    steps.onCommitFailed(error);
+    return "commit-failed";
+  }
+  if (!wrote) return "nothing-committed";
+  await steps.refresh();
+  return "committed";
 }
