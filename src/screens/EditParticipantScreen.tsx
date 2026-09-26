@@ -15,6 +15,10 @@ import {
   type GroupEventParticipant,
   readGroupEventDetail,
 } from "@/db/group-events-read";
+import {
+  buildParticipantFieldPatch,
+  buildParticipantFollowPatch,
+} from "@/logic/group-participant-patch";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
@@ -71,40 +75,8 @@ export function EditParticipantScreen({
     setSaving(true);
     setError(null);
     const initial = loaded.draft;
-    const follow = {
-      ...(draft.follow.channel !== initial.follow.channel
-        ? {
-            channel: draft.follow.channel
-              ? { follow: true as const }
-              : { follow: false as const, value: draft.value.channel },
-          }
-        : {}),
-      ...(draft.follow.quality !== initial.follow.quality
-        ? {
-            quality: draft.follow.quality
-              ? { follow: true as const }
-              : { follow: false as const, value: draft.value.quality },
-          }
-        : {}),
-      ...(draft.follow.duration !== initial.follow.duration
-        ? {
-            duration: draft.follow.duration
-              ? { follow: true as const }
-              : { follow: false as const, value: draft.value.duration },
-          }
-        : {}),
-    };
-    const fields = {
-      ...(draft.value.direction !== initial.value.direction
-        ? { direction: draft.value.direction }
-        : {}),
-      ...(draft.value.connected !== initial.value.connected
-        ? { connected: draft.value.connected }
-        : {}),
-      ...(draft.value.note !== initial.value.note
-        ? { note: draft.value.note }
-        : {}),
-    };
+    const follow = buildParticipantFollowPatch(initial, draft);
+    const fields = buildParticipantFieldPatch(initial, draft);
     try {
       await saveParticipantEdits(getExecutor(), {
         interactionId,

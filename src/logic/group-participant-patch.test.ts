@@ -125,14 +125,20 @@ describe("buildParticipantFollowPatch", () => {
       value: { quality: "Negative" },
       follow: { quality: false },
     });
-    const next = draft({ value: { quality: null }, follow: { quality: false } });
+    const next = draft({
+      value: { quality: null },
+      follow: { quality: false },
+    });
     expect(buildParticipantFollowPatch(initial, next)).toEqual({
       quality: { follow: false, value: null },
     });
   });
 
   it("overridden null Tone → value emits the new value", () => {
-    const initial = draft({ value: { quality: null }, follow: { quality: false } });
+    const initial = draft({
+      value: { quality: null },
+      follow: { quality: false },
+    });
     const next = draft({
       value: { quality: "Neutral" },
       follow: { quality: false },
@@ -191,7 +197,10 @@ describe("buildParticipantFieldPatch", () => {
 
   it("includes only changed direct fields", () => {
     expect(
-      buildParticipantFieldPatch(draft(), draft({ value: { direction: null } })),
+      buildParticipantFieldPatch(
+        draft(),
+        draft({ value: { direction: null } }),
+      ),
     ).toEqual({ direction: null });
     expect(
       buildParticipantFieldPatch(draft(), draft({ value: { connected: 0 } })),

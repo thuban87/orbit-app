@@ -23,6 +23,12 @@ import {
 import { runMigrations } from "@/db/migrations/runner";
 import { recordTouchpoint } from "@/db/recency-dao";
 import type { SqlExecutor } from "@/db/types";
+import { resolveDisplay } from "@/logic/group-inheritance";
+import {
+  buildParticipantFieldPatch,
+  buildParticipantFollowPatch,
+  type ParticipantPatchDraft,
+} from "@/logic/group-participant-patch";
 
 const NOW = "2026-09-12 12:00:00";
 let counter = 0;
@@ -1314,5 +1320,226 @@ describe("saveParticipantEdits", () => {
       ge_follow_duration: 1,
     });
     expect(await readDataRevision(exec)).toBe(revision + 1);
+  });
+});
+
+/**
+ * RG-019 / reliability-testing/AUD-REL-006: prove the shared patch builder
+ * through the real coordinator — build → saveParticipantEdits → re-read —
+ * rather than asserting on source strings.
+ */
+describe("participant patch builder round-trip (RG-019)", () => {
+  /** Mirror `participantDraft`: resolve the child against its parent event. */
+  async function initialDraft(
+    groupEventId: number,
+    contactId: number,
+  ): Promise<{ interactionId: number; draft: ParticipantPatchDraft }> {
+    const event = (await exec.getFirstAsync<{
+      channel: string | null;
+      quality: string | null;
+      duration: number | null;
+    }>("SELECT channel, quality, duration FROM group_events WHERE id = ?", [
+      groupEventId,
+    ]))!;
+    const child = (await groupChildren(groupEventId)).find(
+      (row) => row.contact_id === contactId,
+    )!;
+    const display = resolveDisplay(
+      {
+        channel: child.channel,
+        quality: child.quality,
+        duration: child.duration,
+        direction: child.direction,
+        connected: child.connected,
+        geFollowChannel: child.ge_follow_channel,
+        geFollowQuality: child.ge_follow_quality,
+        geFollowDuration: child.ge_follow_duration,
+      },
+      {
+        channel: event.channel ?? "In Person",
+        quality: event.quality,
+        duration: event.duration,
+      },
+    );
+    return {
+      interactionId: child.id,
+      draft: {
+        value: {
+          channel: display.channel.value,
+          quality: display.quality.value,
+          duration: display.duration.value,
+          direction: child.direction,
+          connected: child.connected,
+          note: child.note,
+        },
+        follow: {
+          channel: display.channel.following,
+          quality: display.quality.following,
+          duration: display.duration.following,
+        },
+      },
+    };
+  }
+
+  async function overriddenAlex(
+    field: "channel" | "quality" | "duration",
+    value: string | number | null,
+  ) {
+    const { groupEventId, alex } = await groupWithThreeChildren();
+    const child = (await groupChildren(groupEventId)).find(
+      (row) => row.contact_id === alex,
+    )!;
+    await setParticipantOverride(exec, {
+      interactionId: child.id,
+      contactId: alex,
+      groupEventId,
+      now: NOW,
+      field,
+      value,
+    });
+    return { groupEventId, alex, ...(await initialDraft(groupEventId, alex)) };
+  }
+
+  async function saveDraft(
+    groupEventId: number,
+    contactId: number,
+    interactionId: number,
+    initial: ParticipantPatchDraft,
+    draft: ParticipantPatchDraft,
+  ) {
+    await saveParticipantEdits(exec, {
+      interactionId,
+      contactId,
+      groupEventId,
+      now: NOW,
+      follow: buildParticipantFollowPatch(initial, draft),
+      fields: buildParticipantFieldPatch(initial, draft),
+    });
+    return exec.getFirstAsync(
+      `SELECT channel, quality, duration, ge_follow_channel, ge_follow_quality,
+              ge_follow_duration
+         FROM interactions WHERE id = ?`,
+      [interactionId],
+    );
+  }
+
+  function edit(
+    draft: ParticipantPatchDraft,
+    value: Partial<ParticipantPatchDraft["value"]>,
+  ): ParticipantPatchDraft {
+    return { value: { ...draft.value, ...value }, follow: { ...draft.follow } };
+  }
+
+  it("persists a Channel edit on an already-overridden participant (follow stays 0)", async () => {
+    const { groupEventId, alex, interactionId, draft } = await overriddenAlex(
+      "channel",
+      "Message",
+    );
+    expect(draft.follow.channel).toBe(false);
+    const revision = await readDataRevision(exec);
+    expect(
+      await saveDraft(
+        groupEventId,
+        alex,
+        interactionId,
+        draft,
+        edit(draft, { channel: "In Person" }),
+      ),
+    ).toMatchObject({ channel: "In Person", ge_follow_channel: 0 });
+    expect(await readDataRevision(exec)).toBe(revision + 1);
+  });
+
+  it("persists a Duration edit on an already-overridden participant (follow stays 0)", async () => {
+    const { groupEventId, alex, interactionId, draft } = await overriddenAlex(
+      "duration",
+      600,
+    );
+    expect(
+      await saveDraft(
+        groupEventId,
+        alex,
+        interactionId,
+        draft,
+        edit(draft, { duration: 1200 }),
+      ),
+    ).toMatchObject({ duration: 1200, ge_follow_duration: 0 });
+  });
+
+  it("persists an overridden Tone → null and null → value", async () => {
+    const { groupEventId, alex, interactionId, draft } = await overriddenAlex(
+      "quality",
+      "Negative",
+    );
+    const cleared = edit(draft, { quality: null });
+    expect(
+      await saveDraft(groupEventId, alex, interactionId, draft, cleared),
+    ).toMatchObject({ quality: null, ge_follow_quality: 0 });
+
+    const reloaded = (await initialDraft(groupEventId, alex)).draft;
+    expect(reloaded.value.quality).toBeNull();
+    expect(reloaded.follow.quality).toBe(false);
+    expect(
+      await saveDraft(
+        groupEventId,
+        alex,
+        interactionId,
+        reloaded,
+        edit(reloaded, { quality: "Neutral" }),
+      ),
+    ).toMatchObject({ quality: "Neutral", ge_follow_quality: 0 });
+  });
+
+  it("an override edited to equal the parent value persists and stays detached (ADR-125)", async () => {
+    const { groupEventId, alex, interactionId, draft } = await overriddenAlex(
+      "quality",
+      "Negative",
+    );
+    // Parent Tone is "Positive" (groupWithThreeChildren).
+    expect(
+      await saveDraft(
+        groupEventId,
+        alex,
+        interactionId,
+        draft,
+        edit(draft, { quality: "Positive" }),
+      ),
+    ).toMatchObject({ quality: "Positive", ge_follow_quality: 0 });
+
+    // Still detached: a later parent Tone change must not fan out to Alex.
+    await updateGroupEvent(exec, {
+      groupEventId,
+      now: NOW,
+      patch: { quality: { value: "Neutral" } },
+    });
+    expect(
+      await exec.getFirstAsync(
+        "SELECT quality, ge_follow_quality FROM interactions WHERE id = ?",
+        [interactionId],
+      ),
+    ).toEqual({ quality: "Positive", ge_follow_quality: 0 });
+  });
+
+  it("a 'Follow event' draft re-attaches with the parent value", async () => {
+    const { groupEventId, alex, interactionId, draft } = await overriddenAlex(
+      "duration",
+      600,
+    );
+    const following: ParticipantPatchDraft = {
+      value: { ...draft.value, duration: 3600 },
+      follow: { ...draft.follow, duration: true },
+    };
+    expect(
+      await saveDraft(groupEventId, alex, interactionId, draft, following),
+    ).toMatchObject({ duration: 3600, ge_follow_duration: 1 });
+  });
+
+  it("an unchanged draft is a no-op save (no revision bump)", async () => {
+    const { groupEventId, alex, interactionId, draft } = await overriddenAlex(
+      "channel",
+      "Message",
+    );
+    const revision = await readDataRevision(exec);
+    await saveDraft(groupEventId, alex, interactionId, draft, edit(draft, {}));
+    expect(await readDataRevision(exec)).toBe(revision);
   });
 });
