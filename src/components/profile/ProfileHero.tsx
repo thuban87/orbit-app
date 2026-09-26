@@ -5,12 +5,16 @@ import { Icon } from "@/components/icons/Icon";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import type { ProfileIdentity } from "@/db/profile-read";
-import { profileHeroActionState } from "@/profile/relationship-sheet-model";
+import {
+  type ProfileHeroMessageContext,
+  profileHeroActionState,
+} from "@/profile/relationship-sheet-model";
 import { SPACING } from "@/theme/tokens/spacing";
 
 export function ProfileHero({
   identity,
   actionableMethods,
+  messageContext,
   onToggleFavourite,
   onMessage,
   onCall,
@@ -18,12 +22,17 @@ export function ProfileHero({
 }: {
   identity: ProfileIdentity;
   actionableMethods: Parameters<typeof profileHeroActionState>[0];
+  /**
+   * Archive state and host for Message eligibility (D-09, D-25). A blocked
+   * Message still renders — disabled, with its reason caption — never hidden.
+   */
+  messageContext: ProfileHeroMessageContext;
   onToggleFavourite: () => void;
   onMessage: () => void;
   onCall: () => void;
   pendingFavourite?: boolean;
 }) {
-  const actions = profileHeroActionState(actionableMethods);
+  const actions = profileHeroActionState(actionableMethods, messageContext);
   return (
     <View testID="profile-hero" style={styles.root}>
       <View style={styles.utilityRow}>

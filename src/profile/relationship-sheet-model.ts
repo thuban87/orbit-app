@@ -179,20 +179,58 @@ export function relationshipSheetReducer<T>(
   };
 }
 
-export function profileHeroActionState(methods: {
-  phone: ContactMethodRow | null;
-  email: ContactMethodRow | null;
-}) {
+/** Hero Message reason for an archived contact, in any Profile host (D-09). */
+export const PROFILE_MESSAGE_ARCHIVED_REASON =
+  "Archived contacts can't be messaged.";
+
+/**
+ * Hero Message reason for a Profile hosted in the Settings stack (D-25): Compose
+ * is never registered under Settings, so messaging opens from Contacts instead.
+ */
+export const PROFILE_MESSAGE_SETTINGS_HOST_REASON =
+  "Open this contact from Contacts to send a message.";
+
+/**
+ * Where a Profile is shown and what it is, as far as hero Message eligibility
+ * cares. Lifecycle (Bound/Unbound, trackingEnabled) is deliberately absent: a
+ * live Unbound contact can still be messaged (dossier Cluster N).
+ */
+export interface ProfileHeroMessageContext {
+  archived: boolean;
+  settingsHosted: boolean;
+}
+
+/**
+ * Fixed hero action capability. Message is disabled (never hidden) for an
+ * archived contact in every host (D-09) and for any Settings-hosted Profile
+ * (D-25), evaluated in that order, before method availability — RG-021 keeps
+ * archived messaging prohibited and Compose unregistered under Settings. Call
+ * follows the phone rule only; archive/host never change it (D-27).
+ */
+export function profileHeroActionState(
+  methods: {
+    phone: ContactMethodRow | null;
+    email: ContactMethodRow | null;
+  },
+  context: ProfileHeroMessageContext,
+) {
   const phone = methods.phone?.is_actionable === 1;
   const email = methods.email?.is_actionable === 1;
+  const messageBlockedReason = context.archived
+    ? PROFILE_MESSAGE_ARCHIVED_REASON
+    : context.settingsHosted
+      ? PROFILE_MESSAGE_SETTINGS_HOST_REASON
+      : !phone && !email
+        ? "Add a phone number or email to message this contact."
+        : null;
   return {
     message:
-      phone || email
+      messageBlockedReason === null
         ? { enabled: true as const, route: "compose" as const, reason: null }
         : {
             enabled: false as const,
             route: null,
-            reason: "Add a phone number or email to message this contact.",
+            reason: messageBlockedReason,
           },
     call: phone
       ? { enabled: true as const, route: "call" as const, reason: null }

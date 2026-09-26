@@ -58,6 +58,18 @@ The stable migration object is `profilePresentationMigration`; `src/db/database.
 
 The Hero is fixed structure, not a draggable/sticky layout module. It always supplies identity, Favorite, Message, Call, and one overflow entry point. Missing/unusable methods remain readable with explicit disabled reasons. Its Message action opens Compose with `origin: 'profile'`, so Back or a confirmed logged handoff returns by stack pop to the Profile that launched it; widget and notification resets remain built at their external routing boundaries.
 
+### Message eligibility (38.3, RG-021)
+
+Hero Message is decided by `profileHeroActionState(methods, { archived, settingsHosted })` in `src/profile/relationship-sheet-model.ts`, checked in this order:
+
+1. **Archived contact, in any host → disabled** with "Archived contacts can't be messaged." (owner ruling D-09). Messaging an archived contact stays prohibited.
+2. **Profile hosted in the Settings stack → disabled** with "Open this contact from Contacts to send a message." (owner ruling D-25). This covers the archived Profile (Settings → Contacts → Archived → Profile) and a live participant Profile reached inside Settings through a group event.
+3. **No actionable phone or email → disabled** with the existing add-a-method reason.
+
+Message is always rendered — disabled with its reason caption, never hidden. Lifecycle is not an input: a live Unbound contact outside Settings can still open Compose. Call keeps its phone-only rule in every host, and the Contact Methods row's native SMS handoff stays enabled for archived contacts (D-27).
+
+The host is explicit, not inferred from navigation state: `SettingsStack` registers `Profile` through `SettingsProfileHostRoute`, which renders `ContactProfileScreen` with `host="settings"` (the same pattern as the Backup host wrappers). Compose and ComposeResearch are **never registered under Settings** and there is no cross-tab jump to message; `SETTINGS_HOST_EXCLUDED_PROFILE_ROUTES` in `src/navigation/shell-contract.ts` names them, and `settings-routes.test.ts` fails if either is registered. Every other route in `PROFILE_REACHABLE_ROUTES` (including `RecentlyDeleted`) must be registered wherever Profile is hosted.
+
 The controller never creates a second Profile data writer. Favorite, archive, lifecycle, frequency, and Snooze route through their existing public DAOs/services; after a successful write it reloads the coherent local snapshot. User-triggered call/message/email handoffs use the established interaction-assist service. No read depends on network access.
 
 ### Semantic body and relationship facts
@@ -127,6 +139,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 13. **Do not turn heading metadata into content state.** Normal headings have no duplicated values or inferred empty caption; render meaningful state in the semantic body.
 14. **Scoped Off Limits writes stay scoped.** Filtering UI items is insufficient: force the kind and validate deletions at the controller/DAO boundary, then reload the controlled collection.
 15. **Orphan span is not layout persistence.** The computed stretch must not rewrite the compact/wide preference or reorder modules.
+16. **Do not make Message work in Settings by registering Compose there.** Settings-hosted Profiles disable Message by ruling (D-09, D-25, RG-021); registering Compose/ComposeResearch under Settings or adding a cross-tab jump reverses those rulings and is an owner decision.
 
 ## Related systems
 
@@ -154,3 +167,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-09-02 | 37 | Exposed global layout/background defaults in Settings while retaining per-contact template managers on Profile. |
 | 2026-09-19 | 38.1 | Made headings identifier-only, added bounded temporal knowledge/edit routes, moved Unbind to overflow, and added visual-only orphan packing with centered Overview cards. |
 | 2026-09-25 | 38.3 | Coherent snapshot + History revision (RG-024): the snapshot load is latest-request gated and also refreshes on the post-sweep foreground tick; each successful publication bumps the History revision so the metrics and History share one trigger. |
+| 2026-09-25 | 38.3 | Message eligibility by archive state and host (D-09, D-25, RG-021): hero Message is disabled with a reason for archived contacts in every host and for any Settings-hosted Profile; Compose stays unregistered under Settings, and Settings now registers `RecentlyDeleted`. |

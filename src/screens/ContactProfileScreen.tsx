@@ -63,11 +63,19 @@ import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "contact-profile";
 
+/**
+ * Which navigator hosts this Profile, passed explicitly by the host's route
+ * wrapper (no nav-state inference). `"settings"` disables hero Message because
+ * Compose is never registered under Settings (D-25, RG-021).
+ */
+export type ContactProfileHost = "settings";
+
 /** One local coherent snapshot drives the fixed Hero and resolved module host. */
 export function ContactProfileScreen({
   navigation,
   route,
-}: RootStackScreenProps<"Profile">) {
+  host,
+}: RootStackScreenProps<"Profile"> & { host?: ContactProfileHost }) {
   const { colors, package: themePackage } = useTheme();
   const contactId = route.params.contactId;
   const [snapshot, setSnapshot] = useState<ProfileSnapshot | null>(null);
@@ -420,6 +428,10 @@ export function ContactProfileScreen({
               <ProfileHero
                 identity={snapshot.identity}
                 actionableMethods={snapshot.actionableMethods}
+                messageContext={{
+                  archived: snapshot.identity.archivedAt !== null,
+                  settingsHosted: host === "settings",
+                }}
                 pendingFavourite={
                   pendingFavourite || lifecycle.kind !== "bound"
                 }

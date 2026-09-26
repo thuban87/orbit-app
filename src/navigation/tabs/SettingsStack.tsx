@@ -174,6 +174,15 @@ function RestoreResultSettingsRoute(
   return <RestoreResultScreen {...props} host="settings" />;
 }
 
+// Profile is hosted here (Settings → Archived → Profile, and a participant
+// Profile reached through a group event). The wrapper threads an explicit host,
+// mirroring the Backup wrappers above, so the hero disables Message: Compose and
+// ComposeResearch are deliberately never registered under Settings (D-09, D-25,
+// RG-021 — archived messaging stays prohibited; no cross-tab jump).
+function SettingsProfileHostRoute(props: RootStackScreenProps<"Profile">) {
+  return <ContactProfileScreen {...props} host="settings" />;
+}
+
 export function SettingsStack() {
   return (
     <Stack.Navigator
@@ -236,7 +245,7 @@ export function SettingsStack() {
         component={CategoryManagementScreen}
       />
       <Stack.Screen name="Archived" component={ArchivedContactsScreen} />
-      <Stack.Screen name="Profile" component={ContactProfileScreen} />
+      <Stack.Screen name="Profile" component={SettingsProfileHostRoute} />
       {/* Detailed-log route (HIST-15): a Settings-originated (Archived -> Profile)
           empty-date "Log interaction" must resolve here. */}
       <Stack.Screen name="LogContact" component={LogInteractionScreen} />
