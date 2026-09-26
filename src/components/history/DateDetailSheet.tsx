@@ -23,6 +23,11 @@
  * parent is never an `interactions` row (no double-count — D-10/D-12). No
  * multi-select / batch edit (Phase 32 boundary). All colours via theme tokens;
  * families read by icon + label, never colour alone. No group-event column.
+ *
+ * Row times (visible caption AND accessibility label) render through the shared
+ * minute-precision `formatTimeMinuteOrFallback` (12-hour AM/PM, no seconds,
+ * neutral fallback) — never a 24-hour slice of the stored string (RG-038
+ * ui-accessibility/AUD-UIA-018, 38.4 D-07, ADR-152).
  */
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
@@ -42,6 +47,7 @@ import {
 } from "@/db/memory-registry";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { formatTimeMinuteOrFallback } from "@/utils/dates";
 
 /** Channel/type → semantic icon (families read by silhouette, never colour). */
 const CHANNEL_ICON: Record<string, IconName> = {
@@ -59,11 +65,6 @@ const EVENT_ICON: Record<string, IconName> = {
   bind: "group-events",
   unbind: "group-events",
 };
-
-/** The stored local wall-clock string's `HH:MM` (never routed through UTC ISO). */
-function timeOf(stored: string): string {
-  return stored.slice(11, 16);
-}
 
 interface InteractionItem {
   readonly kind: "interaction";
@@ -207,7 +208,7 @@ function SheetRow({
     return (
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Interaction, ${r.channel}, ${timeOf(r.occurredAt)}`}
+        accessibilityLabel={`Interaction, ${r.channel}, ${formatTimeMinuteOrFallback(r.occurredAt)}`}
         style={[styles.row, { borderColor }]}
         onPress={() => onOpenInteraction(r.id)}
       >
@@ -216,7 +217,7 @@ function SheetRow({
           <View style={styles.rowHead}>
             <AppText role="label">{r.channel}</AppText>
             <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {timeOf(r.occurredAt)}
+              {formatTimeMinuteOrFallback(r.occurredAt)}
             </AppText>
           </View>
           {meta ? (
@@ -240,7 +241,7 @@ function SheetRow({
     const icon = EVENT_ICON[r.type] ?? "list";
     return (
       <View
-        accessibilityLabel={`${label}, ${timeOf(r.occurredAt)}`}
+        accessibilityLabel={`${label}, ${formatTimeMinuteOrFallback(r.occurredAt)}`}
         style={[styles.row, { borderColor }]}
       >
         <Icon name={icon} tone="textSecondary" size="sm" />
@@ -250,7 +251,7 @@ function SheetRow({
               {label}
             </AppText>
             <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {timeOf(r.occurredAt)}
+              {formatTimeMinuteOrFallback(r.occurredAt)}
             </AppText>
           </View>
           {r.detail ? (
@@ -269,7 +270,7 @@ function SheetRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Knowledge change, ${fieldLabel}, ${timeOf(r.createdAt)}`}
+      accessibilityLabel={`Knowledge change, ${fieldLabel}, ${formatTimeMinuteOrFallback(r.createdAt)}`}
       style={[styles.row, { borderColor }]}
       onPress={() => onOpenKnowledgeChange(r.fieldKey)}
     >
@@ -278,7 +279,7 @@ function SheetRow({
         <View style={styles.rowHead}>
           <AppText role="label">{fieldLabel}</AppText>
           <AppText role="caption" style={{ color: colors.textSecondary }}>
-            {timeOf(r.createdAt)}
+            {formatTimeMinuteOrFallback(r.createdAt)}
           </AppText>
         </View>
         {r.value ? (

@@ -114,19 +114,50 @@ export function formatMinuteClock(
 export function formatDateTimeMinute(stored: string): string {
   const date = new Date(parseLocalMs(stored));
   const month = MONTH_ABBREVIATIONS[date.getMonth()];
-  return `${month} ${date.getDate()}, ${date.getFullYear()}, ${formatMinuteClock(
-    { hour: date.getHours(), minute: date.getMinutes() },
-    TIME_FORMAT,
-  )}`;
+  return `${month} ${date.getDate()}, ${date.getFullYear()}, ${clockOf(date)}`;
 }
+
+/** The neutral display label shared by every `…OrFallback` formatter. */
+const UNKNOWN_TIME_LABEL = "Unknown time";
 
 /** Returns a neutral display label when a stored timestamp cannot be parsed. */
 export function formatDateTimeMinuteOrFallback(stored: string): string {
   try {
     return formatDateTimeMinute(stored);
   } catch {
-    return "Unknown time";
+    return UNKNOWN_TIME_LABEL;
   }
+}
+
+/**
+ * Formats only the clock of a stored local wall-clock timestamp (e.g.
+ * "9:05 AM"), for rows that already sit within a known day.
+ *
+ * Display-only, like `formatDateTimeMinute`: stored precision is unchanged and
+ * seconds are truncated, never shown. Both formatters share `clockOf` and the
+ * module-private `TIME_FORMAT`, so time-only and date-time displays are one
+ * contract and cannot disagree (ADR-152, 38.4 D-07; RG-038). Throws on an
+ * unparseable value — use `formatTimeMinuteOrFallback` in UI.
+ */
+export function formatTimeMinute(stored: string): string {
+  return clockOf(new Date(parseLocalMs(stored)));
+}
+
+/** `formatTimeMinute`, degrading to the same neutral label on a parse failure. */
+export function formatTimeMinuteOrFallback(stored: string): string {
+  try {
+    return formatTimeMinute(stored);
+  } catch {
+    return UNKNOWN_TIME_LABEL;
+  }
+}
+
+/** The single minute-precision clock rendering shared by the display formatters. */
+function clockOf(date: Date): string {
+  return formatMinuteClock(
+    { hour: date.getHours(), minute: date.getMinutes() },
+    TIME_FORMAT,
+  );
 }
 
 const MS_PER_DAY = 86_400_000;
