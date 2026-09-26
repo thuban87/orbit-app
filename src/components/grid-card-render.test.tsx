@@ -193,6 +193,27 @@ describe("row accessible context (RG-031 ui-accessibility/AUD-UIA-007)", () => {
     expect(rootLabel(nodes)).toBe(`${summary} 1 match · "Loves bouldering".`);
   });
 
+  it("Grid card announces the rendered search context", () => {
+    const nodes = resolve(GridCard({ ...baseProps, searchResult }));
+    expect(rootLabel(nodes)).toBe(
+      `${summary} 1 match · Memory · "Met at the climbing gym".`,
+    );
+  });
+
+  it("Grid selection state still follows the context-bearing description", () => {
+    const nodes = resolve(
+      GridCard({
+        ...baseProps,
+        searchResult,
+        selectionMode: true,
+        selected: true,
+      }),
+    );
+    expect(rootLabel(nodes)).toBe(
+      `${summary} 1 match · Memory · "Met at the climbing gym". Selected.`,
+    );
+  });
+
   it("normal Grid does not announce the List-only line three (38.1)", () => {
     const nodes = resolve(
       GridCard({ ...baseProps, line3: { text: "Routine profile excerpt" } }),

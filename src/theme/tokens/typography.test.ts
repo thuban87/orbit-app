@@ -7,10 +7,33 @@
  * sizes and exactly TWO weights, with label vs caption sharing the 14 step and
  * diverging by weight + colour token.
  */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { RADII } from "./radii";
 import { SPACING } from "./spacing";
-import { TYPOGRAPHY, type TypographyRole } from "./typography";
+import {
+  resolveFontFamily,
+  TYPOGRAPHY,
+  type TypographyRole,
+} from "./typography";
+
+const ROOT = resolve(__dirname, "../../..");
+const read = (relPath: string) => readFileSync(resolve(ROOT, relPath), "utf8");
+
+/**
+ * The keys `src/theme/fonts.ts` `getFontMap()` registers with expo-font. Read
+ * from the source (calling getFontMap() would `require` the .ttf assets, which
+ * is device-only), so a key rename there fails this contract.
+ */
+function registeredFontKeys(): string[] {
+  const source = read("src/theme/fonts.ts");
+  const body = source.slice(
+    source.indexOf("export function getFontMap"),
+    source.indexOf("export type FontLoader"),
+  );
+  return [...body.matchAll(/"([^"]+)":\s*require\(/g)].map((m) => m[1]);
+}
 
 describe("TYPOGRAPHY", () => {
   const roles = Object.keys(TYPOGRAPHY) as TypographyRole[];
@@ -60,6 +83,44 @@ describe("TYPOGRAPHY", () => {
     for (const r of roles) {
       expect(TYPOGRAPHY[r].lineHeight).toBeGreaterThan(TYPOGRAPHY[r].size);
     }
+  });
+});
+
+describe("resolveFontFamily (RG-031 ui-accessibility/AUD-UIA-015)", () => {
+  it("maps semantic family + weight to the registered font keys", () => {
+    expect(resolveFontFamily("Inter", 400)).toBe("Inter-Regular");
+    expect(resolveFontFamily("Inter", 600)).toBe("Inter-SemiBold");
+    expect(resolveFontFamily("Space Grotesk", 600)).toBe(
+      "SpaceGrotesk-SemiBold",
+    );
+  });
+
+  it("resolves every TYPOGRAPHY role to a key fonts.ts registers", () => {
+    const keys = registeredFontKeys();
+    expect(keys.sort()).toEqual(
+      ["Inter-Regular", "Inter-SemiBold", "SpaceGrotesk-SemiBold"].sort(),
+    );
+    for (const role of Object.keys(TYPOGRAPHY) as TypographyRole[]) {
+      const { family, weight } = TYPOGRAPHY[role];
+      expect(keys).toContain(resolveFontFamily(family, weight));
+    }
+  });
+
+  it.each(["src/components/ListRow.tsx", "src/components/GridCard.tsx"])(
+    "%s never assigns a bare semantic TYPOGRAPHY family",
+    (relPath) => {
+      const source = read(relPath);
+      expect(source).not.toMatch(/fontFamily:\s*TYPOGRAPHY\.[a-z]+\.family/);
+      expect(
+        source.match(/fontFamily:\s*resolveFontFamily\(/g)?.length ?? 0,
+      ).toBeGreaterThanOrEqual(3);
+    },
+  );
+
+  it("AppText uses the shared mapping instead of a private copy", () => {
+    const source = read("src/components/ui/AppText.tsx");
+    expect(source).not.toMatch(/function resolveFontFamily/);
+    expect(source).toMatch(/resolveFontFamily\(t\.family, t\.weight\)/);
   });
 });
 
