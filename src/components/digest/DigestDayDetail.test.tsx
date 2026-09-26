@@ -134,4 +134,52 @@ describe("DigestDayDetail", () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(tree.some((node) => node.type === "ActivityIndicator")).toBe(false);
   });
+
+  it("renders row times at minute precision in 12-hour AM/PM, in text and labels (RG-038)", () => {
+    const row = (id: number, occurredAt: string) => ({
+      kind: "interaction" as const,
+      id,
+      occurredAt,
+      title: null,
+      contactId: id,
+      contactName: `C${id}`,
+    });
+    const tree = nodes(
+      DigestDayDetail({
+        date: DATE,
+        state: {
+          status: "loaded",
+          date: DATE,
+          rows: [
+            row(1, "2026-09-18 00:00:00"),
+            row(2, "2026-09-18 12:00:00"),
+            row(3, "2026-09-18 23:59:59"),
+            row(4, "2026-09-18 09:05:59"),
+            row(5, "2026-09-18 09:06:00"),
+            row(6, "garbage"),
+          ],
+        },
+        onRetry: vi.fn(),
+      }),
+    );
+    const expected: Record<number, string> = {
+      1: "12:00 AM",
+      2: "12:00 PM",
+      3: "11:59 PM",
+      4: "9:05 AM",
+      5: "9:06 AM",
+      6: "Unknown time",
+    };
+    const body = text(tree);
+    for (const [id, clock] of Object.entries(expected)) {
+      expect(body).toContain(clock);
+      expect(
+        tree.find(
+          (node) => node.props.testID === `digest-day-detail-interaction-${id}`,
+        )?.props.accessibilityLabel,
+      ).toBe(`Interaction with C${id}, ${clock}`);
+    }
+    expect(body).not.toMatch(/\b(00|23|09):\d{2}\b/);
+    expect(body).not.toContain("garbage");
+  });
 });
