@@ -157,7 +157,9 @@ describe("Digest load-state reducers", () => {
   });
 
   it("loaded+refreshError + publish → loaded with refreshError cleared", () => {
-    const failed = digestLoadStateOnFail(digestLoadStateOnPublish(loading, "A"));
+    const failed = digestLoadStateOnFail(
+      digestLoadStateOnPublish(loading, "A"),
+    );
     expect(digestLoadStateOnPublish(failed, "B")).toEqual({
       phase: "loaded",
       data: "B",

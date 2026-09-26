@@ -4,13 +4,13 @@ import { THEME_PRESETS } from "@/theme/theme-presets";
 
 vi.mock("react", () => ({
   useCallback: (fn: unknown) => fn,
+  useEffect: vi.fn(),
   useRef: (value: unknown) => ({ current: value }),
   useState: (value: unknown) => [
     typeof value === "function" ? (value as () => unknown)() : value,
     vi.fn(),
   ],
 }));
-vi.mock("@react-navigation/native", () => ({ useFocusEffect: vi.fn() }));
 vi.mock("react-native", () => ({
   View: "View",
   StyleSheet: { create: (styles: unknown) => styles },
@@ -67,7 +67,7 @@ function nodes(node: ReactNode): TestElement[] {
 
 describe("YourWeekSection", () => {
   it("renders informational metrics and the two-option period binding", () => {
-    const tree = nodes(YourWeekSection());
+    const tree = nodes(YourWeekSection({ refreshSignal: 0 }));
     const toggle = tree.find((node) => node.type === "SegmentedControl");
     expect(toggle?.props.testID).toBe("your-week-period");
     expect(toggle?.props.value).toBe("rolling7");

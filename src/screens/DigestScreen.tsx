@@ -1,8 +1,8 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import {
   type HorizonDrillTarget,
@@ -11,6 +11,7 @@ import {
 import { UpNextSection } from "@/components/digest/UpNextSection";
 import { YourWeekSection } from "@/components/digest/YourWeekSection";
 import { AppText } from "@/components/ui/AppText";
+import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { DIGEST } from "@/constants/product-labels";
 import {
@@ -34,7 +35,18 @@ import {
 } from "@/logic/digest-composition";
 import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { DigestStackParamList, TabParamList } from "@/navigation/types";
+import {
+  createDigestRefreshController,
+  type DigestRefreshController,
+  type DigestRefreshLoadState,
+  digestLoadStateOnFail,
+  digestLoadStateOnPublish,
+} from "@/screens/digest-refresh";
 import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
+import {
+  useForegroundRefresh,
+  useShellRefresh,
+} from "@/stores/shell-refresh-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -57,10 +69,33 @@ interface DigestData {
   neverContactedRows: DashboardRow[];
 }
 
-export type DigestLoadState =
-  | { phase: "loading" }
-  | { phase: "loaded"; data: DigestData }
-  | { phase: "error" };
+export type DigestLoadState = DigestRefreshLoadState<DigestData>;
+
+/** The five Digest reads, unchanged; one bundle per accepted refresh. */
+async function readDigestData(): Promise<DigestData> {
+  const exec = getExecutor();
+  const now = localDateTime();
+  const [
+    upNextCandidates,
+    overlooked,
+    birthdayCandidates,
+    neverContactedCount,
+    neverContactedRows,
+  ] = await Promise.all([
+    readUpNextCandidates(exec),
+    readOverlooked(exec),
+    listBirthdayCandidates(exec),
+    countNeverContacted(exec),
+    listDashboardPopulation(exec, NEVER_CONTACTED_QUERY, now),
+  ]);
+  return {
+    upNextCandidates,
+    overlooked,
+    birthdayCandidates,
+    neverContactedCount,
+    neverContactedRows,
+  };
+}
 
 interface DrillThroughDeps {
   setPopulationsAndFilters: ReturnType<
@@ -89,49 +124,59 @@ type DigestScreenProps = NativeStackScreenProps<DigestStackParamList, "Digest">;
 
 export function DigestScreen({ navigation }: DigestScreenProps) {
   const [state, setState] = useState<DigestLoadState>({ phase: "loading" });
+  // Your Week follows this Digest-owned signal (one trigger owner, RG-026). It
+  // bumps on ACCEPTANCE, not success: Your Week owns its own reads and must
+  // still re-window on a new day even when the outer read fails (D-13/D-15).
+  const [yourWeekSignal, setYourWeekSignal] = useState(0);
+  const isFocused = useIsFocused();
+  const isFocusedRef = useRef(isFocused);
+  isFocusedRef.current = isFocused;
 
+  const controllerRef = useRef<DigestRefreshController | null>(null);
+  if (controllerRef.current === null) {
+    controllerRef.current = createDigestRefreshController<DigestData>({
+      read: readDigestData,
+      publish: (data) =>
+        setState((current) => digestLoadStateOnPublish(current, data)),
+      fail: (cause) => {
+        Logger.error(LOG_SCOPE, "failed to load Digest", cause);
+        // Nothing loaded → the full error; a loaded body stays mounted with a
+        // compact refresh notice (never back to `loading` on a refresh).
+        setState((current) => digestLoadStateOnFail(current));
+      },
+      isVisible: () => isFocusedRef.current,
+      onAccepted: () => setYourWeekSignal((signal) => signal + 1),
+    });
+  }
+  const controller = controllerRef.current;
+
+  // D-13: committed in-process writes (Quick Log/Undo, assist, warm
+  // notification actions) re-read while Digest stays focused.
+  const onShellRefresh = useCallback(() => {
+    void controller.request("shell");
+  }, [controller]);
+  useShellRefresh(onShellRefresh);
+
+  // D-14: every foreground resume re-reads AFTER the launch/foreground sweep
+  // settles (post-sweep tick), so Digest reflects its purges and expiry.
+  const onForegroundRefresh = useCallback(() => {
+    void controller.request("foreground");
+  }, [controller]);
+  useForegroundRefresh(onForegroundRefresh);
+
+  // Every focus reads; hidden shell/foreground triggers are covered here.
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      void (async () => {
-        try {
-          const exec = getExecutor();
-          const now = localDateTime();
-          const [
-            upNextCandidates,
-            overlooked,
-            birthdayCandidates,
-            neverContactedCount,
-            neverContactedRows,
-          ] = await Promise.all([
-            readUpNextCandidates(exec),
-            readOverlooked(exec),
-            listBirthdayCandidates(exec),
-            countNeverContacted(exec),
-            listDashboardPopulation(exec, NEVER_CONTACTED_QUERY, now),
-          ]);
-          if (!cancelled) {
-            setState({
-              phase: "loaded",
-              data: {
-                upNextCandidates,
-                overlooked,
-                birthdayCandidates,
-                neverContactedCount,
-                neverContactedRows,
-              },
-            });
-          }
-        } catch (cause) {
-          Logger.error(LOG_SCOPE, "failed to load Digest", cause);
-          if (!cancelled) setState({ phase: "error" });
-        }
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }, []),
+      void controller.request("focus");
+    }, [controller]),
   );
+
+  // Unmount: nothing outstanding may publish into a dead screen.
+  useEffect(() => () => controller.invalidate(), [controller]);
+
+  const onRetry = useCallback(() => {
+    void controller.request("focus");
+  }, [controller]);
 
   const onDrillThrough = useCallback(
     (target: HorizonDrillTarget) => {
@@ -156,6 +201,8 @@ export function DigestScreen({ navigation }: DigestScreenProps) {
   return (
     <DigestContent
       state={state}
+      refreshSignal={yourWeekSignal}
+      onRetry={onRetry}
       onOpenProfile={(contactId) =>
         navigation.navigate("Profile", { contactId })
       }
@@ -166,10 +213,14 @@ export function DigestScreen({ navigation }: DigestScreenProps) {
 
 export function DigestContent({
   state,
+  refreshSignal,
+  onRetry,
   onOpenProfile,
   onDrillThrough,
 }: {
   state: DigestLoadState;
+  refreshSignal: number;
+  onRetry: () => void;
   onOpenProfile: (contactId: number) => void;
   onDrillThrough: (target: HorizonDrillTarget) => void;
 }) {
@@ -191,11 +242,29 @@ export function DigestContent({
           </View>
         </ChromeScrim>
       ) : state.phase === "loaded" ? (
-        <DigestLoadedBody
-          data={state.data}
-          onOpenProfile={onOpenProfile}
-          onDrillThrough={onDrillThrough}
-        />
+        <>
+          {state.refreshError ? (
+            <ChromeScrim style={styles.noticeScrim} radius={RADII.md}>
+              <View testID="digest-refresh-error" style={styles.notice}>
+                <AppText role="caption" style={{ color: colors.danger }}>
+                  Couldn't refresh Up Next and Horizon
+                </AppText>
+                <Button
+                  role="tertiary"
+                  label="Retry"
+                  accessibilityLabel="Retry refreshing Up Next and Horizon"
+                  onPress={onRetry}
+                />
+              </View>
+            </ChromeScrim>
+          ) : null}
+          <DigestLoadedBody
+            data={state.data}
+            refreshSignal={refreshSignal}
+            onOpenProfile={onOpenProfile}
+            onDrillThrough={onDrillThrough}
+          />
+        </>
       ) : null}
     </View>
   );
@@ -203,10 +272,12 @@ export function DigestContent({
 
 export function DigestLoadedBody({
   data,
+  refreshSignal,
   onOpenProfile,
   onDrillThrough,
 }: {
   data: DigestData;
+  refreshSignal: number;
   onOpenProfile: (contactId: number) => void;
   onDrillThrough: (target: HorizonDrillTarget) => void;
 }) {
@@ -231,7 +302,7 @@ export function DigestLoadedBody({
         onOpenProfile={onOpenProfile}
         onDrillThrough={onDrillThrough}
       />
-      <YourWeekSection />
+      <YourWeekSection refreshSignal={refreshSignal} />
     </ScrollView>
   );
 }
@@ -241,5 +312,16 @@ const styles = StyleSheet.create({
   header: { padding: SPACING.md, overflow: "hidden" },
   body: { gap: SPACING.lg, paddingBottom: SPACING.base },
   messageScrim: { padding: SPACING.base, overflow: "hidden" },
+  noticeScrim: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    overflow: "hidden",
+  },
+  notice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: SPACING.sm,
+  },
   message: { gap: SPACING.sm },
 });

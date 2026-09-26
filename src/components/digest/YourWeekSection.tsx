@@ -1,5 +1,4 @@
-import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { DigestDayDetail } from "@/components/digest/DigestDayDetail";
 import { YourWeekHeatmap } from "@/components/digest/YourWeekHeatmap";
@@ -55,7 +54,13 @@ interface LoadedWeek {
   counts: Map<string, number>;
 }
 
-export function YourWeekSection() {
+/**
+ * Your Week (Digest's third module). Digest is the single trigger owner
+ * (38.3 RG-026): this section re-reads when Digest's `refreshSignal` changes —
+ * once per accepted Digest focus / shell tick / post-sweep foreground tick —
+ * and on mount. It has no focus effect of its own.
+ */
+export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
   const { colors } = useTheme();
   const [controller, setController] = useState<YourWeekControllerState>(() =>
     initialYourWeekState(),
@@ -104,37 +109,32 @@ export function YourWeekSection() {
     [commitController],
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      let cancelled = false;
-      void (async () => {
-        try {
-          const settings = await getAppSettings(getExecutor());
-          if (cancelled) return;
-          const base = {
-            ...controllerRef.current,
-            persistedPeriod: settings.yourWeekPeriod,
-          };
-          const next = selectYourWeekPeriod(base, settings.yourWeekPeriod);
-          commitController(next);
-          setDayRows([]);
-          await loadPeriod(next.period, next.generation, () => cancelled);
-        } catch (cause) {
-          if (!cancelled) {
-            Logger.error(
-              LOG_SCOPE,
-              "failed to load Your Week preference",
-              cause,
-            );
-            setError(true);
-          }
+  // biome-ignore lint/correctness/useExhaustiveDependencies: refreshSignal is the Digest-owned trigger; each change re-runs this read.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const settings = await getAppSettings(getExecutor());
+        if (cancelled) return;
+        const base = {
+          ...controllerRef.current,
+          persistedPeriod: settings.yourWeekPeriod,
+        };
+        const next = selectYourWeekPeriod(base, settings.yourWeekPeriod);
+        commitController(next);
+        setDayRows([]);
+        await loadPeriod(next.period, next.generation, () => cancelled);
+      } catch (cause) {
+        if (!cancelled) {
+          Logger.error(LOG_SCOPE, "failed to load Your Week preference", cause);
+          setError(true);
         }
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }, [commitController, loadPeriod]),
-  );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [commitController, loadPeriod, refreshSignal]);
 
   const onPeriodChange = useCallback(
     async (period: YourWeekPeriod) => {

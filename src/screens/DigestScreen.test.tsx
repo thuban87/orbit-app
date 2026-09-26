@@ -7,7 +7,14 @@ vi.mock("react-native", () => ({
   StyleSheet: { create: (styles: unknown) => styles },
   View: "View",
 }));
-vi.mock("@react-navigation/native", () => ({ useFocusEffect: vi.fn() }));
+vi.mock("@react-navigation/native", () => ({
+  useFocusEffect: vi.fn(),
+  useIsFocused: () => true,
+}));
+vi.mock("@/stores/shell-refresh-store", () => ({
+  useShellRefresh: vi.fn(),
+  useForegroundRefresh: vi.fn(),
+}));
 vi.mock("@/components/digest/UpNextSection", () => ({
   UpNextSection: "UpNextSection",
 }));
@@ -19,6 +26,7 @@ vi.mock("@/components/digest/YourWeekSection", () => ({
 }));
 vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
 vi.mock("@/components/ui/ChromeScrim", () => ({ ChromeScrim: "ChromeScrim" }));
+vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
 vi.mock("@/db/database", () => ({
   getExecutor: () => mocks.exec,
   localDateTime: () => "2026-09-19 12:00:00",
@@ -31,6 +39,12 @@ vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
 const { DigestContent, DigestLoadedBody, runDigestDrillThrough } = await import(
   "./DigestScreen"
 );
+const {
+  createDigestRefreshController,
+  digestLoadStateOnFail,
+  digestLoadStateOnPublish,
+} = await import("./digest-refresh");
+type DigestLoadState = import("./DigestScreen").DigestLoadState;
 
 interface Node {
   type: unknown;
@@ -44,6 +58,12 @@ function resolve(node: ReactNode): Node[] {
     return [{ type: "text", props: {}, text: String(node), children: [] }];
   if (Array.isArray(node)) return node.flatMap(resolve);
   const element = node as ReactElement<{ children?: ReactNode }>;
+  // Expand local function components (DigestLoadedBody inside DigestContent);
+  // mocked modules are strings and stay leaves.
+  if (typeof element.type === "function")
+    return resolve(
+      (element.type as (props: unknown) => ReactNode)(element.props),
+    );
   const children = resolve(element.props.children);
   return [
     {
@@ -83,6 +103,7 @@ describe("DigestScreen composition", () => {
       resolve(
         DigestLoadedBody({
           data,
+          refreshSignal: 0,
           onOpenProfile: vi.fn(),
           onDrillThrough: vi.fn(),
         }),
@@ -112,6 +133,8 @@ describe("DigestScreen composition", () => {
       resolve(
         DigestContent({
           state: { phase: "loading" },
+          refreshSignal: 0,
+          onRetry: vi.fn(),
           onOpenProfile: vi.fn(),
           onDrillThrough: vi.fn(),
         }),
@@ -124,6 +147,8 @@ describe("DigestScreen composition", () => {
       resolve(
         DigestContent({
           state: { phase: "error" },
+          refreshSignal: 0,
+          onRetry: vi.fn(),
           onOpenProfile: vi.fn(),
           onDrillThrough: vi.fn(),
         }),
@@ -132,6 +157,101 @@ describe("DigestScreen composition", () => {
     const text = error.map((node) => node.text).join(" ");
     expect(text).toContain("Couldn't load your Digest");
     expect(text).toContain("Try opening it again in a moment.");
+  });
+
+  it("keeps the loaded body mounted across a failed refresh and clears the notice on a successful Retry", async () => {
+    const onRetry = vi.fn();
+    const render = (state: DigestLoadState, refreshSignal: number) =>
+      all(
+        resolve(
+          DigestContent({
+            state,
+            refreshSignal,
+            onRetry,
+            onOpenProfile: vi.fn(),
+            onDrillThrough: vi.fn(),
+          }),
+        ),
+      );
+    const yourWeek = (tree: Node[]) =>
+      tree.find((node) => node.type === "YourWeekSection");
+    const notice = (tree: Node[]) =>
+      tree.find((node) => node.props.testID === "digest-refresh-error");
+
+    const loaded = digestLoadStateOnPublish<typeof data>(
+      { phase: "loading" },
+      data,
+    );
+    const before = render(loaded, 3);
+    expect(notice(before)).toBeUndefined();
+    expect(yourWeek(before)?.props).toEqual({ refreshSignal: 3 });
+
+    const failed = digestLoadStateOnFail(loaded);
+    const during = render(failed, 3);
+    expect(yourWeek(during)?.props).toEqual({ refreshSignal: 3 });
+    const shown = notice(during);
+    expect(shown?.text).toContain("Couldn't refresh Up Next and Horizon");
+    expect(during.some((node) => node.props.testID === "digest-error")).toBe(
+      false,
+    );
+    const retry = shown?.children.find((node) => node.type === "Button");
+    expect(retry?.props.label).toBe("Retry");
+    if (!retry) throw new Error("Missing Retry");
+    (retry.props.onPress as () => void)();
+    expect(onRetry).toHaveBeenCalledTimes(1);
+
+    const retried = digestLoadStateOnPublish(failed, data);
+    const after = render(retried, 4);
+    expect(notice(after)).toBeUndefined();
+    expect(yourWeek(after)?.props).toEqual({ refreshSignal: 4 });
+  });
+
+  it("signals Your Week on acceptance, so a failed outer read still refreshes Your Week under the notice", async () => {
+    let state: DigestLoadState = { phase: "loading" };
+    let signal = 0;
+    let fail = false;
+    const controller = createDigestRefreshController<typeof data>({
+      read: async () => {
+        if (fail) throw new Error("outer read failed");
+        return data;
+      },
+      publish: (next) => {
+        state = digestLoadStateOnPublish(state, next);
+      },
+      fail: () => {
+        state = digestLoadStateOnFail(state);
+      },
+      isVisible: () => true,
+      onAccepted: () => {
+        signal += 1;
+      },
+    });
+
+    await controller.request("focus");
+    expect(state.phase).toBe("loaded");
+    expect(signal).toBe(1);
+
+    fail = true;
+    await controller.request("shell");
+    expect(signal).toBe(2);
+    const tree = all(
+      resolve(
+        DigestContent({
+          state,
+          refreshSignal: signal,
+          onRetry: vi.fn(),
+          onOpenProfile: vi.fn(),
+          onDrillThrough: vi.fn(),
+        }),
+      ),
+    );
+    expect(
+      tree.some((node) => node.props.testID === "digest-refresh-error"),
+    ).toBe(true);
+    expect(tree.some((node) => node.type === "UpNextSection")).toBe(true);
+    expect(tree.find((node) => node.type === "YourWeekSection")?.props).toEqual(
+      { refreshSignal: 2 },
+    );
   });
 
   it("awaits the complete query write before navigating and never navigates on rejection", async () => {
