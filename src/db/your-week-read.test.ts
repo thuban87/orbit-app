@@ -10,6 +10,8 @@ import {
   readYourWeekDateCounts,
   readYourWeekDay,
   readYourWeekMetrics,
+  YOUR_WEEK_DATE_COUNTS_SQL,
+  YOUR_WEEK_DAY_SQL,
   YOUR_WEEK_METRICS_SQL,
 } from "@/db/your-week-read";
 
@@ -49,6 +51,20 @@ async function interaction(
       groupEventId,
     ],
   );
+}
+
+async function interactionId(
+  uid: string,
+  contactId: number,
+  occurredAt: string,
+  groupEventId: number | null = null,
+): Promise<number> {
+  await interaction(uid, contactId, occurredAt, groupEventId);
+  const row = await exec.getFirstAsync<{ id: number }>(
+    "SELECT id FROM interactions WHERE uid = ?",
+    [uid],
+  );
+  return row?.id ?? -1;
 }
 
 async function groupEvent(
@@ -156,5 +172,297 @@ describe("Your Week query plans (RG-028, performance/AUD-PERF-004)", () => {
     expect(joined).toContain("idx_group_events_occurred_at");
     expect(fullScanOf(details, "i"), joined).toBe(false);
     expect(fullScanOf(details, "ge"), joined).toBe(false);
+  });
+
+  it("both date-count UNION ALL arms SEARCH their new index", async () => {
+    const details = await planDetails(YOUR_WEEK_DATE_COUNTS_SQL, [
+      ...Array.from({ length: 2 }, () => [
+        "2026-09-14",
+        "2026-09-20",
+        "2026-09-14",
+        "2026-09-20",
+      ]).flat(),
+    ]);
+    const joined = details.join("\n");
+    expect(joined).toMatch(/SEARCH i USING INDEX idx_interactions_occurred_at/);
+    expect(joined).toMatch(
+      /SEARCH ge USING (COVERING )?INDEX idx_group_events_occurred_at/,
+    );
+    expect(fullScanOf(details, "i"), joined).toBe(false);
+    expect(fullScanOf(details, "ge"), joined).toBe(false);
+  });
+
+  it("both day-list UNION ALL arms SEARCH their new index", async () => {
+    const details = await planDetails(
+      YOUR_WEEK_DAY_SQL,
+      Array.from({ length: 6 }, () => "2026-09-16"),
+    );
+    const joined = details.join("\n");
+    expect(joined).toMatch(/SEARCH i USING INDEX idx_interactions_occurred_at/);
+    expect(joined).toMatch(
+      /SEARCH ge USING (COVERING )?INDEX idx_group_events_occurred_at/,
+    );
+    expect(fullScanOf(details, "i"), joined).toBe(false);
+    expect(fullScanOf(details, "ge"), joined).toBe(false);
+  });
+});
+
+// --- Pre-RG-028 oracle -------------------------------------------------------
+// The legacy Your Week predicates exactly as shipped before 38.4 Plan 01 (bare
+// `date(column)` only, no range conjunct). Kept ONLY here, as the reference the
+// bounded reads must match row-for-row. Never import these into app code.
+
+const LEGACY_METRICS_SQL = `SELECT
+       (SELECT COUNT(DISTINCT i.contact_id)
+          FROM interactions i
+          JOIN contacts c ON c.id = i.contact_id
+         WHERE c.archived_at IS NULL
+           AND date(i.occurred_at) BETWEEN date(?) AND date(?)) AS peopleReached,
+       (SELECT COUNT(*)
+          FROM interactions i
+          JOIN contacts c ON c.id = i.contact_id
+         WHERE c.archived_at IS NULL
+           AND date(i.occurred_at) BETWEEN date(?) AND date(?)) AS interactions,
+       (SELECT COUNT(*)
+          FROM group_events ge
+         WHERE date(ge.occurred_at) BETWEEN date(?) AND date(?)) AS events`;
+
+const LEGACY_DATE_COUNTS_SQL = `SELECT activity_date AS d, COUNT(*) AS n
+       FROM (
+         SELECT date(i.occurred_at) AS activity_date
+           FROM interactions i
+           JOIN contacts c ON c.id = i.contact_id
+          WHERE i.group_event_id IS NULL
+            AND c.archived_at IS NULL
+            AND date(i.occurred_at) BETWEEN date(?) AND date(?)
+         UNION ALL
+         SELECT date(ge.occurred_at) AS activity_date
+           FROM group_events ge
+          WHERE date(ge.occurred_at) BETWEEN date(?) AND date(?)
+       ) activity
+      GROUP BY activity_date
+      ORDER BY activity_date`;
+
+const LEGACY_DAY_SQL = `SELECT 'group_event' AS kind,
+            ge.id AS id,
+            ge.occurred_at AS occurredAt,
+            ge.title AS title,
+            NULL AS contactId,
+            NULL AS contactName
+       FROM group_events ge
+      WHERE date(ge.occurred_at) = date(?)
+      UNION ALL
+     SELECT 'interaction' AS kind,
+            i.id AS id,
+            i.occurred_at AS occurredAt,
+            NULL AS title,
+            c.id AS contactId,
+            c.name AS contactName
+       FROM interactions i
+       JOIN contacts c ON c.id = i.contact_id
+      WHERE i.group_event_id IS NULL
+        AND c.archived_at IS NULL
+        AND date(i.occurred_at) = date(?)
+      ORDER BY occurredAt DESC, kind, id DESC`;
+
+async function legacyMetrics(start: string, end: string) {
+  return exec.getFirstAsync(LEGACY_METRICS_SQL, [
+    start,
+    end,
+    start,
+    end,
+    start,
+    end,
+  ]);
+}
+
+function legacyDateCounts(start: string, end: string) {
+  return exec.getAllAsync(LEGACY_DATE_COUNTS_SQL, [start, end, start, end]);
+}
+
+function legacyDay(date: string) {
+  return exec.getAllAsync(LEGACY_DAY_SQL, [date, date]);
+}
+
+/** Every calendar date from `first` to `last` inclusive (UTC math on dates only). */
+function datesBetween(first: string, last: string): string[] {
+  const out: string[] = [];
+  const cursor = new Date(`${first}T00:00:00Z`);
+  const stop = new Date(`${last}T00:00:00Z`);
+  while (cursor <= stop) {
+    out.push(cursor.toISOString().slice(0, 10));
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return out;
+}
+
+const WINDOWS: ReadonlyArray<readonly [string, string]> = [
+  ["2026-09-14", "2026-09-20"],
+  ["2026-09-13", "2026-09-19"],
+  ["2026-09-15", "2026-09-21"],
+  ["2026-09-01", "2026-09-30"],
+  ["2026-09-21", "2026-09-27"],
+  ["2026-09-17", "2026-09-17"],
+];
+
+/** Snapshot every Your Week result over the parity windows and days. */
+async function snapshotAll() {
+  const out: unknown[] = [];
+  for (const [start, end] of WINDOWS) {
+    out.push(await readYourWeekMetrics(exec, start, end));
+    out.push(await readYourWeekDateCounts(exec, start, end));
+  }
+  for (const date of datesBetween("2026-09-10", "2026-09-24")) {
+    out.push(await readYourWeekDay(exec, date));
+  }
+  return out;
+}
+
+/**
+ * The stored forms the parity proof covers: live-writer `YYYY-MM-DD HH:MM:SS`
+ * at day edges, plus date-only, `T`-separated, fractional-second and malformed
+ * values (the latter only reachable via restore). The timezone-suffixed form is
+ * the documented accepted exception (T-38.4-01-04) and is deliberately absent.
+ */
+async function seedParityFixture() {
+  const ada = await contact("p-ada", "Ada");
+  const bea = await contact("p-bea", "Bea");
+  const cal = await contact("p-cal", "Cal");
+  const arc = await contact("p-arc", "Archived", true);
+
+  await interaction("first-day-start", ada, "2026-09-14 00:00:00");
+  await interaction("last-day-end", bea, "2026-09-20 23:59:59");
+  await interaction("day-after", cal, "2026-09-21 00:00:00");
+  await interaction("day-before", cal, "2026-09-13 23:59:59");
+  await interaction("date-only", bea, "2026-09-17");
+  await interaction("t-separated", cal, "2026-09-18T10:30:00");
+  await interaction("fractional", ada, "2026-09-19 08:15:30.250");
+  await interaction("malformed", ada, "2026-09-16garbage");
+  await interaction("archived-in", arc, "2026-09-16 12:00:00");
+  await interaction("archived-out", arc, "2026-09-22 12:00:00");
+
+  const inRange = await groupEvent("ge-in", "Dinner", "2026-09-16 19:00:00");
+  await interaction("ge-in-ada", ada, "2026-09-16 19:00:00", inRange);
+  await interaction("ge-in-bea", bea, "2026-09-16 19:00:00", inRange);
+  await interaction("ge-in-arc", arc, "2026-09-16 19:00:00", inRange);
+
+  const outRange = await groupEvent("ge-out", "Trip", "2026-09-12 09:00:00");
+  // A child whose own occurred_at drifted into range while its parent is out.
+  await interaction("ge-out-cal", cal, "2026-09-15 09:00:00", outRange);
+  await interaction("ge-out-bea", bea, "2026-09-12 09:00:00", outRange);
+
+  await groupEvent("ge-edge-start", "Breakfast", "2026-09-14 00:00:00");
+  await groupEvent("ge-edge-end", "Late", "2026-09-20 23:59:59");
+  await groupEvent("ge-next", "Brunch", "2026-09-21 00:00:00");
+  await groupEvent("ge-date-only", "Picnic", "2026-09-18");
+  await groupEvent("ge-malformed", "Broken", "2026-09-17garbage");
+}
+
+/** Hundreds of rows dated years before any parity window. */
+async function seedAncientHistory(count: number) {
+  const old = await contact("ancient", "Ancient");
+  for (let n = 0; n < count; n++) {
+    const year = 2019 + (n % 5);
+    const month = String((n % 12) + 1).padStart(2, "0");
+    const day = String((n % 28) + 1).padStart(2, "0");
+    const at = `${year}-${month}-${day} 1${n % 10}:00:00`;
+    if (n % 5 === 0) {
+      await groupEvent(`ancient-ge-${n}`, `Old ${n}`, at);
+    } else {
+      await interaction(`ancient-${n}`, old, at);
+    }
+  }
+}
+
+describe("Your Week bounded reads match the pre-RG-028 oracle", () => {
+  it("returns identical metrics, date counts and day rows for every live stored form", async () => {
+    await seedParityFixture();
+
+    for (const [start, end] of WINDOWS) {
+      expect(await readYourWeekMetrics(exec, start, end), start).toEqual(
+        await legacyMetrics(start, end),
+      );
+      expect(await readYourWeekDateCounts(exec, start, end), start).toEqual(
+        await legacyDateCounts(start, end),
+      );
+    }
+    for (const date of datesBetween("2026-09-10", "2026-09-24")) {
+      expect(await readYourWeekDay(exec, date), date).toEqual(
+        await legacyDay(date),
+      );
+    }
+  });
+
+  it("includes both edges of the window, excludes the next day, and counts date-only values", async () => {
+    await seedParityFixture();
+
+    // Standalone live rows in 09-14..09-20: first-day-start, last-day-end,
+    // date-only, t-separated, fractional (malformed + archived excluded);
+    // plus 3 active group children (ge-in-ada, ge-in-bea, ge-out-cal).
+    expect(await readYourWeekMetrics(exec, "2026-09-14", "2026-09-20")).toEqual(
+      { peopleReached: 3, interactions: 8, events: 4 },
+    );
+    expect(
+      await readYourWeekDateCounts(exec, "2026-09-14", "2026-09-20"),
+    ).toEqual([
+      { d: "2026-09-14", n: 2 },
+      { d: "2026-09-16", n: 1 },
+      { d: "2026-09-17", n: 1 },
+      { d: "2026-09-18", n: 2 },
+      { d: "2026-09-19", n: 1 },
+      { d: "2026-09-20", n: 2 },
+    ]);
+    expect(
+      (await readYourWeekDay(exec, "2026-09-21")).map((row) => row.occurredAt),
+    ).toEqual(["2026-09-21 00:00:00", "2026-09-21 00:00:00"]);
+    expect(
+      (await readYourWeekDay(exec, "2026-09-17")).map((row) => row.occurredAt),
+    ).toEqual(["2026-09-17"]);
+  });
+
+  it("returns nothing for an empty period even with 500 rows years earlier", async () => {
+    await seedAncientHistory(500);
+
+    expect(await readYourWeekMetrics(exec, "2026-09-14", "2026-09-20")).toEqual(
+      { peopleReached: 0, interactions: 0, events: 0 },
+    );
+    expect(
+      await readYourWeekDateCounts(exec, "2026-09-14", "2026-09-20"),
+    ).toEqual([]);
+    expect(await readYourWeekDay(exec, "2026-09-16")).toEqual([]);
+  });
+
+  it("leaves every result unchanged when hundreds of older rows are added", async () => {
+    await seedParityFixture();
+    const before = await snapshotAll();
+
+    await seedAncientHistory(500);
+
+    expect(await snapshotAll()).toEqual(before);
+  });
+
+  it("keeps day-detail order occurredAt DESC, kind, id DESC", async () => {
+    const ada = await contact("o-ada", "Ada");
+    const bea = await contact("o-bea", "Bea");
+    const early = await interactionId("o-early", ada, "2026-09-16 08:00:00");
+    const tieA = await interactionId("o-tie-a", ada, "2026-09-16 19:00:00");
+    const tieB = await interactionId("o-tie-b", bea, "2026-09-16 19:00:00");
+    const eventA = await groupEvent("o-ge-a", "A", "2026-09-16 19:00:00");
+    const eventB = await groupEvent("o-ge-b", "B", "2026-09-16 19:00:00");
+    const late = await groupEvent("o-ge-late", "Late", "2026-09-16 22:00:00");
+
+    expect(
+      (await readYourWeekDay(exec, "2026-09-16")).map((row) => [
+        row.kind,
+        row.id,
+      ]),
+    ).toEqual([
+      ["group_event", late],
+      ["group_event", eventB],
+      ["group_event", eventA],
+      ["interaction", tieB],
+      ["interaction", tieA],
+      ["interaction", early],
+    ]);
   });
 });

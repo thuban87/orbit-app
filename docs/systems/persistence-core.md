@@ -1,7 +1,7 @@
 # Persistence Core
 
-**Last updated:** 2026-09-25
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Last updated:** 2026-09-26
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -69,6 +69,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/027-default-interaction-channel.ts` | Adds validated ordinary interaction-channel preference and remembered-channel columns. |
 | Migration | `src/db/migrations/028-compose-message-mode.ts` | Adds validated Compose default/remembered message-mode settings without a new entity table. |
 | Migration | `src/db/migrations/030-your-week-period.ts` | Adds the validated portable Rolling 7 Days / Calendar Week setting. |
+| Migration | `src/db/migrations/031-your-week-occurred-at-indexes.ts` | Adds `occurred_at` indexes on `interactions` and `group_events` so Your Week reads SEARCH the period; the current schema head (`TARGET_VERSION = YOUR_WEEK_INDEX_SCHEMA_VERSION`, 31). |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Systems DAO | `src/db/systems-dao.ts` | Owns transactional System definitions, rules, overrides, preferences, delete/Undo, and selection-aware lifecycle composites. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
@@ -108,6 +109,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/profile-presentation.ts` | Exports migration 024 and its schema version for Profile templates, assignments, overrides, collapse state, and global preference UIDs. |
 | `src/db/migrations/027-default-interaction-channel.ts` | Adds `default_interaction_channel` and `remembered_interaction_channel` as validated, non-null singleton settings. |
 | `src/db/migrations/030-your-week-period.ts` | Adds `your_week_period` additively with a safe Rolling 7 Days default. |
+| `src/db/migrations/031-your-week-occurred-at-indexes.ts` | Plain additive `CREATE INDEX idx_interactions_occurred_at` / `idx_group_events_occurred_at` (no existence guard; no row read or rewritten; no backup-format change — indexes are not portable data). |
 | `src/db/systems-dao.ts` | Sole mutation boundary for System metadata and ref-keyed customization. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
@@ -269,7 +271,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **AI suggestions** — persists non-secret settings and acknowledgement state through migration 004 while keeping credentials outside SQLite.
 - **AI suggestions** — persists non-secret multi-connection, personalization, and permission-default metadata through migration 029 while keeping credentials outside SQLite.
 - **Digest** — reads the migration-005 scheduling preference and registers a post-migration launch-sweep reconcile.
-- **Digest** — also reads the migration-030 period preference while keeping its data derived.
+- **Digest** — also reads the migration-030 period preference while keeping its data derived; its Your Week reads range-seek the migration-031 `occurred_at` indexes.
 - **Backup & Restore** — uses migrations 007/008, revisions, snapshots, and launch recovery without a backend.
 - **Contact Import** — uses migration 012, serial write cores, and foreground recovery hooks for accepted selected-contact work.
 - **Contact Reconciliation** — uses migration 013, serial write cores, and foreground recovery for durable linked-contact review.
@@ -280,6 +282,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 
 | Date | Phase | What Changed |
 |------|-------|--------------|
+| 2026-09-26 | 38.4 | Added migration 031 (schema head 31): additive `idx_interactions_occurred_at` and `idx_group_events_occurred_at` so Your Week reads are period-bounded (RG-028, performance/AUD-PERF-004, D-18); no shipped migration edited, no stored value rewritten. |
 | 2026-09-26 | 38.3 | Bounded each launch-sweep hook with `SWEEP_HOOK_TIMEOUT_MS` so a hung hook no longer wedges later sweeps or the foreground tick; a still-running hook is skipped, never re-run (review A-WR-02, owner ruling D-30). |
 | 2026-09-25 | 38.3 | Added `onSweepSettled`: one owning-run settlement notification per launch sweep (coalesced passes publish once), forwarded by `App.tsx` to the foreground refresh tick. |
 | 2026-09-23 | 38.2 | Isolated launch hooks and image candidates, added per-pass backup recovery prerequisites, and contained recoverable background faults at boot. |

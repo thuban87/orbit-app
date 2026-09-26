@@ -1,7 +1,7 @@
 # Digest
 
-**Last updated:** 2026-09-25
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Last updated:** 2026-09-26
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/db/digest-read.ts`, `src/db/up-next-read.ts`, `src/db/your-week-read.ts`, `src/logic/digest-composition.ts`, `src/screens/DigestScreen.tsx`, `src/screens/digest-refresh.ts`, `src/services/notifications/digest-schedule.ts`
 
 ## Purpose
@@ -16,7 +16,7 @@ Digest reads existing state and persists only the portable app-wide period prefe
 
 **Tables:**
 - `contacts` — supplies canonical status/progress, birthdays, lifecycle state, and people reached.
-- `interactions` and `group_events` — supply Your Week metrics, heatmap activity, and inline day detail.
+- `interactions` and `group_events` — supply Your Week metrics, heatmap activity, and inline day detail. Migration 031 indexes both on `occurred_at` (`idx_interactions_occurred_at`, `idx_group_events_occurred_at`) so those reads are bounded to the period.
 - `app_settings` — supplies `your_week_period` (`rolling-7-days` or `calendar-week`) and the independent digest notification policy.
 
 **Types:**
@@ -74,7 +74,11 @@ Digest reads existing state and persists only the portable app-wide period prefe
 ### Reflecting in Your Week
 
 1. `week-window.ts` derives the selected Rolling 7 Days or device-locale Calendar Week and supplies the same bounds to metrics, heatmap, and day detail.
-2. `your-week-read.ts` reads canonical activity: group-linked child rows do not count as separate events, while a Group Event parent appears once.
+2. `your-week-read.ts` reads canonical activity: group-linked child rows do not count as separate events, while a Group Event parent appears once. Every period predicate (metrics, heatmap date counts, day detail) is two conjuncts (38.4 RG-028, `performance/AUD-PERF-004`):
+   - a half-open string range `occurred_at >= date(?) AND occurred_at < date(?, '+1 day')`, which lets SQLite SEARCH the migration-031 `idx_interactions_occurred_at` / `idx_group_events_occurred_at` indexes instead of scanning lifetime history on every Digest open;
+   - the original `date(occurred_at)` residual (`BETWEEN date(?) AND date(?)`, or `= date(?)` for one day), which keeps results exact — e.g. a malformed value the string range admits but `date()` rejects stays excluded.
+
+   Every bound is a `?` parameter. Results are identical to the pre-38.4 reads for every stored form a live writer produces (`YYYY-MM-DD HH:MM:SS` via `rejectFutureOccurredAt`), plus date-only, `T`-separated, fractional-second, and malformed values; `src/db/your-week-read.test.ts` proves this against the legacy predicates as an oracle, alongside EXPLAIN QUERY PLAN and growing-history fixtures. **Accepted edge (not repaired, 38.2 D-23):** a timezone-suffixed `occurred_at` — reachable only through a hand-crafted backup, since `restore-apply.ts` writes backup strings without format validation — can fall outside the string range where `date()` would have shifted it across a UTC day, so it may drop out of a Your Week window it previously appeared in.
 3. A heatmap selection expands `DigestDayDetail` beneath the heatmap. The visual language and count classification reuse the Profile History helpers without adding rotary or long-range navigation.
 4. Settings and the in-context toggle both write the same validated portable `your_week_period` setting; Horizon birthdays and weekly notification cadence do not use it.
 5. On each `refreshSignal`, Your Week keeps the chosen period and re-windows to the current local day (D-15). No timer detects the new day (D-22). A selected day survives while it is still a real day in the new window, including across a tab return (D-26), and is re-read; otherwise it clears.
@@ -119,6 +123,7 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 6. **Do not add a Digest trigger outside `DigestScreen`.** Sections follow Digest's refresh ownership; a section-level focus effect or private AppState listener reintroduces pre-sweep resume reads and double reads.
 7. **A selected day is not immediately empty.** Day detail is `idle | loading | loaded | error`. A pending read shows the inline indicator, a failed one "Couldn't load this day" with Retry; never render "No activity on this date." for anything but a successful empty read. Every read (tap, Retry, retained-day refresh) takes a fresh request token. Never guard publication with `selectedDay === date` — a slower older read for the same date would overwrite the newer one.
 8. **Seven 44dp heatmap targets need compact-width treatment.** Fixed cells plus outer padding can overflow 360dp-or-narrower layouts.
+9. **Keep both halves of every Your Week predicate.** Dropping the `occurred_at` range falls back to a lifetime-history scan; dropping the `date()` residual lets malformed values the range admits into the counts. Never wrap the range column in a function, and never interpolate a period bound.
 
 ## Related Systems
 
@@ -141,3 +146,4 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 | 2026-09-25 | 38.3 | Live Digest refresh (RG-026, react-native/AUD-RN-006, reliability-testing/AUD-REL-013): focus, shell-tick and post-sweep foreground triggers with one authority; Your Week follows a Digest-owned signal and keeps its period across a new day (D-15); standard list transition for Up Next and Horizon (D-13). |
 | 2026-09-25 | 38.3 | Truthful day detail (RG-026, reliability-testing/AUD-REL-014; closes Phase 38 WR-01): explicit `idle \| loading \| loaded \| error` day-detail states with request-scoped tokens, inline loading indicator, "Couldn't load this day" + Retry, empty copy only after a successful empty read (D-16). |
 | 2026-09-26 | 38.3 | Your Week keeps a loaded heatmap and day detail on a refresh failure and shows a compact "Couldn't refresh Your Week" notice with a read-only Retry; the full "Couldn't load Your Week" state (also with Retry) appears only when nothing has loaded (review B-WR-06). |
+| 2026-09-26 | 38.4 | Bounded Your Week reads via occurred_at indexes (RG-028, performance/AUD-PERF-004): migration 031 adds `idx_interactions_occurred_at` / `idx_group_events_occurred_at`; metrics, date counts, and day detail use a half-open range plus the retained `date()` residual with oracle-proven identical results; no Digest cache (ADR-148, D-18). |

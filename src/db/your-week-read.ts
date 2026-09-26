@@ -74,6 +74,28 @@ export async function readYourWeekMetrics(
 }
 
 /**
+ * Heatmap date-count SQL (exported for the EXPLAIN proof). Binds (8): per
+ * UNION ALL arm `start, end` for the range then `start, end` for the residual.
+ */
+export const YOUR_WEEK_DATE_COUNTS_SQL = `SELECT activity_date AS d, COUNT(*) AS n
+       FROM (
+         SELECT date(i.occurred_at) AS activity_date
+           FROM interactions i
+           JOIN contacts c ON c.id = i.contact_id
+          WHERE i.group_event_id IS NULL
+            AND c.archived_at IS NULL
+            AND i.occurred_at >= date(?) AND i.occurred_at < date(?, '+1 day')
+            AND date(i.occurred_at) BETWEEN date(?) AND date(?)
+         UNION ALL
+         SELECT date(ge.occurred_at) AS activity_date
+           FROM group_events ge
+          WHERE ge.occurred_at >= date(?) AND ge.occurred_at < date(?, '+1 day')
+            AND date(ge.occurred_at) BETWEEN date(?) AND date(?)
+       ) activity
+      GROUP BY activity_date
+      ORDER BY activity_date`;
+
+/**
  * Heatmap activity units by local date: standalone interaction = 1, Group
  * Event parent = 1. Group-linked child rows never enter this aggregation.
  */
@@ -82,40 +104,25 @@ export function readYourWeekDateCounts(
   start: string,
   end: string,
 ): Promise<YourWeekDateCount[]> {
-  return exec.getAllAsync<YourWeekDateCount>(
-    `SELECT activity_date AS d, COUNT(*) AS n
-       FROM (
-         SELECT date(i.occurred_at) AS activity_date
-           FROM interactions i
-           JOIN contacts c ON c.id = i.contact_id
-          WHERE i.group_event_id IS NULL
-            AND c.archived_at IS NULL
-            AND date(i.occurred_at) BETWEEN date(?) AND date(?)
-         UNION ALL
-         SELECT date(ge.occurred_at) AS activity_date
-           FROM group_events ge
-          WHERE date(ge.occurred_at) BETWEEN date(?) AND date(?)
-       ) activity
-      GROUP BY activity_date
-      ORDER BY activity_date`,
-    [start, end, start, end],
-  );
+  return exec.getAllAsync<YourWeekDateCount>(YOUR_WEEK_DATE_COUNTS_SQL, [
+    ...[start, end, start, end],
+    ...[start, end, start, end],
+  ]);
 }
 
-/** One app-wide day list with each Group Event parent represented once. */
-export function readYourWeekDay(
-  exec: SqlExecutor,
-  date: string,
-): Promise<YourWeekDayRow[]> {
-  return exec.getAllAsync<YourWeekDayRow>(
-    `SELECT 'group_event' AS kind,
+/**
+ * One-day list SQL (exported for the EXPLAIN proof). Binds (6): per UNION ALL
+ * arm `date, date` for the range then `date` for the residual.
+ */
+export const YOUR_WEEK_DAY_SQL = `SELECT 'group_event' AS kind,
             ge.id AS id,
             ge.occurred_at AS occurredAt,
             ge.title AS title,
             NULL AS contactId,
             NULL AS contactName
        FROM group_events ge
-      WHERE date(ge.occurred_at) = date(?)
+      WHERE ge.occurred_at >= date(?) AND ge.occurred_at < date(?, '+1 day')
+        AND date(ge.occurred_at) = date(?)
       UNION ALL
      SELECT 'interaction' AS kind,
             i.id AS id,
@@ -127,8 +134,17 @@ export function readYourWeekDay(
        JOIN contacts c ON c.id = i.contact_id
       WHERE i.group_event_id IS NULL
         AND c.archived_at IS NULL
+        AND i.occurred_at >= date(?) AND i.occurred_at < date(?, '+1 day')
         AND date(i.occurred_at) = date(?)
-      ORDER BY occurredAt DESC, kind, id DESC`,
-    [date, date],
-  );
+      ORDER BY occurredAt DESC, kind, id DESC`;
+
+/** One app-wide day list with each Group Event parent represented once. */
+export function readYourWeekDay(
+  exec: SqlExecutor,
+  date: string,
+): Promise<YourWeekDayRow[]> {
+  return exec.getAllAsync<YourWeekDayRow>(YOUR_WEEK_DAY_SQL, [
+    ...[date, date, date],
+    ...[date, date, date],
+  ]);
 }
