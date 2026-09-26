@@ -3,8 +3,8 @@ import type { AiPermissionItem } from "@/db/ai-permissions-dao";
 import {
   buildPermissionSummaryCopy,
   filterAiPermissionItems,
-  isPermissionFilterActive,
   groupAiPermissionItems,
+  isPermissionFilterActive,
   selectedPermissionRefs,
   selectionImpact,
   summarizePermissionView,
