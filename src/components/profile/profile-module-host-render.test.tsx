@@ -10,6 +10,7 @@ vi.mock("react", async (original) => ({
   useCallback: <T,>(callback: T) => callback,
   useEffect: () => {},
   useMemo: <T,>(factory: () => T) => factory(),
+  useRef: <T,>(value: T) => ({ current: value }),
   useState: <T,>(value: T) => [value, vi.fn()] as const,
 }));
 vi.mock("react-native", () => ({
@@ -105,7 +106,7 @@ function sectionHeaderCaptions(
         presentation,
         todayLocal: "2026-09-19",
         historyRevision: 0,
-        onOpenHistory: vi.fn(),
+        onRequestScrollTo: vi.fn(),
         onSetFrequency: vi.fn(async () => {}),
         onSnooze: vi.fn(async () => {}),
         onUnsnooze: vi.fn(async () => {}),
@@ -139,7 +140,7 @@ function profileHostNodes(
         presentation: hostPresentation,
         todayLocal: "2026-09-19",
         historyRevision: 0,
-        onOpenHistory: vi.fn(),
+        onRequestScrollTo: vi.fn(),
         onSetFrequency: vi.fn(async () => {}),
         onSnooze: vi.fn(async () => {}),
         onUnsnooze: vi.fn(async () => {}),
@@ -254,5 +255,143 @@ describe("ProfileModuleHost section-header captions", () => {
         target: { owner, id: 0 },
       });
     }
+  });
+});
+
+// 38.3 RG-021 (D-10, D-11): the Last Interaction tile and the Status sheet's
+// "View history" reveal the in-Profile History section, and are offered only
+// when the resolved layout shows History.
+describe("ProfileModuleHost History reveal", () => {
+  function historyPresentation(
+    history: { visible: boolean; expanded: boolean },
+    collapse: Record<string, boolean> = {},
+  ): ProfilePresentation {
+    return {
+      collapse,
+      layout: {
+        document: {
+          topLevel: [
+            { id: "relationship-overview", visible: true, expanded: true },
+            { id: "interaction-history", ...history },
+          ],
+          overview: [],
+          thingsToRemember: [],
+        },
+      },
+    } as unknown as ProfilePresentation;
+  }
+
+  function historyHostNodes(
+    hostPresentation: ProfilePresentation,
+    onRequestScrollTo = vi.fn(),
+  ): Node[] {
+    return all(
+      resolve(
+        ProfileModuleHost({
+          snapshot: {
+            identity: { id: 7, name: "Ada", intervalDays: 30 },
+            knowledge: { status: "ready", data: {} },
+            history: { status: "ready", data: {} },
+          } as unknown as ProfileSnapshot,
+          presentation: hostPresentation,
+          todayLocal: "2026-09-19",
+          historyRevision: 0,
+          onRequestScrollTo,
+          onSetFrequency: vi.fn(async () => {}),
+          onSnooze: vi.fn(async () => {}),
+          onUnsnooze: vi.fn(async () => {}),
+          onKnowledgeAction: vi.fn(),
+          onKnowledgeViewAll: vi.fn(),
+          onOpenValueHistory: vi.fn(),
+          onOpenKnowledgeChange: vi.fn(),
+          onContactMethodAction: vi.fn(),
+        }),
+      ),
+    );
+  }
+
+  const layout = (y: number) => ({ nativeEvent: { layout: { y } } });
+
+  it("hands both History actions a reveal handler when the layout shows History", () => {
+    const nodes = historyHostNodes(
+      historyPresentation({ visible: true, expanded: true }),
+    );
+    const overview = nodes.find((node) => node.type === "RelationshipOverview");
+    const sheets = nodes.find(
+      (node) => node.type === "ProfileRelationshipSheets",
+    );
+    expect(overview?.props.onOpenHistory).toBeTypeOf("function");
+    expect(sheets?.props.onOpenHistory).toBeTypeOf("function");
+  });
+
+  it("offers neither History action when the layout hides History (D-11)", () => {
+    const nodes = historyHostNodes(
+      historyPresentation({ visible: false, expanded: true }),
+    );
+    const overview = nodes.find((node) => node.type === "RelationshipOverview");
+    const sheets = nodes.find(
+      (node) => node.type === "ProfileRelationshipSheets",
+    );
+    expect(overview).toBeDefined();
+    expect(overview?.props.onOpenHistory).toBeUndefined();
+    expect(sheets?.props.onOpenHistory).toBeUndefined();
+    expect(
+      nodes.find((node) => node.props.testID === "profile-history-anchor"),
+    ).toBeUndefined();
+  });
+
+  it("scrolls an expanded History into view at the host offset plus the section offset", async () => {
+    const { setProfileCollapseOverride } = await import(
+      "@/db/profile-presentation-dao"
+    );
+    vi.mocked(setProfileCollapseOverride).mockClear();
+    const onRequestScrollTo = vi.fn();
+    const nodes = historyHostNodes(
+      historyPresentation({ visible: true, expanded: true }),
+      onRequestScrollTo,
+    );
+    const host = nodes.find((node) => node.props.testID === "profile-module-host");
+    const anchor = nodes.find(
+      (node) => node.props.testID === "profile-history-anchor",
+    );
+    (host?.props.onLayout as (event: unknown) => void)(layout(240));
+    (anchor?.props.onLayout as (event: unknown) => void)(layout(600));
+    const overview = nodes.find((node) => node.type === "RelationshipOverview");
+    (overview?.props.onOpenHistory as () => void)();
+
+    expect(onRequestScrollTo).toHaveBeenCalledExactlyOnceWith(840);
+    // Already expanded: the reveal writes nothing (no reset of History state).
+    expect(setProfileCollapseOverride).not.toHaveBeenCalled();
+  });
+
+  it("expands a collapsed History through the persisted collapse override (D-28)", async () => {
+    const { setProfileCollapseOverride, readProfileCollapseOverride } =
+      await import("@/db/profile-presentation-dao");
+    vi.mocked(setProfileCollapseOverride).mockClear();
+    vi.mocked(readProfileCollapseOverride).mockResolvedValue({
+      "interaction-history": true,
+    });
+    const onRequestScrollTo = vi.fn();
+    const nodes = historyHostNodes(
+      historyPresentation(
+        { visible: true, expanded: true },
+        { "interaction-history": false },
+      ),
+      onRequestScrollTo,
+    );
+    const sheets = nodes.find(
+      (node) => node.type === "ProfileRelationshipSheets",
+    );
+    (sheets?.props.onOpenHistory as () => void)();
+    await vi.waitFor(() =>
+      expect(setProfileCollapseOverride).toHaveBeenCalledWith(undefined, {
+        contactId: 7,
+        moduleId: "interaction-history",
+        expanded: true,
+        now: undefined,
+      }),
+    );
+    // The scroll waits for the expanded History layout.
+    expect(onRequestScrollTo).not.toHaveBeenCalled();
   });
 });
