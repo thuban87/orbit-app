@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   FREQUENCY_CHOICES,
+  PROFILE_MESSAGE_ARCHIVED_REASON,
+  PROFILE_MESSAGE_SETTINGS_HOST_REASON,
   profileHeroActionState,
   relationshipExplanation,
   relationshipSheetReducer,
@@ -8,13 +10,26 @@ import {
   validateCustomSnoozeDate,
 } from "./relationship-sheet-model";
 
+const STANDARD = { archived: false, settingsHosted: false } as const;
+const PHONE = { phone: { is_actionable: 1 } as never, email: null };
+const NO_METHODS = { phone: null, email: null };
+const CALL_ENABLED = { enabled: true, route: "call", reason: null };
+const CALL_DISABLED = {
+  enabled: false,
+  route: null,
+  reason: "Add a phone number to call this contact.",
+};
+
 describe("fixed Hero action capability", () => {
   it("keeps Call and Message independent with readable disabled reasons", () => {
     expect(
-      profileHeroActionState({
-        phone: null,
-        email: { is_actionable: 1 } as never,
-      }),
+      profileHeroActionState(
+        {
+          phone: null,
+          email: { is_actionable: 1 } as never,
+        },
+        STANDARD,
+      ),
     ).toEqual({
       message: { enabled: true, route: "compose", reason: null },
       call: {
@@ -24,10 +39,13 @@ describe("fixed Hero action capability", () => {
       },
     });
     expect(
-      profileHeroActionState({
-        phone: { is_actionable: 0 } as never,
-        email: null,
-      }),
+      profileHeroActionState(
+        {
+          phone: { is_actionable: 0 } as never,
+          email: null,
+        },
+        STANDARD,
+      ),
     ).toEqual({
       message: {
         enabled: false,
@@ -40,6 +58,100 @@ describe("fixed Hero action capability", () => {
         reason: "Add a phone number to call this contact.",
       },
     });
+  });
+});
+
+// RG-021 — owner rulings D-09 (archived → Message disabled in every host) and
+// D-25 (Settings-hosted Profile → Message disabled). Disabled with a reason,
+// never hidden; Call is unaffected (D-27 keeps native handoffs enabled).
+describe("Hero Message eligibility by archive state and host", () => {
+  it("enables Message for a live contact in a standard host", () => {
+    expect(profileHeroActionState(PHONE, STANDARD)).toEqual({
+      message: { enabled: true, route: "compose", reason: null },
+      call: CALL_ENABLED,
+    });
+  });
+
+  it("disables Message for an archived contact with the archived reason", () => {
+    expect(
+      profileHeroActionState(PHONE, { archived: true, settingsHosted: false }),
+    ).toEqual({
+      message: {
+        enabled: false,
+        route: null,
+        reason: PROFILE_MESSAGE_ARCHIVED_REASON,
+      },
+      call: CALL_ENABLED,
+    });
+  });
+
+  it("disables Message for a Settings-hosted live contact with the host reason", () => {
+    expect(
+      profileHeroActionState(PHONE, { archived: false, settingsHosted: true }),
+    ).toEqual({
+      message: {
+        enabled: false,
+        route: null,
+        reason: PROFILE_MESSAGE_SETTINGS_HOST_REASON,
+      },
+      call: CALL_ENABLED,
+    });
+  });
+
+  it("prefers the archived reason when archived and Settings-hosted", () => {
+    expect(
+      profileHeroActionState(PHONE, { archived: true, settingsHosted: true })
+        .message,
+    ).toEqual({
+      enabled: false,
+      route: null,
+      reason: PROFILE_MESSAGE_ARCHIVED_REASON,
+    });
+  });
+
+  it("checks archive and host before method availability", () => {
+    expect(
+      profileHeroActionState(NO_METHODS, {
+        archived: true,
+        settingsHosted: false,
+      }).message.reason,
+    ).toBe(PROFILE_MESSAGE_ARCHIVED_REASON);
+    expect(
+      profileHeroActionState(NO_METHODS, {
+        archived: false,
+        settingsHosted: true,
+      }).message.reason,
+    ).toBe(PROFILE_MESSAGE_SETTINGS_HOST_REASON);
+    expect(profileHeroActionState(NO_METHODS, STANDARD)).toEqual({
+      message: {
+        enabled: false,
+        route: null,
+        reason: "Add a phone number or email to message this contact.",
+      },
+      call: CALL_DISABLED,
+    });
+  });
+
+  it("leaves Call exactly as the method rule decides in every context", () => {
+    for (const archived of [false, true]) {
+      for (const settingsHosted of [false, true]) {
+        const context = { archived, settingsHosted };
+        expect(profileHeroActionState(PHONE, context).call).toEqual(
+          CALL_ENABLED,
+        );
+        expect(profileHeroActionState(NO_METHODS, context).call).toEqual(
+          CALL_DISABLED,
+        );
+      }
+    }
+  });
+
+  it("uses distinct, non-empty reason copy", () => {
+    expect(PROFILE_MESSAGE_ARCHIVED_REASON.length).toBeGreaterThan(0);
+    expect(PROFILE_MESSAGE_SETTINGS_HOST_REASON.length).toBeGreaterThan(0);
+    expect(PROFILE_MESSAGE_ARCHIVED_REASON).not.toBe(
+      PROFILE_MESSAGE_SETTINGS_HOST_REASON,
+    );
   });
 });
 
