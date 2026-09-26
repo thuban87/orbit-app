@@ -1149,7 +1149,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.3-audit-remediation-runtime-state-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md
 **UI hint**: yes
-**Plans**: 15/16 plans executed in 6 waves
+**Plans**: 16/16 plans executed in 6 waves
 
 Plans:
 **Wave 1**
@@ -1184,7 +1184,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 38.3-16-PLAN.md — Phase gate + batched Pixel device UAT incl. D-05 TalkBack gate (all RGs)
+- [x] 38.3-16-PLAN.md — Phase gate + batched Pixel device UAT incl. D-05 TalkBack gate (all RGs)
 
 > **Planned 2026-09-25 — 16 plans, 6 waves; run gsd-execute-phase 38.3. RG-020 accessibility subset is investigation-gated; the Phase 22 ContactPicker read-error fallback (CF-02) is kept (D-07); RN-013 was reopened into RG-023 (D-08).**
 
@@ -1249,7 +1249,7 @@ Plans:
 | 37. Settings & Personalization | 8/8 | Complete | 2026-09-14 |
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
-| 38.3 Runtime Correctness, Navigation & State Coherence | 15/16 | In Progress|  |
+| 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 0/TBD | Ready to discuss | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
