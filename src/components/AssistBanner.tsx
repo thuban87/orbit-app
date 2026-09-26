@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useRef, useState } from "react";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { AssistConfirmation } from "@/components/AssistConfirmation";
 import { PendingConfirmationsSheet } from "@/components/PendingConfirmationsSheet";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -7,9 +7,24 @@ import {
   markAssistDismissed,
   markAssistLogged,
 } from "@/db/interaction-assist-dao";
+import {
+  ASSIST_FAILURE_COPY,
+  publishAssistCommit,
+  publishAssistDismissal,
+  runAssistAction,
+} from "@/services/assist-commit";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useAssistBanner } from "@/stores/assist-store";
+import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
+import { Logger } from "@/utils/logger";
+import type { InFlightRef } from "@/utils/single-flight";
+
+const LOG_SCOPE = "assist-banner";
+
+function logFailure(message: string, error: unknown): void {
+  Logger.error(LOG_SCOPE, message, error);
+}
 
 function questionFor(channel: "call" | "text" | "email", name: string): string {
   switch (channel) {
@@ -29,6 +44,11 @@ export function AssistBanner() {
   const morePendingCount = useAssistBanner((state) => state.morePendingCount);
   const refresh = useAssistBanner((state) => state.refresh);
   const [reviewOpen, setReviewOpen] = useState(false);
+  // 38.3 RG-023 / D-08: the ref is the synchronous double-tap latch (a state
+  // flag alone cannot stop two taps in one tick); `pending` drives the UI only.
+  // Both are declared above the early return (Rules of Hooks).
+  const latchRef = useRef<InFlightRef>({ current: false });
+  const [pending, setPending] = useState(false);
 
   if (!newest) {
     return reviewOpen ? (
@@ -39,23 +59,57 @@ export function AssistBanner() {
     ) : null;
   }
 
+  const assistUid = newest.uid;
+
+  // Confirm/dismiss run through the shared runner + publisher
+  // (src/services/assist-commit.ts). Both handlers always resolve: a write
+  // failure shows an Alert and leaves the assist pending; a publication failure
+  // after the commit is only logged, never reported as "couldn't log" (D-04).
   const confirm = async (connected: 0 | 1, note?: string) => {
-    await markAssistLogged(getExecutor(), {
-      assistUid: newest.uid,
-      connected,
-      note,
-      now: localDateTime(),
+    setPending(true);
+    const result = await runAssistAction({
+      latch: latchRef.current,
+      write: () =>
+        markAssistLogged(getExecutor(), {
+          assistUid,
+          connected,
+          note,
+          now: localDateTime(),
+        }),
+      publish: () =>
+        publishAssistCommit({
+          notifyWidget: notifyWidgetDataChanged,
+          bumpShell: bumpShellRefresh,
+          refreshQueue: refresh,
+          logFailure,
+        }),
+      onError: (kind) => {
+        const copy = ASSIST_FAILURE_COPY.log[kind];
+        Alert.alert(copy.title, copy.body);
+      },
+      logFailure,
     });
-    notifyWidgetDataChanged();
-    await refresh();
+    if (result !== "busy") setPending(false);
   };
 
   const dismiss = async () => {
-    await markAssistDismissed(getExecutor(), {
-      assistUid: newest.uid,
-      now: localDateTime(),
+    setPending(true);
+    const result = await runAssistAction({
+      latch: latchRef.current,
+      write: () =>
+        markAssistDismissed(getExecutor(), {
+          assistUid,
+          now: localDateTime(),
+        }),
+      publish: () =>
+        publishAssistDismissal({ refreshQueue: refresh, logFailure }),
+      onError: () => {
+        const copy = ASSIST_FAILURE_COPY.dismiss.generic;
+        Alert.alert(copy.title, copy.body);
+      },
+      logFailure,
     });
-    await refresh();
+    if (result !== "busy") setPending(false);
   };
 
   return (

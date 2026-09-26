@@ -60,10 +60,27 @@ function isValidLocalDateTime(value: string): boolean {
 }
 
 /**
+ * The future-date (clock-rollback) rejection, typed so a UI surface can show
+ * specific copy for it (38.3 RG-023 / D-08) without matching message text. The
+ * message is byte-identical to the plain `Error` this branch threw before; the
+ * guard logic itself is unchanged (ADR-071). The two malformed-value branches
+ * below stay plain `Error` — they are not a clock problem.
+ */
+export class FutureOccurredAtError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "FutureOccurredAtError";
+    // Keep `instanceof` reliable under ES5-style down-level class transforms.
+    Object.setPrototypeOf(this, FutureOccurredAtError.prototype);
+  }
+}
+
+/**
  * Throw when `occurredAt` is malformed OR strictly after `now` (both local
  * wall-clock `YYYY-MM-DD HH:MM:SS`). A malformed/empty/whitespace value throws
  * BEFORE the compare (it cannot be trusted to sort chronologically). Equal and
- * past well-formed values return without throwing.
+ * past well-formed values return without throwing. The future case throws a
+ * `FutureOccurredAtError`; the malformed cases throw a plain `Error`.
  */
 export function rejectFutureOccurredAt(occurredAt: string, now: string): void {
   if (!isValidLocalDateTime(occurredAt)) {
@@ -77,6 +94,8 @@ export function rejectFutureOccurredAt(occurredAt: string, now: string): void {
     );
   }
   if (occurredAt > now) {
-    throw new Error(`occurredAt is in the future (${occurredAt} > ${now})`);
+    throw new FutureOccurredAtError(
+      `occurredAt is in the future (${occurredAt} > ${now})`,
+    );
   }
 }

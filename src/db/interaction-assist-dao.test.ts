@@ -6,6 +6,7 @@ import {
   markAssistFailed,
   markAssistLogged,
 } from "@/db/interaction-assist-dao";
+import { FutureOccurredAtError } from "@/db/log-guards";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
 import { migration003 } from "@/db/migrations/003-orrery-settings";
@@ -231,6 +232,11 @@ describe("interaction assist write DAO", () => {
     await expect(
       markAssistLogged(exec, { assistUid, connected: 1, now: NOW }),
     ).rejects.toThrow("future");
+    // 38.3 RG-023 / D-08: the rejection is the typed clock-rollback error, so
+    // the assist UI can show specific copy; the row stays pending (below).
+    await expect(
+      markAssistLogged(exec, { assistUid, connected: 1, now: NOW }),
+    ).rejects.toBeInstanceOf(FutureOccurredAtError);
     expect(await exec.getAllAsync("SELECT id FROM interactions")).toEqual([]);
     expect(
       await exec.getFirstAsync<{ status: string }>(

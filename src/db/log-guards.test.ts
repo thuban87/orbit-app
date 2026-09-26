@@ -81,14 +81,17 @@ describe("rejectFutureOccurredAt", () => {
   it.each([
     ["a malformed occurredAt", "not-a-date", "2026-08-15 12:00:00"],
     ["a malformed now", "2026-08-01 10:00:00", "not-a-date"],
-  ])("throws a plain Error (NOT FutureOccurredAtError) for %s", (_label, occurredAt, now) => {
-    let caught: unknown;
-    try {
-      rejectFutureOccurredAt(occurredAt, now);
-    } catch (error) {
-      caught = error;
-    }
-    expect(caught).toBeInstanceOf(Error);
-    expect(caught).not.toBeInstanceOf(FutureOccurredAtError);
-  });
+  ])(
+    "throws a plain Error (NOT FutureOccurredAtError) for %s",
+    (_label, occurredAt, now) => {
+      let caught: unknown;
+      try {
+        rejectFutureOccurredAt(occurredAt, now);
+      } catch (error) {
+        caught = error;
+      }
+      expect(caught).toBeInstanceOf(Error);
+      expect(caught).not.toBeInstanceOf(FutureOccurredAtError);
+    },
+  );
 });

@@ -47,9 +47,9 @@ describe("classifyAssistFailure", () => {
 
   it("classifies any other error (including a plain Error mentioning 'future') as generic", () => {
     expect(classifyAssistFailure(new Error("db locked"))).toBe("generic");
-    expect(classifyAssistFailure(new Error("occurredAt is in the future"))).toBe(
-      "generic",
-    );
+    expect(
+      classifyAssistFailure(new Error("occurredAt is in the future")),
+    ).toBe("generic");
     expect(classifyAssistFailure("boom")).toBe("generic");
     expect(classifyAssistFailure(undefined)).toBe("generic");
   });
