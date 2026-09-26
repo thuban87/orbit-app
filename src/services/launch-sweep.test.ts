@@ -13,10 +13,11 @@
  * a macrotask so the async `runLaunchSweep()` `finally` resets its `running`
  * guard between synchronous `fire()` calls.
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   __resetSweepForTest,
   installSweepTrigger,
+  onSweepSettled,
   registerSweepHook,
   runLaunchSweep,
 } from "@/services/launch-sweep";
@@ -321,5 +322,155 @@ describe("installSweepTrigger — AppState gating", () => {
     fake.fire("inactive");
     await flush();
     expect(calls).toBe(1); // neither transition target is a background→active
+  });
+});
+
+/** A hand-controlled promise: resolve/reject it from the test body. */
+function deferred(): {
+  promise: Promise<void>;
+  resolve: () => void;
+  reject: (err: Error) => void;
+} {
+  let resolve!: () => void;
+  let reject!: (err: Error) => void;
+  const promise = new Promise<void>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
+describe("onSweepSettled — owning-run publication (38.3 D-14)", () => {
+  it("(a) publishes once per owning run, only after the last hook resolves", async () => {
+    const first = deferred();
+    const last = deferred();
+    const settled = vi.fn();
+    registerSweepHook(() => first.promise);
+    registerSweepHook(() => last.promise);
+    onSweepSettled(settled);
+
+    const run = runLaunchSweep();
+    await flush();
+    expect(settled).not.toHaveBeenCalled();
+    first.resolve();
+    await flush();
+    expect(settled).not.toHaveBeenCalled(); // second hook still pending
+    last.resolve();
+    await run;
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("(b) a re-entrant call publishes nothing of its own; one publication after the follow-up pass", async () => {
+    const gates = [deferred(), deferred()];
+    let pass = 0;
+    registerSweepHook(() => {
+      const gate = gates[pass];
+      pass += 1;
+      return gate.promise;
+    });
+    const settled = vi.fn();
+    onSweepSettled(settled);
+
+    const owning = runLaunchSweep();
+    await flush();
+    await runLaunchSweep(); // re-entrant: early-returns while pass 1 is gated
+    expect(settled).not.toHaveBeenCalled();
+
+    gates[0].resolve();
+    await flush();
+    expect(pass).toBe(2); // follow-up pass has started…
+    expect(settled).not.toHaveBeenCalled(); // …and has not settled yet
+
+    gates[1].resolve();
+    await owning;
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("(c) a burst of three overlapping calls publishes once, after the single follow-up pass", async () => {
+    const gates = [deferred(), deferred()];
+    let pass = 0;
+    registerSweepHook(() => {
+      const gate = gates[pass];
+      pass += 1;
+      return gate.promise;
+    });
+    const settled = vi.fn();
+    onSweepSettled(settled);
+
+    const runs = [runLaunchSweep(), runLaunchSweep(), runLaunchSweep()];
+    await flush();
+    gates[0].resolve();
+    await flush();
+    expect(settled).not.toHaveBeenCalled();
+    gates[1].resolve();
+    await Promise.all(runs);
+    expect(pass).toBe(2);
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("(d) a throwing hook never suppresses the publication", async () => {
+    registerSweepHook(
+      async () => {
+        throw new Error("private content");
+      },
+      { id: "boom" },
+    );
+    const settled = vi.fn();
+    onSweepSettled(settled);
+    await runLaunchSweep();
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("(e) a throwing listener is isolated: a sibling still fires and the runner is not wedged", async () => {
+    let calls = 0;
+    registerSweepHook(async () => {
+      calls += 1;
+    });
+    const throwing = vi.fn(() => {
+      throw new Error("listener failure");
+    });
+    const sibling = vi.fn();
+    onSweepSettled(throwing);
+    onSweepSettled(sibling);
+
+    await expect(runLaunchSweep()).resolves.toBeUndefined();
+    expect(throwing).toHaveBeenCalledTimes(1);
+    expect(sibling).toHaveBeenCalledTimes(1);
+
+    // `running` was released in finally: a subsequent run still works.
+    await runLaunchSweep();
+    expect(calls).toBe(2);
+    expect(sibling).toHaveBeenCalledTimes(2);
+  });
+
+  it("(f) unsubscribe stops delivery", async () => {
+    const settled = vi.fn();
+    const remove = onSweepSettled(settled);
+    await runLaunchSweep();
+    expect(settled).toHaveBeenCalledTimes(1);
+    remove();
+    await runLaunchSweep();
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("publishes after the cold-start trigger's owning run", async () => {
+    const settled = vi.fn();
+    onSweepSettled(settled);
+    const fake = makeFakeAppState();
+    installSweepTrigger(fake.appState);
+    await flush();
+    expect(settled).toHaveBeenCalledTimes(1);
+    fake.fire("background");
+    fake.fire("active");
+    await flush();
+    expect(settled).toHaveBeenCalledTimes(2);
+  });
+
+  it("__resetSweepForTest clears listeners", async () => {
+    const settled = vi.fn();
+    onSweepSettled(settled);
+    __resetSweepForTest();
+    await runLaunchSweep();
+    expect(settled).not.toHaveBeenCalled();
   });
 });

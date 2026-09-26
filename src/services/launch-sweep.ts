@@ -82,6 +82,38 @@ export function __armUatSweepFault(fault: Partial<UatSweepFault>): void {
   Object.assign(uatFault, fault);
 }
 
+// Post-sweep settled listeners (38.3 D-14). Fired ONLY by the owning run, once,
+// after its do/while loop (including any coalesced follow-up pass) has settled —
+// never by a re-entrant call that early-returns (Pitfall 2). App.tsx forwards
+// this to the shell-refresh store's foreground tick; this module stays node-pure
+// and imports no store or react-native binding (P5).
+const settledListeners = new Set<() => void>();
+
+/**
+ * Subscribe to "an owning sweep run has fully settled". Called once per owning
+ * `runLaunchSweep()` run (cold start or a real background→active return), after
+ * every hook of that run and any coalesced follow-up pass. A throwing hook never
+ * suppresses it; a throwing listener is isolated and never wedges the runner.
+ * Returns the unsubscribe function.
+ */
+export function onSweepSettled(listener: () => void): () => void {
+  settledListeners.add(listener);
+  return () => {
+    settledListeners.delete(listener);
+  };
+}
+
+function publishSweepSettled(): void {
+  // Snapshot so an unsubscribe during delivery cannot skip a sibling listener.
+  for (const listener of [...settledListeners]) {
+    try {
+      listener();
+    } catch {
+      Logger.error("launch-sweep", "settled listener failed");
+    }
+  }
+}
+
 // Module-level re-entrancy guard: keeps a single launch from double-running.
 let running = false;
 // DEFER-ONE (WR-03): a real background→active launch that overlaps an in-flight
@@ -102,7 +134,8 @@ let pendingRerun = false;
  *     "runs once per real foreground launch" contract later phases' quarantine-
  *     expiry / archived-purge / schedule-reconcile hooks depend on.
  * The `running` flag is reset in `finally` so a throwing hook never wedges the
- * runner shut.
+ * runner shut. After it is released, the owning run publishes `onSweepSettled`
+ * exactly once (38.3 D-14); a re-entrant early return publishes nothing.
  */
 export async function runLaunchSweep(): Promise<void> {
   if (running) {
@@ -150,6 +183,9 @@ export async function runLaunchSweep(): Promise<void> {
     } while (pendingRerun);
   } finally {
     running = false;
+    // Owner path only: the re-entrant branch above returned before `running`
+    // was ours, so it never reaches here. Publish once per owning run.
+    publishSweepSettled();
   }
 }
 
@@ -190,4 +226,5 @@ export function __resetSweepForTest(): void {
   hooks.length = 0;
   running = false;
   pendingRerun = false;
+  settledListeners.clear();
 }

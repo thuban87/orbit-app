@@ -42,6 +42,7 @@ import {
 import { interactionAssistSweep } from "@/services/interaction-assist-sweep";
 import {
   installSweepTrigger,
+  onSweepSettled,
   registerSweepHook,
 } from "@/services/launch-sweep";
 import { registerMemoryTrashSweep } from "@/services/memory-trash-sweep";
@@ -67,6 +68,7 @@ import { registerRestorePhotoFinalizeSweep } from "@/services/photos/restore-pho
 import { registerWidgetSweep } from "@/services/widget/widget-refresh";
 import { subscribeAppState, useAssistBanner } from "@/stores/assist-store";
 import { setFocusedRouteName } from "@/stores/focused-route-store";
+import { publishForegroundRefresh } from "@/stores/shell-refresh-store";
 import {
   themeSelectionFromSettings,
   useThemeStore,
@@ -331,6 +333,10 @@ function AppShell() {
     // against channel creation. Both calls are idempotent and Logger-guarded.
     let cancelled = false;
     let subscription: { remove(): void } | null = null;
+    // 38.3 D-14: forward each OWNING sweep run's settlement to the foreground
+    // tick, so resume reads are ordered after the sweep's purge/expiry writes.
+    // Registered BEFORE installSweepTrigger so the cold-start sweep publishes.
+    const removeSweepSettled = onSweepSettled(publishForegroundRefresh);
     (async () => {
       try {
         await ensureChannels();
@@ -350,6 +356,7 @@ function AppShell() {
     return () => {
       cancelled = true;
       subscription?.remove();
+      removeSweepSettled();
       assistSubscription.remove();
     };
   }, [ready]);
