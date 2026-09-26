@@ -18,7 +18,7 @@ import {
   sortModeLabel,
 } from "./control-labels";
 import { collapseSummary } from "./control-summary";
-import { dashboardPanelStore } from "./DashboardOverlayHost";
+import { dashboardPanelStore } from "./dashboard-panel-store";
 import { FilterPanelContent } from "./FilterPanelContent";
 import { selectedFilterLabels } from "./filter-summary";
 import { PopulationPanelContent } from "./PopulationPanelContent";
@@ -28,11 +28,7 @@ const PANEL_ID = "dashboard-population";
 const FILTER_PANEL_ID = "dashboard-filters";
 const SORT_PANEL_ID = "dashboard-sort";
 
-export function DashboardControlRow({
-  onPanelOpenChange,
-}: {
-  onPanelOpenChange?: (open: boolean) => void;
-}) {
+export function DashboardControlRow() {
   const { colors } = useTheme();
   const populations = useDashboardQueryStore((state) => state.populations);
   const filters = useDashboardQueryStore((state) => state.filters);
@@ -91,10 +87,12 @@ export function DashboardControlRow({
     }, [shellRevision]),
   );
 
+  // Owner dismissal: the trigger re-tap toggle and the request's onDismiss both
+  // route here. Home derives its inertness from the panel store (RG-020), so
+  // closing is all that is needed; closing an already-closed store is a no-op.
   const dismiss = useCallback(() => {
     dashboardPanelStore.getState().close();
-    onPanelOpenChange?.(false);
-  }, [onPanelOpenChange]);
+  }, []);
 
   const togglePopulation = useCallback(
     async (key: DashboardPopulation) => {
@@ -190,9 +188,8 @@ export function DashboardControlRow({
         ),
         onDismiss: dismiss,
       });
-      onPanelOpenChange?.(true);
     });
-  }, [dismiss, onPanelOpenChange, pending, togglePopulation]);
+  }, [dismiss, pending, togglePopulation]);
 
   const openFilters = useCallback(() => {
     if (dashboardPanelStore.getState().request?.id === FILTER_PANEL_ID) {
@@ -215,16 +212,8 @@ export function DashboardControlRow({
         ),
         onDismiss: dismiss,
       });
-      onPanelOpenChange?.(true);
     });
-  }, [
-    categories,
-    clearFilters,
-    dismiss,
-    filtersPending,
-    onPanelOpenChange,
-    toggleFilter,
-  ]);
+  }, [categories, clearFilters, dismiss, filtersPending, toggleFilter]);
 
   const openSort = useCallback(() => {
     if (dashboardPanelStore.getState().request?.id === SORT_PANEL_ID) {
@@ -245,9 +234,8 @@ export function DashboardControlRow({
         ),
         onDismiss: dismiss,
       });
-      onPanelOpenChange?.(true);
     });
-  }, [dismiss, onPanelOpenChange, selectSort, sortPending]);
+  }, [dismiss, selectSort, sortPending]);
 
   // The host owns the presentation node, so refresh the pure content props as
   // store state changes without coupling the content component to persistence.

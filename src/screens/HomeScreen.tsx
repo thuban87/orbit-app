@@ -70,6 +70,10 @@ import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
+import {
+  dashboardPanelStore,
+  selectPanelOpen,
+} from "@/components/control-surface/dashboard-panel-store";
 import { Icon } from "@/components/icons/Icon";
 import { ICON_REGISTRY, type IconName } from "@/components/icons/icon-registry";
 import { ListRow, type ListRowProps } from "@/components/ListRow";
@@ -505,7 +509,9 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     AccessibilityInfo.announceForAccessibility(label);
   }, [selectionCount, selectionMode]);
   const [resultGeneration, setResultGeneration] = useState(0);
-  const [panelOpen, setPanelOpen] = useState(false);
+  // Derived from the single panel-store owner (RG-020): never mirror it in
+  // local state, or a missed close leaves both wrappers inert.
+  const panelOpen = dashboardPanelStore(selectPanelOpen);
   const [contextMenuContactId, setContextMenuContactId] = useState<
     number | null
   >(null);
@@ -1708,7 +1714,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           />
         </View>
       ) : (
-        <DashboardControlRow onPanelOpenChange={setPanelOpen} />
+        <DashboardControlRow />
       )}
       <View
         accessible={!panelOpen}
