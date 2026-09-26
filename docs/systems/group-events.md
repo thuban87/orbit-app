@@ -66,6 +66,7 @@ No Group Event Zustand store or background scheduler is required; screens hold u
 | `src/screens/GroupEventsScreen.tsx` | Reverse-chronological local browse and search. |
 | `src/screens/GroupEventDetailScreen.tsx` | Presentation-first parent and virtualized participant cards. |
 | `src/screens/group-event-detail-logic.ts` | Child consent read-through and whole-second duration display. |
+| `src/screens/group-event-refresh.ts` | Saved-event participant commit vs readback: draft reducer (`initialLoaded` is the only seed), latest-request refresh controller, `runParticipantAdd`, committed-id picker exclusion. |
 | `src/components/group/ParticipantOverrideEditor.tsx` | Restricted child controls and Follow event affordances. |
 | `src/components/group/ParticipantCard.tsx` | Compact participant rows and scoped overflow. |
 | `src/components/group/RemoveParticipantSheet.tsx` | Delete / Keep individual / Cancel intent. |
@@ -99,8 +100,10 @@ No Group Event Zustand store or background scheduler is required; screens hold u
 1. Edit or Detail excludes existing members from the same canonical picker.
 2. Done invokes `addParticipants` once. The transaction re-reads current parent/membership state and rejects duplicate contacts before inserting children.
 3. New children use current parent shared values, the event’s occurrence timestamp, and all three follow flags set to `1`.
-4. A late child failure rolls back every child, recency change, and revision increment. Success awaits one reload before picker cleanup; rejection preserves the Modal, selection, and visible error.
-5. Archived contacts’ recency advances without restoration; they remain archived.
+4. A late child failure rolls back every child, recency change, and revision increment. Rejection preserves the Modal, selection, and visible error. Success resolves the picker as soon as the batch commits; the event readback runs afterwards through `src/screens/group-event-refresh.ts` (`runParticipantAdd`), so a failed read shows the screen's own "Couldn't refresh this event" row with a Retry that only re-reads (38.3 D-19).
+5. Until a successful refresh, committed ids stay in the picker exclusion set (`excludedParticipantIds`), so a re-pick cannot reach the unchanged duplicate-participant guard. Refreshes are latest-request: an older read never overwrites a newer one.
+6. On Edit Group Event, add, remove and participant Save commit on their own and then refresh the saved `event` only. The parent draft and its dirty baseline are seeded once by `initialLoaded` in `groupEventEditReducer`; unsaved Date/Channel/Tone/Duration/Group Note edits survive and still go through Save or the Discard/Keep guard (D-17). Following participants resolve against the saved event, not the unsaved draft (D-18).
+7. Archived contacts’ recency advances without restoration; they remain archived.
 
 ### Browsing, inspecting, and choosing edit scope
 
@@ -174,6 +177,8 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 8. **Native verification has limits.** Final Pixel UAT records three passes. Its long-content case has three participants; this is not large-list performance evidence. The phase’s full suite had an unrelated Orrery parser failure despite passing targeted checks.
 9. **Do not use participant children as Digest event rows.** The aggregate must count the Group Event parent once; participant identity belongs only in People reached semantics.
 10. **Participant patches come from `src/logic/group-participant-patch.ts`.** A value edit on an already-overridden field is sent as `{ follow: false, value }`; follow is never inferred from equality (ADR-125). The earlier inline builders emitted a field only when its follow flag changed, so editing an existing override's value silently no-opped (reliability-testing/AUD-REL-006).
+11. **Participant work never reseeds the parent draft — only `initialLoaded` seeds it (D-17).** The old Edit Group Event `load()` rebuilt the draft and baseline after every add, remove and participant Save, erasing unsaved parent edits (reliability-testing/AUD-REL-007). A reload that reseeds every field is not draft preservation; `eventRefreshed` replaces `event` only.
+12. **A committed add with a failed refresh is a success; Retry re-reads only (D-19, reliability-testing/AUD-REL-008).** Awaiting the readback inside the picker's `onConfirm` reported a committed add as failed and invited a retry into the duplicate guard. `runParticipantAdd` awaits the write alone. Group Event Detail also shows remove/dissolve/delete write failures inline now; they were invisible whenever an event was loaded.
 
 ## Related Systems
 
@@ -193,3 +198,4 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 | 2026-09-02 | 33 | Introduced event-first Group Event parents, canonical children, live inheritance, explicit lifecycle/scope, local browse/detail, atomic saved additions, and portability handoff. |
 | 2026-09-02 | 38 | Documented the read-only Your Week parent-once activity projection and Events-detail Profile return path. |
 | 2026-09-25 | 38.3 | Override value edits persist in both participant editors (RG-019, reliability-testing/AUD-REL-006). |
+| 2026-09-25 | 38.3 | Draft-preserving participant refresh + commit-vs-read recovery (RG-019). |

@@ -59,7 +59,10 @@ describe("contact picker multi-select helpers", () => {
   });
 
   it("uses the one batch-write, commit-vs-refresh owner contract on both saved-event screens (38.3 D-19)", () => {
-    for (const screen of ["EditGroupEventScreen.tsx"]) {
+    for (const screen of [
+      "EditGroupEventScreen.tsx",
+      "GroupEventDetailScreen.tsx",
+    ]) {
       const source = readFileSync(
         new URL(`../screens/${screen}`, import.meta.url),
         "utf8",

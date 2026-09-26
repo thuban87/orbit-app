@@ -1,13 +1,13 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit Button/AppText `role` is a domain prop, not ARIA.
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
 import { ContactPicker } from "@/components/ContactPicker";
 import { ParticipantCard } from "@/components/group/ParticipantCard";
 import { RemoveParticipantSheet } from "@/components/group/RemoveParticipantSheet";
 import { InteractionDetail } from "@/components/history/InteractionDetail";
 import { ShellAppBar } from "@/components/ShellAppBar";
-import { AppText, ConfirmDialog } from "@/components/ui";
+import { AppText, Button, ConfirmDialog } from "@/components/ui";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   addParticipants,
@@ -30,6 +30,11 @@ import {
   closeThenOpenParticipantProfile,
   groupEventDurationLabel,
 } from "./group-event-detail-logic";
+import {
+  createGroupEventRefreshController,
+  excludedParticipantIds,
+  runParticipantAdd,
+} from "./group-event-refresh";
 
 const DISSOLVE = {
   title: "Dissolve this group event?",
@@ -51,53 +56,68 @@ export function GroupEventDetailScreen({
   const { colors } = useTheme();
   const { groupEventId } = route.params;
   const [event, setEvent] = useState<GroupEventDetail | null>(null);
-  const [failed, setFailed] = useState(false);
+  // One read-failure flag, split by whether an event is already on screen:
+  // no event → the full "Couldn't load" view; an event → an inline refresh
+  // row whose Retry only re-reads (38.3 D-19).
+  const [readFailed, setReadFailed] = useState(false);
+  const loadFailed = event === null && readFailed;
+  const refreshFailed = event !== null && readFailed;
+  // A remove/dissolve/delete write that actually rejected.
+  const [writeError, setWriteError] = useState(false);
+  const [committedPendingIds, setCommittedPendingIds] = useState<
+    readonly number[]
+  >([]);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [removing, setRemoving] = useState<GroupEventParticipant | null>(null);
   const [detail, setDetail] = useState<GroupEventParticipant | null>(null);
   const [confirm, setConfirm] = useState<"dissolve" | "delete" | null>(null);
 
-  const load = useCallback(
-    async ({ throwOnFailure = false } = {}) => {
-      try {
-        const loaded = await readGroupEventDetail(getExecutor(), {
-          groupEventId,
-        });
-        if (!loaded)
-          throw new Error("This group event is no longer available.");
-        setEvent(loaded);
-        setFailed(false);
-      } catch (error) {
-        setFailed(true);
-        if (throwOnFailure) throw error;
-      }
-    },
+  const refreshController = useMemo(
+    () =>
+      createGroupEventRefreshController({
+        read: () => readGroupEventDetail(getExecutor(), { groupEventId }),
+        onRefreshed: (loaded) => {
+          setEvent(loaded);
+          setReadFailed(false);
+          setCommittedPendingIds([]);
+        },
+        onRefreshFailed: () => setReadFailed(true),
+      }),
     [groupEventId],
   );
+  useEffect(() => () => refreshController.invalidate(), [refreshController]);
+  const refresh = refreshController.refresh;
   useFocusEffect(
     useCallback(() => {
-      void load();
-    }, [load]),
+      void refresh();
+    }, [refresh]),
+  );
+  const excludedIds = useMemo(
+    () => excludedParticipantIds(event, committedPendingIds),
+    [event, committedPendingIds],
   );
 
-  const addSelected = async (contactIds: number[]) => {
-    try {
-      await addParticipants(getExecutor(), {
-        groupEventId,
-        participants: contactIds.map((contactId) => ({
-          contactId,
-          uid: newUid(),
-        })),
-        now: localDateTime(),
-      });
-      await load({ throwOnFailure: true });
-    } catch (error) {
-      setFailed(true);
-      throw error;
-    }
-  };
+  // Picker owner: only a rejected write reports failure (D-19, D-04).
+  const addSelected = (contactIds: number[]) =>
+    runParticipantAdd({
+      add: () =>
+        addParticipants(getExecutor(), {
+          groupEventId,
+          participants: contactIds.map((contactId) => ({
+            contactId,
+            uid: newUid(),
+          })),
+          now: localDateTime(),
+        }),
+      onCommitted: () =>
+        setCommittedPendingIds((current) => [
+          ...new Set([...current, ...contactIds]),
+        ]),
+      refresh,
+    });
   const remove = async (keep: boolean) => {
     if (!removing) return;
+    setWriteError(false);
     try {
       if (keep)
         await detachParticipant(getExecutor(), {
@@ -112,14 +132,17 @@ export function GroupEventDetailScreen({
           contactId: removing.contactId,
           now: localDateTime(),
         });
-      setRemoving(null);
-      await load();
     } catch {
-      setFailed(true);
+      setRemoving(null);
+      setWriteError(true);
+      return;
     }
+    setRemoving(null);
+    void refresh();
   };
   const lifecycle = async () => {
     if (!confirm) return;
+    setWriteError(false);
     try {
       if (confirm === "dissolve")
         await dissolveGroupEvent(getExecutor(), {
@@ -135,7 +158,7 @@ export function GroupEventDetailScreen({
       navigation.goBack();
     } catch {
       setConfirm(null);
-      setFailed(true);
+      setWriteError(true);
     }
   };
   const interaction =
@@ -145,7 +168,7 @@ export function GroupEventDetailScreen({
   if (!event)
     return (
       <View style={styles.center}>
-        {failed ? (
+        {loadFailed ? (
           <AppText role="body" style={{ color: colors.danger }}>
             Couldn't load this group event.
           </AppText>
@@ -180,6 +203,24 @@ export function GroupEventDetailScreen({
         ListHeaderComponent={
           <View style={styles.header}>
             <AppText role="heading">{event.title}</AppText>
+            {refreshFailed ? (
+              <View style={styles.inlineError}>
+                <AppText role="caption" style={{ color: colors.danger }}>
+                  Couldn't refresh this event
+                </AppText>
+                <Button
+                  role="tertiary"
+                  label="Retry"
+                  accessibilityLabel="Retry refreshing this event"
+                  onPress={() => void refresh()}
+                />
+              </View>
+            ) : null}
+            {writeError ? (
+              <AppText role="caption" style={{ color: colors.danger }}>
+                Couldn't update this group event. Please try again.
+              </AppText>
+            ) : null}
             <DetailField label="When" value={event.occurredAt} />
             <DetailField label="Channel" value={event.channel} />
             <DetailField label="Tone" value={event.quality} />
@@ -219,9 +260,7 @@ export function GroupEventDetailScreen({
       <ContactPicker
         mode="multi"
         visible={pickerVisible}
-        excludeContactIds={event.participants.map(
-          (participant) => participant.contactId,
-        )}
+        excludeContactIds={excludedIds}
         onDismiss={() => setPickerVisible(false)}
         onConfirm={addSelected}
       />
@@ -274,7 +313,7 @@ export function GroupEventDetailScreen({
           }
           onDeleted={() => {
             setDetail(null);
-            void load();
+            void refresh();
           }}
         />
       ) : null}
@@ -308,4 +347,5 @@ const styles = StyleSheet.create({
   header: { gap: SPACING.md, paddingBottom: SPACING.base },
   field: { gap: SPACING.xs },
   empty: { gap: SPACING.sm, paddingVertical: SPACING.lg },
+  inlineError: { flexDirection: "row", alignItems: "center", gap: SPACING.sm },
 });
