@@ -34,6 +34,7 @@ import { deleteTouchpoint, recordTouchpoint } from "@/db/recency-dao";
 import { newUid } from "@/db/uid";
 import { isFocusedWorkflow } from "@/navigation/focused-route-classification";
 import { navigationRef } from "@/navigation/linking";
+import { navigateIntoTab } from "@/navigation/tab-entry";
 import { FAB_EDGE_GAP, FAB_SIZE } from "@/navigation/use-bottom-clearance";
 import { useWindowObstacle } from "@/navigation/use-window-measurement";
 import { runQuickLog } from "@/services/quick-log-command";
@@ -250,10 +251,9 @@ export function UniversalFab() {
         logContact(contactId);
         return;
       }
-      navigationRef.current?.navigate("DashboardTab", {
-        screen: flow.screen,
-        params: { contactId },
-      } as never);
+      navigateIntoTab(navigationRef.current, "DashboardTab", flow.screen, {
+        contactId,
+      });
     },
     [logContact, pickerFlow],
   );
@@ -272,10 +272,12 @@ export function UniversalFab() {
       closeDial(!opensPicker);
 
       if (intent.kind === "navigate") {
-        navigationRef.current?.navigate(intent.tab, {
-          screen: intent.screen,
-          params: intent.params,
-        } as never);
+        navigateIntoTab(
+          navigationRef.current,
+          intent.tab,
+          intent.screen,
+          intent.params,
+        );
       } else if (intent.kind === "quick-log") {
         if (intent.contactId === null) {
           setPickerFlow({ kind: "quick-log" });
