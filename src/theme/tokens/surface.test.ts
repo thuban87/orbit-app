@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { applyAccent, resolveAccent } from "../accents";
+import { applyAccent, DEFAULT_ACCENT, resolveAccent } from "../accents";
 import { BACKGROUND_SLOTS, type BackgroundAssetSlot } from "../backgrounds";
 import {
   AA_LARGE,
@@ -9,6 +9,7 @@ import {
   relativeLuminance,
 } from "../contrast";
 import { resolveGlassForegroundPalette } from "../glass-foregrounds";
+import { ACCENT_IDS, type AccentId } from "../theme-option-ids";
 import { resolvePalette } from "../theme-presets";
 import type { ResolvedMode, ThemePackage, ThemePalette } from "../theme-types";
 import {
@@ -71,6 +72,16 @@ interface ProofExclusion {
   package?: ThemePackage;
   /** Omitted = every mode. */
   mode?: ResolvedMode;
+  /** accentText only: the curated accent excluded. Omitted = every accent. */
+  accentId?: AccentId;
+  /** Omitted = both the card and the chrome regimes. */
+  treatment?: "card" | "chrome";
+  /**
+   * `accepted` = an owner-ruled, permanent limitation. `held-for-owner` = a
+   * failure found by this proof that is the owner's call (a regime other than
+   * Standard Light, or a protected tone); nothing is retuned while it is held.
+   */
+  status: "accepted" | "held-for-owner";
   justification: string;
   inventoryRef: string;
 }
@@ -82,13 +93,19 @@ const PROOF_EXCLUSIONS: readonly ProofExclusion[] = [
     mode: "dark",
     justification:
       "ADR-084 owner-accepted Galaxy Dark danger (#E5484D) limitation: danger-as-text reaches 3.58-4.16:1 over the brightest Galaxy composites. D-24 keeps it as it is; it is never retuned here.",
+    status: "accepted",
     inventoryRef: "E-1",
   },
   {
     token: "accentText",
+    package: "galaxy",
+    mode: "light",
+    accentId: "coral",
+    treatment: "card",
+    status: "held-for-owner",
     justification:
-      "HELD for the owner (D-24 STOP): accentText renders on Standard-Light glass, but the aurora-teal and emerald accents cannot pass the corrected proof by lightness alone without dropping below HSL L 12% (near-black). No accentText variant is committed until the owner rules; accentText was never asserted by this proof before RG-029.",
-    inventoryRef: "E-2",
+      "Galaxy Light coral link text (#B03A26, the shared accents.ts light tone) measures 4.48:1 against the presentation-density opaque card (0.88 over the darkest Galaxy pixel, composite #DDDEE0); comfortable/dense cards and chrome clear it (5.01/5.49). A Galaxy regime and a curated accent tone are owner-bucket under the D-24 STOP rule, so nothing is retuned and it is held for the owner.",
+    inventoryRef: "E-7",
   },
 ];
 
@@ -96,12 +113,15 @@ function isExcluded(
   token: keyof ThemePalette,
   pkg: ThemePackage,
   mode: ResolvedMode,
+  scope: { accentId?: AccentId | null; treatment?: "card" | "chrome" } = {},
 ): boolean {
   return PROOF_EXCLUSIONS.some(
     (e) =>
       e.token === token &&
       (e.package === undefined || e.package === pkg) &&
-      (e.mode === undefined || e.mode === mode),
+      (e.mode === undefined || e.mode === mode) &&
+      (e.accentId === undefined || e.accentId === scope.accentId) &&
+      (e.treatment === undefined || e.treatment === scope.treatment),
   );
 }
 
@@ -231,20 +251,67 @@ function assertClearsExtrema(
 function effectiveGlassPalette(
   pkg: ThemePackage,
   mode: ResolvedMode,
+  accentId: AccentId | null = null,
 ): ThemePalette {
   const palette = applyAccent(
     resolvePalette(pkg, mode),
-    resolveAccent(null, pkg, mode),
+    resolveAccent(accentId, pkg, mode),
   );
   return (
     resolveGlassForegroundPalette({
       palette,
       package: pkg,
       mode,
-      accentId: null,
+      accentId,
       backgroundIsAsset: true,
     }) ?? palette
   );
+}
+
+/**
+ * Every curated accent plus the package default (`null`) — accentText is a link
+ * tone keyed by accent, so the proof loops all of them (RG-029 / D-24 / D-26).
+ */
+const ACCENT_CHOICES: readonly (AccentId | null)[] = [null, ...ACCENT_IDS];
+
+function resolveDefaultAccentId(pkg: ThemePackage): AccentId {
+  return DEFAULT_ACCENT[pkg];
+}
+
+/**
+ * accentText (link text, AA_NORMAL) on the EFFECTIVE glass palette for every
+ * curated accent. In Standard Light over an asset this is the lightness-only
+ * `STANDARD_LIGHT_GLASS_ACCENT_TEXT` variant (owner ruling D-26, which also
+ * accepts the sub-12% aurora-teal and emerald variants); elsewhere it is the
+ * root accent tone.
+ */
+function assertAccentTextClearsExtrema(
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+  opacityFor: (pkg: ThemePackage, mode: ResolvedMode) => number,
+  treatment: "card" | "chrome",
+  slot: BackgroundAssetSlot,
+  label: string,
+) {
+  for (const accentId of ACCENT_CHOICES) {
+    // `null` renders the package default; an exclusion keyed by that default
+    // id covers it too.
+    const rendered = accentId ?? resolveDefaultAccentId(pkg);
+    if (
+      isExcluded("accentText", pkg, mode, { accentId: rendered, treatment })
+    ) {
+      continue;
+    }
+    const palette = effectiveGlassPalette(pkg, mode, accentId);
+    assertClearsExtrema(
+      palette.accentText,
+      palette[SURFACE[pkg].tintTokenKey],
+      opacityFor(pkg, mode),
+      slot,
+      AA_NORMAL,
+      `${label}: accentText (${accentId ?? "default"})`,
+    );
+  }
 }
 
 describe("both-extrema interval helper — boundary + mid-tone edges (RG-029)", () => {
@@ -443,6 +510,17 @@ describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1
           `${id} @ ${pkg}/${mode} ${regime} card`,
         );
       });
+
+      it(`${id} @ ${pkg}/${mode} (${regime}): accentText for every curated accent over the card clears both extrema (RG-029 / D-24 / D-26)`, () => {
+        assertAccentTextClearsExtrema(
+          pkg,
+          mode,
+          (p, m) => cardTintOpacity(p, m, "presentation"),
+          "card",
+          slot,
+          `${id} @ ${pkg}/${mode} ${regime} card`,
+        );
+      });
     }
   }
 });
@@ -565,6 +643,17 @@ describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)",
           mode,
           palette[SURFACE[pkg].tintTokenKey],
           chromeScrimOpacity(pkg, mode),
+          slot,
+          `${id} @ ${pkg}/${mode} chrome`,
+        );
+      });
+
+      it(`${id} @ ${pkg}/${mode}: accentText for every curated accent over the chrome scrim clears both extrema (RG-029 / D-24 / D-26)`, () => {
+        assertAccentTextClearsExtrema(
+          pkg,
+          mode,
+          chromeScrimOpacity,
+          "chrome",
           slot,
           `${id} @ ${pkg}/${mode} chrome`,
         );
@@ -712,16 +801,36 @@ describe("proof exclusions are written down against the committed inventory (D-2
     }
   });
 
-  it("the only non-Standard-Light exclusion is the ADR-084 Galaxy Dark danger limitation", () => {
-    const scoped = PROOF_EXCLUSIONS.filter(
-      (e) => e.package !== undefined || e.mode !== undefined,
+  it("the only ACCEPTED non-Standard-Light exclusion is the ADR-084 Galaxy Dark danger limitation", () => {
+    const scopedAccepted = PROOF_EXCLUSIONS.filter(
+      (e) =>
+        e.status === "accepted" &&
+        (e.package !== undefined || e.mode !== undefined),
     );
-    expect(scoped).toEqual([
+    expect(scopedAccepted).toEqual([
       expect.objectContaining({
         token: "danger",
         package: "galaxy",
         mode: "dark",
       }),
     ]);
+  });
+
+  it("every held-for-owner exclusion is fully scoped and named as an open owner question in the inventory", () => {
+    const inventory = readFileSync(INVENTORY, "utf8");
+    const held = PROOF_EXCLUSIONS.filter((e) => e.status === "held-for-owner");
+    for (const e of held) {
+      // Held items may never blanket-exclude a token: package, mode and (for
+      // accentText) the accent must all be named.
+      expect(e.package, e.inventoryRef).toBeDefined();
+      expect(e.mode, e.inventoryRef).toBeDefined();
+      if (e.token === "accentText") {
+        expect(e.accentId, e.inventoryRef).toBeDefined();
+      }
+      expect(
+        inventory.includes(`**${e.inventoryRef}** — HELD for the owner`),
+        `${e.inventoryRef}: inventory must mark it HELD for the owner`,
+      ).toBe(true);
+    }
   });
 });

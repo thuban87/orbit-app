@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { applyAccent, resolveAccent } from "./accents";
+import { ACCENTS, applyAccent, DEFAULT_ACCENT, resolveAccent } from "./accents";
 import {
+  OWNER_ACCEPTED_SUB12_ACCENT_TEXT,
   resolveGlassForegroundPalette,
+  STANDARD_LIGHT_GLASS_ACCENT_TEXT,
   STANDARD_LIGHT_GLASS_VARIANTS,
 } from "./glass-foregrounds";
+import { ACCENT_IDS, type AccentId } from "./theme-option-ids";
 import { resolvePalette } from "./theme-presets";
 import type { ResolvedMode, ThemePackage } from "./theme-types";
 
@@ -74,8 +77,15 @@ describe("resolveGlassForegroundPalette — scope is Standard Light over an asse
     for (const [key, hex] of Object.entries(STANDARD_LIGHT_GLASS_VARIANTS)) {
       expect(glass?.[key as keyof typeof palette], key).toBe(hex);
     }
+    expect(glass?.accentText).toBe(
+      STANDARD_LIGHT_GLASS_ACCENT_TEXT[DEFAULT_ACCENT.standard],
+    );
     for (const key of Object.keys(palette) as (keyof typeof palette)[]) {
-      if (key === "textSecondary" || key in STANDARD_LIGHT_GLASS_VARIANTS) {
+      if (
+        key === "textSecondary" ||
+        key === "accentText" ||
+        key in STANDARD_LIGHT_GLASS_VARIANTS
+      ) {
         continue;
       }
       expect(glass?.[key], key).toEqual(palette[key]);
@@ -179,5 +189,75 @@ describe("Standard-Light glass variants are lightness-only darkenings (D-24)", (
         }) ?? palette;
       expect(effective).toBe(palette);
     }
+  });
+});
+
+describe("Standard-Light glass accentText variants (D-24 / owner ruling D-26)", () => {
+  it("declares a variant for exactly every curated accent id", () => {
+    expect(Object.keys(STANDARD_LIGHT_GLASS_ACCENT_TEXT).sort()).toEqual(
+      [...ACCENT_IDS].sort(),
+    );
+  });
+
+  it("the owner-accepted sub-12% set is exactly aurora-teal and emerald (D-26)", () => {
+    expect([...OWNER_ACCEPTED_SUB12_ACCENT_TEXT].sort()).toEqual([
+      "aurora-teal",
+      "emerald",
+    ]);
+  });
+
+  for (const id of ACCENT_IDS) {
+    it(`${id}: same hue family (±5°), same saturation band, darker than the root light link tone`, () => {
+      const base = toHsl(ACCENTS[id].light.text);
+      const next = toHsl(STANDARD_LIGHT_GLASS_ACCENT_TEXT[id]);
+      const dh = Math.abs(base.h - next.h);
+      expect(Math.min(dh, 360 - dh), `${id} hue shift`).toBeLessThanOrEqual(5);
+      expect(Math.abs(base.s - next.s), `${id} saturation`).toBeLessThanOrEqual(
+        10,
+      );
+      expect(next.l, `${id} lightness drops`).toBeLessThan(base.l);
+      // D-24 near-black floor is HSL L 12%. The owner accepted aurora-teal and
+      // emerald below it (D-26, 2026-09-26) because lightness alone cannot pass
+      // Dusk's darkest composite otherwise; they still keep a real hue (>= 10%).
+      const floor = (
+        OWNER_ACCEPTED_SUB12_ACCENT_TEXT as readonly string[]
+      ).includes(id)
+        ? 10
+        : 12;
+      expect(next.l, `${id} not near-black`).toBeGreaterThanOrEqual(floor);
+    });
+  }
+
+  it("keys the variant by the RESOLVED accent id: null and unknown ids fall back to the package default", () => {
+    const cases: (AccentId | null)[] = [null, ...ACCENT_IDS];
+    for (const accentId of cases) {
+      const palette = applyAccent(
+        resolvePalette("standard", "light"),
+        resolveAccent(accentId, "standard", "light"),
+      );
+      const glass = resolveGlassForegroundPalette({
+        palette,
+        package: "standard",
+        mode: "light",
+        accentId,
+        backgroundIsAsset: true,
+      });
+      expect(glass?.accentText, String(accentId)).toBe(
+        STANDARD_LIGHT_GLASS_ACCENT_TEXT[accentId ?? DEFAULT_ACCENT.standard],
+      );
+      // accent fill and onAccent are never touched (fills, not link text).
+      expect(glass?.accent).toBe(palette.accent);
+      expect(glass?.onAccent).toBe(palette.onAccent);
+    }
+    const tampered = resolveGlassForegroundPalette({
+      palette: rootPalette("standard", "light"),
+      package: "standard",
+      mode: "light",
+      accentId: "not-an-accent" as AccentId,
+      backgroundIsAsset: true,
+    });
+    expect(tampered?.accentText).toBe(
+      STANDARD_LIGHT_GLASS_ACCENT_TEXT[DEFAULT_ACCENT.standard],
+    );
   });
 });
