@@ -180,9 +180,34 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
     widget-overhaul phase** as a hard requirement there: the new widget
     ships with named actions.
 
+### Pre-planning owner inputs (2026-09-26)
+
+-   **[DECIDED · 2026-09-26] D-21 --- RG-041 artwork supplied; launcher
+    wiring.** Owner artwork: `assets/orbit-icon-foreground.png`,
+    `orbit-icon-monochrome.png` and `orbit-icon-legacy.png` (1254²,
+    RGBA). The adaptive background is the solid colour **Deep royal
+    `#1A2F8A`**, set through `adaptiveIcon.backgroundColor` with no
+    background image. The foreground and monochrome art currently fill
+    about 90% of the canvas, so they are scaled down and centered inside
+    Android's adaptive-icon safe zone (the inner 66/108) before wiring,
+    as previewed and approved. The legacy full-square art becomes
+    `app.json` `icon` and the About screen image.
+-   **[DECIDED · 2026-09-26] D-22 --- Top-level tab roots never show a
+    Back.** The Events tab root (`GroupEventsScreen`) still renders
+    `ShellAppBar variant="child"`, left over from before Phase 38
+    promoted it to a tab. It becomes `variant="root"`. Rides with RG-037.
+-   **[DECIDED · 2026-09-26] D-23 --- Digest uses the shared header
+    row.** Replace Digest's bespoke `ChromeScrim` display-text title with
+    the same `ShellAppBar variant="root"` header row that the other tab
+    roots use, titled "Digest". Rides with RG-037.
+
 ## Revision Log
 
 -   2026-09-26 --- discuss session: grounding check (14/15 still
     present; UIA-019 fixed in 38.2); owner decisions D-08..D-16;
     TRIAGE.md selection recorded (RG-032 deferred to the widget
     overhaul).
+-   2026-09-26 --- plan-phase intake: owner supplied launcher art and
+    picked the Deep royal `#1A2F8A` background (D-21), and added the
+    root-chrome consistency rulings D-22 (no Back on Events) and D-23
+    (Digest shared header row).
