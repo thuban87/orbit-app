@@ -1192,14 +1192,48 @@ Plans:
 
 **Goal**: Resolve remaining code-detectable UI/design-system inconsistencies, accessibility defects, bounded performance/resource issues, and small production-hygiene problems without redesigning Orbit or reopening accepted visual/product decisions.
 **Depends on**: Phase 38.3
-**Requirements**: TBD — defined at planning from the covered remediation groups (RG-008, 027–034, 036–041); preserve RG + packet-qualified finding IDs
+**Requirements**: RG-008, RG-027, RG-028, RG-029, RG-030, RG-031, RG-033, RG-034, RG-036, RG-037, RG-038, RG-039, RG-040, RG-041, WI-O-3, WI-A-WR-05, WI-W2, WI-W3 (RG-032 deferred to the widget-overhaul phase, D-16); packet-qualified finding IDs preserved in each plan
 **Success Criteria**: Defined at planning; targeted Android manual visual/device pass (narrow widths, large text, Standard/Galaxy, TalkBack, touch targets, widget semantics, FAB states, launcher); performance claims from physical-device measurement only
 **Scope source**: docs/dossier/milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; ADR-115 + ADR-087 (surface/glass authority)
 **UI hint**: yes
-**Plans**: TBD
+**Plans**: 17 plans in 5 waves
+
+Plans:
+**Wave 1**
+
+- [ ] 38.4-01-PLAN.md — Bounded Your Week reads: migration 031 occurred_at indexes + range/residual predicates (RG-028; D-06, D-18)
+- [ ] 38.4-02-PLAN.md — Orrery settled geometry/resource retirement + worklet-order guard (RG-027; D-19)
+- [ ] 38.4-03-PLAN.md — Both-extrema contrast proof + Standard-Light glass-scoped foregrounds and darker variants (RG-029 UIA-001; D-12, D-24)
+- [ ] 38.4-04-PLAN.md — Canonical AI master in Memory hosts, truthful permission totals, saved-model marker + AI/Memory controls (RG-008, RG-030; D-17)
+- [ ] 38.4-05-PLAN.md — Backup/Restore role foregrounds, visible passphrase labels, formatted source date (RG-029 UIA-002, RG-036, RG-038; D-14)
+- [ ] 38.4-06-PLAN.md — Editor switches/selectors/targets + touchpoint timestamp (RG-030, RG-038; D-20)
+- [ ] 38.4-07-PLAN.md — Shared time-only minute formatter for event/Digest/History timestamps (RG-038; D-07)
+- [ ] 38.4-08-PLAN.md — Row accessible context, review-card selection/evidence, registered fonts (RG-031)
+- [ ] 38.4-10-PLAN.md — Single header Back on Settings children + hub icon/subtitle/chevron rows (RG-037; D-15)
+- [ ] 38.4-11-PLAN.md — FAB and large-text confirmation investigation gates + FAB glyph foreground (RG-039, RG-034; D-04, D-20)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 38.4-09-PLAN.md — Heatmap fit-to-width + centering and layout-preview geometry (RG-033; D-13)
+- [ ] 38.4-12-PLAN.md — Tab roots use the root header; Digest shared header row; Events timestamps (D-22, D-23; RG-037, RG-038)
+- [ ] 38.4-13-PLAN.md — Release-only overlay permission removal + Orbit launcher art wiring (RG-040, RG-041; D-09, D-21)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 38.4-14-PLAN.md — Workstream I: background-gated Digest/Profile reads, favourite publication seam, Import Complete focus re-read (W2, A-WR-05, O-3; D-10)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 38.4-15-PLAN.md — Workstream I W3/O-1 investigation + evidence-gated mitigation; D-25 native-remedy owner decision (checkpoint)
+- [ ] 38.4-16-PLAN.md — Glass-scope consumer follow-through: placeholder token sweep + on-glass accent-text roles (RG-029; D-24)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 38.4-17-PLAN.md — Phase gate, debug + one release build, targeted Pixel device pass and owner checklist (all)
 
 > **Discussed 2026-09-26 — ready to plan once the owner supplies launcher artwork (D-08). See `38.4-CONTEXT.md` (D-08..D-20). RG-032 moved to the widget-overhaul phase; 38.3 loose ends folded in as Workstream I; Phase 40 keeps its stub list.**
+> **Planned 2026-09-26 — 17 plans, 5 waves. Investigation-first: RG-034/RG-039 (Plan 11) and W3 (Plan 15, D-25 owner checkpoint). Migration 031 (additive indexes). One release APK at the end (Plan 17).**
 
 ### Phase 39: Onboarding
 
@@ -1250,7 +1284,7 @@ Plans:
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
-| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 0/TBD | Ready to plan | - |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 0/17 | Planned | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
