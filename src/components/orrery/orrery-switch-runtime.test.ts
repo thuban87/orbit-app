@@ -1,20 +1,66 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CameraPose, WorldBody } from "@/logic/orrery-camera-logic";
+import { bodyKey } from "@/logic/orrery-frame";
+import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
+
+/**
+ * Single-render hook harness: the repo has no react-test-renderer, so React
+ * hooks are identity/record stubs and Reanimated runs worklets synchronously.
+ * `withTiming` records its completion callback instead of animating, so a test
+ * decides when (and with which generation) a switch driver completes.
+ */
+const harness = vi.hoisted(() => ({
+  state: { value: undefined as unknown },
+  timings: [] as ((finished: boolean) => void)[],
+  reactions: [] as ((current: unknown, previous: unknown) => void)[],
+}));
+
+vi.mock("react", () => ({
+  useCallback: (fn: unknown) => fn,
+  useEffect: () => {},
+  useRef: (current: unknown) => ({ current }),
+  useState: (initial: unknown) => {
+    harness.state.value = initial;
+    return [
+      initial,
+      (next: unknown) => {
+        harness.state.value =
+          typeof next === "function"
+            ? (next as (current: unknown) => unknown)(harness.state.value)
+            : next;
+      },
+    ];
+  },
+}));
 
 vi.mock("react-native-reanimated", () => ({
   cancelAnimation: vi.fn(),
   ReduceMotion: { Never: "never" },
   runOnJS: (fn: unknown) => fn,
   runOnUI: (fn: unknown) => fn,
-  useAnimatedReaction: vi.fn(),
+  useAnimatedReaction: (
+    _prepare: unknown,
+    react: (current: unknown, previous: unknown) => void,
+  ) => {
+    harness.reactions.push(react);
+  },
   useSharedValue: (value: unknown) => ({ value }),
-  withTiming: (value: unknown) => value,
+  withTiming: (
+    _target: unknown,
+    _config: unknown,
+    callback?: (finished: boolean) => void,
+  ) => {
+    if (callback) harness.timings.push(callback);
+    return 0;
+  },
 }));
 
 import {
   beginOrrerySwitchRuntime,
   createSettledOrrerySwitchRuntime,
+  type OrreryBodyResource,
   pauseOrrerySwitchRuntime,
+  useOrrerySwitchRuntime as renderOrrerySwitchRuntimeOnce,
   resumeOrrerySwitchRuntime,
   sampleOrrerySwitchRuntime,
 } from "./use-orrery-switch-runtime";
@@ -143,5 +189,111 @@ describe("screen-owned Orrery switch runtime", () => {
     expect(mid.sample.accumulatedRotation).toBe(0);
     expect(mid.sample.angularVelocity).toBe(0);
     expect(reduced.transition.radialDisplacement).toBe(0);
+  });
+});
+
+const sceneOf = (generation: number, world: WorldBody[]) =>
+  ({ generation, world }) as unknown as OrrerySceneSnapshot;
+const keysOf = (world: readonly WorldBody[]) => world.map(bodyKey);
+
+function mountRuntime() {
+  harness.state.value = undefined;
+  harness.timings.length = 0;
+  harness.reactions.length = 0;
+  const pose = { value: { ...sourceCamera } };
+  const reducedMotion = { value: false };
+  const runtime = renderOrrerySwitchRuntimeOnce(
+    pose as never,
+    reducedMotion as never,
+  );
+  return {
+    runtime,
+    pose,
+    reducedMotion,
+    resources: () => harness.state.value as OrreryBodyResource[],
+    entryKeys: () => runtime.transition.value.entries.map(({ key }) => key),
+    /** Completes the most recent driver, as `withTiming` would on the UI thread. */
+    complete: () => harness.timings[harness.timings.length - 1](true),
+  };
+}
+
+describe("settled Orrery geometry retirement (RG-027, performance/AUD-PERF-001)", () => {
+  beforeEach(() => {
+    harness.timings.length = 0;
+  });
+
+  it("finish compacts the UI-thread choreography to the destination and prunes departed resources", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    expect(mounted.entryKeys()).toEqual(keysOf(sourceWorld));
+
+    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    expect(mounted.entryKeys()).toEqual([
+      "sun:0",
+      "contact:1",
+      "contact:2",
+      "contact:3",
+    ]);
+    expect(mounted.runtime.running.value).toBe(true);
+    const beforeSettle = sampleOrrerySwitchRuntime({
+      transition: mounted.runtime.transition.value,
+      progress: 1,
+      cameraFrom: mounted.runtime.cameraFrom.value,
+      cameraTo: mounted.runtime.cameraTo.value,
+      status: "settled",
+      remainingFraction: 0,
+    }).world.filter((body) => body.opacity > 0);
+
+    mounted.runtime.progress.value = 0.6;
+    mounted.complete();
+
+    expect(mounted.runtime.progress.value).toBe(1);
+    expect(mounted.runtime.running.value).toBe(false);
+    expect(mounted.pose.value).toEqual(homeCamera);
+    expect(mounted.runtime.transition.value.generation).toBe(2);
+    expect(mounted.entryKeys()).toEqual(keysOf(destinationWorld));
+    expect(
+      sampleOrrerySwitchRuntime({
+        transition: mounted.runtime.transition.value,
+        progress: 1,
+        cameraFrom: homeCamera,
+        cameraTo: homeCamera,
+        status: "settled",
+        remainingFraction: 0,
+      }).world,
+    ).toEqual(beforeSettle);
+    expect(mounted.resources().map(({ key }) => key)).toEqual(
+      keysOf(destinationWorld),
+    );
+  });
+
+  it("a stale driver completion never compacts a switch that is still running", () => {
+    const mounted = mountRuntime();
+    const cWorld: WorldBody[] = [
+      { id: 0, kind: "sun", x: 0, y: 0, radius: 18, ringRadius: 0 },
+      { id: 4, kind: "contact", x: 0, y: -140, radius: 12, ringRadius: 140 },
+    ];
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    const bDriver = harness.timings[0];
+    mounted.runtime.progress.value = 0.4;
+    mounted.runtime.publish(sceneOf(3, cWorld), true, 1, homeCamera);
+    const running = mounted.entryKeys();
+    expect(running).toEqual(
+      expect.arrayContaining([
+        "contact:1",
+        "contact:2",
+        "contact:3",
+        "contact:4",
+      ]),
+    );
+
+    bDriver(true);
+    expect(mounted.entryKeys()).toEqual(running);
+    expect(mounted.runtime.running.value).toBe(true);
+
+    mounted.complete();
+    expect(mounted.entryKeys()).toEqual(keysOf(cWorld));
+    expect(mounted.resources().map(({ key }) => key)).toEqual(keysOf(cWorld));
   });
 });

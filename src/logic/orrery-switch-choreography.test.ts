@@ -10,6 +10,7 @@ import {
   SHED_END,
   SHED_START,
   sampleSwitchChoreography,
+  settleSwitchChoreography,
 } from "./orrery-switch-choreography";
 
 const contact = (id: number, ringRadius: number, angle = 0): WorldBody => ({
@@ -280,5 +281,106 @@ describe("Orrery System-switch choreography", () => {
         (body) => body.id === 1,
       ),
     ).toMatchObject(destination[0]);
+  });
+});
+
+// RG-027 / performance/AUD-PERF-001 (D-19): a settled switch retires departed geometry.
+describe("settleSwitchChoreography", () => {
+  const sun: WorldBody = {
+    id: 0,
+    kind: "sun",
+    x: 0,
+    y: 0,
+    radius: 24,
+    ringRadius: 0,
+  };
+  const a = [sun, contact(1, 80, 0.2), contact(2, 130, 0.8)];
+  const b = [sun, contact(2, 180, 1.4), contact(3, 240, 2.1)];
+  const keysOf = (transition: ReturnType<typeof beginSwitchChoreography>) =>
+    transition.entries.map(({ key }) => key);
+
+  it.each([false, true])(
+    "keeps only destination entries and preserves generation/reduced motion (reduced=%s)",
+    (reducedMotion) => {
+      const transition = beginSwitchChoreography(a, b, 31, {
+        intensity: 0.9,
+        reducedMotion,
+      });
+      expect(keysOf(transition)).toEqual([
+        "sun:0",
+        "contact:1",
+        "contact:2",
+        "contact:3",
+      ]);
+      const settled = settleSwitchChoreography(transition);
+      expect(keysOf(settled)).toEqual(["sun:0", "contact:2", "contact:3"]);
+      expect(settled.generation).toBe(31);
+      expect(settled.reducedMotion).toBe(reducedMotion);
+      expect(settled.spinTurns).toBe(0);
+      expect(settled.radialDisplacement).toBe(0);
+      expect(settled.entries.every((entry) => entry.destination)).toBe(true);
+      expect(settleSwitchChoreography(settled)).toEqual(settled);
+    },
+  );
+
+  it("renders the same visible world at progress 1 (no visual change at settle)", () => {
+    for (const reducedMotion of [false, true]) {
+      const transition = beginSwitchChoreography(a, b, 32, {
+        intensity: 1,
+        reducedMotion,
+      });
+      const before = sampleSwitchChoreography(transition, 1);
+      const after = sampleSwitchChoreography(
+        settleSwitchChoreography(transition),
+        1,
+      );
+      expect(after.world).toEqual(
+        before.world.filter((body) => body.opacity > 0),
+      );
+      expect(after.world).toHaveLength(b.length);
+      expect(after.generation).toBe(before.generation);
+      expect(after.phase).toBe("complete");
+    }
+  });
+
+  it("settles an empty destination to zero entries", () => {
+    const settled = settleSwitchChoreography(
+      beginSwitchChoreography(a, [], 33, {
+        intensity: 1,
+        reducedMotion: false,
+      }),
+    );
+    expect(settled.entries).toEqual([]);
+    expect(sampleSwitchChoreography(settled, 1).world).toEqual([]);
+    expect(
+      settleSwitchChoreography(
+        beginSwitchChoreography([], [], 34, {
+          intensity: 0,
+          reducedMotion: false,
+        }),
+      ).entries,
+    ).toEqual([]);
+  });
+
+  it("keeps a body present in source and destination under the same key", () => {
+    const transition = beginSwitchChoreography(a, b, 35, {
+      intensity: 0.4,
+      reducedMotion: false,
+    });
+    const shared = settleSwitchChoreography(transition).entries.find(
+      (entry) => entry.key === "contact:2",
+    );
+    expect(shared?.role).toBe("retained");
+    expect(shared?.destination).toMatchObject(b[1]);
+    expect(shared?.source).toMatchObject(b[1]);
+  });
+
+  it("does not compact a transition that has not been settled by its caller", () => {
+    const transition = beginSwitchChoreography(a, b, 36, {
+      intensity: 1,
+      reducedMotion: false,
+    });
+    settleSwitchChoreography(transition);
+    expect(keysOf(transition)).toHaveLength(4);
   });
 });
