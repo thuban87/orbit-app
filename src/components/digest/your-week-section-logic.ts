@@ -1,6 +1,7 @@
 import type { YourWeekPeriod } from "@/db/app-settings-dao";
 import type { YourWeekDateCount } from "@/db/your-week-read";
 import type { HistoryWindow } from "@/services/history/window";
+import { createLatestRequestAuthority } from "@/utils/latest-request";
 
 export interface YourWeekControllerState {
   readonly period: YourWeekPeriod;
@@ -8,6 +9,12 @@ export interface YourWeekControllerState {
   readonly generation: number;
   readonly pendingPeriod: YourWeekPeriod | null;
   readonly selectedDay: string | null;
+  /**
+   * The period a Digest toggle is persisting right now (38.3 RESEARCH
+   * Pitfall 5). While set, a refresh never adopts the DB period, so a refresh
+   * can never revert a toggle whose write is still in flight.
+   */
+  readonly writingPeriod: YourWeekPeriod | null;
 }
 
 export function initialYourWeekState(
@@ -19,6 +26,7 @@ export function initialYourWeekState(
     generation: 0,
     pendingPeriod: null,
     selectedDay: null,
+    writingPeriod: null,
   };
 }
 
@@ -35,6 +43,66 @@ export function selectYourWeekPeriod(
   };
 }
 
+/** A Digest toggle: `selectYourWeekPeriod` plus the in-flight write marker. */
+export function beginYourWeekPeriodWrite(
+  state: YourWeekControllerState,
+  period: YourWeekPeriod,
+): YourWeekControllerState {
+  return { ...selectYourWeekPeriod(state, period), writingPeriod: period };
+}
+
+/**
+ * Refresh-time period resolution (38.3 D-15): the chosen period is KEPT; a
+ * period changed elsewhere (Settings, the other `yourWeekPeriod` writer) is
+ * adopted only when ALL hold:
+ * - the DB value differs from what this controller last knew was persisted;
+ * - no toggle write is in flight (`writingPeriod === null`);
+ * - the controller generation is unchanged since the settings read BEGAN
+ *   (`readGeneration`), so a read that began before a toggle can never revert
+ *   it — correctness does not rely on the single in-order SQLite connection.
+ */
+export function resolveYourWeekRefreshPeriod(
+  state: YourWeekControllerState,
+  persistedFromDb: YourWeekPeriod,
+  readGeneration: number,
+): { state: YourWeekControllerState; adopted: boolean } {
+  if (
+    persistedFromDb === state.persistedPeriod ||
+    state.writingPeriod !== null ||
+    state.generation !== readGeneration
+  ) {
+    return { state, adopted: false };
+  }
+  return {
+    state: {
+      ...selectYourWeekPeriod(state, persistedFromDb),
+      persistedPeriod: persistedFromDb,
+    },
+    adopted: true,
+  };
+}
+
+/** True only for a real (non-placeholder) cell carrying `day`. */
+export function isYourWeekDayInWindow(
+  window: HistoryWindow,
+  day: string,
+): boolean {
+  return window.cells.some((cell) => !cell.isPlaceholder && cell.date === day);
+}
+
+/**
+ * Re-window retention (D-15; D-26 planner call): a selected day survives a new
+ * local day or a tab return only while it is still a real day in the window.
+ */
+export function retainYourWeekDay(
+  state: YourWeekControllerState,
+  window: HistoryWindow,
+): YourWeekControllerState {
+  if (state.selectedDay === null) return state;
+  if (isYourWeekDayInWindow(window, state.selectedDay)) return state;
+  return { ...state, selectedDay: null };
+}
+
 export function reconcileYourWeekRead(
   state: YourWeekControllerState,
   generation: number,
@@ -48,7 +116,12 @@ export function persistYourWeekPeriodAccepted(
   generation: number,
 ): YourWeekControllerState {
   if (generation !== state.generation) return state;
-  return { ...state, persistedPeriod: state.period, pendingPeriod: null };
+  return {
+    ...state,
+    persistedPeriod: state.period,
+    pendingPeriod: null,
+    writingPeriod: null,
+  };
 }
 
 export function persistYourWeekPeriodRejected(
@@ -62,6 +135,55 @@ export function persistYourWeekPeriodRejected(
     generation: state.generation + 1,
     pendingPeriod: null,
     selectedDay: null,
+    writingPeriod: null,
+  };
+}
+
+export interface YourWeekPeriodReaderDeps<T> {
+  getState(): YourWeekControllerState;
+  /** A current read whose period intent still holds (reconciled state). */
+  accept(state: YourWeekControllerState, result: T): void;
+  /** A current read failed while its period intent still holds. */
+  fail(cause: unknown): void;
+}
+
+export interface YourWeekPeriodReader<T> {
+  load(generation: number, read: () => Promise<T>): Promise<void>;
+  /** Retire every outstanding read (unmount). */
+  invalidate(): void;
+}
+
+/**
+ * One request-scoped authority for EVERY Your Week period read — the Digest
+ * refresh signal, a manual toggle and a rollback (38.3 RG-026). The most
+ * recently BEGUN read wins; the generation check stays only as the
+ * period-intent guard (`reconcileYourWeekRead`).
+ */
+export function createYourWeekPeriodReader<T>(
+  deps: YourWeekPeriodReaderDeps<T>,
+): YourWeekPeriodReader<T> {
+  const authority = createLatestRequestAuthority();
+  return {
+    async load(generation, read) {
+      const token = authority.begin();
+      let result: T;
+      try {
+        result = await read();
+      } catch (cause) {
+        if (
+          authority.isCurrent(token) &&
+          generation === deps.getState().generation
+        ) {
+          deps.fail(cause);
+        }
+        return;
+      }
+      if (!authority.isCurrent(token)) return;
+      const reconciled = reconcileYourWeekRead(deps.getState(), generation);
+      if (!reconciled.accepted) return;
+      deps.accept(reconciled.state, result);
+    },
+    invalidate: () => authority.invalidate(),
   };
 }
 

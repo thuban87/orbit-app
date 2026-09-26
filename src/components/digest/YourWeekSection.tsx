@@ -3,14 +3,17 @@ import { StyleSheet, View } from "react-native";
 import { DigestDayDetail } from "@/components/digest/DigestDayDetail";
 import { YourWeekHeatmap } from "@/components/digest/YourWeekHeatmap";
 import {
+  beginYourWeekPeriodWrite,
+  createYourWeekPeriodReader,
   directDateCounts,
   initialYourWeekState,
   persistYourWeekPeriodAccepted,
   persistYourWeekPeriodRejected,
-  reconcileYourWeekRead,
+  resolveYourWeekRefreshPeriod,
+  retainYourWeekDay,
   selectYourWeekDay,
-  selectYourWeekPeriod,
   type YourWeekControllerState,
+  type YourWeekPeriodReader,
 } from "@/components/digest/your-week-section-logic";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { AppText } from "@/components/ui/AppText";
@@ -76,70 +79,110 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
     return next;
   }, []);
 
-  const loadPeriod = useCallback(
-    async (
-      period: YourWeekPeriod,
-      generation: number,
-      cancelled?: () => boolean,
-    ) => {
-      const today = formatLocalDate(new Date());
-      const window = buildYourWeekWindow(period, today, resolveFirstWeekday());
-      const exec = getExecutor();
-      try {
-        const [metrics, rows] = await Promise.all([
-          readYourWeekMetrics(exec, window.start, window.end),
-          readYourWeekDateCounts(exec, window.start, window.end),
-        ]);
-        if (cancelled?.()) return;
-        const reconciled = reconcileYourWeekRead(
-          controllerRef.current,
-          generation,
-        );
-        if (!reconciled.accepted) return;
-        commitController(reconciled.state);
-        setLoaded({ window, metrics, counts: directDateCounts(window, rows) });
+  // ONE request authority for every period read (refresh signal, toggle,
+  // rollback): the most recently begun read wins; the generation check inside
+  // the reader keeps its period-intent role.
+  const readerRef = useRef<YourWeekPeriodReader<LoadedWeek> | null>(null);
+  if (readerRef.current === null) {
+    readerRef.current = createYourWeekPeriodReader<LoadedWeek>({
+      getState: () => controllerRef.current,
+      accept: (state, week) => {
+        commitController(state);
+        setLoaded(week);
         setError(false);
-      } catch (cause) {
-        if (cancelled?.() || generation !== controllerRef.current.generation)
-          return;
+      },
+      fail: (cause) => {
         Logger.error(LOG_SCOPE, "failed to load Your Week", cause);
         setError(true);
-      }
+      },
+    });
+  }
+  const reader = readerRef.current;
+  useEffect(() => () => reader.invalidate(), [reader]);
+
+  const loadPeriod = useCallback(
+    (period: YourWeekPeriod, generation: number, window?: HistoryWindow) => {
+      const target =
+        window ??
+        buildYourWeekWindow(
+          period,
+          formatLocalDate(new Date()),
+          resolveFirstWeekday(),
+        );
+      return reader.load(generation, async () => {
+        const exec = getExecutor();
+        const [metrics, rows] = await Promise.all([
+          readYourWeekMetrics(exec, target.start, target.end),
+          readYourWeekDateCounts(exec, target.start, target.end),
+        ]);
+        return {
+          window: target,
+          metrics,
+          counts: directDateCounts(target, rows),
+        };
+      });
     },
-    [commitController],
+    [reader],
   );
 
+  // Day-detail read shared by a tap and a refresh that retained the day
+  // (Plan 15 replaces this with the D-16 state machine).
+  const loadDay = useCallback(async (date: string) => {
+    try {
+      const rows = await readYourWeekDay(getExecutor(), date);
+      if (controllerRef.current.selectedDay === date) setDayRows(rows);
+    } catch (cause) {
+      Logger.error(LOG_SCOPE, "failed to load Your Week day", cause);
+    }
+  }, []);
+
+  // Digest-owned refresh (RG-026): on mount and on every `refreshSignal`
+  // change. Keeps the chosen period and re-windows to today (D-15), adopting a
+  // Settings-changed period only when no toggle is in flight (Pitfall 5). No
+  // timer detects the new day — the signal does (D-22).
   // biome-ignore lint/correctness/useExhaustiveDependencies: refreshSignal is the Digest-owned trigger; each change re-runs this read.
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      const readGeneration = controllerRef.current.generation;
+      let persistedFromDb: YourWeekPeriod;
       try {
-        const settings = await getAppSettings(getExecutor());
-        if (cancelled) return;
-        const base = {
-          ...controllerRef.current,
-          persistedPeriod: settings.yourWeekPeriod,
-        };
-        const next = selectYourWeekPeriod(base, settings.yourWeekPeriod);
-        commitController(next);
-        setDayRows([]);
-        await loadPeriod(next.period, next.generation, () => cancelled);
+        persistedFromDb = (await getAppSettings(getExecutor())).yourWeekPeriod;
       } catch (cause) {
         if (!cancelled) {
           Logger.error(LOG_SCOPE, "failed to load Your Week preference", cause);
           setError(true);
         }
+        return;
       }
+      if (cancelled) return;
+      const resolved = resolveYourWeekRefreshPeriod(
+        controllerRef.current,
+        persistedFromDb,
+        readGeneration,
+      );
+      const window = buildYourWeekWindow(
+        resolved.state.period,
+        formatLocalDate(new Date()),
+        resolveFirstWeekday(),
+      );
+      const next = commitController(retainYourWeekDay(resolved.state, window));
+      if (next.selectedDay === null) {
+        setDayRows([]);
+      } else {
+        void loadDay(next.selectedDay);
+      }
+      await loadPeriod(next.period, next.generation, window);
     })();
     return () => {
       cancelled = true;
     };
-  }, [commitController, loadPeriod, refreshSignal]);
+  }, [commitController, loadDay, loadPeriod, refreshSignal]);
 
   const onPeriodChange = useCallback(
     async (period: YourWeekPeriod) => {
       if (period === controllerRef.current.period) return;
-      const next = selectYourWeekPeriod(controllerRef.current, period);
+      const next = beginYourWeekPeriodWrite(controllerRef.current, period);
       commitController(next);
       setDayRows([]);
       setLoaded(null);
@@ -172,14 +215,9 @@ export function YourWeekSection({ refreshSignal }: { refreshSignal: number }) {
     async (date: string) => {
       commitController(selectYourWeekDay(controllerRef.current, date));
       setDayRows([]);
-      try {
-        const rows = await readYourWeekDay(getExecutor(), date);
-        if (controllerRef.current.selectedDay === date) setDayRows(rows);
-      } catch (cause) {
-        Logger.error(LOG_SCOPE, "failed to load Your Week day", cause);
-      }
+      await loadDay(date);
     },
-    [commitController],
+    [commitController, loadDay],
   );
 
   const metrics = loaded?.metrics ?? EMPTY_METRICS;
