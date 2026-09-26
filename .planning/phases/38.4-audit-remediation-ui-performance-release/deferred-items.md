@@ -1,8 +1,24 @@
 # 38.4 deferred items (out-of-scope discoveries)
 
+**Dispositions (owner rulings 2026-09-26, D-29..D-33).** Every item below now has a home. None is left undispositioned.
+
+| Item | Disposition |
+|---|---|
+| F-1 bare text on Standard art (Plan 03) | **Plan 16 Task 3** — fixed (D-29, supersedes D-27): scrim on Standard-Light Dusk/Mesh only |
+| E-7 Galaxy Light coral (Plan 03) | **Resolved** (D-28), commits `f446484`/`d8a9ba1` |
+| Touchpoint duration chips, border-only selection (Plan 06) | **Plan 16 Task 4** — filled accent chip + `onAccent` label (D-30) |
+| `RelationshipEditor.tsx` unused `Pressable` import (Plan 06) | **Plan 16 Task 4** (planner-bucket nit, CONTEXT recorded call) |
+| Bare `TYPOGRAPHY.<role>.family` outside the contact renderers (Plan 08) | **Plan 16 Task 4** (planner-bucket nit, CONTEXT recorded call) |
+| Open FAB dial does not trap keyboard focus (Plan 11) | **Plan 12 Task 3** (D-31) |
+| `Sheet` detail variant clips its actions at large text (Plan 11) | **Plan 18** (G1, D-32) |
+| Stale Profile scroll after a warm deep link / Quick Log snackbar (Plan 11) | **Plan 19 Task 3**, check E (G2, D-33) |
+| Contacts screen freeze on population/filter/sort (owner report, 2026-09-26) | **Plan 19** (G2, D-33, `GAP-G2`) |
+
 ## From Plan 03 (RG-029)
 
-- **F-1 — owner device review in Plan 17 (D-27).** Functional text sits bare on the Standard-Light
+- **F-1 — DISPOSITION: fixed in Plan 16 Task 3 (D-29, 2026-09-26; supersedes D-27).** A `ChromeScrim`
+  backing appears only on Standard-Light Dusk/Mesh; the text renders unchanged elsewhere. Plan 17 verifies it on device.
+  Original note follows. Functional text sits bare on the Standard-Light
   shell background (not glass). Owner ruling D-27 (2026-09-26): not fixed in Plan 03; the owner reviews
   it on the device in Plan 17 and then decides defer vs fix. Site list: `38.4-RG029-INVENTORY.md` §5. The RG-029
   inventory trace found many functional text sites with no glass and no opaque backing:
@@ -32,17 +48,19 @@
 
 ## From Plan 06 (2026-09-26)
 
-- **Touchpoint duration chips: selection shown by border colour only.** `TouchpointRefineForm.tsx`
+- **Touchpoint duration chips: selection shown by border colour only. DISPOSITION: Plan 16 Task 4 (D-30):
+  the selected chip is filled with the accent fill and gets an `onAccent` label.** `TouchpointRefineForm.tsx`
   preset/None chips carry `accessibilityState.selected` (so TalkBack is correct), but the visible
   selected mark is only the `colors.accent` border. Not among the AUD-UIA-005 cited sites and not in
   Plan 06's behavior list, so it was left as is. Candidate fix: a filled `select` glyph or a fill
   change on the selected chip.
-- **`RelationshipEditor.tsx` unused `Pressable` import** (biome `noUnusedImports` warning). It predates
+- **`RelationshipEditor.tsx` unused `Pressable` import. DISPOSITION: Plan 16 Task 4** (biome `noUnusedImports` warning). It predates
   Plan 06 and Plan 06 did not cause it. It was left alone to keep the task diff scoped.
 
 ## From Plan 08 (2026-09-26)
 
-- **Bare semantic `TYPOGRAPHY.<role>.family` still assigned outside the contact renderers.** Plan 08
+- **Bare semantic `TYPOGRAPHY.<role>.family` still assigned outside the contact renderers. DISPOSITION:
+  Plan 16 Task 4** (swap plus typography source-scan extension). Plan 08
   moved `resolveFontFamily` into `src/theme/tokens/typography.ts` and put `ListRow`/`GridCard` (the
   AUD-UIA-015 cited "contact renderers") on the registered keys. The same unregistered-family pattern
   remains in `HomeScreen.tsx` (selection count, selection action label, bulk-picker title/label),
@@ -53,7 +71,8 @@
 
 ## From Plan 11 (2026-09-26)
 
-- **Open FAB dial does not trap keyboard focus.** With the speed dial OPEN, keyboard TAB still walks
+- **Open FAB dial does not trap keyboard focus. DISPOSITION: Plan 12 Task 3 (D-31).** The background is hidden
+  from accessibility while the dial is open, and the dial gets a keyboard focus cycle. With the speed dial OPEN, keyboard TAB still walks
   the background screen (Digest filters, tab bar) before reaching the scrim and the six actions
   (`ev11/rg039-fix-tab-open.log`). The dial's only modal marker is the iOS-only
   `accessibilityViewIsModal`. This predates Plan 11 and is not the RG-039 closed-state defect
@@ -61,7 +80,8 @@
   part of the Plan 17 owner TalkBack check. Candidate fix: while open, mark the tab navigator /
   screen content `importantForAccessibility="no-hide-descendants"` (the 38.3 RG-020 shell-transient
   pattern) or close the dial when focus leaves it.
-- **`Sheet` `detail` variant clips its actions at large text, with no scroll.** At font_scale 2.0 on
+- **`Sheet` `detail` variant clips its actions at large text, with no scroll. DISPOSITION: Plan 18 (G1, D-32).**
+  Compact and detail sheets get a bounded scroll body. At font_scale 2.0 on
   the Pixel 3a (≈320dp and ≈349dp), InteractionDetail's detail sheet (`maxHeight: 60%`,
   `overflow: "hidden"`, no ScrollView in `Sheet.tsx`/`InteractionDetail.tsx`) clips its Edit/Delete
   row below the sheet edge. The buttons are absent from the accessibility dump and touch cannot
@@ -70,7 +90,14 @@
   ConfirmDialog defect, and no 38.4 plan owns `Sheet` large-text overflow. Candidate fix: a
   ScrollView body for non-expanded Sheet variants (`Sheet.tsx` already notes the large-font clip
   risk at `overlayContent`). It needs its own device check across the Sheet consumers.
-- **Stale profile scroll after a warm `orbit://contact/<id>` deep link (automation observation, not
-  triaged).** Twice in the Plan 11 session, a warm deep link or a Quick Log snackbar left the
+- **Stale profile scroll after a warm `orbit://contact/<id>` deep link (automation observation). DISPOSITION:
+  Plan 19 Task 3, check E (G2, D-33)** — recorded as not reproduced, same cause, or distinct; fixed or surfaced. Twice in the Plan 11 session, a warm deep link or a Quick Log snackbar left the
   profile ScrollView ignoring injected swipes until a cold start. It may be an adb-injection
   artifact. Worth a finger check before treating it as an app bug.
+
+## Owner report (2026-09-26)
+
+- **Contacts (Home) screen freeze. DISPOSITION: Plan 19 (G2, D-33, `GAP-G2`).** Choosing a population, filter or
+  sort-order action at the top of the Contacts screen makes the app unresponsive: tabs cannot be switched and a
+  force-restart is needed. The setting change is persisted. The owner reproduced it on the Pixel 3a by changing
+  population. It was not tracked anywhere before. Plan 19 is investigation-first.

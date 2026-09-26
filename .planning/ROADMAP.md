@@ -1192,12 +1192,12 @@ Plans:
 
 **Goal**: Resolve remaining code-detectable UI/design-system inconsistencies, accessibility defects, bounded performance/resource issues, and small production-hygiene problems without redesigning Orbit or reopening accepted visual/product decisions.
 **Depends on**: Phase 38.3
-**Requirements**: RG-008, RG-027, RG-028, RG-029, RG-030, RG-031, RG-033, RG-034, RG-036, RG-037, RG-038, RG-039, RG-040, RG-041, WI-O-3, WI-A-WR-05, WI-W2, WI-W3 (RG-032 deferred to the widget-overhaul phase, D-16); packet-qualified finding IDs preserved in each plan
+**Requirements**: RG-008, RG-027, RG-028, RG-029, RG-030, RG-031, RG-033, RG-034, RG-036, RG-037, RG-038, RG-039, RG-040, RG-041, WI-O-3, WI-A-WR-05, WI-W2, WI-W3, GAP-G2 (owner-reported Contacts freeze, D-33) (RG-032 deferred to the widget-overhaul phase, D-16); packet-qualified finding IDs preserved in each plan
 **Success Criteria**: Defined at planning; targeted Android manual visual/device pass (narrow widths, large text, Standard/Galaxy, TalkBack, touch targets, widget semantics, FAB states, launcher); performance claims from physical-device measurement only
 **Scope source**: docs/dossier/milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; ADR-115 + ADR-087 (surface/glass authority)
 **UI hint**: yes
-**Plans**: 10/17 plans executed in 5 waves
+**Plans**: 10/19 plans executed in 6 waves
 
 Plans:
 **Wave 1**
@@ -1216,7 +1216,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [ ] 38.4-09-PLAN.md — Heatmap fit-to-width + centering and layout-preview geometry (RG-033; D-13)
-- [ ] 38.4-12-PLAN.md — Tab roots use the root header; Digest shared header row; Events timestamps (D-22, D-23; RG-037, RG-038)
+- [ ] 38.4-12-PLAN.md — Tab roots use the root header; Digest shared header row; Events timestamps; open FAB dial holds focus (D-22, D-23, D-31; RG-037, RG-038, RG-039)
 - [ ] 38.4-13-PLAN.md — Release-only overlay permission removal + Orbit launcher art wiring (RG-040, RG-041; D-09, D-21)
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -1226,14 +1226,20 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [ ] 38.4-15-PLAN.md — Workstream I W3/O-1 investigation + evidence-gated mitigation; D-25 native-remedy owner decision (checkpoint)
-- [ ] 38.4-16-PLAN.md — Glass-scope consumer follow-through: placeholder token sweep + on-glass accent-text roles (RG-029; D-24)
+- [ ] 38.4-18-PLAN.md — Gap G1: Sheet compact/detail body scrolls at large text so actions stay reachable (D-32; RG-034 follow-on)
+- [ ] 38.4-19-PLAN.md — Gap G2: Contacts population/filter/sort freeze — device repro, root cause, test-first fix; Profile-swipe check (D-33; GAP-G2)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 38.4-17-PLAN.md — Phase gate, debug + one release build, targeted Pixel device pass and owner checklist (all)
+- [ ] 38.4-16-PLAN.md — Glass-scope consumer follow-through (placeholder sweep + on-glass accent-text roles) + F-1 Dusk/Mesh scrim, filled duration chip, font/import nits (RG-029; D-24, D-29, D-30)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 38.4-17-PLAN.md — Phase gate, debug + one release build, targeted device pass and owner checklist (all)
 
 > **Discussed 2026-09-26 — ready to plan once the owner supplies launcher artwork (D-08). See `38.4-CONTEXT.md` (D-08..D-20). RG-032 moved to the widget-overhaul phase; 38.3 loose ends folded in as Workstream I; Phase 40 keeps its stub list.**
 > **Planned 2026-09-26 — 17 plans, 5 waves. Investigation-first: RG-034/RG-039 (Plan 11) and W3 (Plan 15, D-25 owner checkpoint). Migration 031 (additive indexes). One release APK at the end (Plan 17).**
+> **Re-planned 2026-09-26 after Wave 1 (owner rulings D-29..D-33) — 19 plans, 6 waves.** Two gap plans were added: 18 (G1, Sheet large-text scroll) and 19 (G2, Contacts freeze, investigation-first). D-31 is folded into Plan 12. The F-1 Dusk/Mesh scrim (D-29), the filled duration chip (D-30) and the font/import nits are folded into Plan 16, which moves to wave 5 behind Plan 19. Plan 17 moves to wave 6.
 
 ### Phase 39: Onboarding
 
@@ -1284,7 +1290,7 @@ Plans:
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
-| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 10/17 | In Progress|  |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 10/19 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
