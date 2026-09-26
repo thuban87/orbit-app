@@ -150,3 +150,48 @@ describe("Restore Preview source date (RG-038 AUD-UIA-018, D-07)", () => {
     }
   });
 });
+
+describe("Backup passphrase fields have persistent visible labels (RG-036 AUD-UIA-014, D-14)", () => {
+  const settings = read("src/screens/BackupSettingsScreen.tsx");
+  const FIELDS = [
+    ["backup-settings-passphrase", "Passphrase"],
+    ["backup-settings-confirm-passphrase", "Confirm passphrase"],
+    ["backup-settings-current-passphrase", "Current passphrase"],
+    ["backup-settings-new-passphrase", "New passphrase"],
+    ["backup-settings-confirm-new-passphrase", "Confirm new passphrase"],
+  ] as const;
+
+  function escape(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  it("renders exactly five secure passphrase inputs", () => {
+    expect(settings.match(/\bsecureTextEntry\b/g)).toHaveLength(5);
+  });
+
+  for (const [testID, label] of FIELDS) {
+    it(`${testID} is immediately preceded by a visible "${label}" label`, () => {
+      // The label AppText is the input's preceding sibling, unconditionally
+      // rendered with it, so it stays visible before entry, after entry and
+      // while an error is shown.
+      const preceded = new RegExp(
+        `<AppText([^>]*)>\\s*${escape(label)}\\s*</AppText>\\s*<TextInput\\s+testID="${escape(testID)}"`,
+      );
+      const match = settings.match(preceded);
+      expect(match, `no visible label before ${testID}`).not.toBeNull();
+      const attributes = (match as RegExpMatchArray)[1];
+      expect(attributes).toContain('role="label"');
+      // The input keeps its own accessible name; the visual label is hidden
+      // from TalkBack so the name is not announced twice.
+      expect(attributes).toContain('importantForAccessibility="no"');
+    });
+
+    it(`${testID} keeps secure entry and its accessible name`, () => {
+      const start = settings.indexOf(`testID="${testID}"`);
+      expect(start).toBeGreaterThan(-1);
+      const input = settings.slice(start, settings.indexOf("/>", start));
+      expect(input).toContain("secureTextEntry");
+      expect(input).toContain(`accessibilityLabel="${label}"`);
+    });
+  }
+});
