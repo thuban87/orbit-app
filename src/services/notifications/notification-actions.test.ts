@@ -31,11 +31,17 @@ const h = vi.hoisted(() => ({
   // the node vitest env — and the node-tested mark seam must NEVER fire a native
   // requestWidgetUpdate. The stub lets the ACTION_MARK-only publish be asserted.
   notifyWidget: vi.fn(),
+  // Spy standing in for the shell-refresh tick (38.3 D-13): a warm, committed
+  // Mark/Snooze publishes it once; replays, no-ops and failures publish none.
+  bumpShellRefresh: vi.fn(),
 }));
 
 vi.mock("expo-notifications");
 vi.mock("@/services/widget/widget-refresh", () => ({
   notifyWidgetDataChanged: h.notifyWidget,
+}));
+vi.mock("@/stores/shell-refresh-store", () => ({
+  bumpShellRefresh: h.bumpShellRefresh,
 }));
 vi.mock("@/services/device-region", () => ({
   getDeviceRegion: () => "US",
@@ -288,5 +294,64 @@ describe("exactly-once (H2) — a re-delivered/replayed mark writes ONE row", ()
     // row, and the already-acted notification is still cancelled.
     expect(interactionCount()).toBe(1);
     expect(second.cancel).toHaveBeenCalledWith(decayIdentifier(CONTACT_ID));
+  });
+});
+
+describe("handleNotificationAction — warm shell-refresh publication (38.3 D-13)", () => {
+  it("Mark success publishes the shell tick exactly once, after the widget publish", async () => {
+    const order: string[] = [];
+    h.notifyWidget.mockImplementationOnce(() => order.push("widget"));
+    h.bumpShellRefresh.mockImplementationOnce(() => order.push("shell"));
+    const { handleNotificationAction } = await freshHandler();
+    await handleNotificationAction(DATA, ACTION_MARK);
+
+    expect(interactionCount()).toBe(1);
+    expect(h.bumpShellRefresh).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(["widget", "shell"]);
+  });
+
+  it("Snooze success publishes the shell tick exactly once", async () => {
+    const { handleNotificationAction } = await freshHandler();
+    await handleNotificationAction(DATA, ACTION_SNOOZE);
+
+    expect(snoozeEventCount()).toBe(1);
+    expect(h.bumpShellRefresh).toHaveBeenCalledTimes(1);
+  });
+
+  it("a UNIQUE-collision replay publishes nothing", async () => {
+    const first = await freshHandler();
+    await first.handleNotificationAction(DATA, ACTION_MARK);
+    expect(h.bumpShellRefresh).toHaveBeenCalledTimes(1);
+    h.bumpShellRefresh.mockClear();
+
+    const second = await freshHandler(); // cold replay: same uid, empty handledSet
+    await second.handleNotificationAction(DATA, ACTION_MARK);
+
+    expect(interactionCount()).toBe(1);
+    expect(second.cancel).toHaveBeenCalledWith(decayIdentifier(CONTACT_ID));
+    expect(h.bumpShellRefresh).not.toHaveBeenCalled();
+  });
+
+  it("a genuine (non-UNIQUE) write failure publishes nothing", async () => {
+    // Make the Mark write fail with a non-UNIQUE SQLite error.
+    db.exec("ALTER TABLE interactions RENAME TO interactions_unavailable");
+    const { handleNotificationAction, cancel } = await freshHandler();
+    await handleNotificationAction(DATA, ACTION_MARK);
+
+    expect(cancel).not.toHaveBeenCalled();
+    expect(h.notifyWidget).not.toHaveBeenCalled();
+    expect(h.bumpShellRefresh).not.toHaveBeenCalled();
+  });
+
+  it("an Unbound contact + Snooze (intentional no-op) publishes nothing", async () => {
+    await h.exec?.runAsync(
+      "UPDATE contacts SET tracking_enabled = 0 WHERE id = ?",
+      [CONTACT_ID],
+    );
+    const { handleNotificationAction } = await freshHandler();
+    await handleNotificationAction(DATA, ACTION_SNOOZE);
+
+    expect(snoozeEventCount()).toBe(0);
+    expect(h.bumpShellRefresh).not.toHaveBeenCalled();
   });
 });
