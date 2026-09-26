@@ -6,7 +6,7 @@
  * allowed) that both the record path (recency-dao) and the refine-form UI share.
  */
 import { describe, expect, it } from "vitest";
-import { rejectFutureOccurredAt } from "@/db/log-guards";
+import { FutureOccurredAtError, rejectFutureOccurredAt } from "@/db/log-guards";
 
 describe("rejectFutureOccurredAt", () => {
   it("throws when occurredAt is in the future", () => {
@@ -59,5 +59,36 @@ describe("rejectFutureOccurredAt", () => {
     expect(() =>
       rejectFutureOccurredAt("2025-12-31 23:59:59", "2026-08-15 12:00:00"),
     ).not.toThrow();
+  });
+
+  // 38.3 RG-023 / D-08: the clock-rollback case is a TYPED error so the assist
+  // UI can show specific copy — the message text stays byte-identical.
+  it("throws a FutureOccurredAtError with the unchanged message for a future value", () => {
+    let caught: unknown;
+    try {
+      rejectFutureOccurredAt("2026-08-20 09:00:00", "2026-08-15 12:00:00");
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(FutureOccurredAtError);
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toBe(
+      "occurredAt is in the future (2026-08-20 09:00:00 > 2026-08-15 12:00:00)",
+    );
+    expect((caught as Error).name).toBe("FutureOccurredAtError");
+  });
+
+  it.each([
+    ["a malformed occurredAt", "not-a-date", "2026-08-15 12:00:00"],
+    ["a malformed now", "2026-08-01 10:00:00", "not-a-date"],
+  ])("throws a plain Error (NOT FutureOccurredAtError) for %s", (_label, occurredAt, now) => {
+    let caught: unknown;
+    try {
+      rejectFutureOccurredAt(occurredAt, now);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught).not.toBeInstanceOf(FutureOccurredAtError);
   });
 });
