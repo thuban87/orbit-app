@@ -2,6 +2,10 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { ringVisual } from "@/components/ContactCard";
+import {
+  DigestListGroup,
+  DigestListItem,
+} from "@/components/digest/DigestListTransition";
 import { AppText } from "@/components/ui/AppText";
 import type { UpNextCandidateRow } from "@/db/up-next-read";
 import { pickUpNext } from "@/logic/digest-composition";
@@ -42,53 +46,56 @@ export function UpNextSection({
           </AppText>
         </View>
       ) : (
-        rows.map((row) => {
-          const ring = ringVisual(row.status, colors);
-          return (
-            <Pressable
-              key={row.id}
-              testID={`digest-up-next-row-${row.id}`}
-              accessibilityRole="button"
-              accessibilityLabel={`${row.name}. ${upNextReason(row)}`}
-              onPress={() => onOpenProfile(row.id)}
-              style={styles.row}
-            >
-              <View
-                testID={`digest-up-next-status-${row.id}`}
-                accessibilityLabel={`${row.status} status`}
-                style={[
-                  styles.avatarRing,
-                  {
-                    borderColor: ring.color,
-                    borderWidth: ring.width,
-                    opacity: ring.opacity,
-                  },
-                ]}
-              >
-                <Avatar
-                  photo={row.photo}
-                  name={row.name}
-                  contactId={row.id}
-                  size={44}
-                />
-              </View>
-              <View style={styles.copy}>
-                <AppText numberOfLines={1} ellipsizeMode="tail" role="body">
-                  {row.name}
-                </AppText>
-                <AppText
-                  testID={`digest-up-next-reason-${row.id}`}
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  role="label"
-                  style={{ color: colors.textSecondary }}
+        <DigestListGroup>
+          {rows.map((row) => {
+            const ring = ringVisual(row.status, colors);
+            return (
+              <DigestListItem key={row.id}>
+                <Pressable
+                  testID={`digest-up-next-row-${row.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${row.name}. ${upNextReason(row)}`}
+                  onPress={() => onOpenProfile(row.id)}
+                  style={styles.row}
                 >
-                  {upNextReason(row)}
-                </AppText>
-              </View>
-            </Pressable>
-          );
-        })
+                  <View
+                    testID={`digest-up-next-status-${row.id}`}
+                    accessibilityLabel={`${row.status} status`}
+                    style={[
+                      styles.avatarRing,
+                      {
+                        borderColor: ring.color,
+                        borderWidth: ring.width,
+                        opacity: ring.opacity,
+                      },
+                    ]}
+                  >
+                    <Avatar
+                      photo={row.photo}
+                      name={row.name}
+                      contactId={row.id}
+                      size={44}
+                    />
+                  </View>
+                  <View style={styles.copy}>
+                    <AppText numberOfLines={1} ellipsizeMode="tail" role="body">
+                      {row.name}
+                    </AppText>
+                    <AppText
+                      testID={`digest-up-next-reason-${row.id}`}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      role="label"
+                      style={{ color: colors.textSecondary }}
+                    >
+                      {upNextReason(row)}
+                    </AppText>
+                  </View>
+                </Pressable>
+              </DigestListItem>
+            );
+          })}
+        </DigestListGroup>
       )}
     </View>
   );

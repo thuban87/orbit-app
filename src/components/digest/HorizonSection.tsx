@@ -2,6 +2,10 @@
 import { Pressable, StyleSheet, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
 import { ringVisual } from "@/components/ContactCard";
+import {
+  DigestListGroup,
+  DigestListItem,
+} from "@/components/digest/DigestListTransition";
 import { AppText } from "@/components/ui/AppText";
 import type { DashboardRow } from "@/db/dashboard-read";
 import type { OverlookedRow } from "@/db/digest-read";
@@ -72,51 +76,62 @@ export function HorizonSection({
       {birthdays.length > 0 ? (
         <View testID="digest-horizon-birthdays" style={styles.group}>
           <AppText role="label">Birthdays</AppText>
-          {birthdays.map((birthday) => (
-            <Pressable
-              key={birthday.id}
-              testID={`digest-birthday-row-${birthday.id}`}
-              accessibilityRole="button"
-              accessibilityLabel={`${birthday.name}, ${birthday.tag}`}
-              onPress={() => onOpenProfile(birthday.id)}
-              style={styles.row}
-            >
-              <AppText
-                numberOfLines={1}
-                ellipsizeMode="tail"
-                role="body"
-                style={styles.name}
-              >
-                {birthday.name}
-              </AppText>
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                {birthday.tag}
-              </AppText>
-            </Pressable>
-          ))}
+          <DigestListGroup>
+            {birthdays.map((birthday) => (
+              <DigestListItem key={birthday.id}>
+                <Pressable
+                  testID={`digest-birthday-row-${birthday.id}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${birthday.name}, ${birthday.tag}`}
+                  onPress={() => onOpenProfile(birthday.id)}
+                  style={styles.row}
+                >
+                  <AppText
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    role="body"
+                    style={styles.name}
+                  >
+                    {birthday.name}
+                  </AppText>
+                  <AppText
+                    role="caption"
+                    style={{ color: colors.textSecondary }}
+                  >
+                    {birthday.tag}
+                  </AppText>
+                </Pressable>
+              </DigestListItem>
+            ))}
+          </DigestListGroup>
         </View>
       ) : null}
 
       {remainingOverlooked.length > 0 ? (
         <View testID="digest-horizon-overlooked" style={styles.group}>
           <AppText role="label">Overlooked</AppText>
-          {overlookedPreview.shown.map((row) => (
-            <CompactContactRow
-              key={row.id}
-              id={row.id}
-              name={row.name}
-              photo={row.photo}
-              status={row.status}
-              onPress={onOpenProfile}
-            />
-          ))}
-          {overlookedPreview.overflow > 0 ? (
-            <DrillRow
-              testID="digest-overlooked-more"
-              label="See everyone needing attention →"
-              onPress={() => onDrillThrough("overlooked")}
-            />
-          ) : null}
+          <DigestListGroup>
+            {overlookedPreview.shown.map((row) => (
+              <DigestListItem key={row.id}>
+                <CompactContactRow
+                  id={row.id}
+                  name={row.name}
+                  photo={row.photo}
+                  status={row.status}
+                  onPress={onOpenProfile}
+                />
+              </DigestListItem>
+            ))}
+            {overlookedPreview.overflow > 0 ? (
+              <DigestListItem key="overlooked-more">
+                <DrillRow
+                  testID="digest-overlooked-more"
+                  label="See everyone needing attention →"
+                  onPress={() => onDrillThrough("overlooked")}
+                />
+              </DigestListItem>
+            ) : null}
+          </DigestListGroup>
         </View>
       ) : null}
 
@@ -128,23 +143,28 @@ export function HorizonSection({
               ? "1 person has never been contacted"
               : `${never.count} people have never been contacted`}
           </AppText>
-          {neverPreview.shown.map((row) => (
-            <CompactContactRow
-              key={row.id}
-              id={row.id}
-              name={row.name}
-              photo={row.photo}
-              status={null}
-              onPress={onOpenProfile}
-            />
-          ))}
-          {neverPreview.overflow > 0 ? (
-            <DrillRow
-              testID="digest-never-contacted-more"
-              label={`+${neverPreview.overflow} more →`}
-              onPress={() => onDrillThrough("never-contacted")}
-            />
-          ) : null}
+          <DigestListGroup>
+            {neverPreview.shown.map((row) => (
+              <DigestListItem key={row.id}>
+                <CompactContactRow
+                  id={row.id}
+                  name={row.name}
+                  photo={row.photo}
+                  status={null}
+                  onPress={onOpenProfile}
+                />
+              </DigestListItem>
+            ))}
+            {neverPreview.overflow > 0 ? (
+              <DigestListItem key="never-contacted-more">
+                <DrillRow
+                  testID="digest-never-contacted-more"
+                  label={`+${neverPreview.overflow} more →`}
+                  onPress={() => onDrillThrough("never-contacted")}
+                />
+              </DigestListItem>
+            ) : null}
+          </DigestListGroup>
         </View>
       ) : null}
     </View>

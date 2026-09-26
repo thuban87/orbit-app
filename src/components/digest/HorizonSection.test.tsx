@@ -7,6 +7,10 @@ vi.mock("react-native", () => ({
   View: "View",
 }));
 vi.mock("@/components/Avatar", () => ({ Avatar: "Avatar" }));
+vi.mock("@/components/digest/DigestListTransition", () => ({
+  DigestListGroup: ({ children }: { children: unknown }) => children,
+  DigestListItem: ({ children }: { children: unknown }) => children,
+}));
 vi.mock("@/components/ContactCard", () => ({
   ringVisual: () => ({ color: "theme-token", opacity: 1, width: 2 }),
 }));

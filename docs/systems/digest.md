@@ -1,12 +1,12 @@
 # Digest
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 38-your-week
-**Owners:** `src/db/digest-read.ts`, `src/db/up-next-read.ts`, `src/db/your-week-read.ts`, `src/logic/digest-composition.ts`, `src/screens/DigestScreen.tsx`, `src/services/notifications/digest-schedule.ts`
+**Last updated:** 2026-09-25
+**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Owners:** `src/db/digest-read.ts`, `src/db/up-next-read.ts`, `src/db/your-week-read.ts`, `src/logic/digest-composition.ts`, `src/screens/DigestScreen.tsx`, `src/screens/digest-refresh.ts`, `src/services/notifications/digest-schedule.ts`
 
 ## Purpose
 
-Digest is Orbit’s local, default home for relationship care: act through Up Next, look ahead through Horizon, then reflect through Your Week. It derives every visible item from canonical SQLite data when the screen is focused; it owns no relationship-domain table, snapshot, cache, backend, or network read path.
+Digest is Orbit’s local, default home for relationship care: act through Up Next, look ahead through Horizon, then reflect through Your Week. It derives every visible item from canonical SQLite data on focus, on committed in-process writes while focused, and after each resume sweep; it owns no relationship-domain table, snapshot, cache, backend, or network read path.
 
 ## Architecture
 
@@ -33,7 +33,8 @@ Digest reads existing state and persists only the portable app-wide period prefe
 | Read DAO | `src/db/your-week-read.ts` | Aggregates app-wide metrics, heatmap counts, and group-deduplicated day detail. |
 | Pure logic | `src/logic/digest-composition.ts` | Caps Up Next at three and removes its claims from Horizon. |
 | Period service | `src/services/history/week-window.ts` | Defines Rolling 7 Days and locale-aware Calendar Week once. |
-| Screen | `src/screens/DigestScreen.tsx` | Reloads live sections on focus and owns canonical Contacts drill navigation. |
+| Screen | `src/screens/DigestScreen.tsx` | Owns every Digest refresh trigger (focus, shell tick, post-sweep foreground tick) and canonical Contacts drill navigation. |
+| Refresh controller | `src/screens/digest-refresh.ts` | Defers hidden triggers to focus, gates publication with one latest-request authority, and keeps a loaded body mounted across a failed refresh. |
 | Scheduler | `src/services/notifications/digest-schedule.ts` | Reconciles the separate singleton weekly OS request. |
 
 ### Key Files
@@ -43,7 +44,9 @@ Digest reads existing state and persists only the portable app-wide period prefe
 | `src/screens/DigestScreen.tsx` | Mounts Up Next, Horizon, and Your Week in fixed order; opens Profiles and Contacts drills. |
 | `src/components/digest/UpNextSection.tsx` | Shows at most three explainable Profile-opening candidates without inline outreach writes. |
 | `src/components/digest/HorizonSection.tsx` | Shows separate conditional birthdays, overlooked, and Never Contacted groups. |
-| `src/components/digest/YourWeekSection.tsx` | Synchronizes the period preference and mounts selected-day detail inline. |
+| `src/components/digest/YourWeekSection.tsx` | Follows Digest's `refreshSignal`, synchronizes the period preference, and mounts selected-day detail inline. |
+| `src/components/digest/your-week-section-logic.ts` | Pure period controller: in-flight write marker, safe Settings adoption, re-window day retention, shared period-read authority. |
+| `src/components/digest/DigestListTransition.tsx` | The standard Up Next/Horizon list transition, skipped on first render and off under reduced motion. |
 | `src/components/digest/YourWeekHeatmap.tsx` | Reuses shared heatmap language with a non-colour-only selected state. |
 | `src/db/your-week-read.ts` | Excludes group-linked child interactions and includes each Group Event parent once. |
 
@@ -52,7 +55,12 @@ Digest reads existing state and persists only the portable app-wide period prefe
 ### Opening Digest
 
 1. Fresh launch and a Digest notification select the Digest tab; resume keeps the user’s active tab and stack.
-2. `DigestScreen` refreshes local reads on focus and renders all three major sections even when their data is empty.
+2. `DigestScreen` is the single refresh-trigger owner and renders all three major sections even when their data is empty. It re-reads:
+   - on every focus;
+   - on the shell tick — a committed Quick Log/Undo, assist confirmation, or warm notification action — while Digest stays focused (D-13);
+   - on the post-sweep foreground tick, published after the launch/foreground sweep settles, so a resume reflects the sweep's purges and expiry (D-14).
+
+   A shell or foreground trigger while Digest is hidden reads nothing; the next focus read covers it (no background reads). One latest-request authority gates publication, so an older read never overwrites a newer one. A failed refresh over an already-loaded Digest keeps the body mounted and shows a compact "Couldn't refresh Up Next and Horizon" notice with Retry; only a failure before anything has loaded shows the full error. Each accepted trigger also bumps a Digest-owned `refreshSignal` that Your Week follows instead of its own focus effect — on acceptance, not success, so Your Week still re-windows when the outer read fails.
 3. An Up Next or Horizon birthday row opens Profile in the Digest stack, so Back returns to Digest.
 
 ### Composing Up Next and Horizon
@@ -68,6 +76,12 @@ Digest reads existing state and persists only the portable app-wide period prefe
 2. `your-week-read.ts` reads canonical activity: group-linked child rows do not count as separate events, while a Group Event parent appears once.
 3. A heatmap selection expands `DigestDayDetail` beneath the heatmap. The visual language and count classification reuse the Profile History helpers without adding rotary or long-range navigation.
 4. Settings and the in-context toggle both write the same validated portable `your_week_period` setting; Horizon birthdays and weekly notification cadence do not use it.
+5. On each `refreshSignal`, Your Week keeps the chosen period and re-windows to the current local day (D-15). No timer detects the new day (D-22). A selected day survives while it is still a real day in the new window, including across a tab return (D-26), and is re-read; otherwise it clears.
+6. A period changed in Settings is adopted on the next refresh, but only when no in-context toggle write is in flight and no toggle has begun since that settings read started. A refresh can therefore never revert an in-flight toggle. Every period read (refresh, toggle, rollback) goes through one request authority, so the most recently begun read wins.
+
+### List transitions
+
+When a refresh changes Up Next or Horizon while Digest stays mounted, rows use the standard list transition (D-13). A leaving row fades out, an arriving row fades in, and the rest shift into place, using Reanimated's built-in `FadeOut`/`FadeIn` (`MOTION.fast`) and `LinearTransition` (`MOTION.base`) builders. `DigestListGroup` skips entering animations on first render. Under reduced motion there is no transition at all.
 
 ### Delivering the weekly prompt
 
@@ -100,8 +114,9 @@ Digest reads existing state and persists only the portable app-wide period prefe
 3. **Birthdays are not Your Week activity.** Their independent next-seven-day window never changes with the period toggle.
 4. **Keep the Unbound exception exact.** It applies only to opted-in `not-contacted`, never to other active-cadence populations.
 5. **Do not double-count Group Events.** Exclude their linked child interactions from event activity and project the parent once.
-6. **A selected day is not immediately empty.** Day detail remains asynchronous; preserve a loading/error state until its matching read completes.
-7. **Seven 44dp heatmap targets need compact-width treatment.** Fixed cells plus outer padding can overflow 360dp-or-narrower layouts.
+6. **Do not add a Digest trigger outside `DigestScreen`.** Sections follow Digest's refresh ownership; a section-level focus effect or private AppState listener reintroduces pre-sweep resume reads and double reads.
+7. **A selected day is not immediately empty.** Day detail remains asynchronous; preserve a loading/error state until its matching read completes.
+8. **Seven 44dp heatmap targets need compact-width treatment.** Fixed cells plus outer padding can overflow 360dp-or-narrower layouts.
 
 ## Related Systems
 
@@ -121,3 +136,4 @@ Digest reads existing state and persists only the portable app-wide period prefe
 | 2026-09-02 | 25 | Repointed the backlog action to live Home while retaining the never-contacted count. |
 | 2026-09-02 | 32 | Lockstepped the gentle-line count onto the migrated `Negative` Tone value. |
 | 2026-09-02 | 38 | Replaced the retrospective-first screen with fixed Up Next, Horizon, and Your Week modules; added portable period selection and group-deduplicated activity reads. |
+| 2026-09-25 | 38.3 | Live Digest refresh (RG-026, react-native/AUD-RN-006, reliability-testing/AUD-REL-013): focus, shell-tick and post-sweep foreground triggers with one authority; Your Week follows a Digest-owned signal and keeps its period across a new day (D-15); standard list transition for Up Next and Horizon (D-13). |
