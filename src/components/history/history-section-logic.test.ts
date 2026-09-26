@@ -13,17 +13,23 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  advanceHistoryDay,
   buildLogRoute,
   countByCycle,
+  historyDayAfterLensChange,
+  historyDayAfterNext,
+  historyDayAfterPrev,
   type HistoryReadState,
   historyReadStateOnFail,
   historyReadStateOnPublish,
   historyReadStateOnStart,
+  initialHistoryDayState,
   initialHistoryReadState,
   isEmptyHistory,
   resolveActiveWindow,
 } from "@/components/history/history-section-logic";
 import type { CycleBlock } from "@/services/history/cycles";
+import { nextWindow, prevWindow } from "@/services/history/window";
 
 const TODAY = "2026-09-11";
 
@@ -199,5 +205,117 @@ describe("history read state (38.3 RG-024)", () => {
     });
     const loaded = historyReadStateOnPublish(initial, "rows-1");
     expect(historyReadStateOnStart(loaded)).toBe(loaded);
+  });
+});
+
+describe("history day state — D-12 follow-today (38.3 RG-024)", () => {
+  it("starts on today, following today", () => {
+    expect(initialHistoryDayState("2026-09-25")).toEqual({
+      today: "2026-09-25",
+      refDate: "2026-09-25",
+      followingToday: true,
+    });
+  });
+
+  it("the same local date returns the unchanged object", () => {
+    const state = initialHistoryDayState("2026-09-25");
+    expect(advanceHistoryDay(state, "2026-09-25")).toBe(state);
+  });
+
+  it("a following view advances its window to the new today", () => {
+    const next = advanceHistoryDay(
+      initialHistoryDayState("2026-09-25"),
+      "2026-09-26",
+    );
+    expect(next).toEqual({
+      today: "2026-09-26",
+      refDate: "2026-09-26",
+      followingToday: true,
+    });
+  });
+
+  it("a picked past window stays put while today-bound limits update", () => {
+    const start = initialHistoryDayState("2026-09-25");
+    const window = resolveActiveWindow("month", start.refDate, start.today);
+    if (!window) throw new Error("month window expected");
+    const past = historyDayAfterPrev(
+      start,
+      prevWindow(window, start.today).ref,
+    );
+    expect(past.followingToday).toBe(false);
+    const next = advanceHistoryDay(past, "2026-09-26");
+    expect(next).toEqual({
+      today: "2026-09-26",
+      refDate: past.refDate,
+      followingToday: false,
+    });
+  });
+
+  it("advances across month, year and leap-day boundaries when following", () => {
+    const month = advanceHistoryDay(
+      initialHistoryDayState("2026-01-31"),
+      "2026-02-01",
+    );
+    expect(month.refDate).toBe("2026-02-01");
+    expect(
+      resolveActiveWindow("month", month.refDate, month.today)?.start,
+    ).toBe("2026-02-01");
+
+    const year = advanceHistoryDay(
+      initialHistoryDayState("2026-12-31"),
+      "2027-01-01",
+    );
+    expect(year.refDate).toBe("2027-01-01");
+    expect(resolveActiveWindow("year", year.refDate, year.today)?.start).toBe(
+      "2027-01-01",
+    );
+
+    const leap = advanceHistoryDay(
+      initialHistoryDayState("2028-02-28"),
+      "2028-02-29",
+    );
+    expect(leap.refDate).toBe("2028-02-29");
+    expect(resolveActiveWindow("7days", leap.refDate, leap.today)?.end).toBe(
+      "2028-02-29",
+    );
+  });
+
+  it("next reaching the window containing today resumes following; stopping short does not", () => {
+    const today = "2026-09-25";
+    let state = initialHistoryDayState(today);
+    let window = resolveActiveWindow("month", state.refDate, state.today);
+    if (!window) throw new Error("month window expected");
+    // Two months back.
+    state = historyDayAfterPrev(state, prevWindow(window, today).ref);
+    window = resolveActiveWindow("month", state.refDate, today);
+    if (!window) throw new Error("month window expected");
+    state = historyDayAfterPrev(state, prevWindow(window, today).ref);
+    window = resolveActiveWindow("month", state.refDate, today);
+    if (!window) throw new Error("month window expected");
+    expect(window.start).toBe("2026-07-01");
+
+    // One step forward: August — still a past window.
+    state = historyDayAfterNext(state, "month", nextWindow(window, today).ref);
+    expect(state.followingToday).toBe(false);
+    window = resolveActiveWindow("month", state.refDate, today);
+    if (!window) throw new Error("month window expected");
+    expect(window.start).toBe("2026-08-01");
+
+    // Second step: September, which contains today.
+    state = historyDayAfterNext(state, "month", nextWindow(window, today).ref);
+    expect(state.followingToday).toBe(true);
+    expect(advanceHistoryDay(state, "2026-10-01").refDate).toBe("2026-10-01");
+  });
+
+  it("a lens change resets to today and following", () => {
+    const past = historyDayAfterPrev(
+      initialHistoryDayState("2026-09-25"),
+      "2026-08-15",
+    );
+    expect(historyDayAfterLensChange(past)).toEqual({
+      today: "2026-09-25",
+      refDate: "2026-09-25",
+      followingToday: true,
+    });
   });
 });
