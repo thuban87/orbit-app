@@ -27,6 +27,30 @@ export function registerUatProbes(): void {
     __armUatSweepFault({ slowPassMs: 8_000 });
     console.log("uat-probe armed slow pass");
   });
+  // 38.3 one-shot read faults (RG-023/RG-026). Inert until a later plan's call
+  // site runs `applyUatFault(name)`; `armUatFault` is itself a no-op outside
+  // __DEV__.
+  DevSettings.addMenuItem("UAT: fail next Digest day read", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { armUatFault } =
+      require("@/utils/uat-faults") as typeof import("@/utils/uat-faults");
+    armUatFault("digest-day-read", { mode: "reject" });
+    console.log("uat-probe armed", "digest-day-read");
+  });
+  DevSettings.addMenuItem("UAT: delay next Digest day read (5s)", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { armUatFault } =
+      require("@/utils/uat-faults") as typeof import("@/utils/uat-faults");
+    armUatFault("digest-day-read", { mode: "delay", ms: 5_000 });
+    console.log("uat-probe armed", "digest-day-read");
+  });
+  DevSettings.addMenuItem("UAT: fail next assist queue refresh", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { armUatFault } =
+      require("@/utils/uat-faults") as typeof import("@/utils/uat-faults");
+    armUatFault("assist-queue-refresh", { mode: "reject" });
+    console.log("uat-probe armed", "assist-queue-refresh");
+  });
   DevSettings.addMenuItem("Dump scheduled notifications", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getAllScheduledNotificationsAsync } =

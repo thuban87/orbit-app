@@ -29,7 +29,10 @@ afterEach(() => {
 
 describe("uat-faults", () => {
   it("exposes the fault names later plans wire", () => {
-    expect(UAT_FAULT_NAMES).toEqual(["digest-day-read", "assist-queue-refresh"]);
+    expect(UAT_FAULT_NAMES).toEqual([
+      "digest-day-read",
+      "assist-queue-refresh",
+    ]);
   });
 
   it("unarmed: applyUatFault resolves immediately", async () => {
@@ -41,12 +44,21 @@ describe("uat-faults", () => {
     delete devGlobal.__DEV__;
     armUatFault("digest-day-read", { mode: "reject" });
     await expect(applyUatFault("digest-day-read")).resolves.toBeUndefined();
+    // Nothing was stored: even a later dev-build apply finds no armed fault.
+    devGlobal.__DEV__ = true;
+    await expect(applyUatFault("digest-day-read")).resolves.toBeUndefined();
   });
 
   it("__DEV__ false: arming is a no-op", async () => {
     devGlobal.__DEV__ = false;
     armUatFault("assist-queue-refresh", { mode: "reject" });
-    await expect(applyUatFault("assist-queue-refresh")).resolves.toBeUndefined();
+    await expect(
+      applyUatFault("assist-queue-refresh"),
+    ).resolves.toBeUndefined();
+    devGlobal.__DEV__ = true;
+    await expect(
+      applyUatFault("assist-queue-refresh"),
+    ).resolves.toBeUndefined();
   });
 
   it("armed reject throws once, then disarms", async () => {
@@ -55,13 +67,17 @@ describe("uat-faults", () => {
     await expect(applyUatFault("assist-queue-refresh")).rejects.toThrow(
       "uat injected fault",
     );
-    await expect(applyUatFault("assist-queue-refresh")).resolves.toBeUndefined();
+    await expect(
+      applyUatFault("assist-queue-refresh"),
+    ).resolves.toBeUndefined();
   });
 
   it("armed faults are per-name", async () => {
     devGlobal.__DEV__ = true;
     armUatFault("digest-day-read", { mode: "reject" });
-    await expect(applyUatFault("assist-queue-refresh")).resolves.toBeUndefined();
+    await expect(
+      applyUatFault("assist-queue-refresh"),
+    ).resolves.toBeUndefined();
     await expect(applyUatFault("digest-day-read")).rejects.toThrow();
   });
 
