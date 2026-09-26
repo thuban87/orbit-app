@@ -28,6 +28,7 @@ import { LogInteractionScreen } from "@/screens/LogInteractionScreen";
 import { MemoryHistoryScreen } from "@/screens/MemoryHistoryScreen";
 import { MergeConflictsScreen } from "@/screens/MergeConflictsScreen";
 import { OffLimitsEditorScreen } from "@/screens/OffLimitsEditorScreen";
+import { RecentlyDeletedScreen } from "@/screens/RecentlyDeletedScreen";
 import { ReconcileCompleteScreen } from "@/screens/ReconcileCompleteScreen";
 import { ReconcileDetailScreen } from "@/screens/ReconcileDetailScreen";
 import { ReconcileGridScreen } from "@/screens/ReconcileGridScreen";
@@ -248,6 +249,8 @@ export function SettingsStack() {
         component={ThingsToRememberScreen}
       />
       <Stack.Screen name="MemoryHistory" component={MemoryHistoryScreen} />
+      {/* Things to Remember always offers Recently Deleted (RG-021, D-24). */}
+      <Stack.Screen name="RecentlyDeleted" component={RecentlyDeletedScreen} />
       <Stack.Screen name="OffLimitsEditor" component={OffLimitsEditorScreen} />
       <Stack.Screen name="Edit" component={EditContactScreen} />
       <Stack.Screen name="EditInteraction" component={EditInteractionScreen} />

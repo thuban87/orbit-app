@@ -365,6 +365,11 @@ export type SettingsStackParamList = {
    */
   ThingsToRemember: { contactId: number };
   MemoryHistory: { contactId: number; fieldKey: CurrentStateFieldKey };
+  /**
+   * Things to Remember always offers Recently Deleted, so a Settings-hosted
+   * Profile must resolve it too (RG-021, react-native/AUD-RN-004).
+   */
+  RecentlyDeleted: { contactId: number };
   OffLimitsEditor: { contactId: number };
   Edit: { contactId: number };
   /**
