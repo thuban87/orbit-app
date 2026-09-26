@@ -33,6 +33,14 @@
  * The two action buttons register with `opensAppToForeground:false` so a
  * killed-app tap reaches the headless task (a foregrounding button would instead
  * boot the UI and bypass the headless write path).
+ *
+ * Publication. A committed Mark publishes the widget (`notifyWidgetDataChanged`),
+ * and a committed Mark OR Snooze also publishes the shell refresh tick
+ * (`bumpShellRefresh`, 38.3 D-13) so an in-process foreground Digest/Home/Profile
+ * re-reads without waiting for the next resume. On a killed-app headless launch
+ * there are no mounted subscribers, so the tick is a harmless no-op there. The
+ * UNIQUE-collision replay, the Unbound-snooze no-op and a genuine write failure
+ * publish nothing (no data changed).
  */
 import {
   cancelScheduledNotificationAsync,
@@ -44,6 +52,7 @@ import { recordTouchpoint } from "@/db/recency-dao";
 import { snoozeContact } from "@/db/snooze-dao";
 import { getDeviceRegion } from "@/services/device-region";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { Logger } from "@/utils/logger";
 import {
   ACTION_MARK,
@@ -159,6 +168,8 @@ export async function handleNotificationAction(
       // errors (12-06). NOT published on the snooze branch (not widget-visible) nor
       // on the UNIQUE-collision replay path (no data changed).
       notifyWidgetDataChanged();
+      // Warm in-process consumers (Digest/Home/Profile) re-read (38.3 D-13).
+      bumpShellRefresh();
     } else {
       // The fixed +1-week headless snooze.
       await snoozeContact(exec, {
@@ -167,6 +178,8 @@ export async function handleNotificationAction(
         preset: "1w",
         now,
       });
+      // Snooze changes derived status/Digest membership → shell tick (D-13).
+      bumpShellRefresh();
     }
 
     // Suppress the acted-on contact's imminent decay notification immediately

@@ -1,7 +1,7 @@
 # Persistence Core
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 38-your-week
+**Last updated:** 2026-09-25
+**Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/db/database.ts`, `src/db/migrations/runner.ts`, `src/db/migrations/001-initial.ts`, `src/db/mutex.ts`, `src/db/transaction.ts`, `src/services/launch-sweep.ts`
 
 ## Purpose
@@ -155,6 +155,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 2. The trigger runs hooks sequentially once per foreground launch, after database access is available. Each hook has its own failure boundary, so a failed hook does not starve later independent hooks. An overlapping launch queues one follow-up pass.
 3. Hooks may declare `id` and `requires` when registering. A failed or skipped prerequisite skips its dependents for that pass. Background reconciliation and restore-photo finalization run before automatic backup; backup is held only when either recovery hook fails in that same pass. No durable hold flag or pending-row scan controls backup.
 4. A hook that writes obtains its own `inWriteTransaction()`; it must not nest that non-reentrant boundary inside another hook transaction. Migration and theme hydration still gate the first render, while recoverable background image faults are logged and retried by the foreground sweep.
+5. `onSweepSettled(listener)` notifies subscribers once per **owning** `runLaunchSweep()` run — the call that set the running guard — after every hook of that run and any coalesced follow-up pass has settled. A re-entrant call that only queues the follow-up pass publishes nothing of its own, so a burst of overlapping launches still publishes once. A throwing hook never suppresses the notification; each listener runs in its own `try`, and the running guard is already released. The module stays free of React Native and store imports; `App.tsx` forwards the notification to the shell-refresh store's foreground tick (see App Shell).
 
 ### Group Event schema and composed writes
 
@@ -252,6 +253,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 28. **AI metadata is not credential material.** Migration 029 may store lane, model, endpoint, preferences, and permission defaults, but no key-shaped value belongs in `app_settings`, `ai_connections`, or backup.
 29. **Do not turn `your_week_period` into a Digest cache.** Migration 030 persists a bounded app setting; metrics, heatmap, and detail remain read-time derivations.
 
+- **Do not attach sweep-ordered work to a trigger's promise.** A re-entrant `runLaunchSweep()` resolves immediately while the in-flight pass is still running; code that must observe the sweep's purge/expiry writes subscribes with `onSweepSettled`, which only the owning run fires.
 - **FK detachment needs explicit cleanup.** `ON DELETE SET NULL` clears only the link. Lifecycle writers and the locked orphan contract clear all three follow flags together with the reference.
 
 ## Related Systems
@@ -276,6 +278,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 
 | Date | Phase | What Changed |
 |------|-------|--------------|
+| 2026-09-25 | 38.3 | Added `onSweepSettled`: one owning-run settlement notification per launch sweep (coalesced passes publish once), forwarded by `App.tsx` to the foreground refresh tick. |
 | 2026-09-23 | 38.2 | Isolated launch hooks and image candidates, added per-pass backup recovery prerequisites, and contained recoverable background faults at boot. |
 | 2026-08-14 | 02 | Created the SQLite bootstrap, migration-1 contract, and shared write serialization. |
 | 2026-08-14 | 03 | Added the shared transaction entry point and launch-sweep integration for runtime custom-field maintenance. |

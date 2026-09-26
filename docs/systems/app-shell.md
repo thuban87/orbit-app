@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-09-19
-**Updated by phase:** 38.1-profile-presentation-polish
+**Last updated:** 2026-09-25
+**Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -23,6 +23,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | Background shell | `src/components/ui/BackgroundHost.tsx`, `src/navigation/focused-route-classification.ts`, `src/stores/focused-route-store.ts` | Renders one fixed local System background, selects a density from the deepest focused route, and suppresses the image only on the Orrery visualization. |
 | Route types | `src/navigation/types.ts` | Defines serializable tab and per-stack route parameters. |
 | Reset intents | `src/navigation/reset-intents.ts` | Sole owner of typed nested semantic tab-root reset states for external and completion paths. |
+| Refresh signals | `src/stores/shell-refresh-store.ts`, `src/utils/latest-request.ts` | Carries the shell tick (in-process committed writes) and the foreground tick (once per owning launch-sweep run), plus the shared latest-request authority consumers use to discard stale reads. |
 | Transient/back state | `src/stores/shell-transient-store.ts`, `src/navigation/back-intent.ts` | Registers executable overlay dismissal callbacks and resolves transient-first Back behavior. |
 | Shell chrome | `src/components/ShellAppBar.tsx`, `src/navigation/use-bottom-clearance.ts` | Provides themed root/child app bars, measured compact trailing content, and shared tab/FAB clearance. |
 | Capture | `src/components/UniversalFab.tsx`, `src/services/quick-log-command.ts`, `src/components/ContactPicker.tsx`, `src/components/Snackbar.tsx` | Provides the universal action dial, shared Quick Log command, local contact selection, and commit-truthful feedback. |
@@ -160,6 +161,19 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 1. The ready-gated application effect registers notification reconciliation, awaits channel and action-category initialization, then installs the launch-sweep trigger.
 2. `App.tsx` imports the headless-task module at bundle scope and sets an explicit silent foreground notification behavior.
 3. `NotificationResponseGate` shares the navigator readiness flag with `ShareIntentGate`, queues an early body tap, and applies it only after the navigation ref is ready.
+
+### Refreshing visible surfaces after writes and resumes
+
+1. The shell-refresh store carries two independent counters. Neither is driven by a timer, and there is no general event bus.
+   - **Shell tick** (`bumpShellRefresh` / `useShellRefresh`) is for in-process committed writes. Its current publishers are Quick Log and Undo, Dashboard bulk actions, category management, and warm notification Mark/Snooze. Phase 38.3 is extending the set to assist, History delete, and Post-Log note writes.
+   - **Foreground tick** (`publishForegroundRefresh` / `useForegroundRefresh`) is published once per owning launch-sweep run: the cold start, or a real background-to-active return. It fires after that run's purge and expiry writes have settled.
+2. The ready-gated application effect registers `onSweepSettled(publishForegroundRefresh)` before `installSweepTrigger`, so the cold-start sweep publishes too. The effect cleanup removes the registration.
+3. A notification Mark or Snooze handled in a live process bumps the shell tick after its write commits, so a visible Digest, Home or Profile converges. On a killed-app headless launch nothing is subscribed, so the bump does nothing. A replayed action, an Unbound Snooze no-op, or a failed write publishes nothing.
+4. Consumer rule:
+   - Subscribe to the tick that matches the data you read.
+   - Where the owning screen defers hidden reads, gate the re-read on focus or visibility.
+   - Gate every publication (rows, counts, error flags and loading settles) on a `createLatestRequestAuthority()` token, so an older read never overwrites a newer one. Invalidate it on blur or unmount.
+   - Subscribers use the skip-initial-revision idiom, so a surface mounted after a tick never replays it.
 
 ### Bootstrapping normalized-method migration
 
@@ -395,6 +409,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 38. **Types do not prove Settings registration.** A Settings route advertised by the hub must appear in the runtime registration contract and as a real `<Stack.Screen>`; a type-only route may be intentionally reserved.
 38. **Keep AI routes typed and content-free.** Route parameters identify a screen or focus only; keys, prompt text, personalization bodies, and callback material remain in their owning local state.
 
+- **Resume freshness comes from the foreground tick, not AppState.** A consumer that re-reads on its own `AppState` listener can race the launch sweep and show pre-purge data. Subscribe with `useForegroundRefresh`, which only fires after the owning sweep run settles. Never detect a day change with a timer.
 - **Types do not register native routes.** A shared type intersection cannot prove that a route is mounted in each hosting stack; Group Event routes require all three runtime registrations.
 
 ## Related Systems
@@ -459,3 +474,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 37 | Replaced the Settings monolith with a navigation-first category directory and registered the canonical Backup tree in the Settings stack through explicit host semantics. |
 | 2026-09-02 | 38 | Replaced the four-tab shell with Contacts, Events, Digest, Orrery, and Settings; made Digest the default root, removed the Backup tab, and moved external Digest routing to the semantic tab root. |
 | 2026-09-19 | 38.1 | Registered Profile-origin knowledge editors across their host stacks and documented the Orrery-specific overlay surface exception. |
+| 2026-09-25 | 38.3 | Foreground refresh tick + warm notification publication: added a sweep-ordered foreground tick beside the shell tick, a shell tick for warm notification Mark/Snooze, and the shared latest-request authority consumer rule. |
