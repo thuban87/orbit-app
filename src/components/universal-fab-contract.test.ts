@@ -26,3 +26,57 @@ describe("UniversalFab glyph foreground (D-20)", () => {
     expect(glyphRegion()).not.toContain("colors.background");
   });
 });
+
+/** The JSX opener region that starts at `anchor` and ends at the opener's first `>` after `until`. */
+function openerAfter(anchor: string, until: string): string {
+  const start = fab.indexOf(anchor);
+  expect(start).toBeGreaterThan(-1);
+  const end = fab.indexOf(">", fab.indexOf(until, start));
+  return fab.slice(start, end + 1);
+}
+
+describe("UniversalFab closed-dial semantics (RG-039 ui-accessibility/AUD-UIA-023, CONFIRMED on device)", () => {
+  const scrim = openerAfter(
+    'accessibilityLabel="Dismiss capture actions"',
+    "style=",
+  );
+  // The action-rows container: from its `<View` opener up to its dial style.
+  const dialOpener = fab.slice(
+    fab.lastIndexOf("<View", fab.indexOf("style={styles.dial}")),
+    fab.indexOf("style={styles.dial}"),
+  );
+  const row = openerAfter(
+    '<AnimatedPressable\n      accessibilityRole="button"',
+    "style=",
+  );
+  const fabButton = openerAfter('testID="dashboard-create-fab"', "onPress=");
+
+  it("hides the scrim from accessibility while the dial is closed", () => {
+    expect(scrim).toContain(
+      'importantForAccessibility={open ? "auto" : "no-hide-descendants"}',
+    );
+    expect(scrim).toContain("accessibilityElementsHidden={!open}");
+  });
+
+  it("hides the action-rows container from accessibility while the dial is closed", () => {
+    expect(dialOpener).toContain(
+      'importantForAccessibility={open ? "auto" : "no-hide-descendants"}',
+    );
+    expect(dialOpener).toContain("accessibilityElementsHidden={!open}");
+  });
+
+  it("takes the scrim and every action row out of keyboard focus while closed", () => {
+    expect(scrim).toContain("focusable={open}");
+    expect(row).toContain("focusable={open}");
+  });
+
+  it("keeps the existing touch gating (opacity + pointerEvents) on scrim and rows", () => {
+    expect(scrim).toContain("pointerEvents={scrimPointerEvents}");
+    expect(row).toContain("pointerEvents={pointerEvents}");
+    expect(fab).toContain("opacity: expanded.value");
+  });
+
+  it("announces the dial's expanded state on the FAB", () => {
+    expect(fabButton).toContain("accessibilityState={{ expanded: open }}");
+  });
+});
