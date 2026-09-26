@@ -1,6 +1,16 @@
 import { Logger } from "@/utils/logger";
 
 /**
+ * Per-hook time budget (38.3 review A-WR-02, owner ruling D-30). The sweep stops
+ * WAITING on a hook after this long; it never cancels or re-runs the hook's
+ * work. Sized for a normal automatic backup (full export, 600k-iteration PBKDF2
+ * ~53 ms, encrypt, SAF write + verify), which finishes in seconds; a hook past
+ * this budget is treated as hung. A late-finishing hook is harmless: its work
+ * still lands, and it is never started again while that call is in flight.
+ */
+export const SWEEP_HOOK_TIMEOUT_MS = 60_000;
+
+/**
  * Launch sweep — the once-per-foreground-launch hook registry (DATA-06).
  *
  * A single entry point (`runLaunchSweep`) that runs a list of registered hooks
@@ -56,8 +66,68 @@ export interface AppStateLike {
   ): { remove(): void };
 }
 
+interface RegisteredHook {
+  fn: SweepHook;
+  options: SweepHookOptions;
+}
+
 // EMPTY in Phase 2 — later phases push their responsibilities here.
-const hooks: Array<{ fn: SweepHook; options: SweepHookOptions }> = [];
+const hooks: RegisteredHook[] = [];
+
+// Hooks whose call is still unsettled — including one the sweep stopped waiting
+// on at its budget (D-30). A later pass skips such a hook rather than starting
+// its work a second time alongside the first call.
+const inFlightHooks = new Set<RegisteredHook>();
+
+type BoundedHookOutcome = "settled" | "failed" | "timed-out";
+
+/**
+ * Await one hook for at most {@link SWEEP_HOOK_TIMEOUT_MS} (D-30). A synchronous
+ * throw or a rejection is "failed"; the budget elapsing first is "timed-out".
+ * The hook's own promise is always observed, so a late rejection is logged and
+ * never unhandled. The budget timer is a bounded watchdog cleared as soon as
+ * either side wins — not a freshness timer (D-22).
+ */
+function runHookWithinBudget(
+  entry: RegisteredHook,
+  invoke: () => Promise<void>,
+): Promise<BoundedHookOutcome> {
+  let work: Promise<void>;
+  try {
+    work = Promise.resolve(invoke());
+  } catch {
+    return Promise.resolve("failed");
+  }
+  inFlightHooks.add(entry);
+  let abandoned = false;
+  const observed = work.then(
+    (): BoundedHookOutcome => {
+      inFlightHooks.delete(entry);
+      return "settled";
+    },
+    (): BoundedHookOutcome => {
+      inFlightHooks.delete(entry);
+      if (abandoned) {
+        Logger.error(
+          "launch-sweep",
+          `hook failed after its budget: ${entry.options.id ?? "anonymous"}`,
+        );
+      }
+      return "failed";
+    },
+  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const budget = new Promise<BoundedHookOutcome>((resolve) => {
+    timer = setTimeout(() => {
+      abandoned = true;
+      resolve("timed-out");
+    }, SWEEP_HOOK_TIMEOUT_MS);
+  });
+  return Promise.race([observed, budget]).then((outcome) => {
+    if (timer !== undefined) clearTimeout(timer);
+    return outcome;
+  });
+}
 
 /** Register a hook to run on each real foreground launch (registration order). */
 export function registerSweepHook(
@@ -133,8 +203,10 @@ let pendingRerun = false;
  *   - The follow-up pass runs after the current pass settles, guaranteeing the
  *     "runs once per real foreground launch" contract later phases' quarantine-
  *     expiry / archived-purge / schedule-reconcile hooks depend on.
- * The `running` flag is reset in `finally` so a throwing hook never wedges the
- * runner shut. After it is released, the owning run publishes `onSweepSettled`
+ * Each hook is awaited for at most `SWEEP_HOOK_TIMEOUT_MS` (D-30), so a hook
+ * whose promise never settles cannot hold `running` forever or starve the
+ * foreground tick. The `running` flag is reset in `finally` so a throwing hook
+ * never wedges the runner shut. After it is released, the owning run publishes `onSweepSettled`
  * exactly once (38.3 D-14); a re-entrant early return publishes nothing.
  */
 export async function runLaunchSweep(): Promise<void> {
@@ -156,7 +228,8 @@ export async function runLaunchSweep(): Promise<void> {
         uatFault.slowPassMs = 0;
         await new Promise((resolve) => setTimeout(resolve, ms));
       }
-      for (const [index, { fn, options }] of hooks.entries()) {
+      for (const [index, entry] of hooks.entries()) {
+        const { fn, options } = entry;
         if (options.requires?.some((id) => unavailable.has(id))) {
           if (options.id) unavailable.add(options.id);
           Logger.warn(
@@ -165,14 +238,32 @@ export async function runLaunchSweep(): Promise<void> {
           );
           continue;
         }
-        try {
+        if (inFlightHooks.has(entry)) {
+          // Its earlier call outlived the budget and is still running (D-30):
+          // never start that work twice. Unfinished work is unavailable to
+          // dependents, exactly like a failure.
+          if (options.id) unavailable.add(options.id);
+          Logger.warn(
+            "launch-sweep",
+            `hook still running: ${options.id ?? "anonymous"}`,
+          );
+          continue;
+        }
+        const outcome = await runHookWithinBudget(entry, () => {
           if (index === 0 && isDevBuild() && uatFault.failFirstHook) {
             uatFault.failFirstHook = false;
             throw new Error("uat injected first-hook failure");
           }
-          await fn();
-        } catch {
-          if (options.id) unavailable.add(options.id);
+          return fn();
+        });
+        if (outcome === "settled") continue;
+        if (options.id) unavailable.add(options.id);
+        if (outcome === "timed-out") {
+          Logger.error(
+            "launch-sweep",
+            `hook exceeded its budget: ${options.id ?? "anonymous"}`,
+          );
+        } else {
           Logger.error(
             "launch-sweep",
             `hook failed: ${options.id ?? "anonymous"}`,
@@ -224,6 +315,7 @@ export function installSweepTrigger(appState: AppStateLike): {
  */
 export function __resetSweepForTest(): void {
   hooks.length = 0;
+  inFlightHooks.clear();
   running = false;
   pendingRerun = false;
   settledListeners.clear();

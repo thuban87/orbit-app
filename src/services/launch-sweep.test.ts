@@ -20,6 +20,7 @@ import {
   onSweepSettled,
   registerSweepHook,
   runLaunchSweep,
+  SWEEP_HOOK_TIMEOUT_MS,
 } from "@/services/launch-sweep";
 
 /** Yield a macrotask so a pending runLaunchSweep() settles and resets `running`. */
@@ -474,3 +475,119 @@ describe("onSweepSettled — owning-run publication (38.3 D-14)", () => {
     expect(settled).not.toHaveBeenCalled();
   });
 });
+
+describe("per-hook time budget (38.3 review A-WR-02, owner ruling D-30)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("is a named tunable sized for a normal automatic backup", () => {
+    expect(SWEEP_HOOK_TIMEOUT_MS).toBe(60_000);
+  });
+
+  it("a hung hook stops being awaited at the budget: later hooks run and the tick fires once", async () => {
+    const after = vi.fn(async () => {});
+    const settled = vi.fn();
+    registerSweepHook(() => new Promise<void>(() => {}), { id: "hung" });
+    registerSweepHook(after);
+    onSweepSettled(settled);
+
+    const run = runLaunchSweep();
+    await vi.advanceTimersByTimeAsync(SWEEP_HOOK_TIMEOUT_MS - 1);
+    expect(after).not.toHaveBeenCalled();
+    expect(settled).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await run;
+    expect(after).toHaveBeenCalledTimes(1);
+    expect(settled).toHaveBeenCalledTimes(1);
+  });
+
+  it("a timed-out hook is unavailable to its dependents in that pass", async () => {
+    const dependent = vi.fn(async () => {});
+    registerSweepHook(() => new Promise<void>(() => {}), { id: "producer" });
+    registerSweepHook(dependent, { id: "consumer", requires: ["producer"] });
+
+    const run = runLaunchSweep();
+    await vi.advanceTimersByTimeAsync(SWEEP_HOOK_TIMEOUT_MS);
+    await run;
+    expect(dependent).not.toHaveBeenCalled();
+  });
+
+  it("the next sweep runs (not wedged) and does not re-run a hook whose earlier call is still in flight", async () => {
+    let calls = 0;
+    const gate = deferredVoid();
+    const other = vi.fn(async () => {});
+    const settled = vi.fn();
+    registerSweepHook(
+      () => {
+        calls += 1;
+        return gate.promise;
+      },
+      { id: "slow" },
+    );
+    registerSweepHook(other);
+    onSweepSettled(settled);
+
+    const first = runLaunchSweep();
+    await vi.advanceTimersByTimeAsync(SWEEP_HOOK_TIMEOUT_MS);
+    await first;
+    expect(settled).toHaveBeenCalledTimes(1);
+
+    // A later real foreground launch runs a full pass of its own.
+    const second = runLaunchSweep();
+    await vi.advanceTimersByTimeAsync(0);
+    await second;
+    expect(calls).toBe(1); // still-running work is never started twice
+    expect(other).toHaveBeenCalledTimes(2);
+    expect(settled).toHaveBeenCalledTimes(2);
+  });
+
+  it("a late-settling hook never publishes a tick or disturbs the DEFER-ONE guard", async () => {
+    const gate = deferredVoid();
+    let calls = 0;
+    const settled = vi.fn();
+    registerSweepHook(() => {
+      calls += 1;
+      return calls === 1 ? gate.promise : Promise.resolve();
+    });
+    onSweepSettled(settled);
+
+    const first = runLaunchSweep();
+    await vi.advanceTimersByTimeAsync(SWEEP_HOOK_TIMEOUT_MS);
+    await first;
+    expect(settled).toHaveBeenCalledTimes(1);
+
+    // The abandoned work rejects late: no tick, no unhandled rejection.
+    gate.reject(new Error("late"));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(settled).toHaveBeenCalledTimes(1);
+
+    // Overlapping launches still coalesce into exactly one follow-up pass.
+    const owner = runLaunchSweep();
+    void runLaunchSweep();
+    void runLaunchSweep();
+    await vi.advanceTimersByTimeAsync(0);
+    await owner;
+    expect(calls).toBe(3); // owning pass + one coalesced follow-up
+    expect(settled).toHaveBeenCalledTimes(2);
+  });
+
+  it("clears its budget timer when a hook settles in time", async () => {
+    registerSweepHook(async () => {});
+    await runLaunchSweep();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+function deferredVoid() {
+  let resolve!: () => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<void>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}

@@ -155,7 +155,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 2. The trigger runs hooks sequentially once per foreground launch, after database access is available. Each hook has its own failure boundary, so a failed hook does not starve later independent hooks. An overlapping launch queues one follow-up pass.
 3. Hooks may declare `id` and `requires` when registering. A failed or skipped prerequisite skips its dependents for that pass. Background reconciliation and restore-photo finalization run before automatic backup; backup is held only when either recovery hook fails in that same pass. No durable hold flag or pending-row scan controls backup.
 4. A hook that writes obtains its own `inWriteTransaction()`; it must not nest that non-reentrant boundary inside another hook transaction. Migration and theme hydration still gate the first render, while recoverable background image faults are logged and retried by the foreground sweep.
-5. `onSweepSettled(listener)` notifies subscribers once per **owning** `runLaunchSweep()` run — the call that set the running guard — after every hook of that run and any coalesced follow-up pass has settled. A re-entrant call that only queues the follow-up pass publishes nothing of its own, so a burst of overlapping launches still publishes once. A throwing hook never suppresses the notification; each listener runs in its own `try`, and the running guard is already released. The module stays free of React Native and store imports; `App.tsx` forwards the notification to the shell-refresh store's foreground tick (see App Shell).
+5. Each hook is awaited for at most `SWEEP_HOOK_TIMEOUT_MS` (38.3 D-30). Past that budget the sweep stops waiting, logs a content-free "exceeded its budget" line, marks the hook's `id` unavailable for its dependents in that pass, and continues. It never cancels or re-runs the hook's work: the late call still lands, a late rejection is logged rather than left unhandled, and a later pass skips the hook ("still running") until that call settles. A hung hook therefore cannot hold the running guard forever or starve the foreground tick.
+6. `onSweepSettled(listener)` notifies subscribers once per **owning** `runLaunchSweep()` run — the call that set the running guard — after every hook of that run and any coalesced follow-up pass has settled. A re-entrant call that only queues the follow-up pass publishes nothing of its own, so a burst of overlapping launches still publishes once. A throwing hook never suppresses the notification; each listener runs in its own `try`, and the running guard is already released. The module stays free of React Native and store imports; `App.tsx` forwards the notification to the shell-refresh store's foreground tick (see App Shell).
 
 ### Group Event schema and composed writes
 
@@ -168,6 +169,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Constant | Value | File | Purpose |
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
+| `SWEEP_HOOK_TIMEOUT_MS` | `60000` | `src/services/launch-sweep.ts` | Per-hook launch-sweep wait budget (D-30); sized for a normal automatic backup. |
 | `TARGET_VERSION` | `30` | `src/db/database.ts` | Current registered schema head, including the portable Your Week period setting. |
 
 ## Decisions
@@ -278,6 +280,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 
 | Date | Phase | What Changed |
 |------|-------|--------------|
+| 2026-09-26 | 38.3 | Bounded each launch-sweep hook with `SWEEP_HOOK_TIMEOUT_MS` so a hung hook no longer wedges later sweeps or the foreground tick; a still-running hook is skipped, never re-run (review A-WR-02, owner ruling D-30). |
 | 2026-09-25 | 38.3 | Added `onSweepSettled`: one owning-run settlement notification per launch sweep (coalesced passes publish once), forwarded by `App.tsx` to the foreground refresh tick. |
 | 2026-09-23 | 38.2 | Isolated launch hooks and image candidates, added per-pass backup recovery prerequisites, and contained recoverable background faults at boot. |
 | 2026-08-14 | 02 | Created the SQLite bootstrap, migration-1 contract, and shared write serialization. |
