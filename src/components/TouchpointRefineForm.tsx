@@ -15,6 +15,14 @@
  * LOG-06). Seeding the dialogs uses `parseLocalDateTime` (time-of-day preserved),
  * never `types.ts parseDate`.
  *
+ * VISIBLE TIMESTAMP (38.4 RG-038, ui-accessibility/AUD-UIA-018, D-07): the
+ * date/time control DISPLAYS `formatDateTimeMinuteOrFallback(occurredAt)`
+ * (12-hour AM/PM, no seconds) and exposes that same string as its
+ * accessibility value (RG-030, AUD-UIA-005); the stored value and the native
+ * picker seed keep full `HH:MM:SS` precision. Duration preset/None chips sit at
+ * the MIN_TOUCH_TARGET floor with no hitSlop, so the 8dp row gap keeps
+ * neighbouring hit regions apart (RG-030, AUD-UIA-006).
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
 import DateTimePicker, {
@@ -40,7 +48,9 @@ import {
   parseCustomDurationMinutes,
   parseLocalDateTime,
 } from "@/components/touchpoint-refine-logic";
+import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import { useTheme } from "@/theme";
+import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 
 /** The controlled refine value — every editable column of a touchpoint. */
 export interface TouchpointRefineValue {
@@ -193,6 +203,8 @@ export function TouchpointRefineForm({
 
   // Seed both dialogs from the stored occurred_at, preserving time-of-day.
   const seed = parseLocalDateTime(value.occurredAt);
+  // Display-only minute presentation; never written back (D-07).
+  const occurredAtLabel = formatDateTimeMinuteOrFallback(value.occurredAt);
 
   function set<K extends keyof TouchpointRefineValue>(
     key: K,
@@ -250,6 +262,7 @@ export function TouchpointRefineForm({
               testID={`${testID}-datetime`}
               accessibilityRole="button"
               accessibilityLabel="Correct date and time"
+              accessibilityValue={{ text: occurredAtLabel }}
               onPress={openDateTime}
               style={[
                 styles.control,
@@ -257,7 +270,7 @@ export function TouchpointRefineForm({
               ]}
             >
               <Text style={{ color: colors.textPrimary }}>
-                {value.occurredAt}
+                {occurredAtLabel}
               </Text>
             </Pressable>
             {error ? (
@@ -598,7 +611,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   chip: {
-    minHeight: 40,
+    minHeight: MIN_TOUCH_TARGET,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 14,
