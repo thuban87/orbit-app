@@ -36,10 +36,6 @@ import {
 
 const LOG_SCOPE = "settings-interactions-screen";
 
-interface SettingsInteractionsScreenProps {
-  onBack: () => void;
-}
-
 /**
  * Interactions category screen (D-09). Surfaces the Compose default message mode
  * (D-04a), the dashboard right-swipe action (D-04c), and the default interaction
@@ -49,11 +45,12 @@ interface SettingsInteractionsScreenProps {
  * its CANONICAL specialized writer `setInteractionAssistEnabled` + banner refresh
  * (D-10 / ADR-070), NEVER the generic path.
  *
+ * Back is the `ShellAppBar` header Back only (RG-037 ui-accessibility/
+ * AUD-UIA-016, D-15): no duplicate in-body Back.
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-export function SettingsInteractionsScreen({
-  onBack,
-}: SettingsInteractionsScreenProps) {
+export function SettingsInteractionsScreen() {
   const { colors } = useTheme();
   const bottomClearance = useBottomClearance();
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -173,17 +170,6 @@ export function SettingsInteractionsScreen({
           { paddingBottom: bottomClearance },
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={onBack}
-          style={styles.backLink}
-        >
-          <AppText role="caption" style={{ color: colors.accent }}>
-            Back
-          </AppText>
-        </Pressable>
-
         {renderChipSection(
           "settings-message-mode-section",
           "Default message mode",
@@ -257,11 +243,6 @@ const styles = StyleSheet.create({
   content: {
     padding: SPACING.base,
     gap: SPACING.md,
-  },
-  backLink: {
-    alignSelf: "flex-start",
-    minHeight: 44,
-    justifyContent: "center",
   },
   section: {
     gap: SPACING.md,

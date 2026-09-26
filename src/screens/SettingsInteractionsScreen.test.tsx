@@ -85,7 +85,7 @@ describe("SettingsInteractionsScreen Your Week preference", () => {
   });
 
   it("renders the current period and persists the shared key", async () => {
-    const tree = nodes(SettingsInteractionsScreen({ onBack: vi.fn() }));
+    const tree = nodes(SettingsInteractionsScreen());
     const rolling = tree.find(
       (node) =>
         node.props.testID === "settings-your-week-period-section-rolling7",
@@ -108,7 +108,7 @@ describe("SettingsInteractionsScreen Your Week preference", () => {
   });
 
   it("re-reads the shared preference whenever the screen gains focus", async () => {
-    SettingsInteractionsScreen({ onBack: vi.fn() });
+    SettingsInteractionsScreen();
     expect(mocks.focusEffect).toBeTypeOf("function");
     mocks.focusEffect?.();
     await Promise.resolve();

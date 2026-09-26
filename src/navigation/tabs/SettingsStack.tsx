@@ -111,12 +111,6 @@ function AIPreviewRoute({ navigation }: SettingsScreenProps<"AIPreview">) {
   return <AIPreviewScreen onBack={() => navigation.goBack()} />;
 }
 
-function SettingsInteractionsRoute({
-  navigation,
-}: SettingsScreenProps<"SettingsInteractions">) {
-  return <SettingsInteractionsScreen onBack={() => navigation.goBack()} />;
-}
-
 function SettingsAppearanceRoute({
   navigation,
 }: SettingsScreenProps<"SettingsAppearance">) {
@@ -145,10 +139,15 @@ function SettingsAIRoute({ navigation }: SettingsScreenProps<"SettingsAI">) {
   return <SettingsAIScreen onBack={() => navigation.goBack()} />;
 }
 
-function SettingsAboutRoute({
-  navigation,
-}: SettingsScreenProps<"SettingsAbout">) {
-  return <SettingsAboutScreen onBack={() => navigation.goBack()} />;
+// Header-chrome Settings children own a single Back: the ShellAppBar header
+// Back (RG-037 ui-accessibility/AUD-UIA-016, D-15). Their wrappers pass no
+// `onBack`; the header routes through `resolveBackIntent` (SHELL-03).
+function SettingsInteractionsRoute() {
+  return <SettingsInteractionsScreen />;
+}
+
+function SettingsAboutRoute() {
+  return <SettingsAboutScreen />;
 }
 
 // Backup is Settings-only after Phase 38. These wrappers host the same canonical

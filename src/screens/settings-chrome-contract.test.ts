@@ -29,9 +29,7 @@ function registeredScreenFiles(): string[] {
   const importPattern = /from "@\/((?:screens|components)\/[A-Za-z0-9_/]+)"/g;
   for (const match of STACK_SOURCE.matchAll(importPattern)) {
     const base = join(ROOT, "src", match[1]);
-    const file = [`${base}.tsx`, `${base}.ts`].find((path) =>
-      existsSync(path),
-    );
+    const file = [`${base}.tsx`, `${base}.ts`].find((path) => existsSync(path));
     if (file) files.push(file);
   }
   return files;
