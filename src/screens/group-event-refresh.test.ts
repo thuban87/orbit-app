@@ -603,3 +603,29 @@ describe("committed removals hide stale rows until a successful refresh (38.3 re
     expect(refreshed.committedRemovedIds).toEqual([]);
   });
 });
+
+describe("EditGroupEventScreen clears a stale failure when a later write starts (38.3 review A-WR-04, D-04)", () => {
+  const source = readFileSync(
+    new URL("./EditGroupEventScreen.tsx", import.meta.url),
+    "utf8",
+  );
+  function body(name: string): string {
+    const start = source.indexOf(`function ${name}(`);
+    expect(start).toBeGreaterThan(-1);
+    const next = source.indexOf("\n  }\n", start);
+    return source.slice(start, next);
+  }
+
+  it.each(["removeParticipant", "saveParticipant", "saveEvent"])(
+    "%s clears the previous error before its write",
+    (name) => {
+      expect(body(name)).toContain("setError(null)");
+    },
+  );
+
+  it("a committed participant add clears the previous error", () => {
+    const add = body("addSelected");
+    const committed = add.slice(add.indexOf("onCommitted"));
+    expect(committed).toContain("setError(null)");
+  });
+});

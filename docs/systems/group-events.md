@@ -200,3 +200,4 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 | 2026-09-25 | 38.3 | Override value edits persist in both participant editors (RG-019, reliability-testing/AUD-REL-006). |
 | 2026-09-25 | 38.3 | Draft-preserving participant refresh + commit-vs-read recovery (RG-019). |
 | 2026-09-26 | 38.3 | Participant remove mirrors the add recovery: `runParticipantRemove` latches Delete/Keep against double taps, reports only a rejected first write as "not saved", and hides committed-removed rows until a successful refresh so a stale Edit/Remove cannot hit a departed child (review A-WR-03, D-04). |
+| 2026-09-26 | 38.3 | Edit Group Event clears its failure caption when a later participant add, remove, edit or save starts, so a stale "not saved" never sits beside a fresh success (review A-WR-04). |

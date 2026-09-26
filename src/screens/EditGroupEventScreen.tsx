@@ -170,8 +170,11 @@ export function EditGroupEventScreen({
           })),
           now: localDateTime(),
         }),
-      onCommitted: () =>
-        dispatch({ type: "participantsCommitted", contactIds }),
+      onCommitted: () => {
+        // A stale failure must not sit beside a fresh success (A-WR-04, D-04).
+        setError(null);
+        dispatch({ type: "participantsCommitted", contactIds });
+      },
       refresh: refreshEvent,
     });
   }
@@ -182,6 +185,7 @@ export function EditGroupEventScreen({
   async function removeParticipant(keep: boolean) {
     const target = removing;
     if (!target) return;
+    setError(null);
     setRemovePending(true);
     const result = await runParticipantRemove({
       latch: removeLatch.current,
@@ -218,6 +222,7 @@ export function EditGroupEventScreen({
     if (!editing || !participantDraftState || !event) return;
     const initial = participantDraft(editing, event);
     const draftParticipant = participantDraftState;
+    setError(null);
     try {
       await saveParticipantEdits(getExecutor(), {
         interactionId: editing.interactionId,
