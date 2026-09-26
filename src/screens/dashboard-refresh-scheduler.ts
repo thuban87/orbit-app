@@ -38,6 +38,23 @@ const DEFERRABLE_WHILE_HIDDEN: ReadonlySet<DashboardRefreshSource> = new Set([
   "foreground",
 ]);
 
+/**
+ * Home's visibility for the scheduler (38.3 review A-WR-01, D-23). Navigation
+ * focus alone stays `true` while the app sits in the background with Home as
+ * the focused route, so a warm notification Mark/Snooze's shell tick ran the
+ * full Home read in the background. `appState` is react-native's synchronous
+ * `AppState.currentState` (not a React-state mirror, which would lag the
+ * post-sweep foreground tick on resume and drop the D-14 read). Only the
+ * background hides Home: `inactive` is a transient overlay with no resume
+ * sweep after it, so a tick there must still read.
+ */
+export function isDashboardVisible(
+  focused: boolean,
+  appState: string | null | undefined,
+): boolean {
+  return focused && appState !== "background";
+}
+
 export interface DashboardRefreshScheduler {
   /** Issue a read and return its token, or `null` when deferred while hidden. */
   request(source: DashboardRefreshSource): number | null;

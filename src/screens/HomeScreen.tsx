@@ -152,6 +152,7 @@ import {
   type DashboardReadSinks,
   type DashboardRefreshScheduler,
   type DashboardRefreshSource,
+  isDashboardVisible,
   publishDashboardRead,
 } from "@/screens/dashboard-refresh-scheduler";
 import { reconcileSchedule } from "@/services/notifications/notification-schedule";
@@ -879,13 +880,17 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
 
   // ONE scheduler + publication authority for every Home read (RG-022, D-23).
   // Created once; `isVisible` defers shell/foreground reads while Home is hidden
-  // (the next focus read covers them). The debug marker names only the trigger.
+  // or the app is backgrounded (the next focus / foreground read covers them). The debug marker names only the trigger.
   if (schedulerRef.current === null) {
     schedulerRef.current = createDashboardRefreshScheduler({
       read: (token, source) => {
         void readRef.current(token, source);
       },
-      isVisible: () => isFocusedRef.current,
+      // Focus AND not backgrounded (review A-WR-01): a warm notification
+      // action's shell tick must not read while the app is in the background;
+      // the post-sweep foreground tick reads on resume.
+      isVisible: () =>
+        isDashboardVisible(isFocusedRef.current, AppState.currentState),
       log: (source) => Logger.debug(LOG_SCOPE, "dashboard read bundle", source),
     });
   }

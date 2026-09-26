@@ -16,6 +16,7 @@ import {
   createDashboardRefreshScheduler,
   type DashboardReadOutcome,
   type DashboardRefreshSource,
+  isDashboardVisible,
   publishDashboardRead,
 } from "@/screens/dashboard-refresh-scheduler";
 
@@ -419,5 +420,34 @@ describe("reload dependencies exclude animation/lifecycle state", () => {
     // Query/search changes must still re-issue the focus read.
     expect(names).toContain("debouncedSearchText");
     expect(names).toContain("query");
+  });
+});
+
+describe("isDashboardVisible — backgrounded Home defers reads (38.3 review A-WR-01, D-23)", () => {
+  it("is hidden while the app is backgrounded even with Home still the focused route", () => {
+    expect(isDashboardVisible(true, "background")).toBe(false);
+  });
+
+  it("is visible only when Home is focused and the app is not backgrounded", () => {
+    expect(isDashboardVisible(true, "active")).toBe(true);
+    expect(isDashboardVisible(false, "active")).toBe(false);
+    // `inactive` is a transient overlay state, not the background (no resume
+    // sweep follows it), so a shell tick there must still read.
+    expect(isDashboardVisible(true, "inactive")).toBe(true);
+  });
+
+  it("a shell or foreground request while backgrounded issues no read", () => {
+    let appState = "background";
+    const reads: DashboardRefreshSource[] = [];
+    const scheduler = createDashboardRefreshScheduler({
+      read: (_token, source) => reads.push(source),
+      isVisible: () => isDashboardVisible(true, appState),
+    });
+    expect(scheduler.request("shell")).toBeNull();
+    expect(scheduler.request("foreground")).toBeNull();
+    expect(reads).toEqual([]);
+    appState = "active";
+    expect(scheduler.request("foreground")).not.toBeNull();
+    expect(reads).toEqual(["foreground"]);
   });
 });
