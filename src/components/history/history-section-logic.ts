@@ -219,3 +219,55 @@ export function historyDayAfterNext(
     followingToday: window.start <= state.today && state.today <= window.end,
   };
 }
+
+/**
+ * A globally persisted History preference (lens / cycle preset) as one mounted
+ * History holds it (38.3 review A-WR-08). History re-reads settings on every
+ * Profile revision; re-publishing the persisted value from each read let a
+ * read that started before the settings write committed revert the user's
+ * choice, and a failed write was silently reverted by the next re-read.
+ *
+ * `userGen` is a monotonic count of local choices (never reset, so a late
+ * failure of an old write can never match a newer choice). `held` is true
+ * while a local choice is outstanding; only when it is false may a read adopt
+ * the persisted value.
+ */
+export interface PersistedPref<T> {
+  readonly value: T;
+  readonly userGen: number;
+  readonly held: boolean;
+}
+
+export function initialPersistedPref<T>(value: T): PersistedPref<T> {
+  return { value, userGen: 0, held: false };
+}
+
+/** A read adopts the persisted value only while no local choice is held. */
+export function persistedPrefOnRead<T>(
+  pref: PersistedPref<T>,
+  persisted: T,
+): PersistedPref<T> {
+  return pref.held ? pref : { ...pref, value: persisted };
+}
+
+/** A local choice wins over every later read in this mount. */
+export function persistedPrefOnUserChange<T>(
+  pref: PersistedPref<T>,
+  next: T,
+): PersistedPref<T> {
+  return { value: next, userGen: pref.userGen + 1, held: true };
+}
+
+/**
+ * The write for choice `gen` failed. If no newer choice superseded it, revert
+ * to `previous` explicitly and let reads adopt the persisted truth again.
+ */
+export function persistedPrefOnWriteFailed<T>(
+  pref: PersistedPref<T>,
+  gen: number,
+  previous: T,
+): PersistedPref<T> {
+  return pref.held && pref.userGen === gen
+    ? { value: previous, userGen: pref.userGen, held: false }
+    : pref;
+}

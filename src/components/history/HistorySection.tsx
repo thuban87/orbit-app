@@ -42,7 +42,7 @@
  */
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { GroupTitlePromptSheet } from "@/components/group/GroupTitlePromptSheet";
 import type { HeatmapCellTarget } from "@/components/history/ActivityHeatmap";
@@ -62,7 +62,12 @@ import {
   historyReadStateOnStart,
   initialHistoryDayState,
   initialHistoryReadState,
+  initialPersistedPref,
   isEmptyHistory,
+  type PersistedPref,
+  persistedPrefOnRead,
+  persistedPrefOnUserChange,
+  persistedPrefOnWriteFailed,
   resolveActiveWindow,
 } from "@/components/history/history-section-logic";
 import { IntensityChart } from "@/components/history/IntensityChart";
@@ -178,8 +183,31 @@ export function HistorySection({
   );
   const { today, refDate } = day;
 
-  const [lens, setLens] = useState<HistoryLens>("cycles");
-  const [cycleCount, setCycleCount] = useState<HistoryCycleCount>(10);
+  // 38.3 review A-WR-08: the persisted lens/preset are adopted from reads only
+  // while no local choice is outstanding, so a revision re-read that started
+  // before the settings write committed can never revert the user's choice.
+  // Each pref is mirrored in a ref so handlers read the committed value.
+  const [lensPref, setLensPref] = useState<PersistedPref<HistoryLens>>(() =>
+    initialPersistedPref<HistoryLens>("cycles"),
+  );
+  const lensPrefRef = useRef(lensPref);
+  const commitLensPref = useCallback((next: PersistedPref<HistoryLens>) => {
+    lensPrefRef.current = next;
+    setLensPref(next);
+  }, []);
+  const [cyclePref, setCyclePref] = useState<PersistedPref<HistoryCycleCount>>(
+    () => initialPersistedPref<HistoryCycleCount>(10),
+  );
+  const cyclePrefRef = useRef(cyclePref);
+  const commitCyclePref = useCallback(
+    (next: PersistedPref<HistoryCycleCount>) => {
+      cyclePrefRef.current = next;
+      setCyclePref(next);
+    },
+    [],
+  );
+  const lens = lensPref.value;
+  const cycleCount = cyclePref.value;
   const [readState, setReadState] = useState<HistoryReadState<ContactHistory>>(
     initialHistoryReadState,
   );
@@ -206,8 +234,12 @@ export function HistorySection({
         readContactHistory(exec, contactId),
       ]);
       if (!authority.isCurrent(token)) return;
-      setLens(settings.historyLens);
-      setCycleCount(settings.historyCycleCount);
+      commitLensPref(
+        persistedPrefOnRead(lensPrefRef.current, settings.historyLens),
+      );
+      commitCyclePref(
+        persistedPrefOnRead(cyclePrefRef.current, settings.historyCycleCount),
+      );
       setReadState((current) => historyReadStateOnPublish(current, next));
     } catch {
       if (!authority.isCurrent(token)) return;
@@ -215,7 +247,7 @@ export function HistorySection({
       Logger.error(LOG_SCOPE, "failed to read contact history");
       setReadState(historyReadStateOnFail);
     }
-  }, [authority, contactId]);
+  }, [authority, commitCyclePref, commitLensPref, contactId]);
 
   // Revision-driven read (38.3 RG-024): runs on mount (which also covers
   // expand-after-collapse) and on every parent Profile publication. There is
@@ -231,23 +263,53 @@ export function HistorySection({
   }, [load, revision]);
 
   // --- Persisted lens / preset (global app_settings, never per-contact) ------
-  const onLensChange = useCallback((next: HistoryLens) => {
-    setLens(next);
-    setDay(historyDayAfterLensChange);
-    void updateAppSettings(
-      getExecutor(),
-      { historyLens: next },
-      localDateTime(),
-    );
-  }, []);
-  const onPresetChange = useCallback((next: HistoryCycleCount) => {
-    setCycleCount(next);
-    void updateAppSettings(
-      getExecutor(),
-      { historyCycleCount: next },
-      localDateTime(),
-    );
-  }, []);
+  // A failed write logs content-free and reverts explicitly (never silently via
+  // a later re-read), unless a newer choice has superseded it.
+  const onLensChange = useCallback(
+    (next: HistoryLens) => {
+      const previous = lensPrefRef.current.value;
+      const changed = persistedPrefOnUserChange(lensPrefRef.current, next);
+      commitLensPref(changed);
+      setDay(historyDayAfterLensChange);
+      updateAppSettings(
+        getExecutor(),
+        { historyLens: next },
+        localDateTime(),
+      ).catch(() => {
+        Logger.error(LOG_SCOPE, "failed to persist history lens");
+        commitLensPref(
+          persistedPrefOnWriteFailed(
+            lensPrefRef.current,
+            changed.userGen,
+            previous,
+          ),
+        );
+      });
+    },
+    [commitLensPref],
+  );
+  const onPresetChange = useCallback(
+    (next: HistoryCycleCount) => {
+      const previous = cyclePrefRef.current.value;
+      const changed = persistedPrefOnUserChange(cyclePrefRef.current, next);
+      commitCyclePref(changed);
+      updateAppSettings(
+        getExecutor(),
+        { historyCycleCount: next },
+        localDateTime(),
+      ).catch(() => {
+        Logger.error(LOG_SCOPE, "failed to persist history cycle preset");
+        commitCyclePref(
+          persistedPrefOnWriteFailed(
+            cyclePrefRef.current,
+            changed.userGen,
+            previous,
+          ),
+        );
+      });
+    },
+    [commitCyclePref],
+  );
 
   // --- The one shared window everything reads --------------------------------
   const interactions = useMemo(() => history?.interactions ?? [], [history]);

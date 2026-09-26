@@ -25,7 +25,11 @@ import {
   historyReadStateOnStart,
   initialHistoryDayState,
   initialHistoryReadState,
+  initialPersistedPref,
   isEmptyHistory,
+  persistedPrefOnRead,
+  persistedPrefOnUserChange,
+  persistedPrefOnWriteFailed,
   resolveActiveWindow,
 } from "@/components/history/history-section-logic";
 import type { CycleBlock } from "@/services/history/cycles";
@@ -317,5 +321,54 @@ describe("history day state — D-12 follow-today (38.3 RG-024)", () => {
       refDate: "2026-09-25",
       followingToday: true,
     });
+  });
+});
+
+describe("persisted History lens/preset (38.3 review A-WR-08)", () => {
+  it("adopts the persisted value from reads until the user makes a choice", () => {
+    let pref = initialPersistedPref("cycles");
+    pref = persistedPrefOnRead(pref, "7days");
+    expect(pref.value).toBe("7days");
+    pref = persistedPrefOnRead(pref, "month");
+    expect(pref.value).toBe("month");
+  });
+
+  it("a revision re-read that started before the write committed never reverts the user's choice", () => {
+    let pref = persistedPrefOnRead(initialPersistedPref("cycles"), "cycles");
+    pref = persistedPrefOnUserChange(pref, "month");
+    // A read snapshotted before the settings write lands with the old value.
+    pref = persistedPrefOnRead(pref, "cycles");
+    expect(pref.value).toBe("month");
+  });
+
+  it("a failed write reverts to the previous value and lets reads adopt the persisted truth again", () => {
+    let pref = persistedPrefOnRead(initialPersistedPref("cycles"), "cycles");
+    const change = persistedPrefOnUserChange(pref, "month");
+    pref = persistedPrefOnWriteFailed(change, change.userGen, "cycles");
+    expect(pref.value).toBe("cycles");
+    pref = persistedPrefOnRead(pref, "7days");
+    expect(pref.value).toBe("7days");
+  });
+
+  it("a failed OLDER write never reverts a newer choice", () => {
+    let pref = persistedPrefOnRead(initialPersistedPref("cycles"), "cycles");
+    const first = persistedPrefOnUserChange(pref, "month");
+    const second = persistedPrefOnUserChange(first, "7days");
+    pref = persistedPrefOnWriteFailed(second, first.userGen, "cycles");
+    expect(pref).toEqual(second);
+  });
+});
+
+describe("persisted History pref generations never collide (38.3 review A-WR-08)", () => {
+  it("a late failure of an old write cannot revert a choice made after an earlier revert", () => {
+    let pref = persistedPrefOnRead(initialPersistedPref("cycles"), "cycles");
+    const first = persistedPrefOnUserChange(pref, "month");
+    const second = persistedPrefOnUserChange(first, "7days");
+    pref = persistedPrefOnWriteFailed(second, second.userGen, "month");
+    const third = persistedPrefOnUserChange(pref, "cycles");
+    // The first write's failure lands last: it must not touch the newest choice.
+    expect(persistedPrefOnWriteFailed(third, first.userGen, "cycles")).toEqual(
+      third,
+    );
   });
 });
