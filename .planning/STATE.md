@@ -5,11 +5,11 @@ milestone_name: Release Readiness
 current_phase: 38.4
 current_phase_name: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
 status: executing
-stopped_at: Completed 38.4-02-PLAN.md
-last_updated: "2026-09-26T18:11:43.813Z"
+stopped_at: "38.4-03 checkpoint: D-24 STOP on accentText (Task 2 partial committed; Task 3 not started)"
+last_updated: "2026-09-26T18:32:45.569Z"
 last_activity: 2026-09-26
-last_activity_desc: "38.4-02 complete — settled Orrery switch compacts UI-thread choreography; settled publications replace resources; worklet forward-ref scan (RG-027)"
-state_head: d997f17c2a5973d684ca082a99a58e3de0fc5fd6
+last_activity_desc: 38.4-02 complete — settled Orrery switch compacts UI-thread choreography; settled publications replace resources; worklet forward-ref scan (RG-027)
+state_head: bbfb8c6c019acff793c1ff64fde0bdafedab4cf1
 progress:
   total_phases: 26
   completed_phases: 17
@@ -841,6 +841,8 @@ Foundational decisions affecting current work:
   build-blocking hooks are in place. Build **only** via `npm run graph:build` — the stock
   `graphify build` silently corrupts the graph and is blocked at the harness layer.
 
+- 38.4-03 D-24 STOP: accentText Standard-Light glass variants for aurora-teal and emerald need HSL L < 12% (owner decision; see 38.4-RG029-INVENTORY.md §3). Plan 03 Task 3 and dependents halted.
+
 ## Deferred Items
 
 For v2.0, the hand-off lists are REQUIREMENTS.md "Out of Scope" + "Deferred-planning phases" and each
@@ -878,11 +880,11 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-26T18:11:35.093Z
-**Stopped at:** Completed 38.4-02-PLAN.md
+**Last session:** 2026-09-26T18:32:36.897Z
+**Stopped at:** 38.4-03 checkpoint: D-24 STOP on accentText (Task 2 partial committed; Task 3 not started)
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
-**Resume file:** None
+**Resume file:** .planning/phases/38.4-audit-remediation-ui-performance-release/38.4-RG029-INVENTORY.md
 are archived under `.planning/milestones/v1.0-phases/`.)
 
 ## Phase 4 — Closeout (2026-08-15) ✅ COMPLETE
