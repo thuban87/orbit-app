@@ -165,7 +165,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 ### Refreshing visible surfaces after writes and resumes
 
 1. The shell-refresh store carries two independent counters. Neither is driven by a timer, and there is no general event bus.
-   - **Shell tick** (`bumpShellRefresh` / `useShellRefresh`) is for in-process committed writes. Its current publishers are Quick Log and Undo, Dashboard bulk actions, category management, and warm notification Mark/Snooze. Phase 38.3 is extending the set to assist, History delete, and Post-Log note writes.
+   - **Shell tick** (`bumpShellRefresh` / `useShellRefresh`) is for in-process committed writes. Its current publishers are Quick Log and Undo, Dashboard bulk actions, category management, warm notification Mark/Snooze, committed Interaction Assist confirmations (banner, pending sheet and Compose, via `src/services/assist-commit.ts`), and the Post-Log editor's note and Memory writes. Phase 38.3 is extending the set to History delete.
    - **Foreground tick** (`publishForegroundRefresh` / `useForegroundRefresh`) is published once per owning launch-sweep run: the cold start, or a real background-to-active return. It fires after that run's purge and expiry writes have settled.
 2. The ready-gated application effect registers `onSweepSettled(publishForegroundRefresh)` before `installSweepTrigger`, so the cold-start sweep publishes too. The effect cleanup removes the registration.
 3. A notification Mark or Snooze handled in a live process bumps the shell tick after its write commits, so a visible Digest, Home or Profile converges. On a killed-app headless launch nothing is subscribed, so the bump does nothing. A replayed action, an Unbound Snooze no-op, or a failed write publishes nothing.
@@ -475,3 +475,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-02 | 38 | Replaced the four-tab shell with Contacts, Events, Digest, Orrery, and Settings; made Digest the default root, removed the Backup tab, and moved external Digest routing to the semantic tab root. |
 | 2026-09-19 | 38.1 | Registered Profile-origin knowledge editors across their host stacks and documented the Orrery-specific overlay surface exception. |
 | 2026-09-25 | 38.3 | Foreground refresh tick + warm notification publication: added a sweep-ordered foreground tick beside the shell tick, a shell tick for warm notification Mark/Snooze, and the shared latest-request authority consumer rule. |
+| 2026-09-25 | 38.3 | Shell-tick publisher list updated: Interaction Assist confirmations and Post-Log note/Memory writes now publish it (RG-023, D-21). |

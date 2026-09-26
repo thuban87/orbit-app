@@ -34,6 +34,7 @@ import {
   resolvePostCreateMemoryTarget,
   resolvePostLogSave,
 } from "@/screens/post-log-note-logic";
+import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
@@ -150,6 +151,9 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         duration: seed.duration,
         allowAi: seed.allowAi,
       });
+      // 38.3 D-21: publish the committed note to foreground consumers (Profile,
+      // History, Dashboard) before closing — same shell tick as the Quick Log.
+      bumpShellRefresh();
       onClose();
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to save interaction note", err);
@@ -179,6 +183,9 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         createdAt: now,
         now,
       });
+      // 38.3 D-21: published BEFORE the re-read so a failed re-read cannot
+      // suppress the signal for a Memory that already committed.
+      bumpShellRefresh();
       // The Memory now durably exists — creation is TERMINAL (review WR-02). A
       // null re-read must NOT fall back to the re-submittable Add-Note surface
       // (that allowed a duplicate on a second tap); close instead.
@@ -207,6 +214,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
           ...patch,
           now: localDateTime(),
         });
+        bumpShellRefresh();
         const row = await reReadCreatedMemory(id, contactId);
         setCreatedMemory(row);
         return true;
@@ -228,7 +236,10 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     (id: number) => {
       if (contactId === null) return;
       void deleteMemory(getExecutor(), { id, contactId, now: localDateTime() })
-        .then(() => onClose())
+        .then(() => {
+          bumpShellRefresh();
+          onClose();
+        })
         .catch((err) =>
           Logger.error(LOG_SCOPE, "failed to delete memory", err),
         );
@@ -242,9 +253,11 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         id,
         contactId,
         now: localDateTime(),
-      }).catch((err) =>
-        Logger.error(LOG_SCOPE, "failed to restore memory", err),
-      );
+      })
+        .then(() => bumpShellRefresh())
+        .catch((err) =>
+          Logger.error(LOG_SCOPE, "failed to restore memory", err),
+        );
     },
     [contactId],
   );
@@ -256,9 +269,11 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
         contactId,
         allow,
         now: localDateTime(),
-      }).catch((err) =>
-        Logger.error(LOG_SCOPE, "failed to set memory AI permission", err),
-      );
+      })
+        .then(() => bumpShellRefresh())
+        .catch((err) =>
+          Logger.error(LOG_SCOPE, "failed to set memory AI permission", err),
+        );
     },
     [contactId],
   );

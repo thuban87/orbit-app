@@ -1,8 +1,8 @@
 # Interaction Assist & Reach Out
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 37-settings-personalization
-**Owners:** `src/db/interaction-assist-dao.ts`, `src/db/interaction-assist-read.ts`, `src/logic/assist-eligibility.ts`, `src/services/reach-out/handoff.ts`, `src/services/interaction-assist-sweep.ts`, `src/stores/assist-store.ts`, `src/components/ReachOutRouter.tsx`, `src/components/EndpointSelector.tsx`, `src/components/AssistBanner.tsx`, `src/components/AssistConfirmation.tsx`, `src/components/PendingConfirmationsSheet.tsx`
+**Last updated:** 2026-09-25
+**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Owners:** `src/services/assist-commit.ts`, `src/db/interaction-assist-dao.ts`, `src/db/interaction-assist-read.ts`, `src/logic/assist-eligibility.ts`, `src/services/reach-out/handoff.ts`, `src/services/interaction-assist-sweep.ts`, `src/stores/assist-store.ts`, `src/components/ReachOutRouter.tsx`, `src/components/EndpointSelector.tsx`, `src/components/AssistBanner.tsx`, `src/components/AssistConfirmation.tsx`, `src/components/PendingConfirmationsSheet.tsx`
 
 ## Purpose
 
@@ -37,7 +37,8 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | Logic | `src/logic/assist-eligibility.ts` | Pure 15s/24h local-wall-clock eligibility + newest-eligible banner selection. |
 | Service | `src/services/reach-out/handoff.ts` | `performReachOut`: shared write-before-launch handoff that returns launch status and the created assist UID when one exists. |
 | Service | `src/services/interaction-assist-sweep.ts` | Foreground launch-sweep: 24h expiry of pending rows + 30-day prune of terminal rows. |
-| Store | `src/stores/assist-store.ts` | SQLite-backed eligible-queue state; refreshes only on a real background→active return. |
+| Service | `src/services/assist-commit.ts` | The shared confirmation contract: `runAssistAction` (synchronous in-flight latch, typed failure classification) and the post-commit publishers `publishAssistCommit` (widget + shell tick + queue) / `publishAssistDismissal` (queue). Node-testable; callers inject the real side effects. |
+| Store | `src/stores/assist-store.ts` | SQLite-backed eligible-queue state; refreshed at launch, on a real background→active return, and after every committed confirm/dismiss. Only the most recently started refresh may publish (latest-request authority). |
 
 ### Key Files
 
@@ -46,8 +47,8 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | `src/db/migrations/014-interaction-assists.ts` | Creates `interaction_assists` (+ pending index, FK cascade) and the settings column. |
 | `src/components/ReachOutRouter.tsx` | Themed channel chooser; hides on no-route, launches directly on one endpoint, opens the selector on many. |
 | `src/components/EndpointSelector.tsx` | Scrollable phone/email chooser with the primary method emphasized. |
-| `src/components/AssistBanner.tsx` | App-global non-modal overlay; owns the confirm/dismiss DB writes and widget invalidation. |
-| `src/components/AssistConfirmation.tsx` | Presentational attestation controls (Yes / No answer / Don't log) + optional Notes expander. |
+| `src/components/AssistBanner.tsx` | App-global non-modal overlay; runs confirm/dismiss through the shared `assist-commit` runner and publishers. |
+| `src/components/AssistConfirmation.tsx` | Presentational attestation controls (Yes / No answer / Don't log) + optional Notes expander; disabled while the owner's write is `pending`. |
 | `src/components/PendingConfirmationsSheet.tsx` | Transient multi-item pending-queue review surface. |
 | `src/screens/ComposeScreen.tsx` | Compose-attached Yes / Not yet panel that supplements, never replaces, the durable queue surfaces. |
 | `src/screens/SettingsInteractionsScreen.tsx` | Hosts the toggle through the specialized queue-clearing settings writer. |
@@ -65,7 +66,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 ### Compose-attached confirmation
 
 1. `ComposeScreen` presents `Did you send it?` only when `performReachOut()` reports both a started handoff and an assist UID.
-2. `Yes, log interaction` calls `markAssistLogged()` with that UID and `connected: 1`; the DAO re-reads the pending row and writes at its original `handoff_at` through the sole recency writer.
+2. `Yes, log interaction` calls `markAssistLogged()` with that UID and `connected: 1` through the shared `runAssistAction`; the DAO re-reads the pending row and writes at its original `handoff_at` through the sole recency writer. After the commit it publishes through `publishAssistCommit` (widget, shell tick, queue) before leaving Compose.
 3. `Not yet` closes only the local panel and preserves the Compose session. It does not dismiss the assist, leaving the app-global banner and pending-confirmations sheet available after navigation, process death, or the 24-hour window.
 
 ### Returning and confirming
@@ -74,6 +75,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 2. `AssistConfirmation` offers, for Call: **Yes** (`connected=1`), **No answer** (`connected=0`, still logs), **Don't log**; for Text/Email: **Yes**, **Don't log**. An optional Notes expander (default closed) rides on any confirmation that writes an interaction.
 3. **Yes / No answer** call `markAssistLogged`, which re-reads the assist row **inside** one transaction, inserts a single outbound interaction at `handoff_at` via `insertInteractionCore`, recomputes recency via `recomputeLastContactCore` (the sole `last_contact` writer), then flips the assist to `logged`. **Don't log** calls `markAssistDismissed` — no interaction. (See ADR-071; the write path composes the cores from `src/db/data-revision-dao.ts`.)
 4. The banner exposes `PendingConfirmationsSheet` for multiple pending items; resolving the last one leaves the sheet in a calm empty state.
+5. **One publication and failure contract (38.3 RG-023).** Banner, sheet and Compose all run the write through `runAssistAction` in `src/services/assist-commit.ts`. A committed confirmation publishes widget notify, the shell refresh tick and an assist-queue refresh; a dismissal refreshes the queue only. A write failure shows an Alert and leaves the assist pending; a publication failure after the commit is logged, never reported as a failed log.
 
 ### Lifecycle housekeeping
 
@@ -106,7 +108,11 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 1. **All four DAO writers must stay inside `inWriteTransaction`.** `markAssistDismissed`/`markAssistFailed` originally issued bare `UPDATE`s (review WR-01); on the single shared connection a bare write executes inside whatever transaction the launch sweep is holding and is lost if that transaction rolls back. Fixed in-phase — both now wrap in the shared mutex like `createPendingAssist`/`markAssistLogged`. Never reintroduce a bare assist write.
 2. **The banner intentionally shows assists for archived contacts.** `ELIGIBILITY_SQL` has no `archived_at IS NULL` gate — dossier Cluster Z decided that a contact archived while an assist is pending can still be confirmed. This is deliberate, not the same as the widget guard (which blocks a *new* reach to an archived target). Do not "fix" it by adding the filter.
 3. **A method-less contact tapped via the widget strands `openReachOut`.** `ContactProfileScreen` clears the param only when `hasReachRoute` is true, so a widget "Contact" tap on a favourite with no phone/email opens nothing and leaves the param set (review IN-02, owner-deferred). Clearing it unconditionally is the recommended fix.
-4. **Confirm/dismiss handlers have no try/catch** (review IN-03, backlog): a rejected `markAssistLogged`/`markAssistDismissed` (e.g. the LOG-06 future-`handoff_at` guard on a backward clock) is currently an unhandled rejection. Mirror `doLogContact`'s Alert if you touch these.
+4. **Every confirm/dismiss goes through `runAssistAction` in `src/services/assist-commit.ts`** (38.3 RG-023; D-04, D-08, D-21; closes Phase 21 IN-03 and `react-native/AUD-RN-013`). Banner, pending sheet and Compose share it. Its rules:
+   - A rejected write shows an Alert, and the assist stays pending: the DAO guard fires before the transaction opens, or the transaction rolls back. The ADR-071 future-`handoff_at` (clock-rollback) guard throws the typed `FutureOccurredAtError` from `src/db/log-guards.ts` (same message text) and gets its own "Check your device clock" copy; anything else gets the generic copy.
+   - A synchronous in-flight latch blocks double taps on Yes / No answer / Don't log (per surface; per assist in the sheet), released in `finally`. `AssistConfirmation` disables its controls while `pending` and awaits its handlers instead of dropping rejections with `void`.
+   - Publication (widget + queue + shell tick) runs only after the commit, each step isolated, and never rejects — a committed write is never presented as failed or invited to replay (D-04).
+   - Do not bypass the runner with a direct DAO call from a new surface, and do not change the guard, the handoff-time timestamp or the pending recheck (ADR-071).
 5. **`endpoint_value` is not history.** It exists only to perform the handoff; the interaction row records the coarse `channel` only. Do not add endpoint/provider columns to `interactions` — that is explicitly out of scope.
 6. **Failed = the native launch threw**, not "the user didn't send." `expo-sms` returns `unknown` on Android and `tel:`/`mailto:` only report that some app can handle them, so "sent" is never observable — confirmation is user attestation.
 7. **Not yet is not Don't log.** The Compose panel must not call `markAssistDismissed`; durable dismissal remains available from the pending-confirmations sheet.
@@ -128,3 +134,4 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | 2026-08-31 | 21-interaction-assist-reach-out | New subsystem: migration 014 `interaction_assists` + `interaction_assist_enabled`; shared Reach Out router + native handoff; app-global assist banner; durable lifecycle (cap-5 / 15s–24h / 30-day sweep); attestation logging through the sole recency writer; merge/purge wiring; widget `Contact` deep-link. |
 | 2026-09-02 | 35 | Added the Compose-attached confirmation panel while preserving the banner, sheet, dismissal path, and handoff-time interaction write. |
 | 2026-09-02 | 37 | Moved the toggle to Interactions and preserved its specialized opt-out writer and banner refresh. |
+| 2026-09-25 | 38.3 | Shared assist publisher + RN-013 failure handling (RG-023): banner, pending sheet and Compose share `assist-commit.ts` (latched runner, widget + queue + shell-tick publication that never reports a post-commit failure, Alert on write failure with typed clock-rollback copy); the queue refresh is latest-request gated. |

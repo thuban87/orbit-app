@@ -1,7 +1,7 @@
 # Interaction Log
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 33-group-interaction-logging
+**Last updated:** 2026-09-25
+**Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`, `src/services/quick-log-command.ts`, `src/db/bulk-actions-dao.ts`, `src/db/interaction-vocabulary.ts`
 
 ## Purpose
@@ -90,6 +90,7 @@ All log data lives in local SQLite. A touchpoint is distinct from a lifecycle ev
 
 1. The universal FAB and Dashboard List right-swipe action both select the current Profile contact or canonical picker as needed, then run `runQuickLog()` with established outbound, connected, manual defaults and the resolved ordinary Channel preference.
 2. The shared command shows success, Undo, and Add Note only after `recordTouchpoint()` resolves. Undo calls `deleteTouchpoint()` with both the interaction and contact IDs; Add Note opens a post-log editor bound to the committed row; a failed write or undo shows retryable feedback rather than a false success.
+   - The post-log editor (`src/components/PostLogNoteEditor.tsx`) publishes the shell refresh tick (`bumpShellRefresh()`) after each of its own writes commits — the note save, and the Memory create / edit / delete / restore / Allow-AI writes — so a visible Profile, History or Dashboard re-reads (38.3 D-21). It never publishes on a no-op, missing-interaction or failed write.
 3. The command publishes browse and widget refreshes only after a committed write or delete. Its single-flight guards prevent a rapid tap or swipe from creating or deleting more than one row.
 
 ### Detailed ordinary logging
@@ -243,7 +244,7 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 - **Notifications** — supplies the foreground and headless action paths that use these writers.
 - **Widget** — supplies a separate headless one-tap source with the same DAO-owned write invariant.
 - **Backup & Restore** — exports interactions and applies them only after their contact survives UID reconciliation.
-- **Interaction Assist & Reach Out** — confirmation writes an `source='assist'` outbound touchpoint at the original handoff time through the shared recency cores.
+- **Interaction Assist & Reach Out** — confirmation writes an `source='assist'` outbound touchpoint at the original handoff time through the shared recency cores The ADR-071 future-date branch of `rejectFutureOccurredAt` now throws the typed `FutureOccurredAtError` (identical message) so the assist UI can show clock-rollback copy; the malformed-value branches stay plain `Error`.
 
 ## Changelog
 
@@ -262,3 +263,4 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 | 2026-09-02 | 33 | Documented canonical Group Event children, three-field inheritance, parent-only note ownership, and recency-safe lifecycle composition. |
 | 2026-09-02 | 34 | Added detailed Log Interaction, scoped Channel defaults, post-log Note-or-Memory capture, and the ordinary Channel preference consumer. |
 | 2026-09-02 | 36 | Added the new-item interaction-note permission default and bounded opted-in recent-note prompt serialization. |
+| 2026-09-25 | 38.3 | Post-Log Note editor publishes the shell refresh tick after its committed note and Memory writes (D-21); `log-guards.ts` gained the typed `FutureOccurredAtError` for the future branch (message unchanged, guard logic unchanged). |
