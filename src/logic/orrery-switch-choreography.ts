@@ -403,6 +403,33 @@ export function beginSwitchChoreography(
   };
 }
 
+/**
+ * Settled geometry retirement (RG-027, performance/AUD-PERF-001, D-19): once a
+ * switch has completed, rebuild the choreography from its destination bodies
+ * only, so departed bodies (opacity 0 at progress 1) stop being projected every
+ * frame. Sampling the result at progress 1 renders the same visible world;
+ * generation and reduced motion are preserved and shared keys stay stable.
+ * Only call this for a completed switch — a running one still needs its
+ * departures for interruption continuity. Defined after
+ * `beginSwitchChoreography`, which it calls (Hermes worklet forward-ref hazard).
+ */
+export function settleSwitchChoreography(
+  transition: SwitchChoreography,
+): SwitchChoreography {
+  "worklet";
+  const destination: ChoreographyWorldBody[] = [];
+  for (let index = 0; index < transition.entries.length; index++) {
+    const body = transition.entries[index].destination;
+    if (body) destination.push(body);
+  }
+  return beginSwitchChoreography(
+    destination,
+    destination,
+    transition.generation,
+    { intensity: 0, reducedMotion: transition.reducedMotion },
+  );
+}
+
 export function sampleSwitchChoreography(
   transition: SwitchChoreography,
   fraction: number,

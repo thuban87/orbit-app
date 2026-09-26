@@ -18,6 +18,7 @@ import {
   type SwitchChoreographyOptions,
   type SwitchChoreographySample,
   sampleSwitchChoreography,
+  settleSwitchChoreography,
 } from "@/logic/orrery-switch-choreography";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 
@@ -229,6 +230,8 @@ export function useOrrerySwitchRuntime(
       running.value = false;
       progress.value = 1;
       pose.value = { ...cameraTo.value };
+      // RG-027 / performance/AUD-PERF-001: retire departed geometry on settle.
+      transition.value = settleSwitchChoreography(transition.value);
       runOnJS(prune)(generation);
     },
     [cameraTo, pose, progress, prune, running, transition],
