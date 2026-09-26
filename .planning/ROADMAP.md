@@ -1197,7 +1197,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; ADR-115 + ADR-087 (surface/glass authority)
 **UI hint**: yes
-**Plans**: 8/17 plans executed in 5 waves
+**Plans**: 9/17 plans executed in 5 waves
 
 Plans:
 **Wave 1**
@@ -1210,7 +1210,7 @@ Plans:
 - [x] 38.4-06-PLAN.md — Editor switches/selectors/targets + touchpoint timestamp (RG-030, RG-038; D-20)
 - [x] 38.4-07-PLAN.md — Shared time-only minute formatter for event/Digest/History timestamps (RG-038; D-07)
 - [x] 38.4-08-PLAN.md — Row accessible context, review-card selection/evidence, registered fonts (RG-031)
-- [ ] 38.4-10-PLAN.md — Single header Back on Settings children + hub icon/subtitle/chevron rows (RG-037; D-15)
+- [x] 38.4-10-PLAN.md — Single header Back on Settings children + hub icon/subtitle/chevron rows (RG-037; D-15)
 - [ ] 38.4-11-PLAN.md — FAB and large-text confirmation investigation gates + FAB glyph foreground (RG-039, RG-034; D-04, D-20)
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -1284,7 +1284,7 @@ Plans:
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
-| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 8/17 | In Progress|  |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 9/17 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
