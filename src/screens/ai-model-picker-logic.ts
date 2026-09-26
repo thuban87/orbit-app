@@ -32,10 +32,10 @@ export function orderOpenRouterModels(
   return [...orderedCurated, ...rest];
 }
 
-export function filterModelCards(
-  cards: readonly ModelPickerCard[],
+export function filterModelCards<T extends ModelPickerCard>(
+  cards: readonly T[],
   query: string,
-): readonly ModelPickerCard[] {
+): readonly T[] {
   const needle = query.trim().toLocaleLowerCase();
   if (needle === "") return cards;
   return cards.filter((card) =>
@@ -100,4 +100,53 @@ export function directCards(
     pricing: null,
     context: null,
   }));
+}
+
+/** A picker card plus whether it is the lane's saved (remembered) model. */
+export type MarkedModelPickerCard = ModelPickerCard & {
+  readonly isCurrent: boolean;
+};
+
+export interface RememberedModelMarks {
+  readonly cards: readonly MarkedModelPickerCard[];
+  /** The saved id when no catalog card matches it (e.g. a manual id). */
+  readonly manualCurrent: string | null;
+}
+
+/**
+ * Mark the lane's saved model (38.4 RG-008; ui-accessibility/AUD-UIA-020;
+ * D-17). The remembered id is trimmed, then matched on EXACT string equality —
+ * no case folding or fuzzy match, because the id is what `choose()` saved and
+ * what a request would send. A saved id with no matching card (a manual id, or
+ * a model missing from the current catalog) surfaces as `manualCurrent` so it
+ * is still visibly identified. Pure: it reads and writes nothing.
+ */
+export function markRememberedModel(
+  cards: readonly ModelPickerCard[],
+  remembered: string | null,
+): RememberedModelMarks {
+  const id = remembered?.trim() ?? "";
+  const marked = cards.map((card) => ({
+    ...card,
+    isCurrent: id !== "" && card.id === id,
+  }));
+  const matched = marked.some((card) => card.isCurrent);
+  return { cards: marked, manualCurrent: id !== "" && !matched ? id : null };
+}
+
+/**
+ * The saved model id to show in the standalone "Current model" row: the manual
+ * id, or a matching catalog card's id when that card is not in the visible list
+ * (recommendations-only view or a search), so the mark never disappears.
+ */
+export function currentModelRowId(
+  marks: RememberedModelMarks,
+  visibleCards: readonly Pick<ModelPickerCard, "id">[],
+): string | null {
+  if (marks.manualCurrent !== null) return marks.manualCurrent;
+  const current = marks.cards.find((card) => card.isCurrent);
+  if (!current) return null;
+  return visibleCards.some((card) => card.id === current.id)
+    ? null
+    : current.id;
 }

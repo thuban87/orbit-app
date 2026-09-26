@@ -27,8 +27,10 @@ import {
   refreshOpenRouterCatalogIfStale,
 } from "@/ai/openrouter-catalog";
 import { AppText, Button, GlassSurface } from "@/components/ui";
+import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import {
   activateAiConnection,
+  getAiConnection,
   setRememberedModel,
 } from "@/db/ai-connections-dao";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -39,8 +41,10 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
+  currentModelRowId,
   directCards,
   filterModelCards,
+  markRememberedModel,
   openRouterCards,
 } from "./ai-model-picker-logic";
 
@@ -91,6 +95,9 @@ export function AIModelPickerScreen({
   const [moreInfo, setMoreInfo] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  // The lane's saved model, read-only (38.4 RG-008; AUD-UIA-020; D-17). A
+  // missing row or a failed read means "no remembered model" — never a write.
+  const [rememberedModel, setRememberedModelId] = useState<string | null>(null);
   const openRouterStorage = useMemo(createOpenRouterStorage, []);
   const directStorage = useMemo(createFileCatalogStorage, []);
 
@@ -122,6 +129,22 @@ export function AIModelPickerScreen({
     });
   }, [load]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setRememberedModelId(null);
+    void getAiConnection(getExecutor(), lane)
+      .then((connection) => {
+        if (!cancelled)
+          setRememberedModelId(connection?.rememberedModel ?? null);
+      })
+      .catch((caught) => {
+        Logger.error(LOG_SCOPE, "failed to read the saved model", caught);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [lane]);
+
   const cards = useMemo(() => {
     if (lane === "openrouter") {
       const models = openRouterCatalog?.models ?? [];
@@ -131,12 +154,22 @@ export function AIModelPickerScreen({
     const all = modelsFor(directCatalog, lane, "all");
     return directCards(all, curatedModelsFor(directCatalog, lane));
   }, [directCatalog, lane, openRouterCatalog]);
+  const marks = useMemo(
+    () => markRememberedModel(cards, rememberedModel),
+    [cards, rememberedModel],
+  );
   const visibleCards = useMemo(() => {
     const source = browseAll
-      ? cards
-      : cards.filter((card) => card.recommendation !== null);
+      ? marks.cards
+      : marks.cards.filter((card) => card.recommendation !== null);
     return filterModelCards(source, query);
-  }, [browseAll, cards, query]);
+  }, [browseAll, marks, query]);
+  // A manual id, or a saved catalog model hidden by the current view, still gets
+  // a visible, announced "Current model" row so the mark never disappears.
+  const currentRowId = useMemo(
+    () => currentModelRowId(marks, visibleCards),
+    [marks, visibleCards],
+  );
 
   async function choose(model: string) {
     const trimmed = model.trim();
@@ -145,6 +178,7 @@ export function AIModelPickerScreen({
       await setRememberedModel(getExecutor(), lane, trimmed, localDateTime());
       await activateAiConnection(getExecutor(), lane, localDateTime());
       await useAiConfigStore.getState().hydrate(getExecutor());
+      setRememberedModelId(trimmed);
       onSelected?.(trimmed);
       onBack();
     } catch (caught) {
@@ -235,6 +269,18 @@ export function AIModelPickerScreen({
           </>
         ) : null}
 
+        {currentRowId !== null ? (
+          <GlassSurface density="dense" style={styles.card}>
+            <View
+              testID="ai-model-picker-current"
+              accessible
+              accessibilityLabel={`Current model: ${currentRowId}`}
+            >
+              <AppText role="label">Current model: {currentRowId}</AppText>
+            </View>
+          </GlassSurface>
+        ) : null}
+
         {visibleCards.length === 0 ? (
           lane === "custom" ? null : (
             <GlassSurface density="dense" style={styles.card}>
@@ -246,6 +292,9 @@ export function AIModelPickerScreen({
             <GlassSurface key={card.id} density="dense" style={styles.card}>
               <View style={styles.modelCopy}>
                 <AppText role="label">{card.name}</AppText>
+                {card.isCurrent ? (
+                  <AppText role="caption">Current model</AppText>
+                ) : null}
                 <AppText role="caption" style={{ color: colors.textSecondary }}>
                   {card.provider}
                 </AppText>
@@ -283,19 +332,35 @@ export function AIModelPickerScreen({
                 ) : null}
               </View>
               <View style={styles.toolbar}>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() =>
-                    setMoreInfo(moreInfo === card.id ? null : card.id)
-                  }
-                >
-                  <AppText role="caption" style={{ color: colors.accentText }}>
-                    More Info
-                  </AppText>
-                </Pressable>
+                {/* Offered only when there is detail to reveal; names the model,
+                    announces expansion and meets the 44dp floor without hitSlop
+                    (38.4 RG-030; ui-accessibility/AUD-UIA-006). */}
+                {card.context ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`More info about ${card.name}`}
+                    accessibilityState={{ expanded: moreInfo === card.id }}
+                    onPress={() =>
+                      setMoreInfo(moreInfo === card.id ? null : card.id)
+                    }
+                    style={styles.moreInfo}
+                  >
+                    <AppText
+                      role="caption"
+                      style={{ color: colors.accentText }}
+                    >
+                      More Info
+                    </AppText>
+                  </Pressable>
+                ) : null}
                 <Button
                   role="secondary"
                   label="Choose this model"
+                  accessibilityLabel={`Choose this model: ${card.name}`}
+                  accessibilityHint={
+                    card.isCurrent ? "This is the current model" : undefined
+                  }
+                  selected={card.isCurrent}
                   onPress={() => void choose(card.id)}
                 />
               </View>
@@ -360,6 +425,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
   },
   modelCopy: { flex: 1, gap: SPACING.xs },
+  moreInfo: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: MIN_TOUCH_TARGET,
+    minWidth: MIN_TOUCH_TARGET,
+  },
   root: { flex: 1 },
   toolbar: {
     alignItems: "center",

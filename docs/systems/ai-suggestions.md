@@ -53,6 +53,9 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | `modules/orbit-secure-fetch/src/OrbitSecureFetchModule.ts` | Enforces native Custom address, redirect, and proxy posture. |
 | `src/ai/model-catalog-cache.ts` | Loads local model catalog cache and runs explicit refreshes. |
 | `src/ai/model-registry.ts` | Resolves All or latest-per-tier Frontier model lists. |
+| `src/logic/ai-enablement.ts` | `isAiMasterEnabled()` — the single canonical AI master predicate (`aiEnabled === 1`). |
+| `src/screens/ai-permissions-logic.ts` | Permission review filtering, grouping, and `buildPermissionSummaryCopy()` (access totals vs filtered view). |
+| `src/screens/ai-model-picker-logic.ts` | Model card ordering/filtering and `markRememberedModel()` (saved-model marker). |
 
 ## How It Works
 
@@ -62,7 +65,9 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 2. The user configures the recommended OpenRouter lane or an Advanced direct/Custom lane. A new lane does not replace the active connection until it has a selected model and activates successfully; inactive saved lanes retain their remembered models.
 3. SecureStore writes or removes provider-specific credentials directly. OpenRouter authorizes through its one-shot loopback callback; Custom endpoint validation rejects malformed, credentialed, local, cleartext, and non-public literal URLs.
 4. OpenRouter cards use cached/live catalog metadata and real input/output pricing. Direct lanes use the LiteLLM seed/cache and manual model entry; a missing or unavailable model is Needs Attention rather than a fallback.
-5. A Custom SecureStore value without an endpoint-bound record fails closed for every endpoint. It remains stored until the user re-enters the credential; re-entry replaces it with a bound record. A failed Custom metadata save restores the exact raw SecureStore item that existed before the attempt, including an unbound or absent item. This follows D-23 (`security/AUD-SEC-006`).
+5. The model picker reads the lane's saved model (`getAiConnection(...).rememberedModel`, read-only) and marks it: the matching card shows a visible "Current model" caption and its Choose control is announced as selected. The saved id is trimmed and matched on exact string equality; a manual id not in the catalog, or a saved card hidden by the current view, gets a separate announced "Current model: <id>" row (38.4 RG-008, `ui-accessibility/AUD-UIA-020`).
+6. The AI Data Permissions summary states actual access from the UNFILTERED enabled items. When a type filter, Enabled only, or a search is active, a separate "Showing N of M items" line describes the view. A failed or pending load prints no count, and the empty card distinguishes "no access" from "no match" (38.4 RG-008, `ui-accessibility/AUD-UIA-013`).
+7. A Custom SecureStore value without an endpoint-bound record fails closed for every endpoint. It remains stored until the user re-enters the credential; re-entry replaces it with a bound record. A failed Custom metadata save restores the exact raw SecureStore item that existed before the attempt, including an unbound or absent item. This follows D-23 (`security/AUD-SEC-006`).
 
 ### Resolving and sending a suggestion
 
@@ -122,6 +127,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 9. **Off Limits never leaves the device through AI.** It is neither positive context nor an avoidance constraint and can never become Message Focus; changing that is an owner decision under ADR-107.
 10. **Carrying is transmission once resolved.** Interaction notes enter the payload only through the latest-three projection and only when that individual row has `allow_ai=1`.
 11. **Do not weaken the OpenRouter callback.** It must bind loopback only, require the exact state before exchange, and wake the app without code or state in the URI.
+12. **AI availability comes from the master, not `aiProvider`.** Every surface that asks "is AI on?" calls `isAiMasterEnabled(settings)` (ADR-135). `ai_provider` is a retained compatibility field; a stale `'none'` or provider id there must not show or hide AI. The master is distinct from the active connection, readiness, per-item `allow_ai` consent and remembered models, and reading it never writes consent (38.4 RG-008; `architecture/AUD-ARCH-003`, `react-native/AUD-RN-005`; D-17).
 
 ## Related Systems
 
@@ -146,3 +152,4 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | 2026-09-02 | 37 | Replaced the monolithic Settings entry with the AI category, preserving the existing configuration hierarchy and local availability read. |
 | 2026-09-23 | 38.2 | Per D-23 (`security/AUD-SEC-006`), unbound Custom values fail closed and require re-entry; failed saves restore the prior raw SecureStore item. |
 | 2026-09-23 | 38.2 | Bounded Custom transport response bodies, retained call ownership through body consumption, and mapped oversized responses to `invalid_response`. |
+| 2026-09-26 | 38.4 | Truthful AI configuration presentation (RG-008; AUD-ARCH-003, AUD-RN-005, AUD-UIA-013, AUD-UIA-020): Memory hosts use the canonical master, the permission summary separates access totals from the filtered view, and the model picker marks the saved model including manual ids. |

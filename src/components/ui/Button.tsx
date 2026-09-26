@@ -42,6 +42,10 @@ interface CommonButtonProps
   extends Pick<PressableProps, "onPress" | "disabled" | "testID"> {
   /** Optional a11y label; REQUIRED for `role="iconOnly"` (see the union below). */
   accessibilityLabel?: string;
+  /** Optional a11y hint describing the result or current status. */
+  accessibilityHint?: string;
+  /** Announces the control as the selected/current choice (38.4 AUD-UIA-020). */
+  selected?: boolean;
 }
 
 interface LabelButtonProps extends CommonButtonProps {
@@ -61,7 +65,15 @@ interface IconOnlyButtonProps extends CommonButtonProps {
 export type ButtonProps = LabelButtonProps | IconOnlyButtonProps;
 
 export function Button(props: ButtonProps) {
-  const { role, onPress, disabled, testID, accessibilityLabel } = props;
+  const {
+    role,
+    onPress,
+    disabled,
+    testID,
+    accessibilityLabel,
+    accessibilityHint,
+    selected,
+  } = props;
   const { colors } = useTheme();
   const v = buttonVisual(role);
 
@@ -88,7 +100,12 @@ export function Button(props: ButtonProps) {
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      accessibilityState={{ disabled: !!disabled }}
+      accessibilityState={
+        selected === undefined
+          ? { disabled: !!disabled }
+          : { disabled: !!disabled, selected }
+      }
+      accessibilityHint={accessibilityHint}
       accessibilityLabel={
         accessibilityLabel ??
         (props.role !== "iconOnly" ? props.label : undefined)

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { OpenRouterModel } from "@/ai/openrouter-catalog";
 import {
+  currentModelRowId,
   directCards,
   filterModelCards,
   markRememberedModel,
@@ -115,5 +116,34 @@ describe("markRememberedModel", () => {
       { ...cards[0], isCurrent: false },
       { ...cards[1], isCurrent: true },
     ]);
+  });
+});
+
+describe("currentModelRowId", () => {
+  const cards = directCards(["gpt-x", "gpt-y"], []);
+
+  it("shows the manual id row when no card matches", () => {
+    const marks = markRememberedModel(cards, "my-custom-id");
+    expect(currentModelRowId(marks, marks.cards)).toBe("my-custom-id");
+  });
+
+  it("shows no row when the current card is visible", () => {
+    const marks = markRememberedModel(cards, "gpt-x");
+    expect(currentModelRowId(marks, marks.cards)).toBeNull();
+  });
+
+  it("shows the row when the current card is filtered out of the visible list", () => {
+    const marks = markRememberedModel(cards, "gpt-x");
+    expect(
+      currentModelRowId(
+        marks,
+        marks.cards.filter((card) => card.id !== "gpt-x"),
+      ),
+    ).toBe("gpt-x");
+  });
+
+  it("shows no row without a remembered model", () => {
+    const marks = markRememberedModel(cards, null);
+    expect(currentModelRowId(marks, [])).toBeNull();
   });
 });
