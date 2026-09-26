@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { ProfileStatusMetric } from "@/services/profile-metrics";
 import {
   FREQUENCY_CHOICES,
   PROFILE_MESSAGE_ARCHIVED_REASON,
@@ -211,9 +212,9 @@ describe("relationship explanations", () => {
 
   // 38.3 RG-021 (D-11): when the Profile layout omits History, the Status
   // sheet offers no History route — Insights is unaffected.
-  const AVAILABLE_STATUS = {
+  const AVAILABLE_STATUS: ProfileStatusMetric = {
     available: true,
-    label: "Steady",
+    label: "Stable",
     visualValue: 0.2,
     context: "6 of 30 days since the last interaction.",
     factors: {
@@ -223,12 +224,12 @@ describe("relationship explanations", () => {
       rarelyResponds: false,
       rogueReason: null,
     },
-  } as const;
-  const UNAVAILABLE_STATUS = {
+  };
+  const UNAVAILABLE_STATUS: ProfileStatusMetric = {
     available: false,
     label: "Not tracked",
     context: "Set a contact frequency to see Orbit Status.",
-  } as const;
+  };
 
   it("omits the History route when History is not available (D-11)", () => {
     expect(

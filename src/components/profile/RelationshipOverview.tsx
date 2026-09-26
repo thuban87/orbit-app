@@ -33,6 +33,11 @@ export function RelationshipOverview({
   snapshot: ProfileSnapshot;
   modules: ProfileLayoutDocument["overview"];
   onOpenSheet: (sheet: RelationshipSheetId) => void;
+  /**
+   * Reveals the in-Profile History section (38.3 RG-021, D-10). Absent when the
+   * layout hides History: the Last Interaction tile is then information only,
+   * with no tap action and no button semantics (D-11).
+   */
   onOpenHistory?: () => void;
 }) {
   const { colors } = useTheme();
@@ -113,68 +118,87 @@ export function RelationshipOverview({
         const tileWidth =
           columnWidth * placement.columnSpan +
           SPACING.sm * (placement.columnSpan - 1);
-        return (
+        const accessibilityLabel = `${item.label}. ${item.value}${item.detail ? `. ${item.detail}` : ""}`;
+        const onPress = action[placement.id];
+        const tile = (
+          <GlassSurface
+            key={placement.id}
+            density="presentation"
+            style={styles.tile}
+          >
+            <View style={styles.tileContent}>
+              <AppText role="caption" style={styles.centeredText}>
+                {item.label}
+              </AppText>
+              <AppText role="heading" style={styles.centeredText}>
+                {item.value}
+              </AppText>
+              {item.detail ? (
+                <AppText role="caption" style={styles.centeredText}>
+                  {item.detail}
+                </AppText>
+              ) : null}
+              {placement.id === "gravity" &&
+              snapshot.metrics.gravity.available ? (
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={[
+                    styles.gravity,
+                    {
+                      width:
+                        16 + snapshot.metrics.gravity.factors.tierIndex * 12,
+                      height:
+                        16 + snapshot.metrics.gravity.factors.tierIndex * 12,
+                      backgroundColor:
+                        colors.gravityTiers[
+                          snapshot.metrics.gravity.factors.tierIndex
+                        ] ?? colors.borderStrong,
+                    },
+                  ]}
+                />
+              ) : null}
+              {placement.id === "intensity" ? (
+                <View
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants"
+                  style={styles.histogram}
+                >
+                  {[8, 16, 12, 24].map((height) => (
+                    <View
+                      key={height}
+                      style={[
+                        styles.bar,
+                        { height, backgroundColor: colors.borderStrong },
+                      ]}
+                    />
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          </GlassSurface>
+        );
+        return onPress ? (
           <Pressable
             key={placement.id}
             testID={`profile-overview-${placement.id}`}
             accessibilityRole="button"
-            accessibilityLabel={`${item.label}. ${item.value}${item.detail ? `. ${item.detail}` : ""}`}
-            onPress={action[placement.id]}
+            accessibilityLabel={accessibilityLabel}
+            onPress={onPress}
             style={{ width: tileWidth }}
           >
-            <GlassSurface density="presentation" style={styles.tile}>
-              <View style={styles.tileContent}>
-                <AppText role="caption" style={styles.centeredText}>
-                  {item.label}
-                </AppText>
-                <AppText role="heading" style={styles.centeredText}>
-                  {item.value}
-                </AppText>
-                {item.detail ? (
-                  <AppText role="caption" style={styles.centeredText}>
-                    {item.detail}
-                  </AppText>
-                ) : null}
-                {placement.id === "gravity" &&
-                snapshot.metrics.gravity.available ? (
-                  <View
-                    accessibilityElementsHidden
-                    importantForAccessibility="no-hide-descendants"
-                    style={[
-                      styles.gravity,
-                      {
-                        width:
-                          16 + snapshot.metrics.gravity.factors.tierIndex * 12,
-                        height:
-                          16 + snapshot.metrics.gravity.factors.tierIndex * 12,
-                        backgroundColor:
-                          colors.gravityTiers[
-                            snapshot.metrics.gravity.factors.tierIndex
-                          ] ?? colors.borderStrong,
-                      },
-                    ]}
-                  />
-                ) : null}
-                {placement.id === "intensity" ? (
-                  <View
-                    accessibilityElementsHidden
-                    importantForAccessibility="no-hide-descendants"
-                    style={styles.histogram}
-                  >
-                    {[8, 16, 12, 24].map((height) => (
-                      <View
-                        key={height}
-                        style={[
-                          styles.bar,
-                          { height, backgroundColor: colors.borderStrong },
-                        ]}
-                      />
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            </GlassSurface>
+            {tile}
           </Pressable>
+        ) : (
+          <View
+            key={placement.id}
+            testID={`profile-overview-${placement.id}`}
+            accessible
+            accessibilityLabel={accessibilityLabel}
+            style={{ width: tileWidth }}
+          >
+            {tile}
+          </View>
         );
       })}
     </View>

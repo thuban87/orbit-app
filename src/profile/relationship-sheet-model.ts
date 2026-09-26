@@ -19,6 +19,11 @@ export type RelationshipExplanationInput =
       kind: "status";
       metric: ProfileStatusMetric;
       insightsAvailable: boolean;
+      /**
+       * The Profile layout shows History, so "View history" can reveal it
+       * (38.3 RG-021, D-11). When false the History route is omitted.
+       */
+      historyAvailable: boolean;
     }
   | { kind: "gravity"; metric: ProfileGravityMetric }
   | { kind: "intensity"; metric: ProfileIntensityMetric };
@@ -27,12 +32,13 @@ export function relationshipExplanation(
   input: RelationshipExplanationInput,
 ): RelationshipExplanation {
   if (input.kind === "status") {
+    const history: Array<"history"> = input.historyAvailable ? ["history"] : [];
     if (!input.metric.available) {
       return {
         title: "Orbit Status",
         summary: input.metric.label,
         details: [input.metric.context],
-        routes: ["history"],
+        routes: history,
       };
     }
     const details = [
@@ -49,7 +55,7 @@ export function relationshipExplanation(
       title: "Orbit Status",
       summary: input.metric.label,
       details,
-      routes: input.insightsAvailable ? ["history", "insights"] : ["history"],
+      routes: input.insightsAvailable ? [...history, "insights"] : history,
     };
   }
   if (input.kind === "gravity") {

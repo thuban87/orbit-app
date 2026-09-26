@@ -131,6 +131,8 @@ export function ProfileRelationshipSheets({
           kind: "status",
           metric: snapshot.metrics.status,
           insightsAvailable: !!onOpenInsights,
+          // D-11: the host passes no History action when the layout hides it.
+          historyAvailable: onOpenHistory !== undefined,
         })
       : active === "gravity"
         ? relationshipExplanation({
@@ -162,7 +164,7 @@ export function ProfileRelationshipSheets({
                 {detail}
               </AppText>
             ))}
-            {explanation.routes?.includes("history") ? (
+            {explanation.routes?.includes("history") && onOpenHistory ? (
               <Button
                 role="tertiary"
                 label="View history"
