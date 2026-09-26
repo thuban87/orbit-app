@@ -87,19 +87,6 @@ const HEADER_CHROME_SETTINGS_CHILDREN = [
 ] as const;
 
 /**
- * SEQUENCING AID ONLY (Plan 38.4-10 Task 1 → Task 2). These header-chrome
- * children still carry their duplicate in-body Back until Task 2 removes it; the
- * list is deleted in Task 2. It is not a permanent exemption.
- */
-const PENDING_SINGLE_BACK: readonly string[] = [
-  "src/screens/SettingsAIScreen.tsx",
-  "src/screens/SettingsAppearanceScreen.tsx",
-  "src/screens/SettingsContactsScreen.tsx",
-  "src/screens/SettingsNotificationsScreen.tsx",
-  "src/screens/SettingsOrreryScreen.tsx",
-];
-
-/**
  * Header-less screens registered in SettingsStack that carry an in-body Back
  * today. With no ShellAppBar they have no header Back, so each must keep its
  * in-body Back (RG-037 out of scope; Pitfall 6).
@@ -152,21 +139,19 @@ describe("Settings chrome: single header Back (RG-037 AUD-UIA-016, D-15)", () =>
     },
   );
 
+  it.each(HEADER_CHROME_SETTINGS_CHILDREN)(
+    "%s has no in-body Back (header Back only)",
+    (path) => {
+      expect(hasInBodyBack(read(path))).toBe(false);
+    },
+  );
+
   it("every header-chrome SettingsStack screen has no in-body Back", () => {
     const offenders = files.filter((path) => {
-      if (PENDING_SINGLE_BACK.includes(path)) return false;
       const source = read(path);
       return rendersHeaderChrome(source) && hasInBodyBack(source);
     });
     expect(offenders).toEqual([]);
-  });
-
-  it("pending screens are still genuinely pending (sequencing aid)", () => {
-    for (const path of PENDING_SINGLE_BACK) {
-      const source = read(path);
-      expect(rendersHeaderChrome(source), path).toBe(true);
-      expect(hasInBodyBack(source), path).toBe(true);
-    }
   });
 
   it.each(HEADERLESS_SCREENS_KEEPING_IN_BODY_BACK)(

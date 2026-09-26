@@ -53,10 +53,6 @@ import { contactImportMode } from "./use-contact-import-mode";
 
 const LOG_SCOPE = "settings-contacts-screen";
 
-interface SettingsContactsScreenProps {
-  onBack: () => void;
-}
-
 const regionNames =
   typeof Intl.DisplayNames === "function"
     ? new Intl.DisplayNames(["en"], { type: "region" })
@@ -82,11 +78,12 @@ const PHONE_REGIONS = getCountries()
  * capabilities (Import, Check linked) stay visible with explanation rather than
  * hidden (§G).
  *
+ * Back is the `ShellAppBar` header Back only (RG-037 ui-accessibility/
+ * AUD-UIA-016, D-15): no duplicate in-body Back.
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-export function SettingsContactsScreen({
-  onBack,
-}: SettingsContactsScreenProps) {
+export function SettingsContactsScreen() {
   const { colors } = useTheme();
   const bottomClearance = useBottomClearance();
   const navigation =
@@ -377,17 +374,6 @@ export function SettingsContactsScreen({
           { paddingBottom: bottomClearance },
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={onBack}
-          style={styles.backLink}
-        >
-          <Text style={[styles.backLinkText, { color: colors.accent }]}>
-            Back
-          </Text>
-        </Pressable>
-
         {SETTINGS_CONTACTS_SECTIONS.map((section) => (
           <View
             key={section.key}
@@ -494,15 +480,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 12,
-  },
-  backLink: {
-    alignSelf: "flex-start",
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  backLinkText: {
-    fontSize: 13,
-    fontWeight: "400",
   },
   section: {
     gap: 12,

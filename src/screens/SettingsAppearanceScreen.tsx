@@ -59,10 +59,6 @@ import { persistAppearanceSetting } from "./settings-appearance-persist";
 
 const LOG_SCOPE = "settings-appearance-screen";
 
-interface SettingsAppearanceScreenProps {
-  onBack: () => void;
-}
-
 const BACKGROUND_LABELS: Record<BackgroundSlotId, string> = {
   "galaxy-deep-space": "Deep Space",
   "galaxy-starfield": "Starfield",
@@ -156,11 +152,12 @@ function BackgroundThumbnail({
  * and renders an inline, non-nagging save-error notice. The failure is never
  * swallowed and the store is never left diverged.
  *
+ * Back is the `ShellAppBar` header Back only (RG-037 ui-accessibility/
+ * AUD-UIA-016, D-15): no duplicate in-body Back.
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-export function SettingsAppearanceScreen({
-  onBack,
-}: SettingsAppearanceScreenProps) {
+export function SettingsAppearanceScreen() {
   const { colors, mode } = useTheme();
   const { fontScale } = useWindowDimensions();
   const bottomClearance = useBottomClearance();
@@ -501,17 +498,6 @@ export function SettingsAppearanceScreen({
           { paddingBottom: bottomClearance },
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={onBack}
-          style={styles.backLink}
-        >
-          <Text style={[styles.backLinkLabel, { color: colors.accent }]}>
-            Back
-          </Text>
-        </Pressable>
-
         {saveError !== null ? (
           <View
             testID="settings-appearance-save-error"
@@ -1258,15 +1244,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 12,
-  },
-  backLink: {
-    alignSelf: "flex-start",
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  backLinkLabel: {
-    fontSize: 13,
-    fontWeight: "400",
   },
   section: {
     gap: 12,

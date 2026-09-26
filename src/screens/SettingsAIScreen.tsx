@@ -34,10 +34,6 @@ import {
 
 const LOG_SCOPE = "settings-ai-screen";
 
-interface SettingsAIScreenProps {
-  onBack: () => void;
-}
-
 /**
  * AI category screen (§J / D-09). A top-level Settings category that routes into
  * the CANONICAL Phase 36 AI hierarchy (the existing `AIConnection` /
@@ -55,9 +51,12 @@ interface SettingsAIScreenProps {
  * read-path hydration of already-stored config; the catalog read is the LOCAL
  * cache file — NO real AI provider network call (local-first; no new egress).
  *
+ * Back is the `ShellAppBar` header Back only (RG-037 ui-accessibility/
+ * AUD-UIA-016, D-15): no duplicate in-body Back.
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-export function SettingsAIScreen({ onBack }: SettingsAIScreenProps) {
+export function SettingsAIScreen() {
   const { colors } = useTheme();
   const bottomClearance = useBottomClearance();
   const navigation =
@@ -145,17 +144,6 @@ export function SettingsAIScreen({ onBack }: SettingsAIScreenProps) {
           { paddingBottom: bottomClearance },
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={onBack}
-          style={styles.backLink}
-        >
-          <Text style={[styles.backLinkText, { color: colors.accent }]}>
-            Back
-          </Text>
-        </Pressable>
-
         {/* AI is an optional capability. The master switch mutates only
             app_settings.ai_enabled; every connection, model, personalization
             section, and permission survives the off state. */}
@@ -314,15 +302,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 12,
-  },
-  backLink: {
-    alignSelf: "flex-start",
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  backLinkText: {
-    fontSize: 13,
-    fontWeight: "400",
   },
   section: {
     gap: 12,

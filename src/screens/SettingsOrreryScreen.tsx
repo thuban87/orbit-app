@@ -23,10 +23,6 @@ const DENSITY_LABELS: Record<OrreryDensity, string> = {
   compact: "Compact",
 };
 
-interface SettingsOrreryScreenProps {
-  onBack: () => void;
-}
-
 /**
  * Orrery category screen (§H / D-09). Surfaces the stateless user-configurable
  * Orrery Display preferences — density + Relationship Satellites — bound to the
@@ -44,9 +40,12 @@ interface SettingsOrreryScreenProps {
  * A Systems section routes to the canonical `SystemsManagement` screen (reuse by
  * navigation; it stays reachable from the Orrery too, per §H).
  *
+ * Back is the `ShellAppBar` header Back only (RG-037 ui-accessibility/
+ * AUD-UIA-016, D-15): no duplicate in-body Back.
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-export function SettingsOrreryScreen({ onBack }: SettingsOrreryScreenProps) {
+export function SettingsOrreryScreen() {
   const { colors } = useTheme();
   const bottomClearance = useBottomClearance();
   const navigation =
@@ -80,17 +79,6 @@ export function SettingsOrreryScreen({ onBack }: SettingsOrreryScreenProps) {
           { paddingBottom: bottomClearance },
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={onBack}
-          style={styles.backLink}
-        >
-          <Text style={[styles.backLinkText, { color: colors.accent }]}>
-            Back
-          </Text>
-        </Pressable>
-
         {/* Display — density + Relationship Satellites, bound to the canonical
             useOrreryPreferencesStore (committed for read; save for write). */}
         <View testID="settings-orrery-display-section" style={styles.section}>
@@ -262,15 +250,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 12,
-  },
-  backLink: {
-    alignSelf: "flex-start",
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  backLinkText: {
-    fontSize: 13,
-    fontWeight: "400",
   },
   section: {
     gap: 12,

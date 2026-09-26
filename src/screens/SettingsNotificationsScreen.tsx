@@ -70,10 +70,6 @@ const NOTIFICATION_PERSIST_DEPS: PersistNotificationDeps = {
   now: localDateTime,
 };
 
-interface SettingsNotificationsScreenProps {
-  onBack: () => void;
-}
-
 /**
  * Notifications category screen (§G / D-09). Migrates all 10 notification
  * controls out of the monolith — master, degraded note, Decay, Birthday,
@@ -92,11 +88,12 @@ interface SettingsNotificationsScreenProps {
  * Permission is OS-owned and revocable — the raw status is read FRESH on focus
  * (Task 2). The master-on-but-blocked `degraded` note stays a separate concern.
  *
+ * Back is the `ShellAppBar` header Back only (RG-037 ui-accessibility/
+ * AUD-UIA-016, D-15): no duplicate in-body Back.
+ *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
-export function SettingsNotificationsScreen({
-  onBack,
-}: SettingsNotificationsScreenProps) {
+export function SettingsNotificationsScreen() {
   const { colors } = useTheme();
   const bottomClearance = useBottomClearance();
 
@@ -235,17 +232,6 @@ export function SettingsNotificationsScreen({
           { paddingBottom: bottomClearance },
         ]}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={onBack}
-          style={styles.backLink}
-        >
-          <Text style={[styles.backLinkText, { color: colors.accent }]}>
-            Back
-          </Text>
-        </Pressable>
-
         {/* Notifications — master toggle + degraded note. */}
         <View testID="settings-notifications-section" style={styles.section}>
           <Text
@@ -743,15 +729,6 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 12,
-  },
-  backLink: {
-    alignSelf: "flex-start",
-    minHeight: 44,
-    justifyContent: "center",
-  },
-  backLinkText: {
-    fontSize: 13,
-    fontWeight: "400",
   },
   section: {
     gap: 12,
