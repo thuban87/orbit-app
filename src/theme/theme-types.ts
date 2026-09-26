@@ -274,6 +274,15 @@ export interface ResolvedTheme {
   colors: ThemePalette;
   mode: ResolvedMode;
   package: ThemePackage;
+  /**
+   * The palette glass/chrome descendants render with (RG-029 /
+   * ui-accessibility/AUD-UIA-001 / D-12 / D-24), set only when
+   * `resolveGlassForegroundPalette` is active (Standard Light over an asset
+   * background). `GlassForegroundScope` re-provides it as `colors`; absent means
+   * the scope is a pass-through. Optional so literal constructions and test
+   * mocks stay valid.
+   */
+  glassColors?: ThemePalette;
 }
 
 /**

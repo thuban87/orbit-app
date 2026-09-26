@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { applyAccent, resolveAccent } from "../accents";
-import { type BackgroundAssetSlot, BACKGROUND_SLOTS } from "../backgrounds";
+import { BACKGROUND_SLOTS, type BackgroundAssetSlot } from "../backgrounds";
 import {
   AA_LARGE,
   AA_NORMAL,
@@ -127,9 +127,10 @@ function assertClearsExtrema(
 ) {
   const { dark, bright } = slotComposites(tint, opacity, slot);
   const e = evaluateOverExtrema(fg, dark, bright);
-  expect(e.ratioDark, `${label}: vs darkest composite ${dark}`).toBeGreaterThanOrEqual(
-    floor,
-  );
+  expect(
+    e.ratioDark,
+    `${label}: vs darkest composite ${dark}`,
+  ).toBeGreaterThanOrEqual(floor);
   expect(
     e.ratioBright,
     `${label}: vs brightest composite ${bright}`,

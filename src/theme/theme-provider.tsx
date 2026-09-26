@@ -3,14 +3,24 @@ import { createContext, useContext, useMemo } from "react";
 import { useColorScheme } from "react-native";
 import { useThemeStore } from "@/stores/theme-store";
 import { applyAccent, resolveAccent } from "./accents";
+import { resolveBackground } from "./backgrounds";
+import { resolveGlassForegroundPalette } from "./glass-foregrounds";
 import {
   DEFAULT_PRESET_ID,
   resolveMode,
   resolvePalette,
 } from "./theme-presets";
-import type { ResolvedTheme } from "./theme-types";
+import type { ResolvedTheme, ThemePalette } from "./theme-types";
 
 export const ThemeContext = createContext<ResolvedTheme | null>(null);
+
+/**
+ * The ROOT resolved theme (RG-029 / D-24). Provided once by `ThemeProvider` with
+ * the same value as the root `ThemeContext` and NEVER overridden, so an opaque
+ * overlay nested inside a glass scope can restore the normal hierarchy via
+ * `UnscopedTheme`.
+ */
+export const RootThemeContext = createContext<ResolvedTheme | null>(null);
 
 interface ThemeProviderProps {
   children: React.ReactNode;
@@ -42,6 +52,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const standardMode = useThemeStore((s) => s.standardMode);
   const galaxyAccent = useThemeStore((s) => s.galaxyAccent);
   const standardAccent = useThemeStore((s) => s.standardAccent);
+  const galaxyBackground = useThemeStore((s) => s.galaxyBackground);
+  const standardBackground = useThemeStore((s) => s.standardBackground);
   const scheme = useColorScheme();
 
   const theme = useMemo<ResolvedTheme>(() => {
@@ -51,10 +63,24 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     // The active package's OWN stored accent-id (NULL -> package default tone).
     const accentId = themePackage === "galaxy" ? galaxyAccent : standardAccent;
     const tone = resolveAccent(accentId, themePackage, resolved);
+    const colors = applyAccent(resolvePalette(themePackage, resolved), tone);
+    // Glass foreground scope (RG-029 / D-12 / D-24): active only when the
+    // active package's background resolves to a bundled asset (not `none`).
+    const backgroundId =
+      themePackage === "galaxy" ? galaxyBackground : standardBackground;
+    const glassColors = resolveGlassForegroundPalette({
+      palette: colors,
+      package: themePackage,
+      mode: resolved,
+      accentId,
+      backgroundIsAsset:
+        resolveBackground(themePackage, backgroundId).kind === "asset",
+    });
     return {
-      colors: applyAccent(resolvePalette(themePackage, resolved), tone),
+      colors,
       mode: resolved,
       package: themePackage,
+      ...(glassColors ? { glassColors } : {}),
     };
   }, [
     themePackage,
@@ -62,12 +88,67 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     standardMode,
     galaxyAccent,
     standardAccent,
+    galaxyBackground,
+    standardBackground,
     scheme,
   ]);
 
   return (
-    <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
+    <RootThemeContext.Provider value={theme}>
+      <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
+    </RootThemeContext.Provider>
   );
+}
+
+/**
+ * Re-provide the theme with the glass foreground palette (RG-029 / D-24) for a
+ * GlassSurface card, ChromeScrim or ShellAppBar subtree. When the override is
+ * inactive (`glassColors` unset — Galaxy, Standard Dark, the `none` background)
+ * this renders its children unchanged. Nested scopes are idempotent.
+ */
+export function GlassForegroundScope({
+  children,
+}: {
+  children?: React.ReactNode;
+}) {
+  const theme = useTheme();
+  const glassColors = theme.glassColors;
+  const scoped = useMemo<ResolvedTheme | null>(
+    () =>
+      glassColors && theme.colors !== glassColors
+        ? { ...theme, colors: glassColors }
+        : null,
+    [theme, glassColors],
+  );
+  if (!scoped) {
+    return <>{children}</>;
+  }
+  return (
+    <ThemeContext.Provider value={scoped}>{children}</ThemeContext.Provider>
+  );
+}
+
+/**
+ * Restore the ROOT theme for an opaque surface (sheet, dialog, menu) rendered
+ * inside a glass scope, so it keeps the normal text hierarchy (RG-029 / D-24).
+ * Outside a provider it renders its children unchanged.
+ */
+export function UnscopedTheme({ children }: { children?: React.ReactNode }) {
+  const root = useContext(RootThemeContext);
+  if (!root) {
+    return <>{children}</>;
+  }
+  return <ThemeContext.Provider value={root}>{children}</ThemeContext.Provider>;
+}
+
+/**
+ * The glass foreground palette for a component that draws its OWN glass/chrome
+ * backing (ShellAppBar) and so cannot sit inside its own scope: `glassColors`
+ * when the override is active, otherwise the current `colors`.
+ */
+export function useGlassForegroundColors(): ThemePalette {
+  const theme = useTheme();
+  return theme.glassColors ?? theme.colors;
 }
 
 /**

@@ -7,5 +7,13 @@
 
 export * from "./theme-option-ids";
 export * from "./theme-presets";
-export { ThemeContext, ThemeProvider, useTheme } from "./theme-provider";
+export {
+  GlassForegroundScope,
+  RootThemeContext,
+  ThemeContext,
+  ThemeProvider,
+  UnscopedTheme,
+  useGlassForegroundColors,
+  useTheme,
+} from "./theme-provider";
 export * from "./theme-types";

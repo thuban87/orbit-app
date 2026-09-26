@@ -17,11 +17,16 @@
  * LOCATION exemption cannot become an escape hatch. The default card treatment uses
  * its mode-aware token helper; Orrery callers opt into the separately AA-proven
  * controlled-canvas treatment without creating a parallel component family.
+ *
+ * GLASS FOREGROUND SCOPE (RG-029 / ui-accessibility/AUD-UIA-001 / D-24): the
+ * card treatment wraps its content in `GlassForegroundScope`, so descendants read
+ * the proof-validated glass palette (`resolveGlassForegroundPalette`) — in
+ * Standard Light over an asset, `textSecondary` resolves to `textPrimary`.
  */
 import { BlurView } from "expo-blur";
 import type { ReactNode } from "react";
 import { type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
-import { useTheme } from "@/theme";
+import { GlassForegroundScope, useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import {
   cardTintOpacity,
@@ -114,7 +119,17 @@ export function GlassSurface({
         ]}
         pointerEvents="none"
       />
-      <View style={styles.content}>{children}</View>
+      {/* Card content renders on this glass, so it sees the glass foreground
+          palette (RG-029 / D-12 / D-24: Standard Light over an asset resolves
+          secondary text to primary). The Orrery overlay keeps the root palette
+          under its own ADR-149 proof. */}
+      <View style={styles.content}>
+        {treatment === "card" ? (
+          <GlassForegroundScope>{children}</GlassForegroundScope>
+        ) : (
+          children
+        )}
+      </View>
     </View>
   );
 }

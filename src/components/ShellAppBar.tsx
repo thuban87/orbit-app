@@ -3,7 +3,11 @@ import { type ReactNode, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { resolveBackIntent } from "@/navigation/back-intent";
 import { shellTransientStore } from "@/stores/shell-transient-store";
-import { useTheme } from "@/theme";
+import {
+  GlassForegroundScope,
+  useGlassForegroundColors,
+  useTheme,
+} from "@/theme";
 import { chromeScrimOpacity } from "@/theme/tokens/surface";
 import { type OverflowAction, OverflowMenu } from "./OverflowMenu";
 
@@ -42,6 +46,10 @@ export function ShellAppBar({
   trailingLabelProbe,
 }: ShellAppBarProps) {
   const { colors, mode, package: themePackage } = useTheme();
+  // The bar draws its OWN chrome scrim below, so its title/Back read the glass
+  // foreground palette directly (RG-029 / D-24: Standard Light over an asset
+  // resolves the secondary Back label to primary).
+  const glassColors = useGlassForegroundColors();
   const navigation = useNavigation();
   const [rootWidth, setRootWidth] = useState(0);
   const [titleWidth, setTitleWidth] = useState(0);
@@ -115,7 +123,9 @@ export function ShellAppBar({
           onPress={onBack}
           style={styles.back}
         >
-          <Text style={[styles.backLabel, { color: colors.textSecondary }]}>
+          <Text
+            style={[styles.backLabel, { color: glassColors.textSecondary }]}
+          >
             Back
           </Text>
         </Pressable>
@@ -131,15 +141,19 @@ export function ShellAppBar({
           );
           setTitleWidth((current) => (current === width ? current : width));
         }}
-        style={[styles.title, { color: colors.textPrimary }]}
+        style={[styles.title, { color: glassColors.textPrimary }]}
       >
         {title}
       </Text>
       {trailingContent ? (
-        <View style={styles.trailing}>{trailingContent}</View>
+        <View style={styles.trailing}>
+          <GlassForegroundScope>{trailingContent}</GlassForegroundScope>
+        </View>
       ) : null}
       {overflow && overflow.length > 0 ? (
-        <OverflowMenu actions={overflow} />
+        <GlassForegroundScope>
+          <OverflowMenu actions={overflow} />
+        </GlassForegroundScope>
       ) : null}
       {trailingLabelProbe ? (
         <View

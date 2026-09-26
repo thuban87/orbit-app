@@ -20,13 +20,15 @@
  * this module in the node/vitest harness never evaluates a `.webp` require. The
  * resolvers return the thunk (uncalled); only `BackgroundHost` invokes it on device.
  *
- * DECLARED-VS-DECODED (REVIEWS 23-06 cycle-4 MEDIUM): each asset carries a declared
- * worst-case `brightestPixel` — a design CONSTRAINT the shipped `.webp` must not
- * exceed, used by the surface.test composited-AA proof. Nothing here decodes the
- * committed bytes, so the shipped asset is enforced against this pixel by the
- * per-asset device-UAT (23-VALIDATION.md Manual-Only), not the node test. The
- * placeholder assets are uniform-fill webps whose single colour IS the declared
- * pixel (README provenance rows); final art must stay at or below it.
+ * DECLARED-VS-DECODED (REVIEWS 23-06 cycle-4 MEDIUM; RG-029 / D-12): each asset
+ * carries a declared worst-case `brightestPixel` AND `darkestPixel` — design
+ * CONSTRAINTS the shipped `.webp` must stay within, used by the surface.test
+ * both-extrema composited-AA proof. Nothing here decodes the committed bytes; the
+ * committed `scripts/measure-background-extrema.py` does (Pillow): it composites
+ * every decoded pixel under every card/chrome tint regime of the slot's package
+ * and `--check` fails if either declared bound does not enclose that regime's
+ * decoded COMPOSITE extremum. Run it whenever an asset is added or changed
+ * (docs/runbooks/theme-visual-system-maintenance.md).
  */
 
 import { BACKGROUND_SLOT_IDS, type BackgroundSlotId } from "./theme-option-ids";
@@ -47,6 +49,16 @@ export interface BackgroundAssetSlot {
    * placeholder uniform-fill assets this equals the fill colour (README rows).
    */
   brightestPixel: string;
+  /**
+   * Declared worst-case (darkest representative) `#RRGGBB` pixel — the dark-end
+   * composited-AA design bound the shipped asset must not undercut (RG-029 /
+   * ui-accessibility/AUD-UIA-001 / D-12). Dark text is limited by the DARKEST
+   * composite, so the proof composites every tint over BOTH this pixel and
+   * `brightestPixel`. Reported by `scripts/measure-background-extrema.py` as the
+   * channel-wise MIN of the raw-darkest pixel and every regime's composite-argmin
+   * pixel; `--check` fails if the decoded asset undercuts it.
+   */
+  darkestPixel: string;
 }
 
 /**
@@ -63,41 +75,49 @@ export const BACKGROUND_SLOTS: Record<
     package: "galaxy",
     source: () => require("../../assets/backgrounds/galaxy-deep-space.webp"),
     brightestPixel: "#1A1F35",
+    darkestPixel: "#000000",
   },
   "galaxy-starfield": {
     package: "galaxy",
     source: () => require("../../assets/backgrounds/galaxy-starfield.webp"),
     brightestPixel: "#202545",
+    darkestPixel: "#000000",
   },
   "galaxy-nebula": {
     package: "galaxy",
     source: () => require("../../assets/backgrounds/galaxy-nebula.webp"),
     brightestPixel: "#2A2148",
+    darkestPixel: "#000003",
   },
   "galaxy-aurora": {
     package: "galaxy",
     source: () => require("../../assets/backgrounds/galaxy-aurora.webp"),
     brightestPixel: "#16303A",
+    darkestPixel: "#000103",
   },
   "standard-dawn": {
     package: "standard",
     source: () => require("../../assets/backgrounds/standard-dawn.webp"),
     brightestPixel: "#E8D8C0",
+    darkestPixel: "#D09E76",
   },
   "standard-paper": {
     package: "standard",
     source: () => require("../../assets/backgrounds/standard-paper.webp"),
     brightestPixel: "#EDE6D8",
+    darkestPixel: "#B4997A",
   },
   "standard-dusk": {
     package: "standard",
     source: () => require("../../assets/backgrounds/standard-dusk.webp"),
     brightestPixel: "#C8B0C0",
+    darkestPixel: "#292634",
   },
   "standard-mesh": {
     package: "standard",
     source: () => require("../../assets/backgrounds/standard-mesh.webp"),
     brightestPixel: "#B8C4D0",
+    darkestPixel: "#3A5069",
   },
 };
 
@@ -146,6 +166,8 @@ export type ResolvedBackground =
       source: () => number;
       /** The asset's declared worst-case brightest pixel (composited-AA bound). */
       brightestPixel: string;
+      /** The asset's declared worst-case darkest pixel (composited-AA bound, RG-029). */
+      darkestPixel: string;
     }
   | { kind: "solid" };
 
@@ -169,6 +191,7 @@ function resolveAssetById(slotId: BackgroundSlotId): ResolvedBackground {
     slotId,
     source: slot.source,
     brightestPixel: slot.brightestPixel,
+    darkestPixel: slot.darkestPixel,
   };
 }
 
@@ -201,6 +224,7 @@ export function resolveBackground(
     slotId,
     source: slot.source,
     brightestPixel: slot.brightestPixel,
+    darkestPixel: slot.darkestPixel,
   };
 }
 

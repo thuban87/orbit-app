@@ -15,10 +15,15 @@
  * per-asset AA of that opacity is proven in `surface.test.ts`.
  *
  * Cards do NOT use this — they already back their own text via `GlassSurface`.
+ *
+ * GLASS FOREGROUND SCOPE (RG-029 / ui-accessibility/AUD-UIA-001 / D-24): the
+ * children render inside `GlassForegroundScope`, so chrome text reads the
+ * proof-validated glass palette (Standard Light over an asset resolves
+ * `textSecondary` to `textPrimary`).
  */
 import type { ReactNode } from "react";
 import { type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
-import { useTheme } from "@/theme";
+import { GlassForegroundScope, useTheme } from "@/theme";
 import { chromeScrimOpacity } from "@/theme/tokens/surface";
 
 export interface ChromeScrimProps {
@@ -42,7 +47,7 @@ export function ChromeScrim({ children, style, radius }: ChromeScrimProps) {
           radius !== undefined ? { borderRadius: radius } : null,
         ]}
       />
-      {children}
+      <GlassForegroundScope>{children}</GlassForegroundScope>
     </View>
   );
 }
