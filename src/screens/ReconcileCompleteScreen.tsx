@@ -1,14 +1,25 @@
-import { useCallback, useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { getExecutor } from "@/db/database";
 import {
   type ReconcileCompletionCounts,
   reconcileCompletionCounts,
 } from "@/db/reconcile-session-read";
+import { type ReadPhase, readLoading, runGatedRead } from "@/logic/read-phase";
 import { navigationRef } from "@/navigation/linking";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
+import { createLatestRequestAuthority } from "@/utils/latest-request";
+import { Logger } from "@/utils/logger";
+
+const LOG_SCOPE = "reconcile-complete";
 
 function interactionLabel(count: number): string {
   return `${count} interaction${count === 1 ? "" : "s"}`;
@@ -43,29 +54,69 @@ export function ReconcileCompleteScreen({
   route,
 }: RootStackScreenProps<"ReconcileComplete">) {
   const { colors } = useTheme();
-  const [counts, setCounts] = useState<ReconcileCompletionCounts | null>(null);
-  const [failed, setFailed] = useState(false);
-  const load = useCallback(async () => {
-    setCounts(
-      await reconcileCompletionCounts(getExecutor(), route.params.sessionId),
-    );
-    setFailed(false);
-  }, [route.params.sessionId]);
+  // RG-035 / D-24: the initial read is a real loading state; the read-error
+  // copy renders only after the read actually failed. Only the latest request
+  // may publish (D-23); Retry re-reads and never re-runs the check.
+  const [phase, setPhase] =
+    useState<ReadPhase<ReconcileCompletionCounts>>(readLoading);
+  const authority = useMemo(() => createLatestRequestAuthority(), []);
+  const load = useCallback(async (): Promise<void> => {
+    await runGatedRead({
+      gate: authority,
+      read: () =>
+        reconcileCompletionCounts(getExecutor(), route.params.sessionId),
+      publish: setPhase,
+      onError: (error) =>
+        Logger.error(LOG_SCOPE, "failed to load check summary", error),
+    });
+  }, [authority, route.params.sessionId]);
   useEffect(() => {
-    void load().catch(() => setFailed(true));
-  }, [load]);
+    void load();
+    return () => authority.invalidate();
+  }, [authority, load]);
 
-  if (failed || counts === null)
+  if (phase.phase === "loading")
     return (
       <View style={styles.root}>
         <Text style={[styles.title, { color: colors.textPrimary }]}>
           Check complete
         </Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Couldn&apos;t load the check summary. Please go back and try again.
-        </Text>
+        <View
+          testID="reconcile-complete-loading"
+          accessibilityLabel="Loading check summary"
+          style={styles.center}
+        >
+          <ActivityIndicator color={colors.accent} />
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            Loading check summary…
+          </Text>
+        </View>
       </View>
     );
+  if (phase.phase === "error")
+    return (
+      <View testID="reconcile-complete-read-error" style={styles.root}>
+        <Text style={[styles.title, { color: colors.textPrimary }]}>
+          Check complete
+        </Text>
+        <Text style={[styles.body, { color: colors.textSecondary }]}>
+          Couldn&apos;t load the check summary.
+        </Text>
+        <Pressable
+          testID="reconcile-complete-retry"
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading the check summary"
+          onPress={() => void load()}
+          style={[
+            styles.secondaryButton,
+            { borderColor: colors.border, backgroundColor: colors.surface },
+          ]}
+        >
+          <Text style={{ color: colors.textPrimary }}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  const counts = phase.data;
   return (
     <View testID="reconcile-complete-screen" style={styles.root}>
       <Text style={[styles.title, { color: colors.textPrimary }]}>
@@ -113,6 +164,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, padding: 16, gap: 16 },
   title: { fontSize: 24, fontWeight: "700" },
   body: { fontSize: 15, lineHeight: 21 },
+  center: { alignItems: "center", justifyContent: "center", gap: 12 },
   counts: { gap: 10 },
   footerEntry: {
     borderWidth: 1,

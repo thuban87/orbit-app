@@ -141,3 +141,4 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 | 2026-09-03 | 24.1 | Extended merge reparenting with typed contact-knowledge rows, self-link safety, and current-state collision preservation. |
 | 2026-09-02 | 33 | Added owner-locked same-event merge refusal before reparenting and user-visible membership remediation. |
 | 2026-09-23 | 38.2 | Preserved source-option identity through reconciliation, recorded the complete reviewed comparable, and excluded ambiguous scalars from bulk source apply. |
+| 2026-09-25 | 38.3 | Reconcile summary loading vs error (RG-035): Reconcile Complete shows a real loading state during its read and "Couldn't load the check summary" with a read-only Retry only after the read fails. |

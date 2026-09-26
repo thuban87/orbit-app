@@ -213,3 +213,4 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | 2026-09-02 | 34 | Added focused Update Contact knowledge editors, registry-keyed rapid Memory creation, and complete-edit transaction composition. |
 | 2026-09-02 | 35 | Added populated-only, read-only Compose Research with source-owned eligibility and structural Off Limits Avoid context. |
 | 2026-09-02 | 36 | Added creation-time AI permission defaults, central review, and bounded resolved-prompt Memory context. |
+| 2026-09-25 | 38.3 | Memory screen read-error state; editor never opens over a failed read (RG-035): loading, then the editor over successfully read Memories or "Couldn't load memories" with Retry; a failed re-read after a committed restore/delete/AI-permission write shows the read error without undoing or retrying the write. |
