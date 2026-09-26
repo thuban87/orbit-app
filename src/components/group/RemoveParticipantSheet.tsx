@@ -11,6 +11,8 @@ interface RemoveParticipantSheetProps {
   onDelete: () => void;
   onKeep: () => void;
   onRequestClose: () => void;
+  /** A remove is in flight: Delete/Keep are disabled (review A-WR-03). */
+  busy?: boolean;
 }
 
 /** Shared three-intent removal choice for group-edit and participant-card flows. */
@@ -20,6 +22,7 @@ export function RemoveParticipantSheet({
   onDelete,
   onKeep,
   onRequestClose,
+  busy = false,
 }: RemoveParticipantSheetProps) {
   return (
     <Sheet visible={visible} onRequestClose={onRequestClose} variant="compact">
@@ -30,11 +33,13 @@ export function RemoveParticipantSheet({
         <Button
           role="destructive"
           label="Delete interaction"
+          disabled={busy}
           onPress={onDelete}
         />
         <Button
           role="secondary"
           label="Keep as individual interaction"
+          disabled={busy}
           onPress={onKeep}
         />
         <Button role="tertiary" label="Cancel" onPress={onRequestClose} />

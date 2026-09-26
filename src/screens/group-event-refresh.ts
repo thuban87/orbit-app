@@ -13,12 +13,17 @@
  *   committed ids stay excluded from the picker so a re-pick cannot trip the
  *   (unchanged) DAO duplicate-participant guard.
  *
- * Pure: type-only imports plus the latest-request authority. No React, no
- * react-native, no database runtime.
+ * Pure: type-only imports plus the latest-request authority and the
+ * single-flight latch. No React, no react-native, no database runtime.
  */
 import type { TouchpointRefineValue } from "@/components/TouchpointRefineForm";
 import type { GroupEventDetail } from "@/db/group-events-read";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
+import {
+  beginInFlight,
+  endInFlight,
+  type InFlightRef,
+} from "@/utils/single-flight";
 
 export interface EventDraft {
   value: TouchpointRefineValue;
@@ -55,6 +60,12 @@ export interface GroupEventEditState {
   readonly refreshError: boolean;
   /** Committed participant ids not yet reflected by a successful refresh. */
   readonly committedPendingIds: readonly number[];
+  /**
+   * Interaction ids whose remove committed but no successful refresh has
+   * dropped them yet (review A-WR-03). Their rows are hidden so a stale
+   * Edit/Remove cannot target a child that is no longer a member.
+   */
+  readonly committedRemovedIds: readonly number[];
 }
 
 export type GroupEventEditAction =
@@ -62,6 +73,7 @@ export type GroupEventEditAction =
   | { type: "initialLoadFailed" }
   | { type: "draftChanged"; draft: EventDraft }
   | { type: "participantsCommitted"; contactIds: readonly number[] }
+  | { type: "participantRemoved"; interactionId: number }
   | { type: "eventRefreshed"; event: GroupEventDetail }
   | { type: "refreshFailed" };
 
@@ -72,6 +84,7 @@ export const initialGroupEventEditState: GroupEventEditState = {
   loadError: false,
   refreshError: false,
   committedPendingIds: [],
+  committedRemovedIds: [],
 };
 
 export function groupEventEditReducer(
@@ -93,6 +106,7 @@ export function groupEventEditReducer(
         loadError: false,
         refreshError: false,
         committedPendingIds: [],
+        committedRemovedIds: [],
       };
     }
     case "initialLoadFailed":
@@ -104,6 +118,16 @@ export function groupEventEditReducer(
       for (const contactId of action.contactIds) pending.add(contactId);
       return { ...state, committedPendingIds: [...pending] };
     }
+    case "participantRemoved":
+      return state.committedRemovedIds.includes(action.interactionId)
+        ? state
+        : {
+            ...state,
+            committedRemovedIds: [
+              ...state.committedRemovedIds,
+              action.interactionId,
+            ],
+          };
     case "eventRefreshed":
       // Event only. `draft` and `baseline` are deliberately untouched, even
       // when the refreshed values happen to equal the draft (D-17).
@@ -112,6 +136,7 @@ export function groupEventEditReducer(
         event: action.event,
         refreshError: false,
         committedPendingIds: [],
+        committedRemovedIds: [],
       };
     case "refreshFailed":
       return { ...state, refreshError: true };
@@ -198,4 +223,60 @@ export function excludedParticipantIds(
   const ids = new Set(event?.participants.map(({ contactId }) => contactId));
   for (const contactId of committedPendingIds) ids.add(contactId);
   return [...ids];
+}
+
+/** The saved participants minus rows whose remove already committed. */
+export function visibleParticipants(
+  event: GroupEventDetail,
+  committedRemovedIds: readonly number[],
+): GroupEventDetail["participants"] {
+  if (committedRemovedIds.length === 0) return event.participants;
+  const removed = new Set(committedRemovedIds);
+  return event.participants.filter(
+    ({ interactionId }) => !removed.has(interactionId),
+  );
+}
+
+export interface RunParticipantRemoveOptions {
+  /** Per-screen synchronous latch against a double tap on Delete/Keep. */
+  latch: InFlightRef;
+  /** The one `deleteGroupChild` / `detachParticipant` write. */
+  remove: () => Promise<void>;
+  /** Record the committed removal (hide the stale row) before any readback. */
+  onCommitted: () => void;
+  /** Report a REJECTED write. Never called once the write committed. */
+  onWriteFailed: (error: unknown) => void;
+  /** The screen's controller refresh; its failure is reported there. */
+  refresh: () => Promise<void>;
+}
+
+/**
+ * Remove one participant (38.3 review A-WR-03; the remove-side mirror of
+ * `runParticipantAdd`, D-19/D-04). A same-tick second tap is "busy" and never
+ * runs a second write — that second write used to throw "not a member" and
+ * show "Your changes weren't saved" for a remove that had committed. Only a
+ * rejected first write is "failed"; a committed remove hides its row and
+ * refreshes detached, so a failed readback is the screen's refresh error.
+ */
+export async function runParticipantRemove({
+  latch,
+  remove,
+  onCommitted,
+  onWriteFailed,
+  refresh,
+}: RunParticipantRemoveOptions): Promise<"committed" | "failed" | "busy"> {
+  if (!beginInFlight(latch)) return "busy";
+  try {
+    try {
+      await remove();
+    } catch (error) {
+      onWriteFailed(error);
+      return "failed";
+    }
+    onCommitted();
+    void refresh().catch(() => undefined);
+    return "committed";
+  } finally {
+    endInFlight(latch);
+  }
 }

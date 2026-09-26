@@ -40,6 +40,7 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
+import type { InFlightRef } from "@/utils/single-flight";
 import {
   createGroupEventRefreshController,
   eventDraft,
@@ -48,6 +49,8 @@ import {
   initialGroupEventEditState,
   isGroupEventDraftDirty,
   runParticipantAdd,
+  runParticipantRemove,
+  visibleParticipants,
 } from "./group-event-refresh";
 
 const GROUP_FUTURE_DATE_MESSAGE = "Group events can't be in the future.";
@@ -68,6 +71,8 @@ export function EditGroupEventScreen({
     useState<ParticipantEditDraft | null>(null);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [removing, setRemoving] = useState<GroupEventParticipant | null>(null);
+  const [removePending, setRemovePending] = useState(false);
+  const removeLatch = useRef<InFlightRef>({ current: false });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bypassRef = useRef(false);
@@ -171,28 +176,42 @@ export function EditGroupEventScreen({
     });
   }
 
+  // 38.3 review A-WR-03 (D-04): latched, and only a rejected first write is
+  // "not saved". A committed remove hides its row until a successful refresh,
+  // so a stale Edit/Remove can never target a child that is gone.
   async function removeParticipant(keep: boolean) {
-    if (!removing) return;
-    try {
-      if (keep) {
-        await detachParticipant(getExecutor(), {
-          groupEventId,
-          interactionId: removing.interactionId,
-          now: localDateTime(),
+    const target = removing;
+    if (!target) return;
+    setRemovePending(true);
+    const result = await runParticipantRemove({
+      latch: removeLatch.current,
+      remove: () =>
+        keep
+          ? detachParticipant(getExecutor(), {
+              groupEventId,
+              interactionId: target.interactionId,
+              now: localDateTime(),
+            })
+          : deleteGroupChild(getExecutor(), {
+              groupEventId,
+              interactionId: target.interactionId,
+              contactId: target.contactId,
+              now: localDateTime(),
+            }),
+      onCommitted: () => {
+        dispatch({
+          type: "participantRemoved",
+          interactionId: target.interactionId,
         });
-      } else {
-        await deleteGroupChild(getExecutor(), {
-          groupEventId,
-          interactionId: removing.interactionId,
-          contactId: removing.contactId,
-          now: localDateTime(),
-        });
-      }
-      setRemoving(null);
-      void refreshEvent();
-    } catch {
-      setError("Couldn't update the group event. Your changes weren't saved.");
-    }
+        setRemoving(null);
+      },
+      onWriteFailed: () =>
+        setError(
+          "Couldn't update the group event. Your changes weren't saved.",
+        ),
+      refresh: refreshEvent,
+    });
+    if (result !== "busy") setRemovePending(false);
   }
 
   async function saveParticipant() {
@@ -278,7 +297,7 @@ export function EditGroupEventScreen({
         <View style={[styles.participants, { borderColor: colors.border }]}>
           <AppText role="label">Participants</AppText>
           <FlatList
-            data={event.participants}
+            data={visibleParticipants(event, state.committedRemovedIds)}
             keyExtractor={(participant) => String(participant.interactionId)}
             scrollEnabled={false}
             renderItem={({ item }) => (
@@ -343,6 +362,7 @@ export function EditGroupEventScreen({
       <RemoveParticipantSheet
         visible={removing !== null}
         participant={removing}
+        busy={removePending}
         onRequestClose={() => setRemoving(null)}
         onDelete={() => void removeParticipant(false)}
         onKeep={() => void removeParticipant(true)}

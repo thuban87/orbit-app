@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit Button/AppText `role` is a domain prop, not ARIA.
 import { useFocusEffect } from "@react-navigation/native";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, View } from "react-native";
 import { ContactPicker } from "@/components/ContactPicker";
 import { ParticipantCard } from "@/components/group/ParticipantCard";
@@ -25,6 +25,7 @@ import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import type { InFlightRef } from "@/utils/single-flight";
 import {
   buildGroupEventDetailInteraction,
   closeThenOpenParticipantProfile,
@@ -34,6 +35,8 @@ import {
   createGroupEventRefreshController,
   excludedParticipantIds,
   runParticipantAdd,
+  runParticipantRemove,
+  visibleParticipants,
 } from "./group-event-refresh";
 
 const DISSOLVE = {
@@ -69,6 +72,12 @@ export function GroupEventDetailScreen({
   >([]);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [removing, setRemoving] = useState<GroupEventParticipant | null>(null);
+  const [removePending, setRemovePending] = useState(false);
+  const removeLatch = useRef<InFlightRef>({ current: false });
+  // Committed removals not yet dropped by a successful refresh (A-WR-03).
+  const [committedRemovedIds, setCommittedRemovedIds] = useState<
+    readonly number[]
+  >([]);
   const [detail, setDetail] = useState<GroupEventParticipant | null>(null);
   const [confirm, setConfirm] = useState<"dissolve" | "delete" | null>(null);
 
@@ -80,6 +89,7 @@ export function GroupEventDetailScreen({
           setEvent(loaded);
           setReadFailed(false);
           setCommittedPendingIds([]);
+          setCommittedRemovedIds([]);
         },
         onRefreshFailed: () => setReadFailed(true),
       }),
@@ -115,30 +125,44 @@ export function GroupEventDetailScreen({
         ]),
       refresh,
     });
+  // 38.3 review A-WR-03 (D-04): latched, and only a rejected first write shows
+  // the write error. A committed remove hides its row until a successful
+  // refresh, so a stale Remove/Edit can never target a child that is gone.
   const remove = async (keep: boolean) => {
-    if (!removing) return;
+    const target = removing;
+    if (!target) return;
     setWriteError(false);
-    try {
-      if (keep)
-        await detachParticipant(getExecutor(), {
-          groupEventId,
-          interactionId: removing.interactionId,
-          now: localDateTime(),
-        });
-      else
-        await deleteGroupChild(getExecutor(), {
-          groupEventId,
-          interactionId: removing.interactionId,
-          contactId: removing.contactId,
-          now: localDateTime(),
-        });
-    } catch {
-      setRemoving(null);
-      setWriteError(true);
-      return;
-    }
-    setRemoving(null);
-    void refresh();
+    setRemovePending(true);
+    const result = await runParticipantRemove({
+      latch: removeLatch.current,
+      remove: () =>
+        keep
+          ? detachParticipant(getExecutor(), {
+              groupEventId,
+              interactionId: target.interactionId,
+              now: localDateTime(),
+            })
+          : deleteGroupChild(getExecutor(), {
+              groupEventId,
+              interactionId: target.interactionId,
+              contactId: target.contactId,
+              now: localDateTime(),
+            }),
+      onCommitted: () => {
+        setCommittedRemovedIds((current) =>
+          current.includes(target.interactionId)
+            ? current
+            : [...current, target.interactionId],
+        );
+        setRemoving(null);
+      },
+      onWriteFailed: () => {
+        setRemoving(null);
+        setWriteError(true);
+      },
+      refresh,
+    });
+    if (result !== "busy") setRemovePending(false);
   };
   const lifecycle = async () => {
     if (!confirm) return;
@@ -197,7 +221,7 @@ export function GroupEventDetailScreen({
         ]}
       />
       <FlatList
-        data={event.participants}
+        data={visibleParticipants(event, committedRemovedIds)}
         keyExtractor={(item) => String(item.interactionId)}
         contentContainerStyle={styles.content}
         ListHeaderComponent={
@@ -267,6 +291,7 @@ export function GroupEventDetailScreen({
       <RemoveParticipantSheet
         visible={removing !== null}
         participant={removing}
+        busy={removePending}
         onRequestClose={() => setRemoving(null)}
         onDelete={() => void remove(false)}
         onKeep={() => void remove(true)}

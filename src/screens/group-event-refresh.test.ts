@@ -24,6 +24,8 @@ import {
   initialGroupEventEditState,
   isGroupEventDraftDirty,
   runParticipantAdd,
+  runParticipantRemove,
+  visibleParticipants,
 } from "./group-event-refresh";
 
 function deferred<T>() {
@@ -394,8 +396,10 @@ describe("groupEventEditReducer — participant work preserves the parent draft 
     expect(source).not.toMatch(/\bawait load\(/);
     expect(source.match(/type: "initialLoaded"/g)).toHaveLength(1);
     expect(source).toContain('type: "draftChanged"');
+    // Participant work re-reads through the controller: direct calls plus the
+    // add/remove seams that take it as their detached `refresh` (A-WR-03).
     expect(
-      source.match(/refreshEvent\(\)/g)?.length ?? 0,
+      source.match(/refreshEvent\(\)|refresh: refreshEvent\b/g)?.length ?? 0,
     ).toBeGreaterThanOrEqual(3);
   });
 });
@@ -514,5 +518,88 @@ describe("runParticipantAdd against node-sqlite (T-38.3-06-01)", () => {
       "is already a group participant",
     );
     expect(await childCount(groupEventId, blair)).toBe(1);
+  });
+});
+
+describe("runParticipantRemove — a committed remove is never 'not saved' (38.3 review A-WR-03, D-04)", () => {
+  it("only a rejected FIRST write reports failure", async () => {
+    const onCommitted = vi.fn();
+    const onWriteFailed = vi.fn();
+    const refresh = vi.fn(async () => {});
+    const result = await runParticipantRemove({
+      latch: { current: false },
+      remove: () => Promise.reject(new Error("db")),
+      onCommitted,
+      onWriteFailed,
+      refresh,
+    });
+    expect(result).toBe("failed");
+    expect(onWriteFailed).toHaveBeenCalledTimes(1);
+    expect(onCommitted).not.toHaveBeenCalled();
+    expect(refresh).not.toHaveBeenCalled();
+  });
+
+  it("a committed remove whose refresh fails is still committed (the refresh reports its own error)", async () => {
+    const onWriteFailed = vi.fn();
+    const onCommitted = vi.fn();
+    const result = await runParticipantRemove({
+      latch: { current: false },
+      remove: async () => {},
+      onCommitted,
+      onWriteFailed,
+      refresh: () => Promise.reject(new Error("read")),
+    });
+    expect(result).toBe("committed");
+    expect(onCommitted).toHaveBeenCalledTimes(1);
+    expect(onWriteFailed).not.toHaveBeenCalled();
+  });
+
+  it("drops a same-tick double tap so the remove runs once and nothing reports 'not saved'", async () => {
+    const latch = { current: false };
+    const gate = deferred<void>();
+    const remove = vi.fn(() => gate.promise);
+    const onWriteFailed = vi.fn();
+    const opts = {
+      latch,
+      remove,
+      onCommitted: vi.fn(),
+      onWriteFailed,
+      refresh: async () => {},
+    };
+    const first = runParticipantRemove(opts);
+    const second = runParticipantRemove(opts);
+    expect(await second).toBe("busy");
+    gate.resolve();
+    expect(await first).toBe("committed");
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(onWriteFailed).not.toHaveBeenCalled();
+    expect(latch.current).toBe(false);
+  });
+});
+
+describe("committed removals hide stale rows until a successful refresh (38.3 review A-WR-03)", () => {
+  it("filters a committed-removed row out of the rendered participants", () => {
+    const event = detail([participant(1), participant(2)]);
+    expect(
+      visibleParticipants(event, [20]).map(({ contactId }) => contactId),
+    ).toEqual([1]);
+  });
+
+  it("the reducer records a committed removal, keeps it across a failed refresh, and clears it on success", () => {
+    const loaded = detail([participant(1), participant(2)]);
+    const afterRemove = reduceAll(initialGroupEventEditState, [
+      { type: "initialLoaded", event: loaded },
+      { type: "participantRemoved", interactionId: 20 },
+      { type: "refreshFailed" },
+    ]);
+    expect(afterRemove.committedRemovedIds).toEqual([20]);
+    expect(afterRemove.refreshError).toBe(true);
+    // Draft/baseline are untouched by participant work (D-17).
+    expect(isGroupEventDraftDirty(afterRemove)).toBe(false);
+    const refreshed = groupEventEditReducer(afterRemove, {
+      type: "eventRefreshed",
+      event: detail([participant(1)]),
+    });
+    expect(refreshed.committedRemovedIds).toEqual([]);
   });
 });
