@@ -50,12 +50,17 @@ import { ActivityHeatmap } from "@/components/history/ActivityHeatmap";
 import { DateDetailSheet } from "@/components/history/DateDetailSheet";
 import { HeatmapContextCard } from "@/components/history/HeatmapContextCard";
 import {
+  advanceHistoryDay,
   buildLogRoute,
   countByCycle,
   type HistoryReadState,
+  historyDayAfterLensChange,
+  historyDayAfterNext,
+  historyDayAfterPrev,
   historyReadStateOnFail,
   historyReadStateOnPublish,
   historyReadStateOnStart,
+  initialHistoryDayState,
   initialHistoryReadState,
   isEmptyHistory,
   resolveActiveWindow,
@@ -166,11 +171,15 @@ export function HistorySection({
 }: HistorySectionProps) {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const today = useMemo(() => formatLocalDate(new Date()), []);
+  // D-12: `today` + the window reference + the explicit following-today flag,
+  // re-evaluated with formatLocalDate() on mount and every parent revision.
+  const [day, setDay] = useState(() =>
+    initialHistoryDayState(formatLocalDate(new Date())),
+  );
+  const { today, refDate } = day;
 
   const [lens, setLens] = useState<HistoryLens>("cycles");
   const [cycleCount, setCycleCount] = useState<HistoryCycleCount>(10);
-  const [refDate, setRefDate] = useState(today);
   const [readState, setReadState] = useState<HistoryReadState<ContactHistory>>(
     initialHistoryReadState,
   );
@@ -211,24 +220,26 @@ export function HistorySection({
   // Revision-driven read (38.3 RG-024): runs on mount (which also covers
   // expand-after-collapse) and on every parent Profile publication. There is
   // no independent focus read — the parent's focus load produces the revision.
+  // The same moment re-evaluates "today" (D-12): a following view advances to
+  // the new day, a picked past window stays put. No timer (D-22).
   // biome-ignore lint/correctness/useExhaustiveDependencies: `revision` is the re-read trigger.
   useEffect(() => {
+    setDay((current) =>
+      advanceHistoryDay(current, formatLocalDate(new Date())),
+    );
     void load();
   }, [load, revision]);
 
   // --- Persisted lens / preset (global app_settings, never per-contact) ------
-  const onLensChange = useCallback(
-    (next: HistoryLens) => {
-      setLens(next);
-      setRefDate(today);
-      void updateAppSettings(
-        getExecutor(),
-        { historyLens: next },
-        localDateTime(),
-      );
-    },
-    [today],
-  );
+  const onLensChange = useCallback((next: HistoryLens) => {
+    setLens(next);
+    setDay(historyDayAfterLensChange);
+    void updateAppSettings(
+      getExecutor(),
+      { historyLens: next },
+      localDateTime(),
+    );
+  }, []);
   const onPresetChange = useCallback((next: HistoryCycleCount) => {
     setCycleCount(next);
     void updateAppSettings(
@@ -276,11 +287,15 @@ export function HistorySection({
   }, [lens, cyclesResult, window, impactInputs]);
 
   const onPrev = useCallback(() => {
-    if (window) setRefDate(prevWindow(window, today).ref);
-  }, [window, today]);
+    if (window) setDay(historyDayAfterPrev(day, prevWindow(window, today).ref));
+  }, [day, window, today]);
   const onNext = useCallback(() => {
-    if (window) setRefDate(nextWindow(window, today).ref);
-  }, [window, today]);
+    if (window) {
+      setDay(
+        historyDayAfterNext(day, window.lens, nextWindow(window, today).ref),
+      );
+    }
+  }, [day, window, today]);
   const canGoNext = window ? window.end < today : false;
 
   // --- Cross-surface routing helpers -----------------------------------------
@@ -469,10 +484,10 @@ export function HistorySection({
             setConversionError(null);
             setConverting(true);
           }}
-          onDeleted={() => {
-            setDetailId(null);
-            void load();
-          }}
+          // Close only: InteractionDetail publishes the shell tick, which
+          // reloads the Profile snapshot, whose revision re-reads History — one
+          // trigger for every projection (architecture/AUD-ARCH-004).
+          onDeleted={() => setDetailId(null)}
         />
       ) : null}
       <GroupTitlePromptSheet

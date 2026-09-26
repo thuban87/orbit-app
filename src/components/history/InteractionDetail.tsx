@@ -46,6 +46,7 @@ import { getExecutor, localDateTime } from "@/db/database";
 import type { HistoryInteractionRecord } from "@/db/history-read";
 import { deleteTouchpoint } from "@/db/recency-dao";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
+import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 
@@ -76,7 +77,11 @@ export interface InteractionDetailProps {
   onConvertToGroup?: () => void;
   /** Optional host-owned route to the interaction owner's Profile. */
   onViewProfile?: () => void;
-  /** Called after a confirmed successful delete (parent closes + refreshes). */
+  /**
+   * Called after a confirmed successful delete, AFTER the widget notify and the
+   * shell tick have been published (the parent closes; shell subscribers
+   * refresh).
+   */
   onDeleted: () => void;
 }
 
@@ -125,7 +130,11 @@ export function InteractionDetail({
         interactionId: interaction.id,
         now: localDateTime(),
       });
+      // Publish once to every consumer (widget + shell tick): the Profile
+      // snapshot, its History revision, Home, Digest and Orrery all converge
+      // (38.3 RG-024, architecture/AUD-ARCH-004).
       notifyWidgetDataChanged();
+      bumpShellRefresh();
       setConfirmVisible(false);
       setDeleting(false);
       onDeleted();

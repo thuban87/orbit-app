@@ -156,3 +156,66 @@ export function historyReadStateOnPublish<T>(
 ): HistoryReadState<T> {
   return { phase: "loaded", data, refreshError: false };
 }
+
+/**
+ * History's day state (38.3 D-12; react-native/AUD-RN-009). `today` is the
+ * local date the section last evaluated; `refDate` is the date its window is
+ * built around; `followingToday` is the explicit flag — distinct from
+ * `refDate` — that says whether the user is viewing the current window.
+ *
+ * On a new local day a following view advances its window to the new today,
+ * while a past window the user picked stays put. Every today-bound limit
+ * (next-window navigation, Rolodex max day, Log prefill, cycles `now`) reads
+ * `today`, so it always follows the new day. Day changes are detected only on
+ * lifecycle events (mount, Profile revision) — never a timer (D-22). All dates
+ * are local `YYYY-MM-DD` strings from `formatLocalDate()`; no UTC slicing.
+ */
+export interface HistoryDayState {
+  readonly today: string;
+  readonly refDate: string;
+  readonly followingToday: boolean;
+}
+
+export function initialHistoryDayState(today: string): HistoryDayState {
+  return { today, refDate: today, followingToday: true };
+}
+
+/** Re-evaluate "today". Same date → the same object (no re-render churn). */
+export function advanceHistoryDay(
+  state: HistoryDayState,
+  nowLocal: string,
+): HistoryDayState {
+  if (nowLocal === state.today) return state;
+  return state.followingToday
+    ? { today: nowLocal, refDate: nowLocal, followingToday: true }
+    : { ...state, today: nowLocal };
+}
+
+/** A lens change always returns to the current window. */
+export function historyDayAfterLensChange(
+  state: HistoryDayState,
+): HistoryDayState {
+  return initialHistoryDayState(state.today);
+}
+
+/** Stepping back always leaves the current window. */
+export function historyDayAfterPrev(
+  state: HistoryDayState,
+  prevRef: string,
+): HistoryDayState {
+  return { today: state.today, refDate: prevRef, followingToday: false };
+}
+
+/** Stepping forward follows today again once the window contains today. */
+export function historyDayAfterNext(
+  state: HistoryDayState,
+  lens: DateLens,
+  nextRef: string,
+): HistoryDayState {
+  const window = buildWindow(lens, nextRef, state.today);
+  return {
+    today: state.today,
+    refDate: nextRef,
+    followingToday: window.start <= state.today && state.today <= window.end,
+  };
+}
