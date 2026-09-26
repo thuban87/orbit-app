@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
 import { AppText, Button, ConfirmDialog, GlassSurface } from "@/components/ui";
+import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import {
   type AiPermissionCategory,
   type AiPermissionDefaults,
@@ -29,14 +30,14 @@ import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import {
   type AiPermissionTypeFilter,
+  buildPermissionSummaryCopy,
   filterAiPermissionItems,
   groupAiPermissionItems,
+  isPermissionFilterActive,
   selectedPermissionRefs,
-  summarizePermissionView,
 } from "./ai-permissions-logic";
 
 const LOG_SCOPE = "ai-permissions";
-const EMPTY_COPY = "AI can't access any contact information yet.";
 const DEFAULT_NOTE = "Changing this affects new items only.";
 
 const TYPE_CHIPS: FilterChip<AiPermissionTypeFilter>[] = [
@@ -85,6 +86,9 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Only a successful read backs a count (38.4 AUD-UIA-013): until the first
+  // read lands the empty `items` array is not "AI can access nothing".
+  const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -95,6 +99,7 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
       ]);
       setDefaults(nextDefaults);
       setItems(nextItems);
+      setLoaded(true);
       setError(null);
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to load AI permissions", caught);
@@ -116,7 +121,23 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
     [enabledOnly, items, query, typeFilter],
   );
   const groups = useMemo(() => groupAiPermissionItems(filtered), [filtered]);
-  const summary = useMemo(() => summarizePermissionView(filtered), [filtered]);
+  // Access totals come from the UNFILTERED enabled items; the filtered view gets
+  // its own "Showing N of M" line; no count prints without a clean read
+  // (38.4 RG-008; ui-accessibility/AUD-UIA-013; D-17).
+  const summaryCopy = useMemo(
+    () =>
+      buildPermissionSummaryCopy({
+        allItems: items,
+        filteredItems: filtered,
+        filterActive: isPermissionFilterActive({
+          query,
+          type: typeFilter,
+          enabledOnly,
+        }),
+        loadFailed: !loaded || error !== null,
+      }),
+    [enabledOnly, error, filtered, items, loaded, query, typeFilter],
+  );
   const refs = useMemo(
     () => selectedPermissionRefs(items, selected),
     [items, selected],
@@ -226,6 +247,7 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
                       setTypeFilter(row.category);
                       setEnabledOnly(false);
                     }}
+                    style={styles.reviewLink}
                   >
                     <AppText role="caption" style={{ color: colors.accent }}>
                       Review existing…
@@ -279,10 +301,16 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
               thumbColor={colors.surfaceElevated}
             />
           </View>
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            AI can currently access information from {summary.contacts} contacts
-            · {summary.items} items
-          </AppText>
+          {summaryCopy.accessLine !== null ? (
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              {summaryCopy.accessLine}
+            </AppText>
+          ) : null}
+          {summaryCopy.showingLine !== null ? (
+            <AppText role="caption" style={{ color: colors.textSecondary }}>
+              {summaryCopy.showingLine}
+            </AppText>
+          ) : null}
 
           {error ? (
             <AppText
@@ -295,9 +323,11 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
           ) : null}
 
           {groups.length === 0 ? (
-            <GlassSurface density="dense" style={styles.card}>
-              <AppText role="body">{EMPTY_COPY}</AppText>
-            </GlassSurface>
+            summaryCopy.emptyLine !== null ? (
+              <GlassSurface density="dense" style={styles.card}>
+                <AppText role="body">{summaryCopy.emptyLine}</AppText>
+              </GlassSurface>
+            ) : null
           ) : (
             groups.map((group) => {
               const expanded = expandedContact === group.contactUid;
@@ -431,6 +461,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: SPACING.md,
     padding: SPACING.base,
+  },
+  // The "Review existing…" link meets the 44dp floor with its own box — no
+  // overlapping hitSlop (38.4 RG-030; ui-accessibility/AUD-UIA-006).
+  reviewLink: {
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    minHeight: MIN_TOUCH_TARGET,
   },
   item: {
     alignItems: "center",
