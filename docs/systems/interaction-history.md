@@ -78,6 +78,21 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 
 Visible local timestamps use `formatDateTimeMinuteOrFallback()` from `src/utils/dates.ts`. It preserves stored local-wall-clock values and structured raw fields, renders a 12-hour minute-precision default, and displays `Unknown time` rather than exposing malformed raw storage. Relative language remains separate.
 
+Rows that already sit within a known day render the clock alone through the paired time-only helper `formatTimeMinuteOrFallback()` (38.4, RG-038 `ui-accessibility/AUD-UIA-018`, D-07). Both helpers share one private clock renderer and the module-private `TIME_FORMAT`, so a time-only row and a date-time field can never disagree: `00:00` → `12:00 AM`, `12:00` → `12:00 PM`, `23:59` → `11:59 PM`, and seconds are truncated (`09:05:59` → `9:05 AM`, `09:06:00` → `9:06 AM`). The formatters are display-only — stored precision, native editing precision and local-date handling are unchanged, and there is no 12/24-hour preference. Never slice `HH:MM` out of the stored string: that yields 24-hour text that disagrees with every other surface.
+
+Covered explicit-timestamp consumers (visible text **and** accessibility labels):
+
+| Consumer | Helper |
+|---|---|
+| History `DateDetailSheet` rows (interaction, lifecycle, knowledge) | `formatTimeMinuteOrFallback` |
+| Digest Your Week `DigestDayDetail` rows | `formatTimeMinuteOrFallback` |
+| Group Event Detail "When" | `formatDateTimeMinuteOrFallback` |
+| Touchpoint refine form date/time value (38.4 Plan 06) | `formatDateTimeMinuteOrFallback` |
+| Restore preview source date (38.4 Plan 05) | `formatDateTimeMinuteOrFallback` |
+| Group Events list date-time (rides with 38.4 Plan 12; not yet landed at Plan 07) | shared minute formatters |
+
+`src/utils/timestamp-consumer-contract.test.ts` pins the History, Digest and Group Event Detail consumers to the shared helpers.
+
 ### Sharing history language with Digest
 
 1. Digest reuses `classifyHeatmapCell`, theme heatmap tokens, and accessible structural selection from this subsystem rather than recreating a second visual grammar.
@@ -174,3 +189,4 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | 2026-09-25 | 38.3 | History now reads on the parent Profile revision rather than its own focus hook; ADR-123's on-focus read is preserved via that revision. Interaction deletes publish the shell tick. "Today" is re-evaluated per revision with `formatLocalDate`, and the explicit following-today state implements D-12 without timers. Read failures show error/refresh notices with Retry (RG-024). |
 | 2026-09-25 | 38.3 | Reveal entry points (RG-021, D-10, D-11, D-28): the Profile's Last Interaction tile and Orbit Status → View history now scroll to this section and expand it through the persisted collapse toggle, instead of routing to Things to Remember. The section's period/selection is never reset by the reveal. Neither entry point exists when the layout hides History. |
 | 2026-09-26 | 38.3 | The persisted lens and cycle preset are adopted from revision re-reads only until the user picks locally, so a re-read that started before the settings write committed can no longer revert the choice; a failed write logs content-free and reverts explicitly unless a newer choice superseded it (review A-WR-08). |
+| 2026-09-26 | 38.4 | Shared minute timestamps for remaining consumers (RG-038, ui-accessibility/AUD-UIA-018): added the time-only `formatTimeMinute`/`formatTimeMinuteOrFallback` pair; History date-detail and Digest day-detail rows (text and a11y labels) and Group Event Detail "When" now render 12-hour minute-precision time instead of 24-hour slices or raw storage. |

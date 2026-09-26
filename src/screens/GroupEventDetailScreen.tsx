@@ -25,6 +25,7 @@ import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 import type { InFlightRef } from "@/utils/single-flight";
 import {
   buildGroupEventDetailInteraction,
@@ -245,7 +246,12 @@ export function GroupEventDetailScreen({
                 Couldn't update this group event. Please try again.
               </AppText>
             ) : null}
-            <DetailField label="When" value={event.occurredAt} />
+            {/* RG-038 (ui-accessibility/AUD-UIA-018, D-07): display-only minute
+                precision; the edit flow keeps the stored value. */}
+            <DetailField
+              label="When"
+              value={formatDateTimeMinuteOrFallback(event.occurredAt)}
+            />
             <DetailField label="Channel" value={event.channel} />
             <DetailField label="Tone" value={event.quality} />
             <DetailField

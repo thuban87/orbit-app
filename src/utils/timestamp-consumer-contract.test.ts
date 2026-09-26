@@ -105,8 +105,8 @@ describe("timestamp consumer contract (RG-038)", () => {
 
   it("GroupEventDetailScreen renders When through the date-time formatter, never raw", () => {
     const source = read("src/screens/GroupEventDetailScreen.tsx");
-    expect(source).toContain(
-      'label="When" value={formatDateTimeMinuteOrFallback(event.occurredAt)}',
+    expect(source).toMatch(
+      /label="When"\s+value=\{formatDateTimeMinuteOrFallback\(event\.occurredAt\)\}/,
     );
     expect(source).not.toMatch(/value=\{event\.occurredAt\}/);
   });

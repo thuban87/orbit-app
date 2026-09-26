@@ -8,8 +8,14 @@ import { Button } from "@/components/ui/Button";
 import type { YourWeekDayRow } from "@/db/your-week-read";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { formatTimeMinuteOrFallback } from "@/utils/dates";
 
 const AVATAR_SIZE = 36;
+
+// Row times (visible caption AND accessibility label) use the shared time-only
+// minute formatter — the rows sit within the known selected day, so a clock is
+// enough; 12-hour AM/PM, no seconds, neutral fallback (RG-038
+// ui-accessibility/AUD-UIA-018, 38.4 D-07, ADR-152).
 
 export interface DigestDayDetailProps {
   date: string;
@@ -21,10 +27,6 @@ export interface DigestDayDetailProps {
   /** Re-read the same day with a fresh request (error state's Retry). */
   onRetry: () => void;
   testID?: string;
-}
-
-function timeOf(occurredAt: string): string {
-  return occurredAt.slice(11, 16);
 }
 
 export function DigestDayDetail({
@@ -96,7 +98,7 @@ function renderDayRows(
           <View
             key={`group-event-${row.id}`}
             testID={`${testID}-group-event-${row.id}`}
-            accessibilityLabel={`Event, ${row.title ?? "Group Event"}, ${timeOf(row.occurredAt)}`}
+            accessibilityLabel={`Event, ${row.title ?? "Group Event"}, ${formatTimeMinuteOrFallback(row.occurredAt)}`}
             style={[styles.row, { borderColor: colors.border }]}
           >
             <Icon name="group-events" tone="textPrimary" size="sm" />
@@ -106,7 +108,7 @@ function renderDayRows(
                 {row.title ?? "Group Event"}
               </AppText>
               <AppText role="caption" style={{ color: colors.textSecondary }}>
-                {timeOf(row.occurredAt)}
+                {formatTimeMinuteOrFallback(row.occurredAt)}
               </AppText>
             </View>
           </View>
@@ -114,7 +116,7 @@ function renderDayRows(
           <View
             key={`interaction-${row.id}`}
             testID={`${testID}-interaction-${row.id}`}
-            accessibilityLabel={`Interaction with ${row.contactName ?? "Unknown contact"}, ${timeOf(row.occurredAt)}`}
+            accessibilityLabel={`Interaction with ${row.contactName ?? "Unknown contact"}, ${formatTimeMinuteOrFallback(row.occurredAt)}`}
             style={[styles.row, { borderColor: colors.border }]}
           >
             <Avatar
@@ -129,7 +131,7 @@ function renderDayRows(
                 {row.contactName ?? "Unknown contact"}
               </AppText>
               <AppText role="caption" style={{ color: colors.textSecondary }}>
-                {timeOf(row.occurredAt)}
+                {formatTimeMinuteOrFallback(row.occurredAt)}
               </AppText>
             </View>
           </View>
