@@ -96,17 +96,6 @@ const PROOF_EXCLUSIONS: readonly ProofExclusion[] = [
     status: "accepted",
     inventoryRef: "E-1",
   },
-  {
-    token: "accentText",
-    package: "galaxy",
-    mode: "light",
-    accentId: "coral",
-    treatment: "card",
-    status: "held-for-owner",
-    justification:
-      "Galaxy Light coral link text (#B03A26, the shared accents.ts light tone) measures 4.48:1 against the presentation-density opaque card (0.88 over the darkest Galaxy pixel, composite #DDDEE0); comfortable/dense cards and chrome clear it (5.01/5.49). A Galaxy regime and a curated accent tone are owner-bucket under the D-24 STOP rule, so nothing is retuned and it is held for the owner.",
-    inventoryRef: "E-7",
-  },
 ];
 
 function isExcluded(
@@ -814,6 +803,19 @@ describe("proof exclusions are written down against the committed inventory (D-2
         mode: "dark",
       }),
     ]);
+  });
+
+  it("E-7 is resolved (owner ruling D-28): Galaxy Light coral accentText is asserted in every regime, not excluded", () => {
+    for (const treatment of ["card", "chrome"] as const) {
+      expect(
+        isExcluded("accentText", "galaxy", "light", {
+          accentId: "coral",
+          treatment,
+        }),
+        `galaxy/light coral ${treatment}`,
+      ).toBe(false);
+    }
+    expect(PROOF_EXCLUSIONS.some((e) => e.inventoryRef === "E-7")).toBe(false);
   });
 
   it("every held-for-owner exclusion is fully scoped and named as an open owner question in the inventory", () => {
