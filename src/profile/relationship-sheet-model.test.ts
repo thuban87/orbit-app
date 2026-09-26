@@ -174,6 +174,7 @@ describe("relationship explanations", () => {
           },
         },
         insightsAvailable: true,
+        historyAvailable: true,
       }),
     ).toEqual({
       title: "Orbit Status",
@@ -198,6 +199,7 @@ describe("relationship explanations", () => {
           context: "Set a contact frequency to see Orbit Status.",
         },
         insightsAvailable: false,
+        historyAvailable: true,
       }),
     ).toEqual({
       title: "Orbit Status",
@@ -205,6 +207,76 @@ describe("relationship explanations", () => {
       details: ["Set a contact frequency to see Orbit Status."],
       routes: ["history"],
     });
+  });
+
+  // 38.3 RG-021 (D-11): when the Profile layout omits History, the Status
+  // sheet offers no History route — Insights is unaffected.
+  const AVAILABLE_STATUS = {
+    available: true,
+    label: "Steady",
+    visualValue: 0.2,
+    context: "6 of 30 days since the last interaction.",
+    factors: {
+      lastContact: "2026-09-13 09:00:00",
+      intervalDays: 30,
+      progress: 0.2,
+      rarelyResponds: false,
+      rogueReason: null,
+    },
+  } as const;
+  const UNAVAILABLE_STATUS = {
+    available: false,
+    label: "Not tracked",
+    context: "Set a contact frequency to see Orbit Status.",
+  } as const;
+
+  it("omits the History route when History is not available (D-11)", () => {
+    expect(
+      relationshipExplanation({
+        kind: "status",
+        metric: AVAILABLE_STATUS,
+        insightsAvailable: true,
+        historyAvailable: false,
+      }).routes,
+    ).toEqual(["insights"]);
+    expect(
+      relationshipExplanation({
+        kind: "status",
+        metric: AVAILABLE_STATUS,
+        insightsAvailable: false,
+        historyAvailable: false,
+      }).routes ?? [],
+    ).toEqual([]);
+  });
+
+  it("offers no routes for an unavailable Status when History is not available", () => {
+    expect(
+      relationshipExplanation({
+        kind: "status",
+        metric: UNAVAILABLE_STATUS,
+        insightsAvailable: true,
+        historyAvailable: false,
+      }).routes ?? [],
+    ).toEqual([]);
+  });
+
+  it("keeps the History route unchanged when History is available", () => {
+    expect(
+      relationshipExplanation({
+        kind: "status",
+        metric: AVAILABLE_STATUS,
+        insightsAvailable: false,
+        historyAvailable: true,
+      }).routes,
+    ).toEqual(["history"]);
+    expect(
+      relationshipExplanation({
+        kind: "status",
+        metric: UNAVAILABLE_STATUS,
+        insightsAvailable: false,
+        historyAvailable: true,
+      }).routes,
+    ).toEqual(["history"]);
   });
 
   it("explains Gravity and Intensity without making either editable", () => {
