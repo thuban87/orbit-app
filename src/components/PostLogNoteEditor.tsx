@@ -31,6 +31,7 @@ import {
 import { listMemoriesForContact, type MemoryRow } from "@/db/memories-read";
 import { editTouchpointFull } from "@/db/recency-dao";
 import {
+  commitThenReReadMemory,
   resolvePostCreateMemoryTarget,
   resolvePostLogSave,
 } from "@/screens/post-log-note-logic";
@@ -176,29 +177,36 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
       }
       if (result.target !== "memory") return;
       const now = localDateTime();
-      const id = await addMemory(getExecutor(), {
-        contactId,
-        type: result.type,
-        value: result.value,
-        createdAt: now,
-        now,
+      // 38.3 review B-CR-01 (D-04): only a rejected addMemory is a failed save.
+      // Once it resolves the Memory durably exists and creation is TERMINAL
+      // (review WR-02): the shell tick (D-21) and the re-read run OUTSIDE the
+      // write's error path, so a failed re-read closes the editor instead of
+      // re-offering "Create Memory Instead" (which created a duplicate).
+      const outcome = await commitThenReReadMemory({
+        write: () =>
+          addMemory(getExecutor(), {
+            contactId,
+            type: result.type,
+            value: result.value,
+            createdAt: now,
+            now,
+          }),
+        publish: bumpShellRefresh,
+        reRead: (id) => reReadCreatedMemory(id, contactId),
+        onPostCommitError: (stage, err) =>
+          Logger.error(LOG_SCOPE, `memory ${stage} failed after commit`, err),
       });
-      // 38.3 D-21: published BEFORE the re-read so a failed re-read cannot
-      // suppress the signal for a Memory that already committed.
-      bumpShellRefresh();
-      // The Memory now durably exists — creation is TERMINAL (review WR-02). A
-      // null re-read must NOT fall back to the re-submittable Add-Note surface
-      // (that allowed a duplicate on a second tap); close instead.
-      const row = await reReadCreatedMemory(id, contactId);
-      const next = resolvePostCreateMemoryTarget(row);
+      if (outcome.kind === "write-failed") {
+        Logger.error(LOG_SCOPE, "failed to create memory", outcome.error);
+        setError(SAVE_FAILED_MESSAGE);
+        return;
+      }
+      const next = resolvePostCreateMemoryTarget(outcome.row);
       if (next.target === "close") {
         onClose();
         return;
       }
       setCreatedMemory(next.row);
-    } catch (err) {
-      Logger.error(LOG_SCOPE, "failed to create memory", err);
-      setError(SAVE_FAILED_MESSAGE);
     } finally {
       savingRef.current = false;
     }
@@ -207,23 +215,34 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
   const onEditMemory = useCallback(
     async (id: number, patch: MemoryEditPatch): Promise<boolean> => {
       if (contactId === null) return false;
-      try {
-        await editMemory(getExecutor(), {
-          id,
-          contactId,
-          ...patch,
-          now: localDateTime(),
-        });
-        bumpShellRefresh();
-        const row = await reReadCreatedMemory(id, contactId);
-        setCreatedMemory(row);
-        return true;
-      } catch (err) {
-        Logger.error(LOG_SCOPE, "failed to edit memory", err);
+      // 38.3 review B-CR-01: a resolved editMemory is a successful save even if
+      // the re-read fails. A missing re-read row closes the editor rather than
+      // dropping back to the re-submittable Add-Note surface.
+      const outcome = await commitThenReReadMemory({
+        write: () =>
+          editMemory(getExecutor(), {
+            id,
+            contactId,
+            ...patch,
+            now: localDateTime(),
+          }),
+        publish: bumpShellRefresh,
+        reRead: () => reReadCreatedMemory(id, contactId),
+        onPostCommitError: (stage, err) =>
+          Logger.error(LOG_SCOPE, `memory ${stage} failed after edit`, err),
+      });
+      if (outcome.kind === "write-failed") {
+        Logger.error(LOG_SCOPE, "failed to edit memory", outcome.error);
         return false;
       }
+      if (outcome.row === null) {
+        onClose();
+        return true;
+      }
+      setCreatedMemory(outcome.row);
+      return true;
     },
-    [contactId, reReadCreatedMemory],
+    [contactId, onClose, reReadCreatedMemory],
   );
 
   // showAdd is false in this bound context, so onAdd is never reached; it is

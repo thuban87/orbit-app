@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { DEFAULT_MEMORY_TYPE_KEY } from "@/db/memory-registry";
 import {
+  commitThenReReadMemory,
   type PostLogSaveResult,
   resolvePostCreateMemoryTarget,
   resolvePostLogSave,
@@ -115,5 +116,72 @@ describe("resolvePostCreateMemoryTarget (WR-02)", () => {
     expect(resolvePostCreateMemoryTarget<null>(null)).toEqual({
       target: "close",
     });
+  });
+});
+
+describe("commitThenReReadMemory — a committed Memory is never reported as failed (38.3 review B-CR-01, D-04)", () => {
+  it("reports write-failed only when the write itself rejects, and never publishes or re-reads", async () => {
+    const publish = vi.fn();
+    const reRead = vi.fn();
+    const outcome = await commitThenReReadMemory({
+      write: () => Promise.reject(new Error("disk")),
+      publish,
+      reRead,
+    });
+    expect(outcome.kind).toBe("write-failed");
+    expect(publish).not.toHaveBeenCalled();
+    expect(reRead).not.toHaveBeenCalled();
+  });
+
+  it("returns committed with the re-read row on the happy path, publishing before the re-read", async () => {
+    const order: string[] = [];
+    const outcome = await commitThenReReadMemory({
+      write: async () => {
+        order.push("write");
+        return 7;
+      },
+      publish: () => order.push("publish"),
+      reRead: async (id) => {
+        order.push(`reRead:${id}`);
+        return { id, value: "coffee" };
+      },
+    });
+    expect(order).toEqual(["write", "publish", "reRead:7"]);
+    expect(outcome).toEqual({
+      kind: "committed",
+      row: { id: 7, value: "coffee" },
+    });
+  });
+
+  it("returns committed with a null row (never write-failed) when the post-commit re-read throws", async () => {
+    const outcome = await commitThenReReadMemory({
+      write: async () => 7,
+      publish: () => {},
+      reRead: () => Promise.reject(new Error("read failed")),
+    });
+    expect(outcome.kind).toBe("committed");
+    if (outcome.kind === "committed") {
+      expect(outcome.row).toBeNull();
+      expect(outcome.reReadFailed).toBe(true);
+    }
+    // A null committed row closes the editor — terminal, no re-submittable surface.
+    if (outcome.kind === "committed") {
+      expect(resolvePostCreateMemoryTarget(outcome.row)).toEqual({
+        target: "close",
+      });
+    }
+  });
+
+  it("returns committed even when the publisher throws", async () => {
+    const reRead = vi.fn(async () => ({ id: 3 }));
+    const outcome = await commitThenReReadMemory({
+      write: async () => 3,
+      publish: () => {
+        throw new Error("publisher");
+      },
+      reRead,
+    });
+    expect(outcome).toEqual({ kind: "committed", row: { id: 3 } });
+    expect(reRead).toHaveBeenCalledTimes(1);
   });
 });

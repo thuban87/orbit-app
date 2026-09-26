@@ -108,3 +108,44 @@ export function resolvePostCreateMemoryTarget<T>(
   }
   return { target: "edit", row: reReadRow };
 }
+
+/** Outcome of {@link commitThenReReadMemory}. */
+export type CommitThenReReadOutcome<T> =
+  | { kind: "write-failed"; error: unknown }
+  | { kind: "committed"; row: T | null; reReadFailed?: boolean };
+
+/**
+ * Run a Memory write, publish it, then re-read the row (38.3 review B-CR-01,
+ * D-04). Only a rejected WRITE is reported as `write-failed`. Once the write
+ * resolves the outcome is `committed` no matter what happens next: a throwing
+ * publisher is swallowed, and a throwing re-read yields `row: null` with
+ * `reReadFailed: true`. The caller must treat `committed` as terminal and never
+ * offer the write again (a replay here created a duplicate Memory).
+ */
+export async function commitThenReReadMemory<Id, T>(steps: {
+  readonly write: () => Promise<Id>;
+  readonly publish: () => void;
+  readonly reRead: (id: Id) => Promise<T | null>;
+  readonly onPostCommitError?: (
+    stage: "publish" | "re-read",
+    error: unknown,
+  ) => void;
+}): Promise<CommitThenReReadOutcome<T>> {
+  let id: Id;
+  try {
+    id = await steps.write();
+  } catch (error) {
+    return { kind: "write-failed", error };
+  }
+  try {
+    steps.publish();
+  } catch (error) {
+    steps.onPostCommitError?.("publish", error);
+  }
+  try {
+    return { kind: "committed", row: await steps.reRead(id) };
+  } catch (error) {
+    steps.onPostCommitError?.("re-read", error);
+    return { kind: "committed", row: null, reReadFailed: true };
+  }
+}
