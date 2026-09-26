@@ -115,9 +115,74 @@ measurements for performance claims.
 RG-008, RG-027, RG-028, RG-029, RG-030, RG-031, RG-032, RG-033, RG-034,
 RG-036, RG-037, RG-038, RG-039, RG-040, RG-041.
 
+> 2026-09-26: RG-032 moved to the widget-overhaul phase (D-16). The 38.3
+> loose ends were added as Workstream I (D-10).
+
 ## GSD Planning Guidance
 
 Bundle small consistency fixes into coherent plans instead of generating
 one plan per RG. Keep investigation-first items conditional. Preserve
 original RG/finding IDs and verification expectations so repo-audit
 verification can trace the work later.
+
+## Owner Decisions (discuss session, 2026-09-26)
+
+Grounding check (2026-09-26, `a8979c0`): 14 of 15 covered groups are
+STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
+`1e0139c`); its remaining accessible-selection work belongs to
+`AUD-UIA-008`. Line numbers have drifted since the audit.
+
+-   **[DECIDED · 2026-09-26] D-08 --- RG-041 launcher artwork is an
+    owner input before planning.** The owner supplies Orbit artwork
+    before plan-phase runs. The plan wires it into every active variant
+    (adaptive foreground/background, monochrome/themed, legacy
+    `icon.png`) and the About screen's icon. Package identity is
+    unchanged. `splash-icon.png` is unreferenced and not in scope unless
+    the owner supplies splash art too.
+-   **[DECIDED · 2026-09-26] D-09 --- RG-040: remove the overlay
+    permission from release only.** `SYSTEM_ALERT_WINDOW` is removed from
+    the production manifest through authored config. Debug/dev-client
+    builds keep it if they need it. No other permission changes;
+    READ_CONTACTS (ADR-003) stays.
+-   **[DECIDED · 2026-09-26] D-10 --- 38.3 loose ends fold into 38.4
+    (new Workstream I).** O-3 (Import Complete Need-review count stale
+    after DuplicateReview), A-WR-05 (Home favourite toggle bypasses the
+    publication seam), W2 (Digest/Profile read on a warm notification
+    action while backgrounded) and W3/O-1 (expo-sqlite
+    `ERR_USING_RELEASED_SHARED_OBJECT` during shell-tick fan-out; seen
+    once, so investigation comes first).
+-   **[DECIDED · 2026-09-26] D-11 --- Phase 40 keeps its stub list.**
+    38.4 covers its RGs, Workstream I and a targeted device pass. Phase
+    40 keeps H6 backup/scene contention, broad large-text reflow, large-
+    System Orrery performance, reduced-motion QA, AI loading/resume
+    heuristics and final release/signing checks.
+-   **[DECIDED · 2026-09-26] D-12 --- RG-029 contrast: foreground-only
+    fix.** Standard Light glass (0.5) and all artwork stay as they are.
+    Functional text on glass over Standard assets uses a foreground
+    token that passes the real worst-case composite, and the proof tests
+    the relevant extremum for each foreground. Backup/Restore actions
+    use role foregrounds (`onAccent`, and a verified danger foreground).
+-   **[DECIDED · 2026-09-26] D-13 --- RG-033 heatmaps: auto-size and
+    center.** The owner reports that Your Week does not overflow on the
+    narrow Moto Razr but leaves visible empty space on the right. The
+    Your Week grid sizes its cells from the measured width (bounded) and
+    is centered horizontally. Every day stays visible, with no
+    horizontal scroll. Other heatmaps get the same fit guarantee.
+-   **[DECIDED · 2026-09-26] D-14 --- RG-036: a persistent visible label
+    above each passphrase field.**
+-   **[DECIDED · 2026-09-26] D-15 --- RG-037 Settings chrome.** Remove
+    the in-body Back from every Settings child and keep only the header
+    (`ShellAppBar`) Back. Root rows get the Phase 37 `[DECIDED]` icon +
+    title + subtitle + chevron. The planner picks glyphs from the
+    existing semantic icon set, and the owner reviews them on the device
+    pass.
+-   **[DECIDED · 2026-09-26] D-16 --- RG-032 deferred to the
+    widget-overhaul phase** as a hard requirement there: the new widget
+    ships with named actions.
+
+## Revision Log
+
+-   2026-09-26 --- discuss session: grounding check (14/15 still
+    present; UIA-019 fixed in 38.2); owner decisions D-08..D-16;
+    TRIAGE.md selection recorded (RG-032 deferred to the widget
+    overhaul).

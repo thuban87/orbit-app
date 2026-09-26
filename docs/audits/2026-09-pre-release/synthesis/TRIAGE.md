@@ -15,7 +15,7 @@ Choose a destination for a group (select, defer, accept, investigate), record th
 | [RG-005](REMEDIATION-GROUPS.md#rg-005) — Legacy credential binding across restore investigation | S1 | Investigation only; synthetic-key supported upgrade/restore reproduction first. | Selected → Phase 38.2 (2026-09-23) |
 | [RG-006](REMEDIATION-GROUPS.md#rg-006) — Provider-scoped credential drafts | S1 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
 | [RG-007](REMEDIATION-GROUPS.md#rg-007) — Imported-note consent provenance | S1 | Existing imported permission flags need a separate owner policy if retrospective repair is proposed. | Selected → Phase 38.2 (2026-09-23) |
-| [RG-008](REMEDIATION-GROUPS.md#rg-008) — Current AI configuration and truthful permission presentation | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
+| [RG-008](REMEDIATION-GROUPS.md#rg-008) — Current AI configuration and truthful permission presentation | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.4 (2026-09-26) |
 | [RG-009](REMEDIATION-GROUPS.md#rg-009) — Restore reconciliation and committed graph integrity | S1 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
 | [RG-010](REMEDIATION-GROUPS.md#rg-010) — Canonical photo ownership across restore, merge and deletion | S1 | Coordinate canonical byte ownership; any filename-policy reversal needs owner approval. | Selected → Phase 38.2 (2026-09-23) |
 | [RG-011](REMEDIATION-GROUPS.md#rg-011) — Restore publication and partial-success reporting | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
@@ -34,21 +34,21 @@ Choose a destination for a group (select, defer, accept, investigate), record th
 | [RG-024](REMEDIATION-GROUPS.md#rg-024) — Profile history, metrics and calendar coherence | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.3 (2026-09-25) |
 | [RG-025](REMEDIATION-GROUPS.md#rg-025) — Profile relationship selector retry settlement | S3 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.3 (2026-09-25) |
 | [RG-026](REMEDIATION-GROUPS.md#rg-026) — Live Digest and truthful day-detail results | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.3 (2026-09-25) |
-| [RG-027](REMEDIATION-GROUPS.md#rg-027) — Orrery settled resource retirement | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-028](REMEDIATION-GROUPS.md#rg-028) — Bounded-period Your Week query access | S3 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-029](REMEDIATION-GROUPS.md#rg-029) — Theme contrast proof and semantic action foregrounds | S2 | Keep approved glass/protected hues; any visual-policy change needs owner review. | Pending |
-| [RG-030](REMEDIATION-GROUPS.md#rg-030) — Accessible and themed editor controls | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-031](REMEDIATION-GROUPS.md#rg-031) — Contact and review row identity, typography and accessible context | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-032](REMEDIATION-GROUPS.md#rg-032) — Native widget action accessibility | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-033](REMEDIATION-GROUPS.md#rg-033) — Heatmap and layout-preview width accounting | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-034](REMEDIATION-GROUPS.md#rg-034) — Large-text confirmation reachability investigation | S2 | Investigation only; large-text native reachability unproven. | Pending |
+| [RG-027](REMEDIATION-GROUPS.md#rg-027) — Orrery settled resource retirement | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.4 (2026-09-26) |
+| [RG-028](REMEDIATION-GROUPS.md#rg-028) — Bounded-period Your Week query access | S3 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.4 (2026-09-26) |
+| [RG-029](REMEDIATION-GROUPS.md#rg-029) — Theme contrast proof and semantic action foregrounds | S2 | Keep approved glass/protected hues; any visual-policy change needs owner review. | Selected → Phase 38.4 (2026-09-26) |
+| [RG-030](REMEDIATION-GROUPS.md#rg-030) — Accessible and themed editor controls | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.4 (2026-09-26) |
+| [RG-031](REMEDIATION-GROUPS.md#rg-031) — Contact and review row identity, typography and accessible context | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.4 (2026-09-26) |
+| [RG-032](REMEDIATION-GROUPS.md#rg-032) — Native widget action accessibility | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Deferred → widget-overhaul phase (owner 2026-09-26; hard requirement there) |
+| [RG-033](REMEDIATION-GROUPS.md#rg-033) — Heatmap and layout-preview width accounting | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.4 (2026-09-26) |
+| [RG-034](REMEDIATION-GROUPS.md#rg-034) — Large-text confirmation reachability investigation | S2 | Investigation only; large-text native reachability unproven. | Selected → Phase 38.4 (2026-09-26) |
 | [RG-035](REMEDIATION-GROUPS.md#rg-035) — Truthful asynchronous workflow presentation | S2 | Five screen branches OPEN; picker read-fallback subclaim held for CF-02 authority clarification. | Selected → Phase 38.3 (2026-09-25) |
-| [RG-036](REMEDIATION-GROUPS.md#rg-036) — Backup passphrase field identification | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-037](REMEDIATION-GROUPS.md#rg-037) — Settings directory and child chrome consistency | S3 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-038](REMEDIATION-GROUPS.md#rg-038) — Shared explicit timestamp presentation | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Pending |
-| [RG-039](REMEDIATION-GROUPS.md#rg-039) — Collapsed FAB accessibility investigation | S2 | Investigation only; hidden native FAB actions unproven. | Pending |
-| [RG-040](REMEDIATION-GROUPS.md#rg-040) — Production overlay permission inventory | S3 | Owner security-posture decision on unnecessary overlay permission. | Pending |
-| [RG-041](REMEDIATION-GROUPS.md#rg-041) — Orbit launcher identity | S3 | Owner must select/approve launcher artwork. | Pending |
+| [RG-036](REMEDIATION-GROUPS.md#rg-036) — Backup passphrase field identification | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.4 (2026-09-26) |
+| [RG-037](REMEDIATION-GROUPS.md#rg-037) — Settings directory and child chrome consistency | S3 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.4 (2026-09-26) |
+| [RG-038](REMEDIATION-GROUPS.md#rg-038) — Shared explicit timestamp presentation | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.4 (2026-09-26) |
+| [RG-039](REMEDIATION-GROUPS.md#rg-039) — Collapsed FAB accessibility investigation | S2 | Investigation only; hidden native FAB actions unproven. | Selected → Phase 38.4 (2026-09-26) |
+| [RG-040](REMEDIATION-GROUPS.md#rg-040) — Production overlay permission inventory | S3 | Owner security-posture decision on unnecessary overlay permission. | Selected → Phase 38.4 (2026-09-26) |
+| [RG-041](REMEDIATION-GROUPS.md#rg-041) — Orbit launcher identity | S3 | Owner must select/approve launcher artwork. | Selected → Phase 38.4 (2026-09-26) |
 | [RG-042](REMEDIATION-GROUPS.md#rg-042) — Cold/warm notification navigation chronology | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.3 (2026-09-25) |
 | [RG-043](REMEDIATION-GROUPS.md#rg-043) — Source-reconciliation choice identity | S2 | Select, defer or accept the bounded outcomes and verification in the group. | Selected → Phase 38.2 (2026-09-23) |
 
