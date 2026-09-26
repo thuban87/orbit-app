@@ -80,6 +80,21 @@ describe("Backup/Restore filled-action role foregrounds (RG-029 AUD-UIA-002)", (
     expect(apply).not.toContain("colors.textPrimary");
   });
 
+  it("Backup settings: every accent-filled primary action labels with onAccent", () => {
+    // Save schedule, Turn on encryption / Set a new passphrase, Save encryption
+    // change — the same misrole class as AUD-UIA-002 (was colors.background).
+    const regions = primaryButtonRegions(
+      read("src/screens/BackupSettingsScreen.tsx"),
+    );
+    expect(regions).toHaveLength(3);
+    for (const region of regions) {
+      expect(region).toContain("backgroundColor: colors.accent");
+      expect(labelColor(region)).toBe("colors.onAccent");
+      expect(region).not.toContain("colors.textPrimary");
+      expect(region).not.toContain("color: colors.background");
+    }
+  });
+
   it("Restore Result: the accent-filled return action labels with onAccent", () => {
     const regions = primaryButtonRegions(
       read("src/screens/RestoreResultScreen.tsx"),

@@ -583,7 +583,7 @@ export function BackupSettingsScreen({
                     { backgroundColor: colors.accent },
                   ]}
                 >
-                  <Text style={{ color: colors.background }}>
+                  <Text style={{ color: colors.onAccent }}>
                     Save schedule
                   </Text>
                 </Pressable>
@@ -669,7 +669,7 @@ export function BackupSettingsScreen({
                     },
                   ]}
                 >
-                  <Text style={{ color: colors.background }}>
+                  <Text style={{ color: colors.onAccent }}>
                     {encryptionFlow === "forgotten"
                       ? "Set a new passphrase for future backups"
                       : "Turn on encryption"}
@@ -793,7 +793,7 @@ export function BackupSettingsScreen({
                     },
                   ]}
                 >
-                  <Text style={{ color: colors.background }}>
+                  <Text style={{ color: colors.onAccent }}>
                     Save encryption change
                   </Text>
                 </Pressable>
