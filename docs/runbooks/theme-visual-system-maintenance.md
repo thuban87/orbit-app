@@ -4,7 +4,7 @@
 
 Use this process when adding a curated accent, bundled background slot, semantic theme token, or a complete theme package. It preserves Orbit's local-only appearance system, durable option-ID settings, token-only colour rule, and contrast/accessibility checks.
 
-## Architecture (Phases 23, 31, 31.1, 38.1)
+## Architecture (Phases 23, 31, 31.1, 38.1, 38.4)
 
 `app_settings` stores a package plus per-package mode, accent ID, and background ID. `ThemeProvider` resolves the active package and OS appearance, then applies a curated accent tone at render time. Palette hex values live only under `src/theme/`; screens receive resolved semantic tokens through `useTheme()`.
 
@@ -16,6 +16,7 @@ Use this process when adding a curated accent, bundled background slot, semantic
 4. **Background and shell** — `src/theme/backgrounds.ts` resolves a local asset or solid fallback; one `BackgroundHost` in `RootNavigator` renders it fixed behind transparent ordinary routes.
 5. **Route treatment** — `src/navigation/focused-route-classification.ts` selects presentation, comfortable, or dense treatment and suppresses the image only on the Orrery visualization.
 6. **Readable composition** — `src/theme/tokens/surface.ts` independently selects the host veil, mode-aware card tint, protected chrome opacity, and the controlled-canvas Orrery overlay treatment.
+7. **Glass foreground scope** — in Standard Light over an asset background only, `src/theme/glass-foregrounds.ts` resolves a `glassColors` palette. `GlassSurface` cards, `ChromeScrim` and the `ShellAppBar` re-provide it to their descendants through `GlassForegroundScope`. There `textSecondary` resolves to `textPrimary`, and the on-glass status hues, `rogue`, `danger` and every accent's `accentText` resolve to darker lightness-only variants (RG-029, D-24, D-26). Overlays reset to the root palette through `UnscopedTheme`.
 
 ## File Locations
 
@@ -25,7 +26,10 @@ Use this process when adding a curated accent, bundled background slot, semantic
 | `src/theme/theme-types.ts` | Package, mode, palette, and theme-token type contracts. |
 | `src/theme/theme-presets.ts` | Complete palette values; the normal home for palette hex literals. |
 | `src/theme/accents.ts` | Curated accent tone triples and package defaults. |
-| `src/theme/backgrounds.ts` | Local background manifest, stable ordering, and solid fallback. |
+| `src/theme/backgrounds.ts` | Local background manifest, stable ordering, solid fallback, and each slot's declared `darkestPixel` / `brightestPixel` bounds. |
+| `src/theme/glass-foregrounds.ts` | Standard-Light glass foreground palette (`resolveGlassForegroundPalette`), its lightness-only variants, and the pure scoped-value helpers. |
+| `scripts/measure-background-extrema.py` | Decodes every bundled asset and validates the declared bounds against each tint regime's composite extrema (`--check`, `--self-test`). |
+| `scripts/background-extrema-regimes.json` | The card/chrome tint regimes the script composites; a sync guard in `surface.test.ts` keeps it equal to the proof. |
 | `src/theme/tokens/surface.ts` | Package surface treatment and compositing helpers. |
 | `src/components/ui/BackgroundHost.tsx` | Fixed shell background, veil, Profile override, and render-failure fallback. |
 | `src/components/ui/GlassSurface.tsx` | Mode-aware glass/opaque card renderer. |
@@ -56,6 +60,8 @@ Use this process when adding a curated accent, bundled background slot, semantic
 
 5. **Add local background assets deliberately.** Put the bundled `.webp` in `assets/backgrounds/`, add its lazy `require()` slot and stable package order, then add a provenance row with its declared brightest pixel in `assets/backgrounds/README.md`. `none` stays asset-free and resolves to the solid theme background.
 
+   Every slot declares BOTH a `darkestPixel` and a `brightestPixel` in `src/theme/backgrounds.ts`. Run `python3 scripts/measure-background-extrema.py --check` for any new or changed asset. It decodes the file, composites every pixel under each card/chrome tint regime, and fails if a declared bound does not enclose that regime's composite extremum. Raw-luminance extrema are not enough, because an sRGB tint blend reorders luminance across hues. If the check fails, use the channel-wise bounds the script reports. If you change a card or chrome tint or opacity, update `scripts/background-extrema-regimes.json` too; the sync guard fails otherwise.
+
    For replacement art, review the complete slot family together, retain each stable ID/package mapping, transcode only the approved source into its existing production filename, and measure the final WebP against the declared brightness ceiling. If it exceeds the ceiling, remaster the art or re-prove the bound and compositing together.
 
 6. **Preserve production adoption.** A bundled slot automatically appears through the shared `BACKGROUND_ORDER`, but verify the Settings label and grouping remain meaningful. Ordinary page roots omit only their full-page background wash; do not mount another `BackgroundHost`. New routes must receive the right density in `src/navigation/focused-route-classification.ts`, and only the actual `Orrery` route may force `none`.
@@ -64,7 +70,12 @@ Use this process when adding a curated accent, bundled background slot, semantic
 
 8. **Validate durable-settings scope.** Do not edit migration 015. A new persisted setting requires a new forward migration, typed DAO validation, the `PORTABLE_SETTINGS_KEYS` allowlist, and an explicit decision about the backup-format projection. Storing a hex value in SQLite is prohibited; store an ID or NULL.
 
-9. **Preserve accessibility seams.** New icons use `src/components/icons/icon-registry.ts`; status meaning needs an existing or new non-colour cue; Skia ambient motion reads `useReducedMotionShared()` inside a worklet and never uses per-frame React state.
+9. **Keep the both-extrema proof and the glass scope honest.** `src/theme/tokens/surface.test.ts` composites each tint over BOTH declared extrema. It requires the floor at each extremum, and it requires the foreground luminance to lie strictly OUTSIDE the composite-luminance interval. A mid-tone foreground can pass both endpoints while some pixel in between composites to nearly 1:1 against it. The proof asserts the same effective palette the app renders (`resolveGlassForegroundPalette(...) ?? palette`).
+   - **A new foreground rendered on Standard glass/chrome must be added to the proof or given a written exclusion.** Every exclusion in `PROOF_EXCLUSIONS` carries a justification and an inventory reference. An exclusion that is the owner's call is marked `held-for-owner` and scoped as narrowly as possible. Fix a failure by lowering only HSL lightness in a Standard-Light glass variant. A hue change, glass opacity, artwork or a Galaxy/Standard Dark retune is the owner's call.
+   - **Scope boundaries.** The scope applies inside a `GlassSurface` card (not the Orrery overlay), a `ChromeScrim`, and the `ShellAppBar` title/Back/trailing content. It resets in every overlay built on `overlay-base` (Modal, Sheet, ConfirmDialog) and in the `OverflowMenu` sheet through `UnscopedTheme`. An opaque surface that reads colours above its own boundary uses `useUnscopedTheme()`. A `GlassSurface` card inside an overlay re-enters the scope.
+   - **`textPlaceholder`.** Input placeholders use `textPlaceholder`. It equals `textSecondary` in every palette, and the glass scope never overrides it, because inputs sit on their own surface.
+
+10. **Preserve accessibility seams.** New icons use `src/components/icons/icon-registry.ts`; status meaning needs an existing or new non-colour cue; Skia ambient motion reads `useReducedMotionShared()` inside a worklet and never uses per-frame React state.
 
 ## What You Don't Need to Change
 
@@ -95,9 +106,15 @@ Use this process when adding a curated accent, bundled background slot, semantic
 
 10. **A controlled canvas is not wallpaper.** Do not apply the Orrery overlay treatment to ordinary cards or modal Sheets; it is a named semantic exception for floating Orrery `GlassSurface` consumers.
 
+11. **A palette token cannot tell text from fill.** Inside Standard-Light glass the darker `danger` and status variants also darken destructive fills, borders and status rings drawn in a card. Review them on the device, not only in the proof.
+
+12. **Text bare on the art is not glass.** Captions and errors with no `GlassSurface`, `ChromeScrim` or opaque backing sit on the veiled art. The glass scope does not reach them, and neither does the proof (38.4 finding F-1, owner device review in Plan 17).
+
 ## Smoke Test
 
 ```bash
+python3 scripts/measure-background-extrema.py --self-test
+python3 scripts/measure-background-extrema.py --check
 npx vitest run src/theme src/navigation/focused-route-classification.test.ts src/stores/theme-store.test.ts
 npm run check:colors
 npx tsc --noEmit
@@ -106,3 +123,7 @@ npx tsc --noEmit
 Expected: theme tests pass, the colour gate finds no literals outside `src/theme/`, and TypeScript is clean.
 
 For a bundled background or surface-composition change, select two materially different assets in each package on the physical Pixel and compare the same presentation, comfortable, and dense routes. Confirm the art changes visibly, cards and chrome remain readable in matching and mismatched modes, scroll content moves over a fixed image, Orrery and System Builder show no image bleed, and a no-photo Profile falls through while a resolved Profile photo wins. For a live-motion change, toggle the OS reduced-motion preference while the affected Skia surface is visible.
+
+## Changelog
+
+- **2026-09-26 — Phase 38.4 Plan 03 (RG-029 / `ui-accessibility/AUD-UIA-001`; D-12, D-24, D-26, D-27).** Added `darkestPixel` and `scripts/measure-background-extrema.py --check`, the both-extrema + interval proof, the Standard-Light glass foreground scope (`GlassForegroundScope`, `UnscopedTheme`, `useUnscopedTheme`, `useGlassForegroundColors`) with lightness-only variants, the `textPlaceholder` token, and the rule that a new foreground on Standard glass is proven or excluded in writing.
