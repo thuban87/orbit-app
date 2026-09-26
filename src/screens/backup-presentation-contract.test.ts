@@ -39,7 +39,9 @@ function primaryButtonRegions(source: string): string[] {
 
 /** The `color:` value of the label `Text` inside a primary-button region. */
 function labelColor(region: string): string {
-  const match = region.match(/<Text style=\{\{\s*color:\s*([^}]+?)\s*\}\}>/);
+  const match = region.match(
+    /<Text\s+style=\{\{\s*color:\s*([^}]+?),?\s*\}\}\s*>/,
+  );
   expect(match, `no label Text colour in region:\n${region}`).not.toBeNull();
   return (match as RegExpMatchArray)[1].replace(/\s+/g, " ").trim();
 }

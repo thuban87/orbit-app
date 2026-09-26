@@ -83,7 +83,7 @@ export function RestoreResultScreen({
           }
           style={[styles.primaryButton, { backgroundColor: colors.accent }]}
         >
-          <Text style={{ color: colors.textPrimary }}>{returnLabel}</Text>
+          <Text style={{ color: colors.onAccent }}>{returnLabel}</Text>
         </Pressable>
       </View>
     </ScrollView>

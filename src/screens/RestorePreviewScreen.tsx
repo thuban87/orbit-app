@@ -37,6 +37,7 @@ import { createSafStorage } from "@/services/backup/saf-storage";
 import { readStoredPhotoBase64 } from "@/services/backup/share-export";
 import { useThemeStore } from "@/stores/theme-store";
 import { useTheme } from "@/theme";
+import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "restore-preview";
@@ -249,7 +250,7 @@ export function RestorePreviewScreen({
             onPress={returnToSelection}
             style={[styles.primaryButton, { backgroundColor: colors.accent }]}
           >
-            <Text style={{ color: colors.textPrimary }}>Choose file again</Text>
+            <Text style={{ color: colors.onAccent }}>Choose file again</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -291,7 +292,7 @@ export function RestorePreviewScreen({
           Backup details
         </Text>
         <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Source date: {preview.exportedAt}
+          Source date: {formatDateTimeMinuteOrFallback(preview.exportedAt)}
         </Text>
         <Text style={[styles.body, { color: colors.textSecondary }]}>
           Format version: {preview.backupFormatVersion}
@@ -403,7 +404,11 @@ export function RestorePreviewScreen({
           },
         ]}
       >
-        <Text style={{ color: colors.textPrimary }}>
+        <Text
+          style={{
+            color: mode === "replace-all" ? colors.onDanger : colors.onAccent,
+          }}
+        >
           {restoreApplyLabel(mode)}
         </Text>
       </Pressable>
