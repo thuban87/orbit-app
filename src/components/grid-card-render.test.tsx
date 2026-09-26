@@ -139,3 +139,64 @@ describe("GridCard line-three presentation", () => {
     ).toBeDefined();
   });
 });
+
+describe("row accessible context (RG-031 ui-accessibility/AUD-UIA-007)", () => {
+  const searchResult = {
+    contactId: 7,
+    score: 1,
+    totalMatchCount: 1,
+    matches: [
+      {
+        sourceKind: "memory-or-custom-field" as const,
+        fieldLabel: "Memory",
+        snippet: "Met at the climbing gym",
+        highlights: [{ start: 11, length: 8 }],
+        priority: 1,
+      },
+    ],
+  };
+  const summary = "Alex. No category. Yesterday. Not favourite. Stable.";
+
+  function rootLabel(nodes: readonly Node[]): unknown {
+    return nodes[0]?.props.accessibilityLabel;
+  }
+
+  it("List row announces the rendered search explanation and snippet after identity", () => {
+    const nodes = resolve(ListRow({ ...baseProps, searchResult }));
+    expect(rootLabel(nodes)).toBe(
+      `${summary} 1 match · Memory · "Met at the climbing gym".`,
+    );
+  });
+
+  it("List row announces the rendered adaptive line three outside search", () => {
+    const nodes = resolve(
+      ListRow({ ...baseProps, line3: { text: "Birthday in 3 days" } }),
+    );
+    expect(rootLabel(nodes)).toBe(`${summary} Birthday in 3 days.`);
+  });
+
+  it("List row with no search result and no line three announces only identity", () => {
+    expect(rootLabel(resolve(ListRow(baseProps)))).toBe(summary);
+    expect(
+      rootLabel(resolve(ListRow({ ...baseProps, line3: { text: "" } }))),
+    ).toBe(summary);
+  });
+
+  it("List row name/fuel fallback announces the displayed fallback snippet", () => {
+    const nodes = resolve(
+      ListRow({
+        ...baseProps,
+        searchResult: null,
+        searchSnippet: "Loves bouldering",
+      }),
+    );
+    expect(rootLabel(nodes)).toBe(`${summary} 1 match · "Loves bouldering".`);
+  });
+
+  it("normal Grid does not announce the List-only line three (38.1)", () => {
+    const nodes = resolve(
+      GridCard({ ...baseProps, line3: { text: "Routine profile excerpt" } }),
+    );
+    expect(rootLabel(nodes)).toBe(summary);
+  });
+});
