@@ -14,6 +14,11 @@
  *
  *   - `textSecondary` resolves to `textPrimary` (D-24; research-recommended
  *     surface-scoped override — no 133-file consumer sweep).
+ *   - The inventoried on-glass status hues, `rogue` and `danger` resolve to
+ *     darker, LIGHTNESS-ONLY Standard-Light variants (D-24 "inventory, then
+ *     darken"; `STANDARD_LIGHT_GLASS_VARIANTS`). `accentText` is HELD for the
+ *     owner: two curated accents cannot pass by lightness alone (D-24 STOP; see
+ *     38.4-RG029-INVENTORY.md).
  *
  * Everything else (Galaxy, Standard Dark, the solid `none` background, opaque
  * sheets/dialogs, Orrery overlays) keeps the root palette: the resolver returns
@@ -27,6 +32,34 @@
 
 import type { AccentId } from "./theme-option-ids";
 import type { ResolvedMode, ThemePackage, ThemePalette } from "./theme-types";
+
+/**
+ * Darker Standard-Light-only variants for the non-text foregrounds the RG-029
+ * inventory proves render on Standard glass/chrome (D-24). Each was derived by
+ * lowering ONLY the HSL lightness of the Standard Light root hex (hue within
+ * ±5°, saturation unchanged within rounding) to the lightest value that clears
+ * the both-extrema + interval proof over every Standard asset (Dawn, Paper,
+ * Dusk, Mesh) in the card-presentation and chrome regimes with a 0.1 ratio
+ * margin. Old hex -> new hex and worst ratios are recorded in
+ * `.planning/phases/38.4-audit-remediation-ui-performance-release/
+ * 38.4-RG029-INVENTORY.md`; the owner reviews them on the device pass.
+ *
+ *   statusStable #1E7D5A -> #134F39   (Dusk 1.67 -> 3.13, floor 3.0)
+ *   statusWobble #836612 -> #57430C   (Dusk 1.78 -> 3.12, floor 3.0)
+ *   statusDecay  #B33A22 -> #7E2918   (Dusk 1.95 -> 3.11, floor 3.0)
+ *   rogue        #96591A -> #663C12   (Dusk 1.84 -> 3.11, floor 3.0)
+ *   danger       #B21D22 -> #590E11   (Dusk 2.23 -> 4.61, floor 4.5)
+ *
+ * Galaxy, Standard Dark and the root Standard Light palette are untouched; these
+ * apply ONLY inside `GlassForegroundScope` in Standard Light over an asset.
+ */
+export const STANDARD_LIGHT_GLASS_VARIANTS = {
+  statusStable: "#134F39",
+  statusWobble: "#57430C",
+  statusDecay: "#7E2918",
+  rogue: "#663C12",
+  danger: "#590E11",
+} as const satisfies Partial<Record<keyof ThemePalette, string>>;
 
 /** Inputs that decide whether (and how) the glass foreground override applies. */
 export interface GlassForegroundInput {
@@ -59,5 +92,6 @@ export function resolveGlassForegroundPalette(
   return {
     ...palette,
     textSecondary: palette.textPrimary,
+    ...STANDARD_LIGHT_GLASS_VARIANTS,
   };
 }

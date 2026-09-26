@@ -152,9 +152,10 @@ describe("Standard-Light glass variants are lightness-only darkenings (D-24)", (
       const next = toHsl(variant);
       const dh = Math.abs(base.h - next.h);
       expect(Math.min(dh, 360 - dh), `${key} hue shift`).toBeLessThanOrEqual(5);
-      expect(Math.abs(base.s - next.s), `${key} saturation`).toBeLessThanOrEqual(
-        10,
-      );
+      expect(
+        Math.abs(base.s - next.s),
+        `${key} saturation`,
+      ).toBeLessThanOrEqual(10);
       expect(next.l, `${key} lightness drops`).toBeLessThan(base.l);
       // D-24 STOP floor: below HSL L 12% a hue reads as neutral near-black.
       expect(next.l, `${key} not near-black`).toBeGreaterThanOrEqual(12);
