@@ -54,6 +54,7 @@ import type { FuelKind } from "@/db/fuel-dao";
 import type { FuelItem } from "@/db/fuel-read";
 import { formatFuelAge } from "@/services/fuel-age";
 import { useTheme } from "@/theme";
+import { Icon } from "./icons/Icon";
 import { normaliseLinkUrl } from "./LinksEditor";
 
 /** The 5 kinds in editor order, each with its human copy (UI-SPEC copywriting). */
@@ -118,7 +119,10 @@ function openFuelUrl(rawUrl: string): void {
 /**
  * The kind picker — a `Pressable` trigger opening a `Modal` + `FlatList` of the 5
  * human kind labels (the `DropdownFieldWidget` pattern, zero new deps). The
- * selected kind renders in `accent`.
+ * trigger names the control and exposes the current kind as its value; the
+ * selected option carries `accessibilityState.selected` and a filled `select`
+ * glyph so selection never relies on colour (38.4 RG-030,
+ * ui-accessibility/AUD-UIA-005).
  */
 function KindPicker({
   value,
@@ -137,7 +141,8 @@ function KindPicker({
       <Pressable
         testID={testID}
         accessibilityRole="button"
-        accessibilityLabel={`Kind: ${kindLabel(value)}`}
+        accessibilityLabel="Kind"
+        accessibilityValue={{ text: kindLabel(value) }}
         onPress={() => setOpen(true)}
         style={[
           styles.kindTrigger,
@@ -186,6 +191,7 @@ function KindPicker({
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={item.label}
+                    accessibilityState={{ selected: isSelected }}
                     onPress={() => {
                       onSelect(item.kind);
                       setOpen(false);
@@ -193,12 +199,20 @@ function KindPicker({
                     style={[styles.option, { borderColor: colors.border }]}
                   >
                     <Text
-                      style={{
-                        color: isSelected ? colors.accent : colors.textPrimary,
-                      }}
+                      style={[
+                        styles.optionLabel,
+                        {
+                          color: isSelected
+                            ? colors.accentText
+                            : colors.textPrimary,
+                        },
+                      ]}
                     >
                       {item.label}
                     </Text>
+                    {isSelected ? (
+                      <Icon name="select" state="active" tone="accentText" />
+                    ) : null}
                   </Pressable>
                 );
               }}
@@ -673,8 +687,15 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   option: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  optionLabel: {
+    flex: 1,
   },
 });

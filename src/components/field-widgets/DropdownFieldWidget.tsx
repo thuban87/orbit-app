@@ -7,6 +7,12 @@
  * (e.g. an options edit dropped it), it is STILL rendered as a selectable raw
  * entry so no data is lost. `CustomFieldValue` surfaces such a value as the
  * SAME tap-to-fix error state via `isValueInOptions`. Colours via `useTheme()`.
+ *
+ * Accessibility (38.4 RG-030, ui-accessibility/AUD-UIA-005): the trigger names
+ * the field AND exposes the current value (`selectorAccessibilityValue`); the
+ * selected option carries `accessibilityState.selected` plus a filled `select`
+ * glyph, so selection never depends on colour alone. The out-of-list prepend
+ * lives in the shared `selectorItems` helper (behavior unchanged).
  */
 import { useState } from "react";
 import {
@@ -17,6 +23,11 @@ import {
   Text,
   View,
 } from "react-native";
+import { Icon } from "@/components/icons/Icon";
+import {
+  selectorAccessibilityValue,
+  selectorItems,
+} from "@/components/selector-a11y";
 import { useTheme } from "@/theme";
 import type { FieldWidgetProps } from "./types";
 
@@ -31,8 +42,7 @@ export function DropdownFieldWidget({
   const [open, setOpen] = useState(false);
   const selected = value ?? "";
   // Preserve an out-of-list value by prepending it to the option set.
-  const items =
-    selected && !options.includes(selected) ? [selected, ...options] : options;
+  const items = selectorItems(selected, options);
 
   return (
     <>
@@ -40,6 +50,7 @@ export function DropdownFieldWidget({
         testID={testID}
         accessibilityRole="button"
         accessibilityLabel={label}
+        accessibilityValue={selectorAccessibilityValue(selected)}
         onPress={() => setOpen(true)}
         style={[
           styles.trigger,
@@ -94,6 +105,7 @@ export function DropdownFieldWidget({
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={item}
+                    accessibilityState={{ selected: isSelected }}
                     onPress={() => {
                       onChange(item);
                       setOpen(false);
@@ -101,12 +113,20 @@ export function DropdownFieldWidget({
                     style={[styles.option, { borderColor: colors.border }]}
                   >
                     <Text
-                      style={{
-                        color: isSelected ? colors.accent : colors.textPrimary,
-                      }}
+                      style={[
+                        styles.optionLabel,
+                        {
+                          color: isSelected
+                            ? colors.accentText
+                            : colors.textPrimary,
+                        },
+                      ]}
                     >
                       {item}
                     </Text>
+                    {isSelected ? (
+                      <Icon name="select" state="active" tone="accentText" />
+                    ) : null}
                   </Pressable>
                 );
               }}
@@ -140,8 +160,15 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   option: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  optionLabel: {
+    flex: 1,
   },
 });

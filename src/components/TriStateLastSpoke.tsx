@@ -14,18 +14,30 @@
  * locked copy in `colors.danger` and the prior selection is kept. Dates format
  * through formatLocalDate (never toISOString) — validation lives in the tested
  * pure module tri-state-last-spoke-logic.ts. Every colour via useTheme().
+ *
+ * Accessibility (38.4 RG-030, ui-accessibility/AUD-UIA-005): the "Pick date"
+ * segment exposes the chosen date as its accessibility value (the same string
+ * it displays). Segments sit at the MIN_TOUCH_TARGET floor; their hitSlop
+ * expands vertically only so adjacent segments' hit regions never overlap.
  */
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
 import { useTheme } from "@/theme";
 import { parseDate } from "@/types";
 import {
   type LastSpokeValue,
   resolvePickedDate,
 } from "./tri-state-last-spoke-logic";
+
+/**
+ * Vertical-only hit expansion: the segments sit `gap: 8` apart in a row, so a
+ * uniform `hitSlop={8}` made neighbouring hit regions overlap (RG-030).
+ */
+const VERTICAL_HIT_SLOP = { top: 8, bottom: 8 } as const;
 
 interface TriStateLastSpokeProps {
   /** The controlled selection — the segment shown derives from this. */
@@ -114,6 +126,7 @@ export function TriStateLastSpoke({
   const dateC = segmentColors("date", selectedKind === "date");
   const notYetC = segmentColors("not-yet", selectedKind === "not-yet");
   const dateLabel = value.kind === "date" ? value.date : "Pick date";
+  const dateValue = value.kind === "date" ? { text: value.date } : undefined;
 
   return (
     <View testID={testID} accessibilityLabel={label} style={styles.group}>
@@ -123,7 +136,7 @@ export function TriStateLastSpoke({
           accessibilityRole="button"
           accessibilityState={{ selected: selectedKind === "today" }}
           accessibilityLabel="Today"
-          hitSlop={8}
+          hitSlop={VERTICAL_HIT_SLOP}
           onPress={pickToday}
           style={[
             styles.segment,
@@ -138,7 +151,8 @@ export function TriStateLastSpoke({
           accessibilityRole="button"
           accessibilityState={{ selected: selectedKind === "date" }}
           accessibilityLabel="Pick date"
-          hitSlop={8}
+          accessibilityValue={dateValue}
+          hitSlop={VERTICAL_HIT_SLOP}
           onPress={openPicker}
           style={[
             styles.segment,
@@ -153,7 +167,7 @@ export function TriStateLastSpoke({
           accessibilityRole="button"
           accessibilityState={{ selected: selectedKind === "not-yet" }}
           accessibilityLabel="Not yet"
-          hitSlop={8}
+          hitSlop={VERTICAL_HIT_SLOP}
           onPress={pickNotYet}
           style={[
             styles.segment,
@@ -200,7 +214,7 @@ const styles = StyleSheet.create({
   segment: {
     flexGrow: 1,
     flexBasis: 0,
-    minHeight: 44,
+    minHeight: MIN_TOUCH_TARGET,
     borderWidth: 1,
     borderRadius: 8,
     paddingHorizontal: 12,
