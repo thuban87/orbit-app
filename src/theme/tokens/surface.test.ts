@@ -1,6 +1,14 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { BACKGROUND_SLOTS } from "../backgrounds";
-import { AA_LARGE, AA_NORMAL, contrastRatio } from "../contrast";
+import { applyAccent, resolveAccent } from "../accents";
+import { type BackgroundAssetSlot, BACKGROUND_SLOTS } from "../backgrounds";
+import {
+  AA_LARGE,
+  AA_NORMAL,
+  contrastRatio,
+  relativeLuminance,
+} from "../contrast";
+import { resolveGlassForegroundPalette } from "../glass-foregrounds";
 import { resolvePalette } from "../theme-presets";
 import type { ResolvedMode, ThemePackage, ThemePalette } from "../theme-types";
 import {
@@ -55,6 +63,136 @@ function assertForegroundsAA(
     ).toBeGreaterThanOrEqual(AA_LARGE);
   }
 }
+
+/**
+ * BOTH-EXTREMA + INTERVAL proof (RG-029 / ui-accessibility/AUD-UIA-001 / D-12).
+ *
+ * The tint is composited over BOTH declared extrema of the asset
+ * (`darkestPixel`, `brightestPixel`). For a foreground of luminance Lf over a
+ * composite whose luminance spans [Lmin, Lmax]:
+ *   - if Lf is OUTSIDE the interval the worst contrast is at the nearer
+ *     endpoint, so endpoint checks are exact;
+ *   - if Lf is INSIDE the interval (the mid-tone pitfall) some pixel between the
+ *     extrema composites to ~Lf and contrast collapses toward 1:1 — endpoint
+ *     checks alone would falsely pass. So Lf must lie STRICTLY outside
+ *     [Lmin, Lmax]; a luminance equal to an endpoint counts as inside (fails).
+ * A ratio exactly equal to the floor passes (`>=`, AA thresholds never lowered).
+ */
+function evaluateOverExtrema(
+  fg: string,
+  compositeDark: string,
+  compositeBright: string,
+) {
+  const lf = relativeLuminance(fg);
+  const la = relativeLuminance(compositeDark);
+  const lb = relativeLuminance(compositeBright);
+  const lo = Math.min(la, lb);
+  const hi = Math.max(la, lb);
+  return {
+    ratioDark: contrastRatio(fg, compositeDark),
+    ratioBright: contrastRatio(fg, compositeBright),
+    outside: lf < lo || lf > hi,
+  };
+}
+
+function clearsExtrema(
+  fg: string,
+  compositeDark: string,
+  compositeBright: string,
+  floor: number,
+): boolean {
+  const e = evaluateOverExtrema(fg, compositeDark, compositeBright);
+  return e.ratioDark >= floor && e.ratioBright >= floor && e.outside;
+}
+
+/** The tint composited over a slot's declared darkest and brightest pixels. */
+function slotComposites(
+  tint: string,
+  opacity: number,
+  slot: BackgroundAssetSlot,
+) {
+  return {
+    dark: alphaComposite(tint, slot.darkestPixel, opacity),
+    bright: alphaComposite(tint, slot.brightestPixel, opacity),
+  };
+}
+
+function assertClearsExtrema(
+  fg: string,
+  tint: string,
+  opacity: number,
+  slot: BackgroundAssetSlot,
+  floor: number,
+  label: string,
+) {
+  const { dark, bright } = slotComposites(tint, opacity, slot);
+  const e = evaluateOverExtrema(fg, dark, bright);
+  expect(e.ratioDark, `${label}: vs darkest composite ${dark}`).toBeGreaterThanOrEqual(
+    floor,
+  );
+  expect(
+    e.ratioBright,
+    `${label}: vs brightest composite ${bright}`,
+  ).toBeGreaterThanOrEqual(floor);
+  expect(
+    e.outside,
+    `${label}: foreground luminance must lie outside the composite interval [${dark}, ${bright}]`,
+  ).toBe(true);
+}
+
+/**
+ * The EFFECTIVE palette the runtime renders on a glass card / chrome over an
+ * asset: the same `resolveGlassForegroundPalette` the ThemeProvider feeds to
+ * `GlassForegroundScope`, falling back to the root palette where it is inactive.
+ */
+function effectiveGlassPalette(
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+): ThemePalette {
+  const palette = applyAccent(
+    resolvePalette(pkg, mode),
+    resolveAccent(null, pkg, mode),
+  );
+  return (
+    resolveGlassForegroundPalette({
+      palette,
+      package: pkg,
+      mode,
+      accentId: null,
+      backgroundIsAsset: true,
+    }) ?? palette
+  );
+}
+
+describe("both-extrema interval helper — boundary + mid-tone edges (RG-029)", () => {
+  it("a ratio exactly equal to the floor passes", () => {
+    const exact = contrastRatio("#000000", "#FFFFFF");
+    expect(clearsExtrema("#000000", "#FFFFFF", "#FFFFFF", exact)).toBe(true);
+  });
+
+  it("a foreground luminance equal to an endpoint counts as inside (fails)", () => {
+    const e = evaluateOverExtrema("#808080", "#808080", "#FFFFFF");
+    expect(e.outside).toBe(false);
+    expect(clearsExtrema("#808080", "#808080", "#FFFFFF", 1)).toBe(false);
+  });
+
+  it("a mid-tone foreground passing both endpoints still fails the interval", () => {
+    // Both endpoint ratios clear AA_LARGE, but the grey sits between them, so
+    // some pixel of the asset composites to ~1:1 against it.
+    const e = evaluateOverExtrema("#767676", "#000000", "#FFFFFF");
+    expect(e.ratioDark).toBeGreaterThanOrEqual(AA_LARGE);
+    expect(e.ratioBright).toBeGreaterThanOrEqual(AA_LARGE);
+    expect(clearsExtrema("#767676", "#000000", "#FFFFFF", AA_LARGE)).toBe(
+      false,
+    );
+  });
+
+  it("a foreground darker than the whole interval passes at the nearer endpoint", () => {
+    expect(clearsExtrema("#000000", "#999999", "#FFFFFF", AA_NORMAL)).toBe(
+      true,
+    );
+  });
+});
 
 describe("alphaComposite — fg-over-bg blend, clamped #RRGGBB", () => {
   it("alpha=1 returns the foreground; alpha=0 returns the background", () => {
@@ -183,13 +321,34 @@ describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1
   // regime (galaxy↔dark, standard↔light — light/dark text over a matched-tone art)
   // AND the OPAQUE mismatched regime (galaxy-in-light, standard-in-dark — card falls
   // back opaque so text stays readable). Presentation is the most translucent
-  // (worst-case) density. Validates the DECLARED brightest pixel; the shipped .webp
-  // bytes are enforced by the device-UAT.
+  // (worst-case) density.
+  //
+  // RG-029 (ui-accessibility/AUD-UIA-001 / D-12): text foregrounds are checked
+  // over BOTH declared extrema (darkestPixel + brightestPixel) with the interval
+  // test, on the EFFECTIVE glass palette the runtime scope renders. The declared
+  // extrema are validated against the decoded .webp bytes by
+  // `scripts/measure-background-extrema.py --check`.
   for (const [id, slot] of Object.entries(BACKGROUND_SLOTS)) {
     const pkg = slot.package;
     for (const mode of MODES) {
       const regime = cardMatchesMode(pkg, mode) ? "glassy" : "opaque";
-      it(`${id} @ ${pkg}/${mode} (${regime}): foregrounds over the card on the brightest pixel meet AA`, () => {
+      it(`${id} @ ${pkg}/${mode} (${regime}): text foregrounds over the card clear both extrema`, () => {
+        const palette = effectiveGlassPalette(pkg, mode);
+        const tint = palette[SURFACE[pkg].tintTokenKey];
+        const opacity = cardTintOpacity(pkg, mode, "presentation");
+        for (const fg of TEXT_FGS) {
+          assertClearsExtrema(
+            palette[fg],
+            tint,
+            opacity,
+            slot,
+            AA_NORMAL,
+            `${id} @ ${pkg}/${mode} ${regime} card: ${fg}`,
+          );
+        }
+      });
+
+      it(`${id} @ ${pkg}/${mode} (${regime}): status foregrounds over the card on the brightest pixel meet AA`, () => {
         const palette = resolvePalette(pkg, mode);
         const tint = palette[SURFACE[pkg].tintTokenKey];
         const composite = alphaComposite(
@@ -301,6 +460,22 @@ describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)",
   for (const [id, slot] of Object.entries(BACKGROUND_SLOTS)) {
     const pkg = slot.package;
     for (const mode of MODES) {
+      it(`${id} @ ${pkg}/${mode}: text foregrounds over the chrome scrim clear both extrema (RG-029)`, () => {
+        const palette = effectiveGlassPalette(pkg, mode);
+        const tint = palette[SURFACE[pkg].tintTokenKey];
+        const opacity = chromeScrimOpacity(pkg, mode);
+        for (const fg of TEXT_FGS) {
+          assertClearsExtrema(
+            palette[fg],
+            tint,
+            opacity,
+            slot,
+            AA_NORMAL,
+            `${id} @ ${pkg}/${mode} chrome: ${fg}`,
+          );
+        }
+      });
+
       it(`${id} @ ${pkg}/${mode}: foregrounds over the chrome scrim on the brightest pixel meet AA`, () => {
         const palette = resolvePalette(pkg, mode);
         const tint = palette[SURFACE[pkg].tintTokenKey];
@@ -362,5 +537,78 @@ describe("surface-token-only selector guard (cycle-3 LOW, finding #4)", () => {
     // Galaxy blurs only where affordable.
     expect(resolveSurfaceStyle("galaxy", false).useBlur).toBe(false);
     expect(resolveSurfaceStyle("galaxy", true).useBlur).toBe(true);
+  });
+});
+
+describe("background-extrema regime table sync guard (RG-029 / D-12)", () => {
+  // scripts/measure-background-extrema.py validates the declared extrema under
+  // the tint regimes in scripts/background-extrema-regimes.json. That table must
+  // equal exactly the (package, mode, treatment, tint, opacity) tuples the card
+  // and chrome suites above composite, or the script would validate a proof
+  // that no longer exists.
+  interface Regime {
+    package: ThemePackage;
+    mode: ResolvedMode;
+    treatment: "card" | "chrome";
+    tint: string;
+    opacity: number;
+  }
+
+  function tsRegimes(): Regime[] {
+    const packages = [
+      ...new Set(Object.values(BACKGROUND_SLOTS).map((slot) => slot.package)),
+    ];
+    const out: Regime[] = [];
+    for (const pkg of packages) {
+      for (const mode of MODES) {
+        const tint = resolvePalette(pkg, mode)[SURFACE[pkg].tintTokenKey];
+        out.push({
+          package: pkg,
+          mode,
+          treatment: "card",
+          tint,
+          opacity: cardTintOpacity(pkg, mode, "presentation"),
+        });
+        out.push({
+          package: pkg,
+          mode,
+          treatment: "chrome",
+          tint,
+          opacity: chromeScrimOpacity(pkg, mode),
+        });
+      }
+    }
+    return out;
+  }
+
+  function sameRegime(a: Regime, b: Regime): boolean {
+    return (
+      a.package === b.package &&
+      a.mode === b.mode &&
+      a.treatment === b.treatment &&
+      a.tint.toLowerCase() === b.tint.toLowerCase() &&
+      Math.abs(a.opacity - b.opacity) <= 1e-9
+    );
+  }
+
+  it("the script's regime table equals the card + chrome proof tuples exactly", () => {
+    const table = JSON.parse(
+      readFileSync("scripts/background-extrema-regimes.json", "utf8"),
+    ) as { regimes: Regime[] };
+    const ts = tsRegimes();
+    expect(table.regimes.length).toBeGreaterThan(0);
+    expect(table.regimes.length).toBe(ts.length);
+    for (const want of ts) {
+      expect(
+        table.regimes.some((got) => sameRegime(got, want)),
+        `missing regime ${want.package}/${want.mode}/${want.treatment} ${want.tint}@${want.opacity}`,
+      ).toBe(true);
+    }
+    for (const got of table.regimes) {
+      expect(
+        ts.some((want) => sameRegime(got, want)),
+        `stale regime ${got.package}/${got.mode}/${got.treatment} ${got.tint}@${got.opacity}`,
+      ).toBe(true);
+    }
   });
 });

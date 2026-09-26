@@ -7,6 +7,7 @@ import {
   resolveBackground,
   resolveRenderableBackground,
 } from "./backgrounds";
+import { relativeLuminance } from "./contrast";
 import { BACKGROUND_SLOT_IDS } from "./theme-option-ids";
 import type { ThemePackage } from "./theme-types";
 
@@ -39,6 +40,29 @@ describe("slot-id drift guard — manifest slot-id set === BACKGROUND_SLOT_IDS",
       expect(typeof slot.source).toBe("function");
       expect(slot.brightestPixel).toMatch(/^#[0-9A-Fa-f]{6}$/);
       expect(PACKAGES).toContain(slot.package);
+    }
+  });
+
+  it("every asset slot declares a #RRGGBB darkest pixel no brighter than its brightest (RG-029)", () => {
+    // Both-extrema proof input (ui-accessibility/AUD-UIA-001 / D-12): the
+    // declared darkest bound must be a real hex and must not sit above the
+    // brightest bound, or the composite-luminance interval would be inverted.
+    for (const [id, slot] of Object.entries(BACKGROUND_SLOTS)) {
+      expect(slot.darkestPixel, id).toMatch(/^#[0-9A-Fa-f]{6}$/);
+      expect(
+        relativeLuminance(slot.darkestPixel),
+        `${id}: darkestPixel luminance <= brightestPixel luminance`,
+      ).toBeLessThanOrEqual(relativeLuminance(slot.brightestPixel));
+    }
+  });
+
+  it("a resolved asset carries the slot's declared darkest pixel", () => {
+    const r = resolveBackground("standard", "standard-dusk");
+    expect(r.kind).toBe("asset");
+    if (r.kind === "asset") {
+      expect(r.darkestPixel).toBe(
+        BACKGROUND_SLOTS["standard-dusk"].darkestPixel,
+      );
     }
   });
 
