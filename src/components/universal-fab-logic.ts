@@ -133,7 +133,9 @@ function focusedRoute(state: unknown) {
 }
 
 /**
- * Returns profile context from any focused relationship-browsing tab stack.
+ * Returns profile context from any focused relationship-browsing tab stack,
+ * including the Settings-hosted Profile (Settings → Archived → Profile — RG-021,
+ * react-native/AUD-RN-004). A tab root or a non-Profile child yields no contact.
  * Navigation state may be incomplete before the container is ready, so malformed
  * trees deliberately resolve to no context rather than throwing.
  */
@@ -143,9 +145,13 @@ export function getFocusedContactContext(
   const tabRoute = focusedRoute(navigationState);
   if (
     !tabRoute ||
-    !["DashboardTab", "EventsTab", "DigestTab", "OrreryTab"].includes(
-      tabRoute.name,
-    )
+    ![
+      "DashboardTab",
+      "EventsTab",
+      "DigestTab",
+      "OrreryTab",
+      "SettingsTab",
+    ].includes(tabRoute.name)
   ) {
     return { originContactId: null };
   }
