@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { importCompleteRetryState } from "./import-complete-logic";
+import { describe, expect, it, vi } from "vitest";
+import {
+  importCompleteRetryState,
+  runImportCompleteAction,
+} from "./import-complete-logic";
 
 describe("importCompleteRetryState (RG-035, D-26)", () => {
   it("offers Retry for pending rows left by a fatal stop", () => {
@@ -43,5 +46,56 @@ describe("importCompleteRetryState (RG-035, D-26)", () => {
     expect(
       importCompleteRetryState({ failed: 0, pending: 1, photoRows: 1 }).message,
     ).toBe("Some contacts haven't been imported yet.");
+  });
+});
+
+describe("runImportCompleteAction (38.3 review B-WR-03 / B-WR-04, D-04)", () => {
+  it("a failed write is reported as a write failure and still re-reads the summary read-only", async () => {
+    const order: string[] = [];
+    const onWriteFailed = vi.fn(() => order.push("write-failed"));
+    const outcome = await runImportCompleteAction(
+      { current: false },
+      {
+        write: () => Promise.reject(new Error("batch")),
+        refresh: async () => {
+          order.push("refresh");
+        },
+        onWriteFailed,
+      },
+    );
+    expect(outcome).toBe("write-failed");
+    expect(onWriteFailed).toHaveBeenCalledTimes(1);
+    // The summary is re-read so counts show what DID commit before the failure.
+    expect(order).toEqual(["write-failed", "refresh"]);
+  });
+
+  it("a committed write refreshes once and never reports a write failure", async () => {
+    const refresh = vi.fn(async () => {});
+    const onWriteFailed = vi.fn();
+    const outcome = await runImportCompleteAction(
+      { current: false },
+      { write: async () => {}, refresh, onWriteFailed },
+    );
+    expect(outcome).toBe("committed");
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(onWriteFailed).not.toHaveBeenCalled();
+  });
+
+  it("drops a same-tick second call so the write runs once", async () => {
+    const latch = { current: false };
+    let release = () => {};
+    const write = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    const steps = { write, refresh: async () => {}, onWriteFailed: vi.fn() };
+    const first = runImportCompleteAction(latch, steps);
+    const second = runImportCompleteAction(latch, steps);
+    expect(await second).toBe("dropped");
+    release();
+    expect(await first).toBe("committed");
+    expect(write).toHaveBeenCalledTimes(1);
   });
 });

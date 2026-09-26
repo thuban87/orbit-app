@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { finalizeSessionIfTerminal } from "@/db/import-session-dao";
@@ -9,6 +9,12 @@ import {
   sessionRowCounts,
   sessionSummaryCounts,
 } from "@/db/import-session-read";
+import {
+  loadedData,
+  type ReadPhase,
+  readLoading,
+  runGatedRead,
+} from "@/logic/read-phase";
 import { navigationRef } from "@/navigation/linking";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
 import { navigateIntoTab } from "@/navigation/tab-entry";
@@ -20,9 +26,12 @@ import {
   skipRemainingPhotos,
 } from "@/services/import/import-photo-retry";
 import { useTheme } from "@/theme";
+import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { Logger } from "@/utils/logger";
-import { runSingleFlight } from "@/utils/single-flight";
-import { importCompleteRetryState } from "./import-complete-logic";
+import {
+  importCompleteRetryState,
+  runImportCompleteAction,
+} from "./import-complete-logic";
 import { useOpenImportSession } from "./use-open-import-session";
 
 const LOG_SCOPE = "import-complete";
@@ -31,6 +40,52 @@ function contactLabel(count: number): string {
   return `${count} contact${count === 1 ? "" : "s"}`;
 }
 
+interface ImportCompleteSummary {
+  counts: SessionSummaryCounts;
+  unfinished: { failed: number; pending: number };
+  photoRows: number[];
+  alreadyLinkedContactId: number | null;
+}
+
+async function readImportCompleteSummary(
+  sessionId: number,
+): Promise<ImportCompleteSummary> {
+  const exec = getExecutor();
+  await finalizeSessionIfTerminal(exec, sessionId, localDateTime());
+  const [counts, rawCounts, session, rows] = await Promise.all([
+    sessionSummaryCounts(exec, sessionId),
+    sessionRowCounts(exec, sessionId),
+    getSessionById(exec, sessionId),
+    listSessionRows(exec, sessionId),
+  ]);
+  const alreadyLinkedRows = rows.filter(
+    (row) => row.matchOutcome === "already_linked",
+  );
+  return {
+    counts,
+    unfinished: { failed: rawCounts.failed, pending: rawCounts.pending },
+    photoRows: rows
+      .filter(
+        (row) =>
+          row.rowStatus === "imported" &&
+          row.contactId !== null &&
+          row.photoRelPath !== null,
+      )
+      .map((row) => row.id),
+    alreadyLinkedContactId:
+      session?.mode === "single" &&
+      alreadyLinkedRows.length === 1 &&
+      alreadyLinkedRows[0].matchedContactId !== null
+        ? alreadyLinkedRows[0].matchedContactId
+        : null,
+  };
+}
+
+const RETRY_FAILED_NOTICE =
+  "Retry didn't finish. Contacts already imported are saved.";
+const SKIP_PHOTOS_FAILED_NOTICE =
+  "Couldn't skip the remaining photos. Please try again.";
+
 /** Durable completion report and the final bridge out of bulk import. */
 export function ImportCompleteScreen({
   navigation,
@@ -38,87 +93,65 @@ export function ImportCompleteScreen({
 }: RootStackScreenProps<"ImportComplete">) {
   useOpenImportSession(route.params.sessionId);
   const { colors } = useTheme();
-  const [counts, setCounts] = useState<SessionSummaryCounts | null>(null);
-  const [unfinishedRows, setUnfinishedRows] = useState({
-    failed: 0,
-    pending: 0,
-  });
-  const [photoRows, setPhotoRows] = useState<number[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 38.3 review B-WR-04 (D-04, RG-035): the summary read is a ReadPhase gated
+  // by one latest-request authority, like ReconcileComplete. A read failure
+  // renders a read-error state with a read-only Retry; a failed Retry/Skip
+  // WRITE is an inline notice above the still-loaded summary, never "Couldn't
+  // load the import summary".
+  const [phase, setPhase] =
+    useState<ReadPhase<ImportCompleteSummary>>(readLoading);
+  const authority = useMemo(() => createLatestRequestAuthority(), []);
   const [retrying, setRetrying] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
   // 38.3 review B-WR-03: `disabled={retrying}` is async React state, so two
   // same-tick taps started two runImportBatch runs over one pending snapshot;
   // the loser hit the external-link UNIQUE index and the driver re-marked the
   // winner's imported row "failed". One synchronous slot covers Retry and
   // Skip remaining photos.
   const actionInFlight = useRef(false);
-  const [error, setError] = useState(false);
-  const [alreadyLinkedContactId, setAlreadyLinkedContactId] = useState<
-    number | null
-  >(null);
 
-  const load = useCallback(async () => {
-    const exec = getExecutor();
-    await finalizeSessionIfTerminal(
-      exec,
-      route.params.sessionId,
-      localDateTime(),
-    );
-    const [next, rawCounts, session, rows] = await Promise.all([
-      sessionSummaryCounts(exec, route.params.sessionId),
-      sessionRowCounts(exec, route.params.sessionId),
-      getSessionById(exec, route.params.sessionId),
-      listSessionRows(exec, route.params.sessionId),
-    ]);
-    const alreadyLinkedRows = rows.filter(
-      (row) => row.matchOutcome === "already_linked",
-    );
-    setAlreadyLinkedContactId(
-      session?.mode === "single" &&
-        alreadyLinkedRows.length === 1 &&
-        alreadyLinkedRows[0].matchedContactId !== null
-        ? alreadyLinkedRows[0].matchedContactId
-        : null,
-    );
-    setCounts(next);
-    setUnfinishedRows({
-      failed: rawCounts.failed,
-      pending: rawCounts.pending,
+  const load = useCallback(async (): Promise<void> => {
+    await runGatedRead({
+      gate: authority,
+      read: () => readImportCompleteSummary(route.params.sessionId),
+      publish: setPhase,
+      onError: (err) =>
+        Logger.error(LOG_SCOPE, "failed to load import summary", err),
     });
-    setPhotoRows(
-      rows
-        .filter(
-          (row) =>
-            row.rowStatus === "imported" &&
-            row.contactId !== null &&
-            row.photoRelPath !== null,
-        )
-        .map((row) => row.id),
-    );
-    setError(false);
-  }, [route.params.sessionId]);
+  }, [authority, route.params.sessionId]);
 
   useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        await load();
-      } catch (err) {
-        Logger.error(LOG_SCOPE, "failed to load import summary", err);
-        if (active) setError(true);
-      } finally {
-        if (active) setLoading(false);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [load]);
+    void load();
+    return () => authority.invalidate();
+  }, [authority, load]);
 
-  const retry = useCallback(async () => {
-    await runSingleFlight(actionInFlight, async () => {
+  const photoRows = loadedData(phase)?.photoRows ?? [];
+
+  const runAction = useCallback(
+    async (write: () => Promise<unknown>, failureNotice: string) => {
       setRetrying(true);
       try {
+        await runImportCompleteAction(actionInFlight, {
+          write: async () => {
+            setActionNotice(null);
+            await write();
+          },
+          refresh: load,
+          onWriteFailed: (err) => {
+            Logger.error(LOG_SCOPE, "import complete action failed", err);
+            setActionNotice(failureNotice);
+          },
+        });
+      } finally {
+        if (!actionInFlight.current) setRetrying(false);
+      }
+    },
+    [load],
+  );
+
+  const retry = useCallback(
+    () =>
+      runAction(async () => {
         const exec = getExecutor();
         await runImportBatch(exec, {
           sessionId: route.params.sessionId,
@@ -133,43 +166,26 @@ export function ImportCompleteScreen({
           route.params.sessionId,
           localDateTime(),
         );
-        await load();
-      } catch (err) {
-        Logger.error(LOG_SCOPE, "failed to retry import", err);
-        setError(true);
-      } finally {
-        setRetrying(false);
-      }
-    });
-  }, [load, photoRows, route.params.sessionId]);
+      }, RETRY_FAILED_NOTICE),
+    [photoRows, route.params.sessionId, runAction],
+  );
 
-  const skipPhotos = useCallback(async () => {
-    await runSingleFlight(actionInFlight, async () => {
-      setRetrying(true);
-      try {
-        await skipRemainingPhotos(
-          getExecutor(),
-          retryPhotoFs,
-          route.params.sessionId,
-          localDateTime(),
-        );
-        await load();
-      } catch (err) {
-        Logger.error(LOG_SCOPE, "could not skip remaining import photos", err);
-        setError(true);
-      } finally {
-        setRetrying(false);
-      }
-    });
-  }, [load, route.params.sessionId]);
+  const skipPhotos = useCallback(
+    () =>
+      runAction(
+        () =>
+          skipRemainingPhotos(
+            getExecutor(),
+            retryPhotoFs,
+            route.params.sessionId,
+            localDateTime(),
+          ),
+        SKIP_PHOTOS_FAILED_NOTICE,
+      ),
+    [route.params.sessionId, runAction],
+  );
 
-  const retryState = importCompleteRetryState({
-    failed: unfinishedRows.failed,
-    pending: unfinishedRows.pending,
-    photoRows: photoRows.length,
-  });
-
-  if (loading) {
+  if (phase.phase === "loading") {
     return (
       <View style={styles.root}>
         <Text style={[styles.body, { color: colors.textSecondary }]}>
@@ -179,18 +195,38 @@ export function ImportCompleteScreen({
     );
   }
 
-  if (error || counts === null) {
+  if (phase.phase === "error") {
     return (
-      <View style={styles.root}>
+      <View testID="import-complete-read-error" style={styles.root}>
         <Text style={[styles.title, { color: colors.textPrimary }]}>
           Import complete
         </Text>
         <Text style={[styles.body, { color: colors.textSecondary }]}>
-          Couldn&apos;t load the import summary. Please go back and try again.
+          Couldn&apos;t load the import summary. Contacts already imported are
+          saved.
         </Text>
+        <Pressable
+          testID="import-complete-read-retry"
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading the import summary"
+          onPress={() => void load()}
+          style={[
+            styles.secondaryButton,
+            { borderColor: colors.border, backgroundColor: colors.surface },
+          ]}
+        >
+          <Text style={{ color: colors.textPrimary }}>Retry</Text>
+        </Pressable>
       </View>
     );
   }
+
+  const { counts, alreadyLinkedContactId } = phase.data;
+  const retryState = importCompleteRetryState({
+    failed: phase.data.unfinished.failed,
+    pending: phase.data.unfinished.pending,
+    photoRows: photoRows.length,
+  });
 
   return (
     <View testID="import-complete-screen" style={styles.root}>
@@ -281,6 +317,16 @@ export function ImportCompleteScreen({
           </Text>
         </View>
       </View>
+
+      {actionNotice ? (
+        <Text
+          testID="import-complete-action-notice"
+          accessibilityLiveRegion="polite"
+          style={[styles.body, { color: colors.danger }]}
+        >
+          {actionNotice}
+        </Text>
+      ) : null}
 
       {retryState.visible ? (
         <View style={styles.retryBlock}>
