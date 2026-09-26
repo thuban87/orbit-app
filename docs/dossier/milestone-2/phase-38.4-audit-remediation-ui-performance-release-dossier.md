@@ -201,6 +201,20 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
     the same `ShellAppBar variant="root"` header row that the other tab
     roots use, titled "Digest". Rides with RG-037.
 
+-   **[DECIDED · 2026-09-26] D-24 --- RG-029 non-text/link colours:
+    inventory, then darken.** The corrected darkest-pixel proof fails status
+    hues, rogue, accent text and danger text over Standard Dusk/Mesh in
+    Standard Light. Inventory which of them actually render on Standard
+    glass, then add darker Standard-Light-only variants for those so they
+    pass on every Standard asset. Galaxy, Standard Dark and the 0.5 glass
+    are unchanged. The owner reviews on the device pass. Secondary text on
+    Standard-Light glass resolves to primary text. Any narrowing of the
+    proof must be explicit and justified in the test.
+-   **[OPEN · owner] D-25 --- W3/O-1 native remedy.** A patch-package
+    backport of the upstream expo-sqlite fix versus waiting for a
+    published bump is the owner's call. It is asked only if the
+    investigation shows the JS mitigations are not enough.
+
 ## Revision Log
 
 -   2026-09-26 --- discuss session: grounding check (14/15 still
@@ -211,3 +225,5 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
     picked the Deep royal `#1A2F8A` background (D-21), and added the
     root-chrome consistency rulings D-22 (no Back on Events) and D-23
     (Digest shared header row).
+-   2026-09-26 --- post-research: D-24 (RG-029 inventory-then-darken,
+    answering research ESC-1); D-25 held open (W3 native remedy).
