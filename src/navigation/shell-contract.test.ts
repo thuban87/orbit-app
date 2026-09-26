@@ -5,28 +5,9 @@ import {
   DIGEST_STACK_ROUTES,
   EVENTS_STACK_ROUTES,
   INITIAL_TAB,
+  PROFILE_REACHABLE_ROUTES,
   TAB_ORDER,
 } from "./shell-contract";
-
-const PROFILE_REACHABLE_ROUTES = [
-  "Profile",
-  "RecentlyDeleted",
-  "GroupEventDetail",
-  "EditGroupEvent",
-  "EditParticipant",
-  "Compose",
-  "ComposeResearch",
-  "LogContact",
-  "Edit",
-  "EditInteraction",
-  "ThingsToRemember",
-  "MemoryHistory",
-  "OffLimitsEditor",
-  "CropPhoto",
-  "SurvivorSelect",
-  "MergeConflicts",
-  "MergeImpactSummary",
-] as const;
 
 describe("shell contract", () => {
   it("defines the permanent five-tab order with Digest as the initial tab", () => {
