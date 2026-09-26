@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { getSessionById, sessionRowCounts } from "@/db/import-session-read";
@@ -9,6 +9,7 @@ import { Logger } from "@/utils/logger";
 import {
   classifyImportStop,
   type ImportProgressPhase,
+  importProgressRunIdentity,
 } from "./import-progress-state";
 import {
   importProgressHoldActive,
@@ -23,7 +24,6 @@ export function ImportProgressScreen({
   route,
 }: RootStackScreenProps<"ImportProgress">) {
   const { colors } = useTheme();
-  const mounted = useRef(false);
   const [state, setState] = useState<ImportProgressPhase>({
     phase: "running",
     done: 0,
@@ -36,23 +36,29 @@ export function ImportProgressScreen({
     importProgressHoldActive(state.phase),
   );
 
+  const runIdentity = importProgressRunIdentity(route.params);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runIdentity (session + resume runKey) re-keys the run; a resume re-entry reuses this route and only swaps params (38.3 review B-WR-01).
   useEffect(() => {
-    mounted.current = true;
+    // Per-run liveness: a re-keyed run must never receive an earlier run's
+    // late progress or stop (B-WR-01).
+    const run = { live: true };
     const exec = getExecutor();
+    // A re-entry starts a fresh run: leave "stopped" so the hold re-engages.
+    setState({ phase: "running", done: 0, total: 0 });
     void (async () => {
       try {
         const counts = await sessionRowCounts(exec, route.params.sessionId);
-        if (mounted.current)
+        if (run.live)
           setState({ phase: "running", done: 0, total: counts.pending });
         await runImportBatch(exec, {
           sessionId: route.params.sessionId,
           now: localDateTime(),
           onProgress: (nextDone, nextTotal) => {
-            if (!mounted.current) return;
+            if (!run.live) return;
             setState({ phase: "running", done: nextDone, total: nextTotal });
           },
         });
-        if (mounted.current) {
+        if (run.live) {
           navigation.replace("ImportComplete", {
             sessionId: route.params.sessionId,
           });
@@ -65,13 +71,13 @@ export function ImportProgressScreen({
         const outcome = await classifyImportStop(() =>
           getSessionById(exec, route.params.sessionId),
         );
-        if (mounted.current) setState({ phase: "stopped", outcome });
+        if (run.live) setState({ phase: "stopped", outcome });
       }
     })();
     return () => {
-      mounted.current = false;
+      run.live = false;
     };
-  }, [navigation, route.params.sessionId]);
+  }, [navigation, route.params.sessionId, runIdentity]);
 
   if (state.phase === "stopped") {
     const readable = state.outcome === "summary-available";

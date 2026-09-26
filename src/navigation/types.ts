@@ -399,7 +399,12 @@ export type SettingsStackParamList = {
   LegacyContactPicker: undefined;
   ImportReview: { sessionId: number };
   BulkImportSetup: { sessionId: number };
-  ImportProgress: { sessionId: number; batchCategoryId: number | null };
+  ImportProgress: {
+    sessionId: number;
+    batchCategoryId: number | null;
+    /** Fresh per explicit resume so a reused route re-runs (38.3 B-WR-01). */
+    runKey?: number;
+  };
   DuplicateReview: { sessionId: number };
   ImportComplete: { sessionId: number };
   BulkReview: undefined;

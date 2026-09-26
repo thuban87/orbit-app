@@ -26,3 +26,26 @@ export async function classifyImportStop(
     return "session-unreadable";
   }
 }
+
+let lastRunKey = 0;
+
+/**
+ * A fresh key for an explicit, user-initiated re-entry into ImportProgress
+ * (38.3 review B-WR-01). React Navigation 7 answers a NAVIGATE whose name
+ * equals the CURRENT route by reusing that route and swapping its params, so a
+ * resume tapped over a stopped ImportProgress for the same session would change
+ * nothing the run effect depends on and silently do nothing. The resume prompt
+ * passes this key; the run effect is keyed on {@link importProgressRunIdentity}.
+ */
+export function nextImportRunKey(): number {
+  lastRunKey += 1;
+  return lastRunKey;
+}
+
+/** The identity of one import run: its session plus the entry's run key. */
+export function importProgressRunIdentity(params: {
+  sessionId: number;
+  runKey?: number;
+}): string {
+  return `${params.sessionId}:${params.runKey ?? 0}`;
+}

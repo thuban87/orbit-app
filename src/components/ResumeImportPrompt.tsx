@@ -4,6 +4,7 @@ import { getExecutor, localDateTime } from "@/db/database";
 import { discardSession } from "@/db/import-session-dao";
 import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { TabParamList } from "@/navigation/types";
+import { nextImportRunKey } from "@/screens/import-progress-state";
 import {
   cleanupDiscardedStagedPhotos,
   type ResumableImport,
@@ -42,9 +43,13 @@ function resumeImport(
       });
       return;
     }
+    // A fresh run key: if the stopped ImportProgress for this session is the
+    // Settings stack's current route, React Navigation reuses it and only swaps
+    // params — the key is what makes that explicit resume re-run (B-WR-01).
     navigateIntoTab(navigation, "SettingsTab", "ImportProgress", {
       sessionId,
       batchCategoryId: null,
+      runKey: nextImportRunKey(),
     });
     return;
   }
