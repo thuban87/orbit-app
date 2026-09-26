@@ -1,3 +1,4 @@
+// biome-ignore-all lint/a11y/useValidAriaRole: `role` is Orbit's visual/typography domain prop.
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -10,6 +11,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { AppText } from "@/components/ui";
 import {
   type AppSettings,
   getAppSettings,
@@ -583,9 +585,7 @@ export function BackupSettingsScreen({
                     { backgroundColor: colors.accent },
                   ]}
                 >
-                  <Text style={{ color: colors.onAccent }}>
-                    Save schedule
-                  </Text>
+                  <Text style={{ color: colors.onAccent }}>Save schedule</Text>
                 </Pressable>
               </>
             ) : null}
@@ -613,6 +613,9 @@ export function BackupSettingsScreen({
                 <Text style={[styles.help, { color: colors.textSecondary }]}>
                   Use a long, unique passphrase you can keep safely.
                 </Text>
+                <AppText role="label" importantForAccessibility="no">
+                  Passphrase
+                </AppText>
                 <TextInput
                   testID="backup-settings-passphrase"
                   accessibilityLabel="Passphrase"
@@ -627,6 +630,9 @@ export function BackupSettingsScreen({
                     { color: colors.textPrimary, borderColor: colors.border },
                   ]}
                 />
+                <AppText role="label" importantForAccessibility="no">
+                  Confirm passphrase
+                </AppText>
                 <TextInput
                   testID="backup-settings-confirm-passphrase"
                   accessibilityLabel="Confirm passphrase"
@@ -678,6 +684,9 @@ export function BackupSettingsScreen({
               </>
             ) : encryptionFlow === "change" ? (
               <>
+                <AppText role="label" importantForAccessibility="no">
+                  Current passphrase
+                </AppText>
                 <TextInput
                   testID="backup-settings-current-passphrase"
                   accessibilityLabel="Current passphrase"
@@ -692,6 +701,9 @@ export function BackupSettingsScreen({
                     { color: colors.textPrimary, borderColor: colors.border },
                   ]}
                 />
+                <AppText role="label" importantForAccessibility="no">
+                  New passphrase
+                </AppText>
                 <TextInput
                   testID="backup-settings-new-passphrase"
                   accessibilityLabel="New passphrase"
@@ -706,6 +718,9 @@ export function BackupSettingsScreen({
                     { color: colors.textPrimary, borderColor: colors.border },
                   ]}
                 />
+                <AppText role="label" importantForAccessibility="no">
+                  Confirm new passphrase
+                </AppText>
                 <TextInput
                   testID="backup-settings-confirm-new-passphrase"
                   accessibilityLabel="Confirm new passphrase"
