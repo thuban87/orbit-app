@@ -1197,13 +1197,13 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; ADR-115 + ADR-087 (surface/glass authority)
 **UI hint**: yes
-**Plans**: 1/17 plans executed in 5 waves
+**Plans**: 2/17 plans executed in 5 waves
 
 Plans:
 **Wave 1**
 
 - [x] 38.4-01-PLAN.md — Bounded Your Week reads: migration 031 occurred_at indexes + range/residual predicates (RG-028; D-06, D-18)
-- [ ] 38.4-02-PLAN.md — Orrery settled geometry/resource retirement + worklet-order guard (RG-027; D-19)
+- [x] 38.4-02-PLAN.md — Orrery settled geometry/resource retirement + worklet-order guard (RG-027; D-19)
 - [ ] 38.4-03-PLAN.md — Both-extrema contrast proof + Standard-Light glass-scoped foregrounds and darker variants (RG-029 UIA-001; D-12, D-24)
 - [ ] 38.4-04-PLAN.md — Canonical AI master in Memory hosts, truthful permission totals, saved-model marker + AI/Memory controls (RG-008, RG-030; D-17)
 - [ ] 38.4-05-PLAN.md — Backup/Restore role foregrounds, visible passphrase labels, formatted source date (RG-029 UIA-002, RG-036, RG-038; D-14)
@@ -1284,7 +1284,7 @@ Plans:
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
-| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 1/17 | In Progress|  |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 2/17 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
