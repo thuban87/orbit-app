@@ -5,7 +5,7 @@ milestone_name: Release Readiness
 current_phase: 38.3
 current_phase_name: Runtime Correctness, Navigation & State Coherence (INSERTED)
 status: phase-complete
-stopped_at: Phase 38.3 complete (16/16, verification passed 94/94); next Phase 38.4
+stopped_at: Phase 38.4 context gathered (discuss complete 2026-09-26); next plan-phase 38.4 once owner supplies launcher artwork (D-08)
 last_updated: "2026-09-26T15:00:00.000Z"
 last_activity: 2026-09-26
 last_activity_desc: Phase 38.3 closed after Pixel device UAT, post-review re-check and owner dispositions
@@ -17,9 +17,9 @@ progress:
   completed_plans: 216
 carried_forward:
 
-  - "38.3 owner dispositions (2026-09-26, not passes): UAT-023a widget leg DEFERRED to the widget-overhaul phase; UAT-042 A-then-B chronology, UAT-024b month/year rollover, UAT-026b in-range keep and UAT-022 warm-Mark-while-backgrounded ACCEPTED-RISK (unit tests only). O-3 (Import Complete Need-review count stale on return from DuplicateReview; reads on mount only) needs an owner/phase home."
-  - "38.3 loose ends (owner 2026-09-26): 38.3 review A-WR-05 (Home favourite toggle bypasses the publication seam — not a widget item) and verifier W2/W3 (Digest/Profile background read on warm notification action; O-1 expo-sqlite 'shared object already released') need an owner/phase home."
-  - "WIDGET OVERHAUL (owner 2026-09-25): owner wants a dedicated widget phase (dislikes current widget in several ways). RG-001 remaining checks (max-size resize, visible explicit refresh) are DEFERRED there — not passes."
+  - "38.3 owner dispositions (2026-09-26, not passes): UAT-023a widget leg DEFERRED to the widget-overhaul phase; UAT-042 A-then-B chronology, UAT-024b month/year rollover, UAT-026b in-range keep and UAT-022 warm-Mark-while-backgrounded ACCEPTED-RISK (unit tests only). O-3 → homed in 38.4 Workstream I (D-10)."
+  - "38.3 loose ends (owner 2026-09-26): 38.3 review A-WR-05 (Home favourite toggle bypasses the publication seam — not a widget item) and verifier W2/W3 (Digest/Profile background read on warm notification action; O-1 expo-sqlite 'shared object already released') → homed in 38.4 Workstream I (38.4 D-10, owner 2026-09-26)."
+  - "WIDGET OVERHAUL (owner 2026-09-25): owner wants a dedicated widget phase (dislikes current widget in several ways). RG-001 remaining checks (max-size resize, visible explicit refresh) are DEFERRED there — not passes. RG-032 widget action accessible names also deferred there as a hard requirement (38.4 D-16, 2026-09-26)."
   - "38.2 owner waivers (2026-09-25, not passes): RG-002 hostile-provider ingress subcases (no test-provider APK built); RG-014 completed Drive upload (Drive stalls for any app's share on the test Pixel — environmental), Files target, natural 24 h retirement."
   - "Resolved 2026-09-25: shipped migrations 006/009/017 restored to their pre-25063ad bytes; biome.json override disables formatting/import-sorting for src/db/migrations/0*.ts (tests still formatted) so a format pass cannot edit a shipped migration again."
   - "31.1 NOT complete: 31.1-05 corrective (backgrounds were invisible on the owner's release — full-screen scrim at card opacity) is executed + debug-validated + release built/delivered, but the phase stays open until the owner validates the release on his personal phone (the prior 31.1-04 gate's false positive is why). See 31.1-05-PLAN.md, 31.1-UAT.md (superseded + corrective section)."

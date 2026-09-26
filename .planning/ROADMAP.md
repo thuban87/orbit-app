@@ -1199,7 +1199,7 @@ Plans:
 **UI hint**: yes
 **Plans**: TBD
 
-> **Ready to discuss — dossier authored 2026-09-23 (owner + codex). Run gsd-discuss-phase first (see `38.4-CONTEXT.md` shim). RG-034 and RG-039 are investigation-gated; RG-041 needs owner-supplied launcher artwork; Phase 40's remaining scope should be re-confirmed once 38.4 is planned.**
+> **Discussed 2026-09-26 — ready to plan once the owner supplies launcher artwork (D-08). See `38.4-CONTEXT.md` (D-08..D-20). RG-032 moved to the widget-overhaul phase; 38.3 loose ends folded in as Workstream I; Phase 40 keeps its stub list.**
 
 ### Phase 39: Onboarding
 
@@ -1250,7 +1250,7 @@ Plans:
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
-| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 0/TBD | Ready to discuss | - |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 0/TBD | Ready to plan | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
