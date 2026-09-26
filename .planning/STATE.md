@@ -17,7 +17,7 @@ progress:
   completed_plans: 216
 carried_forward:
 
-  - "38.3 → 38.4 (owner 2026-09-26): UAT-020b D-05 TalkBack gate (`ui-accessibility/AUD-UIA-022`, Contacts wrapper grouping) DEFERRED to 38.4 with RG-031/RG-039 — NOT passed, never run under TalkBack (adb cannot drive it; D-pad traversal only). If TalkBack treats a Home wrapper as one stop, apply the D-05 fix (drop only `accessible` on the two Home wrappers). Also 38.3 review A-WR-05 (Home favourite toggle bypasses the publication seam — not a widget item) and verifier W2/W3 (Digest/Profile background read on warm notification action; O-1 expo-sqlite 'shared object already released') need an owner/phase home."
+  - "38.3 loose ends (owner 2026-09-26): 38.3 review A-WR-05 (Home favourite toggle bypasses the publication seam — not a widget item) and verifier W2/W3 (Digest/Profile background read on warm notification action; O-1 expo-sqlite 'shared object already released') need an owner/phase home."
   - "WIDGET OVERHAUL (owner 2026-09-25): owner wants a dedicated widget phase (dislikes current widget in several ways). RG-001 remaining checks (max-size resize, visible explicit refresh) are DEFERRED there — not passes."
   - "38.2 owner waivers (2026-09-25, not passes): RG-002 hostile-provider ingress subcases (no test-provider APK built); RG-014 completed Drive upload (Drive stalls for any app's share on the test Pixel — environmental), Files target, natural 24 h retirement."
   - "Resolved 2026-09-25: shipped migrations 006/009/017 restored to their pre-25063ad bytes; biome.json override disables formatting/import-sorting for src/db/migrations/0*.ts (tests still formatted) so a format pass cannot edit a shipped migration again."
