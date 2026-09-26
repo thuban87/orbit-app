@@ -23,12 +23,15 @@ import {
 } from "@/components/PostLogNoteEditor";
 import {
   createQuickLogUndoController,
+  type FabContext,
   getFocusedContactContext,
+  resolveFabContactContext,
   resolveFabTarget,
   UNIVERSAL_FAB_ACTIONS,
   type UniversalFabAction,
 } from "@/components/universal-fab-logic";
 import { getAppSettings } from "@/db/app-settings-dao";
+import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import { deleteTouchpoint, recordTouchpoint } from "@/db/recency-dao";
 import { newUid } from "@/db/uid";
@@ -258,12 +261,27 @@ export function UniversalFab() {
     [logContact, pickerFlow],
   );
 
+  // One action at a time while the context read below settles.
+  const dispatchPending = useRef(false);
   const dispatchAction = useCallback(
-    (action: UniversalFabAction) => {
-      const intent = resolveFabTarget(
-        action.id,
-        getFocusedContactContext(navigationRef.current?.getRootState()),
-      );
+    async (action: UniversalFabAction) => {
+      if (dispatchPending.current) return;
+      dispatchPending.current = true;
+      let context: FabContext;
+      try {
+        // Owner ruling D-29 (review A-WR-07): an archived focused Profile is
+        // never FAB context — it falls back to the picker flows.
+        context = await resolveFabContactContext(
+          getFocusedContactContext(navigationRef.current?.getRootState()),
+          async (contactId) => {
+            const header = await getContactHeader(getExecutor(), contactId);
+            return header ? { archived: header.archived_at !== null } : null;
+          },
+        );
+      } finally {
+        dispatchPending.current = false;
+      }
+      const intent = resolveFabTarget(action.id, context);
       const opensPicker =
         intent.kind === "pick-then" ||
         (intent.kind === "quick-log" && intent.contactId === null);
@@ -351,7 +369,7 @@ export function UniversalFab() {
               expanded={expanded}
               index={index}
               key={action.id}
-              onPress={() => dispatchAction(action)}
+              onPress={() => void dispatchAction(action)}
               pointerEvents={scrimPointerEvents}
             />
           ))}

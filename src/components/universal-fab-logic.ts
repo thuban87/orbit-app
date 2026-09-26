@@ -167,3 +167,31 @@ export function getFocusedContactContext(
     ? { originContactId: contactId }
     : { originContactId: null };
 }
+
+/** The focused contact's lifecycle as the FAB needs it; `null` when gone. */
+export type FabContactState = { archived: boolean } | null;
+
+/**
+ * Owner ruling D-29 (review A-WR-07): an archived contact is never FAB context,
+ * in any tab — including the Settings-hosted Profile. The FAB then behaves as
+ * if there were no contact (the normal picker flows, whose picker lists only
+ * live contacts), consistent with D-09/D-25 disabling Message for archived
+ * contacts. A contact that no longer exists, or whose lifecycle read fails,
+ * is dropped the same way (fail safe: never preselect a contact whose state is
+ * unknown). A live contact's context — including the non-archived Settings-
+ * hosted Profile from 38.3-10 — is unchanged.
+ */
+export async function resolveFabContactContext(
+  context: FabContext,
+  readContactState: (contactId: number) => Promise<FabContactState>,
+): Promise<FabContext> {
+  if (context.originContactId === null) return context;
+  try {
+    const state = await readContactState(context.originContactId);
+    return state !== null && !state.archived
+      ? context
+      : { originContactId: null };
+  } catch {
+    return { originContactId: null };
+  }
+}

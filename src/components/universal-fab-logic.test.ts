@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createQuickLogUndoController,
   getFocusedContactContext,
+  resolveFabContactContext,
   resolveFabTarget,
   UNIVERSAL_FAB_ACTIONS,
 } from "./universal-fab-logic";
@@ -255,5 +256,53 @@ describe("getFocusedContactContext", () => {
         ],
       }),
     ).toEqual({ originContactId: null });
+  });
+});
+
+describe("resolveFabContactContext — an archived contact is never FAB context (38.3 review A-WR-07, owner ruling D-29)", () => {
+  it("drops an archived focused Profile so every action falls back to the picker flows", async () => {
+    const context = await resolveFabContactContext(
+      { originContactId: 7 },
+      async () => ({ archived: true }),
+    );
+    expect(context).toEqual({ originContactId: null });
+    expect(resolveFabTarget("QuickLog", context)).toEqual({
+      kind: "quick-log",
+      contactId: null,
+    });
+    expect(resolveFabTarget("LogContact", context)).toEqual({
+      kind: "pick-then",
+      screen: "LogContact",
+    });
+  });
+
+  it("keeps a live contact's context (including a Settings-hosted Profile)", async () => {
+    await expect(
+      resolveFabContactContext({ originContactId: 7 }, async () => ({
+        archived: false,
+      })),
+    ).resolves.toEqual({ originContactId: 7 });
+  });
+
+  it("drops a contact that no longer exists", async () => {
+    await expect(
+      resolveFabContactContext({ originContactId: 7 }, async () => null),
+    ).resolves.toEqual({ originContactId: null });
+  });
+
+  it("fails safe to no context when the archive read fails", async () => {
+    await expect(
+      resolveFabContactContext({ originContactId: 7 }, () =>
+        Promise.reject(new Error("read")),
+      ),
+    ).resolves.toEqual({ originContactId: null });
+  });
+
+  it("does not read when there is no focused contact", async () => {
+    const read = vi.fn();
+    await expect(
+      resolveFabContactContext({ originContactId: null }, read),
+    ).resolves.toEqual({ originContactId: null });
+    expect(read).not.toHaveBeenCalled();
   });
 });

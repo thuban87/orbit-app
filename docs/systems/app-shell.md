@@ -111,7 +111,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 ### Capturing from any browse surface
 
 1. `App.tsx` mounts one `UniversalFab` and snackbar host outside the tab tree. The FAB is visible only on browse/read routes and uses measured tab-bar geometry for its bottom offset.
-2. The fixed labeled speed dial is Add Contact, Quick Log, Log Interaction, Group Log, Update Contact, and Memory. Profile context preselects a contact; global contact-specific actions open the reusable local picker, while Group Log routes directly. Dashboard List can reuse the same Quick Log command after its configured gesture commits.
+2. The fixed labeled speed dial is Add Contact, Quick Log, Log Interaction, Group Log, Update Contact, and Memory. Profile context preselects a contact; global contact-specific actions open the reusable local picker, while Group Log routes directly. An archived focused Profile is never context, in any tab (D-29): the FAB reads the contact's lifecycle on press and falls back to the picker flows for an archived, missing or unreadable contact. Dashboard List can reuse the same Quick Log command after its configured gesture commits.
 3. Quick Log waits for the canonical SQLite write to resolve before it shows success, Undo, and Add Note. Its picker, dial, List host, and snackbar register real dismissal callbacks with the transient store.
 
 ### Navigating dashboard and settings
@@ -479,5 +479,6 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-19 | 38.1 | Registered Profile-origin knowledge editors across their host stacks and documented the Orrery-specific overlay surface exception. |
 | 2026-09-25 | 38.3 | Foreground refresh tick + warm notification publication: added a sweep-ordered foreground tick beside the shell tick, a shell tick for warm notification Mark/Snooze, and the shared latest-request authority consumer rule. |
 | 2026-09-25 | 38.3 | Shell-tick publisher list updated: Interaction Assist confirmations and Post-Log note/Memory writes now publish it (RG-023, D-21). |
+| 2026-09-26 | 38.3 | The universal FAB ignores an archived focused Profile as context (any tab, including Settings-hosted); it falls back to the picker flows (review A-WR-07, owner ruling D-29). |
 | 2026-09-26 | 38.3 | Foreground tick can no longer be starved by a hung launch-sweep hook: each hook is bounded by `SWEEP_HOOK_TIMEOUT_MS` (review A-WR-02, D-30). |
 | 2026-09-25 | 38.3 | Cross-tab nested entry routed through `navigateIntoTab` (`initial: false`) at every caller so a first visit keeps the tab's semantic root; added a repository guard against direct tab navigation (RG-021, react-native/AUD-RN-002). |
