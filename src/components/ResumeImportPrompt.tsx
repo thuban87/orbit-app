@@ -2,6 +2,7 @@ import { type NavigationProp, useNavigation } from "@react-navigation/native";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { discardSession } from "@/db/import-session-dao";
+import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { TabParamList } from "@/navigation/types";
 import {
   cleanupDiscardedStagedPhotos,
@@ -24,10 +25,7 @@ function resumeImport(
 ): void {
   const { counts, mode, sessionId } = resumable;
   if (mode === "single" && counts.pending > 0) {
-    navigation.navigate("SettingsTab", {
-      screen: "ImportReview",
-      params: { sessionId },
-    });
+    navigateIntoTab(navigation, "SettingsTab", "ImportReview", { sessionId });
     return;
   }
 
@@ -39,30 +37,25 @@ function resumeImport(
       counts.failed +
       counts.needs_review;
     if (nonPending === 0) {
-      navigation.navigate("SettingsTab", {
-        screen: "BulkImportSetup",
-        params: { sessionId },
+      navigateIntoTab(navigation, "SettingsTab", "BulkImportSetup", {
+        sessionId,
       });
       return;
     }
-    navigation.navigate("SettingsTab", {
-      screen: "ImportProgress",
-      params: { sessionId, batchCategoryId: null },
+    navigateIntoTab(navigation, "SettingsTab", "ImportProgress", {
+      sessionId,
+      batchCategoryId: null,
     });
     return;
   }
 
   if (counts.needs_review > 0) {
-    navigation.navigate("SettingsTab", {
-      screen: "DuplicateReview",
-      params: { sessionId },
+    navigateIntoTab(navigation, "SettingsTab", "DuplicateReview", {
+      sessionId,
     });
     return;
   }
-  navigation.navigate("SettingsTab", {
-    screen: "ImportComplete",
-    params: { sessionId },
-  });
+  navigateIntoTab(navigation, "SettingsTab", "ImportComplete", { sessionId });
 }
 
 /** App-root, explicit-action-only recovery sheet for a durable import snapshot. */

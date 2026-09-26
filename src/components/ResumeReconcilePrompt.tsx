@@ -2,6 +2,7 @@ import { type NavigationProp, useNavigation } from "@react-navigation/native";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { discardSession } from "@/db/reconcile-session-dao";
+import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { TabParamList } from "@/navigation/types";
 import {
   cleanupDiscardedReconcileStagedPhotos,
@@ -82,9 +83,8 @@ export function ResumeReconcilePrompt({
               accessibilityRole="button"
               accessibilityLabel="Resume check"
               onPress={() => {
-                navigation.navigate("SettingsTab", {
-                  screen: "ReconcileGrid",
-                  params: { sessionId: resumable.sessionId },
+                navigateIntoTab(navigation, "SettingsTab", "ReconcileGrid", {
+                  sessionId: resumable.sessionId,
                 });
                 onDismiss();
               }}

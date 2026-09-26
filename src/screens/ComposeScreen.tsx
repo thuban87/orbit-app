@@ -139,6 +139,7 @@ import {
 } from "@/logic/compose-logic";
 import type { ContactMethodType } from "@/logic/contact-method-normalization";
 import { resetToDashboardRoot } from "@/navigation/reset-intents";
+import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { RootStackScreenProps, TabParamList } from "@/navigation/types";
 import { AiError, type AiErrorCode, AiService } from "@/services/AiService";
 import { aiKeyStore } from "@/services/ai-key-store";
@@ -957,9 +958,7 @@ export function ComposeScreen({
   // Needs-Attention repair route — send the user to the EXISTING AI settings
   // surface (interim per D-12). Compose is never a provider-troubleshooting screen.
   const onOpenAiSettings = useCallback(() => {
-    navigation
-      .getParent<NavigationProp<TabParamList>>()
-      ?.navigate("SettingsTab", { screen: "AIConnection" });
+    navigateIntoTab(navigation.getParent(), "SettingsTab", "AIConnection");
   }, [navigation]);
 
   // Transmit — in-flight latched (A3). Returns early while a handoff is open and

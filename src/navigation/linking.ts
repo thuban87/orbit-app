@@ -3,6 +3,7 @@ import { useShareIntentContext } from "expo-share-intent";
 import { createRef, useEffect } from "react";
 import { hasSharedBackup } from "../../modules/orbit-backup-document-picker";
 import { shouldRouteBackupShare } from "./backup-share-intent";
+import { navigateIntoTab } from "./tab-entry";
 import type { TabParamList } from "./types";
 
 /**
@@ -60,11 +61,11 @@ export function ShareIntentGate({ isReady }: { isReady: boolean }) {
     if (isReady) {
       if (shouldRouteBackupShare(backupReady, hasShareIntent)) {
         resetShareIntent();
-        navigationRef.current?.navigate("SettingsTab", { screen: "Backup" });
+        navigateIntoTab(navigationRef.current, "SettingsTab", "Backup");
         return;
       }
       if (hasShareIntent) {
-        navigationRef.current?.navigate("DashboardTab", { screen: "Capture" });
+        navigateIntoTab(navigationRef.current, "DashboardTab", "Capture");
       }
     }
   }, [hasShareIntent, isReady, resetShareIntent]);
