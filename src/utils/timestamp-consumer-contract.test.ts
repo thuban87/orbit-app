@@ -32,6 +32,18 @@ const CONSUMERS: readonly Consumer[] = [
     // 3 visible time captions + 3 accessibility labels.
     minCalls: 6,
   },
+  {
+    path: "src/components/digest/DigestDayDetail.tsx",
+    formatters: ["formatTimeMinuteOrFallback"],
+    // Rows sit within a known day: 2 visible time captions + 2 a11y labels.
+    minCalls: 4,
+  },
+  {
+    path: "src/screens/GroupEventDetailScreen.tsx",
+    formatters: ["formatDateTimeMinuteOrFallback"],
+    // The "When" field (no date context on the screen, so date-time).
+    minCalls: 1,
+  },
 ];
 
 /** Substring extraction of the stored string's `HH:MM` characters (11..16). */
@@ -78,5 +90,24 @@ describe("timestamp consumer contract (RG-038)", () => {
     for (const label of labels) {
       expect(label).toContain("formatTimeMinuteOrFallback(");
     }
+  });
+
+  it("DigestDayDetail announces the formatted time in every row label", () => {
+    const source = read("src/components/digest/DigestDayDetail.tsx");
+    const labels = (
+      source.match(/accessibilityLabel=\{`[^`]*`\}/g) ?? []
+    ).filter((label) => label.includes("row."));
+    expect(labels.length).toBe(2);
+    for (const label of labels) {
+      expect(label).toContain("formatTimeMinuteOrFallback(row.occurredAt)");
+    }
+  });
+
+  it("GroupEventDetailScreen renders When through the date-time formatter, never raw", () => {
+    const source = read("src/screens/GroupEventDetailScreen.tsx");
+    expect(source).toContain(
+      'label="When" value={formatDateTimeMinuteOrFallback(event.occurredAt)}',
+    );
+    expect(source).not.toMatch(/value=\{event\.occurredAt\}/);
   });
 });
