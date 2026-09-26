@@ -1149,7 +1149,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.3-audit-remediation-runtime-state-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md
 **UI hint**: yes
-**Plans**: 14/16 plans executed in 6 waves
+**Plans**: 15/16 plans executed in 6 waves
 
 Plans:
 **Wave 1**
@@ -1180,7 +1180,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 38.3-15-PLAN.md — Your Week day-detail truth (RG-026 REL-014; D-16; closes Phase 38 WR-01)
+- [x] 38.3-15-PLAN.md — Your Week day-detail truth (RG-026 REL-014; D-16; closes Phase 38 WR-01)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -1249,7 +1249,7 @@ Plans:
 | 37. Settings & Personalization | 8/8 | Complete | 2026-09-14 |
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
-| 38.3 Runtime Correctness, Navigation & State Coherence | 14/16 | In Progress|  |
+| 38.3 Runtime Correctness, Navigation & State Coherence | 15/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 0/TBD | Ready to discuss | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
