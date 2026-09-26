@@ -1,3 +1,4 @@
+import type { IconName } from "@/components/icons/icon-registry";
 import type { SettingsRegisteredRoute } from "@/navigation/settings-routes";
 import type { RootStackParamList } from "@/navigation/types";
 import { ADD_WIDGET_ACTION } from "./settings-add-widget";
@@ -51,7 +52,8 @@ export type SettingsHubRouteEntry = {
   readonly key: string;
   readonly title: string;
   readonly subtitle: string;
-  readonly icon: string;
+  /** Registry semantic name (ADR-086) — never a raw glyph string. */
+  readonly icon: IconName;
   /** Typed against the runtime registration contract — an unregistered or
    *  reserved (D-03) name fails to type-check. Narrowed to the params-free
    *  subset: a hub row is a bare `navigate(name)` with no context to pass, so
@@ -64,7 +66,8 @@ export type SettingsHubActionEntry = {
   readonly key: string;
   readonly title: string;
   readonly subtitle: string;
-  readonly icon: string;
+  /** Registry semantic name (ADR-086) — never a raw glyph string. */
+  readonly icon: IconName;
   /** Stable action identifier the hub screen switches on (no route exists). */
   readonly action: string;
 };
@@ -73,7 +76,7 @@ export type SettingsHubRow = SettingsHubRouteEntry | SettingsHubActionEntry;
 
 /**
  * The hub directory rows, authored in §A order. Per §A the rows carry NO live
- * setting values — title + subtitle only. After Plan 08 the full §A category
+ * setting values — icon + title + subtitle (+ chevron on navigation rows) only. After Plan 08 the full §A category
  * hierarchy is present (Appearance → About) followed by the bottom utility
  * (`kind:"action"`) "Add Orbit widget" row (§L). The transitional "More settings"
  * (`SettingsMore`) row was removed once every group migrated into its category.
@@ -84,7 +87,7 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     key: "appearance",
     title: "Appearance",
     subtitle: "Theme, mode, accent, and background",
-    icon: "palette",
+    icon: "appearance",
     route: "SettingsAppearance",
   },
   {
@@ -100,7 +103,7 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     key: "interactions",
     title: "Interactions",
     subtitle: "Message defaults, dashboard swipe, and Interaction Assist",
-    icon: "chat",
+    icon: "message",
     route: "SettingsInteractions",
   },
   {
@@ -108,7 +111,7 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     key: "notifications",
     title: "Notifications",
     subtitle: "Reminders, birthdays, weekly digest, and delivery time",
-    icon: "bell",
+    icon: "notifications",
     route: "SettingsNotifications",
   },
   {
@@ -116,7 +119,7 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     key: "orrery",
     title: "Orrery",
     subtitle: "Display density, relationship satellites, and Systems",
-    icon: "orbit",
+    icon: "orrery",
     route: "SettingsOrrery",
   },
   {
@@ -127,7 +130,7 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     key: "data-backup",
     title: "Data & Backup",
     subtitle: "Export, restore, encryption, and automatic backups",
-    icon: "database",
+    icon: "backup",
     route: "Backup",
   },
   {
@@ -135,7 +138,7 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     key: "ai",
     title: "AI",
     subtitle: "Connection, model, personalization, and data permissions",
-    icon: "sparkles",
+    icon: "sparkle",
     route: "SettingsAI",
   },
   {
@@ -145,7 +148,7 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     key: "about",
     title: "About Orbit",
     subtitle: "App name and version",
-    icon: "info",
+    icon: "about",
     route: "SettingsAbout",
   },
   {
@@ -161,3 +164,23 @@ export const SETTINGS_HUB_ROWS: ReadonlyArray<SettingsHubRow> = Object.freeze([
     action: ADD_WIDGET_ACTION,
   },
 ]);
+
+/**
+ * Whether a hub row shows the trailing forward chevron (RG-037
+ * ui-accessibility/AUD-UIA-017, D-15; Phase 37 root-row spec). Only navigation
+ * (`kind:"route"`) rows get the navigation affordance; a utility `kind:"action"`
+ * row (Add Orbit widget) acts in place, so it shows no chevron — keeping
+ * navigation visually distinct from the utility action (ADR-140).
+ */
+export function hubRowShowsChevron(row: SettingsHubRow): boolean {
+  return row.kind === "route";
+}
+
+/**
+ * The hub row's accessible name: its title and its subtitle, so a screen-reader
+ * user hears the same scope a sighted user reads (RG-037 AUD-UIA-017). Rows
+ * carry no live setting values, so neither does the name (ADR-140).
+ */
+export function hubRowAccessibilityLabel(row: SettingsHubRow): string {
+  return `${row.title}, ${row.subtitle}`;
+}

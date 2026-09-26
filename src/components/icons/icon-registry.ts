@@ -68,6 +68,19 @@ export const ICON_REGISTRY = {
   orrery: { outline: "planet-outline", filled: "planet" },
   backup: { outline: "cloud-upload-outline", filled: "cloud-upload" },
 
+  // ---- Settings directory rows (RG-037 AUD-UIA-017, D-15) ---------------
+  // Planner glyph picks; the owner reviews them on the device pass and can swap
+  // any glyph here (ADR-086 swap seam). Rows also reuse `message`, `orrery`,
+  // `backup` and `sparkle` above.
+  appearance: { outline: "color-palette-outline", filled: "color-palette" },
+  contacts: { outline: "people-circle-outline", filled: "people-circle" },
+  notifications: { outline: "notifications-outline", filled: "notifications" },
+  about: {
+    outline: "information-circle-outline",
+    filled: "information-circle",
+  },
+  widget: { outline: "apps-outline", filled: "apps" },
+
   // ---- Plan 07 destructive affordance -----------------------------------
   warning: { outline: "warning-outline", filled: "warning" },
 

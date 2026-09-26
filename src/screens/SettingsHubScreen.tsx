@@ -3,22 +3,32 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { useCallback, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { requestPinWidget } from "react-native-android-widget";
+import { Icon } from "@/components/icons/Icon";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import type { RootStackParamList } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import { ADD_WIDGET_ACTION, pinResultCopy } from "./settings-add-widget";
-import { SETTINGS_HUB_ROWS, type SettingsHubRow } from "./settings-hub-model";
+import {
+  hubRowAccessibilityLabel,
+  hubRowShowsChevron,
+  SETTINGS_HUB_ROWS,
+  type SettingsHubRow,
+} from "./settings-hub-model";
 
 const LOG_SCOPE = "settings-hub-screen";
 
 /**
  * SettingsHubScreen — the navigation-first Settings directory (§A/D-09). Mounts
  * at the preserved `Settings` route name (§M) in place of the monolith. Rows
- * carry a title + subtitle only (NO live setting values, §A); tapping a
- * `kind:"route"` row navigates to the registered category route, a
- * `kind:"action"` row invokes its handler in place (none this plan).
+ * follow the Phase 37 root-row spec (RG-037 ui-accessibility/AUD-UIA-017,
+ * D-15): a leading registry icon (ADR-086), title and subtitle (NO live setting
+ * values, §A / ADR-140), and a trailing chevron on navigation rows only. Tapping
+ * a `kind:"route"` row navigates to the registered category route; a
+ * `kind:"action"` row (Add Orbit widget) invokes its handler in place and shows
+ * no chevron, keeping the utility action distinct from navigation. Each row's
+ * accessible name is its title plus subtitle.
  *
  * Every colour resolves through `useTheme().colors.*` (CLAUDE.md / check:colors).
  */
@@ -96,21 +106,28 @@ export function SettingsHubScreen() {
             <Pressable
               testID={`settings-hub-row-${row.key}`}
               accessibilityRole="button"
-              accessibilityLabel={row.title}
+              accessibilityLabel={hubRowAccessibilityLabel(row)}
               onPress={() => onPressRow(row)}
               style={[
                 styles.row,
+                styles.hubRow,
                 { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
             >
-              <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
-                {row.title}
-              </Text>
-              <Text
-                style={[styles.rowSubtitle, { color: colors.textSecondary }]}
-              >
-                {row.subtitle}
-              </Text>
+              <Icon name={row.icon} tone="accent" size="md" />
+              <View style={styles.rowText}>
+                <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
+                  {row.title}
+                </Text>
+                <Text
+                  style={[styles.rowSubtitle, { color: colors.textSecondary }]}
+                >
+                  {row.subtitle}
+                </Text>
+              </View>
+              {hubRowShowsChevron(row) ? (
+                <Icon name="forward" tone="textSecondary" size="sm" />
+              ) : null}
             </Pressable>
             {row.kind === "action" &&
             row.action === ADD_WIDGET_ACTION &&
@@ -144,6 +161,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 10,
     padding: 12,
+    gap: 4,
+  },
+  hubRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  rowText: {
+    flex: 1,
     gap: 4,
   },
   rowTitle: {
