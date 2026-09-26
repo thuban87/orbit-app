@@ -6,15 +6,15 @@ current_phase: 38.4
 current_phase_name: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
 status: executing
 stopped_at: "38.4-03 checkpoint: D-24 STOP on accentText (Task 2 partial committed; Task 3 not started)"
-last_updated: "2026-09-26T18:32:45.569Z"
+last_updated: "2026-09-26T18:48:00.000Z"
 last_activity: 2026-09-26
-last_activity_desc: 38.4-02 complete — settled Orrery switch compacts UI-thread choreography; settled publications replace resources; worklet forward-ref scan (RG-027)
+last_activity_desc: 38.4-04 complete — canonical AI master (isAiMasterEnabled) in all four Memory hosts, truthful permission access totals vs filtered view, saved-model marker incl. manual ids, named/themed Memory switches + 44dp AI actions (RG-008, RG-030)
 state_head: bbfb8c6c019acff793c1ff64fde0bdafedab4cf1
 progress:
   total_phases: 26
   completed_phases: 17
   total_plans: 235
-  completed_plans: 218
+  completed_plans: 219
 carried_forward:
 
   - "38.3 owner dispositions (2026-09-26, not passes): UAT-023a widget leg DEFERRED to the widget-overhaul phase; UAT-042 A-then-B chronology, UAT-024b month/year rollover, UAT-026b in-range keep and UAT-022 warm-Mark-while-backgrounded ACCEPTED-RISK (unit tests only). O-3 → homed in 38.4 Workstream I (D-10)."
@@ -50,7 +50,7 @@ FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-26 — 38.4-01 complete: migration 031 occurred_at indexes (schema head 31), Your Week reads range-bounded with oracle parity (RG-028); 4425 tests, tsc/colors/biome clean
+Last activity: 2026-09-26 — 38.4-04 complete: Memory hosts use isAiMasterEnabled (ADR-135), permission summary separates access totals from the filtered view, model picker marks the saved model (RG-008, RG-030); 4527 tests, tsc/colors/biome clean. Earlier: 38.4-01 complete: migration 031 occurred_at indexes (schema head 31), Your Week reads range-bounded with oracle parity (RG-028); 4425 tests, tsc/colors/biome clean
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: Run Phase 37.1 verification against the complete nine-plan implementation and retained physical-device evidence.
 
@@ -370,6 +370,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.3 P15 | 6min | 2 tasks | 7 files |
 | Phase 38.4 P01 | 7min | 2 tasks | 11 files |
 | Phase 38.4 P02 | 12min | 2 tasks | 6 files |
+| Phase 38.4 P04 | 13min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -812,6 +813,9 @@ Foundational decisions affecting current work:
 - [Phase 38.4]: 38.4-01: Migration 031 (head 31) adds occurred_at indexes on interactions/group_events; Your Week reads use half-open range + retained date() residual (RG-028); no backup bump
 - [Phase 38.4]: 38.4-02: settle compaction lives only in the generation-checked finish worklet (reduced-motion completion flows through it; no second site)
 - [Phase 38.4]: 38.4-02: settled (non-switch) Orrery publications replace React resources; only a running switch merges departures until the generation-checked prune
+- [Phase 38.4]: 38.4-04: AI availability on every Memory host = isAiMasterEnabled(settings) (aiEnabled === 1, ADR-135); aiProvider retained as a compatibility field, no longer read for availability (D-17)
+- [Phase 38.4]: 38.4-04: AI permission counts render only after a successful read; access totals from unfiltered enabled items, separate "Showing N of M" line when filtered; empty card distinguishes no-access from no-match
+- [Phase 38.4]: 38.4-04: a saved model with no visible card (manual id, or hidden by recommendations/search) gets an announced "Current model: <id>" row; Button gained optional selected/accessibilityHint
 
 ### Pending Todos
 
