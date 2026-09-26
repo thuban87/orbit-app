@@ -10,7 +10,10 @@ import {
   classifyImportStop,
   type ImportProgressPhase,
 } from "./import-progress-state";
-import { useOpenImportSession } from "./use-open-import-session";
+import {
+  importProgressHoldActive,
+  useOpenImportSession,
+} from "./use-open-import-session";
 
 const LOG_SCOPE = "import-progress";
 
@@ -28,7 +31,10 @@ export function ImportProgressScreen({
   });
   // A fatal stop releases the hold so the resume sweep can re-offer the
   // session on the next foreground (D-20).
-  useOpenImportSession(route.params.sessionId, state.phase !== "stopped");
+  useOpenImportSession(
+    route.params.sessionId,
+    importProgressHoldActive(state.phase),
+  );
 
   useEffect(() => {
     mounted.current = true;

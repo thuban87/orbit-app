@@ -1,5 +1,5 @@
 import { Picker } from "@react-native-picker/picker";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
@@ -33,7 +33,10 @@ import {
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import { useImportLeaveGuard } from "./use-import-leave-guard";
-import { useOpenImportSession } from "./use-open-import-session";
+import {
+  bulkSetupHoldActive,
+  useOpenImportSession,
+} from "./use-open-import-session";
 
 const LOG_SCOPE = "bulk-import-setup";
 
@@ -46,7 +49,12 @@ export function BulkImportSetupScreen({
   navigation,
   route,
 }: RootStackScreenProps<"BulkImportSetup">) {
-  useOpenImportSession(route.params.sessionId);
+  // 38.3 review B-CR-02 (D-20): hold the session only while this screen is
+  // focused. It stays mounted under the pushed ImportProgress, and holding it
+  // there kept the refcounted mark alive after a fatal stop released
+  // ImportProgress's own hold, so the resume sweep never re-offered it.
+  const isFocused = useIsFocused();
+  useOpenImportSession(route.params.sessionId, bulkSetupHoldActive(isFocused));
   const { colors } = useTheme();
   const [count, setCount] = useState(0);
   const [categories, setCategories] = useState<
@@ -86,7 +94,16 @@ export function BulkImportSetupScreen({
   useEffect(() => {
     void load();
   }, [load]);
-  useFocusEffect(useCallback(() => void load(), [load]));
+  // 38.3 review B-CR-02: startBatch leaves `saving` true on its success path
+  // (the push to ImportProgress), so returning here after an "Import stopped"
+  // must re-enable Import. Only a focus transition runs this, never an
+  // in-flight start on the already-focused screen.
+  useFocusEffect(
+    useCallback(() => {
+      setSaving(false);
+      void load();
+    }, [load]),
+  );
 
   function clusterKey(rows: ImportSessionRow[]): string {
     return rows
