@@ -14,7 +14,10 @@ vi.mock("@/services/photos/photo-storage", () => ({
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { readPromptContext } from "@/db/ai-context-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { acceptImportSessionWithRows } from "@/db/import-session-dao";
+import {
+  acceptImportSessionWithRows,
+  UNBOUND_IMPORT,
+} from "@/db/import-session-dao";
 import { getSessionById, listSessionRows } from "@/db/import-session-read";
 import { importContactRecord } from "@/db/imported-contact-dao";
 import { setMemoryAllowAi } from "@/db/memories-dao";
@@ -313,6 +316,7 @@ describe("source consolidation", () => {
 
   it("rolls back contact and row resolutions for an in-transaction failure, while photo failure is post-commit only", async () => {
     await importContactRecord(exec, {
+      lifecycle: UNBOUND_IMPORT,
       input: {
         uid: uid(),
         name: "Existing",

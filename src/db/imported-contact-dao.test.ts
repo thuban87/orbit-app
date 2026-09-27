@@ -5,9 +5,13 @@ vi.mock("expo-sqlite", () => ({}));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import type { CreateContactFullInput } from "@/db/contacts-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
-import { acceptImportSessionWithRows } from "@/db/import-session-dao";
+import {
+  acceptImportSessionWithRows,
+  UNBOUND_IMPORT,
+} from "@/db/import-session-dao";
 import {
   InvalidImportBirthdayError,
+  InvalidImportLifecycleError,
   importContactRecord,
   linkExistingContactToRow,
   NameRequiredError,
@@ -82,6 +86,7 @@ describe("importContactRecord", () => {
     async (birthday) => {
       await expect(
         importContactRecord(exec, {
+          lifecycle: UNBOUND_IMPORT,
           input: unboundInput(),
           externalLinks: [],
           birthday,
@@ -96,6 +101,7 @@ describe("importContactRecord", () => {
     "persists valid birthday %j unchanged",
     async (birthday) => {
       const { contactId } = await importContactRecord(exec, {
+        lifecycle: UNBOUND_IMPORT,
         input: unboundInput(),
         externalLinks: [],
         birthday,
@@ -113,6 +119,7 @@ describe("importContactRecord", () => {
 
   it("accepts a null birthday without forcing an update", async () => {
     const { contactId } = await importContactRecord(exec, {
+      lifecycle: UNBOUND_IMPORT,
       input: unboundInput(),
       externalLinks: [],
       birthday: null,
@@ -132,6 +139,7 @@ describe("importContactRecord", () => {
       "UPDATE app_settings SET ai_default_memory_allow = 1 WHERE id = 1",
     );
     const noted = await importContactRecord(exec, {
+      lifecycle: UNBOUND_IMPORT,
       input: unboundInput("Noted Person"),
       externalLinks: [],
       birthday: null,
@@ -139,6 +147,7 @@ describe("importContactRecord", () => {
       now: NOW,
     } as Parameters<typeof importContactRecord>[1]);
     const blank = await importContactRecord(exec, {
+      lifecycle: UNBOUND_IMPORT,
       input: unboundInput("Blank Note Person"),
       externalLinks: [],
       birthday: null,
@@ -171,6 +180,7 @@ describe("importContactRecord", () => {
   it("atomically creates an Unbound contact, source link, provenance, and resolved row", async () => {
     const rowId = await acceptRow();
     const { contactId } = await importContactRecord(exec, {
+      lifecycle: UNBOUND_IMPORT,
       input: unboundInput(),
       externalLinks: [
         { provider: "android", externalContactId: "android-contact-1" },
@@ -241,6 +251,7 @@ describe("importContactRecord", () => {
 
     await expect(
       importContactRecord(exec, {
+        lifecycle: UNBOUND_IMPORT,
         input,
         externalLinks: [
           { provider: "android", externalContactId: "bad-method" },
@@ -270,6 +281,7 @@ describe("importContactRecord", () => {
       const rowId = await acceptRow(`blank-${name.length}`);
       await expect(
         importContactRecord(exec, {
+          lifecycle: UNBOUND_IMPORT,
           input: unboundInput(name),
           externalLinks: [
             { provider: "android", externalContactId: `blank-${name.length}` },
@@ -289,6 +301,90 @@ describe("importContactRecord", () => {
       ).toEqual({ row_status: "pending" });
     },
   );
+});
+
+/**
+ * 38.4 D-57 (owner, OA-E2): the create seam takes the lifecycle as an explicit,
+ * validated parameter instead of forcing Unbound. The lifecycle is the only
+ * source: whatever `input` carries is overridden.
+ */
+describe("importContactRecord lifecycle (D-57)", () => {
+  async function lifecycleOf(contactId: number) {
+    return exec.getFirstAsync<{
+      tracking_enabled: number;
+      interval_days: number | null;
+    }>("SELECT tracking_enabled, interval_days FROM contacts WHERE id = ?", [
+      contactId,
+    ]);
+  }
+
+  it("creates a Bound contact at the given cadence", async () => {
+    const rowId = await acceptRow("bound-30");
+    const { contactId } = await importContactRecord(exec, {
+      input: unboundInput("Bound Person"),
+      lifecycle: { trackingEnabled: true, intervalDays: 30 },
+      externalLinks: [{ provider: "android", externalContactId: "bound-30" }],
+      birthday: null,
+      now: NOW,
+      resolveRow: { rowId, matchOutcome: "new" },
+    });
+    expect(await lifecycleOf(contactId)).toEqual({
+      tracking_enabled: 1,
+      interval_days: 30,
+    });
+  });
+
+  it("creates an Unbound, never-assigned contact from UNBOUND_IMPORT even if the input says otherwise", async () => {
+    const input = {
+      ...unboundInput("Override"),
+      trackingEnabled: true,
+      intervalDays: 7,
+    };
+    const { contactId } = await importContactRecord(exec, {
+      input,
+      lifecycle: UNBOUND_IMPORT,
+      externalLinks: [],
+      birthday: null,
+      now: NOW,
+    });
+    expect(await lifecycleOf(contactId)).toEqual({
+      tracking_enabled: 0,
+      interval_days: null,
+    });
+  });
+
+  it.each([
+    { trackingEnabled: true, intervalDays: null },
+    { trackingEnabled: true, intervalDays: 0 },
+    { trackingEnabled: true, intervalDays: 2.5 },
+    { trackingEnabled: false, intervalDays: 14 },
+  ])("rejects invalid lifecycle %j before any write", async (lifecycle) => {
+    const rowId = await acceptRow(`invalid-${JSON.stringify(lifecycle)}`);
+    await expect(
+      importContactRecord(exec, {
+        input: unboundInput(),
+        lifecycle: lifecycle as unknown as typeof UNBOUND_IMPORT,
+        externalLinks: [
+          {
+            provider: "android",
+            externalContactId: `invalid-${JSON.stringify(lifecycle)}`,
+          },
+        ],
+        birthday: null,
+        now: NOW,
+        resolveRow: { rowId, matchOutcome: "new" },
+      }),
+    ).rejects.toBeInstanceOf(InvalidImportLifecycleError);
+    expect(await count("contacts")).toBe(0);
+    expect(await count("external_contact_links")).toBe(0);
+    expect(await count("contact_method_provenance")).toBe(0);
+    expect(
+      await exec.getFirstAsync<{ row_status: string }>(
+        "SELECT row_status FROM import_session_rows WHERE id = ?",
+        [rowId],
+      ),
+    ).toEqual({ row_status: "pending" });
+  });
 });
 
 describe("linkExistingContactToRow", () => {

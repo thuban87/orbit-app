@@ -8,6 +8,8 @@ import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
   acceptImportSessionWithRows,
   setSessionBatchCategory,
+  setSessionBatchDefaults,
+  UNBOUND_IMPORT,
 } from "@/db/import-session-dao";
 import { getResumableSession, listSessionRows } from "@/db/import-session-read";
 import { importContactRecord } from "@/db/imported-contact-dao";
@@ -57,6 +59,7 @@ async function createSession(
 
 async function createLinkedContact(externalContactId: string): Promise<number> {
   const { contactId } = await importContactRecord(exec, {
+    lifecycle: UNBOUND_IMPORT,
     input: {
       uid: uid(),
       name: "Already Orbit",
@@ -101,6 +104,7 @@ describe("runImportBatch", () => {
   it("imports safe rows, atomically classifies linked and ambiguous rows, and isolates failures", async () => {
     const linkedContactId = await createLinkedContact("already-linked");
     await importContactRecord(exec, {
+      lifecycle: UNBOUND_IMPORT,
       input: {
         uid: uid(),
         name: "Ambiguous Orbit",
@@ -248,6 +252,7 @@ describe("runImportBatch", () => {
     ]);
     const firstRows = await listSessionRows(exec, session.sessionId);
     await importContactRecord(exec, {
+      lifecycle: UNBOUND_IMPORT,
       input: {
         uid: uid(),
         name: "Existing",
@@ -292,5 +297,129 @@ describe("runImportBatch", () => {
         "SELECT COUNT(*) AS count FROM contacts",
       ),
     ).toEqual({ count: 2 });
+  });
+});
+
+/**
+ * 38.4 D-57 (owner, OA-E2): every contact the driver creates gets the batch
+ * lifecycle from the durable session — including after a resume, which calls
+ * `runImportBatch` again with no in-pass lifecycle.
+ */
+describe("runImportBatch batch lifecycle (D-57)", () => {
+  async function lifecycles() {
+    return exec.getAllAsync<{
+      name: string;
+      tracking_enabled: number;
+      interval_days: number | null;
+      category_id: number | null;
+    }>(
+      "SELECT name, tracking_enabled, interval_days, category_id FROM contacts ORDER BY name",
+    );
+  }
+
+  it("imports every new row Bound at the session cadence, with the chosen category", async () => {
+    const category = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM categories ORDER BY id LIMIT 1",
+    );
+    if (!category) throw new Error("expected seeded category");
+    const session = await createSession([
+      { externalContactId: "a", sourcePayload: payload("Alpha") },
+      { externalContactId: "b", sourcePayload: payload("Beta") },
+    ]);
+    await setSessionBatchDefaults(
+      exec,
+      session.sessionId,
+      {
+        categoryId: category.id,
+        lifecycle: { trackingEnabled: true, intervalDays: 14 },
+      },
+      NOW,
+    );
+
+    await runImportBatch(exec, { sessionId: session.sessionId, now: NOW });
+
+    expect(await lifecycles()).toEqual([
+      {
+        name: "Alpha",
+        tracking_enabled: 1,
+        interval_days: 14,
+        category_id: category.id,
+      },
+      {
+        name: "Beta",
+        tracking_enabled: 1,
+        interval_days: 14,
+        category_id: category.id,
+      },
+    ]);
+  });
+
+  it("keeps a default session Unbound with no cadence", async () => {
+    const session = await createSession([
+      { externalContactId: "u", sourcePayload: payload("Unbound Person") },
+    ]);
+    await runImportBatch(exec, { sessionId: session.sessionId, now: NOW });
+    expect(await lifecycles()).toEqual([
+      {
+        name: "Unbound Person",
+        tracking_enabled: 0,
+        interval_days: null,
+        category_id: null,
+      },
+    ]);
+    expect(UNBOUND_IMPORT).toEqual({
+      trackingEnabled: false,
+      intervalDays: null,
+    });
+  });
+
+  it("a resumed pass reads the Bound lifecycle from the session", async () => {
+    const session = await createSession([
+      { externalContactId: "first", sourcePayload: payload("First") },
+      { externalContactId: "second", sourcePayload: payload("Second") },
+    ]);
+    await setSessionBatchDefaults(
+      exec,
+      session.sessionId,
+      {
+        categoryId: null,
+        lifecycle: { trackingEnabled: true, intervalDays: 14 },
+      },
+      NOW,
+    );
+    const [firstRow] = await listSessionRows(exec, session.sessionId);
+    await exec.runAsync(
+      "UPDATE import_session_rows SET row_status = 'failed' WHERE id = ?",
+      [firstRow.id],
+    );
+    // First pass: only the failed row — the pending row is left for resume.
+    await runImportBatch(exec, {
+      sessionId: session.sessionId,
+      now: NOW,
+      eligibleStatuses: ["failed"],
+    });
+    expect(
+      (await listSessionRows(exec, session.sessionId)).map(
+        (row) => row.rowStatus,
+      ),
+    ).toEqual(["imported", "pending"]);
+
+    // Resume, exactly as ImportProgress calls it.
+    await runImportBatch(exec, { sessionId: session.sessionId, now: NOW });
+
+    expect(await lifecycles()).toEqual([
+      {
+        name: "First",
+        tracking_enabled: 1,
+        interval_days: 14,
+        category_id: null,
+      },
+      {
+        name: "Second",
+        tracking_enabled: 1,
+        interval_days: 14,
+        category_id: null,
+      },
+    ]);
   });
 });

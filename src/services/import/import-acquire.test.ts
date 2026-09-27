@@ -32,6 +32,7 @@ vi.mock("@/services/photos/derivative-cache", () => ({ discardDerivative }));
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { readPromptContext } from "@/db/ai-context-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { UNBOUND_IMPORT } from "@/db/import-session-dao";
 import { getSessionById, listSessionRows } from "@/db/import-session-read";
 import { setMemoryAllowAi } from "@/db/memories-dao";
 import { runMigrations } from "@/db/migrations/runner";
@@ -229,6 +230,7 @@ describe("import acquisition", () => {
     const [row] = await listSessionRows(exec, sessionId);
 
     const result = await importRowAsNew(exec, {
+      lifecycle: UNBOUND_IMPORT,
       row,
       batchCategoryId: null,
       phoneRegion: "US",
@@ -267,4 +269,73 @@ describe("import acquisition", () => {
       { label: "Imported from Contacts App", value: "Raw bulk provider note" },
     ]);
   });
+});
+
+/**
+ * 38.4 D-57 (planner-bucket enforcement of Phase 19 Cluster D / ADR-066): the
+ * single-contact review's Bound choice and cadence reach the contact row.
+ */
+describe("commitSingleImport lifecycle (D-57)", () => {
+  async function singleSession(lookupKey: string) {
+    const sessionId = await acceptPickedContacts(
+      exec,
+      [
+        {
+          lookupKey,
+          displayName: "Single Person",
+          methods: [],
+          birthday: null,
+          note: null,
+          photoTempUri: null,
+        },
+      ],
+      {
+        mode: "single",
+        batchCategoryId: null,
+        effectivePhoneRegion: "US",
+        now: NOW,
+      },
+    );
+    const [row] = await listSessionRows(exec, sessionId);
+    return { sessionId, rowId: row.id };
+  }
+
+  it.each([
+    [true, 30, { tracking_enabled: 1, interval_days: 30 }],
+    [false, null, { tracking_enabled: 0, interval_days: null }],
+  ] as const)(
+    "trackingEnabled %s creates the reviewed lifecycle",
+    async (trackingEnabled, intervalDays, expected) => {
+      const { sessionId, rowId } = await singleSession(
+        `single-${trackingEnabled}`,
+      );
+      const contactId = await commitSingleImport(exec, {
+        sessionId,
+        rowId,
+        input: {
+          uid: uid(),
+          name: "Single Person",
+          intervalDays,
+          trackingEnabled,
+          now: NOW,
+          methodDrafts: [],
+          methodNormalization: { effectivePhoneRegion: "US" },
+        },
+        externalLinks: [
+          {
+            provider: "android",
+            externalContactId: `single-${trackingEnabled}`,
+          },
+        ],
+        birthday: null,
+        now: NOW,
+      });
+      expect(
+        await exec.getFirstAsync(
+          "SELECT tracking_enabled, interval_days FROM contacts WHERE id = ?",
+          [contactId],
+        ),
+      ).toEqual(expected);
+    },
+  );
 });

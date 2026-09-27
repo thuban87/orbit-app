@@ -30,20 +30,20 @@ async function indexNames(exec: SqlExecutor): Promise<Set<string>> {
 }
 
 describe("migration 031 — Your Week occurred_at indexes (RG-028)", () => {
-  it("is the registered schema head", () => {
+  it("is registered exactly once (no longer the head: 032 follows, 38.4 D-57)", () => {
     expect(YOUR_WEEK_INDEX_SCHEMA_VERSION).toBe(31);
-    expect(TARGET_VERSION).toBe(YOUR_WEEK_INDEX_SCHEMA_VERSION);
+    expect(TARGET_VERSION).toBeGreaterThan(YOUR_WEEK_INDEX_SCHEMA_VERSION);
     expect(MIGRATIONS.filter((m) => m.version === 31)).toHaveLength(1);
   });
 
-  it("advances a v1 fixture through the full chain to v31 with both indexes", async () => {
+  it("advances a v1 fixture through the full chain to the head with both indexes", async () => {
     const exec = nodeSqliteExecutor(openTestDb());
     const d = deps();
     await runMigrations(exec, MIGRATIONS, 1, d);
     await runMigrations(exec, MIGRATIONS, TARGET_VERSION, d);
 
     expect(await exec.getFirstAsync("PRAGMA user_version")).toEqual({
-      user_version: 31,
+      user_version: TARGET_VERSION,
     });
     const names = await indexNames(exec);
     for (const index of INDEXES) expect(names.has(index), index).toBe(true);
@@ -76,7 +76,7 @@ describe("migration 031 — Your Week occurred_at indexes (RG-028)", () => {
     await runMigrations(exec, MIGRATIONS, TARGET_VERSION, d);
 
     expect(await exec.getFirstAsync("PRAGMA user_version")).toEqual({
-      user_version: 31,
+      user_version: TARGET_VERSION,
     });
     const names = await indexNames(exec);
     for (const index of INDEXES) expect(names.has(index), index).toBe(true);

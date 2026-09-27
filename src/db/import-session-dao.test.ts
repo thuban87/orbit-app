@@ -6,6 +6,8 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
   acceptImportSessionWithRows,
+  assertImportLifecycle,
+  createImportSession,
   deferNeedsReviewCore,
   discardSession,
   finalizeSessionIfTerminal,
@@ -15,6 +17,8 @@ import {
   setRowContactCore,
   setRowMatchOutcomeCore,
   setSessionBatchCategory,
+  setSessionBatchDefaults,
+  UNBOUND_IMPORT,
 } from "@/db/import-session-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
@@ -271,5 +275,178 @@ describe("import-session-dao", () => {
     await expect(retireRowStagedPhoto(exec, 9999, NOW)).rejects.toThrow(
       "retireRowStagedPhotoCore: no row matched id=9999",
     );
+  });
+});
+
+/**
+ * 38.4 D-57 (owner, OA-E2): the batch lifecycle (Bound with a positive cadence,
+ * or Unbound with none) lives on the durable session, written with the batch
+ * category in ONE update before any contact is created.
+ */
+describe("import session batch lifecycle (D-57)", () => {
+  async function sessionColumns(sessionId: number) {
+    return exec.getFirstAsync<{
+      batch_category_id: number | null;
+      batch_tracking_enabled: number;
+      batch_interval_days: number | null;
+      modified_at: string;
+    }>(
+      `SELECT batch_category_id, batch_tracking_enabled, batch_interval_days, modified_at
+       FROM import_sessions WHERE id = ?`,
+      [sessionId],
+    );
+  }
+
+  it("UNBOUND_IMPORT is the Unbound, no-cadence lifecycle", () => {
+    expect(UNBOUND_IMPORT).toEqual({
+      trackingEnabled: false,
+      intervalDays: null,
+    });
+  });
+
+  it("assertImportLifecycle accepts Bound with a positive integer cadence and Unbound without one", () => {
+    expect(() => assertImportLifecycle(UNBOUND_IMPORT)).not.toThrow();
+    expect(() =>
+      assertImportLifecycle({ trackingEnabled: true, intervalDays: 14 }),
+    ).not.toThrow();
+  });
+
+  it.each([
+    { trackingEnabled: true, intervalDays: null },
+    { trackingEnabled: true, intervalDays: 0 },
+    { trackingEnabled: true, intervalDays: -7 },
+    { trackingEnabled: true, intervalDays: 1.5 },
+    { trackingEnabled: false, intervalDays: 30 },
+  ])("assertImportLifecycle rejects %j", (lifecycle) => {
+    expect(() =>
+      assertImportLifecycle(lifecycle as unknown as typeof UNBOUND_IMPORT),
+    ).toThrow();
+  });
+
+  it("setSessionBatchDefaults writes category and lifecycle in one update", async () => {
+    const accepted = await acceptRows(["bound"]);
+    const category = await exec.getFirstAsync<{ id: number }>(
+      "SELECT id FROM categories ORDER BY id LIMIT 1",
+    );
+    if (!category) throw new Error("migration fixture did not seed a category");
+    const updates: string[] = [];
+    const spy: SqlExecutor = {
+      ...exec,
+      runAsync: (sql, params) => {
+        if (/UPDATE\s+import_sessions/i.test(sql)) updates.push(sql);
+        return exec.runAsync(sql, params);
+      },
+    };
+
+    await setSessionBatchDefaults(
+      spy,
+      accepted.sessionId,
+      {
+        categoryId: category.id,
+        lifecycle: { trackingEnabled: true, intervalDays: 14 },
+      },
+      "2026-09-27 09:00:00",
+    );
+
+    expect(updates).toHaveLength(1);
+    expect(await sessionColumns(accepted.sessionId)).toEqual({
+      batch_category_id: category.id,
+      batch_tracking_enabled: 1,
+      batch_interval_days: 14,
+      modified_at: "2026-09-27 09:00:00",
+    });
+
+    await setSessionBatchDefaults(
+      exec,
+      accepted.sessionId,
+      { categoryId: null, lifecycle: UNBOUND_IMPORT },
+      "2026-09-27 10:00:00",
+    );
+    expect(await sessionColumns(accepted.sessionId)).toEqual({
+      batch_category_id: null,
+      batch_tracking_enabled: 0,
+      batch_interval_days: null,
+      modified_at: "2026-09-27 10:00:00",
+    });
+  });
+
+  it("setSessionBatchDefaults validates before writing: an invalid lifecycle writes nothing", async () => {
+    const accepted = await acceptRows(["invalid"]);
+    const before = await sessionColumns(accepted.sessionId);
+    await expect(
+      setSessionBatchDefaults(
+        exec,
+        accepted.sessionId,
+        {
+          categoryId: null,
+          lifecycle: {
+            trackingEnabled: true,
+            intervalDays: null,
+          } as unknown as typeof UNBOUND_IMPORT,
+        },
+        "2026-09-27 11:00:00",
+      ),
+    ).rejects.toThrow();
+    expect(await sessionColumns(accepted.sessionId)).toEqual(before);
+  });
+
+  it("setSessionBatchDefaults throws for an unknown session", async () => {
+    await expect(
+      setSessionBatchDefaults(
+        exec,
+        9999,
+        { categoryId: null, lifecycle: UNBOUND_IMPORT },
+        NOW,
+      ),
+    ).rejects.toThrow(/no row matched id=9999/);
+  });
+
+  it("session creation takes an optional cadence validated with the tracking flag", async () => {
+    const bound = await createImportSession(exec, {
+      uid: newUid(),
+      mode: "bulk",
+      batchCategoryId: null,
+      batchTrackingEnabled: true,
+      batchIntervalDays: 30,
+      phoneRegion: "US",
+      now: NOW,
+    });
+    expect(await sessionColumns(bound)).toMatchObject({
+      batch_tracking_enabled: 1,
+      batch_interval_days: 30,
+    });
+    const defaulted = await createImportSession(exec, {
+      uid: newUid(),
+      mode: "bulk",
+      batchCategoryId: null,
+      batchTrackingEnabled: false,
+      phoneRegion: "US",
+      now: NOW,
+    });
+    expect(await sessionColumns(defaulted)).toMatchObject({
+      batch_tracking_enabled: 0,
+      batch_interval_days: null,
+    });
+    const sessionsBefore = await exec.getFirstAsync<{ count: number }>(
+      "SELECT COUNT(*) AS count FROM import_sessions",
+    );
+    await expect(
+      acceptImportSessionWithRows(exec, {
+        session: {
+          uid: newUid(),
+          mode: "bulk",
+          batchCategoryId: null,
+          batchTrackingEnabled: true,
+          phoneRegion: "US",
+          now: NOW,
+        },
+        rows: [],
+      }),
+    ).rejects.toThrow();
+    expect(
+      await exec.getFirstAsync<{ count: number }>(
+        "SELECT COUNT(*) AS count FROM import_sessions",
+      ),
+    ).toEqual(sessionsBefore);
   });
 });

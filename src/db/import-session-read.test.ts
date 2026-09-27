@@ -16,11 +16,14 @@ import {
   resolveAlreadyLinked,
   setRowContact,
   setSessionBatchCategory,
+  setSessionBatchDefaults,
+  UNBOUND_IMPORT,
 } from "@/db/import-session-dao";
 import {
   getResumableSession,
   getSessionById,
   listSessionRows,
+  sessionBatchLifecycle,
   sessionRowCounts,
   sessionSummaryCounts,
 } from "@/db/import-session-read";
@@ -322,5 +325,48 @@ describe("import-session-read", () => {
     expect(serialized).not.toContain("importSessionRows");
     expect(serialized).not.toContain("row_status");
     expect(serialized).not.toContain("match_outcome");
+  });
+});
+
+/** 38.4 D-57: the session carries its batch lifecycle; resume reads it back. */
+describe("import-session-read batch lifecycle (D-57)", () => {
+  it("reads a default session as Unbound with no cadence", async () => {
+    const accepted = await acceptRows(exec, ["default"]);
+    const session = await getSessionById(exec, accepted.sessionId);
+    if (!session) throw new Error("missing session");
+    expect(session).toMatchObject({
+      batchTrackingEnabled: false,
+      batchIntervalDays: null,
+    });
+    expect(sessionBatchLifecycle(session)).toEqual(UNBOUND_IMPORT);
+  });
+
+  it("reads a Bound session's cadence through both reads", async () => {
+    const accepted = await acceptRows(exec, ["bound"]);
+    await setSessionBatchDefaults(
+      exec,
+      accepted.sessionId,
+      {
+        categoryId: null,
+        lifecycle: { trackingEnabled: true, intervalDays: 21 },
+      },
+      NOW,
+    );
+    const session = await getSessionById(exec, accepted.sessionId);
+    if (!session) throw new Error("missing session");
+    expect(session).toMatchObject({
+      batchTrackingEnabled: true,
+      batchIntervalDays: 21,
+    });
+    expect(sessionBatchLifecycle(session)).toEqual({
+      trackingEnabled: true,
+      intervalDays: 21,
+    });
+    const resumable = await getResumableSession(exec, NOW);
+    expect(resumable?.session).toMatchObject({
+      id: accepted.sessionId,
+      batchTrackingEnabled: true,
+      batchIntervalDays: 21,
+    });
   });
 });
