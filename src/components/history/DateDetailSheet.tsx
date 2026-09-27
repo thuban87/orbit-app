@@ -147,7 +147,12 @@ export function DateDetailSheet({
   const items = interleave(interactions, lifecycleEvents, knowledgeChanges);
 
   return (
-    <Sheet visible={visible} onRequestClose={onRequestClose} variant="detail">
+    <Sheet
+      visible={visible}
+      onRequestClose={onRequestClose}
+      variant="detail"
+      scrollBody={false}
+    >
       <AppText role="heading">{title}</AppText>
 
       <ScrollView

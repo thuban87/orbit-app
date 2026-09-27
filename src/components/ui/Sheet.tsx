@@ -11,7 +11,7 @@
  * body is a bounded ScrollView (`flexGrow: 0`, `flexShrink: 1`) — content that
  * fits renders at its own height, content taller than the cap scrolls instead
  * of clipping its actions below the sheet edge. A consumer that renders its own
- * ScrollView inside a compact/detail sheet passes `scrollBody={false}`; its body
+ * ScrollView inside a compact/detail sheet sets `scrollBody` to false; its body
  * is then a shrinkable View, so its own ScrollView is the single bounded scroll.
  * `expanded` is a fixed 92% sheet with a `flex: 1` body; its consumers own their
  * workspace scroll. `sheet-consumers-contract.test.ts` pins every consumer.

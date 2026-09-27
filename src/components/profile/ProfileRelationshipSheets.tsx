@@ -170,6 +170,7 @@ export function ProfileRelationshipSheets({
       visible={active !== null}
       onRequestClose={close}
       variant={explanation ? "detail" : "compact"}
+      scrollBody={false}
     >
       <ScrollView contentContainerStyle={styles.content}>
         {explanation ? (

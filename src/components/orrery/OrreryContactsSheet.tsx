@@ -51,7 +51,12 @@ export function OrreryContactsSheet({
     qualifyingSun,
   );
   return (
-    <Sheet visible={visible} onRequestClose={onClose} variant="detail">
+    <Sheet
+      visible={visible}
+      onRequestClose={onClose}
+      variant="detail"
+      scrollBody={false}
+    >
       <ScrollView
         style={{ maxHeight: height * 0.45 }}
         contentContainerStyle={styles.content}
