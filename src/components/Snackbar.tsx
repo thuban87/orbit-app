@@ -1,6 +1,11 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography variant.
 import { Pressable, StyleSheet, View } from "react-native";
 import { AppText } from "@/components/ui/AppText";
+import {
+  fabDialBackgroundA11y,
+  selectFabDialOpen,
+} from "@/components/universal-fab-logic";
+import { shellTransientStore } from "@/stores/shell-transient-store";
 import { snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -11,11 +16,17 @@ export function Snackbar() {
   const { colors } = useTheme();
   const snackbar = snackbarStore((state) => state.snackbar);
   const dismiss = snackbarStore((state) => state.dismiss);
+  // Hidden from accessibility while the FAB dial is open (D-31, D-42 A).
+  const fabDialOpen = shellTransientStore(selectFabDialOpen);
 
   if (!snackbar) return null;
 
   return (
-    <View pointerEvents="box-none" style={styles.overlay}>
+    <View
+      pointerEvents="box-none"
+      style={styles.overlay}
+      {...fabDialBackgroundA11y(fabDialOpen)}
+    >
       <View
         accessibilityLiveRegion="polite"
         style={[

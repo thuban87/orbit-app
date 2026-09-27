@@ -2,6 +2,10 @@ import { useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { AssistConfirmation } from "@/components/AssistConfirmation";
 import { PendingConfirmationsSheet } from "@/components/PendingConfirmationsSheet";
+import {
+  fabDialBackgroundA11y,
+  selectFabDialOpen,
+} from "@/components/universal-fab-logic";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   markAssistDismissed,
@@ -16,6 +20,7 @@ import {
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useAssistBanner } from "@/stores/assist-store";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
+import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import type { InFlightRef } from "@/utils/single-flight";
@@ -49,6 +54,9 @@ export function AssistBanner() {
   // Both are declared above the early return (Rules of Hooks).
   const latchRef = useRef<InFlightRef>({ current: false });
   const [pending, setPending] = useState(false);
+  // Hidden from accessibility while the FAB dial is open (D-31, D-42 A). The
+  // review sheet is an RN Modal (its own window) and is not affected.
+  const fabDialOpen = shellTransientStore(selectFabDialOpen);
 
   if (!newest) {
     return reviewOpen ? (
@@ -124,7 +132,11 @@ export function AssistBanner() {
   };
 
   return (
-    <View pointerEvents="box-none" style={styles.root}>
+    <View
+      pointerEvents="box-none"
+      style={styles.root}
+      {...fabDialBackgroundA11y(fabDialOpen)}
+    >
       <View
         style={[
           styles.banner,

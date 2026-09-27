@@ -45,6 +45,25 @@ export function selectFabDialOpen(state: {
 }
 
 /**
+ * Accessibility props for a same-window shell overlay that sits OUTSIDE the
+ * tab navigator (App.tsx: the Quick Log undo `Snackbar`, the `AssistBanner`).
+ * While the dial is open they are hidden from TalkBack and Switch Access like
+ * the navigator itself (D-31; owner default D-42 A). Only these two props:
+ * `accessible` would merge the overlay into one node, and touch is unchanged
+ * (the dial's scrim already takes it). RN `Modal`s are separate native windows
+ * this cannot reach and are exempt (`fab-dial-shell-overlays-contract.test.ts`).
+ */
+export function fabDialBackgroundA11y(open: boolean): {
+  importantForAccessibility: "no-hide-descendants" | "auto";
+  accessibilityElementsHidden: boolean;
+} {
+  return {
+    importantForAccessibility: open ? "no-hide-descendants" : "auto",
+    accessibilityElementsHidden: open,
+  };
+}
+
+/**
  * Android native keyboard focus links for one dial element. Values are native
  * view tags (`findNodeHandle`); `undefined` leaves Android's default search.
  */
