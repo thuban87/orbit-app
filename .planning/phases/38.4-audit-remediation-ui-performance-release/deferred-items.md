@@ -127,3 +127,12 @@ D-38 (2026-09-26) supersedes D-29, D-35 and D-36: bare text on the background ar
     the Your Week metric labels, the UpdateContact editor text and the "Add photo" link.
   - The planned Plan 16 enumeration (Table D), wrapping and contract test are cancelled (D-38). The art brief's AST inventory
     (294 bare sites on 50 routes: 100 hand-verified, 194 script-found; plus 24 mixed components) is the current list, carried to 38.5.
+- **Plan 20 out-of-scope findings (2026-09-27). DISPOSITION: surfaced to the owner/orchestrator in the Plan 20 return; not fixed.**
+  - `AIPermissionsScreen.tsx` item state caption ("Enabled"): `item.enabled ? colors.accent : …` paints the accent FILL as
+    text inside the contact group glass card. It is an accent-as-text misrole that Table C (Plan 16) did not list. Candidate
+    owner: Plan 21 (already edits AIPermissions) — swap to `scoped.accentText` inside the existing ScopedPalette.
+  - Contacts Card view on the Pixel 3a (font_scale 1.15): the status ring renders as a horizontal pill around the avatar,
+    not a circle, and overlaps the favourite star. Present before Plan 20 (identical geometry in the before/after capture).
+  - `CardContextMenu.tsx:5`: unused `View` import (pre-existing biome warning).
+  - The debug LogBox toast still appears after D-61: its remaining sources are RN core deprecation warnings
+    (ProgressBarAndroid, SafeAreaView, Clipboard, InteractionManager, PushNotificationIOS getters touched at startup; the accessing module was not traced), not the blur.
