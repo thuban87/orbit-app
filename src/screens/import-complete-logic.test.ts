@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import ts from "typescript";
 import { describe, expect, it, vi } from "vitest";
 import {
   importCompleteRetryState,
@@ -97,5 +99,95 @@ describe("runImportCompleteAction (38.3 review B-WR-03 / B-WR-04, D-04)", () => 
     release();
     expect(await first).toBe("committed");
     expect(write).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * 38.3 UAT O-3 (38.4 D-10): Import Complete re-reads its summary on EVERY focus
+ * (returning from Duplicate Review after a link must show the current
+ * Need-review count), through the same gated latest-request authority, and the
+ * focus path never re-runs an import, retry, skip or any row mutation — it runs
+ * only `load` (the summary read plus the pre-existing idempotent terminal
+ * finalizer). Source contract over ImportCompleteScreen.tsx.
+ */
+describe("ImportCompleteScreen focus re-read contract (38.3 UAT O-3, D-10)", () => {
+  const source = readFileSync("src/screens/ImportCompleteScreen.tsx", "utf8");
+  const file = ts.createSourceFile(
+    "ImportCompleteScreen.tsx",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+
+  function calls(name: string): ts.CallExpression[] {
+    const found: ts.CallExpression[] = [];
+    const visit = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === name
+      ) {
+        found.push(node);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+    return found;
+  }
+
+  function identifiersIn(node: ts.Node): string[] {
+    const names: string[] = [];
+    const visit = (child: ts.Node): void => {
+      if (ts.isIdentifier(child)) names.push(child.text);
+      ts.forEachChild(child, visit);
+    };
+    visit(node);
+    return names;
+  }
+
+  it("imports useFocusEffect from @react-navigation/native", () => {
+    expect(source).toMatch(
+      /import\s*\{[^}]*\buseFocusEffect\b[^}]*\}\s*from\s*"@react-navigation\/native"/,
+    );
+  });
+
+  it("loads through useFocusEffect(useCallback(...)) whose cleanup invalidates the authority", () => {
+    const focusEffects = calls("useFocusEffect");
+    expect(focusEffects).toHaveLength(1);
+    const [callback] = focusEffects[0].arguments;
+    expect(
+      callback !== undefined &&
+        ts.isCallExpression(callback) &&
+        ts.isIdentifier(callback.expression) &&
+        callback.expression.text === "useCallback",
+    ).toBe(true);
+    const text = callback.getText(file);
+    expect(text).toContain("load()");
+    expect(text).toMatch(/return\s*\(\)\s*=>\s*authority\.invalidate\(\)/);
+  });
+
+  it("the focus callback references only load/authority — never an import, retry, skip or action", () => {
+    const [callback] = calls("useFocusEffect")[0].arguments;
+    const names = identifiersIn(callback);
+    for (const forbidden of [
+      "runImportCompleteAction",
+      "runAction",
+      "retry",
+      "skipPhotos",
+      "runImportBatch",
+      "retryImportedPhoto",
+      "skipRemainingPhotos",
+      "finalizeSessionIfTerminal",
+    ]) {
+      expect(names).not.toContain(forbidden);
+    }
+    expect(names).toContain("load");
+  });
+
+  it("no mount-only useEffect still owns the summary read", () => {
+    for (const effect of calls("useEffect")) {
+      expect(identifiersIn(effect)).not.toContain("load");
+    }
   });
 });
