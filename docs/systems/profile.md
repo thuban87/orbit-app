@@ -1,7 +1,7 @@
 # Profile presentation
 
-**Last updated:** 2026-09-25
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Last updated:** 2026-09-26
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/screens/ContactProfileScreen.tsx`, `src/db/profile-read.ts`, `src/db/profile-presentation-read.ts`, `src/db/profile-presentation-dao.ts`, and `src/profile/`
 
 ## Purpose
@@ -84,6 +84,16 @@ Section headings identify their section only. Module bodies own values, empty st
 
 Unbind remains a confirmed lifecycle action for Bound contacts but lives in the Profile overflow; the meaningful Bind experience remains visible for Unbound contacts. Relationship Overview retains the existing compact/wide preference, then derives only a visual full-row span for compact row orphans. It preserves configured order and semantic size while centering every tile's content.
 
+### Layout preview geometry (38.4, RG-033)
+
+The layout editor's live preview uses the same geometry as the real Relationship Overview (`ui-accessibility/AUD-UIA-021`). Both go through `src/components/profile/overview-geometry.ts`. `overviewColumnWidth` is `(width − SPACING.sm·(columns − 1)) / columns`, and `overviewTileWidth` is `span·column + (span − 1)·SPACING.sm`.
+
+The preview packs its modules against the **Profile overview's** width basis, not its own. `profileOverviewWidthBasis(window)` is the window width minus 66dp, which is the overview's full inset chain: `ContactProfileScreen` content padding, the `ProfileSection` body padding and the section card's `GlassSurface` border. So at any window width and font scale, the preview shows the same column count, row membership and spans as the Profile, including the 360dp point where the real overview drops to one column.
+
+Tiles are then **sized** from the preview card's own measured width with the same formulas and `SPACING.sm` gaps. The card sits inside the sheet padding, so it is narrower than the Profile overview, and using Profile pixel widths would overflow it. The preview renders no tiles until that width is measured. A test reads the three inset style sites and fails if any of them drifts from the 66dp constant. Saved layouts, layout controls and orphan stretching are unchanged.
+
+The editor's per-module visibility switch uses the themed `trackColor`/`thumbColor` tokens and keeps its "Show {module}" accessible name (RG-030 `ui-accessibility/AUD-UIA-003`).
+
 Interaction History renders the full History & Insights section (Heatmap, Intensity, Rolodex, Detail Sheet) behind the stable `interaction-history` semantic key via `ProfileModuleHost.renderHistory()`; the replacement of the earlier bounded stub migrated no layouts or collapse state. Knowledge-change rows in its Detail Sheet route back through the screen's existing knowledge navigation via a threaded `onOpenKnowledgeChange`. See `interaction-history.md`.
 
 ### History actions reveal the in-Profile History section (38.3, RG-021)
@@ -159,6 +169,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 16. **Do not make Message work in Settings by registering Compose there.** Settings-hosted Profiles disable Message by ruling (D-09, D-25, RG-021); registering Compose/ComposeResearch under Settings or adding a cross-tab jump reverses those rulings and is an owner decision.
 17. **History actions never navigate.** Last Interaction and Status → View history reveal the in-Profile History section (D-10). Routing them to Things to Remember, a new History route, or a timeline screen contradicts D-10 and ADR-123. When the layout hides History, omit the actions; never reveal History temporarily or edit the layout (D-11).
 18. **Selector Retry settles only its owner.** Route every Frequency/Snooze write and Retry through the relationship-sheet runner. A Retry that dispatches to both reducers, or that never dispatches `success`, leaves a selector `pending`, and `close()` then refuses to reset it (RG-025).
+19. **The preview packs at the Profile width, not its own.** Packing against the narrower preview card would show fewer columns than the real Profile. If the Profile overview's padding or card border changes, update `PROFILE_OVERVIEW_HORIZONTAL_INSET` in `overview-geometry.ts`. The inset-chain test fails until you do.
 
 ## Related systems
 
@@ -189,3 +200,4 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-09-25 | 38.3 | Message eligibility by archive state and host (D-09, D-25, RG-021): hero Message is disabled with a reason for archived contacts in every host and for any Settings-hosted Profile; Compose stays unregistered under Settings, and Settings now registers `RecentlyDeleted`. |
 | 2026-09-25 | 38.3 | History actions reveal the in-Profile History section (RG-021, D-10, D-11, D-28): Last Interaction and Status → View history close the sheet, expand a collapsed History through the persisted collapse toggle, and scroll to it (instant under reduced motion). When the layout hides History, neither action is offered and the Last Interaction tile is informational. The Things to Remember history route is gone. |
 | 2026-09-25 | 38.3 | Selector Retry settlement (RG-025, D-24): Contact Frequency and Snooze submit/Retry settle through `createRelationshipSheetRunner`, so a Retry settles only the failed selector and both stay usable after reopening. |
+| 2026-09-26 | 38.4 | Layout preview geometry (RG-033 AUD-UIA-021): the preview packs against the Profile overview width basis (window − 66dp) and sizes tiles with the shared `overviewColumnWidth`/`overviewTileWidth` helpers and `SPACING.sm` gaps, so compact/auto/wide rows match the real Profile; the layout switch uses themed track/thumb tokens (RG-030 AUD-UIA-003). |

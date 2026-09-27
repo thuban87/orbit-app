@@ -1,7 +1,7 @@
 # Interaction History & Insights
 
-**Last updated:** 2026-09-25
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Last updated:** 2026-09-26
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/db/history-read.ts`, `src/db/interaction-edit-read.ts`, `src/services/history/` (`window.ts`, `buckets.ts`, `cycles.ts`, `intensity-window.ts`), `src/components/history/`, `src/screens/EditInteractionScreen.tsx`, `src/screens/edit-interaction-logic.ts`
 
 ## Purpose
@@ -73,6 +73,7 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 2. Tapping a cell opens `HeatmapContextCard` first (count + `See details`, or `0 interactions` + `Log interaction`) — never the large sheet directly.
 3. `See details` opens the shared `DateDetailSheet`; `Log interaction` routes the typed `LogContact { contactId, prefillDate }` contract to the canonical detailed form. The prefilled day remains editable.
 4. The Year lens uses vertically flowing, weekday-aligned week rows rather than a horizontal scroll container. It reuses the same day-cell renderer, selection, classification, and accessible labels as the other lenses.
+5. The day lenses (7 Days / Month, 7 columns) and the Cycles lens (5 columns) fit their measured width (38.4 RG-033, `ui-accessibility/AUD-UIA-010`, D-13). `ActivityHeatmap` measures its container with `onLayout` and sizes each lens's cells with the shared pure `fitHeatmapCell` (`src/components/heatmap-fit.ts`). The width is capped at `DAY_MAX_CELL` 38 or `CYCLE_MAX_CELL` 52 and shrinks below that whenever the width demands it. Both grids are centered, and neither renders until measured. The Cycles grid is exactly five cells plus four gaps wide, so it always wraps at five. The dense Year lens is deliberately unchanged at its fixed `yearCellEdge` 13dp — an accepted limitation.
 
 ### Explicit timestamp presentation
 
@@ -129,6 +130,8 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | `history_cycle_count` default | `10` | `src/db/migrations/025-interaction-history-schema.ts` | Default Cycles preset (options 5/10/15/20). |
 | Rolodex year range | 30 years back, capped at today's year | `src/components/history/rolodex-logic.ts` | Browsable Year span. |
 | Your Week periods | Rolling 7 Days / locale-aware Calendar Week | `src/services/history/week-window.ts` | Shared app-wide local-date window vocabulary. |
+| `DAY_MAX_CELL` / `CYCLE_MAX_CELL` | `38` / `52` | `src/components/history/ActivityHeatmap.tsx` | Per-lens cell caps; the fitted edge never exceeds them (RG-033). |
+| `HEATMAP_GEOMETRY.yearCellEdge` | `13` | `src/components/history/ActivityHeatmap.tsx` | Fixed dense Year cell; not width-fitted. |
 
 ## Decisions
 
@@ -191,3 +194,4 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | 2026-09-26 | 38.3 | The persisted lens and cycle preset are adopted from revision re-reads only until the user picks locally, so a re-read that started before the settings write committed can no longer revert the choice; a failed write logs content-free and reverts explicitly unless a newer choice superseded it (review A-WR-08). |
 | 2026-09-26 | 38.4 | Shared minute timestamps for remaining consumers (RG-038, ui-accessibility/AUD-UIA-018): added the time-only `formatTimeMinute`/`formatTimeMinuteOrFallback` pair; History date-detail and Digest day-detail rows (text and a11y labels) and Group Event Detail "When" now render 12-hour minute-precision time instead of 24-hour slices or raw storage. |
 | 2026-09-26 | 38.4 | Group Events list rows render their date-time through `formatDateTimeMinuteOrFallback` (Plan 12, RG-038 ui-accessibility/AUD-UIA-018); the local 24-hour slice helper is gone. |
+| 2026-09-26 | 38.4 | Activity heatmap fit-to-width (Plan 09, RG-033 ui-accessibility/AUD-UIA-010, D-13): the 7 Days/Month and Cycles lenses size their cells from the measured width with `fitHeatmapCell` (caps 38/52) and are centered; the dense Year lens is unchanged. |

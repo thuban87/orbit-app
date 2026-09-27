@@ -48,7 +48,8 @@ Digest reads existing state and persists only the portable app-wide period prefe
 | `src/components/digest/your-week-section-logic.ts` | Pure period controller: in-flight write marker, safe Settings adoption, re-window day retention, shared period-read authority; the token-scoped day-detail state machine (`startDayRead` / `settleDayRead` / `failDayRead` / `clearDayDetail`). |
 | `src/components/digest/DigestDayDetail.tsx` | Renders the selected day from its read state: inline loading indicator, "Couldn't load this day" with Retry, empty copy only after a successful empty read, or the day's rows. |
 | `src/components/digest/DigestListTransition.tsx` | The standard Up Next/Horizon list transition, skipped on first render and off under reduced motion. |
-| `src/components/digest/YourWeekHeatmap.tsx` | Reuses shared heatmap language with a non-colour-only selected state. |
+| `src/components/digest/YourWeekHeatmap.tsx` | Reuses shared heatmap language with a non-colour-only selected state; sizes its cells from the measured width and centers the grid. |
+| `src/components/heatmap-fit.ts` | Pure `fitHeatmapCell` fit-to-width helper shared with the Profile History heatmap. |
 | `src/db/your-week-read.ts` | Excludes group-linked child interactions and includes each Group Event parent once. |
 
 ## How It Works
@@ -80,6 +81,7 @@ Digest reads existing state and persists only the portable app-wide period prefe
 
    Every bound is a `?` parameter. Results are identical to the pre-38.4 reads for every stored form a live writer produces (`YYYY-MM-DD HH:MM:SS` via `rejectFutureOccurredAt`), plus date-only, `T`-separated, fractional-second, and malformed values; `src/db/your-week-read.test.ts` proves this against the legacy predicates as an oracle, alongside EXPLAIN QUERY PLAN and growing-history fixtures. **Accepted edge (not repaired, 38.2 D-23):** a timezone-suffixed `occurred_at` — reachable only through a hand-crafted backup, since `restore-apply.ts` writes backup strings without format validation — can fall outside the string range where `date()` would have shifted it across a UTC day, so it may drop out of a Your Week window it previously appeared in.
 3. A heatmap selection expands `DigestDayDetail` beneath the heatmap. The visual language and count classification reuse the Profile History helpers without adding rotary or long-range navigation.
+   The grid fits its measured width (38.4 RG-033, `ui-accessibility/AUD-UIA-010`, D-13). A full-width wrapper measures the available width with `onLayout`. `fitHeatmapCell` then picks the cell edge `min(MAX_CELL, floor((width − 6·gap) / 7))`, and the grid is centered. Cells are whole dp, so seven cells plus six gaps never exceed the width, and nothing renders until the width is measured. `MAX_CELL` stops cells ballooning on wide screens. `MIN_CELL` is the design floor for supported (≥320dp) widths, not a clamp: on a narrower width the cells keep shrinking so every day stays visible, with no horizontal scroll.
 4. Settings and the in-context toggle both write the same validated portable `your_week_period` setting; Horizon birthdays and weekly notification cadence do not use it.
 5. On each `refreshSignal`, Your Week keeps the chosen period and re-windows to the current local day (D-15). No timer detects the new day (D-22). A selected day survives while it is still a real day in the new window, including across a tab return (D-26), and is re-read; otherwise it clears.
 6. A period changed in Settings is adopted on the next refresh, but only when no in-context toggle write is in flight and no toggle has begun since that settings read started. A refresh can therefore never revert an in-flight toggle. Every period read (refresh, toggle, rollback) goes through one request authority, so the most recently begun read wins.
@@ -103,6 +105,8 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 | Birthday window | next `7` days | `src/db/digest-read.ts` | Horizon-only forward-looking birthday range. |
 | `your_week_period` default | `rolling-7-days` | `src/db/migrations/030-your-week-period.ts` | Portable default selected for metrics and detail. |
 | `DIGEST_WEEKDAY` | `1` | `src/services/notifications/digest-schedule.ts` | Sunday weekly delivery. |
+| `MAX_CELL` | `56` | `src/components/digest/YourWeekHeatmap.tsx` | Your Week cell-edge cap on wide screens. |
+| `MIN_CELL` | `36` | `src/components/digest/YourWeekHeatmap.tsx` | Documented design floor for ≥320dp windows (320dp fits 37dp cells); visibility wins below it. |
 
 ## Decisions
 
@@ -122,7 +126,7 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 5. **Do not double-count Group Events.** Exclude their linked child interactions from event activity and project the parent once.
 6. **Do not add a Digest trigger outside `DigestScreen`.** Sections follow Digest's refresh ownership; a section-level focus effect or private AppState listener reintroduces pre-sweep resume reads and double reads.
 7. **A selected day is not immediately empty.** Day detail is `idle | loading | loaded | error`. A pending read shows the inline indicator, a failed one "Couldn't load this day" with Retry; never render "No activity on this date." for anything but a successful empty read. Every read (tap, Retry, retained-day refresh) takes a fresh request token. Never guard publication with `selectedDay === date` — a slower older read for the same date would overwrite the newer one.
-8. **Seven 44dp heatmap targets need compact-width treatment.** Fixed cells plus outer padding can overflow 360dp-or-narrower layouts.
+8. **Never give the Your Week grid a fixed cell edge again.** The old fixed 44dp cells overflowed narrow screens and left an empty right side on wider ones. Cells come from the measured width through `fitHeatmapCell`, and `MIN_CELL` must never become a clamp that could push a day off-screen (D-13). On screens narrower than about 366dp the cells are smaller than 44dp. That is the accepted cost of keeping all seven days visible.
 9. **Keep both halves of every Your Week predicate.** Dropping the `occurred_at` range falls back to a lifetime-history scan; dropping the `date()` residual lets malformed values the range admits into the counts. Never wrap the range column in a function, and never interpolate a period bound.
 
 ## Related Systems
@@ -147,3 +151,4 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 | 2026-09-25 | 38.3 | Truthful day detail (RG-026, reliability-testing/AUD-REL-014; closes Phase 38 WR-01): explicit `idle \| loading \| loaded \| error` day-detail states with request-scoped tokens, inline loading indicator, "Couldn't load this day" + Retry, empty copy only after a successful empty read (D-16). |
 | 2026-09-26 | 38.3 | Your Week keeps a loaded heatmap and day detail on a refresh failure and shows a compact "Couldn't refresh Your Week" notice with a read-only Retry; the full "Couldn't load Your Week" state (also with Retry) appears only when nothing has loaded (review B-WR-06). |
 | 2026-09-26 | 38.4 | Bounded Your Week reads via occurred_at indexes (RG-028, performance/AUD-PERF-004): migration 031 adds `idx_interactions_occurred_at` / `idx_group_events_occurred_at`; metrics, date counts, and day detail use a half-open range plus the retained `date()` residual with oracle-proven identical results; no Digest cache (ADR-148, D-18). |
+| 2026-09-26 | 38.4 | Your Week heatmap fit-to-width (RG-033 AUD-UIA-010, D-13): cells sized from the measured width by `fitHeatmapCell` between `MIN_CELL` 36 / `MAX_CELL` 56, grid centered, nothing rendered until measured; every day visible with no horizontal scroll. |
