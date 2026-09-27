@@ -82,7 +82,7 @@ describe("tab-root chrome contract (RG-037, D-22, D-23)", () => {
     }
   });
 
-  it.each(TAB_ROOTS.filter((root) => root.screen !== "DigestScreen"))(
+  it.each(TAB_ROOTS)(
     "$screen renders only the root ShellAppBar (no Back)",
     (root) => {
       const variants = shellAppBarVariants(screenSource(root.screen));
@@ -90,6 +90,14 @@ describe("tab-root chrome contract (RG-037, D-22, D-23)", () => {
       expect(variants.every((variant) => variant === '"root"')).toBe(true);
     },
   );
+
+  it("Digest renders the shared header row, not its own display-role title (D-23)", () => {
+    const source = screenSource("DigestScreen");
+    expect(
+      source.match(/<ShellAppBar variant="root" title=\{DIGEST\} \/>/g),
+    ).toHaveLength(1);
+    expect(source).not.toContain('role="display"');
+  });
 
   it("the Events root keeps its search trailing action", () => {
     const source = screenSource("GroupEventsScreen");

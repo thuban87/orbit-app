@@ -27,6 +27,9 @@ vi.mock("@/components/digest/YourWeekSection", () => ({
 vi.mock("@/components/ui/AppText", () => ({ AppText: "AppText" }));
 vi.mock("@/components/ui/ChromeScrim", () => ({ ChromeScrim: "ChromeScrim" }));
 vi.mock("@/components/ui/Button", () => ({ Button: "Button" }));
+// ShellAppBar reads navigation hooks, so this renderless harness cannot expand
+// it; it stays a leaf whose props (variant, title) are asserted directly.
+vi.mock("@/components/ShellAppBar", () => ({ ShellAppBar: "ShellAppBar" }));
 vi.mock("@/db/database", () => ({
   getExecutor: () => mocks.exec,
   localDateTime: () => "2026-09-19 12:00:00",
@@ -141,7 +144,6 @@ describe("DigestScreen composition", () => {
       ),
     );
     expect(loading.some((node) => node.type === "UpNextSection")).toBe(false);
-    expect(loading.map((node) => node.text).join(" ")).toContain("Digest");
 
     const error = all(
       resolve(
@@ -253,6 +255,56 @@ describe("DigestScreen composition", () => {
       { refreshSignal: 2 },
     );
   });
+
+  it.each([
+    ["loading", { phase: "loading" }],
+    ["error", { phase: "error" }],
+    [
+      "loaded",
+      digestLoadStateOnPublish<typeof data>({ phase: "loading" }, data),
+    ],
+    [
+      "loaded with a refresh error",
+      digestLoadStateOnFail(
+        digestLoadStateOnPublish<typeof data>({ phase: "loading" }, data),
+      ),
+    ],
+  ] as const)(
+    "renders the shared root header row first while %s (D-23)",
+    (_label, state) => {
+      const [root, ...rest] = resolve(
+        DigestContent({
+          state: state as DigestLoadState,
+          refreshSignal: 0,
+          onRetry: vi.fn(),
+          onOpenProfile: vi.fn(),
+          onDrillThrough: vi.fn(),
+        }),
+      );
+      expect(rest).toHaveLength(0);
+      expect(root.props.testID).toBe("digest-root");
+      const [header, body, ...others] = root.children;
+      expect(others).toHaveLength(0);
+      // The header row is full-bleed: the outer container carries no padding;
+      // the body below it does.
+      expect(header.type).toBe("ShellAppBar");
+      expect(header.props).toEqual({ variant: "root", title: "Digest" });
+      expect(body.type).toBe("View");
+      expect(body.props.testID).toBe("digest-body");
+      expect(root.props.style).not.toHaveProperty("padding");
+      expect(body.props.style).toHaveProperty("padding");
+
+      const nodes = all([root]);
+      expect(nodes.filter((node) => node.type === "ShellAppBar")).toHaveLength(
+        1,
+      );
+      expect(
+        nodes.some(
+          (node) => node.type === "AppText" && node.props.role === "display",
+        ),
+      ).toBe(false);
+    },
+  );
 
   it("awaits the complete query write before navigating and never navigates on rejection", async () => {
     const order: string[] = [];
