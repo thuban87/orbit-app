@@ -440,7 +440,21 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
     `import_sessions`; head+1 is verified on disk), with no backup-format
     change. Resume keeps the choice. The single-contact review's Bound
     choice, which the create seam drops today, is honoured as part of
-    the same change (Phase 19 Cluster D). Plan 21.
+    the same change (Phase 19 Cluster D). Plan 21. *(Its open Import
+    Complete question is resolved by D-58.)*
+-   **[DECIDED · 2026-09-27] D-58 --- Import Complete's "View Unbound
+    contacts" action is removed entirely,** because it would not list a
+    Bound batch. It may return later in a more sensible form. The
+    Unbound contacts screen stays reachable from the Contacts overflow
+    menu. Plan 21 Task 7. The backlog todo
+    `2026-09-27-retire-old-fuel-editor.md` severity is **major**.
+    Record-keeping: this supersedes ADR-066's "bridge to Unbound
+    contacts" clause and the Phase 19 dossier's `[DECIDED]` Import
+    Complete bridge (`19-system-contact-import.md` ~:417--419); both get
+    a superseding note at KB extraction.
+-   **[DECIDED · 2026-09-27] D-59 --- Plan 21 stays a single plan:** no
+    split and no mid-plan handoff, despite its ~285k (low-confidence)
+    estimate.
 
 ## Revision Log
 
@@ -479,3 +493,8 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
     and a new Plan 23 (FAB: D-52 clearance and the D-56 border). The
     phase is 23 plans in 9 waves; the code review runs between waves 8
     and 9.
+-   2026-09-27 --- owner rulings D-58 (remove Import Complete's "View
+    Unbound contacts" action; Plan 21) and D-59 (Plan 21 stays whole).
+    Plan-check fixes, with no decision change: Plan 15 now runs after
+    Plan 19 (wave 5) because both drive the single Pixel 3a. Still 23
+    plans in 9 waves.
