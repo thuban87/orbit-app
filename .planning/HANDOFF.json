@@ -1,0 +1,40 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-09-27T10:21:08.185Z",
+  "phase": "38.4",
+  "phase_name": "UI Consistency, Accessibility, Performance & Release Polish (INSERTED)",
+  "phase_dir": ".planning/phases/38.4-audit-remediation-ui-performance-release",
+  "plan": 19,
+  "task": 0,
+  "total_tasks": 0,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "38.4-01..14", "name": "Plans 01-14 executed", "status": "done", "commit": "c36ff65-era; see SUMMARY.md files"},
+    {"id": "38.4-18", "name": "Sheet large-text scroll (G1) + D-42 A-C", "status": "done", "commit": "d9c96f2"}
+  ],
+  "remaining_tasks": [
+    {"id": "38.4-19", "name": "Contacts freeze (G2) + D-55 on-screen count (wave 4, device)", "status": "not_started"},
+    {"id": "38.4-15", "name": "W3/O-1 sqlite race investigation (wave 5, device, after 19)", "status": "not_started"},
+    {"id": "38.4-16", "name": "Placeholder sweep + on-glass accent roles (wave 5)", "status": "not_started"},
+    {"id": "38.4-22", "name": "Platform config: native dialogs follow mode, storage permissions (wave 5)", "status": "not_started"},
+    {"id": "38.4-20", "name": "Glass-scope read sweep, duration chips, font swaps (wave 6)", "status": "not_started"},
+    {"id": "38.4-21", "name": "UI fixes + import Bound/Unbound + migration 032 + D-58 (wave 7)", "status": "not_started"},
+    {"id": "38.4-23", "name": "FAB clearance sweep + app-wide FAB border (wave 8)", "status": "not_started"},
+    {"id": "code-review", "name": "MANUAL gsd-code-review 38.4 + fixes before Plan 17 (D-37)", "status": "not_started"},
+    {"id": "38.4-17", "name": "Automated gate, debug + one release build, Pixel 3a device pass, owner checklist (wave 9)", "status": "not_started"}
+  ],
+  "blockers": [],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {"action": "Push the local commits (404 unpushed) when ready", "context": "Agents never push", "blocking": false},
+    {"action": "Plan 17 owner checklist (TalkBack legs, icons C4, icon margin C8, colour variants, import blurb, themed icon on the Pixel 6 Pro)", "context": "End of phase", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Phase fixed at 23 plans; Plan 21 stays whole (D-59)", "rationale": "Owner ruling after repeated plan inflation", "phase": "38.4"},
+    {"decision": "Code review runs manually after Plan 23 and before Plan 17 (D-37)", "rationale": "Avoid redoing the device pass after review fixes", "phase": "38.4"},
+    {"decision": "Plan 15 runs after Plan 19, never concurrently", "rationale": "Single shared test device + Metro :8082", "phase": "38.4"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "/gsd-execute-phase 38.4 (resumes at Plan 19); verify adb device 943AY0JR4P, Metro :8082 and adb reverse tcp:8081 tcp:8082 first",
+  "context_notes": "Read .continue-here.md BLOCKING CONSTRAINTS first: act only on explicit owner instruction; never default owner decisions; no new plans; manual code review before Plan 17."
+}
