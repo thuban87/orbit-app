@@ -1,10 +1,10 @@
 ---
 schema_version: 1
-open_count: 61
+open_count: 65
 waived_count: 0
 fixed_count: 13
-total_count: 74
-last_updated: 2026-09-26T19:20:02.047Z
+total_count: 78
+last_updated: 2026-09-27T22:20:09.774Z
 ---
 
 # Broken Windows Ledger
@@ -89,6 +89,10 @@ last_updated: 2026-09-26T19:20:02.047Z
 | 72 | 36 | deviation | src/backup/orrery-preferences-portability.test.ts |  | Updated composed restore test boundaries for the v5 background persistence dependency | fixed |  | 2026-09-14T09:25:13.472Z | 2026-09-14T09:26:16.345Z |
 | 73 | 38.2 | unrun-verify | .planning/phases/38.2-audit-remediation-data-security-lifecycle/38.2-08-PLAN.md |  | Plan 08 Pixel export/Merge/re-export/Replace-all and notification snooze device backstop deferred to Plan 16 | open |  | 2026-09-24T04:53:41.068Z |  |
 | 74 | 38.4 | deviation | src/theme/tokens/surface.test.ts |  | E-7 held for owner: Galaxy Light coral accentText #B03A26 4.48:1 (<4.5) on the presentation-density card over the darkest Galaxy pixel; scoped proof exclusion until the owner rules (38.4-RG029-INVENTORY.md §4) | fixed |  | 2026-09-26T19:01:48.617Z | 2026-09-26T19:20:02.047Z |
+| 75 | 38.4 | unrun-verify | .planning/phases/38.4-audit-remediation-ui-performance-release/38.4-UAT.md |  | 38.4-17 G1-f FAIL: group title prompt hidden behind keyboard, Cancel clipped at font 2.0 (Plan 18 gap) | open |  | 2026-09-27T22:20:00.845Z |  |
+| 76 | 38.4 | deviation | .planning/phases/38.4-audit-remediation-ui-performance-release/38.4-UAT.md |  | 38.4-17 DEFECT-1: PostLog Edit Memory sheet clips Allow AI/Save at font 1.15 on the Pixel 3a (expanded Sheet without ScrollView; pre-existing) | open |  | 2026-09-27T22:20:09.412Z |  |
+| 77 | 38.4 | unrun-verify | .planning/phases/38.4-audit-remediation-ui-performance-release/38.4-UAT.md |  | 38.4-17 BLOCKED: D34-a/b (cost warning, Digest refresh error), RG008-c/RG030-c (model picker, no direct AI lane), OAD3-c (no assist queue), OAE2-7 D-64 lock UI, WI-O-3, WI-W2 | open |  | 2026-09-27T22:20:09.589Z |  |
+| 78 | 38.4 | deviation | .planning/phases/38.4-audit-remediation-ui-performance-release/38.4-UAT.md |  | 38.4-17 out-of-scope: bulk Set category sheet lists only Uncategorized (OOS-4); single-import Leave import? alert after commit (OOS-5); Orbit Status sheet seconds (OOS-8) | open |  | 2026-09-27T22:20:09.774Z |  |
 
 ````json
 [
@@ -979,6 +983,54 @@ last_updated: 2026-09-26T19:20:02.047Z
     "reason": "",
     "recorded_at": "2026-09-26T19:01:48.617Z",
     "resolved_at": "2026-09-26T19:20:02.047Z"
+  },
+  {
+    "id": 75,
+    "kind": "unrun-verify",
+    "phase": "38.4",
+    "file": ".planning/phases/38.4-audit-remediation-ui-performance-release/38.4-UAT.md",
+    "line": null,
+    "description": "38.4-17 G1-f FAIL: group title prompt hidden behind keyboard, Cancel clipped at font 2.0 (Plan 18 gap)",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-27T22:20:00.845Z",
+    "resolved_at": null
+  },
+  {
+    "id": 76,
+    "kind": "deviation",
+    "phase": "38.4",
+    "file": ".planning/phases/38.4-audit-remediation-ui-performance-release/38.4-UAT.md",
+    "line": null,
+    "description": "38.4-17 DEFECT-1: PostLog Edit Memory sheet clips Allow AI/Save at font 1.15 on the Pixel 3a (expanded Sheet without ScrollView; pre-existing)",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-27T22:20:09.412Z",
+    "resolved_at": null
+  },
+  {
+    "id": 77,
+    "kind": "unrun-verify",
+    "phase": "38.4",
+    "file": ".planning/phases/38.4-audit-remediation-ui-performance-release/38.4-UAT.md",
+    "line": null,
+    "description": "38.4-17 BLOCKED: D34-a/b (cost warning, Digest refresh error), RG008-c/RG030-c (model picker, no direct AI lane), OAD3-c (no assist queue), OAE2-7 D-64 lock UI, WI-O-3, WI-W2",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-27T22:20:09.589Z",
+    "resolved_at": null
+  },
+  {
+    "id": 78,
+    "kind": "deviation",
+    "phase": "38.4",
+    "file": ".planning/phases/38.4-audit-remediation-ui-performance-release/38.4-UAT.md",
+    "line": null,
+    "description": "38.4-17 out-of-scope: bulk Set category sheet lists only Uncategorized (OOS-4); single-import Leave import? alert after commit (OOS-5); Orbit Status sheet seconds (OOS-8)",
+    "status": "open",
+    "reason": "",
+    "recorded_at": "2026-09-27T22:20:09.774Z",
+    "resolved_at": null
   }
 ]
 ````

@@ -1198,7 +1198,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; ADR-115 + ADR-087 (surface/glass authority)
 **UI hint**: yes
-**Plans**: 22/23 plans executed in 9 waves
+**Plans**: 23/23 plans executed in 9 waves
 
 Plans:
 **Wave 1**
@@ -1249,7 +1249,7 @@ Plans:
 
 **Wave 9** *(blocked on Wave 8 completion and the D-37 phase code review/fix pass)*
 
-- [ ] 38.4-17-PLAN.md — Phase gate, debug + one release build, targeted device pass and owner checklist (all)
+- [x] 38.4-17-PLAN.md — Phase gate, debug + one release build, targeted device pass and owner checklist (all)
 
 > **Discussed 2026-09-26 — ready to plan once the owner supplies launcher artwork (D-08). See `38.4-CONTEXT.md` (D-08..D-20). RG-032 moved to the widget-overhaul phase; 38.3 loose ends folded in as Workstream I; Phase 40 keeps its stub list.**
 > **Planned 2026-09-26 — 17 plans, 5 waves. Investigation-first: RG-034/RG-039 (Plan 11) and W3 (Plan 15, D-25 owner checkpoint). Migration 031 (additive indexes). One release APK at the end (Plan 17).**
@@ -1332,7 +1332,7 @@ Plans:
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
-| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 22/23 | In Progress|  |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 0/TBD | Deferred planning (needs discuss; sheet signed 2026-09-27; art spike + discuss next) | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
