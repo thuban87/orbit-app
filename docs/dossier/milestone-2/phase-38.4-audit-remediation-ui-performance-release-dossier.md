@@ -371,7 +371,7 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
     Plan 21.
 -   **[DECIDED · 2026-09-27] D-45 --- The FAB gets a border on Backup
     settings only,** in a theme-token colour, so it stays distinct over
-    that screen's accent buttons. Plan 21.
+    that screen's accent buttons. Plan 21. *(Superseded by D-56.)*
 -   **[DECIDED · 2026-09-27] D-46 --- The Profile's Off Limits edit opens
     the Update Contact entry editor,** not the Fuel editor with its Kind
     picker. This changes ADR-150's editor-UI choice for the Profile
@@ -379,6 +379,7 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
     validated edits and deletes) is kept. Fuel is not retired, and the
     Fuel editor stays in Create/Edit Contact. Its remaining uses go to
     the owner, and a superseding ADR is due at KB extraction. Plan 21.
+    *(Superseded by D-54: descoped to the backlog.)*
 -   **[DECIDED · 2026-09-27] D-47 --- The layout editor's live preview
     is hidden,** behind a flag rather than deleted. Plan 21.
 -   **[DECIDED · 2026-09-27] D-48 --- The storage permission pair
@@ -395,13 +396,51 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
 -   **[DECIDED · 2026-09-27] D-51 --- Contacts count vs List vs Card is
     investigated** within the G2 plan. The header count is by design the
     contacted-live count (Phase 26); a List/Card divergence is fixed.
-    Plan 19.
+    Plan 19. *(Count semantics changed by D-55.)*
 -   **[DECIDED · 2026-09-27] D-52 --- Every FAB-bearing scrolling screen
     gets bottom clearance** so the last item scrolls clear of the FAB,
-    enforced by a route-derived contract. Plan 21.
+    enforced by a route-derived contract. Plan 21. *(Moved to Plan 23.)*
 -   **[DECIDED · 2026-09-27] D-53 --- Not planned:** `npm audit` is
     triaged separately by the orchestrator; an import-time Bound/Unbound
-    choice (E2) is excluded pending an owner question.
+    choice (E2) is excluded pending an owner question. *(E2 resolved by
+    D-57.)*
+
+### Owner answers (2026-09-27, second round)
+
+-   **[DECIDED · 2026-09-27] D-54 --- The Off Limits editor work (C3)
+    leaves 38.4 for the backlog.** D-46 is superseded and nothing from
+    it ships here. The owner wants the old Fuel editor retired
+    everywhere: Create Contact, Edit Contact and the Profile's Off
+    Limits route should all use the new Off Limits entry editor (FAB →
+    Update Contact → Off Limits). Backlog:
+    `.planning/todos/pending/2026-09-27-retire-old-fuel-editor.md`.
+    Doing it supersedes ADR-150's scoped `FuelEditor` choice (and
+    ADR-131's Create/Edit Off Limits editor) and needs a new ADR then.
+    Off Limits entries stay `fuel` rows; ADR-081 retired only
+    AI-proposed fuel.
+-   **[DECIDED · 2026-09-27] D-55 --- The Contacts header count shows
+    what is on screen:** the number of contacts the active view displays
+    for the active population, filters and search, the same in List and
+    Card. This supersedes the Phase 26 "total-live" header rule
+    (`26-UAT.md` Product observation; no ADR records it) and D-51's "keep
+    the count". The cause-aware empty state still uses the live count.
+    Plan 19.
+-   **[DECIDED · 2026-09-27] D-56 --- The FAB gets a permanent
+    theme-token border on every screen,** made in the FAB component.
+    This supersedes D-45's Backup-settings-only border. Planner pick:
+    `onAccent` at 2dp. Plan 23.
+-   **[DECIDED · 2026-09-27] D-57 --- Bulk import offers Bound or
+    Unbound, defaulting to Unbound.** Bound shows a batch frequency
+    picker (the existing cadence options) and a short blurb that binding
+    creates reminders for every imported contact. Imported contacts are
+    created with that lifecycle and cadence through the canonical create
+    seam (ADR-062 rules). This partially supersedes ADR-066 ("only a
+    batch category override"); Unbound stays the default. Persisting the
+    choice needs migration 032 (a nullable batch cadence on
+    `import_sessions`; head+1 is verified on disk), with no backup-format
+    change. Resume keeps the choice. The single-contact review's Bound
+    choice, which the create seam drops today, is honoured as part of
+    the same change (Phase 19 Cluster D). Plan 21.
 
 ## Revision Log
 
@@ -432,3 +471,11 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
     D-45, D-46, D-47, D-49, D-52) and Plan 22 (platform config: D-48,
     D-50). Plan 21's D-46 tasks wait on two open owner questions (the
     ADR-150 editor reversal, and Create/Edit Contact scope).
+-   2026-09-27 --- owner answers D-54..D-57: C3 goes to the backlog
+    (D-54), the Contacts count shows what is on screen (D-55), the FAB
+    gets a permanent app-wide border (D-56, replacing D-45), and bulk
+    import offers Bound/Unbound with a batch frequency (D-57, answering
+    D-53's E2). Owner-approved split: Plan 21 (UI fixes, including E2)
+    and a new Plan 23 (FAB: D-52 clearance and the D-56 border). The
+    phase is 23 plans in 9 waves; the code review runs between waves 8
+    and 9.

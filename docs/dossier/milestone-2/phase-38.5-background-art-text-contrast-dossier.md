@@ -4,8 +4,9 @@
 sheet (38.4 D-40), **met 2026-09-27** (sign-off v2, D-08). Before planning, the O-9 `codex-edu` image spike still has
 to run. Authored 2026-09-26 at phase insertion, from the owner rulings 38.4 D-38..D-41 and the 38.4 background-art
 brief. Updated 2026-09-27 with the owner's scrim sign-off v2 results and rulings D-08..D-14. The phase is now sequenced
-art-first (D-13), and the images are made by a Codex agent in a Claude-verified loop (D-14). No discuss session has run
-yet.
+art-first (D-13), and the images are made by a Codex agent in a Claude-verified loop (D-14). A second round the same day
+added D-15 (the owner confirms the ADR-115 supersession) and D-16 (a pearl planet limb as an exploration only). No
+discuss session has run yet.
 
 ## Decision Legend
 
@@ -14,7 +15,7 @@ yet.
 -   **[DERIVED]** a consequence of a decision or of a measured fact.
 -   **[PLANNING NOTE]** a repository finding or engineering follow-up to verify at planning time.
 
-**Numbering.** D-08..D-14 are this phase's own rulings (2026-09-27); they match the CONTEXT shim. The carried 38.4
+**Numbering.** D-08..D-16 are this phase's own rulings (2026-09-27); they match the CONTEXT shim. The carried 38.4
 rulings are D-38..D-41. Any other 38.4 decision is written "38.4 D-NN".
 
 ## Objective
@@ -182,7 +183,7 @@ order.
         chrome. The sheet showed
         today's rule on the page, and these are owner-bucket calls (D-06), so they are recorded as decided. Planning
         needs a new ADR that supersedes these parts of ADR-115 (and of ADR-087 where it still applies). Other content
-        cards keep ADR-115 unless the owner rules otherwise (O-8).
+        cards keep ADR-115 unless the owner rules otherwise (O-8). *(Confirmed by the owner as D-15.)*
 -   **[DECIDED · 2026-09-27] D-10 --- Text on the art takes the colour that suits the art.**
     -   Wherever a component goes from full to transparent or none over the art, the text sitting on the art takes the
         colour that suits the art beneath it, not the mode's default. Examples (owner): white text over dark Galaxy art
@@ -236,6 +237,25 @@ order.
             `git status` for stray changes.
         -   `~/.codex-edu/config.toml` defaults to `gpt-6-sol` (MEASURED 2026-09-27), so pass `-m gpt-6-astra` explicitly.
     -   Whether this path can generate image files at all is open: see O-9.
+
+### D-15 and D-16: ADR-115 supersession and the planet-limb exploration (2026-09-27, second round)
+
+-   **[DECIDED · 2026-09-27] D-15 --- The owner supersedes the parts of ADR-115 that D-08/D-09 reverse, and 38.5 writes
+    the superseding ADR.** This turns D-09's **[DERIVED]** note into an explicit owner ruling. The superseded parts are:
+    -   contact entries (List rows and Card-view cards) truly transparent in Galaxy Light and Standard Dark, where ADR-115
+        keeps opaque cards in the mismatched package/mode pairings and rejects "Always-translucent cards";
+    -   List rows see-through where the sign-off says T (they are solid in every combination today);
+    -   no backing on the count label, the Contacts header and the Digest header where the sign-off says N, where ADR-115
+        gives bare chrome a local `ChromeScrim`/app-bar backing.
+    -   The new ADR also covers ADR-087 where it still applies. Other content cards keep ADR-115 unless the owner rules
+        otherwise (O-8).
+-   **[DECIDED · 2026-09-27] D-16 --- A pearl planet limb may be made as an exploration, not a commitment.** The owner is
+    open to having it created and looking at it (O-2's concept idea).
+    -   The Phase 31 art rule that excludes planets (restated in brief §I: no horizons, planets or recognisable imagery) is
+        **relaxed for this exploration only**. It is not relaxed for shipped art.
+    -   Shipping a planet-limb image, or relaxing the rule for shipped art, needs a later owner decision: the D-14 blocking
+        art sign-off at the earliest.
+    -   O-2 (the Galaxy light-mode imagery concept) stays OPEN.
 
 ## Primary Input: the 38.4 Background-Art Brief
 
@@ -304,7 +324,9 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
     -   **Owner concept ideas (2026-09-27; still OPEN, not choices):** a pastel nebula with white star glints, and a pearl
         planet limb.
     -   [PLANNING NOTE] The Phase 31 prompt rules, restated in brief §I, exclude horizons, planets and recognisable
-        imagery. A planet limb would need the owner to relax that rule for Galaxy Light.
+        imagery. A planet limb would need the owner to relax that rule for Galaxy Light. *(2026-09-27, D-16: relaxed for
+        an exploration only; the planet limb may be made and shown to the owner, and shipping it is a later owner
+        decision.)*
 -   **[OPEN] O-3 --- Standard light pale band.** Owner leaning (2026-09-26), **not a decision**: the pale remaps in
     `band-examples-standard.png` look acceptable in principle. Discuss before it becomes a decision. The band puts the whole
     image at about L\* 89–97.
@@ -452,3 +474,6 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
 
     Open items: O-5 resolved; O-9 added (the `codex-edu` image spike); O-2 gains the owner's concept ideas; O-7 parked; O-8
     has a scope note. P-9..P-11 added. The status header, Objective, Out of Scope and Prerequisites are updated.
+-   2026-09-27 (second round) --- D-15: the owner confirms the ADR-115 supersession D-09 derived, and 38.5 writes the
+    superseding ADR. D-16: a pearl planet limb may be made as an exploration only, with the Phase 31 no-planets rule relaxed
+    for that exploration; O-2 stays open.
