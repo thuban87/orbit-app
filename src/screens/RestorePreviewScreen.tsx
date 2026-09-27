@@ -11,6 +11,7 @@ import { applyRestore, type RestoreMode } from "@/backup/restore-apply";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
   type BackupHost,
   DEFAULT_BACKUP_HOST,
@@ -100,6 +101,8 @@ export function RestorePreviewScreen({
   host = DEFAULT_BACKUP_HOST,
 }: RootStackScreenProps<"RestorePreview"> & { host?: BackupHost }) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const [mode, setMode] = useState<RestoreMode>("merge");
   const [expired, setExpired] = useState(
     () => restorePreviewCache.read(route.params.token) === null,
@@ -219,7 +222,10 @@ export function RestorePreviewScreen({
     return (
       <ScrollView
         testID="restore-preview-expired"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
       >
         <Pressable
           accessibilityRole="button"
@@ -261,7 +267,10 @@ export function RestorePreviewScreen({
   return (
     <ScrollView
       testID="restore-preview-screen"
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: bottomClearance },
+      ]}
     >
       <Pressable
         accessibilityRole="button"

@@ -53,6 +53,7 @@ import {
   type WritingStyle,
   type WritingTone,
 } from "@/db/personalization-dao";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import type { AiCloudProviderId } from "@/services/ai-types";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -138,6 +139,8 @@ export function AIPersonalizationScreen({
   focus,
 }: AIPersonalizationScreenProps) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const [style, setStyle] = useState<WritingStyle>(DEFAULT_STYLE);
   const [sections, setSections] = useState<PersonalizationSection[]>([]);
   const [activeModel, setActiveModel] = useState<ActiveEstimateModel | null>(
@@ -412,7 +415,10 @@ export function AIPersonalizationScreen({
       </View>
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <View

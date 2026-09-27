@@ -32,6 +32,7 @@ import {
   unsnoozeProfileContact,
 } from "@/db/profile-relationship-actions";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { resolveProfilePresentation } from "@/profile/resolve-presentation";
 import type { ProfileLayoutDocument } from "@/profile/types";
 import {
@@ -79,6 +80,8 @@ export function ContactProfileScreen({
   host,
 }: RootStackScreenProps<"Profile"> & { host?: ContactProfileHost }) {
   const { colors, package: themePackage } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const contactId = route.params.contactId;
   const [snapshot, setSnapshot] = useState<ProfileSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -443,7 +446,13 @@ export function ContactProfileScreen({
             />
           </View>
         ) : null}
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.content}>
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: bottomClearance },
+          ]}
+        >
           {loading && !snapshot ? <AppText>Loading Profile…</AppText> : null}
           {error ? <AppText>{error}</AppText> : null}
           {snapshot && presentation ? (
