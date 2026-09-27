@@ -27,6 +27,7 @@ Use this process when adding a curated accent, bundled background slot, semantic
 | `src/theme/theme-presets.ts` | Complete palette values; the normal home for palette hex literals. |
 | `src/theme/accents.ts` | Curated accent tone triples and package defaults. |
 | `src/theme/backgrounds.ts` | Local background manifest, stable ordering, solid fallback, and each slot's declared `darkestPixel` / `brightestPixel` bounds. |
+| `src/theme/native-color-scheme.ts` | Drives the native night mode (RN `Alert`, date/time pickers) from the active package's mode setting; "system" → `"unspecified"` (D-50). |
 | `src/theme/glass-foregrounds.ts` | Standard-Light glass foreground palette (`resolveGlassForegroundPalette`), its lightness-only variants, and the pure scoped-value helpers. |
 | `scripts/measure-background-extrema.py` | Decodes every bundled asset and validates the declared bounds against each tint regime's composite extrema (`--check`, `--self-test`). |
 | `scripts/background-extrema-regimes.json` | The card/chrome tint regimes the script composites; a sync guard in `surface.test.ts` keeps it equal to the proof. |
@@ -76,6 +77,16 @@ Use this process when adding a curated accent, bundled background slot, semantic
    - **`textPlaceholder`.** Input placeholders use `textPlaceholder`. It equals `textSecondary` in every palette, and the glass scope never overrides it, because inputs sit on their own surface.
 
 10. **Preserve accessibility seams.** New icons use `src/components/icons/icon-registry.ts`; status meaning needs an existing or new non-colour cue; Skia ambient motion reads `useReducedMotionShared()` inside a worklet and never uses per-frame React state.
+
+## Native dialogs follow Orbit's mode (D-50)
+
+RN `Alert` confirmations and the Android date/time picker dialogs are native surfaces Orbit does not paint. They take their light or dark look from the activity's night configuration, not from `useTheme()`.
+
+- **The rule.** The active package's mode *setting* drives the native night mode. `ThemeProvider` calls `useNativeColorSchemeSync(activeMode)` once, with the same `activeMode` its palette resolution uses.
+- **The helper.** `src/theme/native-color-scheme.ts` holds `nativeColorSchemeFor(mode)` (light → `"light"`, dark → `"dark"`, system → `"unspecified"`) and `useNativeColorSchemeSync(mode)`. The hook calls `Appearance.setColorScheme` from an effect keyed on the mode. RN core maps that to `AppCompatDelegate.setDefaultNightMode`. The Expo AppTheme is DayNight and MainActivity handles `uiMode`, so nothing is recreated and no native package is needed.
+- **The guard.** "system" must map to `"unspecified"`, never to the resolved mode. Once the native mode is forced, `useColorScheme()` reports the override. Passing a resolved value would freeze Orbit's own System mode on the last forced value. `native-color-scheme.test.ts` pins the mapping, the guard and the `ThemeProvider` call site.
+- `app.json` `userInterfaceStyle` plays no part on Android (without `expo-system-ui` it only produces a prebuild warning). Do not add `expo-system-ui` for this; that is a native dependency and an owner decision. Evidence: `.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-NATIVE-CONFIG-INVESTIGATION.md`.
+- Surfaces in other processes (the system photo picker, DocumentsUI, the share chooser, the keyboard, notifications, the widget host) keep following the device.
 
 ## What You Don't Need to Change
 
@@ -127,3 +138,4 @@ For a bundled background or surface-composition change, select two materially di
 ## Changelog
 
 - **2026-09-26 — Phase 38.4 Plan 03 (RG-029 / `ui-accessibility/AUD-UIA-001`; D-12, D-24, D-26, D-27).** Added `darkestPixel` and `scripts/measure-background-extrema.py --check`, the both-extrema + interval proof, the Standard-Light glass foreground scope (`GlassForegroundScope`, `UnscopedTheme`, `useUnscopedTheme`, `useGlassForegroundColors`) with lightness-only variants, the `textPlaceholder` token, and the rule that a new foreground on Standard glass is proven or excluded in writing.
+- **2026-09-27 — Phase 38.4 Plan 22 (D-50 / `OA-D4`).** Added "Native dialogs follow Orbit's mode": `native-color-scheme.ts` (`nativeColorSchemeFor`, `useNativeColorSchemeSync`), called once from `ThemeProvider` with the active package's mode setting; "system" → `"unspecified"` feedback-loop guard; `userInterfaceStyle` recorded as inert on Android.

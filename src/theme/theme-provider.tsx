@@ -9,6 +9,7 @@ import {
   resolveGlassForegroundPalette,
   unscopedTheme,
 } from "./glass-foregrounds";
+import { useNativeColorSchemeSync } from "./native-color-scheme";
 import {
   DEFAULT_PRESET_ID,
   resolveMode,
@@ -43,6 +44,11 @@ interface ThemeProviderProps {
  * `resolveMode` (whose `SystemScheme` param is a superset), with no coercion
  * that could drop the `"unspecified"` path or invert the dark default.
  *
+ * The active package's mode SETTING also drives the native night mode (D-50),
+ * so RN `Alert` and the date/time pickers match Orbit. "system" maps to
+ * `"unspecified"`, so `useColorScheme()` keeps reporting the device scheme
+ * (see `native-color-scheme.ts`).
+ *
  * The active package's stored accent-id (NULL = package default) is resolved to
  * a `{ fill, onAccent, text }` tone for the resolved mode and OVERLAID onto
  * `palette.accent`(=fill)/`onAccent`/`accentText` at render (Plan 03 / THEME-02).
@@ -59,11 +65,14 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const galaxyBackground = useThemeStore((s) => s.galaxyBackground);
   const standardBackground = useThemeStore((s) => s.standardBackground);
   const scheme = useColorScheme();
+  // Per-package memory: the active package's OWN remembered mode drives render.
+  const activeMode = themePackage === "galaxy" ? galaxyMode : standardMode;
+  // D-50: native dialogs follow this mode SETTING ("system" → the device), never
+  // the resolved mode, so `useColorScheme()` keeps reporting the device scheme.
+  useNativeColorSchemeSync(activeMode);
 
   const theme = useMemo<ResolvedTheme>(() => {
-    // Per-package memory: the active package's OWN remembered mode drives render.
-    const mode = themePackage === "galaxy" ? galaxyMode : standardMode;
-    const resolved = resolveMode(mode, scheme);
+    const resolved = resolveMode(activeMode, scheme);
     // The active package's OWN stored accent-id (NULL -> package default tone).
     const accentId = themePackage === "galaxy" ? galaxyAccent : standardAccent;
     const tone = resolveAccent(accentId, themePackage, resolved);
@@ -88,8 +97,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     };
   }, [
     themePackage,
-    galaxyMode,
-    standardMode,
+    activeMode,
     galaxyAccent,
     standardAccent,
     galaxyBackground,
