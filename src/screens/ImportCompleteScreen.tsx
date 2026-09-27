@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { finalizeSessionIfTerminal } from "@/db/import-session-dao";
@@ -120,10 +121,17 @@ export function ImportCompleteScreen({
     });
   }, [authority, route.params.sessionId]);
 
-  useEffect(() => {
-    void load();
-    return () => authority.invalidate();
-  }, [authority, load]);
+  // 38.3 UAT O-3 (D-10): re-read on EVERY focus, not mount only, so returning
+  // from Duplicate Review after a link shows the current Need-review count.
+  // The focus path runs only `load` — the gated summary read plus the
+  // pre-existing idempotent terminal finalizer — never an import, retry, skip
+  // or row mutation. Blur retires any in-flight read.
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+      return () => authority.invalidate();
+    }, [authority, load]),
+  );
 
   const photoRows = loadedData(phase)?.photoRows ?? [];
 
