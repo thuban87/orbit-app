@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitHeatmapCell } from "@/components/heatmap-fit";
+import { cellHitSlop, fitHeatmapCell } from "@/components/heatmap-fit";
 import { SPACING } from "@/theme/tokens/spacing";
 
 const GAP = SPACING.xs;
@@ -134,5 +134,83 @@ describe("fitHeatmapCell — ActivityHeatmap lens shapes (RG-033, D-13)", () => 
       expect(cell).toBeLessThanOrEqual(52);
       expect(rowWidth(cell, 5, GAP)).toBeLessThanOrEqual(width);
     }
+  });
+});
+
+describe("cellHitSlop — heatmap tap zones never overlap (D-42 B)", () => {
+  const even = (gap: number) => ({
+    left: gap,
+    right: gap,
+    top: gap,
+    bottom: gap,
+  });
+
+  it("grows each side toward the 44dp target but never past half the gap", () => {
+    // 13dp Year cell: wants 16dp per side; 4dp gaps allow 2, an 8dp gap 4.
+    expect(
+      cellHitSlop({
+        edge: 13,
+        gaps: { left: 4, right: 8, top: 4, bottom: 4 },
+      }),
+    ).toEqual({ left: 2, right: 4, top: 2, bottom: 2 });
+    // A 42dp cell needs only 1dp per side to reach 44dp.
+    expect(cellHitSlop({ edge: 42, gaps: even(8) })).toEqual(even(1));
+    // An odd shortfall rounds up so the zone reaches the target.
+    expect(cellHitSlop({ edge: 41, gaps: even(8) })).toEqual(even(2));
+  });
+
+  it("adds nothing to a cell already at or above the target", () => {
+    expect(cellHitSlop({ edge: 44, gaps: even(4) })).toEqual(even(0));
+    expect(cellHitSlop({ edge: 52, gaps: even(4) })).toEqual(even(0));
+  });
+
+  it("never returns a negative inset, even for a zero or odd gap", () => {
+    expect(cellHitSlop({ edge: 10, gaps: even(0) })).toEqual(even(0));
+    expect(cellHitSlop({ edge: 10, gaps: even(5) })).toEqual(even(2));
+    expect(cellHitSlop({ edge: 10, gaps: even(-3) })).toEqual(even(0));
+  });
+
+  it("honours an explicit target", () => {
+    expect(cellHitSlop({ edge: 20, gaps: even(40), target: 30 })).toEqual(
+      even(5),
+    );
+  });
+
+  it("keeps facing insets within every gap for every fitted day/cycle edge, 200–900dp", () => {
+    for (const { columns, maxCell } of [
+      { columns: 7, maxCell: 38 },
+      { columns: 5, maxCell: 52 },
+    ]) {
+      for (let width = 200; width <= 900; width += 1) {
+        const edge = fitHeatmapCell({
+          availableWidth: width,
+          columns,
+          gap: GAP,
+          maxCell,
+        });
+        if (edge === null) throw new Error("unmeasured");
+        const slop = cellHitSlop({ edge, gaps: even(GAP) });
+        // Horizontal neighbours: my right + their left; vertical likewise.
+        expect(slop.right + slop.left).toBeLessThanOrEqual(GAP);
+        expect(slop.bottom + slop.top).toBeLessThanOrEqual(GAP);
+        // As large as the gap allows toward 44dp.
+        const want = Math.ceil(Math.max(0, 44 - edge) / 2);
+        expect(slop.left).toBe(Math.min(want, Math.floor(GAP / 2)));
+      }
+    }
+  });
+
+  it("keeps the Year week-boundary zones apart across the wider 8dp gap", () => {
+    const weekGap = SPACING.sm;
+    const lastOfWeek = cellHitSlop({
+      edge: 13,
+      gaps: { left: GAP, right: weekGap, top: GAP, bottom: GAP },
+    });
+    const firstOfNext = cellHitSlop({
+      edge: 13,
+      gaps: { left: weekGap, right: GAP, top: GAP, bottom: GAP },
+    });
+    expect(lastOfWeek.right + firstOfNext.left).toBeLessThanOrEqual(weekGap);
+    expect(lastOfWeek.right).toBe(weekGap / 2);
   });
 });

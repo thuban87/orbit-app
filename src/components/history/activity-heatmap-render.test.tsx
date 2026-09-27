@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
@@ -269,5 +270,102 @@ describe("ActivityHeatmap fit-to-width (RG-033 ui-accessibility/AUD-UIA-010, D-1
         height: 13,
       });
     }
+  });
+});
+
+describe("ActivityHeatmap tap zones never overlap (D-42 B)", () => {
+  const even = (n: number) => ({ left: n, right: n, top: n, bottom: n });
+
+  it("caps day-lens cell hitSlop at half the 4dp gap", () => {
+    measuredWidth = 254; // 32dp cells
+    const nodes = all(resolve(ActivityHeatmap(props({}))));
+    const cell = nodes.find(
+      (node) => node.props.testID === "activity-heatmap-cell-2026-01-01",
+    );
+    expect(cell?.props.hitSlop).toEqual(even(2));
+  });
+
+  it("gives Cycles cells no slop at 44dp+ and a capped slop when narrow", () => {
+    measuredWidth = 254; // 47dp cells
+    const wide = all(
+      resolve(
+        ActivityHeatmap(
+          props({ lens: "cycles", window: null, cycles: CYCLES }),
+        ),
+      ),
+    );
+    expect(
+      wide.find((node) => node.props.testID === "activity-heatmap-cycle-0")
+        ?.props.hitSlop,
+    ).toEqual(even(0));
+    measuredWidth = 200; // floor((200 − 16) / 5) = 36dp cells
+    const narrow = all(
+      resolve(
+        ActivityHeatmap(
+          props({ lens: "cycles", window: null, cycles: CYCLES }),
+        ),
+      ),
+    );
+    expect(
+      narrow.find((node) => node.props.testID === "activity-heatmap-cycle-0")
+        ?.props.hitSlop,
+    ).toEqual(even(2));
+  });
+
+  it("widens only the Year week-boundary sides to half the 8dp week gap", () => {
+    const cells = [
+      "2026-01-01",
+      "2026-01-02",
+      "2026-01-03",
+      "2026-01-04",
+      "2026-01-05",
+      "2026-01-06",
+      "2026-01-07",
+      "2026-01-08",
+      "2026-01-09",
+      "2026-01-10",
+      "2026-01-11",
+      "2026-01-12",
+      "2026-01-13",
+      "2026-01-14",
+    ].map((date) => ({ date, isPlaceholder: false, isFuture: false }));
+    const nodes = all(
+      resolve(
+        ActivityHeatmap(
+          props({
+            lens: "year",
+            window: { ...DAY_WINDOW, lens: "year", cells },
+          }),
+        ),
+      ),
+    );
+    const slopOf = (date: string) =>
+      nodes.find(
+        (node) => node.props.testID === `activity-heatmap-cell-${date}`,
+      )?.props.hitSlop;
+    expect(slopOf("2026-01-01")).toEqual(even(2));
+    expect(slopOf("2026-01-07")).toEqual({
+      left: 2,
+      right: 4,
+      top: 2,
+      bottom: 2,
+    });
+    expect(slopOf("2026-01-08")).toEqual({
+      left: 4,
+      right: 2,
+      top: 2,
+      bottom: 2,
+    });
+    expect(slopOf("2026-01-14")).toEqual(even(2));
+  });
+
+  it("derives every cell slop from cellHitSlop, not the old symmetric rule", () => {
+    const source = readFileSync(
+      new URL("./ActivityHeatmap.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).not.toContain("hitSlopFor");
+    expect(source).not.toMatch(/\(44 - edge\) \/ 2/);
+    expect(source.match(/cellHitSlop\(/g)?.length).toBeGreaterThanOrEqual(2);
   });
 });
