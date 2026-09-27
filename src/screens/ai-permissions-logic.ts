@@ -76,7 +76,8 @@ export interface PermissionSummaryCopyInput {
   allItems: readonly AiPermissionItem[];
   /** The items the current type / enabled-only / search view shows. */
   filteredItems: readonly AiPermissionItem[];
-  filterActive: boolean;
+  /** The "Enabled only" switch: the list then holds only AI-accessible items. */
+  enabledOnly: boolean;
   /** No successful read backs the counts (failed or not-yet-completed load). */
   loadFailed: boolean;
 }
@@ -84,8 +85,12 @@ export interface PermissionSummaryCopyInput {
 export interface PermissionSummaryCopy {
   /** Actual AI access, from the unfiltered ENABLED items; null without a read. */
   accessLine: string | null;
-  /** The filtered view against the unfiltered item count; null when unfiltered. */
-  showingLine: string | null;
+  /**
+   * Exactly what the list below shows: its items of the total, from how many
+   * contacts, and how many of them AI can access (D-44). Null without a read,
+   * and null when there are no items at all (`emptyLine` covers that).
+   */
+  listLine: string | null;
   /** Copy for an empty review list; null when the list has rows or no read. */
   emptyLine: string | null;
 }
@@ -98,42 +103,75 @@ function plural(count: number, one: string, many: string): string {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+/** Items AI can access, from a list that may include disabled ones. */
+function enabledItems(
+  items: readonly AiPermissionItem[],
+): readonly AiPermissionItem[] {
+  return items.filter((item) => item.enabled === 1);
+}
+
+function accessPhrase(shown: number, accessible: number): string {
+  if (shown === 1)
+    return accessible === 1 ? "AI can access it" : "AI can't access it";
+  if (accessible === shown) return "AI can access all of them";
+  if (accessible === 0) return "AI can access none of them";
+  return `AI can access ${accessible} of them`;
+}
+
 /**
- * The permission summary copy (38.4 RG-008; ui-accessibility/AUD-UIA-013; D-17).
- * The access claim is computed from the UNFILTERED enabled items, never from
- * the filtered view — a search or type filter must not read as "AI can access
- * less". When any filter is active a separate "Showing N of M" line describes
- * the view. With no successful read there is no truthful count, so nothing is
- * printed (the screen shows its error or loading state instead).
+ * The permission summary copy (38.4 RG-008; ui-accessibility/AUD-UIA-013; D-17;
+ * D-44). The access line is the truthful total: it is computed from the
+ * UNFILTERED enabled items, never from the filtered view, so a search, a type
+ * filter or the Enabled-only switch never reads as "AI can access less". The
+ * list line describes exactly the rows below — how many items of the total,
+ * from how many contacts, and how many of those AI can access — because the
+ * list may include items AI cannot access (D-44). Every count uses
+ * `summarizePermissionView`'s one counting rule (unique item keys and contact
+ * uids), so the list line reconciles with the contact headers and, for the
+ * full unfiltered view, with the access line. With no successful read there is
+ * no truthful count, so nothing is printed (the screen shows its error or
+ * loading state instead).
  */
 export function buildPermissionSummaryCopy(
   input: PermissionSummaryCopyInput,
 ): PermissionSummaryCopy {
   if (input.loadFailed) {
-    return { accessLine: null, showingLine: null, emptyLine: null };
+    return { accessLine: null, listLine: null, emptyLine: null };
   }
-  const access = summarizePermissionView(
-    input.allItems.filter((item) => item.enabled === 1),
-  );
+  const access = summarizePermissionView(enabledItems(input.allItems));
   const accessLine = `AI can currently access information from ${plural(
     access.contacts,
     "contact",
     "contacts",
   )} · ${plural(access.items, "item", "items")}`;
-  const showingLine = input.filterActive
-    ? `Showing ${summarizePermissionView(input.filteredItems).items} of ${plural(
-        summarizePermissionView(input.allItems).items,
-        "item",
-        "items",
-      )}`
-    : null;
+  const total = summarizePermissionView(input.allItems).items;
+  const shown = summarizePermissionView(input.filteredItems);
+  const accessible = input.enabledOnly
+    ? shown.items
+    : summarizePermissionView(enabledItems(input.filteredItems)).items;
+  let listLine: string | null = null;
+  if (total > 0 && shown.items === 0) {
+    listLine = `Showing 0 of ${plural(total, "item", "items")}`;
+  } else if (total > 0) {
+    const itemsPhrase =
+      shown.items === total
+        ? total === 1
+          ? "1 item"
+          : `all ${total} items`
+        : `${shown.items} of ${plural(total, "item", "items")}`;
+    listLine = `Showing ${itemsPhrase} from ${plural(
+      shown.contacts,
+      "contact",
+      "contacts",
+    )} · ${accessPhrase(shown.items, accessible)}`;
+  }
   const emptyLine =
     input.filteredItems.length > 0
       ? null
       : access.items === 0
         ? PERMISSION_EMPTY_COPY
         : PERMISSION_NO_MATCH_COPY;
-  return { accessLine, showingLine, emptyLine };
+  return { accessLine, listLine, emptyLine };
 }
 
 /** Convert selected display rows to unique permission-owning row references. */

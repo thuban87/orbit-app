@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import type { AiPermissionItem } from "@/db/ai-permissions-dao";
 import {
   buildPermissionSummaryCopy,
-  PERMISSION_NO_MATCH_COPY,
   filterAiPermissionItems,
   groupAiPermissionItems,
   isPermissionFilterActive,
+  PERMISSION_NO_MATCH_COPY,
   selectedPermissionRefs,
   selectionImpact,
   summarizePermissionView,

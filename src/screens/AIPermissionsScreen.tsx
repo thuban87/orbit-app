@@ -34,7 +34,6 @@ import {
   buildPermissionSummaryCopy,
   filterAiPermissionItems,
   groupAiPermissionItems,
-  isPermissionFilterActive,
   selectedPermissionRefs,
 } from "./ai-permissions-logic";
 
@@ -138,22 +137,18 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
     [enabledOnly, items, query, typeFilter],
   );
   const groups = useMemo(() => groupAiPermissionItems(filtered), [filtered]);
-  // Access totals come from the UNFILTERED enabled items; the filtered view gets
-  // its own "Showing N of M" line; no count prints without a clean read
-  // (38.4 RG-008; ui-accessibility/AUD-UIA-013; D-17).
+  // Access totals come from the UNFILTERED enabled items; the list line states
+  // exactly what the list below shows and how much of it AI can access; no
+  // count prints without a clean read (38.4 RG-008; AUD-UIA-013; D-17; D-44).
   const summaryCopy = useMemo(
     () =>
       buildPermissionSummaryCopy({
         allItems: items,
         filteredItems: filtered,
-        filterActive: isPermissionFilterActive({
-          query,
-          type: typeFilter,
-          enabledOnly,
-        }),
+        enabledOnly,
         loadFailed: !loaded || error !== null,
       }),
-    [enabledOnly, error, filtered, items, loaded, query, typeFilter],
+    [enabledOnly, error, filtered, items, loaded],
   );
   const refs = useMemo(
     () => selectedPermissionRefs(items, selected),
@@ -321,9 +316,9 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
               {summaryCopy.accessLine}
             </AppText>
           ) : null}
-          {summaryCopy.showingLine !== null ? (
+          {summaryCopy.listLine !== null ? (
             <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {summaryCopy.showingLine}
+              {summaryCopy.listLine}
             </AppText>
           ) : null}
 
