@@ -5,9 +5,11 @@ import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
 import { ABOUT_APP_NAME, resolveAboutVersion } from "./settings-about-model";
 
-// The app icon (app.json `icon`). A static require resolves at bundle time; the
-// same asset the launcher shows, so About needs no separate artwork.
-const APP_ICON = require("../../assets/icon.png");
+// The app icon (app.json `icon`): the owner's legacy Orbit art with its
+// transparent corners (RG-041 release-readiness/AUD-REL-003, D-21). A static
+// require resolves at bundle time; the same asset as the legacy launcher icon,
+// so About needs no separate artwork.
+const APP_ICON = require("../../assets/orbit-icon-legacy.png");
 
 /**
  * About Orbit category screen (§K / D-09). A BASIC surface: it shows ONLY fields

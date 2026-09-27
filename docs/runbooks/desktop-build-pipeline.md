@@ -300,3 +300,34 @@ Phase 31's standalone release exposed a missing `react-native-screens` generated
 4. When a dependency version changes, regenerate and review the patch against that exact version instead of weakening `patch-package`'s loud failure.
 
 **Expected:** `npm ci` reports the patch applied, the clean release build succeeds, and the installed APK opens the native-backed Profile workflow standalone.
+
+## 8. Release manifest + launcher icon checks (Phase 38.4)
+
+**Release manifest (RG-040 `release-readiness/AUD-REL-002`, D-09).**
+`plugins/withReleaseOnlyOverlayPermissionRemoval.js` deletes `SYSTEM_ALERT_WINDOW` from the
+generated main manifest and writes `android\app\src\release\AndroidManifest.xml` with a
+`tools:node="remove"` marker, so only **release** builds drop it; debug keeps it for React
+Native's dev overlays. After the §1c clean prebuild, check the built APKs' merged manifests:
+
+```cmd
+"%ANDROID_HOME%\build-tools\35.0.0\aapt2.exe" dump xmltree --file AndroidManifest.xml "C:\Users\bwales\projects\orbit-app\android\app\build\outputs\apk\release\app-release.apk" | findstr /i "SYSTEM_ALERT_WINDOW"
+"%ANDROID_HOME%\build-tools\35.0.0\aapt2.exe" dump xmltree --file AndroidManifest.xml "C:\Users\bwales\projects\orbit-app\android\app\build\outputs\apk\debug\app-debug.apk" | findstr /i "SYSTEM_ALERT_WINDOW"
+```
+
+The **release** `findstr` must return no match (exit code 1); the **debug** one must match.
+Every other permission (INTERNET, READ_CONTACTS per ADR-003, RECEIVE_BOOT_COMPLETED, VIBRATE,
+the capped storage pair) must be unchanged in both dumps. Never hand-edit a generated
+manifest and never switch to `android.blockedPermissions` — its main-manifest marker would
+also strip the debug copy.
+
+**Launcher icon regeneration (RG-041 `release-readiness/AUD-REL-003`, D-21).** The adaptive
+foreground and monochrome layers are committed derivatives of the owner's art. After changing
+the source art or the `MARGIN` tunable, run `python3 scripts/fit-launcher-icons.py`, confirm
+`python3 scripts/fit-launcher-icons.py --check` exits 0, and commit both derivatives (see
+`assets/README.md`). After prebuild, expect `res\values\colors.xml` `iconBackground` =
+`#1A2F8A`, `res\mipmap-anydpi-v26\ic_launcher.xml` backed by `@color/iconBackground`,
+`ic_launcher_foreground.webp` / `ic_launcher_monochrome.webp` in every `mipmap-*`, and no
+`ic_launcher_background.webp`.
+
+**Launcher cache.** The Pixel launcher may keep showing the old icon after `adb install -r`.
+Relaunch the launcher (or reboot the phone) before judging the launcher or themed icon.
