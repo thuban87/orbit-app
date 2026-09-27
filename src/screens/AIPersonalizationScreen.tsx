@@ -33,6 +33,7 @@ import {
   GlassSurface,
   MIN_TOUCH_TARGET,
 } from "@/components/ui";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { resolveActiveAiConnection } from "@/db/ai-connections-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -638,25 +639,39 @@ export function AIPersonalizationScreen({
         </View>
 
         <GlassSurface density="dense" style={styles.estimateCard}>
-          <AppText role="caption">{formattedEstimate.context}</AppText>
-          {recomputing ? (
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              Recalculating…
-            </AppText>
-          ) : null}
-          {displayCost ? (
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              {displayCost}
-            </AppText>
-          ) : null}
-          {formattedEstimate.overflow ? (
-            <View style={[styles.warning, { borderColor: colors.danger }]}>
-              <Icon name="warning" tone="danger" size="sm" />
-              <AppText role="body" style={{ color: colors.danger }}>
-                {formattedEstimate.overflow}
-              </AppText>
-            </View>
-          ) : null}
+          <ScopedPalette>
+            {(scoped) => (
+              <>
+                <AppText role="caption">{formattedEstimate.context}</AppText>
+                {recomputing ? (
+                  <AppText
+                    role="caption"
+                    style={{ color: scoped.textSecondary }}
+                  >
+                    Recalculating…
+                  </AppText>
+                ) : null}
+                {displayCost ? (
+                  <AppText
+                    role="caption"
+                    style={{ color: scoped.textSecondary }}
+                  >
+                    {displayCost}
+                  </AppText>
+                ) : null}
+                {formattedEstimate.overflow ? (
+                  <View
+                    style={[styles.warning, { borderColor: scoped.danger }]}
+                  >
+                    <Icon name="warning" tone="danger" size="sm" />
+                    <AppText role="body" style={{ color: scoped.danger }}>
+                      {formattedEstimate.overflow}
+                    </AppText>
+                  </View>
+                ) : null}
+              </>
+            )}
+          </ScopedPalette>
         </GlassSurface>
 
         {message ? (
