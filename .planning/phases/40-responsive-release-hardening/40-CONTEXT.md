@@ -45,6 +45,10 @@ available. Interrogate with the owner first; this shim then gets replaced by a r
     real fixes; resolved by a future Expo SDK upgrade.
   - Suggested approach (not yet decided): `npm audit fix` without `--force`, verified by prebuild +
     full test suite; re-run the audit at planning time since results drift.
+- **D-05 (owner, 2026-09-27; LOW priority):** mention only. On the Pixel 3a **debug** build, changing a Contacts
+  Population / Filter / Sort takes ~1–2 s of JS work before the list settles (mostly the full list re-rendering;
+  38.4-19 out-of-scope finding 4). A lag, not a freeze. If Phase 40's performance pass has room, measure on a
+  release build first; no action required otherwise.
 </decisions>
 
 <canonical_refs>
