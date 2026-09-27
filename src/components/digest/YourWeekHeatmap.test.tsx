@@ -88,9 +88,7 @@ describe("YourWeekHeatmap", () => {
       (node) => node.props.testID === "your-week-heatmap-grid",
     );
     expect(grid?.props.style).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ alignSelf: "center" }),
-      ]),
+      expect.objectContaining({ alignSelf: "center" }),
     );
     const real = tree.find(
       (node) => node.props.testID === "your-week-heatmap-cell-2026-09-18",
