@@ -150,7 +150,9 @@ describe("accent-text role swap contract (Plan 16, RG-029, ADR-084)", () => {
   it.each(superseded.map((row) => [row.id, row] as const))(
     "%s reads its superseding token at its anchored site",
     (_id, row) => {
-      const token = (row.status.match(SUPERSEDED_STATUS) as RegExpMatchArray)[2];
+      const token = (
+        row.status.match(SUPERSEDED_STATUS) as RegExpMatchArray
+      )[2];
       expect(
         checkDoneSite(
           readFileSync(join(ROOT, row.file), "utf8"),
