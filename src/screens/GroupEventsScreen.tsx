@@ -13,6 +13,7 @@ import { Icon } from "@/components/icons/Icon";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText, Button } from "@/components/ui";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { EVENTS } from "@/constants/product-labels";
 import { getExecutor } from "@/db/database";
 import {
@@ -143,13 +144,17 @@ export function GroupEventsScreen({
                   ? "Couldn't load events"
                   : (emptyCopy ?? "No events yet")}
               </AppText>
-              <AppText role="body" style={{ color: colors.textSecondary }}>
-                {failed
-                  ? // A tab root has no Back (D-22); the list rereads on focus.
-                    "Try opening it again in a moment."
-                  : (emptyCopy ??
-                    "Log a get-together with several people at once from the + button, or from Group Log on any contact.")}
-              </AppText>
+              <ScopedPalette>
+                {(scoped) => (
+                  <AppText role="body" style={{ color: scoped.textSecondary }}>
+                    {failed
+                      ? // A tab root has no Back (D-22); the list rereads on focus.
+                        "Try opening it again in a moment."
+                      : (emptyCopy ??
+                        "Log a get-together with several people at once from the + button, or from Group Log on any contact.")}
+                  </AppText>
+                )}
+              </ScopedPalette>
             </ChromeScrim>
           }
         />

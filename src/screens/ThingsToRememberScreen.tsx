@@ -16,6 +16,7 @@ import {
 } from "@/components/RelationshipEditor";
 import { AppText } from "@/components/ui";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { setCurrentStateValue } from "@/db/current-state-history-dao";
 import {
@@ -437,27 +438,35 @@ export function ThingsToRememberScreen({
       contentContainerStyle={styles.content}
     >
       <ChromeScrim style={styles.header} radius={RADII.lg}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.back, { borderColor: colors.border }]}
-        >
-          <AppText role="caption">Back</AppText>
-        </Pressable>
-        <AppText accessibilityRole="header" role="display">
-          Things to Remember
-        </AppText>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Recently Deleted"
-          onPress={() => navigation.navigate("RecentlyDeleted", { contactId })}
-          style={[styles.back, { borderColor: colors.border }]}
-        >
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            Recently Deleted
-          </AppText>
-        </Pressable>
+        <ScopedPalette>
+          {(scoped) => (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Back"
+                onPress={() => navigation.goBack()}
+                style={[styles.back, { borderColor: colors.border }]}
+              >
+                <AppText role="caption">Back</AppText>
+              </Pressable>
+              <AppText accessibilityRole="header" role="display">
+                Things to Remember
+              </AppText>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Recently Deleted"
+                onPress={() =>
+                  navigation.navigate("RecentlyDeleted", { contactId })
+                }
+                style={[styles.back, { borderColor: colors.border }]}
+              >
+                <AppText role="caption" style={{ color: scoped.textSecondary }}>
+                  Recently Deleted
+                </AppText>
+              </Pressable>
+            </>
+          )}
+        </ScopedPalette>
       </ChromeScrim>
       <View
         testID={`knowledge-group-${CURRENT_STATE_GROUP}`}
@@ -481,13 +490,19 @@ export function ThingsToRememberScreen({
       </View>
       {isEmpty ? (
         <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
-          <View testID="things-to-remember-empty" style={styles.empty}>
-            <AppText role="heading">Nothing to remember yet</AppText>
-            <AppText role="body" style={{ color: colors.textSecondary }}>
-              Add birthdays, gift ideas, key people, and anything worth bringing
-              up next time.
-            </AppText>
-          </View>
+          <ScopedPalette>
+            {(scoped) => (
+              <>
+                <View testID="things-to-remember-empty" style={styles.empty}>
+                  <AppText role="heading">Nothing to remember yet</AppText>
+                  <AppText role="body" style={{ color: scoped.textSecondary }}>
+                    Add birthdays, gift ideas, key people, and anything worth
+                    bringing up next time.
+                  </AppText>
+                </View>
+              </>
+            )}
+          </ScopedPalette>
         </ChromeScrim>
       ) : null}
       <View style={[styles.group, { borderColor: colors.border }]}>

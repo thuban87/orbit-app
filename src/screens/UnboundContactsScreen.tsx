@@ -11,6 +11,7 @@ import {
 import { Avatar } from "@/components/Avatar";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { getExecutor } from "@/db/database";
 import { listUnbound, type UnboundRow } from "@/db/unbound-read";
 import type { RootStackScreenProps } from "@/navigation/types";
@@ -66,19 +67,41 @@ export function UnboundContactsScreen({
 
       {error ? (
         <ChromeScrim style={styles.screenStateScrim} radius={RADII.md}>
-          <View testID="unbound-contacts-error" style={styles.screenState}>
-            <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-              Couldn&apos;t load contacts. Please go back and retry.
-            </Text>
-          </View>
+          <ScopedPalette>
+            {(scoped) => (
+              <>
+                <View
+                  testID="unbound-contacts-error"
+                  style={styles.screenState}
+                >
+                  <Text
+                    style={[styles.emptyBody, { color: scoped.textSecondary }]}
+                  >
+                    Couldn&apos;t load contacts. Please go back and retry.
+                  </Text>
+                </View>
+              </>
+            )}
+          </ScopedPalette>
         </ChromeScrim>
       ) : rows === null ? (
         <ChromeScrim style={styles.screenStateScrim} radius={RADII.md}>
-          <View testID="unbound-contacts-loading" style={styles.screenState}>
-            <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-              Loading contacts…
-            </Text>
-          </View>
+          <ScopedPalette>
+            {(scoped) => (
+              <>
+                <View
+                  testID="unbound-contacts-loading"
+                  style={styles.screenState}
+                >
+                  <Text
+                    style={[styles.emptyBody, { color: scoped.textSecondary }]}
+                  >
+                    Loading contacts…
+                  </Text>
+                </View>
+              </>
+            )}
+          </ScopedPalette>
         </ChromeScrim>
       ) : (
         <View style={styles.content}>
@@ -115,55 +138,84 @@ export function UnboundContactsScreen({
 
           {rows.length === 0 ? (
             <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
-              <View testID="unbound-contacts-empty" style={styles.emptyState}>
-                <Text
-                  style={[styles.emptyHeading, { color: colors.textPrimary }]}
-                >
-                  No unbound contacts
-                </Text>
-                <Text
-                  style={[styles.emptyBody, { color: colors.textSecondary }]}
-                >
-                  Contacts you unbind stay here, with their details and history
-                  ready when you want to bind them again.
-                </Text>
-              </View>
+              <ScopedPalette>
+                {(scoped) => (
+                  <>
+                    <View
+                      testID="unbound-contacts-empty"
+                      style={styles.emptyState}
+                    >
+                      <Text
+                        style={[
+                          styles.emptyHeading,
+                          { color: colors.textPrimary },
+                        ]}
+                      >
+                        No unbound contacts
+                      </Text>
+                      <Text
+                        style={[
+                          styles.emptyBody,
+                          { color: scoped.textSecondary },
+                        ]}
+                      >
+                        Contacts you unbind stay here, with their details and
+                        history ready when you want to bind them again.
+                      </Text>
+                    </View>
+                  </>
+                )}
+              </ScopedPalette>
             </ChromeScrim>
           ) : (
             <>
               <ChromeScrim style={styles.countScrim} radius={RADII.sm}>
-                <Text
-                  testID="unbound-contacts-count"
-                  style={[styles.count, { color: colors.textSecondary }]}
-                >
-                  {hasTerm
-                    ? unboundCountLabel(filteredRows.length, { matching: true })
-                    : unboundCountLabel(rows.length)}
-                </Text>
+                <ScopedPalette>
+                  {(scoped) => (
+                    <>
+                      <Text
+                        testID="unbound-contacts-count"
+                        style={[styles.count, { color: scoped.textSecondary }]}
+                      >
+                        {hasTerm
+                          ? unboundCountLabel(filteredRows.length, {
+                              matching: true,
+                            })
+                          : unboundCountLabel(rows.length)}
+                      </Text>
+                    </>
+                  )}
+                </ScopedPalette>
               </ChromeScrim>
               {hasTerm && filteredRows.length === 0 ? (
                 <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
-                  <View
-                    testID="unbound-contacts-no-match"
-                    style={styles.emptyState}
-                  >
-                    <Text
-                      style={[
-                        styles.emptyHeading,
-                        { color: colors.textPrimary },
-                      ]}
-                    >
-                      No matching unbound contacts
-                    </Text>
-                    <Text
-                      style={[
-                        styles.emptyBody,
-                        { color: colors.textSecondary },
-                      ]}
-                    >
-                      Try another name.
-                    </Text>
-                  </View>
+                  <ScopedPalette>
+                    {(scoped) => (
+                      <>
+                        <View
+                          testID="unbound-contacts-no-match"
+                          style={styles.emptyState}
+                        >
+                          <Text
+                            style={[
+                              styles.emptyHeading,
+                              { color: colors.textPrimary },
+                            ]}
+                          >
+                            No matching unbound contacts
+                          </Text>
+                          <Text
+                            style={[
+                              styles.emptyBody,
+                              { color: scoped.textSecondary },
+                            ]}
+                          >
+                            Try another name.
+                          </Text>
+                        </View>
+                      </>
+                    )}
+                  </ScopedPalette>
                 </ChromeScrim>
               ) : (
                 <FlatList

@@ -28,6 +28,7 @@ import {
 } from "react-native";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import {
   type ArchivedContactRow,
   listArchived,
@@ -202,21 +203,31 @@ export function ArchivedContactsScreen() {
               >
                 No archived contacts
               </Text>
-              <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-                Contacts you archive are kept here until you delete them
-                permanently.
-              </Text>
+              <ScopedPalette>
+                {(scoped) => (
+                  <Text
+                    style={[styles.emptyBody, { color: scoped.textSecondary }]}
+                  >
+                    Contacts you archive are kept here until you delete them
+                    permanently.
+                  </Text>
+                )}
+              </ScopedPalette>
             </View>
           </ChromeScrim>
         ) : (
           <>
             <ChromeScrim style={styles.countScrim} radius={RADII.sm}>
-              <Text
-                testID="archived-count"
-                style={[styles.count, { color: colors.textSecondary }]}
-              >
-                {countLabel(rows.length)}
-              </Text>
+              <ScopedPalette>
+                {(scoped) => (
+                  <Text
+                    testID="archived-count"
+                    style={[styles.count, { color: scoped.textSecondary }]}
+                  >
+                    {countLabel(rows.length)}
+                  </Text>
+                )}
+              </ScopedPalette>
             </ChromeScrim>
 
             {rows.map((contact) => (

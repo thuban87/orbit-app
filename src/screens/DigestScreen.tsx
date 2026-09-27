@@ -14,6 +14,7 @@ import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { DIGEST } from "@/constants/product-labels";
 import {
   type BirthdayCandidate,
@@ -49,7 +50,6 @@ import {
   useShellRefresh,
 } from "@/stores/shell-refresh-store";
 import { showSnackbar } from "@/stores/snackbar-store";
-import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
@@ -231,7 +231,6 @@ export function DigestContent({
   onOpenProfile: (contactId: number) => void;
   onDrillThrough: (target: HorizonDrillTarget) => void;
 }) {
-  const { colors } = useTheme();
   return (
     <View testID="digest-root" style={styles.root}>
       {/* The shared tab-root header row, full-bleed above the padded body in
@@ -242,9 +241,13 @@ export function DigestContent({
           <ChromeScrim style={styles.messageScrim} radius={RADII.md}>
             <View testID="digest-error" style={styles.message}>
               <AppText role="heading">Couldn't load your Digest</AppText>
-              <AppText role="body" style={{ color: colors.textSecondary }}>
-                Try opening it again in a moment.
-              </AppText>
+              <ScopedPalette>
+                {(scoped) => (
+                  <AppText role="body" style={{ color: scoped.textSecondary }}>
+                    Try opening it again in a moment.
+                  </AppText>
+                )}
+              </ScopedPalette>
             </View>
           </ChromeScrim>
         ) : state.phase === "loaded" ? (
@@ -252,9 +255,13 @@ export function DigestContent({
             {state.refreshError ? (
               <ChromeScrim style={styles.noticeScrim} radius={RADII.md}>
                 <View testID="digest-refresh-error" style={styles.notice}>
-                  <AppText role="caption" style={{ color: colors.danger }}>
-                    Couldn't refresh Up Next and Horizon
-                  </AppText>
+                  <ScopedPalette>
+                    {(scoped) => (
+                      <AppText role="caption" style={{ color: scoped.danger }}>
+                        Couldn't refresh Up Next and Horizon
+                      </AppText>
+                    )}
+                  </ScopedPalette>
                   <Button
                     role="tertiary"
                     label="Retry"
