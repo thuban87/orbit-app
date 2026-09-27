@@ -155,18 +155,22 @@ export function RootNavigator() {
    * picker). Plan 04's app-bar Back must call the same resolveBackIntent /
    * dismissTop path, so system and shell-visible Back make the same decision.
    *
-   * Existing child visible Back controls in DigestScreen, ArchivedContactsScreen,
-   * UnboundContactsScreen, and BackupScreen still call
-   * navigation.goBack() directly. ComposeScreen and CaptureScreen also own
-   * native-system Back listeners. They are a deferred child-chrome pass, not a
-   * claim that the FAB is hidden on child screens (it is visible on browse
-   * children including Archived, UnboundContacts, and Profile).
+   * Screens on the shared ShellAppBar (every tab root, plus child screens such
+   * as Archived, UnboundContacts and Backup) already take this path: the child
+   * header Back calls resolveBackIntent, and tab roots show no Back at all
+   * (38.4 D-22/D-23). Screens that still own their own Back, for example
+   * ComposeScreen's in-body Back plus its native-system Back listener and
+   * CaptureScreen's native-system Back listener, do not consult back-intent.
+   * That is a deferred child-chrome pass, not a claim that the FAB is hidden
+   * on child screens (it is visible on browse children including Archived,
+   * UnboundContacts, and Profile).
    *
    * This is safe while every shell transient keeps its StyleSheet.absoluteFill
    * scrim with pointer events set to auto while open: the scrim physically
-   * intercepts a child Back tap, and without a transient goBack() is the same
-   * default branch. If a later change shrinks that full-screen scrim, re-route
-   * those child controls through back-intent immediately to prevent divergence.
+   * intercepts a screen-owned Back tap, and without a transient goBack() is the
+   * same default branch. If a later change shrinks that full-screen scrim,
+   * re-route those screen-owned controls through back-intent immediately to
+   * prevent divergence.
    */
   const tabOptions = (
     title: string,

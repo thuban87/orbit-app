@@ -82,13 +82,14 @@ describe("tab-root chrome contract (RG-037, D-22, D-23)", () => {
     }
   });
 
-  it.each(
-    TAB_ROOTS.filter((root) => root.screen !== "DigestScreen"),
-  )("$screen renders only the root ShellAppBar (no Back)", (root) => {
-    const variants = shellAppBarVariants(screenSource(root.screen));
-    expect(variants.length).toBeGreaterThanOrEqual(1);
-    expect(variants.every((variant) => variant === '"root"')).toBe(true);
-  });
+  it.each(TAB_ROOTS.filter((root) => root.screen !== "DigestScreen"))(
+    "$screen renders only the root ShellAppBar (no Back)",
+    (root) => {
+      const variants = shellAppBarVariants(screenSource(root.screen));
+      expect(variants.length).toBeGreaterThanOrEqual(1);
+      expect(variants.every((variant) => variant === '"root"')).toBe(true);
+    },
+  );
 
   it("the Events root keeps its search trailing action", () => {
     const source = screenSource("GroupEventsScreen");

@@ -89,9 +89,9 @@ Covered explicit-timestamp consumers (visible text **and** accessibility labels)
 | Group Event Detail "When" | `formatDateTimeMinuteOrFallback` |
 | Touchpoint refine form date/time value (38.4 Plan 06) | `formatDateTimeMinuteOrFallback` |
 | Restore preview source date (38.4 Plan 05) | `formatDateTimeMinuteOrFallback` |
-| Group Events list date-time (rides with 38.4 Plan 12; not yet landed at Plan 07) | shared minute formatters |
+| Group Events list row date-time (38.4 Plan 12; replaced the local 24-hour `displayDateTime` slice) | `formatDateTimeMinuteOrFallback` |
 
-`src/utils/timestamp-consumer-contract.test.ts` pins the History, Digest and Group Event Detail consumers to the shared helpers.
+`src/utils/timestamp-consumer-contract.test.ts` pins the History, Digest, Group Event Detail and Group Events list consumers to the shared helpers.
 
 ### Sharing history language with Digest
 
@@ -190,3 +190,4 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | 2026-09-25 | 38.3 | Reveal entry points (RG-021, D-10, D-11, D-28): the Profile's Last Interaction tile and Orbit Status → View history now scroll to this section and expand it through the persisted collapse toggle, instead of routing to Things to Remember. The section's period/selection is never reset by the reveal. Neither entry point exists when the layout hides History. |
 | 2026-09-26 | 38.3 | The persisted lens and cycle preset are adopted from revision re-reads only until the user picks locally, so a re-read that started before the settings write committed can no longer revert the choice; a failed write logs content-free and reverts explicitly unless a newer choice superseded it (review A-WR-08). |
 | 2026-09-26 | 38.4 | Shared minute timestamps for remaining consumers (RG-038, ui-accessibility/AUD-UIA-018): added the time-only `formatTimeMinute`/`formatTimeMinuteOrFallback` pair; History date-detail and Digest day-detail rows (text and a11y labels) and Group Event Detail "When" now render 12-hour minute-precision time instead of 24-hour slices or raw storage. |
+| 2026-09-26 | 38.4 | Group Events list rows render their date-time through `formatDateTimeMinuteOrFallback` (Plan 12, RG-038 ui-accessibility/AUD-UIA-018); the local 24-hour slice helper is gone. |

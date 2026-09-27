@@ -24,11 +24,7 @@ import type { RootStackScreenProps } from "@/navigation/types";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
-
-function displayDateTime(value: string): string {
-  const [date, time] = value.split(" ");
-  return time ? `${date} · ${time.slice(0, 5)}` : date;
-}
+import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 
 export function GroupEventsScreen({
   navigation,
@@ -68,8 +64,9 @@ export function GroupEventsScreen({
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
+      {/* Events is a tab root: root header, never a Back (D-22). */}
       <ShellAppBar
-        variant="child"
+        variant="root"
         title={EVENTS}
         trailing={
           <Button
@@ -128,7 +125,7 @@ export function GroupEventsScreen({
               <View style={styles.rowCopy}>
                 <AppText role="label">{item.title}</AppText>
                 <AppText role="caption" style={{ color: colors.textSecondary }}>
-                  {displayDateTime(item.occurredAt)}
+                  {formatDateTimeMinuteOrFallback(item.occurredAt)}
                 </AppText>
                 <AppText role="caption" style={{ color: colors.textSecondary }}>
                   {item.participantCount === 1
@@ -148,7 +145,8 @@ export function GroupEventsScreen({
               </AppText>
               <AppText role="body" style={{ color: colors.textSecondary }}>
                 {failed
-                  ? "Please go back and try again."
+                  ? // A tab root has no Back (D-22); the list rereads on focus.
+                    "Try opening it again in a moment."
                   : (emptyCopy ??
                     "Log a get-together with several people at once from the + button, or from Group Log on any contact.")}
               </AppText>
