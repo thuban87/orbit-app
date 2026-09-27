@@ -134,6 +134,10 @@ import {
   type DashboardPopulationCounts,
   selectDashboardEmptyState,
 } from "@/logic/dashboard-empty-logic";
+import {
+  dashboardHeaderCount,
+  dashboardHeaderCountLabel,
+} from "@/logic/dashboard-header-count";
 import type { DashboardViewMode } from "@/logic/dashboard-query-logic";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
 import {
@@ -379,7 +383,7 @@ function isIconName(value: string): value is IconName {
   return value in ICON_REGISTRY;
 }
 
-/** The four population counts feeding the header + the empty-state gate. */
+/** The population counts feeding the cause-aware empty-state gate (the header counts displayed rows, D-55). */
 interface PopulationCounts {
   live: number;
   neverContacted: number;
@@ -1601,16 +1605,25 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     hasTerm: term !== "",
   });
   const showInitialSkeleton = initialLoad && !error;
+  // D-55 (OA-E1): the header counts the contacts the active view displays, so
+  // List and Card agree; the live count feeds only the empty state above.
+  const headerCount = dashboardHeaderCount({
+    error,
+    initialLoading: showInitialSkeleton,
+    viewMode: query.viewMode,
+    listRowCount: rows.length,
+    cardRowCount: cardRows.length,
+  });
 
   const listHeader = (
     <View style={styles.header}>
-      {!error && counts.live > 0 ? (
+      {headerCount !== null ? (
         <ChromeScrim style={styles.countScrim} radius={RADII.sm}>
           <Text
             testID="dashboard-header-count"
             style={[styles.countHeader, { color: colors.textSecondary }]}
           >
-            {`${counts.live} contact${counts.live === 1 ? "" : "s"}`}
+            {dashboardHeaderCountLabel(headerCount)}
           </Text>
         </ChromeScrim>
       ) : null}
