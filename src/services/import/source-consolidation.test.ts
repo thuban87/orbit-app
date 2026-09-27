@@ -129,6 +129,7 @@ describe("source consolidation", () => {
     const result = await combineCluster(exec, photoFs(), {
       rows,
       batchCategoryId: null,
+      lifecycle: UNBOUND_IMPORT,
       phoneRegion: "US",
       now: NOW,
     });
@@ -227,6 +228,7 @@ describe("source consolidation", () => {
     const result = await combineCluster(exec, photoFs(), {
       rows: clusters[0],
       batchCategoryId: null,
+      lifecycle: UNBOUND_IMPORT,
       phoneRegion: "US",
       now: NOW,
     });
@@ -304,6 +306,7 @@ describe("source consolidation", () => {
       {
         rows: session.rows,
         batchCategoryId: null,
+        lifecycle: UNBOUND_IMPORT,
         phoneRegion: "US",
         now: NOW,
       },
@@ -340,6 +343,7 @@ describe("source consolidation", () => {
       combineCluster(exec, photoFs(), {
         rows: duplicate.rows,
         batchCategoryId: null,
+        lifecycle: UNBOUND_IMPORT,
         phoneRegion: "US",
         now: NOW,
       }),
@@ -374,6 +378,7 @@ describe("source consolidation", () => {
       {
         rows: photoFailure.rows,
         batchCategoryId: null,
+        lifecycle: UNBOUND_IMPORT,
         phoneRegion: "US",
         now: NOW,
       },
@@ -418,6 +423,7 @@ describe("source consolidation", () => {
     const result = await combineCluster(exec, photoFs(), {
       rows: clusters[0],
       batchCategoryId: null,
+      lifecycle: UNBOUND_IMPORT,
       phoneRegion: "US",
       now: NOW,
     });
@@ -457,6 +463,7 @@ describe("source consolidation", () => {
       combineCluster(exec, photoFs(), {
         rows: session.rows,
         batchCategoryId: null,
+        lifecycle: UNBOUND_IMPORT,
         phoneRegion: "US",
         now: NOW,
       }),
@@ -472,5 +479,107 @@ describe("source consolidation", () => {
         expect.objectContaining({ rowStatus: "pending" }),
       ]),
     );
+  });
+});
+
+/**
+ * 38.4 D-57 (owner, OA-E2): Combine creates the one contact with the batch
+ * lifecycle, and a Bound combine runs the reminder/widget effects once, after
+ * the commit, without ever failing the combine.
+ */
+describe("combineCluster lifecycle (D-57)", () => {
+  async function pair(prefix: string) {
+    return createSession([
+      {
+        externalContactId: `${prefix}-one`,
+        sourcePayload: payload("Morgan", [
+          { type: "phone", value: "312 555 0142" },
+        ]),
+      },
+      {
+        externalContactId: `${prefix}-two`,
+        sourcePayload: payload("Morgan Lee", [
+          { type: "phone", value: "+1 312 555 0142" },
+        ]),
+      },
+    ]);
+  }
+
+  async function lifecycleOf(contactId: number) {
+    return exec.getFirstAsync(
+      "SELECT tracking_enabled, interval_days FROM contacts WHERE id = ?",
+      [contactId],
+    );
+  }
+
+  it("creates a Bound combined contact and runs the effects once, after the commit", async () => {
+    const session = await pair("bound");
+    const committedAtEffect: unknown[] = [];
+    const effects = vi.fn(async (target: SqlExecutor) => {
+      committedAtEffect.push(
+        await target.getFirstAsync(
+          "SELECT COUNT(*) AS count FROM contacts WHERE tracking_enabled = 1",
+        ),
+      );
+    });
+    const result = await combineCluster(exec, photoFs(), {
+      rows: session.rows,
+      batchCategoryId: null,
+      lifecycle: { trackingEnabled: true, intervalDays: 30 },
+      phoneRegion: "US",
+      now: NOW,
+      effects,
+    });
+    if (!result.combined) throw new Error("expected a combined contact");
+    expect(await lifecycleOf(result.contactId)).toEqual({
+      tracking_enabled: 1,
+      interval_days: 30,
+    });
+    expect(effects).toHaveBeenCalledTimes(1);
+    expect(effects).toHaveBeenCalledWith(exec);
+    expect(committedAtEffect).toEqual([{ count: 1 }]);
+  });
+
+  it("creates an Unbound, never-assigned contact and runs no effects", async () => {
+    const session = await pair("unbound");
+    const effects = vi.fn(async () => {});
+    const result = await combineCluster(exec, photoFs(), {
+      rows: session.rows,
+      batchCategoryId: null,
+      lifecycle: UNBOUND_IMPORT,
+      phoneRegion: "US",
+      now: NOW,
+      effects,
+    });
+    if (!result.combined) throw new Error("expected a combined contact");
+    expect(await lifecycleOf(result.contactId)).toEqual({
+      tracking_enabled: 0,
+      interval_days: null,
+    });
+    expect(effects).not.toHaveBeenCalled();
+  });
+
+  it("a throwing effect leaves the combine committed and its rows resolved", async () => {
+    const session = await pair("throwing");
+    const result = await combineCluster(exec, photoFs(), {
+      rows: session.rows,
+      batchCategoryId: null,
+      lifecycle: { trackingEnabled: true, intervalDays: 14 },
+      phoneRegion: "US",
+      now: NOW,
+      effects: async () => {
+        throw new Error("effects down");
+      },
+    });
+    expect(result).toEqual({
+      combined: true,
+      contactId: expect.any(Number),
+      sessionComplete: true,
+    });
+    expect(
+      (await listSessionRows(exec, session.sessionId)).map(
+        (row) => row.rowStatus,
+      ),
+    ).toEqual(["imported", "imported"]);
   });
 });

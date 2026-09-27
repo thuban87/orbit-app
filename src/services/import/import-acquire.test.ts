@@ -309,9 +309,11 @@ describe("commitSingleImport lifecycle (D-57)", () => {
       const { sessionId, rowId } = await singleSession(
         `single-${trackingEnabled}`,
       );
+      const effects = vi.fn(async () => {});
       const contactId = await commitSingleImport(exec, {
         sessionId,
         rowId,
+        effects,
         input: {
           uid: uid(),
           name: "Single Person",
@@ -336,6 +338,8 @@ describe("commitSingleImport lifecycle (D-57)", () => {
           [contactId],
         ),
       ).toEqual(expected);
+      // D-57: a Bound single import refreshes reminders and the widget once.
+      expect(effects).toHaveBeenCalledTimes(trackingEnabled ? 1 : 0);
     },
   );
 });

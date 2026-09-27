@@ -336,8 +336,15 @@ describe("runImportBatch batch lifecycle (D-57)", () => {
       NOW,
     );
 
-    await runImportBatch(exec, { sessionId: session.sessionId, now: NOW });
+    const effects = vi.fn(async () => {});
+    await runImportBatch(exec, {
+      sessionId: session.sessionId,
+      now: NOW,
+      effects,
+    });
 
+    expect(effects).toHaveBeenCalledTimes(1);
+    expect(effects).toHaveBeenCalledWith(exec);
     expect(await lifecycles()).toEqual([
       {
         name: "Alpha",
@@ -358,7 +365,13 @@ describe("runImportBatch batch lifecycle (D-57)", () => {
     const session = await createSession([
       { externalContactId: "u", sourcePayload: payload("Unbound Person") },
     ]);
-    await runImportBatch(exec, { sessionId: session.sessionId, now: NOW });
+    const effects = vi.fn(async () => {});
+    await runImportBatch(exec, {
+      sessionId: session.sessionId,
+      now: NOW,
+      effects,
+    });
+    expect(effects).not.toHaveBeenCalled();
     expect(await lifecycles()).toEqual([
       {
         name: "Unbound Person",
@@ -397,6 +410,7 @@ describe("runImportBatch batch lifecycle (D-57)", () => {
       sessionId: session.sessionId,
       now: NOW,
       eligibleStatuses: ["failed"],
+      effects: async () => {},
     });
     expect(
       (await listSessionRows(exec, session.sessionId)).map(
@@ -404,8 +418,12 @@ describe("runImportBatch batch lifecycle (D-57)", () => {
       ),
     ).toEqual(["imported", "pending"]);
 
-    // Resume, exactly as ImportProgress calls it.
-    await runImportBatch(exec, { sessionId: session.sessionId, now: NOW });
+    // Resume, exactly as ImportProgress calls it (plus a test-only effects spy).
+    await runImportBatch(exec, {
+      sessionId: session.sessionId,
+      now: NOW,
+      effects: async () => {},
+    });
 
     expect(await lifecycles()).toEqual([
       {
@@ -421,5 +439,74 @@ describe("runImportBatch batch lifecycle (D-57)", () => {
         category_id: null,
       },
     ]);
+  });
+
+  it("runs the effects after finalize, only when the Bound pass created a contact", async () => {
+    const session = await createSession([
+      { externalContactId: "e1", sourcePayload: payload("Effect One") },
+    ]);
+    await setSessionBatchDefaults(
+      exec,
+      session.sessionId,
+      {
+        categoryId: null,
+        lifecycle: { trackingEnabled: true, intervalDays: 7 },
+      },
+      NOW,
+    );
+    const statusAtEffect: unknown[] = [];
+    const effects = vi.fn(async (target: SqlExecutor) => {
+      statusAtEffect.push(
+        await target.getFirstAsync(
+          "SELECT status FROM import_sessions WHERE id = ?",
+          [session.sessionId],
+        ),
+      );
+    });
+    await runImportBatch(exec, {
+      sessionId: session.sessionId,
+      now: NOW,
+      effects,
+    });
+    expect(effects).toHaveBeenCalledTimes(1);
+    expect(statusAtEffect).toEqual([{ status: "complete" }]);
+
+    // A second pass on the same (now complete) Bound session creates nothing.
+    const again = vi.fn(async () => {});
+    await runImportBatch(exec, {
+      sessionId: session.sessionId,
+      now: NOW,
+      effects: again,
+    });
+    expect(again).not.toHaveBeenCalled();
+  });
+
+  it("a throwing effect changes neither the returned counts nor the rows", async () => {
+    const session = await createSession([
+      { externalContactId: "t1", sourcePayload: payload("Quinn Harlow") },
+      { externalContactId: "t2", sourcePayload: payload("Riley Voss") },
+    ]);
+    await setSessionBatchDefaults(
+      exec,
+      session.sessionId,
+      {
+        categoryId: null,
+        lifecycle: { trackingEnabled: true, intervalDays: 7 },
+      },
+      NOW,
+    );
+    const counts = await runImportBatch(exec, {
+      sessionId: session.sessionId,
+      now: NOW,
+      effects: async () => {
+        throw new Error("effects down");
+      },
+    });
+    expect(counts.imported).toBe(2);
+    expect(
+      (await listSessionRows(exec, session.sessionId)).map(
+        (row) => row.rowStatus,
+      ),
+    ).toEqual(["imported", "imported"]);
   });
 });
