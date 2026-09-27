@@ -320,6 +320,19 @@ the capped storage pair) must be unchanged in both dumps. Never hand-edit a gene
 manifest and never switch to `android.blockedPermissions` — its main-manifest marker would
 also strip the debug copy.
 
+**Storage permissions are kept (D-48 / `OA-D1`, owner ruling D-60, Phase 38.4 Plan 22).** Both APKs still declare
+`READ_EXTERNAL_STORAGE` and `WRITE_EXTERNAL_STORAGE` with `maxSdkVersion="32"`. They come from the `expo-image-picker`,
+`expo-file-system` and `expo-image` library manifests and the `expo-file-system` config plugin. Nothing in Orbit
+requests them at runtime. They were **not** removed because the backup restore/share intake opens any URI scheme, so a
+legacy raw `file://` source on Android 7–9 still depends on a manually granted "Files and media" permission. Evidence
+and the removal precondition (a `content://`-only intake guard) are in
+`.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-NATIVE-CONFIG-INVESTIGATION.md`. Do not add
+`android.blockedPermissions` for them without a new owner ruling. When checking a dump, expect both entries, capped at 32:
+
+```cmd
+"%ANDROID_HOME%\build-tools\35.0.0\aapt2.exe" dump xmltree --file AndroidManifest.xml "C:\Users\bwales\projects\orbit-app\android\app\build\outputs\apk\release\app-release.apk" | findstr /i "EXTERNAL_STORAGE maxSdkVersion"
+```
+
 **Launcher icon regeneration (RG-041 `release-readiness/AUD-REL-003`, D-21).** The adaptive
 foreground and monochrome layers are committed derivatives of the owner's art. After changing
 the source art or the `MARGIN` tunable, run `python3 scripts/fit-launcher-icons.py`, confirm
