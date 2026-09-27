@@ -17,6 +17,7 @@ import {
   type ImportSession,
   type ImportSessionRow,
   listSessionRows,
+  sessionBatchLifecycle,
   sessionRowCounts,
 } from "@/db/import-session-read";
 import { linkExistingContactToRow } from "@/db/imported-contact-dao";
@@ -210,6 +211,7 @@ export function DuplicateReviewScreen({
             const result = await importRowAsNew(getExecutor(), {
               row: entry.row,
               batchCategoryId: session.batchCategoryId,
+              lifecycle: sessionBatchLifecycle(session),
               phoneRegion: session.phoneRegion,
               now,
             });

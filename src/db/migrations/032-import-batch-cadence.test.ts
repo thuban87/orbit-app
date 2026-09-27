@@ -78,7 +78,8 @@ describe("migration 032 — import batch cadence (D-57)", () => {
       [NOW, NOW],
     );
     const id = inserted.lastInsertRowId;
-    const update = (value: unknown) =>
+    // async: the node executor throws synchronously; make that a rejection.
+    const update = async (value: unknown) =>
       exec.runAsync(
         "UPDATE import_sessions SET batch_interval_days = ? WHERE id = ?",
         [value as number, id],
@@ -88,12 +89,13 @@ describe("migration 032 — import batch cadence (D-57)", () => {
       await expect(update(bad), String(bad)).rejects.toThrow(/CHECK/);
     }
     await expect(
-      exec.runAsync(
-        `INSERT INTO import_sessions
-           (uid, mode, batch_interval_days, created_at, modified_at)
-         VALUES ('s-3', 'bulk', 0, ?, ?)`,
-        [NOW, NOW],
-      ),
+      (async () =>
+        exec.runAsync(
+          `INSERT INTO import_sessions
+             (uid, mode, batch_interval_days, created_at, modified_at)
+           VALUES ('s-3', 'bulk', 0, ?, ?)`,
+          [NOW, NOW],
+        ))(),
     ).rejects.toThrow(/CHECK/);
 
     await update(30);

@@ -1,9 +1,11 @@
 import {
   discardSession,
+  type ImportLifecycle,
   type ImportMatchOutcome,
   type ImportSessionMode,
   type ImportSessionRowStatus,
   PHOTO_OUTSTANDING,
+  UNBOUND_IMPORT,
 } from "@/db/import-session-dao";
 import type { SqlExecutor } from "@/db/types";
 import { isBirthdayUnreadable } from "@/logic/picked-contact-map";
@@ -15,6 +17,8 @@ export interface ImportSession {
   status: "pending" | "complete" | "discarded";
   batchCategoryId: number | null;
   batchTrackingEnabled: boolean;
+  /** The batch cadence when Bound (38.4 D-57; migration 032); else null. */
+  batchIntervalDays: number | null;
   phoneRegion: string | null;
   totalRows: number;
   createdAt: string;
@@ -46,6 +50,7 @@ interface ImportSessionDbRow {
   status: "pending" | "complete" | "discarded";
   batch_category_id: number | null;
   batch_tracking_enabled: number;
+  batch_interval_days: number | null;
   phone_region: string | null;
   total_rows: number;
   created_at: string;
@@ -60,11 +65,32 @@ function mapSession(row: ImportSessionDbRow): ImportSession {
     status: row.status,
     batchCategoryId: row.batch_category_id,
     batchTrackingEnabled: row.batch_tracking_enabled === 1,
+    batchIntervalDays: row.batch_interval_days,
     phoneRegion: row.phone_region,
     totalRows: row.total_rows,
     createdAt: row.created_at,
     modifiedAt: row.modified_at,
   };
+}
+
+/**
+ * The batch lifecycle every bulk create reads (38.4 D-57): Bound with the
+ * session's cadence, or Unbound. The session is the ONLY source — there is no
+ * in-pass override, so a resumed import keeps the choice made at setup.
+ */
+export function sessionBatchLifecycle(
+  session: Pick<ImportSession, "batchTrackingEnabled" | "batchIntervalDays">,
+): ImportLifecycle {
+  const days = session.batchIntervalDays;
+  if (
+    session.batchTrackingEnabled &&
+    days !== null &&
+    Number.isInteger(days) &&
+    days > 0
+  ) {
+    return { trackingEnabled: true, intervalDays: days };
+  }
+  return UNBOUND_IMPORT;
 }
 
 function parseCandidates(value: string | null): unknown[] {
@@ -95,7 +121,7 @@ export async function getSessionById(
 ): Promise<ImportSession | null> {
   const row = await exec.getFirstAsync<ImportSessionDbRow>(
     `SELECT id, uid, mode, status, batch_category_id, batch_tracking_enabled,
-            phone_region, total_rows, created_at, modified_at
+            batch_interval_days, phone_region, total_rows, created_at, modified_at
      FROM import_sessions WHERE id = ?`,
     [sessionId],
   );
@@ -113,7 +139,7 @@ export async function getResumableSession(
 ): Promise<{ session: ImportSession; sweptPhotoRelPaths: string[] } | null> {
   const candidates = await exec.getAllAsync<ImportSessionDbRow>(
     `SELECT id, uid, mode, status, batch_category_id, batch_tracking_enabled,
-            phone_region, total_rows, created_at, modified_at
+            batch_interval_days, phone_region, total_rows, created_at, modified_at
      FROM import_sessions s WHERE status = 'pending'
        OR EXISTS (SELECT 1 FROM import_session_rows r
                    WHERE r.session_id = s.id AND ${PHOTO_OUTSTANDING})

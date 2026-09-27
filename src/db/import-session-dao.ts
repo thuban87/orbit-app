@@ -43,13 +43,83 @@ export type ImportMatchOutcome =
   | "new"
   | "needs_review";
 
+/**
+ * The lifecycle every contact a bulk import creates receives (38.4 D-57;
+ * ADR-062): Bound with a positive cadence, or Unbound and never-assigned.
+ */
+export type ImportLifecycle =
+  | { trackingEnabled: true; intervalDays: number }
+  | { trackingEnabled: false; intervalDays: null };
+
+/** The default batch lifecycle (ADR-066: Unbound stays the default). */
+export const UNBOUND_IMPORT: ImportLifecycle = Object.freeze({
+  trackingEnabled: false,
+  intervalDays: null,
+}) as ImportLifecycle;
+
+export class InvalidImportLifecycleError extends Error {
+  constructor(detail: string) {
+    super(`Invalid import lifecycle: ${detail}`);
+    this.name = "InvalidImportLifecycleError";
+  }
+}
+
+/**
+ * Reject a lifecycle that breaks the Bound ⇒ positive-cadence pairing (ADR-062)
+ * or carries a cadence while Unbound. Every writer calls this before any write.
+ */
+export function assertImportLifecycle(
+  lifecycle: ImportLifecycle,
+): asserts lifecycle is ImportLifecycle {
+  if (typeof lifecycle !== "object" || lifecycle === null) {
+    throw new InvalidImportLifecycleError("missing");
+  }
+  const { trackingEnabled, intervalDays } = lifecycle as {
+    trackingEnabled: unknown;
+    intervalDays: unknown;
+  };
+  if (trackingEnabled === true) {
+    if (
+      typeof intervalDays !== "number" ||
+      !Number.isInteger(intervalDays) ||
+      intervalDays <= 0
+    ) {
+      throw new InvalidImportLifecycleError(
+        `Bound needs a positive integer cadence, got ${String(intervalDays)}`,
+      );
+    }
+    return;
+  }
+  if (trackingEnabled === false) {
+    if (intervalDays !== null) {
+      throw new InvalidImportLifecycleError(
+        `Unbound carries no cadence, got ${String(intervalDays)}`,
+      );
+    }
+    return;
+  }
+  throw new InvalidImportLifecycleError(
+    `trackingEnabled must be a boolean, got ${String(trackingEnabled)}`,
+  );
+}
+
 export interface CreateImportSessionInput {
   uid: string;
   mode: ImportSessionMode;
   batchCategoryId: number | null;
   batchTrackingEnabled: boolean;
+  /** The batch cadence when Bound (38.4 D-57); omitted means none (NULL). */
+  batchIntervalDays?: number | null;
   phoneRegion: string | null;
   now: string;
+}
+
+/** Validate a session's tracking flag and cadence together (D-57). */
+function assertSessionLifecycle(input: CreateImportSessionInput): void {
+  assertImportLifecycle({
+    trackingEnabled: input.batchTrackingEnabled,
+    intervalDays: input.batchIntervalDays ?? null,
+  } as ImportLifecycle);
 }
 
 export interface InsertSessionRowInput {
@@ -73,13 +143,15 @@ async function insertImportSessionCore(
 ): Promise<number> {
   const result = await exec.runAsync(
     `INSERT INTO import_sessions
-       (uid, mode, batch_category_id, batch_tracking_enabled, phone_region, total_rows, created_at, modified_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (uid, mode, batch_category_id, batch_tracking_enabled, batch_interval_days,
+        phone_region, total_rows, created_at, modified_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.uid,
       input.mode,
       input.batchCategoryId,
       input.batchTrackingEnabled ? 1 : 0,
+      input.batchIntervalDays ?? null,
       input.phoneRegion,
       totalRows,
       input.now,
@@ -126,6 +198,11 @@ export function createImportSession(
   exec: SqlExecutor,
   input: CreateImportSessionInput,
 ): Promise<number> {
+  try {
+    assertSessionLifecycle(input);
+  } catch (error) {
+    return Promise.reject(error);
+  }
   return inWriteTransaction(exec, () =>
     insertImportSessionCore(exec, input, 0),
   );
@@ -153,6 +230,11 @@ export function acceptImportSessionWithRows(
   exec: SqlExecutor,
   input: AcceptImportSessionWithRowsInput,
 ): Promise<{ sessionId: number; rowIds: number[] }> {
+  try {
+    assertSessionLifecycle(input.session);
+  } catch (error) {
+    return Promise.reject(error);
+  }
   return inWriteTransaction(exec, async () => {
     const sessionId = await insertImportSessionCore(
       exec,
@@ -402,6 +484,46 @@ export function setSessionBatchCategory(
       [categoryId, now, sessionId],
     );
     assertOneChange(result, "setSessionBatchCategory", sessionId);
+  });
+}
+
+export interface SessionBatchDefaults {
+  categoryId: number | null;
+  lifecycle: ImportLifecycle;
+}
+
+/**
+ * Persist a bulk batch's category AND lifecycle in ONE update (38.4 D-57).
+ * Setup calls this before any contact is created — on Import and on Combine —
+ * so an interrupted import resumes with the same batch choice. The lifecycle
+ * is validated first: an invalid one writes nothing.
+ */
+export function setSessionBatchDefaults(
+  exec: SqlExecutor,
+  sessionId: number,
+  defaults: SessionBatchDefaults,
+  now: string,
+): Promise<void> {
+  try {
+    assertImportLifecycle(defaults.lifecycle);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+  return inWriteTransaction(exec, async () => {
+    const result = await exec.runAsync(
+      `UPDATE import_sessions
+       SET batch_category_id = ?, batch_tracking_enabled = ?,
+           batch_interval_days = ?, modified_at = ?
+       WHERE id = ?`,
+      [
+        defaults.categoryId,
+        defaults.lifecycle.trackingEnabled ? 1 : 0,
+        defaults.lifecycle.intervalDays,
+        now,
+        sessionId,
+      ],
+    );
+    assertOneChange(result, "setSessionBatchDefaults", sessionId);
   });
 }
 

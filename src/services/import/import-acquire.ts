@@ -10,8 +10,10 @@ import type { CreateContactFullInput } from "@/db/contacts-dao";
 import {
   acceptImportSessionWithRows,
   completeSession,
+  type ImportLifecycle,
   type ImportSessionMode,
   markRowPhotoFailed,
+  UNBOUND_IMPORT,
 } from "@/db/import-session-dao";
 import { listSessionRows } from "@/db/import-session-read";
 import {
@@ -126,6 +128,22 @@ export async function acceptPickedContacts(
 }
 
 /**
+ * The single review's reviewed lifecycle (38.4 D-57; Phase 19 Cluster D): Bound
+ * with its cadence when the review chose Bound, else Unbound. A Bound input
+ * without a positive cadence is passed through so the seam's guard rejects it
+ * (the review UI never produces one: it defaults to Monthly).
+ */
+function reviewedLifecycle(input: CreateContactFullInput): ImportLifecycle {
+  if (input.trackingEnabled === true) {
+    return {
+      trackingEnabled: true,
+      intervalDays: input.intervalDays as number,
+    };
+  }
+  return UNBOUND_IMPORT;
+}
+
+/**
  * The one single-contact create seam. `importContactRecord` composes contact
  * creation and row resolution in one transaction before the session completes.
  */
@@ -147,6 +165,7 @@ export async function commitSingleImport(
   }
   const { contactId } = await importContactRecord(exec, {
     input: params.input,
+    lifecycle: reviewedLifecycle(params.input),
     externalLinks: params.externalLinks,
     birthday: params.birthday,
     note,

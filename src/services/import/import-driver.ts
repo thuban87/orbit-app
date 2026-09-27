@@ -5,6 +5,7 @@
 import {
   deferNeedsReview,
   finalizeSessionIfTerminal,
+  type ImportLifecycle,
   type ImportSessionRowStatus,
   markRowPhotoFailed,
   markRowStatus,
@@ -15,6 +16,7 @@ import {
   type ImportSessionRow,
   listSessionRows,
   type SessionSummaryCounts,
+  sessionBatchLifecycle,
   sessionSummaryCounts,
 } from "@/db/import-session-read";
 import { importContactRecord } from "@/db/imported-contact-dao";
@@ -34,6 +36,8 @@ export const CHUNK_SIZE = 10;
 export interface ImportRowAsNewParams {
   row: ImportSessionRow;
   batchCategoryId: number | null;
+  /** The session's batch lifecycle (`sessionBatchLifecycle(session)`; D-57). */
+  lifecycle: ImportLifecycle;
   phoneRegion: string | null;
   now: string;
 }
@@ -87,6 +91,7 @@ export async function importRowAsNew(
 
   const { contactId } = await importContactRecord(exec, {
     input: mapped.input,
+    lifecycle: params.lifecycle,
     externalLinks: [
       {
         provider: "android",
@@ -132,6 +137,9 @@ export async function runImportBatch(
 
   const eligibleStatuses = params.eligibleStatuses ?? ["pending"];
   const batchCategoryId = params.batchCategoryId ?? session.batchCategoryId;
+  // D-57: the batch lifecycle is read from the durable session only — never an
+  // in-pass override — so a resumed pass keeps the choice made at setup.
+  const lifecycle = sessionBatchLifecycle(session);
   const rows = (await listSessionRows(exec, params.sessionId)).filter((row) =>
     eligibleStatuses.includes(row.rowStatus),
   );
@@ -166,6 +174,7 @@ export async function runImportBatch(
             await importRowAsNew(exec, {
               row,
               batchCategoryId,
+              lifecycle,
               phoneRegion: session.phoneRegion,
               now: params.now,
             });

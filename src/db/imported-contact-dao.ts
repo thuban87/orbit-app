@@ -7,7 +7,10 @@ import {
   createContactFullCore,
 } from "@/db/contacts-dao";
 import {
+  assertImportLifecycle,
+  type ImportLifecycle,
   type ImportMatchOutcome,
+  InvalidImportLifecycleError,
   retireRowStagedPhotoCore,
   setRowContactCore,
   setRowMatchOutcomeCore,
@@ -25,6 +28,9 @@ export class NameRequiredError extends Error {
     this.name = "NameRequiredError";
   }
 }
+
+/** Thrown before any write when an import's lifecycle is invalid (D-57). */
+export { InvalidImportLifecycleError };
 
 export class InvalidImportBirthdayError extends Error {
   constructor() {
@@ -47,6 +53,13 @@ export interface ResolveImportRowInput {
 
 export interface ImportContactRecordInput {
   input: CreateContactFullInput;
+  /**
+   * The contact's lifecycle, validated before the transaction (38.4 D-57). It
+   * is the ONLY source: `input.trackingEnabled` / `input.intervalDays` are
+   * overridden. Bulk paths pass the session's batch lifecycle; the single
+   * review passes its reviewed choice.
+   */
+  lifecycle: ImportLifecycle;
   externalLinks: ExternalContactLinkInput[];
   birthday: string | null;
   /** Raw picker note; blank values intentionally produce no Memory. */
@@ -108,9 +121,13 @@ export async function insertMethodProvenanceCore(
 }
 
 /**
- * Create an Unbound contact and all of its system-contact evidence atomically.
- * The blank-name check intentionally runs before opening a transaction so every
- * create-from-picked caller has a hard no-blank-name backstop.
+ * Create a contact with the caller's validated import lifecycle (38.4 D-57;
+ * ADR-066 default Unbound) and all of its system-contact evidence atomically.
+ * The name, birthday and lifecycle checks intentionally run before opening a
+ * transaction so every create-from-picked caller has a hard backstop and an
+ * invalid request writes nothing. The contacts CHECK
+ * (`tracking_enabled = 0 OR interval_days IS NOT NULL`, migration 011) stays
+ * the last backstop.
  */
 export function importContactRecord(
   exec: SqlExecutor,
@@ -122,15 +139,22 @@ export function importContactRecord(
   if (params.birthday !== null && !isValidStoredBirthday(params.birthday)) {
     return Promise.reject(new InvalidImportBirthdayError());
   }
+  try {
+    assertImportLifecycle(params.lifecycle);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+  const { lifecycle } = params;
 
   return inWriteTransaction(exec, async () => {
     // `params.now` is the import operation's authoritative timestamp; callers
-    // may have mapped the snapshot earlier.
+    // may have mapped the snapshot earlier. The lifecycle is spread AFTER the
+    // input so it is the only source of tracking and cadence (D-57).
     const created = await createContactFullCore(exec, {
       ...params.input,
       now: params.now,
-      trackingEnabled: false,
-      intervalDays: null,
+      trackingEnabled: lifecycle.trackingEnabled,
+      intervalDays: lifecycle.intervalDays,
     });
 
     if (params.birthday !== null) {
