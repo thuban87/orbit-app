@@ -160,6 +160,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.2: Data Integrity, Security & Lifecycle Hardening** (INSERTED) - Completed 2026-09-25: 16/16 plans; verification passed 22/22 with Pixel device UAT (isolated synthetic package) for RG-003/004/009–013/015/016/043; eleven device-found defects fixed (incl. Android 17 import picker, reminder reschedule churn, reconcile identity pulled forward from 38.4). Explicitly recorded owner dispositions (not passes): RG-001 remaining widget checks deferred to a widget-overhaul phase; RG-002 hostile-provider ingress and RG-014 Drive/Files/natural-24 h subcases waived. No schema change (TARGET_VERSION 30), backup format 7.
 - [x] **Phase 38.3: Runtime Correctness, Navigation & State Coherence** (INSERTED) - Completed 2026-09-26: 16/16 plans; verification passed 94/94 truths with Pixel device UAT (isolated synthetic package) for RG-019–026, 035, 042, plus a device re-check of the 14 post-review fixes on `3b63f86`. UAT-020b TalkBack passed (AUD-UIA-022 not reproduced; D-05 fix not needed). Explicitly recorded owner dispositions (not passes): UAT-023a widget leg deferred to the widget-overhaul phase; UAT-042, UAT-024b month/year, UAT-026b in-range keep and the UAT-022 warm-Mark leg accepted risk.
 - [ ] **Phase 38.4: UI Consistency, Accessibility, Performance & Release Polish** (INSERTED) - Pre-release audit remediation (RG-008, 027–034, 036–041): AI permission presentation, bounded Orrery/Your Week resources, contrast + shared controls, contact/widget accessibility, narrow-width/large-text, Settings/forms/timestamps, FAB a11y investigation, overlay permission + launcher artwork (owner-scheduled 2026-09-23)
+- [ ] **Phase 38.5: Background Art & Text-on-Art Contrast** (INSERTED) - DEFERRED PLANNING — needs discuss-phase; prerequisite: owner-signed scrim combination sheet (38.4 D-40). Text sitting directly on the background art meets WCAG floors in every theme × mode × background, mainly through regenerated separate light and dark art per background; moved out of 38.4 by owner ruling D-38 (2026-09-26)
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
 
@@ -1231,7 +1232,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 38.4-16-PLAN.md — Glass-scope consumer follow-through (placeholder sweep + on-glass accent-text roles) + F-1 bare-text scrim: complete AST enumeration first, Standard-Light Dusk/Mesh and Standard Dark on all four (RG-029; D-24, D-29, D-35, D-36)
+- [ ] 38.4-16-PLAN.md — Glass-scope consumer follow-through: placeholder sweep + on-glass accent-text roles (RG-029; D-24). The F-1 bare-text scrim task was cancelled by D-38 (moved to Phase 38.5)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -1248,6 +1249,20 @@ Plans:
 > - Gap plan 20 (G3, D-34, wave 6) sweeps glass-scope colour reads made above the scope. It also takes the D-30 chip and the font/import nits from Plan 16.
 > - Plan 16's F-1 task now enumerates every bare foreground first (D-36), and also scrims Standard Dark on all four backgrounds (D-35).
 > - **Close-out order (D-37):** all code plans through 38.4-20 → the gsd code review of the phase, plus its fixes (run by the orchestrator between waves 6 and 7) → Plan 17's device pass on the reviewed code (wave 7; it re-runs the gate on HEAD but does not redo the review) → verification.
+> **Re-scoped 2026-09-26 (owner rulings D-38..D-41) — still 20 plans, 7 waves.** Bare text on the background art (F-1) leaves 38.4 for the new Phase 38.5 (D-38 supersedes D-29/D-35/D-36). Plan 16's scrim task is cancelled, so Plan 16 is back to its two original tasks (still wave 5, behind Plan 19). Plan 17 drops the scrim device rows and treats bare-text observations as 38.5 inputs, not failures.
+
+### Phase 38.5: Background Art & Text-on-Art Contrast (INSERTED)
+
+**Goal**: Every piece of text over shipped background art meets its WCAG floor (4.5:1 for text and links, 3:1 for glyphs and large text) in every theme × mode × background combination. The primary fix is regenerated art, with separate light and dark versions of each background. Scrims apply only where the owner's signed-off combination sheet says. User-uploaded custom backgrounds (for example contact profile photos) are excluded.
+**Depends on**: Phase 38.4; the owner-signed scrim combination sheet (38.4 D-40)
+**Requirements**: TBD — defined at discuss/planning. Carries the bare-text-on-art remainder of RG-029 (former 38.4 finding F-1), moved out of 38.4 by owner ruling D-38
+**Success Criteria**: Defined at planning; per-pixel art acceptance (the brief's `check_art.py`, `measure-background-extrema.py --check`), a bare-text contrast proof, and owner device sign-off on the Pixel 6 Pro and Pixel 3a
+**Scope source**: docs/dossier/milestone-2/phase-38.5-background-art-text-contrast-dossier.md (authoritative); primary input `.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-BACKGROUND-ART-BRIEF.md`
+**Canonical refs**: 38.4-CONTEXT.md D-38..D-41; ADR-084 (palettes and contrast validation), ADR-087/ADR-113/ADR-114/ADR-115 (background slots, selection and surface composition)
+**UI hint**: yes
+**Plans**: TBD
+
+> **DEFERRED PLANNING — needs discuss-phase; prerequisite: owner-signed scrim combination sheet (D-40).** Inserted 2026-09-26 when owner ruling D-38 moved bare-text-on-art contrast out of 38.4. See `38.5-CONTEXT.md` (shim) and the dossier's OPEN items (background cut per theme, Galaxy light imagery, Standard light pale band, E-1 red text, the sheet outcome, Deep Space/Starfield replacement, the dynamic text-colour idea, card-blend).
 
 ### Phase 39: Onboarding
 
@@ -1299,6 +1314,7 @@ Plans:
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 10/20 | In Progress|  |
+| 38.5 Background Art & Text-on-Art Contrast | 0/TBD | Deferred planning (needs discuss; D-40 sheet first) | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 

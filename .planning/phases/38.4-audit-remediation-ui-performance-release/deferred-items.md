@@ -1,12 +1,13 @@
 # 38.4 deferred items (out-of-scope discoveries)
 
-**Dispositions (owner rulings 2026-09-26, D-29..D-37).** Every item below now has a home. None is left undispositioned.
+**Dispositions (owner rulings 2026-09-26, D-29..D-41).** Every item below now has a home. None is left undispositioned.
+D-38 (2026-09-26) supersedes D-29, D-35 and D-36: bare text on the background art leaves 38.4 and moves to Phase 38.5.
 
 | Item | Disposition |
 |---|---|
-| F-1 bare text on Standard art (Plan 03) | **Plan 16 Task 3** — fixed (D-29, supersedes D-27): scrim on Standard-Light Dusk/Mesh, and on all four Standard backgrounds in Standard Dark (D-35) |
-| F-1 in Standard Dark (owner, 2026-09-26) | **Plan 16 Task 3** (D-35): bare-text scrim on Dawn, Paper, Dusk and Mesh in Standard Dark; Standard Light stays Dusk/Mesh only |
-| F-1 site list incomplete: §5 came from a six-token grep (owner, 2026-09-26) | **Plan 16 Task 3** (D-36): full AST enumeration first (inventory Table D), then wrap every failing site, plus a contract test |
+| F-1 bare text on Standard art (Plan 03) | **Moved to Phase 38.5 (D-38).** Was Plan 16 Task 3 (D-29, which superseded D-27); that task is cancelled |
+| F-1 in Standard Dark (owner, 2026-09-26) | **Moved to Phase 38.5 (D-38).** Was Plan 16 Task 3 (D-35); cancelled. The D-35 Standard Dark measurements are a 38.5 input |
+| F-1 site list incomplete: §5 came from a six-token grep (owner, 2026-09-26) | **Moved to Phase 38.5 (D-38).** Was Plan 16 Task 3 (D-36); cancelled. The art brief's AST inventory (`38.4-art-brief/bare-text-sites.csv`, 294 sites) is the current list and a 38.5 input |
 | E-7 Galaxy Light coral (Plan 03) | **Resolved** (D-28), commits `f446484`/`d8a9ba1` |
 | Touchpoint duration chips, border-only selection (Plan 06) | **Plan 20 Task 2** — filled accent chip + `onAccent` label (D-30; moved from Plan 16 by D-34) |
 | `RelationshipEditor.tsx` unused `Pressable` import (Plan 06) | **Plan 20 Task 3** (planner-bucket nit; moved from Plan 16 by D-34) |
@@ -19,9 +20,11 @@
 
 ## From Plan 03 (RG-029)
 
-- **F-1 — DISPOSITION: fixed in Plan 16 Task 3 (D-29, 2026-09-26; supersedes D-27; extended by D-35 and D-36).** A `ChromeScrim`
-  backing appears on Standard-Light Dusk/Mesh and on all four Standard backgrounds in Standard Dark (D-35). The text renders unchanged
-  elsewhere. The site list is the complete AST enumeration in inventory Table D (D-36), not the six-token §5 grep. Plan 17 verifies it on device.
+- **F-1 — DISPOSITION: moved to Phase 38.5 (D-38, 2026-09-26; supersedes D-29, D-35 and D-36).** Not fixed in 38.4, and not a 38.4
+  failure. The art brief (`38.4-BACKGROUND-ART-BRIEF.md`) showed that one image cannot serve both light and dark mode, so 38.5 regenerates
+  the art as separate light and dark versions (D-39) and applies scrims only where the owner's signed-off combination sheet says (D-40).
+  *History:* D-27 deferred it to the Plan 17 device review; D-29 then scheduled a Plan 16 scrim on Standard-Light Dusk/Mesh, D-35 extended
+  it to Standard Dark on all four backgrounds, and D-36 required a complete AST site list. D-38 cancelled that task.
   Original note follows. Functional text sits bare on the Standard-Light
   shell background (not glass). Owner ruling D-27 (2026-09-26): not fixed in Plan 03; the owner reviews
   it on the device in Plan 17 and then decides defer vs fix. Site list: `38.4-RG029-INVENTORY.md` §5. The RG-029
@@ -116,10 +119,11 @@
     `GridCard` captions (the inventory §6 "secondary → primary" claim does not hold for them today).
   - Planning-time AST scan: 48 out-of-scope reads in 17 files. The owner estimated about 77 across about 30 by a coarser grep.
   - Plan 20 moves each read inside the scope (`ScopedPalette` or an extracted child) and adds an AST source contract.
-- **F-1 also fails in Standard Dark, on all four Standard backgrounds. DISPOSITION: Plan 16 Task 3 (D-35).** Bare
+- **F-1 also fails in Standard Dark, on all four Standard backgrounds. DISPOSITION: moved to Phase 38.5 (D-38); was Plan 16 Task 3 (D-35).** Bare
   Standard Dark `textPrimary` measures 1.15–2.97:1 over the veiled art (numbers in CONTEXT D-35). The scrim there is opaque
-  `surface` (`chromeScrimOpacity` 1.0), giving 14.41:1.
-- **F-1 site list was incomplete. DISPOSITION: Plan 16 Task 3 (D-36).**
+  `surface` (`chromeScrimOpacity` 1.0), giving 14.41:1. These measurements are a Phase 38.5 input.
+- **F-1 site list was incomplete. DISPOSITION: moved to Phase 38.5 (D-38); was Plan 16 Task 3 (D-36).**
   - The §5 list came from a grep of six tokens. Missed examples: `TouchpointRefineForm` labels under LogInteraction/EditInteraction,
     the Your Week metric labels, the UpdateContact editor text and the "Add photo" link.
-  - Plan 16 enumerates every bare foreground by AST walk first (inventory Table D), wraps every failing site, and adds a contract test.
+  - The planned Plan 16 enumeration (Table D), wrapping and contract test are cancelled (D-38). The art brief's AST inventory
+    (294 bare sites on 50 routes: 100 hand-verified, 194 script-found; plus 24 mixed components) is the current list, carried to 38.5.
