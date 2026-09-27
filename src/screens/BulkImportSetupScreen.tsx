@@ -1,6 +1,6 @@
 import { Picker } from "@react-native-picker/picker";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -83,6 +83,11 @@ export function BulkImportSetupScreen({
   // Import is blocked while Bound and the frequency is invalid.
   const [intervalValid, setIntervalValid] = useState(true);
   const [edited, setEdited] = useState(false);
+  // 38.4 review Lane A WR-01: load() runs on mount and on every focus. Once the
+  // user edits, it must not restore the session's category or lifecycle over
+  // the unsaved choice (a late mount read, or a Back from a deep link). A ref,
+  // so the in-flight load sees an edit made while it awaited.
+  const editedRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [consolidationRows, setConsolidationRows] = useState<
     ImportSessionRow[] | null
@@ -92,6 +97,11 @@ export function BulkImportSetupScreen({
   );
 
   useImportLeaveGuard(navigation, route.params.sessionId, edited);
+
+  function markEdited() {
+    editedRef.current = true;
+    setEdited(true);
+  }
 
   const load = useCallback(async () => {
     try {
@@ -103,10 +113,12 @@ export function BulkImportSetupScreen({
       ]);
       if (!session) throw new Error("import session is unavailable");
       setCount(counts.pending);
-      setCategoryId(session.batchCategoryId);
-      const saved = initialBulkLifecycle(session);
-      setTrackingEnabled(saved.trackingEnabled);
-      setIntervalDays(saved.intervalDays);
+      if (!editedRef.current) {
+        setCategoryId(session.batchCategoryId);
+        const saved = initialBulkLifecycle(session);
+        setTrackingEnabled(saved.trackingEnabled);
+        setIntervalDays(saved.intervalDays);
+      }
       setCategories(nextCategories);
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to load bulk import setup", error);
@@ -317,7 +329,7 @@ export function BulkImportSetupScreen({
                 accessibilityState={{ selected, checked: selected }}
                 accessibilityLabel={label}
                 onPress={() => {
-                  setEdited(true);
+                  markEdited();
                   setTrackingEnabled(bound);
                   // Unbound hides the picker; its last validity no longer applies.
                   if (!bound) setIntervalValid(true);
@@ -349,7 +361,7 @@ export function BulkImportSetupScreen({
             <FrequencyPicker
               value={intervalDays ?? BULK_IMPORT_DEFAULT_FREQUENCY}
               onChange={(value) => {
-                setEdited(true);
+                markEdited();
                 setIntervalDays(value);
               }}
               onValidityChange={setIntervalValid}
@@ -392,7 +404,7 @@ export function BulkImportSetupScreen({
               accessibilityLabel="Batch category override"
               selectedValue={categoryId ?? -1}
               onValueChange={(value) => {
-                setEdited(true);
+                markEdited();
                 setCategoryId(value === -1 ? null : Number(value));
               }}
               dropdownIconColor={colors.textSecondary}
@@ -414,7 +426,7 @@ export function BulkImportSetupScreen({
           categories={categories}
           selectedId={categoryId}
           onSelect={(value) => {
-            setEdited(true);
+            markEdited();
             setCategoryId(value);
           }}
           onRequestClose={() => setCategorySheetOpen(false)}

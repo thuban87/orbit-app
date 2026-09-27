@@ -124,6 +124,48 @@ describe("BulkImportSetupScreen lifecycle source contract (D-57)", () => {
     expect(load).toContain("initialBulkLifecycle(session)");
   });
 
+  // 38.4 review Lane A WR-01: load() runs on mount AND on every focus. It must
+  // restore category and lifecycle from the session only while the user has
+  // not edited, so a late mount read or a focus return never overwrites an
+  // unsaved Bound/frequency/category choice.
+  it("restores category and lifecycle from the session only before the user edits", () => {
+    expect(screen).toContain("const editedRef = useRef(false);");
+    const mark = screen.slice(
+      screen.indexOf("function markEdited()"),
+      screen.indexOf("}", screen.indexOf("function markEdited()")),
+    );
+    expect(mark).toContain("editedRef.current = true;");
+    expect(mark).toContain("setEdited(true);");
+    // Every edit goes through markEdited, so the ref can never lag the state.
+    expect(screen.split("setEdited(true)").length - 1).toBe(1);
+
+    const load = screen.slice(
+      screen.indexOf("const load = useCallback("),
+      screen.indexOf("useEffect(() => {"),
+    );
+    const guardAt = load.indexOf("if (!editedRef.current) {");
+    expect(guardAt).toBeGreaterThan(-1);
+    const guarded = load.slice(guardAt, load.indexOf("}", guardAt));
+    for (const restore of [
+      "setCategoryId(session.batchCategoryId)",
+      "setTrackingEnabled(saved.trackingEnabled)",
+      "setIntervalDays(saved.intervalDays)",
+    ]) {
+      expect(guarded, restore).toContain(restore);
+      expect(load.split(restore).length - 1, restore).toBe(1);
+    }
+    // The count and the category list still refresh on every load.
+    expect(load.slice(0, guardAt)).toContain("setCount(counts.pending)");
+    expect(load).toContain("setCategories(nextCategories)");
+  });
+
+  it("keeps the 38.3 B-CR-02 focus reset of saving", () => {
+    const focus = screen.slice(screen.indexOf("useFocusEffect("));
+    expect(focus.slice(0, focus.indexOf("[load]"))).toContain(
+      "setSaving(false);",
+    );
+  });
+
   it("labels accent fills in onAccent, never the page background (ADR-084)", () => {
     expect(screen).not.toContain("colors.background");
     expect(screen.split("colors.onAccent").length - 1).toBeGreaterThanOrEqual(
