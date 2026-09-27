@@ -84,3 +84,77 @@ describe("UniversalFab closed-dial semantics (RG-039 ui-accessibility/AUD-UIA-02
     expect(fabButton).toContain("accessibilityState={{ expanded: open }}");
   });
 });
+
+describe("open dial keeps focus in the dial (D-31)", () => {
+  const navigator = readFileSync("src/navigation/RootNavigator.tsx", "utf8");
+
+  /** The opener of the container that wraps `<Tab.Navigator`. */
+  function navigatorContainerOpener(): string {
+    const tab = navigator.indexOf("<Tab.Navigator");
+    expect(tab).toBeGreaterThan(-1);
+    const start = navigator.lastIndexOf("<SafeAreaView", tab);
+    expect(start).toBeGreaterThan(-1);
+    return navigator.slice(start, navigator.indexOf(">", start) + 1);
+  }
+
+  it("uses the shared transient id instead of a local constant", () => {
+    expect(fab).not.toMatch(/const\s+DIAL_ID\b/);
+    expect(fab).not.toContain('"fab-speed-dial"');
+    expect(fab).toContain("openTransient(FAB_DIAL_TRANSIENT_ID, closeDial)");
+    expect(fab).toContain("closeTransient(FAB_DIAL_TRANSIENT_ID)");
+  });
+
+  it("hides the tab navigator subtree from accessibility while the dial is open", () => {
+    expect(navigator).toContain(
+      "const fabDialOpen = shellTransientStore(selectFabDialOpen);",
+    );
+    const opener = navigatorContainerOpener();
+    expect(opener).toContain(
+      'importantForAccessibility={fabDialOpen ? "no-hide-descendants" : "auto"}',
+    );
+    expect(opener).toContain("accessibilityElementsHidden={fabDialOpen}");
+  });
+
+  it("never collapses the app into one node or blocks touch on that container", () => {
+    const opener = navigatorContainerOpener();
+    // accessible={true} on Android would merge the whole navigator into one
+    // node; the dial's own full-screen scrim already intercepts touch.
+    expect(opener).not.toMatch(/\baccessible=/);
+    expect(opener).not.toContain("pointerEvents");
+  });
+
+  const cycleProps = [
+    "nextFocusForward={open ? ",
+    "nextFocusUp={open ? ",
+    "nextFocusDown={open ? ",
+  ];
+
+  it("gives every action row a keyboard focus link defined only while open", () => {
+    const row = openerAfter(
+      '<AnimatedPressable\n      accessibilityRole="button"',
+      "style=",
+    );
+    for (const prop of cycleProps) {
+      expect(row).toContain(prop);
+    }
+    expect(row.match(/: undefined\}/g)?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("gives the FAB a keyboard focus link defined only while open", () => {
+    const start = fab.indexOf('testID="dashboard-create-fab"');
+    const fabOpener = fab.slice(start, fab.indexOf("style=", start));
+    for (const prop of cycleProps) {
+      expect(fabOpener).toContain(prop);
+    }
+    expect(fabOpener.match(/: undefined\}/g)?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("resolves the native tags once, after the dial opens, not per frame", () => {
+    const openDial = fab.slice(
+      fab.indexOf("const openDial = useCallback"),
+      fab.indexOf("useEffect(", fab.indexOf("const openDial = useCallback")),
+    );
+    expect(openDial).toContain("requestAnimationFrame(");
+    expect(openDial).toContain("resolveDialFocusTags");
+  });
+});

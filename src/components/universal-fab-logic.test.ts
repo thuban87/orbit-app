@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   createQuickLogUndoController,
+  dialFocusCycle,
+  FAB_DIAL_TRANSIENT_ID,
   getFocusedContactContext,
   resolveFabContactContext,
   resolveFabTarget,
+  selectFabDialOpen,
   UNIVERSAL_FAB_ACTIONS,
 } from "./universal-fab-logic";
 
@@ -304,5 +307,79 @@ describe("resolveFabContactContext — an archived contact is never FAB context 
       resolveFabContactContext({ originContactId: null }, read),
     ).resolves.toEqual({ originContactId: null });
     expect(read).not.toHaveBeenCalled();
+  });
+});
+
+describe("selectFabDialOpen (D-31)", () => {
+  it("keeps the dial's transient id stable, so an open entry keeps working", () => {
+    expect(FAB_DIAL_TRANSIENT_ID).toBe("fab-speed-dial");
+  });
+
+  it("is false with no shell transient open", () => {
+    expect(selectFabDialOpen({ entries: [] })).toBe(false);
+  });
+
+  it("is true while the dial's entry is registered, at any layer", () => {
+    expect(
+      selectFabDialOpen({ entries: [{ id: FAB_DIAL_TRANSIENT_ID }] }),
+    ).toBe(true);
+    expect(
+      selectFabDialOpen({
+        entries: [{ id: FAB_DIAL_TRANSIENT_ID }, { id: "contact-picker" }],
+      }),
+    ).toBe(true);
+  });
+
+  it("ignores other transients: only the dial hides the navigator", () => {
+    // The dashboard panel keeps its own Home-scoped RG-020 inertness.
+    expect(selectFabDialOpen({ entries: [{ id: "dashboard-panel" }] })).toBe(
+      false,
+    );
+  });
+});
+
+describe("dialFocusCycle (D-31)", () => {
+  // Dial order: FAB, then the rows from the one nearest the FAB upward.
+  const fab = 10;
+  const rows = [11, 12, 13, 14, 15, 16];
+
+  it("links FAB -> row 1 -> ... -> row 6 -> FAB for keyboard TAB", () => {
+    const cycle = dialFocusCycle(fab, rows);
+    expect(cycle.fab.nextFocusForward).toBe(11);
+    expect(cycle.rows.map((row) => row.nextFocusForward)).toEqual([
+      12, 13, 14, 15, 16, 10,
+    ]);
+  });
+
+  it("mirrors the cycle on the D-pad in visual stacking order (rows rise above the FAB)", () => {
+    const cycle = dialFocusCycle(fab, rows);
+    expect(cycle.fab.nextFocusUp).toBe(11);
+    expect(cycle.fab.nextFocusDown).toBe(16);
+    expect(cycle.rows.map((row) => row.nextFocusUp)).toEqual([
+      12, 13, 14, 15, 16, 10,
+    ]);
+    expect(cycle.rows.map((row) => row.nextFocusDown)).toEqual([
+      10, 11, 12, 13, 14, 15,
+    ]);
+  });
+
+  it("leaves a link undefined when its target tag is unresolved", () => {
+    const cycle = dialFocusCycle(null, [11, null, 13, 14, 15, 16]);
+    expect(cycle.fab.nextFocusForward).toBeUndefined();
+    expect(cycle.rows[0].nextFocusForward).toBeUndefined();
+    expect(cycle.rows[0].nextFocusDown).toBeUndefined();
+    expect(cycle.rows[5].nextFocusForward).toBeUndefined();
+    expect(cycle.rows[2].nextFocusDown).toBeUndefined();
+    expect(cycle.rows[2].nextFocusForward).toBe(14);
+  });
+
+  it("links nothing before any tag resolves", () => {
+    const cycle = dialFocusCycle(null, []);
+    expect(cycle.fab).toEqual({
+      nextFocusForward: undefined,
+      nextFocusUp: undefined,
+      nextFocusDown: undefined,
+    });
+    expect(cycle.rows).toEqual([]);
   });
 });
