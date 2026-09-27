@@ -105,7 +105,11 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [pendingAction, setPendingAction] = useState<PendingAction>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // 38.4 review Lane D WR-01: a failed READ means no count is truthful; a
+  // failed WRITE leaves the last clean read standing. Separate states, so a
+  // failed toggle or bulk apply never hides the counts.
+  const [readError, setReadError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   // Only a successful read backs a count (38.4 AUD-UIA-013): until the first
   // read lands the empty `items` array is not "AI can access nothing".
   const [loaded, setLoaded] = useState(false);
@@ -120,10 +124,10 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
       setDefaults(nextDefaults);
       setItems(nextItems);
       setLoaded(true);
-      setError(null);
+      setReadError(null);
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to load AI permissions", caught);
-      setError("Couldn't load AI permissions. Please try again.");
+      setReadError("Couldn't load AI permissions. Please try again.");
     }
   }, []);
 
@@ -150,9 +154,9 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
         allItems: items,
         filteredItems: filtered,
         enabledOnly,
-        loadFailed: !loaded || error !== null,
+        loadFailed: !loaded || readError !== null,
       }),
-    [enabledOnly, error, filtered, items, loaded],
+    [enabledOnly, filtered, items, loaded, readError],
   );
   const refs = useMemo(
     () => selectedPermissionRefs(items, selected),
@@ -166,6 +170,7 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
   ) {
     const value = enabled ? 1 : 0;
     setDefaults((current) => ({ ...current, [key]: value }));
+    setActionError(null);
     try {
       await setAiPermissionDefault(
         getExecutor(),
@@ -176,7 +181,7 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
     } catch (caught) {
       Logger.error(LOG_SCOPE, "failed to update AI permission default", caught);
       setDefaults((current) => ({ ...current, [key]: enabled ? 0 : 1 }));
-      setError("Couldn't update that default. Please try again.");
+      setActionError("Couldn't update that default. Please try again.");
     }
   }
 
@@ -191,6 +196,7 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
 
   async function requestEnable() {
     if (refs.length === 0) return;
+    setActionError(null);
     try {
       const impact = await getBulkPermissionImpact(getExecutor(), refs);
       setPendingAction({ kind: "enable", impact });
@@ -200,13 +206,14 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
         "failed to calculate AI permission impact",
         caught,
       );
-      setError("Couldn't review that selection. Please try again.");
+      setActionError("Couldn't review that selection. Please try again.");
     }
   }
 
   async function applyPending() {
     if (!pendingAction || refs.length === 0 || busy) return;
     setBusy(true);
+    setActionError(null);
     try {
       if (pendingAction.kind === "enable") {
         await bulkEnableAiPermissions(getExecutor(), refs, localDateTime());
@@ -222,11 +229,13 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
         "failed to update selected AI permissions",
         caught,
       );
-      setError("Couldn't update those permissions. Please try again.");
+      setActionError("Couldn't update those permissions. Please try again.");
     } finally {
       setBusy(false);
     }
   }
+
+  const shownError = readError ?? actionError;
 
   const confirmMessage =
     pendingAction?.kind === "enable"
@@ -331,13 +340,13 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
             </AppText>
           ) : null}
 
-          {error ? (
+          {shownError ? (
             <AppText
-              accessibilityLabel={error}
+              accessibilityLabel={shownError}
               role="caption"
               style={{ color: colors.danger }}
             >
-              {error}
+              {shownError}
             </AppText>
           ) : null}
 
