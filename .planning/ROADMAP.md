@@ -1198,7 +1198,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; ADR-115 + ADR-087 (surface/glass authority)
 **UI hint**: yes
-**Plans**: 21/23 plans executed in 9 waves
+**Plans**: 22/23 plans executed in 9 waves
 
 Plans:
 **Wave 1**
@@ -1245,7 +1245,7 @@ Plans:
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 38.4-23-PLAN.md — FAB: bottom clearance on every FAB-bearing scroll screen (route-derived contract) + a permanent app-wide theme-token FAB border (D-52, D-56; OA-E3, OA-C2)
+- [x] 38.4-23-PLAN.md — FAB: bottom clearance on every FAB-bearing scroll screen (route-derived contract) + a permanent app-wide theme-token FAB border (D-52, D-56; OA-E3, OA-C2)
 
 **Wave 9** *(blocked on Wave 8 completion and the D-37 phase code review/fix pass)*
 
@@ -1332,7 +1332,7 @@ Plans:
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
-| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 21/23 | In Progress|  |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 22/23 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 0/TBD | Deferred planning (needs discuss; sheet signed 2026-09-27; art spike + discuss next) | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |

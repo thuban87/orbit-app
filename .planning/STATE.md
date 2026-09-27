@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.4
 current_phase_name: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
 status: executing
-stopped_at: Completed 38.4-21-PLAN.md
-last_updated: "2026-09-27T16:34:15.344Z"
+stopped_at: Completed 38.4-23-PLAN.md
+last_updated: "2026-09-27T16:52:29.021Z"
 last_activity: 2026-09-27
-last_activity_desc: "38.4-21 complete — D-44: AI Data Permissions list line + per-contact AI-accessible captions reconcile with the access total; D-49: both resume prompts scroll a bounded body at large text, onAccent Resume labels (PendingConfirmationsSheet already bounded); D-47: layout-editor live preview hidden behind PROFILE_LAYOUT_PREVIEW_VISIBLE=false; D-57: migration 032 import_sessions.batch_interval_days (schema head 32), session-only batch lifecycle through every bulk create seam incl. resume/Combine/Duplicate Review, single-review Bound honoured, post-commit reminder/widget effects, bulk setup Bound/Unbound + batch frequency; D-58: Import Complete Unbound bridge removed. 5089 tests, tsc/colors clean, biome 0 errors"
-state_head: cc4406e4406c68f968cdf88a83da8cda62daa5c4
+last_activity_desc: "38.4-23 complete — D-52: route-derived fab-clearance-contract (five mounted tab stacks minus focused routes; 37 FAB-bearing screens), useBottomClearance() on 23 screens + the Custom fields form (FieldDefForm required prop), FAB_EDGE_GAP = SPACING.base; D-56 (supersedes D-45): permanent 2dp onAccent ring on the main FAB via FAB_BORDER_WIDTH / FAB_BORDER_COLOR_KEY, unconditional. 5136 tests, tsc/colors clean, biome 0 errors. Next: D-37 code review, then Plan 17 (device)."
+state_head: 52c4e52d748f81b63ab6cac2b0720f1070d9da05
 progress:
   total_phases: 27
   completed_phases: 17
   total_plans: 241
-  completed_plans: 237
+  completed_plans: 238
 carried_forward:
 
   - "38.3 owner dispositions (2026-09-26, not passes): UAT-023a widget leg DEFERRED to the widget-overhaul phase; UAT-042 A-then-B chronology, UAT-024b month/year rollover, UAT-026b in-range keep and UAT-022 warm-Mark-while-backgrounded ACCEPTED-RISK (unit tests only). O-3 → homed in 38.4 Workstream I (D-10)."
@@ -43,8 +43,8 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 38.4 (UI Consistency, Accessibility, Performance & Release Polish (INSERTED)) — EXECUTING
-Plan: 23 of 23 (next by wave; 21/23 complete — 01–16, 18, 19, 20, 21, 22; remaining 23 → D-37 code review → 17)
-Status: Ready to execute
+Plan: 17 of 23 (next: D-37 code review, then Plan 17; 22/23 complete — 01–16, 18–23)
+Status: Code plans complete — D-37 code review next, then Plan 17 device pass
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
@@ -389,6 +389,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.4 P16 | 21min | 3 tasks | 73 files |
 | Phase 38.4 P20 | 32min | 4 tasks | 32 files |
 | Phase 38.4 P21 | 26 min | 7 tasks | 40 files |
+| Phase 38.4 P23 | 26min | 3 tasks | 32 files |
 
 ## Accumulated Context
 
@@ -927,8 +928,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-27T16:33:42.811Z
-**Stopped at:** Completed 38.4-21-PLAN.md
+**Last session:** 2026-09-27T16:52:19.979Z
+**Stopped at:** Completed 38.4-23-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
