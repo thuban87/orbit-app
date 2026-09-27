@@ -1198,7 +1198,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; ADR-115 + ADR-087 (surface/glass authority)
 **UI hint**: yes
-**Plans**: 17/23 plans executed in 9 waves
+**Plans**: 18/23 plans executed in 9 waves
 
 Plans:
 **Wave 1**
@@ -1233,7 +1233,7 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [ ] 38.4-16-PLAN.md — Glass-scope consumer follow-through: placeholder sweep + on-glass accent-text roles (RG-029; D-24). The F-1 bare-text scrim task was cancelled by D-38 (moved to Phase 38.5)
-- [ ] 38.4-22-PLAN.md — Platform config: native dialogs follow Orbit's light/dark mode; storage-permission audit, removed only if proven unused (D-50, D-48; OA-D4, OA-D1)
+- [x] 38.4-22-PLAN.md — Platform config: native dialogs follow Orbit's light/dark mode; storage-permission audit, removed only if proven unused (D-50, D-48; OA-D4, OA-D1)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
@@ -1332,7 +1332,7 @@ Plans:
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
-| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 17/23 | In Progress|  |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 18/23 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 0/TBD | Deferred planning (needs discuss; sheet signed 2026-09-27; art spike + discuss next) | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
