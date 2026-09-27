@@ -184,10 +184,42 @@ export function permissionGroupCaption(
   group: AiPermissionContactGroup,
   expanded: boolean,
 ): string {
+  return `${groupCountParts(group).join(" · ")} · ${
+    expanded ? "Hide" : "Review"
+  }`;
+}
+
+/** A group's D-44 count phrases: its items, and how many of them AI can access. */
+function groupCountParts(group: AiPermissionContactGroup): [string, string] {
   const { items } = summarizePermissionView(group.items);
   const accessible = summarizePermissionView(enabledItems(group.items)).items;
-  return `${plural(items, "item", "items")} · AI can access ${accessible} · ${
-    expanded ? "Hide" : "Review"
+  return [plural(items, "item", "items"), `AI can access ${accessible}`];
+}
+
+/**
+ * The contact header's accessibility label (38.4 review Lane D WR-03). An
+ * explicit label replaces the aggregated child text on Android, so it carries
+ * the D-44 count itself: the action, the name, then the same counts as the
+ * visible caption (without repeating its trailing Review/Hide affordance).
+ */
+export function permissionGroupA11yLabel(
+  group: AiPermissionContactGroup,
+  expanded: boolean,
+): string {
+  return `${expanded ? "Hide" : "Review"} ${group.contactName}, ${groupCountParts(
+    group,
+  ).join(", ")}`;
+}
+
+/**
+ * An item row's accessibility label (38.4 review Lane D WR-03): its label and
+ * value, then its AI access state, which the visible Enabled/Disabled caption
+ * shows and an explicit label would otherwise hide. Selection is announced by
+ * the row's checkbox state.
+ */
+export function permissionItemA11yLabel(item: AiPermissionItem): string {
+  return `${item.label}: ${item.value}, ${
+    item.enabled === 1 ? "Enabled, AI can access" : "Disabled, AI can't access"
   }`;
 }
 

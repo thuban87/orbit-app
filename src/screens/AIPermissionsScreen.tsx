@@ -35,7 +35,9 @@ import {
   buildPermissionSummaryCopy,
   filterAiPermissionItems,
   groupAiPermissionItems,
+  permissionGroupA11yLabel,
   permissionGroupCaption,
+  permissionItemA11yLabel,
   selectedPermissionRefs,
   visibleSelectedKeys,
 } from "./ai-permissions-logic";
@@ -377,7 +379,10 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
                       <>
                         <Pressable
                           accessibilityRole="button"
-                          accessibilityLabel={`${expanded ? "Hide" : "Review"} ${group.contactName}`}
+                          accessibilityLabel={permissionGroupA11yLabel(
+                            group,
+                            expanded,
+                          )}
                           accessibilityState={{ expanded }}
                           onPress={() =>
                             setExpandedContact(
@@ -401,7 +406,9 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
                                 <Pressable
                                   key={item.itemKey}
                                   accessibilityRole="checkbox"
-                                  accessibilityLabel={`${item.label}: ${item.value}`}
+                                  accessibilityLabel={permissionItemA11yLabel(
+                                    item,
+                                  )}
                                   accessibilityState={{ checked }}
                                   onPress={() => toggleSelected(item.itemKey)}
                                   style={[

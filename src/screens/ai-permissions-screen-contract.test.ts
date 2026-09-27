@@ -89,3 +89,19 @@ describe("AI permissions selection acts only on visible rows (Lane D WR-04)", ()
     expect(writers.length).toBe(2);
   });
 });
+
+describe("AI permissions labels carry count and access state (Lane D WR-03)", () => {
+  it("the contact header label includes the D-44 count", () => {
+    expect(screen).toMatch(
+      /accessibilityLabel=\{permissionGroupA11yLabel\(\s*group,\s*expanded,?\s*\)\}/,
+    );
+  });
+
+  it("the item row label includes its Enabled/Disabled state", () => {
+    expect(screen).toMatch(
+      /accessibilityLabel=\{permissionItemA11yLabel\(\s*item,?\s*\)\}/,
+    );
+    // No label that stops at the item's value.
+    expect(screen).not.toMatch(/accessibilityLabel=\{`\$\{item\.label\}/);
+  });
+});

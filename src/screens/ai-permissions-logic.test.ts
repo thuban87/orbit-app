@@ -6,7 +6,9 @@ import {
   groupAiPermissionItems,
   isPermissionFilterActive,
   PERMISSION_NO_MATCH_COPY,
+  permissionGroupA11yLabel,
   permissionGroupCaption,
+  permissionItemA11yLabel,
   selectedPermissionRefs,
   selectionImpact,
   summarizePermissionView,
@@ -569,5 +571,39 @@ describe("visibleSelectedKeys (Lane D WR-04)", () => {
     expect(selectedPermissionRefs(ITEMS, visible)).toEqual([
       { category: "custom-field", id: 3 },
     ]);
+  });
+});
+
+/**
+ * 38.4 review Lane D WR-03: an explicit accessibilityLabel replaces the
+ * aggregated child text on Android, so the D-44 per-contact count and each
+ * item's AI access state must be IN the labels, or TalkBack never speaks them.
+ */
+describe("AI permission accessibility labels (Lane D WR-03)", () => {
+  const alex = groupAiPermissionItems(ITEMS)[0];
+
+  it("the contact header announces the action, the name and the D-44 count once", () => {
+    expect(permissionGroupA11yLabel(alex, false)).toBe(
+      "Review Alex, 2 items, AI can access 1",
+    );
+    expect(permissionGroupA11yLabel(alex, true)).toBe(
+      "Hide Alex, 2 items, AI can access 1",
+    );
+  });
+
+  it("uses the caption's counting rule, singular included", () => {
+    const blair = groupAiPermissionItems(ITEMS)[1];
+    expect(permissionGroupA11yLabel(blair, false)).toBe(
+      "Review Blair, 1 item, AI can access 1",
+    );
+  });
+
+  it("an item row announces whether AI can access it", () => {
+    expect(permissionItemA11yLabel(ITEMS[0])).toBe(
+      "Memory: Astronomy, Enabled, AI can access",
+    );
+    expect(permissionItemA11yLabel(ITEMS[1])).toBe(
+      "Interaction note: Telescope, Disabled, AI can't access",
+    );
   });
 });
