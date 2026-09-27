@@ -23,6 +23,7 @@ import {
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
 import { mapPickedContact } from "@/logic/picked-contact-map";
+import type { BoundImportEffects } from "@/services/import/import-lifecycle-effects";
 import {
   importedPhotoFs,
   persistImportedPhotoPostCommit,
@@ -49,6 +50,11 @@ export interface CommitSingleImportInput {
   externalLinks: ExternalContactLinkInput[];
   birthday: string | null;
   now: string;
+  /**
+   * Post-commit reminder/widget effects after a Bound single import (D-57).
+   * Tests inject a spy; the default lazily imports `import-lifecycle-effects`.
+   */
+  effects?: BoundImportEffects;
 }
 
 export interface PickedImportNavigator {
@@ -163,9 +169,10 @@ export async function commitSingleImport(
       // A corrupt snapshot has no safe note to import; retain the prior create behavior.
     }
   }
+  const lifecycle = reviewedLifecycle(params.input);
   const { contactId } = await importContactRecord(exec, {
     input: params.input,
-    lifecycle: reviewedLifecycle(params.input),
+    lifecycle,
     externalLinks: params.externalLinks,
     birthday: params.birthday,
     note,
@@ -190,6 +197,18 @@ export async function commitSingleImport(
     }
   }
   await completeSession(exec, params.sessionId, params.now);
+  if (lifecycle.trackingEnabled) {
+    // D-57: best-effort, post-commit; never fails the committed import.
+    try {
+      const run =
+        params.effects ??
+        (await import("@/services/import/import-lifecycle-effects"))
+          .applyBoundImportEffects;
+      await run(exec);
+    } catch (error) {
+      Logger.error("import-acquire", "Bound import effects failed", error);
+    }
+  }
   return contactId;
 }
 

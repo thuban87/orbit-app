@@ -23,6 +23,7 @@ import { importContactRecord } from "@/db/imported-contact-dao";
 import type { SqlExecutor } from "@/db/types";
 import { mapPickedContact } from "@/logic/picked-contact-map";
 import { scoreImportCandidate } from "@/services/import/duplicate-evidence";
+import type { BoundImportEffects } from "@/services/import/import-lifecycle-effects";
 import {
   importedPhotoFs,
   persistImportedPhotoPostCommit,
@@ -53,10 +54,36 @@ export interface RunImportBatchParams {
   eligibleStatuses?: ImportSessionRowStatus[];
   /** An in-pass override; the durable session value is the normal source. */
   batchCategoryId?: number | null;
+  /**
+   * Post-commit reminder/widget effects after a Bound pass (D-57). Tests inject
+   * a spy; the default lazily imports `import-lifecycle-effects`, which pulls in
+   * native modules. The batch lifecycle itself is never a parameter here: it
+   * is read from the session so a resume keeps it.
+   */
+  effects?: BoundImportEffects;
 }
 
 function pickedFromRow(row: ImportSessionRow): PickedContact {
   return JSON.parse(row.sourcePayload) as PickedContact;
+}
+
+/**
+ * Run the Bound import effects once, post-commit and best-effort (D-57): a
+ * failure — including a failed lazy import — is logged and never rethrown.
+ */
+async function runBoundImportEffects(
+  exec: SqlExecutor,
+  effects: BoundImportEffects | undefined,
+): Promise<void> {
+  try {
+    const run =
+      effects ??
+      (await import("@/services/import/import-lifecycle-effects"))
+        .applyBoundImportEffects;
+    await run(exec);
+  } catch (error) {
+    Logger.error("import-driver", "Bound import effects failed", error);
+  }
 }
 
 function failureReason(error: unknown): string {
@@ -144,6 +171,7 @@ export async function runImportBatch(
     eligibleStatuses.includes(row.rowStatus),
   );
   let done = 0;
+  let createdContacts = 0;
 
   for (let start = 0; start < rows.length; start += CHUNK_SIZE) {
     const chunk = rows.slice(start, start + CHUNK_SIZE);
@@ -171,13 +199,14 @@ export async function runImportBatch(
               params.now,
             );
           } else if (scored.outcome === "new") {
-            await importRowAsNew(exec, {
+            const created = await importRowAsNew(exec, {
               row,
               batchCategoryId,
               lifecycle,
               phoneRegion: session.phoneRegion,
               now: params.now,
             });
+            if (created.contactId !== null) createdContacts += 1;
           } else {
             await deferNeedsReview(
               exec,
@@ -207,5 +236,10 @@ export async function runImportBatch(
   }
 
   await finalizeSessionIfTerminal(exec, params.sessionId, params.now);
+  // D-57: a Bound pass that created contacts refreshes reminders and the
+  // widget once, after everything above has committed.
+  if (lifecycle.trackingEnabled && createdContacts > 0) {
+    await runBoundImportEffects(exec, params.effects);
+  }
   return sessionSummaryCounts(exec, params.sessionId);
 }

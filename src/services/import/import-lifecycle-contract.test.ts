@@ -89,7 +89,8 @@ describe("bulk create lifecycle provenance (D-57)", () => {
       driver,
     )?.[1];
     expect(runParams).toBeDefined();
-    expect(runParams).not.toMatch(/\blifecycle\b/);
+    // No lifecycle FIELD (a doc comment may mention the word).
+    expect(runParams).not.toMatch(/^\s*lifecycle\??:/m);
   });
 });
 

@@ -18,6 +18,7 @@ import {
   getSessionById,
   type ImportSessionRow,
   listSessionRows,
+  sessionBatchLifecycle,
   sessionRowCounts,
 } from "@/db/import-session-read";
 import {
@@ -185,6 +186,7 @@ export function BulkImportSetupScreen({
       const result = await combineCluster(exec, importedPhotoFs, {
         rows: consolidationRows,
         batchCategoryId: currentCategoryId,
+        lifecycle: sessionBatchLifecycle(session),
         phoneRegion: session.phoneRegion,
         now: localDateTime(),
       });

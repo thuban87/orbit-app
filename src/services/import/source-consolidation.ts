@@ -5,7 +5,9 @@
  */
 import { createContactFullCore } from "@/db/contacts-dao";
 import {
+  assertImportLifecycle,
   finalizeSessionIfTerminal,
+  type ImportLifecycle,
   markRowPhotoFailed,
   retireRowStagedPhotoCore,
   setRowContactCore,
@@ -22,6 +24,7 @@ import type { SqlExecutor } from "@/db/types";
 import { isValidStoredBirthday } from "@/logic/birthday-logic";
 import { normalizeContactMethod } from "@/logic/contact-method-normalization";
 import { mapPickedContact } from "@/logic/picked-contact-map";
+import type { BoundImportEffects } from "@/services/import/import-lifecycle-effects";
 import {
   type ImportedPhotoFs,
   persistImportedPhotoPostCommit,
@@ -138,8 +141,10 @@ function mapRows(
 }
 
 /**
- * Atomically create the one unbound contact, every source link/provenance row,
- * and every source-row resolution. Photo import is intentionally post-commit.
+ * Atomically create the one contact — with the batch lifecycle setup saved on
+ * the session (38.4 D-57; Unbound by default, ADR-066) — every source
+ * link/provenance row, and every source-row resolution. Photo import and, for
+ * a Bound batch, the reminder/widget effects are intentionally post-commit.
  */
 export async function combineCluster(
   exec: SqlExecutor,
@@ -147,8 +152,15 @@ export async function combineCluster(
   params: {
     rows: ImportSessionRow[];
     batchCategoryId: number | null;
+    /** The batch lifecycle, validated before any write (D-57). */
+    lifecycle: ImportLifecycle;
     phoneRegion: string | null;
     now: string;
+    /**
+     * Post-commit reminder/widget effects after a Bound combine (D-57). Tests
+     * inject a spy; the default lazily imports `import-lifecycle-effects`.
+     */
+    effects?: BoundImportEffects;
   },
 ): Promise<CombineClusterResult> {
   if (params.rows.length < 2) {
@@ -157,6 +169,8 @@ export async function combineCluster(
   if (params.rows.some((row) => row.rowStatus !== "pending")) {
     throw new Error("combineCluster requires pending source rows");
   }
+  assertImportLifecycle(params.lifecycle);
+  const { lifecycle } = params;
 
   const mappedRows = mapRows(
     params.rows,
@@ -208,8 +222,8 @@ export async function combineCluster(
         name,
         now: params.now,
         categoryId: params.batchCategoryId,
-        trackingEnabled: false,
-        intervalDays: null,
+        trackingEnabled: lifecycle.trackingEnabled,
+        intervalDays: lifecycle.intervalDays,
         methodDrafts: methods,
         methodNormalization: { effectivePhoneRegion: params.phoneRegion },
       });
@@ -307,6 +321,22 @@ export async function combineCluster(
       Logger.error(
         "source-consolidation",
         `could not mark photo failure for import row ${photoRow.id}`,
+        error,
+      );
+    }
+  }
+  if (lifecycle.trackingEnabled) {
+    // D-57: best-effort, post-commit; never fails the committed combine.
+    try {
+      const run =
+        params.effects ??
+        (await import("@/services/import/import-lifecycle-effects"))
+          .applyBoundImportEffects;
+      await run(exec);
+    } catch (error) {
+      Logger.error(
+        "source-consolidation",
+        "Bound import effects failed",
         error,
       );
     }

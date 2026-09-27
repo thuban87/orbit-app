@@ -23,6 +23,7 @@ import {
 import { linkExistingContactToRow } from "@/db/imported-contact-dao";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { importRowAsNew } from "@/services/import/import-driver";
+import { applyBoundImportEffects } from "@/services/import/import-lifecycle-effects";
 import { resolveImportStagingUri } from "@/services/photos/photo-storage";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -200,6 +201,7 @@ export function DuplicateReviewScreen({
       return;
     }
     if (!session) return;
+    let importedAny = false;
     // Only a row's own write can fail its resolve; the trailing finalize and
     // re-read go to the read error + read-only Retry (D-04).
     await runLatchedWrite(() =>
@@ -215,6 +217,7 @@ export function DuplicateReviewScreen({
               phoneRegion: session.phoneRegion,
               now,
             });
+            if (result.contactId !== null) importedAny = true;
             if (result.skipped === "name-required") {
               Alert.alert(
                 "Couldn't import — no name",
@@ -247,6 +250,15 @@ export function DuplicateReviewScreen({
         onRecoveryError: onReadError,
       }),
     );
+    // D-57: a Bound batch's Import as new refreshes reminders and the widget
+    // once, post-commit and best-effort (the helper never rejects).
+    if (
+      action === "import-new" &&
+      importedAny &&
+      sessionBatchLifecycle(session).trackingEnabled
+    ) {
+      void applyBoundImportEffects(getExecutor());
+    }
   }
 
   async function chooseLink(choice: CandidateChoice) {
