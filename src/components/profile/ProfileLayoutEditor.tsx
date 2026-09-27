@@ -23,6 +23,7 @@ import {
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
 import { getExecutor, localDateTime } from "@/db/database";
 import { setContactFreeformLayout } from "@/db/profile-presentation-dao";
@@ -166,9 +167,15 @@ function EditorRow({
           />
         ) : null}
       </View>
-      <AppText role="caption" style={{ color: colors.textSecondary }}>
-        {placement.visible ? "Shown in this layout" : "Hidden in this layout"}
-      </AppText>
+      <ScopedPalette>
+        {(scoped) => (
+          <AppText role="caption" style={{ color: scoped.textSecondary }}>
+            {placement.visible
+              ? "Shown in this layout"
+              : "Hidden in this layout"}
+          </AppText>
+        )}
+      </ScopedPalette>
     </GlassSurface>
   );
 }

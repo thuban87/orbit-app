@@ -1,8 +1,8 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: `role` is Orbit's visual/typography domain prop.
 import { StyleSheet, View } from "react-native";
 import { Icon } from "@/components/icons/Icon";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import type { AiRepair } from "@/screens/ai-connection-logic";
-import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { AppText } from "./ui/AppText";
 import { Button } from "./ui/Button";
@@ -20,7 +20,6 @@ export function AINeedsAttention({
   onRepair,
   secondary = false,
 }: AINeedsAttentionProps) {
-  const { colors } = useTheme();
   return (
     <GlassSurface density="dense" style={styles.surface}>
       <View style={styles.content}>
@@ -28,9 +27,13 @@ export function AINeedsAttention({
           <Icon name="warning" tone="danger" size="md" />
           <View style={styles.copy}>
             <AppText role="heading">Needs attention</AppText>
-            <AppText role="body" style={{ color: colors.textSecondary }}>
-              {repair.message}
-            </AppText>
+            <ScopedPalette>
+              {(scoped) => (
+                <AppText role="body" style={{ color: scoped.textSecondary }}>
+                  {repair.message}
+                </AppText>
+              )}
+            </ScopedPalette>
           </View>
         </View>
         <Button

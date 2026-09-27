@@ -22,6 +22,7 @@ import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
 import { listCategories } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
@@ -835,9 +836,13 @@ export function ProfileBackgroundManager({
               </View>
               <GlassSurface density="dense" style={styles.cropBottomOverlay}>
                 {managerState.error ? (
-                  <AppText style={{ color: colors.danger }}>
-                    {managerState.error}
-                  </AppText>
+                  <ScopedPalette>
+                    {(scoped) => (
+                      <AppText style={{ color: scoped.danger }}>
+                        {managerState.error}
+                      </AppText>
+                    )}
+                  </ScopedPalette>
                 ) : null}
                 <AppText accessibilityLiveRegion="polite" role="body">
                   {cropStatus}

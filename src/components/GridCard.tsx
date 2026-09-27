@@ -12,6 +12,7 @@ import { Icon } from "@/components/icons/Icon";
 import type { IconName } from "@/components/icons/icon-registry";
 import { StatusGlyph } from "@/components/icons/StatusGlyph";
 import { GlassSurface } from "@/components/ui/GlassSurface";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import type { ProfileStatus } from "@/db/contact-status-read";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
 import { useTheme } from "@/theme";
@@ -133,10 +134,6 @@ export function GridCard({
   const displayState: StatusDisplayState = isSnoozed(snoozeUntil, now)
     ? "snoozed"
     : status;
-  const ring = ringVisual(
-    displayState === "snoozed" ? null : displayState,
-    colors,
-  );
   const recency = formatListRecency(lastContact, now);
   const isSearchMode = searchResult !== undefined;
   const strongestMatch = searchResult?.matches[0];
@@ -218,139 +215,153 @@ export function GridCard({
         density="dense"
         style={styles.surface}
       >
-        {selectionMode ? (
-          <Pressable
-            testID={`dashboard-grid-card-select-${contactId}`}
-            accessibilityRole="checkbox"
-            accessibilityLabel={`${selected ? "Deselect" : "Select"} ${name}`}
-            accessibilityState={{ checked: selected }}
-            hitSlop={SPACING.sm}
-            onPress={onToggleSelect}
-            style={styles.selectionButton}
-          >
-            <Icon
-              name="select"
-              state={selected ? "active" : "default"}
-              size="md"
-              tone={selected ? "accent" : "textSecondary"}
-            />
-          </Pressable>
-        ) : null}
+        <ScopedPalette>
+          {(scoped) => {
+            // The status ring reads the scoped palette so it matches the scoped
+            // StatusGlyph inside this card (D-24 on-glass status variants, D-34).
+            const ring = ringVisual(
+              displayState === "snoozed" ? null : displayState,
+              scoped,
+            );
+            return (
+              <>
+                {selectionMode ? (
+                  <Pressable
+                    testID={`dashboard-grid-card-select-${contactId}`}
+                    accessibilityRole="checkbox"
+                    accessibilityLabel={`${selected ? "Deselect" : "Select"} ${name}`}
+                    accessibilityState={{ checked: selected }}
+                    hitSlop={SPACING.sm}
+                    onPress={onToggleSelect}
+                    style={styles.selectionButton}
+                  >
+                    <Icon
+                      name="select"
+                      state={selected ? "active" : "default"}
+                      size="md"
+                      tone={selected ? "accent" : "textSecondary"}
+                    />
+                  </Pressable>
+                ) : null}
 
-        {selectionMode ? (
-          <View
-            testID={`dashboard-grid-card-favourite-${contactId}`}
-            accessible={false}
-            accessibilityElementsHidden
-            style={styles.favouriteButton}
-          >
-            <Icon
-              name="favorite"
-              state={isFavourite ? "active" : "default"}
-              size="md"
-              tone={isFavourite ? "accent" : "textSecondary"}
-            />
-          </View>
-        ) : (
-          <Pressable
-            testID={`dashboard-grid-card-favourite-${contactId}`}
-            accessibilityRole="button"
-            accessibilityLabel={
-              isFavourite ? "Remove favourite" : "Add favourite"
-            }
-            accessibilityState={{ selected: isFavourite }}
-            hitSlop={SPACING.sm}
-            onPress={onToggleFavourite}
-            style={styles.favouriteButton}
-          >
-            <Icon
-              name="favorite"
-              state={isFavourite ? "active" : "default"}
-              size="md"
-              tone={isFavourite ? "accent" : "textSecondary"}
-            />
-          </Pressable>
-        )}
+                {selectionMode ? (
+                  <View
+                    testID={`dashboard-grid-card-favourite-${contactId}`}
+                    accessible={false}
+                    accessibilityElementsHidden
+                    style={styles.favouriteButton}
+                  >
+                    <Icon
+                      name="favorite"
+                      state={isFavourite ? "active" : "default"}
+                      size="md"
+                      tone={isFavourite ? "accent" : "textSecondary"}
+                    />
+                  </View>
+                ) : (
+                  <Pressable
+                    testID={`dashboard-grid-card-favourite-${contactId}`}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      isFavourite ? "Remove favourite" : "Add favourite"
+                    }
+                    accessibilityState={{ selected: isFavourite }}
+                    hitSlop={SPACING.sm}
+                    onPress={onToggleFavourite}
+                    style={styles.favouriteButton}
+                  >
+                    <Icon
+                      name="favorite"
+                      state={isFavourite ? "active" : "default"}
+                      size="md"
+                      tone={isFavourite ? "accent" : "textSecondary"}
+                    />
+                  </Pressable>
+                )}
 
-        <View style={styles.avatarArea}>
-          <View
-            testID={`dashboard-grid-card-ring-${contactId}`}
-            accessible={false}
-            accessibilityElementsHidden
-            style={[
-              styles.statusRing,
-              {
-                borderColor: ring.color,
-                borderWidth: ring.width,
-                opacity: ring.opacity,
-              },
-            ]}
-          />
-          <Avatar
-            photo={photo}
-            name={name}
-            contactId={contactId}
-            size={SPACING["2xl"]}
-            cacheBust={modifiedAt}
-          />
-          {displayState !== null ? (
-            <View
-              accessible={false}
-              accessibilityElementsHidden
-              style={styles.statusGlyph}
-            >
-              <StatusGlyph state={displayState} size="sm" />
-            </View>
-          ) : null}
-        </View>
+                <View style={styles.avatarArea}>
+                  <View
+                    testID={`dashboard-grid-card-ring-${contactId}`}
+                    accessible={false}
+                    accessibilityElementsHidden
+                    style={[
+                      styles.statusRing,
+                      {
+                        borderColor: ring.color,
+                        borderWidth: ring.width,
+                        opacity: ring.opacity,
+                      },
+                    ]}
+                  />
+                  <Avatar
+                    photo={photo}
+                    name={name}
+                    contactId={contactId}
+                    size={SPACING["2xl"]}
+                    cacheBust={modifiedAt}
+                  />
+                  {displayState !== null ? (
+                    <View
+                      accessible={false}
+                      accessibilityElementsHidden
+                      style={styles.statusGlyph}
+                    >
+                      <StatusGlyph state={displayState} size="sm" />
+                    </View>
+                  ) : null}
+                </View>
 
-        <View style={styles.content}>
-          <Text
-            testID={`dashboard-grid-card-name-${contactId}`}
-            numberOfLines={1}
-            ellipsizeMode="tail"
-            style={[styles.name, { color: colors.textPrimary }]}
-          >
-            {name}
-          </Text>
-          {isSearchMode ? (
-            <Text
-              testID={`dashboard-grid-card-match-explanation-${contactId}`}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={[styles.recency, { color: colors.textSecondary }]}
-            >
-              {searchExplanation}
-            </Text>
-          ) : (
-            <Text
-              testID={`dashboard-grid-card-recency-${contactId}`}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={[styles.recency, { color: colors.textSecondary }]}
-            >
-              {recency}
-            </Text>
-          )}
-          {isSearchMode ? (
-            <Text
-              testID={`dashboard-grid-card-search-snippet-${contactId}`}
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={[
-                styles.recency,
-                styles.line3Text,
-                { color: colors.textSecondary },
-              ]}
-            >
-              <HighlightedSnippet
-                text={displayedSearchSnippet ?? ""}
-                highlights={strongestMatch?.highlights ?? []}
-                color={colors.textPrimary}
-              />
-            </Text>
-          ) : null}
-        </View>
+                <View style={styles.content}>
+                  <Text
+                    testID={`dashboard-grid-card-name-${contactId}`}
+                    numberOfLines={1}
+                    ellipsizeMode="tail"
+                    style={[styles.name, { color: colors.textPrimary }]}
+                  >
+                    {name}
+                  </Text>
+                  {isSearchMode ? (
+                    <Text
+                      testID={`dashboard-grid-card-match-explanation-${contactId}`}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={[styles.recency, { color: scoped.textSecondary }]}
+                    >
+                      {searchExplanation}
+                    </Text>
+                  ) : (
+                    <Text
+                      testID={`dashboard-grid-card-recency-${contactId}`}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={[styles.recency, { color: scoped.textSecondary }]}
+                    >
+                      {recency}
+                    </Text>
+                  )}
+                  {isSearchMode ? (
+                    <Text
+                      testID={`dashboard-grid-card-search-snippet-${contactId}`}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                      style={[
+                        styles.recency,
+                        styles.line3Text,
+                        { color: scoped.textSecondary },
+                      ]}
+                    >
+                      <HighlightedSnippet
+                        text={displayedSearchSnippet ?? ""}
+                        highlights={strongestMatch?.highlights ?? []}
+                        color={colors.textPrimary}
+                      />
+                    </Text>
+                  ) : null}
+                </View>
+              </>
+            );
+          }}
+        </ScopedPalette>
       </GlassSurface>
     </Pressable>
   );

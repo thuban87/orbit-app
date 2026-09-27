@@ -16,6 +16,7 @@ import { Icon } from "@/components/icons/Icon";
 import type { IconName } from "@/components/icons/icon-registry";
 import { AppText } from "@/components/ui/AppText";
 import { GlassSurface } from "@/components/ui/GlassSurface";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -200,12 +201,18 @@ export function AnchoredMenu({
                       tone={item.danger ? "danger" : "textPrimary"}
                     />
                   ) : null}
-                  <AppText
-                    role="label"
-                    style={item.danger ? { color: colors.danger } : undefined}
-                  >
-                    {item.label}
-                  </AppText>
+                  <ScopedPalette>
+                    {(scoped) => (
+                      <AppText
+                        role="label"
+                        style={
+                          item.danger ? { color: scoped.danger } : undefined
+                        }
+                      >
+                        {item.label}
+                      </AppText>
+                    )}
+                  </ScopedPalette>
                 </Pressable>
               ))}
             </ScrollView>

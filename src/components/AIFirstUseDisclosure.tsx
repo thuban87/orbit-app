@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Modal, StyleSheet, View } from "react-native";
 import { AppText, Button, GlassSurface } from "@/components/ui";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { resolveActiveAiConnection } from "@/db/ai-connections-dao";
 import { getAppSettings, markAiFirstUseDisclosed } from "@/db/app-settings-dao";
 import { getExecutor } from "@/db/database";
@@ -103,9 +104,13 @@ export function AIFirstUseDisclosure() {
             time.
           </AppText>
           {error ? (
-            <AppText role="caption" style={{ color: colors.danger }}>
-              {error}
-            </AppText>
+            <ScopedPalette>
+              {(scoped) => (
+                <AppText role="caption" style={{ color: scoped.danger }}>
+                  {error}
+                </AppText>
+              )}
+            </ScopedPalette>
           ) : null}
           <View style={styles.actions}>
             <Button
