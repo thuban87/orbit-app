@@ -91,7 +91,7 @@
     "source_grounding_authority": "grep"
   },
   "mode": "yolo",
-  "granularity": "fine",
+  "granularity": "standard",
   "resolve_model_ids": "omit",
   "intel": {
     "enabled": false
