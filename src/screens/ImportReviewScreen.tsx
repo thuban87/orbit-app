@@ -55,6 +55,7 @@ import { resolveImportStagingUri } from "@/services/photos/photo-storage";
 import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS } from "@/types";
 import { Logger } from "@/utils/logger";
+import { boundFrequencyBlocksImport } from "./bulk-import-setup-logic";
 import { useImportLeaveGuard } from "./use-import-leave-guard";
 import { useOpenImportSession } from "./use-open-import-session";
 
@@ -99,6 +100,9 @@ export function ImportReviewScreen({
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
   const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [intervalDays, setIntervalDays] = useState<number | null>(null);
+  // 38.4 review CR-01: the picker never emits an invalid custom entry, so
+  // Import is blocked while Bound and the frequency is invalid.
+  const [intervalValid, setIntervalValid] = useState(true);
   const [phoneRegion, setPhoneRegion] = useState<string | null>(null);
   const [methods, setMethods] = useState<MethodGroups>({
     phone: [],
@@ -198,7 +202,8 @@ export function ImportReviewScreen({
     rowId !== null &&
     externalContactId !== null &&
     name.trim().length > 0 &&
-    !birthdayInvalid;
+    !birthdayInvalid &&
+    !boundFrequencyBlocksImport(trackingEnabled, intervalValid);
   const previewUri = useMemo(
     () => (photoRelPath ? resolveImportStagingUri(photoRelPath) : null),
     [photoRelPath],
@@ -423,6 +428,8 @@ export function ImportReviewScreen({
               onPress={() => {
                 setEdited(true);
                 setTrackingEnabled(enabled);
+                // Unbound hides the picker; its last validity no longer applies.
+                if (!enabled) setIntervalValid(true);
               }}
               style={[
                 styles.choice,
@@ -519,6 +526,7 @@ export function ImportReviewScreen({
               setEdited(true);
               setIntervalDays(value);
             }}
+            onValidityChange={setIntervalValid}
           />
         </View>
       ) : null}

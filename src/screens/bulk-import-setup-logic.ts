@@ -43,6 +43,21 @@ export function bulkLifecycleChoice(
   return UNBOUND_IMPORT;
 }
 
+/**
+ * Whether an invalid custom frequency blocks Import (38.4 review CR-01).
+ * `FrequencyPicker` never emits an invalid entry and reports validity through
+ * `onValidityChange` instead, so a Bound choice with an invalid frequency must
+ * not import: it would write the last cadence the picker emitted, which the
+ * user never chose. Unbound carries no cadence, so it never blocks. Shared by
+ * bulk setup and the single import review.
+ */
+export function boundFrequencyBlocksImport(
+  trackingEnabled: boolean,
+  intervalValid: boolean,
+): boolean {
+  return trackingEnabled && !intervalValid;
+}
+
 /** The screen's starting choice, restored from the session (resume keeps it). */
 export function initialBulkLifecycle(
   session: Pick<ImportSession, "batchTrackingEnabled" | "batchIntervalDays">,

@@ -36,6 +36,7 @@ import { Logger } from "@/utils/logger";
 import {
   BULK_BOUND_BLURB,
   BULK_IMPORT_DEFAULT_FREQUENCY,
+  boundFrequencyBlocksImport,
   bulkLifecycleChoice,
   initialBulkLifecycle,
 } from "./bulk-import-setup-logic";
@@ -78,6 +79,9 @@ export function BulkImportSetupScreen({
   // D-57: the batch lifecycle — Unbound by default, restored from the session.
   const [trackingEnabled, setTrackingEnabled] = useState(false);
   const [intervalDays, setIntervalDays] = useState<number | null>(null);
+  // 38.4 review CR-01: the picker never emits an invalid custom entry, so
+  // Import is blocked while Bound and the frequency is invalid.
+  const [intervalValid, setIntervalValid] = useState(true);
   const [edited, setEdited] = useState(false);
   const [saving, setSaving] = useState(false);
   const [consolidationRows, setConsolidationRows] = useState<
@@ -124,6 +128,13 @@ export function BulkImportSetupScreen({
     }, [load]),
   );
 
+  // 38.4 review CR-01: a Bound batch with an invalid custom frequency must not
+  // import (the Import button, startBatch, onImport and onCombine all check it).
+  const importBlocked =
+    saving ||
+    count === 0 ||
+    boundFrequencyBlocksImport(trackingEnabled, intervalValid);
+
   function clusterKey(rows: ImportSessionRow[]): string {
     return rows
       .map((row) => row.id)
@@ -132,7 +143,7 @@ export function BulkImportSetupScreen({
   }
 
   async function startBatch() {
-    if (saving || count === 0) return;
+    if (importBlocked) return;
     setSaving(true);
     try {
       const exec = getExecutor();
@@ -166,7 +177,7 @@ export function BulkImportSetupScreen({
   }
 
   async function onImport() {
-    if (saving || count === 0) return;
+    if (importBlocked) return;
     try {
       const exec = getExecutor();
       const [session, rows] = await Promise.all([
@@ -191,7 +202,12 @@ export function BulkImportSetupScreen({
   }
 
   async function onCombine() {
-    if (!consolidationRows || saving) return;
+    if (
+      !consolidationRows ||
+      saving ||
+      boundFrequencyBlocksImport(trackingEnabled, intervalValid)
+    )
+      return;
     setSaving(true);
     try {
       const exec = getExecutor();
@@ -303,6 +319,8 @@ export function BulkImportSetupScreen({
                 onPress={() => {
                   setEdited(true);
                   setTrackingEnabled(bound);
+                  // Unbound hides the picker; its last validity no longer applies.
+                  if (!bound) setIntervalValid(true);
                 }}
                 style={[
                   styles.default,
@@ -334,6 +352,7 @@ export function BulkImportSetupScreen({
                 setEdited(true);
                 setIntervalDays(value);
               }}
+              onValidityChange={setIntervalValid}
             />
             <Text style={[styles.blurb, { color: colors.textSecondary }]}>
               {BULK_BOUND_BLURB}
@@ -404,21 +423,19 @@ export function BulkImportSetupScreen({
 
       <Pressable
         accessibilityRole="button"
-        disabled={saving || count === 0}
+        disabled={importBlocked}
         onPress={() => void onImport()}
         style={[
           styles.import,
           {
-            backgroundColor:
-              saving || count === 0 ? colors.surface : colors.accent,
-            borderColor: saving || count === 0 ? colors.border : colors.accent,
+            backgroundColor: importBlocked ? colors.surface : colors.accent,
+            borderColor: importBlocked ? colors.border : colors.accent,
           },
         ]}
       >
         <Text
           style={{
-            color:
-              saving || count === 0 ? colors.textSecondary : colors.onAccent,
+            color: importBlocked ? colors.textSecondary : colors.onAccent,
             fontWeight: "600",
           }}
         >
