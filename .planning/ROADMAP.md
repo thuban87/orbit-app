@@ -160,7 +160,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.2: Data Integrity, Security & Lifecycle Hardening** (INSERTED) - Completed 2026-09-25: 16/16 plans; verification passed 22/22 with Pixel device UAT (isolated synthetic package) for RG-003/004/009–013/015/016/043; eleven device-found defects fixed (incl. Android 17 import picker, reminder reschedule churn, reconcile identity pulled forward from 38.4). Explicitly recorded owner dispositions (not passes): RG-001 remaining widget checks deferred to a widget-overhaul phase; RG-002 hostile-provider ingress and RG-014 Drive/Files/natural-24 h subcases waived. No schema change (TARGET_VERSION 30), backup format 7.
 - [x] **Phase 38.3: Runtime Correctness, Navigation & State Coherence** (INSERTED) - Completed 2026-09-26: 16/16 plans; verification passed 94/94 truths with Pixel device UAT (isolated synthetic package) for RG-019–026, 035, 042, plus a device re-check of the 14 post-review fixes on `3b63f86`. UAT-020b TalkBack passed (AUD-UIA-022 not reproduced; D-05 fix not needed). Explicitly recorded owner dispositions (not passes): UAT-023a widget leg deferred to the widget-overhaul phase; UAT-042, UAT-024b month/year, UAT-026b in-range keep and the UAT-022 warm-Mark leg accepted risk.
 - [ ] **Phase 38.4: UI Consistency, Accessibility, Performance & Release Polish** (INSERTED) - Pre-release audit remediation (RG-008, 027–034, 036–041): AI permission presentation, bounded Orrery/Your Week resources, contrast + shared controls, contact/widget accessibility, narrow-width/large-text, Settings/forms/timestamps, FAB a11y investigation, overlay permission + launcher artwork (owner-scheduled 2026-09-23)
-- [ ] **Phase 38.5: Background Art & Text-on-Art Contrast** (INSERTED) - DEFERRED PLANNING — needs discuss-phase; prerequisite: owner-signed scrim combination sheet (38.4 D-40). Text sitting directly on the background art meets WCAG floors in every theme × mode × background, mainly through regenerated separate light and dark art per background; moved out of 38.4 by owner ruling D-38 (2026-09-26)
+- [ ] **Phase 38.5: Background Art & Text-on-Art Contrast** (INSERTED) - DEFERRED PLANNING — needs discuss-phase; prerequisite met: scrim sign-off v2 signed 2026-09-27 (38.5 D-08); next: codex-edu image spike (O-9), then discuss-phase. Text sitting directly on the background art meets WCAG floors in every theme × mode × background, mainly through regenerated separate light and dark art per background; moved out of 38.4 by owner ruling D-38 (2026-09-26)
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
 
@@ -1329,7 +1329,7 @@ Plans:
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 15/25 | In Progress|  |
-| 38.5 Background Art & Text-on-Art Contrast | 0/TBD | Deferred planning (needs discuss; D-40 sheet first) | - |
+| 38.5 Background Art & Text-on-Art Contrast | 0/TBD | Deferred planning (needs discuss; sheet signed 2026-09-27; art spike + discuss next) | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
