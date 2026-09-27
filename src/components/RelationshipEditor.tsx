@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Switch, TextInput, View } from "react-native";
+import { StyleSheet, Switch, TextInput, View } from "react-native";
 import { ContactPicker } from "@/components/ContactPicker";
 import { AppText, Button } from "@/components/ui";
 import type { RelationshipRow } from "@/db/relationships-read";

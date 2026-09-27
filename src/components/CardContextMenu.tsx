@@ -10,7 +10,7 @@ import { BaseOverlay } from "@/components/ui/overlay-base";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
-import { TYPOGRAPHY } from "@/theme/tokens/typography";
+import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
 
 export interface CardContextMenuProps {
   visible: boolean;
@@ -151,7 +151,10 @@ const styles = StyleSheet.create({
     paddingTop: SPACING.lg,
   },
   title: {
-    fontFamily: TYPOGRAPHY.label.family,
+    fontFamily: resolveFontFamily(
+      TYPOGRAPHY.label.family,
+      TYPOGRAPHY.label.weight,
+    ),
     fontSize: TYPOGRAPHY.label.size,
     marginBottom: SPACING.sm,
   },
@@ -164,7 +167,10 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   label: {
-    fontFamily: TYPOGRAPHY.body.family,
+    fontFamily: resolveFontFamily(
+      TYPOGRAPHY.body.family,
+      TYPOGRAPHY.body.weight,
+    ),
     fontSize: TYPOGRAPHY.body.size,
   },
 });

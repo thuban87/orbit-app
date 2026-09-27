@@ -10,7 +10,7 @@ import type { IconName } from "@/components/icons/icon-registry";
 import { Sheet } from "@/components/ui/Sheet";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
-import { TYPOGRAPHY } from "@/theme/tokens/typography";
+import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
 
 export interface BulkActionSurfaceProps {
   selectedCount: number;
@@ -189,7 +189,10 @@ export function BulkActionSurface({
 const styles = StyleSheet.create({
   actions: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
   pendingLabel: {
-    fontFamily: TYPOGRAPHY.caption.family,
+    fontFamily: resolveFontFamily(
+      TYPOGRAPHY.caption.family,
+      TYPOGRAPHY.caption.weight,
+    ),
     fontSize: TYPOGRAPHY.caption.size,
     width: "100%",
   },
@@ -203,11 +206,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm,
   },
   actionLabel: {
-    fontFamily: TYPOGRAPHY.label.family,
+    fontFamily: resolveFontFamily(
+      TYPOGRAPHY.label.family,
+      TYPOGRAPHY.label.weight,
+    ),
     fontSize: TYPOGRAPHY.label.size,
   },
   sheetTitle: {
-    fontFamily: TYPOGRAPHY.label.family,
+    fontFamily: resolveFontFamily(
+      TYPOGRAPHY.label.family,
+      TYPOGRAPHY.label.weight,
+    ),
     fontSize: TYPOGRAPHY.label.size,
     marginBottom: SPACING.sm,
   },
