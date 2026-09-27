@@ -23,6 +23,10 @@ export function Snackbar() {
 
   return (
     <View
+      // G2 (38.4 D-33): a permanent native view, so toggling the dial's a11y
+      // props never flattens and re-creates this full-screen overlay without
+      // its `box-none` (a re-created view defaults to `auto` = touch sink).
+      collapsable={false}
       pointerEvents="box-none"
       style={styles.overlay}
       {...fabDialBackgroundA11y(fabDialOpen)}

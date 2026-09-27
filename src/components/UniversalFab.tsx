@@ -419,6 +419,12 @@ export function UniversalFab() {
           accessibilityViewIsModal
           importantForAccessibility={open ? "auto" : "no-hide-descendants"}
           accessibilityElementsHidden={!open}
+          // G2 (38.4 D-33): keep this full-screen container a permanent native
+          // view. Without it Fabric flattens it while the dial is open, and
+          // Android re-creates it on close WITHOUT the unchanged `box-none`,
+          // so the new view defaults to `auto` and swallows every touch below
+          // the FAB until a cold start (38.4-G2-INVESTIGATION.md).
+          collapsable={false}
           pointerEvents="box-none"
           style={styles.dial}
         >

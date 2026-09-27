@@ -133,6 +133,8 @@ export function AssistBanner() {
 
   return (
     <View
+      // G2 (38.4 D-33): never flattened/re-created, so `box-none` always holds.
+      collapsable={false}
       pointerEvents="box-none"
       style={styles.root}
       {...fabDialBackgroundA11y(fabDialOpen)}
