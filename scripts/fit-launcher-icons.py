@@ -150,6 +150,7 @@ def main(argv):
                 f"expected RGBA ({OUT_SIZE}, {OUT_SIZE})"
             )
             continue
+        before = len(failures)
         if committed.tobytes() != fresh.tobytes():
             failures.append(f"{out_rel}: pixels differ from a fresh run (stale)")
         extent = max_radial_extent(committed, OUT_SIZE / 2, OUT_SIZE / 2)
@@ -158,7 +159,7 @@ def main(argv):
                 f"{out_rel}: content extent {extent:.1f}px exceeds safe radius "
                 f"{TARGET_RADIUS:.1f}px (+1)"
             )
-        else:
+        if len(failures) == before:
             print(
                 f"ok {out_rel}: extent {extent:.1f}px <= {TARGET_RADIUS:.1f}px "
                 f"(scale {scale:.4f}, margin {MARGIN})"
