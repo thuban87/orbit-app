@@ -6,6 +6,7 @@ import {
   groupAiPermissionItems,
   isPermissionFilterActive,
   PERMISSION_NO_MATCH_COPY,
+  permissionGroupCaption,
   selectedPermissionRefs,
   selectionImpact,
   summarizePermissionView,
@@ -418,6 +419,69 @@ describe("buildPermissionSummaryCopy reconciliation (D-44)", () => {
         loadFailed: true,
       }),
     ).toEqual({ accessLine: null, listLine: null, emptyLine: null });
+  });
+});
+
+describe("permissionGroupCaption (D-44)", () => {
+  it("states the contact's item count and how many of them AI can access", () => {
+    const [alex, blair] = groupAiPermissionItems(ITEMS);
+    expect(permissionGroupCaption(alex, false)).toBe(
+      "2 items · AI can access 1 · Review",
+    );
+    expect(permissionGroupCaption(blair, true)).toBe(
+      "1 item · AI can access 1 · Hide",
+    );
+    const [casey] = groupAiPermissionItems(
+      RECONCILE_ITEMS.filter((item) => item.contactUid === "casey"),
+    );
+    expect(permissionGroupCaption(casey, false)).toBe(
+      "2 items · AI can access 0 · Review",
+    );
+  });
+
+  it("headers sum to the list line in every view state", () => {
+    for (const state of RECONCILE_STATES) {
+      const { filteredItems, copy } = copyFor(state.filter);
+      const groups = groupAiPermissionItems(filteredItems);
+      const counts = groups.map((group) => {
+        const match = /^(\d+) items? · AI can access (\d+) · Review$/.exec(
+          permissionGroupCaption(group, false),
+        );
+        if (!match)
+          throw new Error(`unparsed caption for ${group.contactName}`);
+        return { n: Number(match[1]), e: Number(match[2]) };
+      });
+      const n = counts.reduce((sum, c) => sum + c.n, 0);
+      const e = counts.reduce((sum, c) => sum + c.e, 0);
+      const shown = summarizePermissionView(filteredItems);
+      expect(n, state.name).toBe(shown.items);
+      expect(groups.length, state.name).toBe(shown.contacts);
+      expect(e, state.name).toBe(
+        summarizePermissionView(
+          filteredItems.filter((item) => item.enabled === 1),
+        ).items,
+      );
+      // The same three numbers the list line prints.
+      expect(copy.listLine, state.name).toContain(
+        `from ${groups.length} contact`,
+      );
+      if (e === n) {
+        expect(copy.listLine, state.name).toMatch(
+          /AI can access (all of them|it)$/,
+        );
+      } else if (e === 0) {
+        expect(copy.listLine, state.name).toMatch(
+          /AI can access none of them$|AI can't access it$/,
+        );
+      } else {
+        expect(copy.listLine, state.name).toContain(
+          `AI can access ${e} of them`,
+        );
+      }
+      const shownPhrase =
+        n === RECONCILE_ITEMS.length ? `all ${n} items` : `${n} of `;
+      expect(copy.listLine, state.name).toContain(`Showing ${shownPhrase}`);
+    }
   });
 });
 
