@@ -34,6 +34,7 @@ import {
   buildPermissionSummaryCopy,
   filterAiPermissionItems,
   groupAiPermissionItems,
+  permissionGroupCaption,
   selectedPermissionRefs,
 } from "./ai-permissions-logic";
 
@@ -366,8 +367,7 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
                             role="caption"
                             style={{ color: scoped.textSecondary }}
                           >
-                            {group.items.length} items ·{" "}
-                            {expanded ? "Hide" : "Review"}
+                            {permissionGroupCaption(group, expanded)}
                           </AppText>
                         </Pressable>
                         {expanded

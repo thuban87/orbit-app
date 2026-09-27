@@ -54,7 +54,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | `src/ai/model-catalog-cache.ts` | Loads local model catalog cache and runs explicit refreshes. |
 | `src/ai/model-registry.ts` | Resolves All or latest-per-tier Frontier model lists. |
 | `src/logic/ai-enablement.ts` | `isAiMasterEnabled()` — the single canonical AI master predicate (`aiEnabled === 1`). |
-| `src/screens/ai-permissions-logic.ts` | Permission review filtering, grouping, and `buildPermissionSummaryCopy()` (access totals vs filtered view). |
+| `src/screens/ai-permissions-logic.ts` | Permission review filtering, grouping, access totals, a reconciling list line (`buildPermissionSummaryCopy()`) and per-contact AI-accessible counts (`permissionGroupCaption()`). |
 | `src/screens/ai-model-picker-logic.ts` | Model card ordering/filtering and `markRememberedModel()` (saved-model marker). |
 
 ## How It Works
@@ -128,6 +128,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 10. **Carrying is transmission once resolved.** Interaction notes enter the payload only through the latest-three projection and only when that individual row has `allow_ai=1`.
 11. **Do not weaken the OpenRouter callback.** It must bind loopback only, require the exact state before exchange, and wake the app without code or state in the URI.
 12. **AI availability comes from the master, not `aiProvider`.** Every surface that asks "is AI on?" calls `isAiMasterEnabled(settings)` (ADR-135). `ai_provider` is a retained compatibility field; a stale `'none'` or provider id there must not show or hide AI. The master is distinct from the active connection, readiness, per-item `allow_ai` consent and remembered models, and reading it never writes consent (38.4 RG-008; `architecture/AUD-ARCH-003`, `react-native/AUD-RN-005`; D-17).
+13. **The access line counts AI-enabled items only; the list may include disabled items.** On AI Data Permissions the access line is the unfiltered enabled total, while the list (with Enabled only off, e.g. after "Review existing…") also shows items AI cannot access. The list line and each contact header say which, and all three reconcile through one counting rule (D-44).
 
 ## Related Systems
 
@@ -153,3 +154,4 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 | 2026-09-23 | 38.2 | Per D-23 (`security/AUD-SEC-006`), unbound Custom values fail closed and require re-entry; failed saves restore the prior raw SecureStore item. |
 | 2026-09-23 | 38.2 | Bounded Custom transport response bodies, retained call ownership through body consumption, and mapped oversized responses to `invalid_response`. |
 | 2026-09-26 | 38.4 | Truthful AI configuration presentation (RG-008; AUD-ARCH-003, AUD-RN-005, AUD-UIA-013, AUD-UIA-020): Memory hosts use the canonical master, the permission summary separates access totals from the filtered view, and the model picker marks the saved model including manual ids. |
+| 2026-09-27 | 38.4 | AI Data Permissions counts reconcile with the list: a list line states the items shown, their contacts and how many AI can access, and each contact header states its AI-accessible count (D-44, OA-C1). |

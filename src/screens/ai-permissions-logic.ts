@@ -174,6 +174,23 @@ export function buildPermissionSummaryCopy(
   return { accessLine, listLine, emptyLine };
 }
 
+/**
+ * A contact header's caption (D-44): its item count, how many of them AI can
+ * access, and the expand affordance. Summed over the groups of a view, the
+ * counts equal the list line's items and AI-accessible items, because both use
+ * the same unique-item-key rule.
+ */
+export function permissionGroupCaption(
+  group: AiPermissionContactGroup,
+  expanded: boolean,
+): string {
+  const { items } = summarizePermissionView(group.items);
+  const accessible = summarizePermissionView(enabledItems(group.items)).items;
+  return `${plural(items, "item", "items")} · AI can access ${accessible} · ${
+    expanded ? "Hide" : "Review"
+  }`;
+}
+
 /** Convert selected display rows to unique permission-owning row references. */
 export function selectedPermissionRefs(
   items: readonly AiPermissionItem[],
