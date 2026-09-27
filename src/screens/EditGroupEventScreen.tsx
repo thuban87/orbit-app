@@ -248,7 +248,7 @@ export function EditGroupEventScreen({
             Couldn't load this group event. Please go back and retry.
           </AppText>
         ) : (
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={colors.accentText} />
         )}
       </View>
     );

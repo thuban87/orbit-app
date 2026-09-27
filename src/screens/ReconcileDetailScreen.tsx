@@ -410,7 +410,7 @@ export function ReconcileDetailScreen({
         {message ? (
           <Text style={{ color: colors.textSecondary }}>{message}</Text>
         ) : (
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={colors.accentText} />
         )}
         {needsContactsAccess ? (
           <Pressable

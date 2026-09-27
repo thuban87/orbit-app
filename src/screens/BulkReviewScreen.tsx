@@ -186,7 +186,7 @@ export function BulkReviewScreen({
                   ]}
                 />
                 {birthdayInvalid ? (
-                  <Text style={[styles.error, { color: colors.accent }]}>
+                  <Text style={[styles.error, { color: colors.accentText }]}>
                     Enter a real date (YYYY-MM-DD or MM-DD).
                   </Text>
                 ) : null}

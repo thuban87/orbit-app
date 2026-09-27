@@ -245,7 +245,7 @@ function DrillRow({
       onPress={onPress}
       style={styles.drill}
     >
-      <AppText role="label" style={{ color: colors.accent }}>
+      <AppText role="label" style={{ color: colors.accentText }}>
         {label}
       </AppText>
     </Pressable>

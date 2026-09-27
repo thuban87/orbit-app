@@ -80,7 +80,7 @@ export function CustomFieldValue({
             {value ?? ""}
           </Text>
         </View>
-        <Text style={[styles.fixAffordance, { color: colors.accent }]}>
+        <Text style={[styles.fixAffordance, { color: colors.accentText }]}>
           Tap to fix
         </Text>
       </Pressable>

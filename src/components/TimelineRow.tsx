@@ -112,7 +112,7 @@ export function TimelineRow({ item, onEdit, onDelete }: TimelineRowProps) {
               hitSlop={8}
               onPress={onEdit}
             >
-              <Text style={[styles.action, { color: colors.accent }]}>
+              <Text style={[styles.action, { color: colors.accentText }]}>
                 Add detail
               </Text>
             </Pressable>

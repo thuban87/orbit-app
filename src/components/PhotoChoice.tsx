@@ -90,7 +90,7 @@ export function PhotoChoice<T extends string>({
               {isSelected ? (
                 <Text
                   accessibilityLabel="Selected"
-                  style={[styles.check, { color: colors.accent }]}
+                  style={[styles.check, { color: colors.accentText }]}
                 >
                   ✓
                 </Text>
@@ -123,7 +123,7 @@ export function PhotoChoice<T extends string>({
         {activeId === KEEP_ORBIT_PHOTO ? (
           <Text
             accessibilityLabel="Selected"
-            style={[styles.check, { color: colors.accent }]}
+            style={[styles.check, { color: colors.accentText }]}
           >
             ✓
           </Text>

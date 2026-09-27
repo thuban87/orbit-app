@@ -103,7 +103,7 @@ export function EditParticipantScreen({
             {error}
           </AppText>
         ) : (
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={colors.accentText} />
         )}
       </View>
     );

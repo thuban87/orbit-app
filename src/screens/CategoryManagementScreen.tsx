@@ -606,7 +606,7 @@ export function CategoryManagementScreen() {
           <ActivityIndicator
             accessibilityLabel="Loading categories"
             accessibilityState={{ busy: true }}
-            color={colors.accent}
+            color={colors.accentText}
           />
         </View>
       </View>

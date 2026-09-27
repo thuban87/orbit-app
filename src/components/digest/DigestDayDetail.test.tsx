@@ -108,7 +108,7 @@ describe("DigestDayDetail", () => {
     expect(indicator?.props.accessibilityLabel).toBe(
       `Loading activity for ${DATE}`,
     );
-    expect(indicator?.props.color).toBe(THEME_PRESETS.galaxy.dark.accent);
+    expect(indicator?.props.color).toBe(THEME_PRESETS.galaxy.dark.accentText);
     expect(text(tree)).toContain(DATE);
     expect(text(tree)).not.toContain("No activity");
     expect(tree.some((node) => node.type === "Button")).toBe(false);

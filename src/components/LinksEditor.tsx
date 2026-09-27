@@ -198,7 +198,7 @@ export function LinksEditor({
         hitSlop={8}
         style={styles.addBtn}
       >
-        <Text style={{ color: colors.accent, fontWeight: "600" }}>
+        <Text style={{ color: colors.accentText, fontWeight: "600" }}>
           + Add link
         </Text>
       </Pressable>

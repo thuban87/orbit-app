@@ -677,7 +677,9 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
           style={[styles.tile, styles.newTile, { borderColor: colors.accent }]}
         >
           <View style={styles.newGlyphBox}>
-            <Text style={[styles.newGlyph, { color: colors.accent }]}>＋</Text>
+            <Text style={[styles.newGlyph, { color: colors.accentText }]}>
+              ＋
+            </Text>
           </View>
           <Text
             numberOfLines={1}
@@ -905,7 +907,9 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
                   onPress={() => void onNoteDone()}
                   style={styles.noteDone}
                 >
-                  <Text style={[styles.noteDoneText, { color: colors.accent }]}>
+                  <Text
+                    style={[styles.noteDoneText, { color: colors.accentText }]}
+                  >
                     Done
                   </Text>
                 </Pressable>
@@ -920,7 +924,10 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
               style={styles.noteAffordance}
             >
               <Text
-                style={[styles.noteAffordanceText, { color: colors.accent }]}
+                style={[
+                  styles.noteAffordanceText,
+                  { color: colors.accentText },
+                ]}
               >
                 Add a note
               </Text>

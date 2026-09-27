@@ -52,7 +52,7 @@ export function Snackbar() {
             }}
             style={styles.action}
           >
-            <AppText role="label" style={{ color: colors.accent }}>
+            <AppText role="label" style={{ color: colors.accentText }}>
               {snackbar.action.label}
             </AppText>
           </Pressable>
@@ -67,7 +67,7 @@ export function Snackbar() {
             }}
             style={styles.action}
           >
-            <AppText role="label" style={{ color: colors.accent }}>
+            <AppText role="label" style={{ color: colors.accentText }}>
               {snackbar.secondaryAction.label}
             </AppText>
           </Pressable>

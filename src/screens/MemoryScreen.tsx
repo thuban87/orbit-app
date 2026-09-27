@@ -265,7 +265,7 @@ export function MemoryScreen({
             accessibilityLabel="Loading memories"
             style={styles.readState}
           >
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color={colors.accentText} />
           </View>
         ) : memoriesPhase.phase === "error" ? (
           <View testID="memory-screen-read-error" style={styles.readError}>

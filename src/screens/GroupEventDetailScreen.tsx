@@ -198,7 +198,7 @@ export function GroupEventDetailScreen({
             Couldn't load this group event.
           </AppText>
         ) : (
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={colors.accentText} />
         )}
       </View>
     );

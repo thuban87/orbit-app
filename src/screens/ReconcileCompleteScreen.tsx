@@ -86,7 +86,7 @@ export function ReconcileCompleteScreen({
           accessibilityLabel="Loading check summary"
           style={styles.center}
         >
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={colors.accentText} />
           <Text style={[styles.body, { color: colors.textSecondary }]}>
             Loading check summary…
           </Text>

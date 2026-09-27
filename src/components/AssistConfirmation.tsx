@@ -117,7 +117,7 @@ export function AssistConfirmation({
         onPress={() => setNoteOpen((open) => !open)}
         style={styles.noteToggle}
       >
-        <Text style={[styles.noteToggleText, { color: colors.accent }]}>
+        <Text style={[styles.noteToggleText, { color: colors.accentText }]}>
           Add a note
         </Text>
       </Pressable>

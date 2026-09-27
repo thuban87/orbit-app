@@ -122,7 +122,7 @@ export function MemoryCard({
           <AppText
             numberOfLines={1}
             role="caption"
-            style={{ color: colors.accent }}
+            style={{ color: colors.accentText }}
           >
             Open link
           </AppText>

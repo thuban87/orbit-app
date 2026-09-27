@@ -117,7 +117,7 @@ export function SurvivorSelectScreen({
             </Text>
           </View>
           {selected === candidate.id ? (
-            <Text style={{ color: colors.accent }}>✓</Text>
+            <Text style={{ color: colors.accentText }}>✓</Text>
           ) : null}
         </Pressable>
       ))}

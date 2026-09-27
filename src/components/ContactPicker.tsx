@@ -222,7 +222,7 @@ export function ContactPicker(props: ContactPickerProps) {
 
           {loading ? (
             <View style={styles.message}>
-              <ActivityIndicator color={colors.accent} />
+              <ActivityIndicator color={colors.accentText} />
               <Text style={{ color: colors.textSecondary }}>
                 Loading contacts…
               </Text>
@@ -299,7 +299,7 @@ export function ContactPicker(props: ContactPickerProps) {
                       ) : null}
                     </View>
                     {isMultiSelect && isSelected ? (
-                      <Icon name="select" state="active" tone="accent" />
+                      <Icon name="select" state="active" tone="accentText" />
                     ) : null}
                   </Pressable>
                 );
@@ -322,7 +322,7 @@ export function ContactPicker(props: ContactPickerProps) {
             >
               <Text
                 accessibilityLiveRegion="polite"
-                style={[styles.selectionCount, { color: colors.accent }]}
+                style={[styles.selectionCount, { color: colors.accentText }]}
               >
                 {selectionCount(selectedContactIds)} selected
               </Text>

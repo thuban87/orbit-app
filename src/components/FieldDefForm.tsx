@@ -304,7 +304,7 @@ export function FieldDefForm(props: FieldDefFormProps) {
             onPress={addOption}
             style={[styles.addBtn, { borderColor: colors.borderStrong }]}
           >
-            <Text style={{ color: colors.accent }}>Add option</Text>
+            <Text style={{ color: colors.accentText }}>Add option</Text>
           </Pressable>
         </View>
       ) : null}

@@ -317,7 +317,7 @@ export function PhotoSourcePicker({
           onPress={() => void pickFromLibrary()}
           style={styles.actionBtn}
         >
-          <Text style={[styles.actionText, { color: colors.accent }]}>
+          <Text style={[styles.actionText, { color: colors.accentText }]}>
             {hasPhoto ? "Change photo" : "Add photo"}
           </Text>
         </Pressable>

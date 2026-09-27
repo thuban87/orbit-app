@@ -42,7 +42,7 @@ export function DigestDayDetail({
     body = (
       <ActivityIndicator
         testID={`${testID}-loading`}
-        color={colors.accent}
+        color={colors.accentText}
         accessibilityLabel={`Loading activity for ${date}`}
         style={styles.indicator}
       />

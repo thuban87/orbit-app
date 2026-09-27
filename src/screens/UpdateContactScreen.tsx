@@ -978,7 +978,10 @@ export function UpdateContactScreen({
                 >
                   <AppText role="body">{row.label}</AppText>
                   {recent ? (
-                    <AppText role="caption" style={{ color: colors.accent }}>
+                    <AppText
+                      role="caption"
+                      style={{ color: colors.accentText }}
+                    >
                       Updated
                     </AppText>
                   ) : null}

@@ -340,7 +340,7 @@ export function SettingsContactsScreen() {
             <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
               {row.title}
             </Text>
-            <Text style={[styles.rowValue, { color: colors.accent }]}>
+            <Text style={[styles.rowValue, { color: colors.accentText }]}>
               {phoneRegionLabel}
             </Text>
           </View>

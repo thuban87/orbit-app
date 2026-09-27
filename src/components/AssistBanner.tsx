@@ -158,7 +158,7 @@ export function AssistBanner() {
             onPress={() => setReviewOpen(true)}
             style={styles.pendingCount}
           >
-            <Text style={{ color: colors.accent }}>
+            <Text style={{ color: colors.accentText }}>
               {morePendingCount} more pending
             </Text>
           </Pressable>

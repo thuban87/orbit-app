@@ -99,7 +99,7 @@ export function GroupEventsScreen({
       ) : null}
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={colors.accentText} />
         </View>
       ) : (
         <FlatList

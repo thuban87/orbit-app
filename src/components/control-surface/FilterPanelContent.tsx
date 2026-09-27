@@ -146,7 +146,7 @@ export function FilterPanelContent({
         onPress={onClearFilters}
         style={[styles.clear, { borderColor: colors.borderStrong }]}
       >
-        <Text style={[styles.clearLabel, { color: colors.accent }]}>
+        <Text style={[styles.clearLabel, { color: colors.accentText }]}>
           {CONTROL_ACTION_LABELS.clearFilters}
         </Text>
       </Pressable>

@@ -326,7 +326,7 @@ export function DuplicateReviewScreen({
             onPress={() => void loadMatches()}
             style={[styles.retry, { borderColor: colors.accent }]}
           >
-            <Text style={{ color: colors.accent }}>Retry</Text>
+            <Text style={{ color: colors.accentText }}>Retry</Text>
           </Pressable>
         </View>
       ) : view === "empty" ? (

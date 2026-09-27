@@ -27,7 +27,7 @@ const REQUIRED = "colors.textPlaceholder";
  */
 const ALLOWLIST: Record<string, string> = {};
 
-export interface PlaceholderSite {
+interface PlaceholderSite {
   file: string;
   line: number;
   expression: string;
@@ -47,10 +47,7 @@ function walk(dir: string, out: string[]): string[] {
 }
 
 /** Every placeholderTextColor value in one source file, with its 1-based line. */
-export function placeholderSites(
-  file: string,
-  source: string,
-): PlaceholderSite[] {
+function placeholderSites(file: string, source: string): PlaceholderSite[] {
   const sf = ts.createSourceFile(
     file,
     source,
@@ -73,10 +70,7 @@ export function placeholderSites(
       node.name.getText(sf) === "placeholderTextColor"
     ) {
       const init = node.initializer;
-      record(
-        node,
-        init && ts.isJsxExpression(init) ? init.expression : init,
-      );
+      record(node, init && ts.isJsxExpression(init) ? init.expression : init);
     } else if (
       ts.isPropertyAssignment(node) &&
       node.name.getText(sf) === "placeholderTextColor"
@@ -90,7 +84,7 @@ export function placeholderSites(
 }
 
 /** The sites that violate the contract (not the token and not allowlisted). */
-export function placeholderViolations(sites: PlaceholderSite[]): string[] {
+function placeholderViolations(sites: PlaceholderSite[]): string[] {
   return sites
     .filter(
       (site) =>

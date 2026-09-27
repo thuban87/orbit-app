@@ -949,7 +949,7 @@ export function SettingsAppearanceScreen() {
               <Text style={[styles.rowLabel, { color: colors.textPrimary }]}>
                 Orbit Center
               </Text>
-              <Text style={[styles.rowValue, { color: colors.accent }]}>
+              <Text style={[styles.rowValue, { color: colors.accentText }]}>
                 {sunOccupantName}
               </Text>
             </View>
@@ -1102,7 +1102,7 @@ export function SettingsAppearanceScreen() {
                   >
                     Default profile layout
                   </Text>
-                  <Text style={[styles.rowValue, { color: colors.accent }]}>
+                  <Text style={[styles.rowValue, { color: colors.accentText }]}>
                     {layoutTemplates.find((t) => t.uid === globalLayoutUid)
                       ?.name ?? "Default / None"}
                   </Text>
@@ -1134,7 +1134,7 @@ export function SettingsAppearanceScreen() {
                   >
                     Default profile background
                   </Text>
-                  <Text style={[styles.rowValue, { color: colors.accent }]}>
+                  <Text style={[styles.rowValue, { color: colors.accentText }]}>
                     {backgroundTemplates.find(
                       (t) => t.uid === globalBackgroundUid,
                     )?.name ?? "Default / None"}

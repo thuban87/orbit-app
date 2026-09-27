@@ -567,7 +567,7 @@ export function ImportReviewScreen({
           ]}
         />
         {birthdayInvalid ? (
-          <Text style={[styles.birthdayError, { color: colors.accent }]}>
+          <Text style={[styles.birthdayError, { color: colors.accentText }]}>
             Enter a real date (YYYY-MM-DD or MM-DD).
           </Text>
         ) : null}

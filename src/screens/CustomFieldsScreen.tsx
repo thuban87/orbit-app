@@ -453,7 +453,7 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
                   onPress={() => setEditor({ mode: "edit", field })}
                   style={[styles.iconBtn, { borderColor: colors.border }]}
                 >
-                  <Text style={{ color: colors.accent }}>Edit</Text>
+                  <Text style={{ color: colors.accentText }}>Edit</Text>
                 </Pressable>
                 <Pressable
                   testID={`field-delete-${field.id}`}
@@ -511,7 +511,7 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
                 onPress={() => void doRestore(field)}
                 style={[styles.iconBtn, { borderColor: colors.accent }]}
               >
-                <Text style={{ color: colors.accent }}>Restore</Text>
+                <Text style={{ color: colors.accentText }}>Restore</Text>
               </Pressable>
             </View>
           ))}

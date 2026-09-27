@@ -184,7 +184,7 @@ export function ContactCard({
           <Text
             testID={`dashboard-card-favourite-${contactId}`}
             accessibilityLabel="Favourite"
-            style={[styles.favourite, { color: colors.accent }]}
+            style={[styles.favourite, { color: colors.accentText }]}
           >
             {"★"}
           </Text>

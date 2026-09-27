@@ -268,7 +268,7 @@ export function MemoryEditor({
             onPress={openNew}
             style={[styles.action, { borderColor: colors.border }]}
           >
-            <AppText role="body" style={{ color: colors.accent }}>
+            <AppText role="body" style={{ color: colors.accentText }}>
               Add memory
             </AppText>
           </Pressable>
@@ -463,7 +463,7 @@ export function MemoryEditor({
                 onPress={() => onRestore(editing.id)}
                 style={[styles.action, { borderColor: colors.border }]}
               >
-                <AppText role="body" style={{ color: colors.accent }}>
+                <AppText role="body" style={{ color: colors.accentText }}>
                   Restore
                 </AppText>
               </Pressable>

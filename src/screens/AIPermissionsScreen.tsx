@@ -70,6 +70,22 @@ type PendingAction =
   | { kind: "enable"; impact: AiPermissionImpact }
   | null;
 
+/**
+ * The "Review existing…" link label on each defaults card. It reads the palette
+ * itself so `accentText` resolves INSIDE the card's GlassSurface scope and picks
+ * up the Standard-Light glass variant (RG-029 ui-accessibility/AUD-UIA-001,
+ * D-24/D-26). The screen's own `colors` is resolved above the card and would
+ * render the root tone.
+ */
+function ReviewExistingLinkLabel() {
+  const { colors } = useTheme();
+  return (
+    <AppText role="caption" style={{ color: colors.accentText }}>
+      Review existing…
+    </AppText>
+  );
+}
+
 export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
   const { colors } = useTheme();
   const [defaults, setDefaults] = useState<AiPermissionDefaults>({
@@ -249,9 +265,7 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
                     }}
                     style={styles.reviewLink}
                   >
-                    <AppText role="caption" style={{ color: colors.accent }}>
-                      Review existing…
-                    </AppText>
+                    <ReviewExistingLinkLabel />
                   </Pressable>
                 </View>
                 <Switch

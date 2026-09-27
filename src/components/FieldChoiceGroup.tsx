@@ -116,7 +116,7 @@ export function FieldChoiceGroup<T extends string>({
             {selected ? (
               <Text
                 accessibilityLabel="Selected"
-                style={[styles.check, { color: colors.accent }]}
+                style={[styles.check, { color: colors.accentText }]}
               >
                 ✓
               </Text>

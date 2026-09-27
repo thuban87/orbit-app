@@ -522,7 +522,7 @@ export function ThingsToRememberScreen({
                   }}
                   style={[styles.action, { borderColor: colors.border }]}
                 >
-                  <AppText role="caption" style={{ color: colors.accent }}>
+                  <AppText role="caption" style={{ color: colors.accentText }}>
                     Set new value
                   </AppText>
                 </Pressable>
@@ -537,7 +537,7 @@ export function ThingsToRememberScreen({
                   }
                   style={[styles.action, { borderColor: colors.border }]}
                 >
-                  <AppText role="caption" style={{ color: colors.accent }}>
+                  <AppText role="caption" style={{ color: colors.accentText }}>
                     History
                   </AppText>
                 </Pressable>
@@ -565,7 +565,10 @@ export function ThingsToRememberScreen({
                     onPress={() => void saveCurrentValue(fieldKey)}
                     style={[styles.action, { borderColor: colors.border }]}
                   >
-                    <AppText role="caption" style={{ color: colors.accent }}>
+                    <AppText
+                      role="caption"
+                      style={{ color: colors.accentText }}
+                    >
                       Save
                     </AppText>
                   </Pressable>
@@ -636,7 +639,7 @@ export function ThingsToRememberScreen({
                   onPress={() => unhideMemory(memory)}
                   style={[styles.action, { borderColor: colors.border }]}
                 >
-                  <AppText role="caption" style={{ color: colors.accent }}>
+                  <AppText role="caption" style={{ color: colors.accentText }}>
                     Show on Profile
                   </AppText>
                 </Pressable>
@@ -651,7 +654,7 @@ export function ThingsToRememberScreen({
                 }
                 style={styles.tertiary}
               >
-                <AppText role="body" style={{ color: colors.accent }}>
+                <AppText role="body" style={{ color: colors.accentText }}>
                   View all
                 </AppText>
               </Pressable>

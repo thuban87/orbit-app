@@ -422,7 +422,7 @@ export function BackupSettingsScreen({
           accessibilityLabel="Loading backup settings"
           style={styles.readState}
         >
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={colors.accentText} />
         </View>
       ) : null}
       {settingsPhase.phase === "error" ? (
@@ -447,7 +447,7 @@ export function BackupSettingsScreen({
             onPress={() => void readSettings()}
             style={[styles.outlineButton, { borderColor: colors.accent }]}
           >
-            <Text style={{ color: colors.accent }}>Retry</Text>
+            <Text style={{ color: colors.accentText }}>Retry</Text>
           </Pressable>
         </View>
       ) : null}
@@ -493,7 +493,7 @@ export function BackupSettingsScreen({
               onPress={() => void chooseFolder()}
               style={[styles.outlineButton, { borderColor: colors.accent }]}
             >
-              <Text style={{ color: colors.accent }}>
+              <Text style={{ color: colors.accentText }}>
                 {folderConfigured ? "Change folder" : "Choose backup folder"}
               </Text>
             </Pressable>
@@ -512,7 +512,9 @@ export function BackupSettingsScreen({
                   { opacity: openingFolder || !folderAccessible ? 0.6 : 1 },
                 ]}
               >
-                <Text style={{ color: colors.accent }}>Open backup folder</Text>
+                <Text style={{ color: colors.accentText }}>
+                  Open backup folder
+                </Text>
               </Pressable>
             ) : null}
             {folderConfigured ? (
@@ -822,7 +824,7 @@ export function BackupSettingsScreen({
                   onPress={startChange}
                   style={styles.linkButton}
                 >
-                  <Text style={{ color: colors.accent }}>
+                  <Text style={{ color: colors.accentText }}>
                     Change encryption
                   </Text>
                 </Pressable>
@@ -833,7 +835,7 @@ export function BackupSettingsScreen({
                   onPress={startForgotten}
                   style={styles.linkButton}
                 >
-                  <Text style={{ color: colors.accent }}>
+                  <Text style={{ color: colors.accentText }}>
                     I forgot my passphrase
                   </Text>
                 </Pressable>

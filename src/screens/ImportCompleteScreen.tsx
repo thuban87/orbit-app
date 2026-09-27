@@ -349,7 +349,7 @@ export function ImportCompleteScreen({
             onPress={() => void retry()}
             style={[styles.secondaryButton, { borderColor: colors.accent }]}
           >
-            <Text style={{ color: colors.accent }}>
+            <Text style={{ color: colors.accentText }}>
               {retrying ? "Retrying…" : "Retry"}
             </Text>
           </Pressable>

@@ -423,7 +423,7 @@ export function BackupScreen({
             onPress={() => openSettings("automatic")}
             style={styles.linkButton}
           >
-            <Text style={{ color: colors.accent }}>{heroAction}</Text>
+            <Text style={{ color: colors.accentText }}>{heroAction}</Text>
           </Pressable>
         </View>
       ) : (
@@ -454,7 +454,9 @@ export function BackupScreen({
             },
           ]}
         >
-          <Text style={[styles.actionIcon, { color: colors.accent }]}>⇧</Text>
+          <Text style={[styles.actionIcon, { color: colors.accentText }]}>
+            ⇧
+          </Text>
           <Text style={[styles.actionTitle, { color: colors.textPrimary }]}>
             Export now
           </Text>
@@ -601,7 +603,9 @@ export function BackupScreen({
             onPress={() => void chooseRestore()}
             style={styles.linkButton}
           >
-            <Text style={{ color: colors.accent }}>Choose another file</Text>
+            <Text style={{ color: colors.accentText }}>
+              Choose another file
+            </Text>
           </Pressable>
         </View>
       ) : null}
@@ -648,7 +652,7 @@ export function BackupScreen({
               onPress={() => openSettings("automatic")}
               style={styles.linkButton}
             >
-              <Text style={{ color: colors.accent }}>
+              <Text style={{ color: colors.accentText }}>
                 Set up automatic backups
               </Text>
             </Pressable>

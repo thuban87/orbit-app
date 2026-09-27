@@ -255,7 +255,7 @@ export function ArchivedContactsScreen() {
                     onPress={() => void doRestore(contact.id)}
                     style={[styles.actionBtn, { borderColor: colors.accent }]}
                   >
-                    <Text style={{ color: colors.accent }}>Restore</Text>
+                    <Text style={{ color: colors.accentText }}>Restore</Text>
                   </Pressable>
                   <Pressable
                     testID={`archived-delete-${contact.id}`}
