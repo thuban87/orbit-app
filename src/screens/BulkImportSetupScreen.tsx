@@ -14,11 +14,15 @@ import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { listCategories } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
-import { setSessionBatchDefaults } from "@/db/import-session-dao";
+import {
+  type ImportLifecycle,
+  setSessionBatchDefaults,
+} from "@/db/import-session-dao";
 import {
   getSessionById,
   type ImportSessionRow,
   listSessionRows,
+  sessionBatchLifecycle,
   sessionRowCounts,
 } from "@/db/import-session-read";
 import {
@@ -36,8 +40,10 @@ import { Logger } from "@/utils/logger";
 import {
   BULK_BOUND_BLURB,
   BULK_IMPORT_DEFAULT_FREQUENCY,
+  BULK_LIFECYCLE_LOCKED_COPY,
   boundFrequencyBlocksImport,
   bulkLifecycleChoice,
+  bulkLifecycleLocked,
   initialBulkLifecycle,
 } from "./bulk-import-setup-logic";
 import { useImportLeaveGuard } from "./use-import-leave-guard";
@@ -82,6 +88,12 @@ export function BulkImportSetupScreen({
   // 38.4 review CR-01: the picker never emits an invalid custom entry, so
   // Import is blocked while Bound and the frequency is invalid.
   const [intervalValid, setIntervalValid] = useState(true);
+  // D-64 (owner): once any row of the session is resolved, the saved batch
+  // lifecycle is locked (no mixed batches). Non-null exactly while locked; it
+  // is the lifecycle Import and Combine write, never an edited one.
+  const [lockedLifecycle, setLockedLifecycle] =
+    useState<ImportLifecycle | null>(null);
+  const lifecycleLocked = lockedLifecycle !== null;
   const [edited, setEdited] = useState(false);
   // 38.4 review Lane A WR-01: load() runs on mount and on every focus. Once the
   // user edits, it must not restore the session's category or lifecycle over
@@ -113,11 +125,23 @@ export function BulkImportSetupScreen({
       ]);
       if (!session) throw new Error("import session is unavailable");
       setCount(counts.pending);
+      // D-64: a locked batch always shows the lifecycle the driver applies.
+      const locked = bulkLifecycleLocked(counts)
+        ? sessionBatchLifecycle(session)
+        : null;
+      setLockedLifecycle(locked);
+      if (locked) {
+        setTrackingEnabled(locked.trackingEnabled);
+        setIntervalDays(locked.intervalDays);
+        setIntervalValid(true);
+      }
       if (!editedRef.current) {
         setCategoryId(session.batchCategoryId);
-        const saved = initialBulkLifecycle(session);
-        setTrackingEnabled(saved.trackingEnabled);
-        setIntervalDays(saved.intervalDays);
+        if (!locked) {
+          const saved = initialBulkLifecycle(session);
+          setTrackingEnabled(saved.trackingEnabled);
+          setIntervalDays(saved.intervalDays);
+        }
       }
       setCategories(nextCategories);
     } catch (error) {
@@ -173,7 +197,9 @@ export function BulkImportSetupScreen({
         route.params.sessionId,
         {
           categoryId: currentCategoryId,
-          lifecycle: bulkLifecycleChoice(trackingEnabled, intervalDays),
+          lifecycle:
+            lockedLifecycle ??
+            bulkLifecycleChoice(trackingEnabled, intervalDays),
         },
         localDateTime(),
       );
@@ -236,7 +262,8 @@ export function BulkImportSetupScreen({
       if (currentCategoryId !== categoryId) setCategoryId(currentCategoryId);
       // D-57: persist the batch choice BEFORE the combine commits, so an
       // import interrupted after this cluster resumes with the same defaults.
-      const lifecycle = bulkLifecycleChoice(trackingEnabled, intervalDays);
+      const lifecycle =
+        lockedLifecycle ?? bulkLifecycleChoice(trackingEnabled, intervalDays);
       await setSessionBatchDefaults(
         exec,
         route.params.sessionId,
@@ -314,7 +341,8 @@ export function BulkImportSetupScreen({
         </Text>
         {/* D-57: one lifecycle for the whole batch, Unbound by default. The
             selected option is accent-filled with an onAccent label (ADR-084,
-            as D-30). */}
+            as D-30). D-64: locked (disabled, with the reason) once any row of
+            the batch is resolved. */}
         <View
           accessibilityRole="radiogroup"
           accessibilityLabel="Orbit participation"
@@ -326,8 +354,16 @@ export function BulkImportSetupScreen({
               <Pressable
                 key={label}
                 accessibilityRole="radio"
-                accessibilityState={{ selected, checked: selected }}
+                accessibilityState={{
+                  selected,
+                  checked: selected,
+                  disabled: lifecycleLocked,
+                }}
                 accessibilityLabel={label}
+                accessibilityHint={
+                  lifecycleLocked ? BULK_LIFECYCLE_LOCKED_COPY : undefined
+                }
+                disabled={lifecycleLocked}
                 onPress={() => {
                   markEdited();
                   setTrackingEnabled(bound);
@@ -353,6 +389,14 @@ export function BulkImportSetupScreen({
             );
           })}
         </View>
+        {lifecycleLocked ? (
+          <Text
+            testID="bulk-import-lifecycle-locked"
+            style={[styles.blurb, { color: colors.textSecondary }]}
+          >
+            {BULK_LIFECYCLE_LOCKED_COPY}
+          </Text>
+        ) : null}
         {trackingEnabled ? (
           <>
             <Text style={[styles.label, { color: colors.textSecondary }]}>
@@ -365,6 +409,7 @@ export function BulkImportSetupScreen({
                 setIntervalDays(value);
               }}
               onValidityChange={setIntervalValid}
+              disabled={lifecycleLocked}
             />
             <Text style={[styles.blurb, { color: colors.textSecondary }]}>
               {BULK_BOUND_BLURB}

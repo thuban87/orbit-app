@@ -35,6 +35,11 @@ interface FrequencyPickerProps {
   label?: string;
   /** Stable testID root; children derive from it. */
   testID?: string;
+  /**
+   * Read-only: every chip, unit and the custom input ignore input and announce
+   * disabled (38.4 D-64, a locked bulk batch lifecycle). Off by default.
+   */
+  disabled?: boolean;
 }
 
 const PRESETS = Object.entries(FREQUENCY_DAYS) as [Frequency, number][];
@@ -52,6 +57,7 @@ export function FrequencyPicker({
   onValidityChange,
   label = "Contact frequency",
   testID = "frequency-picker",
+  disabled = false,
 }: FrequencyPickerProps) {
   const { colors } = useTheme();
 
@@ -112,8 +118,9 @@ export function FrequencyPicker({
               key={name}
               testID={`${testID}-preset-${name}`}
               accessibilityRole="button"
-              accessibilityState={{ selected }}
+              accessibilityState={{ selected, disabled }}
               accessibilityLabel={name}
+              disabled={disabled}
               onPress={() => selectPreset(days)}
               style={[
                 styles.chip,
@@ -137,8 +144,9 @@ export function FrequencyPicker({
         <Pressable
           testID={`${testID}-custom`}
           accessibilityRole="button"
-          accessibilityState={{ selected: customMode }}
+          accessibilityState={{ selected: customMode, disabled }}
           accessibilityLabel="Custom interval"
+          disabled={disabled}
           onPress={openCustom}
           style={[
             styles.chip,
@@ -163,6 +171,7 @@ export function FrequencyPicker({
               testID={`${testID}-custom-input`}
               accessibilityLabel="Custom interval value"
               value={customRaw}
+              editable={!disabled}
               onChangeText={changeCustomText}
               keyboardType="number-pad"
               placeholder="every N"
@@ -184,8 +193,9 @@ export function FrequencyPicker({
                     key={u}
                     testID={`${testID}-unit-${u}`}
                     accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
+                    accessibilityState={{ selected: active, disabled }}
                     accessibilityLabel={UNIT_LABELS[u]}
+                    disabled={disabled}
                     onPress={() => changeUnit(u)}
                     style={[
                       styles.unit,

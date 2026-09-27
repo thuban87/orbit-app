@@ -12,6 +12,7 @@ import {
   deferNeedsReviewCore,
   discardSession,
   finalizeSessionIfTerminal,
+  ImportBatchLifecycleLockedError,
   markRowStatus,
   resolveAlreadyLinkedCore,
   retireRowStagedPhoto,
@@ -373,6 +374,126 @@ describe("import session batch lifecycle (D-57)", () => {
       ),
     ).rejects.toThrow();
     expect(await sessionColumns(accepted.sessionId)).toEqual(before);
+  });
+
+  // 38.4 D-64 (owner; review A WR-02): one lifecycle per batch. Once any row
+  // of the session has left `pending`, a pass has run under the saved choice,
+  // so the Bound/Unbound choice and cadence are locked. The category is not.
+  describe("setSessionBatchDefaults lifecycle lock (D-64)", () => {
+    async function boundSessionWithResolvedRow(
+      resolve: (rowId: number) => Promise<void>,
+    ) {
+      const accepted = await acceptRows(["done", "waiting"]);
+      await setSessionBatchDefaults(
+        exec,
+        accepted.sessionId,
+        {
+          categoryId: null,
+          lifecycle: { trackingEnabled: true, intervalDays: 14 },
+        },
+        NOW,
+      );
+      await resolve(accepted.rowIds[0]);
+      return accepted;
+    }
+
+    const imported = async (rowId: number) => {
+      const contactId = await seedContact();
+      await inWriteTransaction(exec, () =>
+        setRowContactCore(exec, rowId, contactId, "imported", NOW),
+      );
+    };
+
+    it.each([
+      ["Bound → Unbound", UNBOUND_IMPORT],
+      [
+        "a different cadence",
+        { trackingEnabled: true as const, intervalDays: 30 },
+      ],
+    ])(
+      "rejects %s once a row is imported, and writes nothing",
+      async (_label, lifecycle) => {
+        const accepted = await boundSessionWithResolvedRow(imported);
+        const before = await sessionColumns(accepted.sessionId);
+        await expect(
+          setSessionBatchDefaults(
+            exec,
+            accepted.sessionId,
+            { categoryId: null, lifecycle },
+            "2026-09-27 12:00:00",
+          ),
+        ).rejects.toBeInstanceOf(ImportBatchLifecycleLockedError);
+        expect(await sessionColumns(accepted.sessionId)).toEqual(before);
+      },
+    );
+
+    it.each([
+      ["skipped", "skipped"],
+      ["failed", "failed"],
+      ["needs_review", "needs_review"],
+    ] as const)(
+      "locks once a row is %s (any row that has left pending)",
+      async (_label, status) => {
+        const accepted = await boundSessionWithResolvedRow((rowId) =>
+          markRowStatus(exec, rowId, status, null, NOW),
+        );
+        await expect(
+          setSessionBatchDefaults(
+            exec,
+            accepted.sessionId,
+            { categoryId: null, lifecycle: UNBOUND_IMPORT },
+            "2026-09-27 12:00:00",
+          ),
+        ).rejects.toBeInstanceOf(ImportBatchLifecycleLockedError);
+      },
+    );
+
+    it("still saves the unchanged lifecycle with a new category once locked", async () => {
+      const accepted = await boundSessionWithResolvedRow(imported);
+      const category = await exec.getFirstAsync<{ id: number }>(
+        "SELECT id FROM categories ORDER BY id LIMIT 1",
+      );
+      if (!category)
+        throw new Error("migration fixture did not seed a category");
+      await setSessionBatchDefaults(
+        exec,
+        accepted.sessionId,
+        {
+          categoryId: category.id,
+          lifecycle: { trackingEnabled: true, intervalDays: 14 },
+        },
+        "2026-09-27 12:00:00",
+      );
+      expect(await sessionColumns(accepted.sessionId)).toEqual({
+        batch_category_id: category.id,
+        batch_tracking_enabled: 1,
+        batch_interval_days: 14,
+        modified_at: "2026-09-27 12:00:00",
+      });
+    });
+
+    it("lets the lifecycle change while every row is still pending", async () => {
+      const accepted = await acceptRows(["a", "b"]);
+      await setSessionBatchDefaults(
+        exec,
+        accepted.sessionId,
+        {
+          categoryId: null,
+          lifecycle: { trackingEnabled: true, intervalDays: 14 },
+        },
+        NOW,
+      );
+      await setSessionBatchDefaults(
+        exec,
+        accepted.sessionId,
+        { categoryId: null, lifecycle: UNBOUND_IMPORT },
+        "2026-09-27 12:00:00",
+      );
+      expect(await sessionColumns(accepted.sessionId)).toMatchObject({
+        batch_tracking_enabled: 0,
+        batch_interval_days: null,
+      });
+    });
   });
 
   it("setSessionBatchDefaults throws for an unknown session", async () => {

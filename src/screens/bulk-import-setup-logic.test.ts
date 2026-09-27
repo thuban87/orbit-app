@@ -6,7 +6,9 @@ import { FREQUENCY_DAYS } from "@/types";
 import {
   BULK_BOUND_BLURB,
   BULK_IMPORT_DEFAULT_FREQUENCY,
+  BULK_LIFECYCLE_LOCKED_COPY,
   bulkLifecycleChoice,
+  bulkLifecycleLocked,
   initialBulkLifecycle,
 } from "./bulk-import-setup-logic";
 
@@ -105,8 +107,9 @@ describe("BulkImportSetupScreen lifecycle source contract (D-57)", () => {
     expect(combine.indexOf("setSessionBatchDefaults(")).toBeLessThan(
       combine.indexOf("combineCluster("),
     );
-    expect(combine).toContain(
-      "const lifecycle = bulkLifecycleChoice(trackingEnabled, intervalDays)",
+    // D-64: a locked batch writes the saved lifecycle, never an edited one.
+    expect(combine).toMatch(
+      /const lifecycle =\s*lockedLifecycle \?\?\s*bulkLifecycleChoice\(trackingEnabled, intervalDays\)/,
     );
     const combineArgs = combine.slice(combine.indexOf("combineCluster("));
     expect(combineArgs).toMatch(/\blifecycle,/);
@@ -178,5 +181,38 @@ describe("BulkImportSetupScreen lifecycle source contract (D-57)", () => {
     expect(screen).toContain("CategoryChoiceSheet");
     expect(screen).toContain("resolveCategorySelection");
     expect(screen).toContain("await listCategories(exec)");
+  });
+});
+
+/**
+ * 38.4 D-64 (owner; review A WR-02): the batch lifecycle locks once any row of
+ * the session has left `pending` — the same rule `setSessionBatchDefaults`
+ * enforces, so the screen never offers a change the DAO would reject.
+ */
+describe("bulkLifecycleLocked (D-64)", () => {
+  const none = {
+    pending: 3,
+    imported: 0,
+    linked: 0,
+    needs_review: 0,
+    failed: 0,
+    skipped: 0,
+  };
+
+  it("stays open while every row is pending", () => {
+    expect(bulkLifecycleLocked(none)).toBe(false);
+    expect(bulkLifecycleLocked({ ...none, pending: 0 })).toBe(false);
+  });
+
+  it.each(["imported", "linked", "needs_review", "failed", "skipped"] as const)(
+    "locks once a row is %s",
+    (status) => {
+      expect(bulkLifecycleLocked({ ...none, [status]: 1 })).toBe(true);
+    },
+  );
+
+  it("explains the lock in plain words", () => {
+    expect(BULK_LIFECYCLE_LOCKED_COPY).toMatch(/already/);
+    expect(BULK_LIFECYCLE_LOCKED_COPY.length).toBeGreaterThan(20);
   });
 });

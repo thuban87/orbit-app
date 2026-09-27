@@ -65,6 +65,21 @@ export class InvalidImportLifecycleError extends Error {
 }
 
 /**
+ * A bulk batch's lifecycle is locked (38.4 D-64, owner): once any row of the
+ * session has left `pending`, a pass has run under the saved Bound/Unbound
+ * choice and cadence, so changing it would leave the batch with mixed
+ * lifecycles.
+ */
+export class ImportBatchLifecycleLockedError extends Error {
+  constructor(sessionId: number) {
+    super(
+      `Import batch lifecycle is locked: session ${sessionId} already has resolved rows`,
+    );
+    this.name = "ImportBatchLifecycleLockedError";
+  }
+}
+
+/**
  * Reject a lifecycle that breaks the Bound ⇒ positive-cadence pairing (ADR-062)
  * or carries a cadence while Unbound. Every writer calls this before any write.
  */
@@ -470,6 +485,34 @@ export function completeSession(
   );
 }
 
+/**
+ * The lifecycle a stored session actually applies: Bound only with a positive
+ * integer cadence, else Unbound. Mirrors `sessionBatchLifecycle` in
+ * `import-session-read.ts` (which imports this module, so it cannot be reused
+ * here without a cycle).
+ */
+function effectiveSessionLifecycle(row: {
+  tracking: number;
+  days: number | null;
+}): ImportLifecycle {
+  if (
+    row.tracking === 1 &&
+    row.days !== null &&
+    Number.isInteger(row.days) &&
+    row.days > 0
+  ) {
+    return { trackingEnabled: true, intervalDays: row.days };
+  }
+  return UNBOUND_IMPORT;
+}
+
+function sameLifecycle(left: ImportLifecycle, right: ImportLifecycle): boolean {
+  return (
+    left.trackingEnabled === right.trackingEnabled &&
+    left.intervalDays === right.intervalDays
+  );
+}
+
 export interface SessionBatchDefaults {
   categoryId: number | null;
   lifecycle: ImportLifecycle;
@@ -480,6 +523,12 @@ export interface SessionBatchDefaults {
  * Setup calls this before any contact is created — on Import and on Combine —
  * so an interrupted import resumes with the same batch choice. The lifecycle
  * is validated first: an invalid one writes nothing.
+ *
+ * D-64 (owner): once any row of the session has left `pending`, the lifecycle
+ * is LOCKED. A write whose lifecycle differs from the session's effective one
+ * (the one `sessionBatchLifecycle` hands the driver) throws
+ * `ImportBatchLifecycleLockedError` and writes nothing. The category is not
+ * locked: the same lifecycle with a new category still saves.
  */
 export function setSessionBatchDefaults(
   exec: SqlExecutor,
@@ -493,6 +542,27 @@ export function setSessionBatchDefaults(
     return Promise.reject(error);
   }
   return inWriteTransaction(exec, async () => {
+    const resolved = await exec.getFirstAsync<{ count: number }>(
+      `SELECT COUNT(*) AS count FROM import_session_rows
+       WHERE session_id = ? AND row_status <> 'pending'`,
+      [sessionId],
+    );
+    if ((resolved?.count ?? 0) > 0) {
+      const current = await exec.getFirstAsync<{
+        tracking: number;
+        days: number | null;
+      }>(
+        `SELECT batch_tracking_enabled AS tracking, batch_interval_days AS days
+         FROM import_sessions WHERE id = ?`,
+        [sessionId],
+      );
+      if (
+        current &&
+        !sameLifecycle(effectiveSessionLifecycle(current), defaults.lifecycle)
+      ) {
+        throw new ImportBatchLifecycleLockedError(sessionId);
+      }
+    }
     const result = await exec.runAsync(
       `UPDATE import_sessions
        SET batch_category_id = ?, batch_tracking_enabled = ?,

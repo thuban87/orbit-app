@@ -9,7 +9,7 @@
  * resumed import — reads the same choice.
  */
 import { type ImportLifecycle, UNBOUND_IMPORT } from "@/db/import-session-dao";
-import type { ImportSession } from "@/db/import-session-read";
+import type { ImportSession, SessionRowCounts } from "@/db/import-session-read";
 import { FREQUENCY_DAYS } from "@/types";
 
 // --- Tunable constants (top-of-file per project convention) ------------------
@@ -24,6 +24,13 @@ export const BULK_IMPORT_DEFAULT_FREQUENCY = FREQUENCY_DAYS.Monthly;
  */
 export const BULK_BOUND_BLURB =
   "Bound adds every imported contact to your reminders at this frequency.";
+
+/**
+ * Shown (and read by TalkBack) while the batch lifecycle is locked (D-64). The
+ * owner reviews the wording on the device (Plan 17).
+ */
+export const BULK_LIFECYCLE_LOCKED_COPY =
+  "Some contacts from this import are already done, so the whole batch keeps this choice.";
 
 /**
  * The lifecycle setup saves: Bound with the picked frequency (or the default),
@@ -66,4 +73,23 @@ export function initialBulkLifecycle(
     trackingEnabled: session.batchTrackingEnabled,
     intervalDays: session.batchIntervalDays,
   };
+}
+
+/**
+ * Whether the batch lifecycle is locked (38.4 D-64, owner; review A WR-02):
+ * once any row of the session has left `pending`, a pass has already run under
+ * the saved choice, so Bound/Unbound and the cadence can no longer change and
+ * the batch never ends with mixed lifecycles. The same rule as the
+ * `setSessionBatchDefaults` backstop, so setup never offers a change the DAO
+ * would reject. The category is not locked.
+ */
+export function bulkLifecycleLocked(counts: SessionRowCounts): boolean {
+  return (
+    counts.imported +
+      counts.linked +
+      counts.needs_review +
+      counts.failed +
+      counts.skipped >
+    0
+  );
 }
