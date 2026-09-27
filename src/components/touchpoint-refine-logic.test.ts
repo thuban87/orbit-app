@@ -8,11 +8,14 @@
  * future combined datetime must be flagged. Tested here (node Vitest) since the
  * .tsx component imports react-native + the native picker and cannot load here.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   coerceAllowAi,
   combineDateAndTime,
   DURATION_PRESETS,
+  durationChipTone,
   formatDurationLabel,
   isCombinedInFuture,
   MAX_DURATION_SECONDS,
@@ -175,5 +178,47 @@ describe("coerceAllowAi (D-04 — defaults OFF)", () => {
   it("returns 1 only for an explicit on value", () => {
     expect(coerceAllowAi(1)).toBe(1);
     expect(coerceAllowAi(true)).toBe(1);
+  });
+});
+
+describe("durationChipTone (D-30)", () => {
+  it("fills the selected chip with the accent and labels it onAccent", () => {
+    expect(durationChipTone(true)).toEqual({
+      fill: "accent",
+      border: "accent",
+      label: "onAccent",
+    });
+  });
+
+  it("keeps unselected chips on the surface fill, the border and textPrimary", () => {
+    expect(durationChipTone(false)).toEqual({
+      fill: "surface",
+      border: "border",
+      label: "textPrimary",
+    });
+  });
+
+  it("drives every duration chip (each preset and None) in TouchpointRefineForm", () => {
+    const source = readFileSync(
+      join(__dirname, "TouchpointRefineForm.tsx"),
+      "utf8",
+    );
+    const start = source.indexOf('case "duration":');
+    const end = source.indexOf("<TextInput", start);
+    const block = source.slice(start, end);
+    // One tone for the mapped presets, one for None.
+    expect(block.match(/durationChipTone\(/g)?.length).toBe(2);
+    expect(block.match(/backgroundColor: colors\[\w+\.fill\]/g)?.length).toBe(
+      2,
+    );
+    expect(block.match(/borderColor: colors\[\w+\.border\]/g)?.length).toBe(2);
+    expect(block.match(/color: colors\[\w+\.label\]/g)?.length).toBe(2);
+    expect(block).not.toMatch(/selected \? colors\.accent : colors\.border/);
+    // Accessibility state and the 44dp chip style are unchanged.
+    expect(block).toContain("accessibilityState={{ selected }}");
+    expect(block).toContain(
+      "accessibilityState={{ selected: value.duration === null }}",
+    );
+    expect(block.match(/styles\.chip,/g)?.length).toBe(2);
   });
 });
