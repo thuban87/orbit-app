@@ -62,11 +62,20 @@ function parseResolution(markdown: string): ResolutionRow[] {
   return rows;
 }
 
+/**
+ * Rows whose Plan 16 `accentText` swap a later owner ruling superseded with a
+ * different, non-accent role. The anchored site must now read that token.
+ * D-69 (owner, 2026-09-27): the "Enter a real date…" birthday errors on Import
+ * Review and Bulk Review are errors, so they read `danger`.
+ */
+const SUPERSEDED_STATUS = /^superseded — D-(\d+): reads (\w+)$/;
+
 /** null when the anchored site reads accentText; otherwise the failure. */
 function checkDoneSite(
   source: string,
   anchor: string,
   offset: number,
+  expected = "accentText",
 ): string | null {
   const lines = source.split("\n");
   const hits = lines.flatMap((line, index) =>
@@ -81,8 +90,8 @@ function checkDoneSite(
   if (!found)
     return `line ${siteIndex + 1} has no foreground colour: ${site.trim()}`;
   const token = found[1] ?? found[2];
-  if (FILL_AS_TEXT.test(site) || token !== "accentText")
-    return `line ${siteIndex + 1} uses ${token}, not accentText: ${site.trim()}`;
+  if (FILL_AS_TEXT.test(site) || token !== expected)
+    return `line ${siteIndex + 1} uses ${token}, not ${expected}: ${site.trim()}`;
   return null;
 }
 
@@ -108,15 +117,50 @@ describe("accent-text role swap contract (Plan 16, RG-029, ADR-084)", () => {
             row.status,
           ) ||
           row.status.startsWith("kept — not a text/glyph foreground") ||
+          SUPERSEDED_STATUS.test(row.status) ||
           row.status.startsWith("excluded — Orrery canvas (E-5"),
         `${row.id}: ${row.status}`,
       ).toBe(true);
     }
   });
 
-  it("covers the 64 swapped sites", () => {
-    expect(done.length).toBe(64);
+  it("covers the 62 swapped sites (64 less the two D-69 supersessions)", () => {
+    expect(done.length).toBe(62);
   });
+
+  const superseded = rows.filter((row) => SUPERSEDED_STATUS.test(row.status));
+
+  it("records the D-69 birthday errors as superseded to danger", () => {
+    expect(
+      superseded.map((row) => [row.id, row.file, row.status]).sort(),
+    ).toEqual([
+      [
+        "M29",
+        "src/screens/BulkReviewScreen.tsx",
+        "superseded — D-69: reads danger",
+      ],
+      [
+        "M5",
+        "src/screens/ImportReviewScreen.tsx",
+        "superseded — D-69: reads danger",
+      ],
+    ]);
+  });
+
+  it.each(superseded.map((row) => [row.id, row] as const))(
+    "%s reads its superseding token at its anchored site",
+    (_id, row) => {
+      const token = (row.status.match(SUPERSEDED_STATUS) as RegExpMatchArray)[2];
+      expect(
+        checkDoneSite(
+          readFileSync(join(ROOT, row.file), "utf8"),
+          row.anchor as string,
+          row.offset as number,
+          token,
+        ),
+      ).toBeNull();
+    },
+  );
 
   it.each(done.map((row) => [row.id, row] as const))(
     "%s reads accentText at its anchored site",
