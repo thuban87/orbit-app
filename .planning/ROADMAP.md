@@ -1193,12 +1193,12 @@ Plans:
 
 **Goal**: Resolve remaining code-detectable UI/design-system inconsistencies, accessibility defects, bounded performance/resource issues, and small production-hygiene problems without redesigning Orbit or reopening accepted visual/product decisions.
 **Depends on**: Phase 38.3
-**Requirements**: RG-008, RG-027, RG-028, RG-029, RG-030, RG-031, RG-033, RG-034, RG-036, RG-037, RG-038, RG-039, RG-040, RG-041, WI-O-3, WI-A-WR-05, WI-W2, WI-W3, GAP-G2 (owner-reported Contacts freeze, D-33) (RG-032 deferred to the widget-overhaul phase, D-16); packet-qualified finding IDs preserved in each plan
+**Requirements**: RG-008, RG-027, RG-028, RG-029, RG-030, RG-031, RG-033, RG-034, RG-036, RG-037, RG-038, RG-039, RG-040, RG-041, WI-O-3, WI-A-WR-05, WI-W2, WI-W3, GAP-G2 (owner-reported Contacts freeze, D-33), OA-C1, OA-C2, OA-C3, OA-B2, OA-D1, OA-D3, OA-D4, OA-E1, OA-E3 (owner accounting rulings 2026-09-27, D-44..D-52) (RG-032 deferred to the widget-overhaul phase, D-16); packet-qualified finding IDs preserved in each plan
 **Success Criteria**: Defined at planning; targeted Android manual visual/device pass (narrow widths, large text, Standard/Galaxy, TalkBack, touch targets, widget semantics, FAB states, launcher); performance claims from physical-device measurement only
 **Scope source**: docs/dossier/milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; ADR-115 + ADR-087 (surface/glass authority)
 **UI hint**: yes
-**Plans**: 15/20 plans executed in 7 waves
+**Plans**: 15/25 plans executed in 8 waves
 
 Plans:
 **Wave 1**
@@ -1228,17 +1228,25 @@ Plans:
 
 - [ ] 38.4-15-PLAN.md — Workstream I W3/O-1 investigation + evidence-gated mitigation; D-25 native-remedy owner decision (checkpoint)
 - [x] 38.4-18-PLAN.md — Gap G1: Sheet compact/detail body scrolls at large text so actions stay reachable (D-32; RG-034 follow-on)
-- [ ] 38.4-19-PLAN.md — Gap G2: Contacts population/filter/sort freeze — device repro, root cause, test-first fix; Profile-swipe check (D-33; GAP-G2)
+- [ ] 38.4-19-PLAN.md — Gap G2: Contacts population/filter/sort freeze — device repro, root cause, test-first fix; Profile-swipe check; E1 count vs List vs Card check folded in (D-33, D-51; GAP-G2, OA-E1)
+- [ ] 38.4-21-PLAN.md — AI Data Permissions counts reconcile: list line + per-contact AI-accessible counts (D-44; OA-C1)
+- [ ] 38.4-22-PLAN.md — Profile Off Limits edit opens the Update Contact entry editor (shared component, ADR-150 scoped controller kept); FuelEditor consumers surfaced (D-46; OA-C3)
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [ ] 38.4-16-PLAN.md — Glass-scope consumer follow-through: placeholder sweep + on-glass accent-text roles (RG-029; D-24). The F-1 bare-text scrim task was cancelled by D-38 (moved to Phase 38.5)
+- [ ] 38.4-23-PLAN.md — Resume prompts scroll their body at large text + pending-confirmations check; layout editor live preview hidden (D-49, D-47; OA-D3, OA-B2)
+- [ ] 38.4-24-PLAN.md — Native dialogs follow Orbit's light/dark mode; storage-permission audit, removed only if proven unused (D-50, D-48; OA-D4, OA-D1)
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
 - [ ] 38.4-20-PLAN.md — Gap G3: glass-scope read-site sweep + AST contract; filled duration chip, font/import nits moved from Plan 16 (D-34, D-30; RG-029, RG-030, RG-031)
 
-**Wave 7** *(blocked on Wave 6 completion and the D-37 phase code review/fix pass)*
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 38.4-25-PLAN.md — FAB bottom clearance on every FAB-bearing scroll screen (route-derived contract); FAB border on Backup settings (D-52, D-45; OA-E3, OA-C2)
+
+**Wave 8** *(blocked on Wave 7 completion and the D-37 phase code review/fix pass)*
 
 - [ ] 38.4-17-PLAN.md — Phase gate, debug + one release build, targeted device pass and owner checklist (all)
 
@@ -1250,6 +1258,7 @@ Plans:
 > - Plan 16's F-1 task now enumerates every bare foreground first (D-36), and also scrims Standard Dark on all four backgrounds (D-35).
 > - **Close-out order (D-37):** all code plans through 38.4-20 → the gsd code review of the phase, plus its fixes (run by the orchestrator between waves 6 and 7) → Plan 17's device pass on the reviewed code (wave 7; it re-runs the gate on HEAD but does not redo the review) → verification.
 > **Re-scoped 2026-09-26 (owner rulings D-38..D-41) — still 20 plans, 7 waves.** Bare text on the background art (F-1) leaves 38.4 for the new Phase 38.5 (D-38 supersedes D-29/D-35/D-36). Plan 16's scrim task is cancelled, so Plan 16 is back to its two original tasks (still wave 5, behind Plan 19). Plan 17 drops the scrim device rows and treats bare-text observations as 38.5 inputs, not failures.
+> **Re-planned 2026-09-27 (owner accounting rulings D-43..D-53) — 25 plans, 8 waves.** D-42 and the Plan 03 OverflowMenu reset are owner-approved (D-43). Gap plans 21 (D-44) and 22 (D-46) join wave 4; 23 (D-49, D-47) and 24 (D-50, D-48) are wave 5; 25 (D-52, D-45) is a new wave 7 after Plan 20; E1 (D-51) folds into Plan 19. The D-37 order is unchanged: the code review now runs between waves 7 and 8, and Plan 17 is wave 8. E2 is excluded pending an owner question; D2 (`npm audit`) is triaged outside the plans (D-53).
 
 ### Phase 38.5: Background Art & Text-on-Art Contrast (INSERTED)
 
@@ -1319,7 +1328,7 @@ Plans:
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
-| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 15/20 | In Progress|  |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 15/25 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 0/TBD | Deferred planning (needs discuss; D-40 sheet first) | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
