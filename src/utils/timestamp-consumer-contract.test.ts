@@ -44,6 +44,13 @@ const CONSUMERS: readonly Consumer[] = [
     // The "When" field (no date context on the screen, so date-time).
     minCalls: 1,
   },
+  {
+    path: "src/screens/GroupEventsScreen.tsx",
+    formatters: ["formatDateTimeMinuteOrFallback"],
+    // Each Events list row's date-time caption (38.4 Plan 12). Rows span many
+    // days, so date-time; the row's accessible name carries no time.
+    minCalls: 1,
+  },
 ];
 
 /** Substring extraction of the stored string's `HH:MM` characters (11..16). */
@@ -109,5 +116,12 @@ describe("timestamp consumer contract (RG-038)", () => {
       /label="When"\s+value=\{formatDateTimeMinuteOrFallback\(event\.occurredAt\)\}/,
     );
     expect(source).not.toMatch(/value=\{event\.occurredAt\}/);
+  });
+
+  it("GroupEventsScreen formats each row's time through the shared formatter, with no local 24-hour helper", () => {
+    const source = read("src/screens/GroupEventsScreen.tsx");
+    expect(source).not.toMatch(/function\s+displayDateTime\s*\(/);
+    expect(source).not.toMatch(/\.slice\(\s*0\s*,\s*5\s*\)/);
+    expect(source).toContain("formatDateTimeMinuteOrFallback(item.occurredAt)");
   });
 });
