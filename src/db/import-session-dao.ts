@@ -470,23 +470,6 @@ export function completeSession(
   );
 }
 
-export function setSessionBatchCategory(
-  exec: SqlExecutor,
-  sessionId: number,
-  categoryId: number | null,
-  now: string,
-): Promise<void> {
-  return inWriteTransaction(exec, async () => {
-    const result = await exec.runAsync(
-      `UPDATE import_sessions
-       SET batch_category_id = ?, modified_at = ?
-       WHERE id = ?`,
-      [categoryId, now, sessionId],
-    );
-    assertOneChange(result, "setSessionBatchCategory", sessionId);
-  });
-}
-
 export interface SessionBatchDefaults {
   categoryId: number | null;
   lifecycle: ImportLifecycle;

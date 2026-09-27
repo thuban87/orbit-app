@@ -7,7 +7,6 @@ import { readPromptContext } from "@/db/ai-context-read";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import {
   acceptImportSessionWithRows,
-  setSessionBatchCategory,
   setSessionBatchDefaults,
   UNBOUND_IMPORT,
 } from "@/db/import-session-dao";
@@ -209,7 +208,12 @@ describe("runImportBatch", () => {
         sourcePayload: payload("Categorized"),
       },
     ]);
-    await setSessionBatchCategory(exec, session.sessionId, category.id, NOW);
+    await setSessionBatchDefaults(
+      exec,
+      session.sessionId,
+      { categoryId: category.id, lifecycle: UNBOUND_IMPORT },
+      NOW,
+    );
 
     await runImportBatch(exec, { sessionId: session.sessionId, now: NOW });
     expect(await listSessionRows(exec, session.sessionId)).toEqual(

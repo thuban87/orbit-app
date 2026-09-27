@@ -4,6 +4,7 @@ vi.mock("expo-sqlite", () => ({}));
 
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import * as importSessionDao from "@/db/import-session-dao";
 import {
   acceptImportSessionWithRows,
   assertImportLifecycle,
@@ -16,7 +17,6 @@ import {
   retireRowStagedPhoto,
   setRowContactCore,
   setRowMatchOutcomeCore,
-  setSessionBatchCategory,
   setSessionBatchDefaults,
   UNBOUND_IMPORT,
 } from "@/db/import-session-dao";
@@ -205,27 +205,12 @@ describe("import-session-dao", () => {
     ).toEqual({ status: "pending" });
   });
 
-  it("durably updates a session batch category, including the Uncategorized null", async () => {
-    const accepted = await acceptRows(["category"]);
-    const category = await exec.getFirstAsync<{ id: number }>(
-      "SELECT id FROM categories ORDER BY id LIMIT 1",
-    );
-    if (!category) throw new Error("migration fixture did not seed a category");
-
-    await setSessionBatchCategory(exec, accepted.sessionId, category.id, NOW);
-    expect(
-      await exec.getFirstAsync<{ batch_category_id: number | null }>(
-        "SELECT batch_category_id FROM import_sessions WHERE id = ?",
-        [accepted.sessionId],
-      ),
-    ).toEqual({ batch_category_id: category.id });
-    await setSessionBatchCategory(exec, accepted.sessionId, null, NOW);
-    expect(
-      await exec.getFirstAsync<{ batch_category_id: number | null }>(
-        "SELECT batch_category_id FROM import_sessions WHERE id = ?",
-        [accepted.sessionId],
-      ),
-    ).toEqual({ batch_category_id: null });
+  // 38.4 review Lane A IN-03: D-57 writes the batch category and lifecycle in
+  // ONE update (setSessionBatchDefaults). A category-only writer bypassed that
+  // rule and had no production caller, so it is gone.
+  it("exports no category-only batch writer", () => {
+    expect(importSessionDao).not.toHaveProperty("setSessionBatchCategory");
+    expect(importSessionDao).toHaveProperty("setSessionBatchDefaults");
   });
 
   it("retires only a row's staged-photo reference and updates its timestamp", async () => {

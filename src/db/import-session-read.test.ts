@@ -15,7 +15,6 @@ import {
   markRowStatus,
   resolveAlreadyLinked,
   setRowContact,
-  setSessionBatchCategory,
   setSessionBatchDefaults,
   UNBOUND_IMPORT,
 } from "@/db/import-session-dao";
@@ -111,10 +110,10 @@ describe("import-session-read", () => {
       );
       if (!category)
         throw new Error("migration fixture did not seed a category");
-      await setSessionBatchCategory(
+      await setSessionBatchDefaults(
         firstExec,
         accepted.sessionId,
-        category.id,
+        { categoryId: category.id, lifecycle: UNBOUND_IMPORT },
         NOW,
       );
       first.close();
