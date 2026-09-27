@@ -371,34 +371,34 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
     Plan 21.
 -   **[DECIDED · 2026-09-27] D-45 --- The FAB gets a border on Backup
     settings only,** in a theme-token colour, so it stays distinct over
-    that screen's accent buttons. Plan 25.
+    that screen's accent buttons. Plan 21.
 -   **[DECIDED · 2026-09-27] D-46 --- The Profile's Off Limits edit opens
     the Update Contact entry editor,** not the Fuel editor with its Kind
     picker. This changes ADR-150's editor-UI choice for the Profile
     path; its scoped-write safety (filtered reads, forced kind,
     validated edits and deletes) is kept. Fuel is not retired, and the
     Fuel editor stays in Create/Edit Contact. Its remaining uses go to
-    the owner, and a superseding ADR is due at KB extraction. Plan 22.
+    the owner, and a superseding ADR is due at KB extraction. Plan 21.
 -   **[DECIDED · 2026-09-27] D-47 --- The layout editor's live preview
-    is hidden,** behind a flag rather than deleted. Plan 23.
+    is hidden,** behind a flag rather than deleted. Plan 21.
 -   **[DECIDED · 2026-09-27] D-48 --- The storage permission pair
     (`READ/WRITE_EXTERNAL_STORAGE`, `maxSdkVersion 32`) is removed only
     if proven 100% unused;** otherwise it is kept, with the evidence
-    surfaced. Authored config only. Plan 24.
+    surfaced. Authored config only. Plan 22.
 -   **[DECIDED · 2026-09-27] D-49 --- The resume-import and
     resume-check prompts scroll their body at large text,** and the
-    pending-confirmations sheet is checked. Plan 23.
+    pending-confirmations sheet is checked. Plan 21.
 -   **[DECIDED · 2026-09-27] D-50 --- Native dialogs and pickers follow
     Orbit's light/dark mode.** Orbit's own System mode must keep
     following the device. No new native package without a checkpoint.
-    Plan 24.
+    Plan 22.
 -   **[DECIDED · 2026-09-27] D-51 --- Contacts count vs List vs Card is
     investigated** within the G2 plan. The header count is by design the
     contacted-live count (Phase 26); a List/Card divergence is fixed.
     Plan 19.
 -   **[DECIDED · 2026-09-27] D-52 --- Every FAB-bearing scrolling screen
     gets bottom clearance** so the last item scrolls clear of the FAB,
-    enforced by a route-derived contract. Plan 25.
+    enforced by a route-derived contract. Plan 21.
 -   **[DECIDED · 2026-09-27] D-53 --- Not planned:** `npm audit` is
     triaged separately by the orchestrator; an import-time Bound/Unbound
     choice (E2) is excluded pending an owner question.
@@ -427,3 +427,8 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
 -   2026-09-27 --- accounting-list rulings: D-43 approves D-42 and the
     Plan 03 OverflowMenu reset; D-44..D-52 add gap plans 21-25 and fold
     E1 into Plan 19; D-53 records what is not planned.
+-   2026-09-27 --- plan consolidation (CLAUDE.md "Plan sizing"; no
+    decision change): gap plans 21-25 become Plan 21 (UI fixes: D-44,
+    D-45, D-46, D-47, D-49, D-52) and Plan 22 (platform config: D-48,
+    D-50). Plan 21's D-46 tasks wait on two open owner questions (the
+    ADR-150 editor reversal, and Create/Edit Contact scope).
