@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.4
 current_phase_name: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
 status: executing
-stopped_at: Completed 38.4-18-PLAN.md
-last_updated: "2026-09-27T03:25:00.000Z"
-last_activity: 2026-09-26
-last_activity_desc: "38.4-18 complete (out of order; 15/16 still open) — G1/D-32: Sheet compact/detail body is a bounded ScrollView (SHEET_BODY_SCROLLS, scrollBody opt-out in OrreryContactsSheet/DateDetailSheet/ProfileRelationshipSheets, repo-wide sheet-consumers-contract); D-42 A open FAB dial hides Snackbar/AssistBanner (fabDialBackgroundA11y); D-42 B heatmap cellHitSlop capped at gap midpoint; D-42 C app.json name/slug Orbit/orbit (resolved config identical); 4875 tests, tsc/colors clean; device legs in Plan 17"
+stopped_at: Completed 38.4-19-PLAN.md
+last_updated: "2026-09-27T07:10:00.000Z"
+last_activity: 2026-09-27
+last_activity_desc: "38.4-19 complete — G2/D-33: the Contacts freeze was the FAB dial container re-forming (Fabric flatten + Android re-create) without pointerEvents box-none after every dial close, a full-screen touch sink until cold start; collapsable={false} on UniversalFab dial/Snackbar/AssistBanner roots, AST contract dashboard-controls-responsiveness.test.ts; controls path cleared on device; D-55 header = displayed List/Card rows (dashboardHeaderCount); E SAME CAUSE; 4890 tests, tsc/colors clean; 6/6 device reps per control + 5/5 FAB cycles on the Pixel 3a"
 state_head: 24a20eb104961d98f7d9058433f2e2ba6fbfdd71
 progress:
   total_phases: 27
   completed_phases: 17
   total_plans: 241
-  completed_plans: 231
+  completed_plans: 232
 carried_forward:
 
   - "38.3 owner dispositions (2026-09-26, not passes): UAT-023a widget leg DEFERRED to the widget-overhaul phase; UAT-042 A-then-B chronology, UAT-024b month/year rollover, UAT-026b in-range keep and UAT-022 warm-Mark-while-backgrounded ACCEPTED-RISK (unit tests only). O-3 → homed in 38.4 Workstream I (D-10)."
@@ -43,7 +43,7 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 38.4 (UI Consistency, Accessibility, Performance & Release Polish (INSERTED)) — EXECUTING
-Plan: 15 of 23
+Plan: 15 of 23 (next; 16/23 complete — 01–14, 18, 19)
 Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
@@ -852,6 +852,8 @@ Foundational decisions affecting current work:
 - [Phase 38.4]: 38.4-14: one shared isForegroundVisible/isAppBackgrounded predicate (src/utils/screen-visibility.ts) gates Home, Digest and Profile refresh over synchronous AppState.currentState; Profile gates only its shell tick (foreground tick fires post-resume)
 - [Phase 38.4]: 38.4-14: favourite toggle issues a non-deferrable reload("favourite") after commit (stale reads retired, counts re-read) with dashboardFadeStart=1; un-starring in the Favourites population now removes the row when the read lands
 - [Phase 38.4]: 38.4-18: Sheet compact/detail bodies scroll inside the percent cap (flexGrow 0 / flexShrink 1); consumers owning a ScrollView pass scrollBody={false} (exact set pinned by sheet-consumers-contract); expanded unchanged (D-32)
+- [Phase 38.4]: 38.4-19: G2 root cause = FAB dial container re-formed by Fabric/Android without pointerEvents box-none (touch sink below the FAB); rule: a static box-none View whose a11y props toggle is collapsable={false} (AST contract); Contacts controls path exonerated on device
+- [Phase 38.4]: 38.4-19: D-55 — Contacts header counts the rows the active view displays (List rows / Card rows incl. selection subset), hidden on error, initial skeleton and zero rows; countLiveContacts only feeds the empty state
 - [Phase 38.4]: 38.4-18: D-42 (owner defaults) — open dial hides same-window Snackbar/AssistBanner (RN Modal prompts exempt); heatmap hitSlop capped at floor(gap/2) per side; app.json name/slug set to resolved Orbit/orbit, userInterfaceStyle left as-is
 
 ### Pending Todos
@@ -919,8 +921,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-27T03:25:00.000Z
-**Stopped at:** Completed 38.4-18-PLAN.md
+**Last session:** 2026-09-27T07:10:00.000Z
+**Stopped at:** Completed 38.4-19-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
