@@ -1,6 +1,6 @@
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { finalizeSessionIfTerminal } from "@/db/import-session-dao";
 import {
@@ -236,139 +236,147 @@ export function ImportCompleteScreen({
     photoRows: photoRows.length,
   });
 
+  // D-67 (owner): at large text the summary outgrows the screen, so the
+  // content scrolls and the actions sit after the scroll region, always
+  // reachable (the D-49 resume-prompt shape).
   return (
     <View testID="import-complete-screen" style={styles.root}>
-      <Text
-        accessibilityRole="header"
-        style={[styles.title, { color: colors.textPrimary }]}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.scrollContent}
       >
-        Import complete
-      </Text>
-
-      <View style={styles.counts}>
-        <View
-          style={[
-            styles.footerEntry,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-            {`Imported (${counts.imported})`}
-          </Text>
-          <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
-            {contactLabel(counts.imported)}
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.footerEntry,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-            {`Already in Orbit (${counts.alreadyInOrbit})`}
-          </Text>
-          <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
-            {contactLabel(counts.alreadyInOrbit)}
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.footerEntry,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-            {`Need review (${counts.needReview})`}
-          </Text>
-          <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
-            {contactLabel(counts.needReview)}
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.footerEntry,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-            {`Failed / skipped (${counts.failedOrSkipped})`}
-          </Text>
-          <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
-            {contactLabel(counts.failedOrSkipped)}
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.footerEntry,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-            {`${counts.nameRequiredSkipped} skipped — no name`}
-          </Text>
-          <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
-            {contactLabel(counts.nameRequiredSkipped)}
-          </Text>
-        </View>
-        <View
-          style={[
-            styles.footerEntry,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
-          <Text style={[styles.footerText, { color: colors.textPrimary }]}>
-            {`${counts.birthdayUnreadable} birthdays couldn't be read`}
-          </Text>
-          <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
-            {contactLabel(counts.birthdayUnreadable)}
-          </Text>
-        </View>
-      </View>
-
-      {actionNotice ? (
         <Text
-          testID="import-complete-action-notice"
-          accessibilityLiveRegion="polite"
-          style={[styles.body, { color: colors.danger }]}
+          accessibilityRole="header"
+          style={[styles.title, { color: colors.textPrimary }]}
         >
-          {actionNotice}
+          Import complete
         </Text>
-      ) : null}
 
-      {retryState.visible ? (
-        <View style={styles.retryBlock}>
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            {retryState.message}
-          </Text>
-          <Pressable
-            testID="import-complete-retry"
-            accessibilityRole="button"
-            accessibilityLabel="Retry unfinished imports"
-            disabled={retrying}
-            onPress={() => void retry()}
-            style={[styles.secondaryButton, { borderColor: colors.accent }]}
+        <View style={styles.counts}>
+          <View
+            style={[
+              styles.footerEntry,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
           >
-            <Text style={{ color: colors.accentText }}>
-              {retrying ? "Retrying…" : "Retry"}
+            <Text style={[styles.footerText, { color: colors.textPrimary }]}>
+              {`Imported (${counts.imported})`}
             </Text>
-          </Pressable>
-          {photoRows.length > 0 ? (
+            <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
+              {contactLabel(counts.imported)}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.footerEntry,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.footerText, { color: colors.textPrimary }]}>
+              {`Already in Orbit (${counts.alreadyInOrbit})`}
+            </Text>
+            <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
+              {contactLabel(counts.alreadyInOrbit)}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.footerEntry,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.footerText, { color: colors.textPrimary }]}>
+              {`Need review (${counts.needReview})`}
+            </Text>
+            <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
+              {contactLabel(counts.needReview)}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.footerEntry,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.footerText, { color: colors.textPrimary }]}>
+              {`Failed / skipped (${counts.failedOrSkipped})`}
+            </Text>
+            <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
+              {contactLabel(counts.failedOrSkipped)}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.footerEntry,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.footerText, { color: colors.textPrimary }]}>
+              {`${counts.nameRequiredSkipped} skipped — no name`}
+            </Text>
+            <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
+              {contactLabel(counts.nameRequiredSkipped)}
+            </Text>
+          </View>
+          <View
+            style={[
+              styles.footerEntry,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <Text style={[styles.footerText, { color: colors.textPrimary }]}>
+              {`${counts.birthdayUnreadable} birthdays couldn't be read`}
+            </Text>
+            <Text style={[styles.countDetail, { color: colors.textSecondary }]}>
+              {contactLabel(counts.birthdayUnreadable)}
+            </Text>
+          </View>
+        </View>
+
+        {actionNotice ? (
+          <Text
+            testID="import-complete-action-notice"
+            accessibilityLiveRegion="polite"
+            style={[styles.body, { color: colors.danger }]}
+          >
+            {actionNotice}
+          </Text>
+        ) : null}
+
+        {retryState.visible ? (
+          <View style={styles.retryBlock}>
+            <Text style={[styles.body, { color: colors.textSecondary }]}>
+              {retryState.message}
+            </Text>
             <Pressable
-              testID="import-complete-skip-photos"
+              testID="import-complete-retry"
               accessibilityRole="button"
-              accessibilityLabel="Skip remaining photos"
+              accessibilityLabel="Retry unfinished imports"
               disabled={retrying}
-              onPress={() => void skipPhotos()}
-              style={[styles.secondaryButton, { borderColor: colors.border }]}
+              onPress={() => void retry()}
+              style={[styles.secondaryButton, { borderColor: colors.accent }]}
             >
-              <Text style={{ color: colors.textPrimary }}>
-                Skip remaining photos
+              <Text style={{ color: colors.accentText }}>
+                {retrying ? "Retrying…" : "Retry"}
               </Text>
             </Pressable>
-          ) : null}
-        </View>
-      ) : null}
+            {photoRows.length > 0 ? (
+              <Pressable
+                testID="import-complete-skip-photos"
+                accessibilityRole="button"
+                accessibilityLabel="Skip remaining photos"
+                disabled={retrying}
+                onPress={() => void skipPhotos()}
+                style={[styles.secondaryButton, { borderColor: colors.border }]}
+              >
+                <Text style={{ color: colors.textPrimary }}>
+                  Skip remaining photos
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+      </ScrollView>
 
       <View style={styles.actions}>
         {counts.needReview > 0 ? (
@@ -442,8 +450,10 @@ const styles = StyleSheet.create({
   },
   footerText: { fontSize: 16, fontWeight: "600" },
   countDetail: { fontSize: 13 },
+  scroll: { flexGrow: 1, flexShrink: 1 },
+  scrollContent: { gap: 16 },
   retryBlock: { gap: 8 },
-  actions: { gap: 10, marginTop: "auto" },
+  actions: { gap: 10 },
   secondaryButton: {
     minHeight: 44,
     justifyContent: "center",

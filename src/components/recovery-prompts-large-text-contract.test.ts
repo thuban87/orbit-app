@@ -169,3 +169,59 @@ describe("PendingConfirmationsSheet keeps every confirmation reachable (D-49)", 
     expect(emptyBranch).not.toMatch(/<ScrollView\b/);
   });
 });
+
+/**
+ * Import Complete at large text (38.4 D-67, owner; review C WR-02). The loaded
+ * summary stacks a title, six count cards, a notice and a retry block above
+ * its actions. It takes the D-49 shape: the content scrolls in one bounded
+ * ScrollView and the actions (Review possible matches, View contact, Done) sit
+ * after it, outside the scroll, so they are always on screen and reachable.
+ */
+describe("Import Complete keeps Done and Review reachable at large text (D-67)", () => {
+  const text = source("src/screens/ImportCompleteScreen.tsx");
+  const screenStart = text.indexOf('testID="import-complete-screen"');
+  const loaded = text.slice(screenStart);
+
+  it("finds the loaded summary branch", () => {
+    expect(screenStart).toBeGreaterThan(-1);
+  });
+
+  it("scrolls the title, counts, notice and retry block inside one ScrollView", () => {
+    const opens = [...loaded.matchAll(/<ScrollView\b/g)];
+    expect(opens).toHaveLength(1);
+    const open = opens[0].index ?? -1;
+    const close = loaded.indexOf("</ScrollView>", open);
+    expect(close).toBeGreaterThan(open);
+    const opener = loaded.slice(open, loaded.indexOf(">", open) + 1);
+    const styleName = /\bstyle=\{styles\.(\w+)\}/.exec(opener)?.[1];
+    expect(styleName, "ScrollView style binding").toBeDefined();
+    expect(styleBody(text, styleName ?? "")).toMatch(/flexShrink:\s*1\b/);
+    const inside = loaded.slice(open, close);
+    for (const fragment of [
+      "Import complete",
+      "Imported (",
+      "birthdays couldn't be read",
+      'testID="import-complete-action-notice"',
+      'testID="import-complete-retry"',
+      'testID="import-complete-skip-photos"',
+    ]) {
+      expect(inside, fragment).toContain(fragment);
+    }
+    expect(text).toMatch(
+      /import \{[^}]*\bScrollView\b[^}]*\} from "react-native"/,
+    );
+  });
+
+  it("renders Review, View contact and Done after the scroll region", () => {
+    const close = loaded.indexOf("</ScrollView>");
+    expect(close).toBeGreaterThan(-1);
+    for (const id of [
+      'testID="import-complete-review"',
+      'testID="import-complete-view-contact"',
+      'testID="import-complete-done"',
+    ]) {
+      const at = loaded.indexOf(id);
+      expect(at, id).toBeGreaterThan(close);
+    }
+  });
+});
