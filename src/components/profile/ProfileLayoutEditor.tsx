@@ -48,6 +48,13 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 
+/**
+ * D-47 (owner, 2026-09-27; OA-B2): the layout editor's live preview is hidden.
+ * Flip to `true` to restore it. `ProfileLayoutPreview` stays exported and its
+ * geometry (ui-accessibility/AUD-UIA-021) stays tested.
+ */
+const PROFILE_LAYOUT_PREVIEW_VISIBLE = false;
+
 type EditorPage = "chooser" | "editor";
 
 export interface ProfileLayoutEditorProps {
@@ -410,7 +417,9 @@ export function ProfileLayoutEditor({
               Drag a handle or use Move up and Move down. Every section stays in
               its parent.
             </AppText>
-            <ProfileLayoutPreview layout={draft} />
+            {PROFILE_LAYOUT_PREVIEW_VISIBLE ? (
+              <ProfileLayoutPreview layout={draft} />
+            ) : null}
             <AppText role="label">Profile sections</AppText>
             <ReorderableBucket
               parent="profile"

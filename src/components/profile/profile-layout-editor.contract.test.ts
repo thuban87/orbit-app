@@ -52,7 +52,7 @@ describe("ProfileLayoutEditor live preview flag (D-47)", () => {
     const mounts = [...source.matchAll(/<ProfileLayoutPreview\b/g)];
     expect(mounts).toHaveLength(1);
     const before = source.slice(0, mounts[0].index);
-    expect(before).toMatch(/\{PROFILE_LAYOUT_PREVIEW_VISIBLE \?\s*$/);
+    expect(before).toMatch(/\{PROFILE_LAYOUT_PREVIEW_VISIBLE \?\s*\(?\s*$/);
   });
 
   it("keeps ProfileLayoutPreview exported", () => {
