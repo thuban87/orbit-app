@@ -271,6 +271,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | `headerShown` | `false` | `src/navigation/tabs/` | Leaves screen-owned themed chrome visible inside each tab stack. |
 | `animation` | `fade` | `src/navigation/RootNavigator.tsx` | Gives tab switching a short crossfade without horizontal tab motion. |
 | `FAB_SIZE` / `FAB_EDGE_GAP` | `56` / `16` | `src/navigation/use-bottom-clearance.ts` | Keeps FAB placement and content clearance single-sourced. |
+| `FAB_BORDER_WIDTH` / `FAB_BORDER_COLOR_KEY` | `2` / `onAccent` | `src/components/universal-fab-logic.ts` | Permanent FAB ring on every screen that shows the FAB, drawn by `UniversalFab` with no route keying; `onAccent` is the ADR-084 pair validated against every accent fill, so the FAB stays distinct over accent-filled buttons (D-56, supersedes D-45). The border draws inside the 56dp box; the dial rows keep their own hairline border. |
 | `danger` | `#E5484D` | `src/theme/theme-presets.ts` | Owner-approved destructive and validation emphasis token. |
 | `rogue` | `#E0904A` | `src/theme/theme-presets.ts` | In-app relationship-status emphasis token. |
 | `statusStable` / `statusWobble` / `statusDecay` | `#45B98A` / `#E8C15C` / `#E56A52` | `src/theme/theme-presets.ts` | Shared status-ring palette for dashboard and widget surfaces. |
@@ -494,3 +495,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-26 | 38.4 | Open FAB dial hides the background and cycles keyboard focus (D-31): the tab navigator container is hidden from accessibility while the dial's shell transient is open, and the FAB and six rows form an explicit Android keyboard focus cycle. |
 | 2026-09-26 | 38.4 | Sheet compact/detail body scrolls at large text (D-32, RG-034 follow-on): bounded ScrollView body inside the percent cap, `scrollBody` opt-out for self-scrolling consumers, repo-wide consumer contract; `expanded` unchanged. |
 | 2026-09-26 | 38.4 | Open FAB dial also hides the same-window shell overlays outside the navigator — the undo Snackbar and the AssistBanner (D-42 A, D-31 follow-on); RN Modal prompts exempt by contract. |
+| 2026-09-27 | 38.4 | Permanent FAB border on every screen (D-56, OA-C2; supersedes D-45): `UniversalFab` rings the main FAB with `FAB_BORDER_WIDTH` in `colors[FAB_BORDER_COLOR_KEY]` (`onAccent`), unconditionally; size, position, elevation, glyph and accessibility unchanged. |
