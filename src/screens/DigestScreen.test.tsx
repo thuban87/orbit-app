@@ -38,6 +38,13 @@ vi.mock("@/stores/snackbar-store", () => ({
   showSnackbar: mocks.showSnackbar,
 }));
 vi.mock("@/theme", () => ({ useTheme: () => ({ colors: {} }) }));
+// The loaded body reads the shell FAB clearance (38.4 D-52); this renderless
+// harness has no React dispatcher for the tab-bar store hook.
+vi.mock("@/navigation/use-bottom-clearance", () => ({
+  useBottomClearance: () => 0,
+  FAB_SIZE: 56,
+  FAB_EDGE_GAP: 16,
+}));
 
 const { DigestContent, DigestLoadedBody, runDigestDrillThrough } = await import(
   "./DigestScreen"

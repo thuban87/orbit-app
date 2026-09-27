@@ -23,6 +23,7 @@ import {
 } from "@/db/group-events-read";
 import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
@@ -58,6 +59,8 @@ export function GroupEventDetailScreen({
   route,
 }: RootStackScreenProps<"GroupEventDetail">) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const { groupEventId } = route.params;
   const [event, setEvent] = useState<GroupEventDetail | null>(null);
   // One read-failure flag, split by whether an event is already on screen:
@@ -224,7 +227,10 @@ export function GroupEventDetailScreen({
       <FlatList
         data={visibleParticipants(event, committedRemovedIds)}
         keyExtractor={(item) => String(item.interactionId)}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
         ListHeaderComponent={
           <View style={styles.header}>
             <AppText role="heading">{event.title}</AppText>

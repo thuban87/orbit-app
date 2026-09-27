@@ -15,6 +15,7 @@ import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { getExecutor } from "@/db/database";
 import { listUnbound, type UnboundRow } from "@/db/unbound-read";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { Logger } from "@/utils/logger";
@@ -31,6 +32,8 @@ export function UnboundContactsScreen({
   navigation,
 }: RootStackScreenProps<"UnboundContacts">) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const [rows, setRows] = useState<UnboundRow[] | null>(null);
   const [error, setError] = useState(false);
   const [term, setTerm] = useState("");
@@ -221,7 +224,10 @@ export function UnboundContactsScreen({
                 <FlatList
                   data={filteredRows}
                   keyExtractor={(item) => String(item.id)}
-                  contentContainerStyle={styles.listContent}
+                  contentContainerStyle={[
+                    styles.listContent,
+                    { paddingBottom: bottomClearance },
+                  ]}
                   renderItem={({ item }) => (
                     <Pressable
                       testID={`unbound-contacts-row-${item.id}`}

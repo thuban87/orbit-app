@@ -37,6 +37,7 @@ import {
 } from "@/logic/digest-composition";
 import { navigateIntoTab } from "@/navigation/tab-entry";
 import type { DigestStackParamList, TabParamList } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
   createDigestRefreshController,
   type DigestRefreshController,
@@ -295,6 +296,8 @@ export function DigestLoadedBody({
   onOpenProfile: (contactId: number) => void;
   onDrillThrough: (target: HorizonDrillTarget) => void;
 }) {
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const upNext = pickUpNext(data.upNextCandidates);
   const upNextIds = upNext.map((row) => row.id);
   const birthdays = filterUpcomingBirthdays(
@@ -305,7 +308,9 @@ export function DigestLoadedBody({
   const never = neverContactedConditional(data.neverContactedCount);
 
   return (
-    <ScrollView contentContainerStyle={styles.body}>
+    <ScrollView
+      contentContainerStyle={[styles.body, { paddingBottom: bottomClearance }]}
+    >
       <UpNextSection candidates={upNext} onOpenProfile={onOpenProfile} />
       <HorizonSection
         birthdays={birthdays}

@@ -22,6 +22,7 @@ import {
   searchGroupEvents,
 } from "@/db/group-events-read";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -31,6 +32,8 @@ export function GroupEventsScreen({
   navigation,
 }: RootStackScreenProps<"GroupEvents">) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const [items, setItems] = useState<GroupEventListItem[]>([]);
   const [term, setTerm] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -106,9 +109,10 @@ export function GroupEventsScreen({
         <FlatList
           data={items}
           keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={
-            items.length === 0 ? styles.emptyList : styles.list
-          }
+          contentContainerStyle={[
+            items.length === 0 ? styles.emptyList : styles.list,
+            { paddingBottom: bottomClearance },
+          ]}
           renderItem={({ item }) => (
             <Pressable
               accessibilityRole="button"
