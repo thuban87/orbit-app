@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
+import { resolvePalette } from "@/theme/theme-presets";
 import {
   createQuickLogUndoController,
   dialFocusCycle,
+  FAB_BORDER_COLOR_KEY,
+  FAB_BORDER_WIDTH,
   FAB_DIAL_TRANSIENT_ID,
   fabDialBackgroundA11y,
   getFocusedContactContext,
@@ -30,6 +33,23 @@ describe("UNIVERSAL_FAB_ACTIONS", () => {
       { id: "UpdateContact", label: "Update Contact" },
       { id: "Memory", label: "Memory" },
     ]);
+  });
+});
+
+describe("FAB border tunables (D-56, OA-C2; supersedes D-45)", () => {
+  it("rings the FAB at 2dp in the onAccent role colour", () => {
+    expect(FAB_BORDER_WIDTH).toBe(2);
+    expect(FAB_BORDER_COLOR_KEY).toBe("onAccent");
+  });
+
+  it("names a palette key that resolves in every package and mode", () => {
+    for (const pkg of ["galaxy", "standard"] as const) {
+      for (const mode of ["dark", "light"] as const) {
+        const palette = resolvePalette(pkg, mode);
+        expect(Object.keys(palette)).toContain(FAB_BORDER_COLOR_KEY);
+        expect(typeof palette[FAB_BORDER_COLOR_KEY]).toBe("string");
+      }
+    }
   });
 });
 

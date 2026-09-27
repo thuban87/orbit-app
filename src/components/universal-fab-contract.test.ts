@@ -171,3 +171,80 @@ describe("open dial keeps focus in the dial (D-31)", () => {
     expect(openDial).toContain("resolveDialFocusTags");
   });
 });
+
+describe("permanent FAB border (D-56, OA-C2; supersedes D-45)", () => {
+  /** The main FAB `<Pressable` opener, from its tag to the glyph child. */
+  function fabOpener(): string {
+    const testId = fab.indexOf('testID="dashboard-create-fab"');
+    const start = fab.lastIndexOf("<Pressable", testId);
+    expect(start).toBeGreaterThan(-1);
+    return fab.slice(start, fab.indexOf("<Animated.Text", start));
+  }
+
+  /** The FAB's `style={[ … ]}` array expression. */
+  function fabStyle(): string {
+    const opener = fabOpener();
+    const start = opener.indexOf("style={[");
+    expect(start).toBeGreaterThan(-1);
+    return opener.slice(start, opener.indexOf("]}", start) + 2);
+  }
+
+  it("imports the tunables from the logic module", () => {
+    expect(fab).toMatch(
+      /import\s*\{[^}]*\bFAB_BORDER_COLOR_KEY\b[^}]*\}\s*from\s*"@\/components\/universal-fab-logic"/,
+    );
+    expect(fab).toMatch(
+      /import\s*\{[^}]*\bFAB_BORDER_WIDTH\b[^}]*\}\s*from\s*"@\/components\/universal-fab-logic"/,
+    );
+  });
+
+  it("applies the border unconditionally in the FAB's style array", () => {
+    const style = fabStyle();
+    expect(style).toContain("borderWidth: FAB_BORDER_WIDTH");
+    expect(style).toContain("borderColor: colors[FAB_BORDER_COLOR_KEY]");
+    // No route keying, ternary or condition anywhere in the style array.
+    expect(style).not.toMatch(/\?|&&|\|\||currentRouteName|isFocusedWorkflow/);
+  });
+
+  it("borders only the main FAB: the dial rows get no ring", () => {
+    expect(fab.match(/FAB_BORDER_WIDTH/g)?.length).toBe(2); // import + FAB
+    expect(fab.match(/FAB_BORDER_COLOR_KEY/g)?.length).toBe(2);
+    const row = fab.slice(
+      fab.indexOf("function UniversalFabActionRow("),
+      fab.indexOf("export function UniversalFab("),
+    );
+    expect(row).not.toContain("FAB_BORDER");
+    // The rows keep their existing hairline-width option border.
+    expect(fab).toMatch(/option:\s*\{[^}]*borderWidth: 1,/);
+  });
+
+  it("keeps the FAB's identity, accessibility, offset and disk unchanged", () => {
+    const opener = fabOpener();
+    expect(opener).toContain('testID="dashboard-create-fab"');
+    expect(opener).toContain('accessibilityRole="button"');
+    expect(opener).toContain('accessibilityLabel="Add / capture"');
+    expect(opener).toContain("accessibilityState={{ expanded: open }}");
+    expect(opener).toContain(
+      "nextFocusForward={open ? focusCycle.fab.nextFocusForward : undefined}",
+    );
+    expect(opener).toContain(
+      "nextFocusUp={open ? focusCycle.fab.nextFocusUp : undefined}",
+    );
+    expect(opener).toContain(
+      "nextFocusDown={open ? focusCycle.fab.nextFocusDown : undefined}",
+    );
+    const style = fabStyle();
+    expect(style).toContain("styles.base");
+    expect(style).toContain("bottom: bottomOffset");
+    expect(style).toContain("backgroundColor: colors.accent");
+    const base = fab.slice(
+      fab.indexOf("  base: {"),
+      fab.indexOf("},", fab.indexOf("  base: {")),
+    );
+    expect(base).toContain("width: FAB_SIZE");
+    expect(base).toContain("height: FAB_SIZE");
+    expect(base).toContain("borderRadius: FAB_SIZE / 2");
+    expect(base).toContain("elevation: 6");
+    expect(base).not.toContain("borderWidth");
+  });
+});
