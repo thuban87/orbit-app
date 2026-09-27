@@ -391,26 +391,6 @@ export function ImportCompleteScreen({
             </Text>
           </Pressable>
         ) : null}
-        <Pressable
-          testID="import-complete-unbound"
-          accessibilityRole="button"
-          accessibilityLabel="View Unbound contacts"
-          onPress={() =>
-            navigateIntoTab(
-              navigationRef.current,
-              "DashboardTab",
-              "UnboundContacts",
-            )
-          }
-          style={[
-            styles.secondaryButton,
-            { borderColor: colors.border, backgroundColor: colors.surface },
-          ]}
-        >
-          <Text style={{ color: colors.textPrimary }}>
-            View Unbound contacts
-          </Text>
-        </Pressable>
         {alreadyLinkedContactId !== null ? (
           <Pressable
             testID="import-complete-view-contact"
