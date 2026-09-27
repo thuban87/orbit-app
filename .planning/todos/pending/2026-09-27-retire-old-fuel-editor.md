@@ -2,7 +2,7 @@
 created: 2026-09-27T12:00:00.000Z
 title: Retire the old Fuel editor — Create Contact, Edit Contact and Profile Off Limits use the new Off Limits entry editor (FAB → Update Contact → Off Limits)
 area: ui
-severity: minor
+severity: major
 files:
 
   - src/components/FuelEditor.tsx
