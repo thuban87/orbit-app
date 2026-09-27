@@ -421,40 +421,47 @@ export function ImportReviewScreen({
         <Text style={[styles.label, { color: colors.textSecondary }]}>
           Orbit participation
         </Text>
-        <View style={styles.lifecycle}>
-          {([true, false] as const).map((enabled) => (
-            <Pressable
-              key={String(enabled)}
-              onPress={() => {
-                setEdited(true);
-                setTrackingEnabled(enabled);
-                // Unbound hides the picker; its last validity no longer applies.
-                if (!enabled) setIntervalValid(true);
-              }}
-              style={[
-                styles.choice,
-                {
-                  backgroundColor:
-                    trackingEnabled === enabled
-                      ? colors.accent
-                      : colors.surface,
-                  borderColor:
-                    trackingEnabled === enabled ? colors.accent : colors.border,
-                },
-              ]}
-            >
-              <Text
-                style={{
-                  color:
-                    trackingEnabled === enabled
-                      ? colors.background
-                      : colors.textPrimary,
+        {/* 38.4 review Lane C WR-03: D-57 made this choice decide reminders,
+            so TalkBack hears it as a radio group with the selected option, as
+            on bulk setup (Plan 21). */}
+        <View
+          accessibilityRole="radiogroup"
+          accessibilityLabel="Orbit participation"
+          style={styles.lifecycle}
+        >
+          {([true, false] as const).map((enabled) => {
+            const selected = trackingEnabled === enabled;
+            const label = enabled ? "Bound" : "Unbound";
+            return (
+              <Pressable
+                key={String(enabled)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected, checked: selected }}
+                accessibilityLabel={label}
+                onPress={() => {
+                  setEdited(true);
+                  setTrackingEnabled(enabled);
+                  // Unbound hides the picker; its last validity no longer applies.
+                  if (!enabled) setIntervalValid(true);
                 }}
+                style={[
+                  styles.choice,
+                  {
+                    backgroundColor: selected ? colors.accent : colors.surface,
+                    borderColor: selected ? colors.accent : colors.border,
+                  },
+                ]}
               >
-                {enabled ? "Bound" : "Unbound"}
-              </Text>
-            </Pressable>
-          ))}
+                <Text
+                  style={{
+                    color: selected ? colors.background : colors.textPrimary,
+                  }}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
       </View>
       <View style={styles.field}>
