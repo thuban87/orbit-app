@@ -128,6 +128,27 @@ export const DURATION_PRESETS: readonly DurationPreset[] = [
   { label: "2h", seconds: 2 * 60 * 60 },
 ];
 
+/** Palette KEYS (token-only, like `surface.ts`) for one duration chip's state. */
+export interface DurationChipTone {
+  readonly fill: "accent" | "surface";
+  readonly border: "accent" | "border";
+  readonly label: "onAccent" | "textPrimary";
+}
+
+/**
+ * The duration chip's fill, border and label keys (owner ruling D-30). The
+ * selected chip (a preset or None) is filled with the accent and labelled
+ * `onAccent`, the ADR-084 pair `accents.test.ts` validates for every curated
+ * accent; unselected chips keep the surface fill, the border and `textPrimary`.
+ * None of these tokens is glass-overridden, so the form's own palette is right
+ * wherever it renders.
+ */
+export function durationChipTone(selected: boolean): DurationChipTone {
+  return selected
+    ? { fill: "accent", border: "accent", label: "onAccent" }
+    : { fill: "surface", border: "border", label: "textPrimary" };
+}
+
 /** Upper bound on a custom duration entry (24 hours) — a guard against fat-finger entry. */
 export const MAX_DURATION_SECONDS = 24 * 60 * 60;
 

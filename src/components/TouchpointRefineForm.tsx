@@ -42,6 +42,7 @@ import {
   coerceAllowAi,
   combineDateAndTime,
   DURATION_PRESETS,
+  durationChipTone,
   FUTURE_DATETIME_MESSAGE,
   formatDurationLabel,
   isCombinedInFuture,
@@ -413,8 +414,10 @@ export function TouchpointRefineForm({
             />
           </View>
         );
-      case "duration":
+      case "duration": {
         // Optional; descriptive only — never feeds Status/Gravity/Intensity.
+        // Selected chip = accent fill + onAccent label (D-30).
+        const noneTone = durationChipTone(value.duration === null);
         return (
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.textSecondary }]}>
@@ -423,6 +426,7 @@ export function TouchpointRefineForm({
             <View style={styles.chipRow}>
               {DURATION_PRESETS.map((preset) => {
                 const selected = value.duration === preset.seconds;
+                const tone = durationChipTone(selected);
                 return (
                   <Pressable
                     key={preset.label}
@@ -437,12 +441,12 @@ export function TouchpointRefineForm({
                     style={[
                       styles.chip,
                       {
-                        backgroundColor: colors.surface,
-                        borderColor: selected ? colors.accent : colors.border,
+                        backgroundColor: colors[tone.fill],
+                        borderColor: colors[tone.border],
                       },
                     ]}
                   >
-                    <Text style={{ color: colors.textPrimary }}>
+                    <Text style={{ color: colors[tone.label] }}>
                       {preset.label}
                     </Text>
                   </Pressable>
@@ -460,13 +464,12 @@ export function TouchpointRefineForm({
                 style={[
                   styles.chip,
                   {
-                    backgroundColor: colors.surface,
-                    borderColor:
-                      value.duration === null ? colors.accent : colors.border,
+                    backgroundColor: colors[noneTone.fill],
+                    borderColor: colors[noneTone.border],
                   },
                 ]}
               >
-                <Text style={{ color: colors.textPrimary }}>None</Text>
+                <Text style={{ color: colors[noneTone.label] }}>None</Text>
               </Pressable>
             </View>
             <TextInput
@@ -500,6 +503,7 @@ export function TouchpointRefineForm({
             </Text>
           </View>
         );
+      }
       case "allowAi":
         // Per-interaction egress gate; defaults OFF — D-04.
         return (
