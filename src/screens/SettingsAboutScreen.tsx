@@ -13,8 +13,8 @@ const APP_ICON = require("../../assets/orbit-icon-legacy.png");
 
 /**
  * About Orbit category screen (§K / D-09). A BASIC surface: it shows ONLY fields
- * with a genuine runtime source — the product name (`ABOUT_APP_NAME`, a real
- * name, NOT `app.json`'s scaffold `"orbit-scaffold"` — OWNER FLAG F-1), the app
+ * with a genuine runtime source — the product name (`ABOUT_APP_NAME`, a module
+ * constant, not read from app config — OWNER FLAG F-1), the app
  * icon, and the semantic version (`expo-constants`, with a module-constant
  * fallback). Per §K "omit unavailable rows" it renders NO build-number row (no
  * `android.versionCode` on disk), NO dependency licenses/acknowledgements (no

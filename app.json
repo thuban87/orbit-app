@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "orbit-scaffold",
-    "slug": "orbit-scaffold",
+    "name": "Orbit",
+    "slug": "orbit",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/orbit-icon-legacy.png",

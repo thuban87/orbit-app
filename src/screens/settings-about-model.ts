@@ -5,10 +5,11 @@ import Constants from "expo-constants";
  *
  * §K's rule is "omit unavailable rows": About surfaces ONLY fields that have a
  * genuine runtime source. Verified on disk (Plan 08):
- *   - `app.json` `name`/`slug` are the SCAFFOLD value `"orbit-scaffold"`, so the
- *     product name is NOT read from config — it is the module constant below
- *     (`ABOUT_APP_NAME`). Renaming `app.json` touches Android package/build
- *     identity and is an owner + Phase-40 decision, NOT taken here (OWNER FLAG F-1).
+ *   - the product name is NOT read from config — it is the module constant below
+ *     (`ABOUT_APP_NAME`). (`app.json` once carried the scaffold `"orbit-scaffold"`
+ *     here, OWNER FLAG F-1; 38.4 D-42 C set it to the values `app.config.ts`
+ *     already resolved — "Orbit"/"orbit" — with no change to the resolved
+ *     config or the Android package.)
  *   - the semantic version DOES have a real source (`expo-constants`
  *     `Constants.expoConfig?.version` → `"1.0.0"`), read with a module-constant
  *     fallback so a missing config value still renders.
@@ -21,9 +22,9 @@ import Constants from "expo-constants";
  */
 
 /**
- * The product name shown in About — a real product name, deliberately NOT the
- * `app.json` scaffold value `"orbit-scaffold"` (OWNER FLAG F-1). A rename of the
- * app-config identity is an owner/Phase-40 call, not this phase's.
+ * The product name shown in About — a real product name, kept as a module
+ * constant rather than read from app config (OWNER FLAG F-1). The Android
+ * package id is install-locked and separate (`app.config.ts`).
  */
 export const ABOUT_APP_NAME = "Orbit";
 
