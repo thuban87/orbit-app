@@ -105,8 +105,13 @@ describe("BulkImportSetupScreen lifecycle source contract (D-57)", () => {
     expect(combine.indexOf("setSessionBatchDefaults(")).toBeLessThan(
       combine.indexOf("combineCluster("),
     );
+    expect(combine).toContain(
+      "const lifecycle = bulkLifecycleChoice(trackingEnabled, intervalDays)",
+    );
     const combineArgs = combine.slice(combine.indexOf("combineCluster("));
-    expect(combineArgs).toMatch(/lifecycle:\s*bulkLifecycleChoice\(/);
+    expect(combineArgs).toMatch(/\blifecycle,/);
+    // The same value is saved on the session and passed to the combine.
+    expect(combine).toMatch(/\{ categoryId: currentCategoryId, lifecycle \}/);
     expect(screen.split("setSessionBatchDefaults(").length - 1).toBe(2);
     expect(screen).not.toContain("setSessionBatchCategory(");
   });

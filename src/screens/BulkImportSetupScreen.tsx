@@ -11,14 +11,14 @@ import {
 } from "react-native";
 import { ConsolidationPrompt } from "@/components/ConsolidationPrompt";
 import { CategoryChoiceSheet } from "@/components/category/CategoryChoiceSheet";
+import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { listCategories } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
-import { setSessionBatchCategory } from "@/db/import-session-dao";
+import { setSessionBatchDefaults } from "@/db/import-session-dao";
 import {
   getSessionById,
   type ImportSessionRow,
   listSessionRows,
-  sessionBatchLifecycle,
   sessionRowCounts,
 } from "@/db/import-session-read";
 import {
@@ -33,6 +33,12 @@ import {
 } from "@/services/import/source-consolidation";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import {
+  BULK_BOUND_BLURB,
+  BULK_IMPORT_DEFAULT_FREQUENCY,
+  bulkLifecycleChoice,
+  initialBulkLifecycle,
+} from "./bulk-import-setup-logic";
 import { useImportLeaveGuard } from "./use-import-leave-guard";
 import {
   bulkSetupHoldActive,
@@ -40,6 +46,12 @@ import {
 } from "./use-open-import-session";
 
 const LOG_SCOPE = "bulk-import-setup";
+
+/** D-57: Unbound first (the default), then Bound. */
+const LIFECYCLE_OPTIONS = [
+  { bound: false, label: "Unbound" },
+  { bound: true, label: "Bound" },
+] as const;
 
 function contactLabel(count: number): string {
   return `${count} ${count === 1 ? "contact" : "contacts"}`;
@@ -63,6 +75,9 @@ export function BulkImportSetupScreen({
   >([]);
   const [categoryId, setCategoryId] = useState<number | null>(null);
   const [categorySheetOpen, setCategorySheetOpen] = useState(false);
+  // D-57: the batch lifecycle — Unbound by default, restored from the session.
+  const [trackingEnabled, setTrackingEnabled] = useState(false);
+  const [intervalDays, setIntervalDays] = useState<number | null>(null);
   const [edited, setEdited] = useState(false);
   const [saving, setSaving] = useState(false);
   const [consolidationRows, setConsolidationRows] = useState<
@@ -85,6 +100,9 @@ export function BulkImportSetupScreen({
       if (!session) throw new Error("import session is unavailable");
       setCount(counts.pending);
       setCategoryId(session.batchCategoryId);
+      const saved = initialBulkLifecycle(session);
+      setTrackingEnabled(saved.trackingEnabled);
+      setIntervalDays(saved.intervalDays);
       setCategories(nextCategories);
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to load bulk import setup", error);
@@ -125,10 +143,15 @@ export function BulkImportSetupScreen({
       );
       setCategories(currentCategories);
       if (currentCategoryId !== categoryId) setCategoryId(currentCategoryId);
-      await setSessionBatchCategory(
+      // D-57: category and lifecycle in ONE write before any contact is
+      // created, so a resumed import keeps the batch choice.
+      await setSessionBatchDefaults(
         exec,
         route.params.sessionId,
-        currentCategoryId,
+        {
+          categoryId: currentCategoryId,
+          lifecycle: bulkLifecycleChoice(trackingEnabled, intervalDays),
+        },
         localDateTime(),
       );
       navigation.navigate("ImportProgress", {
@@ -183,10 +206,19 @@ export function BulkImportSetupScreen({
       );
       setCategories(currentCategories);
       if (currentCategoryId !== categoryId) setCategoryId(currentCategoryId);
+      // D-57: persist the batch choice BEFORE the combine commits, so an
+      // import interrupted after this cluster resumes with the same defaults.
+      const lifecycle = bulkLifecycleChoice(trackingEnabled, intervalDays);
+      await setSessionBatchDefaults(
+        exec,
+        route.params.sessionId,
+        { categoryId: currentCategoryId, lifecycle },
+        localDateTime(),
+      );
       const result = await combineCluster(exec, importedPhotoFs, {
         rows: consolidationRows,
         batchCategoryId: currentCategoryId,
-        lifecycle: sessionBatchLifecycle(session),
+        lifecycle,
         phoneRegion: session.phoneRegion,
         now: localDateTime(),
       });
@@ -250,26 +282,64 @@ export function BulkImportSetupScreen({
 
       <View style={styles.field}>
         <Text style={[styles.label, { color: colors.textSecondary }]}>
-          Defaults
+          Orbit participation
         </Text>
-        <View style={styles.defaults}>
-          <View
-            style={[
-              styles.default,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={{ color: colors.textPrimary }}>Unbound</Text>
-          </View>
-          <View
-            style={[
-              styles.default,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-            ]}
-          >
-            <Text style={{ color: colors.textPrimary }}>Uncategorized</Text>
-          </View>
+        {/* D-57: one lifecycle for the whole batch, Unbound by default. The
+            selected option is accent-filled with an onAccent label (ADR-084,
+            as D-30). */}
+        <View
+          accessibilityRole="radiogroup"
+          accessibilityLabel="Orbit participation"
+          style={styles.defaults}
+        >
+          {LIFECYCLE_OPTIONS.map(({ bound, label }) => {
+            const selected = trackingEnabled === bound;
+            return (
+              <Pressable
+                key={label}
+                accessibilityRole="radio"
+                accessibilityState={{ selected, checked: selected }}
+                accessibilityLabel={label}
+                onPress={() => {
+                  setEdited(true);
+                  setTrackingEnabled(bound);
+                }}
+                style={[
+                  styles.default,
+                  {
+                    backgroundColor: selected ? colors.accent : colors.surface,
+                    borderColor: selected ? colors.accent : colors.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={{
+                    color: selected ? colors.onAccent : colors.textPrimary,
+                  }}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
+        {trackingEnabled ? (
+          <>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              Frequency
+            </Text>
+            <FrequencyPicker
+              value={intervalDays ?? BULK_IMPORT_DEFAULT_FREQUENCY}
+              onChange={(value) => {
+                setEdited(true);
+                setIntervalDays(value);
+              }}
+            />
+            <Text style={[styles.blurb, { color: colors.textSecondary }]}>
+              {BULK_BOUND_BLURB}
+            </Text>
+          </>
+        ) : null}
       </View>
 
       <View style={styles.field}>
@@ -348,7 +418,7 @@ export function BulkImportSetupScreen({
         <Text
           style={{
             color:
-              saving || count === 0 ? colors.textSecondary : colors.background,
+              saving || count === 0 ? colors.textSecondary : colors.onAccent,
             fontWeight: "600",
           }}
         >
@@ -379,6 +449,7 @@ const styles = StyleSheet.create({
   count: { fontSize: 18, fontWeight: "600" },
   field: { gap: 8 },
   label: { fontSize: 13, fontWeight: "600" },
+  blurb: { fontSize: 13, lineHeight: 18 },
   defaults: { flexDirection: "row", gap: 8 },
   default: {
     minHeight: 44,
