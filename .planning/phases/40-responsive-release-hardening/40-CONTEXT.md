@@ -31,6 +31,20 @@ available. Interrogate with the owner first; this shim then gets replaced by a r
   upstream phase missed something — check before adding one. The backup wire format is frozen at
   v4 after Phase 36's final plan: any new durable entity or portable preference this phase
   introduces owes a format-5 bump — an owner decision, not a side effect.
+- **D-04 (owner, 2026-09-27):** Dependency audit findings from 38.4 land here (not in 38.4). `npm audit`
+  (2026-09-27, orbit-app HEAD 5624502): 23 findings — 0 critical, 3 high, 20 moderate.
+  - **Ships in the app:** `decode-uri-component` (moderate, GHSA-vcc3-…) via `@react-navigation/core` →
+    `query-string`: DoS by exponential decoding of a malformed percent-encoded URL; reachable through
+    `orbit://` deep-link parsing. Non-breaking fix available.
+  - **Build/test tooling only (desktop):** highs `@xmldom/xmldom` (XML fragment injection; Expo
+    config/plist), `image-size` (DoS in JXL/HEIF parsers; asset processing), `js-yaml` (merge-key CPU);
+    `vitest`/`@vitest/mocker` path traversal (test runner). Non-breaking fixes available for all.
+  - **Expo CLI / config-plugin chain** (`expo`, `@expo/*`, `xcode`, `uuid`; flags on
+    datetimepicker, expo-sharing, react-native-quick-crypto, react-native-android-widget,
+    expo-share-intent come only via that chain): npm's suggested fixes are major downgrades — not
+    real fixes; resolved by a future Expo SDK upgrade.
+  - Suggested approach (not yet decided): `npm audit fix` without `--force`, verified by prebuild +
+    full test suite; re-run the audit at planning time since results drift.
 </decisions>
 
 <canonical_refs>
