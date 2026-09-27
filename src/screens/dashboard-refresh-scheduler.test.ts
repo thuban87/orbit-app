@@ -83,6 +83,16 @@ function okOutcome(
   };
 }
 
+/** An ok outcome carrying an explicit fade start. */
+function okOutcomeWithFade(
+  label: string,
+  fadeStart: number,
+): DashboardReadOutcome<Row, string, string, Counts, PopulationCounts> {
+  const outcome = okOutcome(label);
+  if (outcome.kind !== "ok") throw new Error("expected ok outcome");
+  return { ...outcome, fadeStart };
+}
+
 describe("createDashboardRefreshScheduler", () => {
   it("issues a focus read while visible, once, with a token", () => {
     const reads: Array<[number, DashboardRefreshSource]> = [];
@@ -516,10 +526,7 @@ describe("favourite source (38.3 A-WR-05 / W4)", () => {
     const rec = recordingSinks();
     publishDashboardRead({
       token: 1,
-      outcome: {
-        ...okOutcome("B"),
-        fadeStart: dashboardFadeStart("favourite", true),
-      },
+      outcome: okOutcomeWithFade("B", dashboardFadeStart("favourite", true)),
       isCurrent: () => true,
       sinks: rec.sinks,
     });
@@ -540,10 +547,7 @@ describe("favourite source (38.3 A-WR-05 / W4)", () => {
     const rec = recordingSinks();
     publishDashboardRead({
       token: 1,
-      outcome: {
-        ...okOutcome("B"),
-        fadeStart: dashboardFadeStart("focus", true),
-      },
+      outcome: okOutcomeWithFade("B", dashboardFadeStart("focus", true)),
       isCurrent: () => true,
       sinks: rec.sinks,
     });

@@ -152,6 +152,7 @@ import {
   type DashboardReadSinks,
   type DashboardRefreshScheduler,
   type DashboardRefreshSource,
+  dashboardFadeStart,
   isDashboardVisible,
   publishDashboardRead,
 } from "@/screens/dashboard-refresh-scheduler";
@@ -739,7 +740,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const readRef = useRef<
     (token: number, source: DashboardRefreshSource) => Promise<void>
   >(async () => {});
-  readRef.current = async (token) => {
+  readRef.current = async (token, source) => {
     const now = localDateTime();
     const term = debouncedSearchText.trim();
     const isSearch = term !== "";
@@ -864,12 +865,14 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           "not-contacted": neverContacted,
           snoozed,
         },
-        fadeStart:
+        // A favourite read settles at 1 so a star tap never re-fades the list
+        // (38.3 A-WR-05, D-10); every other source keeps the focused rule.
+        fadeStart: dashboardFadeStart(
+          source,
           isFocusedRef.current &&
-          appActiveRef.current &&
-          !reducedMotionRef.current
-            ? 0
-            : 1,
+            appActiveRef.current &&
+            !reducedMotionRef.current,
+        ),
       };
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load dashboard", err);
@@ -1357,9 +1360,16 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             "success",
             nextMembership,
           );
+          // Optimistic bridge until the favourite read below lands.
           setRows((previousRows) =>
             applyCommittedMembership(previousRows, contactId, nextMembership),
           );
+          // 38.3 REVIEW A-WR-05 / VERIFICATION W4 (D-10): publish through the
+          // scheduler. The committed write is visible to this newer read, whose
+          // token retires any in-flight stale read (which could otherwise
+          // revert the star) and re-reads the population counts. Never
+          // deferred; published with fade start 1 (no list re-fade).
+          reload("favourite");
         })
         .catch((writeError: unknown) => {
           Logger.error(LOG_SCOPE, "failed to update favourite", writeError);
@@ -1379,7 +1389,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           }
         });
     },
-    [favouriteStore],
+    [favouriteStore, reload],
   );
 
   const openCardContextMenu = useCallback((contactId: number) => {

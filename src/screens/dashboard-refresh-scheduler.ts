@@ -25,13 +25,35 @@
 import { createLatestRequestAuthority } from "@/utils/latest-request";
 import { isForegroundVisible } from "@/utils/screen-visibility";
 
-/** Every trigger that may issue a Home read. */
+/**
+ * Every trigger that may issue a Home read. `favourite` is the committed star
+ * toggle (38.3 REVIEW A-WR-05 / VERIFICATION W4, 38.4 D-10): it is requested
+ * only after the favourite write commits, so its newer token retires any
+ * in-flight stale read that could otherwise revert the star, and it re-reads
+ * the population counts. It is NOT deferrable — the toggle is a user action on
+ * a visible Home.
+ */
 export type DashboardRefreshSource =
   | "focus"
   | "shell"
   | "foreground"
   | "pull"
-  | "snooze";
+  | "snooze"
+  | "favourite";
+
+/**
+ * The result-fade start for one read (0 animates in, 1 settles instantly). A
+ * `favourite` read always settles at 1 so a star tap never re-fades the whole
+ * list (38.3 A-WR-05, D-10); every other source keeps the existing rule — 0
+ * only when Home may animate (focused, app active, reduced motion off).
+ */
+export function dashboardFadeStart(
+  source: DashboardRefreshSource,
+  canAnimate: boolean,
+): number {
+  if (source === "favourite") return 1;
+  return canAnimate ? 0 : 1;
+}
 
 /** Sources deferred to the next focus read while Home is hidden (D-23). */
 const DEFERRABLE_WHILE_HIDDEN: ReadonlySet<DashboardRefreshSource> = new Set([
