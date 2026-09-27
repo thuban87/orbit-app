@@ -46,6 +46,17 @@ const FAB_CLEARANCE_ALLOWLIST: Readonly<Record<string, string>> = {
     "A full-screen Skia canvas with no scroll container; nothing can end under the FAB.",
 };
 
+/**
+ * Components that own the scroll container for part of a FAB-bearing screen.
+ * The host passes its `useBottomClearance()` down as a REQUIRED
+ * `bottomClearance` prop (so TypeScript enforces the hand-off), and the
+ * component applies it to its scroll content. Keyed by component file → host.
+ */
+const DELEGATED_SCROLL_COMPONENTS: Readonly<Record<string, string>> = {
+  "src/components/CardGrid.tsx": "src/screens/HomeScreen.tsx",
+  "src/components/FieldDefForm.tsx": "src/screens/CustomFieldsScreen.tsx",
+};
+
 const SCROLL_CONTAINER =
   /<(Animated\.ScrollView|ScrollView|FlatList|SectionList|ReorderableList|NestedReorderableList)\b/;
 
@@ -301,6 +312,27 @@ describe("FAB clearance: every FAB-bearing scroll screen (D-52)", () => {
       expect(reason.trim().length).toBeGreaterThan(0);
     }
   });
+});
+
+describe("FAB clearance: delegated scroll components (D-52)", () => {
+  it.each(Object.entries(DELEGATED_SCROLL_COMPONENTS))(
+    "%s applies the clearance its host %s passes",
+    (component, host) => {
+      expect(FAB_BEARING.has(host), `${host} is not FAB-bearing`).toBe(true);
+      const source = stripComments(read(component));
+      expect(rendersScroll(source)).toBe(true);
+      // Required, not optional: the host cannot forget it.
+      expect(source).toMatch(/\bbottomClearance: number;/);
+      const reaches = attributeExpressions(
+        source,
+        "contentContainerStyle",
+      ).some((expression) => /\bbottomClearance\b/.test(expression));
+      expect(reaches).toBe(true);
+      expect(stripComments(read(host))).toMatch(
+        /bottomClearance=\{bottomClearance\}/,
+      );
+    },
+  );
 });
 
 describe("FAB clearance: geometry tokens (D-52)", () => {

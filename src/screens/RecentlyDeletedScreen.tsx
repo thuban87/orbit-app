@@ -6,6 +6,7 @@ import { getExecutor, localDateTime } from "@/db/database";
 import { purgeMemoryPermanently, restoreMemory } from "@/db/memories-dao";
 import { listRecentlyDeleted, type MemoryRow } from "@/db/memories-read";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { MEMORY_TRASH_WINDOW_DAYS } from "@/services/memory-trash-sweep";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -22,6 +23,8 @@ export function RecentlyDeletedScreen({
   route,
 }: RootStackScreenProps<"RecentlyDeleted">) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const { contactId } = route.params;
   const [rows, setRows] = useState<MemoryRow[]>([]);
   const [pendingPurge, setPendingPurge] = useState<MemoryRow | null>(null);
@@ -91,7 +94,12 @@ export function RecentlyDeletedScreen({
           Recently Deleted
         </AppText>
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
+      >
         {rows.length === 0 ? (
           <View style={styles.empty}>
             <AppText role="heading">Recently Deleted is empty</AppText>

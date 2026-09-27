@@ -69,6 +69,7 @@ import {
 } from "@/db/relationships-read";
 import { isAiMasterEnabled } from "@/logic/ai-enablement";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -162,6 +163,8 @@ export function ThingsToRememberScreen({
   route,
 }: RootStackScreenProps<"ThingsToRemember">) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const { contactId } = route.params;
   const [knowledge, setKnowledge] = useState<KnowledgeState>(EMPTY_KNOWLEDGE);
   const [includeHidden, setIncludeHidden] = useState(false);
@@ -435,7 +438,10 @@ export function ThingsToRememberScreen({
   return (
     <ScrollView
       testID="things-to-remember-screen"
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: bottomClearance },
+      ]}
     >
       <ChromeScrim style={styles.header} radius={RADII.lg}>
         <ScopedPalette>

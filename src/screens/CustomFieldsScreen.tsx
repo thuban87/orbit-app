@@ -52,6 +52,7 @@ import {
   preflightTypeChange,
 } from "@/db/field-type-change";
 import type { CustomFieldDef, NewFieldDef } from "@/db/field-types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 
@@ -101,6 +102,8 @@ function confirmSummary(title: string, message: string): Promise<boolean> {
 
 export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const [defs, setDefs] = useState<CustomFieldDef[]>([]);
   const [emptyById, setEmptyById] = useState<Record<number, boolean>>({});
   const [editor, setEditor] = useState<Editor>(null);
@@ -326,6 +329,7 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
           existingColNames={existingColNames}
           nextDisplayOrder={nextDisplayOrder}
           initialShareWithAi={newFieldShareDefault}
+          bottomClearance={bottomClearance}
           onSubmit={(def) => void handleCreate(def)}
           onCancel={() => setEditor(null)}
         />
@@ -336,6 +340,7 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
       <FieldDefForm
         mode="edit"
         field={editing}
+        bottomClearance={bottomClearance}
         onSubmit={(draft) => void handleEdit(editing, draft)}
         onCancel={() => setEditor(null)}
       />
@@ -345,7 +350,10 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
   return (
     <ScrollView
       testID="custom-fields-screen"
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: bottomClearance },
+      ]}
     >
       <View style={styles.header}>
         <Pressable

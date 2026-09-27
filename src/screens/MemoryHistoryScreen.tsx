@@ -22,6 +22,7 @@ import {
 import { getExecutor, localDateTime } from "@/db/database";
 import { CURRENT_STATE_FIELD_REGISTRY } from "@/db/memory-registry";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
@@ -34,6 +35,8 @@ export function MemoryHistoryScreen({
   route,
 }: RootStackScreenProps<"MemoryHistory">) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const { contactId, fieldKey } = route.params;
   const [current, setCurrent] = useState<CurrentStateEntryRow | null>(null);
   const [history, setHistory] = useState<CurrentStateEntryRow[]>([]);
@@ -144,7 +147,12 @@ export function MemoryHistoryScreen({
           {title}
         </AppText>
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
+      >
         {current ? (
           <View
             style={[

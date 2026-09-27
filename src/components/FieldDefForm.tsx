@@ -65,7 +65,16 @@ const FIELD_TYPES: ReadonlyArray<{ value: FieldType; label: string }> = [
   { value: "phone", label: "Phone" },
 ];
 
-interface CreateProps {
+interface SharedProps {
+  /**
+   * The host's `useBottomClearance()`: the form takes over the Custom fields
+   * screen, which shows the shell FAB, so its Save/Cancel row must scroll
+   * fully above it (38.4 D-52, OA-E3).
+   */
+  bottomClearance: number;
+}
+
+interface CreateProps extends SharedProps {
   mode: "create";
   /** col_names already in use (incl. quarantined) — makeColName uniquifies. */
   existingColNames: ReadonlySet<string>;
@@ -77,7 +86,7 @@ interface CreateProps {
   onCancel: () => void;
 }
 
-interface EditProps {
+interface EditProps extends SharedProps {
   mode: "edit";
   field: CustomFieldDef;
   onSubmit: (draft: FieldDefDraft) => void;
@@ -197,7 +206,10 @@ export function FieldDefForm(props: FieldDefFormProps) {
   return (
     <ScrollView
       testID="field-def-form"
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: props.bottomClearance },
+      ]}
       keyboardShouldPersistTaps="handled"
     >
       <Text style={[styles.heading, { color: colors.textPrimary }]}>

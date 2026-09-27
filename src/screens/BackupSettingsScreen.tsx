@@ -27,6 +27,7 @@ import {
   runGatedRead,
 } from "@/logic/read-phase";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
   createAutomaticBackupReencryptionService,
   createBackupEncryptionLifecycle,
@@ -61,6 +62,8 @@ export function BackupSettingsScreen({
   navigation,
 }: RootStackScreenProps<"BackupSettings">) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   // RG-035 / D-24: settings are UNKNOWN until a read succeeds. Nothing below
   // may present a known encryption, folder or passphrase-setup state from an
   // unread or unreadable row — `backupSettingsPresentation` gates the groups.
@@ -397,7 +400,10 @@ export function BackupSettingsScreen({
   return (
     <ScrollView
       testID="backup-settings-screen"
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: bottomClearance },
+      ]}
     >
       <View style={styles.header}>
         <Pressable
