@@ -1198,7 +1198,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; ADR-115 + ADR-087 (surface/glass authority)
 **UI hint**: yes
-**Plans**: 14/20 plans executed in 7 waves
+**Plans**: 15/20 plans executed in 7 waves
 
 Plans:
 **Wave 1**
@@ -1227,7 +1227,7 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [ ] 38.4-15-PLAN.md — Workstream I W3/O-1 investigation + evidence-gated mitigation; D-25 native-remedy owner decision (checkpoint)
-- [ ] 38.4-18-PLAN.md — Gap G1: Sheet compact/detail body scrolls at large text so actions stay reachable (D-32; RG-034 follow-on)
+- [x] 38.4-18-PLAN.md — Gap G1: Sheet compact/detail body scrolls at large text so actions stay reachable (D-32; RG-034 follow-on)
 - [ ] 38.4-19-PLAN.md — Gap G2: Contacts population/filter/sort freeze — device repro, root cause, test-first fix; Profile-swipe check (D-33; GAP-G2)
 
 **Wave 5** *(blocked on Wave 4 completion)*
@@ -1313,7 +1313,7 @@ Plans:
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
-| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 14/20 | In Progress|  |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 15/20 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 0/TBD | Deferred planning (needs discuss; D-40 sheet first) | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |

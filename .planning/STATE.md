@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.4
 current_phase_name: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
 status: executing
-stopped_at: Completed 38.4-14-PLAN.md
-last_updated: "2026-09-27T03:04:12.336Z"
+stopped_at: Completed 38.4-18-PLAN.md
+last_updated: "2026-09-27T03:25:00.000Z"
 last_activity: 2026-09-26
-last_activity_desc: "38.4-14 complete — Workstream I: shared isForegroundVisible/isAppBackgrounded (src/utils/screen-visibility.ts) gates Digest controller + Profile shell tick on synchronous AppState (38.3 W2); non-deferrable reload(\"favourite\") after the star write with fade start 1 (38.3 A-WR-05/W4); Import Complete re-reads on focus via useFocusEffect + authority.invalidate (38.3 O-3); D-10; 4844 tests, tsc/colors clean; device legs in Plan 17"
-state_head: 5bb2e6d420d9bb6ae42ed5e5cfe2bd3a11b0010c
+last_activity_desc: "38.4-18 complete (out of order; 15/16 still open) — G1/D-32: Sheet compact/detail body is a bounded ScrollView (SHEET_BODY_SCROLLS, scrollBody opt-out in OrreryContactsSheet/DateDetailSheet/ProfileRelationshipSheets, repo-wide sheet-consumers-contract); D-42 A open FAB dial hides Snackbar/AssistBanner (fabDialBackgroundA11y); D-42 B heatmap cellHitSlop capped at gap midpoint; D-42 C app.json name/slug Orbit/orbit (resolved config identical); 4875 tests, tsc/colors clean; device legs in Plan 17"
+state_head: 24a20eb104961d98f7d9058433f2e2ba6fbfdd71
 progress:
   total_phases: 27
   completed_phases: 17
   total_plans: 238
-  completed_plans: 230
+  completed_plans: 231
 carried_forward:
 
   - "38.3 owner dispositions (2026-09-26, not passes): UAT-023a widget leg DEFERRED to the widget-overhaul phase; UAT-042 A-then-B chronology, UAT-024b month/year rollover, UAT-026b in-range keep and UAT-022 warm-Mark-while-backgrounded ACCEPTED-RISK (unit tests only). O-3 → homed in 38.4 Workstream I (D-10)."
@@ -383,6 +383,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.4 P09 | 12min | 3 tasks | 14 files |
 | Phase 38.4 P13 | 15min | 3 tasks | 13 files |
 | Phase 38.4 P14 | 11min | 3 tasks | 16 files |
+| Phase 38.4 P18 | 11min | 5 tasks | 24 files |
 
 ## Accumulated Context
 
@@ -850,6 +851,8 @@ Foundational decisions affecting current work:
 - [Phase 38.4]: 38.4-13: launcher adaptive foreground/monochrome are committed derivatives from scripts/fit-launcher-icons.py (MARGIN 0.95 tunable; --check compares decoded pixels + safe radius); owner judges the fit on the Plan 17 device pass
 - [Phase 38.4]: 38.4-14: one shared isForegroundVisible/isAppBackgrounded predicate (src/utils/screen-visibility.ts) gates Home, Digest and Profile refresh over synchronous AppState.currentState; Profile gates only its shell tick (foreground tick fires post-resume)
 - [Phase 38.4]: 38.4-14: favourite toggle issues a non-deferrable reload("favourite") after commit (stale reads retired, counts re-read) with dashboardFadeStart=1; un-starring in the Favourites population now removes the row when the read lands
+- [Phase 38.4]: 38.4-18: Sheet compact/detail bodies scroll inside the percent cap (flexGrow 0 / flexShrink 1); consumers owning a ScrollView pass scrollBody={false} (exact set pinned by sheet-consumers-contract); expanded unchanged (D-32)
+- [Phase 38.4]: 38.4-18: D-42 (owner defaults) — open dial hides same-window Snackbar/AssistBanner (RN Modal prompts exempt); heatmap hitSlop capped at floor(gap/2) per side; app.json name/slug set to resolved Orbit/orbit, userInterfaceStyle left as-is
 
 ### Pending Todos
 
@@ -916,8 +919,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-27T03:04:03.344Z
-**Stopped at:** Completed 38.4-14-PLAN.md
+**Last session:** 2026-09-27T03:25:00.000Z
+**Stopped at:** Completed 38.4-18-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
