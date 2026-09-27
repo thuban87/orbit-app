@@ -16,6 +16,7 @@ import {
   digestLoadStateOnFail,
   digestLoadStateOnPublish,
 } from "@/screens/digest-refresh";
+import { isForegroundVisible } from "@/utils/screen-visibility";
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -131,6 +132,65 @@ describe("createDigestRefreshController", () => {
     await pending;
     expect(deps.publish).not.toHaveBeenCalled();
     expect(deps.fail).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 38.3 VERIFICATION W2 (38.4 D-10): the controller as DigestScreen wires it —
+ * `isVisible` is the shared foreground predicate over navigation focus AND the
+ * synchronous app state. A warm notification Mark/Snooze's shell tick while the
+ * app is backgrounded (Digest still the focused route) reads nothing; the focus
+ * read and the post-sweep foreground (resume) read still run.
+ */
+describe("Digest controller wired with the shared foreground predicate (W2)", () => {
+  function wired(initial: { focused: boolean; appState: string }) {
+    const env = { ...initial };
+    const deps = {
+      read: vi.fn(() => Promise.resolve("A")),
+      publish: vi.fn(),
+      fail: vi.fn(),
+      isVisible: () => isForegroundVisible(env.focused, env.appState),
+      onAccepted: vi.fn(),
+    };
+    return { env, deps, controller: createDigestRefreshController(deps) };
+  }
+
+  it("a shell tick while backgrounded (Digest focused) issues no read", async () => {
+    const { controller, deps } = wired({
+      focused: true,
+      appState: "background",
+    });
+    await controller.request("shell");
+    expect(deps.read).not.toHaveBeenCalled();
+    expect(deps.onAccepted).not.toHaveBeenCalled();
+  });
+
+  it("a focus request still reads while backgrounded", async () => {
+    const { controller, deps } = wired({
+      focused: true,
+      appState: "background",
+    });
+    await controller.request("focus");
+    expect(deps.read).toHaveBeenCalledTimes(1);
+  });
+
+  it("the post-sweep foreground tick reads once the app is active again", async () => {
+    const { controller, deps, env } = wired({
+      focused: true,
+      appState: "background",
+    });
+    await controller.request("foreground");
+    expect(deps.read).not.toHaveBeenCalled();
+    env.appState = "active";
+    await controller.request("foreground");
+    expect(deps.read).toHaveBeenCalledTimes(1);
+    expect(deps.publish).toHaveBeenCalledWith("A");
+  });
+
+  it("a shell tick during a transient inactive overlay still reads (A-WR-01 rule)", async () => {
+    const { controller, deps } = wired({ focused: true, appState: "inactive" });
+    await controller.request("shell");
+    expect(deps.read).toHaveBeenCalledTimes(1);
   });
 });
 

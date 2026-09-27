@@ -11,6 +11,7 @@ import {
   profileLifecycleView,
   profileMethodGroups,
   profileOverflowEntries,
+  shouldRunProfileShellRefresh,
   unbindConfirmation,
 } from "@/screens/contact-profile-logic";
 
@@ -398,5 +399,46 @@ describe("createProfileSnapshotLoader (38.3 RG-024)", () => {
     expect(publish).not.toHaveBeenCalled();
     expect(fail).not.toHaveBeenCalled();
     expect(settle).not.toHaveBeenCalled();
+  });
+});
+
+describe("shouldRunProfileShellRefresh (38.3 VERIFICATION W2, 38.4 D-10)", () => {
+  it("skips a shell refresh while the app is backgrounded", () => {
+    expect(shouldRunProfileShellRefresh("background")).toBe(false);
+  });
+
+  it("runs a shell refresh while active or during a transient inactive overlay", () => {
+    expect(shouldRunProfileShellRefresh("active")).toBe(true);
+    expect(shouldRunProfileShellRefresh("inactive")).toBe(true);
+  });
+
+  it("runs when the app state is unknown (never silently drops a foreground read)", () => {
+    expect(shouldRunProfileShellRefresh(null)).toBe(true);
+    expect(shouldRunProfileShellRefresh(undefined)).toBe(true);
+  });
+
+  it("a backgrounded shell tick reads nothing; the resume (foreground) load still reads", async () => {
+    let appState = "background";
+    const read = vi.fn(() => Promise.resolve("snapshot"));
+    const loader = createProfileSnapshotLoader({
+      read,
+      publish: vi.fn(),
+      fail: vi.fn(),
+      settle: vi.fn(),
+    });
+    const load = () => loader.load();
+    // The screen's shell subscription: gated on the synchronous app state.
+    const onShellRefresh = () => {
+      if (!shouldRunProfileShellRefresh(appState)) return;
+      void load();
+    };
+    onShellRefresh();
+    expect(read).not.toHaveBeenCalled();
+    // The foreground tick is ungated — it only fires on the post-sweep resume.
+    appState = "active";
+    await load();
+    expect(read).toHaveBeenCalledTimes(1);
+    onShellRefresh();
+    expect(read).toHaveBeenCalledTimes(2);
   });
 });
