@@ -88,6 +88,16 @@ RN `Alert` confirmations and the Android date/time picker dialogs are native sur
 - `app.json` `userInterfaceStyle` plays no part on Android (without `expo-system-ui` it only produces a prebuild warning). Do not add `expo-system-ui` for this; that is a native dependency and an owner decision. Evidence: `.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-NATIVE-CONFIG-INVESTIGATION.md`.
 - Surfaces in other processes (the system photo picker, DocumentsUI, the share chooser, the keyboard, notifications, the widget host) keep following the device.
 
+## Read colours inside the scope (D-34)
+
+`GlassForegroundScope` re-provides the theme only inside a `GlassSurface` card, a `ChromeScrim` and a `ShellAppBar` `trailing` subtree. In Standard Light over an asset it swaps in the glass palette there (`textSecondary` → primary, darker `danger`/status/`rogue`/`accentText`).
+
+- **The rule.** Only a hook called INSIDE that subtree sees the glass palette. A host that calls `useTheme()` once at its top and uses `colors.*` inside its own card renders the ROOT tone there, even though the palette-level proof passes. The same holds for a local variable, JSX value or helper built above the card, a `ThemePalette` parameter, a `colors[key]` lookup, and a whole palette handed to a child or helper.
+- **The helper.** Put `ScopedPalette` (`src/components/ui/ScopedPalette.tsx`, imported by module path) as a child inside the scope and read the render prop: `<GlassSurface><ScopedPalette>{(scoped) => <Text style={{ color: scoped.danger }} />}</ScopedPalette></GlassSurface>`. It adds no node, style or colour. A child component that calls `useTheme()` itself works too. Placeholders stay on `colors.textPlaceholder` (never the scoped palette, Pitfall 9).
+- **Deliberate root reads.** `useUnscopedTheme()` (opaque surfaces nested inside a scope) and `useGlassForegroundColors()` (a component that draws its own backing) are exempt by design.
+- **The contract.** `src/theme/glass-scope-read-contract.test.ts` (analyzer: `src/theme/__contract__/glass-scope-reads.ts`, test support only) fails with `file:line` on any glass-overridden token read through a palette resolved above the scope. The overridden-token set is derived from `resolveGlassForegroundPalette`, so a new override widens the contract automatically. It also pins the list of discovered scope slots (`ProfileSection` `children`/`headerAction`, `AIConnectionScreen`'s `card(…, body)`); a new wrapper that renders a `ReactNode` prop inside a card changes that list. Its allowlist is empty; an entry needs a reason that the read is deliberately root.
+- **Blind spot.** A plain colour string resolved above a scope in one file and passed as a prop to a component that renders it inside its own card in another file is not traced. Check such sites on the device.
+
 ## What You Don't Need to Change
 
 - Do not add a network, CDN, or downloadable-pack path for bundled backgrounds. Profile's explicitly invoked local image workflow is separate: it stores a bounded app-owned derivative and never changes the bundled slot manifest.
@@ -139,3 +149,4 @@ For a bundled background or surface-composition change, select two materially di
 
 - **2026-09-26 — Phase 38.4 Plan 03 (RG-029 / `ui-accessibility/AUD-UIA-001`; D-12, D-24, D-26, D-27).** Added `darkestPixel` and `scripts/measure-background-extrema.py --check`, the both-extrema + interval proof, the Standard-Light glass foreground scope (`GlassForegroundScope`, `UnscopedTheme`, `useUnscopedTheme`, `useGlassForegroundColors`) with lightness-only variants, the `textPlaceholder` token, and the rule that a new foreground on Standard glass is proven or excluded in writing.
 - **2026-09-27 — Phase 38.4 Plan 22 (D-50 / `OA-D4`).** Added "Native dialogs follow Orbit's mode": `native-color-scheme.ts` (`nativeColorSchemeFor`, `useNativeColorSchemeSync`), called once from `ThemeProvider` with the active package's mode setting; "system" → `"unspecified"` feedback-loop guard; `userInterfaceStyle` recorded as inert on Android.
+- **2026-09-27 — Phase 38.4 Plan 20 (D-34 / RG-029 `ui-accessibility/AUD-UIA-001`).** Added "Read colours inside the scope (D-34)": `ScopedPalette`, the glass-scope read contract and its analyzer. The 48 out-of-scope reads (17 files) were moved inside their scopes (inventory Table E).
