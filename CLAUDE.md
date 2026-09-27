@@ -56,6 +56,29 @@ Concretely:
 
 The extra reading costs real tokens. Accept the cost. On the owner's other project, eight diff-scoped reviews missed data-corrupting bugs that one subsystem-level audit found in minutes; each miss cost a full plan–execute–review cycle.
 
+## Plan sizing (non-negotiable)
+
+**Group by what the work affects.** A plan is one coherent change to one area of the app: the same subsystem, screens, stores or tables, verified the same way. Related work in the same area belongs in the same plan. Most phases should land at a handful of plans after initial planning; gap plans are the exception, and each needs a clear reason.
+
+**Split into separate plans when:**
+- the work touches a **different area** (no shared subsystem, files, data or screens);
+- one piece has a **hard ordering** dependency on another's finished output;
+- the pieces need a **different verification path** (e.g. native build/prebuild or device work versus pure JS/unit-tested work);
+- an **owner checkpoint** genuinely has to sit between them; or
+- the plan is **too big for one executor**.
+
+**Size limits are real.** Every plan must be completable by one executor inside its context budget (the GSD target of ~50%). The planner's task- and file-count guidelines (e.g. "2–3 tasks per plan") are the signals for that budget. Use them to catch a plan that is genuinely too large, and split it along its natural seam within the area. Do not use them to scatter small, related items across separate plans. Also do not merge unrelated areas into one plan just to lower the count.
+
+**Adding work mid-phase:** fold it into the not-yet-executed plan that already owns that area, as long as that plan stays within the size budget. Otherwise create a new plan for it.
+
+**Hard gates: stop and ask the owner. These are the only two.**
+1. **Splitting an agreed plan.** If a plan that has passed planning review, or that the owner has seen, would be split into two or more plans (for size or any other reason), stop. Explain which limit forces the split, and wait for approval.
+2. **A large jump in plan count.** If a planning or replanning pass would raise the phase's plan count by **more than 25%** over the last count the owner saw, stop. Show the before and after, with a one-line reason per new plan, and wait for approval.
+
+Everything else proceeds automatically. Ordinary count changes below that threshold do not need sign-off.
+
+**Orchestrators:** include this section verbatim in every planner, replanner and plan-checker prompt.
+
 ---
 
 ## Data layer rules (project-specific, non-negotiable)
