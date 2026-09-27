@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.4
 current_phase_name: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
 status: executing
-stopped_at: Completed 38.4-19-PLAN.md
-last_updated: "2026-09-27T07:10:00.000Z"
+stopped_at: Completed 38.4-15-PLAN.md
+last_updated: "2026-09-27T12:29:04.473Z"
 last_activity: 2026-09-27
-last_activity_desc: "38.4-19 complete — G2/D-33: the Contacts freeze was the FAB dial container re-forming (Fabric flatten + Android re-create) without pointerEvents box-none after every dial close, a full-screen touch sink until cold start; collapsable={false} on UniversalFab dial/Snackbar/AssistBanner roots, AST contract dashboard-controls-responsiveness.test.ts; controls path cleared on device; D-55 header = displayed List/Card rows (dashboardHeaderCount); E SAME CAUSE; 4890 tests, tsc/colors clean; 6/6 device reps per control + 5/5 FAB cycles on the Pixel 3a"
-state_head: 24a20eb104961d98f7d9058433f2e2ba6fbfdd71
+last_activity_desc: "38.4-15 complete — W3/O-1 BOUNDED on the Pixel 3a: shell-tick fan-out probe (dev menu, 20 ticks/run) x10 = 200 ticks with 4 hidden Profiles (800 shell reads) gave 0 ERR_USING_RELEASED_SHARED_OBJECT on logcat and Metro (+0 in a 100-tick Home-focused supplement); no JS mitigation (A/B gated on REPRODUCED); D-25 not triggered; expo-modules-core 57.0.11 installed, 57.0.19 latest sdk-57 lacks #50513 (published only in 58.0.6+); 4890 tests, tsc/colors clean"
+state_head: 72e2acfbe7ff5c494ef74e38cd6a0fa5e9645ce1
 progress:
   total_phases: 27
   completed_phases: 17
   total_plans: 241
-  completed_plans: 232
+  completed_plans: 233
 carried_forward:
 
   - "38.3 owner dispositions (2026-09-26, not passes): UAT-023a widget leg DEFERRED to the widget-overhaul phase; UAT-042 A-then-B chronology, UAT-024b month/year rollover, UAT-026b in-range keep and UAT-022 warm-Mark-while-backgrounded ACCEPTED-RISK (unit tests only). O-3 → homed in 38.4 Workstream I (D-10)."
@@ -43,7 +43,7 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 ## Current Position
 
 Phase: 38.4 (UI Consistency, Accessibility, Performance & Release Polish (INSERTED)) — EXECUTING
-Plan: 15 of 23 (next; 16/23 complete — 01–14, 18, 19)
+Plan: 16 of 23 (next; 17/23 complete — 01–15, 18, 19)
 Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
@@ -384,6 +384,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.4 P13 | 15min | 3 tasks | 13 files |
 | Phase 38.4 P14 | 11min | 3 tasks | 16 files |
 | Phase 38.4 P18 | 11min | 5 tasks | 24 files |
+| Phase 38.4 P15 | 25min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
