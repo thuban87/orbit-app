@@ -108,9 +108,12 @@ describe("Sheet body scrolls at large text (D-32)", () => {
     expect(render).toContain("accessibilityViewIsModal");
     expect(render).toMatch(/\n\s+dismissable\n/);
     expect(render).toContain('scrimAccessibilityLabel="Dismiss"');
-    // The handle stays outside (above) the scroll body.
-    expect(render.indexOf("styles.handleWrap")).toBeLessThan(
-      render.indexOf("<ScrollView"),
+    // The handle stays outside (above) the body inside the sheet container.
+    const container = render.slice(render.indexOf("<SafeAreaView"));
+    expect(container.indexOf("styles.handleWrap")).toBeGreaterThan(-1);
+    expect(container.indexOf("styles.handleWrap")).toBeLessThan(
+      container.indexOf("{body}"),
     );
+    expect(container).not.toContain("<ScrollView");
   });
 });
