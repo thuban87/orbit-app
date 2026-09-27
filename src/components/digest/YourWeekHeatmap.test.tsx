@@ -1,11 +1,16 @@
 import type { ReactElement, ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { HistoryWindow } from "@/services/history/window";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 
+// The heatmap measures its width via onLayout into state (RG-033, D-13). The
+// function is called directly here, so `useState` returns the test-controlled
+// measured width.
+let measuredWidth = 0;
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useMemo: (factory: () => unknown) => factory(),
+  useState: () => [measuredWidth, vi.fn()],
 }));
 vi.mock("react-native", () => ({
   View: "View",
@@ -40,6 +45,93 @@ const window: HistoryWindow = {
 };
 
 describe("YourWeekHeatmap", () => {
+  beforeEach(() => {
+    measuredWidth = 379;
+  });
+
+  it("renders no grid until the available width is measured (no jump)", () => {
+    measuredWidth = 0;
+    const tree = nodes(
+      YourWeekHeatmap({
+        window,
+        counts: new Map(),
+        selectedDate: null,
+        onSelectDay: vi.fn(),
+      }),
+    );
+    const wrapper = tree.find(
+      (node) => node.props.testID === "your-week-heatmap",
+    );
+    expect(typeof wrapper?.props.onLayout).toBe("function");
+    expect(
+      tree.some((node) =>
+        String(node.props.testID ?? "").startsWith("your-week-heatmap-cell-"),
+      ),
+    ).toBe(false);
+    expect(
+      tree.some((node) => node.props.testID === "your-week-heatmap-grid"),
+    ).toBe(false);
+  });
+
+  it("sizes every cell from the measured width and centers the grid", () => {
+    // 411dp window − 2·16 Digest padding = 379 → floor((379 − 24) / 7) = 50.
+    measuredWidth = 379;
+    const tree = nodes(
+      YourWeekHeatmap({
+        window,
+        counts: new Map([["2026-09-18", 1]]),
+        selectedDate: null,
+        onSelectDay: vi.fn(),
+      }),
+    );
+    const grid = tree.find(
+      (node) => node.props.testID === "your-week-heatmap-grid",
+    );
+    expect(grid?.props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ alignSelf: "center" }),
+      ]),
+    );
+    const real = tree.find(
+      (node) => node.props.testID === "your-week-heatmap-cell-2026-09-18",
+    );
+    expect(real?.props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ width: 50, height: 50 }),
+      ]),
+    );
+    const blanks = tree.filter(
+      (node) => node.props.importantForAccessibility === "no-hide-descendants",
+    );
+    for (const blank of blanks) {
+      expect(blank.props.style).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ width: 50, height: 50 }),
+        ]),
+      );
+    }
+  });
+
+  it("caps cells at MAX_CELL on wide screens", () => {
+    measuredWidth = 900;
+    const tree = nodes(
+      YourWeekHeatmap({
+        window,
+        counts: new Map(),
+        selectedDate: null,
+        onSelectDay: vi.fn(),
+      }),
+    );
+    const real = tree.find(
+      (node) => node.props.testID === "your-week-heatmap-cell-2026-09-18",
+    );
+    expect(real?.props.style).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ width: 56, height: 56 }),
+      ]),
+    );
+  });
+
   it("marks the selected real day structurally and accessibly", () => {
     const tree = nodes(
       YourWeekHeatmap({
