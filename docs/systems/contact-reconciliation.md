@@ -144,3 +144,4 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 | 2026-09-23 | 38.2 | Preserved source-option identity through reconciliation, recorded the complete reviewed comparable, and excluded ambiguous scalars from bulk source apply. |
 | 2026-09-25 | 38.3 | Reconcile summary loading vs error (RG-035): Reconcile Complete shows a real loading state during its read and "Couldn't load the check summary" with a read-only Retry only after the read fails. |
 | 2026-09-26 | 38.4 | Review-card accessibility (RG-031 AUD-UIA-008): review cards announce name, advisory chip, evidence and failure copy; expose `selected` while selecting, with a non-border selected glyph; and offer a Select/Deselect action equivalent to long-press. |
+| 2026-09-27 | 38.4 | Resume-check prompt scrolls its body at large text; its Resume label uses `onAccent` (D-49, OA-D3). |
