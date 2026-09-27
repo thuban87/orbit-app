@@ -2,6 +2,11 @@ import { DevSettings } from "react-native";
 
 let registered = false;
 
+/** Shell ticks per "shell-tick fan-out" probe run (38.4 Plan 15, W3/O-1). */
+const UAT_FAN_OUT_TICKS = 20;
+/** Fixed spacing between the probe's shell ticks. */
+const UAT_FAN_OUT_INTERVAL_MS = 150;
+
 /** Dev menu only. Each action uses synthetic input and logs numeric observations. */
 export function registerUatProbes(): void {
   if (!__DEV__ || registered) return;
@@ -51,6 +56,26 @@ export function registerUatProbes(): void {
     armUatFault("assist-queue-refresh", { mode: "reject" });
     console.log("uat-probe armed", "assist-queue-refresh");
   });
+  // 38.4 Plan 15 (W3/O-1): drive the shell-tick fan-out that once released an
+  // expo-sqlite statement under a hidden Profile's read. Counts only — the
+  // probe never logs contact data; the error count is read off logcat/Metro.
+  DevSettings.addMenuItem(
+    `UAT: shell-tick fan-out ×${UAT_FAN_OUT_TICKS}`,
+    () => {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { bumpShellRefresh } =
+        require("@/stores/shell-refresh-store") as typeof import("@/stores/shell-refresh-store");
+      console.log("uat-probe fan-out start", UAT_FAN_OUT_TICKS);
+      let ticks = 0;
+      const timer = setInterval(() => {
+        bumpShellRefresh();
+        ticks += 1;
+        if (ticks < UAT_FAN_OUT_TICKS) return;
+        clearInterval(timer);
+        console.log("uat-probe fan-out end", ticks);
+      }, UAT_FAN_OUT_INTERVAL_MS);
+    },
+  );
   DevSettings.addMenuItem("Dump scheduled notifications", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { getAllScheduledNotificationsAsync } =

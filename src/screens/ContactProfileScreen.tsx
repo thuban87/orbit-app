@@ -136,24 +136,34 @@ export function ContactProfileScreen({
   );
   useEffect(() => () => loader.invalidate(), [loader]);
 
+  // `source` feeds the content-free debug read marker only (38.4 Plan 15,
+  // W3/O-1 fan-out measurement; mirrors Home's "dashboard read bundle").
   // biome-ignore lint/correctness/useExhaustiveDependencies: contactId/themePackage re-key the focus read; the loader reads them through `readInputs`.
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    await loader.load();
-  }, [loader, contactId, themePackage]);
+  const load = useCallback(
+    async (source = "local") => {
+      Logger.debug(LOG_SCOPE, "profile snapshot read", source);
+      setLoading(true);
+      setError(null);
+      await loader.load();
+    },
+    [loader, contactId, themePackage],
+  );
 
   // 38.3 VERIFICATION W2 (D-10): a shell tick delivered while the app is
   // backgrounded (warm notification Mark/Snooze) reads nothing; the focus and
   // post-sweep resume reads cover it. Synchronous AppState, never a mirror.
   const onShellRefresh = useCallback(() => {
     if (!shouldRunProfileShellRefresh(AppState.currentState)) return;
-    void load();
+    void load("shell");
   }, [load]);
   useShellRefresh(onShellRefresh);
   // D-14: the resume read runs after the launch/foreground sweep settles.
-  useForegroundRefresh(load);
-  useFocusEffect(useCallback(() => void load(), [load]));
+  const onForegroundRefresh = useCallback(
+    () => void load("foreground"),
+    [load],
+  );
+  useForegroundRefresh(onForegroundRefresh);
+  useFocusEffect(useCallback(() => void load("focus"), [load]));
 
   const presentation = useMemo(
     () => (snapshot ? resolveProfilePresentation(snapshot.presentation) : null),
