@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
 import { AppText, Button, Sheet } from "@/components/ui";
-import { useTheme } from "@/theme";
+import { useUnscopedTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 
 interface GroupTitlePromptSheetProps {
@@ -19,7 +19,11 @@ export function GroupTitlePromptSheet({
   onConfirm,
   error = null,
 }: GroupTitlePromptSheetProps) {
-  const { colors } = useTheme();
+  // The sheet is an opaque surface, and this host reads above the overlay's
+  // UnscopedTheme boundary: read the ROOT palette so the body text keeps the
+  // secondary role and the error keeps the palette's danger red when opened
+  // from a glass card (38.4 review Lane B2 WR-01; RG-029 / D-24).
+  const { colors } = useUnscopedTheme();
   const [title, setTitle] = useState("");
   useEffect(() => {
     if (!visible) setTitle("");

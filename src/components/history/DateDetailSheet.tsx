@@ -45,7 +45,7 @@ import {
   CURRENT_STATE_FIELD_REGISTRY,
   type CurrentStateFieldKey,
 } from "@/db/memory-registry";
-import { useTheme } from "@/theme";
+import { useTheme, useUnscopedTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatTimeMinuteOrFallback } from "@/utils/dates";
 
@@ -143,7 +143,11 @@ export function DateDetailSheet({
   onOpenKnowledgeChange,
   onLogInteraction,
 }: DateDetailSheetProps) {
-  const { colors } = useTheme();
+  // The sheet is an opaque surface, and this host reads above the overlay's
+  // UnscopedTheme boundary: read the ROOT palette so the empty-state caption
+  // and row borders keep the normal hierarchy when opened from a glass card
+  // (38.4 review Lane B2 WR-01; RG-029 / D-24, as ConfirmDialog).
+  const { colors } = useUnscopedTheme();
   const items = interleave(interactions, lifecycleEvents, knowledgeChanges);
 
   return (
