@@ -91,6 +91,7 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import { Sheet } from "@/components/ui/Sheet";
 import { createQuickLogUndoController } from "@/components/universal-fab-logic";
 import { getAppSettings } from "@/db/app-settings-dao";
@@ -173,7 +174,7 @@ import {
   useShellRefresh,
 } from "@/stores/shell-refresh-store";
 import { showSnackbar, snackbarStore } from "@/stores/snackbar-store";
-import { useTheme } from "@/theme";
+import { type ThemePalette, useTheme } from "@/theme";
 import { EASING, MOTION } from "@/theme/tokens/motion";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -1624,118 +1625,127 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
     <View style={styles.header}>
       {headerCount !== null ? (
         <ChromeScrim style={styles.countScrim} radius={RADII.sm}>
-          <Text
-            testID="dashboard-header-count"
-            style={[styles.countHeader, { color: colors.textSecondary }]}
-          >
-            {dashboardHeaderCountLabel(headerCount)}
-          </Text>
+          <ScopedPalette>
+            {(scoped) => (
+              <Text
+                testID="dashboard-header-count"
+                style={[styles.countHeader, { color: scoped.textSecondary }]}
+              >
+                {dashboardHeaderCountLabel(headerCount)}
+              </Text>
+            )}
+          </ScopedPalette>
         </ChromeScrim>
       ) : null}
     </View>
   );
 
-  const listEmptyContent = error ? (
-    <View testID="dashboard-error-state" style={styles.emptyState}>
-      <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
-        Couldn't load your contacts
-      </Text>
-      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-        Pull down to try again.
-      </Text>
-    </View>
-  ) : emptyState === "search-empty" ? (
-    <View testID="dashboard-empty-search" style={styles.emptyState}>
-      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-        {`No matches for "${term}"`}
-      </Text>
-    </View>
-  ) : emptyState === "birthdays-empty" ? (
-    <View testID="dashboard-empty-birthdays" style={styles.emptyState}>
-      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-        {`Nothing in ${POPULATION_LABELS.birthdays}.`}
-      </Text>
-    </View>
-  ) : emptyState === "not-contacted-empty" ? (
-    <View testID="dashboard-empty-not-contacted" style={styles.emptyState}>
-      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-        {`Nothing in ${POPULATION_LABELS["not-contacted"]}.`}
-      </Text>
-    </View>
-  ) : emptyState === "snoozed-empty" ? (
-    <View testID="dashboard-empty-snoozed" style={styles.emptyState}>
-      <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-        {`Nothing in ${POPULATION_LABELS.snoozed}.`}
-      </Text>
-    </View>
-  ) : emptyState === "firstrun" ? (
-    <View style={styles.emptyState}>
-      <Pressable
-        testID="dashboard-empty-firstrun"
-        accessibilityRole="button"
-        accessibilityLabel="Add your first contact"
-        onPress={() => navigation.navigate("Create")}
-        style={[
-          styles.primaryCta,
-          { backgroundColor: colors.accent, borderColor: colors.accent },
-        ]}
-      >
-        <Text style={[styles.primaryCtaText, { color: colors.background }]}>
-          Add your first contact
+  // Built from the palette ScopedPalette resolves INSIDE the ChromeScrim below
+  // (D-34), so the empty-state captions render the glass variant.
+  const renderListEmptyContent = (palette: ThemePalette) =>
+    error ? (
+      <View testID="dashboard-error-state" style={styles.emptyState}>
+        <Text style={[styles.emptyHeading, { color: palette.textPrimary }]}>
+          Couldn't load your contacts
         </Text>
-      </Pressable>
-    </View>
-  ) : emptyState === "hidden" ? (
-    <View testID="dashboard-empty-hidden" style={styles.emptyState}>
-      <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
-        Everyone's tucked away
-      </Text>
-      {counts.neverContacted > 0 ? (
-        <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-          {`${counts.neverContacted} not yet contacted →`}
+        <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
+          Pull down to try again.
         </Text>
-      ) : null}
-      {counts.snoozed > 0 ? (
-        <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-          {`${counts.snoozed} snoozed`}
+      </View>
+    ) : emptyState === "search-empty" ? (
+      <View testID="dashboard-empty-search" style={styles.emptyState}>
+        <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
+          {`No matches for "${term}"`}
         </Text>
-      ) : null}
-      {counts.archived > 0 ? (
-        <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-          {`${counts.archived} archived`}
+      </View>
+    ) : emptyState === "birthdays-empty" ? (
+      <View testID="dashboard-empty-birthdays" style={styles.emptyState}>
+        <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
+          {`Nothing in ${POPULATION_LABELS.birthdays}.`}
         </Text>
-      ) : null}
-    </View>
-  ) : emptyState === "filter-empty" ? (
-    <View testID="dashboard-empty-filter" style={styles.emptyState}>
-      {query.populations.includes("favourites") &&
-      populationCounts.favourites === 0 ? (
-        // Only the genuine "no favourites exist" case gets the onboarding copy.
-        // A favourites-population list zeroed by an active filter still HAS
-        // favourites, so it falls through to the neutral filtered-empty copy (WR-03).
-        <>
-          <Text style={[styles.emptyHeading, { color: colors.textPrimary }]}>
-            No favourites yet
+      </View>
+    ) : emptyState === "not-contacted-empty" ? (
+      <View testID="dashboard-empty-not-contacted" style={styles.emptyState}>
+        <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
+          {`Nothing in ${POPULATION_LABELS["not-contacted"]}.`}
+        </Text>
+      </View>
+    ) : emptyState === "snoozed-empty" ? (
+      <View testID="dashboard-empty-snoozed" style={styles.emptyState}>
+        <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
+          {`Nothing in ${POPULATION_LABELS.snoozed}.`}
+        </Text>
+      </View>
+    ) : emptyState === "firstrun" ? (
+      <View style={styles.emptyState}>
+        <Pressable
+          testID="dashboard-empty-firstrun"
+          accessibilityRole="button"
+          accessibilityLabel="Add your first contact"
+          onPress={() => navigation.navigate("Create")}
+          style={[
+            styles.primaryCta,
+            { backgroundColor: palette.accent, borderColor: palette.accent },
+          ]}
+        >
+          <Text style={[styles.primaryCtaText, { color: palette.background }]}>
+            Add your first contact
           </Text>
-          <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-            Tap the star on a contact's profile to add them here.
-          </Text>
-        </>
-      ) : (
-        <Text style={[styles.emptyBody, { color: colors.textSecondary }]}>
-          Nothing here right now.
+        </Pressable>
+      </View>
+    ) : emptyState === "hidden" ? (
+      <View testID="dashboard-empty-hidden" style={styles.emptyState}>
+        <Text style={[styles.emptyHeading, { color: palette.textPrimary }]}>
+          Everyone's tucked away
         </Text>
-      )}
-    </View>
-  ) : null;
+        {counts.neverContacted > 0 ? (
+          <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
+            {`${counts.neverContacted} not yet contacted →`}
+          </Text>
+        ) : null}
+        {counts.snoozed > 0 ? (
+          <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
+            {`${counts.snoozed} snoozed`}
+          </Text>
+        ) : null}
+        {counts.archived > 0 ? (
+          <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
+            {`${counts.archived} archived`}
+          </Text>
+        ) : null}
+      </View>
+    ) : emptyState === "filter-empty" ? (
+      <View testID="dashboard-empty-filter" style={styles.emptyState}>
+        {query.populations.includes("favourites") &&
+        populationCounts.favourites === 0 ? (
+          // Only the genuine "no favourites exist" case gets the onboarding copy.
+          // A favourites-population list zeroed by an active filter still HAS
+          // favourites, so it falls through to the neutral filtered-empty copy (WR-03).
+          <>
+            <Text style={[styles.emptyHeading, { color: palette.textPrimary }]}>
+              No favourites yet
+            </Text>
+            <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
+              Tap the star on a contact's profile to add them here.
+            </Text>
+          </>
+        ) : (
+          <Text style={[styles.emptyBody, { color: palette.textSecondary }]}>
+            Nothing here right now.
+          </Text>
+        )}
+      </View>
+    ) : null;
 
   // Chrome scrim (31.1-05): empty-state copy sits on the bare background, so back
   // it locally to stay AA over the lightened veil. Cards already back their own.
-  const listEmpty = listEmptyContent ? (
-    <ChromeScrim style={styles.emptyPanel} radius={RADII.md}>
-      {listEmptyContent}
-    </ChromeScrim>
-  ) : null;
+  // Every empty state except "none" (and the load error) renders content.
+  const listEmpty =
+    error || emptyState !== "none" ? (
+      <ChromeScrim style={styles.emptyPanel} radius={RADII.md}>
+        <ScopedPalette>{renderListEmptyContent}</ScopedPalette>
+      </ChromeScrim>
+    ) : null;
 
   return (
     <View testID="dashboard-root" style={styles.root}>
