@@ -199,6 +199,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // prebuild evidence can audit the API-37 cutoff directly.
     const contactPickerPermissionPlugin =
       "./plugins/withContactPickerPermission";
+    // RG-040 release-readiness/AUD-REL-002 (D-09):
+    // plugins/withReleaseOnlyOverlayPermissionRemoval.js drops
+    // SYSTEM_ALERT_WINDOW from RELEASE builds only — a plain deletion from the
+    // main manifest plus a `src/release` remove marker. Deliberately NOT Expo's
+    // blocked-permissions list, whose main-manifest marker would also strip
+    // React Native's debug-library copy that dev overlays need. Touches no other
+    // permission.
+    const releaseOverlayPermissionPlugin =
+      "./plugins/withReleaseOnlyOverlayPermissionRemoval";
 
     return [
       ...stringPlugins.filter(
@@ -208,7 +217,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           pluginName(p) !== "react-native-android-widget" &&
           pluginName(p) !== bootReceiverPlugin &&
           pluginName(p) !== backupRestoreSharePlugin &&
-          pluginName(p) !== contactPickerPermissionPlugin,
+          pluginName(p) !== contactPickerPermissionPlugin &&
+          pluginName(p) !== releaseOverlayPermissionPlugin,
       ),
       pickerPlugin,
       shareIntentPlugin,
@@ -216,6 +226,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       bootReceiverPlugin,
       backupRestoreSharePlugin,
       contactPickerPermissionPlugin,
+      releaseOverlayPermissionPlugin,
     ];
   })(),
 });
