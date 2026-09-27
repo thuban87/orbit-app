@@ -1,6 +1,11 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 import { useMemo, useState } from "react";
 import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
+import {
+  OVERVIEW_GAP,
+  overviewColumnWidth,
+  overviewTileWidth,
+} from "@/components/profile/overview-geometry";
 import { AppText } from "@/components/ui/AppText";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import type { ProfileSnapshot } from "@/db/profile-read";
@@ -48,13 +53,8 @@ export function RelationshipOverview({
     () => packOverviewModules(visible, { width, fontScale }),
     [fontScale, visible, width],
   );
-  const columnWidth =
-    packed.columns > 0
-      ? Math.max(
-          0,
-          (width - SPACING.sm * (packed.columns - 1)) / packed.columns,
-        )
-      : width;
+  // Shared with the layout editor's preview (RG-033 AUD-UIA-021).
+  const columnWidth = overviewColumnWidth(width, packed.columns);
 
   const content: Record<
     ProfileOverviewModuleId,
@@ -115,9 +115,7 @@ export function RelationshipOverview({
     >
       {packed.placements.map((placement) => {
         const item = content[placement.id];
-        const tileWidth =
-          columnWidth * placement.columnSpan +
-          SPACING.sm * (placement.columnSpan - 1);
+        const tileWidth = overviewTileWidth(placement.columnSpan, columnWidth);
         const accessibilityLabel = `${item.label}. ${item.value}${item.detail ? `. ${item.detail}` : ""}`;
         const onPress = action[placement.id];
         const tile = (
@@ -206,7 +204,7 @@ export function RelationshipOverview({
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: OVERVIEW_GAP },
   tile: { minHeight: 112, padding: SPACING.base },
   tileContent: { alignItems: "center" },
   centeredText: { textAlign: "center" },

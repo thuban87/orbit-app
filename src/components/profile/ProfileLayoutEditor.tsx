@@ -14,6 +14,12 @@ import {
   useReorderableDrag,
 } from "react-native-reorderable-list";
 import { Icon } from "@/components/icons/Icon";
+import {
+  OVERVIEW_GAP,
+  overviewColumnWidth,
+  overviewTileWidth,
+  packProfileOverviewPreview,
+} from "@/components/profile/overview-geometry";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
@@ -32,7 +38,6 @@ import {
   saveLayoutEditorDraft,
 } from "@/profile/layout-editor-session";
 import { PROFILE_MODULE_REGISTRY } from "@/profile/module-registry";
-import { packOverviewModules } from "@/profile/pack-overview";
 import type { ProfileModuleParentId } from "@/profile/persisted-contract";
 import type {
   ProfileLayoutDocument,
@@ -109,6 +114,8 @@ function EditorRow({
             dispatch({ type: "set-visible", id: placement.id, visible })
           }
           accessibilityLabel={`Show ${definition.label}`}
+          trackColor={{ false: colors.border, true: colors.accent }}
+          thumbColor={colors.surfaceElevated}
         />
       </View>
       <View style={styles.rowControls}>
@@ -190,16 +197,30 @@ function ReorderableBucket({
   );
 }
 
-function Preview({ layout }: { layout: ProfileLayoutDocument }) {
+/**
+ * The layout editor's live preview (RG-033 `ui-accessibility/AUD-UIA-021`).
+ * Rows and spans are packed against the PROFILE overview's width basis, so they
+ * match the real Relationship Overview at this window width and font scale;
+ * tiles are then sized with the overview's own column/tile formulas from the
+ * preview card's measured width (narrower than the Profile's, so Profile pixel
+ * widths would overflow the card).
+ */
+export function ProfileLayoutPreview({
+  layout,
+}: {
+  layout: ProfileLayoutDocument;
+}) {
   const { width, fontScale } = useWindowDimensions();
+  const [tilesWidth, setTilesWidth] = useState(0);
   const preview = createAllSectionsPreview(layout);
-  const packed = packOverviewModules(
-    preview.overview.map((placement) => ({
-      id: placement.id,
-      size: placement.size,
-    })),
-    { width: Math.max(1, width - SPACING.lg * 2), fontScale },
-  );
+  const packed = packProfileOverviewPreview(preview.overview, width, fontScale);
+  const columnWidth = overviewColumnWidth(tilesWidth, packed.columns);
+  const rows: (typeof packed.placements)[] = [];
+  for (const placement of packed.placements) {
+    const row = rows[placement.row] ?? [];
+    row.push(placement);
+    rows[placement.row] = row;
+  }
   const topLevel = preview.topLevel.map(
     (placement) => PROFILE_MODULE_REGISTRY[placement.id].label,
   );
@@ -212,22 +233,42 @@ function Preview({ layout }: { layout: ProfileLayoutDocument }) {
         Overview auto-packs into {packed.columns} column
         {packed.columns === 1 ? "" : "s"} at this width.
       </AppText>
-      <View style={styles.previewTiles}>
-        {packed.placements.map((placement) => (
-          <View
-            key={placement.id}
-            style={[
-              styles.previewTile,
-              {
-                flexBasis: `${(placement.columnSpan / packed.columns) * 100}%`,
-              },
-            ]}
-          >
-            <AppText role="caption">
-              {PROFILE_MODULE_REGISTRY[placement.id].label}
-            </AppText>
-          </View>
-        ))}
+      <View
+        testID="profile-layout-preview-tiles"
+        style={styles.previewTiles}
+        onLayout={(event) => setTilesWidth(event.nativeEvent.layout.width)}
+      >
+        {tilesWidth > 0
+          ? rows.map((row, rowIndex) =>
+              row.length === 0 ? null : (
+                <View
+                  key={row.map((placement) => placement.id).join("|")}
+                  testID={`profile-layout-preview-row-${rowIndex}`}
+                  style={styles.previewRow}
+                >
+                  {row.map((placement) => (
+                    <View
+                      key={placement.id}
+                      testID={`profile-layout-preview-tile-${placement.id}`}
+                      style={[
+                        styles.previewTile,
+                        {
+                          width: overviewTileWidth(
+                            placement.columnSpan,
+                            columnWidth,
+                          ),
+                        },
+                      ]}
+                    >
+                      <AppText role="caption">
+                        {PROFILE_MODULE_REGISTRY[placement.id].label}
+                      </AppText>
+                    </View>
+                  ))}
+                </View>
+              ),
+            )
+          : null}
       </View>
     </GlassSurface>
   );
@@ -362,7 +403,7 @@ export function ProfileLayoutEditor({
               Drag a handle or use Move up and Move down. Every section stays in
               its parent.
             </AppText>
-            <Preview layout={draft} />
+            <ProfileLayoutPreview layout={draft} />
             <AppText role="label">Profile sections</AppText>
             <ReorderableBucket
               parent="profile"
@@ -428,7 +469,8 @@ const styles = StyleSheet.create({
     borderRadius: RADII.full,
   },
   preview: { gap: SPACING.sm, padding: SPACING.base },
-  previewTiles: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.xs },
+  previewTiles: { gap: OVERVIEW_GAP },
+  previewRow: { flexDirection: "row", gap: OVERVIEW_GAP },
   previewTile: { minHeight: 44, justifyContent: "center", padding: SPACING.xs },
   footer: { flexDirection: "row", flexWrap: "wrap", gap: SPACING.sm },
 });
