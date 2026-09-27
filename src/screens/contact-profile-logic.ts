@@ -4,6 +4,7 @@ import type { CurrentStateFieldKey } from "@/db/memory-registry";
 import type { KnowledgeChildId } from "@/profile/knowledge-presentation";
 import type { ProfileCollapseMap } from "@/profile/persisted-contract";
 import { createLatestRequestAuthority } from "@/utils/latest-request";
+import { isAppBackgrounded } from "@/utils/screen-visibility";
 
 export type ProfileMethodType = "phone" | "email";
 
@@ -218,6 +219,21 @@ export async function commitProfileOverviewToggle(input: {
   } catch {
     return { ok: false, expanded: input.currentExpanded };
   }
+}
+
+/**
+ * Whether a SHELL tick may re-read the Profile (38.3 VERIFICATION W2, 38.4
+ * D-10). A warm notification Mark/Snooze bumps the shell tick while the app is
+ * backgrounded; that must not cost a Profile read. `appState` is the
+ * synchronous `AppState.currentState`. The focus read and the post-sweep
+ * foreground (resume) read are not gated here — the foreground tick only fires
+ * after resume (D-14). Profile's hidden-but-foregrounded behavior is unchanged
+ * (38.4 Plan 15 owns that evidence-gated decision).
+ */
+export function shouldRunProfileShellRefresh(
+  appState: string | null | undefined,
+): boolean {
+  return !isAppBackgrounded(appState);
 }
 
 export interface ProfileSnapshotLoader {

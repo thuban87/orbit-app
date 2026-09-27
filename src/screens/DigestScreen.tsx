@@ -3,7 +3,7 @@ import type { BottomTabNavigationProp } from "@react-navigation/bottom-tabs";
 import { useFocusEffect, useIsFocused } from "@react-navigation/native";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { AppState, ScrollView, StyleSheet, View } from "react-native";
 import {
   type HorizonDrillTarget,
   HorizonSection,
@@ -53,6 +53,7 @@ import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
+import { isForegroundVisible } from "@/utils/screen-visibility";
 
 const LOG_SCOPE = "digest";
 const NEVER_CONTACTED_QUERY = {
@@ -145,7 +146,12 @@ export function DigestScreen({ navigation }: DigestScreenProps) {
         // compact refresh notice (never back to `loading` on a refresh).
         setState((current) => digestLoadStateOnFail(current));
       },
-      isVisible: () => isFocusedRef.current,
+      // 38.3 VERIFICATION W2 (D-10): focus alone stays true while the app is
+      // backgrounded, so a warm notification Mark/Snooze's shell tick read in
+      // the background. Gate on the synchronous app state too (never a lagging
+      // React mirror, which would drop the post-sweep foreground read).
+      isVisible: () =>
+        isForegroundVisible(isFocusedRef.current, AppState.currentState),
       onAccepted: () => setYourWeekSignal((signal) => signal + 1),
     });
   }

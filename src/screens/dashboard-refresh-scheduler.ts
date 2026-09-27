@@ -23,6 +23,7 @@
  * read bundles.
  */
 import { createLatestRequestAuthority } from "@/utils/latest-request";
+import { isForegroundVisible } from "@/utils/screen-visibility";
 
 /** Every trigger that may issue a Home read. */
 export type DashboardRefreshSource =
@@ -39,20 +40,16 @@ const DEFERRABLE_WHILE_HIDDEN: ReadonlySet<DashboardRefreshSource> = new Set([
 ]);
 
 /**
- * Home's visibility for the scheduler (38.3 review A-WR-01, D-23). Navigation
- * focus alone stays `true` while the app sits in the background with Home as
- * the focused route, so a warm notification Mark/Snooze's shell tick ran the
- * full Home read in the background. `appState` is react-native's synchronous
- * `AppState.currentState` (not a React-state mirror, which would lag the
- * post-sweep foreground tick on resume and drop the D-14 read). Only the
- * background hides Home: `inactive` is a transient overlay with no resume
- * sweep after it, so a tick there must still read.
+ * Home's visibility for the scheduler (38.3 review A-WR-01, D-23). Delegates to
+ * the shared `isForegroundVisible` rule (38.4 D-10, 38.3 VERIFICATION W2), which
+ * Digest and Profile now use too: focused AND not `background`, over the
+ * synchronous `AppState.currentState`; `inactive` still reads.
  */
 export function isDashboardVisible(
   focused: boolean,
   appState: string | null | undefined,
 ): boolean {
-  return focused && appState !== "background";
+  return isForegroundVisible(focused, appState);
 }
 
 export interface DashboardRefreshScheduler {

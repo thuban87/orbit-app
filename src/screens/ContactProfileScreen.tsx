@@ -2,7 +2,7 @@
 
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, AppState, ScrollView, StyleSheet, View } from "react-native";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { ProfileBackgroundManager } from "@/components/profile/ProfileBackgroundManager";
 import { ProfileHero } from "@/components/profile/ProfileHero";
@@ -43,6 +43,7 @@ import {
   profileKnowledgeDestination,
   profileLifecycleView,
   profileOverflowEntries,
+  shouldRunProfileShellRefresh,
   unbindConfirmation,
 } from "@/screens/contact-profile-logic";
 import {
@@ -142,7 +143,14 @@ export function ContactProfileScreen({
     await loader.load();
   }, [loader, contactId, themePackage]);
 
-  useShellRefresh(load);
+  // 38.3 VERIFICATION W2 (D-10): a shell tick delivered while the app is
+  // backgrounded (warm notification Mark/Snooze) reads nothing; the focus and
+  // post-sweep resume reads cover it. Synchronous AppState, never a mirror.
+  const onShellRefresh = useCallback(() => {
+    if (!shouldRunProfileShellRefresh(AppState.currentState)) return;
+    void load();
+  }, [load]);
+  useShellRefresh(onShellRefresh);
   // D-14: the resume read runs after the launch/foreground sweep settles.
   useForegroundRefresh(load);
   useFocusEffect(useCallback(() => void load(), [load]));
