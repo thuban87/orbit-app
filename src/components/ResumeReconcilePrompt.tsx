@@ -1,5 +1,13 @@
 import { type NavigationProp, useNavigation } from "@react-navigation/native";
-import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getExecutor, localDateTime } from "@/db/database";
 import { discardSession } from "@/db/reconcile-session-dao";
 import { navigateIntoTab } from "@/navigation/tab-entry";
@@ -10,6 +18,7 @@ import {
 } from "@/services/import/reconcile-resume-sweep";
 import { deleteReconcileStaging } from "@/services/photos/photo-storage";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 
 type RootNavigation = NavigationProp<TabParamList>;
@@ -28,6 +37,8 @@ export function ResumeReconcilePrompt({
 }: ResumeReconcilePromptProps) {
   const { colors } = useTheme();
   const navigation = useNavigation<RootNavigation>();
+  // D-49: inset by the safe area so the bounded card never meets the bars.
+  const insets = useSafeAreaInsets();
   if (!resumable) return null;
   const discard = async () => {
     try {
@@ -53,7 +64,15 @@ export function ResumeReconcilePrompt({
       animationType="fade"
       onRequestClose={() => undefined}
     >
-      <View style={styles.modalRoot}>
+      <View
+        style={[
+          styles.modalRoot,
+          {
+            paddingTop: insets.top + SPACING.lg,
+            paddingBottom: insets.bottom + SPACING.lg,
+          },
+        ]}
+      >
         <View
           style={[
             StyleSheet.absoluteFill,
@@ -70,14 +89,21 @@ export function ResumeReconcilePrompt({
             },
           ]}
         >
-          <Text style={[styles.heading, { color: colors.textPrimary }]}>
-            Resume your check?
-          </Text>
-          <Text style={[styles.body, { color: colors.textSecondary }]}>
-            {resumable.discardOnly
-              ? "This saved check can’t be resumed. You can discard its unresolved contacts. Changes you already applied stay applied."
-              : "Unresolved contacts are saved. Changes you already applied stay applied."}
-          </Text>
+          {/* D-49: the heading and body give up height first and scroll at
+              large text; the actions below stay outside, always reachable. */}
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={styles.bodyContent}
+          >
+            <Text style={[styles.heading, { color: colors.textPrimary }]}>
+              Resume your check?
+            </Text>
+            <Text style={[styles.bodyText, { color: colors.textSecondary }]}>
+              {resumable.discardOnly
+                ? "This saved check can’t be resumed. You can discard its unresolved contacts. Changes you already applied stay applied."
+                : "Unresolved contacts are saved. Changes you already applied stay applied."}
+            </Text>
+          </ScrollView>
           {!resumable.discardOnly ? (
             <Pressable
               accessibilityRole="button"
@@ -90,7 +116,7 @@ export function ResumeReconcilePrompt({
               }}
               style={[styles.button, { backgroundColor: colors.accent }]}
             >
-              <Text style={[styles.buttonLabel, { color: colors.background }]}>
+              <Text style={[styles.buttonLabel, { color: colors.onAccent }]}>
                 Resume
               </Text>
             </Pressable>
@@ -118,9 +144,19 @@ export function ResumeReconcilePrompt({
 const styles = StyleSheet.create({
   modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
   scrim: { opacity: 0.85 },
-  sheet: { gap: 14, padding: 20, borderWidth: 1, borderRadius: 12 },
+  // flexShrink: the card never outgrows the (safe-area inset) window (D-49).
+  sheet: {
+    flexShrink: 1,
+    gap: 14,
+    padding: 20,
+    borderWidth: 1,
+    borderRadius: 12,
+  },
   heading: { fontSize: 18, fontWeight: "700" },
-  body: { fontSize: 15, lineHeight: 22 },
+  // Bounded scroll body: short copy keeps its height, tall copy scrolls (D-49).
+  body: { flexGrow: 0, flexShrink: 1 },
+  bodyContent: { gap: 14 },
+  bodyText: { fontSize: 15, lineHeight: 22 },
   button: {
     minHeight: 44,
     borderRadius: 10,
