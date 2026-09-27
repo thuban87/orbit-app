@@ -2,8 +2,9 @@
  * GlassSurface (THEME-05) — the ONE semantic surface component.
  *
  * Keyed by the active theme PACKAGE (no parallel component families):
- *   - Galaxy renders glass-forward — expo-blur where affordable, a translucent
- *     tint, a luminous border, a subtle glow.
+ *   - Galaxy renders glass-forward — expo-blur where affordable (iOS; Android
+ *     blur is off for now, D-61), a translucent tint, a luminous border, a
+ *     subtle glow.
  *   - Standard renders flatter/quieter — an opaque tint, a plain border, no glow.
  *
  * Blur degrades gracefully (dossier §F): when blur is unavailable (or the package
@@ -60,6 +61,17 @@ export interface GlassSurfaceProps {
 /** Blur intensity for the glass surface (device-UAT tunable). */
 const BLUR_INTENSITY = 32;
 
+/**
+ * Android blur is OFF "for now" (owner ruling D-61, 2026-09-27). expo-blur's
+ * Dimezis methods need a `blurTarget`; without one the old
+ * `dimezisBlurViewSdk31Plus` silently fell back to no blur and warned on every
+ * mount. `"none"` requests that same fallback explicitly: the native view paints
+ * the identical intensity-scaled tint layer, so the look is unchanged and the
+ * warning stops. `blurMethod` is Android-only, so iOS keeps its real blur.
+ * Real Android blur (a `BlurTargetView` host) is not in 38.4.
+ */
+const ANDROID_BLUR_METHOD = "none";
+
 export function GlassSurface({
   children,
   blurAvailable = true,
@@ -104,9 +116,8 @@ export function GlassSurface({
           style={StyleSheet.absoluteFill}
           intensity={BLUR_INTENSITY}
           tint={mode === "dark" ? "dark" : "light"}
-          // Android needs an explicit method; SDK31+ path falls back to none on
-          // older devices, which is exactly the graceful degrade we want.
-          blurMethod="dimezisBlurViewSdk31Plus"
+          // D-61: no Android blur for now (see ANDROID_BLUR_METHOD).
+          blurMethod={ANDROID_BLUR_METHOD}
           pointerEvents="none"
         />
       ) : null}

@@ -131,6 +131,8 @@ RN `Alert` confirmations and the Android date/time picker dialogs are native sur
 
 12. **Text bare on the art is not glass.** Captions and errors with no `GlassSurface`, `ChromeScrim` or opaque backing sit on the veiled art. The glass scope does not reach them, and neither does the proof (38.4 finding F-1, owner device review in Plan 17).
 
+13. **Android blur is off for now (D-61).** `GlassSurface` passes `blurMethod="none"` on its `BlurView`. expo-blur's Dimezis methods need a `blurTarget`; without one they silently fall back to no blur and warn on every mount. `"none"` keeps the identical native tint fallback, so do not "fix" it by removing the `BlurView` on Android (that drops the tint layer and thins Galaxy cards). Real Android blur needs a `BlurTargetView` host and is out of 38.4. `glass-surface-blur.contract.test.ts` guards it.
+
 ## Smoke Test
 
 ```bash
@@ -149,4 +151,4 @@ For a bundled background or surface-composition change, select two materially di
 
 - **2026-09-26 — Phase 38.4 Plan 03 (RG-029 / `ui-accessibility/AUD-UIA-001`; D-12, D-24, D-26, D-27).** Added `darkestPixel` and `scripts/measure-background-extrema.py --check`, the both-extrema + interval proof, the Standard-Light glass foreground scope (`GlassForegroundScope`, `UnscopedTheme`, `useUnscopedTheme`, `useGlassForegroundColors`) with lightness-only variants, the `textPlaceholder` token, and the rule that a new foreground on Standard glass is proven or excluded in writing.
 - **2026-09-27 — Phase 38.4 Plan 22 (D-50 / `OA-D4`).** Added "Native dialogs follow Orbit's mode": `native-color-scheme.ts` (`nativeColorSchemeFor`, `useNativeColorSchemeSync`), called once from `ThemeProvider` with the active package's mode setting; "system" → `"unspecified"` feedback-loop guard; `userInterfaceStyle` recorded as inert on Android.
-- **2026-09-27 — Phase 38.4 Plan 20 (D-34 / RG-029 `ui-accessibility/AUD-UIA-001`).** Added "Read colours inside the scope (D-34)": `ScopedPalette`, the glass-scope read contract and its analyzer. The 48 out-of-scope reads (17 files) were moved inside their scopes (inventory Table E).
+- **2026-09-27 — Phase 38.4 Plan 20 (D-34 / RG-029 `ui-accessibility/AUD-UIA-001`).** Added "Read colours inside the scope (D-34)": `ScopedPalette`, the glass-scope read contract and its analyzer. The 48 out-of-scope reads (17 files) were moved inside their scopes (inventory Table E). D-61: Android blur off for now (`blurMethod="none"`, Pitfall 13).
