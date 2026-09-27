@@ -17,6 +17,7 @@ import {
   upsertAiConnection,
 } from "@/db/ai-connections-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { aiKeyStore } from "@/services/ai-key-store";
 import type { AiCloudProviderId } from "@/services/ai-types";
 import { useAiConfigStore } from "@/stores/ai-config-store";
@@ -57,6 +58,8 @@ export function AIConnectionScreen({
   onChooseModel,
 }: AIConnectionScreenProps) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const activeLane = useAiConfigStore((state) => state.activeConnection);
   const [connections, setConnections] = useState<AiConnection[]>([]);
   const [expanded, setExpanded] = useState<AiCloudProviderId | null>(
@@ -344,7 +347,10 @@ export function AIConnectionScreen({
         </AppText>
       </View>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>

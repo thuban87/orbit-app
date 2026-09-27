@@ -34,6 +34,7 @@ import {
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor } from "@/db/database";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useComposeSession } from "@/stores/compose-session-store";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
@@ -90,6 +91,8 @@ export function ComposeResearchScreen({
   contactId,
 }: ComposeResearchScreenProps) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const navigation = useNavigation();
   const [items, setItems] = useState<ResearchItem[]>([]);
   const [header, setHeader] = useState<ResearchHeader | null>(null);
@@ -141,7 +144,12 @@ export function ComposeResearchScreen({
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
+      >
         {/* Contact-identity header — the SAME Back + Avatar + name heading Compose
             shows, so the two sibling sides stay oriented (D-14-010). Back pops to
             Compose with the session (draft + Message Focus) preserved (COMP-07). */}

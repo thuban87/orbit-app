@@ -35,6 +35,7 @@ import {
   setRememberedModel,
 } from "@/db/ai-connections-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import type { AiCloudProviderId } from "@/services/ai-types";
 import { useAiConfigStore } from "@/stores/ai-config-store";
 import { useTheme } from "@/theme";
@@ -85,6 +86,8 @@ export function AIModelPickerScreen({
   onSelected,
 }: AIModelPickerScreenProps) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const [openRouterCatalog, setOpenRouterCatalog] =
     useState<OpenRouterCatalog | null>(null);
   const [directCatalog, setDirectCatalog] = useState(() =>
@@ -225,7 +228,10 @@ export function AIModelPickerScreen({
         </AppText>
       </View>
       <ScrollView
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
         keyboardShouldPersistTaps="handled"
       >
         {lane !== "custom" ? (

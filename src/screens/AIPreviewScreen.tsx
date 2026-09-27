@@ -12,6 +12,7 @@ import {
   getWritingStyle,
   listPersonalizationSections,
 } from "@/db/personalization-dao";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
   buildContactPromptReview,
   buildWholePromptPreview,
@@ -53,6 +54,8 @@ export interface AIPreviewScreenProps {
 /** Local-only whole-prompt preview with an optional real-contact example. */
 export function AIPreviewScreen({ onBack }: AIPreviewScreenProps) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const [preview, setPreview] = useState<PreviewState | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [rawOpen, setRawOpen] = useState(false);
@@ -124,7 +127,10 @@ export function AIPreviewScreen({ onBack }: AIPreviewScreenProps) {
         testID="ai-preview-screen"
         contentContainerStyle={[
           styles.content,
-          { backgroundColor: colors.background },
+          {
+            backgroundColor: colors.background,
+            paddingBottom: bottomClearance,
+          },
         ]}
       >
         <View style={styles.header}>

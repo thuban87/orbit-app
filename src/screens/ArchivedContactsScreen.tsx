@@ -41,6 +41,7 @@ import {
   purgeContact,
 } from "@/db/purge-dao";
 import type { RootStackParamList } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { buildNotificationPurgeCleanup } from "@/services/notifications/purge-notification-cleanup";
 import { deleteImportStaging } from "@/services/photos/photo-storage";
 import { buildPhotoPurgeCleanup } from "@/services/photos/purge-photo-cleanup";
@@ -95,6 +96,8 @@ function purgeBody(name: string, parts: string[]): string {
 
 export function ArchivedContactsScreen() {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   // Archived is hosted in both DashboardStack and SettingsStack; both register
   // "Profile", so tapping a row opens the contact and Back returns here — the
   // locked origin-aware return (Dashboard → Archived → Profile → Back → Archived,
@@ -194,7 +197,12 @@ export function ArchivedContactsScreen() {
   return (
     <View testID="archived-contacts-screen" style={{ flex: 1 }}>
       <ShellAppBar variant="child" title="Archived" />
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
+      >
         {rows.length === 0 ? (
           <ChromeScrim style={styles.emptyScrim} radius={RADII.md}>
             <View testID="archived-empty" style={styles.emptyState}>

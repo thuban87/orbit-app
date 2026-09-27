@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import type { RootStackScreenProps } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
   type BackupHost,
   DEFAULT_BACKUP_HOST,
@@ -14,6 +15,8 @@ export function RestoreResultScreen({
   host = DEFAULT_BACKUP_HOST,
 }: RootStackScreenProps<"RestoreResult"> & { host?: BackupHost }) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const {
     added,
     updated,
@@ -37,7 +40,10 @@ export function RestoreResultScreen({
   return (
     <ScrollView
       testID="restore-result-screen"
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[
+        styles.content,
+        { paddingBottom: bottomClearance },
+      ]}
     >
       <View
         style={[
