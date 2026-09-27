@@ -69,7 +69,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | Migration | `src/db/migrations/027-default-interaction-channel.ts` | Adds validated ordinary interaction-channel preference and remembered-channel columns. |
 | Migration | `src/db/migrations/028-compose-message-mode.ts` | Adds validated Compose default/remembered message-mode settings without a new entity table. |
 | Migration | `src/db/migrations/030-your-week-period.ts` | Adds the validated portable Rolling 7 Days / Calendar Week setting. |
-| Migration | `src/db/migrations/031-your-week-occurred-at-indexes.ts` | Adds `occurred_at` indexes on `interactions` and `group_events` so Your Week reads SEARCH the period; the current schema head (`TARGET_VERSION = YOUR_WEEK_INDEX_SCHEMA_VERSION`, 31). |
+| Migration | `src/db/migrations/031-your-week-occurred-at-indexes.ts` | Adds `occurred_at` indexes on `interactions` and `group_events` so Your Week reads SEARCH the period. |
+| Migration | `src/db/migrations/032-import-batch-cadence.ts` | Adds the nullable positive-integer `import_sessions.batch_interval_days` so a bulk import's Bound batch cadence survives resume (38.4 D-57); the current schema head (`TARGET_VERSION = IMPORT_BATCH_CADENCE_SCHEMA_VERSION`, 32). |
 | Settings DAO | `src/db/app-settings-dao.ts` | Validates and persists the singleton's notification, Orrery, and non-secret AI preference updates. |
 | Systems DAO | `src/db/systems-dao.ts` | Owns transactional System definitions, rules, overrides, preferences, delete/Undo, and selection-aware lifecycle composites. |
 | Concurrency utility | `src/db/mutex.ts` | Serializes database write transactions in one JS runtime. |
@@ -110,6 +111,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 | `src/db/migrations/027-default-interaction-channel.ts` | Adds `default_interaction_channel` and `remembered_interaction_channel` as validated, non-null singleton settings. |
 | `src/db/migrations/030-your-week-period.ts` | Adds `your_week_period` additively with a safe Rolling 7 Days default. |
 | `src/db/migrations/031-your-week-occurred-at-indexes.ts` | Plain additive `CREATE INDEX idx_interactions_occurred_at` / `idx_group_events_occurred_at` (no existence guard; no row read or rewritten; no backup-format change — indexes are not portable data). |
+| `src/db/migrations/032-import-batch-cadence.ts` | Plain additive `ALTER TABLE import_sessions ADD COLUMN batch_interval_days INTEGER CHECK (NULL or positive integer)`; no row read or rewritten, so existing sessions read Unbound with no cadence; no backup-format change — import sessions are local-only and not backup data (migration 012). The Bound ⇒ cadence pairing is enforced by the session writer, not a cross-column CHECK. |
 | `src/db/systems-dao.ts` | Sole mutation boundary for System metadata and ref-keyed customization. |
 | `src/db/import-session-dao.ts` | Owns atomic session acceptance and transaction-composable import-row state transitions. |
 | `src/db/app-settings-dao.ts` | Typed, bounds-validated read and update boundary for application settings. |
@@ -172,7 +174,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 |---|---|---|---|
 | `BUSY_TIMEOUT_MS` | `5000` | `src/db/database.ts` | Wait budget for a busy shared connection. |
 | `SWEEP_HOOK_TIMEOUT_MS` | `60000` | `src/services/launch-sweep.ts` | Per-hook launch-sweep wait budget (D-30); sized for a normal automatic backup. |
-| `TARGET_VERSION` | `30` | `src/db/database.ts` | Current registered schema head, including the portable Your Week period setting. |
+| `TARGET_VERSION` | `32` (`IMPORT_BATCH_CADENCE_SCHEMA_VERSION`) | `src/db/database.ts` | Current registered schema head, including the import batch cadence (migration 032). |
 
 ## Decisions
 
@@ -282,6 +284,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 
 | Date | Phase | What Changed |
 |------|-------|--------------|
+| 2026-09-27 | 38.4 | Added migration 032 (schema head 32, `IMPORT_BATCH_CADENCE_SCHEMA_VERSION`): additive nullable positive-integer `import_sessions.batch_interval_days` for the bulk-import Bound batch cadence (D-57, OA-E2); no shipped migration edited, no row rewritten, no backup-format change. Also corrected the stale `TARGET_VERSION` configuration row (it still read 30). |
 | 2026-09-26 | 38.4 | Added migration 031 (schema head 31): additive `idx_interactions_occurred_at` and `idx_group_events_occurred_at` so Your Week reads are period-bounded (RG-028, performance/AUD-PERF-004, D-18); no shipped migration edited, no stored value rewritten. |
 | 2026-09-26 | 38.3 | Bounded each launch-sweep hook with `SWEEP_HOOK_TIMEOUT_MS` so a hung hook no longer wedges later sweeps or the foreground tick; a still-running hook is skipped, never re-run (review A-WR-02, owner ruling D-30). |
 | 2026-09-25 | 38.3 | Added `onSweepSettled`: one owning-run settlement notification per launch sweep (coalesced passes publish once), forwarded by `App.tsx` to the foreground refresh tick. |

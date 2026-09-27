@@ -19,6 +19,8 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
   - `mode` (`TEXT`) — `single` or `bulk` workflow shape.
   - `phone_region` (`TEXT`) — region used when canonicalizing imported phone evidence.
   - `batch_category_id` (`INTEGER`, nullable) — explicit bulk override; `NULL` means Uncategorized.
+  - `batch_tracking_enabled` (`INTEGER` 0/1) — the batch lifecycle chosen at bulk setup (38.4 D-57); written by `setSessionBatchDefaults` together with the category and cadence. Picker acceptance still writes 0 (Unbound).
+  - `batch_interval_days` (`INTEGER`, nullable; migration 032) — the batch cadence when Bound; `NULL` when Unbound and for every session created before migration 032. The CHECK admits only `NULL` or a positive integer; the Bound ⇒ cadence pairing is enforced by `assertImportLifecycle` in the writer.
   - `status` (`TEXT`) — durable pending, complete, or discarded session state.
 - `import_session_rows` — one picker snapshot and review state per selected source contact.
   - `source_payload` (`TEXT`) — accepted name, methods, birthday, and Note snapshot; the allowlist remains the durable source after a provider grant expires.
@@ -53,16 +55,19 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 |---|---|
 | `src/db/migrations/012-import-sessions.ts` | Adds local-only durable import-session tables and state constraints. |
 | `src/services/import/import-acquire.ts` | Accepts picker snapshots, stages accepted photos, and routes single versus bulk flow. |
-| `src/services/import/source-consolidation.ts` | Combines explicit source clusters and retains the first non-blank Note for the new contact. |
+| `src/services/import/source-consolidation.ts` | Combines explicit source clusters with the batch lifecycle and retains the first non-blank Note for the new contact. |
+| `src/db/migrations/032-import-batch-cadence.ts` | Adds the nullable positive-integer `import_sessions.batch_interval_days` (38.4 D-57). |
+| `src/screens/bulk-import-setup-logic.ts` | Bulk setup's batch lifecycle: `BULK_IMPORT_DEFAULT_FREQUENCY` (Monthly), `BULK_BOUND_BLURB`, `bulkLifecycleChoice()` and `initialBulkLifecycle()` (38.4 D-57). |
+| `src/services/import/import-lifecycle-effects.ts` | `applyBoundImportEffects()`: after a Bound pass, combine or single import, reconciles the notification schedule and refreshes the widget once, isolated and best-effort (38.4 D-57). |
 | `modules/orbit-contact-picker/android/src/main/AndroidManifest.xml` | Declares the permission used by legacy acquisition and reconciliation re-reads. |
 | `plugins/withContactPickerPermission.js` | Writes the decisive app-manifest permission declaration during Expo prebuild. |
 | `src/services/import/start-contact-import.ts` | Selects the system or legacy acquisition path once for both entry points. |
 | `src/screens/LegacyContactPickerScreen.tsx` | Browses lightweight contact summaries and reads full fields only for selected contacts. |
 | `src/screens/ImportReviewScreen.tsx` | Provides detailed single-contact review and explicit duplicate interrupt. |
-| `src/screens/BulkImportSetupScreen.tsx` | Shows shared Unbound/Uncategorized defaults, category override, and consolidation prompt. |
+| `src/screens/BulkImportSetupScreen.tsx` | Offers the batch's Orbit participation (Unbound default, or Bound with a batch frequency), the category override, and the consolidation prompt; saves the batch defaults to the session before any write. |
 | `src/screens/ImportProgressScreen.tsx` | Shows one determinate logical bulk import, or a truthful "Import stopped" surface after a fatal setup/session failure. |
 | `src/screens/DuplicateReviewScreen.tsx` | Resolves advisory rows through explicit Link, Import as New, or Skip actions. |
-| `src/screens/ImportCompleteScreen.tsx` | Reports durable outcome buckets and offers review or Unbound navigation. |
+| `src/screens/ImportCompleteScreen.tsx` | Reports durable outcome buckets and offers review, contact, Retry and Done actions. |
 | `src/components/ResumeImportPrompt.tsx` | Offers explicit Resume or Discard after an interrupted import. |
 
 ## How It Works
@@ -78,17 +83,17 @@ Category choices use the canonical ordered catalog and switch to the complete se
 
 ### Reviewing one contact
 
-1. One accepted row opens `ImportReviewScreen`, where the user can choose Bound or Unbound, category, selected/primary methods, birthday, and photo before writing.
+1. One accepted row opens `ImportReviewScreen`, where the user can choose Bound or Unbound, category, selected/primary methods, birthday, and photo before writing. The Bound choice and its frequency are honoured: `commitSingleImport()` passes the reviewed lifecycle to `importContactRecord()`, which takes the lifecycle as an explicit, validated parameter. Before 38.4 the seam forced Unbound and silently dropped a Bound choice (D-57 finding; Phase 19 Cluster D, ADR-066).
 2. The DAO rejects an invalid non-null birthday before opening its transaction; the screen keeps invalid raw input visible and disables Import. The mapper accepts supported year-less and unambiguous slash formats, while still-unreadable values remain flagged rather than coerced.
 3. A deterministic active external link resolves as already in Orbit. Advisory matches require an explicit Link to Existing, Import as New, or Skip choice and never overwrite an existing name.
 4. A successful new-contact create preserves a raw Note as an `imported`, import-provenance Memory with stored AI permission off, regardless of the general new-Memory default. The per-item toggle is the opt-in path. An already-linked outcome deliberately writes no Note.
 
 ### Processing bulk work and recovery
 
-1. A multi-selection opens `BulkImportSetupScreen` with shared Unbound and Uncategorized defaults and an optional category override, not per-person controls.
+1. A multi-selection opens `BulkImportSetupScreen`. The batch is Unbound by default; the user may choose Bound, which reveals a batch frequency (`FrequencyPicker`, starting at Monthly) and a blurb saying that binding puts every imported contact on reminders at that frequency. An optional category override sits beside it. There are no per-person controls. Import (and Combine, before its combine) saves the category and lifecycle to the session in one `setSessionBatchDefaults` write before any contact is created, and every bulk create — the driver's pass, a resume, Combine, and Duplicate Review's Import as new — reads the lifecycle from the session (`sessionBatchLifecycle`), so an interrupted import resumes with the same batch choice. Returning to setup reloads the saved choice (38.4 D-57).
 2. `runImportBatch()` processes each safe row independently; ambiguous rows persist candidate evidence for later review and cannot block safe rows. A nameless bulk row is terminally skipped before it can wedge a resumable session or stage a photo.
 3. If setup or session access fails outside the driver's per-row isolation, `ImportProgressScreen` leaves "Importing… X of Y" for an "Import stopped" surface and never re-runs the batch. A still-readable session offers "View import summary" (replace to Import Complete); an unreadable session shows "Couldn't read this import" with Back. The stopped phase releases the `useOpenImportSession` hold (`useOpenImportSession(sessionId, active)`), so the next foreground sweep can offer the session again.
-4. `ImportCompleteScreen` reads durable Imported, Already in Orbit, Need review, Failed, nameless-skipped, and unreadable-birthday counts. `importCompleteRetryState()` shows Retry when rows are failed, still pending (the fatal-stop case), or committed contacts have outstanding photos. Retry runs only `pending`/`failed` rows (the driver also skips any row that already has a contact) plus photo-only retries; Skip remaining photos explicitly retires photo work. A completed batch can open Unbound contacts. The summary re-reads on **every focus** (`useFocusEffect`, whose cleanup invalidates the latest-request authority; 38.3 UAT O-3, 38.4 D-10), so returning from Duplicate Review after a link shows the current Need-review count. The focus path runs only `load` — the gated summary read plus the pre-existing idempotent `finalizeSessionIfTerminal` (which completes the session only when no rows are unresolved) — never an import, Retry, Skip, or row mutation.
+4. `ImportCompleteScreen` reads durable Imported, Already in Orbit, Need review, Failed, nameless-skipped, and unreadable-birthday counts. `importCompleteRetryState()` shows Retry when rows are failed, still pending (the fatal-stop case), or committed contacts have outstanding photos. Retry runs only `pending`/`failed` rows (the driver also skips any row that already has a contact) plus photo-only retries; Skip remaining photos explicitly retires photo work. The summary re-reads on **every focus** (`useFocusEffect`, whose cleanup invalidates the latest-request authority; 38.3 UAT O-3, 38.4 D-10), so returning from Duplicate Review after a link shows the current Need-review count. The focus path runs only `load` — the gated summary read plus the pre-existing idempotent `finalizeSessionIfTerminal` (which completes the session only when no rows are unresolved) — never an import, Retry, Skip, or row mutation.
 5. The launch sweep offers Resume for pending work and for completed sessions with outstanding photos. Discard removes only unresolved rows and staging; contacts and their outstanding photo work stay in Orbit.
 6. `DuplicateReviewScreen` renders through `duplicateReviewView()`: a failed read shows "Couldn't load matches" with a Retry that only re-reads, never "Nothing to review". A resolve is complete when its write commits: only a rejected link/import/skip write raises the per-row Alert, while a failed finalize or follow-up re-read after a committed write becomes the read error (`runResolveThenRecover` / `runBulkResolveThenRecover`), so the write is never repeated.
 
@@ -118,7 +123,7 @@ Category choices use the canonical ordered catalog and switch to the complete se
 
 - **ADR-064:** Permissionless Android 17 System-Contact Snapshot Acquisition — uses a selected-field native snapshot instead of broad contacts permission.
 - **ADR-065:** Durable Resumable Contact-Import Sessions with Failure-Isolated Photos — keeps review/retry state local and durable while isolating photo failure.
-- **ADR-066:** Deliberate Reviewed Import with Unbound Bulk Defaults — requires single review and uses safe shared bulk defaults.
+- **ADR-066:** Deliberate Reviewed Import with Unbound Bulk Defaults — requires single review and uses safe shared bulk defaults. *Partially superseded by 38.4 D-57 (bulk setup may bind the batch at one frequency; Unbound stays the default) and D-58 (Import Complete's bridge to Unbound contacts removed); superseding ADR due at KB extraction.*
 - **ADR-067:** Conservative Advisory Identity Matching and Explicit Source Consolidation — keeps inferred identity user-confirmed and source consolidation explicit.
 - **ADR-002:** Cross-Version Contact Import — Hybrid Two-Picker — routes acquisition by Android SDK while retaining one local picker-agnostic pipeline.
 - **ADR-003:** `READ_CONTACTS` on API 37+ for Reconcile — enables a permission-gated linked-contact re-read without changing the API-37+ import picker.
@@ -142,6 +147,7 @@ Category choices use the canonical ordered catalog and switch to the complete se
 11. **Never auto-rerun a stopped import.** A fatal ImportProgress stop hands recovery to the user through Import Complete's explicit Retry; replaying a partially committed batch automatically risks duplicate contacts.
 12. **A post-write read failure is not a write failure.** In Duplicate Review, never tell the user to redo a committed link or import because finalize or the re-read failed; route it to the read error and its read-only Retry.
 13. **The resume prompt's body scrolls; its buttons never do.** At large text "Resume your import?" keeps its heading and body in a bounded `ScrollView` (`flexGrow: 0`, `flexShrink: 1`) inside a shrinking, safe-area-inset card, with Resume / Discard / Later outside the scroll region. It stays an RN `Modal` whose only exits are its buttons; do not move an action into the scroll body or make Back dismiss it (D-49).
+14. **The batch lifecycle lives only on the import session.** Never add an in-pass lifecycle override to `runImportBatch` or any other bulk create: resume calls the driver again with no setup state, so it must read the session (`sessionBatchLifecycle`). Every create seam (`importContactRecord`, `importRowAsNew`, `combineCluster`) takes a REQUIRED validated lifecycle, and bulk setup writes it with the category in one `setSessionBatchDefaults` update before any contact is created (D-57).
 
 ## Related Systems
 
@@ -169,3 +175,5 @@ Category choices use the canonical ordered catalog and switch to the complete se
 | 2026-09-26 | 38.3 | Code-review fixes to the D-20 recovery path and import commit truth: BulkImportSetup holds the open-session mark only while focused and re-enables Import on return, so a fatal ImportProgress stop really releases the session to the resume sweep (B-CR-02); a resume re-entry carries a fresh `runKey` so a reused stopped ImportProgress route re-runs (B-WR-01); Duplicate Review link/bulk writes and Import Complete Retry/Skip photos are single-flight latched (B-WR-02, B-WR-03); Import Complete reads through `ReadPhase` with a read-only Retry and shows a failed Retry write as an inline notice above re-read counts (B-WR-04). |
 | 2026-09-26 | 38.4 | Import Complete re-reads on focus (38.3 UAT O-3, D-10): the mount-only summary effect became `useFocusEffect(useCallback(() => { void load(); return () => authority.invalidate(); }))`, still gated by the one latest-request authority; the focus path never re-runs an import, Retry, Skip or row mutation (source-contract test in `import-complete-logic.test.ts`). No legacy-data repair (38.2 D-23). |
 | 2026-09-27 | 38.4 | Resume-import prompt scrolls its body at large text; its Resume label uses `onAccent` (D-49, OA-D3). |
+| 2026-09-27 | 38.4 | Bulk import Bound/Unbound with a batch frequency; single-review lifecycle honoured; migration 032 `import_sessions.batch_interval_days`; Bound imports refresh reminders and the widget post-commit (D-57, OA-E2). |
+| 2026-09-27 | 38.4 | Import Complete's Unbound-contacts bridge removed; it would not list a Bound batch (D-58, OA-E2). ADR-066's bridge clause and the Phase 19 dossier's Import Complete bridge get a superseding note at KB extraction. |
