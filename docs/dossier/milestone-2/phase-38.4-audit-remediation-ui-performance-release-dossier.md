@@ -40,6 +40,10 @@ Backup/Restore action foregrounds; make switches/selectors/actions
 expose theme colors, names, values, selected state and established touch
 targets without overlapping hit regions.
 
+> 2026-09-26: contrast of text sitting bare on the background art (RG-029
+> finding F-1) moved to Phase 38.5 (D-38). 38.4 keeps RG-029's glass proof
+> (`AUD-UIA-001`) and the Backup/Restore role foregrounds (`AUD-UIA-002`).
+
 ## Workstream D --- Contact, Review and Widget Accessibility
 
 **RG-031, RG-032.** Expose real contact identity and relevant
@@ -215,6 +219,139 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
     published bump is the owner's call. It is asked only if the
     investigation shows the JS mitigations are not enough.
 
+### Owner rulings during Plan 03 execution (2026-09-26)
+
+-   **[DECIDED · 2026-09-26] D-26 --- Standard-Light glass link colours:
+    accept all eight lightness-only variants.** Plan 03 stopped because
+    two curated accents pass only below the HSL L 12% near-black floor.
+    The owner accepted lightness-only glass `accentText` variants for
+    all eight accents, including aurora-teal `#05312E` (L 10.6%) and
+    emerald `#083319` (L 11.6%). The other six are nebula-blue
+    `#162568`, slate-indigo `#202856`, solar-amber `#392807`,
+    rose-quartz `#541227`, violet-haze `#331E61` and coral `#501A11`.
+    The alternatives were each rejected: flattening links to primary
+    text loses hue identity, a documented exception leaves links
+    failing, a hue move reverses part of D-24, and a glass-opacity raise
+    reverses D-12. All eight go on the Plan 17 device review, which
+    checks that teal and emerald still read as their hue.
+-   **[SUPERSEDED by D-29 (owner, 2026-09-26)] D-27 --- F-1 bare text on
+    art goes to the device review.** Helper, caption and error text
+    sitting directly on veiled Standard art, with no glass or opaque
+    backing, was not fixed in Plan 03. The owner was to review it on the
+    device in Plan 17 and then decide whether to defer or fix it. The
+    site list is `38.4-RG029-INVENTORY.md` §5.
+-   **[DECIDED · 2026-09-26] D-28 --- Coral's shared light link tone
+    darkens about 1% lightness.** `ACCENTS.coral.light.text` `#B03A26` →
+    `#AC3925` (hue and saturation move only by 8-bit rounding). This
+    lifts the Galaxy Light presentation card from 4.48 to 4.63 and
+    retires the held exclusion E-7. Accepted side effect: Standard Light
+    coral links on opaque surfaces darken imperceptibly. Coral's fill,
+    `onAccent` and the D-26 glass variant are unchanged.
+
+### Owner rulings after Wave 1 (2026-09-26)
+
+-   **[SUPERSEDED by D-38 (owner, 2026-09-26)] D-29 --- F-1 fixed in
+    Plan 16 with a scrim.** Superseded D-27 without waiting for the
+    device review. Bare functional text on Standard art was to get a
+    `ChromeScrim` (or an equivalent existing backing), only in Standard
+    Light on Dusk or Mesh. The owner rejected the light-text/dark-veil
+    and halo alternatives, because no single text colour passes over
+    both extremes of Dusk and Mesh. Extended by D-35 and D-36, then
+    withdrawn from 38.4 by D-38.
+-   **[DECIDED · 2026-09-26] D-30 --- The selected Touchpoint duration
+    chip is filled.** The selected preset or None chip uses the accent
+    fill with an `onAccent` label (ADR-084), so selection no longer
+    depends on border colour. Unselected chips are unchanged. Moved from
+    Plan 16 to Plan 20 by D-34; the ruling itself is unchanged.
+-   **[DECIDED · 2026-09-26] D-31 --- The open FAB dial keeps
+    accessibility focus.** While the speed dial is open, the tab
+    navigator and screen content are hidden from accessibility (the 38.3
+    RG-020 pattern), so TalkBack, Switch Access and keyboard focus stay
+    in the dial. Plan 12. The RG-039 closed-dial fix is unchanged.
+-   **[DECIDED · 2026-09-26] D-32 --- Gap plan 18 (G1): Sheet bodies
+    scroll at large text.** The `Sheet` compact/detail variants scroll
+    their body so the actions stay reachable. Found on the Pixel 3a at
+    font scale 2.0 in InteractionDetail. This is a device-found
+    follow-on to RG-034, not an audit finding.
+-   **[DECIDED · 2026-09-26] D-33 --- Gap plan 19 (G2): the Contacts
+    screen freeze.** Choosing a population, filter or sort-order action
+    at the top of Contacts makes the app unresponsive until a
+    force-restart, although the setting is persisted. The Profile
+    ScrollView ignoring swipes after a warm deep link or a Quick Log
+    snackbar is in scope too. Investigation first; tracked as `GAP-G2`.
+    A root cause whose fix reverses a recorded decision or needs a
+    schema change comes back to the owner.
+-   **[DECIDED · 2026-09-26] D-34 --- Gap plan 20 (G3): glass-scope read
+    sites, plus the items moved from Plan 16.** The glass palette
+    reaches only colours read by a hook called inside the scope. Many
+    screens call `useTheme()` above their `GlassSurface`/`ChromeScrim`
+    and use the colours inside it, so the D-24 variants and the
+    secondary-to-primary override never reach them (for example the
+    `danger` warning in `AIPersonalizationScreen` and the `danger`
+    caption in `DigestScreen`). Every foreground rendered inside a
+    glass/chrome scope resolves through the scope, through an in-card
+    child that calls `useTheme()` or a scoped-read helper. An AST source
+    contract proves rendered usage, not just palette values. Planning
+    found 48 out-of-scope reads in 17 files. The D-30 chip, the Plan 08
+    font-family swaps and the unused `Pressable` import also move to
+    Plan 20, which runs after Plan 16 and before Plan 17.
+-   **[SUPERSEDED by D-38 (owner, 2026-09-26)] D-35 --- The bare-text
+    scrim also covers Standard Dark.** Extended D-29 to Standard Dark on
+    all four Standard backgrounds; Standard Light stayed Dusk and Mesh
+    only. The Standard Dark measurements (every bare cell fails, even
+    AA_LARGE 3.0) remain valid and are an input to Phase 38.5.
+-   **[SUPERSEDED by D-38 (owner, 2026-09-26)] D-36 --- The F-1 site
+    list must be complete.** Required an AST enumeration of every bare
+    foreground over the shell art, not the six-token grep of §5. The art
+    brief's AST inventory (294 bare sites on 50 routes,
+    `38.4-art-brief/bare-text-sites.csv`) is the current site list and
+    an input to Phase 38.5.
+-   **[DECIDED · 2026-09-26] D-37 --- Phase-close order.** All code
+    plans through 38.4-20, then the gsd code review of the phase and its
+    fixes, then the Plan 17 device pass on the reviewed code, then
+    verification. The review runs between waves 6 and 7. Plan 17 re-runs
+    the automated gate on HEAD but does not redo the review.
+
+### Owner rulings after the background-art brief (2026-09-26)
+
+-   **[DECIDED · 2026-09-26] D-38 --- Bare text on art leaves 38.4 for
+    Phase 38.5.** Contrast of text sitting directly on the background
+    art (finding F-1) moves to the new Phase 38.5, Background Art &
+    Text-on-Art Contrast. D-38 supersedes D-29, D-35 and D-36. Plan 16's
+    scrim task is cancelled, and Plan 17 records any bare-text
+    observation as a Phase 38.5 input, never as a FAIL. The art brief
+    (`38.4-BACKGROUND-ART-BRIEF.md`) showed that one image cannot serve
+    both light and dark mode. D-12 still holds: no artwork, glass or
+    veil change ships in 38.4. The Plan 16 accent-fill → `accentText`
+    role swap still lands, including rows on bare art (ADR-084; brief
+    OD-6). 38.4 still closes RG-029's glass proof
+    (`ui-accessibility/AUD-UIA-001`) and the Backup/Restore role
+    foregrounds (`ui-accessibility/AUD-UIA-002`); Phase 38.5 carries the
+    bare-text part of RG-029's outcome.
+-   **[DECIDED · 2026-09-26] D-39 --- Both packages keep both modes;
+    separate light and dark art.** The earlier "theme merge" meant
+    restricting backgrounds to their own package (Galaxy theme → Galaxy
+    backgrounds, Standard → Standard), which is already implemented. It
+    never meant collapsing the two packages into one Dark/Light switch.
+    The fix direction for text on art is separate light and dark art per
+    background: about 12 images if the owner cuts one background per
+    theme, and Galaxy light mode may use different pictures rather than
+    recoloured dark ones. Details are decided in Phase 38.5.
+-   **[DECIDED · 2026-09-26] D-40 --- Scrims are not abolished; the
+    owner picks each combination.** Buttons that open overlay menus (for
+    example the Contacts top action buttons and the Orrery dropdown
+    buttons) and the overlay menus themselves keep their scrims. The
+    owner chooses a full, transparent or no scrim per component and per
+    theme × mode × background from a screenshot sign-off sheet. A
+    separate agent produces that sheet during 38.4 execution; no 38.4
+    plan produces it. The signed sheet is a prerequisite for starting
+    Phase 38.5.
+-   **[DECIDED · 2026-09-26] D-41 --- User-uploaded backgrounds carry no
+    contrast guarantee.** If a user's own picture (for example a contact
+    profile background photo) makes text hard to read, the user picks a
+    different picture, which is the industry-standard behaviour. There
+    is no engineering to adapt text to arbitrary uploads.
+
 ## Revision Log
 
 -   2026-09-26 --- discuss session: grounding check (14/15 still
@@ -227,3 +364,12 @@ STILL PRESENT. `ui-accessibility/AUD-UIA-019` is FIXED (38.2,
     (Digest shared header row).
 -   2026-09-26 --- post-research: D-24 (RG-029 inventory-then-darken,
     answering research ESC-1); D-25 held open (W3 native remedy).
+-   2026-09-26 --- Plan 03 execution: D-26 (all eight Standard-Light
+    glass link variants), D-27 (F-1 to the device review; superseded by
+    D-29) and D-28 (coral's shared light tone).
+-   2026-09-26 --- after Wave 1: D-29..D-37 (F-1 scrim and its
+    extensions, the filled duration chip, the FAB focus trap, gap plans
+    18/19/20, the phase-close order).
+-   2026-09-26 --- after the background-art brief: D-38 moves bare text
+    on art to Phase 38.5 and supersedes D-29/D-35/D-36; D-39..D-41
+    record the art, scrim-policy and custom-upload direction for 38.5.
