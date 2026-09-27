@@ -32,3 +32,30 @@ describe("ProfileLayoutEditor direct reorder contract", () => {
     );
   });
 });
+
+/**
+ * 38.4 D-47 (owner, OA-B2): the live preview is hidden, not deleted. A
+ * top-of-file flag gates its only mount; the component stays exported so its
+ * AUD-UIA-021 geometry tests keep running.
+ */
+describe("ProfileLayoutEditor live preview flag (D-47)", () => {
+  it("declares the preview flag false at module top", () => {
+    const source = editorSource();
+    const flag = source.indexOf("const PROFILE_LAYOUT_PREVIEW_VISIBLE = false");
+    expect(flag).toBeGreaterThan(-1);
+    const firstFunction = source.search(/\n(export )?function /);
+    expect(flag).toBeLessThan(firstFunction);
+  });
+
+  it("mounts ProfileLayoutPreview only behind the flag", () => {
+    const source = editorSource();
+    const mounts = [...source.matchAll(/<ProfileLayoutPreview\b/g)];
+    expect(mounts).toHaveLength(1);
+    const before = source.slice(0, mounts[0].index);
+    expect(before).toMatch(/\{PROFILE_LAYOUT_PREVIEW_VISIBLE \?\s*$/);
+  });
+
+  it("keeps ProfileLayoutPreview exported", () => {
+    expect(editorSource()).toContain("export function ProfileLayoutPreview");
+  });
+});
