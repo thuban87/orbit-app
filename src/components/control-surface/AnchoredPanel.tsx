@@ -23,6 +23,7 @@ import { MOTION } from "@/theme/tokens/motion";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
 import type { AnchorRect } from "./anchor-position";
+import { DASHBOARD_PANEL_TRANSIENT_ID } from "./dashboard-panel-store";
 
 export type PanelSize = "compact" | "medium" | "large";
 
@@ -83,16 +84,22 @@ export function AnchoredPanel({
 
   useEffect(() => {
     if (!visible) {
-      shellTransientStore.getState().closeTransient("dashboard-panel");
+      shellTransientStore
+        .getState()
+        .closeTransient(DASHBOARD_PANEL_TRANSIENT_ID);
       return;
     }
     shellTransientStore
       .getState()
-      .openTransient("dashboard-panel", () => onDismissRef.current());
+      .openTransient(DASHBOARD_PANEL_TRANSIENT_ID, () =>
+        onDismissRef.current(),
+      );
     const handle = findNodeHandle(contentRef.current);
     if (handle != null) AccessibilityInfo.setAccessibilityFocus(handle);
     return () =>
-      shellTransientStore.getState().closeTransient("dashboard-panel");
+      shellTransientStore
+        .getState()
+        .closeTransient(DASHBOARD_PANEL_TRANSIENT_ID);
   }, [visible]);
 
   useEffect(() => {

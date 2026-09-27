@@ -76,6 +76,7 @@ import { POPULATION_LABELS } from "@/components/control-surface/control-labels";
 import { DashboardControlRow } from "@/components/control-surface/DashboardControlRow";
 import { DashboardOverlayHost } from "@/components/control-surface/DashboardOverlayHost";
 import {
+  dashboardPanelFocusEffect,
   dashboardPanelStore,
   selectPanelOpen,
 } from "@/components/control-surface/dashboard-panel-store";
@@ -532,6 +533,10 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   // Derived from the single panel-store owner (RG-020): never mirror it in
   // local state, or a missed close leaves both wrappers inert.
   const panelOpen = dashboardPanelStore(selectPanelOpen);
+  // D-62: an open Population / Filter / Sort panel closes when Contacts loses
+  // focus (tab switch, pushed screen), so it never sits hidden and eats the
+  // first Back or tab re-tap elsewhere. Query state is untouched (ADR-092).
+  useFocusEffect(dashboardPanelFocusEffect);
   const [contextMenuContactId, setContextMenuContactId] = useState<
     number | null
   >(null);

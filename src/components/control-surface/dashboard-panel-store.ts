@@ -10,8 +10,12 @@
  */
 import type { ReactNode } from "react";
 import { create } from "zustand";
+import { shellTransientStore } from "@/stores/shell-transient-store";
 import type { PanelSize } from "./AnchoredPanel";
 import type { AnchorRect } from "./anchor-position";
+
+/** The shell-transient id AnchoredPanel registers while a panel is presented. */
+export const DASHBOARD_PANEL_TRANSIENT_ID = "dashboard-panel";
 
 export interface DashboardPanelRequest {
   id: string;
@@ -49,4 +53,29 @@ export function dismissDashboardPanel(): void {
   const current = dashboardPanelStore.getState().request;
   dashboardPanelStore.getState().close();
   current?.onDismiss();
+}
+
+/**
+ * Close any open panel because the Contacts screen lost focus (owner ruling
+ * D-62). The panel's open state lives in this global store and its Back entry
+ * in the shell-transient registry, so both would otherwise survive a tab
+ * switch: the hidden panel would swallow the first Back or active-tab re-tap
+ * on the other tab. Runs the owner's dismissal like every other path, then
+ * releases the transient entry directly so the release does not depend on the
+ * blurred screen re-rendering its host. Live-apply, one panel at a time, the
+ * floating non-modal panel and transient-first Back are unchanged (ADR-095);
+ * query state is untouched (ADR-092).
+ */
+export function closeDashboardPanelOnBlur(): void {
+  dismissDashboardPanel();
+  shellTransientStore.getState().closeTransient(DASHBOARD_PANEL_TRANSIENT_ID);
+}
+
+/**
+ * `useFocusEffect` callback for HomeScreen (D-62): nothing to do on focus; the
+ * returned cleanup runs on blur and on unmount. Module-level, so its identity
+ * is stable and the effect never re-runs while focused.
+ */
+export function dashboardPanelFocusEffect(): () => void {
+  return closeDashboardPanelOnBlur;
 }
