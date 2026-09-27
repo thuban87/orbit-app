@@ -423,7 +423,7 @@ export function SettingsContactsScreen() {
               value={phoneRegionSearch}
               onChangeText={setPhoneRegionSearch}
               placeholder="Search regions"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               autoCorrect={false}
               style={[
                 styles.regionInput,

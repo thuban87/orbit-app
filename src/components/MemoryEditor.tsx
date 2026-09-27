@@ -293,7 +293,7 @@ export function MemoryEditor({
               value={draft.customLabel ?? ""}
               onChangeText={(value) => update("customLabel", value)}
               placeholder="Memory label"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               style={[
                 styles.input,
                 {
@@ -309,7 +309,7 @@ export function MemoryEditor({
             value={draft.value ?? ""}
             onChangeText={(value) => update("value", value)}
             placeholder="What should you remember?"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             multiline
             style={[
               styles.input,
@@ -326,7 +326,7 @@ export function MemoryEditor({
             value={draft.note ?? ""}
             onChangeText={(value) => update("note", value)}
             placeholder="Note (optional)"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             multiline
             style={[
               styles.input,
@@ -343,7 +343,7 @@ export function MemoryEditor({
             value={draft.url ?? ""}
             onChangeText={(value) => update("url", value)}
             placeholder="Link (optional)"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
@@ -361,7 +361,7 @@ export function MemoryEditor({
             value={draft.meaningfulDate ?? ""}
             onChangeText={(value) => update("meaningfulDate", value)}
             placeholder="Meaningful date (optional)"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             style={[
               styles.input,
               {

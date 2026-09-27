@@ -235,7 +235,7 @@ export function LegacyContactPickerScreen({
             autoCapitalize="none"
             onChangeText={setQuery}
             placeholder="Search contacts"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             value={query}
             style={[
               styles.search,

@@ -26,7 +26,7 @@ export function DateFieldWidget({
       autoCapitalize="none"
       autoCorrect={false}
       maxLength={10}
-      placeholderTextColor={colors.textSecondary}
+      placeholderTextColor={colors.textPlaceholder}
       style={[
         styles.input,
         {

@@ -655,7 +655,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
                     accessibilityLabel="System name"
                     editable={!overrideOnly}
                     placeholder="Name this System"
-                    placeholderTextColor={colors.textSecondary}
+                    placeholderTextColor={colors.textPlaceholder}
                     value={draft.name}
                     onChangeText={(name) =>
                       setDraft((current) => ({ ...current, name }))

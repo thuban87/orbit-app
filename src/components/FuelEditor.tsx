@@ -314,7 +314,7 @@ function FuelRow({
           onEdit(item.id, { text: blankToNull(e.nativeEvent.text) })
         }
         placeholder="What's worth saying?"
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textPlaceholder}
         multiline
         style={[...inputStyle, styles.multiline]}
       />
@@ -326,7 +326,7 @@ function FuelRow({
           onEdit(item.id, { label: blankToNull(e.nativeEvent.text) })
         }
         placeholder="Label (optional)"
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textPlaceholder}
         style={inputStyle}
       />
       <View style={styles.urlRow}>
@@ -338,7 +338,7 @@ function FuelRow({
             onEdit(item.id, { url: blankToNull(e.nativeEvent.text) })
           }
           placeholder="https://…"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.textPlaceholder}
           autoCapitalize="none"
           autoCorrect={false}
           keyboardType="url"
@@ -434,7 +434,7 @@ function DraftRow({
         value={text}
         onChangeText={setText}
         placeholder="What's worth saying?"
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textPlaceholder}
         multiline
         style={[...inputStyle, styles.multiline]}
       />
@@ -444,7 +444,7 @@ function DraftRow({
         value={label}
         onChangeText={setLabel}
         placeholder="Label (optional)"
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textPlaceholder}
         style={inputStyle}
       />
       <TextInput
@@ -453,7 +453,7 @@ function DraftRow({
         value={url}
         onChangeText={setUrl}
         placeholder="https://…"
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textPlaceholder}
         autoCapitalize="none"
         autoCorrect={false}
         keyboardType="url"

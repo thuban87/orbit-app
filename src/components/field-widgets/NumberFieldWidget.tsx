@@ -22,7 +22,7 @@ export function NumberFieldWidget({
       value={value ?? ""}
       onChangeText={onChange}
       keyboardType="numeric"
-      placeholderTextColor={colors.textSecondary}
+      placeholderTextColor={colors.textPlaceholder}
       style={[
         styles.input,
         {

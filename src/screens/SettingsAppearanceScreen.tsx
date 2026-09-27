@@ -825,7 +825,7 @@ export function SettingsAppearanceScreen() {
               onEndEditing={() => void onCommitSelfName()}
               onSubmitEditing={() => void onCommitSelfName()}
               placeholder="You"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               maxLength={100}
               returnKeyType="done"
               style={[
@@ -995,7 +995,7 @@ export function SettingsAppearanceScreen() {
                   value={sunSearch}
                   onChangeText={setSunSearch}
                   placeholder="Search contacts"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={colors.textPlaceholder}
                   autoCorrect={false}
                   style={[
                     styles.searchInput,

@@ -343,7 +343,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
             value={text}
             onChangeText={setText}
             placeholder="What happened?"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             multiline
             autoFocus
             style={[

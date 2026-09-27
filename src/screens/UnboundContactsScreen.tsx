@@ -90,7 +90,7 @@ export function UnboundContactsScreen({
               value={term}
               onChangeText={setTerm}
               placeholder="Search unbound contacts"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               style={[
                 styles.searchInput,
                 {

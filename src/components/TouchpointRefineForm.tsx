@@ -400,7 +400,7 @@ export function TouchpointRefineForm({
               onChangeText={(t) => set("note", t === "" ? null : t)}
               multiline
               placeholder="Add a detail"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               style={[
                 styles.control,
                 styles.noteInput,
@@ -482,7 +482,7 @@ export function TouchpointRefineForm({
               }}
               keyboardType="number-pad"
               placeholder="Custom (minutes)"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               style={[
                 styles.control,
                 {

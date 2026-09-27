@@ -1279,7 +1279,7 @@ export function ComposeScreen({
             value={subject}
             onChangeText={setSubject}
             placeholder="Subject"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             style={[
               styles.subjectInput,
               {
@@ -1315,7 +1315,7 @@ export function ComposeScreen({
           onChangeText={setBody}
           multiline
           placeholder="Write your message…"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.textPlaceholder}
           style={[
             styles.draftInput,
             {
@@ -1432,7 +1432,7 @@ export function ComposeScreen({
             value={adjustGuidance}
             onChangeText={setAdjustGuidance}
             placeholder="Tell Orbit what to change…"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             multiline
             style={[
               styles.adjustInput,

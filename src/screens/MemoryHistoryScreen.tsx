@@ -180,7 +180,7 @@ export function MemoryHistoryScreen({
               value={newDraft}
               onChangeText={setNewDraft}
               placeholder="Set a new value"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               style={[
                 styles.input,
                 {
@@ -238,7 +238,7 @@ export function MemoryHistoryScreen({
                         value={editDraft}
                         onChangeText={setEditDraft}
                         placeholder="Edit value"
-                        placeholderTextColor={colors.textSecondary}
+                        placeholderTextColor={colors.textPlaceholder}
                         style={[
                           styles.input,
                           {

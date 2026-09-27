@@ -633,7 +633,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
             value={searchText}
             onChangeText={setSearchText}
             placeholder="Search people"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             style={[
               styles.searchInput,
               {
@@ -801,7 +801,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
             value={inlineName}
             onChangeText={setInlineName}
             placeholder="Name"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             returnKeyType="done"
             onSubmitEditing={() => void onInlineSubmit()}
             style={[
@@ -869,7 +869,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
                 placeholder={
                   'Add your words — e.g. "for Dad, he asked about this"'
                 }
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.textPlaceholder}
                 style={[
                   styles.noteInput,
                   {

@@ -251,7 +251,7 @@ function CurrentStateFocusedEditor({
         value={value}
         onChangeText={setValue}
         placeholder="Set a new value"
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textPlaceholder}
         style={[
           styles.input,
           {
@@ -498,7 +498,7 @@ function OffLimitsFocusedEditor({
         value={draft}
         onChangeText={setDraft}
         placeholder="What should you avoid?"
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textPlaceholder}
         multiline
         style={[
           styles.input,

@@ -132,7 +132,7 @@ export function SystemRuleAccordion({
                   <TextInput
                     accessibilityLabel="Search categories"
                     placeholder="Search categories"
-                    placeholderTextColor={colors.textSecondary}
+                    placeholderTextColor={colors.textPlaceholder}
                     value={categoryQuery}
                     onChangeText={setCategoryQuery}
                     style={[

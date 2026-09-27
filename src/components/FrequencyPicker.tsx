@@ -166,7 +166,7 @@ export function FrequencyPicker({
               onChangeText={changeCustomText}
               keyboardType="number-pad"
               placeholder="every N"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               style={[
                 styles.input,
                 {

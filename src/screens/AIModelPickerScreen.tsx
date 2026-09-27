@@ -248,7 +248,7 @@ export function AIModelPickerScreen({
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholder="Search models"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.textPlaceholder}
                 value={query}
                 onChangeText={setQuery}
                 style={[
@@ -375,7 +375,7 @@ export function AIModelPickerScreen({
             autoCapitalize="none"
             autoCorrect={false}
             placeholder="Enter model id"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             value={manualModel}
             onChangeText={setManualModel}
             style={[

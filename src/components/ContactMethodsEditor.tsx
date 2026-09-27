@@ -117,7 +117,7 @@ export function ContactMethodsEditor({
                 value={row.label}
                 onChangeText={(label) => onUpdate(row.uid, { label })}
                 placeholder="Custom label"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.textPlaceholder}
                 style={inputStyle}
                 accessibilityLabel="Custom method label"
               />
@@ -128,7 +128,7 @@ export function ContactMethodsEditor({
               value={row.value}
               onChangeText={(value) => onUpdate(row.uid, { value })}
               placeholder={type === "phone" ? "Phone number" : "Email address"}
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               keyboardType={type === "phone" ? "phone-pad" : "email-address"}
               autoCapitalize="none"
               autoCorrect={false}
@@ -139,7 +139,7 @@ export function ContactMethodsEditor({
                 value={row.extension}
                 onChangeText={(extension) => onUpdate(row.uid, { extension })}
                 placeholder="Extension"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.textPlaceholder}
                 keyboardType="phone-pad"
                 style={inputStyle}
                 accessibilityLabel={`Phone extension ${index + 1}`}

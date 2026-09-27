@@ -359,7 +359,7 @@ export function AIConnectionScreen({
                   autoCapitalize="none"
                   autoCorrect={false}
                   placeholder="Paste API key"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={colors.textPlaceholder}
                   secureTextEntry
                   value={
                     credentialDraft?.lane === lane ? credentialDraft.value : ""
@@ -396,7 +396,7 @@ export function AIConnectionScreen({
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholder="https://api.example.com/v1"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.textPlaceholder}
                 value={endpoint}
                 onChangeText={setEndpoint}
                 style={[
@@ -413,7 +413,7 @@ export function AIConnectionScreen({
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholder="Optional credential"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.textPlaceholder}
                 secureTextEntry
                 value={customCredential}
                 onChangeText={setCustomCredential}
@@ -431,7 +431,7 @@ export function AIConnectionScreen({
                 autoCapitalize="none"
                 autoCorrect={false}
                 placeholder="Model id"
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.textPlaceholder}
                 value={customModel}
                 onChangeText={setCustomModel}
                 style={[

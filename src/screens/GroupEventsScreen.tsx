@@ -83,7 +83,7 @@ export function GroupEventsScreen({
             accessibilityLabel="Search events"
             autoFocus
             placeholder="Search title or participant"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             value={term}
             onChangeText={setTerm}
             style={[

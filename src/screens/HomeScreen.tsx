@@ -1827,7 +1827,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
                   value={searchText}
                   onChangeText={setSearchText}
                   placeholder="Search people and notes"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={colors.textPlaceholder}
                   style={[
                     styles.searchInput,
                     {
@@ -2129,7 +2129,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
           value={frequencyDraft}
           onChangeText={setFrequencyDraft}
           placeholder="Days"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.textPlaceholder}
           style={[
             styles.bulkFrequencyInput,
             {

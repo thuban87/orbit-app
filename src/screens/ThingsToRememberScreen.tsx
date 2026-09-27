@@ -549,7 +549,7 @@ export function ThingsToRememberScreen({
                     value={currentDraft}
                     onChangeText={setCurrentDraft}
                     placeholder="Set a new value"
-                    placeholderTextColor={colors.textSecondary}
+                    placeholderTextColor={colors.textPlaceholder}
                     style={[
                       styles.input,
                       {

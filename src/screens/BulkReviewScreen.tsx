@@ -173,7 +173,7 @@ export function BulkReviewScreen({
                   value={birthdayInput}
                   onChangeText={setBirthdayInput}
                   placeholder="YYYY-MM-DD"
-                  placeholderTextColor={colors.textSecondary}
+                  placeholderTextColor={colors.textPlaceholder}
                   style={[
                     styles.input,
                     {

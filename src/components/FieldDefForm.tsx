@@ -214,7 +214,7 @@ export function FieldDefForm(props: FieldDefFormProps) {
         value={label}
         onChangeText={setLabel}
         placeholder="e.g. Birthday"
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textPlaceholder}
         style={[
           styles.input,
           {
@@ -275,7 +275,7 @@ export function FieldDefForm(props: FieldDefFormProps) {
                 value={row}
                 onChangeText={(v) => setOptionAt(index, v)}
                 placeholder={`Option ${index + 1}`}
-                placeholderTextColor={colors.textSecondary}
+                placeholderTextColor={colors.textPlaceholder}
                 style={[
                   styles.input,
                   styles.optionInput,

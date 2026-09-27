@@ -162,7 +162,7 @@ export function RelationshipEditor({
             value={draft.personName}
             onChangeText={(value) => update("personName", value)}
             placeholder="Person name"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             style={[
               styles.input,
               {
@@ -177,7 +177,7 @@ export function RelationshipEditor({
             value={draft.relationType ?? ""}
             onChangeText={(value) => update("relationType", value)}
             placeholder="Relationship type (optional)"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             style={[
               styles.input,
               {
@@ -208,7 +208,7 @@ export function RelationshipEditor({
             value={draft.note ?? ""}
             onChangeText={(value) => update("note", value)}
             placeholder="Note (optional)"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             multiline
             style={[
               styles.input,

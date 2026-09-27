@@ -23,7 +23,7 @@ export function TextFieldWidget({
       value={value ?? ""}
       onChangeText={onChange}
       keyboardType={keyboardType}
-      placeholderTextColor={colors.textSecondary}
+      placeholderTextColor={colors.textPlaceholder}
       style={[
         styles.input,
         {

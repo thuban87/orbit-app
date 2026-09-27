@@ -344,7 +344,7 @@ export function PhotoSourcePicker({
               onChangeText={setUrlText}
               editable={!submittingUrl}
               placeholder="https://…"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"

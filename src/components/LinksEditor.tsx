@@ -135,7 +135,7 @@ export function LinksEditor({
               value={link.url}
               onChangeText={(v) => onUpdate(index, { url: v })}
               placeholder="https://…"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
@@ -147,7 +147,7 @@ export function LinksEditor({
               value={link.label ?? ""}
               onChangeText={(v) => onUpdate(index, { label: v })}
               placeholder="Label (optional)"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               style={inputStyle}
             />
             <View style={styles.rowActions}>

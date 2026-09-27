@@ -90,7 +90,7 @@ export function ManageMembersGrid({
         autoCapitalize="none"
         onChangeText={setQuery}
         placeholder="Search members"
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textPlaceholder}
         value={query}
         style={[
           styles.search,

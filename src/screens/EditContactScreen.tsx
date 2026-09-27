@@ -1209,7 +1209,7 @@ export function EditContactScreen({
             value={form.name}
             onChangeText={(v) => setField("name", v)}
             placeholder="Their name"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             style={inputStyle}
           />
         </View>
@@ -1544,7 +1544,7 @@ export function EditContactScreen({
           value={form.lastTalkedAbout ?? ""}
           onChangeText={(v) => setField("lastTalkedAbout", v)}
           placeholder="What did you last talk about?"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.textPlaceholder}
           style={inputStyle}
         />
       </AccordionSection>
@@ -1583,7 +1583,7 @@ export function EditContactScreen({
           value={form.currentLocation ?? ""}
           onChangeText={(v) => setField("currentLocation", v)}
           placeholder="Where are they now?"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.textPlaceholder}
           style={inputStyle}
         />
       </AccordionSection>

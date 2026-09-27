@@ -530,7 +530,7 @@ export function BackupScreen({
             onChangeText={setRestorePassphrase}
             accessibilityLabel="Backup passphrase"
             placeholder="Passphrase"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             style={[
               styles.passphraseInput,
               {

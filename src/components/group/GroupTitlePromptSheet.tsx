@@ -38,7 +38,7 @@ export function GroupTitlePromptSheet({
           value={title}
           onChangeText={setTitle}
           placeholder="Group event title"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.textPlaceholder}
           style={[
             styles.input,
             {

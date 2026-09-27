@@ -401,7 +401,7 @@ export function ImportReviewScreen({
             setName(value);
           }}
           placeholder="Their name"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.textPlaceholder}
           style={[
             styles.input,
             {
@@ -554,7 +554,7 @@ export function ImportReviewScreen({
             setBirthdayInput(value);
           }}
           placeholder="YYYY-MM-DD"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.textPlaceholder}
           style={[
             styles.input,
             {

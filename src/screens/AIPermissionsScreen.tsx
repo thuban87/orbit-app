@@ -274,7 +274,7 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
             accessibilityLabel="Search contacts"
             autoCapitalize="none"
             placeholder="Search contacts"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             value={query}
             onChangeText={setQuery}
             style={[

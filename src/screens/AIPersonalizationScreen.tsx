@@ -470,7 +470,7 @@ export function AIPersonalizationScreen({
             accessibilityLabel="Custom Writing Style guidance"
             multiline
             placeholder="Optional guidance in your own words"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             value={style.freeform}
             onChangeText={(freeform) =>
               setStyle((current) => ({ ...current, freeform }))
@@ -735,7 +735,7 @@ function NewSectionEditor({
       <TextInput
         accessibilityLabel="Section title"
         placeholder="Section title"
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textPlaceholder}
         value={title}
         onChangeText={onTitleChange}
         style={[
@@ -751,7 +751,7 @@ function NewSectionEditor({
         accessibilityLabel="Section text"
         multiline
         placeholder="Paste or type context"
-        placeholderTextColor={colors.textSecondary}
+        placeholderTextColor={colors.textPlaceholder}
         value={body}
         onChangeText={onBodyChange}
         style={[

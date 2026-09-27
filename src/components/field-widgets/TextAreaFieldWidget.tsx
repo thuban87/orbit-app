@@ -23,7 +23,7 @@ export function TextAreaFieldWidget({
       multiline
       numberOfLines={4}
       textAlignVertical="top"
-      placeholderTextColor={colors.textSecondary}
+      placeholderTextColor={colors.textPlaceholder}
       style={[
         styles.input,
         {

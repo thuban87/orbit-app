@@ -208,7 +208,7 @@ export function ContactPicker(props: ContactPickerProps) {
             autoCapitalize="none"
             onChangeText={setTerm}
             placeholder="Search contacts"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             value={term}
             style={[
               styles.search,

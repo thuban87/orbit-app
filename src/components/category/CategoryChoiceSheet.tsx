@@ -104,7 +104,7 @@ export function CategoryChoiceSheet({
             value={query}
             onChangeText={setQuery}
             placeholder="Search categories"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             style={[
               styles.search,
               {

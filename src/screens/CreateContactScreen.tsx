@@ -441,7 +441,7 @@ export function CreateContactScreen({
             value={name}
             onChangeText={setName}
             placeholder="Their name"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             style={[
               styles.input,
               {
@@ -643,7 +643,7 @@ export function CreateContactScreen({
               value={lastTalkedAbout}
               onChangeText={setLastTalkedAbout}
               placeholder="What did you last talk about?"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               style={[
                 styles.input,
                 {
@@ -695,7 +695,7 @@ export function CreateContactScreen({
               value={currentLocation}
               onChangeText={setCurrentLocation}
               placeholder="Where are they now?"
-              placeholderTextColor={colors.textSecondary}
+              placeholderTextColor={colors.textPlaceholder}
               style={[
                 styles.input,
                 {

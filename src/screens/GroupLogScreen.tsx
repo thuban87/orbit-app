@@ -124,7 +124,7 @@ export function GroupLogScreen({
             value={title}
             onChangeText={setTitle}
             placeholder="What happened?"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             style={[
               styles.input,
               {
@@ -153,7 +153,7 @@ export function GroupLogScreen({
             onChangeText={setGroupNote}
             multiline
             placeholder="Add shared context"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             style={[
               styles.note,
               {

@@ -126,7 +126,7 @@ export function AssistConfirmation({
         <TextInput
           accessibilityLabel="Optional note"
           placeholder="Optional note…"
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={colors.textPlaceholder}
           value={note}
           onChangeText={setNote}
           multiline

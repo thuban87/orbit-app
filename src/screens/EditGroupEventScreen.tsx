@@ -288,7 +288,7 @@ export function EditGroupEventScreen({
             }
             multiline
             placeholder="Add shared context"
-            placeholderTextColor={colors.textSecondary}
+            placeholderTextColor={colors.textPlaceholder}
             style={[
               styles.note,
               {
