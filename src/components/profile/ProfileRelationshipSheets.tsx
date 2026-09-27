@@ -4,6 +4,7 @@ import DateTimePicker, {
 } from "@react-native-community/datetimepicker";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Icon } from "@/components/icons/Icon";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { Sheet } from "@/components/ui/Sheet";
@@ -218,6 +219,7 @@ export function ProfileRelationshipSheets({
                 onPress={() => void saveFrequency(choice.days)}
                 style={[
                   styles.choice,
+                  styles.frequencyChoice,
                   {
                     borderColor:
                       frequency.draft === choice.days
@@ -226,7 +228,14 @@ export function ProfileRelationshipSheets({
                   },
                 ]}
               >
-                <AppText role="body">{choice.label}</AppText>
+                <AppText role="body" style={styles.frequencyLabel}>
+                  {choice.label}
+                </AppText>
+                {/* D-66: the current choice carries the filled select glyph,
+                    as the dropdowns do, so it never depends on border colour. */}
+                {frequency.draft === choice.days ? (
+                  <Icon name="select" state="active" tone="accentText" />
+                ) : null}
               </Pressable>
             ))}
             {frequency.error ? (
@@ -330,5 +339,12 @@ const styles = StyleSheet.create({
     borderRadius: RADII.md,
     paddingHorizontal: SPACING.base,
   },
+  frequencyChoice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: SPACING.sm,
+  },
+  frequencyLabel: { flexShrink: 1 },
   close: { marginTop: SPACING.sm },
 });

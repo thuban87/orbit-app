@@ -90,6 +90,35 @@ describe("Custom-field dropdown (AUD-UIA-005, out-of-list preserved)", () => {
   });
 });
 
+describe("Profile Contact Frequency selector (AUD-UIA-005, D-66)", () => {
+  const sheets = source("src/components/profile/ProfileRelationshipSheets.tsx");
+  const start = sheets.indexOf("FREQUENCY_CHOICES.map(");
+  const end = sheets.indexOf("</Pressable>", start);
+  const option = sheets.slice(start, end);
+
+  it("finds the frequency option row", () => {
+    expect(start).toBeGreaterThan(-1);
+    expect(option).toContain("<Pressable");
+  });
+
+  it("marks the current choice with state and the filled select glyph, as the dropdowns do", () => {
+    expect(option).toMatch(
+      /accessibilityState=\{\{\s*selected: frequency\.draft === choice\.days,/,
+    );
+    expect(option).toMatch(
+      /\{frequency\.draft === choice\.days \? \(\s*<Icon name="select" state="active" tone="accentText" \/>\s*\) : null\}/,
+    );
+    expect(sheets).toContain('import { Icon } from "@/components/icons/Icon";');
+  });
+
+  it("lays the label and the glyph out on one row", () => {
+    expect(option).toContain("styles.frequencyChoice");
+    expect(sheets).toMatch(
+      /frequencyChoice: \{\s*flexDirection: "row",\s*alignItems: "center",\s*justifyContent: "space-between",/,
+    );
+  });
+});
+
 describe("Fuel kind picker (AUD-UIA-005)", () => {
   const fuel = source("src/components/FuelEditor.tsx");
 
