@@ -26,8 +26,15 @@
  * preset cells render visually below the 44px floor (an accepted departure,
  * dossier §AC / Phase 40) but stay a11y-labelled and carry a touch `hitSlop`.
  */
-import { useMemo } from "react";
-import { Pressable, StyleSheet, View, type ViewStyle } from "react-native";
+import { useMemo, useState } from "react";
+import {
+  type LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from "react-native";
+import { fitHeatmapCell } from "@/components/heatmap-fit";
 import {
   classifyCycleBlock,
   classifyHeatmapCell,
@@ -43,25 +50,34 @@ import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 
 // --- Tunable geometry (top-of-file single-edit, CLAUDE.md) -------------------
-// Cell edges per lens. Day/cycle cells clear a comfortable tap; the Year dense
-// grid is deliberately small (a11y-compensated), with two whole weeks per row
-// so it stays compact without horizontal scrolling.
+// The Year dense grid is deliberately small (a11y-compensated), with two whole
+// weeks per row so it stays compact without horizontal scrolling — an accepted
+// limitation left fixed by RG-033.
 const HEATMAP_GEOMETRY = {
-  dayCellEdge: 38,
   yearCellEdge: 13,
-  cycleCellEdge: 52,
   radius: 6,
   columns: 7,
 } as const;
+
+// Per-lens cell caps (RG-033 ui-accessibility/AUD-UIA-010, D-13). The day
+// (7 Days / Month) and Cycles lenses size their cells from the measured width
+// via `fitHeatmapCell` — never wider than these caps, and shrinking below them
+// whenever the width demands it so every day/cycle stays visible.
+const DAY_MAX_CELL = 38;
+const CYCLE_MAX_CELL = 52;
+/** The Cycles grid is always 5 columns wide — presets are 5/10/15/20. */
+const CYCLE_COLUMNS = 5;
+const CELL_GAP = SPACING.xs;
 
 /** A 44px-floor touch target expressed as symmetric hitSlop around a small cell. */
 function hitSlopFor(edge: number): number {
   return Math.max(0, Math.round((44 - edge) / 2));
 }
 
-/** Fixed width of the 5-column cycle grid (5 cells + 4 gaps) — presets are 5/10/15/20. */
-const CYCLE_GRID_MAX_WIDTH =
-  5 * HEATMAP_GEOMETRY.cycleCellEdge + 4 * SPACING.xs;
+/** Width of a row of `columns` cells of `edge` with CELL_GAP gaps. */
+function rowWidth(edge: number, columns: number): number {
+  return columns * edge + (columns - 1) * CELL_GAP;
+}
 
 const MONTHS = [
   "Jan",
@@ -179,6 +195,23 @@ export function ActivityHeatmap({
   testID = "activity-heatmap",
 }: ActivityHeatmapProps) {
   const { colors } = useTheme();
+  // Measured available width (layout measurement, not animation); 0 until the
+  // first layout pass, so the day/cycle grids render nothing until measured.
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const onLayout = (event: LayoutChangeEvent) =>
+    setAvailableWidth(event.nativeEvent.layout.width);
+  const dayCellEdge = fitHeatmapCell({
+    availableWidth,
+    columns: HEATMAP_GEOMETRY.columns,
+    gap: CELL_GAP,
+    maxCell: DAY_MAX_CELL,
+  });
+  const cycleCellEdge = fitHeatmapCell({
+    availableWidth,
+    columns: CYCLE_COLUMNS,
+    gap: CELL_GAP,
+    maxCell: CYCLE_MAX_CELL,
+  });
 
   const dayWeeks = useMemo(
     () => (window ? chunkWeeks(window.cells) : []),
@@ -235,7 +268,7 @@ export function ActivityHeatmap({
   };
 
   /** Render one Cycles-lens block cell with structural current-cycle marking. */
-  const renderCycleCell = (block: CycleBlock, count: number) => {
+  const renderCycleCell = (block: CycleBlock, count: number, edge: number) => {
     const fill = classifyCycleBlock(count);
     const rangeLabel = `${formatMonthDay(block.start)} – ${formatMonthDay(block.end)}`;
     const currentSuffix = block.isCurrent ? ", Current cycle" : "";
@@ -256,7 +289,7 @@ export function ActivityHeatmap({
           })
         }
         style={[
-          cellStyle(HEATMAP_GEOMETRY.cycleCellEdge),
+          cellStyle(edge),
           { backgroundColor: scaleColor(fill.level) },
           // Current cycle: STRUCTURAL emphasis only — a borderStrong outline, never
           // a second hue (dossier §G). Non-current blocks keep the hairline border.
@@ -269,7 +302,7 @@ export function ActivityHeatmap({
   };
 
   return (
-    <View testID={testID} style={styles.container}>
+    <View testID={testID} style={styles.container} onLayout={onLayout}>
       {/* Lens switch — Cycles default. */}
       <SegmentedControl
         testID={`${testID}-lens`}
@@ -327,14 +360,24 @@ export function ActivityHeatmap({
       {/* Grid. */}
       {lens === "cycles" ? (
         cycles.available ? (
-          <View
-            testID={`${testID}-cycles-grid`}
-            style={[styles.cycleGrid, { maxWidth: CYCLE_GRID_MAX_WIDTH }]}
-          >
-            {cycles.blocks.map((block) =>
-              renderCycleCell(block, cycleCounts[block.index] ?? 0),
-            )}
-          </View>
+          cycleCellEdge === null ? null : (
+            // Exactly five cells + four gaps wide, centered (D-13).
+            <View
+              testID={`${testID}-cycles-grid`}
+              style={[
+                styles.cycleGrid,
+                { width: rowWidth(cycleCellEdge, CYCLE_COLUMNS) },
+              ]}
+            >
+              {cycles.blocks.map((block) =>
+                renderCycleCell(
+                  block,
+                  cycleCounts[block.index] ?? 0,
+                  cycleCellEdge,
+                ),
+              )}
+            </View>
+          )
         ) : (
           <AppText
             testID={`${testID}-cycles-unavailable`}
@@ -372,9 +415,10 @@ export function ActivityHeatmap({
             </View>
           ))}
         </View>
-      ) : (
-        // 7 Days / Month: weeks as ROWS (traditional weekday-aligned grid).
-        <View testID={`${testID}-day-grid`}>
+      ) : dayCellEdge === null ? null : (
+        // 7 Days / Month: weeks as ROWS (traditional weekday-aligned grid),
+        // sized from the measured width and centered (D-13).
+        <View testID={`${testID}-day-grid`} style={styles.dayGrid}>
           {dayWeeks.map((week, w) => (
             <View
               key={`row-${week.find((c) => c.date)?.date ?? w}`}
@@ -384,7 +428,7 @@ export function ActivityHeatmap({
                 renderDayCell(
                   cell,
                   `d-${w}-${cell.date ?? `p${d}`}`,
-                  HEATMAP_GEOMETRY.dayCellEdge,
+                  dayCellEdge,
                 ),
               )}
             </View>
@@ -410,9 +454,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  dayGrid: { alignSelf: "center" },
   dayRow: {
     flexDirection: "row",
-    gap: SPACING.xs,
+    gap: CELL_GAP,
     marginBottom: SPACING.xs,
   },
   yearRow: {
@@ -422,8 +467,9 @@ const styles = StyleSheet.create({
   },
   yearWeek: { flexDirection: "row", gap: SPACING.xs },
   cycleGrid: {
+    alignSelf: "center",
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: SPACING.xs,
+    gap: CELL_GAP,
   },
 });
