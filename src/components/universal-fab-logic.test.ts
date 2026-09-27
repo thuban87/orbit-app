@@ -3,6 +3,7 @@ import {
   createQuickLogUndoController,
   dialFocusCycle,
   FAB_DIAL_TRANSIENT_ID,
+  fabDialBackgroundA11y,
   getFocusedContactContext,
   resolveFabContactContext,
   resolveFabTarget,
@@ -335,6 +336,32 @@ describe("selectFabDialOpen (D-31)", () => {
     expect(selectFabDialOpen({ entries: [{ id: "dashboard-panel" }] })).toBe(
       false,
     );
+  });
+});
+
+describe("fabDialBackgroundA11y (D-31 follow-on, D-42 A)", () => {
+  it("hides a same-window shell overlay from accessibility while the dial is open", () => {
+    expect(fabDialBackgroundA11y(true)).toEqual({
+      importantForAccessibility: "no-hide-descendants",
+      accessibilityElementsHidden: true,
+    });
+  });
+
+  it("restores the overlay once the dial closes", () => {
+    expect(fabDialBackgroundA11y(false)).toEqual({
+      importantForAccessibility: "auto",
+      accessibilityElementsHidden: false,
+    });
+  });
+
+  it("never sets accessible or pointerEvents (no merged node, touch unchanged)", () => {
+    for (const open of [true, false]) {
+      const props = fabDialBackgroundA11y(open);
+      expect(Object.keys(props).sort()).toEqual([
+        "accessibilityElementsHidden",
+        "importantForAccessibility",
+      ]);
+    }
   });
 });
 
