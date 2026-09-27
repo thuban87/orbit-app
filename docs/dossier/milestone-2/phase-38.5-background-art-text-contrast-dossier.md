@@ -1,8 +1,11 @@
 # Phase 38.5 --- Background Art & Text-on-Art Contrast Dossier
 
 **Status:** DEFERRED PLANNING. It needs a discuss-phase first. **Prerequisite:** the owner-signed scrim combination
-sheet (38.4 D-40). Authored 2026-09-26 at phase insertion, from the owner rulings 38.4 D-38..D-41 and the 38.4
-background-art brief. No discuss session has run yet.
+sheet (38.4 D-40), **met 2026-09-27** (sign-off v2, D-08). Before planning, the O-9 `codex-edu` image spike still has
+to run. Authored 2026-09-26 at phase insertion, from the owner rulings 38.4 D-38..D-41 and the 38.4 background-art
+brief. Updated 2026-09-27 with the owner's scrim sign-off v2 results and rulings D-08..D-14. The phase is now sequenced
+art-first (D-13), and the images are made by a Codex agent in a Claude-verified loop (D-14). No discuss session has run
+yet.
 
 ## Decision Legend
 
@@ -11,12 +14,16 @@ background-art brief. No discuss session has run yet.
 -   **[DERIVED]** a consequence of a decision or of a measured fact.
 -   **[PLANNING NOTE]** a repository finding or engineering follow-up to verify at planning time.
 
+**Numbering.** D-08..D-14 are this phase's own rulings (2026-09-27); they match the CONTEXT shim. The carried 38.4
+rulings are D-38..D-41. Any other 38.4 decision is written "38.4 D-NN".
+
 ## Objective
 
 Every piece of text over shipped background art is readable, meeting the WCAG floors (4.5:1 for text and links, 3:1 for
 status glyphs and large text), in every theme × mode × background combination. The primary lever is the art itself:
 separate light and dark versions of each background. Scrims apply only where the owner's signed-off combination sheet
-puts them. User-uploaded custom backgrounds are excluded.
+puts them (D-08). Where the sheet thins or removes a backing over the art, the text on the art takes the colour that
+suits the art (D-10). User-uploaded custom backgrounds are excluded.
 
 ## Why This Phase Exists
 
@@ -47,12 +54,188 @@ puts them. User-uploaded custom backgrounds are excluded.
     the overlay menus themselves, keep their scrims. The treatment per combination (full scrim, transparent scrim or no
     scrim; per component, per theme × mode × background) comes from a **screenshot sign-off sheet**. A separate agent
     produces it during 38.4 execution. The owner-signed sheet is a **prerequisite for starting this phase**. The planner
-    does not choose scrim placement.
+    does not choose scrim placement. *(Signed 2026-09-27 as sign-off v2: see D-08.)*
 -   **[DECIDED · 2026-09-26] 38.4 D-41 --- User-uploaded backgrounds are excluded.** Custom uploads (for example contact
     profile background photos) carry no contrast guarantee. If a user's picture makes text hard to read, the user picks a
     different picture, which is the industry-standard behaviour. There is no engineering to adapt text to arbitrary uploads.
 -   **[DERIVED] Who decides, as in 38.4.** Any fix that retunes a protected hue (ADR-084), changes glass or veil opacity
     (ADR-115), or reverses a recorded ADR/HANDOFF decision is the owner's call. Art direction and look are the owner's.
+
+## Owner Rulings (2026-09-27): Scrim Sign-off v2, Text Colour, Sequencing, Art Loop
+
+These rulings come from the owner's answers on the scrim sign-off v2 page
+(`https://claude.ai/artifact/Wexngm7U9WPPWNtkbnd1Vy`, "Orbit Scrim Sign-off v2") and his follow-up rulings the same day.
+The raw answers are saved unmodified at `.planning/phases/38.5-background-art-text-contrast/38.5-scrim-signoff-v2.json`.
+Where the two differ (corrections (a) and (b) below), this dossier is authoritative. The IDs D-08..D-14 match the
+CONTEXT shim.
+
+### D-08: the signed scrim table
+
+-   **[DECIDED · 2026-09-27] D-08 --- Scrim sign-off v2: each component's treatment per theme × mode × background is the
+    table below, with owner corrections (a) and (b).** This resolves O-5 and meets the D-40 prerequisite. The planner
+    does not choose scrim placement (D-40). D-13 sequences a re-sign-off on the new art before any of it is built.
+
+**What the sheet showed** (MEASURED from the sign-off page source):
+
+-   Three shots per combination: Contacts (List), Contacts (Card) and Digest, at rest. They were captured on the Pixel 3a
+    at font scale 1.15, **over the art that ships today** (before 38.5).
+-   **full** means a solid backing; the art does not show through. **transparent** means a see-through glass backing; the
+    art shows faintly through it. **none** means no backing; the element sits directly on the background art.
+-   The sheet printed today's rule (ADR-115) on the page: backings go see-through only where the art tone matches the
+    mode (Galaxy + Dark, Standard + Light), and turn solid in the other two pairings. On the None (solid colour)
+    background, a see-through backing looks the same as a solid one.
+-   Every choice started at the shipped value ("current"). In the matched pairings: List rows full, cards transparent,
+    top buttons full, search + toggle full, count label transparent, both headers transparent, Digest content none. In
+    the mismatched pairings: everything full except Digest content, which is none.
+-   The components and their code today (component hints from the page; code references read on disk 2026-09-27):
+    -   **List entries** are the List-view rows. Today they have a solid `colors.surface` fill in every combination
+        (`src/components/ListRow.tsx:175`).
+    -   **Card entries** are the Card-view cards, a `GlassSurface` with the ADR-115 mode-aware tint
+        (`src/components/GridCard.tsx:216`).
+    -   **Top buttons** are Population, Filters and Sort. Filters and Sort are solid; Population drops its fill while a
+        population is selected.
+    -   **Search + toggle** is the search field and the List/Card toggle. The toggle segments and the open search field are
+        solid; the collapsed search icon has no backing.
+    -   **Count label** is the "N contacts" pill, a `ChromeScrim` (`src/screens/HomeScreen.tsx:1608`).
+    -   **Contacts header** ("Orbit" and ⋯) and **Digest header** ("Digest") are both `ShellAppBar`
+        (`src/screens/HomeScreen.tsx:1729`, `src/screens/DigestScreen.tsx:239`).
+    -   **Section headings** are Up Next, Horizon and Your Week, as plain text on the art.
+    -   **Up Next items** are the rows and the "all caught up" text. **Horizon items** are the rows, sub-headings and the
+        "more" link.
+    -   **Your Week** is the heatmap module, with no panel behind it. Its period toggle and three totals tiles are solid,
+        and its empty heatmap days are see-through.
+
+**The signed table.** **Bold** marks a cell the owner changed from the shipped value. The rows follow the sheet's
+order.
+
+| Combination | List entries | Card entries | Top buttons | Search + toggle | Count label | Contacts header | Digest header | Section headings | Up Next items | Horizon items | Your Week |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Galaxy Light · Deep Space | **transparent** | **transparent** | full | full | **none** | **none** | **none** | none | none | none | none |
+| Galaxy Light · Starfield | **transparent** | **transparent** | full | full | **none** | **none** | **none** | none | none | none | none |
+| Galaxy Light · Nebula | **transparent** | **transparent** | full | full | **none** | **none** | **none** | none | none | none | none |
+| Galaxy Light · Aurora | **transparent** | **transparent** | full | full | **none** | **none** | **none** | none | none | none | none |
+| Galaxy Light · None (solid) | full | full | full | full | **none** | **none** | **none** | none | none | none | none |
+| Galaxy Dark · Deep Space | ~~full~~ **transparent** (a) | transparent | full | full | transparent | transparent | transparent | none | none | none | none |
+| Galaxy Dark · Starfield | **transparent** | transparent | full | full | transparent | transparent | transparent | none | none | none | none |
+| Galaxy Dark · Nebula | **transparent** | transparent | full | full | transparent | transparent | transparent | none | none | none | none |
+| Galaxy Dark · Aurora | **transparent** | transparent | full | full | transparent | transparent | transparent | none | none | none | none |
+| Galaxy Dark · None (solid) | **transparent** | transparent | full | full | transparent | transparent | transparent | none | none | none | none |
+| Standard Light · Dawn | **transparent** | transparent | full | full | **none** | **none** | **none** | none | none | none | none |
+| Standard Light · Paper | full (b) | **full** (b) | full | full | **none** | **none** | **none** | none | none | none | none |
+| Standard Light · Dusk | **transparent** | transparent | full | full | **none** | **none** | **none** | none | none | none | none |
+| Standard Light · Mesh | **transparent** | transparent | full | full | **none** | **none** | **none** | none | none | none | none |
+| Standard Light · None (solid) | **transparent** | transparent | full | full | transparent | transparent | transparent | none | none | none | none |
+| Standard Dark · Dawn | **transparent** | **transparent** | full | full | **transparent** | **transparent** | **transparent** | none | none | none | none |
+| Standard Dark · Paper | **transparent** | **transparent** | full | full | **transparent** | **transparent** | **transparent** | none | none | none | none |
+| Standard Dark · Dusk | **transparent** | **transparent** | full | full | **transparent** | **transparent** | **transparent** | none | none | none | none |
+| Standard Dark · Mesh | **transparent** | **transparent** | full | full | **transparent** | **transparent** | **transparent** | none | none | none | none |
+| Standard Dark · None (solid) | full | full | full | full | full | full | full | none | none | none | none |
+
+**Owner corrections (2026-09-27):**
+
+-   **(a)** The raw answer for Galaxy Dark · Deep Space List entries was "full" (the shipped value). The owner says it was
+    a fluke: it is **transparent**, the same as the other Galaxy Dark backgrounds.
+-   **(b)** Standard Light · Paper's full List rows and full cards are **intentional**. The owner wants one combination
+    with the full-scrim look. Most combinations are largely transparent or have no scrim. Do not make Paper match Dawn,
+    Dusk and Mesh.
+
+**The owner's notes on the sheet (verbatim):**
+
+-   Galaxy Light · Deep Space, Starfield, Nebula and Aurora (the same note on all four): "The font needs to be switched
+    from light to dark on all of these items we're switching from full scrim to none/transparent when the background is
+    one of the dark ones. You can't currently see any of the headers on the digest and all of the font on the contact
+    cards is currently black so when those turn transparent that will have to change to light font. Basically if the
+    mode is light, even though font defaults to black in that mode it should remain white on areas where the background
+    is if one of the dark backgrounds are chosen. Anywhere not on the background should retain the light mode default
+    text colors I would think."
+-   Standard Dark · Dawn, Paper, Dusk and Mesh (the same note on all four): "Similar to the entries at the top of this
+    list, we'll need to change the font color on the components I'm changing here to favor the other side of the
+    spectrum."
+-   No other combination has a note. D-10 states the rule these notes describe.
+
+**Reading the table** ([DERIVED], from the corrected table):
+
+-   Top buttons and search + toggle are **full in all 20 combinations**.
+-   Digest content (section headings, Up Next, Horizon, Your Week) is **none in all 20** (D-11).
+-   The count label, the Contacts header and the Digest header have the **same value in every row**. The Digest header
+    is not "Digest content"; it follows the table.
+-   Across the art backgrounds, contact entries are see-through everywhere except Standard Light · Paper (b). On the
+    None (solid) background, Galaxy Light and Standard Dark keep full entries.
+
+### D-09 to D-12: what the answers mean
+
+-   **[DECIDED · 2026-09-27] D-09 --- In Galaxy Light and Standard Dark, "transparent" contact entries are truly
+    see-through.** This applies to the List rows and the Card-view cards on the four art backgrounds of each pairing.
+    -   **Galaxy Light:** contact entries are truly transparent, like Galaxy Dark's card transparency, not frosted white.
+        Text on them flips to light (D-10). Every other scrimmed component in Galaxy Light keeps the frosted-light look
+        (on the art backgrounds that means the full top buttons and search + toggle; on None (solid) it also covers
+        the full entries).
+    -   **Standard Dark:** contact entries are likewise truly transparent (see-through), and their font flips to suit the
+        art beneath (D-10). Every other scrimmed component keeps the slightly-black scrim where the table says
+        transparent (the count label, both headers) and is fully black where it says full (top buttons, search +
+        toggle, and everything on None (solid)).
+    -   **[DERIVED] This reverses part of ADR-115, by the owner's choice.** ADR-115 keeps opaque cards in the mismatched
+        package/mode pairings and rejects "Always-translucent cards" as an alternative. D-09 makes contact entries
+        see-through in exactly those pairings. D-08 also makes the List rows see-through; today they are solid in every
+        combination. Separately, D-08's **none** for the count label and both headers (every Galaxy Light background, and
+        Standard Light's four art backgrounds) removes the local `ChromeScrim`/app-bar backing that ADR-115 gives bare
+        chrome. The sheet showed
+        today's rule on the page, and these are owner-bucket calls (D-06), so they are recorded as decided. Planning
+        needs a new ADR that supersedes these parts of ADR-115 (and of ADR-087 where it still applies). Other content
+        cards keep ADR-115 unless the owner rules otherwise (O-8).
+-   **[DECIDED · 2026-09-27] D-10 --- Text on the art takes the colour that suits the art.**
+    -   Wherever a component goes from full to transparent or none over the art, the text sitting on the art takes the
+        colour that suits the art beneath it, not the mode's default. Examples (owner): white text over dark Galaxy art
+        in Galaxy Light, and dark text over light art in Standard Dark.
+    -   Text on a truly transparent contact entry (D-09) counts as text on the art.
+    -   Text that is not on the art keeps the mode's default colours.
+    -   Every colour still resolves through theme tokens (CLAUDE.md). See P-9 for how this interacts with the new art.
+-   **[DECIDED · 2026-09-27] D-11 --- Digest content has no scrim anywhere.** Section headings, Up Next items, Horizon items
+    and Your Week are "none" in every combination, including Galaxy Light and Standard Dark. The Digest content relies on
+    D-10 and on the new art.
+    -   **WATCH (owner): these Digest outliers must be checked during 38.5.** They are Galaxy Light, Standard Dark, and
+        mixed art such as Dusk and Mesh. Today Dusk spans L\* 16.1–74.3 and Mesh 33.3–78.5 (brief §A.1, MEASURED). The
+        plans must carry an explicit check for each outlier. A general look is not enough.
+-   **[DECIDED · 2026-09-27] D-12 --- Contacts pop-up menus and all Orrery controls and menus: full scrim everywhere.**
+    The Contacts pop-up menus (Population, Filters, Sort) and every Orrery control and menu keep a full scrim in every
+    combination. This reaffirms D-40; the sheet stated it as already decided and did not ask it. The Orrery route's art
+    stays out of scope (it forces `none`).
+
+### D-13 and D-14: sequencing and who makes the art
+
+-   **[DECIDED · 2026-09-27] D-13 --- Art first, then an owner pause, then a re-sign-off on the new art, then the scrim
+    and text-colour work.** The phase runs in this order:
+    1.  **New background art is produced first**, in the early plans (the D-14 loop).
+    2.  **An owner review pause.** At minimum this is the blocking art sign-off checkpoint that ends the D-14 loop.
+    3.  **A plan that redoes the scrim sign-off sheet on the new backgrounds.** Every v2 choice (D-08..D-12) is actually
+        rendered or mocked, at least for the screens and components the owner changed (the bold cells in the D-08
+        table).
+    4.  **Only then the scrim and text-colour implementation plans.**
+    -   Rationale (owner): scrims changed before the art would have to be redone.
+    -   [DERIVED] The v2 table is the signed starting point. The implementation plans build from the re-signed sheet; if
+        the owner changes a cell there, the newer answer governs.
+-   **[DECIDED · 2026-09-27] D-14 --- Claude plans and builds; a Codex agent (Astra) makes the images.**
+    -   The owner runs 38.5 discuss, plan and plan-review-convergence with Claude, as usual.
+    -   **In execution, background image creation is done by a Codex agent.** The Claude orchestrator invokes it through
+        the owner's `codex-edu` setup, model `gpt-6-astra` ("Astra"). Non-interactive form:
+        `CODEX_HOME="$HOME/.codex-edu" codex exec -m gpt-6-astra ... < /dev/null`. The `codex-edu` shell alias does not
+        exist in non-interactive shells, so use the environment-variable form.
+    -   **The art task is an iterative loop:**
+        1.  Claude hands Codex the art brief, the target bands, `check_art.py` and the owner's direction.
+        2.  Codex produces the images.
+        3.  Claude verifies them with `check_art.py`, `scripts/measure-background-extrema.py --check` and a visual review
+            against the brief, and iterates with Codex until they pass.
+        4.  **A blocking human checkpoint:** the owner reviews the images and either signs off or asks for changes. A
+            change request loops back to step 2.
+    -   **Claude does everything else:** code, asset wiring, extrema, tests, and the scrim and text-colour
+        implementation.
+    -   [PLANNING NOTE] `codex exec` practice (project memory):
+        -   Always close stdin with `< /dev/null`; otherwise it hangs on "Reading additional input from stdin".
+        -   Run with `--sandbox workspace-write`.
+        -   Have Codex write its outputs to files. Constrain it in the prompt to the named output paths, then check
+            `git status` for stray changes.
+        -   `~/.codex-edu/config.toml` defaults to `gpt-6-sol` (MEASURED 2026-09-27), so pass `-m gpt-6-astra` explicitly.
+    -   Whether this path can generate image files at all is open: see O-9.
 
 ## Primary Input: the 38.4 Background-Art Brief
 
@@ -110,11 +293,18 @@ It was written against `738ae12`. Its numbers carry MEASURED / COMPUTED / ESTIMA
 
 ## Open Items (owner, for the discuss-phase)
 
+**Status 2026-09-27:** the owner restated O-1, O-2, O-4 and O-7 as still open; O-7 is parked as a later experiment.
+O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has a scope note).
+
 -   **[OPEN] O-1 --- Which background to cut per theme.** The owner may cut one per package (4 → 3), giving about 12 images.
     Which one in each package?
 -   **[OPEN] O-2 --- Galaxy light-mode imagery.** D-39 allows different pictures rather than recoloured dark art. Capture
     the owner's own ideas for what Galaxy light pictures should be. The brief's pale-Galaxy remaps
     (`band-examples-galaxy.png`) are mechanical feasibility previews, not a proposal.
+    -   **Owner concept ideas (2026-09-27; still OPEN, not choices):** a pastel nebula with white star glints, and a pearl
+        planet limb.
+    -   [PLANNING NOTE] The Phase 31 prompt rules, restated in brief §I, exclude horizons, planets and recognisable
+        imagery. A planet limb would need the owner to relax that rule for Galaxy Light.
 -   **[OPEN] O-3 --- Standard light pale band.** Owner leaning (2026-09-26), **not a decision**: the pale remaps in
     `band-examples-standard.png` look acceptable in principle. Discuss before it becomes a decision. The band puts the whole
     image at about L\* 89–97.
@@ -122,8 +312,10 @@ It was written against `738ae12`. Its numbers carry MEASURED / COMPUTED / ESTIMA
     `#E5484D` limitation (E-1, today cards and chrome only; `38.4-RG029-INVENTORY.md` §4) extend to bare text? If yes, the
     Galaxy Dark art ceiling is L\* 18.5 and today's Galaxy art already passes everything else. If no, it is L\* 8.2. The
     owner asked for this question to be clarified (brief OD-4).
--   **[OPEN] O-5 --- Scrim sign-off sheet outcome (D-40).** Which components get a full scrim, a transparent scrim or no scrim
-    in each theme × mode × background. This is a prerequisite: planning does not start without the signed sheet.
+-   **[DECIDED · 2026-09-27 → D-08] O-5 --- Scrim sign-off sheet outcome (D-40).** Which components get a full scrim, a
+    transparent scrim or no scrim in each theme × mode × background. This is a prerequisite: planning does not start
+    without the signed sheet. **Resolved by D-08** (sign-off v2, with D-09..D-12). A re-sign-off on the new art is
+    sequenced inside the phase (D-13).
 -   **[OPEN] O-6 --- Deep Space / Starfield replacement.** The owner said these two Galaxy images are too dark anyway and
     plans to change two Galaxy images (brief OD-5). Which images are replaced, and does this overlap the O-1 cut?
 -   **[OPEN] O-7 --- Owner idea: dynamic text colour ("stained-glass layers").** The owner's idea, recorded as described:
@@ -136,11 +328,25 @@ It was written against `738ae12`. Its numbers carry MEASURED / COMPUTED / ESTIMA
     -   *Context from the brief (facts, not an assessment):* the art is fixed while content scrolls over it; the `cover`
         crop differs per device (for example Pixel 3a x 63–878 vs Pixel 6 Pro x 84–857 of the 941 px width, and
         foldables crop top and bottom); bare text spans nearly the full width.
+    -   **Status 2026-09-27:** parked as a later experiment. It is still OPEN and not in 38.5 scope. D-10's text-colour
+        rule is a separate, decided rule and does not implement this idea.
 -   **[OPEN] O-8 --- Card-blend (more translucent content cards).** Carried from the 31.1 parked list, which the owner's
     2026-09-26 correction (D-39) says rides with this phase. It has not been re-confirmed for 38.5 scope. It interacts with
     this work: ADR-115 makes cards glassy only when the art tone matches the mode, and with separate light and dark art every
     package × mode would have matching art. 38.4 D-12 kept Standard Light glass at 0.5 for 38.4 only. Any opacity change is
     the owner's.
+    -   **Scope note 2026-09-27:** D-08 and D-09 decide the Contacts List rows and Card-view cards per combination. Card-blend
+        for every other content card is still open, and it is still the owner's call.
+-   **[OPEN] O-9 --- Spike: can `codex-edu` exec make and edit image files non-interactively?** This is a quick spike to run
+    before planning (D-14). It confirms that `CODEX_HOME="$HOME/.codex-edu" codex exec -m gpt-6-astra ... < /dev/null`
+    can generate and edit image files with no interaction, and where the output lands (a named path in the workspace,
+    or only Codex's own store).
+    -   Fact (MEASURED 2026-09-27): `~/.codex-edu/generated_images/` holds 10 PNGs named `exec-<id>.png` in two session
+        folders, so Codex has generated images in this home before.
+    -   That does not confirm the non-interactive path, the Astra model, the output path or the deliverable format
+        (941 × 1672 sRGB, no alpha, lossless; brief §I). H1 runs on the final shipped WebP whatever Codex hands over.
+    -   If the spike fails, the owner decides the fallback.
+    -   Practice: the D-14 planning note (`< /dev/null`, `--sandbox workspace-write`, outputs written to files).
 
 ## Engineering Follow-ups
 
@@ -178,20 +384,71 @@ It was written against `738ae12`. Its numbers carry MEASURED / COMPUTED / ESTIMA
 -   **[PLANNING NOTE] P-8 --- Profile and Orrery.** The Profile route's `profileBackgroundScrim` sits over the same shell art;
     re-measure it with the new art. The Orrery route forces `none` and stays out of scope. App-owned profile photo
     backgrounds (ADR-112) fall under D-41.
+-   **[PLANNING NOTE] P-9 --- How the text-colour rule (D-10) meets the new art.**
+    -   D-10 is defined by the art actually beneath the text. The v2 sheet was answered over today's art: dark Galaxy art
+        in both Galaxy modes, and mid-to-light Standard art in both Standard modes.
+    -   Once separate light and dark art ships (D-39), the colour that suits the art in a pairing depends on that pairing's
+        new art:
+        -   Where the new art matches its mode (the brief's band direction), the art-suited colour is the mode default, and
+            the brief's §E bands apply as written.
+        -   Where a pairing keeps art of the opposite tone (for example, if O-2 settles on darker Galaxy Light pictures),
+            the flipped colours apply. That pairing's band, `check_art.py` (which models the mode-default colours today)
+            and the P-1 proof must then be computed for the flipped colours.
+    -   With O-7 parked, the natural reading is one foreground choice per combination (theme × mode × background, per
+        component), not per region of an image. Confirm this in discuss.
+    -   The re-sign-off (D-13) confirms each pairing on the new art. The D-11 WATCH outliers need this check most.
+-   **[PLANNING NOTE] P-10 --- What the sheet covers.**
+    -   The v2 sheet covered the Contacts and Digest screens, plus the fixed rule for pop-up menus and the Orrery (D-12).
+    -   Bare text on every other route (brief §C: 294 sites on 50 routes) is carried by the art fix.
+    -   The planner adds no scrims elsewhere (D-40).
+    -   The D-13 re-sign-off covers at least the cells the owner changed. Whether it should cover more screens is the
+        owner's call.
+-   **[PLANNING NOTE] P-11 --- New treatments the table implies (MEASURED against code, 2026-09-27).** Several D-08/D-09
+    cells need treatments that do not exist today:
+    -   see-through List rows, which have a solid `colors.surface` fill today (`src/components/ListRow.tsx:175`);
+    -   truly see-through contact cards in the mismatched pairings, where the ADR-115 `GlassSurface` tint is opaque
+        (`src/components/GridCard.tsx:216`);
+    -   a slightly-black see-through backing for the count label and headers in Standard Dark, which are solid there
+        today;
+    -   no backing at all for the count label and headers in Galaxy Light and on the Standard Light art backgrounds;
+    -   the D-10 flipped foregrounds.
+
+    What each new treatment needs:
+    -   Every one resolves through theme tokens, with no hardcoded colours (CLAUDE.md).
+    -   Each is covered by the P-1 proof and kept consistent with the `surface.test.ts` regimes.
+    -   `GlassSurface`, `ChromeScrim` and `ShellAppBar` are shared across routes. D-09 decides the contact entries only,
+        so a global change to the mismatched-mode card tint would go beyond it. Read every consumer before changing a
+        shared token (`npm run graph:ask -- governs <file>` for the governing ADRs).
 
 ## Explicitly Out of Scope
 
 -   Contrast guarantees for user-uploaded backgrounds (D-41).
 -   Collapsing Galaxy and Standard into a single Dark/Light switch (D-39: not the owner's intent).
--   The Orrery route (it forces `none`).
--   The glass-card, chrome and role-foreground work already done in 38.4 (D-12, D-24, D-26, D-28, D-34).
+-   The Orrery route's art (it forces `none`). Its controls and menus keep a full scrim (D-12).
+-   The glass-card, chrome and role-foreground work already done in 38.4 (38.4 D-12, D-24, D-26, D-28, D-34).
+-   The dynamic per-region text-colour idea (O-7), parked on 2026-09-27 as a later experiment, until the owner scopes it.
 
 ## Prerequisites
 
 -   Phase 38.4 complete, including Plan 16's misrole swap and Plan 20's glass-scope read-site sweep.
--   The owner-signed scrim combination sheet (D-40).
+-   The owner-signed scrim combination sheet (D-40). **Met 2026-09-27** (sign-off v2, D-08).
+-   The O-9 `codex-edu` image spike, run before planning (D-14).
 
 ## Revision Log
 
 -   2026-09-26 --- Created at phase insertion from 38.4 owner rulings D-38..D-41 and the 38.4 background-art brief.
     Discuss-phase not yet run. O-7 feasibility assessment pending.
+-   2026-09-27 --- Owner rulings recorded:
+    -   D-08: the scrim sign-off v2 results, as the full 20-combination table, with correction (a) (Galaxy Dark · Deep
+        Space List rows are transparent; "full" was a fluke) and correction (b) (Standard Light · Paper's full rows and
+        cards are intentional). The raw answers are saved unmodified as `38.5-scrim-signoff-v2.json`.
+    -   D-09: contact entries in Galaxy Light and Standard Dark are truly see-through. The entry names the parts of
+        ADR-115 these choices reverse.
+    -   D-10: the text-colour rule.
+    -   D-11: Digest content has no scrim, plus a WATCH item for the outliers.
+    -   D-12: the Contacts pop-up menus and the Orrery keep a full scrim (reaffirms D-40).
+    -   D-13: art-first sequencing, with a re-sign-off on the new art.
+    -   D-14: the Claude/Codex split and the `codex-edu` Astra art loop.
+
+    Open items: O-5 resolved; O-9 added (the `codex-edu` image spike); O-2 gains the owner's concept ideas; O-7 parked; O-8
+    has a scope note. P-9..P-11 added. The status header, Objective, Out of Scope and Prerequisites are updated.

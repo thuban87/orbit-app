@@ -1254,7 +1254,7 @@ Plans:
 ### Phase 38.5: Background Art & Text-on-Art Contrast (INSERTED)
 
 **Goal**: Every piece of text over shipped background art meets its WCAG floor (4.5:1 for text and links, 3:1 for glyphs and large text) in every theme × mode × background combination. The primary fix is regenerated art, with separate light and dark versions of each background. Scrims apply only where the owner's signed-off combination sheet says. User-uploaded custom backgrounds (for example contact profile photos) are excluded.
-**Depends on**: Phase 38.4; the owner-signed scrim combination sheet (38.4 D-40)
+**Depends on**: Phase 38.4; the owner-signed scrim combination sheet (38.4 D-40), signed 2026-09-27 as sign-off v2 (38.5 D-08); the `codex-edu` image spike (38.5 O-9), run before planning
 **Requirements**: TBD — defined at discuss/planning. Carries the bare-text-on-art remainder of RG-029 (former 38.4 finding F-1), moved out of 38.4 by owner ruling D-38
 **Success Criteria**: Defined at planning; per-pixel art acceptance (the brief's `check_art.py`, `measure-background-extrema.py --check`), a bare-text contrast proof, and owner device sign-off on the Pixel 6 Pro and Pixel 3a
 **Scope source**: docs/dossier/milestone-2/phase-38.5-background-art-text-contrast-dossier.md (authoritative); primary input `.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-BACKGROUND-ART-BRIEF.md`
@@ -1262,7 +1262,13 @@ Plans:
 **UI hint**: yes
 **Plans**: TBD
 
-> **DEFERRED PLANNING — needs discuss-phase; prerequisite: owner-signed scrim combination sheet (D-40).** Inserted 2026-09-26 when owner ruling D-38 moved bare-text-on-art contrast out of 38.4. See `38.5-CONTEXT.md` (shim) and the dossier's OPEN items (background cut per theme, Galaxy light imagery, Standard light pale band, E-1 red text, the sheet outcome, Deep Space/Starfield replacement, the dynamic text-colour idea, card-blend).
+> **DEFERRED PLANNING — needs discuss-phase; prerequisite: owner-signed scrim combination sheet (D-40).** Inserted 2026-09-26 when owner ruling D-38 moved bare-text-on-art contrast out of 38.4. See `38.5-CONTEXT.md` (shim) and the dossier's OPEN items (background cut per theme, Galaxy light imagery, Standard light pale band, E-1 red text, Deep Space/Starfield replacement, the dynamic text-colour idea (parked as a later experiment), card-blend, and the `codex-edu` image spike).
+> **Updated 2026-09-27 (owner rulings, 38.5 D-08..D-14).**
+> - The D-40 sheet is signed (sign-off v2; 20 combinations, answers saved as `38.5-scrim-signoff-v2.json`).
+> - Contact entries are truly see-through in Galaxy Light and Standard Dark. This reverses parts of ADR-115 by the owner's choice; a new ADR is due at planning.
+> - Text on the art takes the colour that suits the art. Digest content has no scrim, with a WATCH on its outliers. Pop-up menus and the Orrery keep a full scrim.
+> - **Sequencing is art-first:** new art → owner pause → re-sign-off on the new art → scrim and text-colour work.
+> - The background images are made by a Codex agent (`codex-edu`, `gpt-6-astra`) in a Claude-verified loop that ends at a blocking owner sign-off. Claude does all other work.
 
 ### Phase 39: Onboarding
 
