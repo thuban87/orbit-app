@@ -10,6 +10,7 @@ import {
 } from "@/components/digest/HorizonSection";
 import { UpNextSection } from "@/components/digest/UpNextSection";
 import { YourWeekSection } from "@/components/digest/YourWeekSection";
+import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { ChromeScrim } from "@/components/ui/ChromeScrim";
@@ -227,45 +228,45 @@ export function DigestContent({
   const { colors } = useTheme();
   return (
     <View testID="digest-root" style={styles.root}>
-      <ChromeScrim style={styles.header} radius={RADII.md}>
-        <AppText accessibilityRole="header" role="display">
-          {DIGEST}
-        </AppText>
-      </ChromeScrim>
-      {state.phase === "error" ? (
-        <ChromeScrim style={styles.messageScrim} radius={RADII.md}>
-          <View testID="digest-error" style={styles.message}>
-            <AppText role="heading">Couldn't load your Digest</AppText>
-            <AppText role="body" style={{ color: colors.textSecondary }}>
-              Try opening it again in a moment.
-            </AppText>
-          </View>
-        </ChromeScrim>
-      ) : state.phase === "loaded" ? (
-        <>
-          {state.refreshError ? (
-            <ChromeScrim style={styles.noticeScrim} radius={RADII.md}>
-              <View testID="digest-refresh-error" style={styles.notice}>
-                <AppText role="caption" style={{ color: colors.danger }}>
-                  Couldn't refresh Up Next and Horizon
-                </AppText>
-                <Button
-                  role="tertiary"
-                  label="Retry"
-                  accessibilityLabel="Retry refreshing Up Next and Horizon"
-                  onPress={onRetry}
-                />
-              </View>
-            </ChromeScrim>
-          ) : null}
-          <DigestLoadedBody
-            data={state.data}
-            refreshSignal={refreshSignal}
-            onOpenProfile={onOpenProfile}
-            onDrillThrough={onDrillThrough}
-          />
-        </>
-      ) : null}
+      {/* The shared tab-root header row, full-bleed above the padded body in
+          every phase (D-23, RG-037 ui-accessibility/AUD-UIA-016). */}
+      <ShellAppBar variant="root" title={DIGEST} />
+      <View testID="digest-body" style={styles.content}>
+        {state.phase === "error" ? (
+          <ChromeScrim style={styles.messageScrim} radius={RADII.md}>
+            <View testID="digest-error" style={styles.message}>
+              <AppText role="heading">Couldn't load your Digest</AppText>
+              <AppText role="body" style={{ color: colors.textSecondary }}>
+                Try opening it again in a moment.
+              </AppText>
+            </View>
+          </ChromeScrim>
+        ) : state.phase === "loaded" ? (
+          <>
+            {state.refreshError ? (
+              <ChromeScrim style={styles.noticeScrim} radius={RADII.md}>
+                <View testID="digest-refresh-error" style={styles.notice}>
+                  <AppText role="caption" style={{ color: colors.danger }}>
+                    Couldn't refresh Up Next and Horizon
+                  </AppText>
+                  <Button
+                    role="tertiary"
+                    label="Retry"
+                    accessibilityLabel="Retry refreshing Up Next and Horizon"
+                    onPress={onRetry}
+                  />
+                </View>
+              </ChromeScrim>
+            ) : null}
+            <DigestLoadedBody
+              data={state.data}
+              refreshSignal={refreshSignal}
+              onOpenProfile={onOpenProfile}
+              onDrillThrough={onDrillThrough}
+            />
+          </>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -308,8 +309,8 @@ export function DigestLoadedBody({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, padding: SPACING.base, gap: SPACING.md },
-  header: { padding: SPACING.md, overflow: "hidden" },
+  root: { flex: 1 },
+  content: { flex: 1, padding: SPACING.base, gap: SPACING.md },
   body: { gap: SPACING.lg, paddingBottom: SPACING.base },
   messageScrim: { padding: SPACING.base, overflow: "hidden" },
   noticeScrim: {
