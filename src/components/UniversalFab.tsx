@@ -1,5 +1,11 @@
 import * as Haptics from "expo-haptics";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  type ComponentRef,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   AccessibilityInfo,
   findNodeHandle,
@@ -23,6 +29,9 @@ import {
 } from "@/components/PostLogNoteEditor";
 import {
   createQuickLogUndoController,
+  type DialFocusLinks,
+  dialFocusCycle,
+  FAB_DIAL_TRANSIENT_ID,
   type FabContext,
   getFocusedContactContext,
   resolveFabContactContext,
@@ -51,7 +60,6 @@ import { Logger } from "@/utils/logger";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const LOG_SCOPE = "universal-fab";
-const DIAL_ID = "fab-speed-dial";
 const DIAL_ANIMATION_DURATION = 180;
 const DIAL_ROW_SPACING = 60;
 const DIAL_FIRST_ROW_OFFSET = 68;
@@ -71,6 +79,8 @@ type PickerFlow =
   | { kind: "quick-log" }
   | { kind: "navigate"; screen: "LogContact" | "UpdateContact" | "Memory" };
 
+type DialRowInstance = ComponentRef<typeof AnimatedPressable>;
+
 function UniversalFabActionRow({
   action,
   index,
@@ -78,6 +88,8 @@ function UniversalFabActionRow({
   open,
   pointerEvents,
   bottomOffset,
+  focusLinks,
+  rowRef,
   onPress,
 }: {
   action: UniversalFabAction;
@@ -86,6 +98,8 @@ function UniversalFabActionRow({
   open: boolean;
   pointerEvents: "auto" | "none";
   bottomOffset: number;
+  focusLinks: DialFocusLinks | undefined;
+  rowRef: (instance: DialRowInstance | null) => void;
   onPress: () => void;
 }) {
   const { colors } = useTheme();
@@ -111,7 +125,14 @@ function UniversalFabActionRow({
       // `accessible={false}` clears native focusability.
       accessible={open}
       focusable={open}
+      // D-31: while open, keyboard TAB / D-pad stays in the dial's own cycle
+      // (importantForAccessibility does not move Android keyboard focus).
+      // Closed, every link is unset, so the RG-039 closed state is untouched.
+      nextFocusForward={open ? focusLinks?.nextFocusForward : undefined}
+      nextFocusUp={open ? focusLinks?.nextFocusUp : undefined}
+      nextFocusDown={open ? focusLinks?.nextFocusDown : undefined}
       pointerEvents={pointerEvents}
+      ref={rowRef}
       onPress={onPress}
       style={[
         styles.option,
@@ -160,6 +181,23 @@ export function UniversalFab() {
   const hidden = keyboardOpen || isFocusedWorkflow(currentRouteName);
   const fabMeasurement = useWindowObstacle("shell-fab", !hidden, bottomOffset);
   const fabRef = fabMeasurement.ref;
+  const rowRefs = useRef<(DialRowInstance | null)[]>([]);
+  // Native view tags for the open dial's keyboard focus cycle (D-31). Resolved
+  // once per open, after layout, never per frame.
+  const [focusTags, setFocusTags] = useState<{
+    fab: number | null;
+    rows: (number | null)[];
+  }>({ fab: null, rows: [] });
+  const focusCycle = dialFocusCycle(focusTags.fab, focusTags.rows);
+
+  const resolveDialFocusTags = useCallback(() => {
+    setFocusTags({
+      fab: findNodeHandle(fabRef.current),
+      rows: UNIVERSAL_FAB_ACTIONS.map((_, index) =>
+        findNodeHandle(rowRefs.current[index] ?? null),
+      ),
+    });
+  }, [fabRef]);
 
   const restoreFabFocus = useCallback(() => {
     requestAnimationFrame(() => {
@@ -174,7 +212,7 @@ export function UniversalFab() {
       isOpenRef.current = false;
       expanded.value = withTiming(0, { duration: DIAL_ANIMATION_DURATION });
       setOpen(false);
-      shellTransientStore.getState().closeTransient(DIAL_ID);
+      shellTransientStore.getState().closeTransient(FAB_DIAL_TRANSIENT_ID);
       AccessibilityInfo.announceForAccessibility("Capture actions closed");
       if (restoreFocusAfterClose) restoreFabFocus();
     },
@@ -186,10 +224,16 @@ export function UniversalFab() {
     isOpenRef.current = true;
     expanded.value = withTiming(1, { duration: DIAL_ANIMATION_DURATION });
     setOpen(true);
-    shellTransientStore.getState().openTransient(DIAL_ID, closeDial);
+    shellTransientStore
+      .getState()
+      .openTransient(FAB_DIAL_TRANSIENT_ID, closeDial);
     AccessibilityInfo.announceForAccessibility("Capture actions open");
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  }, [closeDial, expanded]);
+    // The rows are mounted; resolve their tags after this frame's layout.
+    requestAnimationFrame(() => {
+      if (isOpenRef.current) resolveDialFocusTags();
+    });
+  }, [closeDial, expanded, resolveDialFocusTags]);
 
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", () =>
@@ -386,6 +430,10 @@ export function UniversalFab() {
               index={index}
               key={action.id}
               open={open}
+              focusLinks={focusCycle.rows[index]}
+              rowRef={(instance) => {
+                rowRefs.current[index] = instance;
+              }}
               onPress={() => void dispatchAction(action)}
               pointerEvents={scrimPointerEvents}
             />
@@ -398,6 +446,10 @@ export function UniversalFab() {
           accessibilityRole="button"
           accessibilityLabel="Add / capture"
           accessibilityState={{ expanded: open }}
+          // D-31: the FAB opens and closes the dial's keyboard focus cycle.
+          nextFocusForward={open ? focusCycle.fab.nextFocusForward : undefined}
+          nextFocusUp={open ? focusCycle.fab.nextFocusUp : undefined}
+          nextFocusDown={open ? focusCycle.fab.nextFocusDown : undefined}
           onPress={() => (isOpenRef.current ? closeDial() : openDial())}
           style={[
             styles.base,

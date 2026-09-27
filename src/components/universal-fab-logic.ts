@@ -25,6 +25,71 @@ export const UNIVERSAL_FAB_ACTIONS = Object.freeze([
   { id: "Memory", label: "Memory" },
 ] as const satisfies readonly UniversalFabAction[]);
 
+/**
+ * The speed dial's `shellTransientStore` entry id. One source for the dial
+ * (which registers it) and the navigator (which hides the background while it
+ * is open, D-31). The value is unchanged from the dial's former local id.
+ */
+export const FAB_DIAL_TRANSIENT_ID = "fab-speed-dial";
+
+/**
+ * Whether the FAB speed dial is open, read from the shell transient registry
+ * (a store selector, never mirrored state, so closing the dial always restores
+ * the background). Only the dial counts: other transients such as the
+ * dashboard panel keep their own scoped inertness (38.3 RG-020).
+ */
+export function selectFabDialOpen(state: {
+  entries: readonly { id: string }[];
+}): boolean {
+  return state.entries.some((entry) => entry.id === FAB_DIAL_TRANSIENT_ID);
+}
+
+/**
+ * Android native keyboard focus links for one dial element. Values are native
+ * view tags (`findNodeHandle`); `undefined` leaves Android's default search.
+ */
+export interface DialFocusLinks {
+  nextFocusForward: number | undefined;
+  nextFocusUp: number | undefined;
+  nextFocusDown: number | undefined;
+}
+
+/**
+ * The open dial's keyboard focus cycle (D-31). `importantForAccessibility`
+ * does not change Android keyboard focus (38.4 Plan 11 native evidence), so the
+ * dial links its own elements: FAB -> row 1 -> ... -> row N -> FAB for TAB
+ * (`nextFocusForward`; Shift+TAB follows it in reverse). The rows rise above
+ * the FAB in dial order, so the D-pad mirrors it: Up follows the cycle and
+ * Down reverses it. A link whose target tag is unresolved stays `undefined`.
+ */
+export function dialFocusCycle(
+  fabTag: number | null,
+  rowTags: readonly (number | null)[],
+): { fab: DialFocusLinks; rows: DialFocusLinks[] } {
+  const order = [fabTag, ...rowTags];
+  const links = (index: number): DialFocusLinks => {
+    if (order.length < 2) {
+      return {
+        nextFocusForward: undefined,
+        nextFocusUp: undefined,
+        nextFocusDown: undefined,
+      };
+    }
+    const next = order[(index + 1) % order.length] ?? undefined;
+    const previous =
+      order[(index - 1 + order.length) % order.length] ?? undefined;
+    return {
+      nextFocusForward: next,
+      nextFocusUp: next,
+      nextFocusDown: previous,
+    };
+  };
+  return {
+    fab: links(0),
+    rows: rowTags.map((_, index) => links(index + 1)),
+  };
+}
+
 export type FabNavigateIntent = {
   kind: "navigate";
   tab: "DashboardTab";

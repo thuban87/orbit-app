@@ -365,7 +365,8 @@ describe("dialFocusCycle (D-31)", () => {
 
   it("leaves a link undefined when its target tag is unresolved", () => {
     const cycle = dialFocusCycle(null, [11, null, 13, 14, 15, 16]);
-    expect(cycle.fab.nextFocusForward).toBeUndefined();
+    // The FAB's own tag is unresolved, but its outgoing link targets row 1.
+    expect(cycle.fab.nextFocusForward).toBe(11);
     expect(cycle.rows[0].nextFocusForward).toBeUndefined();
     expect(cycle.rows[0].nextFocusDown).toBeUndefined();
     expect(cycle.rows[5].nextFocusForward).toBeUndefined();

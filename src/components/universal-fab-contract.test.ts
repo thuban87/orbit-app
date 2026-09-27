@@ -88,13 +88,24 @@ describe("UniversalFab closed-dial semantics (RG-039 ui-accessibility/AUD-UIA-02
 describe("open dial keeps focus in the dial (D-31)", () => {
   const navigator = readFileSync("src/navigation/RootNavigator.tsx", "utf8");
 
-  /** The opener of the container that wraps `<Tab.Navigator`. */
+  /**
+   * The opener of the `<SafeAreaView` that wraps `<Tab.Navigator`. RootNavigator
+   * renders the navigator as the only child of `TabNavigatorContainer`, whose
+   * single `<SafeAreaView` is that container.
+   */
   function navigatorContainerOpener(): string {
-    const tab = navigator.indexOf("<Tab.Navigator");
-    expect(tab).toBeGreaterThan(-1);
-    const start = navigator.lastIndexOf("<SafeAreaView", tab);
+    expect(navigator).toMatch(
+      /<TabNavigatorContainer>\s*<Tab\.Navigator[\s\S]*<\/Tab\.Navigator>\s*<\/TabNavigatorContainer>/,
+    );
+    const container = navigator.slice(
+      navigator.indexOf("function TabNavigatorContainer("),
+      navigator.indexOf("export function RootNavigator("),
+    );
+    expect(container).toContain("{children}");
+    expect(navigator.split("<SafeAreaView").length - 1).toBe(1);
+    const start = container.indexOf("<SafeAreaView");
     expect(start).toBeGreaterThan(-1);
-    return navigator.slice(start, navigator.indexOf(">", start) + 1);
+    return container.slice(start, container.indexOf(">", start) + 1);
   }
 
   it("uses the shared transient id instead of a local constant", () => {
@@ -105,9 +116,11 @@ describe("open dial keeps focus in the dial (D-31)", () => {
   });
 
   it("hides the tab navigator subtree from accessibility while the dial is open", () => {
-    expect(navigator).toContain(
-      "const fabDialOpen = shellTransientStore(selectFabDialOpen);",
-    );
+    expect(
+      navigator.match(
+        /const fabDialOpen = shellTransientStore\(selectFabDialOpen\);/g,
+      ),
+    ).toHaveLength(1);
     const opener = navigatorContainerOpener();
     expect(opener).toContain(
       'importantForAccessibility={fabDialOpen ? "no-hide-descendants" : "auto"}',

@@ -11,12 +11,13 @@ import {
   type RouteProp,
   StackActions,
 } from "@react-navigation/native";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { BackHandler, Keyboard, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Icon } from "@/components/icons/Icon";
 import { TAB_ICON } from "@/components/icons/icon-registry";
 import { BackgroundHost } from "@/components/ui/BackgroundHost";
+import { selectFabDialOpen } from "@/components/universal-fab-logic";
 import { CONTACTS, DIGEST, EVENTS } from "@/constants/product-labels";
 import { DashboardStack } from "@/navigation/tabs/DashboardStack";
 import { DigestStack } from "@/navigation/tabs/DigestStack";
@@ -120,6 +121,34 @@ function handleActiveTabPress(
   }
 }
 
+/**
+ * The safe-area container around the tab navigator. While the FAB speed dial
+ * is open, the whole navigator (every tab's screens and the tab bar) is hidden
+ * from accessibility, so TalkBack and Switch Access reach only the dial (38.4
+ * D-31, the 38.3 RG-020 pattern). It reads a store selector, never mirrored
+ * state, so closing the dial restores the tree. Subscribing here rather than in
+ * RootNavigator keeps a dial toggle from re-rendering the navigator: the
+ * `children` element is unchanged, so React skips it.
+ *
+ * No `accessible` prop: on Android it would merge the navigator into one node.
+ * No `pointerEvents` either: the dial's full-screen scrim already intercepts
+ * touch while open. `importantForAccessibility` does not move Android keyboard
+ * focus, so the dial holds keyboard focus with its own cycle (UniversalFab).
+ */
+function TabNavigatorContainer({ children }: { children: ReactNode }) {
+  const fabDialOpen = shellTransientStore(selectFabDialOpen);
+  return (
+    <SafeAreaView
+      edges={["top"]}
+      importantForAccessibility={fabDialOpen ? "no-hide-descendants" : "auto"}
+      accessibilityElementsHidden={fabDialOpen}
+      style={styles.fill}
+    >
+      {children}
+    </SafeAreaView>
+  );
+}
+
 export function RootNavigator() {
   const { colors } = useTheme();
   const focusedRoute = useFocusedRouteStore((state) => state.routeName);
@@ -193,7 +222,7 @@ export function RootNavigator() {
       density={densityForRoute(focusedRoute)}
       slotId={systemBackgroundSlotOverride(focusedRoute)}
     >
-      <SafeAreaView edges={["top"]} style={{ flex: 1 }}>
+      <TabNavigatorContainer>
         <Tab.Navigator
           initialRouteName={INITIAL_TAB}
           tabBar={(props) => <MeasuredTabBar {...props} />}
@@ -265,7 +294,11 @@ export function RootNavigator() {
             })}
           />
         </Tab.Navigator>
-      </SafeAreaView>
+      </TabNavigatorContainer>
     </BackgroundHost>
   );
 }
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+});
