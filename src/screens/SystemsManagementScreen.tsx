@@ -34,6 +34,7 @@ import {
 } from "@/db/systems-dao";
 import type { SystemDescriptor } from "@/logic/orrery-system-logic";
 import type { RootStackParamList } from "@/navigation/types";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { showSnackbar, snackbarStore } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -321,6 +322,8 @@ function SystemRow({
 
 export function SystemsManagementScreen() {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [rows, setRows] = useState<SystemManagementRow[]>([]);
@@ -572,7 +575,10 @@ export function SystemsManagementScreen() {
           keyExtractor={(row) => row.id}
           renderItem={renderItem}
           onReorder={onReorder}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: bottomClearance },
+          ]}
         />
       </View>
     </View>

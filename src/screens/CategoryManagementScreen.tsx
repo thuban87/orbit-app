@@ -41,6 +41,7 @@ import {
 } from "@/db/categories-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { validateCategoryName } from "@/logic/category-logic";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { showSnackbar } from "@/stores/snackbar-store";
 import { useTheme } from "@/theme";
@@ -327,6 +328,8 @@ function CategoryRow({
 
 export function CategoryManagementScreen() {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const reducedMotion = useReducedMotion();
   const [rows, setRows] = useState<CategoryManagementRow[]>([]);
   const committedRows = useRef<CategoryManagementRow[]>([]);
@@ -659,7 +662,10 @@ export function CategoryManagementScreen() {
             keyExtractor={(row) => row.uid}
             onReorder={onReorder}
             scrollEnabled
-            contentContainerStyle={styles.list}
+            contentContainerStyle={[
+              styles.list,
+              { paddingBottom: bottomClearance },
+            ]}
             renderItem={({
               item,
               index,
