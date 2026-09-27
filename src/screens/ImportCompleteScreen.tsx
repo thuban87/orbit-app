@@ -87,7 +87,7 @@ const RETRY_FAILED_NOTICE =
 const SKIP_PHOTOS_FAILED_NOTICE =
   "Couldn't skip the remaining photos. Please try again.";
 
-/** Durable completion report and the final bridge out of bulk import. */
+/** Durable completion report for a finished or stopped import. */
 export function ImportCompleteScreen({
   navigation,
   route,
