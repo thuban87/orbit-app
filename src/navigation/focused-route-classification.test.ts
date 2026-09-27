@@ -31,6 +31,10 @@ const focusedRoutes = [
   "EditParticipant",
   "UpdateContact",
   "Memory",
+  // D-68 (owner, 2026-09-27): System Builder and Edit Interaction hide the
+  // FAB and tab bar like the other focused workflows.
+  "SystemBuilder",
+  "EditInteraction",
 ];
 
 const browseRoutes = [

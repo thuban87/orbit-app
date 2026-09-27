@@ -284,7 +284,29 @@ describe("FAB clearance: derived FAB-bearing route set (D-52)", () => {
     expect(routes.has("Create")).toBe(false);
     expect(routes.has("BulkImportSetup")).toBe(false);
     expect(routes.has("__ThemePreview")).toBe(false);
+    // D-68: focused workflows, so the FAB never shows there.
+    expect(routes.has("SystemBuilder")).toBe(false);
+    expect(routes.has("EditInteraction")).toBe(false);
   });
+});
+
+/** Screen files every one of whose registrations is a focused workflow. */
+const FOCUSED_ONLY = [
+  ...new Set(ALL_REGISTRATIONS.map(({ file }) => file)),
+].filter((file) => !FAB_BEARING.has(file));
+
+describe("FAB clearance: focused-only screens reserve none (D-68)", () => {
+  it("includes the D-68 System Builder and Edit Interaction screens", () => {
+    expect(FOCUSED_ONLY).toContain("src/screens/SystemBuilderScreen.tsx");
+    expect(FOCUSED_ONLY).toContain("src/screens/EditInteractionScreen.tsx");
+  });
+
+  it.each(FOCUSED_ONLY.sort())(
+    "%s does not pad for a FAB that never shows",
+    (file) => {
+      expect(stripComments(read(file))).not.toMatch(/\buseBottomClearance\b/);
+    },
+  );
 });
 
 describe("FAB clearance: every FAB-bearing scroll screen (D-52)", () => {

@@ -62,7 +62,6 @@ import {
 import { applyMembershipOverrides } from "@/logic/system-rule-resolver";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
-import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
   type ProvisionalOrreryScene,
   readProvisionalOrreryScene,
@@ -224,8 +223,6 @@ function BuilderBackgroundCanvas() {
 
 export function SystemBuilderScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
-  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
-  const bottomClearance = useBottomClearance();
   const focused = useIsFocused();
   const systemRef = route.params?.systemRef;
   const customRef = route.params?.systemUid
@@ -603,10 +600,7 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
                   </View>
                 ) : (
                   <ScrollView
-                    contentContainerStyle={[
-                      styles.content,
-                      { paddingBottom: bottomClearance },
-                    ]}
+                    contentContainerStyle={styles.content}
                     keyboardShouldPersistTaps="handled"
                   >
                     <View style={styles.header}>

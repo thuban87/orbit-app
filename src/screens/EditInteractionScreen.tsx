@@ -42,7 +42,6 @@ import { readInteractionForEdit } from "@/db/interaction-edit-read";
 import { editTouchpointFull } from "@/db/recency-dao";
 import { useDiscardKeepGuard } from "@/navigation/discard-keep-guard";
 import type { RootStackScreenProps } from "@/navigation/types";
-import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -60,8 +59,6 @@ export function EditInteractionScreen({
   route,
 }: RootStackScreenProps<"EditInteraction">) {
   const { colors } = useTheme();
-  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
-  const bottomClearance = useBottomClearance();
   const { contactId, interactionId } = route.params;
 
   const [value, setValue] = useState<TouchpointRefineValue | null>(null);
@@ -161,10 +158,7 @@ export function EditInteractionScreen({
   return (
     <ScrollView
       testID="edit-interaction-screen"
-      contentContainerStyle={[
-        styles.content,
-        { paddingBottom: bottomClearance },
-      ]}
+      contentContainerStyle={styles.content}
     >
       <View style={styles.header}>
         <Pressable

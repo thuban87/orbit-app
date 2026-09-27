@@ -30,6 +30,10 @@ const FOCUSED_WORKFLOW_ROUTES = new Set<string>([
   "EditParticipant",
   "UpdateContact",
   "Memory",
+  // D-68 (owner, 2026-09-27): authoring and editing workflows, so the FAB and
+  // tab bar hide here too.
+  "SystemBuilder",
+  "EditInteraction",
 ]);
 
 export function isFocusedWorkflow(routeName: string): boolean {
