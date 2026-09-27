@@ -25,6 +25,9 @@
  * interactions" so the grid is fully usable without colour. Dense Year/large-
  * preset cells render visually below the 44px floor (an accepted departure,
  * dossier §AC / Phase 40) but stay a11y-labelled and carry a touch `hitSlop`.
+ * That slop grows toward 44dp but never past the midpoint of the gap to the
+ * adjacent cell (`cellHitSlop`, owner default D-42 B), so tap zones never
+ * overlap a neighbour.
  */
 import { useMemo, useState } from "react";
 import {
@@ -34,7 +37,11 @@ import {
   View,
   type ViewStyle,
 } from "react-native";
-import { fitHeatmapCell } from "@/components/heatmap-fit";
+import {
+  type CellInsets,
+  cellHitSlop,
+  fitHeatmapCell,
+} from "@/components/heatmap-fit";
 import {
   classifyCycleBlock,
   classifyHeatmapCell,
@@ -68,10 +75,42 @@ const CYCLE_MAX_CELL = 52;
 /** The Cycles grid is always 5 columns wide — presets are 5/10/15/20. */
 const CYCLE_COLUMNS = 5;
 const CELL_GAP = SPACING.xs;
+/** Vertical gap between day-lens rows (their `marginBottom`). */
+const DAY_ROW_GAP = SPACING.xs;
+/** Year grid gaps: between days of a week, between the two weeks of a row, between rows. */
+const YEAR_DAY_GAP = SPACING.xs;
+const YEAR_WEEK_GAP = SPACING.sm;
+const YEAR_ROW_GAP = SPACING.xs;
 
-/** A 44px-floor touch target expressed as symmetric hitSlop around a small cell. */
-function hitSlopFor(edge: number): number {
-  return Math.max(0, Math.round((44 - edge) / 2));
+// Tap-zone gaps per lens (D-42 B). `cellHitSlop` caps each side at half of
+// these, so no two cells' zones overlap. Outer sides use the grid's own gap.
+const DAY_CELL_GAPS: CellInsets = {
+  left: CELL_GAP,
+  right: CELL_GAP,
+  top: DAY_ROW_GAP,
+  bottom: DAY_ROW_GAP,
+};
+const CYCLE_CELL_GAPS: CellInsets = {
+  left: CELL_GAP,
+  right: CELL_GAP,
+  top: CELL_GAP,
+  bottom: CELL_GAP,
+};
+
+/** Year cell gaps: the week-boundary sides face the wider week gap. */
+function yearCellGaps(
+  day: number,
+  daysInWeek: number,
+  weekIndex: number,
+  weeksInRow: number,
+): CellInsets {
+  const hasNextWeek = weekIndex < weeksInRow - 1;
+  return {
+    left: day === 0 && weekIndex > 0 ? YEAR_WEEK_GAP : YEAR_DAY_GAP,
+    right: day === daysInWeek - 1 && hasNextWeek ? YEAR_WEEK_GAP : YEAR_DAY_GAP,
+    top: YEAR_ROW_GAP,
+    bottom: YEAR_ROW_GAP,
+  };
 }
 
 /** Width of a row of `columns` cells of `edge` with CELL_GAP gaps. */
@@ -229,7 +268,12 @@ export function ActivityHeatmap({
     colors.heatmapScale[Math.min(level, colors.heatmapScale.length - 1)];
 
   /** Render one day-lens cell (real date, structural blank, or blocked future). */
-  const renderDayCell = (cell: WindowCell, key: string, edge: number) => {
+  const renderDayCell = (
+    cell: WindowCell,
+    key: string,
+    edge: number,
+    gaps: CellInsets,
+  ) => {
     // Structural placeholder OR a blocked future date: a non-interactive blank
     // (heatmapCellEmpty) that must read distinctly from a real zero-count day.
     if (cell.isPlaceholder || cell.date === null || cell.isFuture) {
@@ -250,7 +294,7 @@ export function ActivityHeatmap({
     const fill = classifyHeatmapCell(cell, count, lens);
     const bg =
       fill.kind === "blank" ? colors.heatmapCellEmpty : scaleColor(fill.level);
-    const slop = hitSlopFor(edge);
+    const slop = cellHitSlop({ edge, gaps });
     return (
       <Pressable
         key={key}
@@ -278,6 +322,7 @@ export function ActivityHeatmap({
         testID={`${testID}-cycle-${block.index}`}
         accessibilityRole="button"
         accessibilityLabel={`${rangeLabel}, ${count} interactions${currentSuffix}`}
+        hitSlop={cellHitSlop({ edge, gaps: CYCLE_CELL_GAPS })}
         onPress={() =>
           onCellPress({
             kind: "cycle",
@@ -408,6 +453,7 @@ export function ActivityHeatmap({
                       cell,
                       `y-${row}-${weekIndex}-${cell.date ?? `p${day}`}`,
                       HEATMAP_GEOMETRY.yearCellEdge,
+                      yearCellGaps(day, week.length, weekIndex, weeks.length),
                     ),
                   )}
                 </View>
@@ -429,6 +475,7 @@ export function ActivityHeatmap({
                   cell,
                   `d-${w}-${cell.date ?? `p${d}`}`,
                   dayCellEdge,
+                  DAY_CELL_GAPS,
                 ),
               )}
             </View>
@@ -458,14 +505,14 @@ const styles = StyleSheet.create({
   dayRow: {
     flexDirection: "row",
     gap: CELL_GAP,
-    marginBottom: SPACING.xs,
+    marginBottom: DAY_ROW_GAP,
   },
   yearRow: {
     flexDirection: "row",
-    gap: SPACING.sm,
-    marginBottom: SPACING.xs,
+    gap: YEAR_WEEK_GAP,
+    marginBottom: YEAR_ROW_GAP,
   },
-  yearWeek: { flexDirection: "row", gap: SPACING.xs },
+  yearWeek: { flexDirection: "row", gap: YEAR_DAY_GAP },
   cycleGrid: {
     alignSelf: "center",
     flexDirection: "row",

@@ -74,6 +74,7 @@ This subsystem owns no tables of its own — it reads the `interactions` and `ev
 3. `See details` opens the shared `DateDetailSheet`; `Log interaction` routes the typed `LogContact { contactId, prefillDate }` contract to the canonical detailed form. The prefilled day remains editable.
 4. The Year lens uses vertically flowing, weekday-aligned week rows rather than a horizontal scroll container. It reuses the same day-cell renderer, selection, classification, and accessible labels as the other lenses.
 5. The day lenses (7 Days / Month, 7 columns) and the Cycles lens (5 columns) fit their measured width (38.4 RG-033, `ui-accessibility/AUD-UIA-010`, D-13). `ActivityHeatmap` measures its container with `onLayout` and sizes each lens's cells with the shared pure `fitHeatmapCell` (`src/components/heatmap-fit.ts`). The width is capped at `DAY_MAX_CELL` 38 or `CYCLE_MAX_CELL` 52 and shrinks below that whenever the width demands it. Both grids are centered, and neither renders until measured. The Cycles grid is exactly five cells plus four gaps wide, so it always wraps at five. The dense Year lens is deliberately unchanged at its fixed `yearCellEdge` 13dp — an accepted limitation.
+6. Cell tap zones never overlap (owner default D-42 B). Every interactive cell (7 Days/Month, Cycles, Year) takes its `hitSlop` from the pure `cellHitSlop` (`src/components/heatmap-fit.ts`): each side grows toward 44dp but never past half the gap to the adjacent cell, and an outer side is capped as if a neighbour sat one gap away. With today's 4dp gaps a sub-44dp cell gains 2dp per side (a 32dp day cell has a 36dp zone); Year cells gain 4dp on the side facing the 8dp week gap. Cells at 44dp or more get no slop. The old symmetric `(44 − edge) / 2` slop overlapped neighbours in every lens (16dp across 4dp gaps in Year).
 
 ### Explicit timestamp presentation
 
@@ -132,6 +133,7 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | Your Week periods | Rolling 7 Days / locale-aware Calendar Week | `src/services/history/week-window.ts` | Shared app-wide local-date window vocabulary. |
 | `DAY_MAX_CELL` / `CYCLE_MAX_CELL` | `38` / `52` | `src/components/history/ActivityHeatmap.tsx` | Per-lens cell caps; the fitted edge never exceeds them (RG-033). |
 | `HEATMAP_GEOMETRY.yearCellEdge` | `13` | `src/components/history/ActivityHeatmap.tsx` | Fixed dense Year cell; not width-fitted. |
+| `DAY_ROW_GAP` / `YEAR_DAY_GAP` / `YEAR_WEEK_GAP` / `YEAR_ROW_GAP` | `4` / `4` / `8` / `4` | `src/components/history/ActivityHeatmap.tsx` | Grid gaps that both lay out the grid and cap each cell's tap-zone growth at half the gap (D-42 B). |
 
 ## Decisions
 
@@ -197,3 +199,4 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 | 2026-09-26 | 38.4 | Group Events list rows render their date-time through `formatDateTimeMinuteOrFallback` (Plan 12, RG-038 ui-accessibility/AUD-UIA-018); the local 24-hour slice helper is gone. |
 | 2026-09-26 | 38.4 | Activity heatmap fit-to-width (Plan 09, RG-033 ui-accessibility/AUD-UIA-010, D-13): the 7 Days/Month and Cycles lenses size their cells from the measured width with `fitHeatmapCell` (caps 38/52) and are centered; the dense Year lens is unchanged. |
 | 2026-09-26 | 38.4 | Detail sheets at large text (Plan 18, D-32, RG-034 follow-on): `InteractionDetail` actions scroll into reach in the Sheet's bounded body; `DateDetailSheet` opts out (`scrollBody={false}`) and keeps its footer fixed below its own list. |
+| 2026-09-26 | 38.4 | Heatmap tap zones never overlap (Plan 18, owner default D-42 B): cell `hitSlop` comes from `cellHitSlop`, capped at half the gap to each neighbour, in the 7 Days/Month, Cycles and Year lenses. |

@@ -35,3 +35,52 @@ export function fitHeatmapCell({
   const fitted = Math.floor((availableWidth - (columns - 1) * gap) / columns);
   return Math.max(1, Math.min(maxCell, fitted));
 }
+
+/** Per-side insets, the shape RN's `hitSlop` accepts. */
+export interface CellInsets {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+export interface CellHitSlopInput {
+  /** The rendered square cell edge, in dp. */
+  edge: number;
+  /**
+   * The gap to the adjacent cell on each side. For a side on the outside of
+   * the grid, pass the grid's own gap on that axis (as if a neighbour sat one
+   * gap away), so the zone never reaches an adjacent control either.
+   */
+  gaps: CellInsets;
+  /** The touch-target edge to grow toward (default 44dp). */
+  target?: number;
+}
+
+/**
+ * Non-overlapping heatmap tap zones (owner default D-42 B).
+ *
+ * Each side grows toward `target` — `ceil((target − edge) / 2)` — but never
+ * past the midpoint of that side's gap (`floor(gap / 2)`). Two neighbours'
+ * facing insets therefore sum to at most the gap between them, so a tap can
+ * never land in two cells' zones. A cell already at or above the target gets
+ * no slop. This replaces a symmetric `(44 − edge) / 2` slop that overlapped
+ * neighbours in every lens.
+ *
+ * PURE — no react-native import.
+ */
+export function cellHitSlop({
+  edge,
+  gaps,
+  target = 44,
+}: CellHitSlopInput): CellInsets {
+  const want = Math.ceil(Math.max(0, target - edge) / 2);
+  const side = (gap: number) =>
+    Math.min(want, Math.floor(Math.max(0, gap) / 2));
+  return {
+    left: side(gaps.left),
+    right: side(gaps.right),
+    top: side(gaps.top),
+    bottom: side(gaps.bottom),
+  };
+}
