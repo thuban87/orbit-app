@@ -31,6 +31,8 @@ import {
   createQuickLogUndoController,
   type DialFocusLinks,
   dialFocusCycle,
+  FAB_BORDER_COLOR_KEY,
+  FAB_BORDER_WIDTH,
   FAB_DIAL_TRANSIENT_ID,
   type FabContext,
   getFocusedContactContext,
@@ -460,6 +462,11 @@ export function UniversalFab() {
           style={[
             styles.base,
             { bottom: bottomOffset, backgroundColor: colors.accent },
+            // D-56 (OA-C2): a permanent ring on every screen, never route-keyed.
+            {
+              borderWidth: FAB_BORDER_WIDTH,
+              borderColor: colors[FAB_BORDER_COLOR_KEY],
+            },
           ]}
         >
           <Animated.Text

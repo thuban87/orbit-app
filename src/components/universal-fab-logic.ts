@@ -3,6 +3,22 @@
  * Shell-level navigation always targets a tab plus its nested screen: a bare
  * screen name cannot be resolved reliably from the navigation container.
  */
+import type { ThemePalette } from "@/theme/theme-types";
+
+/**
+ * Permanent FAB border (38.4 D-56, owner 2026-09-27; OA-C2). The FAB carries
+ * one ring on every screen that shows it, drawn by the one FAB component. This
+ * replaces D-45's Backup-settings-only border: no route keying.
+ *
+ * The colour is the `onAccent` palette role, because ADR-084 validates
+ * `onAccent` against every curated accent fill (`accents.test.ts`), so the ring
+ * stays distinct over any accent-filled button beneath the FAB. The width is a
+ * single-number tuning point; RN draws the border inside the 56dp box, so the
+ * FAB's size and centre do not change.
+ */
+export const FAB_BORDER_WIDTH = 2;
+export const FAB_BORDER_COLOR_KEY = "onAccent" satisfies keyof ThemePalette;
+
 export type UniversalFabActionId =
   | "AddContact"
   | "QuickLog"
