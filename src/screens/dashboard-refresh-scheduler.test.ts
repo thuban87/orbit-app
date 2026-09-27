@@ -16,6 +16,7 @@ import {
   createDashboardRefreshScheduler,
   type DashboardReadOutcome,
   type DashboardRefreshSource,
+  dashboardFadeStart,
   isDashboardVisible,
   publishDashboardRead,
 } from "@/screens/dashboard-refresh-scheduler";
@@ -449,5 +450,103 @@ describe("isDashboardVisible — backgrounded Home defers reads (38.3 review A-W
     appState = "active";
     expect(scheduler.request("foreground")).not.toBeNull();
     expect(reads).toEqual(["foreground"]);
+  });
+});
+
+/**
+ * 38.3 REVIEW A-WR-05 / VERIFICATION W4 (38.4 D-10): the Home favourite toggle
+ * publishes through the scheduler. After the write commits it requests a
+ * non-deferrable "favourite" read, whose newer token retires any in-flight
+ * stale read (which could otherwise revert the star), re-reads population
+ * counts, and settles with fade start 1 so a star tap never re-fades the list.
+ */
+describe("favourite source (38.3 A-WR-05 / W4)", () => {
+  it("a favourite request while hidden still issues a read (never deferred)", () => {
+    const reads: DashboardRefreshSource[] = [];
+    const logged: DashboardRefreshSource[] = [];
+    const scheduler = createDashboardRefreshScheduler({
+      read: (_token, source) => reads.push(source),
+      isVisible: () => false,
+      log: (source) => logged.push(source),
+    });
+    expect(scheduler.request("favourite")).not.toBeNull();
+    expect(reads).toEqual(["favourite"]);
+    expect(logged).toEqual(["favourite"]);
+  });
+
+  it("stale read A (before the write) then favourite read B: only B publishes, A resolving later publishes nothing", async () => {
+    const { rec, pending, settled, scheduler } = harness();
+    const a = scheduler.request("pull") as number;
+    const b = scheduler.request("favourite") as number;
+    pending.get(b)?.resolve(okOutcome("B"));
+    pending.get(a)?.resolve(okOutcome("A"));
+    await Promise.all(settled);
+    expect(rec.valuesOf("rows")).toEqual([[{ id: 1, name: "B" }]]);
+    expect(rec.valuesOf("populationCounts")).toEqual([{ favourites: 20 }]);
+    expect(rec.valuesOf("generation")).toHaveLength(1);
+  });
+
+  it("stale read A rejecting after favourite read B publishes no error and no stale settle", async () => {
+    const { rec, pending, settled, scheduler } = harness();
+    const a = scheduler.request("shell") as number;
+    const b = scheduler.request("favourite") as number;
+    pending.get(b)?.resolve(okOutcome("B"));
+    pending.get(a)?.reject(new Error("stale failure"));
+    await Promise.all(settled);
+    expect(rec.valuesOf("error")).toEqual([false]);
+    expect(rec.valuesOf("refreshing")).toEqual([false]);
+    expect(rec.valuesOf("initialLoad")).toEqual([false]);
+  });
+
+  it("two rapid toggles issue two favourite reads; only the last (final committed membership) publishes", async () => {
+    const { rec, pending, settled, scheduler } = harness();
+    const first = scheduler.request("favourite") as number;
+    const second = scheduler.request("favourite") as number;
+    expect(first).not.toBe(second);
+    pending.get(second)?.resolve(okOutcome("B"));
+    pending.get(first)?.resolve(okOutcome("A"));
+    await Promise.all(settled);
+    expect(rec.valuesOf("rows")).toEqual([[{ id: 1, name: "B" }]]);
+    expect(rec.valuesOf("listNow")).toEqual(["B-now"]);
+  });
+
+  it("a favourite-sourced outcome publishes fade start 1 even when animation is allowed", () => {
+    expect(dashboardFadeStart("favourite", true)).toBe(1);
+    expect(dashboardFadeStart("favourite", false)).toBe(1);
+    const rec = recordingSinks();
+    publishDashboardRead({
+      token: 1,
+      outcome: {
+        ...okOutcome("B"),
+        fadeStart: dashboardFadeStart("favourite", true),
+      },
+      isCurrent: () => true,
+      sinks: rec.sinks,
+    });
+    expect(rec.valuesOf("fadeStart")).toEqual([1]);
+  });
+
+  it("every other source keeps the existing rule: 0 when animation is allowed, else 1", () => {
+    for (const source of [
+      "focus",
+      "shell",
+      "foreground",
+      "pull",
+      "snooze",
+    ] as const) {
+      expect(dashboardFadeStart(source, true)).toBe(0);
+      expect(dashboardFadeStart(source, false)).toBe(1);
+    }
+    const rec = recordingSinks();
+    publishDashboardRead({
+      token: 1,
+      outcome: {
+        ...okOutcome("B"),
+        fadeStart: dashboardFadeStart("focus", true),
+      },
+      isCurrent: () => true,
+      sinks: rec.sinks,
+    });
+    expect(rec.valuesOf("fadeStart")).toEqual([0]);
   });
 });
