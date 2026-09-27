@@ -1198,7 +1198,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md (authoritative); per-group detail in docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md
 **Canonical refs**: docs/audits/2026-09-pre-release/synthesis/{REMEDIATION-GROUPS,SYNTHESIS,TRIAGE}.md; ADR-115 + ADR-087 (surface/glass authority)
 **UI hint**: yes
-**Plans**: 10/20 plans executed in 7 waves
+**Plans**: 11/20 plans executed in 7 waves
 
 Plans:
 **Wave 1**
@@ -1217,7 +1217,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [ ] 38.4-09-PLAN.md — Heatmap fit-to-width + centering and layout-preview geometry (RG-033; D-13)
-- [ ] 38.4-12-PLAN.md — Tab roots use the root header; Digest shared header row; Events timestamps; open FAB dial holds focus (D-22, D-23, D-31; RG-037, RG-038, RG-039)
+- [x] 38.4-12-PLAN.md — Tab roots use the root header; Digest shared header row; Events timestamps; open FAB dial holds focus (D-22, D-23, D-31; RG-037, RG-038, RG-039)
 - [ ] 38.4-13-PLAN.md — Release-only overlay permission removal + Orbit launcher art wiring (RG-040, RG-041; D-09, D-21)
 
 **Wave 3** *(blocked on Wave 2 completion)*
@@ -1313,7 +1313,7 @@ Plans:
 | 38. Digest & Navigation Restructure | 8/8 | In Progress|  |
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
-| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 10/20 | In Progress|  |
+| 38.4 UI Consistency, Accessibility, Performance & Release Polish | 11/20 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 0/TBD | Deferred planning (needs discuss; D-40 sheet first) | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
