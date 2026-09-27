@@ -25,6 +25,7 @@ import {
   setAiPermissionDefault,
 } from "@/db/ai-permissions-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -89,6 +90,8 @@ function ReviewExistingLinkLabel() {
 
 export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
   const { colors } = useTheme();
+  // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
+  const bottomClearance = useBottomClearance();
   const [defaults, setDefaults] = useState<AiPermissionDefaults>({
     memory: 0,
     interactionNote: 0,
@@ -238,7 +241,12 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
           AI Data Permissions
         </AppText>
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomClearance },
+        ]}
+      >
         <View style={styles.section}>
           <AppText role="heading">Defaults for new information</AppText>
           <AppText role="caption" style={{ color: colors.textSecondary }}>
