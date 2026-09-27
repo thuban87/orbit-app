@@ -87,3 +87,52 @@ describe("fitHeatmapCell (RG-033 ui-accessibility/AUD-UIA-010, D-13)", () => {
     expect(rowWidth(cell as number, 7, GAP)).toBeLessThanOrEqual(300.7);
   });
 });
+
+describe("fitHeatmapCell — ActivityHeatmap lens shapes (RG-033, D-13)", () => {
+  // Profile History's available width at a 320dp window: ContactProfileScreen
+  // content padding (16/side) + ProfileSection sectionBody padding (16/side) +
+  // GlassSurface border (1/side) = 320 − 66 = 254.
+  const PROFILE_320 = 320 - 66;
+
+  it("day lens (7 columns, cap 38) fits a 320dp Profile and never overflows 200–900", () => {
+    const at320 = fitHeatmapCell({
+      availableWidth: PROFILE_320,
+      columns: 7,
+      gap: GAP,
+      maxCell: 38,
+    }) as number;
+    expect(at320).toBe(32);
+    expect(rowWidth(at320, 7, GAP)).toBeLessThanOrEqual(PROFILE_320);
+    for (let width = 200; width <= 900; width += 1) {
+      const cell = fitHeatmapCell({
+        availableWidth: width,
+        columns: 7,
+        gap: GAP,
+        maxCell: 38,
+      }) as number;
+      expect(cell).toBeLessThanOrEqual(38);
+      expect(rowWidth(cell, 7, GAP)).toBeLessThanOrEqual(width);
+    }
+  });
+
+  it("cycle lens (5 columns, 4 gaps, cap 52) fits a 320dp Profile and never overflows 200–900", () => {
+    const at320 = fitHeatmapCell({
+      availableWidth: PROFILE_320,
+      columns: 5,
+      gap: GAP,
+      maxCell: 52,
+    }) as number;
+    expect(at320).toBe(47);
+    expect(rowWidth(at320, 5, GAP)).toBeLessThanOrEqual(PROFILE_320);
+    for (let width = 200; width <= 900; width += 1) {
+      const cell = fitHeatmapCell({
+        availableWidth: width,
+        columns: 5,
+        gap: GAP,
+        maxCell: 52,
+      }) as number;
+      expect(cell).toBeLessThanOrEqual(52);
+      expect(rowWidth(cell, 5, GAP)).toBeLessThanOrEqual(width);
+    }
+  });
+});
