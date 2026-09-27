@@ -368,9 +368,9 @@ export function PhotoSourcePicker({
               style={[styles.urlSubmit, { backgroundColor: colors.accent }]}
             >
               {submittingUrl ? (
-                <ActivityIndicator color={colors.background} />
+                <ActivityIndicator color={colors.onAccent} />
               ) : (
-                <Text style={[styles.actionText, { color: colors.background }]}>
+                <Text style={[styles.actionText, { color: colors.onAccent }]}>
                   Add from URL
                 </Text>
               )}

@@ -147,7 +147,7 @@ export function CategoryChoiceSheet({
               >
                 <AppText
                   style={{
-                    color: selected ? colors.background : colors.textPrimary,
+                    color: selected ? colors.onAccent : colors.textPrimary,
                   }}
                 >
                   {item.name}

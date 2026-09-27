@@ -126,7 +126,7 @@ export function SurvivorSelectScreen({
         onPress={continueToImpact}
         style={[styles.cta, { backgroundColor: colors.accent }]}
       >
-        <Text style={{ color: colors.background }}>Continue</Text>
+        <Text style={{ color: colors.onAccent }}>Continue</Text>
       </Pressable>
     </View>
   );

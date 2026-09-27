@@ -56,7 +56,7 @@ export function PopulationPanelContent({
             <Text
               style={[
                 styles.label,
-                { color: selected ? colors.background : colors.textPrimary },
+                { color: selected ? colors.onAccent : colors.textPrimary },
               ]}
             >
               {POPULATION_LABELS[key]}
@@ -65,7 +65,7 @@ export function PopulationPanelContent({
               accessibilityElementsHidden
               style={[
                 styles.selection,
-                { color: selected ? colors.background : colors.textSecondary },
+                { color: selected ? colors.onAccent : colors.textSecondary },
               ]}
             >
               {selected ? "Selected" : ""}

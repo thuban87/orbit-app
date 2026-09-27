@@ -454,7 +454,7 @@ export function ImportReviewScreen({
               >
                 <Text
                   style={{
-                    color: selected ? colors.background : colors.textPrimary,
+                    color: selected ? colors.onAccent : colors.textPrimary,
                   }}
                 >
                   {label}
@@ -600,7 +600,7 @@ export function ImportReviewScreen({
       >
         <Text
           style={{
-            color: canImport ? colors.background : colors.textSecondary,
+            color: canImport ? colors.onAccent : colors.textSecondary,
             fontWeight: "600",
           }}
         >
@@ -651,7 +651,7 @@ export function ImportReviewScreen({
                   style={{
                     color:
                       duplicateChoices.length === 1
-                        ? colors.background
+                        ? colors.onAccent
                         : colors.textPrimary,
                   }}
                 >
@@ -663,7 +663,7 @@ export function ImportReviewScreen({
                   style={{
                     color:
                       duplicateChoices.length === 1
-                        ? colors.background
+                        ? colors.onAccent
                         : colors.textSecondary,
                   }}
                 >

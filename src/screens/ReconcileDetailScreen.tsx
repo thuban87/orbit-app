@@ -561,7 +561,7 @@ export function ReconcileDetailScreen({
             },
           ]}
         >
-          <Text style={{ color: colors.background }}>
+          <Text style={{ color: colors.onAccent }}>
             {applying ? "Applying…" : "Apply"}
           </Text>
         </Pressable>

@@ -155,7 +155,9 @@ export function ContactMethodsEditor({
               >
                 <Text
                   style={{
-                    color: row.isPrimary ? colors.accent : colors.textSecondary,
+                    color: row.isPrimary
+                      ? colors.accentText
+                      : colors.textSecondary,
                   }}
                 >
                   {row.isPrimary ? "Primary" : "Set as primary"}

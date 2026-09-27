@@ -1438,7 +1438,7 @@ export function EditContactScreen({
                   <AppText
                     role="label"
                     style={{
-                      color: selected ? colors.background : colors.textPrimary,
+                      color: selected ? colors.onAccent : colors.textPrimary,
                     }}
                   >
                     {label}
@@ -1690,7 +1690,7 @@ export function EditContactScreen({
         <AppText
           role="label"
           style={{
-            color: savable ? colors.background : colors.textSecondary,
+            color: savable ? colors.onAccent : colors.textSecondary,
           }}
         >
           Save changes

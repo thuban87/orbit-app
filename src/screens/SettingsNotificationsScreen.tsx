@@ -578,7 +578,9 @@ export function SettingsNotificationsScreen() {
               <Text
                 style={[
                   styles.rowValue,
-                  { color: masterOn ? colors.accent : colors.textSecondary },
+                  {
+                    color: masterOn ? colors.accentText : colors.textSecondary,
+                  },
                 ]}
               >
                 {formatHour(settings?.deliveryHour ?? 9)}
@@ -613,7 +615,9 @@ export function SettingsNotificationsScreen() {
               <Text
                 style={[
                   styles.rowValue,
-                  { color: masterOn ? colors.accent : colors.textSecondary },
+                  {
+                    color: masterOn ? colors.accentText : colors.textSecondary,
+                  },
                 ]}
               >
                 {formatHour(settings?.quietStartHour ?? 21)}
@@ -648,7 +652,9 @@ export function SettingsNotificationsScreen() {
               <Text
                 style={[
                   styles.rowValue,
-                  { color: masterOn ? colors.accent : colors.textSecondary },
+                  {
+                    color: masterOn ? colors.accentText : colors.textSecondary,
+                  },
                 ]}
               >
                 {formatHour(settings?.quietEndHour ?? 8)}

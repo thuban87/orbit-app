@@ -429,7 +429,7 @@ export function ImportCompleteScreen({
           onPress={() => navigationRef.current?.reset(resetToDashboardRoot())}
           style={[styles.doneButton, { backgroundColor: colors.accent }]}
         >
-          <Text style={{ color: colors.background }}>Done</Text>
+          <Text style={{ color: colors.onAccent }}>Done</Text>
         </Pressable>
       </View>
     </View>

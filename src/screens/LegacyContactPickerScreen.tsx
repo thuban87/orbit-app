@@ -318,7 +318,7 @@ export function LegacyContactPickerScreen({
                       },
                     ]}
                   >
-                    <Text style={{ color: colors.background }}>
+                    <Text style={{ color: colors.onAccent }}>
                       {selected ? "✓" : ""}
                     </Text>
                   </View>
@@ -343,7 +343,7 @@ export function LegacyContactPickerScreen({
             },
           ]}
         >
-          <Text style={{ color: colors.background, fontWeight: "600" }}>
+          <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
             Import ({selectedCount})
           </Text>
         </Pressable>
@@ -386,7 +386,7 @@ function PermissionMessage({
         onPress={onAction}
         style={[styles.permissionAction, { backgroundColor: colors.accent }]}
       >
-        <Text style={{ color: colors.background, fontWeight: "600" }}>
+        <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
           {actionLabel}
         </Text>
       </Pressable>

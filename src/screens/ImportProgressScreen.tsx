@@ -106,9 +106,7 @@ export function ImportProgressScreen({
             }
             style={[styles.button, { backgroundColor: colors.accent }]}
           >
-            <Text style={{ color: colors.background }}>
-              View import summary
-            </Text>
+            <Text style={{ color: colors.onAccent }}>View import summary</Text>
           </Pressable>
         ) : (
           <Pressable
@@ -118,7 +116,7 @@ export function ImportProgressScreen({
             onPress={() => navigation.goBack()}
             style={[styles.button, { backgroundColor: colors.accent }]}
           >
-            <Text style={{ color: colors.background }}>Back</Text>
+            <Text style={{ color: colors.onAccent }}>Back</Text>
           </Pressable>
         )}
       </View>

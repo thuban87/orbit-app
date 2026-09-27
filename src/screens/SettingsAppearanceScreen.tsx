@@ -1026,7 +1026,7 @@ export function SettingsAppearanceScreen() {
                           numberOfLines={1}
                           style={{
                             color: isSelected
-                              ? colors.accent
+                              ? colors.accentText
                               : colors.textPrimary,
                           }}
                         >
@@ -1220,7 +1220,7 @@ export function SettingsAppearanceScreen() {
                           numberOfLines={1}
                           style={{
                             color: isSelected
-                              ? colors.accent
+                              ? colors.accentText
                               : colors.textPrimary,
                           }}
                         >

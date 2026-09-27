@@ -116,7 +116,7 @@ export function ConsolidationPrompt({
             onPress={onCombine}
             style={[styles.combine, { backgroundColor: colors.accent }]}
           >
-            <Text style={{ color: colors.background, fontWeight: "700" }}>
+            <Text style={{ color: colors.onAccent, fontWeight: "700" }}>
               Combine into one
             </Text>
           </Pressable>

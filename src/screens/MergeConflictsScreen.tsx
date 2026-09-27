@@ -425,9 +425,7 @@ export function MergeConflictsScreen({
           { backgroundColor: ready ? colors.accent : colors.surfaceElevated },
         ]}
       >
-        <Text
-          style={{ color: ready ? colors.background : colors.textSecondary }}
-        >
+        <Text style={{ color: ready ? colors.onAccent : colors.textSecondary }}>
           Continue
         </Text>
       </Pressable>

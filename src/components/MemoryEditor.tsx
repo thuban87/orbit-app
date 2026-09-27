@@ -154,7 +154,7 @@ function TypePicker({
                         styles.optionLabel,
                         {
                           color: isSelected
-                            ? colors.accent
+                            ? colors.accentText
                             : colors.textPrimary,
                         },
                       ]}
@@ -162,7 +162,7 @@ function TypePicker({
                       {item.label}
                     </AppText>
                     {isSelected ? (
-                      <Icon name="select" state="active" tone="accent" />
+                      <Icon name="select" state="active" tone="accentText" />
                     ) : null}
                   </Pressable>
                 );
@@ -495,7 +495,7 @@ export function MemoryEditor({
               <AppText
                 role="body"
                 style={{
-                  color: canSave ? colors.background : colors.textSecondary,
+                  color: canSave ? colors.onAccent : colors.textSecondary,
                 }}
               >
                 {editing ? "Save" : "Add memory"}

@@ -322,7 +322,7 @@ export function DashboardControlRow() {
           <Text
             style={[
               styles.label,
-              { color: active ? colors.accent : colors.textPrimary },
+              { color: active ? colors.accentText : colors.textPrimary },
             ]}
           >
             Population
@@ -331,7 +331,7 @@ export function DashboardControlRow() {
             numberOfLines={1}
             style={[
               styles.summary,
-              { color: active ? colors.accent : colors.textSecondary },
+              { color: active ? colors.accentText : colors.textSecondary },
             ]}
           >
             {summary}
@@ -357,7 +357,7 @@ export function DashboardControlRow() {
           <Text
             style={[
               styles.label,
-              { color: filtersActive ? colors.accent : colors.textPrimary },
+              { color: filtersActive ? colors.accentText : colors.textPrimary },
             ]}
           >
             {filterLabel}
@@ -366,7 +366,9 @@ export function DashboardControlRow() {
             numberOfLines={1}
             style={[
               styles.summary,
-              { color: filtersActive ? colors.accent : colors.textSecondary },
+              {
+                color: filtersActive ? colors.accentText : colors.textSecondary,
+              },
             ]}
           >
             {filterSummary}
@@ -392,7 +394,7 @@ export function DashboardControlRow() {
           <Text
             style={[
               styles.label,
-              { color: sortActive ? colors.accent : colors.textPrimary },
+              { color: sortActive ? colors.accentText : colors.textPrimary },
             ]}
           >
             {sortLabel}
@@ -401,7 +403,7 @@ export function DashboardControlRow() {
             numberOfLines={1}
             style={[
               styles.summary,
-              { color: sortActive ? colors.accent : colors.textSecondary },
+              { color: sortActive ? colors.accentText : colors.textSecondary },
             ]}
           >
             {sortSummary}

@@ -112,7 +112,7 @@ export function TriStateLastSpoke({
       return {
         background: colors.accent,
         border: colors.accent,
-        text: colors.background,
+        text: colors.onAccent,
       };
     }
     return {

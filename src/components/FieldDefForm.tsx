@@ -262,7 +262,7 @@ export function FieldDefForm(props: FieldDefFormProps) {
             >
               <Text
                 style={{
-                  color: selected ? colors.background : colors.textPrimary,
+                  color: selected ? colors.onAccent : colors.textPrimary,
                 }}
               >
                 {t.label}
@@ -416,7 +416,7 @@ export function FieldDefForm(props: FieldDefFormProps) {
         >
           <Text
             style={{
-              color: canSubmit ? colors.background : colors.textSecondary,
+              color: canSubmit ? colors.onAccent : colors.textSecondary,
             }}
           >
             {props.mode === "create" ? "Create field" : "Save"}

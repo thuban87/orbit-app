@@ -499,8 +499,7 @@ export function CropPhotoScreen({
             style={[
               styles.useText,
               {
-                color:
-                  ready && !busy ? colors.background : colors.textSecondary,
+                color: ready && !busy ? colors.onAccent : colors.textSecondary,
               },
             ]}
           >

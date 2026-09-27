@@ -132,7 +132,7 @@ export function FrequencyPicker({
             >
               <Text
                 style={{
-                  color: selected ? colors.accent : colors.textPrimary,
+                  color: selected ? colors.accentText : colors.textPrimary,
                 }}
               >
                 {name}
@@ -157,7 +157,9 @@ export function FrequencyPicker({
           ]}
         >
           <Text
-            style={{ color: customMode ? colors.accent : colors.textPrimary }}
+            style={{
+              color: customMode ? colors.accentText : colors.textPrimary,
+            }}
           >
             Custom…
           </Text>
@@ -207,7 +209,7 @@ export function FrequencyPicker({
                   >
                     <Text
                       style={{
-                        color: active ? colors.accent : colors.textPrimary,
+                        color: active ? colors.accentText : colors.textPrimary,
                       }}
                     >
                       {UNIT_LABELS[u]}

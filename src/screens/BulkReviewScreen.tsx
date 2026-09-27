@@ -216,7 +216,7 @@ export function BulkReviewScreen({
                         birthdayInvalid ||
                         normalizedBirthday.stored === null
                           ? colors.textSecondary
-                          : colors.background,
+                          : colors.onAccent,
                     }}
                   >
                     Save birthday

@@ -358,7 +358,7 @@ function FuelRow({
               color:
                 (item.url ?? "").trim().length === 0
                   ? colors.textSecondary
-                  : colors.accent,
+                  : colors.accentText,
             }}
           >
             Open
@@ -493,7 +493,7 @@ function DraftRow({
         >
           <Text
             style={{
-              color: canAdd ? colors.background : colors.textSecondary,
+              color: canAdd ? colors.onAccent : colors.textSecondary,
               fontWeight: "600",
             }}
           >

@@ -165,7 +165,7 @@ export function LinksEditor({
                     color:
                       link.url.trim().length === 0
                         ? colors.textSecondary
-                        : colors.accent,
+                        : colors.accentText,
                   }}
                 >
                   Open

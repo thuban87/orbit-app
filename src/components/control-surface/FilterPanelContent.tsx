@@ -113,7 +113,7 @@ export function FilterPanelContent({
                   style={[
                     styles.optionLabel,
                     {
-                      color: selected ? colors.background : colors.textPrimary,
+                      color: selected ? colors.onAccent : colors.textPrimary,
                     },
                   ]}
                 >
@@ -124,9 +124,7 @@ export function FilterPanelContent({
                   style={[
                     styles.selection,
                     {
-                      color: selected
-                        ? colors.background
-                        : colors.textSecondary,
+                      color: selected ? colors.onAccent : colors.textSecondary,
                     },
                   ]}
                 >

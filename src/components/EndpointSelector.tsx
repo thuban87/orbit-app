@@ -47,7 +47,7 @@ export function EndpointSelector({
                 numberOfLines={1}
                 style={[
                   styles.endpointLabel,
-                  { color: primary ? colors.background : colors.accent },
+                  { color: primary ? colors.onAccent : colors.accentText },
                 ]}
               >
                 {endpoint.display_value}
@@ -57,7 +57,7 @@ export function EndpointSelector({
                   style={[
                     styles.primary,
                     {
-                      color: primary ? colors.background : colors.textSecondary,
+                      color: primary ? colors.onAccent : colors.textSecondary,
                     },
                   ]}
                 >

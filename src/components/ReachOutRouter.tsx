@@ -83,7 +83,7 @@ export function ReachOutRouter({
         <Text
           style={[
             styles.routeLabel,
-            { color: primary ? colors.background : colors.accent },
+            { color: primary ? colors.onAccent : colors.accentText },
           ]}
         >
           {label}

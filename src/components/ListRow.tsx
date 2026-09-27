@@ -293,7 +293,7 @@ export function ListRow({
             name="favorite"
             state={isFavourite ? "active" : "default"}
             size="md"
-            tone={isFavourite ? "accent" : "textSecondary"}
+            tone={isFavourite ? "accentText" : "textSecondary"}
           />
         </Pressable>
         {displayState !== null ? (

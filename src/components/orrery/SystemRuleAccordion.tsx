@@ -120,7 +120,9 @@ export function SystemRuleAccordion({
               <AppText
                 role="label"
                 style={{
-                  color: selected.length ? colors.accent : colors.textSecondary,
+                  color: selected.length
+                    ? colors.accentText
+                    : colors.textSecondary,
                 }}
               >
                 {open ? "−" : "+"}
@@ -186,7 +188,7 @@ export function SystemRuleAccordion({
                         role="body"
                         style={{
                           color: selectedOption
-                            ? colors.accent
+                            ? colors.accentText
                             : colors.textPrimary,
                         }}
                       >

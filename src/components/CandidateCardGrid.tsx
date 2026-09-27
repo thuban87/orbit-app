@@ -214,7 +214,7 @@ export function CandidateCardGrid({
                     name="select"
                     state={selected ? "active" : "default"}
                     size="md"
-                    tone={selected ? "accent" : "textSecondary"}
+                    tone={selected ? "accentText" : "textSecondary"}
                   />
                 </View>
               ) : null}

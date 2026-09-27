@@ -429,7 +429,7 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
                                     role="caption"
                                     style={{
                                       color: item.enabled
-                                        ? colors.accent
+                                        ? scoped.accentText
                                         : scoped.textSecondary,
                                     }}
                                   >

@@ -723,7 +723,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
               testID={`capture-face-check-${row.id}`}
               style={[styles.checkBadge, { backgroundColor: colors.accent }]}
             >
-              <Text style={[styles.checkGlyph, { color: colors.background }]}>
+              <Text style={[styles.checkGlyph, { color: colors.onAccent }]}>
                 ✓
               </Text>
             </View>
@@ -777,7 +777,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
             onPress={() => void onDoneMulti()}
             style={styles.multiDone}
           >
-            <Text style={[styles.multiDoneLabel, { color: colors.background }]}>
+            <Text style={[styles.multiDoneLabel, { color: colors.onAccent }]}>
               Done · {selected.size}
             </Text>
           </Pressable>
@@ -833,7 +833,7 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
             ]}
           >
             <Text
-              style={[styles.inlineSubmitLabel, { color: colors.background }]}
+              style={[styles.inlineSubmitLabel, { color: colors.onAccent }]}
             >
               Create & save
             </Text>

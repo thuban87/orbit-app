@@ -297,7 +297,7 @@ function SmallTile({
           text="›"
           maxLines={1}
           style={{
-            color: asColor(palette.accent),
+            color: asColor(palette.accentText),
             fontSize: CHEVRON_SP,
             marginLeft: SPACING_XS,
           }}
@@ -452,7 +452,7 @@ function LargeTile({
         <ActionButton
           glyph="☎"
           label="Contact"
-          glyphColor={palette.accent}
+          glyphColor={palette.accentText}
           palette={palette}
           clickAction="OPEN_URI"
           clickActionData={{ uri: `orbit://reach/${tile.id}` }}
@@ -561,7 +561,7 @@ function EmptyTile({ palette }: { palette: WidgetPalette }): React.JSX.Element {
         text="☆"
         maxLines={1}
         style={{
-          color: asColor(palette.accent),
+          color: asColor(palette.accentText),
           fontSize: EMPTY_HEAD_SP + SPACING_SM,
           marginBottom: SPACING_SM,
         }}

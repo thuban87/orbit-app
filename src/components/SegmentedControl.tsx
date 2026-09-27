@@ -88,7 +88,7 @@ export function SegmentedControl<V extends string>({
               <Icon
                 name={option.icon}
                 state={isActive ? "active" : "default"}
-                tone={isActive ? "background" : "textSecondary"}
+                tone={isActive ? "onAccent" : "textSecondary"}
                 size="md"
               />
             ) : (
@@ -97,7 +97,7 @@ export function SegmentedControl<V extends string>({
                 style={[
                   styles.label,
                   {
-                    color: isActive ? colors.background : colors.textSecondary,
+                    color: isActive ? colors.onAccent : colors.textSecondary,
                   },
                 ]}
               >

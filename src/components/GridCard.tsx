@@ -239,7 +239,7 @@ export function GridCard({
                       name="select"
                       state={selected ? "active" : "default"}
                       size="md"
-                      tone={selected ? "accent" : "textSecondary"}
+                      tone={selected ? "accentText" : "textSecondary"}
                     />
                   </Pressable>
                 ) : null}
@@ -255,7 +255,7 @@ export function GridCard({
                       name="favorite"
                       state={isFavourite ? "active" : "default"}
                       size="md"
-                      tone={isFavourite ? "accent" : "textSecondary"}
+                      tone={isFavourite ? "accentText" : "textSecondary"}
                     />
                   </View>
                 ) : (
@@ -274,7 +274,7 @@ export function GridCard({
                       name="favorite"
                       state={isFavourite ? "active" : "default"}
                       size="md"
-                      tone={isFavourite ? "accent" : "textSecondary"}
+                      tone={isFavourite ? "accentText" : "textSecondary"}
                     />
                   </Pressable>
                 )}

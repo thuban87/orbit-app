@@ -50,7 +50,7 @@ export function SortPanelContent({
             <Text
               style={[
                 styles.label,
-                { color: selected ? colors.background : colors.textPrimary },
+                { color: selected ? colors.onAccent : colors.textPrimary },
               ]}
             >
               {label}
@@ -59,7 +59,7 @@ export function SortPanelContent({
               accessibilityElementsHidden
               style={[
                 styles.selection,
-                { color: selected ? colors.background : colors.textSecondary },
+                { color: selected ? colors.onAccent : colors.textSecondary },
               ]}
             >
               {selected ? CONTROL_ACTION_LABELS.selected : ""}

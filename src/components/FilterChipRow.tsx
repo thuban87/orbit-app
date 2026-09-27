@@ -80,7 +80,7 @@ export function FilterChipRow<Key extends string>({
               numberOfLines={1}
               style={[
                 styles.label,
-                { color: isActive ? colors.background : colors.textSecondary },
+                { color: isActive ? colors.onAccent : colors.textSecondary },
               ]}
             >
               {label}

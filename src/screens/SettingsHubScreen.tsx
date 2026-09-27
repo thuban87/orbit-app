@@ -114,7 +114,7 @@ export function SettingsHubScreen() {
                 { backgroundColor: colors.surface, borderColor: colors.border },
               ]}
             >
-              <Icon name={row.icon} tone="accent" size="md" />
+              <Icon name={row.icon} tone="accentText" size="md" />
               <View style={styles.rowText}>
                 <Text style={[styles.rowTitle, { color: colors.textPrimary }]}>
                   {row.title}

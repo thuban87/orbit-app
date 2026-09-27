@@ -137,7 +137,7 @@ export function MergeImpactSummary({
         onPress={confirm}
         style={[styles.cta, { backgroundColor: colors.accent }]}
       >
-        <Text style={{ color: colors.background }}>Merge contacts</Text>
+        <Text style={{ color: colors.onAccent }}>Merge contacts</Text>
       </Pressable>
     </View>
   );

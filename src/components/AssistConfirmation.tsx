@@ -68,7 +68,7 @@ export function AssistConfirmation({
             { backgroundColor: colors.accent, borderColor: colors.accent },
           ]}
         >
-          <Text style={[styles.buttonText, { color: colors.background }]}>
+          <Text style={[styles.buttonText, { color: colors.onAccent }]}>
             Yes
           </Text>
         </Pressable>

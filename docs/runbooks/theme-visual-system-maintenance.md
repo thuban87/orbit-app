@@ -147,8 +147,19 @@ Expected: theme tests pass, the colour gate finds no literals outside `src/theme
 
 For a bundled background or surface-composition change, select two materially different assets in each package on the physical Pixel and compare the same presentation, comfortable, and dense routes. Confirm the art changes visibly, cards and chrome remain readable in matching and mismatched modes, scroll content moves over a fixed image, Orrery and System Builder show no image bleed, and a no-photo Profile falls through while a resolved Profile photo wins. For a live-motion change, toggle the OS reduced-motion preference while the affected Skia surface is visible.
 
+## Accent roles: fill, text, on-fill (D-63)
+
+ADR-084 gives the accent three roles, and every foreground picks one:
+
+- **`accent` is a FILL only.** Backgrounds, borders, tracks and Skia shape paints. Never a text or glyph colour, including inside a ternary (`tone={isFavourite ? "accent" : …}`) or a multi-line style object.
+- **`accentText` is the text/glyph role** on any non-accent surface (links, selected-chip labels, the favourite star, selection checks, state captions). Inside a glass card read it through the scope (`ScopedPalette`, or `Icon tone="accentText"`, which resolves inside the card by construction) so the D-26 Standard-Light glass variant reaches the screen.
+- **`onAccent` is the label or glyph ON an accent fill.** Never the page `background` token: ADR-084 validates only `onAccent` on `fill`. This includes tone-object helpers that return `{ background, border, text }` for a selected segment.
+- **Kept graphics.** The tab-bar active tint and the pull-to-refresh spinner stay on `accent` (owner, D-63).
+- **The contract.** `src/theme/accent-foreground-role-contract.test.ts` (analyzer: `src/theme/__contract__/accent-foreground-roles.ts`, test support only) walks the AST of every non-test `src/` file. It checks every `color`/`tone`/`tintColor`/`glyphColor`/`placeholderTextColor` slot and tone-object `text`/`label` key, follows ternary arms, `??`/`||`, call arguments and same-file `const` aliases, and fails with `file:line` and the fix. Its allowlist holds only the two graphic tints and Skia canvas paints, each with a reason; a stale entry fails. The per-site record is `38.4-RG029-INVENTORY.md` Table F.
+
 ## Changelog
 
 - **2026-09-26 — Phase 38.4 Plan 03 (RG-029 / `ui-accessibility/AUD-UIA-001`; D-12, D-24, D-26, D-27).** Added `darkestPixel` and `scripts/measure-background-extrema.py --check`, the both-extrema + interval proof, the Standard-Light glass foreground scope (`GlassForegroundScope`, `UnscopedTheme`, `useUnscopedTheme`, `useGlassForegroundColors`) with lightness-only variants, the `textPlaceholder` token, and the rule that a new foreground on Standard glass is proven or excluded in writing.
 - **2026-09-27 — Phase 38.4 Plan 22 (D-50 / `OA-D4`).** Added "Native dialogs follow Orbit's mode": `native-color-scheme.ts` (`nativeColorSchemeFor`, `useNativeColorSchemeSync`), called once from `ThemeProvider` with the active package's mode setting; "system" → `"unspecified"` feedback-loop guard; `userInterfaceStyle` recorded as inert on Android.
 - **2026-09-27 — Phase 38.4 Plan 20 (D-34 / RG-029 `ui-accessibility/AUD-UIA-001`).** Added "Read colours inside the scope (D-34)": `ScopedPalette`, the glass-scope read contract and its analyzer. The 48 out-of-scope reads (17 files) were moved inside their scopes (inventory Table E). D-61: Android blur off for now (`blurMethod="none"`, Pitfall 13).
+- **2026-09-27 — Phase 38.4 code review fix pass 2 (D-63, owner; ADR-084).** Added "Accent roles: fill, text, on-fill (D-63)": 33 accent-as-text sites → `accentText` and 47 labels on accent fills → `onAccent`, locked by the repo-wide AST contract `accent-foreground-role-contract.test.ts`; tab-bar and pull-to-refresh tints kept.

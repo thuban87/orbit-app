@@ -1688,7 +1688,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             { backgroundColor: palette.accent, borderColor: palette.accent },
           ]}
         >
-          <Text style={[styles.primaryCtaText, { color: palette.background }]}>
+          <Text style={[styles.primaryCtaText, { color: palette.onAccent }]}>
             Add your first contact
           </Text>
         </Pressable>
@@ -2193,7 +2193,7 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
             { backgroundColor: colors.accent, borderColor: colors.accent },
           ]}
         >
-          <Text style={[styles.bulkPickerLabel, { color: colors.background }]}>
+          <Text style={[styles.bulkPickerLabel, { color: colors.onAccent }]}>
             Continue
           </Text>
         </Pressable>

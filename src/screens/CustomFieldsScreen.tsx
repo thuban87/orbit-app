@@ -383,7 +383,7 @@ export function CustomFieldsScreen({ onBack }: CustomFieldsScreenProps) {
           { backgroundColor: colors.accent, borderColor: colors.accent },
         ]}
       >
-        <Text style={{ color: colors.background, fontWeight: "600" }}>
+        <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
           New field
         </Text>
       </Pressable>
