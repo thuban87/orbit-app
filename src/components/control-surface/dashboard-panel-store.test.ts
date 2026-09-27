@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { shellTransientStore } from "@/stores/shell-transient-store";
 import {
+  DASHBOARD_PANEL_TRANSIENT_ID,
   type DashboardPanelRequest,
+  dashboardPanelFocusEffect,
   dashboardPanelStore,
   dismissDashboardPanel,
   selectPanelOpen,
@@ -87,5 +92,88 @@ describe("dismissDashboardPanel (react-native/AUD-RN-001)", () => {
     expect(onDismiss).toHaveBeenCalledTimes(1);
     expect(dashboardPanelStore.getState().request).toBeNull();
     expect(isOpen()).toBe(false);
+  });
+});
+
+/**
+ * D-62 (owner, 2026-09-27): an open Contacts control panel closes when the
+ * Contacts screen loses focus. Before this, the panel's open state (a global
+ * store) and its shell-transient entry survived a tab switch, so the hidden
+ * panel swallowed the first Back or active-tab re-tap on the other tab
+ * (both route through `shellTransientStore.dismissTop()`).
+ */
+describe("dashboardPanelFocusEffect (D-62: close on blur)", () => {
+  afterEach(() => {
+    dashboardPanelStore.getState().close();
+    shellTransientStore.setState({ entries: [] });
+  });
+
+  /** What AnchoredPanel registers while a panel is presented. */
+  const presentPanel = (id: string, onDismiss: () => void) => {
+    open(request(id, onDismiss));
+    shellTransientStore
+      .getState()
+      .openTransient(DASHBOARD_PANEL_TRANSIENT_ID, () =>
+        dismissDashboardPanel(),
+      );
+  };
+
+  it.each(["dashboard-population", "dashboard-filters", "dashboard-sort"])(
+    "blur closes the open %s panel and releases its Back entry",
+    (id) => {
+      const onDismiss = vi.fn(() => dashboardPanelStore.getState().close());
+      const onBlur = dashboardPanelFocusEffect();
+      presentPanel(id, onDismiss);
+      expect(isOpen()).toBe(true);
+      expect(shellTransientStore.getState().isAnyOpen()).toBe(true);
+
+      onBlur();
+
+      expect(isOpen()).toBe(false);
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+      // The other tab's first Back / re-tap is no longer consumed by the panel.
+      expect(shellTransientStore.getState().isAnyOpen()).toBe(false);
+      expect(shellTransientStore.getState().dismissTop()).toBe(false);
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("is a no-op on blur with no panel open and leaves other transients alone", () => {
+    const fabDismiss = vi.fn();
+    shellTransientStore.getState().openTransient("universal-fab", fabDismiss);
+
+    dashboardPanelFocusEffect()();
+
+    expect(isOpen()).toBe(false);
+    expect(shellTransientStore.getState().entries).toEqual([
+      { id: "universal-fab", dismiss: fabDismiss },
+    ]);
+    expect(fabDismiss).not.toHaveBeenCalled();
+  });
+
+  it("does not reopen anything on re-focus (the panel stays closed on return)", () => {
+    presentPanel("dashboard-filters", vi.fn());
+    const onBlur = dashboardPanelFocusEffect();
+    onBlur();
+
+    // Returning to Contacts runs the focus effect again.
+    dashboardPanelFocusEffect();
+
+    expect(isOpen()).toBe(false);
+    expect(shellTransientStore.getState().isAnyOpen()).toBe(false);
+  });
+
+  it("is wired into HomeScreen's focus lifecycle", () => {
+    const home = readFileSync(
+      join(__dirname, "..", "..", "screens", "HomeScreen.tsx"),
+      "utf8",
+    );
+    expect(home).toContain("useFocusEffect(dashboardPanelFocusEffect)");
+  });
+
+  it("AnchoredPanel registers under the shared transient id", () => {
+    const panel = readFileSync(join(__dirname, "AnchoredPanel.tsx"), "utf8");
+    expect(panel).toContain("DASHBOARD_PANEL_TRANSIENT_ID");
+    expect(panel).not.toContain('"dashboard-panel"');
   });
 });
