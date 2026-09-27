@@ -57,3 +57,35 @@ describe("AI permissions read vs action errors (Lane D WR-01)", () => {
     expect(screen).toContain("{shownError ? (");
   });
 });
+
+describe("AI permissions selection acts only on visible rows (Lane D WR-04)", () => {
+  it("derives the effective selection from the filtered view and the expanded contact", () => {
+    expect(screen).toMatch(
+      /visibleSelectedKeys\(filtered, expandedContact, selected\)/,
+    );
+  });
+
+  it("builds bulk refs from the visible selection only", () => {
+    expect(screen).toMatch(
+      /selectedPermissionRefs\(filtered, visibleSelected\)/,
+    );
+    expect(screen).not.toMatch(/selectedPermissionRefs\(items,/);
+  });
+
+  it("counts and shows the bulk bar from the visible selection only", () => {
+    expect(screen).not.toMatch(/\bselected\.size\b/);
+    expect(screen).toContain("{visibleSelected.size > 0 ? (");
+    expect(screen).toContain("{visibleSelected.size} selected");
+  });
+
+  it("still writes consent only through the confirmed bulk apply", () => {
+    const writers = [
+      ...screen.matchAll(/\bbulk(Enable|Disable)AiPermissions\(/g),
+    ];
+    // Exactly one call each, both inside applyPending, both on `refs`.
+    const apply = functionBody("applyPending");
+    expect(apply).toContain("bulkEnableAiPermissions(getExecutor(), refs,");
+    expect(apply).toContain("bulkDisableAiPermissions(getExecutor(), refs,");
+    expect(writers.length).toBe(2);
+  });
+});

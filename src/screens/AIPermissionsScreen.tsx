@@ -37,6 +37,7 @@ import {
   groupAiPermissionItems,
   permissionGroupCaption,
   selectedPermissionRefs,
+  visibleSelectedKeys,
 } from "./ai-permissions-logic";
 
 const LOG_SCOPE = "ai-permissions";
@@ -158,9 +159,15 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
       }),
     [enabledOnly, filtered, items, loaded, readError],
   );
+  // 38.4 review Lane D WR-04: only selected rows that are on screen (filtered
+  // view, expanded contact) count or reach a bulk consent change.
+  const visibleSelected = useMemo(
+    () => visibleSelectedKeys(filtered, expandedContact, selected),
+    [expandedContact, filtered, selected],
+  );
   const refs = useMemo(
-    () => selectedPermissionRefs(items, selected),
-    [items, selected],
+    () => selectedPermissionRefs(filtered, visibleSelected),
+    [filtered, visibleSelected],
   );
 
   async function toggleDefault(
@@ -389,7 +396,7 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
                         </Pressable>
                         {expanded
                           ? group.items.map((item) => {
-                              const checked = selected.has(item.itemKey);
+                              const checked = visibleSelected.has(item.itemKey);
                               return (
                                 <Pressable
                                   key={item.itemKey}
@@ -437,9 +444,9 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
             })
           )}
 
-          {selected.size > 0 ? (
+          {visibleSelected.size > 0 ? (
             <View style={styles.bulkActions}>
-              <AppText role="caption">{selected.size} selected</AppText>
+              <AppText role="caption">{visibleSelected.size} selected</AppText>
               <View style={styles.buttonRow}>
                 <Button
                   role="secondary"

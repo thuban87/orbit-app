@@ -207,6 +207,32 @@ export function selectedPermissionRefs(
   return [...refs.values()];
 }
 
+/**
+ * The selected item keys whose rows are on screen (38.4 review Lane D WR-04):
+ * in the current filtered view (type, Enabled-only, search) AND under the one
+ * expanded contact, since only that contact's rows render. A selection hidden
+ * by a filter, a search or a collapse is inert: it neither counts toward
+ * "N selected" nor reaches a bulk consent change, so every number on screen
+ * reconciles with the visible list (D-44).
+ */
+export function visibleSelectedKeys(
+  filteredItems: readonly AiPermissionItem[],
+  expandedContactUid: string | null,
+  selectedItemKeys: ReadonlySet<string>,
+): Set<string> {
+  const visible = new Set<string>();
+  if (expandedContactUid === null) return visible;
+  for (const item of filteredItems) {
+    if (
+      item.contactUid === expandedContactUid &&
+      selectedItemKeys.has(item.itemKey)
+    ) {
+      visible.add(item.itemKey);
+    }
+  }
+  return visible;
+}
+
 export function selectionImpact(
   items: readonly AiPermissionItem[],
   selectedItemKeys: ReadonlySet<string>,

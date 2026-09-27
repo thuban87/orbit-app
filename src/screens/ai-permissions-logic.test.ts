@@ -10,6 +10,7 @@ import {
   selectedPermissionRefs,
   selectionImpact,
   summarizePermissionView,
+  visibleSelectedKeys,
 } from "./ai-permissions-logic";
 
 const ITEMS: AiPermissionItem[] = [
@@ -517,5 +518,56 @@ describe("isPermissionFilterActive", () => {
         enabledOnly: false,
       }),
     ).toBe(true);
+  });
+});
+
+/**
+ * 38.4 review Lane D WR-04: a selection may only count, and only reach a bulk
+ * consent change, where its row is on screen: in the filtered view AND under
+ * the one expanded contact. Hidden selections are inert.
+ */
+describe("visibleSelectedKeys (Lane D WR-04)", () => {
+  const all = new Set(ITEMS.map((item) => item.itemKey));
+
+  it("keeps only selected rows of the expanded contact in the filtered view", () => {
+    expect([...visibleSelectedKeys(ITEMS, "alex", all)]).toEqual([
+      "memory:1",
+      "interaction-note:2",
+    ]);
+    expect([...visibleSelectedKeys(ITEMS, "blair", all)]).toEqual([
+      "custom-field:30",
+    ]);
+  });
+
+  it("drops a selection a filter or search has hidden", () => {
+    const filtered = filterAiPermissionItems(ITEMS, {
+      query: "",
+      type: "all",
+      enabledOnly: true,
+    });
+    expect([...visibleSelectedKeys(filtered, "alex", all)]).toEqual([
+      "memory:1",
+    ]);
+    const searched = filterAiPermissionItems(ITEMS, {
+      query: "blair",
+      type: "all",
+      enabledOnly: false,
+    });
+    expect(visibleSelectedKeys(searched, "alex", all).size).toBe(0);
+  });
+
+  it("drops a selection whose contact is collapsed, and is empty with none expanded", () => {
+    const selected = new Set(["memory:1", "custom-field:30"]);
+    expect([...visibleSelectedKeys(ITEMS, "blair", selected)]).toEqual([
+      "custom-field:30",
+    ]);
+    expect(visibleSelectedKeys(ITEMS, null, selected).size).toBe(0);
+  });
+
+  it("feeds refs only for visible selected rows", () => {
+    const visible = visibleSelectedKeys(ITEMS, "blair", all);
+    expect(selectedPermissionRefs(ITEMS, visible)).toEqual([
+      { category: "custom-field", id: 3 },
+    ]);
   });
 });
