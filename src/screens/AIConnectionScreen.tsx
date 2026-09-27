@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { connectOpenRouter } from "@/ai/openrouter-oauth";
 import { AppText, Button, ConfirmDialog, GlassSurface } from "@/components/ui";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import {
   type AiConnection,
   activateAiConnection,
@@ -245,71 +246,91 @@ export function AIConnectionScreen({
     const isExpanded = expanded === lane;
     return (
       <GlassSurface key={lane} density="dense" style={styles.card}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ expanded: isExpanded, selected: state.active }}
-          accessibilityLabel={`${LANE_NAMES[lane]} connection`}
-          onPress={() => {
-            setCredentialDraft(switchLane(lane));
-            setExpanded(isExpanded ? null : lane);
-          }}
-          style={styles.cardHeader}
-        >
-          <View style={styles.copy}>
-            <AppText role="label">{LANE_NAMES[lane]}</AppText>
-            {state.rememberedModel ? (
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                {state.rememberedModel}
-              </AppText>
-            ) : null}
-          </View>
-          <AppText
-            role="caption"
-            style={{
-              color: state.active ? colors.accentText : colors.textSecondary,
-            }}
-          >
-            {state.active
-              ? "Active"
-              : state.saved
-                ? "Saved"
-                : isExpanded
-                  ? "−"
-                  : "+"}
-          </AppText>
-        </Pressable>
-        {isExpanded ? (
-          <View
-            style={[
-              styles.cardBody,
-              { borderTopColor: state.active ? colors.accent : colors.border },
-            ]}
-          >
-            {body}
-            {state.saved ? (
-              <Button
-                role="secondary"
-                label="Use saved connection"
-                disabled={pending !== null}
-                onPress={() => void activateSaved(lane)}
-              />
-            ) : null}
-            {connection ? (
-              <View style={styles.actions}>
-                <Button
-                  role="tertiary"
-                  label="Choose model"
-                  onPress={() => onChooseModel(lane)}
-                />
-                <Button
-                  role="destructive"
-                  label={lane === "openrouter" ? "Disconnect" : "Remove key"}
-                  onPress={() => setRemoveLane(lane)}
-                />
-              </View>
-            ) : null}
-          </View>
-        ) : null}
+        <ScopedPalette>
+          {(scoped) => (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{
+                  expanded: isExpanded,
+                  selected: state.active,
+                }}
+                accessibilityLabel={`${LANE_NAMES[lane]} connection`}
+                onPress={() => {
+                  setCredentialDraft(switchLane(lane));
+                  setExpanded(isExpanded ? null : lane);
+                }}
+                style={styles.cardHeader}
+              >
+                <View style={styles.copy}>
+                  <AppText role="label">{LANE_NAMES[lane]}</AppText>
+                  {state.rememberedModel ? (
+                    <AppText
+                      role="caption"
+                      style={{ color: scoped.textSecondary }}
+                    >
+                      {state.rememberedModel}
+                    </AppText>
+                  ) : null}
+                </View>
+                <AppText
+                  role="caption"
+                  style={{
+                    color: state.active
+                      ? scoped.accentText
+                      : scoped.textSecondary,
+                  }}
+                >
+                  {state.active
+                    ? "Active"
+                    : state.saved
+                      ? "Saved"
+                      : isExpanded
+                        ? "−"
+                        : "+"}
+                </AppText>
+              </Pressable>
+              {isExpanded ? (
+                <View
+                  style={[
+                    styles.cardBody,
+                    {
+                      borderTopColor: state.active
+                        ? colors.accent
+                        : colors.border,
+                    },
+                  ]}
+                >
+                  {body}
+                  {state.saved ? (
+                    <Button
+                      role="secondary"
+                      label="Use saved connection"
+                      disabled={pending !== null}
+                      onPress={() => void activateSaved(lane)}
+                    />
+                  ) : null}
+                  {connection ? (
+                    <View style={styles.actions}>
+                      <Button
+                        role="tertiary"
+                        label="Choose model"
+                        onPress={() => onChooseModel(lane)}
+                      />
+                      <Button
+                        role="destructive"
+                        label={
+                          lane === "openrouter" ? "Disconnect" : "Remove key"
+                        }
+                        onPress={() => setRemoveLane(lane)}
+                      />
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+            </>
+          )}
+        </ScopedPalette>
       </GlassSurface>
     );
   }
@@ -443,9 +464,16 @@ export function AIConnectionScreen({
                   },
                 ]}
               />
-              <AppText role="caption" style={{ color: colors.textSecondary }}>
-                {CUSTOM_RETENTION_CAVEAT}
-              </AppText>
+              <ScopedPalette>
+                {(scoped) => (
+                  <AppText
+                    role="caption"
+                    style={{ color: scoped.textSecondary }}
+                  >
+                    {CUSTOM_RETENTION_CAVEAT}
+                  </AppText>
+                )}
+              </ScopedPalette>
               <Button
                 role="primary"
                 label={pending === "custom" ? "Saving…" : "Connect"}

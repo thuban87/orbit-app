@@ -31,6 +31,7 @@ import {
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import type { OrrerySystemId } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -516,224 +517,234 @@ export function SystemBuilderScreen({ navigation, route }: Props) {
         accessibilityViewIsModal
       >
         <GlassSurface density="dense" style={styles.surface}>
-          {previewing ? (
-            <View style={styles.previewContent}>
-              <AppText role="heading">Preview</AppText>
-              <AppText role="label" accessibilityLiveRegion="polite">
-                {previewMembershipSummary(
-                  membership.memberIds.map((id) => ({ id })),
-                )}
-              </AppText>
-              {membership.memberIds.length === 0 ? (
-                <AppText style={{ color: colors.textSecondary }}>
-                  No members in this System yet.
-                </AppText>
-              ) : null}
-              {focusedPreviewMember ? (
-                <AppText role="caption" accessibilityLiveRegion="polite">
-                  Focused member: {focusedPreviewMember.name}
-                </AppText>
-              ) : null}
-              {previewMembers.length ? (
-                <>
-                  <AppText role="label">Preview members</AppText>
+          <ScopedPalette>
+            {(scoped) => (
+              <>
+                {previewing ? (
+                  <View style={styles.previewContent}>
+                    <AppText role="heading">Preview</AppText>
+                    <AppText role="label" accessibilityLiveRegion="polite">
+                      {previewMembershipSummary(
+                        membership.memberIds.map((id) => ({ id })),
+                      )}
+                    </AppText>
+                    {membership.memberIds.length === 0 ? (
+                      <AppText style={{ color: scoped.textSecondary }}>
+                        No members in this System yet.
+                      </AppText>
+                    ) : null}
+                    {focusedPreviewMember ? (
+                      <AppText role="caption" accessibilityLiveRegion="polite">
+                        Focused member: {focusedPreviewMember.name}
+                      </AppText>
+                    ) : null}
+                    {previewMembers.length ? (
+                      <>
+                        <AppText role="label">Preview members</AppText>
+                        <ScrollView
+                          horizontal
+                          contentContainerStyle={styles.previewMembers}
+                          showsHorizontalScrollIndicator={false}
+                        >
+                          {previewMembers.map((member) => {
+                            const selected = member.id === previewFocusedId;
+                            return (
+                              <Pressable
+                                key={member.id}
+                                testID={`system-preview-member-${member.id}`}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Focus ${member.name} in preview`}
+                                accessibilityState={{ selected }}
+                                onPress={() => setPreviewFocusedId(member.id)}
+                                style={[
+                                  styles.previewMember,
+                                  {
+                                    backgroundColor: selected
+                                      ? colors.accent
+                                      : colors.surface,
+                                    borderColor: selected
+                                      ? colors.accent
+                                      : colors.border,
+                                  },
+                                ]}
+                              >
+                                <AppText
+                                  role="label"
+                                  style={{
+                                    color: selected
+                                      ? colors.onAccent
+                                      : colors.textPrimary,
+                                  }}
+                                >
+                                  {member.name}
+                                </AppText>
+                              </Pressable>
+                            );
+                          })}
+                        </ScrollView>
+                      </>
+                    ) : null}
+                    <View style={styles.previewActions}>
+                      <Button
+                        role="secondary"
+                        label="Edit"
+                        onPress={() => setPreviewing(false)}
+                      />
+                      <Button
+                        role="primary"
+                        label="Save System"
+                        disabled={saving}
+                        onPress={() => void previewSaveAction(save)}
+                      />
+                    </View>
+                  </View>
+                ) : (
                   <ScrollView
-                    horizontal
-                    contentContainerStyle={styles.previewMembers}
-                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.content}
+                    keyboardShouldPersistTaps="handled"
                   >
-                    {previewMembers.map((member) => {
-                      const selected = member.id === previewFocusedId;
-                      return (
-                        <Pressable
-                          key={member.id}
-                          testID={`system-preview-member-${member.id}`}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Focus ${member.name} in preview`}
-                          accessibilityState={{ selected }}
-                          onPress={() => setPreviewFocusedId(member.id)}
+                    <View style={styles.header}>
+                      <Button
+                        role="secondary"
+                        label={page === "members" ? "Back" : "Cancel"}
+                        onPress={() =>
+                          page === "members"
+                            ? setPage("definition")
+                            : navigation.goBack()
+                        }
+                      />
+                      <AppText role="heading">
+                        {overrideOnly
+                          ? `Edit ${draft.name}`
+                          : customRef
+                            ? `Edit ${draft.name}`
+                            : "New System"}
+                      </AppText>
+                    </View>
+                    {error ? (
+                      <AppText
+                        accessibilityLiveRegion="polite"
+                        style={{ color: scoped.danger }}
+                      >
+                        {error}
+                      </AppText>
+                    ) : null}
+                    {!ready ? (
+                      <AppText>Loading System…</AppText>
+                    ) : page === "members" ? (
+                      <>
+                        <AppText role="heading">Manage Members</AppText>
+                        <ManageMembersGrid
+                          candidateIds={membership.candidateIds}
+                          includeIds={includeIds}
+                          excludeIds={excludeIds}
+                          rows={[
+                            ...rows,
+                            ...activeRows.filter(
+                              (row) =>
+                                !rows.some(
+                                  (candidate) => candidate.id === row.id,
+                                ),
+                            ),
+                          ]}
+                          onChange={onOverrideChange}
+                        />
+                        <Button
+                          role="secondary"
+                          label="Back to Definition"
+                          onPress={() => setPage("definition")}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <TextInput
+                          accessibilityLabel="System name"
+                          editable={!overrideOnly}
+                          placeholder="Name this System"
+                          placeholderTextColor={colors.textPlaceholder}
+                          value={draft.name}
+                          onChangeText={(name) =>
+                            setDraft((current) => ({ ...current, name }))
+                          }
                           style={[
-                            styles.previewMember,
+                            styles.name,
                             {
-                              backgroundColor: selected
-                                ? colors.accent
-                                : colors.surface,
-                              borderColor: selected
-                                ? colors.accent
-                                : colors.border,
+                              color: colors.textPrimary,
+                              borderColor: colors.border,
+                              backgroundColor: colors.surface,
                             },
                           ]}
-                        >
-                          <AppText
-                            role="label"
-                            style={{
-                              color: selected
-                                ? colors.onAccent
-                                : colors.textPrimary,
-                            }}
-                          >
-                            {member.name}
-                          </AppText>
-                        </Pressable>
-                      );
-                    })}
+                        />
+                        {!overrideOnly ? (
+                          <SystemRuleAccordion
+                            rules={draft.rules}
+                            categories={categories.map((category) => ({
+                              value: category.uid,
+                              label: category.name,
+                            }))}
+                            onChange={(rules) =>
+                              setDraft((current) => ({ ...current, rules }))
+                            }
+                          />
+                        ) : (
+                          <>
+                            <SystemRuleAccordion
+                              rules={draft.rules}
+                              categories={categories.map((category) => ({
+                                value: category.uid,
+                                label: category.name,
+                              }))}
+                              disabled
+                              onChange={() => {}}
+                            />
+                            <AppText
+                              role="caption"
+                              style={{ color: scoped.textSecondary }}
+                            >
+                              This System's base rules are fixed.
+                            </AppText>
+                          </>
+                        )}
+                        <AppText role="label" accessibilityLiveRegion="polite">
+                          {membership.memberIds.length}{" "}
+                          {membership.memberIds.length === 1
+                            ? "member"
+                            : "members"}
+                        </AppText>
+                        <Button
+                          role="secondary"
+                          label="Manage Members"
+                          onPress={() => setPage("members")}
+                        />
+                        <Button
+                          role="secondary"
+                          label="Preview"
+                          disabled={!previewScene}
+                          onPress={() => {
+                            setPreviewFocusedId(null);
+                            setPreviewing(true);
+                          }}
+                        />
+                        {customRef || systemRef ? (
+                          <Button
+                            role="secondary"
+                            label="Reset Membership Overrides"
+                            onPress={resetOverrides}
+                          />
+                        ) : null}
+                        <Button
+                          role="primary"
+                          label="Save System"
+                          disabled={saving}
+                          onPress={() => void previewSaveAction(save)}
+                        />
+                      </>
+                    )}
                   </ScrollView>
-                </>
-              ) : null}
-              <View style={styles.previewActions}>
-                <Button
-                  role="secondary"
-                  label="Edit"
-                  onPress={() => setPreviewing(false)}
-                />
-                <Button
-                  role="primary"
-                  label="Save System"
-                  disabled={saving}
-                  onPress={() => void previewSaveAction(save)}
-                />
-              </View>
-            </View>
-          ) : (
-            <ScrollView
-              contentContainerStyle={styles.content}
-              keyboardShouldPersistTaps="handled"
-            >
-              <View style={styles.header}>
-                <Button
-                  role="secondary"
-                  label={page === "members" ? "Back" : "Cancel"}
-                  onPress={() =>
-                    page === "members"
-                      ? setPage("definition")
-                      : navigation.goBack()
-                  }
-                />
-                <AppText role="heading">
-                  {overrideOnly
-                    ? `Edit ${draft.name}`
-                    : customRef
-                      ? `Edit ${draft.name}`
-                      : "New System"}
-                </AppText>
-              </View>
-              {error ? (
-                <AppText
-                  accessibilityLiveRegion="polite"
-                  style={{ color: colors.danger }}
-                >
-                  {error}
-                </AppText>
-              ) : null}
-              {!ready ? (
-                <AppText>Loading System…</AppText>
-              ) : page === "members" ? (
-                <>
-                  <AppText role="heading">Manage Members</AppText>
-                  <ManageMembersGrid
-                    candidateIds={membership.candidateIds}
-                    includeIds={includeIds}
-                    excludeIds={excludeIds}
-                    rows={[
-                      ...rows,
-                      ...activeRows.filter(
-                        (row) =>
-                          !rows.some((candidate) => candidate.id === row.id),
-                      ),
-                    ]}
-                    onChange={onOverrideChange}
-                  />
-                  <Button
-                    role="secondary"
-                    label="Back to Definition"
-                    onPress={() => setPage("definition")}
-                  />
-                </>
-              ) : (
-                <>
-                  <TextInput
-                    accessibilityLabel="System name"
-                    editable={!overrideOnly}
-                    placeholder="Name this System"
-                    placeholderTextColor={colors.textPlaceholder}
-                    value={draft.name}
-                    onChangeText={(name) =>
-                      setDraft((current) => ({ ...current, name }))
-                    }
-                    style={[
-                      styles.name,
-                      {
-                        color: colors.textPrimary,
-                        borderColor: colors.border,
-                        backgroundColor: colors.surface,
-                      },
-                    ]}
-                  />
-                  {!overrideOnly ? (
-                    <SystemRuleAccordion
-                      rules={draft.rules}
-                      categories={categories.map((category) => ({
-                        value: category.uid,
-                        label: category.name,
-                      }))}
-                      onChange={(rules) =>
-                        setDraft((current) => ({ ...current, rules }))
-                      }
-                    />
-                  ) : (
-                    <>
-                      <SystemRuleAccordion
-                        rules={draft.rules}
-                        categories={categories.map((category) => ({
-                          value: category.uid,
-                          label: category.name,
-                        }))}
-                        disabled
-                        onChange={() => {}}
-                      />
-                      <AppText
-                        role="caption"
-                        style={{ color: colors.textSecondary }}
-                      >
-                        This System's base rules are fixed.
-                      </AppText>
-                    </>
-                  )}
-                  <AppText role="label" accessibilityLiveRegion="polite">
-                    {membership.memberIds.length}{" "}
-                    {membership.memberIds.length === 1 ? "member" : "members"}
-                  </AppText>
-                  <Button
-                    role="secondary"
-                    label="Manage Members"
-                    onPress={() => setPage("members")}
-                  />
-                  <Button
-                    role="secondary"
-                    label="Preview"
-                    disabled={!previewScene}
-                    onPress={() => {
-                      setPreviewFocusedId(null);
-                      setPreviewing(true);
-                    }}
-                  />
-                  {customRef || systemRef ? (
-                    <Button
-                      role="secondary"
-                      label="Reset Membership Overrides"
-                      onPress={resetOverrides}
-                    />
-                  ) : null}
-                  <Button
-                    role="primary"
-                    label="Save System"
-                    disabled={saving}
-                    onPress={() => void previewSaveAction(save)}
-                  />
-                </>
-              )}
-            </ScrollView>
-          )}
+                )}
+              </>
+            )}
+          </ScopedPalette>
         </GlassSurface>
       </OrreryObstacle>
     </View>

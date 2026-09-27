@@ -28,6 +28,7 @@ import {
 } from "@/ai/openrouter-catalog";
 import { AppText, Button, GlassSurface } from "@/components/ui";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import {
   activateAiConnection,
   getAiConnection,
@@ -290,114 +291,139 @@ export function AIModelPickerScreen({
         ) : (
           visibleCards.map((card) => (
             <GlassSurface key={card.id} density="dense" style={styles.card}>
-              <View style={styles.modelCopy}>
-                <AppText role="label">{card.name}</AppText>
-                {card.isCurrent ? (
-                  <AppText role="caption">Current model</AppText>
-                ) : null}
-                <AppText role="caption" style={{ color: colors.textSecondary }}>
-                  {card.provider}
-                </AppText>
-                {card.recommendation ? (
-                  <AppText role="caption" style={{ color: colors.accentText }}>
-                    {card.recommendation}
-                  </AppText>
-                ) : null}
-                {lane === "openrouter" ? (
-                  card.pricing ? (
-                    <AppText role="caption">{card.pricing}</AppText>
-                  ) : (
-                    <AppText
-                      role="caption"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      Pricing unavailable
-                    </AppText>
-                  )
-                ) : (
-                  <AppText
-                    role="caption"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    Cost estimate unavailable for this connection.
-                  </AppText>
-                )}
-                {moreInfo === card.id && card.context ? (
-                  <AppText
-                    role="caption"
-                    style={{ color: colors.textSecondary }}
-                  >
-                    {card.context}
-                  </AppText>
-                ) : null}
-              </View>
-              <View style={styles.toolbar}>
-                {/* Offered only when there is detail to reveal; names the model,
+              <ScopedPalette>
+                {(scoped) => (
+                  <>
+                    <View style={styles.modelCopy}>
+                      <AppText role="label">{card.name}</AppText>
+                      {card.isCurrent ? (
+                        <AppText role="caption">Current model</AppText>
+                      ) : null}
+                      <AppText
+                        role="caption"
+                        style={{ color: scoped.textSecondary }}
+                      >
+                        {card.provider}
+                      </AppText>
+                      {card.recommendation ? (
+                        <AppText
+                          role="caption"
+                          style={{ color: scoped.accentText }}
+                        >
+                          {card.recommendation}
+                        </AppText>
+                      ) : null}
+                      {lane === "openrouter" ? (
+                        card.pricing ? (
+                          <AppText role="caption">{card.pricing}</AppText>
+                        ) : (
+                          <AppText
+                            role="caption"
+                            style={{ color: scoped.textSecondary }}
+                          >
+                            Pricing unavailable
+                          </AppText>
+                        )
+                      ) : (
+                        <AppText
+                          role="caption"
+                          style={{ color: scoped.textSecondary }}
+                        >
+                          Cost estimate unavailable for this connection.
+                        </AppText>
+                      )}
+                      {moreInfo === card.id && card.context ? (
+                        <AppText
+                          role="caption"
+                          style={{ color: scoped.textSecondary }}
+                        >
+                          {card.context}
+                        </AppText>
+                      ) : null}
+                    </View>
+                    <View style={styles.toolbar}>
+                      {/* Offered only when there is detail to reveal; names the model,
                     announces expansion and meets the 44dp floor without hitSlop
                     (38.4 RG-030; ui-accessibility/AUD-UIA-006). */}
-                {card.context ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`More info about ${card.name}`}
-                    accessibilityState={{ expanded: moreInfo === card.id }}
-                    onPress={() =>
-                      setMoreInfo(moreInfo === card.id ? null : card.id)
-                    }
-                    style={styles.moreInfo}
-                  >
-                    <AppText
-                      role="caption"
-                      style={{ color: colors.accentText }}
-                    >
-                      More Info
-                    </AppText>
-                  </Pressable>
-                ) : null}
-                <Button
-                  role="secondary"
-                  label="Choose this model"
-                  accessibilityLabel={`Choose this model: ${card.name}`}
-                  accessibilityHint={
-                    card.isCurrent ? "This is the current model" : undefined
-                  }
-                  selected={card.isCurrent}
-                  onPress={() => void choose(card.id)}
-                />
-              </View>
+                      {card.context ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`More info about ${card.name}`}
+                          accessibilityState={{
+                            expanded: moreInfo === card.id,
+                          }}
+                          onPress={() =>
+                            setMoreInfo(moreInfo === card.id ? null : card.id)
+                          }
+                          style={styles.moreInfo}
+                        >
+                          <AppText
+                            role="caption"
+                            style={{ color: scoped.accentText }}
+                          >
+                            More Info
+                          </AppText>
+                        </Pressable>
+                      ) : null}
+                      <Button
+                        role="secondary"
+                        label="Choose this model"
+                        accessibilityLabel={`Choose this model: ${card.name}`}
+                        accessibilityHint={
+                          card.isCurrent
+                            ? "This is the current model"
+                            : undefined
+                        }
+                        selected={card.isCurrent}
+                        onPress={() => void choose(card.id)}
+                      />
+                    </View>
+                  </>
+                )}
+              </ScopedPalette>
             </GlassSurface>
           ))
         )}
 
         <GlassSurface density="dense" style={styles.card}>
-          <AppText role="heading">Manual model id</AppText>
-          <TextInput
-            accessibilityLabel="Manual model id"
-            autoCapitalize="none"
-            autoCorrect={false}
-            placeholder="Enter model id"
-            placeholderTextColor={colors.textPlaceholder}
-            value={manualModel}
-            onChangeText={setManualModel}
-            style={[
-              styles.input,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.border,
-                color: colors.textPrimary,
-              },
-            ]}
-          />
-          {lane !== "openrouter" ? (
-            <AppText role="caption" style={{ color: colors.textSecondary }}>
-              Cost estimate unavailable for this connection.
-            </AppText>
-          ) : null}
-          <Button
-            role="secondary"
-            label="Choose this model"
-            disabled={manualModel.trim() === ""}
-            onPress={() => void choose(manualModel)}
-          />
+          <ScopedPalette>
+            {(scoped) => (
+              <>
+                <AppText role="heading">Manual model id</AppText>
+                <TextInput
+                  accessibilityLabel="Manual model id"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="Enter model id"
+                  placeholderTextColor={colors.textPlaceholder}
+                  value={manualModel}
+                  onChangeText={setManualModel}
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                      color: colors.textPrimary,
+                    },
+                  ]}
+                />
+                {lane !== "openrouter" ? (
+                  <AppText
+                    role="caption"
+                    style={{ color: scoped.textSecondary }}
+                  >
+                    Cost estimate unavailable for this connection.
+                  </AppText>
+                ) : null}
+                <Button
+                  role="secondary"
+                  label="Choose this model"
+                  disabled={manualModel.trim() === ""}
+                  onPress={() => void choose(manualModel)}
+                />
+              </>
+            )}
+          </ScopedPalette>
         </GlassSurface>
         {message ? (
           <AppText role="caption" style={{ color: colors.danger }}>

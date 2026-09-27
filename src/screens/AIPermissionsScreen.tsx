@@ -11,6 +11,7 @@ import {
 import { type FilterChip, FilterChipRow } from "@/components/FilterChipRow";
 import { AppText, Button, ConfirmDialog, GlassSurface } from "@/components/ui";
 import { MIN_TOUCH_TARGET } from "@/components/ui/button-roles";
+import { ScopedPalette } from "@/components/ui/ScopedPalette";
 import {
   type AiPermissionCategory,
   type AiPermissionDefaults,
@@ -351,66 +352,74 @@ export function AIPermissionsScreen({ onBack }: AIPermissionsScreenProps) {
                   density="dense"
                   style={styles.card}
                 >
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`${expanded ? "Hide" : "Review"} ${group.contactName}`}
-                    accessibilityState={{ expanded }}
-                    onPress={() =>
-                      setExpandedContact(expanded ? null : group.contactUid)
-                    }
-                    style={styles.contactHeader}
-                  >
-                    <AppText role="body">{group.contactName}</AppText>
-                    <AppText
-                      role="caption"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {group.items.length} items ·{" "}
-                      {expanded ? "Hide" : "Review"}
-                    </AppText>
-                  </Pressable>
-                  {expanded
-                    ? group.items.map((item) => {
-                        const checked = selected.has(item.itemKey);
-                        return (
-                          <Pressable
-                            key={item.itemKey}
-                            accessibilityRole="checkbox"
-                            accessibilityLabel={`${item.label}: ${item.value}`}
-                            accessibilityState={{ checked }}
-                            onPress={() => toggleSelected(item.itemKey)}
-                            style={[
-                              styles.item,
-                              { borderTopColor: colors.border },
-                            ]}
+                  <ScopedPalette>
+                    {(scoped) => (
+                      <>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`${expanded ? "Hide" : "Review"} ${group.contactName}`}
+                          accessibilityState={{ expanded }}
+                          onPress={() =>
+                            setExpandedContact(
+                              expanded ? null : group.contactUid,
+                            )
+                          }
+                          style={styles.contactHeader}
+                        >
+                          <AppText role="body">{group.contactName}</AppText>
+                          <AppText
+                            role="caption"
+                            style={{ color: scoped.textSecondary }}
                           >
-                            <View style={styles.copy}>
-                              <AppText role="body">{item.label}</AppText>
-                              <AppText
-                                role="caption"
-                                style={{ color: colors.textSecondary }}
-                              >
-                                {item.value}
-                              </AppText>
-                            </View>
-                            <AppText
-                              role="caption"
-                              style={{
-                                color: item.enabled
-                                  ? colors.accent
-                                  : colors.textSecondary,
-                              }}
-                            >
-                              {checked
-                                ? "Selected"
-                                : item.enabled
-                                  ? "Enabled"
-                                  : "Disabled"}
-                            </AppText>
-                          </Pressable>
-                        );
-                      })
-                    : null}
+                            {group.items.length} items ·{" "}
+                            {expanded ? "Hide" : "Review"}
+                          </AppText>
+                        </Pressable>
+                        {expanded
+                          ? group.items.map((item) => {
+                              const checked = selected.has(item.itemKey);
+                              return (
+                                <Pressable
+                                  key={item.itemKey}
+                                  accessibilityRole="checkbox"
+                                  accessibilityLabel={`${item.label}: ${item.value}`}
+                                  accessibilityState={{ checked }}
+                                  onPress={() => toggleSelected(item.itemKey)}
+                                  style={[
+                                    styles.item,
+                                    { borderTopColor: colors.border },
+                                  ]}
+                                >
+                                  <View style={styles.copy}>
+                                    <AppText role="body">{item.label}</AppText>
+                                    <AppText
+                                      role="caption"
+                                      style={{ color: scoped.textSecondary }}
+                                    >
+                                      {item.value}
+                                    </AppText>
+                                  </View>
+                                  <AppText
+                                    role="caption"
+                                    style={{
+                                      color: item.enabled
+                                        ? colors.accent
+                                        : scoped.textSecondary,
+                                    }}
+                                  >
+                                    {checked
+                                      ? "Selected"
+                                      : item.enabled
+                                        ? "Enabled"
+                                        : "Disabled"}
+                                  </AppText>
+                                </Pressable>
+                              );
+                            })
+                          : null}
+                      </>
+                    )}
+                  </ScopedPalette>
                 </GlassSurface>
               );
             })

@@ -513,9 +513,13 @@ export function AIPersonalizationScreen({
           {sections.length === 0 ? (
             <GlassSurface density="dense" style={styles.card}>
               <AppText role="label">No personalization yet.</AppText>
-              <AppText role="body" style={{ color: colors.textSecondary }}>
-                {EMPTY_COPY}
-              </AppText>
+              <ScopedPalette>
+                {(scoped) => (
+                  <AppText role="body" style={{ color: scoped.textSecondary }}>
+                    {EMPTY_COPY}
+                  </AppText>
+                )}
+              </ScopedPalette>
             </GlassSurface>
           ) : (
             sections.map((section, index) => (
@@ -546,12 +550,16 @@ export function AIPersonalizationScreen({
                   </Pressable>
                   <View style={styles.cardCopy}>
                     <AppText role="label">{section.title}</AppText>
-                    <AppText
-                      role="body"
-                      style={{ color: colors.textSecondary }}
-                    >
-                      {section.body || "No section text yet."}
-                    </AppText>
+                    <ScopedPalette>
+                      {(scoped) => (
+                        <AppText
+                          role="body"
+                          style={{ color: scoped.textSecondary }}
+                        >
+                          {section.body || "No section text yet."}
+                        </AppText>
+                      )}
+                    </ScopedPalette>
                   </View>
                   <Switch
                     accessibilityLabel={`Send ${section.title} to AI`}
