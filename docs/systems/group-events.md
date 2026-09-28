@@ -1,7 +1,7 @@
 # Group Events
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/db/group-events-dao.ts`, `src/db/group-events-read.ts`, `src/logic/group-inheritance.ts`, `src/screens/GroupLogScreen.tsx`, `src/screens/GroupEventDetailScreen.tsx`
 
 ## Purpose
@@ -165,6 +165,8 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 - **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/db/group-events-dao.ts`, `src/db/tombstones-dao.ts`.
 - **ADR-148:** Portable Your Week Period and Group-Deduplicated Activity Aggregation — projects each parent as one Digest event while leaving participant child history canonical.
 - **ADR-167:** Committed Participant Writes Preserve the Parent Draft and Never Replay — persists overridden-value edits through one patch builder, preserves the parent draft across participant commits, and never replays a committed add.
+- **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
+- **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
 
 ## Gotchas
 
@@ -202,3 +204,4 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 | 2026-09-25 | 38.3 | Draft-preserving participant refresh + commit-vs-read recovery (RG-019). |
 | 2026-09-26 | 38.3 | Participant remove mirrors the add recovery: `runParticipantRemove` latches Delete/Keep against double taps, reports only a rejected first write as "not saved", and hides committed-removed rows until a successful refresh so a stale Edit/Remove cannot hit a departed child (review A-WR-03, D-04). |
 | 2026-09-26 | 38.3 | Edit Group Event clears its failure caption when a later participant add, remove, edit or save starts, so a stale "not saved" never sits beside a fresh success (review A-WR-04). |
+| 2026-09-23 | 38.4 | The Events tab root uses `ShellAppBar variant="root"` with no Back (D-22; ADR-175), and its load error reads "Try opening it again in a moment."; list rows and the detail "When" render through `formatDateTimeMinuteOrFallback` (RG-038 AUD-UIA-018); the group title prompt stays above the keyboard and stacks its actions when they do not fit at the largest text (D-72; ADR-174). |
