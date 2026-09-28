@@ -309,6 +309,8 @@ Phase 31's standalone release exposed a missing `react-native-screens` generated
 
 ## 8. Release manifest + launcher icon checks (Phase 38.4)
 
+Governing decision: ADR-176 (authored native platform configuration: release-only overlay removal, Orbit launcher identity).
+
 **Release manifest (RG-040 `release-readiness/AUD-REL-002`, D-09).**
 `plugins/withReleaseOnlyOverlayPermissionRemoval.js` deletes `SYSTEM_ALERT_WINDOW` from the
 generated main manifest and writes `android\app\src\release\AndroidManifest.xml` with a
