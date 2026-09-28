@@ -129,6 +129,12 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 2. Last Talked About and Current Location use the current-state writer, so they retain prior values as history and never create an interaction or change `last_contact`.
 3. Quick Log's post-save editor stores either an Interaction Note or a basic Memory, never both. Full Memory creation and in-place editing stay in the Update Contact Memory editor.
 
+### Importing contact notes
+
+1. A selected Android contact note becomes an `imported` Memory through the import transaction, with `provenance='import'` and `allow_ai=0` set explicitly.
+2. The import row retains the committed Memory identity so a resumed or retried batch does not create a duplicate note after a post-commit interruption.
+3. AI eligibility never follows from imported provenance, local visibility, or a later type default; only an explicit user permission change can admit that Memory to prompt context.
+
 ### Relationships and removal
 
 1. `RelationshipEditor` collects a required person name, optional relation details, and optional link to another Orbit contact.
@@ -167,6 +173,8 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **ADR-134:** Read-Only Compose Research and Permission-Bounded Message Focus — adds the normalized Research projection and source-owned focus eligibility.
 - **ADR-107:** Off Limits Excluded from All AI Egress — keeps human-visible Avoid context out of Message Focus and every AI-bound shape.
 - **ADR-136:** Permission-Bounded Prompt Assembly and AI Transparency — applies durable new-item defaults and consumes only explicit egress permission.
+- **ADR-160:** Committed-Identity Contact Edits and Exact-Source Reconciliation — makes committed knowledge identities authoritative when complete contact edits advance their retry baselines.
+- **ADR-161:** Durable Post-Commit Import Recovery and AI-Off Provenance — preserves imported-note identity across resume and records imported Memories as explicitly AI-off.
 
 ## Gotchas
 
@@ -185,6 +193,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 11. **Current-state is not a touchpoint.** Last Talked About and Current Location writes preserve knowledge history but must never write an interaction or `last_contact`.
 12. **Local visibility is not Message Focus eligibility.** Compose Research may display an item that lacks AI permission; only its normalized `aiEligible` value can enable Add to AI.
 13. **Permission defaults are new-item-only.** Changing a type default must not rewrite existing Memory permissions; the manager's explicit review and bulk actions own those rows.
+14. **Imported provenance is not inferred permission.** Every imported note must persist both `provenance='import'` and `allow_ai=0`; recovery must reuse its committed identity rather than recreating the Memory.
 
 ## Related Systems
 
@@ -213,4 +222,5 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | 2026-09-02 | 34 | Added focused Update Contact knowledge editors, registry-keyed rapid Memory creation, and complete-edit transaction composition. |
 | 2026-09-02 | 35 | Added populated-only, read-only Compose Research with source-owned eligibility and structural Off Limits Avoid context. |
 | 2026-09-02 | 36 | Added creation-time AI permission defaults, central review, and bounded resolved-prompt Memory context. |
+| 2026-09-23 | 38.2 | Made imported-note creation explicitly AI-off and recovery-safe, and advanced complete-edit knowledge baselines from committed identities. |
 | 2026-09-25 | 38.3 | Memory screen read-error state; editor never opens over a failed read (RG-035): loading, then the editor over successfully read Memories or "Couldn't load memories" with Retry; a failed re-read after a committed restore/delete/AI-permission write shows the read error without undoing or retrying the write. |
