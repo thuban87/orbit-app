@@ -221,3 +221,39 @@ describe("row accessible context (RG-031 ui-accessibility/AUD-UIA-007)", () => {
     expect(rootLabel(nodes)).toBe(summary);
   });
 });
+
+describe("Card-view status ring is a circle (D-73a, supersedes D-70)", () => {
+  function flatten(style: unknown): Record<string, unknown> {
+    if (Array.isArray(style)) {
+      return Object.assign({}, ...style.map(flatten));
+    }
+    return (style ?? {}) as Record<string, unknown>;
+  }
+
+  it("sizes the ring's box to the avatar, square and centred, so the ring cannot stretch into a pill", () => {
+    const nodes = all(resolve(GridCard(baseProps)));
+    const area = nodes.find((node) =>
+      node.children.some(
+        (child) => child.props.testID === "dashboard-grid-card-ring-7",
+      ),
+    );
+    expect(area).toBeDefined();
+    const areaStyle = flatten(area?.props.style);
+    // A box that stretches to the card width turns the full-radius ring into a
+    // wide pill (D-70 / owner checklist row 10). It must hug the avatar.
+    expect(areaStyle.alignSelf).toBe("center");
+    expect(typeof areaStyle.width).toBe("number");
+    expect(areaStyle.width).toBe(areaStyle.height);
+    const avatar = area?.children.find((child) => child.type === "Avatar");
+    expect(areaStyle.width).toBeGreaterThan(avatar?.props.size as number);
+
+    const ring = nodes.find(
+      (node) => node.props.testID === "dashboard-grid-card-ring-7",
+    );
+    const ringStyle = flatten(ring?.props.style);
+    expect(ringStyle.position).toBe("absolute");
+    expect(ringStyle.borderRadius).toBeGreaterThanOrEqual(
+      (areaStyle.width as number) / 2,
+    );
+  });
+});

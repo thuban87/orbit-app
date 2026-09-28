@@ -68,6 +68,15 @@ function HighlightedSnippet({
   );
 }
 
+/** The card avatar diameter (unchanged by D-73; bigger photos are backlog 999.1). */
+const AVATAR_SIZE = SPACING["2xl"];
+/**
+ * The status ring's square box: the avatar plus a thin gap on every side. A
+ * fixed square (not a box stretched to the card width) keeps the full-radius
+ * ring a circle around the avatar at every font and display size (D-73a).
+ */
+const RING_BOX = AVATAR_SIZE + SPACING.xs * 2;
+
 export interface GridCardProps {
   contactId: number;
   name: string;
@@ -297,7 +306,7 @@ export function GridCard({
                     photo={photo}
                     name={name}
                     contactId={contactId}
-                    size={SPACING["2xl"]}
+                    size={AVATAR_SIZE}
                     cacheBust={modifiedAt}
                   />
                   {displayState !== null ? (
@@ -398,10 +407,13 @@ const styles = StyleSheet.create({
   },
   avatarArea: {
     alignItems: "center",
+    alignSelf: "center",
+    height: RING_BOX,
     justifyContent: "center",
-    marginTop: -SPACING.sm,
-    padding: SPACING.xs,
+    // Only a small pull-up: the circle keeps clear of the favourite star.
+    marginTop: -SPACING.xs,
     position: "relative",
+    width: RING_BOX,
   },
   statusRing: {
     borderRadius: RADII.full,
