@@ -165,5 +165,11 @@
 // NOTE: ADR-0153 [ACCEPTED] Two-Row Normal Contacts Grid
 // NOTE: ADR-0154 [ACCEPTED] API-37 Import Requests Contacts Access for Notes
 // NOTE: ADR-0155 [ACCEPTED] Backup Share Grants Only the Chosen App
+// NOTE: ADR-0156 [ACCEPTED] Foreground Maintenance Fault Isolation with Per-Pass Dependencies
+// NOTE: ADR-0157 [ACCEPTED] Bounded Native Transfer Ownership
+// NOTE: ADR-0158 [ACCEPTED] Canonical Photo Ownership Across Masters, Staging, and Derivatives
+// NOTE: ADR-0159 [ACCEPTED] Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair
+// NOTE: ADR-0160 [ACCEPTED] Committed-Identity Contact Edits and Exact-Source Reconciliation
+// NOTE: ADR-0161 [ACCEPTED] Durable Post-Commit Import Recovery and AI-Off Provenance
 
-export const ADR_COUNT = 155;
+export const ADR_COUNT = 161;
