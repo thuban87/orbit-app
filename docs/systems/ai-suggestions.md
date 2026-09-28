@@ -1,7 +1,7 @@
 # AI Suggestions
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/services/AiService.ts`, `src/services/ai-key-store.ts`, `src/ai/`, `src/db/ai-context-read.ts`, `src/db/app-settings-dao.ts`, `src/logic/ai-suggestion-logic.ts`, `src/screens/SettingsAIScreen.tsx`, `src/screens/ComposeScreen.tsx`
 
 ## Purpose
@@ -115,6 +115,8 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 - **ADR-137:** Structured Personalization and Explicit Context Capacity — provides enabled global sections and model-aware no-truncation estimates.
 - **ADR-139:** Loopback-Only OpenRouter Authorization Callback — makes browser authorization local, one-shot, and credential-free outside SecureStore.
 - **ADR-157:** Bounded Native Transfer Ownership — keeps Custom call ownership through one bounded response read and deterministically settles cancellation, overflow, and failure.
+- **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
+- **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
 
 ## Gotchas
 
