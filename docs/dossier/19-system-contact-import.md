@@ -419,6 +419,8 @@ Possible actions:
 
 **[DECIDED] The summary should provide a direct bridge to the dedicated Unbound-contact screen.**
 
+> Superseded 2026-09-27 by 38.4 D-58 / ADR-171.
+
 ---
 
 ## Cross-Domain Invariants
