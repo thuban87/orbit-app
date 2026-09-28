@@ -75,7 +75,7 @@
 // IMPORTANT: ADR-0063 [SUPERSEDED BY ADR-145 (partial)] Versioned Lifecycle Backup and Dormant-Cadence Restore
 // NOTE: ADR-0064 [ACCEPTED] Permissionless Android 17 System-Contact Snapshot Acquisition
 // NOTE: ADR-0065 [ACCEPTED] Durable Resumable Contact-Import Sessions with Failure-Isolated Photos
-// NOTE: ADR-0066 [ACCEPTED] Deliberate Reviewed Import with Unbound Bulk Defaults
+// IMPORTANT: ADR-0066 [SUPERSEDED BY ADR-171 (partial)] Deliberate Reviewed Import with Unbound Bulk Defaults
 // NOTE: ADR-0067 [ACCEPTED] Conservative Advisory Identity Matching and Explicit Source Consolidation
 // NOTE: ADR-0068 [ACCEPTED] User-Triggered, Source-Only Reconciliation with Durable Review
 // NOTE: ADR-0069 [ACCEPTED] Atomic Tombstone-Backed Orbit Contact Merge
@@ -178,5 +178,13 @@
 // NOTE: ADR-0166 [ACCEPTED] Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress
 // NOTE: ADR-0167 [ACCEPTED] Committed Participant Writes Preserve the Parent Draft and Never Replay
 // NOTE: ADR-0168 [ACCEPTED] Truthful Read Phases for Import, Review, and Settings Screens
+// NOTE: ADR-0169 [ACCEPTED] Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract
+// NOTE: ADR-0170 [ACCEPTED] Bounded Your Week Reads and Settled Orrery Resource Retirement
+// NOTE: ADR-0171 [ACCEPTED] Durable Bulk-Import Lifecycle Choice, Locked Batches, and One Pass per Session
+// NOTE: ADR-0172 [ACCEPTED] Contacts Header Counts the Contacts on Screen
+// NOTE: ADR-0173 [ACCEPTED] Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance
+// NOTE: ADR-0174 [ACCEPTED] Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets
+// NOTE: ADR-0175 [ACCEPTED] Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child
+// NOTE: ADR-0176 [ACCEPTED] Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs
 
-export const ADR_COUNT = 168;
+export const ADR_COUNT = 176;

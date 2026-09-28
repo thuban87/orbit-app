@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 36 of
-  168 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 37 of
+  176 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -96,7 +96,7 @@ not something you can pattern-match against.
 | 063 | Versioned Lifecycle Backup and Dormant-Cadence Restore | Accepted | 18.2-bound-unbound-lifecycle | ADR-060 (partial) | ADR-145 (partial) | — | 5 | `src/backup`, `src/db/migrations` |
 | 064 | Permissionless Android 17 System-Contact Snapshot Acquisition | Accepted | 19-system-contact-import | — | — | — | 4 | `modules/orbit-contact-picker`, `modules/orbit-contact-picker/android/src/main`, `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker` +1 |
 | 065 | Durable Resumable Contact-Import Sessions with Failure-Isolated Photos | Accepted | 19-system-contact-import | — | — | — | 6 | `src/backup`, `src/db`, `src/db/migrations` +1 |
-| 066 | Deliberate Reviewed Import with Unbound Bulk Defaults | Accepted | 19-system-contact-import | — | — | — | 7 | `src/db`, `src/screens`, `src/services/import` |
+| 066 | Deliberate Reviewed Import with Unbound Bulk Defaults | Accepted | 19-system-contact-import | — | ADR-171 (partial) | — | 7 | `src/db`, `src/screens`, `src/services/import` |
 | 067 | Conservative Advisory Identity Matching and Explicit Source Consolidation | Accepted | 19-system-contact-import | — | — | — | 6 | `src/components`, `src/db`, `src/screens` +1 |
 | 068 | User-Triggered, Source-Only Reconciliation with Durable Review | Accepted | 20-contact-reconciliation-merge | — | — | — | 8 | `src/db`, `src/db/migrations`, `src/logic` +2 |
 | 069 | Atomic Tombstone-Backed Orbit Contact Merge | Accepted | 20-contact-reconciliation-merge | — | — | — | 7 | `src/components`, `src/db`, `src/db/migrations` +1 |
@@ -199,3 +199,11 @@ not something you can pattern-match against.
 | 166 | Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 12 | `src/components`, `src/components/profile`, `src/navigation` +3 |
 | 167 | Committed Participant Writes Preserve the Parent Draft and Never Replay | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 5 | `src/logic`, `src/screens` |
 | 168 | Truthful Read Phases for Import, Review, and Settings Screens | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 14 | `src/logic`, `src/screens`, `src/utils` |
+| 169 | Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 26 | `scripts`, `src/components`, `src/components/ui` +4 |
+| 170 | Bounded Your Week Reads and Settled Orrery Resource Retirement | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 7 | `src/components/orrery`, `src/db`, `src/db/migrations` +1 |
+| 171 | Durable Bulk-Import Lifecycle Choice, Locked Batches, and One Pass per Session | Accepted | 38.4-audit-remediation-ui-performance-release | ADR-066 (partial: bulk "only a batch category override" and the Import Complete bridge to Unbound contacts) | — | — | 21 | `src/db`, `src/db/migrations`, `src/screens` +1 |
+| 172 | Contacts Header Counts the Contacts on Screen | Accepted | 38.4-audit-remediation-ui-performance-release | None (replaces the Phase 26 "total-live" header rule, recorded only in `26-UAT.md` "Product observation"; no ADR carried it) | — | — | 2 | `src/logic`, `src/screens` |
+| 173 | Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 13 | `src/components`, `src/components/control-surface`, `src/navigation` +1 |
+| 174 | Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 18 | `src/components`, `src/components/digest`, `src/components/group` +4 |
+| 175 | Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 15 | `src/components/icons`, `src/navigation`, `src/navigation/tabs` +1 |
+| 176 | Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 9/13 live | `assets`, `plugins`, `scripts` +2 |
