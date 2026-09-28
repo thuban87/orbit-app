@@ -1,6 +1,6 @@
 # Group Events
 
-**Last updated:** 2026-09-25
+**Last updated:** 2026-09-23
 **Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/db/group-events-dao.ts`, `src/db/group-events-read.ts`, `src/logic/group-inheritance.ts`, `src/screens/GroupLogScreen.tsx`, `src/screens/GroupEventDetailScreen.tsx`
 
@@ -164,6 +164,7 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 - **[ADR-128: Same-Group Contact Merge Refusal with Remediation](../decisions/ADR-128-same-group-contact-merge-refusal-with-remediation.md)** — governs `src/db/migrations/026-group-events-schema.ts`.
 - **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/db/group-events-dao.ts`, `src/db/tombstones-dao.ts`.
 - **ADR-148:** Portable Your Week Period and Group-Deduplicated Activity Aggregation — projects each parent as one Digest event while leaving participant child history canonical.
+- **ADR-167:** Committed Participant Writes Preserve the Parent Draft and Never Replay — persists overridden-value edits through one patch builder, preserves the parent draft across participant commits, and never replays a committed add.
 
 ## Gotchas
 
