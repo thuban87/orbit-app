@@ -45,4 +45,4 @@ We extend `EventType` to `archive|restore|snooze|unsnooze|bind|unbind` as a Type
 - `src/backup/restore-apply.ts` — inserts the event `type` verbatim; the new strings pass restore validation.
 
 **Depends on:** ADR-025 (Immutable Lifecycle Events in a Unified Timeline)
-**Required by:** None
+**Required by:** ADR-160 (Committed-Identity Contact Edits and Exact-Source Reconciliation)
