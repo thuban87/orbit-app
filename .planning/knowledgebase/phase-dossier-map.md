@@ -68,9 +68,15 @@ Phases 05, 06, 07 have **no CONTEXT.md at all** — they rely purely on their do
 ## Milestone-2 phases
 
 Milestone-2 dossiers live in `docs/dossier/milestone-2/` and — unlike milestone-1 — **are
-phase-numbered and topic-matched cleanly** (`phase-NN-<slug>-dossier.md`). No milestone-2
-*phase directories* exist under `.planning/phases/` yet, so tier/CONTEXT assessment is N/A
-until those phases are opened. Dossiers present so far:
+phase-numbered and topic-matched cleanly** (`phase-NN-<slug>-dossier.md`). The milestone-2
+table is being backfilled during phase extraction; rows not yet listed here remain unresolved
+by this map and must be verified against their phase CONTEXT before extraction.
+
+| Phase ID | Phase dir | Dossier file(s) | Tier | Notes |
+|----------|-----------|-----------------|------|-------|
+| 38.2 | `38.2-audit-remediation-data-security-lifecycle` | `milestone-2/phase-38.2-audit-remediation-data-security-lifecycle-dossier.md` | dossier + context-dxx | Audit-remediation phase spanning native transfer bounds, photo ownership, restore integrity, committed edit identity, and durable import recovery. `38.2-CONTEXT.md` identifies this dossier as primary and adds D-01…D-23 plus a discussion log. |
+
+Dossiers originally inventoried when this map was created:
 
 - `phase-01-app-shell-navigation-dossier.md`
 - `phase-02-theme-visual-system-dossier.md`
@@ -89,8 +95,9 @@ Also in that dir (not phase dossiers): `orbit-ui-ux-master-handoff-v0.5.docx`,
 
 ## Unresolved / caveats for the resolver
 
-- **None left UNRESOLVED.** Every milestone-1 phase has an identified authoritative source,
-  confirmed by reading dossier openings and phase CONTEXT files.
+- **No milestone-1 entries remain unresolved.** Every milestone-1 phase has an identified
+  authoritative source, confirmed by reading dossier openings and phase CONTEXT files.
+- The broader milestone-2 row backfill is deferred; phase 38.2 is mapped exactly above.
 - Phases **01** and **09** deliberately have **no dossier** (scaffold = HANDOFF §4; compose =
   the explicitly-unowned cross-phase surface). Treat CONTEXT prose as authoritative there.
 - Phase **16** has **no dossier**; its authority is `context-dxx` + ADR-001 (migration 006).
