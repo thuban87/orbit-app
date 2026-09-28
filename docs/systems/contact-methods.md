@@ -1,7 +1,7 @@
 # Contact Methods
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 35-messaging-ai-compose
+**Last updated:** 2026-09-23
+**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
 **Owners:** `src/db/contact-methods-dao.ts`, `src/db/contact-methods-read.ts`, `src/logic/contact-method-normalization.ts`, `src/screens/ComposeScreen.tsx`, `src/logic/compose-logic.ts`
 
 ## Purpose
