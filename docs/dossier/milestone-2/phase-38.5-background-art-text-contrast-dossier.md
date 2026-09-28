@@ -1,6 +1,6 @@
 # Phase 38.5 --- Background Art & Text-on-Art Contrast Dossier
 
-**Status:** DEFERRED PLANNING. It needs a discuss-phase first. **Prerequisite:** the owner-signed scrim combination
+**Status:** DISCUSSED 2026-09-28 (D-17..D-29). Planning waits on the O-9 spike (D-29). **Prerequisite:** the owner-signed scrim combination
 sheet (38.4 D-40), **met 2026-09-27** (sign-off v2, D-08). Before planning, the O-9 `codex-edu` image spike still has
 to run. Authored 2026-09-26 at phase insertion, from the owner rulings 38.4 D-38..D-41 and the 38.4 background-art
 brief. Updated 2026-09-27 with the owner's scrim sign-off v2 results and rulings D-08..D-14. The phase is now sequenced
@@ -257,6 +257,118 @@ order.
         art sign-off at the earliest.
     -   O-2 (the Galaxy light-mode imagery concept) stays OPEN.
 
+## Discuss-Session Rulings (2026-09-28)
+
+From the owner's gsd-discuss-phase session. They resolve O-1, O-3, O-4 (conditionally), O-6 and O-8, and set the
+approach for O-2. The IDs D-17..D-29 match the CONTEXT shim. The full question-and-answer record is in
+`.planning/phases/38.5-background-art-text-contrast/38.5-DISCUSSION-LOG.md`.
+
+### The lineup (O-1, O-6)
+
+-   **[DECIDED · 2026-09-28] D-17 --- Galaxy keeps three slots, graded by how busy the image is.** This resolves O-1 for
+    Galaxy and O-6.
+    -   **Quiet:** a **new** image. Not busy, but still obviously galaxy.
+    -   **Medium:** **Aurora**, kept. Owner: "a nice little ribbon that's noticeable but not overpowering."
+    -   **Busy:** **Starfield reborn**, with stars you can actually see this time.
+    -   **Cut:** Deep Space, Nebula and today's Starfield image. Owner: Deep Space and Starfield "are both basically blank
+        anyways, just black pictures in the app."
+    -   Each slot gets a light and a dark version (38.4 D-39), so Galaxy ships 6 images.
+-   **[DECIDED · 2026-09-28] D-18 --- Standard cuts Mesh.** Standard keeps Dawn, Paper and Dusk, and ships 6 images (a
+    light and a dark version of each). This resolves O-1 for Standard.
+    -   [DERIVED] The Mesh rows of the D-08 table become moot. The D-11 WATCH outliers are now Galaxy Light, Standard Dark
+        and Dusk.
+    -   [DERIVED] Standard Light · Paper keeps its intentional full-scrim look (D-08 b).
+-   **[DECIDED · 2026-09-28] D-19 --- The new quiet image becomes the Galaxy default,** replacing Deep Space. Standard
+    keeps Dawn as its default.
+    -   [PLANNING NOTE] A persisted or restored id for a cut slot (Deep Space, Nebula, Mesh) must resolve safely to the
+        package default (P-4, ADR-113).
+    -   Whether the reborn Starfield reuses the `galaxy-starfield` slot id is a planning detail.
+
+### Art direction (O-2, O-3) and the picker
+
+-   **[DECIDED · 2026-09-28] D-20 --- Visible features versus the band: Codex tries both, and the owner decides at the
+    art sign-off.**
+    -   The strict bands leave the Galaxy Dark art nearly invisible (L\* ≤ 8.2, or ≤ 18.5 under D-24). The busy Starfield's
+        visible stars and a noticeable Aurora ribbon break a strict 0.00%-failing-pixels rule wherever text crosses them.
+    -   So, for the affected slots, Codex paints a **strict** version and a **visible-features** version. The owner picks
+        at the blocking D-14 art sign-off, **with the failing-pixel percentage shown for each**.
+    -   The same applies to dark specks on pale art (for example "negative" stars in Galaxy Light).
+    -   [DERIVED] If a visible-features version ships, the owner has accepted an allowance for small features at that
+        sign-off. The H1 acceptance (`check_art.py`) and the P-1 proof must then encode that allowance, not 0.00%.
+-   **[DECIDED · 2026-09-28] D-21 --- Galaxy Light and Standard Dark: Codex explores two routes per slot, and the owner
+    picks at sign-off.** This sets the approach for O-2; the concepts themselves are chosen at the art sign-off.
+    -   **Route 1:** a pale (Galaxy Light) or deep (Standard Dark) version of the same idea as the slot's other image. For
+        example, Starfield as a pastel field with star glints.
+    -   **Route 2:** a different picture in the same busyness tier. For example, a pastel nebula with white star glints.
+    -   The pearl planet limb (D-16) is one exploration candidate. Shipping it is still a later owner decision.
+    -   The owner's Galaxy Light seed idea was a pale or "negative" version of each dark image (for example white with dark
+        stars). He was unsure it is the best idea; Route 1 covers it.
+-   **[DECIDED · 2026-09-28] D-22 --- The pale Standard Light band is accepted as the target (O-3).** The whole image sits
+    at about L\* 89–97 (brief §E.2). The look is confirmed at the art sign-off.
+-   **[DECIDED · 2026-09-28] D-23 --- The picker: one pick per theme, and it follows the mode.**
+    -   The user picks a slot once per theme (Galaxy, Standard). The app shows that slot's light or dark version
+        automatically, following the mode.
+    -   There is **no new persisted setting and no migration**. `app_settings.galaxy_background` /
+        `standard_background` keep storing the slot id.
+    -   The picker preview shows the version for the current mode.
+    -   [DERIVED] Assets resolve by slot × mode (P-3). This supersedes the one-asset-per-slot part of ADR-087/ADR-113 in
+        the new ADR (D-15).
+
+### Contrast rules (O-4, P-9)
+
+-   **[DECIDED · 2026-09-28] D-24 --- E-1 extends to bare text only if the red text is a minority (O-4).**
+    -   **Metric:** red `danger` bare text sites divided by all bare text sites, on the re-verified site list (P-6).
+    -   **Under 10%:** E-1 extends to bare text. The Galaxy Dark art ceiling is L\* 18.5, and `check_art.py` runs with
+        `--exclude-galaxy-dark-danger`.
+    -   **10% or more:** strict. The ceiling stays at L\* 8.2.
+    -   Today's figure is 27 / 294 ≈ 9.2%. The list is partly ESTIMATED, so the figure is not decisive yet.
+    -   [PLANNING NOTE] Measure it in the first plan, before the art brief goes to Codex, because it sets the Galaxy Dark
+        band.
+    -   [DERIVED] Under E-1, red error text over the brightest Galaxy Dark art falls to about 3.5:1 (COMPUTED roughly from
+        L\* 18.5, veil ignored): below 4.5:1, but still at or above 3:1.
+-   **[DECIDED · 2026-09-28] D-25 --- Scrims on red strings are not decided now; they go to the end-of-phase gap list.**
+    -   The owner would consider scrims on red strings only if text still fails **after he has seen the new art with text
+        on it**.
+    -   At the end of the phase, the executor reports the percentage and the failing strings, with a recommendation. The
+        owner then decides whether a gap plan adds them.
+    -   Nothing in the initial plans adds these scrims.
+-   **[DECIDED · 2026-09-28] D-26 --- The text colour is one choice per combination (P-9).**
+    -   Each component gets one foreground per theme × mode × background, set by that combination's new art (D-10).
+    -   There is no per-region colour change; that is the parked O-7 idea.
+
+### Scope edges and sequencing (O-8, P-10, O-9)
+
+-   **[DECIDED · 2026-09-28] D-27 --- The re-sign-off sheet covers every Contacts and Digest cell.** This refines D-13.
+    -   **Scrim choices:** every Contacts and Digest component, for every new combination. That is 16 combinations: (3 art
+        backgrounds + None) × 2 modes × 2 themes.
+    -   **Look-only gallery:** a few routes heavy in bare text, with **no scrim choices** there (D-40).
+    -   **Card-blend (O-8):** a "more see-through than today" variant of the see-through entries, to compare over the new
+        art. The owner decides card-blend on the sheet.
+-   **[DECIDED · 2026-09-28] D-28 --- Nothing changes outside the components the owner marked in v2.**
+    -   Owner: "We're not changing anything outside of what I indicated unless there's good reason to, and I'm not blanket
+        signing off on that now without any new art."
+    -   Cards and chrome on the other screens keep today's treatment. That includes ADR-115's opaque cards in Galaxy Light
+        and Standard Dark, even once the art there matches the mode.
+    -   If a planner or executor finds a good reason to change one, it goes to the **end-of-phase gap list** for the owner,
+        over the new art. It does not go into a plan.
+    -   The Orrery controls and menus, and the Contacts Population/Filters/Sort overlays, stay **full**. Owner: "seeing
+        through those looks terrible" (reaffirms D-12).
+    -   [DERIVED] The superseding ADR (D-15) supersedes only the D-15 parts plus the D-23 asset model. The rest of ADR-115
+        stands.
+-   **[DECIDED · 2026-09-28] D-29 --- The O-9 spike runs right after this discuss session, before planning.** The Claude
+    orchestrator runs it with one throwaway image written to a named scratch path. If it fails, the owner decides the
+    fallback (O-9).
+
+### End-of-phase gap list (owner review, after the new art)
+
+Items routed here are **not** planned up front. At phase end, the executor reports each one with its measurements and a
+recommendation. The owner then decides whether a gap plan picks it up.
+
+-   Scrims on red `danger` strings in Galaxy Dark, if E-1 is extended and strings still fail (D-25).
+-   Any proposed change to a component outside the v2-marked set (D-28).
+-   Report deferred items to the owner as soon as they are found (project practice); do not hold them silently until
+    phase end.
+
 ## Primary Input: the 38.4 Background-Art Brief
 
 **Path:** `.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-BACKGROUND-ART-BRIEF.md`. The supporting
@@ -316,9 +428,9 @@ It was written against `738ae12`. Its numbers carry MEASURED / COMPUTED / ESTIMA
 **Status 2026-09-27:** the owner restated O-1, O-2, O-4 and O-7 as still open; O-7 is parked as a later experiment.
 O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has a scope note).
 
--   **[OPEN] O-1 --- Which background to cut per theme.** The owner may cut one per package (4 → 3), giving about 12 images.
+-   **[DECIDED · 2026-09-28 → D-17/D-18] O-1 --- Which background to cut per theme.** *Resolved: Galaxy cuts Deep Space and Nebula, and replaces Starfield; Standard cuts Mesh.* The owner may cut one per package (4 → 3), giving about 12 images.
     Which one in each package?
--   **[OPEN] O-2 --- Galaxy light-mode imagery.** D-39 allows different pictures rather than recoloured dark art. Capture
+-   **[APPROACH DECIDED · 2026-09-28 → D-21] O-2 --- Galaxy light-mode imagery.** *Codex explores both routes per slot; the owner picks the concepts at the art sign-off.* D-39 allows different pictures rather than recoloured dark art. Capture
     the owner's own ideas for what Galaxy light pictures should be. The brief's pale-Galaxy remaps
     (`band-examples-galaxy.png`) are mechanical feasibility previews, not a proposal.
     -   **Owner concept ideas (2026-09-27; still OPEN, not choices):** a pastel nebula with white star glints, and a pearl
@@ -327,10 +439,10 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
         imagery. A planet limb would need the owner to relax that rule for Galaxy Light. *(2026-09-27, D-16: relaxed for
         an exploration only; the planet limb may be made and shown to the owner, and shipping it is a later owner
         decision.)*
--   **[OPEN] O-3 --- Standard light pale band.** Owner leaning (2026-09-26), **not a decision**: the pale remaps in
+-   **[DECIDED · 2026-09-28 → D-22] O-3 --- Standard light pale band.** *Accepted as the target; the look is confirmed at sign-off.* Owner leaning (2026-09-26), **not a decision**: the pale remaps in
     `band-examples-standard.png` look acceptable in principle. Discuss before it becomes a decision. The band puts the whole
     image at about L\* 89–97.
--   **[OPEN] O-4 --- Galaxy Dark red error text (exclusion E-1).** Should ADR-084's owner-accepted Galaxy Dark `danger`
+-   **[DECIDED (conditional) · 2026-09-28 → D-24/D-25] O-4 --- Galaxy Dark red error text (exclusion E-1).** *Extend if red sites are under 10%; red-string scrims go to the end-of-phase gap list.* Should ADR-084's owner-accepted Galaxy Dark `danger`
     `#E5484D` limitation (E-1, today cards and chrome only; `38.4-RG029-INVENTORY.md` §4) extend to bare text? If yes, the
     Galaxy Dark art ceiling is L\* 18.5 and today's Galaxy art already passes everything else. If no, it is L\* 8.2. The
     owner asked for this question to be clarified (brief OD-4).
@@ -338,7 +450,7 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
     transparent scrim or no scrim in each theme × mode × background. This is a prerequisite: planning does not start
     without the signed sheet. **Resolved by D-08** (sign-off v2, with D-09..D-12). A re-sign-off on the new art is
     sequenced inside the phase (D-13).
--   **[OPEN] O-6 --- Deep Space / Starfield replacement.** The owner said these two Galaxy images are too dark anyway and
+-   **[DECIDED · 2026-09-28 → D-17] O-6 --- Deep Space / Starfield replacement.** *Both current images go; Starfield returns as the busy slot.* The owner said these two Galaxy images are too dark anyway and
     plans to change two Galaxy images (brief OD-5). Which images are replaced, and does this overlap the O-1 cut?
 -   **[OPEN] O-7 --- Owner idea: dynamic text colour ("stained-glass layers").** The owner's idea, recorded as described:
     -   Regions of each background image are mapped as **layers**.
@@ -352,14 +464,14 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
         foldables crop top and bottom); bare text spans nearly the full width.
     -   **Status 2026-09-27:** parked as a later experiment. It is still OPEN and not in 38.5 scope. D-10's text-colour
         rule is a separate, decided rule and does not implement this idea.
--   **[OPEN] O-8 --- Card-blend (more translucent content cards).** Carried from the 31.1 parked list, which the owner's
+-   **[DECIDED · 2026-09-28 → D-27/D-28] O-8 --- Card-blend (more translucent content cards).** *Decided on the re-sign-off sheet, for the v2-marked entries only.* Carried from the 31.1 parked list, which the owner's
     2026-09-26 correction (D-39) says rides with this phase. It has not been re-confirmed for 38.5 scope. It interacts with
     this work: ADR-115 makes cards glassy only when the art tone matches the mode, and with separate light and dark art every
     package × mode would have matching art. 38.4 D-12 kept Standard Light glass at 0.5 for 38.4 only. Any opacity change is
     the owner's.
     -   **Scope note 2026-09-27:** D-08 and D-09 decide the Contacts List rows and Card-view cards per combination. Card-blend
         for every other content card is still open, and it is still the owner's call.
--   **[OPEN] O-9 --- Spike: can `codex-edu` exec make and edit image files non-interactively?** This is a quick spike to run
+-   **[OPEN · runs 2026-09-28 per D-29] O-9 --- Spike: can `codex-edu` exec make and edit image files non-interactively?** This is a quick spike to run
     before planning (D-14). It confirms that `CODEX_HOME="$HOME/.codex-edu" codex exec -m gpt-6-astra ... < /dev/null`
     can generate and edit image files with no interaction, and where the output lands (a named path in the workspace,
     or only Codex's own store).
@@ -477,3 +589,14 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
 -   2026-09-27 (second round) --- D-15: the owner confirms the ADR-115 supersession D-09 derived, and 38.5 writes the
     superseding ADR. D-16: a pearl planet limb may be made as an exploration only, with the Phase 31 no-planets rule relaxed
     for that exploration; O-2 stays open.
+-   2026-09-28 --- Discuss session: D-17..D-29 recorded.
+    -   Lineup: D-17 (Galaxy quiet/Aurora/busy Starfield; Deep Space and Nebula cut), D-18 (Standard cuts Mesh), D-19
+        (the new quiet image is the Galaxy default).
+    -   Art: D-20 (strict and visible-features versions; the owner picks with the failure % shown), D-21 (two routes per
+        slot), D-22 (pale Standard Light band accepted), D-23 (one pick per theme follows the mode; no migration).
+    -   Contrast: D-24 (conditional E-1 extension, 10% metric), D-25 (red-string scrims go to the end-of-phase gap list),
+        D-26 (one foreground per combination).
+    -   Scope: D-27 (re-sign-off covers all Contacts + Digest cells, a look-only gallery and a card-blend variant), D-28
+        (nothing outside the v2-marked components changes; the rest of ADR-115 stands), D-29 (the O-9 spike runs next).
+    -   An end-of-phase gap list section is added. O-1, O-3, O-6 and O-8 are resolved, O-2's approach is set, O-4 is
+        resolved conditionally, and O-7 stays parked.
