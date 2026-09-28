@@ -160,7 +160,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.2: Data Integrity, Security & Lifecycle Hardening** (INSERTED) - Completed 2026-09-25: 16/16 plans; verification passed 22/22 with Pixel device UAT (isolated synthetic package) for RG-003/004/009–013/015/016/043; eleven device-found defects fixed (incl. Android 17 import picker, reminder reschedule churn, reconcile identity pulled forward from 38.4). Explicitly recorded owner dispositions (not passes): RG-001 remaining widget checks deferred to a widget-overhaul phase; RG-002 hostile-provider ingress and RG-014 Drive/Files/natural-24 h subcases waived. No schema change (TARGET_VERSION 30), backup format 7.
 - [x] **Phase 38.3: Runtime Correctness, Navigation & State Coherence** (INSERTED) - Completed 2026-09-26: 16/16 plans; verification passed 94/94 truths with Pixel device UAT (isolated synthetic package) for RG-019–026, 035, 042, plus a device re-check of the 14 post-review fixes on `3b63f86`. UAT-020b TalkBack passed (AUD-UIA-022 not reproduced; D-05 fix not needed). Explicitly recorded owner dispositions (not passes): UAT-023a widget leg deferred to the widget-overhaul phase; UAT-042, UAT-024b month/year, UAT-026b in-range keep and the UAT-022 warm-Mark leg accepted risk.
 - [x] **Phase 38.4: UI Consistency, Accessibility, Performance & Release Polish** (INSERTED) - Completed 2026-09-28: 23/23 plans + D-37 deep code review (1 critical, 14 warnings, all fixed in two passes) + device-pass fix passes D-72/D-73/D-74; verification passed 32/32 (Pixel 3a device pass + owner checklist). Migrations 031–032 (TARGET_VERSION 32). Final release orbit-38.4-release-2026-09-28-d69a2e3.apk. Owner-routed: text-on-art → 38.5; widget contact tap → widget phase; large-text reflow outside sheets + Light/Dark latency → Phase 40; profile photos → backlog 999.1; remaining minor items → todos (2026-09-28-*).
-- [ ] **Phase 38.5: Background Art & Text-on-Art Contrast** (INSERTED) - DEFERRED PLANNING — needs discuss-phase; prerequisite met: scrim sign-off v2 signed 2026-09-27 (38.5 D-08); next: codex-edu image spike (O-9), then discuss-phase. Text sitting directly on the background art meets WCAG floors in every theme × mode × background, mainly through regenerated separate light and dark art per background; moved out of 38.4 by owner ruling D-38 (2026-09-26)
+- [ ] **Phase 38.5: Background Art & Text-on-Art Contrast** (INSERTED) - PLANNED 2026-09-28 — 9 plans, 8 waves (discussed D-17..D-29; O-9 spike PASS). Text sitting directly on the background art meets WCAG floors in every theme × mode × background, mainly through regenerated separate light and dark art per background; moved out of 38.4 by owner ruling D-38 (2026-09-26)
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
 
@@ -1267,13 +1267,51 @@ Plans:
 
 **Goal**: Every piece of text over shipped background art meets its WCAG floor (4.5:1 for text and links, 3:1 for glyphs and large text) in every theme × mode × background combination. The primary fix is regenerated art, with separate light and dark versions of each background. Scrims apply only where the owner's signed-off combination sheet says. User-uploaded custom backgrounds (for example contact profile photos) are excluded.
 **Depends on**: Phase 38.4; the owner-signed scrim combination sheet (38.4 D-40), signed 2026-09-27 as sign-off v2 (38.5 D-08); the `codex-edu` image spike (38.5 O-9), run before planning
-**Requirements**: TBD — defined at discuss/planning. Carries the bare-text-on-art remainder of RG-029 (former 38.4 finding F-1), moved out of 38.4 by owner ruling D-38
-**Success Criteria**: Defined at planning; per-pixel art acceptance (the brief's `check_art.py`, `measure-background-extrema.py --check`), a bare-text contrast proof, and owner device sign-off on the Pixel 6 Pro and Pixel 3a
+**Requirements**: RG-029 (the bare-text-on-art remainder, former 38.4 finding F-1, moved out of 38.4 by owner ruling D-38; defined at `docs/audits/2026-09-pre-release/synthesis/REMEDIATION-GROUPS.md`)
+**Success Criteria**: Per-pixel art acceptance on every shipped WebP (`scripts/check-background-art.py` H1 + H2, `measure-background-extrema.py --check` incl. veil regimes), a bare-text contrast proof over every shipped variant, the owner's art sign-off and scrim re-sign-off on the new art, and owner device sign-off on the Pixel 6 Pro and Pixel 3a
 **Scope source**: docs/dossier/milestone-2/phase-38.5-background-art-text-contrast-dossier.md (authoritative); primary input `.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-BACKGROUND-ART-BRIEF.md`
 **Canonical refs**: 38.4-CONTEXT.md D-38..D-41; ADR-084 (palettes and contrast validation), ADR-087/ADR-113/ADR-114/ADR-115 (background slots, selection and surface composition)
 **UI hint**: yes
-**Plans**: TBD
+**Plans**: 9 plans (8 waves; two blocking owner checkpoints: art sign-off in 04, scrim re-sign-off in 07)
 
+Plans:
+
+**Wave 1**
+
+- [ ] 38.5-01-PLAN.md — Re-verify the bare-text site list with a committed analyzer; D-24 metric → Galaxy Dark band (`D24_RESULT`) before any art brief (RG-029; D-24, P-6, P-5)
+- [ ] 38.5-02-PLAN.md — Slot × mode asset model on today's art (no visual change): mode-aware resolver, host latch, picker, variant-aware extrema script and proof loops (RG-029; D-23, D-03)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 38.5-03-PLAN.md — Art-acceptance tooling: committed `check-background-art.py` with synced constants, veil regimes + D-20 allowance in the extrema script, E-1 scoped by treatment, bare-text proof harness (RG-029; D-20, D-24, P-1, P-2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 38.5-04-PLAN.md — Codex (`gpt-6-astra` via `codex-edu`) art loop verified by Claude → BLOCKING owner art sign-off → 12 lossless WebPs (RG-029; D-13, D-14, D-16, D-17, D-18, D-20, D-21, D-22)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 38.5-05-PLAN.md — Wire the approved art: quiet Galaxy default, retired ids safe through DAO/restore/picker, extrema + README, bare-text and profile-scrim proofs over every shipped variant (RG-029; D-17, D-18, D-19, D-23, P-4, P-8)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 38.5-06-PLAN.md — Per-combination treatment table for the five v2-marked components (production = today's treatment), opt-in props, scope contracts, DEV-only override for the sheet (RG-029; D-08, D-10, D-28)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 38.5-07-PLAN.md — Scrim re-sign-off on the new art: device capture of every v2 choice, candidate ladders, card-blend, ⋯ question, look-only gallery → BLOCKING owner checkpoint → `38.5-scrim-signoff-v3.json` (RG-029; D-13, D-27)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 38.5-08-PLAN.md — Implement the signed v3 treatments + proofs + regimes; ADR-177 (supersedes the D-15 parts of ADR-115 and the one-asset-per-slot parts of ADR-087/113); runbook and system-doc sync (RG-029; D-09, D-10, D-15, D-26, D-28)
+
+*Phase code review + fixes run here, between waves 7 and 8 (38.4 D-37 practice).*
+
+**Wave 8** *(blocked on the code review)*
+
+- [ ] 38.5-09-PLAN.md — Device pass on Pixel 3a (+ Pixel 6 Pro) incl. explicit D-11 WATCH rows; D-24 final, D-25 red-string report, D-28 gap list; one release APK; owner device sign-off (RG-029; D-11, D-25, D-28, H6)
+
+> **Planned 2026-09-28 — 9 plans, 8 waves.** Art-first per D-13: measure (01) → asset plumbing and proof tooling that do not change a pixel (02, 03) → the Codex art loop and owner art sign-off (04) → wire the art (05) → treatment machinery with production equal to today's treatment (06, flagged: built before the re-sign-off but inert until 08) → re-sign-off on the new art (07) → implement the signed answers (08) → code review → device pass (09). No migration (head stays 032); no backup-format bump (owner-confirm item, asked at the 04 art sign-off).
 > **DEFERRED PLANNING — needs discuss-phase; prerequisite: owner-signed scrim combination sheet (D-40).** Inserted 2026-09-26 when owner ruling D-38 moved bare-text-on-art contrast out of 38.4. See `38.5-CONTEXT.md` (shim) and the dossier's OPEN items (background cut per theme, Galaxy light imagery, Standard light pale band, E-1 red text, Deep Space/Starfield replacement, the dynamic text-colour idea (parked as a later experiment), card-blend, and the `codex-edu` image spike).
 > **Updated 2026-09-27 (owner rulings, 38.5 D-08..D-14).**
 > - The D-40 sheet is signed (sign-off v2; 20 combinations, answers saved as `38.5-scrim-signoff-v2.json`).
@@ -1333,7 +1371,7 @@ Plans:
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
-| 38.5 Background Art & Text-on-Art Contrast | 0/TBD | Deferred planning (needs discuss; sheet signed 2026-09-27; art spike + discuss next) | - |
+| 38.5 Background Art & Text-on-Art Contrast | 0/9 | Planned 2026-09-28 (9 plans, 8 waves) | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
