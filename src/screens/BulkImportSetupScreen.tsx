@@ -40,12 +40,16 @@ import { Logger } from "@/utils/logger";
 import {
   BULK_BOUND_BLURB,
   BULK_IMPORT_DEFAULT_FREQUENCY,
-  BULK_LIFECYCLE_LOCKED_COPY,
+  BULK_IMPORT_STOPPED_CONTINUE,
+  BULK_IMPORT_STOPPED_DISCARD,
   boundFrequencyBlocksImport,
+  bulkImportStoppedMessage,
   bulkLifecycleChoice,
   bulkLifecycleLocked,
+  bulkSetupShowsStopped,
   initialBulkLifecycle,
 } from "./bulk-import-setup-logic";
+import { nextImportRunKey } from "./import-progress-state";
 import { useImportLeaveGuard } from "./use-import-leave-guard";
 import {
   bulkSetupHoldActive,
@@ -107,11 +111,24 @@ export function BulkImportSetupScreen({
   const [declinedClusters, setDeclinedClusters] = useState<Set<string>>(
     new Set(),
   );
+  // D-73c: true from a successful Combine until this screen next gains focus.
+  // Combine resolves rows before the batch starts, so the lock that follows is
+  // the user's own Import in progress, not a stopped import.
+  const [continuing, setContinuing] = useState(false);
+  // One-shot: run the user's Import again once the Combine has settled.
+  const [continueAfterCombine, setContinueAfterCombine] = useState(false);
+  // D-73c (owner; supersedes D-64's on-screen lock copy): a partly processed
+  // batch shows only a plain stopped message with Continue and Discard.
+  const stopped = bulkSetupShowsStopped({
+    locked: lifecycleLocked,
+    pending: count,
+    continuing,
+  });
 
   const markImportComplete = useImportLeaveGuard(
     navigation,
     route.params.sessionId,
-    edited,
+    edited && !stopped,
   );
 
   function markEdited() {
@@ -164,6 +181,7 @@ export function BulkImportSetupScreen({
   useFocusEffect(
     useCallback(() => {
       setSaving(false);
+      setContinuing(false);
       void load();
     }, [load]),
   );
@@ -292,6 +310,12 @@ export function BulkImportSetupScreen({
         setDeclinedClusters((current) =>
           new Set(current).add(clusterKey(consolidationRows)),
         );
+      } else {
+        // D-73c: the batch choice is saved and rows are now resolved; carry on
+        // with the Import the user tapped (the next cluster prompt, or the
+        // batch) rather than landing on a locked setup.
+        setContinuing(true);
+        setContinueAfterCombine(true);
       }
       setConsolidationRows(null);
       await load();
@@ -306,6 +330,33 @@ export function BulkImportSetupScreen({
     }
   }
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: onImport is re-created each render; the one-shot flag gates the run.
+  useEffect(() => {
+    if (!continueAfterCombine || saving || consolidationRows !== null) return;
+    setContinueAfterCombine(false);
+    void onImport();
+  }, [continueAfterCombine, saving, consolidationRows]);
+
+  /** D-73c: resume the stopped batch with its saved lifecycle and category. */
+  function onContinueStopped() {
+    if (saving) return;
+    setSaving(true);
+    // No batch-defaults write: the choices were applied when the batch
+    // started, and the driver reads them from the session (as the resume
+    // prompt's route does). A fresh run key re-runs a reused route.
+    navigation.navigate("ImportProgress", {
+      sessionId: route.params.sessionId,
+      batchCategoryId: null,
+      runKey: nextImportRunKey(),
+    });
+  }
+
+  /** D-73c: leaving through the import leave guard discards what is left. */
+  function onDiscardStopped() {
+    if (saving) return;
+    navigation.goBack();
+  }
+
   function onKeepSeparate() {
     if (consolidationRows) {
       setDeclinedClusters((current) =>
@@ -317,24 +368,67 @@ export function BulkImportSetupScreen({
 
   const importLabel = `Import ${contactLabel(count)}`;
 
-  return (
-    <ScrollView contentContainerStyle={styles.content}>
-      <View style={styles.header}>
+  const header = (
+    <View style={styles.header}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Back"
+        onPress={() => navigation.goBack()}
+        style={[styles.back, { borderColor: colors.border }]}
+      >
+        <Text style={{ color: colors.textSecondary }}>Back</Text>
+      </Pressable>
+      <Text
+        accessibilityRole="header"
+        style={[styles.title, { color: colors.textPrimary }]}
+      >
+        Import contacts
+      </Text>
+    </View>
+  );
+
+  if (stopped) {
+    return (
+      <ScrollView contentContainerStyle={styles.content}>
+        {header}
+        <Text
+          testID="bulk-import-stopped"
+          style={[styles.count, { color: colors.textPrimary }]}
+        >
+          {bulkImportStoppedMessage(count)}
+        </Text>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={[styles.back, { borderColor: colors.border }]}
+          accessibilityLabel="Continue import"
+          disabled={saving}
+          onPress={onContinueStopped}
+          style={[
+            styles.import,
+            { backgroundColor: colors.accent, borderColor: colors.accent },
+          ]}
         >
-          <Text style={{ color: colors.textSecondary }}>Back</Text>
+          <Text style={{ color: colors.onAccent, fontWeight: "600" }}>
+            {BULK_IMPORT_STOPPED_CONTINUE}
+          </Text>
         </Pressable>
-        <Text
-          accessibilityRole="header"
-          style={[styles.title, { color: colors.textPrimary }]}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Discard import"
+          disabled={saving}
+          onPress={onDiscardStopped}
+          style={[styles.import, { borderColor: colors.danger }]}
         >
-          Import contacts
-        </Text>
-      </View>
+          <Text style={{ color: colors.danger, fontWeight: "600" }}>
+            {BULK_IMPORT_STOPPED_DISCARD}
+          </Text>
+        </Pressable>
+      </ScrollView>
+    );
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.content}>
+      {header}
 
       <Text style={[styles.count, { color: colors.textPrimary }]}>
         {contactLabel(count)} selected
@@ -346,8 +440,8 @@ export function BulkImportSetupScreen({
         </Text>
         {/* D-57: one lifecycle for the whole batch, Unbound by default. The
             selected option is accent-filled with an onAccent label (ADR-084,
-            as D-30). D-64: locked (disabled, with the reason) once any row of
-            the batch is resolved. */}
+            as D-30). D-64: disabled once any row of the batch is resolved;
+            D-73c: a stopped batch never reaches this form (stopped view). */}
         <View
           accessibilityRole="radiogroup"
           accessibilityLabel="Orbit participation"
@@ -365,9 +459,6 @@ export function BulkImportSetupScreen({
                   disabled: lifecycleLocked,
                 }}
                 accessibilityLabel={label}
-                accessibilityHint={
-                  lifecycleLocked ? BULK_LIFECYCLE_LOCKED_COPY : undefined
-                }
                 disabled={lifecycleLocked}
                 onPress={() => {
                   markEdited();
@@ -394,14 +485,6 @@ export function BulkImportSetupScreen({
             );
           })}
         </View>
-        {lifecycleLocked ? (
-          <Text
-            testID="bulk-import-lifecycle-locked"
-            style={[styles.blurb, { color: colors.textSecondary }]}
-          >
-            {BULK_LIFECYCLE_LOCKED_COPY}
-          </Text>
-        ) : null}
         {trackingEnabled ? (
           <>
             <Text style={[styles.label, { color: colors.textSecondary }]}>

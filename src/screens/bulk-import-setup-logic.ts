@@ -26,11 +26,33 @@ export const BULK_BOUND_BLURB =
   "Bound adds every imported contact to your reminders at this frequency.";
 
 /**
- * Shown (and read by TalkBack) while the batch lifecycle is locked (D-64). The
- * owner reviews the wording on the device (Plan 17).
+ * The stopped-import view (38.4 D-73c, owner; supersedes D-64's on-screen lock
+ * copy). A partly processed batch shows only this: the choices were already
+ * applied, so no Bound/Unbound, frequency or category controls and no lock
+ * explanation. Short and plain on purpose.
  */
-export const BULK_LIFECYCLE_LOCKED_COPY =
-  "Some contacts from this import are already done, so the whole batch keeps this choice.";
+export const BULK_IMPORT_STOPPED_CONTINUE = "Continue";
+export const BULK_IMPORT_STOPPED_DISCARD = "Discard";
+
+export function bulkImportStoppedMessage(pending: number): string {
+  return `This import stopped partway — ${pending} ${
+    pending === 1 ? "contact" : "contacts"
+  } left.`;
+}
+
+/**
+ * Whether setup shows the stopped view (D-73c): the batch is locked (D-64: a
+ * row has left `pending`), contacts are left, and this screen is not already
+ * continuing the user's own Import after a Combine (Combine resolves rows
+ * before the batch starts; that is not a stopped import).
+ */
+export function bulkSetupShowsStopped(state: {
+  locked: boolean;
+  pending: number;
+  continuing: boolean;
+}): boolean {
+  return state.locked && state.pending > 0 && !state.continuing;
+}
 
 /**
  * The lifecycle setup saves: Bound with the picked frequency (or the default),

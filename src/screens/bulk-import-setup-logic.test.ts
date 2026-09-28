@@ -6,7 +6,6 @@ import { FREQUENCY_DAYS } from "@/types";
 import {
   BULK_BOUND_BLURB,
   BULK_IMPORT_DEFAULT_FREQUENCY,
-  BULK_LIFECYCLE_LOCKED_COPY,
   bulkLifecycleChoice,
   bulkLifecycleLocked,
   initialBulkLifecycle,
@@ -210,9 +209,4 @@ describe("bulkLifecycleLocked (D-64)", () => {
       expect(bulkLifecycleLocked({ ...none, [status]: 1 })).toBe(true);
     },
   );
-
-  it("explains the lock in plain words", () => {
-    expect(BULK_LIFECYCLE_LOCKED_COPY).toMatch(/already/);
-    expect(BULK_LIFECYCLE_LOCKED_COPY.length).toBeGreaterThan(20);
-  });
 });

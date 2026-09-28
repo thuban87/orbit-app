@@ -23,28 +23,22 @@ describe("BulkImportSetupScreen locks the batch lifecycle (D-64)", () => {
     expect(screen).toMatch(/sessionBatchLifecycle\(session\)/);
   });
 
-  it("disables each Bound/Unbound option, with state and the reason for TalkBack", () => {
+  it("disables each Bound/Unbound option, with its disabled state", () => {
     const start = screen.indexOf("LIFECYCLE_OPTIONS.map(");
     const option = screen.slice(start, screen.indexOf("</Pressable>", start));
     expect(option).toContain("disabled={lifecycleLocked}");
     expect(option).toMatch(
       /accessibilityState=\{\{\s*selected,\s*checked: selected,\s*disabled: lifecycleLocked,?\s*\}\}/,
     );
-    expect(option).toMatch(
-      /accessibilityHint=\{\s*lifecycleLocked \? BULK_LIFECYCLE_LOCKED_COPY : undefined\s*\}/,
-    );
+    // D-73c (owner) superseded the on-screen lock reason: a stopped batch shows
+    // only the stopped view (bulk-import-stopped-contract.test.ts).
+    expect(option).not.toContain("accessibilityHint");
   });
 
   it("disables the frequency picker while locked", () => {
     const start = screen.indexOf("<FrequencyPicker");
     const picker = screen.slice(start, screen.indexOf("/>", start));
     expect(picker).toContain("disabled={lifecycleLocked}");
-  });
-
-  it("shows the explanation as visible text while locked", () => {
-    expect(screen).toMatch(
-      /\{lifecycleLocked \? \(\s*<Text[\s\S]*?testID="bulk-import-lifecycle-locked"[\s\S]*?\{BULK_LIFECYCLE_LOCKED_COPY\}/,
-    );
   });
 
   it("writes the locked lifecycle, never an edited one, on Import and Combine", () => {
