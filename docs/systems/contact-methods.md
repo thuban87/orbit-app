@@ -125,6 +125,7 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — deduplicates compatible methods and requires a choice for competing primaries.
 - **ADR-072:** Shared Actionable Reach Out Router with Native Channel Handoff — reuses the actionable-primary selection and routes Compose Send through the shared handoff without a send-time interaction write.
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — adds mode-aware primary resolution and the transactional Compose primary-selection writer.
+- **ADR-160:** Committed-Identity Contact Edits and Exact-Source Reconciliation — returns committed method identities to the editor so post-save baselines cannot retain draft-only UIDs.
 
 - **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — composes normalized method reads into one local Profile snapshot.
 
@@ -145,6 +146,7 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 11. **Import evidence is not a primary-method selection.** Canonical matching informs an explicit import resolution but does not rewrite an existing contact's ordered methods.
 12. **Resolve primaries before reparenting a merge.** The partial primary-per-type index rejects a naïve child update when both contacts own a primary.
 13. **Validate before promoting a Compose selection.** `setContactMethodPrimary()` must prove contact and method type before clearing a prior primary; promoting first violates SQLite's statement-immediate partial unique index.
+14. **Never baseline a generated method from its draft identity.** Inserted link and method IDs become authoritative only in the committed DAO return; using the request draft after commit can duplicate the child on a retry.
 
 ## Related Systems
 
@@ -171,3 +173,4 @@ The actionable-primary selection (`selectActionablePrimaryMethods` in `src/db/co
 | 2026-08-31 | 21 | Compose Send routes through the shared `performReachOut` (pending assist, no send-time interaction); the actionable-primary selection is reused by the Reach Out router. |
 | 2026-09-02 | 31 | Added snapshot-compatible Profile method reads, separate Message/Call capability, and Compose-only AI invocation. |
 | 2026-09-02 | 35 | Added mode-aware Text/Email Compose resolution, explicit primary selection, and encoded email handoff. |
+| 2026-09-23 | 38.2 | Made contact edits return committed child identities and advance post-save method baselines before any projection refresh. |
