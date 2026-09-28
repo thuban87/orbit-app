@@ -1,7 +1,7 @@
 # Interaction Assist & Reach Out
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/services/assist-commit.ts`, `src/db/interaction-assist-dao.ts`, `src/db/interaction-assist-read.ts`, `src/logic/assist-eligibility.ts`, `src/services/reach-out/handoff.ts`, `src/services/interaction-assist-sweep.ts`, `src/stores/assist-store.ts`, `src/components/ReachOutRouter.tsx`, `src/components/EndpointSelector.tsx`, `src/components/AssistBanner.tsx`, `src/components/AssistConfirmation.tsx`, `src/components/PendingConfirmationsSheet.tsx`
 
 ## Purpose
@@ -103,6 +103,8 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — adds a Compose-attached confirmation without weakening the durable assist lifecycle.
 - **ADR-140:** Navigation-First Settings Directory and Canonical Sub-Routes — moves the toggle to Interactions while retaining ADR-070's specialized write path.
 - **ADR-164:** Shared Post-Commit Assist Publisher with Surfaced Assist Failures — routes every confirm/dismiss through `runAssistAction` with one post-commit publisher, latched surfaces, surfaced failures, and a `closed` outcome.
+- **ADR-173:** Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance — closed dial is inert to assistive tech, box-none overlays are `collapsable={false}`, permanent `onAccent` ring, route-derived clearance.
+- **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 
 ## Gotchas
 
@@ -137,3 +139,4 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | 2026-09-02 | 37 | Moved the toggle to Interactions and preserved its specialized opt-out writer and banner refresh. |
 | 2026-09-26 | 38.3 | `markAssistLogged` now resolves `logged` / `already-logged` / `closed`; a confirm of a dismissed or expired assist is shown as "Already closed" and never as logged (Compose no longer exits as "logged" for it). Guard, handoff-time stamp and pending recheck unchanged (review B-WR-05). |
 | 2026-09-25 | 38.3 | Shared assist publisher + RN-013 failure handling (RG-023): banner, pending sheet and Compose share `assist-commit.ts` (latched runner, widget + queue + shell-tick publication that never reports a post-commit failure, Alert on write failure with typed clock-rollback copy); the queue refresh is latest-request gated. |
+| 2026-09-23 | 38.4 | While the FAB speed dial is open, the AssistBanner is hidden from accessibility, and its root is `collapsable={false}` so Fabric cannot re-form it as a touch sink (D-42 A, D-33/GAP-G2; ADR-173). The pending-confirmations sheet was checked at maximum text and kept as an RN `Modal` with explicit-action exits; its minor large-text findings are in todo `2026-09-28-pending-confirmations-sheet-large-text.md` (D-49). |
