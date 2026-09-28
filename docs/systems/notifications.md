@@ -148,6 +148,8 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 13. **Pending UI is not event deduplication.** Repeated explicit Snooze/Unsnooze invocations remain auditable; only an accidental concurrent press is suppressed in the Profile sheet.
 14. **Keep the permission row independent.** OS delivery permission is distinct from Orbit's durable master toggle and must be read fresh when the category receives focus.
 15. **Keep DEV probes out of production ownership.** Phase-38 UAT uses `digest:uat:*` identifiers and never cancels `digest:weekly`; repeated probes must clean every matching DEV request.
+16. **Normalize Android DATE-trigger readback.** Android may return an absent notification title as `null` while Orbit's request uses `undefined`; compare their normalized forms or every foreground pass will replace an unchanged request.
+17. **Do not use the notification archive as current-state evidence.** `dumpsys notification` includes historical entries; verify presented cleanup against the live notification list or `cmd notification` output.
 
 ## Related Systems
 
