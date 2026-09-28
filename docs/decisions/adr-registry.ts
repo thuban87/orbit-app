@@ -171,5 +171,12 @@
 // NOTE: ADR-0159 [ACCEPTED] Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair
 // NOTE: ADR-0160 [ACCEPTED] Committed-Identity Contact Edits and Exact-Source Reconciliation
 // NOTE: ADR-0161 [ACCEPTED] Durable Post-Commit Import Recovery and AI-Off Provenance
+// NOTE: ADR-0162 [ACCEPTED] Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority
+// NOTE: ADR-0163 [ACCEPTED] Live Digest Refresh with Truthful Day-Detail States
+// NOTE: ADR-0164 [ACCEPTED] Shared Post-Commit Assist Publisher with Surfaced Assist Failures
+// NOTE: ADR-0165 [ACCEPTED] In-Profile History Reveal, Today-Following Rollover, and Snapshot-Coherent History
+// NOTE: ADR-0166 [ACCEPTED] Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress
+// NOTE: ADR-0167 [ACCEPTED] Committed Participant Writes Preserve the Parent Draft and Never Replay
+// NOTE: ADR-0168 [ACCEPTED] Truthful Read Phases for Import, Review, and Settings Screens
 
-export const ADR_COUNT = 161;
+export const ADR_COUNT = 168;

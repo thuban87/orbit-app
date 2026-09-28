@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 36 of
-  161 ADRs are superseded in whole or in part.
+  168 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -192,3 +192,10 @@ not something you can pattern-match against.
 | 159 | Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair | Accepted | 38.2-audit-remediation-data-security-lifecycle | — | — | — | 5 | `src/backup`, `src/db`, `src/services/backup` +1 |
 | 160 | Committed-Identity Contact Edits and Exact-Source Reconciliation | Accepted | 38.2-audit-remediation-data-security-lifecycle | — | — | — | 7 | `src/db`, `src/logic`, `src/screens` |
 | 161 | Durable Post-Commit Import Recovery and AI-Off Provenance | Accepted | 38.2-audit-remediation-data-security-lifecycle | — | — | — | 7 | `src/db`, `src/screens`, `src/services/import` |
+| 162 | Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 8 | `src/components/control-surface`, `src/screens`, `src/services` +3 |
+| 163 | Live Digest Refresh with Truthful Day-Detail States | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 6 | `src/components/digest`, `src/screens` |
+| 164 | Shared Post-Commit Assist Publisher with Surfaced Assist Failures | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 10 | `src/components`, `src/db`, `src/screens` +2 |
+| 165 | In-Profile History Reveal, Today-Following Rollover, and Snapshot-Coherent History | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 11 | `src/components/history`, `src/components/profile`, `src/profile` +1 |
+| 166 | Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 12 | `src/components`, `src/components/profile`, `src/navigation` +3 |
+| 167 | Committed Participant Writes Preserve the Parent Draft and Never Replay | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 5 | `src/logic`, `src/screens` |
+| 168 | Truthful Read Phases for Import, Review, and Settings Screens | Accepted | 38.3-audit-remediation-runtime-state | — | — | — | 14 | `src/logic`, `src/screens`, `src/utils` |
