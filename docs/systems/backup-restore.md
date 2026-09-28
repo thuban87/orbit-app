@@ -146,6 +146,9 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 - **ADR-141:** Explicit-Host Dual-Home Backup Navigation — mounts one Backup tree in both navigation homes with deterministic origin behavior.
 - **ADR-145:** Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore — introduces format v6 category tombstones, merge repair, and exact zero-category Replace-all restoration.
 - **ADR-148:** Portable Your Week Period and Group-Deduplicated Activity Aggregation — advances the wire to v7 and carries the validated period preference.
+- **ADR-155:** Recipient-Scoped Backup Share Grants with Staged-File Revocation — grants staged export access only to the selected receiver and revokes it when Orbit retires that staging file.
+- **ADR-157:** Bounded Native Transfer Ownership — bounds restore ingress at 100 MiB with a 30-second no-progress watchdog while leaving total acquisition time unbounded.
+- **ADR-159:** Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair — plans restore against lock-time local state, commits authoritative survivors, and limits post-commit completion to deterministic missing pairs.
 - **[ADR-118: Bind/Unbind Immutable Lifecycle Events Without a Migration](../decisions/ADR-118-bind-unbind-immutable-lifecycle-events-without-a-migration.md)** — governs `src/backup/restore-apply.ts`.
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/db/tombstones-dao.ts`.
 - **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/backup/export-manifest.ts`, `src/db/tombstones-dao.ts`.
@@ -175,6 +178,8 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 18. **AI connection metadata is portable but credentials are not.** A restored lane can remain selected yet must resolve Needs Attention until its device-local SecureStore credential is supplied.
 19. **Do not infer the Backup host from navigator state.** The Settings mount remains explicit so restore return, app-bar chrome, and shared-backup consumption cannot drift.
 20. **Forward v6 before applying v7 validation.** An absent `yourWeekPeriod` in a legitimate v6 file means the Rolling 7 Days default, not a malformed backup or a missing Digest snapshot.
+21. **App-owned staging is not a user-owned backup.** Cleanup and URI-grant revocation may target only Orbit's recognized cache namespaces; never prune the selected SAF destination or an external file after handoff.
+22. **The ingress bounds are exact.** Reject after 104857600 copied bytes or 30000 ms without progress; do not add a total acquisition deadline, and do not imply that every smaller photo-heavy backup can preview within device memory.
 
 - **Phase-33 compatibility was deliberately temporary.** Dissolve/delete initially made format-4 export fail validation. Gap closure filtered only unsupported parent tombstones at the export boundary; it preserved durable local evidence and did not complete the portable Group Event graph.
 
