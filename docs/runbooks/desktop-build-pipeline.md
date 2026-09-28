@@ -226,6 +226,12 @@ Any change to `app.config.ts`, `plugins/withWidgetBootReceiver.js`, `package.jso
 widget's native dependency requires the §1 prebuild and a physical-device check. Metro reload
 does not regenerate the provider, widget-info XML, manifest receiver, or native click path.
 
+Phase 38.2 made providerless inline bitmap delivery the durable security boundary. The
+`react-native-android-widget+0.22.0.patch` must apply during `npm ci`, both built APK manifests
+must omit `RNWidgetImageProvider`, and the Pixel must still render light/dark images after
+refresh and reboot. Restoring an exported image provider or narrowing content to avoid Binder
+pressure is an owner decision, not a build workaround.
+
 1. Build a **release** APK for standalone widget-host proof, resize/render/pin-prompt checks,
    cold-start `orbit://` navigation, and reboot recovery. It embeds its JS bundle and is the
    only meaningful proof after a full reboot.
