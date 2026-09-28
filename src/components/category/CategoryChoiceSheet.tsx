@@ -28,9 +28,12 @@ export function categoryChoiceSheetModel({
   excludeCategoryId,
   excludeCategoryUid,
 }: CategoryChoiceSheetModelInput) {
+  // An exclusion applies only when it is set: rows from listCategories() carry
+  // no uid, so comparing undefined uids would drop every category (D-72).
   const eligible = categories.filter(
     (category) =>
-      category.id !== excludeCategoryId && category.uid !== excludeCategoryUid,
+      (excludeCategoryId === undefined || category.id !== excludeCategoryId) &&
+      (excludeCategoryUid === undefined || category.uid !== excludeCategoryUid),
   );
   const choices = buildCategoryChoices(eligible, allowUncategorized);
   const effectiveQuery = choices.searchable ? query : "";

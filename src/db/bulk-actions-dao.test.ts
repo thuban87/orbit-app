@@ -178,6 +178,33 @@ describe("bulkSetCategory — Profile inheritance boundary", () => {
   });
 });
 
+describe("bulkSetCategory — D-72 chooser rows", () => {
+  it("writes a seeded listCategories() category to every selected contact", async () => {
+    const { listCategories } = await import("@/db/contact-read");
+    const categories = await listCategories(exec);
+    const names = categories.map((category) => category.name);
+    expect(names).toEqual(
+      expect.arrayContaining(["Family", "Friends", "Work", "Community"]),
+    );
+    const work = categories.find((category) => category.name === "Work");
+    if (!work) throw new Error("seeded Work category missing");
+    const a = await seedContact("A");
+    const b = await seedContact("B");
+    const untouched = await seedContact("C");
+    await bulkSetCategory(exec, [a, b], work.id, NOW);
+    expect(
+      await exec.getAllAsync(
+        "SELECT id, category_id FROM contacts WHERE id IN (?,?,?) ORDER BY id",
+        [a, b, untouched],
+      ),
+    ).toEqual([
+      { id: a, category_id: work.id },
+      { id: b, category_id: work.id },
+      { id: untouched, category_id: null },
+    ]);
+  });
+});
+
 describe("other bulk action composers", () => {
   it("archives all selected contacts with audit events and rolls back a mixed-invalid batch", async () => {
     const a = await seedContact("A");

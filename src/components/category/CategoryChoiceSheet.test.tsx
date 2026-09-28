@@ -134,6 +134,72 @@ describe("CategoryChoiceSheet", () => {
     );
   });
 
+  it("D-72: lists every uid-less category row (listCategories shape) when no exclusion is set", () => {
+    // listCategories() selects only `id, name`: the bulk Set Category, Create,
+    // Edit and Import choosers all pass rows with no uid. An unset
+    // excludeCategoryUid must not exclude them (undefined !== undefined).
+    const seeded = [
+      { id: 1, name: "Family" },
+      { id: 2, name: "Friends" },
+      { id: 3, name: "Work" },
+      { id: 4, name: "Community" },
+      { id: 9, name: "ZZ Custom" },
+    ];
+    const model = categoryChoiceSheetModel({
+      categories: seeded,
+      selectedId: null,
+      query: "",
+      allowUncategorized: true,
+    });
+    expect(model.rows.map((row) => row.name)).toEqual([
+      "Family",
+      "Friends",
+      "Work",
+      "Community",
+      "ZZ Custom",
+      "Uncategorized",
+    ]);
+    const byId = categoryChoiceSheetModel({
+      categories: seeded,
+      selectedId: null,
+      query: "",
+      allowUncategorized: false,
+      excludeCategoryId: 2,
+    });
+    expect(byId.rows.map((row) => row.id)).toEqual([1, 3, 4, 9]);
+  });
+
+  it("D-72: pressing a uid-less category row selects that category id", () => {
+    const onSelect = vi.fn();
+    const onRequestClose = vi.fn();
+    const tree = CategoryChoiceSheet({
+      visible: true,
+      categories: [
+        { id: 1, name: "Family" },
+        { id: 2, name: "Friends" },
+      ],
+      selectedId: null,
+      onSelect,
+      onRequestClose,
+    });
+    const list = findElements(tree, "FlatList")[0] as {
+      props: {
+        data: { id: number | null; name: string }[];
+        renderItem: (info: { item: { id: number | null; name: string } }) => {
+          props: { onPress: () => void };
+        };
+      };
+    };
+    expect(list.props.data.map((row) => row.name)).toEqual([
+      "Family",
+      "Friends",
+      "Uncategorized",
+    ]);
+    list.props.renderItem({ item: list.props.data[1] }).props.onPress();
+    expect(onSelect).toHaveBeenCalledWith(2);
+    expect(onRequestClose).toHaveBeenCalled();
+  });
+
   it("renders search only for a searchable eligible catalog", () => {
     const render = (length: number) =>
       CategoryChoiceSheet({
