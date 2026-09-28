@@ -1,7 +1,7 @@
 # Contact Reconciliation
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/db/reconcile-apply.ts`, `src/db/reconcile-session-dao.ts`, `src/db/reconcile-session-read.ts`, `src/db/reconcile-snapshot-dao.ts`, `src/db/reconcile-relink-dao.ts`, `src/db/merge-dao.ts`, `src/logic/reconcile-diff.ts`
 
 ## Purpose
@@ -112,6 +112,8 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 - **[ADR-128: Same-Group Contact Merge Refusal with Remediation](../decisions/ADR-128-same-group-contact-merge-refusal-with-remediation.md)** — governs `src/db/merge-dao.ts`.
 - **[ADR-166: Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress](../decisions/ADR-166-typed-cross-tab-entry-settings-hosted-profile-contract-and-latest-wins-notification-ingress.md)** — routes the reconcile resume prompt through the typed cross-tab entry helper.
 - **[ADR-168: Truthful Read Phases for Import, Review, and Settings Screens](../decisions/ADR-168-truthful-read-phases-for-import-review-and-settings-screens.md)** — gives ReconcileComplete a loading branch and a summary-only Retry.
+- **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
+- **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 
 ## Gotchas
 
