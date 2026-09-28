@@ -51,4 +51,4 @@ The system uses the system photo library without an in-app camera, presents a th
 - `src/services/photos/url-image.ts` — validates and downloads a pasted image URL on the write path.
 
 **Depends on:** ADR-006 (Theme-Token Architecture); ADR-019 (Native Stack Contact Lifecycle Navigation)
-**Required by:** _None._
+**Required by:** ADR-157 (Bounded Native Transfer Ownership)

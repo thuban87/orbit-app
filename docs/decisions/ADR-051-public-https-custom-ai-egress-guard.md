@@ -47,4 +47,4 @@ The Custom provider accepts only validated public HTTPS endpoints and sends them
 - `src/ai/__fixtures__/non-public-vectors.json` — shared non-public address test vectors.
 
 **Depends on:** ADR-005 (AiService Port Omits the Local/LAN Provider)
-**Required by:** None
+**Required by:** ADR-157 (Bounded Native Transfer Ownership)
