@@ -91,7 +91,9 @@ try {
 
 5. **For a parent-table rebuild, derive and re-point every foreign-key child before dropping the old parent.** `PRAGMA defer_foreign_keys` delays constraint checking but does not suppress `ON DELETE` actions. Assert the child set, per-child row counts, retained references such as `app_settings.sun_contact_id`, and `foreign_key_check`; use one atomic migration transaction.
 
-6. **Run the checks**:
+6. **Protect every shipped migration from mechanical rewrites.** Add a new forward migration instead of editing an applied step, and exclude existing `src/db/migrations/*.ts` implementations from bulk formatter `--write` passes. A non-mutating formatter check is acceptable; if it reports an old migration, review the report but do not rewrite production history merely to satisfy current style.
+
+7. **Run the checks**:
 
    ```bash
    npx vitest run src/db/migrations/001-initial.test.ts
@@ -126,6 +128,7 @@ try {
 8. **Repeating a literal head version across the feature.** Derive head+1 from the live registry immediately before implementation and single-source the accepted version from the migration module.
 
 9. **Shipping a value-remap migration without lockstepping every literal consumer.** When a migration re-maps stored *values* in place (e.g. migration 025's `good/fine/hard → Positive/Neutral/Negative` and channel remap), a reader still comparing the retired literal silently miscounts. Single-source the map in one module (e.g. `src/db/interaction-vocabulary.ts`), let the migration's CASE arms be frozen literals **test-pinned** equal to that map but never importing it at upgrade time, and ship the migration **plus every live literal comparer** (AI-context, digest, timeline renderer, and the backup serializer) in the **same commit**. Remember the separate writers a schema migration never touches — `restore-apply` writes the table without running the migration, so it must consume the same map on ingest.
+10. **Formatting-only edits to shipped migrations are still edits.** Migrations 006, 009, and 017 have already carried production data transformations; never include them in a broad `biome --write`, cleanup sweep, or style-only commit. Preserve their exact reviewed source and make any new behavior a later numbered step.
 
 ## Smoke Test
 
