@@ -1,7 +1,7 @@
 # Custom Fields
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 31-profile-experience
+**Last updated:** 2026-09-23
+**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
 **Owners:** `src/db/field-defs-dao.ts`, `src/db/field-values-dao.ts`, `src/db/field-ddl.ts`, `src/db/field-type-change.ts`, `src/db/field-parsers.ts`, `src/db/field-sort.ts`, `src/services/field-sweep.ts`
 
 ## Purpose
