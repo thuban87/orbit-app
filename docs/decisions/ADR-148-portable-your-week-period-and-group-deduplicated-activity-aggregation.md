@@ -51,4 +51,4 @@ The system persists a validated `your_week_period` app setting, defaulting to Ro
 - `src/backup/backup-schema.ts` — forwards v6 manifests with the safe period default.
 
 **Depends on:** ADR-120 (Shared-Window Heatmap and Intensity with Globally-Persisted Lenses); ADR-145 (Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore)
-**Required by:** None.
+**Required by:** ADR-163 (Live Digest Refresh with Truthful Day-Detail States)

@@ -50,4 +50,4 @@ The system treats an imported contact commit and its photo completion as separat
 - `src/screens/ImportCompleteScreen.tsx` — exposes photo-only Retry and Skip remaining photos.
 
 **Depends on:** ADR-065 (Durable Resumable Contact-Import Sessions with Failure-Isolated Photos); ADR-091 (Imported Contact Notes as AI-Off Typed Memories); ADR-158 (Canonical Photo Ownership Across Masters, Staging, and Derivatives)
-**Required by:** None
+**Required by:** ADR-168 (Truthful Read Phases for Import, Review, and Settings Screens)

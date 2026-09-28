@@ -61,4 +61,4 @@ The system uses one focused event-first Group Log form, presentation-first Group
 - `src/navigation/tabs/SettingsStack.tsx` — Settings runtime registrations.
 
 **Depends on:** ADR-122 (Canonical Interaction Detail and Edit Route); ADR-096 (Dashboard Header and Overflow Discovery Paths); ADR-102 (Frozen-Universe Dashboard Multi-Select); ADR-124 (Group Event Parents with Canonical Per-Contact Children)
-**Required by:** None
+**Required by:** ADR-167 (Committed Participant Writes Preserve the Parent Draft and Never Replay)

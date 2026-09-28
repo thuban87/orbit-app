@@ -50,4 +50,4 @@ Digest is a live, read/derive-only surface in fixed Up Next, Horizon, and Your W
 - `src/components/digest/HorizonSection.tsx` — renders separate conditional Horizon groups.
 
 **Depends on:** ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment); ADR-076 (Population-Reached Birthdays Without a Dashboard Banner)
-**Required by:** None.
+**Required by:** ADR-163 (Live Digest Refresh with Truthful Day-Detail States)

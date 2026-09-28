@@ -55,4 +55,4 @@ The system writes a durable `interaction_assists` row **immediately before** lau
 - `App.tsx` — mounts the banner app-wide, registers the sweep hook, and refreshes the queue on foreground.
 
 **Depends on:** None
-**Required by:** ADR-133 (Session-Scoped Compose Modes and Truthful External Handoff)
+**Required by:** ADR-133 (Session-Scoped Compose Modes and Truthful External Handoff); ADR-162 (Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority); ADR-164 (Shared Post-Commit Assist Publisher with Surfaced Assist Failures)

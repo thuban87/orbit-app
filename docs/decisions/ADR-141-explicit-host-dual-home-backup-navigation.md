@@ -49,4 +49,4 @@ The system mounts one canonical Backup screen tree in both the Backup tab and Se
 - `src/screens/RestoreResultScreen.tsx` — returns to the host-appropriate destination after restore.
 
 **Depends on:** ADR-080 (Four-Tab Bottom Navigation Shell with Per-Tab Stacks)
-**Required by:** ADR-146 (Digest-Centered Five-Tab Shell and Semantic Root Routing)
+**Required by:** ADR-146 (Digest-Centered Five-Tab Shell and Semantic Root Routing); ADR-166 (Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress)

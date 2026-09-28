@@ -52,4 +52,4 @@ The shell uses one fixed-order, six-action universal FAB: Add Contact, Quick Log
 - `src/db/recency-dao.ts` — owns the reused touchpoint insert and delete transactions.
 
 **Depends on:** ADR-023 (Structured Touchpoints and One-Tap Defaults); ADR-075 (Binary Favourite Membership Without a User-Facing Order); ADR-080 (Four-Tab Bottom Navigation Shell with Per-Tab Stacks)
-**Required by:** ADR-132 (Focused Rapid Capture Workflows).
+**Required by:** ADR-132 (Focused Rapid Capture Workflows); ADR-166 (Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress)

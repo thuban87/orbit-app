@@ -49,4 +49,4 @@ The system uses equal Contacts, Events, Digest, Orrery, and Settings tabs, with 
 - `src/components/UniversalFab.tsx` — retains the shell-global capture affordance across promoted roots.
 
 **Depends on:** ADR-080 (Four-Tab Bottom Navigation Shell with Per-Tab Stacks); ADR-141 (Explicit-Host Dual-Home Backup Navigation)
-**Required by:** None.
+**Required by:** ADR-162 (Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority); ADR-166 (Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress)

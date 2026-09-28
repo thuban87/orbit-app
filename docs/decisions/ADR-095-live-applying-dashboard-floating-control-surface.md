@@ -55,4 +55,4 @@ The system uses three separate, live-applying Dashboard controls—Population, F
 - `src/stores/dashboard-query-store.ts` — hydrates and persists the durable query axes with stale-hydration protection.
 
 **Depends on:** ADR-092 (Durable Shared Dashboard Query State); ADR-093 (Scoped Composable Dashboard Population and Filter Model)
-**Required by:** None
+**Required by:** ADR-162 (Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority)

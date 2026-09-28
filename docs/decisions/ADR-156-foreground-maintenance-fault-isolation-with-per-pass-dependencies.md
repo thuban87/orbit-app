@@ -49,4 +49,4 @@ The system uses a sequential foreground maintenance registry with per-hook fault
 - `App.tsx` — registers the ordered bootstrap and foreground maintenance sequence.
 
 **Depends on:** ADR-009 (Crash-Safe Forward-Only SQLite Migrations); ADR-057 (Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots)
-**Required by:** None
+**Required by:** ADR-162 (Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority)
