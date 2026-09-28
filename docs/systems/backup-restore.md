@@ -146,6 +146,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 - **ADR-141:** Explicit-Host Dual-Home Backup Navigation — mounts one Backup tree in both navigation homes with deterministic origin behavior.
 - **ADR-145:** Category-Aware Portable Backup Format v6 and Exact Taxonomy Restore — introduces format v6 category tombstones, merge repair, and exact zero-category Replace-all restoration.
 - **ADR-148:** Portable Your Week Period and Group-Deduplicated Activity Aggregation — advances the wire to v7 and carries the validated period preference.
+- **ADR-156:** Foreground Maintenance Fault Isolation with Per-Pass Dependencies — makes automatic backup depend on recovery outcomes from that foreground pass without persisting a backup hold.
 - **ADR-155:** Recipient-Scoped Backup Share Grants with Staged-File Revocation — grants staged export access only to the selected receiver and revokes it when Orbit retires that staging file.
 - **ADR-157:** Bounded Native Transfer Ownership — bounds restore ingress at 100 MiB with a 30-second no-progress watchdog while leaving total acquisition time unbounded.
 - **ADR-159:** Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair — plans restore against lock-time local state, commits authoritative survivors, and limits post-commit completion to deterministic missing pairs.
