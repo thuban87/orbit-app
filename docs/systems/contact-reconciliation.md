@@ -107,6 +107,7 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 - **ADR-069:** Atomic Tombstone-Backed Orbit Contact Merge — defines explicit atomic consolidation and absorbed-contact retirement.
 - **ADR-073:** Merge-Reparented, Purge-Cascaded Interaction Assists — extends the merge reparent loop to the pending-assist child table so redirect needs no lazy lookup.
 - **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — extends merge reparenting to typed contact-knowledge rows and their collision rules.
+- **ADR-160:** Committed-Identity Contact Edits and Exact-Source Reconciliation — carries stable source-option identity through review and snapshots the exact comparable that the user selected.
 - **[ADR-090: Additive Custom-Field Value History and Deferred Contact Scope](../decisions/ADR-090-additive-custom-field-value-history-and-deferred-contact-scope.md)** — governs `src/db/merge-dao.ts`.
 - **[ADR-128: Same-Group Contact Merge Refusal with Remediation](../decisions/ADR-128-same-group-contact-merge-refusal-with-remediation.md)** — governs `src/db/merge-dao.ts`.
 
@@ -120,6 +121,7 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 6. **Reconciled method additions have no v1 provenance row.** Imported methods retain stronger source attribution than reconciliation-added methods.
 7. **Every contact-owned child must join the reparent loop.** The merge reparents children explicitly (not by cascade); a new child table — like `interaction_assists` in phase 21 — that is not added to `mergeContacts()` would be stranded on the absorbed identity. Do not rely on `ON DELETE CASCADE` for merge.
 8. **Clear prospective relationship self-links before reparenting.** The migration-level CHECK is a backstop, not permission to let a merge fail after other choices were resolved.
+9. **Do not collapse source options to a display value.** Selection must retain the stable source-option ID through apply, then snapshot the comparable for that exact option; name or birthday duplicates can otherwise apply or suppress the wrong source value.
 
 - **Remediation must reach the screen.** The original generic catch discarded typed guidance and encouraged an ineffective retry. The corrected merge summary displays the collision-specific message and keeps generic fallback for unrelated failures.
 
