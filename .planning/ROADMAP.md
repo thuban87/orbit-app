@@ -1342,3 +1342,17 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 
 ---
 *Roadmap created 2026-09-02 for milestone v2.0 Release Readiness.*
+
+## Backlog
+
+### Phase 999.1: Profile photos — bigger Card-view photos, cross-screen photo sync, Profile photo lightbox (BACKLOG)
+
+**Goal:** [Captured for future planning] Owner, 2026-09-28 (38.4 owner checklist item 10, D-73):
+(1) Card-view contact photos about twice as big — accept fewer cards on screen, without breaking the card layout;
+(2) profile photos are out of sync across screens — the same contact shows a different or stale photo on different pages;
+(3) new feature: tapping the photo on a contact's Profile opens a lightbox (full-size view).
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd-review-backlog when ready)
