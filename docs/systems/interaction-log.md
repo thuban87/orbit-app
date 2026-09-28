@@ -1,6 +1,6 @@
 # Interaction Log
 
-**Last updated:** 2026-09-25
+**Last updated:** 2026-09-23
 **Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`, `src/services/quick-log-command.ts`, `src/db/bulk-actions-dao.ts`, `src/db/interaction-vocabulary.ts`
 
@@ -207,6 +207,7 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 - **[ADR-125: Three-Field Live Inheritance with Separate Local-Only Group Notes](../decisions/ADR-125-three-field-live-inheritance-with-separate-local-only-group-notes.md)** — governs `src/db/group-events-dao.ts`.
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/db/group-events-dao.ts`.
 - **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/db/group-events-dao.ts`.
+- **[ADR-164: Shared Post-Commit Assist Publisher with Surfaced Assist Failures](../decisions/ADR-164-shared-post-commit-assist-publisher-with-surfaced-assist-failures.md)** — makes Post-Log note and Memory saves publish the shell tick and report only a rejected write as failed.
 
 ## Gotchas
 
