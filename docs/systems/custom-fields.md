@@ -163,6 +163,8 @@ Migration 006 stores current values as normalized rows. Field type determines in
 - **ADR-057:** Full-State Versioned Backups with Verified Manual and Foreground SAF Snapshots — exports definitions and current normalized values, not history.
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — retains prior values separately while preserving current-pair integrity.
 - **ADR-136:** Permission-Bounded Prompt Assembly and AI Transparency — applies the custom-field sharing default only when a new definition is created and reviews its contact/value impact centrally.
+- **ADR-159:** Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair — completes only missing normalized pairs after restore commit and refuses speculative legacy repair.
+- **ADR-160:** Committed-Identity Contact Edits and Exact-Source Reconciliation — makes committed custom-value state authoritative for edit retries and retained-history behavior.
 
 - **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — preserves typed values, grouping, invalid states, and retained history in Profile.
 - **ADR-132:** Focused Rapid Capture Workflows — exposes applicable named fields and the generic Custom Fields path from Update Contact without duplicating definitions.
@@ -187,6 +189,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 14. **Contact scope is not ready for UI creation.** Directly-present contact definitions are guarded on write, but Phase 31 owns durable ownership and owner-purge semantics.
 15. **Rapid capture edits values, never definitions.** Update Contact may surface a field by label, but Settings remains the sole definition-editor and slugifier producer.
 16. **Definition sharing expands across its values.** The permission manager presents contact/value review rows but a custom-field enable changes the owning definition's `share_with_ai` state; its impact confirmation must show that fan-out.
+17. **Restore completion is narrow, not repair.** After committing restored definitions, deterministically create only missing `(contact_id, field_def_id)` rows with `NULL` values; do not rewrite existing raw TEXT, infer values, or introduce a migration for legacy cleanup.
 
 ## Related Systems
 
