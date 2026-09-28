@@ -1,7 +1,7 @@
 # Contact Reconciliation
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
+**Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/db/reconcile-apply.ts`, `src/db/reconcile-session-dao.ts`, `src/db/reconcile-session-read.ts`, `src/db/reconcile-snapshot-dao.ts`, `src/db/reconcile-relink-dao.ts`, `src/db/merge-dao.ts`, `src/logic/reconcile-diff.ts`
 
 ## Purpose
@@ -110,6 +110,8 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 - **ADR-160:** Committed-Identity Contact Edits and Exact-Source Reconciliation — carries stable source-option identity through review and snapshots the exact comparable that the user selected.
 - **[ADR-090: Additive Custom-Field Value History and Deferred Contact Scope](../decisions/ADR-090-additive-custom-field-value-history-and-deferred-contact-scope.md)** — governs `src/db/merge-dao.ts`.
 - **[ADR-128: Same-Group Contact Merge Refusal with Remediation](../decisions/ADR-128-same-group-contact-merge-refusal-with-remediation.md)** — governs `src/db/merge-dao.ts`.
+- **[ADR-166: Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress](../decisions/ADR-166-typed-cross-tab-entry-settings-hosted-profile-contract-and-latest-wins-notification-ingress.md)** — routes the reconcile resume prompt through the typed cross-tab entry helper.
+- **[ADR-168: Truthful Read Phases for Import, Review, and Settings Screens](../decisions/ADR-168-truthful-read-phases-for-import-review-and-settings-screens.md)** — gives ReconcileComplete a loading branch and a summary-only Retry.
 
 ## Gotchas
 
