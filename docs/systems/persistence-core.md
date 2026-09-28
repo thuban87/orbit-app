@@ -227,6 +227,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **ADR-142:** User-Owned Categories with Stable Identity and Canonical Ordering — keeps category mutation in runtime DAO code without reseeding migration-001 taxonomy.
 - **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — uses one non-reentrant writer transaction and existing tombstone infrastructure without a schema migration.
 - **ADR-162:** Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority — publishes the foreground tick from the owning launch-sweep run and bounds each hook with `SWEEP_HOOK_TIMEOUT_MS`.
+- **ADR-170:** Bounded Your Week Reads and Settled Orrery Resource Retirement — range-bounded `occurred_at` predicates on migration-031 indexes; settled Orrery switches drop departed resources.
+- **ADR-171:** Durable Bulk-Import Lifecycle Choice, Locked Batches, and One Pass per Session — Bound/Unbound batch choice on the session (migration 032), lifecycle lock, single run; partially supersedes ADR-066.
 
 ## Gotchas
 
@@ -265,6 +267,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 - **Never bulk-format shipped migrations.** Forward-only migration source is production history; formatting-only rewrites to an already-shipped step create needless audit risk and must be excluded from automated formatting.
 - **Do not attach sweep-ordered work to a trigger's promise.** A re-entrant `runLaunchSweep()` resolves immediately while the in-flight pass is still running; code that must observe the sweep's purge/expiry writes subscribes with `onSweepSettled`, which only the owning run fires.
 - **FK detachment needs explicit cleanup.** `ON DELETE SET NULL` clears only the link. Lifecycle writers and the locked orphan contract clear all three follow flags together with the reference.
+- **`ERR_USING_RELEASED_SHARED_OBJECT` is bounded, not fixed (38.3 O-1 / W3).** expo-sqlite can throw it when Android garbage-collects a shared-object argument to `prepareAsync` during a burst of reads (upstream expo/expo#49799; fix PR #50513, published only in the SDK 58 `expo-modules-core` line). A 200-tick shell fan-out across four hidden Profiles did not reproduce it, so no JS mitigation or patch ships; the dev probe `UAT: shell-tick fan-out ×20` (`src/__dev__/uat-probes.ts`) re-runs the check. A `patch-package` backport versus an SDK bump is an owner decision if it recurs (38.4 D-25). See `.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-W3-INVESTIGATION.md`.
 
 ## Related Systems
 
