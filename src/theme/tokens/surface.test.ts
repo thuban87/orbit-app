@@ -27,6 +27,7 @@ import {
   SURFACE,
   SURFACE_COLOR_TOKEN_KEYS,
   SURFACE_DENSITIES,
+  type SurfaceDensity,
   surfaceOpacityForDensity,
 } from "./surface";
 
@@ -708,16 +709,19 @@ describe("surface-token-only selector guard (cycle-3 LOW, finding #4)", () => {
   });
 });
 
-describe("background-extrema regime table sync guard (RG-029 / D-12)", () => {
+describe("background-extrema regime table sync guard (RG-029 / D-12; 38.5 P-1/P-2)", () => {
   // scripts/measure-background-extrema.py validates the declared extrema under
   // the tint regimes in scripts/background-extrema-regimes.json. That table must
-  // equal exactly the (package, mode, treatment, tint, opacity) tuples the card
-  // and chrome suites above composite, or the script would validate a proof
-  // that no longer exists.
+  // equal exactly the (package, mode, treatment, density, tint, opacity) tuples
+  // the card, chrome and bare-text (BackgroundHost veil, every density) proofs
+  // composite, or the script would validate a proof that no longer exists. A new
+  // regime enters bound, proof and decoder together (38.5-03).
   interface Regime {
     package: ThemePackage;
     mode: ResolvedMode;
-    treatment: "card" | "chrome";
+    treatment: "card" | "chrome" | "veil";
+    /** veil rows only: the BackgroundHost content density. */
+    density?: SurfaceDensity;
     tint: string;
     opacity: number;
   }
@@ -744,6 +748,18 @@ describe("background-extrema regime table sync guard (RG-029 / D-12)", () => {
           tint,
           opacity: chromeScrimOpacity(pkg, mode),
         });
+        // Bare text sits on the BackgroundHost veil: palette.surface at the
+        // density's veil opacity (the bare-text proof's regime).
+        for (const density of SURFACE_DENSITIES) {
+          out.push({
+            package: pkg,
+            mode,
+            treatment: "veil",
+            density,
+            tint: resolvePalette(pkg, mode).surface,
+            opacity: backgroundVeilOpacity(pkg, density),
+          });
+        }
       }
     }
     return out;
@@ -754,28 +770,33 @@ describe("background-extrema regime table sync guard (RG-029 / D-12)", () => {
       a.package === b.package &&
       a.mode === b.mode &&
       a.treatment === b.treatment &&
+      a.density === b.density &&
       a.tint.toLowerCase() === b.tint.toLowerCase() &&
       Math.abs(a.opacity - b.opacity) <= 1e-9
     );
   }
 
-  it("the script's regime table equals the card + chrome proof tuples exactly", () => {
+  function label(r: Regime): string {
+    return `${r.package}/${r.mode}/${r.treatment}${r.density ? `/${r.density}` : ""} ${r.tint}@${r.opacity}`;
+  }
+
+  it("the script's regime table equals the card + chrome + veil proof tuples exactly", () => {
     const table = JSON.parse(
       readFileSync("scripts/background-extrema-regimes.json", "utf8"),
     ) as { regimes: Regime[] };
     const ts = tsRegimes();
-    expect(table.regimes.length).toBeGreaterThan(0);
+    expect(ts.length).toBe(20);
     expect(table.regimes.length).toBe(ts.length);
     for (const want of ts) {
       expect(
         table.regimes.some((got) => sameRegime(got, want)),
-        `missing regime ${want.package}/${want.mode}/${want.treatment} ${want.tint}@${want.opacity}`,
+        `missing regime ${label(want)}`,
       ).toBe(true);
     }
     for (const got of table.regimes) {
       expect(
         ts.some((want) => sameRegime(got, want)),
-        `stale regime ${got.package}/${got.mode}/${got.treatment} ${got.tint}@${got.opacity}`,
+        `stale regime ${label(got)}`,
       ).toBe(true);
     }
   });
