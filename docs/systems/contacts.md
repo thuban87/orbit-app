@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-09-17
-**Updated by phase:** 37.1-category-management
+**Last updated:** 2026-09-23
+**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
 **Owners:** `src/db/contacts-dao.ts`, `src/db/contact-read.ts`, `src/db/favourites-dao.ts`, `src/db/profile-dao.ts`, `src/db/contact-links-dao.ts`, `src/db/purge-dao.ts`, `src/db/recency-dao.ts`, `src/db/snooze-dao.ts`, `src/db/bulk-actions-dao.ts`
 
 ## Purpose
