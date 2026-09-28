@@ -1,6 +1,6 @@
 # Interaction Assist & Reach Out
 
-**Last updated:** 2026-09-25
+**Last updated:** 2026-09-23
 **Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/services/assist-commit.ts`, `src/db/interaction-assist-dao.ts`, `src/db/interaction-assist-read.ts`, `src/logic/assist-eligibility.ts`, `src/services/reach-out/handoff.ts`, `src/services/interaction-assist-sweep.ts`, `src/stores/assist-store.ts`, `src/components/ReachOutRouter.tsx`, `src/components/EndpointSelector.tsx`, `src/components/AssistBanner.tsx`, `src/components/AssistConfirmation.tsx`, `src/components/PendingConfirmationsSheet.tsx`
 
@@ -102,6 +102,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 - **ADR-074:** Widget Contact Supersession and Strict Reach Deep-Link Fail-Safe — the widget entry into this router.
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — adds a Compose-attached confirmation without weakening the durable assist lifecycle.
 - **ADR-140:** Navigation-First Settings Directory and Canonical Sub-Routes — moves the toggle to Interactions while retaining ADR-070's specialized write path.
+- **ADR-164:** Shared Post-Commit Assist Publisher with Surfaced Assist Failures — routes every confirm/dismiss through `runAssistAction` with one post-commit publisher, latched surfaces, surfaced failures, and a `closed` outcome.
 
 ## Gotchas
 
