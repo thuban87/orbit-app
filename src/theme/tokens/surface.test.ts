@@ -9,7 +9,11 @@ import {
   relativeLuminance,
 } from "../contrast";
 import { resolveGlassForegroundPalette } from "../glass-foregrounds";
-import { ACCENT_IDS, type AccentId } from "../theme-option-ids";
+import {
+  ACCENT_IDS,
+  type AccentId,
+  type BackgroundSlotId,
+} from "../theme-option-ids";
 import { resolvePalette } from "../theme-presets";
 import type { ResolvedMode, ThemePackage, ThemePalette } from "../theme-types";
 import {
@@ -63,6 +67,30 @@ const GLASS_NONTEXT_FGS: readonly {
   { token: "danger", floor: AA_NORMAL },
 ];
 
+/** The committed inventories an exclusion may cite. */
+const RG029_INVENTORY =
+  ".planning/phases/38.4-audit-remediation-ui-performance-release/38.4-RG029-INVENTORY.md";
+const BARE_TEXT_INVENTORY =
+  ".planning/phases/38.5-background-art-text-contrast/38.5-BARE-TEXT-INVENTORY.md";
+/** Where an owner-accepted, variant-scoped art allowance is recorded (38.5-04). */
+const ART_SIGNOFF =
+  ".planning/phases/38.5-background-art-text-contrast/38.5-ART-SIGNOFF.md";
+
+/**
+ * Every treatment a proof exclusion can name (38.5-03). `card` and `chrome` are
+ * the glass proofs above; `bare` is the bare-text-on-veil proof below. The
+ * three art treatments (`listEntry`, `cardEntry`, `artChrome`) have no regime
+ * until 38.5-08 (C3-M2); they are defined here so 38.5-05's generated entries
+ * type-check.
+ */
+type ProofTreatment =
+  | "card"
+  | "chrome"
+  | "bare"
+  | "listEntry"
+  | "cardEntry"
+  | "artChrome";
+
 /**
  * Every narrowing of the asserted foreground set, written down (D-24: nothing
  * narrowed silently). Each entry names the inventory row that justifies it.
@@ -71,12 +99,25 @@ interface ProofExclusion {
   token: keyof ThemePalette;
   /** Omitted = every package. */
   package?: ThemePackage;
-  /** Omitted = every mode. */
+  /**
+   * Omitted = every mode. A variant renders only in its own mode (38.5 P-2), so
+   * with `slotId` this is also the variant's mode.
+   */
   mode?: ResolvedMode;
   /** accentText only: the curated accent excluded. Omitted = every accent. */
   accentId?: AccentId;
-  /** Omitted = both the card and the chrome regimes. */
-  treatment?: "card" | "chrome";
+  /**
+   * REQUIRED: the treatments this exclusion covers (38.5-03). No entry covers
+   * every treatment by omission, so a new proof (e.g. bare text) never
+   * silently inherits an old exclusion (research Pitfall 2).
+   */
+  treatment: readonly ProofTreatment[];
+  /**
+   * Variant scope for an owner-accepted art allowance: an entry with `slotId`
+   * matches only a call passing the same `slotId` (a call with another slot or
+   * with none never matches it; C3-L2).
+   */
+  slotId?: BackgroundSlotId;
   /**
    * `accepted` = an owner-ruled, permanent limitation. `held-for-owner` = a
    * failure found by this proof that is the owner's call (a regime other than
@@ -85,6 +126,8 @@ interface ProofExclusion {
   status: "accepted" | "held-for-owner";
   justification: string;
   inventoryRef: string;
+  /** The inventory holding `**inventoryRef**`. Omitted = the 38.4 RG029 inventory. */
+  inventoryPath?: string;
 }
 
 const PROOF_EXCLUSIONS: readonly ProofExclusion[] = [
@@ -92,26 +135,62 @@ const PROOF_EXCLUSIONS: readonly ProofExclusion[] = [
     token: "danger",
     package: "galaxy",
     mode: "dark",
+    treatment: ["card", "chrome"],
     justification:
       "ADR-084 owner-accepted Galaxy Dark danger (#E5484D) limitation: danger-as-text reaches 3.58-4.16:1 over the brightest Galaxy composites. D-24 keeps it as it is; it is never retuned here.",
     status: "accepted",
     inventoryRef: "E-1",
   },
+  // Present because 38.5-BARE-TEXT-INVENTORY.md records `D24_RESULT: extend`
+  // (the sync test below fails if the two disagree).
+  {
+    token: "danger",
+    package: "galaxy",
+    mode: "dark",
+    treatment: ["bare"],
+    justification:
+      "ADR-084 owner-accepted Galaxy Dark danger (#E5484D) limitation extended to bare text on the art by D-24 (owner, 2026-09-28): red danger bare sites are 26/302 = 8.61% (bare-only), 29/325 = 8.92% (bare + mixed), 32/347 = 9.22% (per route row), all under 10%. Worst case about 3.5:1 (COMPUTED 3.52:1 at the L* 18.5 art ceiling), still at or above 3:1; never retuned.",
+    status: "accepted",
+    inventoryRef: "E-1-bare",
+    inventoryPath: BARE_TEXT_INVENTORY,
+  },
 ];
+
+/** The call-site scope an exclusion is matched against. */
+interface ExclusionScope {
+  /** accentText only: the RENDERED accent id. */
+  accentId?: AccentId | null;
+  treatment: ProofTreatment;
+  /** The background variant's slot id; absent for the None (solid) background. */
+  slotId?: BackgroundSlotId;
+}
+
+/** PURE: does one exclusion entry cover this token at this scope? */
+function matchesExclusion(
+  entry: ProofExclusion,
+  token: keyof ThemePalette,
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+  scope: ExclusionScope,
+): boolean {
+  return (
+    entry.token === token &&
+    (entry.package === undefined || entry.package === pkg) &&
+    (entry.mode === undefined || entry.mode === mode) &&
+    (entry.accentId === undefined || entry.accentId === scope.accentId) &&
+    entry.treatment.includes(scope.treatment) &&
+    (entry.slotId === undefined || entry.slotId === scope.slotId)
+  );
+}
 
 function isExcluded(
   token: keyof ThemePalette,
   pkg: ThemePackage,
   mode: ResolvedMode,
-  scope: { accentId?: AccentId | null; treatment?: "card" | "chrome" } = {},
+  scope: ExclusionScope,
 ): boolean {
-  return PROOF_EXCLUSIONS.some(
-    (e) =>
-      e.token === token &&
-      (e.package === undefined || e.package === pkg) &&
-      (e.mode === undefined || e.mode === mode) &&
-      (e.accentId === undefined || e.accentId === scope.accentId) &&
-      (e.treatment === undefined || e.treatment === scope.treatment),
+  return PROOF_EXCLUSIONS.some((e) =>
+    matchesExclusion(e, token, pkg, mode, scope),
   );
 }
 
@@ -123,9 +202,10 @@ function assertNonTextClearsExtrema(
   opacity: number,
   slot: BackgroundVariant,
   label: string,
+  scope: { treatment: "card" | "chrome"; slotId: BackgroundSlotId },
 ) {
   for (const { token, floor } of GLASS_NONTEXT_FGS) {
-    if (isExcluded(token, pkg, mode)) continue;
+    if (isExcluded(token, pkg, mode, scope)) continue;
     assertClearsExtrema(
       palette[token] as string,
       tint,
@@ -282,13 +362,18 @@ function assertAccentTextClearsExtrema(
   treatment: "card" | "chrome",
   slot: BackgroundVariant,
   label: string,
+  slotId: BackgroundSlotId,
 ) {
   for (const accentId of ACCENT_CHOICES) {
     // `null` renders the package default; an exclusion keyed by that default
     // id covers it too.
     const rendered = accentId ?? resolveDefaultAccentId(pkg);
     if (
-      isExcluded("accentText", pkg, mode, { accentId: rendered, treatment })
+      isExcluded("accentText", pkg, mode, {
+        accentId: rendered,
+        treatment,
+        slotId,
+      })
     ) {
       continue;
     }
@@ -302,6 +387,80 @@ function assertAccentTextClearsExtrema(
       `${label}: accentText (${accentId ?? "default"})`,
     );
   }
+}
+
+/**
+ * BARE TEXT on the art (38.5-03; brief §E / H5, dossier P-1). Text with no
+ * glass, scrim or opaque backing sits on the BackgroundHost veil: the palette
+ * `surface` tint at `backgroundVeilOpacity(pkg, density)` over the art. It is
+ * drawn with the ROOT palette (bare text has no glass scope, so never the
+ * Standard-Light glass variants). Text and links at AA_NORMAL; status glyphs
+ * and `rogue` at AA_LARGE. `accentText` is checked for the package default and
+ * every curated accent (ACCENT_CHOICES), because the user picks the accent.
+ */
+const BARE_FOREGROUNDS: readonly {
+  token: keyof ThemePalette;
+  floor: number;
+}[] = [
+  { token: "textPrimary", floor: AA_NORMAL },
+  { token: "textSecondary", floor: AA_NORMAL },
+  { token: "textPlaceholder", floor: AA_NORMAL },
+  { token: "danger", floor: AA_NORMAL },
+  { token: "accentText", floor: AA_NORMAL },
+  ...STATUS_FGS.map((token) => ({ token, floor: AA_LARGE })),
+];
+
+/**
+ * PURE bare-text proof: the failure labels for every bare foreground over the
+ * veil composited on a background's declared extrema at one density (the
+ * both-extrema + interval rule, `evaluateOverExtrema`). Exclusions are matched
+ * with `treatment: "bare"` and the caller's `slotId` (absent for the None
+ * background). Enforcing tests assert `[]`.
+ */
+function bareTextFailures(
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+  bounds: Pick<BackgroundVariant, "darkestPixel" | "brightestPixel">,
+  density: SurfaceDensity,
+  scope: { slotId?: BackgroundSlotId },
+): string[] {
+  const failures: string[] = [];
+  const opacity = backgroundVeilOpacity(pkg, density);
+  for (const accentId of ACCENT_CHOICES) {
+    const rendered = accentId ?? resolveDefaultAccentId(pkg);
+    const palette = applyAccent(
+      resolvePalette(pkg, mode),
+      resolveAccent(accentId, pkg, mode),
+    );
+    const tint = palette.surface;
+    const dark = alphaComposite(tint, bounds.darkestPixel, opacity);
+    const bright = alphaComposite(tint, bounds.brightestPixel, opacity);
+    for (const { token, floor } of BARE_FOREGROUNDS) {
+      // Non-accent tokens do not vary with the accent: check them once.
+      if (token !== "accentText" && accentId !== null) continue;
+      if (
+        isExcluded(token, pkg, mode, {
+          treatment: "bare",
+          slotId: scope.slotId,
+          accentId: rendered,
+        })
+      ) {
+        continue;
+      }
+      const fg = palette[token] as string;
+      if (!clearsExtrema(fg, dark, bright, floor)) {
+        const e = evaluateOverExtrema(fg, dark, bright);
+        failures.push(
+          `${pkg}/${mode} bare @ ${density}${scope.slotId ? ` ${scope.slotId}` : ""}: ${token}${
+            token === "accentText" ? ` (${accentId ?? "default"})` : ""
+          } ${e.ratioDark.toFixed(2)}/${e.ratioBright.toFixed(2)}:1${
+            e.outside ? "" : " inside the composite interval"
+          } (floor ${floor})`,
+        );
+      }
+    }
+  }
+  return failures;
 }
 
 describe("both-extrema interval helper — boundary + mid-tone edges (RG-029)", () => {
@@ -474,6 +633,7 @@ describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1
   // vice-versa. Labels read `slot/mode`.
   for (const [id, entry] of Object.entries(BACKGROUND_SLOTS)) {
     const pkg = entry.package;
+    const slotId = id as BackgroundSlotId;
     for (const mode of MODES) {
       const slot = entry.variants[mode];
       const regime = cardMatchesMode(pkg, mode) ? "glassy" : "opaque";
@@ -482,6 +642,9 @@ describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1
         const tint = palette[SURFACE[pkg].tintTokenKey];
         const opacity = cardTintOpacity(pkg, mode, "presentation");
         for (const fg of TEXT_FGS) {
+          if (isExcluded(fg, pkg, mode, { treatment: "card", slotId })) {
+            continue;
+          }
           assertClearsExtrema(
             palette[fg],
             tint,
@@ -503,6 +666,7 @@ describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1
           cardTintOpacity(pkg, mode, "presentation"),
           slot,
           `${id}/${mode} @ ${pkg}/${mode} ${regime} card`,
+          { treatment: "card", slotId },
         );
       });
 
@@ -514,6 +678,7 @@ describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1
           "card",
           slot,
           `${id}/${mode} @ ${pkg}/${mode} ${regime} card`,
+          slotId,
         );
       });
     }
@@ -614,6 +779,7 @@ describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)",
   // its OWN mode only (38.5 D-23 / P-2).
   for (const [id, entry] of Object.entries(BACKGROUND_SLOTS)) {
     const pkg = entry.package;
+    const slotId = id as BackgroundSlotId;
     for (const mode of MODES) {
       const slot = entry.variants[mode];
       it(`${id}/${mode} @ ${pkg}/${mode}: text foregrounds over the chrome scrim clear both extrema (RG-029)`, () => {
@@ -621,6 +787,9 @@ describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)",
         const tint = palette[SURFACE[pkg].tintTokenKey];
         const opacity = chromeScrimOpacity(pkg, mode);
         for (const fg of TEXT_FGS) {
+          if (isExcluded(fg, pkg, mode, { treatment: "chrome", slotId })) {
+            continue;
+          }
           assertClearsExtrema(
             palette[fg],
             tint,
@@ -642,6 +811,7 @@ describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)",
           chromeScrimOpacity(pkg, mode),
           slot,
           `${id}/${mode} @ ${pkg}/${mode} chrome`,
+          { treatment: "chrome", slotId },
         );
       });
 
@@ -653,6 +823,7 @@ describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)",
           "chrome",
           slot,
           `${id}/${mode} @ ${pkg}/${mode} chrome`,
+          slotId,
         );
       });
     }
@@ -803,38 +974,49 @@ describe("background-extrema regime table sync guard (RG-029 / D-12; 38.5 P-1/P-
 });
 
 describe("proof exclusions are written down against the committed inventory (D-24)", () => {
-  const INVENTORY =
-    ".planning/phases/38.4-audit-remediation-ui-performance-release/38.4-RG029-INVENTORY.md";
+  const inventoryOf = (e: ProofExclusion) => e.inventoryPath ?? RG029_INVENTORY;
 
-  it("every exclusion carries a justification and an inventory row that exists", () => {
-    const inventory = readFileSync(INVENTORY, "utf8");
+  it("every exclusion carries a justification and an inventory row that exists in its own inventory", () => {
     expect(PROOF_EXCLUSIONS.length).toBeGreaterThan(0);
     for (const e of PROOF_EXCLUSIONS) {
       expect(e.justification.trim().length, e.token).toBeGreaterThan(40);
       expect(
+        e.treatment.length,
+        `${e.inventoryRef}: treatment`,
+      ).toBeGreaterThan(0);
+      const inventory = readFileSync(inventoryOf(e), "utf8");
+      expect(
         inventory.includes(`**${e.inventoryRef}**`),
-        `${e.token}: inventory row ${e.inventoryRef} missing`,
+        `${e.token}: inventory row ${e.inventoryRef} missing from ${inventoryOf(e)}`,
       ).toBe(true);
     }
   });
 
-  it("the only ACCEPTED non-Standard-Light exclusion is the ADR-084 Galaxy Dark danger limitation", () => {
+  it("the only ACCEPTED non-Standard-Light exclusions are the ADR-084 Galaxy Dark danger limitation or owner-signed variant allowances", () => {
     const scopedAccepted = PROOF_EXCLUSIONS.filter(
       (e) =>
         e.status === "accepted" &&
         (e.package !== undefined || e.mode !== undefined),
     );
-    expect(scopedAccepted).toEqual([
-      expect.objectContaining({
-        token: "danger",
-        package: "galaxy",
-        mode: "dark",
-      }),
-    ]);
+    expect(scopedAccepted.length).toBeGreaterThan(0);
+    for (const e of scopedAccepted) {
+      const adr084GalaxyDarkDanger =
+        e.token === "danger" &&
+        e.package === "galaxy" &&
+        e.mode === "dark" &&
+        e.slotId === undefined &&
+        e.accentId === undefined;
+      const signedVariantAllowance =
+        e.slotId !== undefined && e.inventoryPath === ART_SIGNOFF;
+      expect(
+        adr084GalaxyDarkDanger || signedVariantAllowance,
+        `${e.inventoryRef}: not an accepted exclusion shape`,
+      ).toBe(true);
+    }
   });
 
   it("E-7 is resolved (owner ruling D-28): Galaxy Light coral accentText is asserted in every regime, not excluded", () => {
-    for (const treatment of ["card", "chrome"] as const) {
+    for (const treatment of ["card", "chrome", "bare"] as const) {
       expect(
         isExcluded("accentText", "galaxy", "light", {
           accentId: "coral",
@@ -847,7 +1029,6 @@ describe("proof exclusions are written down against the committed inventory (D-2
   });
 
   it("every held-for-owner exclusion is fully scoped and named as an open owner question in the inventory", () => {
-    const inventory = readFileSync(INVENTORY, "utf8");
     const held = PROOF_EXCLUSIONS.filter((e) => e.status === "held-for-owner");
     for (const e of held) {
       // Held items may never blanket-exclude a token: package, mode and (for
@@ -857,6 +1038,7 @@ describe("proof exclusions are written down against the committed inventory (D-2
       if (e.token === "accentText") {
         expect(e.accentId, e.inventoryRef).toBeDefined();
       }
+      const inventory = readFileSync(inventoryOf(e), "utf8");
       expect(
         inventory.includes(`**${e.inventoryRef}** — HELD for the owner`),
         `${e.inventoryRef}: inventory must mark it HELD for the owner`,
@@ -866,8 +1048,7 @@ describe("proof exclusions are written down against the committed inventory (D-2
 });
 
 describe("exclusions are scoped by treatment and variant (38.5-03; D-24, C3-L2)", () => {
-  const BARE_INVENTORY =
-    ".planning/phases/38.5-background-art-text-contrast/38.5-BARE-TEXT-INVENTORY.md";
+  const BARE_INVENTORY = BARE_TEXT_INVENTORY;
 
   function d24Result(): string {
     const lines = readFileSync(BARE_INVENTORY, "utf8")
@@ -887,9 +1068,9 @@ describe("exclusions are scoped by treatment and variant (38.5-03; D-24, C3-L2)"
 
   it("bare danger in Galaxy Dark is excluded if and only if D24_RESULT is extend (E-1-bare)", () => {
     const extend = d24Result() === "extend";
-    expect(
-      isExcluded("danger", "galaxy", "dark", { treatment: "bare" }),
-    ).toBe(extend);
+    expect(isExcluded("danger", "galaxy", "dark", { treatment: "bare" })).toBe(
+      extend,
+    );
     const bare = PROOF_EXCLUSIONS.filter((e) => e.inventoryRef === "E-1-bare");
     expect(bare.length).toBe(extend ? 1 : 0);
     if (extend) {
@@ -946,13 +1127,15 @@ describe("bare-text proof harness (38.5-03; brief H5, P-1)", () => {
     ["standard", "dark"],
     ["standard", "light"],
   ];
-  const IN_BAND: Record<string, { darkestPixel: string; brightestPixel: string }> =
-    {
-      "galaxy/dark": { darkestPixel: "#0A0A0A", brightestPixel: "#101010" },
-      "galaxy/light": { darkestPixel: "#E8E8E8", brightestPixel: "#FFFFFF" },
-      "standard/dark": { darkestPixel: "#101010", brightestPixel: "#202020" },
-      "standard/light": { darkestPixel: "#E8E8E8", brightestPixel: "#FFFFFF" },
-    };
+  const IN_BAND: Record<
+    string,
+    { darkestPixel: string; brightestPixel: string }
+  > = {
+    "galaxy/dark": { darkestPixel: "#0A0A0A", brightestPixel: "#101010" },
+    "galaxy/light": { darkestPixel: "#E8E8E8", brightestPixel: "#FFFFFF" },
+    "standard/dark": { darkestPixel: "#101010", brightestPixel: "#202020" },
+    "standard/light": { darkestPixel: "#E8E8E8", brightestPixel: "#FFFFFF" },
+  };
 
   it("the bare foreground set is the root palette's text at 4.5 and glyphs at 3.0", () => {
     expect(BARE_FOREGROUNDS).toEqual([
