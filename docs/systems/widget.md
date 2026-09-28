@@ -117,6 +117,7 @@ Inline delivery consumes RemoteViews bitmap memory and may hit a launcher or Bin
 9. **A method-less `Contact` tap opens nothing and can strand `openReachOut`.** A favourite with no actionable phone/email resolves the deep-link but the router returns null, and the param is cleared only when `hasReachRoute` is true (review IN-02, owner-deferred). Clear it unconditionally if you touch that path.
 10. **Do not weaken the URI parser to accommodate tab routing.** Parsing and lifecycle guards stay unchanged; only the post-acceptance navigation state is nested below Dashboard.
 11. **Do not refresh once per bulk contact.** Widget refresh happens after the one committed batch transaction; per-contact refreshes add headless/render work without a newer durable state.
+12. **Inline bitmap delivery is the security boundary.** Both light and dark images must reach `RemoteViews` through `setImageViewBitmap`; the unauthenticated snapshot provider must remain absent from the merged manifest, and stale private snapshots are cleanup residue rather than a delivery channel.
 
 ## Related Systems
 
