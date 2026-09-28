@@ -166,6 +166,7 @@ The path lock is process-local. Crash safety comes from settling old journal row
 - **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — stages and promotes a selected current source photo around the reconciliation transaction.
 - **ADR-112:** App-Owned Profile Background Derivatives and Launch Reconciliation — adds bounded local derivatives, shared-reference cleanup, and DB-aware recovery.
 - **ADR-138:** Complete Portable Backup Format v5 — stages and restores Profile background bytes with the parent-UID presentation graph.
+- **ADR-156:** Foreground Maintenance Fault Isolation with Per-Pass Dependencies — isolates photo-recovery candidate failures and reports incomplete recovery to dependent backup work within the same pass.
 - **ADR-157:** Bounded Native Transfer Ownership — assigns byte, time, and cleanup bounds to native photo acquisition, export, and staging boundaries.
 - **ADR-158:** Canonical Photo Ownership Across Masters, Staging, and Derivatives — gives each photo namespace one explicit owner and retirement rule.
 - **ADR-159:** Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair — finalizes only journal-authorized bytes owned by the committed restore state.
