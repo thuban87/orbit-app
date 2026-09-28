@@ -115,6 +115,7 @@ def load_regimes():
 
 # The variant parser lives in scripts/background_manifest.py (38.5-03), shared
 # with scripts/check-background-art.py so both validators read the same manifest.
+sys.dont_write_bytecode = True  # no scripts/__pycache__ in the working tree
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from background_manifest import ParseError, parse_manifest, parse_slot_source  # noqa: E402
 
