@@ -1,7 +1,7 @@
 # Widget
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/services/widget/`, `src/navigation/widget-linking.ts`, `src/services/widget/widget-quick-action-guard.ts`, `plugins/withWidgetBootReceiver.js`
 
 ## Purpose
@@ -102,6 +102,7 @@ Inline delivery consumes RemoteViews bitmap memory and may hit a launcher or Bin
 
 - **ADR-109:** Fixed-Hero Semantic Profile Composition and Focused Accessible Editors — retains the consumed-once Profile entry while rebuilding the screen controller.
 - **ADR-164:** Shared Post-Commit Assist Publisher with Surfaced Assist Failures — includes the widget notify in the shared assist post-commit publisher.
+- **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
 
 ## Gotchas
 
@@ -143,3 +144,4 @@ Inline delivery consumes RemoteViews bitmap memory and may hit a launcher or Bin
 | 2026-09-02 | 31 | Verified and restored consumed-once widget Reach Out handling through the rebuilt Profile controller. |
 | 2026-09-23 | 38.2 | Patched `security/AUD-SEC-001` / RG-001: inline light/dark widget bitmaps, removed the exported snapshot provider, and delete stale private snapshots on render; Pixel rendering proof follows in Plan 16. |
 | 2026-09-23 | 38.3 | Assist confirmations notify the widget through the shared post-commit publisher (ADR-164). |
+| 2026-09-23 | 38.4 | Three widget glyphs use `accentText` instead of the accent fill (D-63; ADR-169). Widget action accessible names (RG-032) are untouched and belong to the widget-overhaul phase (D-16), as does the widget contact tap that does not open the Profile (todo `2026-09-28-widget-contact-tap-does-not-open-profile.md`). |
