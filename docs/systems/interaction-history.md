@@ -151,6 +151,7 @@ Group Event Detail’s participant card opens the same child Detail shape throug
 - **[ADR-124: Group Event Parents with Canonical Per-Contact Children](../decisions/ADR-124-group-event-parents-with-canonical-per-contact-children.md)** — governs `src/db/history-read.ts`.
 - **[ADR-125: Three-Field Live Inheritance with Separate Local-Only Group Notes](../decisions/ADR-125-three-field-live-inheritance-with-separate-local-only-group-notes.md)** — governs `src/db/history-read.ts`.
 - **[ADR-165: In-Profile History Reveal, Today-Following Rollover, and Snapshot-Coherent History](../decisions/ADR-165-in-profile-history-reveal-today-following-rollover-and-snapshot-coherent-history.md)** — re-reads History from the parent Profile revision, follows today only on the current window, and holds a local lens choice over stale re-reads.
+- **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 
 ## Gotchas
 
