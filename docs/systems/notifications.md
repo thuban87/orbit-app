@@ -1,7 +1,7 @@
 # Notifications
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/db/notification-read.ts`, `src/db/snooze-dao.ts`, `src/services/notifications/`, `src/navigation/notification-gate.tsx`
 
 ## Purpose
@@ -132,6 +132,7 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — keeps Profile Frequency/Snooze controls on the established notification and immutable-event boundary.
 - **ADR-162:** Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority — has warm Mark/Snooze publish the shell tick after a committed write.
 - **ADR-166:** Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress — drops a stale cold body result once a warm body tap is accepted, and clears the cold response in a `finally`.
+- **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
 
 ## Gotchas
 
@@ -178,3 +179,4 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 | 2026-09-02 | 38 | Routed Digest notification taps to the semantic Digest root and documented isolated DEV-only Digest UAT identifiers. |
 | 2026-09-23 | 38.2 | Matched Android DATE trigger readback, kept decay re-nags on the stateless weekly grid, returned reconcile failure counts, and retired presented reminders after purge or during orphan sweeps. |
 | 2026-09-25 | 38.3 | Cold/warm body-tap chronology (RG-042, react-native/AUD-RN-012, reliability-testing/AUD-REL-012): a warm body tap drops a pending cold result, and the cold clear runs even on failure. |
+| 2026-09-23 | 38.4 | Settings Notifications keeps only the header Back; its in-body Back is removed (RG-037, D-15; ADR-175). |
