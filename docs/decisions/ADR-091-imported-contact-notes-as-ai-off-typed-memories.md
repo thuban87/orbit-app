@@ -50,4 +50,4 @@ The system reads Android Note MIME data and carries the first non-blank note thr
 - `src/db/memory-registry.ts` — defines the searchable, default-AI-off imported Memory type.
 
 **Depends on:** ADR-081 (Retire AI-Proposed Fuel for Explicit Per-Item Permission); ADR-065 (Durable Resumable Contact-Import Sessions with Failure-Isolated Photos)
-**Required by:** _None._
+**Required by:** ADR-161 (Durable Post-Commit Import Recovery and AI-Off Provenance)
