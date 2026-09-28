@@ -1,6 +1,6 @@
 # App Shell
 
-**Last updated:** 2026-09-25
+**Last updated:** 2026-09-23
 **Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
@@ -369,6 +369,9 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **[ADR-097: Scoped Dashboard Search and Dedicated Unbound Retrieval](../decisions/ADR-097-scoped-dashboard-search-and-dedicated-unbound-retrieval.md)** — governs `src/screens/HomeScreen.tsx`.
 - **[ADR-100: Relevance-First, Visibility-Safe Dashboard List Search](../decisions/ADR-100-relevance-first-visibility-safe-dashboard-list-search.md)** — governs `src/screens/HomeScreen.tsx`.
 - **[ADR-127: Canonical Event-First Group Logging and Explicit Child Edit Scope](../decisions/ADR-127-canonical-event-first-group-logging-and-explicit-child-edit-scope.md)** — governs `src/navigation/focused-route-classification.ts`, `src/navigation/types.ts`.
+- **[ADR-162: Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority](../decisions/ADR-162-sweep-ordered-foreground-refresh-and-latest-request-publication-authority.md)** — defines the sweep-ordered foreground tick beside the shell tick, the consumer rule, and the latest-request authority.
+- **[ADR-164: Shared Post-Commit Assist Publisher with Surfaced Assist Failures](../decisions/ADR-164-shared-post-commit-assist-publisher-with-surfaced-assist-failures.md)** — adds assist confirmations and Post-Log writes to the shell-tick publishers.
+- **[ADR-166: Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress](../decisions/ADR-166-typed-cross-tab-entry-settings-hosted-profile-contract-and-latest-wins-notification-ingress.md)** — routes every cross-tab entry through typed `navigateIntoTab`, fixes Settings-hosted Profile routes, and keeps archived contacts out of FAB context.
 
 ## Gotchas
 
