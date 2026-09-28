@@ -76,6 +76,7 @@ by this map and must be verified against their phase CONTEXT before extraction.
 |----------|-----------|-----------------|------|-------|
 | 38.2 | `38.2-audit-remediation-data-security-lifecycle` | `milestone-2/phase-38.2-audit-remediation-data-security-lifecycle-dossier.md` | dossier + context-dxx | Audit-remediation phase spanning native transfer bounds, photo ownership, restore integrity, committed edit identity, and durable import recovery. `38.2-CONTEXT.md` identifies this dossier as primary and adds D-01…D-23 plus a discussion log. |
 | 38.3 | `38.3-audit-remediation-runtime-state` | `milestone-2/phase-38.3-audit-remediation-runtime-state-dossier.md` | dossier + context-dxx | Audit-remediation phase for runtime state coherence: refresh ordering and latest-request publication, live Digest, assist publication, Profile History, cross-tab/Settings-host navigation, notification ingress chronology, Group Event participant commits, and truthful read states. `38.3-CONTEXT.md` names this dossier as authoritative and adds D-01…D-30 (D-25…D-30 from plan-phase and code-review close) plus a discussion log. |
+| 38.4 | `38.4-audit-remediation-ui-performance-release` | `milestone-2/phase-38.4-audit-remediation-ui-performance-release-dossier.md` | dossier + context-dxx | Audit-remediation phase for UI consistency, accessibility, bounded performance and release hygiene (RG-008, 027–031, 033, 034, 036–041), plus the 38.3 loose ends (Workstream I) and device-found gap plans G1–G3. `38.4-CONTEXT.md` names this dossier as authoritative and adds D-01…D-74 plus a discussion log; the dossier mirrors the owner rulings. |
 
 Dossiers originally inventoried when this map was created:
 
@@ -98,7 +99,7 @@ Also in that dir (not phase dossiers): `orbit-ui-ux-master-handoff-v0.5.docx`,
 
 - **No milestone-1 entries remain unresolved.** Every milestone-1 phase has an identified
   authoritative source, confirmed by reading dossier openings and phase CONTEXT files.
-- The broader milestone-2 row backfill is deferred; phases 38.2 and 38.3 are mapped exactly above.
+- The broader milestone-2 row backfill is deferred; phases 38.2, 38.3 and 38.4 are mapped exactly above.
 - Phases **01** and **09** deliberately have **no dossier** (scaffold = HANDOFF §4; compose =
   the explicitly-unowned cross-phase surface). Treat CONTEXT prose as authoritative there.
 - Phase **16** has **no dossier**; its authority is `context-dxx` + ADR-001 (migration 006).
