@@ -153,6 +153,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 - **ADR-151:** Visual-Only Relationship Overview Orphan Packing — fills row-local compact gaps without changing persisted layout semantics.
 - **ADR-165:** In-Profile History Reveal, Today-Following Rollover, and Snapshot-Coherent History — turns History actions into an in-Profile reveal, adds today-following rollover, and settles only the retried relationship selector.
 - **ADR-166:** Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress — disables hero Message for archived contacts and Settings-hosted Profiles, and aligns Settings-hosted child routes.
+- **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 
 ## Gotchas
 
