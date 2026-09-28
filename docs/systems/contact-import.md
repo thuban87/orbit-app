@@ -1,6 +1,6 @@
 # Contact Import
 
-**Last updated:** 2026-09-25
+**Last updated:** 2026-09-23
 **Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `modules/orbit-contact-picker/`, `src/db/import-session-dao.ts`, `src/db/imported-contact-dao.ts`, `src/services/import/`, `src/screens/ImportReviewScreen.tsx`
 
@@ -134,6 +134,8 @@ Category choices use the canonical ordered catalog and switch to the complete se
 - **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — keeps import selectors complete, ordered, searchable, and stale-safe.
 - **ADR-154:** API-37 Import Requests Contacts Access for Notes — removes the unsupported Note MIME from the picker request and enriches a non-empty selection after an in-context permission grant.
 - **ADR-161:** Durable Post-Commit Import Recovery and AI-Off Provenance — separates committed contact success from retryable photo completion and forces new imported-note Memories AI-off.
+- **ADR-166:** Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress — routes the import resume prompt through the typed cross-tab entry helper.
+- **ADR-168:** Truthful Read Phases for Import, Review, and Settings Screens — adds the "Import stopped" fatal state, releases the session hold, latches Import Complete Retry over pending rows, and makes DuplicateReview reads truthful.
 
 ## Gotchas
 
