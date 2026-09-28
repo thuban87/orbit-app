@@ -5,10 +5,10 @@ milestone_name: Release Readiness
 current_phase: 38.4
 current_phase_name: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
 status: executing
-stopped_at: 38.4 D-73 fix pass complete; release e71d518 delivered; next = phase verification
-last_updated: "2026-09-28T06:46:00.000Z"
+stopped_at: 38.4 D-74 fix complete (Back blocked during a running bulk import, single-run guard); release d69a2e3 delivered; next = phase verification
+last_updated: "2026-09-28T07:50:00.000Z"
 last_activity: 2026-09-28
-last_activity_desc: "38.4 owner checklist recorded (c5511fe); D-73 fixes (circle status ring, Edit Memory form open by default, plain stopped-import message, green border on the saved AI model, bulk Done leave-guard fix e71d518); D-44 agent-verified; release orbit-38.4-release-2026-09-28-e71d518.apk delivered; backlog 999.1 + 3 todos; 5280 tests, tsc/colors/biome clean"
+last_activity_desc: "38.4 D-74: Import Progress blocks Back while a bulk import runs (notice 'Still importing. You can go back when it finishes.'), in-memory single-run guard (runImportBatch refuses a concurrent pass; Import Progress follows one in flight), bulk setup holds Back while its Import is starting (20dd629, d69a2e3); 3a device pass PASS with DB checks; release orbit-38.4-release-2026-09-28-d69a2e3.apk delivered; 5301 tests, tsc/colors/biome clean. Earlier: D-73 fixes + release e71d518"
 state_head: 52c4e52d748f81b63ab6cac2b0720f1070d9da05
 progress:
   total_phases: 27
