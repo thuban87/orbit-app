@@ -1,8 +1,8 @@
 # Orrery
 
-**Last updated:** 2026-09-19
+**Last updated:** 2026-09-23
 
-**Updated by phase:** 38.1-profile-presentation-polish
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 
 **Evidence:** automated implementation/SQLite/controller tests plus physical-Pixel authoring, management, accessibility and switch-choreography acceptance recorded in [30-UAT](../../.planning/phases/30-orrery-systems/30-UAT.md) and [30-12-DEVICE](../../.planning/phases/30-orrery-systems/30-12-DEVICE.md).
 
@@ -135,6 +135,8 @@ The real SQLite integration proves production-written `avatars/profile.jpg` ente
 - **ADR-140:** Navigation-First Settings Directory and Canonical Sub-Routes — makes the Settings Orrery entry reuse the existing preference source and Systems manager.
 - **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — removes only the deleted category's System state and routes active selection to All Contacts.
 - **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — defines UID-backed Category rule selection and the constrained three-group System selector.
+- **ADR-170:** Bounded Your Week Reads and Settled Orrery Resource Retirement — range-bounded `occurred_at` predicates on migration-031 indexes; settled Orrery switches drop departed resources.
+- **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
 
 ## Deferred seams and evidence limits
 
