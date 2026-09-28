@@ -1272,7 +1272,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.5-background-art-text-contrast-dossier.md (authoritative); primary input `.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-BACKGROUND-ART-BRIEF.md`
 **Canonical refs**: 38.4-CONTEXT.md D-38..D-41; ADR-084 (palettes and contrast validation), ADR-087/ADR-113/ADR-114/ADR-115 (background slots, selection and surface composition)
 **UI hint**: yes
-**Plans**: 2/9 plans executed (8 waves; two blocking owner checkpoints: art sign-off in 04, scrim re-sign-off in 07)
+**Plans**: 3/9 plans executed (8 waves; two blocking owner checkpoints: art sign-off in 04, scrim re-sign-off in 07)
 
 Plans:
 
@@ -1283,7 +1283,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 38.5-03-PLAN.md — Art-acceptance tooling: committed `check-background-art.py` with synced constants, veil regimes + D-20 allowance in the extrema script, E-1 scoped by treatment, bare-text proof harness (RG-029; D-20, D-24, P-1, P-2)
+- [x] 38.5-03-PLAN.md — Art-acceptance tooling: committed `check-background-art.py` with synced constants, veil regimes + D-20 allowance in the extrema script, E-1 scoped by treatment, bare-text proof harness (RG-029; D-20, D-24, P-1, P-2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -1371,7 +1371,7 @@ Plans:
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
-| 38.5 Background Art & Text-on-Art Contrast | 2/9 | In Progress|  |
+| 38.5 Background Art & Text-on-Art Contrast | 3/9 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
