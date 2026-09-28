@@ -1,7 +1,7 @@
 # Contacts
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/stores/dashboard-selection-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
@@ -212,6 +212,9 @@ The Group Events header and redundant overflow entries navigate to the local rev
 - **[ADR-113: Persistent Shared System Background Selection](../decisions/ADR-113-persistent-shared-system-background-selection.md)** — governs `src/db/app-settings-dao.ts`.
 - **[ADR-120: Shared-Window Heatmap and Intensity with Globally-Persisted Lenses](../decisions/ADR-120-shared-window-heatmap-and-intensity-with-persisted-lenses.md)** — governs `src/db/app-settings-dao.ts`.
 - **[ADR-162: Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority](../decisions/ADR-162-sweep-ordered-foreground-refresh-and-latest-request-publication-authority.md)** — gives Home one refresh-publication seam with hidden deferral, and one owner for panel open state.
+- **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
+- **ADR-172:** Contacts Header Counts the Contacts on Screen — the header shows the active view's displayed rows; `countLiveContacts` serves only the empty state.
+- **ADR-173:** Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance — closed dial is inert to assistive tech, box-none overlays are `collapsable={false}`, permanent `onAccent` ring, route-derived clearance.
 
 ## Gotchas
 
