@@ -1,7 +1,7 @@
 # Contact Knowledge
 
-**Last updated:** 2026-09-02
-**Updated by phase:** 35-messaging-ai-compose
+**Last updated:** 2026-09-23
+**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
 **Owners:** `src/db/memory-registry.ts`, `src/db/memories-dao.ts`, `src/db/memories-read.ts`, `src/db/relationships-dao.ts`, `src/db/relationships-read.ts`, `src/db/current-state-history-dao.ts`, `src/db/current-state-history-read.ts`, `src/db/first-class-knowledge-read.ts`, `src/db/knowledge-search-read.ts`, `src/db/dashboard-knowledge-read.ts`, `src/services/knowledge-search.ts`, `src/services/memory-trash-sweep.ts`
 
 ## Purpose
