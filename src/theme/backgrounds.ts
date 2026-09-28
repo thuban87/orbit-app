@@ -69,6 +69,27 @@ export interface BackgroundVariant {
    * pixel; `--check` fails if the decoded asset undercuts it.
    */
   darkestPixel: string;
+  /**
+   * D-20 small-feature allowance, owner-signed at the 38.5 art sign-off (D-20);
+   * declared extrema are the text-bearing bound after the allowance. Absent =
+   * no allowance: every decoded pixel must lie inside the declared extrema.
+   *
+   * The allowance applies to the UNION, per variant (M-4):
+   * `scripts/measure-background-extrema.py --check` unions every regime's
+   * out-of-bound mask (card, chrome, the BackgroundHost veil at every density)
+   * and `scripts/check-background-art.py` unions every foreground token's
+   * failure mask (every accent); a pixel in several masks counts once, and
+   * disjoint masks that each fit alone can fail together. The variant passes
+   * only when every 8-connected component of the union is <= `maxComponentPx`
+   * pixels and the union covers <= `maxFailingPct` percent of the canvas.
+   * `backgrounds.ts` is parsed by `scripts/background_manifest.py`: keep this
+   * field inside its variant block at 8-space indent.
+   */
+  featureAllowance?: {
+    maxComponentPx: number;
+    maxFailingPct: number;
+    acceptedAt: string;
+  };
 }
 
 /**
@@ -206,12 +227,12 @@ export const BACKGROUND_SLOTS: Record<
       light: {
         source: () => require("../../assets/backgrounds/standard-mesh.webp"),
         brightestPixel: "#B8C4D0",
-        darkestPixel: "#3A5069",
+        darkestPixel: "#3A5068",
       },
       dark: {
         source: () => require("../../assets/backgrounds/standard-mesh.webp"),
         brightestPixel: "#B8C4D0",
-        darkestPixel: "#3A5069",
+        darkestPixel: "#3A5068",
       },
     },
   },
