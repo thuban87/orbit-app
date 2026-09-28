@@ -336,3 +336,61 @@ export function ButtonsScreen() {
     ).toBe(false);
   });
 });
+
+describe("classifyBareTextSites — render helpers and hosted content", () => {
+  it("JSX passed to a same-file render helper that renders it inside a GlassSurface is backed", () => {
+    const screen = `import { View } from "react-native";
+import { AppText } from "@/components/ui/AppText";
+import { GlassSurface } from "@/components/ui/GlassSurface";
+export function HelperScreen() {
+  function card(key: string, body: React.ReactNode) {
+    return <GlassSurface key={key}>{body}</GlassSurface>;
+  }
+  return (
+    <View>
+      {card("a", <AppText role="body">Inside card</AppText>)}
+      <AppText role="body">Outside card</AppText>
+    </View>
+  );
+}
+`;
+    const file = "src/screens/HelperScreen.tsx";
+    const a = classifyBareTextSites([
+      { file, source: screen },
+      stack({
+        Helper: { name: "HelperScreen", from: "@/screens/HelperScreen" },
+      }),
+    ]);
+    expect(site(a, file, lineOf(screen, "Inside card")).classification).toBe(
+      "backed",
+    );
+    expect(site(a, file, lineOf(screen, "Outside card")).classification).toBe(
+      "bare",
+    );
+  });
+
+  it("JSX handed to a call inside an object (a store or portal request) is flagged UNTRACED HOST", () => {
+    const screen = `import { View, Pressable } from "react-native";
+import { AppText } from "@/components/ui/AppText";
+export function PortalScreen() {
+  const open = () => panelStore.open({ content: <AppText role="body">In panel</AppText> });
+  return (
+    <View>
+      <Pressable onPress={open} />
+    </View>
+  );
+}
+`;
+    const file = "src/screens/PortalScreen.tsx";
+    const a = classifyBareTextSites([
+      { file, source: screen },
+      stack({
+        Portal: { name: "PortalScreen", from: "@/screens/PortalScreen" },
+      }),
+    ]);
+    const s = site(a, file, lineOf(screen, "In panel"));
+    expect(
+      s.chains.some((c) => c.note.some((n) => n.includes("UNTRACED HOST"))),
+    ).toBe(true);
+  });
+});

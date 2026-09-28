@@ -794,6 +794,36 @@ class Analyzer {
         isRouteRegistry(node.parent, sf)
       ) {
         return [this.routeChain(node.name.getText(sf), file, segs)];
+      } else if (
+        ts.isCallExpression(node) &&
+        prev !== node.expression &&
+        node.arguments.some((a) => a === prev)
+      ) {
+        // JSX handed to a same-file render helper (`card(lane, <Body/>)`):
+        // backed if the helper renders that parameter inside a backing.
+        const index = node.arguments.findIndex((a) => a === prev);
+        const helper = this.helperBacking(file, node, index, visiting);
+        if (helper)
+          return [
+            {
+              terminal: "backed",
+              backing: helper.kind,
+              note: [...segs, helper.label],
+            },
+          ];
+      } else if (
+        (ts.isPropertyAssignment(node) ||
+          ts.isShorthandPropertyAssignment(node)) &&
+        ts.isObjectLiteralExpression(node.parent) &&
+        isCallArgument(node.parent)
+      ) {
+        // JSX handed to a call inside an object (a store or portal request,
+        // e.g. `panelStore.open({ content: <Panel/> })`): the real host is
+        // elsewhere and is not traced. Flag it for hand review.
+        const call = callOf(node.parent) as ts.CallExpression;
+        segs.push(
+          `hosted:${call.expression.getText(sf).replace(/\s+/g, "")}.${node.name.getText(sf)}@${this.lineOf(file, node)}(UNTRACED HOST)`,
+        );
       } else if (ts.isSourceFile(node)) {
         return [{ terminal: "unmounted", note: [...segs, "⟨module⟩"] }];
       }
@@ -801,6 +831,47 @@ class Analyzer {
       node = node.parent;
     }
     return [{ terminal: "unmounted", note: segs }];
+  }
+
+  /** Does the same-file helper `callee(…)` render argument `index` inside a backing? */
+  private helperBacking(
+    file: string,
+    call: ts.CallExpression,
+    index: number,
+    visiting: Set<string>,
+  ): { kind: BackingKind; label: string } | undefined {
+    if (!ts.isIdentifier(call.expression) || index < 0) return undefined;
+    const name = call.expression.text;
+    const fn = findLocalFunction(call, name);
+    if (!fn?.body) return undefined;
+    const param = fn.parameters[index];
+    if (!param || !ts.isIdentifier(param.name)) return undefined;
+    const paramName = param.name.text;
+    const usages: ts.Identifier[] = [];
+    const visit = (n: ts.Node) => {
+      if (
+        ts.isIdentifier(n) &&
+        n.text === paramName &&
+        n !== param.name &&
+        isValueReference(n) &&
+        isRenderedPosition(n)
+      )
+        usages.push(n);
+      ts.forEachChild(n, visit);
+    };
+    visit(fn.body);
+    if (usages.length === 0) return undefined;
+    const saved = this.localRoot;
+    this.localRoot = fn;
+    const chains = usages.flatMap((u) => this.walk(file, u, visiting));
+    this.localRoot = saved;
+    if (chains.length === 0 || !chains.every((c) => c.terminal === "backed"))
+      return undefined;
+    const kind = chains[0].backing as BackingKind;
+    return {
+      kind,
+      label: `backed:${kind} via helper ${name}(arg ${index})@${this.lineOf(file, fn)} [${chains[0].note[chains[0].note.length - 1]}]`,
+    };
   }
 
   private routeChain(name: string, file: string, segs: string[]): Chain {
@@ -1306,6 +1377,52 @@ interface Foreground {
   roleSize: string;
   floor: string;
   selfFilled?: boolean;
+}
+
+function callOf(
+  obj: ts.ObjectLiteralExpression,
+): ts.CallExpression | undefined {
+  let p: ts.Node = obj.parent;
+  while (ts.isParenthesizedExpression(p) || ts.isAsExpression(p)) p = p.parent;
+  return ts.isCallExpression(p) && p.arguments.some((a) => unwrap(a) === obj)
+    ? p
+    : undefined;
+}
+
+function isCallArgument(obj: ts.ObjectLiteralExpression): boolean {
+  return callOf(obj) !== undefined;
+}
+
+/** The function bound to `name` that is visible from `from` (lexical walk). */
+function findLocalFunction(
+  from: ts.Node,
+  name: string,
+): FunctionLike | undefined {
+  let n: ts.Node | undefined = from.parent;
+  while (n) {
+    const statements: readonly ts.Statement[] | undefined =
+      ts.isBlock(n) || ts.isSourceFile(n) ? n.statements : undefined;
+    if (statements) {
+      for (const st of statements) {
+        if (ts.isFunctionDeclaration(st) && st.name?.text === name) return st;
+        if (ts.isVariableStatement(st)) {
+          for (const d of st.declarationList.declarations) {
+            if (
+              !ts.isIdentifier(d.name) ||
+              d.name.text !== name ||
+              !d.initializer
+            )
+              continue;
+            const init = unwrap(d.initializer);
+            if (ts.isArrowFunction(init) || ts.isFunctionExpression(init))
+              return init;
+          }
+        }
+      }
+    }
+    n = n.parent;
+  }
+  return undefined;
 }
 
 /** An object literal bound (through `as const` / `satisfies`) to a `*ROUTE_COMPONENTS` const. */
