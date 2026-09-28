@@ -180,6 +180,7 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 
 - **ADR-008:** Initial Contact Schema as a Cross-Phase Data Contract — migration 001 establishes the durable first schema.
 - **ADR-009:** Crash-Safe Forward-Only SQLite Migrations — every version step commits atomically.
+- **ADR-156:** Foreground Maintenance Fault Isolation with Per-Pass Dependencies — isolates hook failures while preserving explicit recovery-before-backup ordering within each pass.
 - **ADR-010:** Single-Writer Interaction Recency Spine — the shared mutex serializes its write transactions.
 - **ADR-130:** Durable Scoped Default Interaction Channel — migration 027 adds the ordinary channel preference without changing Group Log defaults.
 - **ADR-133:** Session-Scoped Compose Modes and Truthful External Handoff — migration 028 adds the portable Compose mode preference boundary.
@@ -259,6 +260,8 @@ The schema version is SQLite's `PRAGMA user_version`. Migrations 001–005 estab
 28. **AI metadata is not credential material.** Migration 029 may store lane, model, endpoint, preferences, and permission defaults, but no key-shaped value belongs in `app_settings`, `ai_connections`, or backup.
 29. **Do not turn `your_week_period` into a Digest cache.** Migration 030 persists a bounded app setting; metrics, heatmap, and detail remain read-time derivations.
 
+- **Declare maintenance prerequisites at registration.** Source order and promise chaining are not dependency contracts; a failed or skipped prerequisite must make each dependent unavailable for that pass without creating a durable hold.
+- **Never bulk-format shipped migrations.** Forward-only migration source is production history; formatting-only rewrites to an already-shipped step create needless audit risk and must be excluded from automated formatting.
 - **Do not attach sweep-ordered work to a trigger's promise.** A re-entrant `runLaunchSweep()` resolves immediately while the in-flight pass is still running; code that must observe the sweep's purge/expiry writes subscribes with `onSweepSettled`, which only the owning run fires.
 - **FK detachment needs explicit cleanup.** `ON DELETE SET NULL` clears only the link. Lifecycle writers and the locked orphan contract clear all three follow flags together with the reference.
 
