@@ -1,7 +1,7 @@
 # Contact Knowledge
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/db/memory-registry.ts`, `src/db/memories-dao.ts`, `src/db/memories-read.ts`, `src/db/relationships-dao.ts`, `src/db/relationships-read.ts`, `src/db/current-state-history-dao.ts`, `src/db/current-state-history-read.ts`, `src/db/first-class-knowledge-read.ts`, `src/db/knowledge-search-read.ts`, `src/db/dashboard-knowledge-read.ts`, `src/services/knowledge-search.ts`, `src/services/memory-trash-sweep.ts`
 
 ## Purpose
@@ -177,6 +177,7 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **ADR-161:** Durable Post-Commit Import Recovery and AI-Off Provenance — preserves imported-note identity across resume and records imported Memories as explicitly AI-off.
 - **ADR-164:** Shared Post-Commit Assist Publisher with Surfaced Assist Failures — treats a committed "Create Memory Instead" as saved even when its re-read fails.
 - **ADR-168:** Truthful Read Phases for Import, Review, and Settings Screens — gives MemoryScreen loading and "Couldn't load memories" states and never opens an editor over a failed read.
+- **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 
 ## Gotchas
 
@@ -226,3 +227,4 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 | 2026-09-02 | 36 | Added creation-time AI permission defaults, central review, and bounded resolved-prompt Memory context. |
 | 2026-09-23 | 38.2 | Made imported-note creation explicitly AI-off and recovery-safe, and advanced complete-edit knowledge baselines from committed identities. |
 | 2026-09-25 | 38.3 | Memory screen read-error state; editor never opens over a failed read (RG-035): loading, then the editor over successfully read Memories or "Couldn't load memories" with Retry; a failed re-read after a committed restore/delete/AI-permission write shows the read error without undoing or retrying the write. |
+| 2026-09-23 | 38.4 | Memory hosts (`MemoryScreen`, `ThingsToRememberScreen`, `EditContactScreen`, `PostLogNoteEditor`) decide AI availability with `isAiMasterEnabled` (RG-008, D-17; ADR-135); `MemoryEditor` switches are named and themed and its kind picker announces its value (RG-030). The post-log Edit Memory form scrolls at large text and opens the edited memory's form by default (D-72, D-73 b; ADR-174). |
