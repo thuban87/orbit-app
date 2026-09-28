@@ -1,7 +1,7 @@
 # Custom Fields
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/db/field-defs-dao.ts`, `src/db/field-values-dao.ts`, `src/db/field-ddl.ts`, `src/db/field-type-change.ts`, `src/db/field-parsers.ts`, `src/db/field-sort.ts`, `src/services/field-sweep.ts`
 
 ## Purpose
@@ -168,6 +168,7 @@ Migration 006 stores current values as normalized rows. Field type determines in
 
 - **ADR-110:** Coherent Local Profile Snapshot and Source-Owned Knowledge Projection — preserves typed values, grouping, invalid states, and retained history in Profile.
 - **ADR-132:** Focused Rapid Capture Workflows — exposes applicable named fields and the generic Custom Fields path from Update Contact without duplicating definitions.
+- **ADR-173:** Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance — closed dial is inert to assistive tech, box-none overlays are `collapsable={false}`, permanent `onAccent` ring, route-derived clearance.
 
 ## Gotchas
 
@@ -216,3 +217,4 @@ Migration 006 stores current values as normalized rows. Field type determines in
 | 2026-09-02 | 34 | Added Update Contact discovery of applicable named fields plus the generic Custom Fields value-edit path. |
 | 2026-09-02 | 36 | Added new-definition AI sharing defaults and contact/value-scoped permission review for field definitions. |
 | 2026-09-23 | 38.2 | Routed rapid and full user edits through one custom-value core so retained prior values and pair identity behave alike; rapid unchanged saves do not write. |
+| 2026-09-23 | 38.4 | The Custom fields create/edit form (`FieldDefForm`) takes a required `bottomClearance` so its last field scrolls clear of the FAB (D-52, OA-E3; ADR-173). |
