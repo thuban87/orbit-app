@@ -1,7 +1,7 @@
 # Backup & Restore
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/backup/`, `src/services/backup/`, `src/services/backup-sweep.ts`, `src/db/restore-photo-journal-dao.ts`, `src/screens/BackupScreen.tsx`
 
 ## Purpose
@@ -156,6 +156,7 @@ The Phase-33 extraction records a handoff, not completed wire support: its forma
 - **[ADR-124: Group Event Parents with Canonical Per-Contact Children](../decisions/ADR-124-group-event-parents-with-canonical-per-contact-children.md)** — governs `src/db/group-events-dao.ts`.
 - **[ADR-125: Three-Field Live Inheritance with Separate Local-Only Group Notes](../decisions/ADR-125-three-field-live-inheritance-with-separate-local-only-group-notes.md)** — governs `src/db/group-events-dao.ts`.
 - **[ADR-168: Truthful Read Phases for Import, Review, and Settings Screens](../decisions/ADR-168-truthful-read-phases-for-import-review-and-settings-screens.md)** — shows "Couldn't read backup settings" with Retry and hides every known-state group until the settings read succeeds.
+- **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
 
 ## Gotchas
 
