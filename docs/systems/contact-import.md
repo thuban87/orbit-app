@@ -137,6 +137,7 @@ Category choices use the canonical ordered catalog and switch to the complete se
 - **ADR-166:** Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress — routes the import resume prompt through the typed cross-tab entry helper.
 - **ADR-168:** Truthful Read Phases for Import, Review, and Settings Screens — adds the "Import stopped" fatal state, releases the session hold, latches Import Complete Retry over pending rows, and makes DuplicateReview reads truthful.
 - **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
+- **ADR-171:** Durable Bulk-Import Lifecycle Choice, Locked Batches, and One Pass per Session — Bound/Unbound batch choice on the session (migration 032), lifecycle lock, single run; partially supersedes ADR-066.
 - **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 
 ## Gotchas
