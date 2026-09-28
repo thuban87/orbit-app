@@ -1,7 +1,7 @@
 # Categories
 
-**Last updated:** 2026-09-17
-**Updated by phase:** 37.1-category-management
+**Last updated:** 2026-09-23
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/db/categories-dao.ts`, `src/logic/category-logic.ts`, `src/screens/CategoryManagementScreen.tsx`
 
 ## Purpose
@@ -98,6 +98,7 @@ Backup format 6 exports category tombstones alongside stable-UID rows and depend
 6. A category tombstone is merge evidence, not Undo or a user-facing trash bin.
 7. Search and scrolling may bound rendering, never the accessible catalog.
 8. Category values and diagnostic names remain local; deletion UI and errors expose aggregate counts only.
+9. **A chooser must not exclude by an optional id without guarding `undefined`.** `CategoryChoiceSheet` used to compare `undefined !== undefined` in its uid exclusion, which dropped every category without an internal id, so bulk Contacts → Set Category offered only Uncategorized. Fixed in 38.4 (D-72); the fix covers every chooser that uses the sheet.
 
 ## Related Systems
 
@@ -112,3 +113,4 @@ Backup format 6 exports category tombstones alongside stable-UID rows and depend
 | Date | Phase | What Changed |
 |---|---|---|
 | 2026-09-17 | 37.1 | Documented the canonical mutable taxonomy, identity matrix, atomic all-status deletion fallout, complete selectors, tombstone merge, and exact replace-all contracts. |
+| 2026-09-23 | 38.4 | `CategoryChoiceSheet` lists every category again: its uid exclusion no longer drops categories without an internal id (D-72; pre-existing since 37.1). |
