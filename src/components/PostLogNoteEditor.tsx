@@ -17,7 +17,7 @@
  * deleted row. No colour literal (check:colors) — all colour via theme tokens.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { StyleSheet, TextInput, View } from "react-native";
+import { ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { readInteractionForEdit } from "@/db/interaction-edit-read";
@@ -297,19 +297,30 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
     [contactId],
   );
 
-  const editingExistingMemory = editingMemory && createdMemory !== null;
+  // Non-null only while the full editor is open. The Sheet variant and the
+  // body switch on this one value, so the expanded branch alone owns the
+  // ScrollView (sheet-consumers-contract, D-32).
+  const memoryBeingEdited = editingMemory ? createdMemory : null;
 
   return (
     <Sheet
       visible={target !== null}
       onRequestClose={onClose}
-      variant={editingExistingMemory ? "expanded" : "compact"}
+      variant={memoryBeingEdited ? "expanded" : "compact"}
     >
-      {editingExistingMemory && createdMemory ? (
-        <View style={styles.body}>
+      {memoryBeingEdited ? (
+        // The expanded sheet's consumer owns its workspace scroll (Sheet.tsx,
+        // D-32): the full editor is taller than the sheet even at the default
+        // font, so it scrolls to Allow AI, Cancel and Save (38.4 D-72).
+        <ScrollView
+          style={styles.editScroll}
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator
+        >
           <AppText role="heading">Edit Memory</AppText>
           <MemoryEditor
-            items={[createdMemory]}
+            items={[memoryBeingEdited]}
             showAdd={false}
             onAdd={onAddMemory}
             onEdit={onEditMemory}
@@ -319,60 +330,64 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
             globalAiEnabled={globalAiEnabled}
           />
           <Button role="tertiary" label="Done" onPress={onClose} />
-        </View>
-      ) : createdMemory ? (
-        <View style={styles.body}>
-          <AppText role="heading">Memory saved</AppText>
-          <AppText role="caption" style={{ color: colors.textSecondary }}>
-            Saved as a Memory, not a note on this interaction.
-          </AppText>
-          <View style={styles.actions}>
-            <Button
-              role="tertiary"
-              label="Edit Memory"
-              onPress={() => setEditingMemory(true)}
-            />
-            <Button role="primary" label="Done" onPress={onClose} />
-          </View>
-        </View>
+        </ScrollView>
       ) : (
         <View style={styles.body}>
-          <AppText role="heading">Add Note</AppText>
-          <TextInput
-            accessibilityLabel="Note for the logged interaction"
-            value={text}
-            onChangeText={setText}
-            placeholder="What happened?"
-            placeholderTextColor={colors.textPlaceholder}
-            multiline
-            autoFocus
-            style={[
-              styles.input,
-              {
-                color: colors.textPrimary,
-                backgroundColor: colors.background,
-                borderColor: colors.border,
-              },
-            ]}
-          />
-          {error ? (
-            <AppText role="caption" style={{ color: colors.danger }}>
-              {error}
-            </AppText>
-          ) : null}
-          <View style={styles.actions}>
-            <Button role="tertiary" label="Cancel" onPress={onClose} />
-            <Button
-              role="tertiary"
-              label="Create Memory Instead"
-              onPress={() => void createMemory()}
-            />
-            <Button
-              role="primary"
-              label={error ? "Retry" : "Save"}
-              onPress={() => void saveNote()}
-            />
-          </View>
+          {createdMemory ? (
+            <>
+              <AppText role="heading">Memory saved</AppText>
+              <AppText role="caption" style={{ color: colors.textSecondary }}>
+                Saved as a Memory, not a note on this interaction.
+              </AppText>
+              <View style={styles.actions}>
+                <Button
+                  role="tertiary"
+                  label="Edit Memory"
+                  onPress={() => setEditingMemory(true)}
+                />
+                <Button role="primary" label="Done" onPress={onClose} />
+              </View>
+            </>
+          ) : (
+            <>
+              <AppText role="heading">Add Note</AppText>
+              <TextInput
+                accessibilityLabel="Note for the logged interaction"
+                value={text}
+                onChangeText={setText}
+                placeholder="What happened?"
+                placeholderTextColor={colors.textPlaceholder}
+                multiline
+                autoFocus
+                style={[
+                  styles.input,
+                  {
+                    color: colors.textPrimary,
+                    backgroundColor: colors.background,
+                    borderColor: colors.border,
+                  },
+                ]}
+              />
+              {error ? (
+                <AppText role="caption" style={{ color: colors.danger }}>
+                  {error}
+                </AppText>
+              ) : null}
+              <View style={styles.actions}>
+                <Button role="tertiary" label="Cancel" onPress={onClose} />
+                <Button
+                  role="tertiary"
+                  label="Create Memory Instead"
+                  onPress={() => void createMemory()}
+                />
+                <Button
+                  role="primary"
+                  label={error ? "Retry" : "Save"}
+                  onPress={() => void saveNote()}
+                />
+              </View>
+            </>
+          )}
         </View>
       )}
     </Sheet>
@@ -381,6 +396,7 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
 
 const styles = StyleSheet.create({
   body: { gap: SPACING.base },
+  editScroll: { flex: 1 },
   actions: {
     flexDirection: "row",
     flexWrap: "wrap",
