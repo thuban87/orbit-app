@@ -31,7 +31,7 @@
  * one composite helper over `#RRGGBB` hexes, so the module stays node-testable.
  */
 
-import type { ResolvedMode, ThemePackage } from "../theme-types";
+import type { ResolvedMode, ThemePackage, ThemePalette } from "../theme-types";
 
 /**
  * The palette colour-token keys a surface field may reference. Constrained to the
@@ -330,6 +330,29 @@ export function resolveSurfaceStyle(
     liveGlassTintOpacity: t.liveGlassTintOpacity,
     fallbackTintOpacity: t.fallbackTintOpacity,
   };
+}
+
+/** The border width of a selected surface (D-73d); an unselected one is 1dp. */
+export const SELECTED_SURFACE_BORDER_WIDTH = 2;
+
+/**
+ * A surface's border (38.4 D-73d, owner). A selected surface — the chosen item
+ * in a list, e.g. the model picker's saved model — draws its border in the
+ * success/stable status token (`statusStable`, "bright green") at
+ * {@link SELECTED_SURFACE_BORDER_WIDTH}; otherwise the package's own border
+ * token at 1dp. PURE; colours come only from the palette.
+ */
+export function surfaceBorder(
+  colors: ThemePalette,
+  borderTokenKey: SurfaceColorTokenKey,
+  selected: boolean,
+): { borderColor: string; borderWidth: number } {
+  return selected
+    ? {
+        borderColor: colors.statusStable,
+        borderWidth: SELECTED_SURFACE_BORDER_WIDTH,
+      }
+    : { borderColor: colors[borderTokenKey], borderWidth: 1 };
 }
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/;

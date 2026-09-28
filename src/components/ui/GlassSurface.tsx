@@ -34,6 +34,7 @@ import {
   orreryOverlayTintOpacity,
   resolveSurfaceStyle,
   type SurfaceDensity,
+  surfaceBorder,
 } from "@/theme/tokens/surface";
 
 export type GlassSurfaceTreatment = "card" | "orrery-overlay";
@@ -54,6 +55,11 @@ export interface GlassSurfaceProps {
   density?: SurfaceDensity;
   /** Semantic treatment; defaults to the ordinary mode-aware content card. */
   treatment?: GlassSurfaceTreatment;
+  /**
+   * Marks the chosen item in a list (38.4 D-73d): the border becomes the
+   * success/stable status token at a heavier width. Off by default.
+   */
+  selected?: boolean;
   /** Extra layout style (padding/margins/size) — never colour. */
   style?: StyleProp<ViewStyle>;
 }
@@ -77,6 +83,7 @@ export function GlassSurface({
   blurAvailable = true,
   density = "comfortable",
   treatment = "card",
+  selected = false,
   style,
 }: GlassSurfaceProps) {
   const { colors, mode, package: themePackage } = useTheme();
@@ -90,7 +97,7 @@ export function GlassSurface({
       : cardTintOpacity(themePackage, mode, density);
 
   const tintColor = colors[s.tintTokenKey];
-  const borderColor = colors[s.borderTokenKey];
+  const border = surfaceBorder(colors, s.borderTokenKey, selected);
 
   // Subtle glow (galaxy only) — a token-coloured shadow. Standard passes null.
   const glow: ViewStyle =
@@ -109,7 +116,7 @@ export function GlassSurface({
       : {};
 
   return (
-    <View style={[styles.container, { borderColor }, glow, style]}>
+    <View style={[styles.container, border, glow, style]}>
       {/* Optional real blur underneath (glass + affordable). Decorative only. */}
       {s.useBlur ? (
         <BlurView

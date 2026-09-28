@@ -277,7 +277,9 @@ export function AIModelPickerScreen({
         ) : null}
 
         {currentRowId !== null ? (
-          <GlassSurface density="dense" style={styles.card}>
+          // The saved model's surface is outlined in the success/stable token
+          // (D-73d), like its catalog card when that card is shown.
+          <GlassSurface density="dense" selected style={styles.card}>
             <View
               testID="ai-model-picker-current"
               accessible
@@ -296,7 +298,14 @@ export function AIModelPickerScreen({
           )
         ) : (
           visibleCards.map((card) => (
-            <GlassSurface key={card.id} density="dense" style={styles.card}>
+            <GlassSurface
+              key={card.id}
+              density="dense"
+              // D-73d: the saved model's card gets the bright green border; it
+              // moves with the saved id when another model is chosen.
+              selected={card.isCurrent}
+              style={styles.card}
+            >
               <ScopedPalette>
                 {(scoped) => (
                   <>
