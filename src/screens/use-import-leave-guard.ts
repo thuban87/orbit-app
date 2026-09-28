@@ -8,7 +8,10 @@ import { deleteImportStaging } from "@/services/photos/photo-storage";
 import { Logger } from "@/utils/logger";
 import { hasUnresolvedRows } from "./import-leave-guard-logic";
 
-async function discardUnresolvedSession(sessionId: number): Promise<void> {
+/** Discard a session's unresolved rows (the guard's Leave; bulk setup's Discard). */
+export async function discardUnresolvedSession(
+  sessionId: number,
+): Promise<void> {
   const exec = getExecutor();
   const rows = await listSessionRows(exec, sessionId);
   if (!hasUnresolvedRows(rows)) return;

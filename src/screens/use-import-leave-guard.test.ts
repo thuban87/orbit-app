@@ -111,3 +111,35 @@ describe("import screens mark the guard complete before post-commit navigation (
     },
   );
 });
+
+describe("bulk setup stops guarding once its batch has started (D-73c)", () => {
+  const source = readFileSync(
+    join(__dirname, "BulkImportSetupScreen.tsx"),
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+
+  // Import Complete's Done resets the root, which removes the setup screen
+  // still in the stack. Unmarked, the guard then asked "Leave import?" (after a
+  // Bound batch) or silently discarded the batch's Need-review rows.
+  it("every navigation into ImportProgress follows markImportComplete()", () => {
+    const sites = [
+      ...source.matchAll(/navigation\.navigate\("ImportProgress"/g),
+    ];
+    expect(sites.length).toBe(2);
+    for (const site of sites) {
+      const before = source.slice(0, site.index).trimEnd();
+      expect(before.endsWith("markImportComplete();")).toBe(true);
+    }
+  });
+
+  it("the stopped view's Discard discards explicitly before leaving", () => {
+    const start = source.indexOf("function onDiscardStopped(");
+    const body = source.slice(start, source.indexOf("\n  }\n", start));
+    expect(body).toContain(
+      "await discardUnresolvedSession(route.params.sessionId)",
+    );
+    expect(body.indexOf("discardUnresolvedSession")).toBeLessThan(
+      body.indexOf("navigation.goBack()"),
+    );
+  });
+});

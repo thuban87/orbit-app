@@ -99,7 +99,8 @@ describe("BulkImportSetupScreen stopped view (D-73c)", () => {
     expect(body).not.toContain("bulkLifecycleChoice");
   });
 
-  it("Discard leaves through the import leave guard, which discards what is left", () => {
+  it("Discard discards what is left, then leaves", () => {
+    expect(fn("onDiscardStopped")).toContain("discardUnresolvedSession(");
     expect(fn("onDiscardStopped")).toContain("navigation.goBack()");
     // The stopped view has no edits of its own: leaving never asks "Leave import?".
     expect(screen).toMatch(

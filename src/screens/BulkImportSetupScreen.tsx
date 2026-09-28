@@ -50,7 +50,10 @@ import {
   initialBulkLifecycle,
 } from "./bulk-import-setup-logic";
 import { nextImportRunKey } from "./import-progress-state";
-import { useImportLeaveGuard } from "./use-import-leave-guard";
+import {
+  discardUnresolvedSession,
+  useImportLeaveGuard,
+} from "./use-import-leave-guard";
 import {
   bulkSetupHoldActive,
   useOpenImportSession,
@@ -225,6 +228,11 @@ export function BulkImportSetupScreen({
         },
         localDateTime(),
       );
+      // D-73c: once the batch starts, leaving this screen is no longer
+      // abandoning an unstarted import. Import Complete's Done resets the root
+      // and removes this screen; unmarked, the guard asked "Leave import?" or
+      // silently discarded the batch's Need-review rows.
+      markImportComplete();
       navigation.navigate("ImportProgress", {
         sessionId: route.params.sessionId,
         batchCategoryId: currentCategoryId,
@@ -344,6 +352,7 @@ export function BulkImportSetupScreen({
     // No batch-defaults write: the choices were applied when the batch
     // started, and the driver reads them from the session (as the resume
     // prompt's route does). A fresh run key re-runs a reused route.
+    markImportComplete();
     navigation.navigate("ImportProgress", {
       sessionId: route.params.sessionId,
       batchCategoryId: null,
@@ -351,10 +360,19 @@ export function BulkImportSetupScreen({
     });
   }
 
-  /** D-73c: leaving through the import leave guard discards what is left. */
-  function onDiscardStopped() {
+  /** D-73c: discard what is left (contacts already imported stay), then leave. */
+  async function onDiscardStopped() {
     if (saving) return;
-    navigation.goBack();
+    setSaving(true);
+    try {
+      await discardUnresolvedSession(route.params.sessionId);
+      markImportComplete();
+      navigation.goBack();
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to discard stopped import", error);
+      Alert.alert("Couldn't discard import", "Please try again.");
+      setSaving(false);
+    }
   }
 
   function onKeepSeparate() {
@@ -415,7 +433,7 @@ export function BulkImportSetupScreen({
           accessibilityRole="button"
           accessibilityLabel="Discard import"
           disabled={saving}
-          onPress={onDiscardStopped}
+          onPress={() => void onDiscardStopped()}
           style={[styles.import, { borderColor: colors.danger }]}
         >
           <Text style={{ color: colors.danger, fontWeight: "600" }}>
