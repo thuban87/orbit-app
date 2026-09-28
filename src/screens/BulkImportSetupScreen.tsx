@@ -108,7 +108,11 @@ export function BulkImportSetupScreen({
     new Set(),
   );
 
-  useImportLeaveGuard(navigation, route.params.sessionId, edited);
+  const markImportComplete = useImportLeaveGuard(
+    navigation,
+    route.params.sessionId,
+    edited,
+  );
 
   function markEdited() {
     editedRef.current = true;
@@ -278,6 +282,7 @@ export function BulkImportSetupScreen({
         now: localDateTime(),
       });
       if (result.combined && result.sessionComplete) {
+        markImportComplete();
         navigation.replace("ImportComplete", {
           sessionId: route.params.sessionId,
         });

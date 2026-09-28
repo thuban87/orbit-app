@@ -1,5 +1,5 @@
 import type { NavigationProp, ParamListBase } from "@react-navigation/native";
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { Alert } from "react-native";
 import { getExecutor, localDateTime } from "@/db/database";
 import { discardSession } from "@/db/import-session-dao";
@@ -16,13 +16,23 @@ async function discardUnresolvedSession(sessionId: number): Promise<void> {
   stagedPaths.forEach(deleteImportStaging);
 }
 
-/** Discard accepted-but-uncommitted import ownership when its review is left. */
+/**
+ * Discard accepted-but-uncommitted import ownership when its review is left.
+ *
+ * Returns `markImportComplete`: call it after a commit succeeds and before the
+ * screen's own post-commit navigation (reset to Profile, replace with
+ * ImportComplete), so that navigation is not mistaken for abandoning the
+ * review and the "Leave import?" prompt does not fire (38.4 D-72).
+ */
 export function useImportLeaveGuard(
   navigation: NavigationProp<ParamListBase>,
   sessionId: number,
   hasMeaningfulEdits: boolean,
-): void {
+): () => void {
   const leaving = useRef(false);
+  const markImportComplete = useCallback(() => {
+    leaving.current = true;
+  }, []);
   useEffect(
     () =>
       navigation.addListener("beforeRemove", (event) => {
@@ -61,4 +71,5 @@ export function useImportLeaveGuard(
       }),
     [hasMeaningfulEdits, navigation, sessionId],
   );
+  return markImportComplete;
 }

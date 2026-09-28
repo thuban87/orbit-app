@@ -117,7 +117,11 @@ export function ImportReviewScreen({
     "already_linked"
   > | null>(null);
 
-  useImportLeaveGuard(navigation, route.params.sessionId, edited);
+  const markImportComplete = useImportLeaveGuard(
+    navigation,
+    route.params.sessionId,
+    edited,
+  );
 
   const commitCategories = useCallback(
     (current: Array<{ id: number; name: string }>) => {
@@ -244,6 +248,7 @@ export function ImportReviewScreen({
       now,
     });
     setDuplicateOutcome(null);
+    markImportComplete();
     navigationRef.current?.reset(
       resetToDashboardWith({ name: "Profile", params: { contactId } }),
     );
@@ -270,6 +275,7 @@ export function ImportReviewScreen({
           now,
         );
         await finalizeSessionIfTerminal(exec, route.params.sessionId, now);
+        markImportComplete();
         navigation.replace("ImportComplete", {
           sessionId: route.params.sessionId,
         });
@@ -320,6 +326,7 @@ export function ImportReviewScreen({
         now,
       );
       setDuplicateOutcome(null);
+      markImportComplete();
       navigationRef.current?.reset(
         resetToDashboardWith({
           name: "Profile",
@@ -346,6 +353,7 @@ export function ImportReviewScreen({
         now,
       );
       setDuplicateOutcome(null);
+      markImportComplete();
       navigation.replace("ImportComplete", {
         sessionId: route.params.sessionId,
       });
