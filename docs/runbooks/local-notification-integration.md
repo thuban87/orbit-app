@@ -27,7 +27,9 @@ export function exampleIdentifier(contactId: number): string {
 1. **SQLite candidates** — a pure read module returns deterministic candidates and every value influencing eligibility.
 2. **Desired request** — `notification-schedule.ts` calculates local fire time, body, payload, channel, and stable identifier.
 3. **Full-request diff** — the scheduler compares the existing OS request's fire hour, channel, category, body, title, and payload; a mismatch cancels and replaces it.
-4. **OS cleanup** — master/type gates cancel owned identifiers, and a purge extension cancels the deleted contact's identifiers post-commit.
+4. **OS cleanup** — master/type gates cancel owned identifiers, each pass dismisses presented decay/birthday entries whose contact no longer exists, and a purge extension cancels and dismisses the deleted contact's identifiers post-commit.
+
+Android DATE-trigger readback can represent an absent title as `null` while Orbit's desired request uses `undefined`. Normalize equivalent absent values before the full-request comparison; otherwise every foreground pass replaces an unchanged notification.
 
 ### Singleton weekly flow
 
@@ -82,7 +84,9 @@ The weekly digest is the model for a policy-gated singleton request. `digest-sch
 
 7. **Cancel on lifecycle destruction.** Extend `buildNotificationPurgeCleanup()` with the new identifier if it belongs to a contact. The cancel is post-commit, idempotent, and best effort.
 
-8. **Add unit coverage and run the notification suite**:
+8. **Reconcile presented state as well as scheduled state.** Keep presented cleanup inside the ordinary pass even when scheduling is disabled, and scope it to owned decay/birthday identifiers. Count cleanup failures in the reconcile outcome without aborting independent candidates or touching Digest/foreign notifications.
+
+9. **Add unit coverage and run the notification suite**:
 
    ```bash
    npx vitest run src/services/notifications src/db/notification-read.test.ts src/db/snooze-dao.test.ts src/db/app-settings-dao.test.ts
@@ -111,6 +115,8 @@ The weekly digest is the model for a policy-gated singleton request. `digest-sch
 5. **Do not make every request a decay-scheduler request.** A global weekly trigger has different policy inputs and an independent identifier. Give it a separate coordinator and assert the contact scheduler never cancels it.
 
 6. **A scheduled weekly body is frozen.** Use generic copy and open a live-computed screen for names or counts; physical-device testing must confirm the weekly trigger fires and re-arms after delivery.
+7. **Normalize native absence before diffing.** Treat Android DATE-trigger `title: null` and the desired request's missing title as equal; raw structural comparison creates a reschedule loop.
+8. **`dumpsys notification` includes historical archive entries.** Do not use archive presence as proof that dismissal failed; inspect the live notification list or `cmd notification` output for current presented state.
 
 ## Smoke Test
 
@@ -125,3 +131,5 @@ npx tsc --noEmit && npm run check:colors
 ```
 
 Expected: the notification integration type-checks and uses theme tokens only.
+
+On a device, present a decay or birthday notification, purge its contact, run foreground reconciliation, and verify it is absent from the live list. Historical `dumpsys` archive output is not a failure signal.
