@@ -5,7 +5,7 @@ import type {
   ProfileStatusMetric,
 } from "@/services/profile-metrics";
 import { FREQUENCY_DAYS } from "@/types";
-import { formatLocalDate } from "@/utils/dates";
+import { formatDateTimeMinuteOrFallback, formatLocalDate } from "@/utils/dates";
 
 export type RelationshipExplanation = {
   title: string;
@@ -42,7 +42,7 @@ export function relationshipExplanation(
       };
     }
     const details = [
-      `Last interaction: ${input.metric.factors.lastContact}`,
+      `Last interaction: ${formatDateTimeMinuteOrFallback(input.metric.factors.lastContact)}`,
       `Contact frequency: every ${input.metric.factors.intervalDays} days`,
       `Elapsed progress: ${Math.round(input.metric.factors.progress * 100)}%`,
     ];

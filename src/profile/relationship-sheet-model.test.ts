@@ -181,13 +181,40 @@ describe("relationship explanations", () => {
       title: "Orbit Status",
       summary: "Wobbly",
       details: [
-        "Last interaction: 2026-08-13 09:00:00",
+        "Last interaction: Aug 13, 2026, 9:00 AM",
         "Contact frequency: every 30 days",
         "Elapsed progress: 90%",
         "Rarely Responds: only connected interactions reset the orbit",
       ],
       routes: ["history", "insights"],
     });
+  });
+
+  it("D-72: shows Last interaction at minute precision, never seconds", () => {
+    const status = (lastContact: string) =>
+      relationshipExplanation({
+        kind: "status",
+        metric: {
+          available: true,
+          label: "Stable",
+          visualValue: 0.1,
+          context: "0 of 14 days since the last interaction.",
+          factors: {
+            lastContact,
+            intervalDays: 14,
+            progress: 0.1,
+            rarelyResponds: false,
+            rogueReason: null,
+          },
+        },
+        insightsAvailable: false,
+        historyAvailable: false,
+      }).details[0];
+    expect(status("2026-09-27 16:38:58")).toBe(
+      "Last interaction: Sep 27, 2026, 4:38 PM",
+    );
+    expect(status("2026-09-27 16:38:58")).not.toMatch(/:58/);
+    expect(status("not a timestamp")).toBe("Last interaction: Unknown time");
   });
 
   it("uses cadence-safe unavailable Status copy", () => {
