@@ -28,6 +28,7 @@ import {
   importedPhotoFs,
   persistImportedPhotoPostCommit,
 } from "@/services/import/import-photo";
+import { withImportRun } from "@/services/import/import-run-guard";
 import { Logger } from "@/utils/logger";
 import type { PickedContact } from "../../../modules/orbit-contact-picker";
 
@@ -153,8 +154,28 @@ export async function importRowAsNew(
 /**
  * Classify and process one logical import without a batch-wide transaction.
  * Ambiguous source records remain durable review work while safe rows proceed.
+ *
+ * 38.4 D-74 (owner): one pass per session at a time. A call while a pass for
+ * the session is in flight rejects with `ImportRunActiveError` and processes
+ * nothing, since both passes would work through the same pending snapshot.
+ * Import Progress follows the running pass instead (`followImportRun`).
  */
-export async function runImportBatch(
+export function runImportBatch(
+  exec: SqlExecutor,
+  params: RunImportBatchParams,
+): Promise<SessionSummaryCounts> {
+  return withImportRun(params.sessionId, (report) =>
+    runImportPass(exec, {
+      ...params,
+      onProgress: (done, total) => {
+        params.onProgress?.(done, total);
+        report(done, total);
+      },
+    }),
+  );
+}
+
+async function runImportPass(
   exec: SqlExecutor,
   params: RunImportBatchParams,
 ): Promise<SessionSummaryCounts> {

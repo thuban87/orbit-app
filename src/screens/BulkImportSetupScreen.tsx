@@ -31,6 +31,7 @@ import {
 } from "@/logic/category-logic";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { importedPhotoFs } from "@/services/import/import-photo";
+import { isImportRunActive } from "@/services/import/import-run-guard";
 import {
   combineCluster,
   detectSourceClusters,
@@ -40,6 +41,8 @@ import { Logger } from "@/utils/logger";
 import {
   BULK_BOUND_BLURB,
   BULK_IMPORT_DEFAULT_FREQUENCY,
+  BULK_IMPORT_STILL_RUNNING_BODY,
+  BULK_IMPORT_STILL_RUNNING_TITLE,
   BULK_IMPORT_STOPPED_CONTINUE,
   BULK_IMPORT_STOPPED_DISCARD,
   boundFrequencyBlocksImport,
@@ -345,7 +348,11 @@ export function BulkImportSetupScreen({
     void onImport();
   }, [continueAfterCombine, saving, consolidationRows]);
 
-  /** D-73c: resume the stopped batch with its saved lifecycle and category. */
+  /**
+   * D-73c: resume the stopped batch with its saved lifecycle and category.
+   * D-74: this never starts a pass itself. Import Progress follows a pass
+   * still in flight for the session instead of starting a second one.
+   */
   function onContinueStopped() {
     if (saving) return;
     setSaving(true);
@@ -363,6 +370,14 @@ export function BulkImportSetupScreen({
   /** D-73c: discard what is left (contacts already imported stay), then leave. */
   async function onDiscardStopped() {
     if (saving) return;
+    // D-74: never discard rows a running pass is still working through.
+    if (isImportRunActive(route.params.sessionId)) {
+      Alert.alert(
+        BULK_IMPORT_STILL_RUNNING_TITLE,
+        BULK_IMPORT_STILL_RUNNING_BODY,
+      );
+      return;
+    }
     setSaving(true);
     try {
       await discardUnresolvedSession(route.params.sessionId);

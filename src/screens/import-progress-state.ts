@@ -49,3 +49,24 @@ export function importProgressRunIdentity(params: {
 }): string {
   return `${params.sessionId}:${params.runKey ?? 0}`;
 }
+
+/**
+ * 38.4 D-74 (owner): the plain notice shown (and announced) when Back is
+ * pressed while a bulk import pass is running. Short on purpose.
+ */
+export const IMPORT_PROGRESS_BACK_NOTICE =
+  "Still importing. You can go back when it finishes.";
+
+/**
+ * Whether Import Progress refuses to be left (D-74): while this screen is
+ * driving or following a pass, or while any pass for the session is in flight.
+ * Leaving mid-pass returned to bulk setup with the pass still running, and
+ * Continue there started a second pass over the same rows. After the pass
+ * finishes or stops, leaving works as before.
+ */
+export function importProgressBlocksLeave(state: {
+  driving: boolean;
+  runActive: boolean;
+}): boolean {
+  return state.driving || state.runActive;
+}

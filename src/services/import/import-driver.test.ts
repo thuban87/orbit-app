@@ -15,6 +15,7 @@ import { importContactRecord } from "@/db/imported-contact-dao";
 import { runMigrations } from "@/db/migrations/runner";
 import type { SqlExecutor } from "@/db/types";
 import { runImportBatch } from "@/services/import/import-driver";
+import { ImportRunActiveError } from "@/services/import/import-run-guard";
 
 const NOW = "2026-08-29 12:00:00";
 let exec: SqlExecutor;
@@ -241,6 +242,64 @@ describe("runImportBatch", () => {
       ),
     ).toEqual({ category_id: category.id });
     await expect(getResumableSession(exec, NOW)).resolves.toBeNull();
+  });
+
+  it("never runs two passes over one session at once (D-74)", async () => {
+    // Single-token, pairwise-distinct names so no row is a duplicate candidate.
+    const names = [
+      "Abner",
+      "Bettina",
+      "Cyrus",
+      "Delphine",
+      "Ezra",
+      "Fenella",
+      "Gideon",
+      "Hester",
+      "Ignatius",
+      "Juno",
+      "Kasimir",
+      "Lavinia",
+      "Magnus",
+      "Nerys",
+      "Orson",
+      "Petra",
+      "Quill",
+      "Rosalind",
+      "Silas",
+      "Tamsin",
+      "Ulric",
+      "Verity",
+      "Wystan",
+      "Xanthe",
+      "Yorick",
+    ];
+    const session = await createSession(
+      names.map((name, index) => ({
+        externalContactId: `d74-${index}`,
+        sourcePayload: payload(name),
+      })),
+    );
+    // A second pass started while the first is in flight (Back to setup, then
+    // Continue) is refused; it must not re-read the same pending snapshot.
+    const first = runImportBatch(exec, {
+      sessionId: session.sessionId,
+      now: NOW,
+    });
+    await expect(
+      runImportBatch(exec, { sessionId: session.sessionId, now: NOW }),
+    ).rejects.toBeInstanceOf(ImportRunActiveError);
+    const counts = await first;
+    expect(counts.imported).toBe(25);
+    const contacts = await exec.getFirstAsync<{ n: number }>(
+      "SELECT COUNT(*) AS n FROM contacts",
+    );
+    expect(contacts?.n).toBe(25);
+    const rows = await listSessionRows(exec, session.sessionId);
+    expect(rows.every((row) => row.rowStatus === "imported")).toBe(true);
+    // Once the pass settles, a later pass may run (it finds nothing pending).
+    await expect(
+      runImportBatch(exec, { sessionId: session.sessionId, now: NOW }),
+    ).resolves.toMatchObject({ imported: 25 });
   });
 
   it("retries failed rows without double-importing a row that already has a contact", async () => {

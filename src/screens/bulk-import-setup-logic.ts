@@ -34,6 +34,14 @@ export const BULK_BOUND_BLURB =
 export const BULK_IMPORT_STOPPED_CONTINUE = "Continue";
 export const BULK_IMPORT_STOPPED_DISCARD = "Discard";
 
+/**
+ * 38.4 D-74 (owner): the stopped view's Discard while a pass for the batch is
+ * still running (a defensive backstop; Import Progress blocks Back mid-pass).
+ */
+export const BULK_IMPORT_STILL_RUNNING_TITLE = "Still importing";
+export const BULK_IMPORT_STILL_RUNNING_BODY =
+  "Try again when the import finishes.";
+
 export function bulkImportStoppedMessage(pending: number): string {
   return `This import stopped partway — ${pending} ${
     pending === 1 ? "contact" : "contacts"
