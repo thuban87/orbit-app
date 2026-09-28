@@ -6,7 +6,7 @@
 
 ## Purpose
 
-Contact Import lets a user deliberately bring selected Android system contacts into Orbit while keeping acquisition local to the device. It uses Android's privacy-preserving system picker on API 37+ and a scoped-permission custom picker on API 36 and below, then drives reviewed single or incremental bulk import from durable local state; it never treats the source provider as Orbit's authority.
+Contact Import lets a user deliberately bring selected Android system contacts into Orbit while keeping acquisition local to the device. It uses Android's privacy-preserving system picker on API 37+ with an in-context post-pick Contacts permission request for Note enrichment, and a scoped-permission custom picker on API 36 and below. It then drives reviewed single or incremental bulk import from durable local state; it never treats the source provider as Orbit's authority.
 
 ## Architecture
 
@@ -39,7 +39,7 @@ Migration 012 stores import work outside Orbit's portable backup model. Picker p
 
 | Layer | File | Responsibility |
 |---|---|---|
-| Native picker | `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker/OrbitContactPickerModule.kt` | Launches the API-37 system picker, reads legacy selected contacts, and re-reads linked contacts only for user-initiated reconciliation. |
+| Native picker | `modules/orbit-contact-picker/android/src/main/java/expo/modules/orbitcontactpicker/OrbitContactPickerModule.kt` | Launches the API-37 system picker without the unsupported Note MIME, reads legacy selected contacts, and supports permission-gated provider re-reads for post-pick Note enrichment and user-initiated reconciliation. |
 | Legacy picker | `src/screens/LegacyContactPickerScreen.tsx` | Provides token-driven browse, search, multi-select, and permission recovery for the scoped legacy path. |
 | Session DAO | `src/db/import-session-dao.ts` | Accepts snapshots atomically and owns transaction-composable row transitions. |
 | Session read | `src/db/import-session-read.ts` | Finds resumable work and groups durable completion counts. |
@@ -77,8 +77,8 @@ Category choices use the canonical ordered catalog and switch to the complete se
 
 ### Acquiring and accepting a selection
 
-1. `AddSpeedDialFab` and Settings call `startContactImport()`, which routes API 37+ to the permissionless system picker and API 36 and below to `LegacyContactPicker`.
-2. The system picker snapshots selected fields from its temporary grant; the legacy picker requests scoped `READ_CONTACTS`, lists on-device summaries, then reads full fields only for selected lookup keys. Both map to `PickedContact[]`, including the first non-blank Android Note; no provider URI enters route state or durable payload.
+1. `AddSpeedDialFab` and Settings call `startContactImport()`, which routes API 37+ to the system picker and API 36 and below to `LegacyContactPicker`.
+2. The API-37 picker snapshots supported fields from its temporary grant without requesting the unsupported Note MIME. After a non-empty pick, Orbit requests `READ_CONTACTS` in context; if granted, it re-reads those lookup keys and merges their first non-blank Notes, and if denied it continues without Notes. The legacy picker requests the same scoped permission before browsing and reads full fields only for selected lookup keys. Both paths map to `PickedContact[]`; no provider URI enters route state or durable payload.
 3. The legacy reader accepts birthdays only from `Event.TYPE_BIRTHDAY`, preserves multiple methods, stages selected photos privately, and rejects a read failure so the screen can show an error rather than a false cancellation.
 4. `acceptPickedContacts()` moves accepted photos into flat private `import-staging/` paths, then commits the import session and every row together. Cancelling before acceptance writes neither a session nor an Orbit contact.
 
@@ -117,7 +117,7 @@ Category choices use the canonical ordered catalog and switch to the complete se
 |---|---|---|---|
 | System-picker API | `37+` | `OrbitContactPickerModule.kt` | Enables the privacy-preserving system Contact Picker path. |
 | Legacy-picker API | `≤36` | `LegacyContactPickerScreen.tsx` | Enables the custom on-device ContactsContract path. |
-| Reconcile permission | API `37+`, user initiated | `plugins/withContactPickerPermission.js` | Permits re-reading already-linked contacts after an in-context request; it does not change import acquisition. |
+| Contacts permission | API `37+`, user initiated | `plugins/withContactPickerPermission.js` | Permits post-pick Note enrichment and re-reading already-linked contacts after an in-context request; denial leaves import usable without Notes. |
 | Legacy selection limit | No app-level cap | `modules/orbit-contact-picker/index.ts` | Chunks selected-key reads without restricting a user's selection. |
 
 ## Decisions
@@ -132,11 +132,13 @@ Category choices use the canonical ordered catalog and switch to the complete se
 - **ADR-091:** Imported Contact Notes as AI-Off Typed Memories — preserves accepted provider Notes through all new-contact import paths.
 - **ADR-143:** Lock-Time-Revalidated Atomic Category Deletion and System Fallout — reassigns every referenced pending, complete, and discarded import session in the deletion transaction.
 - **ADR-144:** Complete Category Selection and Grouped Orrery System Discovery — keeps import selectors complete, ordered, searchable, and stale-safe.
+- **ADR-154:** API-37 Import Requests Contacts Access for Notes — removes the unsupported Note MIME from the picker request and enriches a non-empty selection after an in-context permission grant.
+- **ADR-161:** Durable Post-Commit Import Recovery and AI-Off Provenance — separates committed contact success from retryable photo completion and forces new imported-note Memories AI-off.
 
 ## Gotchas
 
 1. **Never re-read a picker URI after acceptance.** Its temporary grant can be gone after process death; use the durable session payload only.
-2. **Keep acquisition and reconciliation distinct.** API-37+ import remains permissionless through the system picker; only a user-initiated linked-contact re-read requests `READ_CONTACTS`, with a Play declaration release obligation.
+2. **Keep picker acquisition and provider enrichment distinct.** API-37+ selection still uses the system picker, but after a non-empty pick Orbit requests `READ_CONTACTS` to re-read only the selected lookup keys for Notes. Denial must continue import without Notes; reconciliation separately requests the same permission for its linked-contact read, with the existing Play declaration release obligation.
 3. **Treat `pending`, `needs_review`, and `failed` as the only staging-live rows.** Resolved rows must not preserve private raw photo staging indefinitely.
 4. **A photo failure is not a contact failure.** The contact and import row remain committed; only the photo is retryable.
 5. **Do not infer identity from name or birthday alone.** Every non-link candidate outcome remains advisory and explicit.
@@ -149,6 +151,7 @@ Category choices use the canonical ordered catalog and switch to the complete se
 12. **A post-write read failure is not a write failure.** In Duplicate Review, never tell the user to redo a committed link or import because finalize or the re-read failed; route it to the read error and its read-only Retry.
 13. **The resume prompt's body scrolls; its buttons never do.** At large text "Resume your import?" keeps its heading and body in a bounded `ScrollView` (`flexGrow: 0`, `flexShrink: 1`) inside a shrinking, safe-area-inset card, with Resume / Discard / Later outside the scroll region. It stays an RN `Modal` whose only exits are its buttons; do not move an action into the scroll body or make Back dismiss it (D-49).
 14. **The batch lifecycle lives only on the import session.** Never add an in-pass lifecycle override to `runImportBatch` or any other bulk create: resume calls the driver again with no setup state, so it must read the session (`sessionBatchLifecycle`). Every create seam (`importContactRecord`, `importRowAsNew`, `combineCluster`) takes a REQUIRED validated lifecycle, and bulk setup writes it with the category in one `setSessionBatchDefaults` update before any contact is created (D-57). Once any session row is resolved the lifecycle is locked in both the setup UI (`bulkLifecycleLocked`) and the DAO; keep the two on the same rule (any row not `pending`) so setup never offers a change the DAO rejects (D-64). A stopped batch's setup shows no choice controls at all and its Continue never writes batch defaults (D-73).
+15. **A live import owns its staging.** The foreground resume sweep must suppress sessions held by an active screen or run, and picker/permission round trips must not trigger retirement of newly staged photos. Cleanup may retire only detached workflow copies after rechecking durable row and external-link ownership.
 
 ## Related Systems
 
@@ -172,6 +175,7 @@ Category choices use the canonical ordered catalog and switch to the complete se
 | 2026-09-03 | 24.2 | Added Note MIME acquisition and durable AI-off imported-Memory writes for new-contact imports. |
 | 2026-09-17 | 37.1 | Made category selection complete and stale-safe; category deletion reassigns pending, complete, and discarded sessions to the same target. |
 | 2026-09-24 | 38.2 | RG-007 forces new imported notes AI-off regardless of the general Memory default. RG-012 retains post-commit photo retry input, offers photo-only Retry and explicit Skip, and retires workflow copies on contact purge. |
+| 2026-09-24 | 38.2 | Removed the unsupported API-37 Note MIME and added post-pick, in-context Contacts permission for selected-key Note enrichment; denial proceeds without Notes. |
 | 2026-09-25 | 38.3 | Truthful import stop + review read errors (RG-035): fatal ImportProgress stop with summary/Back and released session hold (D-20); Import Complete Retry includes pending rows (D-26); Duplicate Review read errors with read-only Retry, post-write recovery split from write failures (D-24, D-04). |
 | 2026-09-26 | 38.3 | Code-review fixes to the D-20 recovery path and import commit truth: BulkImportSetup holds the open-session mark only while focused and re-enables Import on return, so a fatal ImportProgress stop really releases the session to the resume sweep (B-CR-02); a resume re-entry carries a fresh `runKey` so a reused stopped ImportProgress route re-runs (B-WR-01); Duplicate Review link/bulk writes and Import Complete Retry/Skip photos are single-flight latched (B-WR-02, B-WR-03); Import Complete reads through `ReadPhase` with a read-only Retry and shows a failed Retry write as an inline notice above re-read counts (B-WR-04). |
 | 2026-09-26 | 38.4 | Import Complete re-reads on focus (38.3 UAT O-3, D-10): the mount-only summary effect became `useFocusEffect(useCallback(() => { void load(); return () => authority.invalidate(); }))`, still gated by the one latest-request authority; the focus path never re-runs an import, Retry, Skip or row mutation (source-contract test in `import-complete-logic.test.ts`). No legacy-data repair (38.2 D-23). |
