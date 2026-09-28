@@ -46,6 +46,7 @@ import {
   type BackgroundSlotId,
 } from "@/theme/theme-option-ids";
 import type {
+  ResolvedMode,
   ThemeMode,
   ThemePackage,
   ThemePalette,
@@ -75,6 +76,8 @@ type BackgroundThumbnailProps = {
   colors: ThemePalette;
   columnWidth: "23%" | "48%";
   label: string;
+  /** The screen's resolved mode: the preview shows that mode's variant (D-23). */
+  mode: ResolvedMode;
   onPress: (slot: BackgroundSlotId) => void;
   selected: boolean;
   slot: BackgroundSlotId;
@@ -85,6 +88,7 @@ function BackgroundThumbnail({
   colors,
   columnWidth,
   label,
+  mode,
   onPress,
   selected,
   slot,
@@ -94,6 +98,7 @@ function BackgroundThumbnail({
   const resolved = resolveRenderableBackground(
     sourcePackage,
     slot,
+    mode,
     thumbFailed,
   );
 
@@ -779,6 +784,7 @@ export function SettingsAppearanceScreen() {
                   colors={colors}
                   columnWidth={backgroundColumnWidth}
                   label={BACKGROUND_LABELS[slot]}
+                  mode={mode}
                   onPress={onSelectBackground}
                   selected={selectedBackgroundSlot === slot}
                   slot={slot}

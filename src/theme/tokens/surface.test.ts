@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { applyAccent, DEFAULT_ACCENT, resolveAccent } from "../accents";
-import { BACKGROUND_SLOTS, type BackgroundAssetSlot } from "../backgrounds";
+import { BACKGROUND_SLOTS, type BackgroundVariant } from "../backgrounds";
 import {
   AA_LARGE,
   AA_NORMAL,
@@ -120,7 +120,7 @@ function assertNonTextClearsExtrema(
   mode: ResolvedMode,
   tint: string,
   opacity: number,
-  slot: BackgroundAssetSlot,
+  slot: BackgroundVariant,
   label: string,
 ) {
   for (const { token, floor } of GLASS_NONTEXT_FGS) {
@@ -196,11 +196,11 @@ function clearsExtrema(
   return e.ratioDark >= floor && e.ratioBright >= floor && e.outside;
 }
 
-/** The tint composited over a slot's declared darkest and brightest pixels. */
+/** The tint composited over a variant's declared darkest and brightest pixels. */
 function slotComposites(
   tint: string,
   opacity: number,
-  slot: BackgroundAssetSlot,
+  slot: BackgroundVariant,
 ) {
   return {
     dark: alphaComposite(tint, slot.darkestPixel, opacity),
@@ -212,7 +212,7 @@ function assertClearsExtrema(
   fg: string,
   tint: string,
   opacity: number,
-  slot: BackgroundAssetSlot,
+  slot: BackgroundVariant,
   floor: number,
   label: string,
 ) {
@@ -279,7 +279,7 @@ function assertAccentTextClearsExtrema(
   mode: ResolvedMode,
   opacityFor: (pkg: ThemePackage, mode: ResolvedMode) => number,
   treatment: "card" | "chrome",
-  slot: BackgroundAssetSlot,
+  slot: BackgroundVariant,
   label: string,
 ) {
   for (const accentId of ACCENT_CHOICES) {
@@ -467,11 +467,16 @@ describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1
   // test, on the EFFECTIVE glass palette the runtime scope renders. The declared
   // extrema are validated against the decoded .webp bytes by
   // `scripts/measure-background-extrema.py --check`.
-  for (const [id, slot] of Object.entries(BACKGROUND_SLOTS)) {
-    const pkg = slot.package;
+  //
+  // 38.5 D-23 / P-2: each slot's VARIANT is proven in its OWN mode only
+  // (`slot.variants[mode]`) — the light file is never rendered in dark mode and
+  // vice-versa. Labels read `slot/mode`.
+  for (const [id, entry] of Object.entries(BACKGROUND_SLOTS)) {
+    const pkg = entry.package;
     for (const mode of MODES) {
+      const slot = entry.variants[mode];
       const regime = cardMatchesMode(pkg, mode) ? "glassy" : "opaque";
-      it(`${id} @ ${pkg}/${mode} (${regime}): text foregrounds over the card clear both extrema`, () => {
+      it(`${id}/${mode} @ ${pkg}/${mode} (${regime}): text foregrounds over the card clear both extrema`, () => {
         const palette = effectiveGlassPalette(pkg, mode);
         const tint = palette[SURFACE[pkg].tintTokenKey];
         const opacity = cardTintOpacity(pkg, mode, "presentation");
@@ -482,12 +487,12 @@ describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1
             opacity,
             slot,
             AA_NORMAL,
-            `${id} @ ${pkg}/${mode} ${regime} card: ${fg}`,
+            `${id}/${mode} @ ${pkg}/${mode} ${regime} card: ${fg}`,
           );
         }
       });
 
-      it(`${id} @ ${pkg}/${mode} (${regime}): status/rogue/danger over the card clear both extrema (RG-029 / D-24)`, () => {
+      it(`${id}/${mode} @ ${pkg}/${mode} (${regime}): status/rogue/danger over the card clear both extrema (RG-029 / D-24)`, () => {
         const palette = effectiveGlassPalette(pkg, mode);
         assertNonTextClearsExtrema(
           palette,
@@ -496,18 +501,18 @@ describe("COMPOSITED per-asset card AA — the ACTUAL mode-aware card tint (31.1
           palette[SURFACE[pkg].tintTokenKey],
           cardTintOpacity(pkg, mode, "presentation"),
           slot,
-          `${id} @ ${pkg}/${mode} ${regime} card`,
+          `${id}/${mode} @ ${pkg}/${mode} ${regime} card`,
         );
       });
 
-      it(`${id} @ ${pkg}/${mode} (${regime}): accentText for every curated accent over the card clears both extrema (RG-029 / D-24 / D-26)`, () => {
+      it(`${id}/${mode} @ ${pkg}/${mode} (${regime}): accentText for every curated accent over the card clears both extrema (RG-029 / D-24 / D-26)`, () => {
         assertAccentTextClearsExtrema(
           pkg,
           mode,
           (p, m) => cardTintOpacity(p, m, "presentation"),
           "card",
           slot,
-          `${id} @ ${pkg}/${mode} ${regime} card`,
+          `${id}/${mode} @ ${pkg}/${mode} ${regime} card`,
         );
       });
     }
@@ -604,11 +609,13 @@ describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)",
   // art, so a LOCAL chrome scrim (surface tint @ chromeScrimOpacity) backs it.
   // Every text/status foreground over that scrim composited on each asset's
   // brightest pixel must meet AA — the guarantee that "protect chrome" preserves
-  // readability while the veil reveals the art.
-  for (const [id, slot] of Object.entries(BACKGROUND_SLOTS)) {
-    const pkg = slot.package;
+  // readability while the veil reveals the art. Each slot's variant is proven in
+  // its OWN mode only (38.5 D-23 / P-2).
+  for (const [id, entry] of Object.entries(BACKGROUND_SLOTS)) {
+    const pkg = entry.package;
     for (const mode of MODES) {
-      it(`${id} @ ${pkg}/${mode}: text foregrounds over the chrome scrim clear both extrema (RG-029)`, () => {
+      const slot = entry.variants[mode];
+      it(`${id}/${mode} @ ${pkg}/${mode}: text foregrounds over the chrome scrim clear both extrema (RG-029)`, () => {
         const palette = effectiveGlassPalette(pkg, mode);
         const tint = palette[SURFACE[pkg].tintTokenKey];
         const opacity = chromeScrimOpacity(pkg, mode);
@@ -619,12 +626,12 @@ describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)",
             opacity,
             slot,
             AA_NORMAL,
-            `${id} @ ${pkg}/${mode} chrome: ${fg}`,
+            `${id}/${mode} @ ${pkg}/${mode} chrome: ${fg}`,
           );
         }
       });
 
-      it(`${id} @ ${pkg}/${mode}: status/rogue/danger over the chrome scrim clear both extrema (RG-029 / D-24)`, () => {
+      it(`${id}/${mode} @ ${pkg}/${mode}: status/rogue/danger over the chrome scrim clear both extrema (RG-029 / D-24)`, () => {
         const palette = effectiveGlassPalette(pkg, mode);
         assertNonTextClearsExtrema(
           palette,
@@ -633,18 +640,18 @@ describe("chrome-scrim AA (31.1-05 — bare-on-background text stays readable)",
           palette[SURFACE[pkg].tintTokenKey],
           chromeScrimOpacity(pkg, mode),
           slot,
-          `${id} @ ${pkg}/${mode} chrome`,
+          `${id}/${mode} @ ${pkg}/${mode} chrome`,
         );
       });
 
-      it(`${id} @ ${pkg}/${mode}: accentText for every curated accent over the chrome scrim clears both extrema (RG-029 / D-24 / D-26)`, () => {
+      it(`${id}/${mode} @ ${pkg}/${mode}: accentText for every curated accent over the chrome scrim clears both extrema (RG-029 / D-24 / D-26)`, () => {
         assertAccentTextClearsExtrema(
           pkg,
           mode,
           chromeScrimOpacity,
           "chrome",
           slot,
-          `${id} @ ${pkg}/${mode} chrome`,
+          `${id}/${mode} @ ${pkg}/${mode} chrome`,
         );
       });
     }

@@ -19,8 +19,8 @@
  * catches an image RENDER failure (`Image` `onError`, decode error, null image) — NOT
  * a bundle-missing module (which fails at Metro resolution, not recoverably at
  * runtime). The `onError` handler flips a boolean into the node-tested pure reducer
- * `resolveRenderableBackground(package, slotId, renderFailed)`, so the effective
- * background silently becomes None/Solid — the fallback branch is unit-tested, not
+ * `resolveRenderableBackground(package, slotId, mode, renderFailed)`, so the
+ * effective background silently becomes None/Solid — the fallback branch is unit-tested, not
  * untested inline component logic.
  *
  * Backgrounds are STATIC bundled assets, so this host ships NO animation worklet
@@ -90,7 +90,7 @@ export function BackgroundHost({
   appOwnedBackgroundUri = null,
   readability = "default",
 }: BackgroundHostProps) {
-  const { colors, package: activePackage } = useTheme();
+  const { colors, mode, package: activePackage } = useTheme();
   const { height: viewportHeight, width: viewportWidth } =
     useWindowDimensions();
   const storeGalaxy = useThemeStore((s) => s.galaxyBackground);
@@ -103,11 +103,14 @@ export function BackgroundHost({
 
   // Latch a render failure, resetting whenever the selection changes so a new
   // (valid) slot gets a fresh render attempt rather than staying stuck on the
-  // fallback. Uses React's render-phase reset idiom (no effect, no extra frame).
+  // fallback. The selection includes the resolved mode (38.5 D-23): each mode
+  // renders its own variant file, so a mode switch is a fresh attempt too.
+  // Uses React's render-phase reset idiom (no effect, no extra frame).
   const [renderFailed, setRenderFailed] = useState(false);
   const { localUri, selectionKey } = backgroundHostSelection({
     package: pkg,
     slotId: effectiveSlot,
+    mode,
     appOwnedBackgroundUri,
     forceRenderError,
     renderFailed,
@@ -121,6 +124,7 @@ export function BackgroundHost({
   const resolved: ResolvedBackground = resolveRenderableBackground(
     pkg,
     effectiveSlot,
+    mode,
     forceRenderError || renderFailed,
   );
 

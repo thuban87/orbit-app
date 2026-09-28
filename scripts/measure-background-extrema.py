@@ -3,13 +3,15 @@
 # Decoded-asset extrema for the bundled background art (RG-029 /
 # ui-accessibility/AUD-UIA-001 / D-12 "real worst-case composite").
 #
-# `src/theme/backgrounds.ts` declares, per asset slot, a worst-case
-# `darkestPixel` and `brightestPixel`. The node contrast proof
+# `src/theme/backgrounds.ts` declares, per asset slot, one variant per resolved
+# mode (`variants.light`, `variants.dark`; 38.5 D-23), and each variant a
+# worst-case `darkestPixel` and `brightestPixel`. The node contrast proof
 # (`src/theme/tokens/surface.test.ts`) composites each card/chrome tint over
 # BOTH declared pixels instead of decoding the shipped bytes. This script is the
 # reproducible bridge between the two: it decodes every bundled asset with
-# Pillow (RGB, full resolution) and, for EVERY tint regime of the slot's OWN
-# package (`scripts/background-extrema-regimes.json`), composites every pixel
+# Pillow (RGB, full resolution) and, for EVERY tint regime of the variant's OWN
+# package AND OWN mode (`scripts/background-extrema-regimes.json`; a light
+# variant is never rendered in dark mode, 38.5 P-2), composites every pixel
 # exactly like `alphaComposite` in `src/theme/tokens/surface.ts` (sRGB-space
 # blend, rounded per channel) and finds the pixel with the minimum and maximum
 # COMPOSITE WCAG relative luminance.
@@ -21,10 +23,10 @@
 # the raw-darkest pixel and every regime's composite-argmin pixel; brightest =
 # channel-wise MAX of the raw-brightest pixel and every regime's composite-argmax
 # pixel. The blend is monotone per channel, so a channel-wise bound is a valid
-# bound under every regime and one declared field per slot suffices.
+# bound under every regime and one declared field per variant suffices.
 #
 # Usage:
-#   python3 scripts/measure-background-extrema.py            # report per slot
+#   python3 scripts/measure-background-extrema.py            # report per slot/mode
 #   python3 scripts/measure-background-extrema.py --check    # validate declared bounds
 #   python3 scripts/measure-background-extrema.py --self-test
 #
@@ -34,7 +36,9 @@
 #   1  --check found a declared bound that does not enclose a regime's decoded
 #      composite extremum (or a slot is missing a declaration), or the
 #      self-test failed
-#   2  usage error, unreadable asset, or unparseable backgrounds.ts / regime table
+#   2  usage error, unreadable asset, unparseable backgrounds.ts / regime table,
+#      or a slot missing a light/dark variant block (or a variant missing its
+#      require / brightestPixel / darkestPixel)
 #
 # Dev-time tool only (system Python 3 + Pillow); nothing is added to package.json.
 
@@ -110,39 +114,82 @@ def load_regimes():
     return regimes
 
 
+MODES = ("light", "dark")
+# BACKGROUND_SLOTS layout (src/theme/backgrounds.ts, fixed for this parser):
+#   slot key at 2 spaces; `package:` and `variants: {` at 4; `light: {` /
+#   `dark: {` at 6; `source` / `brightestPixel` / `darkestPixel` at 8.
 SLOT_RE = re.compile(r'^  "([a-z0-9-]+)": \{\n(.*?)\n  \},?$', re.M | re.S)
+VARIANT_RE = re.compile(r"^      (light|dark): \{\n(.*?)\n      \},?$", re.M | re.S)
+
+
+class ParseError(ValueError):
+    pass
+
+
+def parse_slot_source(source, base_dir):
+    """Parse the nested BACKGROUND_SLOTS layout into one row per (slot, mode).
+
+    Raises ParseError when a slot lacks either variant block, or a variant lacks
+    its require / brightestPixel / darkestPixel.
+    """
+    rows = []
+    for slot_id, body in SLOT_RE.findall(source):
+        pkg = re.search(r'^    package: "(galaxy|standard)"', body, re.M)
+        if not pkg:
+            continue  # not a BACKGROUND_SLOTS entry (e.g. another object literal)
+        if not re.search(r"^    variants: \{", body, re.M):
+            raise ParseError(f"{slot_id}: no `variants: {{` block")
+        variants = dict(VARIANT_RE.findall(body))
+        for mode in MODES:
+            vbody = variants.get(mode)
+            if vbody is None:
+                raise ParseError(f"{slot_id}: missing {mode} variant block")
+            req = re.search(r'require\("([^"]+)"\)', vbody)
+            bright = re.search(r'brightestPixel: "(#[0-9A-Fa-f]{6})"', vbody)
+            dark = re.search(r'darkestPixel: "(#[0-9A-Fa-f]{6})"', vbody)
+            missing = [
+                name
+                for name, found in (
+                    ("require", req),
+                    ("brightestPixel", bright),
+                    ("darkestPixel", dark),
+                )
+                if not found
+            ]
+            if missing:
+                raise ParseError(f"{slot_id}/{mode}: missing {', '.join(missing)}")
+            rows.append(
+                {
+                    "slot": slot_id,
+                    "mode": mode,
+                    "package": pkg.group(1),
+                    "asset": os.path.normpath(os.path.join(base_dir, req.group(1))),
+                    "brightestPixel": bright.group(1),
+                    "darkestPixel": dark.group(1),
+                }
+            )
+    return rows
 
 
 def parse_slots():
-    """Parse BACKGROUND_SLOTS entries from backgrounds.ts (package, asset, declared pixels)."""
+    """Parse BACKGROUND_SLOTS from backgrounds.ts: one row per (slot, mode) variant."""
     try:
         with open(BACKGROUNDS_TS, encoding="utf-8") as fh:
             source = fh.read()
     except OSError as err:
         print(f"measure-background-extrema: {err}", file=sys.stderr)
         sys.exit(2)
-    slots = {}
-    for slot_id, body in SLOT_RE.findall(source):
-        pkg = re.search(r'package: "(galaxy|standard)"', body)
-        req = re.search(r'require\("([^"]+)"\)', body)
-        if not pkg or not req:
-            continue
-        bright = re.search(r'brightestPixel: "(#[0-9A-Fa-f]{6})"', body)
-        dark = re.search(r'darkestPixel: "(#[0-9A-Fa-f]{6})"', body)
-        slots[slot_id] = {
-            "package": pkg.group(1),
-            "asset": os.path.normpath(
-                os.path.join(os.path.dirname(BACKGROUNDS_TS), req.group(1))
-            ),
-            "brightestPixel": bright.group(1) if bright else None,
-            "darkestPixel": dark.group(1) if dark else None,
-        }
-    if not slots:
+    try:
+        rows = parse_slot_source(source, os.path.dirname(BACKGROUNDS_TS))
+    except ParseError as err:
+        print(f"measure-background-extrema: backgrounds.ts: {err}", file=sys.stderr)
+        sys.exit(2)
+    if not rows:
         print(
             "measure-background-extrema: no BACKGROUND_SLOTS entries parsed", file=sys.stderr
         )
         sys.exit(2)
-    return slots
+    return rows
 
 
 def decode_colors(path):
@@ -198,14 +245,25 @@ def regime_label(r):
 
 def run(check):
     regimes = load_regimes()
-    slots = parse_slots()
+    rows = parse_slots()
     failures = []
-    for slot_id, slot in slots.items():
-        own = [r for r in regimes if r["package"] == slot["package"]]
+    decoded = {}
+    for slot in rows:
+        slot_id = f"{slot['slot']}/{slot['mode']}"
+        # A variant renders only in its own package AND mode (38.5 P-2).
+        own = [
+            r
+            for r in regimes
+            if r["package"] == slot["package"] and r["mode"] == slot["mode"]
+        ]
         if not own:
-            failures.append(f"{slot_id}: no regime for package {slot['package']}")
+            failures.append(
+                f"{slot_id}: no regime for package {slot['package']} mode {slot['mode']}"
+            )
             continue
-        m = measure(decode_colors(slot["asset"]), own)
+        if slot["asset"] not in decoded:
+            decoded[slot["asset"]] = decode_colors(slot["asset"])
+        m = measure(decoded[slot["asset"]], own)
         print(
             f"{slot_id} ({slot['package']}): raw darkest {rgb_to_hex(m['raw_dark'])}, "
             f"raw brightest {rgb_to_hex(m['raw_bright'])}; "
@@ -287,6 +345,44 @@ def self_test():
     if composite(hex_to_rgb("#123456"), hex_to_rgb("#ABCDEF"), 1) != hex_to_rgb("#123456"):
         print("self-test FAILED: alpha=1 must return the tint", file=sys.stderr)
         ok = False
+    # Nested-variant parser fixture (38.5 D-23): one slot, two variants -> two rows.
+    sample = (
+        "  \"fixture-slot\": {\n"
+        "    package: \"galaxy\",\n"
+        "    variants: {\n"
+        "      light: {\n"
+        "        source: () => require(\"./light.webp\"),\n"
+        "        brightestPixel: \"#EEEEEE\",\n"
+        "        darkestPixel: \"#111111\",\n"
+        "      },\n"
+        "      dark: {\n"
+        "        source: () => require(\"./dark.webp\"),\n"
+        "        brightestPixel: \"#222222\",\n"
+        "        darkestPixel: \"#000000\",\n"
+        "      },\n"
+        "    },\n"
+        "  },\n"
+    )
+    rows = parse_slot_source(sample, "/fixture")
+    got = [(r["slot"], r["mode"], os.path.basename(r["asset"]), r["brightestPixel"],
+            r["darkestPixel"]) for r in rows]
+    want = [
+        ("fixture-slot", "light", "light.webp", "#EEEEEE", "#111111"),
+        ("fixture-slot", "dark", "dark.webp", "#222222", "#000000"),
+    ]
+    if got != want:
+        print(f"self-test FAILED: two-variant parse gave {got!r}", file=sys.stderr)
+        ok = False
+    else:
+        print("self-test: two-variant sample parsed to 2 rows (light, dark)")
+    # A slot missing its dark variant must be a parse error (exit 2 at run time).
+    one_variant = sample.split("      dark: {")[0] + "    },\n  },\n"
+    try:
+        parse_slot_source(one_variant, "/fixture")
+        print("self-test FAILED: a missing dark variant was not rejected", file=sys.stderr)
+        ok = False
+    except ParseError as err:
+        print(f"self-test: missing variant rejected ({err})")
     print("self-test passed" if ok else "self-test FAILED")
     return 0 if ok else 1
 

@@ -87,7 +87,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       mode: resolved,
       accentId,
       backgroundIsAsset:
-        resolveBackground(themePackage, backgroundId).kind === "asset",
+        resolveBackground(themePackage, backgroundId, resolved).kind ===
+        "asset",
     });
     return {
       colors,

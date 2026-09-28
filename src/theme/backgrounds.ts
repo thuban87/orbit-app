@@ -20,27 +20,37 @@
  * this module in the node/vitest harness never evaluates a `.webp` require. The
  * resolvers return the thunk (uncalled); only `BackgroundHost` invokes it on device.
  *
- * DECLARED-VS-DECODED (REVIEWS 23-06 cycle-4 MEDIUM; RG-029 / D-12): each asset
+ * SLOT x MODE VARIANTS (38.5 D-23 / D-03): a slot is a PAIR of variants, one per
+ * resolved appearance mode (`variants.light`, `variants.dark`). The stored value in
+ * `app_settings.galaxy_background` / `standard_background` stays the SLOT id — one
+ * pick per package that follows the mode, with no new setting and no migration —
+ * and the resolvers take the resolved mode and return that mode's variant. Both
+ * packages keep both modes (D-03). Until the owner-approved art lands (38.5-05),
+ * both variants of every slot point at the same file with the same declared
+ * extrema, so this model changes no rendered pixel (D-13).
+ *
+ * DECLARED-VS-DECODED (REVIEWS 23-06 cycle-4 MEDIUM; RG-029 / D-12): each variant
  * carries a declared worst-case `brightestPixel` AND `darkestPixel` — design
  * CONSTRAINTS the shipped `.webp` must stay within, used by the surface.test
  * both-extrema composited-AA proof. Nothing here decodes the committed bytes; the
  * committed `scripts/measure-background-extrema.py` does (Pillow): it composites
- * every decoded pixel under every card/chrome tint regime of the slot's package
- * and `--check` fails if either declared bound does not enclose that regime's
+ * every decoded pixel of each variant under every card/chrome tint regime of the
+ * slot's package AND that variant's mode, and `--check` fails if either declared bound does not enclose that regime's
  * decoded COMPOSITE extremum. Run it whenever an asset is added or changed
  * (docs/runbooks/theme-visual-system-maintenance.md).
  */
 
 import { BACKGROUND_SLOT_IDS, type BackgroundSlotId } from "./theme-option-ids";
-import type { ThemePackage } from "./theme-types";
+import type { ResolvedMode, ThemePackage } from "./theme-types";
 
 /** The shared None/Solid slot id — resolves to the solid theme background. */
 export const NONE_SLOT_ID = "none" as const;
 
-/** One bundled background asset slot. `source` is a LAZY require thunk (device-only). */
-export interface BackgroundAssetSlot {
-  /** The owning package (drives the per-package default + picker order). */
-  package: ThemePackage;
+/**
+ * One mode's version of a bundled background (38.5 D-23). `source` is a LAZY require
+ * thunk (device-only); the two pixels are that file's declared composited-AA bounds.
+ */
+export interface BackgroundVariant {
   /** Lazy `require()` of the bundled local asset — never evaluated in node tests. */
   source: () => number;
   /**
@@ -62,6 +72,18 @@ export interface BackgroundAssetSlot {
 }
 
 /**
+ * One bundled background slot: its owning package and one variant per resolved
+ * appearance mode (38.5 D-23). The stored selection is the slot id; the mode picks
+ * the variant at render.
+ */
+export interface BackgroundAssetSlot {
+  /** The owning package (drives the per-package default + picker order). */
+  package: ThemePackage;
+  /** The file rendered in each resolved mode. Both are always present. */
+  variants: Record<ResolvedMode, BackgroundVariant>;
+}
+
+/**
  * The per-package asset slot manifest, keyed by the imported slot ids (NOT a
  * re-declared list). `none` is intentionally ABSENT (it is the shared solid slot,
  * not an asset). Every key here is a member of `BACKGROUND_SLOT_IDS`; the drift
@@ -73,59 +95,133 @@ export const BACKGROUND_SLOTS: Record<
 > = {
   "galaxy-deep-space": {
     package: "galaxy",
-    source: () => require("../../assets/backgrounds/galaxy-deep-space.webp"),
-    brightestPixel: "#1A1F35",
-    darkestPixel: "#000000",
+    variants: {
+      light: {
+        source: () =>
+          require("../../assets/backgrounds/galaxy-deep-space.webp"),
+        brightestPixel: "#1A1F35",
+        darkestPixel: "#000000",
+      },
+      dark: {
+        source: () =>
+          require("../../assets/backgrounds/galaxy-deep-space.webp"),
+        brightestPixel: "#1A1F35",
+        darkestPixel: "#000000",
+      },
+    },
   },
   "galaxy-starfield": {
     package: "galaxy",
-    source: () => require("../../assets/backgrounds/galaxy-starfield.webp"),
-    brightestPixel: "#202545",
-    darkestPixel: "#000000",
+    variants: {
+      light: {
+        source: () => require("../../assets/backgrounds/galaxy-starfield.webp"),
+        brightestPixel: "#202545",
+        darkestPixel: "#000000",
+      },
+      dark: {
+        source: () => require("../../assets/backgrounds/galaxy-starfield.webp"),
+        brightestPixel: "#202545",
+        darkestPixel: "#000000",
+      },
+    },
   },
   "galaxy-nebula": {
     package: "galaxy",
-    source: () => require("../../assets/backgrounds/galaxy-nebula.webp"),
-    brightestPixel: "#2A2148",
-    darkestPixel: "#000003",
+    variants: {
+      light: {
+        source: () => require("../../assets/backgrounds/galaxy-nebula.webp"),
+        brightestPixel: "#2A2148",
+        darkestPixel: "#000003",
+      },
+      dark: {
+        source: () => require("../../assets/backgrounds/galaxy-nebula.webp"),
+        brightestPixel: "#2A2148",
+        darkestPixel: "#000003",
+      },
+    },
   },
   "galaxy-aurora": {
     package: "galaxy",
-    source: () => require("../../assets/backgrounds/galaxy-aurora.webp"),
-    brightestPixel: "#16303A",
-    darkestPixel: "#000103",
+    variants: {
+      light: {
+        source: () => require("../../assets/backgrounds/galaxy-aurora.webp"),
+        brightestPixel: "#16303A",
+        darkestPixel: "#000103",
+      },
+      dark: {
+        source: () => require("../../assets/backgrounds/galaxy-aurora.webp"),
+        brightestPixel: "#16303A",
+        darkestPixel: "#000103",
+      },
+    },
   },
   "standard-dawn": {
     package: "standard",
-    source: () => require("../../assets/backgrounds/standard-dawn.webp"),
-    brightestPixel: "#E8D8C0",
-    darkestPixel: "#D09E76",
+    variants: {
+      light: {
+        source: () => require("../../assets/backgrounds/standard-dawn.webp"),
+        brightestPixel: "#E8D8C0",
+        darkestPixel: "#D09E76",
+      },
+      dark: {
+        source: () => require("../../assets/backgrounds/standard-dawn.webp"),
+        brightestPixel: "#E8D8C0",
+        darkestPixel: "#D09E76",
+      },
+    },
   },
   "standard-paper": {
     package: "standard",
-    source: () => require("../../assets/backgrounds/standard-paper.webp"),
-    brightestPixel: "#EDE6D8",
-    darkestPixel: "#B4997A",
+    variants: {
+      light: {
+        source: () => require("../../assets/backgrounds/standard-paper.webp"),
+        brightestPixel: "#EDE6D8",
+        darkestPixel: "#B4997A",
+      },
+      dark: {
+        source: () => require("../../assets/backgrounds/standard-paper.webp"),
+        brightestPixel: "#EDE6D8",
+        darkestPixel: "#B4997A",
+      },
+    },
   },
   "standard-dusk": {
     package: "standard",
-    source: () => require("../../assets/backgrounds/standard-dusk.webp"),
-    brightestPixel: "#C8B0C0",
-    darkestPixel: "#292634",
+    variants: {
+      light: {
+        source: () => require("../../assets/backgrounds/standard-dusk.webp"),
+        brightestPixel: "#C8B0C0",
+        darkestPixel: "#292634",
+      },
+      dark: {
+        source: () => require("../../assets/backgrounds/standard-dusk.webp"),
+        brightestPixel: "#C8B0C0",
+        darkestPixel: "#292634",
+      },
+    },
   },
   "standard-mesh": {
     package: "standard",
-    source: () => require("../../assets/backgrounds/standard-mesh.webp"),
-    brightestPixel: "#B8C4D0",
-    darkestPixel: "#3A5069",
+    variants: {
+      light: {
+        source: () => require("../../assets/backgrounds/standard-mesh.webp"),
+        brightestPixel: "#B8C4D0",
+        darkestPixel: "#3A5069",
+      },
+      dark: {
+        source: () => require("../../assets/backgrounds/standard-mesh.webp"),
+        brightestPixel: "#B8C4D0",
+        darkestPixel: "#3A5069",
+      },
+    },
   },
 };
 
 /**
  * Each package's stable, ordered slot list for the (future) picker — asset slots
  * first in a FIXED order, then the shared None/Solid slot last. The resolved
- * background is a deterministic function of (package, stored slot-id) independent
- * of selection order (THEME-04 ordering edge).
+ * background is a deterministic function of (package, stored slot-id, resolved
+ * mode) independent of selection order (THEME-04 ordering edge).
  */
 export const BACKGROUND_ORDER: Record<
   ThemePackage,
@@ -162,6 +258,8 @@ export type ResolvedBackground =
   | {
       kind: "asset";
       slotId: BackgroundSlotId;
+      /** The resolved appearance mode whose variant this is (38.5 D-23). */
+      mode: ResolvedMode;
       /** Lazy require of the bundled asset (device-only; never evaluated in node). */
       source: () => number;
       /** The asset's declared worst-case brightest pixel (composited-AA bound). */
@@ -181,34 +279,52 @@ function assetSlot(slotId: BackgroundSlotId): BackgroundAssetSlot | undefined {
   ];
 }
 
-function resolveAssetById(slotId: BackgroundSlotId): ResolvedBackground {
+/** Build the asset descriptor for a known slot's variant in `mode`. */
+function assetFor(
+  slotId: BackgroundSlotId,
+  slot: BackgroundAssetSlot,
+  mode: ResolvedMode,
+): ResolvedBackground {
+  const variant = slot.variants[mode];
+  return {
+    kind: "asset",
+    slotId,
+    mode,
+    source: variant.source,
+    brightestPixel: variant.brightestPixel,
+    darkestPixel: variant.darkestPixel,
+  };
+}
+
+function resolveAssetById(
+  slotId: BackgroundSlotId,
+  mode: ResolvedMode,
+): ResolvedBackground {
   const slot = assetSlot(slotId);
   if (!slot) {
     return { kind: "solid" };
   }
-  return {
-    kind: "asset",
-    slotId,
-    source: slot.source,
-    brightestPixel: slot.brightestPixel,
-    darkestPixel: slot.darkestPixel,
-  };
+  return assetFor(slotId, slot, mode);
 }
 
 /**
- * Resolve `(package, slotId | null)` to a renderable background. PURE and RN-free
- * (node-testable — the returned asset thunk is NOT invoked here):
- *   - NULL   -> the package DEFAULT slot's asset,
+ * Resolve `(package, slotId | null, mode)` to a renderable background. PURE and
+ * RN-free (node-testable — the returned asset thunk is NOT invoked here). The file
+ * is the slot's variant for the resolved `mode` (38.5 D-23); the slot rules are
+ * mode-independent:
+ *   - NULL   -> the package DEFAULT slot's variant,
  *   - 'none' -> the solid theme background,
- *   - a known slot id -> its bundled asset,
- *   - an unknown/tampered id -> the package default asset (safe fallback, T-23-05b).
+ *   - a known slot id -> its variant,
+ *   - an unknown/tampered id -> the package default's variant (safe fallback,
+ *     T-23-05b / ADR-113).
  */
 export function resolveBackground(
   themePackage: ThemePackage,
   slotId: BackgroundSlotId | null,
+  mode: ResolvedMode,
 ): ResolvedBackground {
   if (slotId === null) {
-    return resolveAssetById(PACKAGE_DEFAULT_SLOT[themePackage]);
+    return resolveAssetById(PACKAGE_DEFAULT_SLOT[themePackage], mode);
   }
   if (slotId === NONE_SLOT_ID) {
     return { kind: "solid" };
@@ -217,15 +333,9 @@ export function resolveBackground(
   if (!slot) {
     // Unknown/tampered id (a stored value the DAO would have rejected on write, or
     // one orphaned by a manifest change) — fall back to the package default.
-    return resolveAssetById(PACKAGE_DEFAULT_SLOT[themePackage]);
+    return resolveAssetById(PACKAGE_DEFAULT_SLOT[themePackage], mode);
   }
-  return {
-    kind: "asset",
-    slotId,
-    source: slot.source,
-    brightestPixel: slot.brightestPixel,
-    darkestPixel: slot.darkestPixel,
-  };
+  return assetFor(slotId, slot, mode);
 }
 
 /**
@@ -235,17 +345,19 @@ export function resolveBackground(
  * feeds `renderFailed = true` here and the effective background silently becomes
  * None/Solid. This keeps the fallback branch a node-tested pure function rather than
  * untested inline component logic (the repo has no react-test-renderer to mount
- * `BackgroundHost`).
+ * `BackgroundHost`). The host resets its failure latch when the selection key
+ * (which includes the mode) changes, so a failure never outlives a mode switch.
  */
 export function resolveRenderableBackground(
   themePackage: ThemePackage,
   slotId: BackgroundSlotId | null,
+  mode: ResolvedMode,
   renderFailed: boolean,
 ): ResolvedBackground {
   if (renderFailed) {
     return { kind: "solid" };
   }
-  return resolveBackground(themePackage, slotId);
+  return resolveBackground(themePackage, slotId, mode);
 }
 
 // Compile-time assurance that every non-None accepted id has a manifest slot and

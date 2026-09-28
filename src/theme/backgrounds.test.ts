@@ -133,7 +133,9 @@ describe("resolveBackground — NULL -> default, none -> solid, slot -> the mode
     expect(d.kind).toBe("asset");
     if (d.kind === "asset") {
       expect(d.mode).toBe("dark");
-      expect(d.source).toBe(BACKGROUND_SLOTS["galaxy-aurora"].variants.dark.source);
+      expect(d.source).toBe(
+        BACKGROUND_SLOTS["galaxy-aurora"].variants.dark.source,
+      );
     }
   });
 
