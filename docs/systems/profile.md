@@ -120,6 +120,7 @@ Layout and background resolution is independent. A Category change/deletion remo
 The sole overflow order is Edit Contact, Snooze/Unsnooze, Archive, separator, Profile Layout, Background, conditional Save Current Layout as Template, and conditional Reset. Archive remains recoverable; Reset removes only this contact's layout/template, collapse, and background overrides. It never touches contact data, Favorite, Snooze, AI permission, knowledge, or interaction history.
 
 Background bytes stay in app-owned `profile-backgrounds/<uid>.jpg` paths. Picker/cache paths never enter SQLite. A launch-time reconciliation sweep, registered after migration readiness, cleans interrupted local derivative writes; no timer or network work is used.
+Each crop or ImageManipulator output remains owned by the operation that produced it and is discarded after the app-owned background derivative is staged, including failure paths. The cold-start photo-cache sweep is only a guarded crash backstop and never scans durable background masters.
 
 Background rendering follows the already-resolved presentation axis rather than checking only a contact override. A resolved contact, Category, or global app-owned background URI wins. When resolution falls through to `source: "theme"`, Profile passes no app-owned URI to its own `BackgroundHost`, which then renders the active package's selected System background. Bundled System slots never enter `profile_background_templates`, and the Profile manager does not navigate to the System-background selector.
 
@@ -172,6 +173,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 17. **History actions never navigate.** Last Interaction and Status → View history reveal the in-Profile History section (D-10). Routing them to Things to Remember, a new History route, or a timeline screen contradicts D-10 and ADR-123. When the layout hides History, omit the actions; never reveal History temporarily or edit the layout (D-11).
 18. **Selector Retry settles only its owner.** Route every Frequency/Snooze write and Retry through the relationship-sheet runner. A Retry that dispatches to both reducers, or that never dispatches `success`, leaves a selector `pending`, and `close()` then refuses to reset it (RG-025).
 19. **The preview packs at the Profile width, not its own.** Packing against the narrower preview card would show fewer columns than the real Profile. If the Profile overview's padding or card border changes, update `PROFILE_OVERVIEW_HORIZONTAL_INSET` in `overview-geometry.ts`. The inset-chain test fails until you do.
+20. **Retire source derivatives at the producer boundary.** A completed or failed background crop must discard its ImageManipulator output; launch cleanup may remove only recognized cache residue and must never infer ownership of a durable `profile-backgrounds/` file.
 
 ## Related systems
 
@@ -198,6 +200,7 @@ The full History UX is owned by the History & Insights subsystem and mounts behi
 | 2026-09-02 | 35 | Profile Message now passes a Compose origin so Back and confirmed handoff completion return to the launching Profile. |
 | 2026-09-02 | 37 | Exposed global layout/background defaults in Settings while retaining per-contact template managers on Profile. |
 | 2026-09-19 | 38.1 | Made headings identifier-only, added bounded temporal knowledge/edit routes, moved Unbind to overflow, and added visual-only orphan packing with centered Overview cards. |
+| 2026-09-23 | 38.2 | Made Profile-background source and ImageManipulator copies operation-owned, with terminal cleanup and a guarded cold-start orphan backstop. |
 | 2026-09-25 | 38.3 | Coherent snapshot + History revision (RG-024): the snapshot load is latest-request gated and also refreshes on the post-sweep foreground tick; each successful publication bumps the History revision so the metrics and History share one trigger. |
 | 2026-09-25 | 38.3 | Message eligibility by archive state and host (D-09, D-25, RG-021): hero Message is disabled with a reason for archived contacts in every host and for any Settings-hosted Profile; Compose stays unregistered under Settings, and Settings now registers `RecentlyDeleted`. |
 | 2026-09-25 | 38.3 | History actions reveal the in-Profile History section (RG-021, D-10, D-11, D-28): Last Interaction and Status → View history close the sheet, expand a collapsed History through the persisted collapse toggle, and scroll to it (instant under reduced motion). When the layout hides History, neither action is offered and the Last Interaction tile is informational. The Things to Remember history route is gone. |
