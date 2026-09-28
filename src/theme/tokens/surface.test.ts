@@ -864,3 +864,140 @@ describe("proof exclusions are written down against the committed inventory (D-2
     }
   });
 });
+
+describe("exclusions are scoped by treatment and variant (38.5-03; D-24, C3-L2)", () => {
+  const BARE_INVENTORY =
+    ".planning/phases/38.5-background-art-text-contrast/38.5-BARE-TEXT-INVENTORY.md";
+
+  function d24Result(): string {
+    const lines = readFileSync(BARE_INVENTORY, "utf8")
+      .split("\n")
+      .filter((l) => /^D24_RESULT: (extend|strict|owner-question)$/.test(l));
+    expect(lines.length, "exactly one D24_RESULT line").toBe(1);
+    return lines[0].slice("D24_RESULT: ".length);
+  }
+
+  it("E-1 (Galaxy Dark danger) covers the card and chrome treatments", () => {
+    for (const treatment of ["card", "chrome"] as const) {
+      expect(isExcluded("danger", "galaxy", "dark", { treatment })).toBe(true);
+    }
+    const e1 = PROOF_EXCLUSIONS.find((e) => e.inventoryRef === "E-1");
+    expect(e1?.treatment).toEqual(["card", "chrome"]);
+  });
+
+  it("bare danger in Galaxy Dark is excluded if and only if D24_RESULT is extend (E-1-bare)", () => {
+    const extend = d24Result() === "extend";
+    expect(
+      isExcluded("danger", "galaxy", "dark", { treatment: "bare" }),
+    ).toBe(extend);
+    const bare = PROOF_EXCLUSIONS.filter((e) => e.inventoryRef === "E-1-bare");
+    expect(bare.length).toBe(extend ? 1 : 0);
+    if (extend) {
+      expect(bare[0]).toEqual(
+        expect.objectContaining({
+          token: "danger",
+          package: "galaxy",
+          mode: "dark",
+          treatment: ["bare"],
+          status: "accepted",
+          inventoryPath: BARE_INVENTORY,
+        }),
+      );
+    }
+    // No entry leaks bare scope to any other token.
+    for (const e of PROOF_EXCLUSIONS) {
+      if (e.treatment.includes("bare")) expect(e.inventoryRef).toBe("E-1-bare");
+    }
+  });
+
+  it("a slot-scoped entry matches only a call for the same slot (C3-L2)", () => {
+    const entry: ProofExclusion = {
+      token: "textSecondary",
+      package: "galaxy",
+      mode: "dark",
+      treatment: ["bare"],
+      slotId: "galaxy-aurora",
+      status: "accepted",
+      justification: "test-local fixture entry, never in PROOF_EXCLUSIONS",
+      inventoryRef: "X-1",
+      inventoryPath: ART_SIGNOFF,
+    };
+    const at = (slotId?: BackgroundSlotId) =>
+      matchesExclusion(entry, "textSecondary", "galaxy", "dark", {
+        treatment: "bare",
+        slotId,
+      });
+    expect(at("galaxy-aurora")).toBe(true);
+    expect(at("galaxy-nebula")).toBe(false);
+    expect(at(undefined)).toBe(false);
+    expect(
+      matchesExclusion(entry, "textSecondary", "galaxy", "dark", {
+        treatment: "card",
+        slotId: "galaxy-aurora",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("bare-text proof harness (38.5-03; brief H5, P-1)", () => {
+  const PAIRS: readonly [ThemePackage, ResolvedMode][] = [
+    ["galaxy", "dark"],
+    ["galaxy", "light"],
+    ["standard", "dark"],
+    ["standard", "light"],
+  ];
+  const IN_BAND: Record<string, { darkestPixel: string; brightestPixel: string }> =
+    {
+      "galaxy/dark": { darkestPixel: "#0A0A0A", brightestPixel: "#101010" },
+      "galaxy/light": { darkestPixel: "#E8E8E8", brightestPixel: "#FFFFFF" },
+      "standard/dark": { darkestPixel: "#101010", brightestPixel: "#202020" },
+      "standard/light": { darkestPixel: "#E8E8E8", brightestPixel: "#FFFFFF" },
+    };
+
+  it("the bare foreground set is the root palette's text at 4.5 and glyphs at 3.0", () => {
+    expect(BARE_FOREGROUNDS).toEqual([
+      { token: "textPrimary", floor: AA_NORMAL },
+      { token: "textSecondary", floor: AA_NORMAL },
+      { token: "textPlaceholder", floor: AA_NORMAL },
+      { token: "danger", floor: AA_NORMAL },
+      { token: "accentText", floor: AA_NORMAL },
+      { token: "statusStable", floor: AA_LARGE },
+      { token: "statusWobble", floor: AA_LARGE },
+      { token: "statusDecay", floor: AA_LARGE },
+      { token: "rogue", floor: AA_LARGE },
+    ]);
+  });
+
+  for (const [pkg, mode] of PAIRS) {
+    it(`${pkg}/${mode}: an in-band synthetic background passes at every density`, () => {
+      for (const density of SURFACE_DENSITIES) {
+        expect(
+          bareTextFailures(pkg, mode, IN_BAND[`${pkg}/${mode}`], density, {}),
+        ).toEqual([]);
+      }
+    });
+
+    it(`${pkg}/${mode}: a mid-grey #777777 background fails`, () => {
+      const grey = { darkestPixel: "#777777", brightestPixel: "#777777" };
+      expect(
+        bareTextFailures(pkg, mode, grey, "presentation", {}).length,
+      ).toBeGreaterThan(0);
+    });
+
+    it(`${pkg}/${mode}: bare text over the None (solid) background clears every floor at every density, for every accent`, () => {
+      const background = resolvePalette(pkg, mode).background;
+      for (const density of SURFACE_DENSITIES) {
+        expect(
+          bareTextFailures(
+            pkg,
+            mode,
+            { darkestPixel: background, brightestPixel: background },
+            density,
+            {},
+          ),
+          `${pkg}/${mode} none @ ${density}`,
+        ).toEqual([]);
+      }
+    });
+  }
+});
