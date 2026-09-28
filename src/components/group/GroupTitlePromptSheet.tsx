@@ -1,7 +1,8 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: Orbit Button/AppText `role` is a domain prop, not ARIA.
 import { useEffect, useState } from "react";
 import { StyleSheet, TextInput, View } from "react-native";
-import { AppText, Button, Sheet } from "@/components/ui";
+import { AppText, Sheet } from "@/components/ui";
+import { ConfirmActions } from "@/components/ui/ConfirmDialog";
 import { useUnscopedTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 
@@ -29,6 +30,9 @@ export function GroupTitlePromptSheet({
     if (!visible) setTitle("");
   }, [visible]);
   const trimmed = title.trim();
+  const confirm = () => {
+    if (trimmed) onConfirm(trimmed);
+  };
   return (
     <Sheet visible={visible} onRequestClose={onRequestClose} variant="compact">
       <View style={styles.content}>
@@ -41,6 +45,10 @@ export function GroupTitlePromptSheet({
           autoFocus
           value={title}
           onChangeText={setTitle}
+          // The keyboard's Done key creates the event (D-72): the actions can
+          // sit below the fold of the lifted sheet while typing.
+          returnKeyType="done"
+          onSubmitEditing={confirm}
           placeholder="Group event title"
           placeholderTextColor={colors.textPlaceholder}
           style={[
@@ -57,15 +65,16 @@ export function GroupTitlePromptSheet({
             {error}
           </AppText>
         ) : null}
-        <View style={styles.actions}>
-          <Button role="secondary" label="Cancel" onPress={onRequestClose} />
-          <Button
-            role="primary"
-            label="Create group event"
-            disabled={!trimmed}
-            onPress={() => onConfirm(trimmed)}
-          />
-        </View>
+        {/* A row when both fit, stacked full-width at large text so Cancel is
+            never pushed off the sheet (D-72; the ConfirmDialog treatment). */}
+        <ConfirmActions
+          cancelLabel="Cancel"
+          confirmLabel="Create group event"
+          destructive={false}
+          confirmDisabled={!trimmed}
+          onCancel={onRequestClose}
+          onConfirm={confirm}
+        />
       </View>
     </Sheet>
   );
@@ -77,10 +86,5 @@ const styles = StyleSheet.create({
     borderRadius: SPACING.sm,
     minHeight: 44,
     paddingHorizontal: SPACING.md,
-  },
-  actions: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    gap: SPACING.sm,
   },
 });

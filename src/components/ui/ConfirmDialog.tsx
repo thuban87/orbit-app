@@ -144,9 +144,11 @@ type ActionsLayout = "measuring" | "row" | "stacked";
 
 /**
  * The two explicit choices. Rendered inside the overlay, so it remounts (and
- * re-measures) every time the dialog opens.
+ * re-measures) every time the dialog opens. Exported for other overlays with a
+ * Cancel + confirm pair that must stack at large text (38.4 D-72:
+ * GroupTitlePromptSheet).
  */
-function ConfirmActions({
+export function ConfirmActions({
   cancelLabel,
   confirmLabel,
   destructive,

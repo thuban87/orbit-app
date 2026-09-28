@@ -29,6 +29,12 @@ vi.mock("react-native", () => ({
     setAccessibilityFocus: native.focus,
   },
   findNodeHandle: () => 7,
+  // The shared Sheet listens for the soft keyboard (38.4 D-72).
+  Keyboard: {
+    addListener: () => ({ remove: () => {} }),
+    isVisible: () => false,
+    metrics: () => undefined,
+  },
 }));
 vi.mock("react-native-reanimated", () => ({
   default: {
@@ -48,6 +54,7 @@ vi.mock("expo-blur", () => ({ BlurView: "BlurView" }));
 vi.mock("@/components/Avatar", () => ({ Avatar: "Avatar" }));
 vi.mock("react-native-safe-area-context", () => ({
   SafeAreaView: "SafeAreaView",
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock("react-native-gesture-handler", () => ({
   GestureHandlerRootView: "GestureHandlerRootView",

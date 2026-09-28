@@ -5,6 +5,7 @@ import {
   SHEET_BODY_SCROLLS,
   SHEET_HEIGHT_PERCENT,
   SHEET_VARIANTS,
+  sheetKeyboardLayout,
 } from "./sheet-contract";
 
 describe("Sheet variant contract", () => {
@@ -115,5 +116,90 @@ describe("Sheet body scrolls at large text (D-32)", () => {
       container.indexOf("{body}"),
     );
     expect(container).not.toContain("<ScrollView");
+  });
+});
+
+describe("Sheet stays above the keyboard (38.4 D-72, Plan 17 G1-f)", () => {
+  // The RN Modal window is edge-to-edge, so Android does not resize it for the
+  // IME: at font_scale 2.0 the whole group-title sheet sat behind the keyboard.
+  it("lifts by the keyboard height when the window was not resized", () => {
+    expect(
+      sheetKeyboardLayout({
+        variant: "compact",
+        frameHeight: 640,
+        restingFrameHeight: 640,
+        keyboardHeight: 300,
+        topClearance: 40,
+      }),
+    ).toEqual({ lift: 300, size: 256 });
+  });
+
+  it("gives a percent-capped sheet at most the room left above the keyboard", () => {
+    expect(
+      sheetKeyboardLayout({
+        variant: "detail",
+        frameHeight: 640,
+        restingFrameHeight: 640,
+        keyboardHeight: 400,
+        topClearance: 40,
+      }),
+    ).toEqual({ lift: 400, size: 200 });
+    expect(
+      sheetKeyboardLayout({
+        variant: "expanded",
+        frameHeight: 640,
+        restingFrameHeight: 640,
+        keyboardHeight: 300,
+        topClearance: 40,
+      }),
+    ).toEqual({ lift: 300, size: 300 });
+  });
+
+  it("does not lift twice when the system already resized the window", () => {
+    expect(
+      sheetKeyboardLayout({
+        variant: "compact",
+        frameHeight: 340,
+        restingFrameHeight: 640,
+        keyboardHeight: 300,
+        topClearance: 40,
+      }),
+    ).toEqual({ lift: 0, size: 256 });
+  });
+
+  it("changes nothing while the keyboard is down or before layout", () => {
+    const down = { lift: 0, size: null };
+    expect(
+      sheetKeyboardLayout({
+        variant: "compact",
+        frameHeight: 640,
+        restingFrameHeight: 640,
+        keyboardHeight: 0,
+        topClearance: 40,
+      }),
+    ).toEqual(down);
+    expect(
+      sheetKeyboardLayout({
+        variant: "compact",
+        frameHeight: 0,
+        restingFrameHeight: 0,
+        keyboardHeight: 300,
+        topClearance: 40,
+      }),
+    ).toEqual(down);
+  });
+
+  it("wires the lift and the size into the shared Sheet", () => {
+    const source = readFileSync(
+      new URL("./Sheet.tsx", import.meta.url),
+      "utf8",
+    );
+    expect(source).toContain('Keyboard.addListener("keyboardDidShow"');
+    expect(source).toContain('Keyboard.addListener("keyboardDidHide"');
+    expect(source).toContain("sheetKeyboardLayout(");
+    expect(source).toMatch(/pointerEvents="box-none"/);
+    expect(source).toMatch(/paddingBottom: keyboardLayout\.lift/);
+    expect(source).toMatch(/maxHeight: keyboardLayout\.size/);
+    expect(source).toMatch(/height: keyboardLayout\.size/);
   });
 });

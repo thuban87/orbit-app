@@ -16,16 +16,26 @@
  * `expanded` is a fixed 92% sheet with a `flex: 1` body; its consumers own their
  * workspace scroll. `sheet-consumers-contract.test.ts` pins every consumer.
  *
+ * Keyboard (38.4 D-72, Plan 17 G1-f): the Modal window is edge-to-edge, so
+ * Android does not resize it for the soft keyboard. While the keyboard is up
+ * the sheet is lifted above it and bounded by the room left
+ * (`sheetKeyboardLayout`); its body scrolls as above.
+ *
  * No colour literal (check:colors).
  */
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import {
   type DimensionValue,
+  Keyboard,
+  type LayoutChangeEvent,
   ScrollView,
   StyleSheet,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useTheme } from "@/theme";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -35,6 +45,7 @@ import {
   SHEET_BODY_SCROLLS,
   SHEET_HEIGHT_PERCENT,
   type SheetVariant,
+  sheetKeyboardLayout,
 } from "./sheet-contract";
 
 /** Sheet heights (dossier §O): compact list vs. half-height detail. */
@@ -61,6 +72,36 @@ export function Sheet({
   children,
 }: SheetProps) {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const [keyboardHeight, setKeyboardHeight] = useState(() =>
+    Keyboard.isVisible() ? (Keyboard.metrics()?.height ?? 0) : 0,
+  );
+  const [frameHeight, setFrameHeight] = useState(0);
+  const restingFrameHeight = useRef(0);
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", (event) =>
+      setKeyboardHeight(event.endCoordinates.height),
+    );
+    const hide = Keyboard.addListener("keyboardDidHide", () =>
+      setKeyboardHeight(0),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  const onFrameLayout = (event: LayoutChangeEvent) => {
+    const height = event.nativeEvent.layout.height;
+    restingFrameHeight.current = Math.max(restingFrameHeight.current, height);
+    setFrameHeight(height);
+  };
+  const keyboardLayout = sheetKeyboardLayout({
+    variant,
+    frameHeight,
+    restingFrameHeight: restingFrameHeight.current,
+    keyboardHeight,
+    topClearance: insets.top + SPACING.lg,
+  });
   const body =
     variant === "expanded" ? (
       <View
@@ -92,22 +133,33 @@ export function Sheet({
       scrimAccessibilityLabel="Dismiss"
       contentStyle={styles.overlayContent}
     >
-      <SafeAreaView
-        edges={["bottom"]}
-        style={[
-          styles.sheet,
-          variant === "expanded"
-            ? { height: SHEET_HEIGHT_PERCENT.expanded as DimensionValue }
-            : { maxHeight: SHEET_HEIGHT_PERCENT[variant] as DimensionValue },
-          { backgroundColor: colors.surface, borderColor: colors.border },
-        ]}
-        accessibilityViewIsModal
+      <View
+        pointerEvents="box-none"
+        onLayout={onFrameLayout}
+        style={[styles.keyboardFrame, { paddingBottom: keyboardLayout.lift }]}
       >
-        <View style={styles.handleWrap}>
-          <View style={[styles.handle, { backgroundColor: colors.border }]} />
-        </View>
-        {body}
-      </SafeAreaView>
+        <SafeAreaView
+          edges={["bottom"]}
+          style={[
+            styles.sheet,
+            variant === "expanded"
+              ? { height: SHEET_HEIGHT_PERCENT.expanded as DimensionValue }
+              : { maxHeight: SHEET_HEIGHT_PERCENT[variant] as DimensionValue },
+            keyboardLayout.size === null
+              ? null
+              : variant === "expanded"
+                ? { height: keyboardLayout.size }
+                : { maxHeight: keyboardLayout.size },
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+          accessibilityViewIsModal
+        >
+          <View style={styles.handleWrap}>
+            <View style={[styles.handle, { backgroundColor: colors.border }]} />
+          </View>
+          {body}
+        </SafeAreaView>
+      </View>
     </BaseOverlay>
   );
 }
@@ -117,6 +169,9 @@ const styles = StyleSheet.create({
   // this flex wrapper provides it. Content taller than the percent cap then
   // scrolls in the bounded body below instead of clipping (D-32).
   overlayContent: { flex: 1, justifyContent: "flex-end" },
+  // Fills the overlay; its bottom padding lifts the sheet above the keyboard
+  // (D-72). box-none: the empty area above the sheet still reaches the scrim.
+  keyboardFrame: { flex: 1, justifyContent: "flex-end" },
   sheet: {
     flexDirection: "column",
     borderTopLeftRadius: RADII.xl,

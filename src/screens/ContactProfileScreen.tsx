@@ -448,6 +448,11 @@ export function ContactProfileScreen({
         ) : null}
         <ScrollView
           ref={scrollRef}
+          // Sheets opened from this Profile (e.g. the group title prompt) are
+          // React descendants of this ScrollView even though they render in a
+          // Modal window; without "handled" its responder capture swallows
+          // the first tap on their buttons while the keyboard is up (D-72).
+          keyboardShouldPersistTaps="handled"
           contentContainerStyle={[
             styles.content,
             { paddingBottom: bottomClearance },

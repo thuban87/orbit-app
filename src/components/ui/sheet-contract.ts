@@ -29,3 +29,47 @@ export const SHEET_BODY_FLEX: Readonly<Record<SheetVariant, number>> =
  */
 export const SHEET_BODY_SCROLLS: Readonly<Record<SheetVariant, boolean>> =
   Object.freeze({ compact: true, detail: true, expanded: false });
+
+export interface SheetKeyboardInput {
+  variant: SheetVariant;
+  /** Current height of the sheet's overlay frame (the modal window). */
+  frameHeight: number;
+  /** Tallest frame height seen, i.e. the height while the keyboard is down. */
+  restingFrameHeight: number;
+  /** Height the keyboard occupies above the navigation bar (0 when down). */
+  keyboardHeight: number;
+  /** Space kept clear at the top (status bar inset plus a margin). */
+  topClearance: number;
+}
+
+export interface SheetKeyboardLayout {
+  /** Bottom padding that lifts the sheet above the keyboard. */
+  lift: number;
+  /** Height cap (compact/detail) or fixed height (expanded); null = unchanged. */
+  size: number | null;
+}
+
+/**
+ * Keeps a sheet above the soft keyboard (38.4 D-72, Plan 17 G1-f). The RN
+ * Modal window is edge-to-edge, so Android does not resize it for the IME and
+ * a bottom sheet with a focused field sat entirely behind the keyboard at
+ * large text. While the keyboard is up the sheet is lifted by the part of the
+ * keyboard the system did not already absorb by resizing the window, and its
+ * height is bounded by the room left above the keyboard (the body scrolls,
+ * D-32). The percent heights still apply against the resting window height.
+ */
+export function sheetKeyboardLayout({
+  variant,
+  frameHeight,
+  restingFrameHeight,
+  keyboardHeight,
+  topClearance,
+}: SheetKeyboardInput): SheetKeyboardLayout {
+  if (keyboardHeight <= 0 || frameHeight <= 0) return { lift: 0, size: null };
+  const resting = Math.max(restingFrameHeight, frameHeight);
+  const resized = resting - frameHeight;
+  const lift = Math.max(0, Math.round(keyboardHeight - resized));
+  const room = Math.max(0, frameHeight - lift - topClearance);
+  const percent = Number.parseFloat(SHEET_HEIGHT_PERCENT[variant]) / 100;
+  return { lift, size: Math.min(Math.round(percent * resting), room) };
+}
