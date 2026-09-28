@@ -85,6 +85,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 1. Official providers use their fixed HTTPS hosts; Custom generation validates the endpoint then calls `secureCustomFetch()` rather than raw fetch.
 2. The native transport resolves and validates the destination once, blocks non-public addresses and redirects, bypasses proxies, and returns only sanitized failure codes.
 3. The default model picker reads a bundled LiteLLM-filtered seed or local cache. A user may explicitly refresh the public catalog; refresh sends no key or contact data and leaves the prior catalog intact on failure.
+4. Custom response reading keeps ownership of the native call until the body is consumed once. Success bodies are capped at 1 MiB and error bodies at 16 KiB; over-limit content maps to a sanitized `invalid_response` result without exposing provider bytes.
 
 ## Configuration
 
@@ -113,6 +114,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 - **ADR-136:** Permission-Bounded Prompt Assembly and AI Transparency — sends only explicit permission-gated context and exposes the same resolved prompt for review.
 - **ADR-137:** Structured Personalization and Explicit Context Capacity — provides enabled global sections and model-aware no-truncation estimates.
 - **ADR-139:** Loopback-Only OpenRouter Authorization Callback — makes browser authorization local, one-shot, and credential-free outside SecureStore.
+- **ADR-157:** Bounded Native Transfer Ownership — keeps Custom call ownership through one bounded response read and deterministically settles cancellation, overflow, and failure.
 
 ## Gotchas
 
@@ -129,6 +131,7 @@ AI has no AI-owned per-contact table. Migration 004 extends the singleton `app_s
 11. **Do not weaken the OpenRouter callback.** It must bind loopback only, require the exact state before exchange, and wake the app without code or state in the URI.
 12. **AI availability comes from the master, not `aiProvider`.** Every surface that asks "is AI on?" calls `isAiMasterEnabled(settings)` (ADR-135). `ai_provider` is a retained compatibility field; a stale `'none'` or provider id there must not show or hide AI. The master is distinct from the active connection, readiness, per-item `allow_ai` consent and remembered models, and reading it never writes consent (38.4 RG-008; `architecture/AUD-ARCH-003`, `react-native/AUD-RN-005`; D-17).
 13. **The access line counts AI-enabled items only; the list may include disabled items.** On AI Data Permissions the access line is the unfiltered enabled total, while the list (with Enabled only off, e.g. after "Review existing…") also shows items AI cannot access. The list line and each contact header say which, and all three reconcile through one counting rule (D-44).
+14. **Do not release a Custom call before its bounded body read settles.** The 1 MiB success and 16 KiB error caps apply during consumption; a second reader, late callback, or raw oversized-body error would break deterministic ownership and sanitization.
 
 ## Related Systems
 
