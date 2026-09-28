@@ -5,10 +5,10 @@ milestone_name: Release Readiness
 current_phase: 38.4
 current_phase_name: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
 status: executing
-stopped_at: Completed 38.4-17-PLAN.md
-last_updated: "2026-09-27T22:30:00.000Z"
+stopped_at: 38.4 D-72 fix pass complete (post-Plan-17)
+last_updated: "2026-09-27T22:45:00.000Z"
 last_activity: 2026-09-27
-last_activity_desc: "38.4-17 complete — final gate green on reviewed HEAD 805e95c (5243 tests, tsc/colors/biome, extrema, launcher fit, introspect); debug + ONE release APK from 805e95c (aapt2: release lacks SYSTEM_ALERT_WINDOW, READ_CONTACTS + capped storage pair kept per D-60), release delivered to Drive as orbit-38.4-release-2026-09-27-805e95c.apk; Pixel 3a device pass ~95 rows in 38.4-UAT.md: 1 FAIL (G1-f group title prompt at font 2.0, Plan 18 gap), 9 BLOCKED, owner checklist of 23 items; pre-existing defects routed (PostLog Edit Memory clip, bulk Set category lists only Uncategorized, single-import Leave-import alert, Orbit Status seconds). VALIDATION status draft (open rows). Next: owner checklist + route FAIL/defects, then /gsd-verify-work 38.4."
+last_activity_desc: "38.4 D-72 fix pass (owner ruling, no new plan) — five Plan 17 device defects fixed with failing-first tests and retested PASS on the Pixel 3a: category chooser lists every category (881708c), Orbit Status minute time (4cafd11), no Leave-import alert after a successful import (07a5465), post-log Edit Memory scrolls (e1abdd9), group title prompt above the keyboard with stacking buttons + Profile keyboardShouldPersistTaps (f2a5f23; shared Sheet keyboard lift). Gates: tsc, check:colors, biome 0 errors, 5263 tests green. ONE new release from cf0e949 delivered as orbit-38.4-release-2026-09-27-cf0e949.apk (sha256 176ae35f…bf31; aapt2 identical to 805e95c release, no SYSTEM_ALERT_WINDOW, storage pair kept per D-60). Debug APK reinstalled, device baseline restored, adb reverse 8081->8082 kept. Next: owner checklist, then /gsd-verify-work 38.4."
 state_head: 52c4e52d748f81b63ab6cac2b0720f1070d9da05
 progress:
   total_phases: 27
