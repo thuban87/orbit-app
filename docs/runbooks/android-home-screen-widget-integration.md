@@ -4,9 +4,9 @@
 
 Use this process when adding or materially changing Orbit's Android home-screen widget. It keeps widget data local, renders RemoteViews from bounded inputs, routes headless writes through existing DAOs, and verifies native configuration on the physical Pixel instead of treating Metro reload as a native test.
 
-## Architecture (Phase 12)
+## Architecture (Phases 12 and 38.2)
 
-The registered provider is `OrbitFavourites`. `react-native-android-widget` invokes the module-scope task handler for lifecycle events and clicks; the handler renders an off-screen bitmap or commits a narrowly validated action. The widget has no SQLite table or per-instance configuration: it reads the existing ranked favourites projection.
+The registered widget is `OrbitFavourites`. `react-native-android-widget` invokes the module-scope task handler for lifecycle events and clicks; the handler renders an off-screen bitmap or commits a narrowly validated action. Phase 38.2 patches the dependency so light and dark bitmaps are delivered inline with `RemoteViews.setImageViewBitmap`; the library's unauthenticated `RNWidgetImageProvider` is absent from the merged app manifest. The widget has no SQLite table or per-instance configuration: it reads the existing favourites projection in Dashboard Default order.
 
 ### Provider configuration
 
@@ -44,6 +44,7 @@ const widgetPlugin: [string, WithAndroidWidgetsParams] = [
 | `src/services/widget/widget-refresh.ts` | Event-push and foreground-launch refresh wrapper. |
 | `src/navigation/widget-linking.ts` | Strict `orbit://` resolver and readiness gate. |
 | `plugins/withWidgetBootReceiver.js` | Generates the guarded non-exported boot receiver at prebuild. |
+| `patches/react-native-android-widget+0.22.0.patch` | Removes the image provider, switches RemoteViews to inline bitmaps, and retires stale private snapshots. |
 
 ## How to Change the Widget
 
@@ -59,7 +60,7 @@ const widgetPlugin: [string, WithAndroidWidgetsParams] = [
    });
    ```
 
-   Return `null` for a missing/empty payload or encoder error. Never give RemoteViews a `file://` or `http(s)` image source.
+   Return `null` for a missing/empty payload or encoder error. Never give RemoteViews a `file://` or `http(s)` image source. Keep both light and dark outputs on the patched inline-bitmap path; do not restore provider-backed image URIs.
 
 3. **Add a widget action** in `src/services/widget/widget-render.tsx` and route it in `src/services/widget/widget-task-handler.tsx`. Validate all click data before SQLite. A write must call an existing DAO boundary; it must not write `last_contact` directly or run foreground sweep work.
 
@@ -67,7 +68,9 @@ const widgetPlugin: [string, WithAndroidWidgetsParams] = [
 
 5. **Publish after successful data changes.** Add `notifyWidgetDataChanged()` after the owning write commits. Keep it fire-and-forget: rendering must not roll back a successful user action.
 
-6. **Run JavaScript checks.**
+6. **Verify the native patch and merged manifest.** `npm ci` must apply `react-native-android-widget+0.22.0.patch` before a clean prebuild. Build debug and release APKs, dump each merged manifest with `aapt2`, and assert that neither contains `RNWidgetImageProvider` or `rnwidget.imageprovider`. On the Pixel, verify light/dark rendering, refresh, largest-size layout, and reboot. An `adb shell content read` against `content://com.bwales.orbit.rnwidget.imageprovider/...` must fail with unknown authority.
+
+7. **Run JavaScript checks.**
 
    ```bash
    npx vitest run src/services/widget src/navigation/widget-linking.test.ts
@@ -75,7 +78,7 @@ const widgetPlugin: [string, WithAndroidWidgetsParams] = [
    npm run check:colors
    ```
 
-7. **Rebuild native Android output** whenever `app.config.ts`, `package.json`, a native dependency, or `plugins/withWidgetBootReceiver.js` changes. Follow [the desktop build pipeline](desktop-build-pipeline.md); a Metro refresh does not update the provider or manifest.
+8. **Rebuild native Android output** whenever `app.config.ts`, `package.json`, a native dependency, the widget patch, or `plugins/withWidgetBootReceiver.js` changes. Follow [the desktop build pipeline](desktop-build-pipeline.md); a Metro refresh does not update the provider or manifest.
 
 ## What You Don't Need to Change
 
@@ -91,6 +94,8 @@ const widgetPlugin: [string, WithAndroidWidgetsParams] = [
 3. **The release APK is not database-inspectable.** Use the debug-plus-Metro build for `run-as` row-count verification; use release for standalone widget-host proof.
 4. **Force-stop and reboot differ.** A manual launch re-arms a force-stopped widget; the generated `BOOT_COMPLETED` receiver covers cold boot.
 5. **Capacity is device-tunable.** Validate thumbnail size, tile counts, and layout breakpoints on the physical Pixel; an emulator cannot close this performance proof.
+6. **Provider absence is a release artifact property.** Source manifests and patch contents are insufficient evidence; inspect both built APK manifests after clean prebuild, and treat a provider match as a failed security gate.
+7. **Binder pressure does not authorize a silent fallback.** If the largest inline bitmap layout fails, stop and present the owner with the content-reduction versus trusted-host-grant tradeoff.
 
 ## Smoke Test
 
@@ -109,3 +114,5 @@ grep -q 'android:exported": "false"' plugins/withWidgetBootReceiver.js
 ```
 
 Expected: event-push configuration, headless registration, and the non-exported boot receiver are present before prebuild.
+
+After the native build, the merged-manifest and Pixel checks in step 6 are required; JavaScript tests alone do not verify the providerless delivery boundary.
