@@ -1,7 +1,7 @@
 # Interaction Log
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `src/db/recency-dao.ts`, `src/db/events-dao.ts`, `src/db/timeline-read.ts`, `src/db/log-guards.ts`, `src/db/impact-read.ts`, `src/services/impact.ts`, `src/services/quick-log-command.ts`, `src/db/bulk-actions-dao.ts`, `src/db/interaction-vocabulary.ts`
 
 ## Purpose
@@ -208,6 +208,8 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 - **[ADR-126: Explicit Group Lifecycle and Identity-Preserving Conversion](../decisions/ADR-126-explicit-group-lifecycle-and-identity-preserving-conversion.md)** — governs `src/db/group-events-dao.ts`.
 - **[ADR-129: Portable Group Identity and History-Preserving Orphan Disposition](../decisions/ADR-129-portable-group-identity-and-history-preserving-orphan-disposition.md)** — governs `src/db/group-events-dao.ts`.
 - **[ADR-164: Shared Post-Commit Assist Publisher with Surfaced Assist Failures](../decisions/ADR-164-shared-post-commit-assist-publisher-with-surfaced-assist-failures.md)** — makes Post-Log note and Memory saves publish the shell tick and report only a rejected write as failed.
+- **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
+- **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 
 ## Gotchas
 
@@ -269,3 +271,4 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 | 2026-09-23 | 38.2 | Composed full-editor Bind/Unbind events in the cadence transaction and made committed write results authoritative before post-save refresh. |
 | 2026-09-25 | 38.3 | Post-Log Note editor publishes the shell refresh tick after its committed note and Memory writes (D-21); `log-guards.ts` gained the typed `FutureOccurredAtError` for the future branch (message unchanged, guard logic unchanged). |
 | 2026-09-26 | 38.3 | Post-Log "Create Memory Instead" and Memory edit treat a resolved write as terminal: a failed post-commit re-read no longer reports "Couldn't save" or invites a duplicate Memory (review B-CR-01, D-04). |
+| 2026-09-23 | 38.4 | Touchpoint refine form: the selected duration chip is filled with the accent and labelled with `onAccent` (`durationChipTone`, D-30; ADR-169), chips meet `MIN_TOUCH_TARGET`, and the date/time value renders through the shared minute formatter (RG-030, RG-038). The post-log note editor scrolls at large text (D-72; ADR-174). |
