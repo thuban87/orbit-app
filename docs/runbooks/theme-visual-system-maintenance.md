@@ -8,6 +8,8 @@ Use this process when adding a curated accent, bundled background slot, semantic
 
 `app_settings` stores a package plus per-package mode, accent ID, and background ID. `ThemeProvider` resolves the active package and OS appearance, then applies a curated accent tone at render time. Palette hex values live only under `src/theme/`; screens receive resolved semantic tokens through `useTheme()`.
 
+Governing decisions for the 38.4 additions: ADR-169 (Standard-Light glass foreground scope, both-extrema proof, accent role contract) and ADR-176 (native dialogs follow Orbit's mode setting).
+
 ### Resolution order
 
 1. **SQLite selection** — `src/db/app-settings-dao.ts` returns the active package and remembered package-specific values.
