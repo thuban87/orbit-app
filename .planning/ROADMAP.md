@@ -1272,14 +1272,14 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.5-background-art-text-contrast-dossier.md (authoritative); primary input `.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-BACKGROUND-ART-BRIEF.md`
 **Canonical refs**: 38.4-CONTEXT.md D-38..D-41; ADR-084 (palettes and contrast validation), ADR-087/ADR-113/ADR-114/ADR-115 (background slots, selection and surface composition)
 **UI hint**: yes
-**Plans**: 1/9 plans executed (8 waves; two blocking owner checkpoints: art sign-off in 04, scrim re-sign-off in 07)
+**Plans**: 2/9 plans executed (8 waves; two blocking owner checkpoints: art sign-off in 04, scrim re-sign-off in 07)
 
 Plans:
 
 **Wave 1**
 
 - [x] 38.5-01-PLAN.md — Re-verify the bare-text site list with a committed analyzer; D-24 metric → Galaxy Dark band (`D24_RESULT`) before any art brief (RG-029; D-24, P-6, P-5)
-- [ ] 38.5-02-PLAN.md — Slot × mode asset model on today's art (no visual change): mode-aware resolver, host latch, picker, variant-aware extrema script and proof loops (RG-029; D-23, D-03)
+- [x] 38.5-02-PLAN.md — Slot × mode asset model on today's art (no visual change): mode-aware resolver, host latch, picker, variant-aware extrema script and proof loops (RG-029; D-23, D-03)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -1371,7 +1371,7 @@ Plans:
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
-| 38.5 Background Art & Text-on-Art Contrast | 1/9 | In Progress|  |
+| 38.5 Background Art & Text-on-Art Contrast | 2/9 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
