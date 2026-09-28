@@ -114,7 +114,9 @@ export function OpaqueScreen() {
     const file = "src/screens/OpaqueScreen.tsx";
     const a = classifyBareTextSites([
       { file, source: screen },
-      stack({ Opaque: { name: "OpaqueScreen", from: "@/screens/OpaqueScreen" } }),
+      stack({
+        Opaque: { name: "OpaqueScreen", from: "@/screens/OpaqueScreen" },
+      }),
     ]);
     for (const needle of ["On surface", "In sheet"]) {
       const s = site(a, file, lineOf(screen, needle));
@@ -157,9 +159,7 @@ export function BareScreen() {
       xBand: "ESTIMATED(n/a)",
     });
     expect(row?.density.startsWith("comfortable")).toBe(true);
-    expect(row?.parentChainNote).toContain(
-      `route:Digest@${NAV}`,
-    );
+    expect(row?.parentChainNote).toContain(`route:Digest@${NAV}`);
     const text = a.rows.find(
       (r) => r.fileLine === `${file}:${lineOf(screen, "Hint")}`,
     );
@@ -237,9 +237,15 @@ export function WrappedScreen() {
     const a = classifyBareTextSites([
       { file: "src/components/InfoCard.tsx", source: card },
       { file: "src/screens/WrappedScreen.tsx", source: screen },
-      stack({ Wrapped: { name: "WrappedScreen", from: "@/screens/WrappedScreen" } }),
+      stack({
+        Wrapped: { name: "WrappedScreen", from: "@/screens/WrappedScreen" },
+      }),
     ]);
-    const s = site(a, "src/screens/WrappedScreen.tsx", lineOf(screen, "Wrapped<"));
+    const s = site(
+      a,
+      "src/screens/WrappedScreen.tsx",
+      lineOf(screen, "Wrapped<"),
+    );
     expect(s.classification).toBe("backed");
   });
 });
@@ -276,9 +282,11 @@ export function RolesScreen() {
     for (const [needle, token, roleSize, floor] of expectations) {
       const s = site(a, file, lineOf(screen, needle));
       expect(s.classification).toBe("bare");
-      expect({ token: s.token, roleSize: s.roleSize, floor: s.floor }).toEqual(
-        { token, roleSize, floor },
-      );
+      expect({ token: s.token, roleSize: s.roleSize, floor: s.floor }).toEqual({
+        token,
+        roleSize,
+        floor,
+      });
     }
     const input = site(a, file, lineOf(screen, "<TextInput"));
     expect(input.classification).toBe("backed");
@@ -301,7 +309,9 @@ export function ButtonsScreen() {
     const file = "src/screens/ButtonsScreen.tsx";
     const a = classifyBareTextSites([
       { file, source: screen },
-      stack({ Buttons: { name: "ButtonsScreen", from: "@/screens/ButtonsScreen" } }),
+      stack({
+        Buttons: { name: "ButtonsScreen", from: "@/screens/ButtonsScreen" },
+      }),
     ]);
     const link = site(a, file, lineOf(screen, 'role="tertiary"'));
     expect(link).toMatchObject({
