@@ -104,7 +104,8 @@ describe("BulkImportSetupScreen stopped view (D-73c)", () => {
     expect(fn("onDiscardStopped")).toContain("navigation.goBack()");
     // The stopped view has no edits of its own: leaving never asks "Leave import?".
     expect(screen).toMatch(
-      /useImportLeaveGuard\(\s*navigation,\s*route\.params\.sessionId,\s*edited && !stopped,?\s*\)/,
+      // D-74 adds a 4th argument (hold Back while the Import is starting).
+      /useImportLeaveGuard\(\s*navigation,\s*route\.params\.sessionId,\s*edited && !stopped,\s*\(\) => starting\.current,?\s*\)/,
     );
   });
 

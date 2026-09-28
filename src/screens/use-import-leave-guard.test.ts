@@ -38,7 +38,7 @@ type BeforeRemove = (event: {
   data: { action: unknown };
 }) => void;
 
-function mountGuard(hasMeaningfulEdits: boolean) {
+function mountGuard(hasMeaningfulEdits: boolean, isBusy?: () => boolean) {
   let listener: BeforeRemove | null = null;
   const navigation = {
     addListener: vi.fn((_name: string, callback: BeforeRemove) => {
@@ -52,6 +52,7 @@ function mountGuard(hasMeaningfulEdits: boolean) {
     navigation as never,
     7,
     hasMeaningfulEdits,
+    isBusy,
   );
   const fire = () => {
     const event = { preventDefault: vi.fn(), data: { action: "RESET" } };
@@ -87,6 +88,76 @@ describe("useImportLeaveGuard (D-72)", () => {
     expect(event.preventDefault).not.toHaveBeenCalled();
     expect(mocks.alert).not.toHaveBeenCalled();
     expect(mocks.discardSession).not.toHaveBeenCalled();
+  });
+});
+
+describe("useImportLeaveGuard while the import is starting (D-74)", () => {
+  beforeEach(() => {
+    mocks.alert.mockReset();
+    mocks.listSessionRows.mockReset().mockResolvedValue([]);
+    mocks.discardSession.mockReset().mockResolvedValue([]);
+  });
+
+  it("holds the screen and discards nothing while busy", async () => {
+    const { fire, navigation } = mountGuard(false, () => true);
+    const event = fire();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(mocks.listSessionRows).not.toHaveBeenCalled();
+    expect(mocks.discardSession).not.toHaveBeenCalled();
+    expect(mocks.alert).not.toHaveBeenCalled();
+    expect(navigation.dispatch).not.toHaveBeenCalled();
+  });
+
+  it("behaves as before once no longer busy", () => {
+    const { fire } = mountGuard(false, () => false);
+    const event = fire();
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(mocks.listSessionRows).toHaveBeenCalledWith({}, 7);
+  });
+});
+
+describe("bulk setup holds Back while its Import or Combine is starting (D-74)", () => {
+  const source = readFileSync(
+    join(__dirname, "BulkImportSetupScreen.tsx"),
+    "utf8",
+  ).replace(/\r\n/g, "\n");
+  const fn = (name: string) => {
+    const start = source.indexOf(`async function ${name}(`);
+    expect(start, `${name} exists`).toBeGreaterThan(-1);
+    return source.slice(start, source.indexOf("\n  }\n", start));
+  };
+
+  it("passes a busy check to the leave guard", () => {
+    expect(source.replace(/\s+/g, " ")).toMatch(
+      /useImportLeaveGuard\( navigation, route\.params\.sessionId, edited && !stopped, \(\) => starting\.current,? \)/,
+    );
+  });
+
+  it.each(["onImport", "onCombine"])(
+    "%s marks the start before its first await",
+    (name) => {
+      const body = fn(name);
+      const mark = body.indexOf("starting.current = true");
+      expect(mark).toBeGreaterThan(-1);
+      expect(mark).toBeLessThan(body.indexOf("await "));
+    },
+  );
+
+  it("clears the start whenever the screen stays (prompt, failure, focus)", () => {
+    expect(fn("onImport")).toMatch(
+      /setConsolidationRows\(cluster\);\s*starting\.current = false;/,
+    );
+    expect(fn("startBatch")).toMatch(
+      /catch \(error\) \{[\s\S]*starting\.current = false;/,
+    );
+    expect(fn("onCombine")).toMatch(
+      /catch \(error\) \{[\s\S]*starting\.current = false;/,
+    );
+    expect(source).toMatch(
+      /useFocusEffect\(\s*useCallback\(\(\) => \{\s*starting\.current = false;/,
+    );
   });
 });
 

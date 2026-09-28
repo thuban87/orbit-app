@@ -131,10 +131,17 @@ export function BulkImportSetupScreen({
     continuing,
   });
 
+  // D-74: true from an Import or Combine tap until this screen either moves
+  // on to the run or stays (cluster prompt, failure, refocus). While true,
+  // Back is held: the leave guard would otherwise discard the session under
+  // the run that is about to start.
+  const starting = useRef(false);
+
   const markImportComplete = useImportLeaveGuard(
     navigation,
     route.params.sessionId,
     edited && !stopped,
+    () => starting.current,
   );
 
   function markEdited() {
@@ -186,6 +193,7 @@ export function BulkImportSetupScreen({
   // in-flight start on the already-focused screen.
   useFocusEffect(
     useCallback(() => {
+      starting.current = false;
       setSaving(false);
       setContinuing(false);
       void load();
@@ -242,6 +250,7 @@ export function BulkImportSetupScreen({
       });
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to start bulk import", error);
+      starting.current = false;
       Alert.alert("Couldn't start import", "Please try again.");
       setSaving(false);
     }
@@ -249,6 +258,7 @@ export function BulkImportSetupScreen({
 
   async function onImport() {
     if (importBlocked) return;
+    starting.current = true;
     try {
       const exec = getExecutor();
       const [session, rows] = await Promise.all([
@@ -263,11 +273,13 @@ export function BulkImportSetupScreen({
       );
       if (cluster) {
         setConsolidationRows(cluster);
+        starting.current = false;
         return;
       }
       await startBatch();
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to prepare consolidation", error);
+      starting.current = false;
       Alert.alert("Couldn't prepare import", "Please try again.");
     }
   }
@@ -279,6 +291,7 @@ export function BulkImportSetupScreen({
       boundFrequencyBlocksImport(trackingEnabled, intervalValid)
     )
       return;
+    starting.current = true;
     setSaving(true);
     try {
       const exec = getExecutor();
@@ -330,9 +343,11 @@ export function BulkImportSetupScreen({
       }
       setConsolidationRows(null);
       await load();
+      starting.current = false;
       setSaving(false);
     } catch (error) {
       Logger.error(LOG_SCOPE, "failed to combine source records", error);
+      starting.current = false;
       Alert.alert(
         "Couldn't combine contacts",
         "Please keep them separate and try again.",
