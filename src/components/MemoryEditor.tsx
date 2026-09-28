@@ -68,6 +68,12 @@ export interface MemoryEditorProps {
   onRestore: (id: number) => void;
   onSetAllowAi: (id: number, allow: boolean) => void;
   globalAiEnabled: boolean;
+  /**
+   * Opens this item's edit form on first render, so its options (Allow AI,
+   * Move to Recently Deleted, Cancel, Save) show without a tap on its card.
+   * Used where the editor shows one known memory (post-log Edit Memory, D-73).
+   */
+  initiallyEditingId?: number;
   testID?: string;
 }
 
@@ -191,6 +197,23 @@ export function initialDraft(item?: MemoryRow): MemoryDraft {
   };
 }
 
+/**
+ * The editor's opening state: the form for `initiallyEditingId` when that item
+ * is in `items`, otherwise closed (the cards alone). PURE (D-73).
+ */
+export function initialEditorState(
+  items: readonly MemoryRow[],
+  initiallyEditingId?: number,
+): { editing: MemoryRow | null; draft: MemoryDraft | null } {
+  const item =
+    initiallyEditingId === undefined
+      ? undefined
+      : items.find((candidate) => candidate.id === initiallyEditingId);
+  return item
+    ? { editing: item, draft: initialDraft(item) }
+    : { editing: null, draft: null };
+}
+
 /** Memory form with parent-owned persistence; it deliberately imports no writer DAO. */
 export function MemoryEditor({
   items,
@@ -201,11 +224,16 @@ export function MemoryEditor({
   onRestore,
   onSetAllowAi,
   globalAiEnabled,
+  initiallyEditingId,
   testID,
 }: MemoryEditorProps) {
   const { colors } = useTheme();
-  const [editing, setEditing] = useState<MemoryRow | null>(null);
-  const [draft, setDraft] = useState<MemoryDraft | null>(null);
+  const [editing, setEditing] = useState<MemoryRow | null>(
+    () => initialEditorState(items, initiallyEditingId).editing,
+  );
+  const [draft, setDraft] = useState<MemoryDraft | null>(
+    () => initialEditorState(items, initiallyEditingId).draft,
+  );
 
   const openNew = () => {
     setEditing(null);

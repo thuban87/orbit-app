@@ -51,3 +51,15 @@ describe("post-log Edit Memory body scrolls (D-72)", () => {
     expect(styles).toMatch(/editScroll:\s*\{\s*flex:\s*1/);
   });
 });
+
+describe("post-log Edit Memory opens the memory's form by default (D-73)", () => {
+  it("passes the one shown memory's id as initiallyEditingId", () => {
+    const { inner } = scrollAroundEditor();
+    const editor = inner.slice(
+      inner.indexOf("<MemoryEditor"),
+      inner.indexOf("/>", inner.indexOf("<MemoryEditor")),
+    );
+    expect(editor).toContain("items={[memoryBeingEdited]}");
+    expect(editor).toContain("initiallyEditingId={memoryBeingEdited.id}");
+  });
+});

@@ -321,6 +321,9 @@ export function PostLogNoteEditor({ target, onClose }: PostLogNoteEditorProps) {
           <AppText role="heading">Edit Memory</AppText>
           <MemoryEditor
             items={[memoryBeingEdited]}
+            // Only this one memory is shown, so its options open by default
+            // (no tap on the card needed; owner ruling D-73).
+            initiallyEditingId={memoryBeingEdited.id}
             showAdd={false}
             onAdd={onAddMemory}
             onEdit={onEditMemory}
