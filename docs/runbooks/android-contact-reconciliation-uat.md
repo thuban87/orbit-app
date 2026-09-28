@@ -6,7 +6,7 @@ Use this procedure when changing linked-contact reconciliation, duplicate merge,
 
 ## Architecture (Phase 20)
 
-Reconciliation reads an already-linked Android contact through `orbit-contact-picker`, classifies five field families, and persists review work in migration-013 session tables. Merge is a local SQLite transaction that reparents compatible children, deletes the absorbed contact, and writes a generic tombstone.
+Reconciliation reads an already-linked Android contact through `orbit-contact-picker`, classifies five field families, and persists review work in migration-013 session tables. Source choices retain stable option identity through apply, and the reviewed snapshot stores the comparable for the exact selected option. Merge is a local SQLite transaction that reparents compatible children, deletes the absorbed contact, and writes a generic tombstone. API-37 import separately uses the system picker, then requests Contacts access after a non-empty pick only to enrich selected rows with Notes; denial continues without Notes (ADR-154).
 
 ### Device-to-database evidence chain
 
@@ -53,7 +53,7 @@ Reconciliation reads an already-linked Android contact through `orbit-contact-pi
    adb -s "$device_serial" shell run-as com.bwales.orbit sh -c 'sqlite3 files/SQLite/orbit.db "PRAGMA user_version;"'
    ```
 
-   Expected: installation succeeds and `user_version` is `13`.
+   Expected: installation succeeds and `user_version` is the current registered target, at least `13`; migration 013's reconciliation tables are present.
 
 3. **Take a WAL-aware snapshot before and after each scenario.** Copy all three files together; reading only the main database can omit committed WAL pages.
 
@@ -69,7 +69,7 @@ Reconciliation reads an already-linked Android contact through `orbit-contact-pi
 
 4. **Exercise an atomic merge.** From a profile, choose `Merge with another contact`, select the survivor, resolve name/birthday/photo or competing-primary conflicts, and confirm the impact summary. Verify the app lands on the survivor; the absorbed row is absent from `contacts` and has a `tombstones.entity_type='contact'` record. Never treat archive/restore as a merge result.
 
-5. **Exercise per-contact and batch reconciliation.** On a Bound linked fixture, change one Android source value and use `Update from Contacts`. Verify additive values are recommended, conflicts need a manual choice, a kept unchanged source does not re-nag, and a changed-again source reappears. Then use Settings → `Check linked contacts`: only changed contacts form cards; `Use Contact Values` is unavailable for conflict or photo selections.
+5. **Exercise per-contact and batch reconciliation.** On a Bound linked fixture, create two source options with the same display value but distinct stable IDs, change one, and use `Update from Contacts`. Select that exact option and verify Orbit applies it and snapshots its comparable rather than the first matching display value. Verify additive values are recommended, conflicts need a manual choice, a kept unchanged source does not re-nag, and a changed-again source reappears. Then use Settings → `Check linked contacts`: only changed contacts form cards; `Use Contact Values` is unavailable for conflict or photo selections.
 
 6. **Exercise resume and missing-source handling.** Resolve one card, leave another unresolved, then force-stop and relaunch:
 
@@ -79,9 +79,11 @@ Reconciliation reads an already-linked Android contact through `orbit-contact-pi
 
    Expected: Resume opens only unresolved cards and keeps the committed edit. For a deleted device source, verify `Source missing`; Keep leaves Orbit data alone, Relink retires the stale external link and reviews the replacement, and Unlink changes only the link.
 
-7. **Exercise unreadable-birthday review.** Import a fixture whose raw birthday is `2021-02-29`, then use Settings → `Review flagged items`. Fix with a valid local date and confirm a `fixed` resolution plus a data-revision advance. On a second fixture, choose Ignore and confirm an `ignored` resolution while birthday and other contact data remain unchanged.
+7. **Exercise the API-37 post-pick permission path.** Start import, choose at least one contact in the system picker, and verify the Contacts prompt appears only after the non-empty pick. Grant access and confirm the selected Note is present. Repeat with denial and confirm import continues without the Note. A canceled or empty picker result must not prompt.
 
-8. **Run the automated backstops.**
+8. **Exercise unreadable-birthday review.** Import a fixture whose raw birthday is `2021-02-29`, then use Settings → `Review flagged items`. Fix with a valid local date and confirm a `fixed` resolution plus a data-revision advance. On a second fixture, choose Ignore and confirm an `ignored` resolution while birthday and other contact data remain unchanged.
+
+9. **Run the automated backstops.**
 
    ```bash
    npx vitest run src/db/merge-dao.test.ts src/db/reconcile-apply.test.ts src/db/reconcile-session-dao.test.ts src/db/reconcile-session-read.test.ts src/db/reconcile-relink-dao.test.ts src/db/bulk-review-dao.test.ts src/db/bulk-review-read.test.ts
@@ -102,6 +104,8 @@ Do not alter real Google-account contacts, production source data, the system-pi
 3. **Do not interpret a bulk action-sheet adb limitation as a product failure.** The Phase-20 modal backdrop swallowed injected actions; verify the same writer through its unit tests and the equivalent per-card flow.
 4. **Do not classify missing source as removed fields.** A missing source must preserve the Orbit contact and its data.
 5. **Record the accepted notification limitation.** After a merge, survivor notification refresh is foreground-launch eventual, not an immediate reschedule.
+6. **Do not compare source choices by display text.** The apply payload and reviewed snapshot must follow the stable source-option ID through the write; duplicate-looking names or birthdays are the regression case.
+7. **Do not treat a denied Note-enrichment permission as import cancellation.** The API-37 picker result remains valid and must proceed without Notes.
 
 ## Smoke Test
 
