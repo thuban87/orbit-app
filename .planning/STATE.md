@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.5
-current_phase_name: Background Art & Text-on-Art Contrast
+current_phase_name: Background Art & Text-on-Art Contrast (INSERTED)
 status: executing
 stopped_at: "Phase 38.5 planned (9 plans, 8 waves; checker PASSED iter 3); next: execute-phase"
-last_updated: "2026-09-28T19:13:18.338Z"
+last_updated: "2026-09-28T21:19:15.540Z"
 last_activity: 2026-09-28
-last_activity_desc: Phase 38.5 planned — 9 plans, 8 waves (art-first)
-state_head: 12d42e90f9cea9d4f9bc97cbd3385e0d91e27332
+last_activity_desc: Phase 38.5 execution started
+state_head: 64c355eaa4a12f6122e281345570796a299430e2
 progress:
   total_phases: 27
   completed_phases: 18
@@ -38,20 +38,20 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 38.4 — UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
+**Current focus:** Phase 38.5 — Background Art & Text-on-Art Contrast (INSERTED)
 
 ## Current Position
 
-Phase: 38.5 (Background Art & Text-on-Art Contrast) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
+Phase: 38.5 (Background Art & Text-on-Art Contrast (INSERTED)) — EXECUTING
+Plan: 1 of 9
+Status: Executing Phase 38.5
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-28 — Phase 38.4 complete, transitioned to Phase 38.5
+Last activity: 2026-09-28 — Phase 38.5 execution started
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: Run Phase 37.1 verification against the complete nine-plan implementation and retained physical-device evidence.
 
