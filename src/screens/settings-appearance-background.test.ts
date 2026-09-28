@@ -112,7 +112,12 @@ describe("selectedBackgroundTile — the highlighted tile is what actually rende
   it("the highlighted tile is always one the active package offers", () => {
     for (const pkg of ["galaxy", "standard"] as const) {
       for (const mode of ["light", "dark"] as const) {
-        for (const stored of [null, "none", "made-up-id", ...BACKGROUND_ORDER[pkg]]) {
+        for (const stored of [
+          null,
+          "none",
+          "made-up-id",
+          ...BACKGROUND_ORDER[pkg],
+        ]) {
           expect(backgroundChoicesForPackage(pkg)).toContain(
             selectedBackgroundTile(pkg, stored, mode),
           );

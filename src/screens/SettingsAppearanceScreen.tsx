@@ -36,10 +36,7 @@ import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useThemeStore } from "@/stores/theme-store";
 import { useTheme } from "@/theme";
 import { ACCENTS } from "@/theme/accents";
-import {
-  PACKAGE_DEFAULT_SLOT,
-  resolveRenderableBackground,
-} from "@/theme/backgrounds";
+import { resolveRenderableBackground } from "@/theme/backgrounds";
 import {
   ACCENT_IDS,
   type AccentId,
@@ -55,6 +52,7 @@ import { Logger } from "@/utils/logger";
 import {
   backgroundChoicesForPackage,
   backgroundPatchForPackage,
+  selectedBackgroundTile,
 } from "./settings-appearance-background";
 import { persistAppearanceSetting } from "./settings-appearance-persist";
 
@@ -440,8 +438,13 @@ export function SettingsAppearanceScreen() {
 
   const activeBackground =
     themePackage === "galaxy" ? galaxyBackground : standardBackground;
-  const selectedBackgroundSlot =
-    activeBackground ?? PACKAGE_DEFAULT_SLOT[themePackage];
+  // The highlighted tile is what the resolver actually renders (D-23 / Pitfall 7):
+  // an unknown stored id highlights the default tile it falls back to.
+  const selectedBackgroundSlot = selectedBackgroundTile(
+    themePackage,
+    activeBackground,
+    mode,
+  );
   const backgroundColumnWidth = fontScale >= 1.3 ? "48%" : "23%";
 
   // Persist an appearance patch to app_settings, reconciling the live store on a
@@ -780,7 +783,9 @@ export function SettingsAppearanceScreen() {
             <View style={styles.backgroundGrid}>
               {backgroundChoicesForPackage(themePackage).map((slot) => (
                 <BackgroundThumbnail
-                  key={slot}
+                  // The mode joins the key so each thumbnail's render-failure
+                  // latch resets on a mode switch (each mode has its own file).
+                  key={`${slot}:${mode}`}
                   colors={colors}
                   columnWidth={backgroundColumnWidth}
                   label={BACKGROUND_LABELS[slot]}

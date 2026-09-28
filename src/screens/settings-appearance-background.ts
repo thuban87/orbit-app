@@ -1,7 +1,11 @@
 import type { AppSettingsPatch } from "@/db/app-settings-dao";
-import { BACKGROUND_ORDER } from "@/theme/backgrounds";
+import {
+  BACKGROUND_ORDER,
+  NONE_SLOT_ID,
+  resolveBackground,
+} from "@/theme/backgrounds";
 import type { BackgroundSlotId } from "@/theme/theme-option-ids";
-import type { ThemePackage } from "@/theme/theme-types";
+import type { ResolvedMode, ThemePackage } from "@/theme/theme-types";
 
 /**
  * The background choices offered for the ACTIVE theme package (D-07). Returns
@@ -37,4 +41,26 @@ export function backgroundPatchForPackage(
   return pkg === "galaxy"
     ? { galaxyBackground: slot }
     : { standardBackground: slot };
+}
+
+/**
+ * The tile the Appearance picker highlights (38.5 D-23; research Pitfall 7). It is
+ * derived from what the resolver ACTUALLY renders, not from the raw stored id:
+ * NULL and an unknown/tampered id both render the package default, so both
+ * highlight the default tile; `none` renders the solid background, so it
+ * highlights the None (Solid) tile. The stored id is untrusted input (a tampered
+ * database or restored backup, T-38.5-02-01), so any string is accepted and the
+ * resolver's own fallback decides.
+ */
+export function selectedBackgroundTile(
+  pkg: ThemePackage,
+  storedId: string | null,
+  mode: ResolvedMode,
+): BackgroundSlotId {
+  const resolved = resolveBackground(
+    pkg,
+    storedId as BackgroundSlotId | null,
+    mode,
+  );
+  return resolved.kind === "solid" ? NONE_SLOT_ID : resolved.slotId;
 }
