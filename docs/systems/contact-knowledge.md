@@ -1,7 +1,7 @@
 # Contact Knowledge
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
+**Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/db/memory-registry.ts`, `src/db/memories-dao.ts`, `src/db/memories-read.ts`, `src/db/relationships-dao.ts`, `src/db/relationships-read.ts`, `src/db/current-state-history-dao.ts`, `src/db/current-state-history-read.ts`, `src/db/first-class-knowledge-read.ts`, `src/db/knowledge-search-read.ts`, `src/db/dashboard-knowledge-read.ts`, `src/services/knowledge-search.ts`, `src/services/memory-trash-sweep.ts`
 
 ## Purpose
@@ -175,6 +175,8 @@ Migration 016 adds three tables without moving conversational fuel or changing c
 - **ADR-136:** Permission-Bounded Prompt Assembly and AI Transparency — applies durable new-item defaults and consumes only explicit egress permission.
 - **ADR-160:** Committed-Identity Contact Edits and Exact-Source Reconciliation — makes committed knowledge identities authoritative when complete contact edits advance their retry baselines.
 - **ADR-161:** Durable Post-Commit Import Recovery and AI-Off Provenance — preserves imported-note identity across resume and records imported Memories as explicitly AI-off.
+- **ADR-164:** Shared Post-Commit Assist Publisher with Surfaced Assist Failures — treats a committed "Create Memory Instead" as saved even when its re-read fails.
+- **ADR-168:** Truthful Read Phases for Import, Review, and Settings Screens — gives MemoryScreen loading and "Couldn't load memories" states and never opens an editor over a failed read.
 
 ## Gotchas
 
