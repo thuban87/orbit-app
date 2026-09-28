@@ -1,7 +1,7 @@
 # Contact Import
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `modules/orbit-contact-picker/`, `src/db/import-session-dao.ts`, `src/db/imported-contact-dao.ts`, `src/services/import/`, `src/screens/ImportReviewScreen.tsx`
 
 ## Purpose
@@ -124,7 +124,7 @@ Category choices use the canonical ordered catalog and switch to the complete se
 
 - **ADR-064:** Permissionless Android 17 System-Contact Snapshot Acquisition — uses a selected-field native snapshot instead of broad contacts permission.
 - **ADR-065:** Durable Resumable Contact-Import Sessions with Failure-Isolated Photos — keeps review/retry state local and durable while isolating photo failure.
-- **ADR-066:** Deliberate Reviewed Import with Unbound Bulk Defaults — requires single review and uses safe shared bulk defaults. *Partially superseded by 38.4 D-57 (bulk setup may bind the batch at one frequency; Unbound stays the default) and D-58 (Import Complete's bridge to Unbound contacts removed); superseding ADR due at KB extraction.*
+- **ADR-066:** Deliberate Reviewed Import with Unbound Bulk Defaults — requires single review and uses safe shared bulk defaults. *Partially superseded by 38.4 D-57 (bulk setup may bind the batch at one frequency; Unbound stays the default) and D-58 (Import Complete's bridge to Unbound contacts removed); superseded in part by ADR-171.*
 - **ADR-067:** Conservative Advisory Identity Matching and Explicit Source Consolidation — keeps inferred identity user-confirmed and source consolidation explicit.
 - **ADR-002:** Cross-Version Contact Import — Hybrid Two-Picker — routes acquisition by Android SDK while retaining one local picker-agnostic pipeline.
 - **ADR-003:** `READ_CONTACTS` on API 37+ for Reconcile — enables a permission-gated linked-contact re-read without changing the API-37+ import picker.
@@ -136,6 +136,8 @@ Category choices use the canonical ordered catalog and switch to the complete se
 - **ADR-161:** Durable Post-Commit Import Recovery and AI-Off Provenance — separates committed contact success from retryable photo completion and forces new imported-note Memories AI-off.
 - **ADR-166:** Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress — routes the import resume prompt through the typed cross-tab entry helper.
 - **ADR-168:** Truthful Read Phases for Import, Review, and Settings Screens — adds the "Import stopped" fatal state, releases the session hold, latches Import Complete Retry over pending rows, and makes DuplicateReview reads truthful.
+- **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
+- **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 
 ## Gotchas
 
@@ -154,6 +156,8 @@ Category choices use the canonical ordered catalog and switch to the complete se
 13. **The resume prompt's body scrolls; its buttons never do.** At large text "Resume your import?" keeps its heading and body in a bounded `ScrollView` (`flexGrow: 0`, `flexShrink: 1`) inside a shrinking, safe-area-inset card, with Resume / Discard / Later outside the scroll region. It stays an RN `Modal` whose only exits are its buttons; do not move an action into the scroll body or make Back dismiss it (D-49).
 14. **The batch lifecycle lives only on the import session.** Never add an in-pass lifecycle override to `runImportBatch` or any other bulk create: resume calls the driver again with no setup state, so it must read the session (`sessionBatchLifecycle`). Every create seam (`importContactRecord`, `importRowAsNew`, `combineCluster`) takes a REQUIRED validated lifecycle, and bulk setup writes it with the category in one `setSessionBatchDefaults` update before any contact is created (D-57). Once any session row is resolved the lifecycle is locked in both the setup UI (`bulkLifecycleLocked`) and the DAO; keep the two on the same rule (any row not `pending`) so setup never offers a change the DAO rejects (D-64). A stopped batch's setup shows no choice controls at all and its Continue never writes batch defaults (D-73).
 15. **A live import owns its staging.** The foreground resume sweep must suppress sessions held by an active screen or run, and picker/permission round trips must not trigger retirement of newly staged photos. Cleanup may retire only detached workflow copies after rechecking durable row and external-link ownership.
+16. **The single review lists Bound before Unbound; bulk setup lists Unbound first.** Review C WR-03 flagged the reversed order (`ImportReviewScreen.tsx` maps `[true, false]`); it has no owner ruling and is unchanged. Both controls expose `radiogroup` / `radio` semantics with selected and checked state.
+17. **Back from Import Complete lands on the leftover bulk setup ("0 contacts selected").** Pre-existing; tracked in todo `2026-09-28-import-complete-back-leftover-setup.md`.
 
 ## Related Systems
 
