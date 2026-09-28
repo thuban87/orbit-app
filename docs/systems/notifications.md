@@ -1,7 +1,7 @@
 # Notifications
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
+**Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/db/notification-read.ts`, `src/db/snooze-dao.ts`, `src/services/notifications/`, `src/navigation/notification-gate.tsx`
 
 ## Purpose
@@ -130,6 +130,8 @@ The system owns no remote state and no backend. SQLite supplies live candidate d
 - **ADR-059:** Normalized Contact Methods, Canonical Actionability, and Local Provenance — requires headless first-open migration to supply a device region without making endpoint data part of notifications.
 - **ADR-062:** Bound/Unbound Lifecycle and One-Way Cadence Assignment — gates decay and stale active actions while retaining factual birthdays and touchpoint history.
 - **ADR-111:** Cadence-Guarded Profile Metrics and Composed Relationship Actions — keeps Profile Frequency/Snooze controls on the established notification and immutable-event boundary.
+- **ADR-162:** Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority — has warm Mark/Snooze publish the shell tick after a committed write.
+- **ADR-166:** Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress — drops a stale cold body result once a warm body tap is accepted, and clears the cold response in a `finally`.
 
 ## Gotchas
 
