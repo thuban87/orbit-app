@@ -118,6 +118,9 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 - **ADR-148:** Portable Your Week Period and Group-Deduplicated Activity Aggregation — establishes the period setting and aggregate boundary.
 - **ADR-162:** Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority — supplies the shell and sweep-ordered foreground ticks Digest subscribes to.
 - **ADR-163:** Live Digest Refresh with Truthful Day-Detail States — re-reads Digest on committed writes and every resume, re-windows Your Week on a new day, and makes day detail truthful.
+- **ADR-170:** Bounded Your Week Reads and Settled Orrery Resource Retirement — range-bounded `occurred_at` predicates on migration-031 indexes; settled Orrery switches drop departed resources.
+- **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
+- **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
 
 ## Gotchas
 
