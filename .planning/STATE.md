@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 38.4
-current_phase_name: UI Consistency, Accessibility, Performance & Release Polish (INSERTED)
-status: executing
-stopped_at: 38.4 D-74 fix complete (Back blocked during a running bulk import, single-run guard); release d69a2e3 delivered; next = phase verification
-last_updated: "2026-09-28T07:50:00.000Z"
+current_phase: 38.5
+current_phase_name: Background Art & Text-on-Art Contrast
+status: planning
+stopped_at: Phase 38.4 complete, ready to plan Phase 38.5
+last_updated: "2026-09-28T09:00:05.410Z"
 last_activity: 2026-09-28
-last_activity_desc: "38.4 D-74: Import Progress blocks Back while a bulk import runs (notice 'Still importing. You can go back when it finishes.'), in-memory single-run guard (runImportBatch refuses a concurrent pass; Import Progress follows one in flight), bulk setup holds Back while its Import is starting (20dd629, d69a2e3); 3a device pass PASS with DB checks; release orbit-38.4-release-2026-09-28-d69a2e3.apk delivered; 5301 tests, tsc/colors/biome clean. Earlier: D-73 fixes + release e71d518"
-state_head: 52c4e52d748f81b63ab6cac2b0720f1070d9da05
+last_activity_desc: Phase 38.4 complete, transitioned to Phase 38.5
+state_head: de39bdeaa37841d7c782e50ea23b03ccec299399
 progress:
   total_phases: 27
-  completed_phases: 17
+  completed_phases: 18
   total_plans: 241
   completed_plans: 239
 carried_forward:
@@ -42,16 +42,16 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 38.4 (UI Consistency, Accessibility, Performance & Release Polish (INSERTED)) — EXECUTING
-Plan: 23 of 23 complete (01–23; Plan 17 device pass done 2026-09-27)
-Status: All plans complete — owner checklist (38.4-UAT.md) and routing of G1-f FAIL / device-found defects pending, then verification
+Phase: 38.5 — Background Art & Text-on-Art Contrast
+Plan: Not started
+Status: Ready to plan
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-26 — 38.4-06 complete: RelationshipEditor switches themed, visibility text constant "Hide from Profile" (D-20); selector-a11y helpers (selectorItems out-of-list preserved, selectorAccessibilityValue); dropdown/Fuel kind options carry selected state + filled select glyph, triggers expose value; Last-spoke date announced, segments vertical-only hitSlop; touchpoint date/time via formatDateTimeMinuteOrFallback + accessibilityValue, duration chips MIN_TOUCH_TARGET (RG-030 UIA-003/005/006, RG-038 UIA-018); 4618 tests, tsc/colors clean, biome 0 errors. Earlier: 38.4-05 complete: Backup/Restore role foregrounds (onAccent; onDanger on Replace-all, Galaxy Dark ~3.91:1 ADR-084 limitation kept), Backup settings fills background→onAccent (Rule 2), five visible passphrase labels, restore source date via formatDateTimeMinuteOrFallback (RG-029 UIA-002, RG-036, RG-038); 4597 tests, tsc/colors clean, biome 0 errors. Earlier: 38.4-03 complete: both-extrema proof + Standard-Light glass foreground scope, lightness-only variants incl. all eight accentText (D-26), textPlaceholder, overlay scope reset (RG-029 UIA-001); 4578 tests, tsc/colors/biome clean; E-7 Galaxy Light coral held for owner (since resolved by D-28: coral light tone #B03A26 -> #AC3925, 4.48 -> 4.63), F-1 to Plan 17 (D-27). Earlier: 38.4-04 complete: Memory hosts use isAiMasterEnabled (ADR-135), permission summary separates access totals from the filtered view, model picker marks the saved model (RG-008, RG-030); 4527 tests, tsc/colors/biome clean. Earlier: 38.4-01 complete: migration 031 occurred_at indexes (schema head 31), Your Week reads range-bounded with oracle parity (RG-028); 4425 tests, tsc/colors/biome clean
+Last activity: 2026-09-28 — Phase 38.4 complete, transitioned to Phase 38.5
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
 Next: Run Phase 37.1 verification against the complete nine-plan implementation and retained physical-device evidence.
 
@@ -69,7 +69,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 
 **Velocity:**
 
-- Total plans completed: 148
+- Total plans completed: 171
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -94,6 +94,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | 37.1 | 13 | - | - |
 | 38 | 8 | - | - |
 | 38.1 | 9 | - | - |
+| 38.4 | 23 | - | - |
 
 **Recent Trend:**
 
@@ -929,7 +930,7 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 ## Session
 
 **Last session:** 2026-09-27T22:30:00.000Z
-**Stopped at:** Completed 38.4-17-PLAN.md
+**Stopped at:** Phase 38.4 complete, ready to plan Phase 38.5
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
