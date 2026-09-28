@@ -1,7 +1,7 @@
 # App Shell
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.3-audit-remediation-runtime-state
+**Updated by phase:** 38.4-audit-remediation-ui-performance-release
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -372,6 +372,11 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **[ADR-162: Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority](../decisions/ADR-162-sweep-ordered-foreground-refresh-and-latest-request-publication-authority.md)** — defines the sweep-ordered foreground tick beside the shell tick, the consumer rule, and the latest-request authority.
 - **[ADR-164: Shared Post-Commit Assist Publisher with Surfaced Assist Failures](../decisions/ADR-164-shared-post-commit-assist-publisher-with-surfaced-assist-failures.md)** — adds assist confirmations and Post-Log writes to the shell-tick publishers.
 - **[ADR-166: Typed Cross-Tab Entry, Settings-Hosted Profile Contract, and Latest-Wins Notification Ingress](../decisions/ADR-166-typed-cross-tab-entry-settings-hosted-profile-contract-and-latest-wins-notification-ingress.md)** — routes every cross-tab entry through typed `navigateIntoTab`, fixes Settings-hosted Profile routes, and keeps archived contacts out of FAB context.
+- **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
+- **ADR-173:** Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance — closed dial is inert to assistive tech, box-none overlays are `collapsable={false}`, permanent `onAccent` ring, route-derived clearance.
+- **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
+- **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
+- **ADR-176:** Authored Native Platform Configuration — release-only `SYSTEM_ALERT_WINDOW` removal, Orbit launcher artwork, and native dialogs following Orbit's mode setting.
 
 ## Gotchas
 
@@ -427,6 +432,7 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **Cross-tab nested entry always uses `navigateIntoTab` (`initial: false`) — never a bare nested `screen` payload and never a broad `reset` (RG-021, react-native/AUD-RN-002; ADR-146).** A bare payload into a tab the user has not visited yet initializes that stack as `[target]`; Create's post-save `replace("Profile")` then leaves `[Profile]` with no Home beneath, and reselect cannot recover it. A repository guard in `src/navigation/tab-entry.test.ts` fails on any direct `navigate`/`push`/`replace` into a tab name (or `intent.tab`) outside the helper. Deliberate external resets stay in `reset-intents.ts`.
 - **Every non-focused route shows the FAB; its scroll content must end with `useBottomClearance()` (D-52, OA-E3).** `UniversalFab` hides only on `FOCUSED_WORKFLOW_ROUTES` (and while the keyboard is open), so any other screen that scrolls must pad its scroll container's `contentContainerStyle` with the shared clearance or its last item sits under the FAB (the owner found AI Data Permissions' "No information matches these filters." hidden this way). A child component that takes over a screen's scroll (`CardGrid`, `FieldDefForm`) takes the host's clearance as a required `bottomClearance` prop. `fab-clearance-contract.test.ts` derives the route set from the stacks, so a new FAB-bearing scroll screen fails by name until it is cleared or allowlisted with a reason. The inverse also holds: a screen reached only through focused routes (System Builder and Edit Interaction since D-68) reserves no FAB clearance, and the contract fails if it does.
 - **Compact/detail sheets scroll their body; never nest a second vertical scroll (D-32, RG-034 follow-on, device-found).** At font_scale 2.0 on a ≈320dp phone a percent-capped sheet clipped its actions below the edge. `Sheet` now renders a bounded ScrollView body (`flexGrow: 0`, `flexShrink: 1`, `keyboardShouldPersistTaps="handled"`) for `compact`/`detail` (`SHEET_BODY_SCROLLS`). A consumer that renders its own ScrollView/FlatList/SectionList inside a compact/detail sheet passes `scrollBody={false}` so its own container is the single bounded scroll (today: OrreryContactsSheet, DateDetailSheet, ProfileRelationshipSheets). `sheet-consumers-contract.test.ts` scans every `<Sheet>` consumer and fails on a missing or stray opt-out. A variant switch between `expanded` and a non-expanded variant swaps the body element, which remounts the sheet's children; keep sheet state in the owner, as the current consumers do.
+- **The open FAB dial is not fully traversable by keyboard or TalkBack swipe.** The `nextFocus*` ring is not effective on the device (owner-accepted, 38.4 D-43 C7), and a TalkBack swipe through the open dial reaches only three of the six actions (todo `2026-09-28-fab-dial-talkback-swipe-skips-actions.md`).
 
 ## Related Systems
 
