@@ -1,7 +1,7 @@
 # Widget
 
 **Last updated:** 2026-09-23
-**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
+**Updated by phase:** 38.3-audit-remediation-runtime-state
 **Owners:** `src/services/widget/`, `src/navigation/widget-linking.ts`, `src/services/widget/widget-quick-action-guard.ts`, `plugins/withWidgetBootReceiver.js`
 
 ## Purpose
@@ -101,6 +101,7 @@ Inline delivery consumes RemoteViews bitmap memory and may hit a launcher or Bin
 - **ADR-103:** Atomic Composed Dashboard Bulk Mutations — requires one post-commit widget refresh for a committed Dashboard batch.
 
 - **ADR-109:** Fixed-Hero Semantic Profile Composition and Focused Accessible Editors — retains the consumed-once Profile entry while rebuilding the screen controller.
+- **ADR-164:** Shared Post-Commit Assist Publisher with Surfaced Assist Failures — includes the widget notify in the shared assist post-commit publisher.
 
 ## Gotchas
 
@@ -141,3 +142,4 @@ Inline delivery consumes RemoteViews bitmap memory and may hit a launcher or Bin
 | 2026-09-02 | 28 | Documented one post-commit refresh for Dashboard bulk batches. |
 | 2026-09-02 | 31 | Verified and restored consumed-once widget Reach Out handling through the rebuilt Profile controller. |
 | 2026-09-23 | 38.2 | Patched `security/AUD-SEC-001` / RG-001: inline light/dark widget bitmaps, removed the exported snapshot provider, and delete stale private snapshots on render; Pixel rendering proof follows in Plan 16. |
+| 2026-09-23 | 38.3 | Assist confirmations notify the widget through the shared post-commit publisher (ADR-164). |
