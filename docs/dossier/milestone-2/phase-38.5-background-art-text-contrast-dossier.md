@@ -1,6 +1,6 @@
 # Phase 38.5 --- Background Art & Text-on-Art Contrast Dossier
 
-**Status:** DISCUSSED 2026-09-28 (D-17..D-29). Planning waits on the O-9 spike (D-29). **Prerequisite:** the owner-signed scrim combination
+**Status:** DISCUSSED 2026-09-28 (D-17..D-29). The O-9 spike PASSED on 2026-09-28; the phase is ready to plan. **Prerequisite:** the owner-signed scrim combination
 sheet (38.4 D-40), **met 2026-09-27** (sign-off v2, D-08). Before planning, the O-9 `codex-edu` image spike still has
 to run. Authored 2026-09-26 at phase insertion, from the owner rulings 38.4 D-38..D-41 and the 38.4 background-art
 brief. Updated 2026-09-27 with the owner's scrim sign-off v2 results and rulings D-08..D-14. The phase is now sequenced
@@ -471,7 +471,25 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
     the owner's.
     -   **Scope note 2026-09-27:** D-08 and D-09 decide the Contacts List rows and Card-view cards per combination. Card-blend
         for every other content card is still open, and it is still the owner's call.
--   **[OPEN · runs 2026-09-28 per D-29] O-9 --- Spike: can `codex-edu` exec make and edit image files non-interactively?** This is a quick spike to run
+-   **[RESOLVED · 2026-09-28 → PASS] O-9 --- Spike: can `codex-edu` exec make and edit image files non-interactively?**
+    **Result (MEASURED 2026-09-28): PASS.**
+    -   The command was `CODEX_HOME="$HOME/.codex-edu" codex exec -m gpt-6-astra --sandbox workspace-write
+        --skip-git-repo-check -C <dir> "<prompt>" < /dev/null`. It exited 0, needed no interaction, used about 32k
+        tokens, and took about 2 minutes.
+    -   Codex used its built-in `image_gen.imagegen` tool for both **generating** and **editing**, then PIL to resize and
+        convert.
+    -   **Where the output lands:** the generator always saves its originals to
+        `~/.codex-edu/generated_images/<session>/exec-<id>.png`, outside the workspace. Codex then wrote the requested
+        copies to the named paths inside `-C <dir>`. The orchestrator must name the output paths in the prompt; the
+        stray originals in `~/.codex-edu` are harmless.
+    -   Both outputs were exactly **941 × 1672, RGB, no alpha, PNG, sRGB** (verified with PIL). A lossless WebP transcode
+        is still a repo-side step (brief §I).
+    -   It followed a band instruction: the test prompt asked for L\* 89–97, and the output measured L\* 90.6–100
+        (generate) and 88.9–100 (edit), with 0.00% of pixels below 87. The white star glints reach L\* 100, which is
+        fine on light art.
+    -   The spike images are throwaway scratch files, not art candidates.
+    -   `~/.codex-edu/config.toml` now defaults to `gpt-6-astra` (MEASURED 2026-09-28; it was `gpt-6-sol` on
+        2026-09-27). Keep passing `-m gpt-6-astra` explicitly. This is a quick spike to run
     before planning (D-14). It confirms that `CODEX_HOME="$HOME/.codex-edu" codex exec -m gpt-6-astra ... < /dev/null`
     can generate and edit image files with no interaction, and where the output lands (a named path in the workspace,
     or only Codex's own store).
@@ -600,3 +618,5 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
         (nothing outside the v2-marked components changes; the rest of ADR-115 stands), D-29 (the O-9 spike runs next).
     -   An end-of-phase gap list section is added. O-1, O-3, O-6 and O-8 are resolved, O-2's approach is set, O-4 is
         resolved conditionally, and O-7 stays parked.
+-   2026-09-28 --- O-9 spike run (D-29): PASS. `codex-edu`/Astra generates and edits images non-interactively; the
+    output goes to named workspace paths, and the originals also land in `~/.codex-edu/generated_images/`.
