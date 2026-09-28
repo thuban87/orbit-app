@@ -116,6 +116,8 @@ When a refresh changes Up Next or Horizon while Digest stays mounted, rows use t
 - **ADR-076:** Population-Reached Birthdays Without a Dashboard Banner — moves richer birthday presentation to Horizon.
 - **ADR-147:** Derived Digest Composition and Canonical Contacts Drill-Through — establishes the fixed sections, canonical reads, claim deduplication, and drill contract.
 - **ADR-148:** Portable Your Week Period and Group-Deduplicated Activity Aggregation — establishes the period setting and aggregate boundary.
+- **ADR-162:** Sweep-Ordered Foreground Refresh and Latest-Request Publication Authority — supplies the shell and sweep-ordered foreground ticks Digest subscribes to.
+- **ADR-163:** Live Digest Refresh with Truthful Day-Detail States — re-reads Digest on committed writes and every resume, re-windows Your Week on a new day, and makes day detail truthful.
 
 ## Gotchas
 
