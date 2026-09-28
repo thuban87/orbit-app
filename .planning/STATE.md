@@ -4,16 +4,16 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.5
 current_phase_name: Background Art & Text-on-Art Contrast
-status: planning
-stopped_at: "Phase 38.5 context gathered (D-17..D-29); O-9 spike PASSED; next: plan-phase"
-last_updated: "2026-09-28T17:52:03.620Z"
+status: executing
+stopped_at: "Phase 38.5 planned (9 plans, 8 waves; checker PASSED iter 3); next: execute-phase"
+last_updated: "2026-09-28T19:13:18.338Z"
 last_activity: 2026-09-28
-last_activity_desc: Phase 38.4 complete, transitioned to Phase 38.5
-state_head: 68d300f7f6351802b8f56b74f18455b9fdd7537e
+last_activity_desc: Phase 38.5 planned — 9 plans, 8 waves (art-first)
+state_head: 12d42e90f9cea9d4f9bc97cbd3385e0d91e27332
 progress:
   total_phases: 27
   completed_phases: 18
-  total_plans: 241
+  total_plans: 250
   completed_plans: 239
 carried_forward:
 
@@ -42,9 +42,9 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 38.5 — Background Art & Text-on-Art Contrast
+Phase: 38.5 (Background Art & Text-on-Art Contrast) — READY TO EXECUTE
 Plan: Not started
-Status: Ready to plan
+Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
