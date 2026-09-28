@@ -184,6 +184,7 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 - **ADR-117:** Per-Interaction Allow-AI Consent Gate — adds the durable `allow_ai` flag (default OFF, fail-closed on restore) to every interaction row.
 - **ADR-136:** Permission-Bounded Prompt Assembly and AI Transparency — resolves the interaction-note default at creation and serializes only opted-in recent notes.
 - **ADR-118:** Bind/Unbind Immutable Lifecycle Events Without a Migration — extends `EventType` and emits insert-only bind/unbind events inside the existing cadence-change transaction.
+- **ADR-160:** Committed-Identity Contact Edits and Exact-Source Reconciliation — treats a committed cadence transition and its immutable event as successful even if the following projection refresh fails.
 - **[ADR-011: Query-Time Status and Never-Contacted Segregation](../decisions/ADR-011-query-time-status-and-never-contacted-segregation.md)** — governs `src/db/recency-dao.ts`.
 - **[ADR-016: Fixed-First Contact Forms and Atomic Contact Creation](../decisions/ADR-016-fixed-first-contact-forms-and-atomic-contact-creation.md)** — governs `src/db/recency-dao.ts`.
 - **[ADR-028: Per-Item Conversational Fuel with Fixed Kinds](../decisions/ADR-028-per-item-conversational-fuel-with-fixed-kinds.md)** — governs `src/screens/ContactProfileScreen.tsx`.
@@ -233,6 +234,7 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 19. **Quick Log remains immediate.** A post-log note or Memory must never turn it into a pre-submit form; post-log content is either the interaction note or a Memory, never both.
 20. **Allow AI remains default off.** Group Note never routes through the interaction toggle, and an omitted Tone stays `NULL`, not Neutral.
 21. **Changing the type default is not a bulk grant.** It affects a new interaction note only; existing rows change only through their explicit editor or permission review.
+22. **Do not replay a committed lifecycle transition after a read failure.** The bind/unbind write and immutable event commit together; post-save baselines advance from that committed return before any refresh can fail.
 
 - **Parent removal and child removal differ.** Direct child deletion removes only that participant. Dissolve detaches all children; full event deletion removes all linked children. The parent can remain valid with no participants.
 
@@ -263,5 +265,6 @@ An Interaction may reference `group_events` through nullable `group_event_id`, w
 | 2026-09-02 | 33 | Documented canonical Group Event children, three-field inheritance, parent-only note ownership, and recency-safe lifecycle composition. |
 | 2026-09-02 | 34 | Added detailed Log Interaction, scoped Channel defaults, post-log Note-or-Memory capture, and the ordinary Channel preference consumer. |
 | 2026-09-02 | 36 | Added the new-item interaction-note permission default and bounded opted-in recent-note prompt serialization. |
+| 2026-09-23 | 38.2 | Composed full-editor Bind/Unbind events in the cadence transaction and made committed write results authoritative before post-save refresh. |
 | 2026-09-25 | 38.3 | Post-Log Note editor publishes the shell refresh tick after its committed note and Memory writes (D-21); `log-guards.ts` gained the typed `FutureOccurredAtError` for the future branch (message unchanged, guard logic unchanged). |
 | 2026-09-26 | 38.3 | Post-Log "Create Memory Instead" and Memory edit treat a resolved write as terminal: a failed post-commit re-read no longer reports "Couldn't save" or invites a duplicate Memory (review B-CR-01, D-04). |
