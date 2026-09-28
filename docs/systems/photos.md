@@ -166,6 +166,9 @@ The path lock is process-local. Crash safety comes from settling old journal row
 - **ADR-068:** User-Triggered, Source-Only Reconciliation with Durable Review — stages and promotes a selected current source photo around the reconciliation transaction.
 - **ADR-112:** App-Owned Profile Background Derivatives and Launch Reconciliation — adds bounded local derivatives, shared-reference cleanup, and DB-aware recovery.
 - **ADR-138:** Complete Portable Backup Format v5 — stages and restores Profile background bytes with the parent-UID presentation graph.
+- **ADR-157:** Bounded Native Transfer Ownership — assigns byte, time, and cleanup bounds to native photo acquisition, export, and staging boundaries.
+- **ADR-158:** Canonical Photo Ownership Across Masters, Staging, and Derivatives — gives each photo namespace one explicit owner and retirement rule.
+- **ADR-159:** Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair — finalizes only journal-authorized bytes owned by the committed restore state.
 
 ## Gotchas
 
@@ -182,6 +185,8 @@ The path lock is process-local. Crash safety comes from settling old journal row
 11. **A Profile background is shared template data.** Never apply the avatar pipeline's single-owner deletion assumption; re-read every live template reference first.
 12. **Background restore is not contact-photo journaling.** Its UID-derived pending/finalization path must retain the incoming bytes until the committed template owns the candidate.
 13. **Canonical masters have one owner.** New writes, recovery, removal, and sidecar reconciliation acquire the same path lock. Delete intents are idempotent and delete only when no live contact, profile, custom-field value, or pending finalize references the exact path.
+14. **Every transient native copy needs a named owner and terminal cleanup.** Picker copies, downloads, ImageManipulator outputs, staging files, and derivatives retire at their owning operation's success/failure boundary, with a guarded cold-start sweep only as a crash backstop.
+15. **Never broaden a cleanup namespace to repair old aliases.** Restore and merge act on current canonical ownership and committed journal evidence; uncertain or pre-fix paths prefer a bounded leak over deleting potentially live bytes.
 
 ## Related Systems
 
