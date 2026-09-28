@@ -50,7 +50,6 @@ import sys
 
 # ---- Tunables -------------------------------------------------------------
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-BACKGROUNDS_TS = os.path.join(REPO_ROOT, "src", "theme", "backgrounds.ts")
 REGIMES_JSON = os.path.join(REPO_ROOT, "scripts", "background-extrema-regimes.json")
 # WCAG 2.x sRGB linearisation knee (mirrors src/theme/contrast.ts).
 WCAG_KNEE = 0.03928
@@ -114,82 +113,19 @@ def load_regimes():
     return regimes
 
 
-MODES = ("light", "dark")
-# BACKGROUND_SLOTS layout (src/theme/backgrounds.ts, fixed for this parser):
-#   slot key at 2 spaces; `package:` and `variants: {` at 4; `light: {` /
-#   `dark: {` at 6; `source` / `brightestPixel` / `darkestPixel` at 8.
-SLOT_RE = re.compile(r'^  "([a-z0-9-]+)": \{\n(.*?)\n  \},?$', re.M | re.S)
-VARIANT_RE = re.compile(r"^      (light|dark): \{\n(.*?)\n      \},?$", re.M | re.S)
-
-
-class ParseError(ValueError):
-    pass
-
-
-def parse_slot_source(source, base_dir):
-    """Parse the nested BACKGROUND_SLOTS layout into one row per (slot, mode).
-
-    Raises ParseError when a slot lacks either variant block, or a variant lacks
-    its require / brightestPixel / darkestPixel.
-    """
-    rows = []
-    for slot_id, body in SLOT_RE.findall(source):
-        pkg = re.search(r'^    package: "(galaxy|standard)"', body, re.M)
-        if not pkg:
-            continue  # not a BACKGROUND_SLOTS entry (e.g. another object literal)
-        if not re.search(r"^    variants: \{", body, re.M):
-            raise ParseError(f"{slot_id}: no `variants: {{` block")
-        variants = dict(VARIANT_RE.findall(body))
-        for mode in MODES:
-            vbody = variants.get(mode)
-            if vbody is None:
-                raise ParseError(f"{slot_id}: missing {mode} variant block")
-            req = re.search(r'require\("([^"]+)"\)', vbody)
-            bright = re.search(r'brightestPixel: "(#[0-9A-Fa-f]{6})"', vbody)
-            dark = re.search(r'darkestPixel: "(#[0-9A-Fa-f]{6})"', vbody)
-            missing = [
-                name
-                for name, found in (
-                    ("require", req),
-                    ("brightestPixel", bright),
-                    ("darkestPixel", dark),
-                )
-                if not found
-            ]
-            if missing:
-                raise ParseError(f"{slot_id}/{mode}: missing {', '.join(missing)}")
-            rows.append(
-                {
-                    "slot": slot_id,
-                    "mode": mode,
-                    "package": pkg.group(1),
-                    "asset": os.path.normpath(os.path.join(base_dir, req.group(1))),
-                    "brightestPixel": bright.group(1),
-                    "darkestPixel": dark.group(1),
-                }
-            )
-    return rows
+# The variant parser lives in scripts/background_manifest.py (38.5-03), shared
+# with scripts/check-background-art.py so both validators read the same manifest.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from background_manifest import ParseError, parse_manifest, parse_slot_source  # noqa: E402
 
 
 def parse_slots():
     """Parse BACKGROUND_SLOTS from backgrounds.ts: one row per (slot, mode) variant."""
     try:
-        with open(BACKGROUNDS_TS, encoding="utf-8") as fh:
-            source = fh.read()
-    except OSError as err:
-        print(f"measure-background-extrema: {err}", file=sys.stderr)
-        sys.exit(2)
-    try:
-        rows = parse_slot_source(source, os.path.dirname(BACKGROUNDS_TS))
+        return parse_manifest()
     except ParseError as err:
         print(f"measure-background-extrema: backgrounds.ts: {err}", file=sys.stderr)
         sys.exit(2)
-    if not rows:
-        print(
-            "measure-background-extrema: no BACKGROUND_SLOTS entries parsed", file=sys.stderr
-        )
-        sys.exit(2)
-    return rows
 
 
 def decode_colors(path):

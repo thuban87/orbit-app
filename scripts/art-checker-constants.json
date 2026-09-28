@@ -1,0 +1,135 @@
+{
+  "_comment": "Every colour and opacity scripts/check-background-art.py and scripts/background_manifest.py use (38.5-03, D-14). Keys are <package>-<mode>. veil = BACKGROUND_VEIL_OPACITY per density; surface = palette.surface (the veil and card/chrome tint); card = cardTintOpacity(pkg, mode, 'presentation') (the checker's combined card/chrome section); bare = the ROOT-palette foregrounds that can sit on the art (text at floors.text, status glyphs at floors.glyph); accentText = resolveAccent(id, pkg, mode).text per curated accent; standardLightGlass = resolveGlassForegroundPalette in Standard Light over an asset (card/chrome foregrounds there). src/theme/art-checker-constants.test.ts rebuilds this object from the TS theme and fails on any stale, missing or extra key: edit the TS, then regenerate this file.",
+  "veil": {
+    "galaxy-dark": { "presentation": 0.02, "comfortable": 0.1, "dense": 0.22 },
+    "galaxy-light": { "presentation": 0.02, "comfortable": 0.1, "dense": 0.22 },
+    "standard-dark": {
+      "presentation": 0.05,
+      "comfortable": 0.14,
+      "dense": 0.3
+    },
+    "standard-light": {
+      "presentation": 0.05,
+      "comfortable": 0.14,
+      "dense": 0.3
+    }
+  },
+  "surface": {
+    "galaxy-dark": "#141828",
+    "galaxy-light": "#FBFCFE",
+    "standard-dark": "#191C22",
+    "standard-light": "#FFFFFF"
+  },
+  "card": {
+    "galaxy-dark": 0.05,
+    "galaxy-light": 0.88,
+    "standard-dark": 0.97,
+    "standard-light": 0.5
+  },
+  "bare": {
+    "galaxy-dark": [
+      { "token": "textPrimary", "hex": "#E6E9F5", "floor": 4.5 },
+      { "token": "textSecondary", "hex": "#8B93B0", "floor": 4.5 },
+      { "token": "textPlaceholder", "hex": "#8B93B0", "floor": 4.5 },
+      { "token": "danger", "hex": "#E5484D", "floor": 4.5 },
+      { "token": "statusStable", "hex": "#45B98A", "floor": 3 },
+      { "token": "statusWobble", "hex": "#E8C15C", "floor": 3 },
+      { "token": "statusDecay", "hex": "#E56A52", "floor": 3 },
+      { "token": "rogue", "hex": "#E0904A", "floor": 3 }
+    ],
+    "galaxy-light": [
+      { "token": "textPrimary", "hex": "#1A1F33", "floor": 4.5 },
+      { "token": "textSecondary", "hex": "#515A78", "floor": 4.5 },
+      { "token": "textPlaceholder", "hex": "#515A78", "floor": 4.5 },
+      { "token": "danger", "hex": "#B21D22", "floor": 4.5 },
+      { "token": "statusStable", "hex": "#1E7D5A", "floor": 3 },
+      { "token": "statusWobble", "hex": "#8A6A12", "floor": 3 },
+      { "token": "statusDecay", "hex": "#B33A22", "floor": 3 },
+      { "token": "rogue", "hex": "#9A5B14", "floor": 3 }
+    ],
+    "standard-dark": [
+      { "token": "textPrimary", "hex": "#E9ECF1", "floor": 4.5 },
+      { "token": "textSecondary", "hex": "#9AA1AD", "floor": 4.5 },
+      { "token": "textPlaceholder", "hex": "#9AA1AD", "floor": 4.5 },
+      { "token": "danger", "hex": "#FF6B6B", "floor": 4.5 },
+      { "token": "statusStable", "hex": "#4BB08A", "floor": 3 },
+      { "token": "statusWobble", "hex": "#E2C065", "floor": 3 },
+      { "token": "statusDecay", "hex": "#EA7059", "floor": 3 },
+      { "token": "rogue", "hex": "#DA9350", "floor": 3 }
+    ],
+    "standard-light": [
+      { "token": "textPrimary", "hex": "#1B1E26", "floor": 4.5 },
+      { "token": "textSecondary", "hex": "#565D6B", "floor": 4.5 },
+      { "token": "textPlaceholder", "hex": "#565D6B", "floor": 4.5 },
+      { "token": "danger", "hex": "#B21D22", "floor": 4.5 },
+      { "token": "statusStable", "hex": "#1E7D5A", "floor": 3 },
+      { "token": "statusWobble", "hex": "#836612", "floor": 3 },
+      { "token": "statusDecay", "hex": "#B33A22", "floor": 3 },
+      { "token": "rogue", "hex": "#96591A", "floor": 3 }
+    ]
+  },
+  "accentText": {
+    "galaxy-dark": {
+      "nebula-blue": "#8FA6FF",
+      "slate-indigo": "#9AA8E0",
+      "aurora-teal": "#4FD0C6",
+      "solar-amber": "#F0C766",
+      "rose-quartz": "#EC86A8",
+      "violet-haze": "#B199E8",
+      "emerald": "#63CC7F",
+      "coral": "#FF9377"
+    },
+    "galaxy-light": {
+      "nebula-blue": "#2A46C7",
+      "slate-indigo": "#3C4AA0",
+      "aurora-teal": "#0B6A64",
+      "solar-amber": "#7A5610",
+      "rose-quartz": "#A8244D",
+      "violet-haze": "#5E37B5",
+      "emerald": "#106A33",
+      "coral": "#AC3925"
+    },
+    "standard-dark": {
+      "nebula-blue": "#8FA6FF",
+      "slate-indigo": "#9AA8E0",
+      "aurora-teal": "#4FD0C6",
+      "solar-amber": "#F0C766",
+      "rose-quartz": "#EC86A8",
+      "violet-haze": "#B199E8",
+      "emerald": "#63CC7F",
+      "coral": "#FF9377"
+    },
+    "standard-light": {
+      "nebula-blue": "#2A46C7",
+      "slate-indigo": "#3C4AA0",
+      "aurora-teal": "#0B6A64",
+      "solar-amber": "#7A5610",
+      "rose-quartz": "#A8244D",
+      "violet-haze": "#5E37B5",
+      "emerald": "#106A33",
+      "coral": "#AC3925"
+    }
+  },
+  "standardLightGlass": {
+    "tokens": [
+      { "token": "textPrimary", "hex": "#1B1E26", "floor": 4.5 },
+      { "token": "textSecondary", "hex": "#1B1E26", "floor": 4.5 },
+      { "token": "danger", "hex": "#590E11", "floor": 4.5 },
+      { "token": "statusStable", "hex": "#134F39", "floor": 3 },
+      { "token": "statusWobble", "hex": "#57430C", "floor": 3 },
+      { "token": "statusDecay", "hex": "#7E2918", "floor": 3 },
+      { "token": "rogue", "hex": "#663C12", "floor": 3 }
+    ],
+    "accentText": {
+      "nebula-blue": "#162568",
+      "slate-indigo": "#202856",
+      "aurora-teal": "#05312E",
+      "solar-amber": "#392807",
+      "rose-quartz": "#541227",
+      "violet-haze": "#331E61",
+      "emerald": "#083319",
+      "coral": "#501A11"
+    }
+  },
+  "floors": { "text": 4.5, "glyph": 3 }
+}
