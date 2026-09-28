@@ -48,6 +48,6 @@ Android builds run on the owner's Windows desktop **`droid`** over SSH/Tailscale
 - `docs/runbooks/desktop-build-pipeline.md` — the proven commit → tar-over-ssh → droid build → pull → `adb install` procedure (release proof + debug/Metro iteration).
 
 **Depends on:** None
-**Required by:** None
+**Required by:** ADR-176 (Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs)
 
 ---

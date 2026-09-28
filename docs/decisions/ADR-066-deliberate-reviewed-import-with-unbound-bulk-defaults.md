@@ -50,4 +50,4 @@ The system requires a detailed review before single-contact creation or linking.
 - `src/screens/ImportCompleteScreen.tsx` — renders durable outcome counts and next actions.
 
 **Depends on:** ADR-059 (Normalized Contact Methods, Canonical Actionability, and Local Provenance); ADR-062 (Bound/Unbound Lifecycle and One-Way Cadence Assignment); ADR-065 (Durable Resumable Contact-Import Sessions with Failure-Isolated Photos)
-**Required by:** ADR-067 (Conservative Advisory Identity Matching and Explicit Source Consolidation).
+**Required by:** ADR-067 (Conservative Advisory Identity Matching and Explicit Source Consolidation); ADR-171 (Durable Bulk-Import Lifecycle Choice, Locked Batches, and One Pass per Session)

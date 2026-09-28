@@ -47,4 +47,4 @@ The system enables `READ_CONTACTS` on API 37+ only for a user-initiated reconcil
 - `src/screens/ReconcileGridScreen.tsx` — gates the linked-contact batch read behind permission.
 
 **Depends on:** ADR-002 (Cross-Version Contact Import — Hybrid Two-Picker)
-**Required by:** ADR-154 (API-37 Import Requests Contacts Access for Notes)
+**Required by:** ADR-154 (API-37 Import Requests Contacts Access for Notes); ADR-176 (Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs)

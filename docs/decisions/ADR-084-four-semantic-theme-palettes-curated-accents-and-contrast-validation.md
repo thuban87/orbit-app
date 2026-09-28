@@ -50,4 +50,4 @@ The system resolves four complete semantic palettes: Galaxy and Standard, each i
 - `src/screens/SettingsScreen.tsx` — offers live package, appearance-mode, and accent controls for existing consumers.
 
 **Depends on:** ADR-083 (Durable Multi-Package Theme Configuration and Restore-Before-Paint)
-**Required by:** ADR-120 (Shared-Window Heatmap and Intensity with Globally-Persisted Lenses)
+**Required by:** ADR-120 (Shared-Window Heatmap and Intensity with Globally-Persisted Lenses); ADR-169 (Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract); ADR-173 (Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance)

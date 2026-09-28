@@ -53,4 +53,4 @@ The system uses `app_settings` migration 015 for a Galaxy/Standard package axis 
 - `App.tsx` — keeps the main shell behind the migration and theme-hydration gate.
 
 **Depends on:** ADR-006 (Theme-Token Architecture)
-**Required by:** ADR-084 (Four Semantic Theme Palettes, Curated Accents, and Contrast Validation); ADR-092 (Durable Shared Dashboard Query State); ADR-108 (Durable Independent-Axis Profile Presentation and Inheritance)
+**Required by:** ADR-084 (Four Semantic Theme Palettes, Curated Accents, and Contrast Validation); ADR-092 (Durable Shared Dashboard Query State); ADR-108 (Durable Independent-Axis Profile Presentation and Inheritance); ADR-176 (Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs)
