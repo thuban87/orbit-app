@@ -220,6 +220,7 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 - **ADR-093:** Scoped Composable Dashboard Population and Filter Model — keeps favourite storage as membership while Dashboard/Widget use shared Default ordering.
 - **ADR-082:** Universal Capture FAB, Canonical Picker, and Truthful Quick Log — adds the shared local target picker.
 - **ADR-131:** Progressive Contact Creation and Complete-Record Editing — keeps creation quiet while composing complete edit knowledge atomically.
+- **ADR-160:** Committed-Identity Contact Edits and Exact-Source Reconciliation — makes committed write returns the authority for post-save baselines and retry-safe child identity.
 - **ADR-089:** Recoverable Memory Lifecycle and Contact-Operation Integrity — extends merge and purge with explicit contact-knowledge integrity work.
 - **ADR-090:** Additive Custom-Field Value History and Deferred Contact Scope — requires retained field history to follow explicit contact lifecycle handling.
 - **ADR-035:** Native SMS Handoff with Guaranteed Clipboard Copy — partially superseded; native handoff and Copy remain the interaction boundary.
@@ -295,6 +296,7 @@ Permanent contact purge removes and tombstones that contact’s child Interactio
 25. **A bulk action is not a set-based update.** Calling a public writer inside the batch deadlocks the non-reentrant transaction mutex; compose its core inside `bulk-actions-dao` instead.
 26. **Archive batch state must include its event.** Updating `archived_at` without the immutable archive event breaks the lifecycle timeline.
 27. **Off Limits is a fuel kind, not the whole table.** A complete-edit diff must seed and mutate only `off_limits` rows; other fuel kinds must survive the save.
+28. **A failed post-write refresh is not a failed write.** Advance edit baselines and generated child identities from the committed DAO result before refreshing projections, so a safe retry cannot duplicate rows or replay lifecycle events.
 
 - **Archived participation is allowed.** An archive guard or automatic restore prompt on Group Event insertion would reverse the owner-accepted recency behavior.
 
