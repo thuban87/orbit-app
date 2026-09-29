@@ -611,6 +611,24 @@ the CONTEXT shim.
         snapshot or staging, uses the same predicate for the settings write, and re-decides consent inside its
         transaction from that transaction's own settings read, so an unconsented unavailable id can never be written.
 
+### End-of-Phase Rulings (UAT, 2026-09-29)
+
+The owner answered the phase-end report (`38.5-PHASE-END-REPORT.md` §2/§3) during UAT (`38.5-UAT.md`). He also signed
+off the device look on the Pixel 6 Pro (all four theme × mode groups) and the Pixel 3a, and the AUR-L/AUR-D, SWP (D-48),
+ACT (D-46) and SDH checks.
+
+-   **[DECIDED · 2026-09-29] D-50 --- D-25 answered: D25-A + D25-B.** The 25 transient/error red `danger` strings over
+    Galaxy Dark art stay accepted under `E-1-bare` (3.58--4.00:1, above 3:1). The four strings that stay on screen as
+    normal content get a scrim that brings them to 4.5:1 in Galaxy Dark: "Discard" (`BulkImportSetupScreen.tsx:469`),
+    "Unlink source" (`ReconcileDetailScreen.tsx:474`), "Remove photo" (`PhotoSourcePicker.tsx:333`) and
+    "{absorbed} will be retired." (`MergeImpactSummary.tsx:126`). Gap plan; UAT gap `G-38.5-11`.
+-   **[DECIDED · 2026-09-29] D-51 --- G1-LATER.** The Orrery "isn't responding" ANR (Pixel 3a, debug build) is
+    investigated outside 38.5, first on the release build and the Pixel 6 Pro.
+-   **[DECIDED · 2026-09-29] D-52 --- G2-FIX.** The Galaxy Dark Aurora picker thumbnail is cropped toward the mirrored
+    ribbon (D-35) instead of the centre. The full-screen background render is unchanged. Gap plan; UAT gap `G-38.5-13`.
+-   **[DECIDED · 2026-09-29] D-53 --- G3-LATER.** The Your Week "Interactions" mid-word wrap at font scale 1.15 is logged
+    for a later layout pass, not 38.5.
+
 ## Primary Input: the 38.4 Background-Art Brief
 
 **Path:** `.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-BACKGROUND-ART-BRIEF.md`. The supporting
