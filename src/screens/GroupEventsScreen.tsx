@@ -67,7 +67,9 @@ export function GroupEventsScreen({
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    // No page fill: the background art shows through, and every row is a full
+    // (opaque `surface`) card over it (38.5, owner 2026-09-29).
+    <View style={styles.root}>
       {/* Events is a tab root: root header, never a Back (D-22). */}
       <ShellAppBar
         variant="root"

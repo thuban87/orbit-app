@@ -25,6 +25,7 @@ import { newUid } from "@/db/uid";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import { useTheme } from "@/theme";
+import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { formatDateTimeMinuteOrFallback } from "@/utils/dates";
 import type { InFlightRef } from "@/utils/single-flight";
@@ -192,6 +193,10 @@ export function GroupEventDetailScreen({
   const interaction =
     detail && event ? buildGroupEventDetailInteraction(event, detail) : null;
   const confirmCopy = confirm === "dissolve" ? DISSOLVE : DELETE;
+  const cardColors = {
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+  };
 
   if (!event)
     return (
@@ -206,7 +211,10 @@ export function GroupEventDetailScreen({
       </View>
     );
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    // No page fill: the background art shows through, and the event summary,
+    // the empty state and every participant are full (opaque `surface`) cards
+    // over it (38.5, owner 2026-09-29).
+    <View style={styles.root}>
       <ShellAppBar
         variant="child"
         title="Group Event"
@@ -233,43 +241,45 @@ export function GroupEventDetailScreen({
         ]}
         ListHeaderComponent={
           <View style={styles.header}>
-            <AppText role="heading">{event.title}</AppText>
-            {refreshFailed ? (
-              <View style={styles.inlineError}>
+            <View style={[styles.card, cardColors]}>
+              <AppText role="heading">{event.title}</AppText>
+              {refreshFailed ? (
+                <View style={styles.inlineError}>
+                  <AppText role="caption" style={{ color: colors.danger }}>
+                    Couldn't refresh this event
+                  </AppText>
+                  <Button
+                    role="tertiary"
+                    label="Retry"
+                    accessibilityLabel="Retry refreshing this event"
+                    onPress={() => void refresh()}
+                  />
+                </View>
+              ) : null}
+              {writeError ? (
                 <AppText role="caption" style={{ color: colors.danger }}>
-                  Couldn't refresh this event
+                  Couldn't update this group event. Please try again.
                 </AppText>
-                <Button
-                  role="tertiary"
-                  label="Retry"
-                  accessibilityLabel="Retry refreshing this event"
-                  onPress={() => void refresh()}
-                />
-              </View>
-            ) : null}
-            {writeError ? (
-              <AppText role="caption" style={{ color: colors.danger }}>
-                Couldn't update this group event. Please try again.
-              </AppText>
-            ) : null}
-            {/* RG-038 (ui-accessibility/AUD-UIA-018, D-07): display-only minute
+              ) : null}
+              {/* RG-038 (ui-accessibility/AUD-UIA-018, D-07): display-only minute
                 precision; the edit flow keeps the stored value. */}
-            <DetailField
-              label="When"
-              value={formatDateTimeMinuteOrFallback(event.occurredAt)}
-            />
-            <DetailField label="Channel" value={event.channel} />
-            <DetailField label="Tone" value={event.quality} />
-            <DetailField
-              label="Duration"
-              value={groupEventDurationLabel(event.duration)}
-            />
-            <DetailField label="Group Note" value={event.groupNote} />
+              <DetailField
+                label="When"
+                value={formatDateTimeMinuteOrFallback(event.occurredAt)}
+              />
+              <DetailField label="Channel" value={event.channel} />
+              <DetailField label="Tone" value={event.quality} />
+              <DetailField
+                label="Duration"
+                value={groupEventDurationLabel(event.duration)}
+              />
+              <DetailField label="Group Note" value={event.groupNote} />
+            </View>
             <AppText role="label">Participants</AppText>
           </View>
         }
         ListEmptyComponent={
-          <View style={styles.empty}>
+          <View style={[styles.card, styles.empty, cardColors]}>
             <AppText role="heading">No participants yet</AppText>
             <AppText role="body" style={{ color: colors.textSecondary }}>
               Add the people who were there — or save now and add them later.
@@ -383,6 +393,13 @@ const styles = StyleSheet.create({
   content: { padding: SPACING.base },
   header: { gap: SPACING.md, paddingBottom: SPACING.base },
   field: { gap: SPACING.xs },
+  // Matches the Events list row card.
+  card: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: RADII.md,
+    gap: SPACING.md,
+    padding: SPACING.base,
+  },
   empty: { gap: SPACING.sm, paddingVertical: SPACING.lg },
   inlineError: { flexDirection: "row", alignItems: "center", gap: SPACING.sm },
 });
