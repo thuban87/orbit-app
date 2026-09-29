@@ -25,8 +25,8 @@ by `scripts/dev/art-signoff-candidates.ts`, so the mapping lives in one place.
 
 Usage:
   python3 scripts/dev/art-signoff-capture.py <mode> [--out DIR] [--candidates FILE]
-modes: tracer | base | active | ladders | cardblend | overflow | gallery-one COMBO |
-       restore | font-check
+modes: tracer | base | active | ladders | cardblend | overflow | gallery SLUG |
+       combo KEY [--keep] | restore | font-check
 """
 from __future__ import annotations
 
@@ -169,8 +169,11 @@ def dismiss_toast() -> None:
 
 def go_tab(name: str) -> None:
     dismiss_toast()
+    want = "dashboard-root" if name == "Contacts" else "digest-root" if name == "Digest" else None
     for attempt in range(3):
         nodes = dump()
+        if want is not None and find(nodes, id=want):
+            return
         n = find(nodes, desc_end=f", {name}")
         if n is None:
             adb("shell", "input", "keyevent", "4")  # one back to leave a pushed route
@@ -180,7 +183,6 @@ def go_tab(name: str) -> None:
         tap(x, y - 20)
         time.sleep(NAV_WAIT)
         nodes = dump()
-        want = "dashboard-root" if name == "Contacts" else "digest-root" if name == "Digest" else None
         if want is None or find(nodes, id=want):
             return
     raise RuntimeError(f"could not reach tab {name}")
@@ -355,6 +357,23 @@ def run(mode: str, out: Path, cands: dict, extra: list[str]) -> None:
                 continue
             capture_views(out, key, ["list"], "overflow-local-backing",
                           override_for(key, cands, cells_patch={"contactsHeader": {"overflowLocalBacking": True}}))
+    elif mode == "gallery":
+        # The route (extra[0] = its slug) is already open on the device; the
+        # override is swapped under it, so the navigation state survives each
+        # refresh. Look-only, at today's production treatment (combo only, no
+        # cells or opacities), no choices.
+        slug = extra[0]
+        for key in keys:
+            if key.endswith("-none"):
+                continue
+            p = out / f"{key}__{slug}__gallery.png"
+            if p.exists():
+                continue
+            pkg, mode_, bg = combo_parts(key)
+            apply({"enabled": True, "combo": {"package": pkg, "mode": mode_, "background": bg}})
+            time.sleep(1.0)
+            screencap(p)
+            print(f"  shot {p.name}", flush=True)
     elif mode == "combo":
         # Apply one combination at the mapped v2 values and leave it (gallery driving).
         apply(override_for(extra[0], cands))
