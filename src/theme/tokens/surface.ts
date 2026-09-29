@@ -103,9 +103,12 @@ export const SURFACE: Record<ThemePackage, SurfaceTokenSet> = {
     tintTokenKey: "surface",
     borderTokenKey: "borderStrong",
     glowTokenKey: "accent",
-    // The OPAQUE band — used when the mode does NOT match the art tone (galaxy art
-    // is dark, so this applies in LIGHT mode) to keep text readable. In the matched
-    // regime the card goes glassy instead (see CARD_GLASS_OPACITY / cardTintOpacity).
+    // The OPAQUE band — used in the regime `cardMatchesMode` calls unmatched
+    // (Galaxy LIGHT mode). Since 38.5 every variant's art matches its mode, so
+    // this is a D-28 ruling (the rest of ADR-115 stands), not an art-tone
+    // necessity. In the matched regime the card goes glassy instead (see
+    // CARD_GLASS_OPACITY / cardTintOpacity); the table-driven contact entries
+    // take their signed levels instead (ART_SEE_THROUGH_OPACITY).
     densityOpacity: { presentation: 0.88, comfortable: 0.93, dense: 0.97 },
     liveGlassTintOpacity: 0.88,
     fallbackTintOpacity: 0.88,
@@ -115,8 +118,9 @@ export const SURFACE: Record<ThemePackage, SurfaceTokenSet> = {
     tintTokenKey: "surface",
     borderTokenKey: "border",
     glowTokenKey: null,
-    // The OPAQUE band — applied when mode does NOT match the art tone (standard art
-    // is light, so this applies in DARK mode). Matched (light mode) goes glassy.
+    // The OPAQUE band — applied in the unmatched regime (Standard DARK mode). Since
+    // 38.5 the art matches the mode, so this is a D-28 ruling, not an art-tone
+    // necessity. Matched (light mode) goes glassy.
     densityOpacity: { presentation: 0.97, comfortable: 0.99, dense: 1.0 },
     liveGlassTintOpacity: 0.97,
     fallbackTintOpacity: 0.97,
@@ -144,6 +148,11 @@ export function surfaceOpacityForDensity(
  * mismatched-tone composite and fail AA, so the card falls back to the OPAQUE band
  * (`SURFACE.densityOpacity`) and stays readable. `surface.test.ts` proves AA per
  * asset for BOTH regimes across all four package×mode combos.
+ *
+ * (That art-tone rationale predates 38.5. Since 38.5 each slot has a light and
+ * a dark image that match their mode; the matched/unmatched split stands for
+ * every card outside the table-driven contact entries by ruling D-28, and the
+ * proofs still cover both regimes.)
  *
  * TUNABLE: the matched-regime glass opacity (owner-approved near-transparent
  * galaxy cards, 2026-09-11). Standard is a touch higher (its light art needs a

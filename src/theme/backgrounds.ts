@@ -25,9 +25,9 @@
  * `app_settings.galaxy_background` / `standard_background` stays the SLOT id — one
  * pick per package that follows the mode, with no new setting and no migration —
  * and the resolvers take the resolved mode and return that mode's variant. Both
- * packages keep both modes (D-03). Until the owner-approved art lands (38.5-05),
- * both variants of every slot point at the same file with the same declared
- * extrema, so this model changes no rendered pixel (D-13).
+ * packages keep both modes (D-03). Since 38.5-05 each variant has its own
+ * owner-approved file (`assets/backgrounds/<slot>-<mode>.webp`, D-30) and its
+ * own declared extrema.
  *
  * DECLARED-VS-DECODED (REVIEWS 23-06 cycle-4 MEDIUM; RG-029 / D-12): each variant
  * carries a declared worst-case `brightestPixel` AND `darkestPixel` — design

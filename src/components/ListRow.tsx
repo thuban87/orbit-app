@@ -5,8 +5,8 @@
  * TABLE-DRIVEN BACKING (38.5-06 / D-08, D-09, D-10): the row's backing comes
  * from the per-combination art treatment table (`contactsListEntries`), decided
  * by the pure `listRowBacking`:
- *   - `full` (every combination in production): today's solid `surface` fill,
- *     root palette;
+ *   - `full` (the None backgrounds and Standard Light · Paper in the signed
+ *     v3 table): the solid `surface` fill, root palette;
  *   - `seeThrough`: no fill; an absolute-fill `surface` tint at the cell opacity,
  *     and the whole row inside `GlassForegroundScope`;
  *   - `none`: neither; root palette.
