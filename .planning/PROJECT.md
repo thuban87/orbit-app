@@ -120,6 +120,11 @@ are local on `main`, NOT pushed.
 - ✓ **Profile Experience** — v2.0 (Phase 31). Fixed Hero over semantic modular sections,
   reusable layout and local-photo background templates, explanatory relationship tiles, safe
   presentation-only persistence, and owner-approved physical-Pixel workflows.
+- ✓ **Background art & text-on-art contrast** — v2.0 (Phase 38.5; ADR-177). Twelve lossless light/dark
+  background variants (slot × mode), a signed per-combination treatment table, per-pixel art acceptance
+  plus bare-text proofs over every shipped variant, and scaled picker thumbnails. The Events tab now
+  shows the art under solid cards. The owner signed off on the Pixel 6 Pro and the Pixel 3a
+  (release `orbit-38.5-release-2026-09-29-b74eed7.apk`).
 
 ### Active
 
@@ -256,6 +261,7 @@ are local on `main`, NOT pushed.
 | System switching is one UI-thread choreography over retained/leaving/entering roles, with screen-owned pause/re-target state and a Reduced Motion replacement | Prevents React publication steps, preserves lifecycle/camera continuity, and delivers the owner-approved spin/shedding/capture behavior (30-systems) | ✓ Good (v2.0) |
 | Profile presentation resolves layout and background independently through contact → Category → global → factory/theme, with presentation-only reset and axis-specific writes | Inheritance remains live without copying state, while contact facts, Favorite, Snooze, knowledge, and sibling presentation axes stay protected (31-profile) | ✓ Good (v2.0) |
 | Profile editing supports both direct drag and named Move actions; background cropping uses a full-source bounded selection with direct touch/pinch | Modern native interaction remains available without making precision gestures the only control path (31-profile) | ✓ Good (v2.0) |
+| Text-on-art contrast is fixed mainly by regenerated art (separate light and dark variant per background slot); scrims only where the owner-signed combination table says; Galaxy Dark red `danger` stays owner-accepted except four persistent strings on an opaque backing | Keeps the art visible while meeting WCAG floors, with every remaining carve-out owner-signed and mechanically tested (38.5; ADR-177, D-24/D-50) | ✓ Good (v2.0) |
 
 ## Evolution
 
@@ -276,4 +282,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. Update Context with current state
 
 ---
-*Last updated: 2026-09-10 after completing Phase 31 Profile Experience*
+*Last updated: 2026-09-29 after completing Phase 38.5 Background Art & Text-on-Art Contrast*
