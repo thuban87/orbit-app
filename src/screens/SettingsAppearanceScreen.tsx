@@ -59,6 +59,9 @@ import { persistAppearanceSetting } from "./settings-appearance-persist";
 const LOG_SCOPE = "settings-appearance-screen";
 
 const BACKGROUND_LABELS: Record<BackgroundSlotId, string> = {
+  // 38.5 D-33: the owner labelled the quiet Galaxy slot "Deep Space"; its id
+  // stays `galaxy-quiet` (the retiring `galaxy-deep-space` id is a different slot).
+  "galaxy-quiet": "Deep Space",
   "galaxy-deep-space": "Deep Space",
   "galaxy-starfield": "Starfield",
   "galaxy-nebula": "Nebula",

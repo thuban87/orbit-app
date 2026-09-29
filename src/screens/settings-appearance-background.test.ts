@@ -12,11 +12,13 @@ import {
 
 describe("backgroundChoicesForPackage — active-package guard (D-07)", () => {
   it("offers the Galaxy slots + None for galaxy", () => {
+    // 38.5 D-19: the quiet default first, then the tiers ascending, None last.
     expect(backgroundChoicesForPackage("galaxy")).toEqual([
-      "galaxy-deep-space",
-      "galaxy-starfield",
-      "galaxy-nebula",
+      "galaxy-quiet",
       "galaxy-aurora",
+      "galaxy-starfield",
+      "galaxy-deep-space",
+      "galaxy-nebula",
       NONE_SLOT_ID,
     ]);
     // Contract-anchored: it is exactly the package's ordered list.
@@ -41,6 +43,7 @@ describe("backgroundChoicesForPackage — active-package guard (D-07)", () => {
   it("does NOT offer the Galaxy-only choices while Standard is active", () => {
     const standardChoices = backgroundChoicesForPackage("standard");
     for (const galaxySlot of [
+      "galaxy-quiet",
       "galaxy-deep-space",
       "galaxy-starfield",
       "galaxy-nebula",

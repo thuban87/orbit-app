@@ -356,7 +356,9 @@ describe("the owner-approved lineup (38.5 D-17 / D-18 / D-19 / D-30 / D-33)", ()
 
   it("Galaxy's picker order is quiet (default), Aurora, Starfield, then the None tile", () => {
     const galaxy = BACKGROUND_ORDER.galaxy.filter((id) =>
-      ["galaxy-quiet", "galaxy-aurora", "galaxy-starfield", "none"].includes(id),
+      ["galaxy-quiet", "galaxy-aurora", "galaxy-starfield", "none"].includes(
+        id,
+      ),
     );
     expect(galaxy).toEqual([
       "galaxy-quiet",

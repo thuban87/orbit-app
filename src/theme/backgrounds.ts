@@ -114,6 +114,75 @@ export const BACKGROUND_SLOTS: Record<
   Exclude<BackgroundSlotId, typeof NONE_SLOT_ID>,
   BackgroundAssetSlot
 > = {
+  "galaxy-quiet": {
+    package: "galaxy",
+    variants: {
+      light: {
+        source: () =>
+          require("../../assets/backgrounds/galaxy-quiet-light.webp"),
+        brightestPixel: "#F8F6FF",
+        darkestPixel: "#E5DDF9",
+      },
+      dark: {
+        source: () =>
+          require("../../assets/backgrounds/galaxy-quiet-dark.webp"),
+        brightestPixel: "#1B2149",
+        darkestPixel: "#000000",
+      },
+    },
+  },
+  "galaxy-aurora": {
+    package: "galaxy",
+    variants: {
+      light: {
+        source: () =>
+          require("../../assets/backgrounds/galaxy-aurora-light.webp"),
+        brightestPixel: "#F6F8F9",
+        darkestPixel: "#CEE5E4",
+      },
+      dark: {
+        source: () =>
+          require("../../assets/backgrounds/galaxy-aurora-dark.webp"),
+        brightestPixel: "#113032",
+        darkestPixel: "#000000",
+      },
+    },
+  },
+  "galaxy-starfield": {
+    package: "galaxy",
+    variants: {
+      light: {
+        source: () =>
+          require("../../assets/backgrounds/galaxy-starfield-light.webp"),
+        brightestPixel: "#FFFFFF",
+        darkestPixel: "#CED9DC",
+        featureAllowance: {
+          maxComponentPx: 18,
+          maxFailingPct: 0.5,
+          acceptedAt: "2026-09-28",
+        },
+      },
+      dark: {
+        source: () =>
+          require("../../assets/backgrounds/galaxy-starfield-dark.webp"),
+        // Text-bearing bound after the owner-signed allowance (D-20 / D-31). The
+        // checker's channel-wise textBearingBound (#2C2868, L=0.0305) is a
+        // synthetic colour brighter than any real text-bearing pixel; the file has
+        // an EMPTY luminance band between its brightest non-star pixel (#222544,
+        // L=0.0208) and its dimmest star (L>=0.064). This bound sits in that band
+        // (L=0.0228), and `measure-background-extrema.py --check` reproduces the
+        // signed union exactly (2,680 px, 0.170%, largest 9 px), so it declares
+        // the same pixels text-bearing as #2C2868 does.
+        brightestPixel: "#262452",
+        darkestPixel: "#000000",
+        featureAllowance: {
+          maxComponentPx: 18,
+          maxFailingPct: 0.5,
+          acceptedAt: "2026-09-28",
+        },
+      },
+    },
+  },
   "galaxy-deep-space": {
     package: "galaxy",
     variants: {
@@ -127,21 +196,6 @@ export const BACKGROUND_SLOTS: Record<
         source: () =>
           require("../../assets/backgrounds/galaxy-deep-space.webp"),
         brightestPixel: "#1A1F35",
-        darkestPixel: "#000000",
-      },
-    },
-  },
-  "galaxy-starfield": {
-    package: "galaxy",
-    variants: {
-      light: {
-        source: () => require("../../assets/backgrounds/galaxy-starfield.webp"),
-        brightestPixel: "#202545",
-        darkestPixel: "#000000",
-      },
-      dark: {
-        source: () => require("../../assets/backgrounds/galaxy-starfield.webp"),
-        brightestPixel: "#202545",
         darkestPixel: "#000000",
       },
     },
@@ -161,33 +215,20 @@ export const BACKGROUND_SLOTS: Record<
       },
     },
   },
-  "galaxy-aurora": {
-    package: "galaxy",
-    variants: {
-      light: {
-        source: () => require("../../assets/backgrounds/galaxy-aurora.webp"),
-        brightestPixel: "#16303A",
-        darkestPixel: "#000103",
-      },
-      dark: {
-        source: () => require("../../assets/backgrounds/galaxy-aurora.webp"),
-        brightestPixel: "#16303A",
-        darkestPixel: "#000103",
-      },
-    },
-  },
   "standard-dawn": {
     package: "standard",
     variants: {
       light: {
-        source: () => require("../../assets/backgrounds/standard-dawn.webp"),
-        brightestPixel: "#E8D8C0",
-        darkestPixel: "#D09E76",
+        source: () =>
+          require("../../assets/backgrounds/standard-dawn-light.webp"),
+        brightestPixel: "#FFF6E8",
+        darkestPixel: "#FDD8C0",
       },
       dark: {
-        source: () => require("../../assets/backgrounds/standard-dawn.webp"),
-        brightestPixel: "#E8D8C0",
-        darkestPixel: "#D09E76",
+        source: () =>
+          require("../../assets/backgrounds/standard-dawn-dark.webp"),
+        brightestPixel: "#4D201C",
+        darkestPixel: "#2D0711",
       },
     },
   },
@@ -195,14 +236,16 @@ export const BACKGROUND_SLOTS: Record<
     package: "standard",
     variants: {
       light: {
-        source: () => require("../../assets/backgrounds/standard-paper.webp"),
-        brightestPixel: "#EDE6D8",
-        darkestPixel: "#B4997A",
+        source: () =>
+          require("../../assets/backgrounds/standard-paper-light.webp"),
+        brightestPixel: "#F7F3E9",
+        darkestPixel: "#E4E0D7",
       },
       dark: {
-        source: () => require("../../assets/backgrounds/standard-paper.webp"),
-        brightestPixel: "#EDE6D8",
-        darkestPixel: "#B4997A",
+        source: () =>
+          require("../../assets/backgrounds/standard-paper-dark.webp"),
+        brightestPixel: "#302E2C",
+        darkestPixel: "#191415",
       },
     },
   },
@@ -210,14 +253,16 @@ export const BACKGROUND_SLOTS: Record<
     package: "standard",
     variants: {
       light: {
-        source: () => require("../../assets/backgrounds/standard-dusk.webp"),
-        brightestPixel: "#C8B0C0",
-        darkestPixel: "#292634",
+        source: () =>
+          require("../../assets/backgrounds/standard-dusk-light.webp"),
+        brightestPixel: "#FEF5EA",
+        darkestPixel: "#DEDAFD",
       },
       dark: {
-        source: () => require("../../assets/backgrounds/standard-dusk.webp"),
-        brightestPixel: "#C8B0C0",
-        darkestPixel: "#292634",
+        source: () =>
+          require("../../assets/backgrounds/standard-dusk-dark.webp"),
+        brightestPixel: "#3D253F",
+        darkestPixel: "#24143F",
       },
     },
   },
@@ -249,10 +294,11 @@ export const BACKGROUND_ORDER: Record<
   readonly BackgroundSlotId[]
 > = {
   galaxy: [
-    "galaxy-deep-space",
-    "galaxy-starfield",
-    "galaxy-nebula",
+    "galaxy-quiet",
     "galaxy-aurora",
+    "galaxy-starfield",
+    "galaxy-deep-space",
+    "galaxy-nebula",
     NONE_SLOT_ID,
   ],
   standard: [
@@ -270,7 +316,7 @@ export const BACKGROUND_ORDER: Record<
  * defaults to the Deep Space gradient, Standard to the soft Dawn gradient (UI-SPEC).
  */
 export const PACKAGE_DEFAULT_SLOT: Record<ThemePackage, BackgroundSlotId> = {
-  galaxy: "galaxy-deep-space",
+  galaxy: "galaxy-quiet",
   standard: "standard-dawn",
 };
 

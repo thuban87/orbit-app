@@ -44,6 +44,7 @@ export type AccentId = (typeof ACCENT_IDS)[number];
  */
 export const BACKGROUND_SLOT_IDS = [
   "none",
+  "galaxy-quiet",
   "galaxy-nebula",
   "galaxy-deep-space",
   "galaxy-aurora",
