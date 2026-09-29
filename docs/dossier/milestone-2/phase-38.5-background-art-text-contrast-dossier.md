@@ -1,6 +1,6 @@
 # Phase 38.5 --- Background Art & Text-on-Art Contrast Dossier
 
-**Status:** DISCUSSED 2026-09-28 (D-17..D-29). The O-9 spike PASSED on 2026-09-28; the phase is ready to plan. **Prerequisite:** the owner-signed scrim combination
+**Status:** DISCUSSED 2026-09-28 (D-17..D-29); ART SIGNED OFF 2026-09-28 (D-30..D-34). The O-9 spike PASSED on 2026-09-28; the phase is ready to plan. **Prerequisite:** the owner-signed scrim combination
 sheet (38.4 D-40), **met 2026-09-27** (sign-off v2, D-08). Before planning, the O-9 `codex-edu` image spike still has
 to run. Authored 2026-09-26 at phase insertion, from the owner rulings 38.4 D-38..D-41 and the 38.4 background-art
 brief. Updated 2026-09-27 with the owner's scrim sign-off v2 results and rulings D-08..D-14. The phase is now sequenced
@@ -15,7 +15,7 @@ discuss session has run yet.
 -   **[DERIVED]** a consequence of a decision or of a measured fact.
 -   **[PLANNING NOTE]** a repository finding or engineering follow-up to verify at planning time.
 
-**Numbering.** D-08..D-16 are this phase's own rulings (2026-09-27); they match the CONTEXT shim. The carried 38.4
+**Numbering.** D-08..D-16 (2026-09-27), D-17..D-29 (discuss, 2026-09-28) and D-30..D-34 (art sign-off, 2026-09-28) are this phase's own rulings; they match the CONTEXT shim. The carried 38.4
 rulings are D-38..D-41. Any other 38.4 decision is written "38.4 D-NN".
 
 ## Objective
@@ -369,6 +369,53 @@ recommendation. The owner then decides whether a gap plan picks it up.
 -   Report deferred items to the owner as soon as they are found (project practice); do not hold them silently until
     phase end.
 
+## Art Sign-off (2026-09-28)
+
+The owner's blocking art sign-off (D-14 step 4; plan 38.5-04 Task 3), given across three messages on 2026-09-28 after
+four Codex rounds. The IDs D-30..D-34 match the CONTEXT shim. The full record, with the owner's words verbatim, the
+per-cell checker results on the shipped files, the P-7 sizes and the machine-readable allowance block, is
+`.planning/phases/38.5-background-art-text-contrast/38.5-ART-SIGNOFF.md`.
+
+-   **[DECIDED · 2026-09-28] D-30 --- The 12 images (resolves O-2's concepts; confirms D-22's look).** One pick per slot ×
+    mode; each ships as `assets/backgrounds/<slot>-<mode>.webp`.
+    -   **galaxy-quiet:** dark DeepSpace-D1 (`galaxy-quiet-dark-base-strict-r1`); light DeepSpace-L1
+        (`galaxy-quiet-light-route1-strict-r2`, route 1).
+    -   **galaxy-aurora:** dark Aurora-D7 (`galaxy-aurora-dark-base-strict-r4e`); light Aurora-L1
+        (`galaxy-aurora-light-route1-strict-r2`, route 1).
+    -   **galaxy-starfield:** dark Starfield-D3 (`galaxy-starfield-dark-base-visible-r3`, visible features); light
+        Starfield-L5 (`galaxy-starfield-light-route2-visible-r4d`, route 2, visible features).
+    -   **standard-dawn:** dark Dawn-D1 (`standard-dawn-dark-route1-strict-r2`, route 1); light Dawn-L1
+        (`standard-dawn-light-base-strict-r0`).
+    -   **standard-paper:** dark Paper-D5 (`standard-paper-dark-route1-strict-r4f`); light Paper-L2
+        (`standard-paper-light-base-strict-r4a`). D5 was made as the dark partner of a different paper than L2; the
+        pairing is the owner's explicit choice.
+    -   **standard-dusk:** dark Dusk-D1 (`standard-dusk-dark-route1-strict-r2`, route 1); light Dusk-L2
+        (`standard-dusk-light-base-strict-r4a`).
+    -   **Galaxy Dark Aurora is a new image (Aurora-D7), not the remaster of today's image.** The owner first picked the
+        round-3 visible Aurora-D3; told its ribbon drops `textSecondary` to about 2.2:1, he asked for it dimmed and picked
+        the strict round-4 D7. So no broad-feature exclusion exists.
+    -   Rejected on the way: every round-1/2 Paper ("None of the papers have a paper texture, arguably the defining piece
+        of that type of art") and the round-1 Dusk light ("has virtually no anything in it. It's basically just a white
+        background").
+    -   [DERIVED] Every shipped file is pixel-identical to its approved master and passes H1 and H2 (`--margin 0.1`) as
+        shipped. The ten strict images have no failing pixel.
+-   **[DECIDED · 2026-09-28] D-31 --- The Starfield feature allowance: 18 px / 0.5%, Starfield only; no exclusions.**
+    -   Owner: "Failing on 0.17% of the screen is infinitesimal, I'm fine with that, but an upper band of 0.5% is fine
+        too. The star sizes are fine, going 5x bigger would be a massive mistake anyways so don't do that, 2x bigger at
+        the absolute max but that should be rare".
+    -   `featureAllowance { maxComponentPx: 18, maxFailingPct: 0.5 }` for galaxy-starfield dark and light. 18 px is twice
+        Starfield-D3's largest failing star (9 px); Starfield-L5's largest is 13 px. D3 fails on 0.170% of the canvas,
+        L5 on 0.028%.
+    -   No other allowance. **No exclusion** (the accepted-exclusions block's `exclusions` is empty).
+-   **[DECIDED · 2026-09-28] D-32 --- The pearl planet limb is shelved (D-16).** Owner: "I do not care for whatever the
+    hell you made here no. Let's shelve this and I can revisit another time". It is not transcoded, committed or wired;
+    the no-planets rule stands for every shipped image.
+-   **[DECIDED · 2026-09-28] D-33 --- Labels.** The new quiet Galaxy slot is labelled **"Deep Space"**. Its id stays
+    `galaxy-quiet`; the existing `galaxy-deep-space` id is still retired by 38.5-05 (only the label is reused). Aurora and
+    Starfield keep their names in both modes.
+-   **[DECIDED · 2026-09-28] D-34 --- No backup-format bump.** The owner agreed with the recommendation: the slot id stays
+    in the same keys and nothing on the wire changes.
+
 ## Primary Input: the 38.4 Background-Art Brief
 
 **Path:** `.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-BACKGROUND-ART-BRIEF.md`. The supporting
@@ -430,7 +477,7 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
 
 -   **[DECIDED · 2026-09-28 → D-17/D-18] O-1 --- Which background to cut per theme.** *Resolved: Galaxy cuts Deep Space and Nebula, and replaces Starfield; Standard cuts Mesh.* The owner may cut one per package (4 → 3), giving about 12 images.
     Which one in each package?
--   **[APPROACH DECIDED · 2026-09-28 → D-21] O-2 --- Galaxy light-mode imagery.** *Codex explores both routes per slot; the owner picks the concepts at the art sign-off.* D-39 allows different pictures rather than recoloured dark art. Capture
+-   **[DECIDED · 2026-09-28 → D-21/D-30/D-32] O-2 --- Galaxy light-mode imagery.** *Codex explored both routes per slot; at the art sign-off the owner picked route 1 for quiet and Aurora and route 2 for Starfield (D-30), and shelved the planet limb (D-32).* D-39 allows different pictures rather than recoloured dark art. Capture
     the owner's own ideas for what Galaxy light pictures should be. The brief's pale-Galaxy remaps
     (`band-examples-galaxy.png`) are mechanical feasibility previews, not a proposal.
     -   **Owner concept ideas (2026-09-27; still OPEN, not choices):** a pastel nebula with white star glints, and a pearl
@@ -620,3 +667,7 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
         resolved conditionally, and O-7 stays parked.
 -   2026-09-28 --- O-9 spike run (D-29): PASS. `codex-edu`/Astra generates and edits images non-interactively; the
     output goes to named workspace paths, and the originals also land in `~/.codex-edu/generated_images/`.
+-   2026-09-28 --- Art sign-off (plan 38.5-04): D-30..D-34 recorded in a new "Art Sign-off" section. D-30 the 12 picks
+    (Galaxy Dark Aurora is a new image), D-31 the Starfield allowance (18 px / 0.5%) and no exclusions, D-32 the planet
+    limb shelved, D-33 the "Deep Space" label for `galaxy-quiet`, D-34 no backup-format bump. O-2 is resolved. The record
+    is `38.5-ART-SIGNOFF.md`.
