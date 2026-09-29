@@ -1,7 +1,7 @@
 # Group Events
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-09-26
+**Updated by phase:** 38.5-background-art-text-contrast
 **Owners:** `src/db/group-events-dao.ts`, `src/db/group-events-read.ts`, `src/logic/group-inheritance.ts`, `src/screens/GroupLogScreen.tsx`, `src/screens/GroupEventDetailScreen.tsx`
 
 ## Purpose
@@ -113,6 +113,7 @@ No Group Event Zustand store or background scheduler is required; screens hold u
 4. `buildGroupEventDetailInteraction` preserves the stored child Allow-AI state; duration display uses `formatDurationLabel` through the Detail helper.
 5. Group-linked Edit asks individual versus Group Event scope. Detail and focused editors are registered in the Events stack and every profile-hosting stack that can preserve an origin-local return.
 6. Parent records never enter contact aggregation as extra interactions; contact consumers continue reading child rows only.
+7. The Events list and detail paint no page fill, so the selected background art shows behind them (ADR-179). Their content sits in full, opaque `surface` cards: the event rows, the event summary card, the "No participants yet" card and the participant cards. The header keeps its glass backing, and the "Participants" label sits on the art like the Digest section headings.
 
 ### Contributing to Digest activity
 
@@ -167,6 +168,7 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 - **ADR-167:** Committed Participant Writes Preserve the Parent Draft and Never Replay — persists overridden-value edits through one patch builder, preserves the parent draft across participant commits, and never replays a committed add.
 - **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
 - **ADR-175:** Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child — one header Back per child screen; every tab root uses `ShellAppBar variant="root"`.
+- **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — the Events list and detail show the background art, with their content in full `surface` cards.
 
 ## Gotchas
 
@@ -205,3 +207,4 @@ The phase’s portability contract uses parent UIDs, parent-before-child mapping
 | 2026-09-26 | 38.3 | Participant remove mirrors the add recovery: `runParticipantRemove` latches Delete/Keep against double taps, reports only a rejected first write as "not saved", and hides committed-removed rows until a successful refresh so a stale Edit/Remove cannot hit a departed child (review A-WR-03, D-04). |
 | 2026-09-26 | 38.3 | Edit Group Event clears its failure caption when a later participant add, remove, edit or save starts, so a stale "not saved" never sits beside a fresh success (review A-WR-04). |
 | 2026-09-23 | 38.4 | The Events tab root uses `ShellAppBar variant="root"` with no Back (D-22; ADR-175), and its load error reads "Try opening it again in a moment."; list rows and the detail "When" render through `formatDateTimeMinuteOrFallback` (RG-038 AUD-UIA-018); the group title prompt stays above the keyboard and stacks its actions when they do not fit at the largest text (D-72; ADR-174). |
+| 2026-09-26 | 38.5 | The Events list and detail show the background art: no opaque page fill, content in full `surface` cards (D-54; ADR-179). |
