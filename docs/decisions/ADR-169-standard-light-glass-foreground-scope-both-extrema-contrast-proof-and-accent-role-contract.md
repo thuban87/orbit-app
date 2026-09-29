@@ -85,4 +85,4 @@ Android `GlassSurface` blur is explicitly off (`ANDROID_BLUR_METHOD = "none"`, D
 - `src/components/ui/glass-surface-blur.contract.test.ts` — pins Android blur off.
 
 **Depends on:** ADR-084 (Four Semantic Theme Palettes, Curated Accents, and Contrast Validation); ADR-115 (Visible, Mode-Aware Background Surface Composition)
-**Required by:** None
+**Required by:** ADR-177 (Mode-Specific Background Art and Signed Per-Combination Art Treatments)

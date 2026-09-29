@@ -54,4 +54,4 @@ The system uses independent tokenized layers for background visibility and conte
 - `src/screens/HomeScreen.tsx` — applies protected count and empty-state chrome on the primary presentation route.
 
 **Depends on:** ADR-114 (Route-Aware App-Wide System Background Composition)
-**Required by:** ADR-149 (Orrery-Specific Translucent Overlay Treatment and Icon Controls); ADR-169 (Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract)
+**Required by:** ADR-149 (Orrery-Specific Translucent Overlay Treatment and Icon Controls); ADR-169 (Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract); ADR-177 (Mode-Specific Background Art and Signed Per-Combination Art Treatments); ADR-179 (Owner-Ruled Art Treatments Beyond the Signed Table)
