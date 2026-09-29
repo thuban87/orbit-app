@@ -1,7 +1,7 @@
 # Contact Reconciliation
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-09-26
+**Updated by phase:** 38.5-background-art-text-contrast
 **Owners:** `src/db/reconcile-apply.ts`, `src/db/reconcile-session-dao.ts`, `src/db/reconcile-session-read.ts`, `src/db/reconcile-snapshot-dao.ts`, `src/db/reconcile-relink-dao.ts`, `src/db/merge-dao.ts`, `src/logic/reconcile-diff.ts`
 
 ## Purpose
@@ -114,6 +114,7 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 - **[ADR-168: Truthful Read Phases for Import, Review, and Settings Screens](../decisions/ADR-168-truthful-read-phases-for-import-review-and-settings-screens.md)** — gives ReconcileComplete a loading branch and a summary-only Retry.
 - **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
 - **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
+- **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — the Reconcile detail "Unlink source" string and the merge impact "{absorbed} will be retired." line sit on an opaque root-`background` backing in Galaxy Dark (`persistentDangerScrim`), clearing 4.5:1 over the art.
 
 ## Gotchas
 
@@ -151,3 +152,4 @@ A no-collision merge preserves existing child reparenting, Group Event reference
 | 2026-09-25 | 38.3 | Reconcile summary loading vs error (RG-035): Reconcile Complete shows a real loading state during its read and "Couldn't load the check summary" with a read-only Retry only after the read fails. |
 | 2026-09-26 | 38.4 | Review-card accessibility (RG-031 AUD-UIA-008): review cards announce name, advisory chip, evidence and failure copy; expose `selected` while selecting, with a non-border selected glyph; and offer a Select/Deselect action equivalent to long-press. |
 | 2026-09-27 | 38.4 | Resume-check prompt scrolls its body at large text; its Resume label uses `onAccent` (D-49, OA-D3). |
+| 2026-09-26 | 38.5 | In Galaxy Dark, the Reconcile detail "Unlink source" string and the merge impact "{absorbed} will be retired." line sit on an opaque backing over the art (D-50; ADR-179). |

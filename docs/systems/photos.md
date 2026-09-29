@@ -1,7 +1,7 @@
 # Photos
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.2-audit-remediation-data-security-lifecycle
+**Last updated:** 2026-09-26
+**Updated by phase:** 38.5-background-art-text-contrast
 **Owners:** `src/services/photos/`, `src/db/contacts-dao.ts`, `src/db/profile-dao.ts`, `src/components/Avatar.tsx`, `src/components/PhotoSourcePicker.tsx`
 
 ## Purpose
@@ -170,6 +170,7 @@ The path lock is process-local. Crash safety comes from settling old journal row
 - **ADR-157:** Bounded Native Transfer Ownership — assigns byte, time, and cleanup bounds to native photo acquisition, export, and staging boundaries.
 - **ADR-158:** Canonical Photo Ownership Across Masters, Staging, and Derivatives — gives each photo namespace one explicit owner and retirement rule.
 - **ADR-159:** Commit-Current Restore with Deterministic Pair Completion and No Legacy Repair — finalizes only journal-authorized bytes owned by the committed restore state.
+- **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — the Photo source picker "Remove photo" string sits on an opaque root-`background` backing in Galaxy Dark (`persistentDangerScrim`), clearing 4.5:1 over the art.
 
 ## Gotchas
 
@@ -213,3 +214,4 @@ The path lock is process-local. Crash safety comes from settling old journal row
 | 2026-09-23 | 38.2 | Added settle-before-write ownership, reference-safe delete intents, and staging guards for `reliability-testing/AUD-REL-003`. |
 | 2026-09-24 | 38.2 | Re-homed merged photos to survivor-derived masters and journaled purge/definition deletion for all derived paths. |
 | 2026-09-24 | 38.2 | Corrected the widget thumbnail description against installed native ImageManipulator behavior and added guarded derivative/picker-copy retirement with a cold-start orphan sweep (`data-privacy/AUD-DPI-011`, RG-013). |
+| 2026-09-26 | 38.5 | In Galaxy Dark, the Photo source picker "Remove photo" string sits on an opaque backing over the art (D-50; ADR-179). |

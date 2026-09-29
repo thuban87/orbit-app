@@ -1,7 +1,7 @@
 # Contact Import
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-09-26
+**Updated by phase:** 38.5-background-art-text-contrast
 **Owners:** `modules/orbit-contact-picker/`, `src/db/import-session-dao.ts`, `src/db/imported-contact-dao.ts`, `src/services/import/`, `src/screens/ImportReviewScreen.tsx`
 
 ## Purpose
@@ -139,6 +139,7 @@ Category choices use the canonical ordered catalog and switch to the complete se
 - **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
 - **ADR-171:** Durable Bulk-Import Lifecycle Choice, Locked Batches, and One Pass per Session — Bound/Unbound batch choice on the session (migration 032), lifecycle lock, single run; partially supersedes ADR-066.
 - **ADR-174:** Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets — measured, centred heatmaps with capped tap zones; dialog, sheet and prompt actions stay reachable at maximum text.
+- **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — the Bulk Import setup "Discard" string sits on an opaque root-`background` backing in Galaxy Dark (`persistentDangerScrim`), clearing 4.5:1 over the art.
 
 ## Gotchas
 
@@ -194,3 +195,4 @@ Category choices use the canonical ordered catalog and switch to the complete se
 | 2026-09-28 | 38.4 | Bulk setup marks its leave guard complete when the batch starts: Import Complete's Done no longer shows "Leave import?" after a bulk import with edited choices, nor silently discards its Need-review rows (found in the D-73 device pass; same class as D-72 item 4). The stopped view's Discard discards explicitly. |
 | 2026-09-28 | 38.4 | One bulk import pass per session (D-74, owner): Import Progress blocks Back while a pass runs (plain notice "Still importing. You can go back when it finishes."), so setup's Continue can no longer start a second pass over the same rows; an in-memory run guard makes `runImportBatch` refuse a concurrent pass, ImportProgress follows a pass already in flight, and the stopped setup's Discard refuses while one runs. No schema change. |
 | 2026-09-28 | 38.4 | Bulk setup holds Back while its Import or Combine is starting (`useImportLeaveGuard` `isBusy`), so an instant Back no longer discards the session under the starting run ("Import stopped", nothing imported); found in the D-74 device pass. |
+| 2026-09-26 | 38.5 | In Galaxy Dark, the Bulk Import setup "Discard" string sits on an opaque backing over the art (D-50; ADR-179). |
