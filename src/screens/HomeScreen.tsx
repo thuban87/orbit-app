@@ -63,6 +63,8 @@ import ReanimatedSwipeable, {
 } from "react-native-gesture-handler/ReanimatedSwipeable";
 import Animated, {
   Easing,
+  type SharedValue,
+  useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
@@ -297,6 +299,30 @@ function ListLoadingSkeleton() {
   );
 }
 
+/**
+ * Mirrors `ReanimatedSwipeable`'s applied translation into the row's own shared
+ * value, on the UI thread (review WR-01, D-48). The swipeable hands that value
+ * only to its action renderers; the row's see-through tint reads the mirror and
+ * rises to `SWIPE_ROW_BACKING_OPACITY` while it is non-zero. Rendered in the
+ * left actions layer, an earlier sibling of the row, so this reaction's mapper
+ * registers before the row tint's style mapper and both run in the same frame.
+ */
+function SwipeTranslationMirror({
+  translation,
+  mirror,
+}: {
+  translation: SharedValue<number>;
+  mirror: SharedValue<number>;
+}) {
+  useAnimatedReaction(
+    () => translation.value,
+    (value) => {
+      mirror.value = value;
+    },
+  );
+  return null;
+}
+
 function SwipeableListRow({
   onLogInteraction,
   onEditContact,
@@ -308,6 +334,7 @@ function SwipeableListRow({
   openRowRef: { current: SwipeableMethods | null };
 }) {
   const swipeableRef = useRef<SwipeableMethods | null>(null);
+  const swipeTranslation = useSharedValue(0);
   const isThisRowOpen = useCallback(
     () => openRowRef.current === swipeableRef.current,
     [openRowRef],
@@ -354,8 +381,14 @@ function SwipeableListRow({
       rightThreshold={SWIPE_ACTION_WIDTH / 2}
       overshootLeft={false}
       overshootRight={false}
-      renderLeftActions={() => (
-        <SwipeActionSurface label="Log" icon="message" side="left" />
+      renderLeftActions={(_progress, translation) => (
+        <>
+          <SwipeTranslationMirror
+            translation={translation}
+            mirror={swipeTranslation}
+          />
+          <SwipeActionSurface label="Log" icon="message" side="left" />
+        </>
       )}
       renderRightActions={() => (
         <SwipeActionSurface label="Edit" icon="edit" side="right" />
@@ -366,6 +399,7 @@ function SwipeableListRow({
     >
       <ListRow
         {...rowProps}
+        swipeTranslation={swipeTranslation}
         onPress={onPress}
         onLogInteraction={() => {
           void onLogInteraction(rowProps.contactId);

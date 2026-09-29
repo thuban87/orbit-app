@@ -1,5 +1,9 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import {
+  SWIPE_ROW_BACKING_OPACITY,
+  swipeRowTintOpacity,
+} from "@/components/list-row-swipe-backing";
 import { applyAccent, DEFAULT_ACCENT, resolveAccent } from "../accents";
 import {
   ART_COMBINATION_KEYS,
@@ -26,6 +30,8 @@ import {
 } from "../theme-option-ids";
 import { resolvePalette } from "../theme-presets";
 import type { ResolvedMode, ThemePackage, ThemePalette } from "../theme-types";
+import { ICON_SIZE } from "./icon-size";
+import { SPACING } from "./spacing";
 import {
   ART_SEE_THROUGH_OPACITY,
   type ArtOpacityGroup,
@@ -1814,6 +1820,288 @@ describe("Signed art treatments (38.5 v3)", () => {
             : null,
         ),
       ).toEqual([]);
+    },
+  );
+});
+
+/**
+ * SWIPED SEE-THROUGH LIST ROW (38.5 review WR-01; owner ruling R1a, D-48,
+ * 2026-09-29).
+ *
+ * `ReanimatedSwipeable` shows the Log/Edit action panel (`SwipeActionSurface`
+ * in HomeScreen: a `SWIPE_ACTION_WIDTH` panel of opaque root `surfaceElevated`
+ * with a 1 px root `border`, a centred `textSecondary` icon and `textPrimary`
+ * label) BEHIND the row as soon as the row moves. While it moves, a see-through
+ * row's `surface` tint rises to `SWIPE_ROW_BACKING_OPACITY` (0.5), so each row
+ * foreground sits on one of:
+ *   - the shipped art, under the 0.5 tint (the part of the row off the panel);
+ *   - the panel fill or border, under the 0.5 tint;
+ *   - the panel's label and icon glyphs, under the 0.5 tint.
+ * Rows signed `full` or `none` are unaffected (no tint layer), so only the
+ * signed see-through List cells are in scope: 11 of the 16 combinations (the
+ * four None backgrounds and Standard Light · Paper are `full`).
+ *
+ * The row's content column (name, meta, snippet, line three and its icon)
+ * starts `ROW_CONTENT_INSET` px in from either row edge and never reaches the
+ * glyphs (the geometry test below), so TEXT must clear its floor over the art,
+ * the fill and the border, with no exemption. The trailing favourite/status
+ * icons and the ring border do cross the glyphs in motion; that overlap fails
+ * at 0.5 and is the owner's recorded exemption (`SWIPE_GLYPH_EXEMPTION`).
+ */
+
+/** Where a row foreground sits in the row, for the glyph-overlap geometry. */
+type SwipeRowPlace = "content" | "trailing" | "ring";
+
+/** Every foreground `ListRow` paints on its tint, by element (C2-L4: the chip and Avatar are opaque). */
+const SWIPE_ROW_ELEMENTS: readonly {
+  element: string;
+  token: keyof ThemePalette;
+  floor: number;
+  place: SwipeRowPlace;
+}[] = [
+  {
+    element: "name / highlighted snippet",
+    token: "textPrimary",
+    floor: AA_NORMAL,
+    place: "content",
+  },
+  {
+    element: "recency / meta / explanation / snippet / line three and its icon",
+    token: "textSecondary",
+    floor: AA_NORMAL,
+    place: "content",
+  },
+  {
+    element: "favourite icon (default)",
+    token: "textSecondary",
+    floor: AA_NORMAL,
+    place: "trailing",
+  },
+  {
+    element: "favourite icon (active)",
+    token: "accentText",
+    floor: AA_NORMAL,
+    place: "trailing",
+  },
+  ...STATUS_FGS.map((token) => ({
+    element: `status glyph (${token})`,
+    token,
+    floor: AA_LARGE,
+    place: "trailing" as const,
+  })),
+  ...STATUS_FGS.map((token) => ({
+    element: `ring border (${token})`,
+    token,
+    floor: AA_LARGE,
+    place: "ring" as const,
+  })),
+];
+
+/**
+ * THE RECORDED EXEMPTION (owner ruling R1a, D-48, 2026-09-29). Owner, verbatim:
+ * "I don't want to do a full backing on the row when it's moving, that'll look
+ * funny. Can we try a 50% transparency maybe instead?" Shown the measurements,
+ * he accepted 0.5 (option R1a), including this transient, in-motion overlap:
+ * the row's trailing favourite/status icons cross the Edit panel's glyphs in
+ * the first ~32 px of a swipe towards Edit, and the row's 2 px ring border
+ * crosses the Log or Edit glyphs as its edge passes them (~34-60 px of travel).
+ * Passing there would need ~0.95, effectively the full backing he rejected.
+ *
+ * Measured at 0.5 (COMPUTED here): the failing icon and ring pairs over the
+ * glyphs range from 1.20:1 (Galaxy Dark `statusDecay` over the `textPrimary`
+ * label) to 4.38:1, each below its floor. The same composite would fail text too (Galaxy Dark `textPrimary`
+ * 3.21:1, `textSecondary` 1.28:1), which is why text is kept off the glyphs
+ * by geometry, not by an exemption.
+ *
+ * NARROW: icons and the ring over the glyphs only. Text (`content`) is never
+ * exempt; it is proven over the art, the panel fill and the border, and never
+ * reaches the glyphs. The icons and ring are also proven over the art, the
+ * fill and the border; only their glyph overlap is exempt. Record: dossier "Code-Review Rulings (2026-09-29)" D-48 and
+ * 38.5-CONTEXT D-48.
+ */
+const SWIPE_GLYPH_EXEMPTION: {
+  places: readonly SwipeRowPlace[];
+  ruling: string;
+} = {
+  places: ["trailing", "ring"],
+  ruling: "owner ruling R1a, D-48 (2026-09-29)",
+};
+
+/** The see-through List cells a swipe affects: the signed `seeThrough` List rows. */
+const SWIPED_LIST_CASES = SIGNED_TREATMENT_CASES.filter(
+  (c) => c.component === "contactsListEntries" && c.backing === "seeThrough",
+);
+
+/** The swiped tint level of a case, through the runtime mapping. */
+function swipedOpacity(pkg: ThemePackage, mode: ResolvedMode): number {
+  const rest = ART_SEE_THROUGH_OPACITY[pkg][mode].listEntry;
+  const swiped = swipeRowTintOpacity(rest, 1);
+  if (swiped === null) throw new Error(`${pkg}/${mode}: no List row tint`);
+  return swiped;
+}
+
+/**
+ * PURE: the failures of the swiped row's foregrounds over the action panel.
+ * The row renders with its scoped palette (glass in Standard Light over an
+ * asset); the panel with the root palette (`useTheme()` outside the row's
+ * scope). Each is checked for the package default and every curated accent.
+ */
+function swipePanelFailures(
+  c: (typeof SWIPED_LIST_CASES)[number],
+  under: "fill" | "border" | "glyphs",
+  places: readonly SwipeRowPlace[],
+): string[] {
+  const background = combinationBackground(c.pkg, c.mode, c.bgKey);
+  const rowPaletteOf = scopedPaletteOf(
+    c.pkg,
+    c.mode,
+    background.slotId !== undefined,
+  );
+  const opacity = swipedOpacity(c.pkg, c.mode);
+  const failures: string[] = [];
+  for (const accentId of ACCENT_CHOICES) {
+    const row = rowPaletteOf(accentId);
+    const root = applyAccent(
+      resolvePalette(c.pkg, c.mode),
+      resolveAccent(accentId, c.pkg, c.mode),
+    );
+    const panelColors =
+      under === "fill"
+        ? [root.surfaceElevated]
+        : under === "border"
+          ? [root.border]
+          : [root.textSecondary, root.textPrimary];
+    for (const panel of panelColors) {
+      const composite = alphaComposite(row.surface, panel, opacity);
+      for (const e of SWIPE_ROW_ELEMENTS) {
+        if (!places.includes(e.place)) continue;
+        if (e.token !== "accentText" && accentId !== null) continue;
+        const ratio = contrastRatio(row[e.token] as string, composite);
+        if (ratio < e.floor) {
+          failures.push(
+            `${c.key} ${under} ${panel}: ${e.element}${
+              e.token === "accentText" ? ` (${accentId ?? "default"})` : ""
+            } ${ratio.toFixed(2)}:1 (floor ${e.floor})`,
+          );
+        }
+      }
+    }
+  }
+  return failures;
+}
+
+/** The row's content column inset from either row edge (ListRow styles). */
+const ROW_CONTENT_INSET =
+  SPACING.xs / 2 + // row border
+  SPACING.md + // row padding
+  SPACING["2xl"] + // Avatar (left) / favourite button column (right)
+  SPACING.md; // row gap
+/** HomeScreen's `SWIPE_ACTION_WIDTH`. */
+const SWIPE_PANEL_WIDTH = 96;
+/**
+ * The measured outer extent of the panel's centred glyphs from the panel's
+ * outer edge (38.5 review WR-01 fix pass; the figure the owner accepted in
+ * D-48). The label is "Log" or "Edit" at 13 px semibold under a 20 px icon.
+ */
+const PANEL_GLYPH_EXTENT_MEASURED = 60;
+
+describe("Swiped see-through List row (38.5 review WR-01, D-48)", () => {
+  it("covers every signed see-through List cell: 11 (None and Standard Light · Paper are full)", () => {
+    expect(SWIPED_LIST_CASES.length).toBe(11);
+    expect(
+      SWIPED_LIST_CASES.some((c) => c.key === "standard-light-paper"),
+    ).toBe(false);
+    expect(SWIPED_LIST_CASES.every((c) => c.bgKey !== NONE_SLOT_ID)).toBe(true);
+  });
+
+  it("the swiped level is 0.5 in every case, above every signed rest level", () => {
+    for (const c of SWIPED_LIST_CASES) {
+      expect(swipedOpacity(c.pkg, c.mode)).toBe(SWIPE_ROW_BACKING_OPACITY);
+      expect(
+        ART_SEE_THROUGH_OPACITY[c.pkg][c.mode].listEntry as number,
+      ).toBeLessThan(SWIPE_ROW_BACKING_OPACITY);
+    }
+  });
+
+  it("geometry: the content column never reaches the panel's glyphs, the trailing icons do", () => {
+    const listRow = readFileSync("src/components/ListRow.tsx", "utf8");
+    const home = readFileSync("src/screens/HomeScreen.tsx", "utf8");
+    // The inputs of ROW_CONTENT_INSET, pinned to the sources.
+    expect(listRow).toMatch(/borderWidth: SPACING\.xs \/ 2,/);
+    expect(listRow).toMatch(
+      /gap: SPACING\.md,\s+minHeight:[^\n]+\n\s+padding: SPACING\.md,/,
+    );
+    expect(listRow).toMatch(/size=\{SPACING\["2xl"\]\}/);
+    expect(listRow).toMatch(
+      /favouriteButton: \{[^}]*minWidth: SPACING\["2xl"\],/,
+    );
+    expect(listRow).toMatch(/statusGlyph: \{[^}]*width: ICON_SIZE\.md,/);
+    expect(ICON_SIZE.md).toBeLessThanOrEqual(SPACING["2xl"]);
+    // The panel: its width, and its glyphs centred in it.
+    expect(home).toMatch(
+      new RegExp(`const SWIPE_ACTION_WIDTH = ${SWIPE_PANEL_WIDTH};`),
+    );
+    expect(home).toMatch(
+      /swipeAction: \{[^}]*justifyContent: "center",\s+alignItems: "center",/,
+    );
+    // A translation only moves the row away from the panel's outer edge, so the
+    // content column is always at least ROW_CONTENT_INSET from it.
+    expect(ROW_CONTENT_INSET).toBe(74);
+    expect(ROW_CONTENT_INSET).toBeGreaterThan(PANEL_GLYPH_EXTENT_MEASURED);
+    expect(PANEL_GLYPH_EXTENT_MEASURED).toBeGreaterThan(SWIPE_PANEL_WIDTH / 2);
+    // The trailing icons start inside the glyph extent at rest: the exempt overlap.
+    const trailingIconInset =
+      SPACING.xs / 2 + SPACING.md + (SPACING["2xl"] - ICON_SIZE.md) / 2;
+    expect(trailingIconInset).toBeLessThan(PANEL_GLYPH_EXTENT_MEASURED);
+  });
+
+  it("the harness is not trivially passing: the icon-over-glyph overlap fails at 0.5 (the reason for the exemption)", () => {
+    expect(
+      SWIPED_LIST_CASES.flatMap((c) =>
+        swipePanelFailures(c, "glyphs", SWIPE_GLYPH_EXEMPTION.places),
+      ).length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("the exemption is narrow: icons and the ring, never text", () => {
+    expect([...SWIPE_GLYPH_EXEMPTION.places].sort()).toEqual([
+      "ring",
+      "trailing",
+    ]);
+    expect(SWIPE_GLYPH_EXEMPTION.places).not.toContain("content");
+    expect(SWIPE_GLYPH_EXEMPTION.ruling).toContain("D-48");
+    // Every text foreground is a content-column element.
+    for (const e of SWIPE_ROW_ELEMENTS) {
+      if (e.place !== "content") expect(e.element).toMatch(/icon|glyph|ring/);
+    }
+    // And no signed exclusion narrows the List proof instead.
+    for (const e of PROOF_EXCLUSIONS) {
+      expect(e.treatment).not.toContain("listEntry");
+    }
+  });
+
+  it.each(SWIPED_LIST_CASES.map((c) => [c.key, c]))(
+    "%s: every row foreground clears its floor over the shipped art at 0.5",
+    (_key, c) => {
+      expect(
+        signedTreatmentFailures(
+          c.pkg,
+          c.mode,
+          "contactsListEntries",
+          "seeThrough",
+          combinationBackground(c.pkg, c.mode, c.bgKey),
+          swipedOpacity(c.pkg, c.mode),
+        ),
+      ).toEqual([]);
+    },
+  );
+
+  it.each(SWIPED_LIST_CASES.map((c) => [c.key, c]))(
+    "%s: row text, icons and ring clear their floors over the panel fill and border at 0.5",
+    (_key, c) => {
+      const every: readonly SwipeRowPlace[] = ["content", "trailing", "ring"];
+      expect(swipePanelFailures(c, "fill", every)).toEqual([]);
+      expect(swipePanelFailures(c, "border", every)).toEqual([]);
     },
   );
 });

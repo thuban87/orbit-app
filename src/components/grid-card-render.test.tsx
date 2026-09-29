@@ -10,6 +10,11 @@ vi.mock("react-native", () => ({
   Text: "Text",
   View: "View",
 }));
+// ListRow's swipe-aware tint (D-48) imports Reanimated; these cases render no tint.
+vi.mock("react-native-reanimated", () => ({
+  default: { View: "AnimatedView" },
+  useAnimatedStyle: (fn: () => unknown) => fn(),
+}));
 vi.mock("@/components/Avatar", () => ({ Avatar: "Avatar" }));
 vi.mock("@/components/contact-card-ring", () => ({
   ringVisual: () => ({ color: "ring", opacity: 1, width: 1 }),

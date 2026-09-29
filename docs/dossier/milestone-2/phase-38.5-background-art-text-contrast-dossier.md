@@ -368,6 +368,8 @@ recommendation. The owner then decides whether a gap plan picks it up.
 -   Any proposed change to a component outside the v2-marked set (D-28).
 -   ~~The active Population/Filters/Sort buttons draw no fill today (H-3, I1).~~ Ruled on 2026-09-29 as D-46 (filled,
     accent border and text).
+-   ~~A see-through List row mid-swipe shows the Log/Edit action panel through its content (review WR-01).~~ Ruled on
+    2026-09-29 as D-48 (the backing goes to 50% while the row is swiped).
 -   Report deferred items to the owner as soon as they are found (project practice); do not hold them silently until
     phase end.
 
@@ -571,6 +573,27 @@ the CONTEXT shim.
         restore with nothing written.
     -   The substitution happens in the restore's settings mapping, before the DAO. The DAO stays strict for every
         write. A malformed value (not a bounded string) is still a damaged file. No backup-format bump (D-34).
+-   **[DECIDED · 2026-09-29] D-48 --- A see-through List row's backing goes to 50% while the row is swiped (review
+    WR-01, option R1a).** Owner, verbatim: "I don't want to do a full backing on the row when it's moving, that'll look
+    funny. Can we try a 50% transparency maybe instead?" Shown the contrast measurements, he chose R1a: accept 50%.
+    -   While a List row's swipe translation is non-zero, its see-through `surface` tint animates to
+        `SWIPE_ROW_BACKING_OPACITY = 0.5` (`src/components/list-row-swipe-backing.ts`). The value follows the
+        Reanimated swipe shared value on the UI thread, never React state. At rest the row keeps its signed v3 level
+        (0.05). Rows signed `full` (the four None backgrounds and Standard Light · Paper) or `none` (no production List
+        cell) have no tint layer and are unaffected. The signed 0.05 level is unchanged.
+    -   The change is a step at the first non-zero translation, not a ramp. `ReanimatedSwipeable` shows the action panel
+        at that same moment, and the row's text already sits over the panel fill at small translations.
+    -   [DERIVED] Row text at 0.5 clears AA over the shipped art and over the panel's fill and border in all 11 signed
+        see-through List cells (COMPUTED). The icons and ring also clear their floors there. The row's content column
+        starts 74 px in from either row edge. The panel's label and icon glyphs end about 60 px in from the panel's outer
+        edge. So text never overlaps the glyphs.
+    -   **Accepted exemption (narrow: icons and the ring, never text).** The row's trailing favourite and status icons
+        cross the Edit panel's glyphs during roughly the first 32 px of a swipe towards Edit. The row's 2 px ring border
+        crosses the Log or Edit glyphs as its edge passes them. Over the glyphs those pairs fall to 1.20--4.38:1 at 0.5
+        (COMPUTED). Passing there would need about 0.95, which is effectively the full backing he rejected. He accepted
+        this as a transient, in-motion overlap. The exemption is recorded in `src/theme/tokens/surface.test.ts`
+        ("Swiped see-through List row").
+    -   The owner sees a mid-swipe row on the device in 38.5-09.
 
 ## Primary Input: the 38.4 Background-Art Brief
 
@@ -850,3 +873,6 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
     struck. Record: `38.5-SIGNOFF-V3.md` §8.
 -   2026-09-29 --- Code-review rulings: D-47 recorded (a restore with an unavailable background id asks, then uses the
     package default; supersedes T-38.5-05-03's abort).
+-   2026-09-29 --- Code-review rulings: D-48 recorded (a see-through List row's backing goes to 50% while the row is
+    swiped; review WR-01, option R1a). The row's icons and ring crossing the panel glyphs in motion are an accepted,
+    recorded exemption; text is proven. The mid-swipe gap-list item is struck.

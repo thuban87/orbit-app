@@ -8,7 +8,10 @@
  *   - `full` (the None backgrounds and Standard Light · Paper in the signed
  *     v3 table): the solid `surface` fill, root palette;
  *   - `seeThrough`: no fill; an absolute-fill `surface` tint at the cell opacity,
- *     and the whole row inside `GlassForegroundScope`;
+ *     and the whole row inside `GlassForegroundScope`. While the row is swiped
+ *     (the list host passes `swipeTranslation`), the tint rises to
+ *     `SWIPE_ROW_BACKING_OPACITY` on the UI thread (review WR-01, D-48;
+ *     `list-row-swipe-backing.ts`);
  *   - `none`: neither; root palette.
  * Every colour read (ring, name, meta, snippet, highlight) comes from the
  * `ScopedPalette` render prop, so it resolves inside the scope when there is
@@ -16,6 +19,10 @@
  * keeps the ROOT palette through `useUnscopedTheme()` (C2-L4).
  */
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  type SharedValue,
+  useAnimatedStyle,
+} from "react-native-reanimated";
 import { Avatar } from "@/components/Avatar";
 import {
   ringVisual,
@@ -42,6 +49,38 @@ import {
   formatMatchCategories,
   formatMatchExplanation,
 } from "./list-row-content";
+import { swipeRowTintOpacity } from "./list-row-swipe-backing";
+
+/**
+ * A see-through row's tint while it can be swiped (review WR-01, D-48). The
+ * opacity follows the swipe translation shared value on the UI thread: the
+ * signed level at rest, `SWIPE_ROW_BACKING_OPACITY` while the row is moved.
+ * Never driven from React state.
+ */
+function SwipeRowTint({
+  color,
+  restOpacity,
+  translation,
+}: {
+  color: string;
+  restOpacity: number;
+  translation: SharedValue<number>;
+}) {
+  const swipeOpacity = useAnimatedStyle(() => ({
+    opacity: swipeRowTintOpacity(restOpacity, translation.value) ?? restOpacity,
+  }));
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        StyleSheet.absoluteFill,
+        styles.tint,
+        { backgroundColor: color },
+        swipeOpacity,
+      ]}
+    />
+  );
+}
 
 function HighlightedSnippet({
   text,
@@ -106,6 +145,11 @@ export interface ListRowProps {
   searchResult?: DashboardSearchResult | null;
   /** Name/fuel search fallback; present only when `searchResult` is null. */
   searchSnippet?: string | null;
+  /**
+   * The list host's swipe translation (px), mirrored from `ReanimatedSwipeable`.
+   * A see-through row raises its tint while it is non-zero (D-48).
+   */
+  swipeTranslation?: SharedValue<number>;
 }
 
 export function ListRow({
@@ -126,6 +170,7 @@ export function ListRow({
   onEditContact,
   searchResult,
   searchSnippet = null,
+  swipeTranslation,
 }: ListRowProps) {
   const backing = listRowBacking(useArtTreatment("contactsListEntries"));
   // The chip's opaque fill keeps the root text hierarchy inside a scope (C2-L4).
@@ -197,7 +242,13 @@ export function ListRow({
               { borderColor: ring.color },
             ]}
           >
-            {backing.tintOpacity !== null ? (
+            {backing.tintOpacity !== null && swipeTranslation !== undefined ? (
+              <SwipeRowTint
+                color={scoped.surface}
+                restOpacity={backing.tintOpacity}
+                translation={swipeTranslation}
+              />
+            ) : backing.tintOpacity !== null ? (
               <View
                 pointerEvents="none"
                 style={[
