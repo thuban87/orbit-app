@@ -187,5 +187,7 @@
 // NOTE: ADR-0175 [ACCEPTED] Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child
 // NOTE: ADR-0176 [ACCEPTED] Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs
 // NOTE: ADR-0177 [ACCEPTED] Mode-Specific Background Art and Signed Per-Combination Art Treatments
+// NOTE: ADR-0178 [ACCEPTED] Restore Asks Before Replacing an Unavailable Background Id with the Package Default
+// NOTE: ADR-0179 [ACCEPTED] Owner-Ruled Art Treatments Beyond the Signed Table
 
-export const ADR_COUNT = 177;
+export const ADR_COUNT = 179;

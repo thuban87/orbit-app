@@ -22,7 +22,7 @@ not something you can pattern-match against.
 ## How to use this
 
 - **Is a decision still live?** Check the `Superseded by` column. 39 of
-  177 ADRs are superseded in whole or in part.
+  179 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -208,3 +208,5 @@ not something you can pattern-match against.
 | 175 | Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 15 | `src/components/icons`, `src/navigation`, `src/navigation/tabs` +1 |
 | 176 | Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 9/13 live | `assets`, `plugins`, `scripts` +2 |
 | 177 | Mode-Specific Background Art and Signed Per-Combination Art Treatments | Accepted | 38.5-background-art-text-contrast | ADR-115 (partial — the D-15 parts only: see-through Contacts entries in Galaxy Light / Standard Dark, see-through List rows, and no backing on the count label and the Contacts/Digest headers, where signed); ADR-087 (partial — one asset per slot used in both modes); ADR-113 (partial — the one-asset-per-slot library of eight WebPs) | — | — | 17 | `scripts`, `src/components`, `src/components/ui` +4 |
+| 178 | Restore Asks Before Replacing an Unavailable Background Id with the Package Default | Accepted | 38.5-background-art-text-contrast | None (replaces the phase's own threat mitigation T-38.5-05-03, a whole-restore abort that no ADR recorded) | — | — | 9 | `src/backup`, `src/db`, `src/screens` |
+| 179 | Owner-Ruled Art Treatments Beyond the Signed Table | Accepted | 38.5-background-art-text-contrast | — | — | — | 15 | `src/components`, `src/components/control-surface`, `src/screens` +2 |
