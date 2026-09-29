@@ -250,6 +250,142 @@ export function WrappedScreen() {
   });
 });
 
+describe("classifyBareTextSites — table-driven art backings (38.5 WR-03)", () => {
+  it("a ChromeScrim with artComponent is mixed: backed in its signed cells, bare in its `none` cells", () => {
+    const screen = `import { View } from "react-native";
+import { AppText } from "@/components/ui/AppText";
+import { ChromeScrim } from "@/components/ui/ChromeScrim";
+export function CountScreen() {
+  return (
+    <View>
+      <ChromeScrim artComponent="contactsCountLabel">
+        <AppText role="caption">12 contacts</AppText>
+      </ChromeScrim>
+      <ChromeScrim>
+        <AppText role="caption">Default scrim</AppText>
+      </ChromeScrim>
+    </View>
+  );
+}
+`;
+    const file = "src/screens/CountScreen.tsx";
+    const a = classifyBareTextSites([
+      { file, source: screen },
+      stack({ Count: { name: "CountScreen", from: "@/screens/CountScreen" } }),
+    ]);
+    const label = site(a, file, lineOf(screen, "12 contacts"));
+    expect(label.classification).toBe("mixed");
+    expect(label.backingKinds).toEqual(["glass"]);
+    expect(label.bareRoutes).toEqual(["Count"]);
+    const notes = label.chains.map((c) => c.note.join(" < ")).join("\n");
+    // The signed v3 column: `none` in the 7 light-mode art and None cells.
+    expect(notes).toContain("artComponent=contactsCountLabel none in 7/16");
+    expect(notes).toContain("galaxy-light-quiet");
+    expect(notes).toContain("artComponent=contactsCountLabel backed in 9/16");
+    expect(a.rows).toEqual([
+      expect.objectContaining({ route: "Count", bareKind: "mixed" }),
+    ]);
+    // With no artComponent the primitive is today's always-backed scrim.
+    expect(site(a, file, lineOf(screen, "Default scrim")).classification).toBe(
+      "backed",
+    );
+  });
+
+  it("a column with no `none` cell stays backed; a non-literal artComponent is split conservatively", () => {
+    const screen = `import { View } from "react-native";
+import { AppText } from "@/components/ui/AppText";
+import { ChromeScrim } from "@/components/ui/ChromeScrim";
+export function EdgeScreen({ which }: { which: string }) {
+  return (
+    <View>
+      <ChromeScrim artComponent="contactsCardEntries">
+        <AppText role="caption">Never none</AppText>
+      </ChromeScrim>
+      <ChromeScrim artComponent={which}>
+        <AppText role="caption">Unresolved</AppText>
+      </ChromeScrim>
+    </View>
+  );
+}
+`;
+    const file = "src/screens/EdgeScreen.tsx";
+    const a = classifyBareTextSites([
+      { file, source: screen },
+      stack({ Edge: { name: "EdgeScreen", from: "@/screens/EdgeScreen" } }),
+    ]);
+    expect(site(a, file, lineOf(screen, "Never none")).classification).toBe(
+      "backed",
+    );
+    const unresolved = site(a, file, lineOf(screen, "Unresolved"));
+    expect(unresolved.classification).toBe("mixed");
+    expect(
+      unresolved.chains.some((c) =>
+        c.note.some((n) => n.includes("artComponent=expr:which")),
+      ),
+    ).toBe(true);
+  });
+
+  it("a ShellAppBar's own title follows each render site's artComponent; guarded text a site never renders is not a site there", () => {
+    const bar = `import { Pressable, Text, View } from "react-native";
+export function ShellAppBar({ variant, title, overflow, artComponent }) {
+  return (
+    <View>
+      {variant === "child" ? (
+        <Pressable>
+          <Text style={{ color: colors.textSecondary }}>Back</Text>
+        </Pressable>
+      ) : null}
+      <Text style={{ color: colors.textPrimary }}>{title}</Text>
+      {overflow && overflow.length > 0 ? (
+        <Text style={{ color: colors.textSecondary }}>More</Text>
+      ) : null}
+    </View>
+  );
+}
+`;
+    const artScreen = `import { ShellAppBar } from "@/components/ShellAppBar";
+export function ArtScreen() {
+  return <ShellAppBar variant="root" title="Digest" artComponent="digestHeader" />;
+}
+`;
+    const childScreen = `import { ShellAppBar } from "@/components/ShellAppBar";
+export function ChildScreen() {
+  return <ShellAppBar variant="child" title="Details" overflow={actions} />;
+}
+`;
+    const barFile = "src/components/ShellAppBar.tsx";
+    const a = classifyBareTextSites([
+      { file: barFile, source: bar },
+      { file: "src/screens/ArtScreen.tsx", source: artScreen },
+      { file: "src/screens/ChildScreen.tsx", source: childScreen },
+      stack({
+        ArtRoute: { name: "ArtScreen", from: "@/screens/ArtScreen" },
+        ChildRoute: { name: "ChildScreen", from: "@/screens/ChildScreen" },
+      }),
+    ]);
+    const title = site(a, barFile, lineOf(bar, "{title}"));
+    expect(title.classification).toBe("mixed");
+    expect(title.bareRoutes).toEqual(["ArtRoute"]);
+    expect(
+      title.chains.some((c) =>
+        c.note.some((n) =>
+          n.includes("art-none:<ShellAppBar>@src/screens/ArtScreen.tsx"),
+        ),
+      ),
+    ).toBe(true);
+    // Back renders only for variant="child", More only with `overflow`: the
+    // Digest-style root bar has neither, so both stay backed.
+    for (const needle of [">Back<", ">More<"]) {
+      const s = site(a, barFile, lineOf(bar, needle));
+      expect(s.classification, needle).toBe("backed");
+      expect(s.bareRoutes, needle).toEqual([]);
+    }
+    expect(a.rows.map((r) => `${r.route} ${r.fileLine}`)).toEqual([
+      `ArtRoute ${barFile}:${lineOf(bar, "{title}")}`,
+    ]);
+  });
+});
+
 describe("classifyBareTextSites — foreground tokens", () => {
   it("AppText without an explicit colour takes its role default; TextInput is always backed", () => {
     const screen = `import { View, TextInput } from "react-native";

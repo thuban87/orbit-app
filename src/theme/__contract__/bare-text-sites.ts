@@ -32,6 +32,16 @@
  *     helpers and JSX-valued locals are followed to their references.
  *   - bare: every chain reaches a route unbacked; backed: every chain is backed;
  *     mixed: some of each; unmounted: no chain reaches a route.
+ *   - TABLE-DRIVEN art backings (38.5-06/08; code review WR-03): a
+ *     `ChromeScrim` / `ShellAppBar` whose call site passes a literal
+ *     `artComponent` draws no scrim in the signed table's `none` cells
+ *     (`ART_TREATMENTS`). Its text gets a backed chain for the other cells and
+ *     a walk that continues upward, noted `art-none:… none in n/16 [cells]`, so
+ *     it classifies `mixed` and the note names the cells. Text inside
+ *     `ShellAppBar` itself (title, Back, ⋯) follows each render site the same
+ *     way; a site whose attributes rule out a render guard (`variant ===
+ *     "child"`, `overflow && …`, a prop left unset) is skipped for that text.
+ *     Without `artComponent` the primitive is always glass, as before.
  *
  * Tokens resolve from the colour expression (`colors.X`, `scoped.X`,
  * `palette.X`, `tone="X"`, a local alias of one) or the role default, written
@@ -49,6 +59,12 @@
  */
 import ts from "typescript";
 import { densityForRoute } from "../../navigation/focused-route-classification";
+import {
+  ART_COMBINATION_KEYS,
+  ART_TREATMENTS,
+  type ArtComponent,
+  TABLE_DRIVEN_COMPONENTS,
+} from "../art-treatments";
 import { resolvePalette } from "../theme-presets";
 import { ICON_SIZE, type IconSizeToken } from "../tokens/icon-size";
 import { BACKGROUND_VEIL_OPACITY } from "../tokens/surface";
@@ -138,6 +154,12 @@ export interface BareTextAnalysis {
 // ---------------------------------------------------------------------------
 
 const GLASS_TAGS = new Set<string>(SCOPE_ELEMENTS.map((s) => s.element));
+/**
+ * The glass primitives whose backing is TABLE-DRIVEN when the call site passes
+ * a literal `artComponent` (38.5-06/08; code review WR-03): in the signed
+ * table's `none` cells they draw no scrim, so their text sits on the art.
+ */
+const ART_OPT_IN_TAGS = new Set(["ChromeScrim", "ShellAppBar"]);
 const OPAQUE_TAGS = new Set(["Sheet", "Modal", "ConfirmDialog"]);
 const OPAQUE_KEYS = new Set(["surface", "surfaceElevated", "background"]);
 /** Translucent by design (~72-77%), so never a backing. */
@@ -263,6 +285,80 @@ function literalValues(expr: ts.Expression | undefined): string[] | undefined {
     if (a && b) return [...a, ...b];
   }
   return undefined;
+}
+
+/** A JSX render condition and the branch the text is on. */
+interface RenderGuard {
+  expr: ts.Expression;
+  /** True: the text renders when `expr` is truthy; false: when it is falsy. */
+  holds: boolean;
+}
+
+/** The prop names a component destructures from its first parameter (no renames). */
+function destructuredProps(fn: FunctionLike | undefined): Set<string> {
+  const out = new Set<string>();
+  const param = fn?.parameters[0];
+  if (param && ts.isObjectBindingPattern(param.name))
+    for (const el of param.name.elements)
+      if (!el.propertyName && ts.isIdentifier(el.name)) out.add(el.name.text);
+  return out;
+}
+
+/**
+ * Do a call site's attributes make a render guard impossible? Only three
+ * shapes are read, and only on a destructured prop; anything else, and any
+ * site with a spread, is kept (conservative):
+ *   - `prop` (truthy), including the left side of `prop && …`: the site omits it;
+ *   - `prop === "lit"` on the true branch: the site's literal differs;
+ *   - `prop === "lit"` on the false branch: the site's literal equals it.
+ */
+function guardRuledOut(
+  guard: RenderGuard,
+  props: ReadonlySet<string>,
+  site: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+): boolean {
+  // A spread (`{...props}`) may supply any prop: nothing is ruled out.
+  if (site.attributes.properties.some((p) => ts.isJsxSpreadAttribute(p)))
+    return false;
+  const e = unwrap(guard.expr);
+  if (ts.isIdentifier(e) && props.has(e.text))
+    return guard.holds && attr(site, e.text) === undefined;
+  if (
+    ts.isBinaryExpression(e) &&
+    e.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken
+  )
+    return (
+      guard.holds && guardRuledOut({ expr: e.left, holds: true }, props, site)
+    );
+  if (
+    ts.isBinaryExpression(e) &&
+    e.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken &&
+    ts.isIdentifier(e.left) &&
+    props.has(e.left.text) &&
+    (ts.isStringLiteral(e.right) || ts.isNoSubstitutionTemplateLiteral(e.right))
+  ) {
+    const values = literalValues(attrExpr(site, e.left.text));
+    if (values === undefined) return false;
+    const lit = e.right.text;
+    return guard.holds ? !values.includes(lit) : values.every((v) => v === lit);
+  }
+  return false;
+}
+
+/** A table-driven primitive's signed cells, split by backing (WR-03). */
+interface ArtSplit {
+  component: string;
+  /** Combination keys (`<theme>-<mode>-<bg>`) where the backing is `none`. */
+  noneKeys: string[];
+  /** Combination keys where it draws a backing (see-through or full). */
+  backedKeys: string[];
+}
+
+/** The note naming a split's cells: `artComponent=X none in 7/16 [keys]`. */
+function artCells(art: ArtSplit, side: "none" | "backed"): string {
+  const keys = side === "none" ? art.noneKeys : art.backedKeys;
+  const total = art.noneKeys.length + art.backedKeys.length;
+  return `artComponent=${art.component} ${side} in ${keys.length}/${total} [${keys.join(",")}]`;
 }
 
 function uniq<T>(xs: T[]): T[] {
@@ -707,14 +803,76 @@ class Analyzer {
     return `${tag}@${this.lineOf(file, el)}${hint}${slot && slot !== "children" ? `.${slot}` : ""}`;
   }
 
+  /**
+   * The per-combination split of a table-driven `ChromeScrim` / `ShellAppBar`
+   * (WR-03): the signed combinations where its backing is `none` (text bare on
+   * the art) and the rest (text backed). Undefined for any other element or
+   * with no `artComponent` (the default, always-backed primitive). A
+   * non-literal `artComponent` is split conservatively (both sides unknown).
+   */
+  artSplit(
+    file: string,
+    el: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+  ): ArtSplit | undefined {
+    const sf = this.files.get(file)?.sf as ts.SourceFile;
+    if (!ART_OPT_IN_TAGS.has(tagText(el, sf))) return undefined;
+    const expr = attrExpr(el, "artComponent");
+    if (!expr) return undefined;
+    const values = literalValues(expr);
+    const component = values?.length === 1 ? values[0] : undefined;
+    if (
+      component === undefined ||
+      !(TABLE_DRIVEN_COMPONENTS as readonly string[]).includes(component)
+    ) {
+      const unknown = [`expr:${expr.getText(sf).replace(/\s+/g, "")}`];
+      return {
+        component: unknown[0],
+        noneKeys: unknown,
+        backedKeys: unknown,
+      };
+    }
+    const backingIn = (key: string) =>
+      ART_TREATMENTS[key]?.[component as ArtComponent]?.backing;
+    return {
+      component,
+      noneKeys: ART_COMBINATION_KEYS.filter((k) => backingIn(k) === "none"),
+      backedKeys: ART_COMBINATION_KEYS.filter((k) => backingIn(k) !== "none"),
+    };
+  }
+
   /** Walk from `start` (a JSX element or a reference) up to a backing, route or component root. */
   walk(file: string, start: ts.Node, visiting: Set<string>): Chain[] {
+    // A table-driven backing both BACKS the text (in its non-`none` cells) and
+    // lets the walk continue upward (in its `none` cells): the backed chains
+    // collect here, beside whatever the continued walk returns.
+    const artBacked: Chain[] = [];
+    return [...this.walkCore(file, start, visiting, artBacked), ...artBacked];
+  }
+
+  private walkCore(
+    file: string,
+    start: ts.Node,
+    visiting: Set<string>,
+    artBacked: Chain[],
+  ): Chain[] {
     const segs: string[] = [];
+    // The JSX conditions this text renders under, within the current function
+    // (read only at a table-driven primitive's root, WR-03).
+    const guards: RenderGuard[] = [];
     let prev: ts.Node = start;
     let node: ts.Node | undefined = start.parent;
     let attrName: string | undefined;
     const sf = this.files.get(file)?.sf as ts.SourceFile;
     while (node) {
+      if (ts.isConditionalExpression(node) && prev !== node.condition) {
+        guards.push({ expr: node.condition, holds: prev === node.whenTrue });
+      } else if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
+        prev === node.right
+      ) {
+        guards.push({ expr: node.left, holds: true });
+      }
       if (ts.isJsxAttribute(node)) {
         attrName = node.name.getText(sf);
       } else if (
@@ -727,22 +885,43 @@ class Analyzer {
             const name = literalValues(attrExpr(node, "name"))?.[0];
             if (name) return [this.routeChain(name, file, segs)];
           }
-          const b = this.backingOf(file, node, attrName ?? "?");
-          if (b)
-            return [
-              { terminal: "backed", backing: b.kind, note: [...segs, b.label] },
-            ];
-          segs.push(this.describe(file, node, attrName));
+          const art = this.artSplit(file, node);
+          if (art) {
+            if (!this.artContinue(file, node, art, segs, artBacked)) return [];
+          } else {
+            const b = this.backingOf(file, node, attrName ?? "?");
+            if (b)
+              return [
+                {
+                  terminal: "backed",
+                  backing: b.kind,
+                  note: [...segs, b.label],
+                },
+              ];
+            segs.push(this.describe(file, node, attrName));
+          }
         }
         attrName = undefined;
       } else if (ts.isJsxElement(node)) {
         if (prev !== node.openingElement && prev !== node.closingElement) {
-          const b = this.backingOf(file, node.openingElement, "children");
-          if (b)
-            return [
-              { terminal: "backed", backing: b.kind, note: [...segs, b.label] },
-            ];
-          segs.push(this.describe(file, node.openingElement));
+          const art = this.artSplit(file, node.openingElement);
+          if (art) {
+            if (
+              !this.artContinue(file, node.openingElement, art, segs, artBacked)
+            )
+              return [];
+          } else {
+            const b = this.backingOf(file, node.openingElement, "children");
+            if (b)
+              return [
+                {
+                  terminal: "backed",
+                  backing: b.kind,
+                  note: [...segs, b.label],
+                },
+              ];
+            segs.push(this.describe(file, node.openingElement));
+          }
         }
       } else if (this.localRoot && node === this.localRoot) {
         return [{ terminal: "unmounted", note: [...segs, "⟨root⟩"] }];
@@ -750,7 +929,11 @@ class Analyzer {
         const def = this.componentByRoot.get(node) as ComponentDef;
         // The backing primitives' own internals are backed by construction
         // (ShellAppBar paints its scrim as an absolute-fill SIBLING of its text).
-        if (GLASS_TAGS.has(def.name))
+        if (GLASS_TAGS.has(def.name)) {
+          // A table-driven primitive's own text (the ShellAppBar title, Back
+          // and ⋯) follows each render site's `artComponent` (WR-03).
+          if (ART_OPT_IN_TAGS.has(def.name) && !this.localRoot)
+            return this.crossArtPrimitive(def, segs, visiting, guards);
           return [
             {
               terminal: "backed",
@@ -758,6 +941,7 @@ class Analyzer {
               note: [...segs, `backed:glass inside ⟨${def.name}⟩`],
             },
           ];
+        }
         if (OPAQUE_TAGS.has(def.name))
           return [
             {
@@ -872,6 +1056,93 @@ class Analyzer {
       kind,
       label: `backed:${kind} via helper ${name}(arg ${index})@${this.lineOf(file, fn)} [${chains[0].note[chains[0].note.length - 1]}]`,
     };
+  }
+
+  /**
+   * Record a table-driven backing met on the walk (WR-03): its backed cells
+   * become a backed chain in `artBacked`; its `none` cells add a segment and
+   * the walk continues upward. Returns false when no cell is `none` (nothing
+   * to continue).
+   */
+  private artContinue(
+    file: string,
+    el: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
+    art: ArtSplit,
+    segs: string[],
+    artBacked: Chain[],
+  ): boolean {
+    const sf = this.files.get(file)?.sf as ts.SourceFile;
+    const at = `${tagText(el, sf)}@${this.lineOf(file, el)}`;
+    if (art.backedKeys.length > 0)
+      artBacked.push({
+        terminal: "backed",
+        backing: "glass",
+        note: [...segs, `backed:glass ${at} ${artCells(art, "backed")}`],
+      });
+    if (art.noneKeys.length === 0) return false;
+    segs.push(`art-none:${at} ${artCells(art, "none")}`);
+    return true;
+  }
+
+  /**
+   * The chains of text INSIDE a table-driven primitive (the ShellAppBar
+   * title): backed at every render site without `artComponent`, split by the
+   * signed table at every site with one (WR-03).
+   */
+  private crossArtPrimitive(
+    def: ComponentDef,
+    segs: string[],
+    visiting: Set<string>,
+    guards: readonly RenderGuard[],
+  ): Chain[] {
+    const props = destructuredProps(def.fn);
+    const inside = `backed:glass inside ⟨${def.name}⟩`;
+    const out: Chain[] = [];
+    let plainSite = false;
+    const next = new Set(visiting);
+    next.add(def.key);
+    for (const { file, id } of this.refs.get(def.key) ?? []) {
+      const start = jsxStartOf(id);
+      const opening = ts.isJsxElement(start)
+        ? start.openingElement
+        : ts.isJsxSelfClosingElement(start)
+          ? start
+          : undefined;
+      const art = opening ? this.artSplit(file, opening) : undefined;
+      if (!art) {
+        plainSite = true;
+        continue;
+      }
+      // Text this call site never renders (the Back of a `variant="root"` bar,
+      // the ⋯ of a bar with no `overflow`) is not a site there.
+      if (opening && guards.some((g) => guardRuledOut(g, props, opening)))
+        continue;
+      const at = `<${def.name}>@${file}:${this.lineOf(file, id)}`;
+      if (art.backedKeys.length > 0)
+        out.push({
+          terminal: "backed",
+          backing: "glass",
+          note: [...segs, `${inside} ${at} ${artCells(art, "backed")}`],
+        });
+      if (art.noneKeys.length === 0 || visiting.has(def.key)) continue;
+      for (const c of this.walk(file, start, next))
+        out.push({
+          ...c,
+          note: [
+            ...segs,
+            `⟨${def.name}⟩`,
+            `art-none:${at} ${artCells(art, "none")}`,
+            ...c.note,
+          ],
+        });
+    }
+    if (plainSite || out.length === 0)
+      out.unshift({
+        terminal: "backed",
+        backing: "glass",
+        note: [...segs, inside],
+      });
+    return out;
   }
 
   private routeChain(name: string, file: string, segs: string[]): Chain {
