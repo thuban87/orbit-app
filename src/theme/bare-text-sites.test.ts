@@ -15,6 +15,7 @@ import {
   classifyBareTextSites,
   rowsToCsv,
 } from "./__contract__/bare-text-sites";
+import { ART_COMBINATION_KEYS, ART_TREATMENTS } from "./art-treatments";
 
 const NAV = "src/navigation/tabs/TestStack.tsx";
 
@@ -282,8 +283,13 @@ export function CountScreen() {
     expect(notes).toContain("artComponent=contactsCountLabel none in 7/16");
     expect(notes).toContain("galaxy-light-quiet");
     expect(notes).toContain("artComponent=contactsCountLabel backed in 9/16");
+    // 38.5-09 M-2: backed in 9 cells, bare in 7, so the ROW is
+    // combination-dependent (the site keeps its chain-level `mixed`).
     expect(a.rows).toEqual([
-      expect.objectContaining({ route: "Count", bareKind: "mixed" }),
+      expect.objectContaining({
+        route: "Count",
+        bareKind: "combination-dependent",
+      }),
     ]);
     // With no artComponent the primitive is today's always-backed scrim.
     expect(site(a, file, lineOf(screen, "Default scrim")).classification).toBe(
@@ -528,5 +534,151 @@ export function PortalScreen() {
     expect(
       s.chains.some((c) => c.note.some((n) => n.includes("UNTRACED HOST"))),
     ).toBe(true);
+  });
+});
+
+/** The signed v3 keys where `component` has `backing`. */
+function keysWhere(component: string, backing: string): string[] {
+  return ART_COMBINATION_KEYS.filter(
+    (k) =>
+      ART_TREATMENTS[k]?.[component as keyof (typeof ART_TREATMENTS)[string]]
+        ?.backing === backing,
+  );
+}
+
+describe("classifyBareTextSites — treatment-aware per combination (38.5-09 M-2)", () => {
+  const LIST_ROW = `import { Pressable, Text } from "react-native";
+import { useArtTreatment } from "@/theme/use-art-treatment";
+export function ListRow({ name }: { name: string }) {
+  const backing = listRowBacking(useArtTreatment("contactsListEntries"));
+  return (
+    <Pressable
+      style={[styles.row, backing.solidFill ? { backgroundColor: colors.surface } : null]}
+    >
+      <Text style={{ color: colors.textPrimary }}>{name}</Text>
+    </Pressable>
+  );
+}
+`;
+  const HOME = `import { View } from "react-native";
+import { AppText } from "@/components/ui/AppText";
+import { ChromeScrim } from "@/components/ui/ChromeScrim";
+import { GlassSurface } from "@/components/ui/GlassSurface";
+import { ListRow } from "@/components/ListRow";
+export function HomeScreen() {
+  return (
+    <View>
+      <ChromeScrim artComponent="contactsCountLabel">
+        <AppText role="caption">7 contacts</AppText>
+      </ChromeScrim>
+      <ListRow name="Ada" />
+      <GlassSurface treatment="contact-entry">
+        <AppText role="label">Card name</AppText>
+      </GlassSurface>
+      <GlassSurface treatment="card">
+        <AppText role="label">Plain card</AppText>
+      </GlassSurface>
+    </View>
+  );
+}
+`;
+  const homeFile = "src/screens/HomeScreen.tsx";
+  const listFile = "src/components/ListRow.tsx";
+  const analyse = () =>
+    classifyBareTextSites([
+      { file: listFile, source: LIST_ROW },
+      { file: homeFile, source: HOME },
+      stack({ Home: { name: "HomeScreen", from: "@/screens/HomeScreen" } }),
+    ]);
+
+  it("a `none` cell puts chrome text on the art in exactly that combination", () => {
+    const a = analyse();
+    const label = site(a, homeFile, lineOf(HOME, "7 contacts"));
+    const none = keysWhere("contactsCountLabel", "none");
+    expect(none.length).toBeGreaterThan(0);
+    expect(label.onArtKeys).toEqual(none);
+    // A see-through chrome cell (Galaxy Dark) is backed: not on the art there.
+    expect(keysWhere("contactsCountLabel", "seeThrough")).toContain(
+      "galaxy-dark-quiet",
+    );
+    expect(label.onArtKeys).not.toContain("galaxy-dark-quiet");
+  });
+
+  it("a component backed in some combinations and bare in others is combination-dependent", () => {
+    const a = analyse();
+    const label = site(a, homeFile, lineOf(HOME, "7 contacts"));
+    expect(label.artKind).toBe("combination-dependent");
+    const row = a.rows.find((r) => r.fileLine.endsWith(`:${label.line}`));
+    expect(row?.bareKind).toBe("combination-dependent");
+    expect(row?.parentChainNote).toContain(
+      `combination-dependent ON THE ART in ${label.onArtKeys.length}/16`,
+    );
+  });
+
+  it("text inside ListRow is a see-through-entry from the contactsListEntries column, with no marker at the call site", () => {
+    const a = analyse();
+    const name = site(a, listFile, lineOf(LIST_ROW, "{name}"));
+    const seeThrough = keysWhere("contactsListEntries", "seeThrough");
+    expect(seeThrough).toHaveLength(11);
+    expect(name.artKind).toBe("see-through-entry");
+    expect(name.onArtKeys).toEqual([
+      ...ART_COMBINATION_KEYS.filter(
+        (k) =>
+          seeThrough.includes(k) ||
+          keysWhere("contactsListEntries", "none").includes(k),
+      ),
+    ]);
+    // The full rows (the four None backgrounds and Standard Light Paper) back it.
+    expect(name.backingKinds).toEqual(["opaque"]);
+    expect(name.onArtKeys).not.toContain("standard-light-paper");
+    const row = a.rows.find((r) => r.fileLine === `${listFile}:${name.line}`);
+    expect(row).toEqual(
+      expect.objectContaining({ route: "Home", bareKind: "see-through-entry" }),
+    );
+    expect(row?.parentChainNote).toContain(
+      "see-through-entry ON THE ART in 11/16",
+    );
+  });
+
+  it("text in GridCard's GlassSurface treatment=contact-entry is a see-through-entry from the contactsCardEntries column", () => {
+    const a = analyse();
+    const card = site(a, homeFile, lineOf(HOME, "Card name"));
+    expect(card.artKind).toBe("see-through-entry");
+    expect(card.onArtKeys).toEqual(
+      keysWhere("contactsCardEntries", "seeThrough"),
+    );
+    expect(card.backingKinds).toEqual(["glass"]);
+    // Any other GlassSurface treatment keeps today's always-backed rule.
+    const plain = site(a, homeFile, lineOf(HOME, "Plain card"));
+    expect(plain.classification).toBe("backed");
+    expect(plain.artKind).toBeUndefined();
+  });
+
+  it("an unmarked ShellAppBar consumer stays backed", () => {
+    const bar = `import { Text, View } from "react-native";
+export function ShellAppBar({ title }) {
+  return (
+    <View>
+      <Text style={{ color: colors.textPrimary }}>{title}</Text>
+    </View>
+  );
+}
+`;
+    const screen = `import { ShellAppBar } from "@/components/ShellAppBar";
+export function PlainScreen() {
+  return <ShellAppBar variant="root" title="Plain" />;
+}
+`;
+    const barFile = "src/components/ShellAppBar.tsx";
+    const a = classifyBareTextSites([
+      { file: barFile, source: bar },
+      { file: "src/screens/PlainScreen.tsx", source: screen },
+      stack({ Plain: { name: "PlainScreen", from: "@/screens/PlainScreen" } }),
+    ]);
+    const title = site(a, barFile, lineOf(bar, "{title}"));
+    expect(title.classification).toBe("backed");
+    expect(title.artKind).toBeUndefined();
+    expect(title.onArtKeys).toEqual([]);
+    expect(a.rows).toEqual([]);
   });
 });

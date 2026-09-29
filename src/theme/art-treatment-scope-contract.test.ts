@@ -112,6 +112,10 @@ describe("art-treatment opt-ins are confined to the five v2-marked sites (D-28)"
     ).toEqual([
       "src/components/GridCard.tsx",
       "src/components/ui/GlassSurface.tsx",
+      // 38.5-09 M-2: the bare-text classifier READS the treatment to classify
+      // GridCard's text per combination. Test/tool support only, never
+      // imported by app code, so it is not an opt-in.
+      "src/theme/__contract__/bare-text-sites.ts",
     ]);
   });
 

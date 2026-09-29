@@ -5,7 +5,7 @@
  * `src/theme/__contract__/bare-text-sites.ts`, replacing the brief's uncommitted
  * scratch walker. Re-runnable at phase close (38.5-09).
  *
- *   npx tsx scripts/bare-text-inventory.ts [--out <csv>] [--route <Name>] [--compare <brief csv>] [--sites <json>]
+ *   npx tsx scripts/bare-text-inventory.ts [--out <csv>] [--route <Name>] [--compare <brief csv>] [--sites <json>] [--d24 1]
  *
  *   --out      write the brief-format CSV (14 columns)
  *   --route    only rows for this route (repeatable)
@@ -13,6 +13,12 @@
  *              CSV in the same columns (the 38.4 brief's, or a previous run)
  *   --sites    write every classified foreground (backed, bare, mixed, unmounted)
  *              as JSON, for hand verification
+ *   --d24      print the D-24 figure (red `danger` bare sites ÷ all bare sites)
+ *              in the three 38.5-01 units, plus the per-combination breakdown
+ *              (38.5-09 M-2, C2-M3): a `see-through-entry` or
+ *              `combination-dependent` row counts as bare (it is on the art in
+ *              at least one combination); per combination it counts as bare
+ *              only where it is on the art, and as backed elsewhere
  *
  * Rows are matched on route + file + component + element + token, tolerant of
  * line drift (pass 1: same line; pass 2: in source order within the key;
@@ -31,6 +37,7 @@ import {
   type SourceFileInput,
   splitFileLine,
 } from "../src/theme/__contract__/bare-text-sites";
+import { ART_COMBINATION_KEYS } from "../src/theme/art-treatments";
 
 const REPO = join(__dirname, "..");
 const ROOTS = ["src/screens", "src/components", "src/navigation"];
@@ -55,6 +62,7 @@ function args(argv: string[]) {
     out?: string;
     compare?: string;
     sites?: string;
+    d24?: boolean;
     routes: string[];
   } = { routes: [] };
   for (let i = 0; i < argv.length; i += 2) {
@@ -64,6 +72,7 @@ function args(argv: string[]) {
     else if (a === "--compare") out.compare = v;
     else if (a === "--sites") out.sites = v;
     else if (a === "--route") out.routes.push(v);
+    else if (a === "--d24") out.d24 = v !== "0";
     else throw new Error(`unknown argument ${a}`);
   }
   return out;
@@ -233,6 +242,58 @@ function compare(
   );
 }
 
+/** A row whose rendered colour can be the red `danger` token. */
+function isDanger(token: string): boolean {
+  return normToken(token).split("|").includes("danger");
+}
+
+/** The three 38.5-01 D-24 units over a set of rows (C2-M3 counting). */
+function d24Units(rows: readonly BareTextRow[]) {
+  const bareOnly = rows.filter((r) => r.bareKind !== "mixed");
+  const unit = (rs: readonly BareTextRow[], unique: boolean) => {
+    const keyOf = (r: BareTextRow) =>
+      unique ? r.fileLine : `${r.route}|${r.fileLine}`;
+    const all = new Set(rs.map(keyOf));
+    const danger = new Set(rs.filter((r) => isDanger(r.token)).map(keyOf));
+    return { numerator: danger.size, denominator: all.size };
+  };
+  return {
+    "bare-only, unique file:line": unit(bareOnly, true),
+    "bare + mixed, unique file:line": unit(rows, true),
+    "per-route row": unit(rows, false),
+  };
+}
+
+function pct(u: { numerator: number; denominator: number }): string {
+  return u.denominator === 0
+    ? "n/a"
+    : `${((100 * u.numerator) / u.denominator).toFixed(2)}%`;
+}
+
+function printD24(rows: readonly BareTextRow[]) {
+  const kinds: Record<string, number> = {};
+  for (const r of rows) kinds[r.bareKind] = (kinds[r.bareKind] ?? 0) + 1;
+  console.log(
+    `\nD-24 FINAL (treatment-aware, C2-M3); rows by bare_kind ${JSON.stringify(kinds)}`,
+  );
+  for (const [name, u] of Object.entries(d24Units(rows)))
+    console.log(`  ${name}: ${u.numerator} / ${u.denominator} = ${pct(u)}`);
+  console.log(
+    "per-combination breakdown (each row bare only where it is on the art):",
+  );
+  const header = ["combination", ...Object.keys(d24Units([]))];
+  console.log(`  ${header.join(" | ")}`);
+  for (const key of ART_COMBINATION_KEYS) {
+    const onArt = rows.filter((r) => r.onArtKeys.includes(key));
+    const u = d24Units(onArt);
+    console.log(
+      `  ${key} | ${Object.values(u)
+        .map((x) => `${x.numerator}/${x.denominator} = ${pct(x)}`)
+        .join(" | ")}`,
+    );
+  }
+}
+
 function main() {
   const opts = args(process.argv.slice(2));
   const files: SourceFileInput[] = [];
@@ -249,9 +310,12 @@ function main() {
   console.log(
     `foregrounds ${analysis.sites.length}: ${JSON.stringify(byClass)}`,
   );
+  const uniqOf = (kind: string) =>
+    uniq(rows.filter((r) => r.bareKind === kind).map((r) => r.fileLine));
   console.log(
-    `rows ${rows.length}; unique file:line bare ${uniq(rows.filter((r) => r.bareKind === "bare").map((r) => r.fileLine))}, mixed ${uniq(rows.filter((r) => r.bareKind === "mixed").map((r) => r.fileLine))}; routes ${uniq(rows.map((r) => r.route))}`,
+    `rows ${rows.length}; unique file:line bare ${uniqOf("bare")}, mixed ${uniqOf("mixed")}, see-through-entry ${uniqOf("see-through-entry")}, combination-dependent ${uniqOf("combination-dependent")}; routes ${uniq(rows.map((r) => r.route))}`,
   );
+  if (opts.d24) printD24(rows);
 
   if (opts.out) {
     writeFileSync(resolve(REPO, opts.out), rowsToCsv(rows));

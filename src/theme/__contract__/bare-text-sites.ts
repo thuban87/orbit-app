@@ -121,7 +121,22 @@ export interface ForegroundSite {
   /** Routes reached by at least one UNBACKED chain. */
   bareRoutes: string[];
   chains: Chain[];
+  /**
+   * The per-combination kind of a site whose text is on the art only in some
+   * signed combinations (38.5-09 M-2), else undefined:
+   *   - `see-through-entry`: text on a contact entry (List row or Card entry)
+   *     whose cell is `seeThrough` in at least one combination; text on the
+   *     art per D-10;
+   *   - `combination-dependent`: every unbacked chain passes a table-driven
+   *     backing, so the text is backed in some combinations and bare (`none`)
+   *     in the others.
+   */
+  artKind?: ArtKind;
+  /** The combinations where the text is on the art (all 16 when unconditional). */
+  onArtKeys: string[];
 }
+
+export type ArtKind = "see-through-entry" | "combination-dependent";
 
 export interface BareTextRow {
   route: string;
@@ -137,7 +152,9 @@ export interface BareTextRow {
   density: string;
   verification: string;
   parentChainNote: string;
-  bareKind: "bare" | "mixed";
+  bareKind: "bare" | "mixed" | ArtKind;
+  /** The combinations where this row's text is on the art (not a CSV column). */
+  onArtKeys: string[];
 }
 
 export interface BareTextAnalysis {
@@ -352,6 +369,16 @@ interface ArtSplit {
   noneKeys: string[];
   /** Combination keys where it draws a backing (see-through or full). */
   backedKeys: string[];
+  /**
+   * A CONTACT ENTRY site (38.5-09 M-2): the List row (`ListRow`, the
+   * `contactsListEntries` column) or the Card entry (`GridCard`'s
+   * `GlassSurface treatment="contact-entry"`, the `contactsCardEntries`
+   * column). On an entry a `seeThrough` cell is text on the art (D-10, CONTEXT
+   * :120), so its see-through keys are NOT backed: they continue the walk with
+   * the `none` keys. On the three chrome sites (`ChromeScrim` / `ShellAppBar`
+   * `artComponent`) a see-through cell stays backed (glass), as before.
+   */
+  entry?: { seeThroughKeys: string[]; fullBacking: BackingKind };
 }
 
 /** The note naming a split's cells: `artComponent=X none in 7/16 [keys]`. */
@@ -359,6 +386,100 @@ function artCells(art: ArtSplit, side: "none" | "backed"): string {
   const keys = side === "none" ? art.noneKeys : art.backedKeys;
   const total = art.noneKeys.length + art.backedKeys.length;
   return `artComponent=${art.component} ${side} in ${keys.length}/${total} [${keys.join(",")}]`;
+}
+
+/**
+ * The note naming an entry split's on-the-art cells (M-2):
+ * `entry=X seeThrough in 11/16 [keys]; none in 0/16 [keys]`. `bareKindOf`
+ * reads it back, so its shape is load-bearing.
+ */
+function entryCells(art: ArtSplit): string {
+  const st = art.entry?.seeThroughKeys ?? [];
+  const total = art.noneKeys.length + art.backedKeys.length;
+  return `entry=${art.component} seeThrough in ${st.length}/${total} [${st.join(",")}]; none in ${art.noneKeys.length}/${total} [${art.noneKeys.join(",")}]`;
+}
+
+/** The contact-entry sites the classifier names explicitly (M-2). */
+const LIST_ROW_FILE = "src/components/ListRow.tsx";
+const LIST_ROW_NAME = "ListRow";
+const CONTACT_ENTRY_TREATMENT = "contact-entry";
+
+/** The entry split for a contact-entry column (`full` backed, the rest on the art). */
+function entrySplit(
+  component: ArtComponent,
+  fullBacking: BackingKind,
+): ArtSplit {
+  const backingIn = (key: string) => ART_TREATMENTS[key]?.[component]?.backing;
+  const full = ART_COMBINATION_KEYS.filter((k) => backingIn(k) === "full");
+  return {
+    component,
+    noneKeys: ART_COMBINATION_KEYS.filter((k) => backingIn(k) === "none"),
+    // For an entry only `full` backs its text; see-through is on the art.
+    backedKeys: full,
+    entry: {
+      seeThroughKeys: ART_COMBINATION_KEYS.filter(
+        (k) => backingIn(k) === "seeThrough",
+      ),
+      fullBacking,
+    },
+  };
+}
+
+/**
+ * The keys a note segment lists, or undefined when the split was unresolved
+ * (a non-literal `artComponent`): such a chain is treated as unconditional.
+ */
+function segmentKeys(seg: string, label: string): string[] | undefined {
+  const m = new RegExp(`${label} in \\d+/\\d+ \\[([^\\]]*)\\]`).exec(seg);
+  if (!m) return undefined;
+  const keys = m[1] === "" ? [] : m[1].split(",");
+  return keys.every((k) => ART_COMBINATION_KEYS.includes(k)) ? keys : undefined;
+}
+
+/**
+ * The per-combination kind of a site from its UNBACKED chains (M-2). Each
+ * chain is on the art in the intersection of the on-art keys of every
+ * table-driven backing it passes (a chain that passes none is on the art in
+ * all 16); the site is on the art in the union over its chains.
+ */
+function artKindOf(bareChains: readonly Chain[]): {
+  kind?: ArtKind;
+  onArtKeys: string[];
+} {
+  const all = [...ART_COMBINATION_KEYS];
+  if (bareChains.length === 0) return { onArtKeys: [] };
+  let seeThroughEntry = false;
+  let everyChainConditional = true;
+  const on = new Set<string>();
+  for (const c of bareChains) {
+    let keys: Set<string> | undefined;
+    let conditional = false;
+    for (const seg of c.note) {
+      let segKeys: string[] | undefined;
+      if (seg.startsWith("art-entry:")) {
+        const st = segmentKeys(seg, "seeThrough");
+        const none = segmentKeys(seg, "none");
+        if (st && none) {
+          segKeys = [...st, ...none];
+          if (st.length > 0) seeThroughEntry = true;
+        }
+      } else if (seg.startsWith("art-none:")) {
+        segKeys = segmentKeys(seg, "none");
+      } else continue;
+      if (!segKeys) continue;
+      conditional = true;
+      keys = keys
+        ? new Set([...keys].filter((k) => segKeys?.includes(k)))
+        : new Set(segKeys);
+    }
+    if (!conditional) everyChainConditional = false;
+    for (const k of keys ?? all) on.add(k);
+  }
+  const onArtKeys = all.filter((k) => on.has(k));
+  if (seeThroughEntry) return { kind: "see-through-entry", onArtKeys };
+  if (everyChainConditional && onArtKeys.length < all.length)
+    return { kind: "combination-dependent", onArtKeys };
+  return { onArtKeys };
 }
 
 function uniq<T>(xs: T[]): T[] {
@@ -815,7 +936,15 @@ class Analyzer {
     el: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
   ): ArtSplit | undefined {
     const sf = this.files.get(file)?.sf as ts.SourceFile;
-    if (!ART_OPT_IN_TAGS.has(tagText(el, sf))) return undefined;
+    const tag = tagText(el, sf);
+    // The Card entry (M-2): `GlassSurface treatment="contact-entry"` reads the
+    // `contactsCardEntries` column (`GridCard`).
+    if (
+      tag === "GlassSurface" &&
+      literalValues(attrExpr(el, "treatment"))?.[0] === CONTACT_ENTRY_TREATMENT
+    )
+      return entrySplit("contactsCardEntries", "glass");
+    if (!ART_OPT_IN_TAGS.has(tag)) return undefined;
     const expr = attrExpr(el, "artComponent");
     if (!expr) return undefined;
     const values = literalValues(expr);
@@ -952,6 +1081,15 @@ class Analyzer {
           ];
         if (this.localRoot)
           return [{ terminal: "unmounted", note: [...segs, "⟨root⟩"] }];
+        // The List row (M-2): `ListRow` reads its backing from the
+        // `contactsListEntries` column through `useArtTreatment` (no JSX
+        // marker at its call sites), so every foreground rendered inside it is
+        // split by that column here, at its root.
+        if (def.name === LIST_ROW_NAME && def.file === LIST_ROW_FILE) {
+          // A `full` List row paints a solid `surface` fill (opaque).
+          const split = entrySplit("contactsListEntries", "opaque");
+          if (!this.splitAt(`⟨${def.name}⟩`, split, segs, artBacked)) return [];
+        }
         return this.cross(def, segs, visiting);
       } else if (isFunctionLike(node)) {
         const bound = boundName(node);
@@ -1073,12 +1211,33 @@ class Analyzer {
   ): boolean {
     const sf = this.files.get(file)?.sf as ts.SourceFile;
     const at = `${tagText(el, sf)}@${this.lineOf(file, el)}`;
+    return this.splitAt(at, art, segs, artBacked);
+  }
+
+  /**
+   * The shared half of `artContinue` and the ListRow root (M-2): push the
+   * backed cells as a chain, and extend `segs` with the on-the-art cells.
+   * Returns false when no cell is on the art (nothing to continue).
+   */
+  private splitAt(
+    at: string,
+    art: ArtSplit,
+    segs: string[],
+    artBacked: Chain[],
+  ): boolean {
+    const backing = art.entry?.fullBacking ?? "glass";
     if (art.backedKeys.length > 0)
       artBacked.push({
         terminal: "backed",
-        backing: "glass",
-        note: [...segs, `backed:glass ${at} ${artCells(art, "backed")}`],
+        backing,
+        note: [...segs, `backed:${backing} ${at} ${artCells(art, "backed")}`],
       });
+    if (art.entry) {
+      if (art.entry.seeThroughKeys.length + art.noneKeys.length === 0)
+        return false;
+      segs.push(`art-entry:${at} ${entryCells(art)}`);
+      return true;
+    }
     if (art.noneKeys.length === 0) return false;
     segs.push(`art-none:${at} ${artCells(art, "none")}`);
     return true;
@@ -1355,6 +1514,7 @@ class Analyzer {
     else if (bareChains.length > 0) classification = "bare";
     else if (backedChains.length > 0) classification = "backed";
     else classification = "unmounted";
+    const art = artKindOf(bareChains);
     return {
       file,
       line: this.lineOf(file, el),
@@ -1369,6 +1529,8 @@ class Analyzer {
         (r) => !DEV_ROUTES.has(r),
       ),
       chains,
+      artKind: art.kind,
+      onArtKeys: art.onArtKeys,
     };
   }
 
@@ -1609,7 +1771,11 @@ class Analyzer {
           .map((c) => c.note.join(" < ")),
       );
       const shown = notes.slice(0, MAX_NOTE_CHAINS);
+      const combos = s.artKind
+        ? `${s.artKind} ON THE ART in ${s.onArtKeys.length}/${ART_COMBINATION_KEYS.length} [${s.onArtKeys.join(",")}] || `
+        : "";
       const note =
+        combos +
         shown.join(" || ") +
         (notes.length > shown.length
           ? ` || (+${notes.length - shown.length} more chains)`
@@ -1629,7 +1795,8 @@ class Analyzer {
           density: densityLabel(route),
           verification: DEFAULT_VERIFICATION,
           parentChainNote: note,
-          bareKind: s.classification,
+          bareKind: s.artKind ?? s.classification,
+          onArtKeys: s.onArtKeys,
         });
       }
     }
