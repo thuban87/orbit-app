@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import type { AccentId, BackgroundSlotId } from "@/theme/theme-option-ids";
+import type {
+  AccentId,
+  BackgroundSlotId,
+  StoredBackgroundId,
+} from "@/theme/theme-option-ids";
 import { DEFAULT_PRESET_ID } from "@/theme/theme-presets";
 import type {
   ThemeMode,
@@ -32,7 +36,11 @@ interface ThemeStore extends ThemeSelection {
   setModeForActivePackage: (mode: ThemeMode) => void;
   /** Set the accent for the CURRENTLY-ACTIVE package (null = package default). */
   setAccentForActivePackage: (accent: AccentId | null) => void;
-  /** Set the background for the CURRENTLY-ACTIVE package (null = package default). */
+  /**
+   * Set the background for the CURRENTLY-ACTIVE package (null = package default).
+   * Only ACTIVE ids: the picker never offers a retired one (38.5 D-19 / P-4), while
+   * the hydrated state may still hold one (`StoredBackgroundId`).
+   */
   setBackgroundForActivePackage: (background: BackgroundSlotId | null) => void;
 }
 
@@ -80,8 +88,8 @@ export function themeSelectionFromSettings(settings: {
   standardMode: ThemeMode;
   galaxyAccent: AccentId | null;
   standardAccent: AccentId | null;
-  galaxyBackground: BackgroundSlotId | null;
-  standardBackground: BackgroundSlotId | null;
+  galaxyBackground: StoredBackgroundId | null;
+  standardBackground: StoredBackgroundId | null;
 }): ThemeSelection {
   return {
     package: settings.themePackage,

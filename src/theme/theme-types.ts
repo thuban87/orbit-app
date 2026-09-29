@@ -7,7 +7,7 @@
  * `theme-presets.ts` (which reference these types) stay node-unit-testable.
  */
 
-import type { AccentId, BackgroundSlotId } from "./theme-option-ids";
+import type { AccentId, StoredBackgroundId } from "./theme-option-ids";
 
 /** User-selectable theme mode. `system` defers to the OS colour scheme. */
 export type ThemeMode = "light" | "dark" | "system";
@@ -306,6 +306,7 @@ export interface ThemeSelection {
   standardMode: ThemeMode;
   galaxyAccent: AccentId | null;
   standardAccent: AccentId | null;
-  galaxyBackground: BackgroundSlotId | null;
-  standardBackground: BackgroundSlotId | null;
+  /** Stored slot id, possibly RETIRED (38.5 D-19 / P-4); NULL = package default. */
+  galaxyBackground: StoredBackgroundId | null;
+  standardBackground: StoredBackgroundId | null;
 }

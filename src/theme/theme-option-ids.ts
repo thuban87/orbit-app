@@ -37,23 +37,52 @@ export const ACCENT_IDS = [
 export type AccentId = (typeof ACCENT_IDS)[number];
 
 /**
- * The accepted background slot ids (THEME-04). `none` is the explicit None/Solid
- * slot (resolves to the solid theme background); the remaining ids are the
- * per-package bundled backgrounds Plan 06's `backgrounds.ts` maps to local
- * `require()` assets. A stored NULL resolves to the package default at render.
+ * The ACTIVE background slot ids (THEME-04; lineup 38.5 D-17 / D-18 / D-19). `none`
+ * is the explicit None/Solid slot (resolves to the solid theme background); the
+ * remaining ids are the per-package bundled backgrounds `backgrounds.ts` maps to
+ * local `require()` assets. A stored NULL resolves to the package default at render.
+ * The picker offers only these; `galaxy-quiet` (label "Deep Space", D-33) is the
+ * Galaxy default.
  */
 export const BACKGROUND_SLOT_IDS = [
   "none",
   "galaxy-quiet",
-  "galaxy-nebula",
-  "galaxy-deep-space",
   "galaxy-aurora",
   "galaxy-starfield",
   "standard-dawn",
   "standard-dusk",
-  "standard-mesh",
   "standard-paper",
 ] as const;
 
-/** A validated background slot id (a member of `BACKGROUND_SLOT_IDS`). */
+/** An active background slot id (a member of `BACKGROUND_SLOT_IDS`). */
 export type BackgroundSlotId = (typeof BACKGROUND_SLOT_IDS)[number];
+
+/**
+ * RETIRED background slot ids (38.5 D-19 / P-4). These slots were cut from the
+ * lineup, but a user's `app_settings` row or an older backup may still hold one.
+ * The DAO keeps accepting them on write and restore (a restore validates ids
+ * inside its transaction, so rejecting them would abort the whole restore —
+ * research Pitfall 1); the resolver renders the package default for them; the
+ * picker never offers them. Stored values are never rewritten (no migration,
+ * D-23). Forward-only: never move an id from here back into the active set
+ * without a new decision, and never delete one from here while a backup could
+ * still carry it.
+ */
+export const RETIRED_BACKGROUND_SLOT_IDS = [
+  "galaxy-deep-space",
+  "galaxy-nebula",
+  "standard-mesh",
+] as const;
+
+/** A retired background slot id (a member of `RETIRED_BACKGROUND_SLOT_IDS`). */
+export type RetiredBackgroundSlotId =
+  (typeof RETIRED_BACKGROUND_SLOT_IDS)[number];
+
+/**
+ * The type of a PERSISTED or RESTORED background value (`app_settings`
+ * `galaxy_background` / `standard_background`, the theme store's selection,
+ * `BackgroundHost`'s slot). It may be retired; only the picker's writes are
+ * narrowed to `BackgroundSlotId`. Treat it as untrusted: the resolver still
+ * tolerates any string at runtime.
+ */
+export type StoredBackgroundId = BackgroundSlotId | RetiredBackgroundSlotId;

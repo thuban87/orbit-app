@@ -40,7 +40,11 @@
  * (docs/runbooks/theme-visual-system-maintenance.md).
  */
 
-import { BACKGROUND_SLOT_IDS, type BackgroundSlotId } from "./theme-option-ids";
+import {
+  BACKGROUND_SLOT_IDS,
+  type BackgroundSlotId,
+  type StoredBackgroundId,
+} from "./theme-option-ids";
 import type { ResolvedMode, ThemePackage } from "./theme-types";
 
 /** The shared None/Solid slot id — resolves to the solid theme background. */
@@ -183,38 +187,6 @@ export const BACKGROUND_SLOTS: Record<
       },
     },
   },
-  "galaxy-deep-space": {
-    package: "galaxy",
-    variants: {
-      light: {
-        source: () =>
-          require("../../assets/backgrounds/galaxy-deep-space.webp"),
-        brightestPixel: "#1A1F35",
-        darkestPixel: "#000000",
-      },
-      dark: {
-        source: () =>
-          require("../../assets/backgrounds/galaxy-deep-space.webp"),
-        brightestPixel: "#1A1F35",
-        darkestPixel: "#000000",
-      },
-    },
-  },
-  "galaxy-nebula": {
-    package: "galaxy",
-    variants: {
-      light: {
-        source: () => require("../../assets/backgrounds/galaxy-nebula.webp"),
-        brightestPixel: "#2A2148",
-        darkestPixel: "#000003",
-      },
-      dark: {
-        source: () => require("../../assets/backgrounds/galaxy-nebula.webp"),
-        brightestPixel: "#2A2148",
-        darkestPixel: "#000003",
-      },
-    },
-  },
   "standard-dawn": {
     package: "standard",
     variants: {
@@ -266,21 +238,6 @@ export const BACKGROUND_SLOTS: Record<
       },
     },
   },
-  "standard-mesh": {
-    package: "standard",
-    variants: {
-      light: {
-        source: () => require("../../assets/backgrounds/standard-mesh.webp"),
-        brightestPixel: "#B8C4D0",
-        darkestPixel: "#3A5068",
-      },
-      dark: {
-        source: () => require("../../assets/backgrounds/standard-mesh.webp"),
-        brightestPixel: "#B8C4D0",
-        darkestPixel: "#3A5068",
-      },
-    },
-  },
 };
 
 /**
@@ -293,27 +250,15 @@ export const BACKGROUND_ORDER: Record<
   ThemePackage,
   readonly BackgroundSlotId[]
 > = {
-  galaxy: [
-    "galaxy-quiet",
-    "galaxy-aurora",
-    "galaxy-starfield",
-    "galaxy-deep-space",
-    "galaxy-nebula",
-    NONE_SLOT_ID,
-  ],
-  standard: [
-    "standard-dawn",
-    "standard-paper",
-    "standard-dusk",
-    "standard-mesh",
-    NONE_SLOT_ID,
-  ],
+  galaxy: ["galaxy-quiet", "galaxy-aurora", "galaxy-starfield", NONE_SLOT_ID],
+  standard: ["standard-dawn", "standard-paper", "standard-dusk", NONE_SLOT_ID],
 };
 
 /**
  * Each package's DEFAULT background slot — applied when the stored per-package
- * background is NULL (the accent/self-sun NULL-resolve-at-render idiom). Galaxy
- * defaults to the Deep Space gradient, Standard to the soft Dawn gradient (UI-SPEC).
+ * background is NULL, retired, unknown or another package's (the accent/self-sun
+ * NULL-resolve-at-render idiom). Galaxy defaults to the quiet slot, labelled "Deep
+ * Space" (38.5 D-19 / D-33); Standard to Dawn.
  */
 export const PACKAGE_DEFAULT_SLOT: Record<ThemePackage, BackgroundSlotId> = {
   galaxy: "galaxy-quiet",
@@ -336,9 +281,13 @@ export type ResolvedBackground =
     }
   | { kind: "solid" };
 
-/** Narrow a slot id to a known asset slot (not `none`, not tampered). */
-function assetSlot(slotId: BackgroundSlotId): BackgroundAssetSlot | undefined {
-  if (slotId === NONE_SLOT_ID) {
+/**
+ * Narrow an UNTRUSTED stored string to a known asset slot (not `none`, not
+ * retired, not tampered). Own-property lookup only, so a stored `__proto__` or
+ * `constructor` can never reach `Object.prototype` (T-38.5-05-02).
+ */
+function assetSlot(slotId: string): BackgroundAssetSlot | undefined {
+  if (slotId === NONE_SLOT_ID || !Object.hasOwn(BACKGROUND_SLOTS, slotId)) {
     return undefined;
   }
   return BACKGROUND_SLOTS[
@@ -363,10 +312,12 @@ function assetFor(
   };
 }
 
-function resolveAssetById(
-  slotId: BackgroundSlotId,
+/** The requested package's default slot, in `mode` (always a real asset slot). */
+function resolvePackageDefault(
+  themePackage: ThemePackage,
   mode: ResolvedMode,
 ): ResolvedBackground {
+  const slotId = PACKAGE_DEFAULT_SLOT[themePackage];
   const slot = assetSlot(slotId);
   if (!slot) {
     return { kind: "solid" };
@@ -375,34 +326,39 @@ function resolveAssetById(
 }
 
 /**
- * Resolve `(package, slotId | null, mode)` to a renderable background. PURE and
+ * Resolve `(package, stored id | null, mode)` to a renderable background. PURE and
  * RN-free (node-testable — the returned asset thunk is NOT invoked here). The file
  * is the slot's variant for the resolved `mode` (38.5 D-23); the slot rules are
  * mode-independent:
  *   - NULL   -> the package DEFAULT slot's variant,
  *   - 'none' -> the solid theme background,
- *   - a known slot id -> its variant,
- *   - an unknown/tampered id -> the package default's variant (safe fallback,
+ *   - an active slot id OF THIS PACKAGE -> its variant,
+ *   - a RETIRED id (38.5 D-19 / P-4: `galaxy-deep-space`, `galaxy-nebula`,
+ *     `standard-mesh`) -> the package default's variant,
+ *   - an id whose slot belongs to the OTHER package (a hand-edited backup or a
+ *     tampered row) -> this package's default: backgrounds are restricted to their
+ *     own package (38.4 D-39; T-38.5-05-02),
+ *   - an unknown/tampered string -> the package default's variant (safe fallback,
  *     T-23-05b / ADR-113).
+ * The parameter is typed `StoredBackgroundId | null` (a persisted value), but any
+ * runtime string is tolerated: stored data is untrusted.
  */
 export function resolveBackground(
   themePackage: ThemePackage,
-  slotId: BackgroundSlotId | null,
+  slotId: StoredBackgroundId | null,
   mode: ResolvedMode,
 ): ResolvedBackground {
   if (slotId === null) {
-    return resolveAssetById(PACKAGE_DEFAULT_SLOT[themePackage], mode);
+    return resolvePackageDefault(themePackage, mode);
   }
   if (slotId === NONE_SLOT_ID) {
     return { kind: "solid" };
   }
   const slot = assetSlot(slotId);
-  if (!slot) {
-    // Unknown/tampered id (a stored value the DAO would have rejected on write, or
-    // one orphaned by a manifest change) — fall back to the package default.
-    return resolveAssetById(PACKAGE_DEFAULT_SLOT[themePackage], mode);
+  if (!slot || slot.package !== themePackage) {
+    return resolvePackageDefault(themePackage, mode);
   }
-  return assetFor(slotId, slot, mode);
+  return assetFor(slotId as BackgroundSlotId, slot, mode);
 }
 
 /**
@@ -417,7 +373,7 @@ export function resolveBackground(
  */
 export function resolveRenderableBackground(
   themePackage: ThemePackage,
-  slotId: BackgroundSlotId | null,
+  slotId: StoredBackgroundId | null,
   mode: ResolvedMode,
   renderFailed: boolean,
 ): ResolvedBackground {

@@ -37,7 +37,8 @@ import {
   ACCENT_IDS,
   type AccentId,
   BACKGROUND_SLOT_IDS,
-  type BackgroundSlotId,
+  RETIRED_BACKGROUND_SLOT_IDS,
+  type StoredBackgroundId,
 } from "@/theme/theme-option-ids";
 import type { ThemeMode, ThemePackage } from "@/theme/theme-types";
 
@@ -306,10 +307,13 @@ export interface AppSettings {
   galaxyAccent: AccentId | null;
   /** Standard's remembered accent-id, or NULL = package default at render. */
   standardAccent: AccentId | null;
-  /** Galaxy's remembered background slot-id, or NULL = package default. */
-  galaxyBackground: BackgroundSlotId | null;
-  /** Standard's remembered background slot-id, or NULL = package default. */
-  standardBackground: BackgroundSlotId | null;
+  /**
+   * Galaxy's remembered background slot-id, or NULL = package default. May be a
+   * RETIRED id (38.5 D-19 / P-4); the resolver renders the default for it.
+   */
+  galaxyBackground: StoredBackgroundId | null;
+  /** Standard's remembered background slot-id (may be retired), or NULL = default. */
+  standardBackground: StoredBackgroundId | null;
 
   // --- Dashboard query preferences (Phase 25, migration 019) --------------
   /** Shared List/Card presentation preference. */
@@ -457,8 +461,8 @@ export interface PortableSettingsSnapshot {
   standardMode?: ThemeMode;
   galaxyAccent?: AccentId | null;
   standardAccent?: AccentId | null;
-  galaxyBackground?: BackgroundSlotId | null;
-  standardBackground?: BackgroundSlotId | null;
+  galaxyBackground?: StoredBackgroundId | null;
+  standardBackground?: StoredBackgroundId | null;
   // --- Dashboard keys (Phase 25) -------------------------------------------
   dashboardViewMode?: DashboardViewMode;
   dashboardPopulations?: string;
@@ -817,9 +821,9 @@ export async function getAppSettings(
     galaxyAccent: (row.galaxy_accent ?? null) as AccentId | null,
     standardAccent: (row.standard_accent ?? null) as AccentId | null,
     galaxyBackground: (row.galaxy_background ??
-      null) as BackgroundSlotId | null,
+      null) as StoredBackgroundId | null,
     standardBackground: (row.standard_background ??
-      null) as BackgroundSlotId | null,
+      null) as StoredBackgroundId | null,
     dashboardViewMode: row.dashboard_view_mode as DashboardViewMode,
     dashboardPopulations: row.dashboard_populations,
     dashboardFilters: row.dashboard_filters,
@@ -993,9 +997,9 @@ export async function getPortableSettingsSnapshot(
     galaxyAccent: (row.galaxy_accent ?? null) as AccentId | null,
     standardAccent: (row.standard_accent ?? null) as AccentId | null,
     galaxyBackground: (row.galaxy_background ??
-      null) as BackgroundSlotId | null,
+      null) as StoredBackgroundId | null,
     standardBackground: (row.standard_background ??
-      null) as BackgroundSlotId | null,
+      null) as StoredBackgroundId | null,
     dashboardViewMode: row.dashboard_view_mode as DashboardViewMode,
     dashboardPopulations: row.dashboard_populations,
     dashboardFilters: row.dashboard_filters,
@@ -1178,15 +1182,23 @@ export function assertAccentId(field: string, v: unknown): void {
 }
 
 /**
- * Throw unless `v` is null or a KNOWN background slot-id. Consumes the exported
- * `BACKGROUND_SLOT_IDS` single source (theme-option-ids.ts) via `.includes()`, so
- * the DAO's accepted-id set and Plan 06's `backgrounds.ts` manifest cannot drift.
+ * Throw unless `v` is null or a KNOWN background slot-id: an ACTIVE id or a
+ * RETIRED one (38.5 D-19 / P-4). Consumes the exported single-source arrays
+ * (`BACKGROUND_SLOT_IDS`, `RETIRED_BACKGROUND_SLOT_IDS`, theme-option-ids.ts) via
+ * `.includes()`, so the DAO's accepted-id set and the `backgrounds.ts` manifest
+ * cannot drift. Retired ids stay accepted because restore writes the backup's
+ * settings through this validator INSIDE its transaction: rejecting a cut slot
+ * would abort the whole restore (research Pitfall 1; T-38.5-05-01). It is still a
+ * closed-set membership check, so an unknown id throws (T-38.5-05-03).
  */
 export function assertBackgroundId(field: string, v: unknown): void {
   if (v === null) return;
   if (
     typeof v !== "string" ||
-    !(BACKGROUND_SLOT_IDS as readonly string[]).includes(v)
+    !(
+      (BACKGROUND_SLOT_IDS as readonly string[]).includes(v) ||
+      (RETIRED_BACKGROUND_SLOT_IDS as readonly string[]).includes(v)
+    )
   ) {
     throw new Error(
       `updateAppSettings: ${field} must be null or a known background slot id, got ${String(v)}`,

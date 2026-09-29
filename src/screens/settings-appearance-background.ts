@@ -4,7 +4,10 @@ import {
   NONE_SLOT_ID,
   resolveBackground,
 } from "@/theme/backgrounds";
-import type { BackgroundSlotId } from "@/theme/theme-option-ids";
+import type {
+  BackgroundSlotId,
+  StoredBackgroundId,
+} from "@/theme/theme-option-ids";
 import type { ResolvedMode, ThemePackage } from "@/theme/theme-types";
 
 /**
@@ -47,8 +50,9 @@ export function backgroundPatchForPackage(
  * The tile the Appearance picker highlights (38.5 D-23; research Pitfall 7). It is
  * derived from what the resolver ACTUALLY renders, not from the raw stored id:
  * NULL and an unknown/tampered id both render the package default, so both
- * highlight the default tile; `none` renders the solid background, so it
- * highlights the None (Solid) tile. The stored id is untrusted input (a tampered
+ * highlight the default tile. So do a RETIRED id (38.5 D-19 / P-4) and another
+ * package's id (38.4 D-39): both render this package's default. `none` renders
+ * the solid background, so it highlights the None (Solid) tile. The stored id is untrusted input (a tampered
  * database or restored backup, T-38.5-02-01), so any string is accepted and the
  * resolver's own fallback decides.
  */
@@ -59,7 +63,7 @@ export function selectedBackgroundTile(
 ): BackgroundSlotId {
   const resolved = resolveBackground(
     pkg,
-    storedId as BackgroundSlotId | null,
+    storedId as StoredBackgroundId | null,
     mode,
   );
   return resolved.kind === "solid" ? NONE_SLOT_ID : resolved.slotId;

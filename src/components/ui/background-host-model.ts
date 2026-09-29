@@ -1,4 +1,4 @@
-import type { BackgroundSlotId } from "@/theme/theme-option-ids";
+import type { StoredBackgroundId } from "@/theme/theme-option-ids";
 import type { ResolvedMode, ThemePackage } from "@/theme/theme-types";
 
 /**
@@ -12,7 +12,8 @@ import type { ResolvedMode, ThemePackage } from "@/theme/theme-types";
  */
 export function backgroundHostSelection(input: {
   package: ThemePackage;
-  slotId: BackgroundSlotId | null;
+  /** The stored slot id (may be retired, 38.5 D-19 / P-4); NULL = default. */
+  slotId: StoredBackgroundId | null;
   mode: ResolvedMode;
   appOwnedBackgroundUri: string | null;
   forceRenderError: boolean;

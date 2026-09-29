@@ -39,7 +39,7 @@ import {
   type ResolvedBackground,
   resolveRenderableBackground,
 } from "@/theme/backgrounds";
-import type { BackgroundSlotId } from "@/theme/theme-option-ids";
+import type { StoredBackgroundId } from "@/theme/theme-option-ids";
 import type { ThemePackage } from "@/theme/theme-types";
 import {
   backgroundVeilOpacity,
@@ -65,7 +65,7 @@ export interface BackgroundHostProps {
    * stored background from the theme store; an explicit value (incl. `null` for the
    * package default, or `'none'`) forces a slot.
    */
-  slotId?: BackgroundSlotId | null;
+  slotId?: StoredBackgroundId | null;
   /**
    * DEV-only: force the render-failure fallback (the `ThemePreviewScreen` toggle
    * that exercises `onError -> None/Solid` on device without deleting an asset).

@@ -561,7 +561,10 @@ def self_test():
         == {k: v for k, v in b.items() if not (i == 0 and k == "featureAllowance")}
         for i, (a, b) in enumerate(zip(mod_rows, base_rows))
     )
-    expect(same_rest and all(r["featureAllowance"] is None for r in base_rows),
+    # The fixture line goes into the FIRST variant, which must not already carry an
+    # allowance (38.5-05 ships signed allowances on the two Starfield variants, so
+    # "no real variant has one" no longer holds; only the target must be clean).
+    expect(same_rest and base_rows[0]["featureAllowance"] is None,
            "every other field equals parse_manifest() on the unmodified file")
     # The formatter wraps a long object literal; the wrapped form parses the same.
     wrapped = ('        featureAllowance: {\n          maxComponentPx: 9,\n'
