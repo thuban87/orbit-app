@@ -33,7 +33,11 @@
 # scripts/background_manifest.py): a variant may carry an owner-signed
 # `featureAllowance: { maxComponentPx, maxFailingPct, acceptedAt }`. Its declared
 # extrema are then the TEXT-BEARING bound after the allowance (the checker's
-# `textBearingBound`), and `--check` instead: finds every decoded colour whose
+# `textBearingBound`, or a value inside an empty luminance band between the
+# text-bearing pixels and the allowed features; such a declared bound may be
+# luminance-only rather than channel-wise, because every check compares
+# composite luminance: the Starfield bounds, 38.5-ART-SIGNOFF.md §5), and
+# `--check` instead: finds every decoded colour whose
 # composite falls outside the declared bounds' composites under ANY regime of
 # the variant (card, chrome, veil at every density, profile, the signed art
 # treatments listEntry / cardEntry / artChrome, and any regime added later),

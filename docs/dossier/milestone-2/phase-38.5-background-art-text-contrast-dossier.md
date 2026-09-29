@@ -409,6 +409,12 @@ per-cell checker results on the shipped files, the P-7 sizes and the machine-rea
         Starfield-D3's largest failing star (9 px); Starfield-L5's largest is 13 px. D3 fails on 0.170% of the canvas,
         L5 on 0.028%.
     -   No other allowance. **No exclusion** (the accepted-exclusions block's `exclusions` is empty).
+    -   **Addendum (2026-09-29): the declared Starfield bounds.** The code declares light `darkestPixel` `#D3DDE0` and
+        dark `brightestPixel` `#262452`, not the checker's channel-wise `#CED9DC` / `#2C2868`. Each sits in an empty
+        luminance band of its own file, so the same pixels are text-bearing: `--check` reproduces the signed unions
+        (2,680 px / 0.170% dark; 446 px / 0.028% light). The dark bound is luminance-valid, not channel-wise. The
+        allowance is unchanged. Owner, on the code review's WR-02 (2026-09-29): "Accepted and noted". Record:
+        `38.5-ART-SIGNOFF.md` §5.
 -   **[DECIDED · 2026-09-28] D-32 --- The pearl planet limb is shelved (D-16).** Owner: "I do not care for whatever the
     hell you made here no. Let's shelve this and I can revisit another time". It is not transcoded, committed or wired;
     the no-planets rule stands for every shipped image.
@@ -806,3 +812,6 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
     -   D-44: mode-default text on the see-through entries.
     -   D-45: the WATCH outliers are accepted.
     -   O-8 is resolved. Record: `38.5-SIGNOFF-V3.md`; answers: `38.5-scrim-signoff-v3.json`.
+-   2026-09-29 --- Code review WR-02: an addendum under D-31 records the declared Starfield text-bearing bounds
+    (`#D3DDE0` light darkest, `#262452` dark brightest), why they differ from the checker's channel-wise bounds, and the
+    owner's acknowledgement ("Accepted and noted"). Record: `38.5-ART-SIGNOFF.md` §5.
