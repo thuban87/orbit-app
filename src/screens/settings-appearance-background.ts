@@ -68,3 +68,34 @@ export function selectedBackgroundTile(
   );
   return resolved.kind === "solid" ? NONE_SLOT_ID : resolved.slotId;
 }
+
+/**
+ * The picker tile's image box (38.5 D-52). Width AND height are always explicit:
+ * React Native sizes a bundled `require()` image to its intrinsic pixel size
+ * unless the style sets both, and that size beats `absoluteFill`'s edges, so the
+ * tile showed the art's top-left corner at full scale (every tile, and a black
+ * Aurora tile). Without a focus the box is the tile and `cover` crops around the
+ * centre. With one, the box is `zoom`× the tile's width and shifted so the
+ * anchor `x` lines up with the tile, so the tile shows the art magnified around
+ * `x`. Percentages only: no layout measurement. The full-screen render never
+ * uses it.
+ */
+export function thumbnailImageStyle(
+  focus: { x: number; zoom: number } | undefined,
+): {
+  position: "absolute";
+  top: 0;
+  left: `${number}%`;
+  width: `${number}%`;
+  height: "100%";
+} {
+  const zoom = focus ? Math.max(1, focus.zoom) : 1;
+  const x = focus ? Math.min(1, Math.max(0, focus.x)) : 0;
+  return {
+    position: "absolute",
+    top: 0,
+    left: `${-(zoom - 1) * x * 100 || 0}%`,
+    width: `${zoom * 100}%`,
+    height: "100%",
+  };
+}

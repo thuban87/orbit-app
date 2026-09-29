@@ -94,6 +94,13 @@ export interface BackgroundVariant {
     maxFailingPct: number;
     acceptedAt: string;
   };
+  /**
+   * Picker-thumbnail crop only (38.5 D-52); never the full-screen render. The
+   * tile shows the art magnified `zoom`× and anchored horizontally at `x`
+   * (0 = left edge, 1 = right edge). Absent = a centred `cover` crop. Used where
+   * the art's subject sits off-centre and a centred crop reads as empty.
+   */
+  thumbnailFocus?: { x: number; zoom: number };
 }
 
 /**
@@ -141,12 +148,16 @@ export const BACKGROUND_SLOTS: Record<
       light: {
         source: () =>
           require("../../assets/backgrounds/galaxy-aurora-light.webp"),
+        // The mirrored ribbon (D-35) hugs the right edge; crop the tile to it (D-52).
+        thumbnailFocus: { x: 1, zoom: 2 },
         brightestPixel: "#F6F8F9",
         darkestPixel: "#CEE5E4",
       },
       dark: {
         source: () =>
           require("../../assets/backgrounds/galaxy-aurora-dark.webp"),
+        // The mirrored ribbon (D-35) hugs the right edge; crop the tile to it (D-52).
+        thumbnailFocus: { x: 1, zoom: 2 },
         brightestPixel: "#123035",
         darkestPixel: "#000000",
       },
@@ -285,6 +296,8 @@ export type ResolvedBackground =
       brightestPixel: string;
       /** The asset's declared worst-case darkest pixel (composited-AA bound, RG-029). */
       darkestPixel: string;
+      /** Picker-thumbnail crop anchor (D-52); absent = centred cover. */
+      thumbnailFocus?: { x: number; zoom: number };
     }
   | { kind: "solid" };
 
@@ -316,6 +329,9 @@ function assetFor(
     source: variant.source,
     brightestPixel: variant.brightestPixel,
     darkestPixel: variant.darkestPixel,
+    ...(variant.thumbnailFocus
+      ? { thumbnailFocus: variant.thumbnailFocus }
+      : {}),
   };
 }
 

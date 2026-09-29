@@ -53,6 +53,7 @@ import {
   backgroundChoicesForPackage,
   backgroundPatchForPackage,
   selectedBackgroundTile,
+  thumbnailImageStyle,
 } from "./settings-appearance-background";
 import { persistAppearanceSetting } from "./settings-appearance-persist";
 
@@ -125,7 +126,7 @@ function BackgroundThumbnail({
         {resolved.kind === "asset" ? (
           <Image
             source={resolved.source()}
-            style={StyleSheet.absoluteFill}
+            style={thumbnailImageStyle(resolved.thumbnailFocus)}
             resizeMode="cover"
             onError={() => setThumbFailed(true)}
           />

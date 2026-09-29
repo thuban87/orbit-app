@@ -3,12 +3,14 @@ import {
   BACKGROUND_ORDER,
   NONE_SLOT_ID,
   PACKAGE_DEFAULT_SLOT,
+  resolveBackground,
 } from "@/theme/backgrounds";
 import { RETIRED_BACKGROUND_SLOT_IDS } from "@/theme/theme-option-ids";
 import {
   backgroundChoicesForPackage,
   backgroundPatchForPackage,
   selectedBackgroundTile,
+  thumbnailImageStyle,
 } from "./settings-appearance-background";
 
 describe("backgroundChoicesForPackage — active-package guard (D-07)", () => {
@@ -160,5 +162,46 @@ describe("selectedBackgroundTile — the highlighted tile is what actually rende
         }
       }
     }
+  });
+});
+
+describe("thumbnailImageStyle — picker crop anchor (D-52)", () => {
+  it("fills the tile with an explicit width and height when there is no focus", () => {
+    // Both must be explicit: RN otherwise sizes a require()d image to its
+    // intrinsic pixels, which beats absoluteFill and shows the art's corner.
+    expect(thumbnailImageStyle(undefined)).toEqual({
+      position: "absolute",
+      top: 0,
+      left: "0%",
+      width: "100%",
+      height: "100%",
+    });
+  });
+
+  it("magnifies and right-anchors so the tile shows the art's right half", () => {
+    expect(thumbnailImageStyle({ x: 1, zoom: 2 })).toMatchObject({
+      left: "-100%",
+      width: "200%",
+      height: "100%",
+    });
+  });
+
+  it("clamps a stray anchor and never shrinks below the tile", () => {
+    expect(thumbnailImageStyle({ x: 3, zoom: 0.5 })).toMatchObject({
+      left: "0%",
+      width: "100%",
+    });
+  });
+
+  it("anchors both Aurora variants on the ribbon and nothing else", () => {
+    for (const mode of ["light", "dark"] as const) {
+      const resolved = resolveBackground("galaxy", "galaxy-aurora", mode);
+      expect(resolved.kind === "asset" && resolved.thumbnailFocus).toEqual({
+        x: 1,
+        zoom: 2,
+      });
+    }
+    const quiet = resolveBackground("galaxy", "galaxy-quiet", "dark");
+    expect(quiet.kind === "asset" && quiet.thumbnailFocus).toBeUndefined();
   });
 });
