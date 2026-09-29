@@ -125,12 +125,12 @@ export const BACKGROUND_SLOTS: Record<
         source: () =>
           require("../../assets/backgrounds/galaxy-quiet-light.webp"),
         brightestPixel: "#F8F6FF",
-        darkestPixel: "#E5DDF9",
+        darkestPixel: "#E4DDF9",
       },
       dark: {
         source: () =>
           require("../../assets/backgrounds/galaxy-quiet-dark.webp"),
-        brightestPixel: "#1B2149",
+        brightestPixel: "#262149",
         darkestPixel: "#000000",
       },
     },
@@ -147,7 +147,7 @@ export const BACKGROUND_SLOTS: Record<
       dark: {
         source: () =>
           require("../../assets/backgrounds/galaxy-aurora-dark.webp"),
-        brightestPixel: "#113032",
+        brightestPixel: "#123035",
         darkestPixel: "#000000",
       },
     },
@@ -159,7 +159,14 @@ export const BACKGROUND_SLOTS: Record<
         source: () =>
           require("../../assets/backgrounds/galaxy-starfield-light.webp"),
         brightestPixel: "#FFFFFF",
-        darkestPixel: "#CED9DC",
+        // Text-bearing bound after the owner-signed allowance (D-20 / D-31). The
+        // checker's channel-wise textBearingBound (#CED9DC, L=0.679) is a synthetic
+        // colour darker than any real text-bearing pixel; the file has an EMPTY
+        // luminance band between its brightest dark star (L<0.3) and its darkest
+        // non-star pixel (#D6E0F2, L=0.740). This bound sits in that band
+        // (L=0.709), and `measure-background-extrema.py --check` reproduces the
+        // signed union exactly (446 px, 0.028%, largest 13 px).
+        darkestPixel: "#D3DDE0",
         featureAllowance: {
           maxComponentPx: 18,
           maxFailingPct: 0.5,
@@ -194,7 +201,7 @@ export const BACKGROUND_SLOTS: Record<
         source: () =>
           require("../../assets/backgrounds/standard-dawn-light.webp"),
         brightestPixel: "#FFF6E8",
-        darkestPixel: "#FDD8C0",
+        darkestPixel: "#F8D8C0",
       },
       dark: {
         source: () =>
@@ -216,7 +223,7 @@ export const BACKGROUND_SLOTS: Record<
       dark: {
         source: () =>
           require("../../assets/backgrounds/standard-paper-dark.webp"),
-        brightestPixel: "#302E2C",
+        brightestPixel: "#312E2C",
         darkestPixel: "#191415",
       },
     },
@@ -233,7 +240,7 @@ export const BACKGROUND_SLOTS: Record<
       dark: {
         source: () =>
           require("../../assets/backgrounds/standard-dusk-dark.webp"),
-        brightestPixel: "#3D253F",
+        brightestPixel: "#3E253F",
         darkestPixel: "#24143F",
       },
     },

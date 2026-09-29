@@ -11,8 +11,9 @@
 # the reproducible bridge between the two: it decodes every bundled asset with
 # Pillow (RGB, full resolution) and, for EVERY tint regime of the variant's OWN
 # package AND OWN mode (`scripts/background-extrema-regimes.json`: card, chrome
-# and the BackgroundHost veil at every density, 38.5-03; a light variant is never
-# rendered in dark mode, 38.5 P-2), composites every pixel exactly like
+# and the BackgroundHost veil at every density, 38.5-03; the Profile route's
+# profileBackgroundScrim, 38.5-05; a light variant is never rendered in dark
+# mode, 38.5 P-2), composites every pixel exactly like
 # `alphaComposite` in `src/theme/tokens/surface.ts` (sRGB-space blend, rounded
 # per channel) and finds the pixel with the minimum and maximum COMPOSITE WCAG
 # relative luminance.
@@ -75,7 +76,7 @@ REGIMES_JSON = os.path.join(REPO_ROOT, "scripts", "background-extrema-regimes.js
 WCAG_KNEE = 0.03928
 # ----------------------------------------------------------------------------
 
-TREATMENTS = ("card", "chrome", "veil")
+TREATMENTS = ("card", "chrome", "veil", "profile")
 DENSITIES = ("presentation", "comfortable", "dense")
 
 # The variant parser lives in scripts/background_manifest.py (38.5-03), shared
@@ -617,8 +618,8 @@ HELP = """usage: measure-background-extrema.py [--check | --self-test | --help]
 
 Decode every bundled background variant and report (or --check) its declared
 darkestPixel/brightestPixel against every tint regime of its own package AND
-mode: card, chrome and the BackgroundHost veil at every density
-(scripts/background-extrema-regimes.json).
+mode: card, chrome, the BackgroundHost veil at every density and the Profile
+route's profileBackgroundScrim (scripts/background-extrema-regimes.json).
 
 featureAllowance (38.5 D-20): a variant with an owner-signed allowance passes
 --check when the UNION, across every regime of the variant, of the pixels whose

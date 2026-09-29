@@ -2,48 +2,95 @@
 
 In-project provenance/license record for every bundled background (THEME-04 /
 dossier §E [DERIVED]). Backgrounds are **local, bundled `require()` assets only** —
-no network, no CDN, no downloadable path (D-04). Every slot the `backgrounds.ts`
+no network, no CDN, no downloadable path (D-04). Every variant the `backgrounds.ts`
 manifest resolves via `require()` has a committed asset here **and** a row below.
 
-## Declared worst-case brightest pixel (composited-AA bound)
+## Slots and variants (38.5 D-23)
 
-Each asset row records a **declared worst-case (brightest representative) pixel**
-(cycle-3 MEDIUM). This is the composited-AA design bound the shipped asset must not
-exceed: `src/theme/tokens/surface.test.ts` composites the live glass tint over this
-pixel and asserts every text/status foreground still meets AA-equivalent contrast.
+A background **slot** is a pair of **variants**, one per resolved appearance mode:
+`<slot>-light.webp` and `<slot>-dark.webp`. The stored setting
+(`app_settings.galaxy_background` / `standard_background`) is the slot id; the mode
+picks the file at render. Lineup (38.5 D-17 / D-18 / D-19, owner sign-off
+2026-09-28, `.planning/phases/38.5-background-art-text-contrast/38.5-ART-SIGNOFF.md`):
 
-**Measured delivery (Phase 31 Plan 12):** every committed `.webp` was decoded to
-RGB24 with ffmpeg and scanned byte-for-byte. Its measured per-channel maximum equals
-the declared pixel below, so the declared composited-AA proof remains valid without
-changing a shared tint or opacity token. Release Pixel screenshots remain the visual
-proof for the renderer itself. If a future asset's actual brightest region exceeds
-its declared pixel, re-master/darken the art or retune its declared pixel + tint
-opacity — **never weaken AA**.
+- **Galaxy:** `galaxy-quiet` (label "Deep Space", the package default), `galaxy-aurora`,
+  `galaxy-starfield`, then None.
+- **Standard:** `standard-dawn` (the package default), `standard-paper`, `standard-dusk`,
+  then None.
 
-## Current assets — approved local art
+## Declared extrema (composited-AA bounds)
 
-The eight production WebPs are the owner-approved Phase 31 candidate board,
-transcoded losslessly at `941x1672` and remastered per RGB channel so no decoded
-pixel exceeds its slot's declared AA bound. They replace only the established asset
-paths; IDs, resolver mappings, package order/defaults, and the bundled-local-only
-boundary are unchanged.
+Each variant declares a **brightest** and a **darkest** pixel in `backgrounds.ts`.
+They are the bounds the contrast proofs in `src/theme/tokens/surface.test.ts`
+composite over, under every regime of the variant's own package and mode:
+
+- **card** and **chrome**: the glass tint at `cardTintOpacity` / `chromeScrimOpacity`;
+- **veil**: the BackgroundHost veil under bare text, at every density
+  (`BACKGROUND_VEIL_OPACITY`);
+- **profile**: the Profile route's own `profileBackgroundScrim` (its colour at its
+  alpha byte / 255).
+
+`scripts/measure-background-extrema.py --check` decodes every shipped file (Pillow),
+composites every pixel under each of those regimes (`scripts/background-extrema-regimes.json`)
+and fails if a declared bound does not enclose the decoded composite extrema. Run it
+whenever an asset or a regime changes.
+
+**Feature allowance (38.5 D-20 / D-31).** Only the two `galaxy-starfield` variants
+carry one: owner-signed `18 px / 0.5%`. For them the declared extrema are the
+**text-bearing bound**: every pixel outside it belongs to an allowed star, and
+`--check` measures the union of those pixels (8-connected components ≤ 18 px, ≤ 0.5%
+of the canvas). Each Starfield file has an empty luminance band between its stars and
+its text-bearing pixels; its declared bound sits inside that band, and `--check`
+reproduces the signed union exactly (dark: 2,680 px, 0.170%, largest 9 px; light:
+446 px, 0.028%, largest 13 px).
+
+Every shipped file also passes the per-pixel art checker as shipped
+(`uv run --no-project --with numpy --with pillow python3 scripts/check-background-art.py --all
+--exclude-galaxy-dark-danger --accepted-exclusions .planning/phases/38.5-background-art-text-contrast/38.5-ART-SIGNOFF.md`,
+and again with `--margin 0.1`). If a future asset exceeds its declared bound, re-make
+the art or record a new owner ruling — **never weaken AA** and never retune an
+opacity, veil or hue to make art pass (38.5 D-06).
 
 ## Provenance rows
 
-| Slot id | Package | File | Dimensions | Measured brightest pixel | Source | License | Author |
-|---------|---------|------|-----------------|--------|---------|--------|
-| `galaxy-deep-space` | galaxy | `galaxy-deep-space.webp` | `941x1672` | `#1A1F35` | Approved `31-12-art/galaxy-deep-space.png`, ffmpeg lossless WebP remaster | OpenAI Terms of Use | OpenAI image generation; orbit-app remaster |
-| `galaxy-starfield` | galaxy | `galaxy-starfield.webp` | `941x1672` | `#202545` | Approved `31-12-art/galaxy-starfield.png`, ffmpeg lossless WebP remaster | OpenAI Terms of Use | OpenAI image generation; orbit-app remaster |
-| `galaxy-nebula` | galaxy | `galaxy-nebula.webp` | `941x1672` | `#2A2148` | Approved `31-12-art/galaxy-nebula.png`, ffmpeg lossless WebP remaster | OpenAI Terms of Use | OpenAI image generation; orbit-app remaster |
-| `galaxy-aurora` | galaxy | `galaxy-aurora.webp` | `941x1672` | `#16303A` | Approved `31-12-art/galaxy-aurora.png`, ffmpeg lossless WebP remaster | OpenAI Terms of Use | OpenAI image generation; orbit-app remaster |
-| `standard-dawn` | standard | `standard-dawn.webp` | `941x1672` | `#E8D8C0` | Approved `31-12-art/standard-dawn.png`, ffmpeg lossless WebP remaster | OpenAI Terms of Use | OpenAI image generation; orbit-app remaster |
-| `standard-paper` | standard | `standard-paper.webp` | `941x1672` | `#EDE6D8` | Approved `31-12-art/standard-paper.png`, ffmpeg lossless WebP remaster | OpenAI Terms of Use | OpenAI image generation; orbit-app remaster |
-| `standard-dusk` | standard | `standard-dusk.webp` | `941x1672` | `#C8B0C0` | Approved `31-12-art/standard-dusk.png`, ffmpeg lossless WebP remaster | OpenAI Terms of Use | OpenAI image generation; orbit-app remaster |
-| `standard-mesh` | standard | `standard-mesh.webp` | `941x1672` | `#B8C4D0` | Approved `31-12-art/standard-mesh.png`, ffmpeg lossless WebP remaster | OpenAI Terms of Use | OpenAI image generation; orbit-app remaster |
+All twelve files are the owner-picked candidates from the 38.5 art loop, saved from
+their approved PNG masters as lossless WebPs (`lossless=True, method=6`), decoded and
+verified pixel-identical to the master, with metadata and text chunks dropped.
+
+| Slot id | Package | Mode | File | Dimensions | Measured brightest pixel | Measured darkest pixel | Feature allowance | Source | License | Author |
+|---------|---------|------|------|------------|--------------------------|------------------------|-------------------|--------|---------|--------|
+| `galaxy-quiet` | galaxy | light | `galaxy-quiet-light.webp` | `941x1672` | `#F8F6FF` | `#E4DDF9` | none | Codex `gpt-6-astra` via `codex-edu`; 38.5 art sign-off 2026-09-28, DeepSpace-L1 (`galaxy-quiet-light-route1-strict-r2`); Pillow lossless WebP | OpenAI Terms of Use | OpenAI image generation (Codex); orbit-app |
+| `galaxy-quiet` | galaxy | dark | `galaxy-quiet-dark.webp` | `941x1672` | `#262149` | `#000000` | none | Codex `gpt-6-astra` via `codex-edu`; 38.5 art sign-off 2026-09-28, DeepSpace-D1 (`galaxy-quiet-dark-base-strict-r1`); Pillow lossless WebP | OpenAI Terms of Use | OpenAI image generation (Codex); orbit-app |
+| `galaxy-aurora` | galaxy | light | `galaxy-aurora-light.webp` | `941x1672` | `#F6F8F9` | `#CEE5E4` | none | Codex `gpt-6-astra` via `codex-edu`; 38.5 art sign-off 2026-09-28, Aurora-L1 (`galaxy-aurora-light-route1-strict-r2`); Pillow lossless WebP | OpenAI Terms of Use | OpenAI image generation (Codex); orbit-app |
+| `galaxy-aurora` | galaxy | dark | `galaxy-aurora-dark.webp` | `941x1672` | `#123035` | `#000000` | none | Codex `gpt-6-astra` via `codex-edu`; 38.5 art sign-off 2026-09-28, Aurora-D7 (`galaxy-aurora-dark-base-strict-r4e`); Pillow lossless WebP | OpenAI Terms of Use | OpenAI image generation (Codex); orbit-app |
+| `galaxy-starfield` | galaxy | light | `galaxy-starfield-light.webp` | `941x1672` | `#FFFFFF` | `#D3DDE0` (text-bearing) | 18 px / 0.5% (signed 2026-09-28) | Codex `gpt-6-astra` via `codex-edu`; 38.5 art sign-off 2026-09-28, Starfield-L5 (`galaxy-starfield-light-route2-visible-r4d`); Pillow lossless WebP | OpenAI Terms of Use | OpenAI image generation (Codex); orbit-app |
+| `galaxy-starfield` | galaxy | dark | `galaxy-starfield-dark.webp` | `941x1672` | `#262452` (text-bearing) | `#000000` | 18 px / 0.5% (signed 2026-09-28) | Codex `gpt-6-astra` via `codex-edu`; 38.5 art sign-off 2026-09-28, Starfield-D3 (`galaxy-starfield-dark-base-visible-r3`); Pillow lossless WebP | OpenAI Terms of Use | OpenAI image generation (Codex); orbit-app |
+| `standard-dawn` | standard | light | `standard-dawn-light.webp` | `941x1672` | `#FFF6E8` | `#F8D8C0` | none | Codex `gpt-6-astra` via `codex-edu`; 38.5 art sign-off 2026-09-28, Dawn-L1 (`standard-dawn-light-base-strict-r0`); Pillow lossless WebP | OpenAI Terms of Use | OpenAI image generation (Codex); orbit-app |
+| `standard-dawn` | standard | dark | `standard-dawn-dark.webp` | `941x1672` | `#4D201C` | `#2D0711` | none | Codex `gpt-6-astra` via `codex-edu`; 38.5 art sign-off 2026-09-28, Dawn-D1 (`standard-dawn-dark-route1-strict-r2`); Pillow lossless WebP | OpenAI Terms of Use | OpenAI image generation (Codex); orbit-app |
+| `standard-paper` | standard | light | `standard-paper-light.webp` | `941x1672` | `#F7F3E9` | `#E4E0D7` | none | Codex `gpt-6-astra` via `codex-edu`; 38.5 art sign-off 2026-09-28, Paper-L2 (`standard-paper-light-base-strict-r4a`); Pillow lossless WebP | OpenAI Terms of Use | OpenAI image generation (Codex); orbit-app |
+| `standard-paper` | standard | dark | `standard-paper-dark.webp` | `941x1672` | `#312E2C` | `#191415` | none | Codex `gpt-6-astra` via `codex-edu`; 38.5 art sign-off 2026-09-28, Paper-D5 (`standard-paper-dark-route1-strict-r4f`); Pillow lossless WebP | OpenAI Terms of Use | OpenAI image generation (Codex); orbit-app |
+| `standard-dusk` | standard | light | `standard-dusk-light.webp` | `941x1672` | `#FEF5EA` | `#DEDAFD` | none | Codex `gpt-6-astra` via `codex-edu`; 38.5 art sign-off 2026-09-28, Dusk-L2 (`standard-dusk-light-base-strict-r4a`); Pillow lossless WebP | OpenAI Terms of Use | OpenAI image generation (Codex); orbit-app |
+| `standard-dusk` | standard | dark | `standard-dusk-dark.webp` | `941x1672` | `#3E253F` | `#24143F` | none | Codex `gpt-6-astra` via `codex-edu`; 38.5 art sign-off 2026-09-28, Dusk-D1 (`standard-dusk-dark-route1-strict-r2`); Pillow lossless WebP | OpenAI Terms of Use | OpenAI image generation (Codex); orbit-app |
+
+The measured pixels are the variant's declarations in `backgrounds.ts`, taken from
+`measure-background-extrema.py`'s report (for Starfield, the text-bearing bound
+above) and proven by its `--check` to enclose every regime's decoded composite. The
+report's channel-wise bound can differ from a declaration by one channel step where
+`--check` shows the declaration already encloses the composite luminance (for
+example `galaxy-aurora` light `#F7F8F9` reported vs `#F6F8F9` declared).
 
 **None / Solid** (`none` slot id) ships **no asset** — it resolves to the solid theme
 background (`colors.background`) at render, so it has no row here.
 
-Future replacements must update **Source / License / Author**, record decoded RGB
-maxima, and confirm the actual brightest region stays at or below the declared pixel
-(then rerun the device-UAT).
+## Retired slot ids
+
+`galaxy-deep-space`, `galaxy-nebula` and `standard-mesh` were cut in 38.5 (D-19), and
+their files were deleted. Their ids live on in `RETIRED_BACKGROUND_SLOT_IDS`
+(`src/theme/theme-option-ids.ts`): the settings DAO still **accepts** them on write and
+on restore (so an older backup restores cleanly), stored values are never rewritten,
+the resolver **renders the package default** for them, and the picker never offers
+them. The new quiet Galaxy slot reuses the display label "Deep Space" but not the id.
+
+Future replacements must update **Source / License / Author**, re-run
+`measure-background-extrema.py --check` and the art checker, and record the new
+declared extrema here (then rerun the device UAT).

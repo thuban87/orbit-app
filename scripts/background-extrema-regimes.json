@@ -1,25 +1,29 @@
 {
-  "_comment": "Tint regimes the surface.test.ts AA proofs composite over each bundled background variant (RG-029 / ui-accessibility/AUD-UIA-001 / D-12; 38.5 P-1/P-2). Read by scripts/measure-background-extrema.py, which validates every variant's declared darkestPixel/brightestPixel under every regime of the variant's own package AND mode. card = cardTintOpacity(pkg, mode, 'presentation'); chrome = chromeScrimOpacity(pkg, mode); veil = the BackgroundHost full-screen veil under bare text, BACKGROUND_VEIL_OPACITY[pkg][density] for every density (38.5-03: a new regime enters bound, proof and decoder together). surface.test.ts asserts this table equals exactly the (package, mode, treatment, density, tint, opacity) tuples its card, chrome and bare-text proofs use, so the script cannot drift from the TS proof. Tint = palette[SURFACE[package].tintTokenKey] (= palette.surface) for that package/mode.",
+  "_comment": "Tint regimes the surface.test.ts AA proofs composite over each bundled background variant (RG-029 / ui-accessibility/AUD-UIA-001 / D-12; 38.5 P-1/P-2). Read by scripts/measure-background-extrema.py, which validates every variant's declared darkestPixel/brightestPixel under every regime of the variant's own package AND mode. card = cardTintOpacity(pkg, mode, 'presentation'); chrome = chromeScrimOpacity(pkg, mode); veil = the BackgroundHost full-screen veil under bare text, BACKGROUND_VEIL_OPACITY[pkg][density] for every density (38.5-03: a new regime enters bound, proof and decoder together). profile = the Profile route's own BackgroundHost scrim (readability=\"profile\"): the palette's profileBackgroundScrim #RRGGBBAA, tint = its #RRGGBB and opacity = its alpha byte / 255 (38.5-05 P-8 / M-3). surface.test.ts asserts this table equals exactly the (package, mode, treatment, density, tint, opacity) tuples its card, chrome, bare-text and profile-scrim proofs use, so the script cannot drift from the TS proof. Tint = palette[SURFACE[package].tintTokenKey] (= palette.surface) for that package/mode.",
   "regimes": [
     { "package": "galaxy", "mode": "dark", "treatment": "card", "tint": "#141828", "opacity": 0.05 },
     { "package": "galaxy", "mode": "dark", "treatment": "chrome", "tint": "#141828", "opacity": 0.05 },
     { "package": "galaxy", "mode": "dark", "treatment": "veil", "density": "presentation", "tint": "#141828", "opacity": 0.02 },
     { "package": "galaxy", "mode": "dark", "treatment": "veil", "density": "comfortable", "tint": "#141828", "opacity": 0.1 },
     { "package": "galaxy", "mode": "dark", "treatment": "veil", "density": "dense", "tint": "#141828", "opacity": 0.22 },
+    { "package": "galaxy", "mode": "dark", "treatment": "profile", "tint": "#0B0E1A", "opacity": 0.7215686274509804 },
     { "package": "galaxy", "mode": "light", "treatment": "card", "tint": "#FBFCFE", "opacity": 0.88 },
     { "package": "galaxy", "mode": "light", "treatment": "chrome", "tint": "#FBFCFE", "opacity": 0.97 },
     { "package": "galaxy", "mode": "light", "treatment": "veil", "density": "presentation", "tint": "#FBFCFE", "opacity": 0.02 },
     { "package": "galaxy", "mode": "light", "treatment": "veil", "density": "comfortable", "tint": "#FBFCFE", "opacity": 0.1 },
     { "package": "galaxy", "mode": "light", "treatment": "veil", "density": "dense", "tint": "#FBFCFE", "opacity": 0.22 },
+    { "package": "galaxy", "mode": "light", "treatment": "profile", "tint": "#EDF0F9", "opacity": 0.7215686274509804 },
     { "package": "standard", "mode": "dark", "treatment": "card", "tint": "#191C22", "opacity": 0.97 },
     { "package": "standard", "mode": "dark", "treatment": "chrome", "tint": "#191C22", "opacity": 1.0 },
     { "package": "standard", "mode": "dark", "treatment": "veil", "density": "presentation", "tint": "#191C22", "opacity": 0.05 },
     { "package": "standard", "mode": "dark", "treatment": "veil", "density": "comfortable", "tint": "#191C22", "opacity": 0.14 },
     { "package": "standard", "mode": "dark", "treatment": "veil", "density": "dense", "tint": "#191C22", "opacity": 0.3 },
+    { "package": "standard", "mode": "dark", "treatment": "profile", "tint": "#101216", "opacity": 0.7686274509803922 },
     { "package": "standard", "mode": "light", "treatment": "card", "tint": "#FFFFFF", "opacity": 0.5 },
     { "package": "standard", "mode": "light", "treatment": "chrome", "tint": "#FFFFFF", "opacity": 0.5 },
     { "package": "standard", "mode": "light", "treatment": "veil", "density": "presentation", "tint": "#FFFFFF", "opacity": 0.05 },
     { "package": "standard", "mode": "light", "treatment": "veil", "density": "comfortable", "tint": "#FFFFFF", "opacity": 0.14 },
-    { "package": "standard", "mode": "light", "treatment": "veil", "density": "dense", "tint": "#FFFFFF", "opacity": 0.3 }
+    { "package": "standard", "mode": "light", "treatment": "veil", "density": "dense", "tint": "#FFFFFF", "opacity": 0.3 },
+    { "package": "standard", "mode": "light", "treatment": "profile", "tint": "#F2F3F6", "opacity": 0.7686274509803922 }
   ]
 }
