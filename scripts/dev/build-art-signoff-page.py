@@ -391,9 +391,12 @@ CSS = r"""
 :root{--bg:#f6f5f1;--panel:#ffffff;--ink:#1d1f24;--muted:#5d6270;--line:#dcdad3;--accent:#2f4fb5;
 --accent-ink:#ffffff;--sugg:#fff4d6;--sugg-line:#e0b94a;--ok:#1e7d5a;--warn:#9a5b14;--chip:#eef0f7;
 --watch:#b3261e;--mock:#6b3fa0;--sel:#e3e9ff}
-@media (prefers-color-scheme: dark){:root{--bg:#15171c;--panel:#1e2129;--ink:#e8eaf0;--muted:#a3a9b8;
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#15171c;--panel:#1e2129;--ink:#e8eaf0;--muted:#a3a9b8;
 --line:#343845;--accent:#8fa6ff;--accent-ink:#0b0e1a;--sugg:#3a3220;--sugg-line:#a88734;--ok:#57c79a;
 --warn:#e0a060;--chip:#2a2f3c;--watch:#ff8a80;--mock:#c9a2ff;--sel:#2c3656}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#15171c;--panel:#1e2129;--ink:#e8eaf0;--muted:#a3a9b8;
+--line:#343845;--accent:#8fa6ff;--accent-ink:#0b0e1a;--sugg:#3a3220;--sugg-line:#a88734;--ok:#57c79a;
+--warn:#e0a060;--chip:#2a2f3c;--watch:#ff8a80;--mock:#c9a2ff;--sel:#2c3656}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif}
 main{max-width:1180px;margin:0 auto;padding:20px 16px 80px}
@@ -404,7 +407,7 @@ h3{font-size:17px;margin:18px 0 6px}
 .code{display:inline-block;font:700 18px/1.2 ui-monospace,Menlo,monospace;background:var(--chip);border:1px solid var(--line);
 border-radius:6px;padding:2px 8px;margin-right:6px;letter-spacing:.3px}
 .code.big{font-size:22px}
-.status{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:8px 16px;font-size:14px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.status{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:8px 16px;font-size:14px;display:flex;gap:12px;flex-wrap:wrap;align-items:center}
 .status b{font-weight:600}
 button{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:7px;padding:6px 12px;cursor:pointer}
 button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
@@ -741,13 +744,13 @@ def page(data: dict) -> str:
            "Standard has <b>Dawn</b>, <b>Paper</b> and <b>Dusk</b>. Each has a Light and a Dark version, shown automatically "
            "in its mode. <b>None</b> is the plain background colour.</p>")
     missing = ("<div class=\"panel small\" style=\"border-color:var(--watch)\">Missing shots: " + html.escape(", ".join(data["missing"])) + "</div>") if data["missing"] else ""
-    return f"""<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Orbit — scrim re-sign-off v3 (new art)</title>
+    # Authored as a Claude artifact body: the publish step adds the doctype/head skeleton.
+    return f"""<title>Orbit Scrim Sign-off v3</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap">
-<style>{CSS}</style></head><body>
+<style>{CSS}</style>
 <div class="status"><b>Orbit scrim re-sign-off v3</b><span id="savestate">Connecting…</span>
 <button class="primary" id="acceptall" onclick="acceptAll()">Accept all of Claude's suggestions</button>
-<button onclick="download()">Download answers JSON</button><button onclick="copyJson()">Copy JSON</button></div>
+<button onclick="copyJson()">Copy JSON</button></div>
 <main>
 <h1>Backings over the new art — your re-sign-off</h1>
 <p>This is the same sheet as your 38.4 sign-off (v2), now on the new art you approved. Every choice starts at your 38.4 answer, and every screenshot shows that answer on a real debug build on the Pixel 3a at font size 1.15. Where you change something, your new answer wins (D-13).</p>
@@ -774,7 +777,6 @@ def page(data: dict) -> str:
 </main>
 <script type="application/json" id="data">{payload}</script>
 <script>{JS}</script>
-</body></html>
 """
 
 
