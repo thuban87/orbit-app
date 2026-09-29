@@ -15,7 +15,7 @@
  * treatment through default props. The Population/Filters/Sort overlay menus and
  * every Orrery control and menu are never table-driven (D-12, D-04); the Contacts
  * control-row triggers read only their ACTIVE-state backing from here (see
- * `activeTriggerBacking`), and their inactive fill is fixed.
+ * `activeTriggerBacking`; `full` by D-46), and their inactive fill is fixed.
  *
  * PRODUCTION DATA = THE OWNER'S SIGNED v3 ANSWERS (38.5-08; D-13 step 4, D-36):
  * `SIGNED_V3_BACKINGS` is transcribed from
@@ -77,8 +77,8 @@ export type ArtForeground = "mode" | "inverse";
 
 /**
  * The backing an ACTIVE Population/Filters/Sort trigger draws. Only `full` or
- * `none`: a control that opens an overlay menu keeps a scrim (D-04), and the
- * open question (38.5-01 gap H-3) is only whether its active state gets one too.
+ * `none`: a control that opens an overlay menu keeps a scrim (D-04). Whether
+ * its active state gets one too (38.5-01 gap H-3) was ruled `full` (D-46).
  */
 export const ART_TRIGGER_BACKINGS = ["full", "none"] as const;
 export type ArtTriggerBacking = (typeof ART_TRIGGER_BACKINGS)[number];
@@ -94,11 +94,11 @@ export interface ArtCell {
   overflowLocalBacking: boolean;
   /**
    * `contactsTopButtons` only (null for every other component): the backing of
-   * an ACTIVE Population/Filters/Sort trigger. Production is `none`, today's
-   * border-only look, although D-08 marks "Top btns" F in every combination.
-   * The v3 sheet showed that gap (38.5-01 H-3, item I1) for information only;
-   * it was not ruled, so it stays `none` and sits on the end-of-phase owner
-   * list (D-28, D-45). An inactive trigger's solid fill is fixed and never
+   * an ACTIVE Population/Filters/Sort trigger. Production is `full` in every
+   * combination: the owner's ruling on gap H-3 / item I1 (D-46, 2026-09-29),
+   * which the v3 sheet showed for information only. An active trigger keeps
+   * the regular solid fill and switches its border and text to the accent
+   * (`controlTriggerLook`). An inactive trigger's solid fill is fixed and never
    * table-driven (D-04, D-12).
    */
   activeTriggerBacking: ArtTriggerBacking | null;
@@ -190,7 +190,9 @@ export type ArtTreatmentTable = Record<string, Record<ArtComponent, ArtCell>>;
  * The components the table drives at runtime (D-28): the five the owner marked
  * on the v2 sheet. The v3 answers changed no cell outside them (38.5-SIGNOFF-V3
  * §2), so none joins. Every other component's signed column equals its
- * pre-38.5 behaviour (`currentArtCell`); the sync guard proves both.
+ * pre-38.5 behaviour (`currentArtCell`), with ONE owner-ruled exception: the
+ * top buttons' `activeTriggerBacking` is `full` (D-46), read only by the
+ * control row's active state. The sync guard proves all of it.
  */
 export const TABLE_DRIVEN_COMPONENTS = [
   "contactsListEntries",
@@ -264,6 +266,14 @@ const SIGNED_V3_FOREGROUND: ArtForeground = "mode";
  */
 const SIGNED_V3_OVERFLOW_LOCAL_BACKING = false;
 
+/**
+ * The owner's ruling on the active Population/Filters/Sort trigger (D-46,
+ * 2026-09-29; gap H-3 / item I1, recorded in 38.5-SIGNOFF-V3.md's addendum):
+ * "fill them when active too", keeping the regular fill and switching the
+ * border and text colours. Every combination.
+ */
+const SIGNED_ACTIVE_TRIGGER_BACKING: ArtTriggerBacking = "full";
+
 function buildSignedTable(): ArtTreatmentTable {
   const table: ArtTreatmentTable = {};
   for (const [key, backings] of Object.entries(SIGNED_V3_BACKINGS)) {
@@ -276,10 +286,11 @@ function buildSignedTable(): ArtTreatmentTable {
           component === "contactsHeader" &&
           backings[index] === "none" &&
           SIGNED_V3_OVERFLOW_LOCAL_BACKING,
-        // I1 (the active trigger's fill) was not ruled on v3: production stays
-        // border-only (D-28 gap list).
+        // I1, the active trigger's fill: ruled after v3 (D-46).
         activeTriggerBacking:
-          component === "contactsTopButtons" ? "none" : null,
+          component === "contactsTopButtons"
+            ? SIGNED_ACTIVE_TRIGGER_BACKING
+            : null,
       };
     });
     table[key] = row;
@@ -423,10 +434,11 @@ export function listRowBacking(
 
 /**
  * A Contacts Population/Filters/Sort trigger's backing (orchestrator addition to
- * 38.5-06; 38.5-01 gap H-3). An INACTIVE trigger is always `full` (its solid
- * `surface` fill; D-04: a button that opens an overlay menu keeps its scrim), so
- * it is never table-driven. An ACTIVE trigger takes the table's
- * `activeTriggerBacking`; with no treatment it keeps today's border-only look.
+ * 38.5-06; 38.5-01 gap H-3; D-46). An INACTIVE trigger is always `full` (its
+ * solid `surface` fill; D-04: a button that opens an overlay menu keeps its
+ * scrim), so it is never table-driven. An ACTIVE trigger takes the table's
+ * `activeTriggerBacking` (production: `full`, D-46); with no treatment it keeps
+ * the pre-38.5 border-only look.
  */
 export function controlTriggerBacking(
   active: boolean,

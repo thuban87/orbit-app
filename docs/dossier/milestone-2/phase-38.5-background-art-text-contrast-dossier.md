@@ -15,7 +15,7 @@ discuss session has run yet.
 -   **[DERIVED]** a consequence of a decision or of a measured fact.
 -   **[PLANNING NOTE]** a repository finding or engineering follow-up to verify at planning time.
 
-**Numbering.** D-08..D-16 (2026-09-27), D-17..D-29 (discuss, 2026-09-28), D-30..D-35 (art sign-off, 2026-09-28/29) and D-36, D-37, D-42..D-45 (re-sign-off v3, 2026-09-29; D-38..D-41 skipped) are this phase's own rulings; they match the CONTEXT shim. The carried 38.4
+**Numbering.** D-08..D-16 (2026-09-27), D-17..D-29 (discuss, 2026-09-28), D-30..D-35 (art sign-off, 2026-09-28/29) and D-36, D-37, D-42..D-45 (re-sign-off v3, 2026-09-29; D-38..D-41 skipped) and D-46 onward (code-review rulings, 2026-09-29) are this phase's own rulings; they match the CONTEXT shim. The carried 38.4
 rulings are D-38..D-41. Any other 38.4 decision is written "38.4 D-NN".
 
 ## Objective
@@ -366,8 +366,8 @@ recommendation. The owner then decides whether a gap plan picks it up.
 
 -   Scrims on red `danger` strings in Galaxy Dark, if E-1 is extended and strings still fail (D-25).
 -   Any proposed change to a component outside the v2-marked set (D-28).
--   The active Population/Filters/Sort buttons draw no fill today (H-3, I1). The v3 sheet showed this for information;
-    it was not ruled there (D-45).
+-   ~~The active Population/Filters/Sort buttons draw no fill today (H-3, I1).~~ Ruled on 2026-09-29 as D-46 (filled,
+    accent border and text).
 -   Report deferred items to the owner as soon as they are found (project practice); do not hold them silently until
     phase end.
 
@@ -541,6 +541,22 @@ in chat the same day, 2026-09-29. Where the chat differs from the page, the chat
         accepted as shown.
     -   **Not ruled here:** the active Population/Filters/Sort buttons have no fill today (H-3, I1). The sheet showed
         this for information only. It stays on the end-of-phase gap list (D-28).
+
+## Code-Review Rulings (2026-09-29)
+
+The owner ruled on the owner-decision items of the phase code review (`38.5-REVIEW.md`) on 2026-09-29. The IDs match
+the CONTEXT shim.
+
+-   **[DECIDED · 2026-09-29] D-46 --- The active Population/Filters/Sort triggers are filled (resolves H-3 / I1; review
+    IN-06).** Owner, verbatim: "fill them when active too actually, just invert the colors maybe? Or leave the regular
+    fill color and just switch the border/font colors. It needs to have some indication that that button has something
+    set within it, but I agree the invisible look doesn't work but don't think the regular full scrim look would work
+    either, we need some differentiation."
+    -   Implemented: the second option. An active trigger keeps the regular `surface` fill; its border switches to
+        `accent` and its label and summary to `accentText`. `activeTriggerBacking` is `full` in every combination.
+    -   [DERIVED] `accentText` on `surface` clears AA for every accent in all four package × mode pairs (COMPUTED).
+    -   The inverted alternative (`accent` fill, `onAccent` text) is noted in `trigger-look.ts`, one edit away.
+    -   The owner confirms the look on the device in 38.5-09. Record: `38.5-SIGNOFF-V3.md` §8.
 
 ## Primary Input: the 38.4 Background-Art Brief
 
@@ -815,3 +831,6 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
 -   2026-09-29 --- Code review WR-02: an addendum under D-31 records the declared Starfield text-bearing bounds
     (`#D3DDE0` light darkest, `#262452` dark brightest), why they differ from the checker's channel-wise bounds, and the
     owner's acknowledgement ("Accepted and noted"). Record: `38.5-ART-SIGNOFF.md` §5.
+-   2026-09-29 --- Code-review rulings: D-46 recorded in a new "Code-Review Rulings (2026-09-29)" section (the active
+    Population/Filters/Sort triggers are filled, with accent border and text; resolves H-3 / I1). The gap-list item is
+    struck. Record: `38.5-SIGNOFF-V3.md` §8.

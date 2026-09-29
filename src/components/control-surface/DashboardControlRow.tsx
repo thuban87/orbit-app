@@ -25,6 +25,7 @@ import { FilterPanelContent } from "./FilterPanelContent";
 import { selectedFilterLabels } from "./filter-summary";
 import { PopulationPanelContent } from "./PopulationPanelContent";
 import { SortPanelContent } from "./SortPanelContent";
+import { controlTriggerLook } from "./trigger-look";
 
 const PANEL_ID = "dashboard-population";
 const FILTER_PANEL_ID = "dashboard-filters";
@@ -32,16 +33,20 @@ const SORT_PANEL_ID = "dashboard-sort";
 
 export function DashboardControlRow() {
   const { colors } = useTheme();
-  // Orchestrator addition to 38.5-06 (38.5-01 gap H-3): an ACTIVE trigger reads
-  // its backing from the art treatment table (production: today's border-only
-  // look; D-08 marks "Top btns" F, so the re-sign-off decides). An inactive
-  // trigger keeps its fixed solid fill (D-04); the menus are never table-driven.
+  // 38.5-01 gap H-3, ruled by the owner as D-46: an ACTIVE trigger reads its
+  // backing from the art treatment table (production: the solid fill, like an
+  // inactive one) and shows its state through the accent border and text. An
+  // inactive trigger keeps its fixed solid fill (D-04); the menus are never
+  // table-driven. The colours live in ONE place, `controlTriggerLook`, which
+  // also records the owner's inverted alternative.
   const activeTriggerBacking =
     useArtTreatment("contactsTopButtons")?.activeTriggerBacking ?? null;
-  const triggerSurface = (isActive: boolean) =>
-    controlTriggerBacking(isActive, activeTriggerBacking) === "full"
-      ? { backgroundColor: colors.surface }
-      : null;
+  const triggerLook = (isActive: boolean) =>
+    controlTriggerLook(
+      isActive,
+      controlTriggerBacking(isActive, activeTriggerBacking) === "full",
+      colors,
+    );
   const populations = useDashboardQueryStore((state) => state.populations);
   const filters = useDashboardQueryStore((state) => state.filters);
   const sort = useDashboardQueryStore((state) => state.sort);
@@ -313,6 +318,9 @@ export function DashboardControlRow() {
   const sortSummary =
     sort === "default" ? AXIS_DEFAULT_LABELS.sort : sortModeLabel(sort);
   const sortActive = sort !== "default";
+  const populationLook = triggerLook(active);
+  const filtersLook = triggerLook(filtersActive);
+  const sortLook = triggerLook(sortActive);
 
   return (
     <View style={styles.wrapper}>
@@ -326,24 +334,18 @@ export function DashboardControlRow() {
           onPress={open}
           style={[
             styles.trigger,
-            { borderColor: active ? colors.accent : colors.border },
-            triggerSurface(active),
+            {
+              borderColor: populationLook.border,
+              backgroundColor: populationLook.fill ?? undefined,
+            },
           ]}
         >
-          <Text
-            style={[
-              styles.label,
-              { color: active ? colors.accentText : colors.textPrimary },
-            ]}
-          >
+          <Text style={[styles.label, { color: populationLook.label }]}>
             Population
           </Text>
           <Text
             numberOfLines={1}
-            style={[
-              styles.summary,
-              { color: active ? colors.accentText : colors.textSecondary },
-            ]}
+            style={[styles.summary, { color: populationLook.summary }]}
           >
             {summary}
           </Text>
@@ -360,26 +362,18 @@ export function DashboardControlRow() {
           onPress={openFilters}
           style={[
             styles.trigger,
-            { borderColor: filtersActive ? colors.accent : colors.border },
-            triggerSurface(filtersActive),
+            {
+              borderColor: filtersLook.border,
+              backgroundColor: filtersLook.fill ?? undefined,
+            },
           ]}
         >
-          <Text
-            style={[
-              styles.label,
-              { color: filtersActive ? colors.accentText : colors.textPrimary },
-            ]}
-          >
+          <Text style={[styles.label, { color: filtersLook.label }]}>
             {filterLabel}
           </Text>
           <Text
             numberOfLines={1}
-            style={[
-              styles.summary,
-              {
-                color: filtersActive ? colors.accentText : colors.textSecondary,
-              },
-            ]}
+            style={[styles.summary, { color: filtersLook.summary }]}
           >
             {filterSummary}
           </Text>
@@ -396,24 +390,18 @@ export function DashboardControlRow() {
           onPress={openSort}
           style={[
             styles.trigger,
-            { borderColor: sortActive ? colors.accent : colors.border },
-            triggerSurface(sortActive),
+            {
+              borderColor: sortLook.border,
+              backgroundColor: sortLook.fill ?? undefined,
+            },
           ]}
         >
-          <Text
-            style={[
-              styles.label,
-              { color: sortActive ? colors.accentText : colors.textPrimary },
-            ]}
-          >
+          <Text style={[styles.label, { color: sortLook.label }]}>
             {sortLabel}
           </Text>
           <Text
             numberOfLines={1}
-            style={[
-              styles.summary,
-              { color: sortActive ? colors.accentText : colors.textSecondary },
-            ]}
+            style={[styles.summary, { color: sortLook.summary }]}
           >
             {sortSummary}
           </Text>

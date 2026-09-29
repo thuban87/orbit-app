@@ -275,10 +275,10 @@ describe("v3 sync guard: the production table equals the signed answers (D-13, D
     }
   });
 
-  it("the active Population/Filters/Sort trigger keeps the production border-only look (I1 not ruled; gap list, D-28)", () => {
+  it("the active Population/Filters/Sort trigger is filled in every combination (I1 ruled after v3: D-46)", () => {
     for (const key of ART_COMBINATION_KEYS) {
       const row = ART_TREATMENTS[key];
-      expect(row.contactsTopButtons.activeTriggerBacking).toBe("none");
+      expect(row.contactsTopButtons.activeTriggerBacking).toBe("full");
       for (const component of ART_COMPONENTS) {
         if (component === "contactsTopButtons") continue;
         expect(row[component].activeTriggerBacking).toBeNull();
@@ -439,6 +439,22 @@ describe("v3 sync guard: the see-through levels equal the signed treatmentValues
   });
 });
 
+/**
+ * The pre-38.5 cell with the owner's one post-v3 ruling outside the table-driven
+ * set applied: the top buttons' active trigger is filled (D-46; it is read only
+ * by `DashboardControlRow`'s active state, never as a component backing).
+ */
+function expectedUnmarkedCell(
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+  component: ArtComponent,
+) {
+  const before = currentArtCell(pkg, mode, component);
+  return component === "contactsTopButtons"
+    ? { ...before, activeTriggerBacking: "full" as const }
+    : before;
+}
+
 describe("TABLE_DRIVEN_COMPONENTS — only the marked components move (D-28)", () => {
   /** Where each table-driven component opts in (the source-scan contract in art-treatment-scope-contract.test.ts). */
   const OPT_IN: Record<string, { file: string; pattern: RegExp }> = {
@@ -480,7 +496,7 @@ describe("TABLE_DRIVEN_COMPONENTS — only the marked components move (D-28)", (
     const changed = new Set<ArtComponent>();
     for (const { pkg, mode, key } of COMBOS) {
       for (const component of ART_COMPONENTS) {
-        const before = currentArtCell(pkg, mode, component);
+        const before = expectedUnmarkedCell(pkg, mode, component);
         const now = resolveArtCell(ART_TREATMENTS, pkg, mode, key, component);
         const opacityMoved =
           artOpacityGroup(component) !== null &&
@@ -515,7 +531,7 @@ describe("TABLE_DRIVEN_COMPONENTS — only the marked components move (D-28)", (
         expect(
           resolveArtCell(ART_TREATMENTS, pkg, mode, key, component),
           `${pkg}-${mode}-${key}.${component}`,
-        ).toEqual(currentArtCell(pkg, mode, component));
+        ).toEqual(expectedUnmarkedCell(pkg, mode, component));
       }
     }
   });
@@ -690,11 +706,25 @@ describe("controlTriggerBacking — Population/Filters/Sort (orchestrator additi
     expect(controlTriggerBacking(true, "full")).toBe("full");
   });
 
-  it("production: every combination's active trigger is today's border-only look", () => {
+  it("production: every combination's active trigger keeps the regular fill (D-46)", () => {
     for (const { pkg, mode, slot } of COMBOS) {
       const t = resolveArtTreatment(pkg, mode, slot, "contactsTopButtons");
-      expect(controlTriggerBacking(true, t.activeTriggerBacking)).toBe("none");
+      expect(controlTriggerBacking(true, t.activeTriggerBacking)).toBe("full");
       expect(controlTriggerBacking(false, t.activeTriggerBacking)).toBe("full");
+    }
+  });
+  it("D-46 is the only change to the top buttons: their cell differs from pre-38.5 in activeTriggerBacking alone", () => {
+    for (const { pkg, mode, key } of COMBOS) {
+      const before = currentArtCell(pkg, mode, "contactsTopButtons");
+      const now = resolveArtCell(
+        ART_TREATMENTS,
+        pkg,
+        mode,
+        key,
+        "contactsTopButtons",
+      );
+      expect(before.activeTriggerBacking).toBe("none");
+      expect(now).toEqual({ ...before, activeTriggerBacking: "full" });
     }
   });
 });
