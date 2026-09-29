@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   BACKGROUND_ORDER,
@@ -249,5 +250,145 @@ describe("resolveRenderableBackground — onError -> None/Solid pure reducer (23
         }
       }
     }
+  });
+});
+
+/**
+ * The owner-signed machine-readable block in 38.5-ART-SIGNOFF.md is the SINGLE
+ * source of truth for `featureAllowance` (D-20, D-31, M-4). Parse it the way
+ * `scripts/background_manifest.py` `parse_accepted_exclusions()` does: the one
+ * fenced ```json block under "## Accepted exclusions (machine-readable)".
+ */
+const ART_SIGNOFF =
+  ".planning/phases/38.5-background-art-text-contrast/38.5-ART-SIGNOFF.md";
+
+interface SignedAllowance {
+  slotId: string;
+  mode: ResolvedMode;
+  maxComponentPx: number;
+  maxFailingPct: number;
+  acceptedAt: string;
+}
+
+function readSignoffBlock(text: string): {
+  allowances: SignedAllowance[];
+  exclusions: unknown[];
+} {
+  const section = text.split("## Accepted exclusions (machine-readable)")[1];
+  if (section === undefined) {
+    throw new Error("ART-SIGNOFF has no machine-readable section");
+  }
+  const match = /```json\n([\s\S]*?)\n```/.exec(section);
+  if (match === null) {
+    throw new Error("ART-SIGNOFF machine-readable section has no json block");
+  }
+  return JSON.parse(match[1]);
+}
+
+/** The allowance map the manifest declares, keyed `slot/mode`. */
+function manifestAllowances(): Map<string, unknown> {
+  const out = new Map<string, unknown>();
+  for (const [id, slot] of Object.entries(BACKGROUND_SLOTS)) {
+    for (const mode of MODES) {
+      const a = slot.variants[mode].featureAllowance;
+      if (a !== undefined) {
+        out.set(`${id}/${mode}`, a);
+      }
+    }
+  }
+  return out;
+}
+
+/** The allowance map the signed block records, keyed `slot/mode`. */
+function signedAllowances(text: string): Map<string, unknown> {
+  const out = new Map<string, unknown>();
+  for (const a of readSignoffBlock(text).allowances) {
+    out.set(`${a.slotId}/${a.mode}`, {
+      maxComponentPx: a.maxComponentPx,
+      maxFailingPct: a.maxFailingPct,
+      acceptedAt: a.acceptedAt,
+    });
+  }
+  return out;
+}
+
+describe("the owner-approved lineup (38.5 D-17 / D-18 / D-19 / D-30 / D-33)", () => {
+  it("Galaxy defaults to the new quiet slot, Standard to Dawn", () => {
+    expect(PACKAGE_DEFAULT_SLOT.galaxy).toBe("galaxy-quiet");
+    expect(PACKAGE_DEFAULT_SLOT.standard).toBe("standard-dawn");
+  });
+
+  it("stored NULL on Galaxy renders galaxy-quiet's variant for the mode", () => {
+    for (const mode of MODES) {
+      const r = resolveBackground("galaxy", null, mode);
+      expect(r.kind).toBe("asset");
+      if (r.kind === "asset") {
+        expect(r.slotId).toBe("galaxy-quiet");
+        expect(r.source).toBe(
+          BACKGROUND_SLOTS["galaxy-quiet"].variants[mode].source,
+        );
+      }
+    }
+  });
+
+  it("every approved slot wires <slot>-light.webp and <slot>-dark.webp, a different file per mode", () => {
+    const approved = [
+      "galaxy-quiet",
+      "galaxy-aurora",
+      "galaxy-starfield",
+      "standard-dawn",
+      "standard-paper",
+      "standard-dusk",
+    ] as const;
+    for (const id of approved) {
+      const light = resolveBackground(slotOf(id)!.package, id, "light");
+      const dark = resolveBackground(slotOf(id)!.package, id, "dark");
+      expect(light.kind).toBe("asset");
+      expect(dark.kind).toBe("asset");
+      if (light.kind === "asset" && dark.kind === "asset") {
+        expect(light.source).not.toBe(dark.source);
+        // The thunk is never invoked in node; its text names the bundled file.
+        expect(String(light.source), id).toContain(`${id}-light.webp`);
+        expect(String(dark.source), id).toContain(`${id}-dark.webp`);
+      }
+    }
+  });
+
+  it("Galaxy's picker order is quiet (default), Aurora, Starfield, then the None tile", () => {
+    const galaxy = BACKGROUND_ORDER.galaxy.filter((id) =>
+      ["galaxy-quiet", "galaxy-aurora", "galaxy-starfield", "none"].includes(id),
+    );
+    expect(galaxy).toEqual([
+      "galaxy-quiet",
+      "galaxy-aurora",
+      "galaxy-starfield",
+      NONE_SLOT_ID,
+    ]);
+    expect(BACKGROUND_ORDER.galaxy[0]).toBe("galaxy-quiet");
+    const standard = BACKGROUND_ORDER.standard.filter((id) =>
+      ["standard-dawn", "standard-paper", "standard-dusk", "none"].includes(id),
+    );
+    expect(standard).toEqual([
+      "standard-dawn",
+      "standard-paper",
+      "standard-dusk",
+      NONE_SLOT_ID,
+    ]);
+  });
+});
+
+describe("featureAllowance ⇄ 38.5-ART-SIGNOFF.md machine-readable block (M-4)", () => {
+  it("every variant's featureAllowance equals its signed allowance exactly; no unsigned variant has one", () => {
+    const signed = signedAllowances(readFileSync(ART_SIGNOFF, "utf8"));
+    expect(signed.size).toBeGreaterThan(0);
+    expect(manifestAllowances()).toEqual(signed);
+  });
+
+  it("the sync guard detects an edited signed number (mutation fixture)", () => {
+    const text = readFileSync(ART_SIGNOFF, "utf8").replace(
+      '"maxComponentPx": 18',
+      '"maxComponentPx": 19',
+    );
+    expect(manifestAllowances()).not.toEqual(signedAllowances(text));
   });
 });
