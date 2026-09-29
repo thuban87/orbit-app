@@ -136,11 +136,11 @@ export function RestorePreviewScreen({
   // settings are older than this phone's skips them, so it shows nothing.
   const [unavailableBackground, setUnavailableBackground] = useState(false);
   useEffect(() => {
+    // Clear the previous mode's answer before the new read starts, so the
+    // notice never shows a stale decision while it runs (scoped re-check IN-1).
+    setUnavailableBackground(false);
     const cached = restorePreviewCache.read(route.params.token);
-    if (cached === null) {
-      setUnavailableBackground(false);
-      return;
-    }
+    if (cached === null) return;
     let current = true;
     backupNeedsBackgroundConsent(cached, mode, readLocalSettingsModifiedAt)
       .then((needed) => {

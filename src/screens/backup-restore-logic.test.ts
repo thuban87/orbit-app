@@ -708,3 +708,25 @@ describe("restore apply: the confirmed mode is the executed mode (WR-1)", () => 
     expect(source).toContain("await applyRun.begin(mode)");
   });
 });
+
+describe("restore preview notice (scoped re-check IN-1)", () => {
+  it("clears the previous mode's answer when a new read starts and still drops a late resolve", () => {
+    const source = readFileSync("src/screens/RestorePreviewScreen.tsx", "utf8");
+    const start = source.indexOf(
+      "useEffect(() => {\n    // Clear the previous",
+    );
+    expect(start).toBeGreaterThan(-1);
+    const effect = source.slice(
+      start,
+      source.indexOf("}, [mode, route.params.token]);", start),
+    );
+    const clear = effect.indexOf("setUnavailableBackground(false);");
+    const read = effect.indexOf("backupNeedsBackgroundConsent(");
+    expect(clear).toBeGreaterThan(-1);
+    expect(clear).toBeLessThan(read);
+    // The no-setState-after-unmount / out-of-order guard stays.
+    expect(effect).toContain("if (current) setUnavailableBackground(needed);");
+    expect(effect).toContain("if (current) setUnavailableBackground(false);");
+    expect(effect).toMatch(/return \(\) => \{\s*current = false;\s*\};/);
+  });
+});
