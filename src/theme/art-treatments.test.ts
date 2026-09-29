@@ -121,7 +121,12 @@ describe("combination keys", () => {
   });
 
   it("a retired, unknown or null stored id resolves to the default slot's row (edge)", () => {
-    for (const stored of [null, "galaxy-deep-space", "galaxy-nebula", "bogus"]) {
+    for (const stored of [
+      null,
+      "galaxy-deep-space",
+      "galaxy-nebula",
+      "bogus",
+    ]) {
       expect(
         artBackgroundKey(
           resolveBackground(
@@ -343,21 +348,26 @@ describe("resolveArtTreatment — the hook's pure core", () => {
 
 describe("artScrimBacking — ChromeScrim / ShellAppBar backing decision", () => {
   it("a null treatment (no opt-in) is exactly today's scoped scrim at the default opacity", () => {
-    expect(artScrimBacking(null, chromeScrimOpacity("standard", "dark"))).toEqual(
-      { opacity: chromeScrimOpacity("standard", "dark"), scoped: true },
-    );
+    expect(
+      artScrimBacking(null, chromeScrimOpacity("standard", "dark")),
+    ).toEqual({
+      opacity: chromeScrimOpacity("standard", "dark"),
+      scoped: true,
+    });
   });
 
   it("backing none draws no scrim and leaves the children unscoped (D-10)", () => {
-    expect(
-      artScrimBacking({ backing: "none", opacity: null }, 1),
-    ).toEqual({ opacity: null, scoped: false });
+    expect(artScrimBacking({ backing: "none", opacity: null }, 1)).toEqual({
+      opacity: null,
+      scoped: false,
+    });
   });
 
   it("full and see-through draw the treatment's opacity and keep the scope", () => {
     const opacity = chromeScrimOpacity("galaxy", "dark");
-    expect(
-      artScrimBacking({ backing: "seeThrough", opacity }, 1),
-    ).toEqual({ opacity, scoped: true });
+    expect(artScrimBacking({ backing: "seeThrough", opacity }, 1)).toEqual({
+      opacity,
+      scoped: true,
+    });
   });
 });

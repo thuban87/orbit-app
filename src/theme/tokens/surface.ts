@@ -31,6 +31,7 @@
  * one composite helper over `#RRGGBB` hexes, so the module stays node-testable.
  */
 
+import type { ArtBacking } from "../art-treatments";
 import type { ResolvedMode, ThemePackage, ThemePalette } from "../theme-types";
 
 /**
@@ -285,6 +286,83 @@ export function chromeScrimOpacity(
   mode: ResolvedMode,
 ): number {
   return cardTintOpacity(themePackage, mode, "dense");
+}
+
+/**
+ * ART TREATMENT OPACITY GROUPS (38.5-06 / D-08). The five v2-marked components
+ * take their backing from the per-combination table in `art-treatments.ts`; this
+ * is where their opacities live (the table module carries none):
+ *   - `listEntry`  the Contacts List row,
+ *   - `cardEntry`  the Contacts Card-view card,
+ *   - `artChrome`  the "N contacts" count label and the Contacts/Digest headers.
+ */
+export type ArtOpacityGroup = "listEntry" | "cardEntry" | "artChrome";
+
+/** The owner-unsigned group row: every see-through value null. */
+const UNSIGNED_ART_SEE_THROUGH: Record<ArtOpacityGroup, number | null> = {
+  // owner-unsigned (D-06); set from the signed re-sign-off in 38.5-08
+  listEntry: null,
+  // owner-unsigned (D-06); set from the signed re-sign-off in 38.5-08
+  cardEntry: null,
+  // owner-unsigned (D-06); set from the signed re-sign-off in 38.5-08
+  artChrome: null,
+};
+
+/**
+ * The see-through (`seeThrough`) opacity per package × resolved mode × group.
+ *
+ * Seeded ONLY with today's shipped see-through values, by reference (never
+ * re-typed): the mode-matched card glass (`CARD_GLASS_OPACITY`) and the
+ * mode-matched chrome scrim (`chromeScrimOpacity`) in Galaxy Dark and Standard
+ * Light. Every other cell is `null`: the owner has not signed a value for it
+ * (D-06, D-09), and `artBackingOpacity` never selects a null (it fails safe to
+ * the full value). List rows are solid everywhere today, so no List see-through
+ * value exists yet.
+ */
+export const ART_SEE_THROUGH_OPACITY: Record<
+  ThemePackage,
+  Record<ResolvedMode, Record<ArtOpacityGroup, number | null>>
+> = {
+  galaxy: {
+    dark: {
+      // owner-unsigned (D-06); set from the signed re-sign-off in 38.5-08
+      listEntry: null,
+      cardEntry: CARD_GLASS_OPACITY.galaxy,
+      artChrome: chromeScrimOpacity("galaxy", "dark"),
+    },
+    light: { ...UNSIGNED_ART_SEE_THROUGH },
+  },
+  standard: {
+    light: {
+      // owner-unsigned (D-06); set from the signed re-sign-off in 38.5-08
+      listEntry: null,
+      cardEntry: CARD_GLASS_OPACITY.standard,
+      artChrome: chromeScrimOpacity("standard", "light"),
+    },
+    dark: { ...UNSIGNED_ART_SEE_THROUGH },
+  },
+};
+
+/**
+ * The backing opacity for an art-treatment cell, or `null` for no backing.
+ *   - `full`       today's opaque value: a List row's solid fill (1); a card or
+ *                  chrome backing at the package's densest opaque band.
+ *   - `seeThrough` the signed see-through value, or the `full` value as a
+ *                  fail-safe when it is unsigned (null), so an unsigned cell can
+ *                  never render thinner than today.
+ *   - `none`       no backing at all (`null`).
+ */
+export function artBackingOpacity(
+  themePackage: ThemePackage,
+  mode: ResolvedMode,
+  group: ArtOpacityGroup,
+  backing: ArtBacking,
+): number | null {
+  const full =
+    group === "listEntry" ? 1 : SURFACE[themePackage].densityOpacity.dense;
+  if (backing === "none") return null;
+  if (backing === "full") return full;
+  return ART_SEE_THROUGH_OPACITY[themePackage][mode][group] ?? full;
 }
 
 /**

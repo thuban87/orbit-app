@@ -20,11 +20,21 @@
  * children render inside `GlassForegroundScope`, so chrome text reads the
  * proof-validated glass palette (Standard Light over an asset resolves
  * `textSecondary` to `textPrimary`).
+ *
+ * ART TREATMENT OPT-IN (38.5-06 / D-08, D-28): only the Contacts "N contacts"
+ * count label passes `artComponent`. Its backing then comes from the
+ * per-combination table (`useArtTreatment`): `none` draws no backing and renders
+ * its children WITHOUT the glass scope (D-10: text on the art takes the root,
+ * art-suited palette); otherwise the backing draws at the table's opacity with
+ * the children scoped as before. With no `artComponent` (every other use) the
+ * tree is exactly today's.
  */
 import type { ReactNode } from "react";
 import { type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import { GlassForegroundScope, useTheme } from "@/theme";
+import { artScrimBacking } from "@/theme/art-treatments";
 import { chromeScrimOpacity } from "@/theme/tokens/surface";
+import { useArtTreatment } from "@/theme/use-art-treatment";
 
 export interface ChromeScrimProps {
   children?: ReactNode;
@@ -32,22 +42,42 @@ export interface ChromeScrimProps {
   style?: StyleProp<ViewStyle>;
   /** Rounds the scrim backing to match a padded pill/panel. */
   radius?: number;
+  /**
+   * The v2-marked component this scrim backs (38.5-06). Only the Contacts count
+   * label opts in; omitted, the scrim is exactly today's.
+   */
+  artComponent?: "contactsCountLabel";
 }
 
-export function ChromeScrim({ children, style, radius }: ChromeScrimProps) {
+export function ChromeScrim({
+  children,
+  style,
+  radius,
+  artComponent,
+}: ChromeScrimProps) {
   const { colors, mode, package: themePackage } = useTheme();
-  const opacity = chromeScrimOpacity(themePackage, mode);
+  const treatment = useArtTreatment(artComponent);
+  const { opacity, scoped } = artScrimBacking(
+    treatment,
+    chromeScrimOpacity(themePackage, mode),
+  );
   return (
     <View style={style}>
-      <View
-        pointerEvents="none"
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: colors.surface, opacity },
-          radius !== undefined ? { borderRadius: radius } : null,
-        ]}
-      />
-      <GlassForegroundScope>{children}</GlassForegroundScope>
+      {opacity !== null ? (
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: colors.surface, opacity },
+            radius !== undefined ? { borderRadius: radius } : null,
+          ]}
+        />
+      ) : null}
+      {scoped ? (
+        <GlassForegroundScope>{children}</GlassForegroundScope>
+      ) : (
+        children
+      )}
     </View>
   );
 }

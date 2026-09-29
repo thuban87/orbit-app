@@ -1624,7 +1624,11 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
   const listHeader = (
     <View style={styles.header}>
       {headerCount !== null ? (
-        <ChromeScrim style={styles.countScrim} radius={RADII.sm}>
+        <ChromeScrim
+          style={styles.countScrim}
+          radius={RADII.sm}
+          artComponent="contactsCountLabel"
+        >
           <ScopedPalette>
             {(scoped) => (
               <Text
