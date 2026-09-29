@@ -1,7 +1,17 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { applyAccent, DEFAULT_ACCENT, resolveAccent } from "../accents";
-import { BACKGROUND_SLOTS, type BackgroundVariant } from "../backgrounds";
+import {
+  ART_COMBINATION_KEYS,
+  ART_TREATMENTS,
+  artOpacityGroup,
+  TABLE_DRIVEN_COMPONENTS,
+} from "../art-treatments";
+import {
+  BACKGROUND_SLOTS,
+  type BackgroundVariant,
+  NONE_SLOT_ID,
+} from "../backgrounds";
 import {
   AA_LARGE,
   AA_NORMAL,
@@ -17,7 +27,9 @@ import {
 import { resolvePalette } from "../theme-presets";
 import type { ResolvedMode, ThemePackage, ThemePalette } from "../theme-types";
 import {
+  ART_SEE_THROUGH_OPACITY,
   alphaComposite,
+  type ArtOpacityGroup,
   BACKGROUND_VEIL_OPACITY,
   backgroundVeilOpacity,
   CARD_GLASS_OPACITY,
@@ -37,6 +49,11 @@ import {
 
 const PACKAGES: ThemePackage[] = ["galaxy", "standard"];
 const MODES: ResolvedMode[] = ["dark", "light"];
+const ART_OPACITY_GROUPS: readonly ArtOpacityGroup[] = [
+  "listEntry",
+  "cardEntry",
+  "artChrome",
+];
 
 /**
  * Text foregrounds are gated at AA_NORMAL; status/glyph foregrounds at AA_LARGE
@@ -79,9 +96,9 @@ const ART_SIGNOFF =
 /**
  * Every treatment a proof exclusion can name (38.5-03). `card` and `chrome` are
  * the glass proofs above; `bare` is the bare-text-on-veil proof below. The
- * three art treatments (`listEntry`, `cardEntry`, `artChrome`) have no regime
- * until 38.5-08 (C3-M2); they are defined here so 38.5-05's generated entries
- * type-check.
+ * three art treatments (`listEntry`, `cardEntry`, `artChrome`) are the signed
+ * see-through backings of the table-driven components, proven in "Signed art
+ * treatments (38.5 v3)" and entered in the extrema regimes (38.5-08, C3-M2).
  */
 type ProofTreatment =
   | "card"
@@ -568,7 +585,18 @@ function profileScrimFailures(
   );
 }
 
-/** Shared body of the bare and profile-scrim proofs (one wash over the art). */
+/**
+ * What a wash proof checks and with which palette. Defaults: every bare
+ * foreground, the ROOT palette, exclusions matched as `bare`.
+ */
+interface WashProofOptions {
+  foregrounds?: readonly { token: keyof ThemePalette; floor: number }[];
+  /** The palette the text renders with, per accent (null = package default). */
+  paletteOf?: (accentId: AccentId | null) => ThemePalette;
+  treatment?: ProofTreatment;
+}
+
+/** Shared body of the bare, profile-scrim and signed-treatment proofs (one wash over the art). */
 function washTextFailures(
   pkg: ThemePackage,
   mode: ResolvedMode,
@@ -579,24 +607,31 @@ function washTextFailures(
     label: string;
   },
   scope: { slotId?: BackgroundSlotId },
+  options: WashProofOptions = {},
 ): string[] {
+  const foregrounds = options.foregrounds ?? BARE_FOREGROUNDS;
+  const treatment = options.treatment ?? "bare";
+  const paletteOf =
+    options.paletteOf ??
+    ((accentId: AccentId | null) =>
+      applyAccent(
+        resolvePalette(pkg, mode),
+        resolveAccent(accentId, pkg, mode),
+      ));
   const failures: string[] = [];
   const opacity = wash.opacity;
   for (const accentId of ACCENT_CHOICES) {
     const rendered = accentId ?? resolveDefaultAccentId(pkg);
-    const palette = applyAccent(
-      resolvePalette(pkg, mode),
-      resolveAccent(accentId, pkg, mode),
-    );
+    const palette = paletteOf(accentId);
     const tint = wash.tintOf(palette);
     const dark = alphaComposite(tint, bounds.darkestPixel, opacity);
     const bright = alphaComposite(tint, bounds.brightestPixel, opacity);
-    for (const { token, floor } of BARE_FOREGROUNDS) {
+    for (const { token, floor } of foregrounds) {
       // Non-accent tokens do not vary with the accent: check them once.
       if (token !== "accentText" && accentId !== null) continue;
       if (
         isExcluded(token, pkg, mode, {
-          treatment: "bare",
+          treatment,
           slotId: scope.slotId,
           accentId: rendered,
         })
@@ -1046,7 +1081,14 @@ describe("background-extrema regime table sync guard (RG-029 / D-12; 38.5 P-1/P-
   interface Regime {
     package: ThemePackage;
     mode: ResolvedMode;
-    treatment: "card" | "chrome" | "veil" | "profile";
+    treatment:
+      | "card"
+      | "chrome"
+      | "veil"
+      | "profile"
+      | "listEntry"
+      | "cardEntry"
+      | "artChrome";
     /** veil rows only: the BackgroundHost content density. */
     density?: SurfaceDensity;
     tint: string;
@@ -1099,6 +1141,14 @@ describe("background-extrema regime table sync guard (RG-029 / D-12; 38.5 P-1/P-
           tint: scrim.color,
           opacity: scrim.alpha,
         });
+        // The signed see-through backings of the table-driven components
+        // (38.5-08): palette.surface at each signed level, one row per group
+        // with a signed (non-null) value.
+        for (const group of ART_OPACITY_GROUPS) {
+          const opacity = ART_SEE_THROUGH_OPACITY[pkg][mode][group];
+          if (opacity === null) continue;
+          out.push({ package: pkg, mode, treatment: group, tint, opacity });
+        }
       }
     }
     return out;
@@ -1119,13 +1169,27 @@ describe("background-extrema regime table sync guard (RG-029 / D-12; 38.5 P-1/P-
     return `${r.package}/${r.mode}/${r.treatment}${r.density ? `/${r.density}` : ""} ${r.tint}@${r.opacity}`;
   }
 
-  it("the script's regime table equals the card + chrome + veil + profile proof tuples exactly", () => {
+  it("the script's regime table equals the card + chrome + veil + profile + signed art-treatment proof tuples exactly", () => {
     const table = JSON.parse(
       readFileSync("scripts/background-extrema-regimes.json", "utf8"),
     ) as { regimes: Regime[] };
     const ts = tsRegimes();
-    expect(ts.length).toBe(24);
+    // 24 base rows + one per signed see-through group (11 in the v3 answer).
+    const signedGroups = PACKAGES.flatMap((pkg) =>
+      MODES.flatMap((mode) =>
+        ART_OPACITY_GROUPS.filter(
+          (group) => ART_SEE_THROUGH_OPACITY[pkg][mode][group] !== null,
+        ),
+      ),
+    ).length;
+    expect(signedGroups).toBe(11);
+    expect(ts.length).toBe(24 + signedGroups);
     expect(ts.filter((r) => r.treatment === "profile").length).toBe(4);
+    expect(
+      ts.filter((r) =>
+        (ART_OPACITY_GROUPS as readonly string[]).includes(r.treatment),
+      ).length,
+    ).toBe(signedGroups);
     expect(table.regimes.length).toBe(ts.length);
     for (const want of ts) {
       expect(
@@ -1473,4 +1537,283 @@ describe("Profile scrim over the shipped art (P-8)", () => {
       expect(profileScrimFailures(pkg, mode, variant, { slotId })).toEqual([]);
     });
   }
+});
+
+/**
+ * SIGNED ART TREATMENTS (38.5-08; D-08..D-10, D-36, D-37, D-44; P-11).
+ *
+ * Every cell of the production table whose backing is `seeThrough` or `none`,
+ * for the five table-driven components, is proven over the shipped art of that
+ * combination: the variant of its slot in its own mode, or the solid background
+ * colour for None.
+ *   - `seeThrough`: the palette `surface` tint at the SIGNED level
+ *     (`ART_SEE_THROUGH_OPACITY`) composited on the declared extrema, with the
+ *     both-extrema + interval rule. The palette is the one the component renders
+ *     with: every see-through backing scopes its content in
+ *     `GlassForegroundScope`, so the effective glass palette (Standard Light over
+ *     an asset), else the root palette (the glass override is inactive over
+ *     None). Exclusions match the group's treatment name.
+ *   - `none`: the content is unscoped (root palette) and sits on the
+ *     BackgroundHost veil, so the bare (veil) model at every density, with
+ *     exclusions matched as `bare`.
+ * The foregrounds are the ones each component actually paints (read from the
+ * component sources, 38.5-08 Task 2). The signed v3 answer flags no inverse cell
+ * (D-44), so the proof requires every cell to be `mode`; an inverse cell would
+ * need the inverse palette in this proof first.
+ */
+type TableDrivenComponent = (typeof TABLE_DRIVEN_COMPONENTS)[number];
+
+/** Contact entries: `ListRow` / `GridCard` text, links and status glyphs. */
+const CONTACT_ENTRY_FOREGROUNDS: readonly {
+  token: keyof ThemePalette;
+  floor: number;
+}[] = [
+  // Name and the highlighted search snippet.
+  { token: "textPrimary", floor: AA_NORMAL },
+  // Recency / meta / search explanation / snippet / line three, and the
+  // default favourite and select icons.
+  { token: "textSecondary", floor: AA_NORMAL },
+  // The active favourite and select icons (link tone, every accent).
+  { token: "accentText", floor: AA_NORMAL },
+  // The status ring and the StatusGlyph.
+  ...STATUS_FGS.map((token) => ({ token, floor: AA_LARGE })),
+];
+
+/**
+ * The foregrounds each table-driven component paints on its backing. Not
+ * included, with the reason: the ListRow category chip and the Avatar (opaque
+ * fills of their own; the chip reads the root palette, C2-L4); the neutral
+ * `border` ring and glyph of a never-contacted or snoozed contact (decorative,
+ * the state is also a text label; not in any glass proof set). No table-driven
+ * component renders `danger`, so E-1 is not extended to the art treatments.
+ */
+const TABLE_DRIVEN_FOREGROUNDS: Record<
+  TableDrivenComponent,
+  readonly { token: keyof ThemePalette; floor: number }[]
+> = {
+  contactsListEntries: CONTACT_ENTRY_FOREGROUNDS,
+  contactsCardEntries: CONTACT_ENTRY_FOREGROUNDS,
+  // HomeScreen's "N contacts" label reads scoped.textSecondary.
+  contactsCountLabel: [{ token: "textSecondary", floor: AA_NORMAL }],
+  // ShellAppBar: the title (textPrimary) and the ⋯ glyph (OverflowMenu,
+  // textSecondary). The Contacts bar has no Back and no trailing content.
+  contactsHeader: [
+    { token: "textPrimary", floor: AA_NORMAL },
+    { token: "textSecondary", floor: AA_NORMAL },
+  ],
+  // ShellAppBar: the "Digest" title only.
+  digestHeader: [{ token: "textPrimary", floor: AA_NORMAL }],
+};
+
+/** The shipped background a combination renders: its own-mode variant, or the solid colour for None. */
+function combinationBackground(
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+  bgKey: string,
+): {
+  bounds: Pick<BackgroundVariant, "darkestPixel" | "brightestPixel">;
+  slotId?: BackgroundSlotId;
+} {
+  if (bgKey === NONE_SLOT_ID) {
+    const solid = resolvePalette(pkg, mode).background;
+    return { bounds: { darkestPixel: solid, brightestPixel: solid } };
+  }
+  const slotId = `${pkg}-${bgKey}` as BackgroundSlotId;
+  return { bounds: BACKGROUND_SLOTS[slotId].variants[mode], slotId };
+}
+
+/** The palette a scoped see-through backing renders with, per accent. */
+function scopedPaletteOf(
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+  backgroundIsAsset: boolean,
+) {
+  return (accentId: AccentId | null): ThemePalette => {
+    const palette = applyAccent(
+      resolvePalette(pkg, mode),
+      resolveAccent(accentId, pkg, mode),
+    );
+    return (
+      resolveGlassForegroundPalette({
+        palette,
+        package: pkg,
+        mode,
+        accentId,
+        backgroundIsAsset,
+      }) ?? palette
+    );
+  };
+}
+
+/**
+ * PURE: the failure labels of one table-driven cell over the given background
+ * bounds. `[]` = proven. Throws on an inverse cell (no inverse palette exists)
+ * and on a see-through cell with an unsigned level.
+ */
+function signedTreatmentFailures(
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+  component: TableDrivenComponent,
+  backing: "seeThrough" | "none",
+  background: {
+    bounds: Pick<BackgroundVariant, "darkestPixel" | "brightestPixel">;
+    slotId?: BackgroundSlotId;
+  },
+  opacity: number | null,
+): string[] {
+  const foregrounds = TABLE_DRIVEN_FOREGROUNDS[component];
+  const scope = { slotId: background.slotId };
+  if (backing === "none") {
+    return SURFACE_DENSITIES.flatMap((density) =>
+      washTextFailures(
+        pkg,
+        mode,
+        background.bounds,
+        {
+          tintOf: (palette) => palette.surface,
+          opacity: backgroundVeilOpacity(pkg, density),
+          label: `${component} none (bare @ ${density})`,
+        },
+        scope,
+        { foregrounds, treatment: "bare" },
+      ),
+    );
+  }
+  if (opacity === null) {
+    throw new Error(`${pkg}/${mode} ${component}: see-through level unsigned`);
+  }
+  const group = artOpacityGroup(component) as ArtOpacityGroup;
+  return washTextFailures(
+    pkg,
+    mode,
+    background.bounds,
+    {
+      tintOf: (palette) => palette[SURFACE[pkg].tintTokenKey],
+      opacity,
+      label: `${component} seeThrough @ ${opacity}`,
+    },
+    scope,
+    {
+      foregrounds,
+      treatment: group,
+      paletteOf: scopedPaletteOf(pkg, mode, background.slotId !== undefined),
+    },
+  );
+}
+
+/** Every combination × table-driven component whose signed backing is see-through or none. */
+const SIGNED_TREATMENT_CASES = ART_COMBINATION_KEYS.flatMap((key) => {
+  const [pkg, mode, ...rest] = key.split("-") as [
+    ThemePackage,
+    ResolvedMode,
+    ...string[],
+  ];
+  const bgKey = rest.join("-");
+  return TABLE_DRIVEN_COMPONENTS.flatMap((component) => {
+    const cell = ART_TREATMENTS[key][component];
+    if (cell.backing === "full") return [];
+    return [
+      {
+        key,
+        pkg,
+        mode,
+        bgKey,
+        component,
+        backing: cell.backing,
+        foreground: cell.foreground,
+      },
+    ];
+  });
+});
+
+describe("Signed art treatments (38.5 v3)", () => {
+  it("covers every see-through or none cell of the five table-driven components (67 in the v3 answer)", () => {
+    expect(SIGNED_TREATMENT_CASES.length).toBe(67);
+    expect(
+      SIGNED_TREATMENT_CASES.filter((c) => c.backing === "seeThrough").length,
+    ).toBe(40);
+    expect(
+      SIGNED_TREATMENT_CASES.filter((c) => c.backing === "none").length,
+    ).toBe(27);
+  });
+
+  it("the proven foregrounds cover every table-driven component", () => {
+    expect(Object.keys(TABLE_DRIVEN_FOREGROUNDS).sort()).toEqual(
+      [...TABLE_DRIVEN_COMPONENTS].sort(),
+    );
+  });
+
+  it("the harness is not trivially passing: a see-through entry over a mid-grey background fails (fixture)", () => {
+    const grey = { darkestPixel: "#777777", brightestPixel: "#777777" };
+    for (const [pkg, mode] of [
+      ["galaxy", "light"],
+      ["standard", "dark"],
+    ] as const) {
+      expect(
+        signedTreatmentFailures(
+          pkg,
+          mode,
+          "contactsListEntries",
+          "seeThrough",
+          { bounds: grey },
+          ART_SEE_THROUGH_OPACITY[pkg][mode].listEntry,
+        ).length,
+        `${pkg}/${mode}`,
+      ).toBeGreaterThan(0);
+      expect(
+        signedTreatmentFailures(
+          pkg,
+          mode,
+          "contactsHeader",
+          "none",
+          { bounds: grey },
+          null,
+        ).length,
+        `${pkg}/${mode} none`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("the harness uses the Standard Light glass palette over an asset and the root palette over None", () => {
+    const glass = scopedPaletteOf("standard", "light", true)(null);
+    const root = scopedPaletteOf("standard", "light", false)(null);
+    expect(glass.textSecondary).toBe(glass.textPrimary);
+    expect(root.textSecondary).toBe(
+      resolvePalette("standard", "light").textSecondary,
+    );
+  });
+
+  it("no signed exclusion or E-1 entry narrows an art-treatment proof", () => {
+    for (const e of PROOF_EXCLUSIONS) {
+      for (const group of ART_OPACITY_GROUPS) {
+        expect(e.treatment, e.inventoryRef).not.toContain(group);
+      }
+    }
+  });
+
+  it.each(
+    SIGNED_TREATMENT_CASES.map((c) => [
+      `${c.key} ${c.component} (${c.backing})`,
+      c,
+    ]),
+  )(
+    "%s: every foreground clears its floor over the shipped art",
+    (_label, c) => {
+      // D-44: no inverse cell; an inverse one needs the inverse palette here first.
+      expect(c.foreground).toBe("mode");
+      const group = artOpacityGroup(c.component) as ArtOpacityGroup;
+      expect(
+        signedTreatmentFailures(
+          c.pkg,
+          c.mode,
+          c.component,
+          c.backing as "seeThrough" | "none",
+          combinationBackground(c.pkg, c.mode, c.bgKey),
+          c.backing === "seeThrough"
+            ? ART_SEE_THROUGH_OPACITY[c.pkg][c.mode][group]
+            : null,
+        ),
+      ).toEqual([]);
+    },
+  );
 });
