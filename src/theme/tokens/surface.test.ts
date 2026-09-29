@@ -28,8 +28,8 @@ import { resolvePalette } from "../theme-presets";
 import type { ResolvedMode, ThemePackage, ThemePalette } from "../theme-types";
 import {
   ART_SEE_THROUGH_OPACITY,
-  alphaComposite,
   type ArtOpacityGroup,
+  alphaComposite,
   BACKGROUND_VEIL_OPACITY,
   backgroundVeilOpacity,
   CARD_GLASS_OPACITY,
@@ -1618,7 +1618,7 @@ function combinationBackground(
     const solid = resolvePalette(pkg, mode).background;
     return { bounds: { darkestPixel: solid, brightestPixel: solid } };
   }
-  const slotId = `${pkg}-${bgKey}` as BackgroundSlotId;
+  const slotId = `${pkg}-${bgKey}` as keyof typeof BACKGROUND_SLOTS;
   return { bounds: BACKGROUND_SLOTS[slotId].variants[mode], slotId };
 }
 

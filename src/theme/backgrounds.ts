@@ -125,7 +125,7 @@ export const BACKGROUND_SLOTS: Record<
         source: () =>
           require("../../assets/backgrounds/galaxy-quiet-light.webp"),
         brightestPixel: "#F8F6FF",
-        darkestPixel: "#E4DDF9",
+        darkestPixel: "#E3DDF9",
       },
       dark: {
         source: () =>

@@ -12,8 +12,10 @@
 # Pillow (RGB, full resolution) and, for EVERY tint regime of the variant's OWN
 # package AND OWN mode (`scripts/background-extrema-regimes.json`: card, chrome
 # and the BackgroundHost veil at every density, 38.5-03; the Profile route's
-# profileBackgroundScrim, 38.5-05; a light variant is never rendered in dark
-# mode, 38.5 P-2), composites every pixel exactly like
+# profileBackgroundScrim, 38.5-05; the signed see-through backings of the
+# table-driven components, listEntry / cardEntry / artChrome, 38.5-08; a light
+# variant is never rendered in dark mode, 38.5 P-2), composites every pixel
+# exactly like
 # `alphaComposite` in `src/theme/tokens/surface.ts` (sRGB-space blend, rounded
 # per channel) and finds the pixel with the minimum and maximum COMPOSITE WCAG
 # relative luminance.
@@ -33,7 +35,8 @@
 # extrema are then the TEXT-BEARING bound after the allowance (the checker's
 # `textBearingBound`), and `--check` instead: finds every decoded colour whose
 # composite falls outside the declared bounds' composites under ANY regime of
-# the variant (card, chrome, veil at every density, and any regime added later),
+# the variant (card, chrome, veil at every density, profile, the signed art
+# treatments listEntry / cardEntry / artChrome, and any regime added later),
 # locates those pixels, takes their UNION across regimes (a pixel out of bound
 # in several regimes counts once; disjoint pixels that each fit alone can fail
 # together), labels its 8-connected components, and passes only when every
@@ -76,7 +79,9 @@ REGIMES_JSON = os.path.join(REPO_ROOT, "scripts", "background-extrema-regimes.js
 WCAG_KNEE = 0.03928
 # ----------------------------------------------------------------------------
 
-TREATMENTS = ("card", "chrome", "veil", "profile")
+# listEntry / cardEntry / artChrome: the owner-signed see-through backings of the
+# table-driven components (38.5-08; ART_SEE_THROUGH_OPACITY in surface.ts).
+TREATMENTS = ("card", "chrome", "veil", "profile", "listEntry", "cardEntry", "artChrome")
 DENSITIES = ("presentation", "comfortable", "dense")
 
 # The variant parser lives in scripts/background_manifest.py (38.5-03), shared
@@ -464,12 +469,28 @@ def self_test():
           "tint": "#000000", "opacity": 0.1}, "a veil row with an unknown density"),
         ({"package": "galaxy", "mode": "dark", "treatment": "scrim", "tint": "#000000",
           "opacity": 0.1}, "an unknown treatment"),
+        ({"package": "standard", "mode": "dark", "treatment": "listEntry",
+          "density": "presentation", "tint": "#000000", "opacity": 0.05},
+         "an art-treatment row with a density"),
     ):
         try:
             validate_regimes([bad_row])
             expect(False, f"{label} is rejected")
         except ValueError:
             expect(True, f"{label} is rejected")
+
+    # Signed art-treatment regimes (38.5-08): accepted without a density, and a
+    # signed level of 0 composites to the raw pixel.
+    try:
+        validate_regimes([
+            {"package": p, "mode": "dark", "treatment": t, "tint": "#000000", "opacity": 0}
+            for p in ("galaxy", "standard") for t in ("listEntry", "cardEntry", "artChrome")
+        ])
+        expect(True, "listEntry / cardEntry / artChrome rows are accepted")
+    except ValueError as err:
+        expect(False, f"listEntry / cardEntry / artChrome rows are accepted ({err})")
+    expect(composite((255, 255, 255), (12, 34, 56), 0) == (12, 34, 56),
+           "a signed see-through level of 0 composites to the raw pixel")
 
     # ---- D-20 allowance fixture: one isolated 2-px feature ------------------
     def image(w, h, base, paint=()):
