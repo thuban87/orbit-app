@@ -14,8 +14,10 @@ import {
   ART_COMPONENTS,
   ART_TREATMENTS,
   type ArtComponent,
+  applyArtDevOverrides,
   artBackgroundKey,
   artCombinationKey,
+  artDevCombo,
   artOpacityGroup,
   artScrimBacking,
   controlTriggerBacking,
@@ -439,6 +441,262 @@ describe("controlTriggerBacking — Population/Filters/Sort (orchestrator additi
       const t = resolveArtTreatment(pkg, mode, slot, "contactsTopButtons");
       expect(controlTriggerBacking(true, t.activeTriggerBacking)).toBe("none");
       expect(controlTriggerBacking(false, t.activeTriggerBacking)).toBe("full");
+    }
+  });
+});
+
+describe("DEV-only override path (38.5-06 Task 3; T-38.5-06-01)", () => {
+  const cell = currentArtCell("galaxy", "dark", "contactsHeader");
+  const opacity = chromeScrimOpacity("galaxy", "dark");
+  const comboKey = "galaxy-dark-aurora";
+
+  it("the committed override file parses and is disabled", () => {
+    const committed = JSON.parse(
+      readFileSync(
+        join(__dirname, "__dev__", "art-treatment-dev-overrides.json"),
+        "utf8",
+      ),
+    ) as { enabled?: unknown };
+    expect(committed.enabled).toBe(false);
+  });
+
+  it.each([
+    ["null", null],
+    ["undefined", undefined],
+    [
+      "disabled",
+      {
+        enabled: false,
+        cells: { [comboKey]: { contactsHeader: { backing: "none" } } },
+      },
+    ],
+    ["not an object", "enabled"],
+  ])(
+    "returns the input unchanged when overrides are %s",
+    (_label, overrides) => {
+      expect(
+        applyArtDevOverrides(
+          cell,
+          opacity,
+          overrides,
+          comboKey,
+          "contactsHeader",
+          "artChrome",
+        ),
+      ).toEqual({ cell, opacity });
+    },
+  );
+
+  it("a cell override replaces backing and overflowLocalBacking, and the opacity follows the backing", () => {
+    const out = applyArtDevOverrides(
+      cell,
+      opacity,
+      {
+        enabled: true,
+        cells: {
+          [comboKey]: {
+            contactsHeader: { backing: "none", overflowLocalBacking: true },
+          },
+        },
+      },
+      comboKey,
+      "contactsHeader",
+      "artChrome",
+    );
+    expect(out.cell).toEqual({
+      ...cell,
+      backing: "none",
+      overflowLocalBacking: true,
+    });
+    expect(out.opacity).toBeNull();
+  });
+
+  it("a cell override for another combination or component is ignored", () => {
+    const overrides = {
+      enabled: true,
+      cells: {
+        "galaxy-dark-quiet": { contactsHeader: { backing: "none" } },
+        [comboKey]: { digestHeader: { backing: "none" } },
+      },
+    };
+    expect(
+      applyArtDevOverrides(
+        cell,
+        opacity,
+        overrides,
+        comboKey,
+        "contactsHeader",
+        "artChrome",
+      ),
+    ).toEqual({ cell, opacity });
+  });
+
+  it("an opacity override for the <pkg>-<mode> group replaces the see-through opacity (a candidate or card-blend value)", () => {
+    const candidate = CARD_GLASS_OPACITY.galaxy / 2;
+    const cardCell = currentArtCell("galaxy", "light", "contactsCardEntries");
+    const out = applyArtDevOverrides(
+      cardCell,
+      cardTintOpacity("galaxy", "light", "dense"),
+      {
+        enabled: true,
+        cells: {
+          "galaxy-light-quiet": {
+            contactsCardEntries: { backing: "seeThrough" },
+          },
+        },
+        opacity: { "galaxy-light": { cardEntry: candidate } },
+      },
+      "galaxy-light-quiet",
+      "contactsCardEntries",
+      "cardEntry",
+    );
+    expect(out.cell.backing).toBe("seeThrough");
+    expect(out.opacity).toBe(candidate);
+  });
+
+  it("an opacity override never applies to a full or none backing", () => {
+    const overrides = {
+      enabled: true,
+      opacity: { "galaxy-light": { artChrome: 0 } },
+    };
+    const full = currentArtCell("galaxy", "light", "contactsHeader");
+    expect(
+      applyArtDevOverrides(
+        full,
+        chromeScrimOpacity("galaxy", "light"),
+        overrides,
+        "galaxy-light-quiet",
+        "contactsHeader",
+        "artChrome",
+      ).opacity,
+    ).toBe(chromeScrimOpacity("galaxy", "light"));
+  });
+
+  it("an unsigned see-through without a candidate fails safe to the full value", () => {
+    const out = applyArtDevOverrides(
+      currentArtCell("standard", "dark", "contactsListEntries"),
+      1,
+      {
+        enabled: true,
+        cells: {
+          "standard-dark-dusk": {
+            contactsListEntries: { backing: "seeThrough" },
+          },
+        },
+      },
+      "standard-dark-dusk",
+      "contactsListEntries",
+      "listEntry",
+    );
+    expect(out.cell.backing).toBe("seeThrough");
+    expect(out.opacity).toBe(1);
+  });
+
+  it("invalid override values are ignored (backing, flags, out-of-range opacity)", () => {
+    const out = applyArtDevOverrides(
+      cell,
+      opacity,
+      {
+        enabled: true,
+        cells: {
+          [comboKey]: {
+            contactsHeader: {
+              backing: "transparent",
+              overflowLocalBacking: "yes",
+            },
+          },
+        },
+        opacity: { "galaxy-dark": { artChrome: 2 } },
+      },
+      comboKey,
+      "contactsHeader",
+      "artChrome",
+    );
+    expect(out).toEqual({ cell, opacity });
+  });
+
+  it("the active-trigger backing of the top buttons can be overridden (H-3 capture)", () => {
+    const top = currentArtCell("standard", "light", "contactsTopButtons");
+    const out = applyArtDevOverrides(
+      top,
+      1,
+      {
+        enabled: true,
+        cells: {
+          "standard-light-dawn": {
+            contactsTopButtons: { activeTriggerBacking: "full" },
+          },
+        },
+      },
+      "standard-light-dawn",
+      "contactsTopButtons",
+      null,
+    );
+    expect(out.cell.activeTriggerBacking).toBe("full");
+    expect(out.opacity).toBe(1);
+  });
+
+  it("resolveArtTreatment passes its result through the overrides", () => {
+    const t = resolveArtTreatment(
+      "galaxy",
+      "dark",
+      "galaxy-aurora",
+      "contactsHeader",
+      {
+        enabled: true,
+        cells: { [comboKey]: { contactsHeader: { backing: "none" } } },
+      },
+    );
+    expect(t.backing).toBe("none");
+    expect(t.opacity).toBeNull();
+  });
+
+  it("artDevCombo validates the in-memory combination (slot id or short key)", () => {
+    expect(artDevCombo(null)).toBeNull();
+    expect(
+      artDevCombo({
+        enabled: false,
+        combo: { package: "galaxy", mode: "dark", background: "aurora" },
+      }),
+    ).toBeNull();
+    expect(
+      artDevCombo({
+        enabled: true,
+        combo: { package: "galaxy", mode: "light", background: "aurora" },
+      }),
+    ).toEqual({
+      package: "galaxy",
+      mode: "light",
+      background: "galaxy-aurora",
+    });
+    expect(
+      artDevCombo({
+        enabled: true,
+        combo: {
+          package: "standard",
+          mode: "dark",
+          background: "standard-paper",
+        },
+      }),
+    ).toEqual({
+      package: "standard",
+      mode: "dark",
+      background: "standard-paper",
+    });
+    expect(
+      artDevCombo({
+        enabled: true,
+        combo: { package: "standard", mode: "dark", background: "none" },
+      }),
+    ).toEqual({ package: "standard", mode: "dark", background: "none" });
+    // Another package's slot, a retired slot, a bad mode: rejected.
+    for (const combo of [
+      { package: "standard", mode: "dark", background: "galaxy-aurora" },
+      { package: "galaxy", mode: "dark", background: "galaxy-nebula" },
+      { package: "galaxy", mode: "system", background: "aurora" },
+      { package: "orbit", mode: "dark", background: "aurora" },
+    ]) {
+      expect(artDevCombo({ enabled: true, combo })).toBeNull();
     }
   });
 });
