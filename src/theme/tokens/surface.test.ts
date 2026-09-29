@@ -130,7 +130,7 @@ interface ProofExclusion {
   inventoryPath?: string;
 }
 
-const PROOF_EXCLUSIONS: readonly ProofExclusion[] = [
+const BASE_PROOF_EXCLUSIONS: readonly ProofExclusion[] = [
   {
     token: "danger",
     package: "galaxy",
@@ -154,6 +154,102 @@ const PROOF_EXCLUSIONS: readonly ProofExclusion[] = [
     inventoryRef: "E-1-bare",
     inventoryPath: BARE_TEXT_INVENTORY,
   },
+];
+
+/**
+ * One owner-approved broad-feature exclusion record from the machine-readable
+ * block in 38.5-ART-SIGNOFF.md (38.5-03's "Exclusion-record schema"; H-2). The
+ * checker enforces `region` / `feature`; the TS proofs work over extrema, so a
+ * record excludes its tokens for that variant and treatments whole (C3-M1).
+ */
+interface SignedExclusionRecord {
+  id: string;
+  slotId: string;
+  mode: ResolvedMode;
+  tokens: readonly string[];
+  treatments: readonly ProofTreatment[];
+  region?: unknown;
+  feature?: unknown;
+  reason: string;
+  ownerApproved: string;
+}
+
+/** The owner-signed block: `featureAllowance` source and exclusion records. */
+interface ArtSignoffBlock {
+  allowances: readonly {
+    slotId: string;
+    mode: ResolvedMode;
+    maxComponentPx: number;
+    maxFailingPct: number;
+    acceptedAt: string;
+  }[];
+  exclusions: readonly SignedExclusionRecord[];
+}
+
+/**
+ * PURE: parse the one fenced ```json block under "## Accepted exclusions
+ * (machine-readable)" — the same block `scripts/background_manifest.py`
+ * `parse_accepted_exclusions()` reads. Never hand-typed (H-2).
+ */
+function parseArtSignoffBlock(text: string): ArtSignoffBlock {
+  const section = text.split("## Accepted exclusions (machine-readable)")[1];
+  if (section === undefined) {
+    throw new Error("ART-SIGNOFF has no machine-readable section");
+  }
+  const match = /```json\n([\s\S]*?)\n```/.exec(section);
+  if (match === null) {
+    throw new Error("ART-SIGNOFF machine-readable section has no json block");
+  }
+  return JSON.parse(match[1]) as ArtSignoffBlock;
+}
+
+/**
+ * PURE (C2-M2): the deterministic expansion of the signed exclusion records into
+ * variant-scoped proof exclusions — one `ProofExclusion` per element of a
+ * record's `tokens`, in record order then token order:
+ *   - `accentText` -> token accentText, every accent (accentId omitted);
+ *   - `accentText:<id>` -> token accentText, that accentId;
+ *   - any other element -> that palette key;
+ *   - `slotId`/`mode` from the record, `package` omitted (the slot scopes it);
+ *   - `treatment` = the record's `treatments`, unchanged;
+ *   - `status: "accepted"`, `inventoryRef` = the record id (its bold `**X-n**`
+ *     row is in 38.5-ART-SIGNOFF.md), `inventoryPath` = ART_SIGNOFF;
+ *   - justification `${reason} [${id}: ${slotId} ${mode}, owner-approved ${ownerApproved}]`,
+ *     over 40 characters because the bracketed suffix alone is.
+ */
+function expandSignedExclusions(
+  records: readonly SignedExclusionRecord[],
+): ProofExclusion[] {
+  const out: ProofExclusion[] = [];
+  for (const record of records) {
+    for (const element of record.tokens) {
+      const [key, accent] = element.split(":");
+      out.push({
+        token: key as keyof ThemePalette,
+        mode: record.mode,
+        ...(key === "accentText" && accent !== undefined
+          ? { accentId: accent as AccentId }
+          : {}),
+        treatment: record.treatments,
+        slotId: record.slotId as BackgroundSlotId,
+        status: "accepted",
+        justification: `${record.reason} [${record.id}: ${record.slotId} ${record.mode}, owner-approved ${record.ownerApproved}]`,
+        inventoryRef: record.id,
+        inventoryPath: ART_SIGNOFF,
+      });
+    }
+  }
+  return out;
+}
+
+const ART_SIGNOFF_BLOCK = parseArtSignoffBlock(
+  readFileSync(ART_SIGNOFF, "utf8"),
+);
+
+/** The written-down exclusions plus the owner-signed variant-scoped ones. */
+const PROOF_EXCLUSIONS: readonly ProofExclusion[] = [
+  ...BASE_PROOF_EXCLUSIONS,
+  ...expandSignedExclusions(ART_SIGNOFF_BLOCK.exclusions),
 ];
 
 /** The call-site scope an exclusion is matched against. */
@@ -424,15 +520,75 @@ function bareTextFailures(
   density: SurfaceDensity,
   scope: { slotId?: BackgroundSlotId },
 ): string[] {
+  return washTextFailures(
+    pkg,
+    mode,
+    bounds,
+    {
+      tintOf: (palette) => palette.surface,
+      opacity: backgroundVeilOpacity(pkg, density),
+      label: `bare @ ${density}`,
+    },
+    scope,
+  );
+}
+
+/**
+ * Split a `#RRGGBBAA` palette token into its `#RRGGBB` colour and its alpha
+ * (AA / 255). `profileBackgroundScrim` carries its alpha in the token, and
+ * `BackgroundHost` paints it with no extra `opacity` (readability="profile").
+ */
+function splitAlphaHex(token: string): { color: string; alpha: number } {
+  const match = /^#([0-9A-Fa-f]{6})([0-9A-Fa-f]{2})$/.exec(token);
+  if (match === null) {
+    throw new Error(`expected #RRGGBBAA, got ${token}`);
+  }
+  return { color: `#${match[1]}`, alpha: Number.parseInt(match[2], 16) / 255 };
+}
+
+/**
+ * PURE P-8 proof: the root palette's bare foregrounds over the Profile route's
+ * own `profileBackgroundScrim` (colour at its alpha) composited on a
+ * background's declared extrema. Profile text is bare text on the art under a
+ * heavier wash, so exclusions match with `treatment: "bare"`.
+ */
+function profileScrimFailures(
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+  bounds: Pick<BackgroundVariant, "darkestPixel" | "brightestPixel">,
+  scope: { slotId?: BackgroundSlotId },
+): string[] {
+  const scrim = splitAlphaHex(resolvePalette(pkg, mode).profileBackgroundScrim);
+  return washTextFailures(
+    pkg,
+    mode,
+    bounds,
+    { tintOf: () => scrim.color, opacity: scrim.alpha, label: "profile scrim" },
+    scope,
+  );
+}
+
+/** Shared body of the bare and profile-scrim proofs (one wash over the art). */
+function washTextFailures(
+  pkg: ThemePackage,
+  mode: ResolvedMode,
+  bounds: Pick<BackgroundVariant, "darkestPixel" | "brightestPixel">,
+  wash: {
+    tintOf: (palette: ThemePalette) => string;
+    opacity: number;
+    label: string;
+  },
+  scope: { slotId?: BackgroundSlotId },
+): string[] {
   const failures: string[] = [];
-  const opacity = backgroundVeilOpacity(pkg, density);
+  const opacity = wash.opacity;
   for (const accentId of ACCENT_CHOICES) {
     const rendered = accentId ?? resolveDefaultAccentId(pkg);
     const palette = applyAccent(
       resolvePalette(pkg, mode),
       resolveAccent(accentId, pkg, mode),
     );
-    const tint = palette.surface;
+    const tint = wash.tintOf(palette);
     const dark = alphaComposite(tint, bounds.darkestPixel, opacity);
     const bright = alphaComposite(tint, bounds.brightestPixel, opacity);
     for (const { token, floor } of BARE_FOREGROUNDS) {
@@ -451,7 +607,7 @@ function bareTextFailures(
       if (!clearsExtrema(fg, dark, bright, floor)) {
         const e = evaluateOverExtrema(fg, dark, bright);
         failures.push(
-          `${pkg}/${mode} bare @ ${density}${scope.slotId ? ` ${scope.slotId}` : ""}: ${token}${
+          `${pkg}/${mode} ${wash.label}${scope.slotId ? ` ${scope.slotId}` : ""}: ${token}${
             token === "accentText" ? ` (${accentId ?? "default"})` : ""
           } ${e.ratioDark.toFixed(2)}/${e.ratioBright.toFixed(2)}:1${
             e.outside ? "" : " inside the composite interval"
@@ -890,7 +1046,7 @@ describe("background-extrema regime table sync guard (RG-029 / D-12; 38.5 P-1/P-
   interface Regime {
     package: ThemePackage;
     mode: ResolvedMode;
-    treatment: "card" | "chrome" | "veil";
+    treatment: "card" | "chrome" | "veil" | "profile";
     /** veil rows only: the BackgroundHost content density. */
     density?: SurfaceDensity;
     tint: string;
@@ -931,6 +1087,18 @@ describe("background-extrema regime table sync guard (RG-029 / D-12; 38.5 P-1/P-
             opacity: backgroundVeilOpacity(pkg, density),
           });
         }
+        // The Profile route's own scrim over the art (38.5 P-8 / M-3): the
+        // `profileBackgroundScrim` colour at its alpha byte / 255.
+        const scrim = splitAlphaHex(
+          resolvePalette(pkg, mode).profileBackgroundScrim,
+        );
+        out.push({
+          package: pkg,
+          mode,
+          treatment: "profile",
+          tint: scrim.color,
+          opacity: scrim.alpha,
+        });
       }
     }
     return out;
@@ -951,12 +1119,13 @@ describe("background-extrema regime table sync guard (RG-029 / D-12; 38.5 P-1/P-
     return `${r.package}/${r.mode}/${r.treatment}${r.density ? `/${r.density}` : ""} ${r.tint}@${r.opacity}`;
   }
 
-  it("the script's regime table equals the card + chrome + veil proof tuples exactly", () => {
+  it("the script's regime table equals the card + chrome + veil + profile proof tuples exactly", () => {
     const table = JSON.parse(
       readFileSync("scripts/background-extrema-regimes.json", "utf8"),
     ) as { regimes: Regime[] };
     const ts = tsRegimes();
-    expect(ts.length).toBe(20);
+    expect(ts.length).toBe(24);
+    expect(ts.filter((r) => r.treatment === "profile").length).toBe(4);
     expect(table.regimes.length).toBe(ts.length);
     for (const want of ts) {
       expect(
@@ -1087,7 +1256,9 @@ describe("exclusions are scoped by treatment and variant (38.5-03; D-24, C3-L2)"
     }
     // No entry leaks bare scope to any other token.
     for (const e of PROOF_EXCLUSIONS) {
-      if (e.treatment.includes("bare")) expect(e.inventoryRef).toBe("E-1-bare");
+      if (e.treatment.includes("bare") && e.slotId === undefined) {
+        expect(e.inventoryRef).toBe("E-1-bare");
+      }
     }
   });
 
@@ -1181,6 +1352,125 @@ describe("bare-text proof harness (38.5-03; brief H5, P-1)", () => {
           `${pkg}/${mode} none @ ${density}`,
         ).toEqual([]);
       }
+    });
+  }
+});
+
+describe("PROOF_EXCLUSIONS ⇄ 38.5-ART-SIGNOFF.md exclusion block (H-2 / C2-M2)", () => {
+  it("the variant-scoped entries equal expand(block.exclusions) exactly (count, fields, order)", () => {
+    const scoped = PROOF_EXCLUSIONS.filter((e) => e.slotId !== undefined);
+    expect(scoped).toEqual(
+      expandSignedExclusions(ART_SIGNOFF_BLOCK.exclusions),
+    );
+    // The 38.5-04 sign-off recorded no exclusion, so today there are none.
+    expect(ART_SIGNOFF_BLOCK.exclusions.length).toBe(0);
+    expect(scoped.length).toBe(0);
+  });
+
+  it("expansion is one entry per token element, mapped deterministically (fixture)", () => {
+    const records: SignedExclusionRecord[] = [
+      {
+        id: "X-1",
+        slotId: "galaxy-aurora",
+        mode: "dark",
+        tokens: ["textSecondary", "accentText", "accentText:coral"],
+        treatments: ["bare"],
+        region: { x: 0, y: 0, w: 10, h: 10 },
+        reason: "ribbon",
+        ownerApproved: "2026-09-28",
+      },
+      {
+        id: "X-2",
+        slotId: "standard-paper",
+        mode: "light",
+        tokens: ["statusDecay"],
+        treatments: ["card", "chrome"],
+        feature: "fibre",
+        reason: "paper fibre",
+        ownerApproved: "2026-09-29",
+      },
+    ];
+    const out = expandSignedExclusions(records);
+    expect(out.length).toBe(4);
+    expect(out[0]).toEqual({
+      token: "textSecondary",
+      mode: "dark",
+      treatment: ["bare"],
+      slotId: "galaxy-aurora",
+      status: "accepted",
+      justification:
+        "ribbon [X-1: galaxy-aurora dark, owner-approved 2026-09-28]",
+      inventoryRef: "X-1",
+      inventoryPath: ART_SIGNOFF,
+    });
+    expect(out[1].token).toBe("accentText");
+    expect(out[1].accentId).toBeUndefined();
+    expect(out[2]).toEqual(
+      expect.objectContaining({ token: "accentText", accentId: "coral" }),
+    );
+    expect(out[3]).toEqual(
+      expect.objectContaining({
+        token: "statusDecay",
+        mode: "light",
+        slotId: "standard-paper",
+        treatment: ["card", "chrome"],
+        inventoryRef: "X-2",
+      }),
+    );
+    for (const e of out) {
+      expect(e.package).toBeUndefined();
+      expect(e.justification.length).toBeGreaterThan(40);
+    }
+  });
+});
+
+/** Every shipped variant, each in its own mode (38.5 P-2). */
+const SHIPPED_VARIANTS = Object.entries(BACKGROUND_SLOTS).flatMap(
+  ([slotId, slot]) =>
+    MODES.map((mode) => ({
+      slotId: slotId as BackgroundSlotId,
+      pkg: slot.package,
+      mode,
+      variant: slot.variants[mode],
+    })),
+);
+
+describe("BARE text on the shipped art over the BackgroundHost veil (38.5 P-1 / brief H5)", () => {
+  it("covers every shipped variant (12 = 6 slots x 2 modes)", () => {
+    expect(SHIPPED_VARIANTS.length).toBe(12);
+  });
+
+  for (const { slotId, pkg, mode, variant } of SHIPPED_VARIANTS) {
+    for (const density of SURFACE_DENSITIES) {
+      it(`${slotId}/${mode} @ ${density}: every bare foreground clears its floor for the default and all 8 accents`, () => {
+        expect(
+          bareTextFailures(pkg, mode, variant, density, { slotId }),
+        ).toEqual([]);
+      });
+    }
+  }
+});
+
+describe("Profile scrim over the shipped art (P-8)", () => {
+  it("splits the #RRGGBBAA scrim token into colour and alpha", () => {
+    expect(splitAlphaHex("#0B0E1AB8")).toEqual({
+      color: "#0B0E1A",
+      alpha: 184 / 255,
+    });
+    expect(() => splitAlphaHex("#0B0E1A")).toThrow();
+  });
+
+  it("a mid-grey background under the profile scrim is not trivially passing (fixture)", () => {
+    // Guards the harness: a wash that ignored the art would pass everything.
+    const white = { darkestPixel: "#FFFFFF", brightestPixel: "#FFFFFF" };
+    expect(
+      profileScrimFailures("galaxy", "dark", white, {}).length,
+    ).toBeGreaterThan(0);
+  });
+
+  for (const { slotId, pkg, mode, variant } of SHIPPED_VARIANTS) {
+    it(`${slotId}/${mode}: the root palette's bare foregrounds clear their floors over profileBackgroundScrim`, () => {
+      expect(profileScrimFailures(pkg, mode, variant, { slotId })).toEqual([]);
     });
   }
 });
