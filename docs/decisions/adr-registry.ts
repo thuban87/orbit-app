@@ -96,7 +96,7 @@
 // NOTE: ADR-0084 [ACCEPTED] Four Semantic Theme Palettes, Curated Accents, and Contrast Validation
 // NOTE: ADR-0085 [ACCEPTED] Live Reduced-Motion Signal for Skia Ambient Animation
 // NOTE: ADR-0086 [ACCEPTED] Semantic Icons and Accessible Interaction Primitives
-// IMPORTANT: ADR-0087 [SUPERSEDED BY ADR-115 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation)] Bundled Background Presets and Package-Speci
+// IMPORTANT: ADR-0087 [SUPERSEDED BY ADR-115 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation); ADR-177 (partial — one asset per slot used i
 // NOTE: ADR-0088 [ACCEPTED] Additive Contact-Knowledge Schema and Application-Owned Memory Registry
 // NOTE: ADR-0089 [ACCEPTED] Recoverable Memory Lifecycle and Contact-Operation Integrity
 // NOTE: ADR-0090 [ACCEPTED] Additive Custom-Field Value History and Deferred Contact Scope
@@ -122,9 +122,9 @@
 // NOTE: ADR-0110 [ACCEPTED] Coherent Local Profile Snapshot and Source-Owned Knowledge Projection
 // NOTE: ADR-0111 [ACCEPTED] Cadence-Guarded Profile Metrics and Composed Relationship Actions
 // NOTE: ADR-0112 [ACCEPTED] App-Owned Profile Background Derivatives and Launch Reconciliation
-// NOTE: ADR-0113 [ACCEPTED] Persistent Shared System Background Selection
+// IMPORTANT: ADR-0113 [SUPERSEDED BY ADR-177 (partial — the one-asset-per-slot library of eight WebPs; the all-slots picker and cross-package clause were already superseded by Phase 37 D-07 and 38.4
 // NOTE: ADR-0114 [ACCEPTED] Route-Aware App-Wide System Background Composition
-// NOTE: ADR-0115 [ACCEPTED] Visible Mode-Aware Background Surface Composition
+// IMPORTANT: ADR-0115 [SUPERSEDED BY ADR-177 (partial — the D-15 parts only: see-through Contacts entries in Galaxy Light / Standard Dark, see-through List rows, and no backing on the count label and
 // NOTE: ADR-0116 [ACCEPTED] Value-Remapped Interaction Vocabulary and Optional Descriptive Duration
 // NOTE: ADR-0117 [ACCEPTED] Per-Interaction Allow-AI Consent Gate, Default-Off and Fail-Closed on Restore
 // NOTE: ADR-0118 [ACCEPTED] Bind/Unbind Immutable Lifecycle Events Without a Migration
@@ -186,5 +186,6 @@
 // NOTE: ADR-0174 [ACCEPTED] Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets
 // NOTE: ADR-0175 [ACCEPTED] Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child
 // NOTE: ADR-0176 [ACCEPTED] Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs
+// NOTE: ADR-0177 [ACCEPTED] Mode-Specific Background Art and Signed Per-Combination Art Treatments
 
-export const ADR_COUNT = 176;
+export const ADR_COUNT = 177;

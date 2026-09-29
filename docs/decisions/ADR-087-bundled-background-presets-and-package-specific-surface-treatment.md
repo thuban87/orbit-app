@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** ADR-115 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation)
+**Superseded by:** ADR-115 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation); ADR-177 (partial — one asset per slot used in both modes)
 
 ## Context
 

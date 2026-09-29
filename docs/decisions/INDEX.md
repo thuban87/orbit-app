@@ -21,8 +21,8 @@ not something you can pattern-match against.
 
 ## How to use this
 
-- **Is a decision still live?** Check the `Superseded by` column. 37 of
-  176 ADRs are superseded in whole or in part.
+- **Is a decision still live?** Check the `Superseded by` column. 39 of
+  177 ADRs are superseded in whole or in part.
 - **Which decisions govern a file?** Don't grep this file — ask the graph:
   `npm run graph:ask -- governs src/db/field-values-dao.ts`, or follow the
   `governed_by` edges.
@@ -117,7 +117,7 @@ not something you can pattern-match against.
 | 084 | Four Semantic Theme Palettes, Curated Accents, and Contrast Validation | Accepted | 23-theme-visual-system | — | — | — | 5/6 live | `src/theme` |
 | 085 | Live Reduced-Motion Signal for Skia Ambient Animation | Accepted | 23-theme-visual-system | — | — | — | 4 | `src/components/orrery`, `src/theme`, `src/theme/tokens` |
 | 086 | Semantic Icons and Accessible Interaction Primitives | Accepted | 23-theme-visual-system | — | — | — | 8 | `src/components`, `src/components/icons`, `src/components/ui` +1 |
-| 087 | Bundled Background Presets and Package-Specific Surface Treatment | Accepted | 23-theme-visual-system | — | ADR-115 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation) | — | 6 | `assets/backgrounds`, `src/components/ui`, `src/components/ui/__dev__` +2 |
+| 087 | Bundled Background Presets and Package-Specific Surface Treatment | Accepted | 23-theme-visual-system | — | ADR-115 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation); ADR-177 (partial — one asset per slot used in both modes) | — | 6 | `assets/backgrounds`, `src/components/ui`, `src/components/ui/__dev__` +2 |
 | 088 | Additive Contact-Knowledge Schema and Application-Owned Memory Registry | Accepted | 24.1-contact-knowledge-foundation | — | — | — | 10 | `src/db`, `src/db/migrations` |
 | 089 | Recoverable Memory Lifecycle and Contact-Operation Integrity | Accepted | 24.1-contact-knowledge-foundation | — | — | — | 7 | `src/db`, `src/screens`, `src/services` |
 | 090 | Additive Custom-Field Value History and Deferred Contact Scope | Accepted | 24.2-contact-knowledge-egress-search-types | — | — | — | 7 | `src/db`, `src/db/migrations` |
@@ -143,9 +143,9 @@ not something you can pattern-match against.
 | 110 | Coherent Local Profile Snapshot and Source-Owned Knowledge Projection | Accepted | 31-profile-experience | — | — | — | 10 | `src/components/profile`, `src/db`, `src/profile` |
 | 111 | Cadence-Guarded Profile Metrics and Composed Relationship Actions | Accepted | 31-profile-experience | — | — | — | 8 | `src/components/profile`, `src/db`, `src/profile` +1 |
 | 112 | App-Owned Profile Background Derivatives and Launch Reconciliation | Accepted | 31-profile-experience | — | — | — | 9 | `assets/backgrounds`, `src/components/profile`, `src/components/ui` +2 |
-| 113 | Persistent Shared System Background Selection | Accepted | 31.1-app-wide-system-backgrounds | — | — | — | 5/6 live | `assets/backgrounds`, `src/db`, `src/stores` +1 |
+| 113 | Persistent Shared System Background Selection | Accepted | 31.1-app-wide-system-backgrounds | — | ADR-177 (partial — the one-asset-per-slot library of eight WebPs; the all-slots picker and cross-package clause were already superseded by Phase 37 D-07 and 38.4 D-39) | — | 5/6 live | `assets/backgrounds`, `src/db`, `src/stores` +1 |
 | 114 | Route-Aware App-Wide System Background Composition | Accepted | 31.1-app-wide-system-backgrounds | — | — | — | 9 | `src/components/ui`, `src/navigation`, `src/screens` +2 |
-| 115 | Visible Mode-Aware Background Surface Composition | Accepted | 31.1-app-wide-system-backgrounds | ADR-087 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation) | — | — | 7 | `src/components`, `src/components/ui`, `src/screens` +1 |
+| 115 | Visible Mode-Aware Background Surface Composition | Accepted | 31.1-app-wide-system-backgrounds | ADR-087 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation) | ADR-177 (partial — the D-15 parts only: see-through Contacts entries in Galaxy Light / Standard Dark, see-through List rows, and no backing on the count label and the Contacts/Digest headers, where the owner signed them; the rest stands) | — | 7 | `src/components`, `src/components/ui`, `src/screens` +1 |
 | 116 | Value-Remapped Interaction Vocabulary and Optional Descriptive Duration | Accepted | 32-interaction-history-insights | ADR-023 (partial — the stored channel/quality value vocabulary) | — | — | 10 | `src/ai`, `src/components`, `src/db` +1 |
 | 117 | Per-Interaction Allow-AI Consent Gate, Default-Off and Fail-Closed on Restore | Accepted | 32-interaction-history-insights | — | — | — | 9 | `src/backup`, `src/components`, `src/components/history` +3 |
 | 118 | Bind/Unbind Immutable Lifecycle Events Without a Migration | Accepted | 32-interaction-history-insights | — | — | — | 3 | `src/backup`, `src/db` |
@@ -207,3 +207,4 @@ not something you can pattern-match against.
 | 174 | Fit-to-Width Heatmaps and Large-Text Reachability for Dialogs and Sheets | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 18 | `src/components`, `src/components/digest`, `src/components/group` +4 |
 | 175 | Header-Only Back and a Shared Root Header on Every Tab Root and Settings Child | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 15 | `src/components/icons`, `src/navigation`, `src/navigation/tabs` +1 |
 | 176 | Authored Native Platform Configuration — Release-Only Overlay Removal, Orbit Launcher Identity, and Mode-Following Native Dialogs | Accepted | 38.4-audit-remediation-ui-performance-release | — | — | — | 9/13 live | `assets`, `plugins`, `scripts` +2 |
+| 177 | Mode-Specific Background Art and Signed Per-Combination Art Treatments | Accepted | 38.5-background-art-text-contrast | ADR-115 (partial — the D-15 parts only: see-through Contacts entries in Galaxy Light / Standard Dark, see-through List rows, and no backing on the count label and the Contacts/Digest headers, where signed); ADR-087 (partial — one asset per slot used in both modes); ADR-113 (partial — the one-asset-per-slot library of eight WebPs) | — | — | 17 | `scripts`, `src/components`, `src/components/ui` +4 |

@@ -1,7 +1,7 @@
 # App Shell
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-09-29
+**Updated by phase:** 38.5-background-art-text-contrast
 **Owners:** `App.tsx`, `src/navigation/RootNavigator.tsx`, `src/navigation/tabs/`, `src/navigation/types.ts`, `src/navigation/reset-intents.ts`, `src/navigation/linking.ts`, `src/navigation/notification-gate.tsx`, `src/navigation/widget-linking.ts`, `src/components/UniversalFab.tsx`, `src/components/ShellAppBar.tsx`
 
 ## Purpose
@@ -213,10 +213,12 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 ### Applying the visual system
 
 1. `ThemeProvider` resolves the active package and system/light/dark appearance to one of four palettes, then overlays its curated accent tone triple.
-2. `SettingsAppearanceScreen` shows all eight bundled System backgrounds plus None/Solid. A tap updates only the active package in the theme store and persists its stable slot ID through the existing settings DAO.
+2. `SettingsAppearanceScreen` shows the active package's three System backgrounds plus None/Solid (`settings-appearance-background.ts`), each previewed in the current mode. Each slot ships a light and a dark image, and the app shows the one for the resolved mode (38.5 D-23, ADR-177). A tap updates only the active package in the theme store and persists its stable slot ID through the existing settings DAO. A retired id (`galaxy-deep-space`, `galaxy-nebula`, `standard-mesh`) still arriving from the DB or a restore renders as the package default.
 3. `App.tsx` applies the transparent navigation theme and synchronizes the deepest focused route. `RootNavigator` mounts one `BackgroundHost` behind the tab scenes, so ordinary transparent page roots scroll over one fixed image.
 4. `densityForRoute()` selects presentation, comfortable, or dense treatment. `systemBackgroundSlotOverride()` forces solid only for the actual `Orrery` route; browse routes reached through the Orrery stack continue to show the System background, while System Builder keeps its own opaque authoring canvas.
-5. The host veil controls artwork contribution independently from cards. `GlassSurface` is glassy when the package artwork tone matches the resolved mode and opaque when it does not; `ChromeScrim` protects bare-on-background chrome.
+5. The host veil controls artwork contribution independently from cards.
+   - **Table-driven components (ADR-177).** Five components take their backing from the owner-signed per-combination table (`src/theme/art-treatments.ts`, `useArtTreatment`): the Contacts List rows (`ListRow`), the Contacts Card-view cards (`GridCard` via `GlassSurface treatment="contact-entry"`), the "N contacts" count label (`ChromeScrim artComponent`), and the Contacts and Digest headers (`ShellAppBar artComponent`). The backing is `full`, `seeThrough` at the signed level, or `none`.
+   - **Everything else (ADR-115).** Every other `GlassSurface` card is glassy when the package artwork tone matches the resolved mode and opaque when it does not, and `ChromeScrim` protects the rest of the bare-on-background chrome.
 6. Screens use semantic registry names and shared UI primitives rather than base-family icon names or ad-hoc action/overlay implementations. `AppText` preserves OS text scaling, and destructive controls do not rely on colour alone.
 7. Orrery floating controls opt into `GlassSurface`'s dedicated `orrery-overlay` treatment; this controlled-canvas exception is not an ordinary route/card opacity change.
 
@@ -281,7 +283,8 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | Theme packages | Galaxy / Standard | `src/theme/theme-types.ts` | Independent of light/dark/follow-system appearance mode. |
 | `PACKAGE_DEFAULT_SLOT` | Galaxy and Standard package defaults | `src/theme/backgrounds.ts` | Resolves a NULL or absent package selection without duplicating defaults in a screen. |
 | `BACKGROUND_VEIL_OPACITY` | Per package and density | `src/theme/tokens/surface.ts` | Keeps bundled artwork visibly present behind ordinary content. |
-| `CARD_GLASS_OPACITY` | Galaxy `0.05`; Standard `0.5` | `src/theme/tokens/surface.ts` | Controls matched-mode card translucency while mismatched modes stay opaque. |
+| `CARD_GLASS_OPACITY` | Galaxy `0.05`; Standard `0.5` | `src/theme/tokens/surface.ts` | Controls matched-mode card translucency while mismatched modes stay opaque (every card except the table-driven Contacts cards). |
+| `ART_SEE_THROUGH_OPACITY` | Owner-signed per package × mode × group | `src/theme/tokens/surface.ts` | The see-through levels of the five table-driven components (ADR-177). |
 | `AA_NORMAL` / `AA_LARGE` | `4.5` / `3.0` | `src/theme/contrast.ts` | Contrast thresholds for text and large/status elements. |
 
 ## Decisions
@@ -298,12 +301,13 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 - **ADR-083:** Durable Multi-Package Theme Configuration and Restore-Before-Paint — moves theme selection to SQLite and gates first main paint on its hydration.
 - **ADR-084:** Four Semantic Theme Palettes, Curated Accents, and Contrast Validation — supplies the four-palette and live-accent contract.
 - **ADR-086:** Semantic Icons and Accessible Interaction Primitives — supplies registry, typography, status, action, and overlay seams.
-- **ADR-087:** Bundled Background Presets and Package-Specific Surface Treatment — supplies tokenized local background and surface primitives for later screen adoption.
+- **ADR-087:** Bundled Background Presets and Package-Specific Surface Treatment — supplies tokenized local background and surface primitives for later screen adoption. Partially superseded by ADR-115 and ADR-177 (each slot now has a light and a dark image).
 - **ADR-149:** Orrery-Specific Translucent Overlay Treatment and Icon Controls — adds the controlled-canvas overlay treatment without changing ordinary card composition.
 - **ADR-150:** Semantic Profile Hierarchy and Source-Owned Knowledge Editing — registers Profile-origin editor destinations while preserving their owning model and writer boundaries.
-- **ADR-113:** Persistent Shared System Background Selection — exposes every approved local slot and persists an independent active-package choice.
+- **ADR-113:** Persistent Shared System Background Selection — persists an independent active-package choice. Its all-slots library is superseded: the picker offers only the active package's slots (Phase 37 D-07, 38.4 D-39), and ADR-177 replaced the one-asset-per-slot library.
 - **ADR-114:** Route-Aware App-Wide System Background Composition — mounts one fixed shell host with route density and explicit Profile/Orrery/SystemBuilder precedence.
-- **ADR-115:** Visible Mode-Aware Background Surface Composition — separates veil, chrome, and card treatment so selected art remains visible and readable.
+- **ADR-115:** Visible Mode-Aware Background Surface Composition — separates veil, chrome, and card treatment so selected art remains visible and readable. Partially superseded by ADR-177 for the five table-driven components; the rest stands.
+- **ADR-177:** Mode-Specific Background Art and Signed Per-Combination Art Treatments — slot × mode art resolved by the mode, retired ids rendered as the default, and the owner-signed backing table for the Contacts entries, count label and Contacts/Digest headers.
 - **ADR-101:** Avatar-First Accessible Dashboard Card Renderer — consumes the semantic icon and accessible interaction primitives in Card View.
 - **ADR-102:** Frozen-Universe Dashboard Multi-Select — adds the Select Contacts entry and serializable Group Log participant handoff.
 - **ADR-020:** Library-Only Photo Capture with Themed In-App Cropping and One-Time URL Download — adds the modal crop route and self-photo entry.
@@ -509,3 +513,4 @@ The shell owns runtime navigation and consumes the durable theme contract; `app_
 | 2026-09-27 | 38.4 | Permanent FAB border on every screen (D-56, OA-C2; supersedes D-45): `UniversalFab` rings the main FAB with `FAB_BORDER_WIDTH` in `colors[FAB_BORDER_COLOR_KEY]` (`onAccent`), unconditionally; size, position, elevation, glyph and accessibility unchanged. |
 | 2026-09-27 | 38.4 | FAB bottom clearance on every FAB-bearing scroll screen (D-52, OA-E3): 23 screens (plus the Custom fields form) now end their scroll content with `useBottomClearance()`; `FAB_EDGE_GAP` moved onto `SPACING.base` (value unchanged); `fab-clearance-contract.test.ts` derives the FAB-bearing set from the stacks. |
 | 2026-09-27 | 38.4 | System Builder and Edit Interaction join `FOCUSED_WORKFLOW_ROUTES`, so the FAB and tab bar hide there like the other focused workflows (D-68, owner); their D-52 FAB clearance was removed and the clearance contract now asserts focused-only screens reserve none. |
+| 2026-09-29 | 38.5 | Slot × mode background art and signed art treatments (ADR-177): the picker offers the active package's three slots plus None, following the mode; retired ids render as the default. The Contacts List and Card entries, the count label and the Contacts/Digest headers take the owner-signed per-combination backing (`art-treatments.ts`). Every other card and chrome keeps ADR-115. |

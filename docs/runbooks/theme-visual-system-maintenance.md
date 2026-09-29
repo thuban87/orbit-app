@@ -4,21 +4,22 @@
 
 Use this process when adding a curated accent, bundled background slot, semantic theme token, or a complete theme package. It preserves Orbit's local-only appearance system, durable option-ID settings, token-only colour rule, and contrast/accessibility checks.
 
-## Architecture (Phases 23, 31, 31.1, 38.1, 38.4)
+## Architecture (Phases 23, 31, 31.1, 38.1, 38.4, 38.5)
 
 `app_settings` stores a package plus per-package mode, accent ID, and background ID. `ThemeProvider` resolves the active package and OS appearance, then applies a curated accent tone at render time. Palette hex values live only under `src/theme/`; screens receive resolved semantic tokens through `useTheme()`.
 
-Governing decisions for the 38.4 additions: ADR-169 (Standard-Light glass foreground scope, both-extrema proof, accent role contract) and ADR-176 (native dialogs follow Orbit's mode setting).
+Governing decisions for the 38.4 additions: ADR-169 (Standard-Light glass foreground scope, both-extrema proof, accent role contract) and ADR-176 (native dialogs follow Orbit's mode setting). For 38.5: ADR-177 (slot × mode art and the owner-signed per-combination art treatments; it supersedes parts of ADR-115, ADR-087 and ADR-113).
 
 ### Resolution order
 
 1. **SQLite selection** — `src/db/app-settings-dao.ts` returns the active package and remembered package-specific values.
 2. **Mode resolution** — `src/theme/theme-provider.tsx` resolves Light, Dark, or Follow System.
 3. **Palette and accent** — `src/theme/theme-presets.ts` selects one complete palette; `src/theme/accents.ts` overlays `{ fill, onAccent, text }`.
-4. **Background and shell** — `src/theme/backgrounds.ts` resolves a local asset or solid fallback; one `BackgroundHost` in `RootNavigator` renders it fixed behind transparent ordinary routes.
+4. **Background and shell** — `src/theme/backgrounds.ts` resolves the slot's variant for the resolved mode (slot × mode, 38.5 D-23), or the solid fallback. A retired, unknown or other-package id renders the package default. One `BackgroundHost` in `RootNavigator` renders it fixed behind transparent ordinary routes.
 5. **Route treatment** — `src/navigation/focused-route-classification.ts` selects presentation, comfortable, or dense treatment and suppresses the image only on the Orrery visualization.
 6. **Readable composition** — `src/theme/tokens/surface.ts` independently selects the host veil, mode-aware card tint, protected chrome opacity, and the controlled-canvas Orrery overlay treatment.
-7. **Glass foreground scope** — in Standard Light over an asset background only, `src/theme/glass-foregrounds.ts` resolves a `glassColors` palette. `GlassSurface` cards, `ChromeScrim` and the `ShellAppBar` re-provide it to their descendants through `GlassForegroundScope`. There `textSecondary` resolves to `textPrimary`, and the on-glass status hues, `rogue`, `danger` and every accent's `accentText` resolve to darker lightness-only variants (RG-029, D-24, D-26). Overlays reset to the root palette through `UnscopedTheme`.
+7. **Art treatment table** — five components are table-driven (`TABLE_DRIVEN_COMPONENTS` in `src/theme/art-treatments.ts`): the Contacts List entries, the Contacts Card entries, the count label, and the Contacts and Digest headers. `useArtTreatment` looks up their backing (`full` / `seeThrough` / `none`) by package × resolved mode × rendered background. The table is the owner's signed v3 answer, and the see-through levels live in `ART_SEE_THROUGH_OPACITY` (`tokens/surface.ts`). A `none` backing renders its content unscoped (root palette). Every other card and chrome keeps ADR-115's mode rule (D-28).
+8. **Glass foreground scope** — in Standard Light over an asset background only, `src/theme/glass-foregrounds.ts` resolves a `glassColors` palette. `GlassSurface` cards, `ChromeScrim` and the `ShellAppBar` re-provide it to their descendants through `GlassForegroundScope`. There `textSecondary` resolves to `textPrimary`, and the on-glass status hues, `rogue`, `danger` and every accent's `accentText` resolve to darker lightness-only variants (RG-029, D-24, D-26). Overlays reset to the root palette through `UnscopedTheme`.
 
 ## File Locations
 
@@ -32,16 +33,18 @@ Governing decisions for the 38.4 additions: ADR-169 (Standard-Light glass foregr
 | `src/theme/native-color-scheme.ts` | Drives the native night mode (RN `Alert`, date/time pickers) from the active package's mode setting; "system" → `"unspecified"` (D-50). |
 | `src/theme/glass-foregrounds.ts` | Standard-Light glass foreground palette (`resolveGlassForegroundPalette`), its lightness-only variants, and the pure scoped-value helpers. |
 | `scripts/measure-background-extrema.py` | Decodes every bundled asset and validates the declared bounds against each tint regime's composite extrema (`--check`, `--self-test`). A variant with an owner-signed `featureAllowance` passes when the union of out-of-bound pixels across its regimes stays within the allowance (38.5 D-20). |
-| `scripts/background-extrema-regimes.json` | The card, chrome, BackgroundHost veil (every density) and Profile-scrim (`profileBackgroundScrim` colour at its alpha, 38.5-05) tint regimes the script composites; a sync guard in `surface.test.ts` keeps it equal to the proof. |
+| `scripts/background-extrema-regimes.json` | The tint regimes the script composites: card, chrome, the BackgroundHost veil (every density), the Profile scrim (`profileBackgroundScrim` colour at its alpha, 38.5-05) and the signed art treatments `listEntry` / `cardEntry` / `artChrome` (one row per signed level, 38.5-08). A sync guard in `surface.test.ts` keeps it equal to the proof. |
 | `scripts/check-background-art.py` | Per-pixel art acceptance checker (38.5 D-14; the promoted 38.4 brief `check_art.py`): H1/H2, `--json`, `--all`, `--feature-max-px`/`--feature-max-pct`, `--accepted-exclusions`, `--self-test`. Needs numpy: `uv run --no-project --with numpy --with pillow python3 scripts/check-background-art.py …`. |
 | `scripts/background_manifest.py` | The single Python parser of the `backgrounds.ts` variants (including `featureAllowance`) and of the `38.5-ART-SIGNOFF.md` accepted-exclusions block; imported by both scripts. |
 | `scripts/art-checker-constants.json` | Every colour and opacity the checker uses; `src/theme/art-checker-constants.test.ts` keeps it equal to the TS theme. |
-| `src/theme/tokens/surface.ts` | Package surface treatment and compositing helpers. |
+| `src/theme/tokens/surface.ts` | Package surface treatment and compositing helpers; `ART_SEE_THROUGH_OPACITY` (the owner-signed see-through levels) and `artBackingOpacity`. |
+| `src/theme/art-treatments.ts` | The per-combination art treatment table (`ART_TREATMENTS`, transcribed from `38.5-scrim-signoff-v3.json` as `SIGNED_V3_BACKINGS`), `TABLE_DRIVEN_COMPONENTS` and the pure backing helpers. `art-treatments.test.ts` is the v3 sync guard. |
+| `src/theme/use-art-treatment.ts` | The runtime read for the five opt-ins, plus the DEV-only override file (`__dev__/art-treatment-dev-overrides.json`, committed disabled). |
 | `src/components/ui/BackgroundHost.tsx` | Fixed shell background, veil, Profile override, and render-failure fallback. |
 | `src/components/ui/GlassSurface.tsx` | Mode-aware glass/opaque card renderer. |
 | `src/components/ui/ChromeScrim.tsx` | Token-only local backing for bare-on-background chrome. |
 | `src/navigation/focused-route-classification.ts` | Background-density map and Orrery-only solid override. |
-| `src/screens/SettingsAppearanceScreen.tsx` | Grouped shared-library picker and immediate package-local persistence. |
+| `src/screens/SettingsAppearanceScreen.tsx`, `src/screens/settings-appearance-background.ts` | Active-package picker (that package's three slots plus None; the preview follows the mode) and immediate package-local persistence. |
 | `assets/backgrounds/README.md` | Background provenance and declared-brightness bounds. |
 | `src/db/migrations/015-theme-settings.ts` | Original durable theme-settings migration; never edit it. |
 
@@ -70,9 +73,21 @@ Governing decisions for the 38.4 additions: ADR-169 (Standard-Light glass foregr
 
    For replacement art, review the complete slot family together, retain each stable ID/package mapping, transcode only the approved source into its existing production filename, and measure the final WebP against the declared brightness ceiling. If it exceeds the ceiling, remaster the art or re-prove the bound and compositing together.
 
+   **Adding or replacing art (38.5).** Work in this order:
+   1. Write a brief that names the slot, the mode and the target band. A variant must sit in its own mode's band; for Galaxy Dark the ceiling is L\* 18.5 under D-24 `extend`.
+   2. Run the checker: `check-background-art.py` H1 (text over the art) and H2 (the band), with `--exclude-galaxy-dark-danger` and `--accepted-exclusions` pointing at the phase's ART-SIGNOFF file.
+   3. Transcode to a lossless WebP named `<slot>-<mode>.webp`.
+   4. Measure it with `measure-background-extrema.py`, then declare the extrema (and any owner-signed `featureAllowance`) in `backgrounds.ts`.
+   5. Add the README provenance row.
+   6. Run every proof green: the card, chrome, bare, Profile-scrim and signed art-treatment proofs.
+
+   The owner signs the art; an allowance or exclusion is his, never invented. Retiring a slot moves its id to `RETIRED_BACKGROUND_SLOT_IDS`. It is never deleted, because stored and restored settings may still hold it.
+
 6. **Preserve production adoption.** A bundled slot automatically appears through the shared `BACKGROUND_ORDER`, but verify the Settings label and grouping remain meaningful. Ordinary page roots omit only their full-page background wash; do not mount another `BackgroundHost`. New routes must receive the right density in `src/navigation/focused-route-classification.ts`, and only the actual `Orrery` route may force `none`.
 
 7. **Keep veil, cards, chrome, and controlled-canvas overlays independent.** Tune background visibility through `BACKGROUND_VEIL_OPACITY`; tune matched-mode card glass through `CARD_GLASS_OPACITY`; protect text outside a card with `ChromeScrim`. The Orrery alone may use `ORRERY_OVERLAY_TINT_OPACITY` through `GlassSurface treatment="orrery-overlay"`: it stays translucent in every package/mode, remains at or below the visibility ceiling, and needs AA proof against the brightest actual canvas backdrop. Do not change ordinary card constants to tune it.
+
+7a. **Changing an art treatment is the owner's call.** The table and its see-through levels are his signed answers (ADR-177). To change a cell or a level, re-sign it with him on a sheet over the real art. Then edit the signed file and `SIGNED_V3_BACKINGS` / `ART_SEE_THROUGH_OPACITY` together; the v3 sync guard fails if they differ. A new signed level also needs its row in `scripts/background-extrema-regimes.json` (the regime sync guard fails otherwise) and a green `--check`. If a declared bound must widen, take the value the script reports. A new component joins the table only through an opt-in that the scope contract (`art-treatment-scope-contract.test.ts`) confines, and its foregrounds join `TABLE_DRIVEN_FOREGROUNDS` in `surface.test.ts`.
 
 8. **Validate durable-settings scope.** Do not edit migration 015. A new persisted setting requires a new forward migration, typed DAO validation, the `PORTABLE_SETTINGS_KEYS` allowlist, and an explicit decision about the backup-format projection. Storing a hex value in SQLite is prohibited; store an ID or NULL.
 
@@ -138,6 +153,14 @@ RN `Alert` confirmations and the Android date/time picker dialogs are native sur
 
 13. **Android blur is off for now (D-61).** `GlassSurface` passes `blurMethod="none"` on its `BlurView`. expo-blur's Dimezis methods need a `blurTarget`; without one they silently fall back to no blur and warn on every mount. `"none"` keeps the identical native tint fallback, so do not "fix" it by removing the `BlurView` on Android (that drops the tint layer and thins Galaxy cards). Real Android blur needs a `BlurTargetView` host and is out of 38.4. `glass-surface-blur.contract.test.ts` guards it.
 
+14. **E-1 is scoped by treatment.** The ADR-084 Galaxy Dark `danger` exclusion covers `card` and `chrome` only; bare text has its own `E-1-bare` entry, and the art treatments (`listEntry` / `cardEntry` / `artChrome`) have none, because no table-driven component renders `danger`. A new exclusion names its treatments explicitly, so a new proof never inherits an old one silently.
+
+15. **Loop over variants in their own mode.** Each slot has a light and a dark image, and a variant is only rendered in its own mode. A proof or script that loops over slots without the mode (or over `BACKGROUND_SLOTS` × both modes with one palette) proves the wrong pairing. Use `slot.variants[mode]` with the palette of that `mode`.
+
+16. **Retired ids stay valid input.** `galaxy-deep-space`, `galaxy-nebula` and `standard-mesh` can still arrive from the DB or a restore. They must resolve to the package default, never throw and never be offered in the picker.
+
+17. **`"transparent"` is a colour to `check:colors`.** The sign-off sheets say `transparent`; the code says `seeThrough`. `scripts/check-colors.sh` flags a quoted `"transparent"` in any `src` file outside `/theme/`, so never compare table values with that literal in a component.
+
 ## Smoke Test
 
 ```bash
@@ -172,3 +195,4 @@ ADR-084 gives the accent three roles, and every foreground picks one:
 - **2026-09-28 — Phase 38.5 Plan 02 (D-23, D-13).** Background slots became slot × mode: `variants.light` / `variants.dark`, a mode-aware `resolveBackground(pkg, slotId, mode)`, a mode-keyed `BackgroundHost` fallback latch, and a per-(slot, mode) extrema script and card/chrome proof. Both variants still point at today's file (no visual change).
 - **2026-09-28 — Phase 38.5 Plan 03 (D-14, D-20, D-24; P-1/P-2).** Added the committed art checker `scripts/check-background-art.py` with `scripts/art-checker-constants.json` and its sync guard, the shared parser `scripts/background_manifest.py`, the BackgroundHost veil regimes in the extrema table, the D-20 `featureAllowance` (union semantics) in `backgrounds.ts` and the extrema script, treatment-scoped proof exclusions (E-1 = card + chrome; `E-1-bare` for D-24 extend) and the bare-text proof harness, enforced over the None background. `standard-mesh` `darkestPixel` widened `#3A5069` → `#3A5068` for the new Standard Light veil regimes.
 - **2026-09-28 — Phase 38.5 Plan 05 (D-17..D-19, D-23, D-30..D-34; P-1/P-4/P-8).** Wired the 12 owner-approved `<slot>-<mode>.webp` variants (Galaxy `galaxy-quiet` "Deep Space" default, Aurora, Starfield; Standard Dawn, Paper, Dusk) and deleted the 8 pre-38.5 files. `galaxy-deep-space`, `galaxy-nebula` and `standard-mesh` moved to `RETIRED_BACKGROUND_SLOT_IDS`: accepted by the DAO on write and restore, rendered as the package default, never offered. The resolver also maps another package's id and prototype keys to the default. Added the Profile-scrim regime and proof, and enforced the bare-text proof over every shipped variant. Starfield declares a text-bearing bound inside its empty luminance band (same signed union).
+- **2026-09-29 — Phase 38.5 Plan 08 (D-13 step 4, D-15, D-23, D-28, D-36, D-37, D-42..D-44; ADR-177).** The art treatment table is now the owner's signed v3 answer (`SIGNED_V3_BACKINGS`, synced against `38.5-scrim-signoff-v3.json`). `ART_SEE_THROUGH_OPACITY` holds his signed levels: 0.05 for every List row and Contacts card, Galaxy Dark chrome 0.05, Standard Light chrome 0.5 and the Standard Dark count label 0. `TABLE_DRIVEN_COMPONENTS` names the five components, the ⋯ follows the header, and no cell is inverse. Every see-through or none cell is proven over the shipped art. The `listEntry` / `cardEntry` / `artChrome` regimes joined the extrema table, which widened `galaxy-quiet` light `darkestPixel` from `#E4DDF9` to `#E3DDF9`. ADR-177 was written, and the picker line was corrected.

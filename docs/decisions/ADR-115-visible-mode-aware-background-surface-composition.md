@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** None
 **Supersedes:** ADR-087 (partial — host/card opacity coupling, Standard flat-only treatment, and Android translucent-card elevation)
-**Superseded by:** None
+**Superseded by:** ADR-177 (partial — the D-15 parts only: see-through Contacts entries in Galaxy Light / Standard Dark, see-through List rows, and no backing on the count label and the Contacts/Digest headers, where the owner signed them; the rest stands)
 
 ## Context
 

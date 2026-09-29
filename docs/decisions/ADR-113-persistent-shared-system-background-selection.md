@@ -7,7 +7,7 @@
 **Reversibility:** reversible
 **Migration:** None
 **Supersedes:** None
-**Superseded by:** None
+**Superseded by:** ADR-177 (partial — the one-asset-per-slot library of eight WebPs; the all-slots picker and cross-package clause were already superseded by Phase 37 D-07 and 38.4 D-39)
 
 ## Context
 
