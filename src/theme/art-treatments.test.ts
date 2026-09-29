@@ -18,7 +18,9 @@ import {
   artCombinationKey,
   artOpacityGroup,
   artScrimBacking,
+  controlTriggerBacking,
   currentArtCell,
+  listRowBacking,
   resolveArtCell,
   resolveArtTreatment,
 } from "./art-treatments";
@@ -369,5 +371,74 @@ describe("artScrimBacking — ChromeScrim / ShellAppBar backing decision", () =>
       opacity,
       scoped: true,
     });
+  });
+});
+
+describe("listRowBacking — the table-driven List row (38.5-06 Task 2)", () => {
+  it("no treatment or full keeps today's solid fill, unscoped", () => {
+    const today = { solidFill: true, tintOpacity: null, scoped: false };
+    expect(listRowBacking(null)).toEqual(today);
+    expect(listRowBacking({ backing: "full", opacity: 1 })).toEqual(today);
+  });
+
+  it("see-through draws a tint at the cell opacity and scopes the content", () => {
+    const opacity = CARD_GLASS_OPACITY.galaxy;
+    expect(listRowBacking({ backing: "seeThrough", opacity })).toEqual({
+      solidFill: false,
+      tintOpacity: opacity,
+      scoped: true,
+    });
+  });
+
+  it("none draws neither fill nor tint and leaves the content unscoped", () => {
+    expect(listRowBacking({ backing: "none", opacity: null })).toEqual({
+      solidFill: false,
+      tintOpacity: null,
+      scoped: false,
+    });
+  });
+
+  it("the production List cell is today's solid row in every combination", () => {
+    for (const { pkg, mode, slot } of COMBOS) {
+      expect(
+        listRowBacking(
+          resolveArtTreatment(pkg, mode, slot, "contactsListEntries"),
+        ),
+      ).toEqual({ solidFill: true, tintOpacity: null, scoped: false });
+    }
+  });
+});
+
+describe("contact-entry cards — GlassSurface treatment (38.5-06 Task 2)", () => {
+  it("the Card-entry backing equals today's dense card tint, scoped, in every combination", () => {
+    for (const { pkg, mode, slot } of COMBOS) {
+      const t = resolveArtTreatment(pkg, mode, slot, "contactsCardEntries");
+      expect(artScrimBacking(t, cardTintOpacity(pkg, mode, "dense"))).toEqual({
+        opacity: cardTintOpacity(pkg, mode, "dense"),
+        scoped: true,
+      });
+    }
+  });
+});
+
+describe("controlTriggerBacking — Population/Filters/Sort (orchestrator addition, H-3)", () => {
+  it("an inactive trigger is always full, whatever the cell says (D-04, D-12)", () => {
+    expect(controlTriggerBacking(false, null)).toBe("full");
+    expect(controlTriggerBacking(false, "none")).toBe("full");
+    expect(controlTriggerBacking(false, "full")).toBe("full");
+  });
+
+  it("an active trigger takes the table's active backing; no treatment is today's border-only look", () => {
+    expect(controlTriggerBacking(true, null)).toBe("none");
+    expect(controlTriggerBacking(true, "none")).toBe("none");
+    expect(controlTriggerBacking(true, "full")).toBe("full");
+  });
+
+  it("production: every combination's active trigger is today's border-only look", () => {
+    for (const { pkg, mode, slot } of COMBOS) {
+      const t = resolveArtTreatment(pkg, mode, slot, "contactsTopButtons");
+      expect(controlTriggerBacking(true, t.activeTriggerBacking)).toBe("none");
+      expect(controlTriggerBacking(false, t.activeTriggerBacking)).toBe("full");
+    }
   });
 });
