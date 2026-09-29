@@ -1,5 +1,5 @@
 import type { RestoreApplyResult, RestoreMode } from "@/backup/restore-apply";
-import { unavailableBackupBackgrounds } from "@/backup/restore-backgrounds";
+import { backgroundsNeedingConsent } from "@/backup/restore-backgrounds";
 import type { BackupManifest } from "@/backup/types";
 import type { RestorePreviewAggregate } from "@/services/backup/backup-service";
 
@@ -85,21 +85,49 @@ export const UNAVAILABLE_BACKGROUND_REPLACE_NOTE =
   "A background selected in this backup is no longer available. Replace and restore will switch to the default background instead.";
 
 /**
- * Whether the validated backup holds a background id the DAO would reject
- * (neither active nor retired; D-47). Retired ids are available.
+ * Whether this restore must ask the D-47 question: the validated backup holds a
+ * background id the DAO would reject (neither active nor retired; retired ids
+ * are available) AND the restore will write the backup's settings. A Merge
+ * whose backup settings are not newer than this phone's never writes them, so
+ * it never asks (owner ruling RA-a, 2026-09-29; D-49). The decision is
+ * `backgroundsNeedingConsent`, the same helper `applyRestore` gates on.
  */
-export function backupHasUnavailableBackground(
+export async function backupNeedsBackgroundConsent(
   entry: Pick<RestoreCacheEntry, "manifest">,
-): boolean {
-  return unavailableBackupBackgrounds(entry.manifest?.appSettings).length > 0;
+  mode: RestoreMode,
+  readLocalSettingsModifiedAt: () => Promise<string>,
+): Promise<boolean> {
+  return (
+    (
+      await backgroundsNeedingConsent(
+        mode,
+        entry.manifest?.appSettings,
+        readLocalSettingsModifiedAt,
+      )
+    ).length > 0
+  );
 }
+
+/** The destination reads an apply's confirmation may need. */
+export type RestoreApplyConfirmationReads = {
+  /** Replace-all only: whether an automatic backup destination is set. */
+  readonly destinationConfigured: () => Promise<boolean>;
+  /**
+   * This phone's settings LWW stamp (`app_settings.modified_at`); read only
+   * when the backup holds an unavailable background id (RA-a / D-49).
+   */
+  readonly localSettingsModifiedAt: () => Promise<string>;
+};
 
 /**
  * The ONE dialog an apply shows, or null for none (a plain Merge):
  *   - Replace-all: the destructive confirmation; with an unavailable background
  *     its message also carries the D-47 notice, and "Replace and restore" is the
  *     consent (one dialog, not two);
- *   - Merge with an unavailable background: the D-47 question, Continue/Cancel.
+ *   - Merge whose backup settings will be written and hold an unavailable
+ *     background: the D-47 question, Continue/Cancel.
+ * `unavailableBackground` is `backupNeedsBackgroundConsent` (RA-a / D-49), not
+ * the bare presence of an unavailable id.
  */
 export function restoreApplyConfirmation(
   mode: RestoreMode,
@@ -131,22 +159,27 @@ export function restoreApplyConfirmation(
 /**
  * Coordinates the apply's confirmation with the validated preview candidate.
  * The candidate never travels through navigation params. Cancel returns before
- * anything is written; a plain Merge confirms without a dialog.
+ * anything is written; a plain Merge (including one whose older backup
+ * settings will not be written, RA-a) confirms without a dialog.
  */
 export async function confirmRestoreApply(
   cache: Pick<ReturnType<typeof createRestorePreviewCache>, "read">,
   token: string,
   mode: RestoreMode,
-  readDestinationConfigured: () => Promise<boolean>,
+  reads: RestoreApplyConfirmationReads,
   confirm: (confirmation: RestoreApplyConfirmation) => Promise<boolean>,
 ): Promise<RestoreApplyConfirmationResult> {
   const candidate = cache.read(token);
   if (!candidate) return { status: "expired" };
 
-  const useDefaultBackgrounds = backupHasUnavailableBackground(candidate);
+  const useDefaultBackgrounds = await backupNeedsBackgroundConsent(
+    candidate,
+    mode,
+    reads.localSettingsModifiedAt,
+  );
   const confirmation = restoreApplyConfirmation(
     mode,
-    mode === "replace-all" ? await readDestinationConfigured() : false,
+    mode === "replace-all" ? await reads.destinationConfigured() : false,
     useDefaultBackgrounds,
   );
   if (confirmation !== null && !(await confirm(confirmation)))

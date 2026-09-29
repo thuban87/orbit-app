@@ -11,7 +11,8 @@ import {
   suppressCategoryTombstoneDependents,
 } from "@/backup/reconciliation";
 import {
-  unavailableBackupBackgrounds,
+  backgroundsNeedingConsent,
+  restoreWritesBackupSettings,
   withDefaultBackgrounds,
 } from "@/backup/restore-backgrounds";
 import type {
@@ -106,10 +107,12 @@ export interface RestoreApplyDependencies {
   /**
    * What to do with a backup background id the DAO would reject (neither active
    * nor retired; 38.5 D-47). `"reject"` (the default) returns
-   * `unavailable-background` before anything is written. `"use-default"` is the
-   * user's answer to the restore flow's confirmation: the settings mapping
-   * writes that package's default slot instead. Retired ids always restore
-   * unchanged.
+   * `unavailable-background` before anything is written, but only when the
+   * backup's settings will be written (RA-a / D-49): a Merge whose backup
+   * settings are not newer than this phone's skips them, so it proceeds and the
+   * unavailable id is irrelevant. `"use-default"` is the user's answer to the
+   * restore flow's confirmation: the settings mapping writes that package's
+   * default slot instead. Retired ids always restore unchanged.
    */
   unavailableBackgrounds?: "reject" | "use-default";
 }
@@ -129,7 +132,10 @@ export type RestoreApplyResult =
     }
   | { status: "incompatible-destination"; incompatibilities: number }
   | { status: "pre-restore-snapshot-failed" }
-  /** An unavailable background id and no consent to the default (D-47). */
+  /**
+   * An unavailable background id in settings this restore would write, and no
+   * consent to the default (D-47, RA-a / D-49).
+   */
   | { status: "unavailable-background"; unavailable: number };
 
 type Row = Record<string, unknown> & ReconciliationRow;
@@ -1479,6 +1485,15 @@ async function writePhotoReference(
   ]);
 }
 
+/** This phone's settings LWW stamp (the column `getPortableSettingsSnapshot` reads). */
+async function readLocalSettingsModifiedAt(exec: SqlExecutor): Promise<string> {
+  const row = await exec.getFirstAsync<{ modified_at: string }>(
+    "SELECT modified_at FROM app_settings WHERE id=1",
+  );
+  if (!row) throw new Error("applyRestore: app_settings row id=1 is missing");
+  return row.modified_at;
+}
+
 export async function applyRestore(
   exec: SqlExecutor,
   manifest: BackupManifest,
@@ -1488,17 +1503,21 @@ export async function applyRestore(
   assertCompleteIncomingPairs(manifest);
   // D-47: an unavailable background id needs the user's consent, which the
   // restore flow asks for before calling this. Without it, stop here: nothing
-  // is staged, snapshotted or written.
-  const unavailableBackgrounds = unavailableBackupBackgrounds(
+  // is staged, snapshotted or written. RA-a (D-49): consent is needed only when
+  // the backup's settings will be written; the flow's question uses the same
+  // helper. The transaction re-checks against its own settings read below.
+  const needingConsent = await backgroundsNeedingConsent(
+    mode,
     manifest.appSettings,
+    () => readLocalSettingsModifiedAt(exec),
   );
   if (
-    unavailableBackgrounds.length > 0 &&
+    needingConsent.length > 0 &&
     deps.unavailableBackgrounds !== "use-default"
   )
     return {
       status: "unavailable-background",
-      unavailable: unavailableBackgrounds.length,
+      unavailable: needingConsent.length,
     };
   let preRestoreSnapshotCreated = false;
   const configured = Boolean(
@@ -1636,9 +1655,29 @@ export async function applyRestore(
         },
         { insert: 0, update: 0, retain: 0, delete: 0, blocked: 0 },
       );
-      const applySettings =
-        mode === "replace-all" ||
-        (manifest.appSettings.modifiedAt as string) > settings.modifiedAt;
+      const applySettings = restoreWritesBackupSettings(
+        mode,
+        manifest.appSettings.modifiedAt,
+        settings.modifiedAt,
+      );
+      // RA-a (D-49): the early gate decided consent from a read taken before
+      // the transaction. Re-decide it here, from this transaction's settings
+      // read and the same helper, before any write: if the settings are now
+      // written but carry an unconsented unavailable id, write nothing.
+      if (deps.unavailableBackgrounds !== "use-default") {
+        const unconsented = await backgroundsNeedingConsent(
+          mode,
+          manifest.appSettings,
+          async () => settings.modifiedAt,
+        );
+        if (unconsented.length > 0)
+          return {
+            result: {
+              status: "unavailable-background" as const,
+              unavailable: unconsented.length,
+            },
+          };
+      }
       const tombstonesByKey = new Map(
         local.flatMap(([entity, , deleted]) =>
           deleted.map(

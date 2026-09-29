@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  backupHasUnavailableBackground,
+  backupNeedsBackgroundConsent,
   confirmRestoreApply,
   createRestoreApplySingleFlight,
   createRestorePreviewCache,
@@ -95,6 +95,17 @@ describe("restore apply decisions", () => {
     );
   });
 
+  /** The destination reads; the local settings stamp defaults to an old one. */
+  function destinationReads(
+    configured: boolean,
+    localSettingsModifiedAt = "2026-01-01 00:00:00",
+  ) {
+    return {
+      destinationConfigured: async () => configured,
+      localSettingsModifiedAt: async () => localSettingsModifiedAt,
+    };
+  }
+
   it("keeps a validated preview available while Replace-all awaits its confirmation", async () => {
     const cache = createRestorePreviewCache();
     const route = cache.store({
@@ -112,7 +123,7 @@ describe("restore apply decisions", () => {
       cache,
       route.token,
       "replace-all",
-      async () => true,
+      destinationReads(true),
       async () => waitingForConfirmation,
     );
     cache.discard(route.token);
@@ -133,9 +144,15 @@ describe("restore apply decisions", () => {
         createRestorePreviewCache(),
         "missing-token",
         "replace-all",
-        async () => {
-          readDestinationCalls += 1;
-          return true;
+        {
+          destinationConfigured: async () => {
+            readDestinationCalls += 1;
+            return true;
+          },
+          localSettingsModifiedAt: async () => {
+            readDestinationCalls += 1;
+            return "2026-01-01 00:00:00";
+          },
         },
         async () => {
           confirmationCalls += 1;
@@ -162,7 +179,7 @@ describe("restore apply decisions", () => {
         cache,
         route.token,
         "replace-all",
-        async () => false,
+        destinationReads(false),
         async () => false,
       ),
     ).resolves.toEqual({ status: "cancelled" });
@@ -171,7 +188,13 @@ describe("restore apply decisions", () => {
     });
   });
 
-  /** A cached candidate whose backup holds the given background ids. */
+  /** The backup's settings stamp: newer than `destinationReads`' default. */
+  const NEWER = "2026-09-29 10:00:00";
+  /** The backup's settings stamp: older than a phone edited after the backup. */
+  const OLDER = "2026-09-01 10:00:00";
+  const PHONE_EDITED_LATER = "2026-09-15 10:00:00";
+
+  /** A cached candidate whose backup holds the given settings. */
   function cachedWith(appSettings: Record<string, unknown> | undefined) {
     const cache = createRestorePreviewCache();
     const route = cache.store({
@@ -184,7 +207,10 @@ describe("restore apply decisions", () => {
   }
 
   it("a plain Merge confirms with no dialog and no destination read", async () => {
-    const { cache, token } = cachedWith({ galaxyBackground: "galaxy-aurora" });
+    const { cache, token } = cachedWith({
+      modifiedAt: NEWER,
+      galaxyBackground: "galaxy-aurora",
+    });
     let reads = 0;
     let dialogs = 0;
     await expect(
@@ -192,9 +218,15 @@ describe("restore apply decisions", () => {
         cache,
         token,
         "merge",
-        async () => {
-          reads += 1;
-          return true;
+        {
+          destinationConfigured: async () => {
+            reads += 1;
+            return true;
+          },
+          localSettingsModifiedAt: async () => {
+            reads += 1;
+            return "2026-01-01 00:00:00";
+          },
         },
         async () => {
           dialogs += 1;
@@ -209,15 +241,18 @@ describe("restore apply decisions", () => {
     expect(dialogs).toBe(0);
   });
 
-  it("Merge with an unavailable background asks the D-47 question; Cancel writes nothing, Continue consents", async () => {
-    const { cache, token } = cachedWith({ galaxyBackground: "galaxy-comet" });
+  it("Merge with NEWER backup settings and an unavailable background asks the D-47 question; Cancel writes nothing, Continue consents", async () => {
+    const { cache, token } = cachedWith({
+      modifiedAt: NEWER,
+      galaxyBackground: "galaxy-comet",
+    });
     const shown: unknown[] = [];
     await expect(
       confirmRestoreApply(
         cache,
         token,
         "merge",
-        async () => true,
+        destinationReads(true),
         async (confirmation) => {
           shown.push(confirmation);
           return false;
@@ -239,7 +274,7 @@ describe("restore apply decisions", () => {
         cache,
         token,
         "merge",
-        async () => true,
+        destinationReads(true),
         async () => true,
       ),
     ).resolves.toMatchObject({
@@ -248,49 +283,145 @@ describe("restore apply decisions", () => {
     });
   });
 
-  it("Replace-all with an unavailable background shows ONE dialog carrying the notice", async () => {
-    const { cache, token } = cachedWith({ standardBackground: "standard-x" });
-    const shown: { message: string; confirmLabel: string }[] = [];
+  it("Merge whose backup settings are OLDER (or the same age) never asks: the settings are not written (RA-a / D-49)", async () => {
+    const { cache, token } = cachedWith({
+      modifiedAt: OLDER,
+      galaxyBackground: "galaxy-comet",
+    });
+    for (const local of [PHONE_EDITED_LATER, OLDER]) {
+      let dialogs = 0;
+      let destinationReadsMade = 0;
+      await expect(
+        confirmRestoreApply(
+          cache,
+          token,
+          "merge",
+          {
+            destinationConfigured: async () => {
+              destinationReadsMade += 1;
+              return true;
+            },
+            localSettingsModifiedAt: async () => local,
+          },
+          async () => {
+            dialogs += 1;
+            return false;
+          },
+        ),
+      ).resolves.toMatchObject({
+        status: "confirmed",
+        useDefaultBackgrounds: false,
+      });
+      expect(dialogs, local).toBe(0);
+      expect(destinationReadsMade, local).toBe(0);
+    }
+  });
+
+  it("Replace-all with an unavailable background shows ONE dialog carrying the notice, even when the backup settings are older", async () => {
+    for (const modifiedAt of [NEWER, OLDER]) {
+      const { cache, token } = cachedWith({
+        modifiedAt,
+        standardBackground: "standard-x",
+      });
+      const shown: { message: string; confirmLabel: string }[] = [];
+      await expect(
+        confirmRestoreApply(
+          cache,
+          token,
+          "replace-all",
+          destinationReads(true, PHONE_EDITED_LATER),
+          async (confirmation) => {
+            shown.push(confirmation);
+            return true;
+          },
+        ),
+      ).resolves.toMatchObject({
+        status: "confirmed",
+        useDefaultBackgrounds: true,
+      });
+      expect(shown).toHaveLength(1);
+      expect(shown[0].message).toContain(
+        "Orbit will first create and verify a fresh automatic backup of this device.",
+      );
+      expect(shown[0].message).toContain(UNAVAILABLE_BACKGROUND_REPLACE_NOTE);
+      expect(shown[0].confirmLabel).toBe("Replace and restore");
+      // Cancel on the same dialog writes nothing.
+      await expect(
+        confirmRestoreApply(
+          cache,
+          token,
+          "replace-all",
+          destinationReads(true, PHONE_EDITED_LATER),
+          async () => false,
+        ),
+      ).resolves.toEqual({ status: "cancelled" });
+    }
+  });
+
+  it("the preview notice follows the same decision: per mode and settings age (RA-a / D-49)", async () => {
+    const entry = (modifiedAt: string, galaxyBackground: unknown) => ({
+      manifest: {
+        appSettings: { modifiedAt, galaxyBackground },
+      } as unknown as import("@/backup/types").BackupManifest,
+    });
+    const phone = async () => PHONE_EDITED_LATER;
     await expect(
-      confirmRestoreApply(
-        cache,
-        token,
-        "replace-all",
-        async () => true,
-        async (confirmation) => {
-          shown.push(confirmation);
-          return true;
-        },
+      backupNeedsBackgroundConsent(
+        entry(OLDER, "galaxy-comet"),
+        "merge",
+        phone,
       ),
-    ).resolves.toMatchObject({
-      status: "confirmed",
-      useDefaultBackgrounds: true,
-    });
-    expect(shown).toHaveLength(1);
-    expect(shown[0].message).toContain(
-      "Orbit will first create and verify a fresh automatic backup of this device.",
-    );
-    expect(shown[0].message).toContain(UNAVAILABLE_BACKGROUND_REPLACE_NOTE);
-    expect(shown[0].confirmLabel).toBe("Replace and restore");
+    ).resolves.toBe(false);
+    await expect(
+      backupNeedsBackgroundConsent(
+        entry(NEWER, "galaxy-comet"),
+        "merge",
+        phone,
+      ),
+    ).resolves.toBe(true);
+    await expect(
+      backupNeedsBackgroundConsent(
+        entry(OLDER, "galaxy-comet"),
+        "replace-all",
+        phone,
+      ),
+    ).resolves.toBe(true);
+    await expect(
+      backupNeedsBackgroundConsent(
+        entry(NEWER, "galaxy-aurora"),
+        "replace-all",
+        phone,
+      ),
+    ).resolves.toBe(false);
   });
 
-  it("retired and active ids never prompt; a manifest without settings is safe", () => {
+  it("retired and active ids never prompt; a manifest without settings is safe", async () => {
     for (const appSettings of [
       undefined,
       {},
       {
+        modifiedAt: NEWER,
         galaxyBackground: "galaxy-nebula",
         standardBackground: "standard-mesh",
       },
-      { galaxyBackground: null, standardBackground: "standard-paper" },
+      {
+        modifiedAt: NEWER,
+        galaxyBackground: null,
+        standardBackground: "standard-paper",
+      },
     ]) {
-      expect(
-        backupHasUnavailableBackground({
-          manifest: {
-            appSettings,
-          } as unknown as import("@/backup/types").BackupManifest,
-        }),
-      ).toBe(false);
+      for (const mode of ["merge", "replace-all"] as const)
+        await expect(
+          backupNeedsBackgroundConsent(
+            {
+              manifest: {
+                appSettings,
+              } as unknown as import("@/backup/types").BackupManifest,
+            },
+            mode,
+            async () => "2026-01-01 00:00:00",
+          ),
+        ).resolves.toBe(false);
     }
     expect(restoreApplyConfirmation("merge", false, false)).toBeNull();
     expect(restoreApplyConfirmation("merge", false, true)?.message).toBe(

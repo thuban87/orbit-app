@@ -573,6 +573,7 @@ the CONTEXT shim.
         restore with nothing written.
     -   The substitution happens in the restore's settings mapping, before the DAO. The DAO stays strict for every
         write. A malformed value (not a bounded string) is still a damaged file. No backup-format bump (D-34).
+    -   *(Refined by D-49, 2026-09-29: the question is asked only when the backup's settings will be applied.)*
 -   **[DECIDED · 2026-09-29] D-48 --- A see-through List row's backing goes to 50% while the row is swiped (review
     WR-01, option R1a).** Owner, verbatim: "I don't want to do a full backing on the row when it's moving, that'll look
     funny. Can we try a 50% transparency maybe instead?" Shown the contrast measurements, he chose R1a: accept 50%.
@@ -594,6 +595,21 @@ the CONTEXT shim.
         this as a transient, in-motion overlap. The exemption is recorded in `src/theme/tokens/surface.test.ts`
         ("Swiped see-through List row").
     -   The owner sees a mid-swipe row on the device in 38.5-09.
+-   **[DECIDED · 2026-09-29] D-49 --- RA-a: the D-47 question is asked only when the backup's settings will be applied
+    (refines D-47; code re-review WR-A).** The owner chose option (a) of the re-review's WR-A.
+    -   The case it fixes: in Merge, the backup's settings are written only when they are newer than this phone's
+        (last-writer-wins on `app_settings.modified_at`). Before this ruling, Merge asked the D-47 question whenever the
+        backup held an unavailable id, even when those settings would be skipped. Continue then changed nothing, and
+        Cancel abandoned the whole merge over a setting that would never have been written.
+    -   Merge whose backup settings are older than (or the same age as) this phone's: **no question, no preview
+        notice.** The restore proceeds; the unavailable id is irrelevant and the phone's settings are untouched.
+    -   Replace-all, and Merge whose backup settings are newer: **D-47 unchanged.** One question before any write;
+        Continue substitutes the package default; Cancel writes nothing.
+    -   [DERIVED] One shared helper decides both the prompt and the write, so they cannot disagree:
+        `restoreWritesBackupSettings` / `backgroundsNeedingConsent` in `src/backup/restore-backgrounds.ts`. The restore
+        flow (`RestorePreviewScreen`, `confirmRestoreApply`) asks through it; `applyRestore` gates on it before any
+        snapshot or staging, uses the same predicate for the settings write, and re-decides consent inside its
+        transaction from that transaction's own settings read, so an unconsented unavailable id can never be written.
 
 ## Primary Input: the 38.4 Background-Art Brief
 
@@ -876,3 +892,6 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
 -   2026-09-29 --- Code-review rulings: D-48 recorded (a see-through List row's backing goes to 50% while the row is
     swiped; review WR-01, option R1a). The row's icons and ring crossing the panel glyphs in motion are an accepted,
     recorded exemption; text is proven. The mid-swipe gap-list item is struck.
+-   2026-09-29 --- Code re-review ruling: D-49 recorded (RA-a: the D-47 question is asked only when the backup's settings
+    will be applied; a Merge whose backup settings are older skips the question and proceeds; re-review WR-A). D-47
+    carries a pointer to it.

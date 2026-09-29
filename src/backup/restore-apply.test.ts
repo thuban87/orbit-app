@@ -2593,14 +2593,22 @@ describe("applyRestore", () => {
     }
   });
 
-  /** A source with one contact, newer settings and the given background ids. */
-  async function manifestWithBackgrounds(backgrounds: {
-    galaxyBackground?: unknown;
-    standardBackground?: unknown;
-  }) {
+  /** The backup's settings stamp in the D-47 fixtures: newer than `db()`'s NOW. */
+  const BACKUP_SETTINGS_NEWER = "2026-08-25 12:01:00";
+  /** A backup whose settings are OLDER than a destination seeded at NOW. */
+  const BACKUP_SETTINGS_OLDER = "2026-08-25 11:00:00";
+
+  /** A source with one contact, the given settings stamp and background ids. */
+  async function manifestWithBackgrounds(
+    backgrounds: {
+      galaxyBackground?: unknown;
+      standardBackground?: unknown;
+    },
+    settingsModifiedAt = BACKUP_SETTINGS_NEWER,
+  ) {
     const source = await db();
     await source.runAsync("UPDATE app_settings SET modified_at=? WHERE id=1", [
-      "2026-08-25 12:01:00",
+      settingsModifiedAt,
     ]);
     await source.runAsync(
       "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('bg-contact','Bea',NULL,30,?,?)",
@@ -2643,13 +2651,93 @@ describe("applyRestore", () => {
         }),
       ).resolves.toEqual({ status: "unavailable-background", unavailable: 1 });
       // Checked before the pre-restore snapshot, staging or the transaction.
-      expect(snapshot).not.toHaveBeenCalled();
-      expect(stagePhoto).not.toHaveBeenCalled();
+      expect(snapshot, mode).not.toHaveBeenCalled();
+      expect(stagePhoto, mode).not.toHaveBeenCalled();
       await expect(backgroundsAndContacts(destination)).resolves.toEqual({
         settings: { galaxy_background: null, standard_background: null },
         contacts: [],
       });
     }
+  });
+
+  it("Merge whose backup settings are older (or the same age) needs no consent: it restores, and the phone's settings are untouched (RA-a / D-49)", async () => {
+    for (const [stamp, local] of [
+      [BACKUP_SETTINGS_OLDER, NOW],
+      [NOW, NOW],
+    ] as const) {
+      const manifest = await manifestWithBackgrounds(
+        { galaxyBackground: "galaxy-made-up" },
+        stamp,
+      );
+      for (const policy of [undefined, "reject"] as const) {
+        const destination = await db();
+        await destination.runAsync(
+          "UPDATE app_settings SET galaxy_background=?, modified_at=? WHERE id=1",
+          ["galaxy-aurora", local],
+        );
+        await expect(
+          applyRestore(destination, manifest, "merge", {
+            stagePhoto: async () => {},
+            ...(policy ? { unavailableBackgrounds: policy } : {}),
+          }),
+        ).resolves.toMatchObject({ status: "applied" });
+        await expect(backgroundsAndContacts(destination)).resolves.toEqual({
+          settings: {
+            galaxy_background: "galaxy-aurora",
+            standard_background: null,
+          },
+          contacts: [{ uid: "bg-contact" }],
+        });
+        await expect(
+          destination.getFirstAsync<{ modified_at: string }>(
+            "SELECT modified_at FROM app_settings WHERE id=1",
+          ),
+        ).resolves.toEqual({ modified_at: local });
+      }
+    }
+  });
+
+  it("Replace-all always writes the backup's settings, so even older ones still need consent (RA-a / D-49)", async () => {
+    const manifest = await manifestWithBackgrounds(
+      { galaxyBackground: "galaxy-made-up" },
+      BACKUP_SETTINGS_OLDER,
+    );
+    const destination = await db();
+    await expect(
+      applyRestore(destination, manifest, "replace-all"),
+    ).resolves.toEqual({ status: "unavailable-background", unavailable: 1 });
+    await expect(backgroundsAndContacts(destination)).resolves.toEqual({
+      settings: { galaxy_background: null, standard_background: null },
+      contacts: [],
+    });
+  });
+
+  it("the transaction re-decides consent from its own settings read: a stale early read cannot let an unconsented id be written (RA-a / D-49)", async () => {
+    // The early gate reads the phone's stamp before the transaction. Make that
+    // one read report a far-future stamp (the gate sees "Merge skips the
+    // settings"), while the transaction reads the real, older one.
+    const manifest = await manifestWithBackgrounds({
+      galaxyBackground: "galaxy-made-up",
+    });
+    const destination = await db();
+    const staleEarlyRead: SqlExecutor = {
+      execAsync: (sql) => destination.execAsync(sql),
+      runAsync: (sql, params) => destination.runAsync(sql, params),
+      getAllAsync: (sql, params) => destination.getAllAsync(sql, params),
+      getFirstAsync: async <T>(sql: string, params?: unknown[]) =>
+        sql === "SELECT modified_at FROM app_settings WHERE id=1"
+          ? ({ modified_at: "2099-01-01 00:00:00" } as T)
+          : destination.getFirstAsync<T>(sql, params),
+    };
+    await expect(
+      applyRestore(staleEarlyRead, manifest, "merge", {
+        stagePhoto: async () => {},
+      }),
+    ).resolves.toEqual({ status: "unavailable-background", unavailable: 1 });
+    await expect(backgroundsAndContacts(destination)).resolves.toEqual({
+      settings: { galaxy_background: null, standard_background: null },
+      contacts: [],
+    });
   });
 
   it("an explicit reject policy behaves as the default: the cancelled prompt writes nothing (D-47)", async () => {

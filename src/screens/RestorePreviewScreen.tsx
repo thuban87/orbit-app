@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -18,7 +18,7 @@ import {
   restoreReturnRouteName,
 } from "@/screens/backup-dualhome-logic";
 import {
-  backupHasUnavailableBackground,
+  backupNeedsBackgroundConsent,
   confirmRestoreApply,
   createRestoreApplySingleFlight,
   type RestoreApplyConfirmation,
@@ -72,6 +72,11 @@ function confirmApply(
   });
 }
 
+/** This phone's settings LWW stamp, for the D-47 / RA-a consent decision. */
+async function readLocalSettingsModifiedAt(): Promise<string> {
+  return (await getAppSettings(getExecutor())).modifiedAt;
+}
+
 async function createPreRestoreSnapshot() {
   const exec = getExecutor();
   const settings = await getAppSettings(exec);
@@ -121,10 +126,31 @@ export function RestorePreviewScreen({
   // D-47: set only when the user agreed to switch an unavailable background to
   // the package default.
   const useDefaultBackgroundsRef = useRef(false);
-  const unavailableBackground = useMemo(() => {
+  // The preview notice shows exactly when the apply will ask (RA-a / D-49): an
+  // unavailable id in settings this mode will write. A Merge whose backup
+  // settings are older than this phone's skips them, so it shows nothing.
+  const [unavailableBackground, setUnavailableBackground] = useState(false);
+  useEffect(() => {
     const cached = restorePreviewCache.read(route.params.token);
-    return cached !== null && backupHasUnavailableBackground(cached);
-  }, [route.params.token]);
+    if (cached === null) {
+      setUnavailableBackground(false);
+      return;
+    }
+    let current = true;
+    backupNeedsBackgroundConsent(cached, mode, readLocalSettingsModifiedAt)
+      .then((needed) => {
+        if (current) setUnavailableBackground(needed);
+      })
+      .catch((error: unknown) => {
+        // The notice is informational; the apply's own confirmation re-reads
+        // and decides, and surfaces a failure there.
+        Logger.error(LOG_SCOPE, "failed to read the local settings", error);
+        if (current) setUnavailableBackground(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [mode, route.params.token]);
   const allowNavigationRef = useRef(false);
   const runSingleApply = useRef(
     createRestoreApplySingleFlight(() => executeRef.current()),
@@ -212,8 +238,11 @@ export function RestorePreviewScreen({
         restorePreviewCache,
         route.params.token,
         mode,
-        async () =>
-          Boolean((await getAppSettings(getExecutor())).backupFolderUri),
+        {
+          destinationConfigured: async () =>
+            Boolean((await getAppSettings(getExecutor())).backupFolderUri),
+          localSettingsModifiedAt: readLocalSettingsModifiedAt,
+        },
         confirmApply,
       );
       if (confirmation.status === "cancelled") return;
