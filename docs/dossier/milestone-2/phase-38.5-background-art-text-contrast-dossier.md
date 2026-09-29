@@ -415,6 +415,18 @@ per-cell checker results on the shipped files, the P-7 sizes and the machine-rea
     Starfield keep their names in both modes.
 -   **[DECIDED · 2026-09-28] D-34 --- No backup-format bump.** The owner agreed with the recommendation: the slot id stays
     in the same keys and nothing on the wire changes.
+-   **[DECIDED · 2026-09-29] D-35 --- The Aurora art is mirrored left↔right, both modes (amends D-30).** Owner, verbatim:
+    "I need the image mirrored. I was feeling weird about the ribbon in the image being only on one side but couldn't
+    put my finger on why and now it's obvious: most of the app's visual content is on the left of the screen, same side
+    as the ribbon, while the right side is relatively content-free. Meaning the ribbon sits behind the contact names and
+    pictures on the list view of contacts and the digest pages. If we mirror the image so the ribbon is exactly the same
+    but on the right side and inverted, I think that would look "stellar" so to speak :P ... I'm not saying to
+    regenerate the image, literally just mechanically flip the image. Both light and dark would need this treatment."
+    -   `galaxy-aurora-dark.webp` (Aurora-D7) and `galaxy-aurora-light.webp` (Aurora-L1) are flipped horizontally on the
+        decoded pixels, not regenerated, and re-saved as lossless WebPs the same way as D-30. Each is pixel-identical to
+        `np.fliplr` of the previous file.
+    -   [DERIVED] A mirror leaves the pixel set unchanged: H1 and H2 still PASS with no failing pixel, and the declared
+        extrema still enclose every regime (`measure-background-extrema.py --check`). Record: `38.5-ART-SIGNOFF.md` §4.
 
 ## Primary Input: the 38.4 Background-Art Brief
 
@@ -671,3 +683,6 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
     (Galaxy Dark Aurora is a new image), D-31 the Starfield allowance (18 px / 0.5%) and no exclusions, D-32 the planet
     limb shelved, D-33 the "Deep Space" label for `galaxy-quiet`, D-34 no backup-format bump. O-2 is resolved. The record
     is `38.5-ART-SIGNOFF.md`.
+-   2026-09-29 --- D-35 recorded in the "Art Sign-off" section: the owner had both Aurora images mirrored left↔right
+    (mechanical flip, no regeneration) so the ribbon sits away from the left-aligned content. Record:
+    `38.5-ART-SIGNOFF.md` §4.
