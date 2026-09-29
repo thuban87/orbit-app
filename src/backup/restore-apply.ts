@@ -10,6 +10,10 @@ import {
   reconcileEntity,
   suppressCategoryTombstoneDependents,
 } from "@/backup/reconciliation";
+import {
+  unavailableBackupBackgrounds,
+  withDefaultBackgrounds,
+} from "@/backup/restore-backgrounds";
 import type {
   BackupManifest,
   ReconciliationRow,
@@ -99,6 +103,15 @@ export interface RestoreApplyDependencies {
   reconcileNotificationSchedule?: () => Promise<ReconcileOutcome | undefined>;
   reconcileDigestSchedule?: () => Promise<void>;
   sessionToken?: string;
+  /**
+   * What to do with a backup background id the DAO would reject (neither active
+   * nor retired; 38.5 D-47). `"reject"` (the default) returns
+   * `unavailable-background` before anything is written. `"use-default"` is the
+   * user's answer to the restore flow's confirmation: the settings mapping
+   * writes that package's default slot instead. Retired ids always restore
+   * unchanged.
+   */
+  unavailableBackgrounds?: "reject" | "use-default";
 }
 export type RestoreApplyResult =
   | {
@@ -115,7 +128,9 @@ export type RestoreApplyResult =
       preRestoreSnapshotCreated: boolean;
     }
   | { status: "incompatible-destination"; incompatibilities: number }
-  | { status: "pre-restore-snapshot-failed" };
+  | { status: "pre-restore-snapshot-failed" }
+  /** An unavailable background id and no consent to the default (D-47). */
+  | { status: "unavailable-background"; unavailable: number };
 
 type Row = Record<string, unknown> & ReconciliationRow;
 type Plan = Record<MergeableEntityType, ReconciliationAction[]>;
@@ -1471,6 +1486,20 @@ export async function applyRestore(
   deps: RestoreApplyDependencies = {},
 ): Promise<RestoreApplyResult> {
   assertCompleteIncomingPairs(manifest);
+  // D-47: an unavailable background id needs the user's consent, which the
+  // restore flow asks for before calling this. Without it, stop here: nothing
+  // is staged, snapshotted or written.
+  const unavailableBackgrounds = unavailableBackupBackgrounds(
+    manifest.appSettings,
+  );
+  if (
+    unavailableBackgrounds.length > 0 &&
+    deps.unavailableBackgrounds !== "use-default"
+  )
+    return {
+      status: "unavailable-background",
+      unavailable: unavailableBackgrounds.length,
+    };
   let preRestoreSnapshotCreated = false;
   const configured = Boolean(
     (
@@ -1771,8 +1800,11 @@ export async function applyRestore(
           typeof uid === "string" && survivors.contacts?.has(uid)
             ? (contacts.get(uid) ?? null)
             : null;
+        // The restore mapping (D-47): with the user's consent, an unavailable
+        // background id becomes its package default here, before the DAO
+        // (which still rejects it). Available ids pass through unchanged.
         const patch = Object.fromEntries(
-          Object.entries(manifest.appSettings).filter(
+          Object.entries(withDefaultBackgrounds(manifest.appSettings)).filter(
             ([key]) => key !== "modifiedAt" && key !== "sunContactUid",
           ),
         ) as AppSettingsPatch;

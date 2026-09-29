@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Pressable,
@@ -18,10 +18,11 @@ import {
   restoreReturnRouteName,
 } from "@/screens/backup-dualhome-logic";
 import {
-  confirmReplaceAllRestore,
+  backupHasUnavailableBackground,
+  confirmRestoreApply,
   createRestoreApplySingleFlight,
+  type RestoreApplyConfirmation,
   type RestoreCacheEntry,
-  replaceAllConfirmation,
   restoreApplyLabel,
   restoreApplyRecovery,
   restorePreviewCache,
@@ -43,21 +44,26 @@ import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "restore-preview";
 
-function confirmReplace(destinationConfigured: boolean): Promise<boolean> {
-  const confirmation = replaceAllConfirmation(destinationConfigured);
+/**
+ * The apply's one confirmation dialog (Replace-all, and/or the 38.5 D-47
+ * unavailable-background question). Dismissing it cancels.
+ */
+function confirmApply(
+  confirmation: RestoreApplyConfirmation,
+): Promise<boolean> {
   return new Promise((resolve) => {
     Alert.alert(
       confirmation.title,
       confirmation.message,
       [
         {
-          text: "Keep local data",
+          text: confirmation.cancelLabel,
           style: "cancel",
           onPress: () => resolve(false),
         },
         {
-          text: "Replace and restore",
-          style: "destructive",
+          text: confirmation.confirmLabel,
+          style: confirmation.destructive ? "destructive" : "default",
           onPress: () => resolve(true),
         },
       ],
@@ -112,6 +118,13 @@ export function RestorePreviewScreen({
   const [applyError, setApplyError] = useState<string | null>(null);
   const executeRef = useRef<() => Promise<void>>(async () => {});
   const confirmedCandidateRef = useRef<RestoreCacheEntry | null>(null);
+  // D-47: set only when the user agreed to switch an unavailable background to
+  // the package default.
+  const useDefaultBackgroundsRef = useRef(false);
+  const unavailableBackground = useMemo(() => {
+    const cached = restorePreviewCache.read(route.params.token);
+    return cached !== null && backupHasUnavailableBackground(cached);
+  }, [route.params.token]);
   const allowNavigationRef = useRef(false);
   const runSingleApply = useRef(
     createRestoreApplySingleFlight(() => executeRef.current()),
@@ -152,6 +165,9 @@ export function RestorePreviewScreen({
     try {
       const result = await applyRestore(getExecutor(), cached.manifest, mode, {
         createVerifiedPreRestoreSnapshot: createPreRestoreSnapshot,
+        unavailableBackgrounds: useDefaultBackgroundsRef.current
+          ? "use-default"
+          : "reject",
       });
       if (result.status !== "applied") {
         setApplyError(restoreApplyRecovery(result.status).message);
@@ -187,33 +203,32 @@ export function RestorePreviewScreen({
 
   const beginApply = useCallback(async () => {
     if (applying || confirming) return;
-    if (mode === "replace-all") {
-      setConfirming(true);
-      try {
-        const confirmation = await confirmReplaceAllRestore(
-          restorePreviewCache,
-          route.params.token,
-          async () =>
-            Boolean((await getAppSettings(getExecutor())).backupFolderUri),
-          confirmReplace,
-        );
-        if (confirmation.status === "cancelled") return;
-        if (confirmation.status === "expired") {
-          setExpired(true);
-          return;
-        }
-        confirmedCandidateRef.current = confirmation.candidate;
-      } catch (error) {
-        Logger.error(
-          LOG_SCOPE,
-          "failed to confirm pre-restore destination",
-          error,
-        );
-        setApplyError(restoreApplyRecovery("unexpected").message);
+    // One dialog at most: Replace-all's, carrying the D-47 notice when a
+    // background is unavailable, or for Merge the D-47 question alone. Cancel
+    // returns here, before anything is written.
+    setConfirming(true);
+    try {
+      const confirmation = await confirmRestoreApply(
+        restorePreviewCache,
+        route.params.token,
+        mode,
+        async () =>
+          Boolean((await getAppSettings(getExecutor())).backupFolderUri),
+        confirmApply,
+      );
+      if (confirmation.status === "cancelled") return;
+      if (confirmation.status === "expired") {
+        setExpired(true);
         return;
-      } finally {
-        setConfirming(false);
       }
+      confirmedCandidateRef.current = confirmation.candidate;
+      useDefaultBackgroundsRef.current = confirmation.useDefaultBackgrounds;
+    } catch (error) {
+      Logger.error(LOG_SCOPE, "failed to confirm the restore apply", error);
+      setApplyError(restoreApplyRecovery("unexpected").message);
+      return;
+    } finally {
+      setConfirming(false);
     }
     await runSingleApply();
   }, [applying, confirming, mode, route.params.token, runSingleApply]);
@@ -316,6 +331,23 @@ export function RestorePreviewScreen({
           {preview.tombstoneCount}
         </Text>
       </View>
+      {unavailableBackground ? (
+        <View
+          testID="restore-background-unavailable"
+          style={[
+            styles.card,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <Text style={[styles.cardTitle, { color: colors.textPrimary }]}>
+            Background not available
+          </Text>
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            A background selected in this backup is no longer available. Orbit
+            will ask before switching to the default background instead.
+          </Text>
+        </View>
+      ) : null}
       <Pressable
         testID="restore-mode-merge"
         accessibilityRole="radio"

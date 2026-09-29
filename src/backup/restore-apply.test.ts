@@ -94,6 +94,7 @@ import { parseBackupManifest } from "@/backup/backup-schema";
 import { buildExportManifest } from "@/backup/export-manifest";
 import { applyRestore } from "@/backup/restore-apply";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { updateAppSettingsCore } from "@/db/app-settings-dao";
 import { deleteMemory, purgeMemoryPermanently } from "@/db/memories-dao";
 import { migration001 } from "@/db/migrations/001-initial";
 import { migration002 } from "@/db/migrations/002-app-settings";
@@ -2592,26 +2593,131 @@ describe("applyRestore", () => {
     }
   });
 
-  it("still rejects an unknown restored background id before writing (T-38.5-05-03)", async () => {
+  /** A source with one contact, newer settings and the given background ids. */
+  async function manifestWithBackgrounds(backgrounds: {
+    galaxyBackground?: unknown;
+    standardBackground?: unknown;
+  }) {
     const source = await db();
     await source.runAsync("UPDATE app_settings SET modified_at=? WHERE id=1", [
       "2026-08-25 12:01:00",
     ]);
+    await source.runAsync(
+      "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('bg-contact','Bea',NULL,30,?,?)",
+      [NOW, NOW],
+    );
     const manifest = await buildExportManifest(source, {
       exportedAt: NOW,
       readPhotoBase64: async () => "",
     });
-    (manifest.appSettings as Record<string, unknown>).galaxyBackground =
-      "galaxy-made-up";
+    Object.assign(manifest.appSettings as Record<string, unknown>, backgrounds);
+    return parseBackupManifest(manifest);
+  }
+
+  async function backgroundsAndContacts(exec: SqlExecutor) {
+    return {
+      settings: await exec.getFirstAsync<{
+        galaxy_background: string | null;
+        standard_background: string | null;
+      }>(
+        "SELECT galaxy_background, standard_background FROM app_settings WHERE id=1",
+      ),
+      contacts: await exec.getAllAsync<{ uid: string }>(
+        "SELECT uid FROM contacts ORDER BY uid",
+      ),
+    };
+  }
+
+  it("an unavailable background id without the user's consent returns unavailable-background and writes nothing (38.5 D-47)", async () => {
+    const manifest = await manifestWithBackgrounds({
+      galaxyBackground: "galaxy-made-up",
+    });
+    for (const mode of ["merge", "replace-all"] as const) {
+      const destination = await db();
+      const snapshot = vi.fn(async () => ({ status: "written" as const }));
+      const stagePhoto = vi.fn(async () => {});
+      await expect(
+        applyRestore(destination, manifest, mode, {
+          createVerifiedPreRestoreSnapshot: snapshot,
+          stagePhoto,
+        }),
+      ).resolves.toEqual({ status: "unavailable-background", unavailable: 1 });
+      // Checked before the pre-restore snapshot, staging or the transaction.
+      expect(snapshot).not.toHaveBeenCalled();
+      expect(stagePhoto).not.toHaveBeenCalled();
+      await expect(backgroundsAndContacts(destination)).resolves.toEqual({
+        settings: { galaxy_background: null, standard_background: null },
+        contacts: [],
+      });
+    }
+  });
+
+  it("an explicit reject policy behaves as the default: the cancelled prompt writes nothing (D-47)", async () => {
+    const manifest = await manifestWithBackgrounds({
+      standardBackground: "standard-made-up",
+    });
     const destination = await db();
     await expect(
-      applyRestore(destination, manifest, "merge"),
-    ).rejects.toThrow();
+      applyRestore(destination, manifest, "merge", {
+        unavailableBackgrounds: "reject",
+      }),
+    ).resolves.toMatchObject({ status: "unavailable-background" });
+    await expect(backgroundsAndContacts(destination)).resolves.toEqual({
+      settings: { galaxy_background: null, standard_background: null },
+      contacts: [],
+    });
+  });
+
+  it("with the user's consent, restores everything and writes each unavailable id's package default (D-47)", async () => {
+    const manifest = await manifestWithBackgrounds({
+      galaxyBackground: "galaxy-made-up",
+      standardBackground: "standard-made-up",
+    });
+    for (const mode of ["merge", "replace-all"] as const) {
+      const destination = await db();
+      await expect(
+        applyRestore(destination, manifest, mode, {
+          unavailableBackgrounds: "use-default",
+        }),
+      ).resolves.toMatchObject({ status: "applied" });
+      await expect(backgroundsAndContacts(destination)).resolves.toEqual({
+        settings: {
+          galaxy_background: "galaxy-quiet",
+          standard_background: "standard-dawn",
+        },
+        contacts: [{ uid: "bg-contact" }],
+      });
+    }
+  });
+
+  it("the default mapping touches only the unavailable key: a retired id beside it restores unchanged (D-47)", async () => {
+    const manifest = await manifestWithBackgrounds({
+      galaxyBackground: "galaxy-made-up",
+      standardBackground: "standard-mesh",
+    });
+    const destination = await db();
     await expect(
-      destination.getFirstAsync<{ galaxy_background: string | null }>(
-        "SELECT galaxy_background FROM app_settings WHERE id=1",
+      applyRestore(destination, manifest, "replace-all", {
+        unavailableBackgrounds: "use-default",
+      }),
+    ).resolves.toMatchObject({ status: "applied" });
+    await expect(backgroundsAndContacts(destination)).resolves.toMatchObject({
+      settings: {
+        galaxy_background: "galaxy-quiet",
+        standard_background: "standard-mesh",
+      },
+    });
+  });
+
+  it("the DAO stays strict: an unavailable id that bypasses the restore mapping still throws (D-47)", async () => {
+    const destination = await db();
+    await expect(
+      updateAppSettingsCore(
+        destination,
+        { galaxyBackground: "galaxy-made-up" as never },
+        "2026-08-25 12:02:00",
       ),
-    ).resolves.toEqual({ galaxy_background: null });
+    ).rejects.toThrow(/known background slot id/);
   });
 
   it("restores the declare-only camelCase channel keys into their SQLite columns via COLUMN_OF (CAPT-11)", async () => {

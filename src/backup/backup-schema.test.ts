@@ -876,3 +876,30 @@ describe("parseBackupManifest", () => {
     expect(() => parseBackupManifest(broken)).toThrow(BackupSchemaError);
   });
 });
+
+describe("background ids at the parse boundary (38.5 D-47)", () => {
+  it("accepts null, active, retired and well-formed unavailable ids (the restore flow asks about the last)", () => {
+    for (const id of [null, "galaxy-aurora", "standard-mesh", "galaxy-comet"]) {
+      const portable = valid();
+      portable.appSettings.galaxyBackground = id;
+      portable.appSettings.standardBackground = id;
+      expect(parseBackupManifest(portable).appSettings).toMatchObject({
+        galaxyBackground: id,
+        standardBackground: id,
+      });
+    }
+  });
+
+  it("rejects a malformed background value as a damaged file", () => {
+    for (const bad of [42, {}, "", "has space", "x".repeat(257), "a\u0000b"]) {
+      for (const key of ["galaxyBackground", "standardBackground"]) {
+        const portable = valid();
+        portable.appSettings[key] = bad;
+        expect(
+          () => parseBackupManifest(portable),
+          `${key}=${String(bad)}`,
+        ).toThrow(/invalid background id/);
+      }
+    }
+  });
+});

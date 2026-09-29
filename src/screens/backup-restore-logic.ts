@@ -1,4 +1,5 @@
 import type { RestoreApplyResult, RestoreMode } from "@/backup/restore-apply";
+import { unavailableBackupBackgrounds } from "@/backup/restore-backgrounds";
 import type { BackupManifest } from "@/backup/types";
 import type { RestorePreviewAggregate } from "@/services/backup/backup-service";
 
@@ -12,10 +13,29 @@ export type RestoreCacheEntry = {
   readonly preview: RestorePreviewAggregate;
 };
 
-export type ReplaceAllConfirmationResult =
-  | { readonly status: "confirmed"; readonly candidate: RestoreCacheEntry }
+export type RestoreApplyConfirmationResult =
+  | {
+      readonly status: "confirmed";
+      readonly candidate: RestoreCacheEntry;
+      /**
+       * The user agreed to switch an unavailable background to the package
+       * default (38.5 D-47); the apply passes `unavailableBackgrounds:
+       * "use-default"`.
+       */
+      readonly useDefaultBackgrounds: boolean;
+    }
   | { readonly status: "cancelled" }
   | { readonly status: "expired" };
+
+/** One confirmation dialog: the copy and the two button labels. */
+export type RestoreApplyConfirmation = {
+  readonly title: string;
+  readonly message: string;
+  readonly cancelLabel: string;
+  readonly confirmLabel: string;
+  /** The confirm button is destructive (Replace-all). */
+  readonly destructive: boolean;
+};
 
 export type RestorePreviewFailureReason =
   | "wrong-passphrase"
@@ -52,22 +72,86 @@ export function createRestorePreviewCache() {
 export const restorePreviewCache = createRestorePreviewCache();
 
 /**
- * Coordinates the async Replace-all confirmation with the validated preview
- * candidate. The candidate never travels through navigation params.
+ * The owner's question for a backup background the app no longer has (38.5
+ * D-47, 2026-09-29): "A background selected in the backup file is no longer
+ * available. Do you agree to switch to the default background for now
+ * instead?"
  */
-export async function confirmReplaceAllRestore(
+export const UNAVAILABLE_BACKGROUND_TITLE = "Background not available";
+export const UNAVAILABLE_BACKGROUND_MESSAGE =
+  "A background selected in this backup is no longer available. Switch to the default background instead?";
+/** The same notice inside the Replace-all dialog, whose buttons carry the answer. */
+export const UNAVAILABLE_BACKGROUND_REPLACE_NOTE =
+  "A background selected in this backup is no longer available. Replace and restore will switch to the default background instead.";
+
+/**
+ * Whether the validated backup holds a background id the DAO would reject
+ * (neither active nor retired; D-47). Retired ids are available.
+ */
+export function backupHasUnavailableBackground(
+  entry: Pick<RestoreCacheEntry, "manifest">,
+): boolean {
+  return unavailableBackupBackgrounds(entry.manifest?.appSettings).length > 0;
+}
+
+/**
+ * The ONE dialog an apply shows, or null for none (a plain Merge):
+ *   - Replace-all: the destructive confirmation; with an unavailable background
+ *     its message also carries the D-47 notice, and "Replace and restore" is the
+ *     consent (one dialog, not two);
+ *   - Merge with an unavailable background: the D-47 question, Continue/Cancel.
+ */
+export function restoreApplyConfirmation(
+  mode: RestoreMode,
+  destinationConfigured: boolean,
+  unavailableBackground: boolean,
+): RestoreApplyConfirmation | null {
+  if (mode === "replace-all") {
+    const base = replaceAllConfirmation(destinationConfigured);
+    return {
+      title: base.title,
+      message: unavailableBackground
+        ? `${base.message}\n\n${UNAVAILABLE_BACKGROUND_REPLACE_NOTE}`
+        : base.message,
+      cancelLabel: "Keep local data",
+      confirmLabel: "Replace and restore",
+      destructive: true,
+    };
+  }
+  if (!unavailableBackground) return null;
+  return {
+    title: UNAVAILABLE_BACKGROUND_TITLE,
+    message: UNAVAILABLE_BACKGROUND_MESSAGE,
+    cancelLabel: "Cancel",
+    confirmLabel: "Continue",
+    destructive: false,
+  };
+}
+
+/**
+ * Coordinates the apply's confirmation with the validated preview candidate.
+ * The candidate never travels through navigation params. Cancel returns before
+ * anything is written; a plain Merge confirms without a dialog.
+ */
+export async function confirmRestoreApply(
   cache: Pick<ReturnType<typeof createRestorePreviewCache>, "read">,
   token: string,
+  mode: RestoreMode,
   readDestinationConfigured: () => Promise<boolean>,
-  confirm: (destinationConfigured: boolean) => Promise<boolean>,
-): Promise<ReplaceAllConfirmationResult> {
+  confirm: (confirmation: RestoreApplyConfirmation) => Promise<boolean>,
+): Promise<RestoreApplyConfirmationResult> {
   const candidate = cache.read(token);
   if (!candidate) return { status: "expired" };
 
-  const destinationConfigured = await readDestinationConfigured();
-  const accepted = await confirm(destinationConfigured);
-  if (!accepted) return { status: "cancelled" };
-  return { status: "confirmed", candidate };
+  const useDefaultBackgrounds = backupHasUnavailableBackground(candidate);
+  const confirmation = restoreApplyConfirmation(
+    mode,
+    mode === "replace-all" ? await readDestinationConfigured() : false,
+    useDefaultBackgrounds,
+  );
+  if (confirmation !== null && !(await confirm(confirmation)))
+    return { status: "cancelled" };
+  return { status: "confirmed", candidate, useDefaultBackgrounds };
 }
 
 export function isEncryptedBackupEnvelope(contents: string): boolean {

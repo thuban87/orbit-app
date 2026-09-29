@@ -1189,7 +1189,10 @@ export function assertAccentId(field: string, v: unknown): void {
  * cannot drift. Retired ids stay accepted because restore writes the backup's
  * settings through this validator INSIDE its transaction: rejecting a cut slot
  * would abort the whole restore (research Pitfall 1; T-38.5-05-01). It is still a
- * closed-set membership check, so an unknown id throws (T-38.5-05-03).
+ * closed-set membership check, so an unknown id throws (T-38.5-05-03), restore
+ * included. Restore no longer reaches this with an unknown id: it asks the user
+ * first and maps the id to the package default before the DAO (38.5 D-47,
+ * `src/backup/restore-backgrounds.ts`).
  */
 export function assertBackgroundId(field: string, v: unknown): void {
   if (v === null) return;

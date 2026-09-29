@@ -557,6 +557,20 @@ the CONTEXT shim.
     -   [DERIVED] `accentText` on `surface` clears AA for every accent in all four package × mode pairs (COMPUTED).
     -   The inverted alternative (`accent` fill, `onAccent` text) is noted in `trigger-look.ts`, one edit away.
     -   The owner confirms the look on the device in 38.5-09. Record: `38.5-SIGNOFF-V3.md` §8.
+-   **[DECIDED · 2026-09-29] D-47 --- A restore with an unavailable background id asks, then uses the default
+    (supersedes T-38.5-05-03's whole-restore abort; review IN-07).** Owner, verbatim: "I would lean towards swapping to
+    the default background in this case but there should be a warning and confirmation given to the user first along
+    the lines of 'A background selected in the backup file is no longer available. Do you agree to switch to the
+    default background for now instead?'"
+    -   Unavailable = an id the DAO rejects: neither active nor retired (for example a slot added by a later version
+        under the same backup format, D-34). Retired ids still restore unchanged and silently (D-19 / P-4).
+    -   Before anything is written, the restore preview asks: "A background selected in this backup is no longer
+        available. Switch to the default background instead?" Merge shows it as a Continue/Cancel dialog; Replace-all
+        carries it inside its existing confirmation, so each path shows one dialog.
+    -   Continue restores everything, with that package's background set to its default. Cancel aborts the whole
+        restore with nothing written.
+    -   The substitution happens in the restore's settings mapping, before the DAO. The DAO stays strict for every
+        write. A malformed value (not a bounded string) is still a damaged file. No backup-format bump (D-34).
 
 ## Primary Input: the 38.4 Background-Art Brief
 
@@ -834,3 +848,5 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
 -   2026-09-29 --- Code-review rulings: D-46 recorded in a new "Code-Review Rulings (2026-09-29)" section (the active
     Population/Filters/Sort triggers are filled, with accent border and text; resolves H-3 / I1). The gap-list item is
     struck. Record: `38.5-SIGNOFF-V3.md` §8.
+-   2026-09-29 --- Code-review rulings: D-47 recorded (a restore with an unavailable background id asks, then uses the
+    package default; supersedes T-38.5-05-03's abort).

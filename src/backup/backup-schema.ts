@@ -354,6 +354,22 @@ function assertPortableSettings(
     )
       fail("appSettings has an invalid Profile template UID");
   }
+  // 38.5 D-47: a background id must be null or a bounded, printable string. A
+  // well-formed id the app does not know (e.g. a slot from a later version) is
+  // NOT a damaged file: the restore flow asks the user and maps it to the
+  // package default (`restore-backgrounds.ts`); the DAO still validates it.
+  for (const key of ["galaxyBackground", "standardBackground"] as const) {
+    const value = settings[key];
+    if (
+      value !== undefined &&
+      value !== null &&
+      (typeof value !== "string" ||
+        value.length === 0 ||
+        value.length > 256 ||
+        /[\s\p{Cc}]/u.test(value))
+    )
+      fail("appSettings has an invalid background id");
+  }
   if (
     settings.sunContactUid !== null &&
     (typeof settings.sunContactUid !== "string" ||

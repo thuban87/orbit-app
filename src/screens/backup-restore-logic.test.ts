@@ -1,15 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
-  confirmReplaceAllRestore,
+  backupHasUnavailableBackground,
+  confirmRestoreApply,
   createRestoreApplySingleFlight,
   createRestorePreviewCache,
   initialRestoreApplyState,
   isEncryptedBackupEnvelope,
   replaceAllConfirmation,
+  restoreApplyConfirmation,
   restoreApplyLabel,
   restoreApplyRecovery,
   restorePreviewFailure,
   toRestoreResultParams,
+  UNAVAILABLE_BACKGROUND_MESSAGE,
+  UNAVAILABLE_BACKGROUND_REPLACE_NOTE,
 } from "@/screens/backup-restore-logic";
 
 const preview = {
@@ -104,9 +108,10 @@ describe("restore apply decisions", () => {
       accept = resolve;
     });
 
-    const result = confirmReplaceAllRestore(
+    const result = confirmRestoreApply(
       cache,
       route.token,
+      "replace-all",
       async () => true,
       async () => waitingForConfirmation,
     );
@@ -124,9 +129,10 @@ describe("restore apply decisions", () => {
     let confirmationCalls = 0;
 
     await expect(
-      confirmReplaceAllRestore(
+      confirmRestoreApply(
         createRestorePreviewCache(),
         "missing-token",
+        "replace-all",
         async () => {
           readDestinationCalls += 1;
           return true;
@@ -152,9 +158,10 @@ describe("restore apply decisions", () => {
     });
 
     await expect(
-      confirmReplaceAllRestore(
+      confirmRestoreApply(
         cache,
         route.token,
+        "replace-all",
         async () => false,
         async () => false,
       ),
@@ -162,6 +169,136 @@ describe("restore apply decisions", () => {
     expect(cache.read(route.token)).toMatchObject({
       manifest: { private: "keep-after-cancel" },
     });
+  });
+
+  /** A cached candidate whose backup holds the given background ids. */
+  function cachedWith(appSettings: Record<string, unknown> | undefined) {
+    const cache = createRestorePreviewCache();
+    const route = cache.store({
+      manifest: {
+        appSettings,
+      } as unknown as import("@/backup/types").BackupManifest,
+      preview,
+    });
+    return { cache, token: route.token };
+  }
+
+  it("a plain Merge confirms with no dialog and no destination read", async () => {
+    const { cache, token } = cachedWith({ galaxyBackground: "galaxy-aurora" });
+    let reads = 0;
+    let dialogs = 0;
+    await expect(
+      confirmRestoreApply(
+        cache,
+        token,
+        "merge",
+        async () => {
+          reads += 1;
+          return true;
+        },
+        async () => {
+          dialogs += 1;
+          return true;
+        },
+      ),
+    ).resolves.toMatchObject({
+      status: "confirmed",
+      useDefaultBackgrounds: false,
+    });
+    expect(reads).toBe(0);
+    expect(dialogs).toBe(0);
+  });
+
+  it("Merge with an unavailable background asks the D-47 question; Cancel writes nothing, Continue consents", async () => {
+    const { cache, token } = cachedWith({ galaxyBackground: "galaxy-comet" });
+    const shown: unknown[] = [];
+    await expect(
+      confirmRestoreApply(
+        cache,
+        token,
+        "merge",
+        async () => true,
+        async (confirmation) => {
+          shown.push(confirmation);
+          return false;
+        },
+      ),
+    ).resolves.toEqual({ status: "cancelled" });
+    expect(shown).toEqual([
+      {
+        title: "Background not available",
+        message:
+          "A background selected in this backup is no longer available. Switch to the default background instead?",
+        cancelLabel: "Cancel",
+        confirmLabel: "Continue",
+        destructive: false,
+      },
+    ]);
+    await expect(
+      confirmRestoreApply(
+        cache,
+        token,
+        "merge",
+        async () => true,
+        async () => true,
+      ),
+    ).resolves.toMatchObject({
+      status: "confirmed",
+      useDefaultBackgrounds: true,
+    });
+  });
+
+  it("Replace-all with an unavailable background shows ONE dialog carrying the notice", async () => {
+    const { cache, token } = cachedWith({ standardBackground: "standard-x" });
+    const shown: { message: string; confirmLabel: string }[] = [];
+    await expect(
+      confirmRestoreApply(
+        cache,
+        token,
+        "replace-all",
+        async () => true,
+        async (confirmation) => {
+          shown.push(confirmation);
+          return true;
+        },
+      ),
+    ).resolves.toMatchObject({
+      status: "confirmed",
+      useDefaultBackgrounds: true,
+    });
+    expect(shown).toHaveLength(1);
+    expect(shown[0].message).toContain(
+      "Orbit will first create and verify a fresh automatic backup of this device.",
+    );
+    expect(shown[0].message).toContain(UNAVAILABLE_BACKGROUND_REPLACE_NOTE);
+    expect(shown[0].confirmLabel).toBe("Replace and restore");
+  });
+
+  it("retired and active ids never prompt; a manifest without settings is safe", () => {
+    for (const appSettings of [
+      undefined,
+      {},
+      {
+        galaxyBackground: "galaxy-nebula",
+        standardBackground: "standard-mesh",
+      },
+      { galaxyBackground: null, standardBackground: "standard-paper" },
+    ]) {
+      expect(
+        backupHasUnavailableBackground({
+          manifest: {
+            appSettings,
+          } as unknown as import("@/backup/types").BackupManifest,
+        }),
+      ).toBe(false);
+    }
+    expect(restoreApplyConfirmation("merge", false, false)).toBeNull();
+    expect(restoreApplyConfirmation("merge", false, true)?.message).toBe(
+      UNAVAILABLE_BACKGROUND_MESSAGE,
+    );
+    expect(restoreApplyConfirmation("replace-all", true, false)?.message).toBe(
+      replaceAllConfirmation(true).message,
+    );
   });
 
   it("shares one pending apply promise and never persists an applying state for a cold start", async () => {
