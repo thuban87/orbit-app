@@ -1,11 +1,16 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import type { RestoreMode } from "@/backup/restore-apply";
 import {
   backupNeedsBackgroundConsent,
+  type ConfirmedRestoreApply,
   confirmRestoreApply,
+  createRestoreApplyRun,
   createRestoreApplySingleFlight,
   createRestorePreviewCache,
   initialRestoreApplyState,
   isEncryptedBackupEnvelope,
+  type RestoreApplyConfirmation,
   replaceAllConfirmation,
   restoreApplyConfirmation,
   restoreApplyLabel,
@@ -488,5 +493,218 @@ describe("restore apply decisions", () => {
     expect(restoreApplyRecovery("incompatible-destination").step).toBe(
       "preview",
     );
+  });
+});
+
+/**
+ * 38.5 scoped re-check WR-1 (enforces D-47 "each path shows one dialog"): the
+ * mode the user confirmed is the mode the apply runs, and the mode is locked
+ * from the Apply tap until the confirmation settles and the apply completes or
+ * is cancelled. The screen's radios go through `acceptsModeChange`, so the
+ * harness below models the screen's mode state the same way.
+ */
+describe("restore apply: the confirmed mode is the executed mode (WR-1)", () => {
+  const NEWER = "2026-09-29 10:00:00";
+  const OLDER = "2026-09-01 10:00:00";
+  const PHONE = "2026-09-15 10:00:00";
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    const promise = new Promise<T>((r) => {
+      resolve = r;
+    });
+    return { promise, resolve };
+  }
+
+  /**
+   * The screen, reduced to its apply wiring: the selected mode, radios gated by
+   * `acceptsModeChange`, the real `confirmRestoreApply`, and a recorded apply.
+   * The phone's settings read is held open so a test can tap mid-preparation.
+   */
+  function screen(appSettings: Record<string, unknown>) {
+    const cache = createRestorePreviewCache();
+    const { token } = cache.store({
+      manifest: {
+        appSettings,
+      } as unknown as import("@/backup/types").BackupManifest,
+      preview,
+    });
+    const settingsRead = deferred<string>();
+    const applyGate = deferred<void>();
+    const dialogs: RestoreApplyConfirmation[] = [];
+    const applied: ConfirmedRestoreApply[] = [];
+    let mode: RestoreMode = "merge";
+    const run = createRestoreApplyRun({
+      confirm: (confirmMode) =>
+        confirmRestoreApply(
+          cache,
+          token,
+          confirmMode,
+          {
+            destinationConfigured: async () => false,
+            localSettingsModifiedAt: () => settingsRead.promise,
+          },
+          async (confirmation) => {
+            dialogs.push(confirmation);
+            return true;
+          },
+        ),
+      apply: async (confirmed) => {
+        applied.push(confirmed);
+        await applyGate.promise;
+      },
+    });
+    return {
+      run,
+      dialogs,
+      applied,
+      settingsRead,
+      applyGate,
+      get mode() {
+        return mode;
+      },
+      /** A radio tap: the screen's `selectMode`. */
+      tap(next: RestoreMode) {
+        if (run.acceptsModeChange()) mode = next;
+      },
+      /** The Apply tap: begins with the mode selected at the tap. */
+      apply() {
+        return run.begin(mode);
+      },
+    };
+  }
+
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  it("tap Merge, then Replace all mid-preparation: the switch is ignored and Merge runs Merge only", async () => {
+    // Newer backup settings with an unavailable id: Merge must read the phone's
+    // stamp before its dialog, which is the window the re-check found.
+    const s = screen({ modifiedAt: NEWER, galaxyBackground: "galaxy-comet" });
+    s.tap("merge");
+    const outcome = s.apply();
+    await flush();
+    s.tap("replace-all");
+    expect(s.mode).toBe("merge");
+    expect(s.run.acceptsModeChange()).toBe(false);
+    s.settingsRead.resolve(PHONE);
+    await flush();
+    // The dialog is Merge's, and the apply runs Merge.
+    expect(s.dialogs.map((d) => d.title)).toEqual(["Background not available"]);
+    expect(s.applied.map((c) => c.mode)).toEqual(["merge"]);
+    // Still locked while the apply runs: a tap is ignored, Apply is busy.
+    s.tap("replace-all");
+    expect(s.mode).toBe("merge");
+    await expect(s.run.begin("replace-all")).resolves.toEqual({
+      status: "busy",
+    });
+    s.applyGate.resolve();
+    await expect(outcome).resolves.toMatchObject({
+      status: "confirmed",
+      mode: "merge",
+      useDefaultBackgrounds: true,
+    });
+    expect(s.applied.map((c) => c.mode)).toEqual(["merge"]);
+    expect(s.dialogs.some((d) => d.title === "Replace all local data?")).toBe(
+      false,
+    );
+    // Unlocked once the apply completes.
+    s.tap("replace-all");
+    expect(s.mode).toBe("replace-all");
+  });
+
+  it("Replace-all always shows its 'Replace all local data?' confirmation exactly once", async () => {
+    for (const appSettings of [
+      { modifiedAt: NEWER, galaxyBackground: "galaxy-comet" },
+      { modifiedAt: OLDER, galaxyBackground: "galaxy-comet" },
+      { modifiedAt: NEWER, galaxyBackground: "galaxy-aurora" },
+    ]) {
+      const s = screen(appSettings);
+      s.tap("replace-all");
+      const outcome = s.apply();
+      await flush();
+      // A mode tap and a second Apply tap mid-preparation change nothing.
+      s.tap("merge");
+      expect(s.mode).toBe("replace-all");
+      await expect(s.apply()).resolves.toEqual({ status: "busy" });
+      s.settingsRead.resolve(PHONE);
+      s.applyGate.resolve();
+      await expect(outcome).resolves.toMatchObject({
+        status: "confirmed",
+        mode: "replace-all",
+      });
+      expect(
+        s.dialogs.filter((d) => d.title === "Replace all local data?"),
+        JSON.stringify(appSettings),
+      ).toHaveLength(1);
+      expect(s.dialogs).toHaveLength(1);
+      expect(s.applied.map((c) => c.mode)).toEqual(["replace-all"]);
+    }
+  });
+
+  it("the mode passed to apply equals the confirmed mode, and a cancel or failure releases the lock", async () => {
+    for (const mode of ["merge", "replace-all"] as const) {
+      const s = screen({ modifiedAt: NEWER, standardBackground: "standard-x" });
+      s.tap(mode);
+      const outcome = s.apply();
+      s.settingsRead.resolve(PHONE);
+      s.applyGate.resolve();
+      const result = await outcome;
+      expect(result).toMatchObject({ status: "confirmed", mode });
+      expect(s.applied).toHaveLength(1);
+      expect(s.applied[0].mode).toBe(mode);
+      expect(s.applied[0]).toBe(result);
+    }
+
+    // Cancel: nothing applied, the lock is released.
+    let applies = 0;
+    const cancelled = createRestoreApplyRun({
+      confirm: async () => ({ status: "cancelled" }),
+      apply: async () => {
+        applies += 1;
+      },
+    });
+    await expect(cancelled.begin("replace-all")).resolves.toEqual({
+      status: "cancelled",
+    });
+    expect(applies).toBe(0);
+    expect(cancelled.acceptsModeChange()).toBe(true);
+
+    // A failed confirmation read: rethrown to the screen, the lock released.
+    const failing = createRestoreApplyRun({
+      confirm: async () => {
+        throw new Error("settings read failed");
+      },
+      apply: async () => {
+        applies += 1;
+      },
+    });
+    await expect(failing.begin("merge")).rejects.toThrow(
+      "settings read failed",
+    );
+    expect(applies).toBe(0);
+    expect(failing.acceptsModeChange()).toBe(true);
+  });
+
+  it("the screen routes its radios through the lock and applies the confirmed mode, never its live mode", () => {
+    const source = readFileSync("src/screens/RestorePreviewScreen.tsx", "utf8");
+    // Both radios: disabled while locked, and the tap goes through the lock.
+    expect(source.match(/disabled=\{applying \|\| modeLocked\}/g)).toHaveLength(
+      3,
+    );
+    expect(source).toContain('onPress={() => selectMode("merge")}');
+    expect(source).toContain('onPress={() => selectMode("replace-all")}');
+    expect(source).toMatch(
+      /if \(applyRun\.acceptsModeChange\(\)\) setMode\(next\)/,
+    );
+    expect(source.match(/setMode\(/g)).toHaveLength(1);
+    // The apply's mode and D-47 answer come from the confirmation.
+    const calls = [...source.matchAll(/applyRestore\(([\s\S]*?)\{/g)].map((m) =>
+      m[1].replace(/\s+/g, " ").trim(),
+    );
+    expect(calls).toEqual([
+      "getExecutor(), confirmed.candidate.manifest, confirmed.mode,",
+    ]);
+    expect(source).toContain("confirmed.useDefaultBackgrounds");
+    expect(source).toContain("await applyRun.begin(mode)");
   });
 });

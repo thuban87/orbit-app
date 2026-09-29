@@ -18,6 +18,13 @@ export type RestoreApplyConfirmationResult =
       readonly status: "confirmed";
       readonly candidate: RestoreCacheEntry;
       /**
+       * The mode the user confirmed. The apply runs with exactly this mode,
+       * never the screen's live selection (38.5 scoped re-check WR-1: a mode
+       * tap during the confirmation's read must not run Replace-all behind
+       * Merge's dialog; D-47 "Replace-all shows one dialog").
+       */
+      readonly mode: RestoreMode;
+      /**
        * The user agreed to switch an unavailable background to the package
        * default (38.5 D-47); the apply passes `unavailableBackgrounds:
        * "use-default"`.
@@ -26,6 +33,12 @@ export type RestoreApplyConfirmationResult =
     }
   | { readonly status: "cancelled" }
   | { readonly status: "expired" };
+
+/** A confirmed apply: the candidate, the confirmed mode and the D-47 answer. */
+export type ConfirmedRestoreApply = Extract<
+  RestoreApplyConfirmationResult,
+  { status: "confirmed" }
+>;
 
 /** One confirmation dialog: the copy and the two button labels. */
 export type RestoreApplyConfirmation = {
@@ -184,7 +197,53 @@ export async function confirmRestoreApply(
   );
   if (confirmation !== null && !(await confirm(confirmation)))
     return { status: "cancelled" };
-  return { status: "confirmed", candidate, useDefaultBackgrounds };
+  return { status: "confirmed", candidate, mode, useDefaultBackgrounds };
+}
+
+/** The two steps of one Apply tap, supplied by the screen. */
+export type RestoreApplyRunSteps = {
+  /** Asks for (at most) the one confirmation for `mode`. */
+  readonly confirm: (
+    mode: RestoreMode,
+  ) => Promise<RestoreApplyConfirmationResult>;
+  /** Runs the apply for a confirmed result, with `confirmed.mode`. */
+  readonly apply: (confirmed: ConfirmedRestoreApply) => Promise<void>;
+};
+
+/**
+ * One Apply tap, with the restore mode LOCKED from the tap until the
+ * confirmation settles and the apply completes or is cancelled (38.5 scoped
+ * re-check WR-1). It enforces D-47's "each path shows one dialog": the
+ * confirmation is asked for the mode selected at the tap, and the apply runs
+ * with the mode that confirmation carries, so Replace-all can never run behind
+ * Merge's dialog, and a Replace-all always passes through its own "Replace all
+ * local data?" confirmation, once. While locked, a mode change is refused
+ * (`acceptsModeChange`) and a second Apply tap returns `busy` without asking
+ * again. The lock is synchronous, so a tap that lands before the screen
+ * re-renders its disabled radios is refused too.
+ */
+export function createRestoreApplyRun(steps: RestoreApplyRunSteps) {
+  let locked = false;
+  return {
+    /** Whether a mode tap may change the selection now. */
+    acceptsModeChange(): boolean {
+      return !locked;
+    },
+    async begin(
+      mode: RestoreMode,
+    ): Promise<RestoreApplyConfirmationResult | { readonly status: "busy" }> {
+      if (locked) return { status: "busy" };
+      locked = true;
+      try {
+        const confirmation = await steps.confirm(mode);
+        if (confirmation.status === "confirmed")
+          await steps.apply(confirmation);
+        return confirmation;
+      } finally {
+        locked = false;
+      }
+    },
+  };
 }
 
 export function isEncryptedBackupEnvelope(contents: string): boolean {
@@ -245,13 +304,13 @@ export function replaceAllConfirmation(destinationConfigured: boolean): {
   };
 }
 
-export function createRestoreApplySingleFlight<T>(
-  operation: () => Promise<T>,
-): () => Promise<T> {
+export function createRestoreApplySingleFlight<A extends unknown[], T>(
+  operation: (...args: A) => Promise<T>,
+): (...args: A) => Promise<T> {
   let pending: Promise<T> | null = null;
-  return () => {
+  return (...args: A) => {
     if (pending) return pending;
-    pending = operation().finally(() => {
+    pending = operation(...args).finally(() => {
       pending = null;
     });
     return pending;

@@ -19,10 +19,12 @@ import {
 } from "@/screens/backup-dualhome-logic";
 import {
   backupNeedsBackgroundConsent,
+  type ConfirmedRestoreApply,
   confirmRestoreApply,
+  createRestoreApplyRun,
   createRestoreApplySingleFlight,
   type RestoreApplyConfirmation,
-  type RestoreCacheEntry,
+  type RestoreApplyConfirmationResult,
   restoreApplyLabel,
   restoreApplyRecovery,
   restorePreviewCache,
@@ -119,13 +121,16 @@ export function RestorePreviewScreen({
     () => restorePreviewCache.read(route.params.token) === null,
   );
   const [applying, setApplying] = useState(false);
-  const [confirming, setConfirming] = useState(false);
+  // True from the Apply tap until the confirmation settles and the apply
+  // completes or is cancelled: the mode radios and Apply are disabled (WR-1).
+  const [modeLocked, setModeLocked] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
-  const executeRef = useRef<() => Promise<void>>(async () => {});
-  const confirmedCandidateRef = useRef<RestoreCacheEntry | null>(null);
-  // D-47: set only when the user agreed to switch an unavailable background to
-  // the package default.
-  const useDefaultBackgroundsRef = useRef(false);
+  const executeRef = useRef<
+    (confirmed: ConfirmedRestoreApply) => Promise<void>
+  >(async () => {});
+  const confirmRef = useRef<
+    (mode: RestoreMode) => Promise<RestoreApplyConfirmationResult>
+  >(async () => ({ status: "cancelled" }));
   // The preview notice shows exactly when the apply will ask (RA-a / D-49): an
   // unavailable id in settings this mode will write. A Merge whose backup
   // settings are older than this phone's skips them, so it shows nothing.
@@ -153,8 +158,26 @@ export function RestorePreviewScreen({
   }, [mode, route.params.token]);
   const allowNavigationRef = useRef(false);
   const runSingleApply = useRef(
-    createRestoreApplySingleFlight(() => executeRef.current()),
+    createRestoreApplySingleFlight((confirmed: ConfirmedRestoreApply) =>
+      executeRef.current(confirmed),
+    ),
   ).current;
+  // One Apply tap: the confirmation for the mode at the tap, then the apply
+  // with the mode that confirmation carries. The mode is locked throughout, so
+  // a radio tap cannot swap Replace-all in behind Merge's dialog (38.5 scoped
+  // re-check WR-1; D-47 "each path shows one dialog").
+  const applyRun = useRef(
+    createRestoreApplyRun({
+      confirm: (confirmMode) => confirmRef.current(confirmMode),
+      apply: (confirmed) => runSingleApply(confirmed),
+    }),
+  ).current;
+  const selectMode = useCallback(
+    (next: RestoreMode) => {
+      if (applyRun.acceptsModeChange()) setMode(next);
+    },
+    [applyRun],
+  );
 
   useEffect(() => {
     setExpired(restorePreviewCache.read(route.params.token) === null);
@@ -178,23 +201,39 @@ export function RestorePreviewScreen({
     navigation.reset({ index: 0, routes: [{ name: "Backup" }] });
   }, [navigation]);
 
-  executeRef.current = async () => {
-    const cached =
-      confirmedCandidateRef.current ??
-      restorePreviewCache.read(route.params.token);
-    if (!cached) {
-      setExpired(true);
-      return;
-    }
+  confirmRef.current = (confirmMode) =>
+    // One dialog at most: Replace-all's, carrying the D-47 notice when a
+    // background is unavailable, or for Merge the D-47 question alone. Cancel
+    // returns before anything is written.
+    confirmRestoreApply(
+      restorePreviewCache,
+      route.params.token,
+      confirmMode,
+      {
+        destinationConfigured: async () =>
+          Boolean((await getAppSettings(getExecutor())).backupFolderUri),
+        localSettingsModifiedAt: readLocalSettingsModifiedAt,
+      },
+      confirmApply,
+    );
+
+  // The apply runs with the CONFIRMED candidate, mode and D-47 answer, never
+  // this render's `mode` (WR-1).
+  executeRef.current = async (confirmed) => {
     setApplying(true);
     setApplyError(null);
     try {
-      const result = await applyRestore(getExecutor(), cached.manifest, mode, {
-        createVerifiedPreRestoreSnapshot: createPreRestoreSnapshot,
-        unavailableBackgrounds: useDefaultBackgroundsRef.current
-          ? "use-default"
-          : "reject",
-      });
+      const result = await applyRestore(
+        getExecutor(),
+        confirmed.candidate.manifest,
+        confirmed.mode,
+        {
+          createVerifiedPreRestoreSnapshot: createPreRestoreSnapshot,
+          unavailableBackgrounds: confirmed.useDefaultBackgrounds
+            ? "use-default"
+            : "reject",
+        },
+      );
       if (result.status !== "applied") {
         setApplyError(restoreApplyRecovery(result.status).message);
         return;
@@ -228,39 +267,19 @@ export function RestorePreviewScreen({
   };
 
   const beginApply = useCallback(async () => {
-    if (applying || confirming) return;
-    // One dialog at most: Replace-all's, carrying the D-47 notice when a
-    // background is unavailable, or for Merge the D-47 question alone. Cancel
-    // returns here, before anything is written.
-    setConfirming(true);
+    if (!applyRun.acceptsModeChange()) return;
+    setModeLocked(true);
     try {
-      const confirmation = await confirmRestoreApply(
-        restorePreviewCache,
-        route.params.token,
-        mode,
-        {
-          destinationConfigured: async () =>
-            Boolean((await getAppSettings(getExecutor())).backupFolderUri),
-          localSettingsModifiedAt: readLocalSettingsModifiedAt,
-        },
-        confirmApply,
-      );
-      if (confirmation.status === "cancelled") return;
-      if (confirmation.status === "expired") {
-        setExpired(true);
-        return;
-      }
-      confirmedCandidateRef.current = confirmation.candidate;
-      useDefaultBackgroundsRef.current = confirmation.useDefaultBackgrounds;
+      const outcome = await applyRun.begin(mode);
+      if (outcome.status === "expired") setExpired(true);
     } catch (error) {
+      // The apply catches its own failures; this is the confirmation's.
       Logger.error(LOG_SCOPE, "failed to confirm the restore apply", error);
       setApplyError(restoreApplyRecovery("unexpected").message);
-      return;
     } finally {
-      setConfirming(false);
+      setModeLocked(false);
     }
-    await runSingleApply();
-  }, [applying, confirming, mode, route.params.token, runSingleApply]);
+  }, [applyRun, mode]);
 
   if (expired) {
     return (
@@ -381,9 +400,12 @@ export function RestorePreviewScreen({
         testID="restore-mode-merge"
         accessibilityRole="radio"
         accessibilityLabel="Merge backup"
-        accessibilityState={{ selected: mode === "merge", disabled: applying }}
-        disabled={applying}
-        onPress={() => setMode("merge")}
+        accessibilityState={{
+          selected: mode === "merge",
+          disabled: applying || modeLocked,
+        }}
+        disabled={applying || modeLocked}
+        onPress={() => selectMode("merge")}
         style={[
           styles.card,
           {
@@ -406,10 +428,10 @@ export function RestorePreviewScreen({
         accessibilityLabel="Replace all local data"
         accessibilityState={{
           selected: mode === "replace-all",
-          disabled: applying,
+          disabled: applying || modeLocked,
         }}
-        disabled={applying}
-        onPress={() => setMode("replace-all")}
+        disabled={applying || modeLocked}
+        onPress={() => selectMode("replace-all")}
         style={[
           styles.card,
           {
@@ -462,15 +484,15 @@ export function RestorePreviewScreen({
         testID="restore-apply"
         accessibilityRole="button"
         accessibilityLabel={restoreApplyLabel(mode)}
-        accessibilityState={{ disabled: applying || confirming }}
-        disabled={applying || confirming}
+        accessibilityState={{ disabled: applying || modeLocked }}
+        disabled={applying || modeLocked}
         onPress={() => void beginApply()}
         style={[
           styles.primaryButton,
           {
             backgroundColor:
               mode === "replace-all" ? colors.danger : colors.accent,
-            opacity: applying || confirming ? 0.6 : 1,
+            opacity: applying || modeLocked ? 0.6 : 1,
           },
         ]}
       >
