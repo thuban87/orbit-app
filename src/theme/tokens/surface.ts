@@ -191,6 +191,13 @@ export function orreryOverlayTintOpacity(
 /**
  * True when the resolved mode matches the package's background art tone, so a
  * glassy (translucent) card stays text-readable. galaxy↔dark, standard↔light.
+ *
+ * 38.5 (ADR-177): the art is mode-matched since 38.5 (each slot ships a light
+ * and a dark image), but this rule is deliberately unchanged (D-28). It still
+ * governs every card and every chrome scrim EXCEPT the five table-driven
+ * components (`TABLE_DRIVEN_COMPONENTS` in `art-treatments.ts`), whose backing
+ * comes from the owner's signed per-combination table instead. The rest of
+ * ADR-115 stands.
  */
 export function cardMatchesMode(
   themePackage: ThemePackage,
@@ -280,6 +287,10 @@ export function backgroundVeilOpacity(
  * consistent with the glassy content, and opaque in the mismatched regime so bare
  * text stays readable. It reuses `cardTintOpacity` at the densest (most opaque,
  * worst-case) step for a little extra backing under bare text with no card.
+ *
+ * 38.5 (ADR-177, D-28): unchanged. It is the scrim of every chrome surface
+ * except the table-driven count label and Contacts/Digest headers, which take
+ * the signed per-combination backing (`artBackingOpacity`) instead.
  */
 export function chromeScrimOpacity(
   themePackage: ThemePackage,
@@ -289,35 +300,33 @@ export function chromeScrimOpacity(
 }
 
 /**
- * ART TREATMENT OPACITY GROUPS (38.5-06 / D-08). The five v2-marked components
- * take their backing from the per-combination table in `art-treatments.ts`; this
- * is where their opacities live (the table module carries none):
+ * ART TREATMENT OPACITY GROUPS (38.5-06 / D-08). The five table-driven
+ * components take their backing from the per-combination table in
+ * `art-treatments.ts`; this is where their opacities live (the table module
+ * carries none):
  *   - `listEntry`  the Contacts List row,
  *   - `cardEntry`  the Contacts Card-view card,
  *   - `artChrome`  the "N contacts" count label and the Contacts/Digest headers.
  */
 export type ArtOpacityGroup = "listEntry" | "cardEntry" | "artChrome";
 
-/** The owner-unsigned group row: every see-through value null. */
-const UNSIGNED_ART_SEE_THROUGH: Record<ArtOpacityGroup, number | null> = {
-  // owner-unsigned (D-06); set from the signed re-sign-off in 38.5-08
-  listEntry: null,
-  // owner-unsigned (D-06); set from the signed re-sign-off in 38.5-08
-  cardEntry: null,
-  // owner-unsigned (D-06); set from the signed re-sign-off in 38.5-08
-  artChrome: null,
-};
-
 /**
- * The see-through (`seeThrough`) opacity per package × resolved mode × group.
+ * The see-through (`seeThrough`) opacity per package × resolved mode × group:
+ * the owner's signed levels from the re-sign-off v3 (2026-09-29;
+ * `38.5-scrim-signoff-v3.json` `treatmentValues`; D-37, D-42). The sync guard
+ * in `art-treatments.test.ts` equates this table with that file.
  *
- * Seeded ONLY with today's shipped see-through values, by reference (never
- * re-typed): the mode-matched card glass (`CARD_GLASS_OPACITY`) and the
- * mode-matched chrome scrim (`chromeScrimOpacity`) in Galaxy Dark and Standard
- * Light. Every other cell is `null`: the owner has not signed a value for it
- * (D-06, D-09), and `artBackingOpacity` never selects a null (it fails safe to
- * the full value). List rows are solid everywhere today, so no List see-through
- * value exists yet.
+ * The levels the owner kept from today stay by reference (never re-typed): the
+ * Galaxy Dark card glass (`CARD_GLASS_OPACITY.galaxy`) and the mode-matched
+ * chrome scrim in Galaxy Dark and Standard Light (`chromeScrimOpacity`). The
+ * Standard Light Contacts-card level moved from `CARD_GLASS_OPACITY.standard`
+ * (0.5) to 0.05, for the Contacts cards only: `CARD_GLASS_OPACITY` itself, and
+ * so every other card, is unchanged (D-42, D-28).
+ *
+ * `null` = the owner signed no level (D-06). Only Galaxy Light `artChrome` is
+ * null: its count label and headers are `none` in every combination, so no
+ * see-through cell uses it, and `artBackingOpacity` would fail safe to the full
+ * value if one ever did.
  */
 export const ART_SEE_THROUGH_OPACITY: Record<
   ThemePackage,
@@ -325,21 +334,39 @@ export const ART_SEE_THROUGH_OPACITY: Record<
 > = {
   galaxy: {
     dark: {
-      // owner-unsigned (D-06); set from the signed re-sign-off in 38.5-08
-      listEntry: null,
+      // v3 2026-09-29, Q2c rung R2
+      listEntry: 0.05,
+      // v3 2026-09-29, Q3a "keep": today's Galaxy Dark card glass
       cardEntry: CARD_GLASS_OPACITY.galaxy,
+      // v3 2026-09-29, signed as today's (not asked)
       artChrome: chromeScrimOpacity("galaxy", "dark"),
     },
-    light: { ...UNSIGNED_ART_SEE_THROUGH },
+    light: {
+      // v3 2026-09-29, Q2a rung R2
+      listEntry: 0.05,
+      // v3 2026-09-29, Q2b rung R2
+      cardEntry: 0.05,
+      // owner-unsigned (D-06): no Galaxy Light count label or header is see-through
+      artChrome: null,
+    },
   },
   standard: {
     light: {
-      // owner-unsigned (D-06); set from the signed re-sign-off in 38.5-08
-      listEntry: null,
-      cardEntry: CARD_GLASS_OPACITY.standard,
+      // v3 2026-09-29, Q2d typed off-ladder 0.05 (chat amendments 2 and 3)
+      listEntry: 0.05,
+      // v3 2026-09-29, Q3b amended to 0.05 in chat (amendments 1 and 3; was 0.5)
+      cardEntry: 0.05,
+      // v3 2026-09-29, signed as today's (not asked); used on Standard Light · None
       artChrome: chromeScrimOpacity("standard", "light"),
     },
-    dark: { ...UNSIGNED_ART_SEE_THROUGH },
+    dark: {
+      // v3 2026-09-29, Q2e rung R2
+      listEntry: 0.05,
+      // v3 2026-09-29, Q2f rung R2
+      cardEntry: 0.05,
+      // v3 2026-09-29, Q2g rung R1: 0, the count label draws no visible tint
+      artChrome: 0,
+    },
   },
 };
 
@@ -347,9 +374,10 @@ export const ART_SEE_THROUGH_OPACITY: Record<
  * The backing opacity for an art-treatment cell, or `null` for no backing.
  *   - `full`       today's opaque value: a List row's solid fill (1); a card or
  *                  chrome backing at the package's densest opaque band.
- *   - `seeThrough` the signed see-through value, or the `full` value as a
- *                  fail-safe when it is unsigned (null), so an unsigned cell can
- *                  never render thinner than today.
+ *   - `seeThrough` the signed see-through value (a signed 0 is a real level),
+ *                  or the `full` value as a fail-safe when it is unsigned
+ *                  (null), so an unsigned cell can never render thinner than
+ *                  today.
  *   - `none`       no backing at all (`null`).
  */
 export function artBackingOpacity(

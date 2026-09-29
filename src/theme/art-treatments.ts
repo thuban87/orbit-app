@@ -7,20 +7,22 @@
  * keys are the v2 sign-off sheet's 11 field names (`38.5-scrim-signoff-v2.json`);
  * the planner never chooses placement (D-04).
  *
- * Only the five v2-marked components read it at runtime, through opt-in props
- * (D-28): Contacts List entries (`ListRow`), Contacts Card entries (`GridCard` via
- * `GlassSurface treatment="contact-entry"`), the "N contacts" count label
- * (`ChromeScrim artComponent`), and the Contacts and Digest headers
- * (`ShellAppBar artComponent`). Everything else keeps today's treatment through
- * default props. The Population/Filters/Sort overlay menus and every Orrery
- * control and menu are never table-driven (D-12, D-04); the Contacts control-row
- * triggers read only their ACTIVE-state backing from here (see
+ * Only the five v2-marked components (`TABLE_DRIVEN_COMPONENTS`) read it at
+ * runtime, through opt-in props (D-28): Contacts List entries (`ListRow`),
+ * Contacts Card entries (`GridCard` via `GlassSurface treatment="contact-entry"`),
+ * the "N contacts" count label (`ChromeScrim artComponent`), and the Contacts and
+ * Digest headers (`ShellAppBar artComponent`). Everything else keeps today's
+ * treatment through default props. The Population/Filters/Sort overlay menus and
+ * every Orrery control and menu are never table-driven (D-12, D-04); the Contacts
+ * control-row triggers read only their ACTIVE-state backing from here (see
  * `activeTriggerBacking`), and their inactive fill is fixed.
  *
- * PRODUCTION DATA = TODAY (D-13): until 38.5-08 replaces `ART_TREATMENTS` with
- * the owner's re-signed v3 answers, the table is built from `currentArtCell`,
- * which encodes today's mode-matched rule (ADR-115). `art-treatments.test.ts`
- * proves the identity for every combination.
+ * PRODUCTION DATA = THE OWNER'S SIGNED v3 ANSWERS (38.5-08; D-13 step 4, D-36):
+ * `SIGNED_V3_BACKINGS` is transcribed from
+ * `.planning/phases/38.5-background-art-text-contrast/38.5-scrim-signoff-v3.json`
+ * (signed 2026-09-29, the assembled answer with his chat amendments). The sync
+ * guard in `art-treatments.test.ts` compares every cell with that file, so an
+ * edit to either side that the other does not mirror fails (ADR-177).
  *
  * Vocabulary only (`full` / `seeThrough` / `none`): no colour and no opacity
  * number lives here. Opacities come from `tokens/surface.ts`
@@ -66,8 +68,10 @@ export type ArtBacking = (typeof ART_BACKINGS)[number];
 
 /**
  * The foreground a cell's text takes (D-10, D-26: one per combination ×
- * component). `mode` is the mode's own palette; `inverse` is reserved for the
- * signed v3 data (38.5-08). Every production cell is `mode`.
+ * component). `mode` is the mode's own palette; `inverse` would be the opposite
+ * mode's text roles. The signed v3 answer flags no inverse cell (D-44: the art
+ * matches the mode), so every production cell is `mode` and no inverse palette
+ * exists.
  */
 export type ArtForeground = "mode" | "inverse";
 
@@ -85,16 +89,17 @@ export interface ArtCell {
   /**
    * `contactsHeader` only: with backing `none`, draw a local backing behind the
    * ⋯ overflow trigger (the owner's ⋯ question on the re-sign-off sheet).
-   * False everywhere in production.
+   * False everywhere in production: the ⋯ follows the header (D-43).
    */
   overflowLocalBacking: boolean;
   /**
    * `contactsTopButtons` only (null for every other component): the backing of
    * an ACTIVE Population/Filters/Sort trigger. Production is `none`, today's
    * border-only look, although D-08 marks "Top btns" F in every combination.
-   * That gap (38.5-01 H-3) is recorded here so the re-sign-off (38.5-07)
-   * captures it and 38.5-08 applies the signed value. An inactive trigger's
-   * solid fill is fixed and never table-driven (D-04, D-12).
+   * The v3 sheet showed that gap (38.5-01 H-3, item I1) for information only;
+   * it was not ruled, so it stays `none` and sits on the end-of-phase owner
+   * list (D-28, D-45). An inactive trigger's solid fill is fixed and never
+   * table-driven (D-04, D-12).
    */
   activeTriggerBacking: ArtTriggerBacking | null;
 }
@@ -137,7 +142,10 @@ export const ART_COMBINATION_KEYS: readonly string[] = PACKAGES.flatMap(
 );
 
 /**
- * TODAY's shipped treatment for a component (ADR-115's mode-matched rule):
+ * The PRE-38.5 treatment for a component (ADR-115's mode-matched rule). Kept for
+ * two reasons: the sync guard proves that only `TABLE_DRIVEN_COMPONENTS` differ
+ * from it (D-28), and `resolveArtCell` falls back to it for a key the table
+ * lacks (never reached for a lineup key). The rule:
  *   - List entries: full (a solid fill in every combination);
  *   - Card entries, the count label and both headers: see-through when the art
  *     tone matches the mode (`cardMatchesMode`), else full;
@@ -178,27 +186,109 @@ export function currentArtCell(
 
 export type ArtTreatmentTable = Record<string, Record<ArtComponent, ArtCell>>;
 
-function buildCurrentTable(): ArtTreatmentTable {
+/**
+ * The components the table drives at runtime (D-28): the five the owner marked
+ * on the v2 sheet. The v3 answers changed no cell outside them (38.5-SIGNOFF-V3
+ * §2), so none joins. Every other component's signed column equals its
+ * pre-38.5 behaviour (`currentArtCell`); the sync guard proves both.
+ */
+export const TABLE_DRIVEN_COMPONENTS = [
+  "contactsListEntries",
+  "contactsCardEntries",
+  "contactsCountLabel",
+  "contactsHeader",
+  "digestHeader",
+] as const satisfies readonly ArtComponent[];
+
+// The sheet's vocabulary: F solid, T see-through (the sheet's "transparent"),
+// N no backing.
+const F: ArtBacking = "full";
+const T: ArtBacking = "seeThrough";
+const N: ArtBacking = "none";
+
+/** One signed row: the 11 backings in `ART_COMPONENTS` order. */
+type SignedRow = readonly [
+  ArtBacking,
+  ArtBacking,
+  ArtBacking,
+  ArtBacking,
+  ArtBacking,
+  ArtBacking,
+  ArtBacking,
+  ArtBacking,
+  ArtBacking,
+  ArtBacking,
+  ArtBacking,
+];
+
+/**
+ * The owner's signed v3 backings (38.5-SIGNOFF-V3.md §7; D-36), one row per
+ * combination. Columns, in `ART_COMPONENTS` order:
+ *   List | Card | Top btns | Search | Count | C. header | D. header |
+ *   D. headings | Up Next | Horizon | Your Week
+ * Galaxy's `quiet` slot is the one labelled "Deep Space" (D-33). The levels of
+ * the T cells live in `ART_SEE_THROUGH_OPACITY` (tokens/surface.ts; D-37).
+ */
+export const SIGNED_V3_BACKINGS: Readonly<Record<string, SignedRow>> = {
+  "galaxy-light-quiet": [T, T, F, F, N, N, N, N, N, N, N],
+  "galaxy-light-aurora": [T, T, F, F, N, N, N, N, N, N, N],
+  "galaxy-light-starfield": [T, T, F, F, N, N, N, N, N, N, N],
+  "galaxy-light-none": [F, F, F, F, N, N, N, N, N, N, N],
+  "galaxy-dark-quiet": [T, T, F, F, T, T, T, N, N, N, N],
+  "galaxy-dark-aurora": [T, T, F, F, T, T, T, N, N, N, N],
+  "galaxy-dark-starfield": [T, T, F, F, T, T, T, N, N, N, N],
+  // List and Card full: the owner's chat amendment 4 ("I meant full scrim").
+  "galaxy-dark-none": [F, F, F, F, T, T, T, N, N, N, N],
+  "standard-light-dawn": [T, T, F, F, N, N, N, N, N, N, N],
+  // Paper keeps its intentional full entries (D-08 correction (b)).
+  "standard-light-paper": [F, F, F, F, N, N, N, N, N, N, N],
+  "standard-light-dusk": [T, T, F, F, N, N, N, N, N, N, N],
+  "standard-light-none": [F, F, F, F, T, T, T, N, N, N, N],
+  // Count label T at the signed Standard Dark level 0 (Q2g R1); headers none.
+  "standard-dark-dawn": [T, T, F, F, T, N, N, N, N, N, N],
+  "standard-dark-paper": [T, T, F, F, T, N, N, N, N, N, N],
+  "standard-dark-dusk": [T, T, F, F, T, N, N, N, N, N, N],
+  "standard-dark-none": [F, F, F, F, F, F, F, N, N, N, N],
+};
+
+/**
+ * The signed foreground of every cell (D-44): text on the see-through contact
+ * entries keeps the mode default in Galaxy Light and Standard Dark, because the
+ * new art matches the mode; no cell is flagged inverse.
+ */
+const SIGNED_V3_FOREGROUND: ArtForeground = "mode";
+
+/**
+ * The signed ⋯ answer (D-43, `followHeader`): where the Contacts header has no
+ * backing, the ⋯ has none either, so no cell draws a local ⋯ backing.
+ */
+const SIGNED_V3_OVERFLOW_LOCAL_BACKING = false;
+
+function buildSignedTable(): ArtTreatmentTable {
   const table: ArtTreatmentTable = {};
-  for (const themePackage of PACKAGES) {
-    for (const mode of MODES) {
-      for (const slotId of BACKGROUND_ORDER[themePackage]) {
-        const row = {} as Record<ArtComponent, ArtCell>;
-        for (const component of ART_COMPONENTS) {
-          row[component] = currentArtCell(themePackage, mode, component);
-        }
-        table[artCombinationKey(themePackage, mode, slotKey(slotId))] = row;
-      }
-    }
+  for (const [key, backings] of Object.entries(SIGNED_V3_BACKINGS)) {
+    const row = {} as Record<ArtComponent, ArtCell>;
+    ART_COMPONENTS.forEach((component, index) => {
+      row[component] = {
+        backing: backings[index],
+        foreground: SIGNED_V3_FOREGROUND,
+        overflowLocalBacking:
+          component === "contactsHeader" &&
+          backings[index] === "none" &&
+          SIGNED_V3_OVERFLOW_LOCAL_BACKING,
+        // I1 (the active trigger's fill) was not ruled on v3: production stays
+        // border-only (D-28 gap list).
+        activeTriggerBacking:
+          component === "contactsTopButtons" ? "none" : null,
+      };
+    });
+    table[key] = row;
   }
   return table;
 }
 
-/**
- * THE production table: today's treatment for every combination, until 38.5-08
- * replaces it with the owner's signed v3 answers (D-13).
- */
-export const ART_TREATMENTS: ArtTreatmentTable = buildCurrentTable();
+/** THE production table: the owner's signed v3 answers (D-13 step 4, D-36). */
+export const ART_TREATMENTS: ArtTreatmentTable = buildSignedTable();
 
 /**
  * Look up a cell. The background key comes from the resolver, so it is always a
@@ -224,7 +314,7 @@ export function resolveArtCell(
   return row?.[component] ?? currentArtCell(themePackage, mode, component);
 }
 
-/** The opacity group of a marked component, or null for the rest. */
+/** The opacity group of a table-driven component, or null for the rest. */
 export function artOpacityGroup(
   component: ArtComponent,
 ): ArtOpacityGroup | null {

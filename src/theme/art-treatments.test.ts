@@ -827,23 +827,31 @@ describe("DEV-only override path (38.5-06 Task 3; T-38.5-06-01)", () => {
   });
 
   it("an unsigned see-through without a candidate fails safe to the full value", () => {
+    // Galaxy Light artChrome is the one group the owner left unsigned (null).
+    expect(ART_SEE_THROUGH_OPACITY.galaxy.light.artChrome).toBeNull();
     const out = applyArtDevOverrides(
-      currentArtCell("standard", "dark", "contactsListEntries"),
-      1,
+      resolveArtCell(
+        ART_TREATMENTS,
+        "galaxy",
+        "light",
+        "aurora",
+        "contactsHeader",
+      ),
+      null,
       {
         enabled: true,
         cells: {
-          "standard-dark-dusk": {
-            contactsListEntries: { backing: "seeThrough" },
+          "galaxy-light-aurora": {
+            contactsHeader: { backing: "seeThrough" },
           },
         },
       },
-      "standard-dark-dusk",
-      "contactsListEntries",
-      "listEntry",
+      "galaxy-light-aurora",
+      "contactsHeader",
+      "artChrome",
     );
     expect(out.cell.backing).toBe("seeThrough");
-    expect(out.opacity).toBe(1);
+    expect(out.opacity).toBe(SURFACE.galaxy.densityOpacity.dense);
   });
 
   it("invalid override values are ignored (backing, flags, out-of-range opacity)", () => {
