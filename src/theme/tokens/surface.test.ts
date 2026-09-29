@@ -1847,6 +1847,19 @@ describe("Signed art treatments (38.5 v3)", () => {
  * the fill and the border, with no exemption. The trailing favourite/status
  * icons and the ring border do cross the glyphs in motion; that overlap fails
  * at 0.5 and is the owner's recorded exemption (`SWIPE_GLYPH_EXEMPTION`).
+ *
+ * FONT ASSUMPTION (scoped re-check IN-3): the label widths come from Roboto
+ * advance widths measured on the test Pixel (`PANEL_LABEL_ADVANCE_EM`). The
+ * label is a raw `Text` with no `fontFamily`, so it renders in the device's
+ * system `sans-serif`, which is Roboto on Pixel and stock Android. An OEM
+ * default face, or a user-selected font style (for example on Samsung), can be
+ * wider, and nothing here models that. The margin at 200% is 3.5 px (70.5
+ * against the 74 px content inset), about 7% of the label width; a face that
+ * much wider puts the row's text over the panel's glyphs at 200%, where the
+ * recorded pairs fall to 3.21:1 and 1.28:1. So the "text never reaches the
+ * glyphs" proof holds for Roboto only. Bounding it for
+ * any face (for example by capping the label's font scaling) is an
+ * accessibility-posture choice for the owner, not made here.
  */
 
 /** Where a row foreground sits in the row, for the glyph-overlap geometry. */
