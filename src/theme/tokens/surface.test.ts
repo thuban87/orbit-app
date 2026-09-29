@@ -2037,6 +2037,27 @@ function styleEntry(source: string, name: string): Record<string, string> {
 }
 
 /**
+ * Every style reaching `SwipeActionSurface`'s elements (scoped re-check IN-2):
+ * each `style=` value as source text, the keys of every inline style object in
+ * the body, and the `Icon` element's source. The geometry test pins all three,
+ * so a padding, margin or letterSpacing added anywhere the panel's glyph column
+ * can see (a side style, an inline object, a wrapper, the icon) fails it.
+ */
+function surfaceStyleUses(body: string) {
+  const styleProps = [
+    ...body.matchAll(/style=\{(\[[\s\S]*?\]|\{[\s\S]*?\})\}/g),
+  ].map((m) => m[1].replace(/\s+/g, " "));
+  const inlineKeys = styleProps.flatMap((prop) =>
+    [...prop.matchAll(/\{([^{}]*)\}/g)].flatMap((o) =>
+      [...o[1].matchAll(/(\w+)\s*:/g)].map((k) => k[1]),
+    ),
+  );
+  const elements = [...body.matchAll(/<(\w+)[\s/>]/g)].map((m) => m[1]);
+  const icon = body.match(/<Icon\b[^>]*\/>/)?.[0] ?? null;
+  return { styleProps, inlineKeys, elements, icon };
+}
+
+/**
  * The swipe panel's glyph geometry, derived from HomeScreen's source values
  * rather than measured on a screen: the labels, the label style, the panel
  * style and the icon size. Returns the outer extent of the glyphs from the
@@ -2045,6 +2066,8 @@ function styleEntry(source: string, name: string): Record<string, string> {
 function panelGlyphGeometry(home: string, fontScale: number) {
   const panel = styleEntry(home, "swipeAction");
   const label = styleEntry(home, "swipeActionLabel");
+  const panelLeft = styleEntry(home, "swipeActionLeft");
+  const panelRight = styleEntry(home, "swipeActionRight");
   const surface = home.match(/function SwipeActionSurface\([\s\S]*?\n\}\n/);
   if (!surface) throw new Error("SwipeActionSurface not found");
   const iconSize = surface[0].match(/<Icon name=\{icon\} size="(\w+)"/)?.[1];
@@ -2071,6 +2094,9 @@ function panelGlyphGeometry(home: string, fontScale: number) {
   return {
     panel,
     label,
+    panelLeft,
+    panelRight,
+    surface: surfaceStyleUses(surface[0]),
     labels,
     fontSize,
     iconWidth,
@@ -2140,6 +2166,33 @@ describe("Swiped see-through List row (38.5 review WR-01, D-48)", () => {
         fontSize: expect.stringMatching(/^\d+$/),
         fontWeight: PANEL_LABEL_FONT_WEIGHT,
       });
+      // The side styles, exactly: the two outer corner radii each, which move
+      // nothing (scoped re-check IN-2).
+      expect(g.panelLeft).toEqual({
+        borderTopLeftRadius: "16",
+        borderBottomLeftRadius: "16",
+      });
+      expect(g.panelRight).toEqual({
+        borderTopRightRadius: "16",
+        borderBottomRightRadius: "16",
+      });
+      // Every style that reaches the panel and its glyphs: the panel's array
+      // (base, one side, an inline colour object) and the label's (label
+      // style, an inline colour object). Inline objects carry colours only; the
+      // elements are the panel View, the Icon (no style prop) and the label.
+      expect(g.surface.styleProps).toEqual([
+        '[ styles.swipeAction, side === "left" ? styles.swipeActionLeft : styles.swipeActionRight, { backgroundColor: colors.surfaceElevated, borderColor: colors.border }, ]',
+        "[styles.swipeActionLabel, { color: colors.textPrimary }]",
+      ]);
+      expect(
+        g.surface.inlineKeys.filter(
+          (k) => !["backgroundColor", "borderColor", "color"].includes(k),
+        ),
+      ).toEqual([]);
+      expect(g.surface.elements).toEqual(["View", "Icon", "Text"]);
+      expect(g.surface.icon).toBe(
+        '<Icon name={icon} size="md" tone="textSecondary" />',
+      );
       expect(g.labels).toEqual(["Log", "Edit"]);
       // The glyphs straddle the panel's centre, and TEXT never reaches them:
       // at the default scale and at Android's 200% maximum.
