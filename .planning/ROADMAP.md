@@ -1272,7 +1272,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.5-background-art-text-contrast-dossier.md (authoritative); primary input `.planning/phases/38.4-audit-remediation-ui-performance-release/38.4-BACKGROUND-ART-BRIEF.md`
 **Canonical refs**: 38.4-CONTEXT.md D-38..D-41; ADR-084 (palettes and contrast validation), ADR-087/ADR-113/ADR-114/ADR-115 (background slots, selection and surface composition)
 **UI hint**: yes
-**Plans**: 8/9 plans executed (8 waves; two blocking owner checkpoints: art sign-off in 04, scrim re-sign-off in 07)
+**Plans**: 9/9 plans executed (8 waves; two blocking owner checkpoints: art sign-off in 04, scrim re-sign-off in 07)
 
 Plans:
 
@@ -1309,7 +1309,7 @@ Plans:
 
 **Wave 8** *(blocked on the code review)*
 
-- [ ] 38.5-09-PLAN.md — Device pass on Pixel 3a (+ Pixel 6 Pro) incl. explicit D-11 WATCH rows; D-24 final, D-25 red-string report, D-28 gap list; one release APK; owner device sign-off (RG-029; D-11, D-25, D-28, H6)
+- [x] 38.5-09-PLAN.md — Device pass on Pixel 3a (+ Pixel 6 Pro) incl. explicit D-11 WATCH rows; D-24 final, D-25 red-string report, D-28 gap list; one release APK; owner device sign-off (RG-029; D-11, D-25, D-28, H6)
 
 > **Planned 2026-09-28 — 9 plans, 8 waves.** Art-first per D-13: measure (01) → asset plumbing and proof tooling that do not change a pixel (02, 03) → the Codex art loop and owner art sign-off (04) → wire the art (05) → treatment machinery with production equal to today's treatment (06, flagged: built before the re-sign-off but inert until 08) → re-sign-off on the new art (07) → implement the signed answers (08) → code review → device pass (09). No migration (head stays 032); no backup-format bump (owner-confirm item, asked at the 04 art sign-off).
 > **DEFERRED PLANNING — needs discuss-phase; prerequisite: owner-signed scrim combination sheet (D-40).** Inserted 2026-09-26 when owner ruling D-38 moved bare-text-on-art contrast out of 38.4. See `38.5-CONTEXT.md` (shim) and the dossier's OPEN items (background cut per theme, Galaxy light imagery, Standard light pale band, E-1 red text, Deep Space/Starfield replacement, the dynamic text-colour idea (parked as a later experiment), card-blend, and the `codex-edu` image spike).
@@ -1371,7 +1371,7 @@ Plans:
 | 38.2 Data Integrity, Security & Lifecycle Hardening | 15/16 | In Progress|  |
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
-| 38.5 Background Art & Text-on-Art Contrast | 8/9 | In Progress|  |
+| 38.5 Background Art & Text-on-Art Contrast | 9/9 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
