@@ -1998,12 +1998,88 @@ const ROW_CONTENT_INSET =
   SPACING.md; // row gap
 /** HomeScreen's `SWIPE_ACTION_WIDTH`. */
 const SWIPE_PANEL_WIDTH = 96;
+/** The OS font scales the glyph geometry is proven at: default, and Android's 200% maximum. */
+const PANEL_FONT_SCALES = [1, 2] as const;
 /**
- * The measured outer extent of the panel's centred glyphs from the panel's
- * outer edge (38.5 review WR-01 fix pass; the figure the owner accepted in
- * D-48). The label is "Log" or "Edit" at 13 px semibold under a 20 px icon.
+ * Advance widths, in em, of the characters of the panel labels in Android's
+ * `sans-serif` (the variable `Roboto-Regular.ttf`) on its Weight axis at 600,
+ * which is what `fontWeight: "600"` selects. Measured 2026-09-29 (38.5
+ * re-review IN-A) from the test phone's `/system/fonts/Roboto-Regular.ttf`
+ * (Android 12; UPM 2048) with Pillow `set_variation_by_axes([600, 100, 0])`.
+ * These are UNKERNED advances; their sum is at least the kerned run for both
+ * labels ("Edit" 3528 vs 3509 units, "Log" 3431 vs 3431), so the derived
+ * width is an upper bound. A label character not listed here fails the
+ * geometry test until it is measured.
  */
-const PANEL_GLYPH_EXTENT_MEASURED = 60;
+const PANEL_LABEL_FONT_WEIGHT = '"600"';
+const PANEL_LABEL_ADVANCE_EM: Readonly<Record<string, number>> = {
+  L: 1107 / 2048,
+  o: 1159 / 2048,
+  g: 1165 / 2048,
+  E: 1155 / 2048,
+  d: 1153 / 2048,
+  i: 532 / 2048,
+  t: 688 / 2048,
+};
+
+/** The `name: { ... },` body of a top-level `StyleSheet.create` entry, as key -> source value. */
+function styleEntry(source: string, name: string): Record<string, string> {
+  const match = source.match(
+    new RegExp(`\\n  ${name}: \\{\\n([^}]*)\\n  \\},`),
+  );
+  if (!match) throw new Error(`style ${name} not found`);
+  return Object.fromEntries(
+    match[1].split("\n").map((line) => {
+      const [key, ...value] = line.trim().replace(/,$/, "").split(": ");
+      return [key, value.join(": ")];
+    }),
+  );
+}
+
+/**
+ * The swipe panel's glyph geometry, derived from HomeScreen's source values
+ * rather than measured on a screen: the labels, the label style, the panel
+ * style and the icon size. Returns the outer extent of the glyphs from the
+ * panel's outer edge at an OS font scale, the widest glyph, and the inputs.
+ */
+function panelGlyphGeometry(home: string, fontScale: number) {
+  const panel = styleEntry(home, "swipeAction");
+  const label = styleEntry(home, "swipeActionLabel");
+  const surface = home.match(/function SwipeActionSurface\([\s\S]*?\n\}\n/);
+  if (!surface) throw new Error("SwipeActionSurface not found");
+  const iconSize = surface[0].match(/<Icon name=\{icon\} size="(\w+)"/)?.[1];
+  if (!iconSize || !(iconSize in ICON_SIZE))
+    throw new Error("SwipeActionSurface icon size not found");
+  const labels = [...home.matchAll(/<SwipeActionSurface label="([^"]+)"/g)].map(
+    (m) => m[1],
+  );
+  const fontSize = Number(label.fontSize);
+  const labelWidths = labels.map((text) => {
+    let em = 0;
+    for (const ch of text) {
+      const advance = PANEL_LABEL_ADVANCE_EM[ch];
+      if (advance === undefined)
+        throw new Error(`measure "${ch}" (label "${text}") at wght 600`);
+      em += advance;
+    }
+    // Android lays text out at the scaled size and rounds the width up.
+    return Math.ceil(em * fontSize * fontScale);
+  });
+  // Ionicons render with `allowFontScaling: false`: the icon keeps its size.
+  const iconWidth = ICON_SIZE[iconSize as keyof typeof ICON_SIZE];
+  const widest = Math.max(iconWidth, ...labelWidths);
+  return {
+    panel,
+    label,
+    labels,
+    fontSize,
+    iconWidth,
+    labelWidths,
+    // The column is centred in the panel (its 1 px border is symmetric), so
+    // the glyphs reach half the widest glyph past the panel's centre.
+    extent: SWIPE_PANEL_WIDTH / 2 + widest / 2,
+  };
+}
 
 describe("Swiped see-through List row (38.5 review WR-01, D-48)", () => {
   it("covers every signed see-through List cell: 11 (None and Standard Light · Paper are full)", () => {
@@ -2041,18 +2117,54 @@ describe("Swiped see-through List row (38.5 review WR-01, D-48)", () => {
     expect(home).toMatch(
       new RegExp(`const SWIPE_ACTION_WIDTH = ${SWIPE_PANEL_WIDTH};`),
     );
-    expect(home).toMatch(
-      /swipeAction: \{[^}]*justifyContent: "center",\s+alignItems: "center",/,
-    );
     // A translation only moves the row away from the panel's outer edge, so the
-    // content column is always at least ROW_CONTENT_INSET from it.
+    // content column is always at least ROW_CONTENT_INSET from it. Every input
+    // of the inset is a layout dp value, so it does not grow with font scale.
     expect(ROW_CONTENT_INSET).toBe(74);
-    expect(ROW_CONTENT_INSET).toBeGreaterThan(PANEL_GLYPH_EXTENT_MEASURED);
-    expect(PANEL_GLYPH_EXTENT_MEASURED).toBeGreaterThan(SWIPE_PANEL_WIDTH / 2);
-    // The trailing icons start inside the glyph extent at rest: the exempt overlap.
     const trailingIconInset =
       SPACING.xs / 2 + SPACING.md + (SPACING["2xl"] - ICON_SIZE.md) / 2;
-    expect(trailingIconInset).toBeLessThan(PANEL_GLYPH_EXTENT_MEASURED);
+    for (const fontScale of PANEL_FONT_SCALES) {
+      const g = panelGlyphGeometry(home, fontScale);
+      // The panel style, exactly: a centred COLUMN (no flexDirection), so `gap`
+      // separates the icon and label vertically and adds no width, and there is
+      // no padding. Any new key (padding, letterSpacing, a row direction, ...)
+      // fails here until the derivation accounts for it.
+      expect(g.panel).toEqual({
+        width: "SWIPE_ACTION_WIDTH",
+        borderWidth: "1",
+        justifyContent: '"center"',
+        alignItems: '"center"',
+        gap: "4",
+      });
+      expect(g.label).toEqual({
+        fontSize: expect.stringMatching(/^\d+$/),
+        fontWeight: PANEL_LABEL_FONT_WEIGHT,
+      });
+      expect(g.labels).toEqual(["Log", "Edit"]);
+      // The glyphs straddle the panel's centre, and TEXT never reaches them:
+      // at the default scale and at Android's 200% maximum.
+      expect(g.extent, `font scale ${fontScale}`).toBeGreaterThan(
+        SWIPE_PANEL_WIDTH / 2,
+      );
+      expect(ROW_CONTENT_INSET, `font scale ${fontScale}`).toBeGreaterThan(
+        g.extent,
+      );
+      // The trailing icons (fixed size) start inside the glyph extent at rest:
+      // the exempt overlap.
+      expect(trailingIconInset).toBeLessThan(g.extent);
+    }
+    // The derived figures (COMPUTED): 59.5 px at 1.0 (the "about 60" of D-48),
+    // 70.5 px at 2.0, against the 74 px content inset.
+    expect(
+      PANEL_FONT_SCALES.map((s) => panelGlyphGeometry(home, s).extent),
+    ).toEqual([59.5, 70.5]);
+    // The icon keeps its size under OS font scaling (the derivation relies on it).
+    expect(
+      readFileSync(
+        "node_modules/@expo/vector-icons/build/vendor/react-native-vector-icons/lib/create-icon-set.js",
+        "utf8",
+      ),
+    ).toMatch(/allowFontScaling: false/);
   });
 
   it("the harness is not trivially passing: the icon-over-glyph overlap fails at 0.5 (the reason for the exemption)", () => {
