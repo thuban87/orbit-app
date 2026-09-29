@@ -59,6 +59,7 @@ import { isImageUrl } from "@/services/photos/url-image";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { markPhotoStaged } from "@/stores/photo-result-store";
 import { useTheme } from "@/theme";
+import { persistentDangerScrim } from "@/theme/danger-scrim";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "photo-source-picker";
@@ -108,7 +109,9 @@ export function PhotoSourcePicker({
   onChanged,
   onValueChange,
 }: PhotoSourcePickerProps) {
-  const { colors } = useTheme();
+  const theme = useTheme();
+  const { colors } = theme;
+  const removeScrim = persistentDangerScrim(theme);
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
 
@@ -328,7 +331,10 @@ export function PhotoSourcePicker({
             accessibilityRole="button"
             accessibilityLabel="Remove photo"
             onPress={() => void removePhoto()}
-            style={styles.actionBtn}
+            style={[
+              styles.actionBtn,
+              removeScrim && [styles.scrimmedActionBtn, removeScrim],
+            ]}
           >
             <Text style={[styles.actionText, { color: colors.danger }]}>
               Remove photo
@@ -408,6 +414,12 @@ const styles = StyleSheet.create({
   actionBtn: {
     minHeight: 44,
     justifyContent: "center",
+  },
+  // D-50: the Galaxy Dark scrim reads as a pill hugging the label.
+  scrimmedActionBtn: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    borderRadius: 10,
   },
   actionText: {
     fontSize: 16,

@@ -11,6 +11,7 @@ import { resetToDashboardWith } from "@/navigation/reset-intents";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { mergeContactsWithPhotoOwnership } from "@/services/photos/merge-photo-rehome";
 import { useTheme } from "@/theme";
+import { persistentDangerScrim } from "@/theme/danger-scrim";
 
 type Counts = {
   interactions: number;
@@ -26,7 +27,8 @@ export function MergeImpactSummary({
   navigation,
   route,
 }: RootStackScreenProps<"MergeImpactSummary">) {
-  const { colors } = useTheme();
+  const theme = useTheme();
+  const { colors } = theme;
   const { survivorId, absorbedId, resolutions } = route.params;
   const [names, setNames] = useState({
     survivor: "Contact",
@@ -122,7 +124,13 @@ export function MergeImpactSummary({
           <Text style={{ color: colors.textPrimary }}>{row}</Text>
         </View>
       ))}
-      <View style={[styles.warning, { borderColor: colors.danger }]}>
+      <View
+        style={[
+          styles.warning,
+          { borderColor: colors.danger },
+          persistentDangerScrim(theme),
+        ]}
+      >
         <Text
           style={{ color: colors.danger }}
         >{`${names.absorbed} will be retired.`}</Text>

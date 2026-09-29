@@ -62,6 +62,7 @@ import {
   stageReconcileSourcePhoto,
 } from "@/services/photos/reconcile-photo";
 import { useTheme } from "@/theme";
+import { persistentDangerScrim } from "@/theme/danger-scrim";
 import {
   type PickedContact,
   pickContacts,
@@ -83,7 +84,8 @@ export function ReconcileDetailScreen({
   navigation,
   route,
 }: RootStackScreenProps<"ReconcileDetail">) {
-  const { colors } = useTheme();
+  const theme = useTheme();
+  const { colors } = theme;
   const { contactId, sessionId, cardId } = route.params;
   useEffect(
     () => (sessionId == null ? undefined : markReconcileSessionOpen(sessionId)),
@@ -469,7 +471,11 @@ export function ReconcileDetailScreen({
           <Pressable
             disabled={applying}
             onPress={() => void unlinkMissingSource()}
-            style={[styles.action, { borderColor: colors.danger }]}
+            style={[
+              styles.action,
+              { borderColor: colors.danger },
+              persistentDangerScrim(theme),
+            ]}
           >
             <Text style={{ color: colors.danger }}>Unlink source</Text>
           </Pressable>

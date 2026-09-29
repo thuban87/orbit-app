@@ -37,6 +37,7 @@ import {
   detectSourceClusters,
 } from "@/services/import/source-consolidation";
 import { useTheme } from "@/theme";
+import { persistentDangerScrim } from "@/theme/danger-scrim";
 import { Logger } from "@/utils/logger";
 import {
   BULK_BOUND_BLURB,
@@ -85,7 +86,8 @@ export function BulkImportSetupScreen({
   // ImportProgress's own hold, so the resume sweep never re-offered it.
   const isFocused = useIsFocused();
   useOpenImportSession(route.params.sessionId, bulkSetupHoldActive(isFocused));
-  const { colors } = useTheme();
+  const theme = useTheme();
+  const { colors } = theme;
   const [count, setCount] = useState(0);
   const [categories, setCategories] = useState<
     Array<{ id: number; name: string }>
@@ -464,7 +466,11 @@ export function BulkImportSetupScreen({
           accessibilityLabel="Discard import"
           disabled={saving}
           onPress={() => void onDiscardStopped()}
-          style={[styles.import, { borderColor: colors.danger }]}
+          style={[
+            styles.import,
+            { borderColor: colors.danger },
+            persistentDangerScrim(theme),
+          ]}
         >
           <Text style={{ color: colors.danger, fontWeight: "600" }}>
             {BULK_IMPORT_STOPPED_DISCARD}
