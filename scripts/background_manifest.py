@@ -198,6 +198,19 @@ def _parse_feature_allowance(vbody, label):
     return obj
 
 
+def strip_ts_comments(text):
+    """`text` without its `/* ... */` blocks and `//` line comments (code review IN-04).
+
+    The variant fields are read with first-match searches, so a comment that
+    quotes a field (the Starfield blocks discuss the checker's old bounds) must
+    never be taken for the declaration. A `//` counts as a comment only at the
+    start of a line or after whitespace, so a `//` inside a quoted string with
+    no space before it (a URL) is kept. The backgrounds manifest has neither.
+    """
+    text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+    return re.sub(r"(^|\s)//[^\n]*", r"\1", text)
+
+
 def parse_slot_source(source, base_dir):
     """Parse the nested BACKGROUND_SLOTS layout into one record per (slot, mode).
 
@@ -218,6 +231,8 @@ def parse_slot_source(source, base_dir):
             vbody = variants.get(mode)
             if vbody is None:
                 raise ParseError(f"{slot_id}: missing {mode} variant block")
+            # Match the declarations, never a comment that quotes one (IN-04).
+            vbody = strip_ts_comments(vbody)
             req = re.search(r'require\("([^"]+)"\)', vbody)
             bright = re.search(r'brightestPixel: "(#[0-9A-Fa-f]{6})"', vbody)
             dark = re.search(r'darkestPixel: "(#[0-9A-Fa-f]{6})"', vbody)

@@ -458,6 +458,26 @@ def self_test():
     expect(got == [("fixture-slot", "light", "light.webp", "#EEEEEE", "#111111"),
                    ("fixture-slot", "dark", "dark.webp", "#222222", "#000000")],
            "two-variant sample parses to 2 rows (light, dark)")
+    # A comment quoting a field is never the declaration (code review IN-04).
+    commented = sample.replace(
+        "        brightestPixel: \"#EEEEEE\",\n",
+        "        // was brightestPixel: \"#ABCDEF\" before the re-master\n"
+        "        /* darkestPixel: \"#FEDCBA\" */\n"
+        "        brightestPixel: \"#EEEEEE\",\n",
+    )
+    rows = parse_slot_source(commented, "/fixture")
+    expect([(r["brightestPixel"], r["darkestPixel"]) for r in rows]
+           == [("#EEEEEE", "#111111"), ("#222222", "#000000")],
+           "a commented-out field is ignored; the declaration is read")
+    only_comment = sample.replace(
+        "        darkestPixel: \"#111111\",\n", "        // darkestPixel: \"#111111\",\n"
+    )
+    try:
+        parse_slot_source(only_comment, "/fixture")
+        expect(False, "a field present only in a comment is missing")
+    except ParseError as err:
+        expect(True, f"a field present only in a comment is missing ({err})")
+
     one_variant = sample.split("      dark: {")[0] + "    },\n  },\n"
     try:
         parse_slot_source(one_variant, "/fixture")
