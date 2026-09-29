@@ -35,7 +35,7 @@ import {
   type ResolvedBackground,
   resolveBackground,
 } from "./backgrounds";
-import type { StoredBackgroundId } from "./theme-option-ids";
+import type { BackgroundSlotId, StoredBackgroundId } from "./theme-option-ids";
 import type { ResolvedMode, ThemePackage } from "./theme-types";
 import {
   type ArtOpacityGroup,
@@ -276,16 +276,22 @@ export function resolveArtTreatment(
   mode: ResolvedMode,
   storedBackground: StoredBackgroundId | null,
   component: ArtComponent,
+  devOverrides: unknown = null,
   table: ArtTreatmentTable = ART_TREATMENTS,
 ): ArtTreatment {
   const key = artBackgroundKey(
     resolveBackground(themePackage, storedBackground, mode),
   );
-  const cell = resolveArtCell(table, themePackage, mode, key, component);
-  return {
-    ...cell,
-    opacity: cellOpacity(themePackage, mode, component, cell.backing),
-  };
+  const found = resolveArtCell(table, themePackage, mode, key, component);
+  const { cell, opacity } = applyArtDevOverrides(
+    found,
+    cellOpacity(themePackage, mode, component, found.backing),
+    devOverrides,
+    artCombinationKey(themePackage, mode, key),
+    component,
+    artOpacityGroup(component),
+  );
+  return { ...cell, opacity };
 }
 
 /**
@@ -338,4 +344,135 @@ export function controlTriggerBacking(
 ): ArtTriggerBacking {
   if (!active) return "full";
   return activeTriggerBacking ?? "none";
+}
+
+// ---------------------------------------------------------------------------
+// DEV-only override (38.5-06 Task 3; D-27; T-38.5-06-01).
+//
+// The re-sign-off capture (38.5-07) renders the owner's v2 choices over the new
+// art on a DEBUG build through `src/theme/__dev__/art-treatment-dev-overrides.json`
+// (schema in `use-art-treatment.ts`). That file reaches the app ONLY through a
+// `__DEV__ ? require(...) : null` guard, so a release bundle never contains it;
+// these pure helpers are inert on `null` and on a disabled file. The file is
+// untrusted input: every field is validated and an invalid one is ignored.
+// ---------------------------------------------------------------------------
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function enabledOverrides(overrides: unknown): Record<string, unknown> | null {
+  return isRecord(overrides) && overrides.enabled === true ? overrides : null;
+}
+
+function member<T extends string>(
+  value: unknown,
+  allowed: readonly T[],
+): T | undefined {
+  return typeof value === "string" &&
+    (allowed as readonly string[]).includes(value)
+    ? (value as T)
+    : undefined;
+}
+
+function ownRecord(
+  holder: unknown,
+  key: string,
+): Record<string, unknown> | undefined {
+  if (!isRecord(holder) || !Object.hasOwn(holder, key)) return undefined;
+  const value = holder[key];
+  return isRecord(value) ? value : undefined;
+}
+
+/**
+ * Apply the DEV override to a resolved cell. Returns the input unchanged when
+ * `overrides` is null, not an object or not `enabled: true`. Otherwise:
+ *   - `cells[comboKey][component]` replaces `backing`, `overflowLocalBacking`
+ *     and `activeTriggerBacking` (each only when valid);
+ *   - the opacity follows the (possibly overridden) backing, and for a
+ *     see-through backing `opacity["<pkg>-<mode>"][group]` (a candidate or
+ *     card-blend value in [0, 1]) replaces the see-through opacity. Without a
+ *     valid candidate an unsigned see-through fails safe to the full value.
+ */
+export function applyArtDevOverrides(
+  cell: ArtCell,
+  opacity: number | null,
+  overrides: unknown,
+  comboKey: string,
+  component: ArtComponent,
+  group: ArtOpacityGroup | null,
+): { cell: ArtCell; opacity: number | null } {
+  const enabled = enabledOverrides(overrides);
+  const combo = /^(galaxy|standard)-(light|dark)-/.exec(comboKey);
+  if (enabled === null || combo === null) return { cell, opacity };
+  const themePackage = combo[1] as ThemePackage;
+  const mode = combo[2] as ResolvedMode;
+
+  const cellOverride = ownRecord(ownRecord(enabled.cells, comboKey), component);
+  const backing = member(cellOverride?.backing, ART_BACKINGS);
+  const activeTrigger = member(
+    cellOverride?.activeTriggerBacking,
+    ART_TRIGGER_BACKINGS,
+  );
+  const next: ArtCell = {
+    ...cell,
+    ...(backing !== undefined ? { backing } : {}),
+    ...(typeof cellOverride?.overflowLocalBacking === "boolean"
+      ? { overflowLocalBacking: cellOverride.overflowLocalBacking }
+      : {}),
+    ...(activeTrigger !== undefined && cell.activeTriggerBacking !== null
+      ? { activeTriggerBacking: activeTrigger }
+      : {}),
+  };
+
+  const candidate =
+    group !== null
+      ? ownRecord(enabled.opacity, `${themePackage}-${mode}`)?.[group]
+      : undefined;
+  const validCandidate =
+    typeof candidate === "number" &&
+    Number.isFinite(candidate) &&
+    candidate >= 0 &&
+    candidate <= 1
+      ? candidate
+      : undefined;
+
+  let nextOpacity: number | null;
+  if (next.backing === "seeThrough" && validCandidate !== undefined) {
+    nextOpacity = validCandidate;
+  } else if (next.backing === cell.backing) {
+    nextOpacity = opacity;
+  } else {
+    nextOpacity = cellOpacity(themePackage, mode, component, next.backing);
+  }
+  return { cell: next, opacity: nextOpacity };
+}
+
+/** The in-memory combination the DEV override applies (validated), or null. */
+export interface ArtDevCombo {
+  package: ThemePackage;
+  mode: ResolvedMode;
+  background: BackgroundSlotId;
+}
+
+/**
+ * The DEV override's `combo` as an in-memory selection, or null when the file
+ * is absent, disabled or the combo is invalid. `background` is the package's
+ * active slot id or its short key (`aurora` -> `galaxy-aurora`, `none`); a
+ * retired slot or another package's slot is rejected.
+ */
+export function artDevCombo(overrides: unknown): ArtDevCombo | null {
+  const combo = ownRecord(enabledOverrides(overrides), "combo");
+  if (!combo) return null;
+  const themePackage = member(combo.package, PACKAGES);
+  const mode = member(combo.mode, MODES);
+  if (themePackage === undefined || mode === undefined) return null;
+  const requested = combo.background;
+  if (typeof requested !== "string") return null;
+  const background = BACKGROUND_ORDER[themePackage].find(
+    (slotId) => slotId === requested || slotKey(slotId) === requested,
+  );
+  return background === undefined
+    ? null
+    : { package: themePackage, mode, background };
 }

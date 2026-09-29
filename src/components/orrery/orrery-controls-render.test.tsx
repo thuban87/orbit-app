@@ -69,6 +69,10 @@ vi.mock("@/theme", () => ({
   // has no glass override, so the reset is a pass-through here.
   UnscopedTheme: ({ children }: { children?: ReactNode }) => children,
 }));
+// The Orrery never opts into the art treatment table (38.5-06, D-12): with no
+// component the real hook returns null, which this stub reproduces without
+// evaluating the hook module's DEV-only `__DEV__` guard under node.
+vi.mock("@/theme/use-art-treatment", () => ({ useArtTreatment: () => null }));
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
 vi.mock("@/navigation/use-window-measurement", () => ({
   useWindowObstacle: () => ({ ref: { current: null }, onLayout: () => {} }),

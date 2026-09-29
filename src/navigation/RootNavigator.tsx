@@ -52,6 +52,13 @@ import { useWindowObstacle } from "./use-window-measurement";
  */
 const Tab = createBottomTabs<TabParamList>();
 
+// DEV-only (38.5-06): applies the art-treatment override's combination in memory
+// for the re-sign-off capture. Kept behind a compile-time guard so Metro removes
+// it from release bundles (the SettingsStack ThemePreview precedent).
+const ArtSheetComboSync: (() => null) | null = __DEV__
+  ? require("@/components/ui/__dev__/ArtSheetComboSync").ArtSheetComboSync
+  : null;
+
 type TabNavigation = BottomTabNavigationProp<TabParamList>;
 type TabRoute = RouteProp<TabParamList, keyof TabParamList>;
 
@@ -222,6 +229,7 @@ export function RootNavigator() {
       density={densityForRoute(focusedRoute)}
       slotId={systemBackgroundSlotOverride(focusedRoute)}
     >
+      {ArtSheetComboSync ? <ArtSheetComboSync /> : null}
       <TabNavigatorContainer>
         <Tab.Navigator
           initialRouteName={INITIAL_TAB}
