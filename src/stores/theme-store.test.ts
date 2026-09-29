@@ -8,17 +8,17 @@ beforeEach(() => {
     standardMode: "light",
     galaxyAccent: "solar-amber",
     standardAccent: "slate-indigo",
-    galaxyBackground: "galaxy-deep-space",
+    galaxyBackground: "galaxy-starfield",
     standardBackground: "standard-dawn",
   });
 });
 
 describe("setBackgroundForActivePackage", () => {
   it("writes only Galaxy's remembered background", () => {
-    useThemeStore.getState().setBackgroundForActivePackage("galaxy-nebula");
+    useThemeStore.getState().setBackgroundForActivePackage("galaxy-aurora");
 
     expect(useThemeStore.getState()).toMatchObject({
-      galaxyBackground: "galaxy-nebula",
+      galaxyBackground: "galaxy-aurora",
       standardBackground: "standard-dawn",
       galaxyMode: "dark",
       standardMode: "light",
@@ -32,7 +32,7 @@ describe("setBackgroundForActivePackage", () => {
     useThemeStore.getState().setBackgroundForActivePackage("standard-dusk");
 
     expect(useThemeStore.getState()).toMatchObject({
-      galaxyBackground: "galaxy-deep-space",
+      galaxyBackground: "galaxy-starfield",
       standardBackground: "standard-dusk",
       galaxyMode: "dark",
       standardMode: "light",
@@ -54,10 +54,28 @@ describe("setBackgroundForActivePackage", () => {
               standardBackground: "standard-dawn",
             }
           : {
-              galaxyBackground: "galaxy-deep-space",
+              galaxyBackground: "galaxy-starfield",
               standardBackground: null,
             },
       );
     },
   );
+});
+
+describe("retired stored background ids (38.5 D-19 / P-4)", () => {
+  it("hydrate keeps a retired stored id unchanged (the resolver, not the store, maps it)", () => {
+    useThemeStore.getState().hydrate({
+      package: "galaxy",
+      galaxyMode: "dark",
+      standardMode: "light",
+      galaxyAccent: null,
+      standardAccent: null,
+      galaxyBackground: "galaxy-nebula",
+      standardBackground: "standard-mesh",
+    });
+    expect(useThemeStore.getState()).toMatchObject({
+      galaxyBackground: "galaxy-nebula",
+      standardBackground: "standard-mesh",
+    });
+  });
 });

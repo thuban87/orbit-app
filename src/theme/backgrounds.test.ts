@@ -9,7 +9,10 @@ import {
   resolveRenderableBackground,
 } from "./backgrounds";
 import { relativeLuminance } from "./contrast";
-import { BACKGROUND_SLOT_IDS } from "./theme-option-ids";
+import {
+  BACKGROUND_SLOT_IDS,
+  RETIRED_BACKGROUND_SLOT_IDS,
+} from "./theme-option-ids";
 import type { ResolvedMode, ThemePackage } from "./theme-types";
 
 const PACKAGES: ThemePackage[] = ["galaxy", "standard"];
@@ -166,12 +169,12 @@ describe("resolveBackground — NULL -> default, none -> solid, slot -> the mode
 
   it("a known slot id resolves to its asset + the variant's declared brightest pixel", () => {
     for (const mode of MODES) {
-      const r = resolveBackground("galaxy", "galaxy-nebula", mode);
+      const r = resolveBackground("galaxy", "galaxy-starfield", mode);
       expect(r.kind).toBe("asset");
       if (r.kind === "asset") {
-        expect(r.slotId).toBe("galaxy-nebula");
+        expect(r.slotId).toBe("galaxy-starfield");
         expect(r.brightestPixel).toBe(
-          BACKGROUND_SLOTS["galaxy-nebula"].variants[mode].brightestPixel,
+          BACKGROUND_SLOTS["galaxy-starfield"].variants[mode].brightestPixel,
         );
       }
     }
@@ -210,11 +213,11 @@ describe("resolveBackground — NULL -> default, none -> solid, slot -> the mode
   });
 
   it("ordering edge: the resolved background is a function of (package, slot, mode) only, not selection order", () => {
-    const direct = resolveBackground("standard", "standard-mesh", "light");
+    const direct = resolveBackground("standard", "standard-paper", "light");
     const afterOthers = (() => {
       resolveBackground("standard", "standard-dawn", "dark");
       resolveBackground("standard", "none", "light");
-      return resolveBackground("standard", "standard-mesh", "light");
+      return resolveBackground("standard", "standard-paper", "light");
     })();
     expect(direct).toEqual(afterOthers);
   });
@@ -227,6 +230,7 @@ describe("resolveRenderableBackground — onError -> None/Solid pure reducer (23
         for (const slot of [
           null,
           "none",
+          "galaxy-aurora",
           "galaxy-nebula",
           "standard-dawn",
         ] as const) {
@@ -392,5 +396,112 @@ describe("featureAllowance ⇄ 38.5-ART-SIGNOFF.md machine-readable block (M-4)"
       '"maxComponentPx": 19',
     );
     expect(manifestAllowances()).not.toEqual(signedAllowances(text));
+  });
+});
+
+describe("retired slot ids (38.5 D-19 / P-4; research Pitfall 1)", () => {
+  it("the retired set is exactly the three cut slots, disjoint from the active ids and the manifest", () => {
+    expect([...RETIRED_BACKGROUND_SLOT_IDS].sort()).toEqual([
+      "galaxy-deep-space",
+      "galaxy-nebula",
+      "standard-mesh",
+    ]);
+    const active = new Set<string>(BACKGROUND_SLOT_IDS);
+    const manifest = new Set<string>(Object.keys(BACKGROUND_SLOTS));
+    for (const id of RETIRED_BACKGROUND_SLOT_IDS) {
+      expect(active.has(id), id).toBe(false);
+      expect(manifest.has(id), id).toBe(false);
+    }
+    // Active ids ∪ {none} === manifest ids ∪ {none} (the drift guard, restated
+    // over the manifest keys rather than the picker order).
+    expect([...active].sort()).toEqual([...manifest, NONE_SLOT_ID].sort());
+  });
+
+  it("a retired id renders the package default's variant in both modes", () => {
+    const cases = [
+      ["galaxy", "galaxy-deep-space"],
+      ["galaxy", "galaxy-nebula"],
+      ["standard", "standard-mesh"],
+    ] as const;
+    for (const [pkg, id] of cases) {
+      for (const mode of MODES) {
+        const r = resolveBackground(pkg, id, mode);
+        expect(r.kind).toBe("asset");
+        if (r.kind === "asset") {
+          const def = PACKAGE_DEFAULT_SLOT[pkg];
+          expect(r.slotId, `${pkg}/${id}/${mode}`).toBe(def);
+          expect(r.mode).toBe(mode);
+          expect(r.source).toBe(slotOf(def)?.variants[mode].source);
+        }
+      }
+    }
+  });
+
+  it("the picker order never offers a retired id", () => {
+    for (const pkg of PACKAGES) {
+      for (const id of RETIRED_BACKGROUND_SLOT_IDS) {
+        expect(BACKGROUND_ORDER[pkg] as readonly string[]).not.toContain(id);
+      }
+    }
+  });
+});
+
+describe("cross-package stored id → the requested package's default (38.4 D-39; T-38.5-05-02)", () => {
+  it("a Galaxy slot id in the Standard setting renders Standard's default, never Galaxy art", () => {
+    for (const id of [
+      "galaxy-quiet",
+      "galaxy-aurora",
+      "galaxy-starfield",
+    ] as const) {
+      for (const mode of MODES) {
+        const r = resolveBackground("standard", id, mode);
+        expect(r.kind).toBe("asset");
+        if (r.kind === "asset") {
+          expect(r.slotId, `${id}/${mode}`).toBe(PACKAGE_DEFAULT_SLOT.standard);
+          expect(r.source).toBe(
+            BACKGROUND_SLOTS["standard-dawn"].variants[mode].source,
+          );
+        }
+        expect(
+          resolveRenderableBackground("standard", id, mode, false),
+        ).toEqual(r);
+      }
+    }
+  });
+
+  it("a Standard slot id in the Galaxy setting renders Galaxy's default, never Standard art", () => {
+    for (const id of [
+      "standard-dawn",
+      "standard-paper",
+      "standard-dusk",
+    ] as const) {
+      for (const mode of MODES) {
+        const r = resolveBackground("galaxy", id, mode);
+        expect(r.kind).toBe("asset");
+        if (r.kind === "asset") {
+          expect(r.slotId, `${id}/${mode}`).toBe(PACKAGE_DEFAULT_SLOT.galaxy);
+          expect(r.source).toBe(
+            BACKGROUND_SLOTS["galaxy-quiet"].variants[mode].source,
+          );
+        }
+        expect(resolveRenderableBackground("galaxy", id, mode, false)).toEqual(
+          r,
+        );
+      }
+    }
+  });
+
+  it("the resolver tolerates any runtime string (untrusted stored data)", () => {
+    for (const pkg of PACKAGES) {
+      for (const mode of MODES) {
+        for (const raw of ["", "NONE", "galaxy-", "__proto__", "constructor"]) {
+          const r = resolveBackground(pkg, raw as never, mode);
+          expect(r.kind, `${pkg}/${raw}/${mode}`).toBe("asset");
+          if (r.kind === "asset") {
+            expect(r.slotId).toBe(PACKAGE_DEFAULT_SLOT[pkg]);
+          }
+        }
+      }
+    }
   });
 });

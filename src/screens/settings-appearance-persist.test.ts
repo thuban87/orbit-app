@@ -13,7 +13,7 @@ const DURABLE_SETTINGS = {
   standardMode: "light",
   galaxyAccent: "nebula-blue",
   standardAccent: null,
-  galaxyBackground: "galaxy-nebula",
+  galaxyBackground: "galaxy-aurora",
   standardBackground: "standard-dawn",
 } as AppSettings;
 
@@ -68,7 +68,7 @@ describe("persistAppearanceSetting — failed durable write (review MEDIUM, cycl
 
     const result = await persistAppearanceSetting(
       exec,
-      { standardBackground: "standard-mesh" },
+      { standardBackground: "standard-paper" },
       deps,
     );
 
@@ -86,7 +86,7 @@ describe("persistAppearanceSetting — failed durable write (review MEDIUM, cycl
       standardMode: "light",
       galaxyAccent: "nebula-blue",
       standardAccent: null,
-      galaxyBackground: "galaxy-nebula",
+      galaxyBackground: "galaxy-aurora",
       standardBackground: "standard-dawn",
     });
     expect(result.reconciledSelection).toEqual({
@@ -95,7 +95,7 @@ describe("persistAppearanceSetting — failed durable write (review MEDIUM, cycl
       standardMode: "light",
       galaxyAccent: "nebula-blue",
       standardAccent: null,
-      galaxyBackground: "galaxy-nebula",
+      galaxyBackground: "galaxy-aurora",
       standardBackground: "standard-dawn",
     });
 

@@ -4,6 +4,7 @@ import {
   NONE_SLOT_ID,
   PACKAGE_DEFAULT_SLOT,
 } from "@/theme/backgrounds";
+import { RETIRED_BACKGROUND_SLOT_IDS } from "@/theme/theme-option-ids";
 import {
   backgroundChoicesForPackage,
   backgroundPatchForPackage,
@@ -17,8 +18,6 @@ describe("backgroundChoicesForPackage — active-package guard (D-07)", () => {
       "galaxy-quiet",
       "galaxy-aurora",
       "galaxy-starfield",
-      "galaxy-deep-space",
-      "galaxy-nebula",
       NONE_SLOT_ID,
     ]);
     // Contract-anchored: it is exactly the package's ordered list.
@@ -32,7 +31,6 @@ describe("backgroundChoicesForPackage — active-package guard (D-07)", () => {
       "standard-dawn",
       "standard-paper",
       "standard-dusk",
-      "standard-mesh",
       NONE_SLOT_ID,
     ]);
     expect(backgroundChoicesForPackage("standard")).toEqual(
@@ -44,20 +42,28 @@ describe("backgroundChoicesForPackage — active-package guard (D-07)", () => {
     const standardChoices = backgroundChoicesForPackage("standard");
     for (const galaxySlot of [
       "galaxy-quiet",
-      "galaxy-deep-space",
       "galaxy-starfield",
-      "galaxy-nebula",
       "galaxy-aurora",
     ] as const) {
       expect(standardChoices).not.toContain(galaxySlot);
+    }
+  });
+
+  it("never offers a retired slot id in either package (38.5 D-19 / P-4)", () => {
+    for (const pkg of ["galaxy", "standard"] as const) {
+      for (const retired of RETIRED_BACKGROUND_SLOT_IDS) {
+        expect(
+          backgroundChoicesForPackage(pkg) as readonly string[],
+        ).not.toContain(retired);
+      }
     }
   });
 });
 
 describe("backgroundPatchForPackage — per-package durable key (review cycle-2 #5)", () => {
   it("writes galaxyBackground for a galaxy selection", () => {
-    expect(backgroundPatchForPackage("galaxy", "galaxy-nebula")).toEqual({
-      galaxyBackground: "galaxy-nebula",
+    expect(backgroundPatchForPackage("galaxy", "galaxy-aurora")).toEqual({
+      galaxyBackground: "galaxy-aurora",
     });
     // None under Galaxy still targets the galaxy column.
     expect(backgroundPatchForPackage("galaxy", NONE_SLOT_ID)).toEqual({
@@ -103,6 +109,31 @@ describe("selectedBackgroundTile — the highlighted tile is what actually rende
     }
   });
 
+  it("a retired stored id highlights the default tile that is rendering (P-4 / Pitfall 7)", () => {
+    for (const mode of ["light", "dark"] as const) {
+      expect(selectedBackgroundTile("galaxy", "galaxy-nebula", mode)).toBe(
+        "galaxy-quiet",
+      );
+      expect(selectedBackgroundTile("galaxy", "galaxy-deep-space", mode)).toBe(
+        "galaxy-quiet",
+      );
+      expect(selectedBackgroundTile("standard", "standard-mesh", mode)).toBe(
+        "standard-dawn",
+      );
+    }
+  });
+
+  it("another package's stored id highlights the active package's default tile (38.4 D-39)", () => {
+    for (const mode of ["light", "dark"] as const) {
+      expect(selectedBackgroundTile("standard", "galaxy-aurora", mode)).toBe(
+        PACKAGE_DEFAULT_SLOT.standard,
+      );
+      expect(selectedBackgroundTile("galaxy", "standard-paper", mode)).toBe(
+        PACKAGE_DEFAULT_SLOT.galaxy,
+      );
+    }
+  });
+
   it("a known stored id highlights its own tile in either mode", () => {
     expect(selectedBackgroundTile("galaxy", "galaxy-aurora", "light")).toBe(
       "galaxy-aurora",
@@ -119,7 +150,9 @@ describe("selectedBackgroundTile — the highlighted tile is what actually rende
           null,
           "none",
           "made-up-id",
-          ...BACKGROUND_ORDER[pkg],
+          ...RETIRED_BACKGROUND_SLOT_IDS,
+          ...BACKGROUND_ORDER.galaxy,
+          ...BACKGROUND_ORDER.standard,
         ]) {
           expect(backgroundChoicesForPackage(pkg)).toContain(
             selectedBackgroundTile(pkg, stored, mode),

@@ -140,6 +140,7 @@ import { computeAiAvailability } from "@/logic/ai-availability";
 import { FakePhotoFs } from "@/services/photos/__testkit__/fake-photo-fs";
 import { persistOwnedMaster } from "@/services/photos/owned-master";
 import { drainRestorePhotoJournal } from "@/services/photos/restore-photo-finalize-sweep";
+import { resolveBackground } from "@/theme/backgrounds";
 
 const NOW = "2026-08-25 12:00:00";
 let uid = 0;
@@ -2546,6 +2547,71 @@ describe("applyRestore", () => {
         "SELECT phone_region_override FROM app_settings WHERE id=1",
       ),
     ).resolves.toEqual({ phone_region_override: "GB" });
+  });
+
+  it("restores a backup holding RETIRED background ids without aborting; they resolve to the package defaults (38.5 D-19 / P-4)", async () => {
+    // Research Pitfall 1: restore writes appSettings through updateAppSettingsCore
+    // -> validateAppSettingsPatch -> assertBackgroundId INSIDE its transaction, so
+    // a cut slot id would throw and abort the whole restore. The retired set keeps
+    // them accepted; the stored value is kept as-is (no rewrite) and the resolver
+    // renders the package default for it.
+    const source = await db();
+    await source.runAsync("UPDATE app_settings SET modified_at=? WHERE id=1", [
+      "2026-08-25 12:01:00",
+    ]);
+    const manifest = await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "",
+    });
+    const settings = manifest.appSettings as Record<string, unknown>;
+    settings.galaxyBackground = "galaxy-nebula";
+    settings.standardBackground = "standard-mesh";
+    const destination = await db();
+    await expect(
+      applyRestore(destination, parseBackupManifest(manifest), "replace-all"),
+    ).resolves.toMatchObject({ status: "applied" });
+    await expect(
+      destination.getFirstAsync<{
+        galaxy_background: string;
+        standard_background: string;
+      }>(
+        "SELECT galaxy_background, standard_background FROM app_settings WHERE id=1",
+      ),
+    ).resolves.toEqual({
+      galaxy_background: "galaxy-nebula",
+      standard_background: "standard-mesh",
+    });
+    for (const mode of ["light", "dark"] as const) {
+      expect(resolveBackground("galaxy", "galaxy-nebula", mode)).toMatchObject({
+        kind: "asset",
+        slotId: "galaxy-quiet",
+      });
+      expect(
+        resolveBackground("standard", "standard-mesh", mode),
+      ).toMatchObject({ kind: "asset", slotId: "standard-dawn" });
+    }
+  });
+
+  it("still rejects an unknown restored background id before writing (T-38.5-05-03)", async () => {
+    const source = await db();
+    await source.runAsync("UPDATE app_settings SET modified_at=? WHERE id=1", [
+      "2026-08-25 12:01:00",
+    ]);
+    const manifest = await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "",
+    });
+    (manifest.appSettings as Record<string, unknown>).galaxyBackground =
+      "galaxy-made-up";
+    const destination = await db();
+    await expect(
+      applyRestore(destination, manifest, "merge"),
+    ).rejects.toThrow();
+    await expect(
+      destination.getFirstAsync<{ galaxy_background: string | null }>(
+        "SELECT galaxy_background FROM app_settings WHERE id=1",
+      ),
+    ).resolves.toEqual({ galaxy_background: null });
   });
 
   it("restores the declare-only camelCase channel keys into their SQLite columns via COLUMN_OF (CAPT-11)", async () => {

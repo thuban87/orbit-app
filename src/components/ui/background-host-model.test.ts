@@ -5,7 +5,7 @@ describe("BackgroundHost local render fallback", () => {
   it("latches an app-owned render failure until the original selection changes", () => {
     const selected = {
       package: "galaxy" as const,
-      slotId: "galaxy-nebula" as const,
+      slotId: "galaxy-aurora" as const,
       mode: "dark" as const,
       appOwnedBackgroundUri: "file:///documents/profile-backgrounds/first.jpg",
       forceRenderError: false,

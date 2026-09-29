@@ -1109,7 +1109,7 @@ describe("exclusions are scoped by treatment and variant (38.5-03; D-24, C3-L2)"
         slotId,
       });
     expect(at("galaxy-aurora")).toBe(true);
-    expect(at("galaxy-nebula")).toBe(false);
+    expect(at("galaxy-starfield")).toBe(false);
     expect(at(undefined)).toBe(false);
     expect(
       matchesExclusion(entry, "textSecondary", "galaxy", "dark", {

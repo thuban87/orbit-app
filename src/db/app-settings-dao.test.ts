@@ -79,7 +79,11 @@ import { runMigrations } from "@/db/migrations/runner";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { newUid } from "@/db/uid";
-import { ACCENT_IDS, BACKGROUND_SLOT_IDS } from "@/theme/theme-option-ids";
+import {
+  ACCENT_IDS,
+  BACKGROUND_SLOT_IDS,
+  RETIRED_BACKGROUND_SLOT_IDS,
+} from "@/theme/theme-option-ids";
 
 const NOW = "2026-08-16 12:00:00";
 const LATER = "2026-08-16 13:30:00";
@@ -1143,7 +1147,7 @@ describe("app-settings-dao — theme settings (migration 015, Phase 23)", () => 
   it("passes NULL accent/background straight through (package default resolved at render)", async () => {
     await updateAppSettings(
       exec,
-      { galaxyAccent: "solar-amber", galaxyBackground: "galaxy-nebula" },
+      { galaxyAccent: "solar-amber", galaxyBackground: "galaxy-aurora" },
       LATER,
     );
     await updateAppSettings(
@@ -1198,6 +1202,36 @@ describe("app-settings-dao — theme settings (migration 015, Phase 23)", () => 
     // An unknown id is rejected.
     expect(() => assertAccentId("galaxyAccent", "made-up")).toThrow();
     expect(() => assertBackgroundId("galaxyBackground", "made-up")).toThrow();
+  });
+
+  it("accepts a RETIRED background id on write and restore, still rejects an unknown one (38.5 D-19 / P-4, T-38.5-05-01/03)", () => {
+    // The retired ids stay in the DAO's closed accepted set so a restore of an
+    // older backup cannot abort inside its transaction (research Pitfall 1).
+    expect(RETIRED_BACKGROUND_SLOT_IDS.length).toBe(3);
+    for (const id of RETIRED_BACKGROUND_SLOT_IDS) {
+      expect(() => assertBackgroundId("galaxyBackground", id)).not.toThrow();
+      expect(() => assertBackgroundId("standardBackground", id)).not.toThrow();
+    }
+    expect(() =>
+      assertBackgroundId("galaxyBackground", "galaxy-nebula"),
+    ).not.toThrow();
+    for (const bad of ["made-up", "", "GALAXY-NEBULA", 7, {}, undefined]) {
+      expect(() => assertBackgroundId("galaxyBackground", bad)).toThrow();
+    }
+  });
+
+  it("round-trips a retired stored background id unchanged (no data rewrite, D-23)", async () => {
+    await updateAppSettings(
+      exec,
+      {
+        galaxyBackground: "galaxy-deep-space",
+        standardBackground: "standard-mesh",
+      },
+      LATER,
+    );
+    const settings = await getAppSettings(exec);
+    expect(settings.galaxyBackground).toBe("galaxy-deep-space");
+    expect(settings.standardBackground).toBe("standard-mesh");
   });
 
   it("emits all seven portable theme keys", async () => {
