@@ -2598,7 +2598,11 @@ describe("applyRestore", () => {
   /** A backup whose settings are OLDER than a destination seeded at NOW. */
   const BACKUP_SETTINGS_OLDER = "2026-08-25 11:00:00";
 
-  /** A source with one contact, the given settings stamp and background ids. */
+  /**
+   * A source with one contact WITH a photo, the given settings stamp and the
+   * given background ids. The photo makes staging observable (IN-B): any path
+   * that runs past the D-47 gate stages it.
+   */
   async function manifestWithBackgrounds(
     backgrounds: {
       galaxyBackground?: unknown;
@@ -2611,15 +2615,28 @@ describe("applyRestore", () => {
       settingsModifiedAt,
     ]);
     await source.runAsync(
-      "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('bg-contact','Bea',NULL,30,?,?)",
+      "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('bg-contact','Bea','avatars/contact-1.jpg',30,?,?)",
       [NOW, NOW],
     );
     const manifest = await buildExportManifest(source, {
       exportedAt: NOW,
-      readPhotoBase64: async () => "",
+      readPhotoBase64: async () => "YQ==",
     });
     Object.assign(manifest.appSettings as Record<string, unknown>, backgrounds);
     return parseBackupManifest(manifest);
+  }
+
+  /**
+   * A destination with an automatic backup folder, so a Replace-all that runs
+   * past the D-47 gate takes the pre-restore snapshot (IN-B).
+   */
+  async function configuredDestination() {
+    const destination = await db();
+    await destination.runAsync(
+      "UPDATE app_settings SET backup_folder_uri=? WHERE id=1",
+      ["content://configured"],
+    );
+    return destination;
   }
 
   async function backgroundsAndContacts(exec: SqlExecutor) {
@@ -2636,12 +2653,12 @@ describe("applyRestore", () => {
     };
   }
 
-  it("an unavailable background id without the user's consent returns unavailable-background and writes nothing (38.5 D-47)", async () => {
+  it("an unavailable background id without the user's consent returns unavailable-background before the snapshot, staging or any write (38.5 D-47)", async () => {
     const manifest = await manifestWithBackgrounds({
       galaxyBackground: "galaxy-made-up",
     });
     for (const mode of ["merge", "replace-all"] as const) {
-      const destination = await db();
+      const destination = await configuredDestination();
       const snapshot = vi.fn(async () => ({ status: "written" as const }));
       const stagePhoto = vi.fn(async () => {});
       await expect(
@@ -2657,6 +2674,26 @@ describe("applyRestore", () => {
         settings: { galaxy_background: null, standard_background: null },
         contacts: [],
       });
+
+      // Control (IN-B): the SAME fixture with consent does snapshot (Replace-all
+      // takes one on a configured destination; Merge never does) and stage, so
+      // the two negative assertions above can fail if the gate moves below them.
+      const control = await configuredDestination();
+      const controlSnapshot = vi.fn(async () => ({
+        status: "written" as const,
+      }));
+      const controlStage = vi.fn(async () => {});
+      await expect(
+        applyRestore(control, manifest, mode, {
+          createVerifiedPreRestoreSnapshot: controlSnapshot,
+          stagePhoto: controlStage,
+          unavailableBackgrounds: "use-default",
+        }),
+      ).resolves.toMatchObject({ status: "applied" });
+      expect(controlSnapshot, mode).toHaveBeenCalledTimes(
+        mode === "replace-all" ? 1 : 0,
+      );
+      expect(controlStage, mode).toHaveBeenCalledTimes(1);
     }
   });
 
