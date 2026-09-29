@@ -633,6 +633,12 @@ ACT (D-46) and SDH checks.
         corner. Explicit sizing fixes all tiles; Aurora also gets a 2× crop anchored on the ribbon.)*
 -   **[DECIDED · 2026-09-29] D-53 --- G3-LATER.** The Your Week "Interactions" mid-word wrap at font scale 1.15 is logged
     for a later layout pass, not 38.5.
+-   **[DECIDED · 2026-09-29] D-54 --- The Events tab shows the background art.** The Group Events list and the Group
+    Event detail page no longer paint an opaque root `background` over the art. Their content sits in full (opaque
+    `surface`) cards: the event rows, the event summary card, the "No participants yet" card and the participant cards.
+    The header keeps its glass backing, and the "Participants" section label sits on the art like the Digest section
+    headings. The Orrery keeps its solid background. Done inline, owner-approved, and checked on the Pixel 3a in all four
+    package × mode groups.
 
 ## Primary Input: the 38.4 Background-Art Brief
 
