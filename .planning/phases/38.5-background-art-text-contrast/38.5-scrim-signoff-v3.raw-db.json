@@ -1,0 +1,161 @@
+{
+  "_meta": {
+    "what": "The raw database content of the 38.5-07 re-sign-off page (artifact db capability), as read on 2026-09-29. RAW: no chat amendment is applied here. The assembled, authoritative answer file is 38.5-scrim-signoff-v3.json.",
+    "source_page": "https://claude.ai/artifact/1de2g31puEfn7w3wCNKMZU (Orbit Scrim Sign-off v3)",
+    "combos": "5 documents in collection 'combos', copied from the ArtifactData export files. Each object re-serialises (indent 2, sorted keys, trailing newline) to exactly the export file's bytes; the sha256 of each export file is in combosExportSha256.",
+    "combosExportSha256": {
+      "galaxy-light-quiet": "4cc1e40e922a6939b8b3e347f3c572dfae0691b693aa08bec84824646b948e59",
+      "standard-dark-dawn": "78c8d9c804aa5b5ee215a1265503f2aa1804d2b3fbc418140025791c1ebfea32",
+      "standard-dark-dusk": "4d1911ce8476c6e7731a2409d50c29ce340e005ca7e18196114b964b02282d91",
+      "standard-dark-paper": "7cf764a13e7c805c1631cf51b4510ed5a7a235116f00e886c074e90081681e9a",
+      "standard-light-none": "c8a451378c0d47f205c19e0beee613cccdf11b5544f1c956aa4e733384e62ae9"
+    },
+    "answers": "13 documents in collection 'answers'. No export file was provided for this collection; the orchestrator read the db and transcribed each document as '<code> <choice> <value>' (e.g. 'Q2a R2 0.05', 'Q2d typed 0.05', 'Q5 ok' plus its note verbatim). These objects rebuild the page's save shape from that transcription ({value, rung} for a rung click, {value, typed} for a typed level, {value, note} for Q5). Per-answer updatedAt timestamps were not transcribed and are not recorded."
+  },
+  "combos": {
+    "galaxy-light-quiet": {
+      "bg": "quiet",
+      "contactsCardEntries": "transparent",
+      "contactsCountLabel": "none",
+      "contactsHeader": "none",
+      "contactsListEntries": "transparent",
+      "contactsSearchAndToggle": "full",
+      "contactsTopButtons": "full",
+      "digestHeader": "none",
+      "digestHorizonItems": "none",
+      "digestSectionHeadings": "none",
+      "digestUpNextItems": "none",
+      "digestYourWeek": "none",
+      "mode": "light",
+      "note": "",
+      "reviewed": false,
+      "theme": "galaxy",
+      "updatedAt": "2026-09-29T05:48:55.133Z"
+    },
+    "standard-dark-dawn": {
+      "bg": "dawn",
+      "contactsCardEntries": "transparent",
+      "contactsCountLabel": "transparent",
+      "contactsHeader": "none",
+      "contactsListEntries": "transparent",
+      "contactsSearchAndToggle": "full",
+      "contactsTopButtons": "full",
+      "digestHeader": "none",
+      "digestHorizonItems": "none",
+      "digestSectionHeadings": "none",
+      "digestUpNextItems": "none",
+      "digestYourWeek": "none",
+      "mode": "dark",
+      "note": "",
+      "reviewed": false,
+      "theme": "standard",
+      "updatedAt": "2026-09-29T06:04:07.440Z"
+    },
+    "standard-dark-dusk": {
+      "bg": "dusk",
+      "contactsCardEntries": "transparent",
+      "contactsCountLabel": "transparent",
+      "contactsHeader": "none",
+      "contactsListEntries": "transparent",
+      "contactsSearchAndToggle": "full",
+      "contactsTopButtons": "full",
+      "digestHeader": "none",
+      "digestHorizonItems": "none",
+      "digestSectionHeadings": "none",
+      "digestUpNextItems": "none",
+      "digestYourWeek": "none",
+      "mode": "dark",
+      "note": "",
+      "reviewed": false,
+      "theme": "standard",
+      "updatedAt": "2026-09-29T06:03:53.461Z"
+    },
+    "standard-dark-paper": {
+      "bg": "paper",
+      "contactsCardEntries": "transparent",
+      "contactsCountLabel": "transparent",
+      "contactsHeader": "none",
+      "contactsListEntries": "transparent",
+      "contactsSearchAndToggle": "full",
+      "contactsTopButtons": "full",
+      "digestHeader": "none",
+      "digestHorizonItems": "none",
+      "digestSectionHeadings": "none",
+      "digestUpNextItems": "none",
+      "digestYourWeek": "none",
+      "mode": "dark",
+      "note": "",
+      "reviewed": false,
+      "theme": "standard",
+      "updatedAt": "2026-09-29T06:04:03.198Z"
+    },
+    "standard-light-none": {
+      "bg": "none",
+      "contactsCardEntries": "full",
+      "contactsCountLabel": "transparent",
+      "contactsHeader": "transparent",
+      "contactsListEntries": "full",
+      "contactsSearchAndToggle": "full",
+      "contactsTopButtons": "full",
+      "digestHeader": "transparent",
+      "digestHorizonItems": "none",
+      "digestSectionHeadings": "none",
+      "digestUpNextItems": "none",
+      "digestYourWeek": "none",
+      "mode": "light",
+      "note": "",
+      "reviewed": false,
+      "theme": "standard",
+      "updatedAt": "2026-09-29T05:54:09.196Z"
+    }
+  },
+  "answers": {
+    "Q2a": {
+      "value": 0.05,
+      "rung": "R2"
+    },
+    "Q2b": {
+      "value": 0.05,
+      "rung": "R2"
+    },
+    "Q2c": {
+      "value": 0.05,
+      "rung": "R2"
+    },
+    "Q2d": {
+      "value": 0.05,
+      "typed": true
+    },
+    "Q2e": {
+      "value": 0.05,
+      "rung": "R2"
+    },
+    "Q2f": {
+      "value": 0.05,
+      "rung": "R2"
+    },
+    "Q2g": {
+      "value": 0,
+      "rung": "R1"
+    },
+    "Q3a": {
+      "value": "keep"
+    },
+    "Q3b": {
+      "value": "more"
+    },
+    "Q4": {
+      "value": "follow"
+    },
+    "Q5": {
+      "value": "ok",
+      "note": "I indicated to remove the header scrims from pretty much everything with I think 1-2 exceptions. So that's off in these shots but otherwise they look good."
+    },
+    "Q6a": {
+      "value": "mode"
+    },
+    "Q6b": {
+      "value": "mode"
+    }
+  }
+}

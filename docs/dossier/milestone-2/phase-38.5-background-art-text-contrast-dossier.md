@@ -15,7 +15,7 @@ discuss session has run yet.
 -   **[DERIVED]** a consequence of a decision or of a measured fact.
 -   **[PLANNING NOTE]** a repository finding or engineering follow-up to verify at planning time.
 
-**Numbering.** D-08..D-16 (2026-09-27), D-17..D-29 (discuss, 2026-09-28) and D-30..D-34 (art sign-off, 2026-09-28) are this phase's own rulings; they match the CONTEXT shim. The carried 38.4
+**Numbering.** D-08..D-16 (2026-09-27), D-17..D-29 (discuss, 2026-09-28), D-30..D-35 (art sign-off, 2026-09-28/29) and D-36, D-37, D-42..D-45 (re-sign-off v3, 2026-09-29; D-38..D-41 skipped) are this phase's own rulings; they match the CONTEXT shim. The carried 38.4
 rulings are D-38..D-41. Any other 38.4 decision is written "38.4 D-NN".
 
 ## Objective
@@ -366,6 +366,8 @@ recommendation. The owner then decides whether a gap plan picks it up.
 
 -   Scrims on red `danger` strings in Galaxy Dark, if E-1 is extended and strings still fail (D-25).
 -   Any proposed change to a component outside the v2-marked set (D-28).
+-   The active Population/Filters/Sort buttons draw no fill today (H-3, I1). The v3 sheet showed this for information;
+    it was not ruled there (D-45).
 -   Report deferred items to the owner as soon as they are found (project practice); do not hold them silently until
     phase end.
 
@@ -427,6 +429,112 @@ per-cell checker results on the shipped files, the P-7 sizes and the machine-rea
         `np.fliplr` of the previous file.
     -   [DERIVED] A mirror leaves the pixel set unchanged: H1 and H2 still PASS with no failing pixel, and the declared
         extrema still enclose every regime (`measure-background-extrema.py --check`). Record: `38.5-ART-SIGNOFF.md` §4.
+
+## Re-sign-off v3 (D-13 step 3)
+
+These rulings are the owner's re-sign-off over the new art (D-13 step 3, D-27; plan 38.5-07 Task 3). He gave them on
+the page <https://claude.ai/artifact/1de2g31puEfn7w3wCNKMZU> ("Orbit Scrim Sign-off v3") and amended and confirmed them
+in chat the same day, 2026-09-29. Where the chat differs from the page, the chat governs.
+
+-   **Record:** `.planning/phases/38.5-background-art-text-contrast/38.5-SIGNOFF-V3.md` has the shots shown, every
+    changed cell, the rung values and the owner's words verbatim.
+-   **Assembled answer:** `38.5-scrim-signoff-v3.json`, the file 38.5-08's sync test reads.
+-   **Raw page data:** `38.5-scrim-signoff-v3.raw-db.json`.
+-   **Numbering:** the IDs match the CONTEXT shim. D-38..D-41 are skipped because this dossier already uses them for
+    the carried 38.4 rulings. Under D-13, the newer answer governs: where these rulings differ from D-08..D-10, they
+    win.
+
+-   **[DECIDED · 2026-09-29] D-36 --- The re-signed scrim table for the 16 new combinations (supersedes the D-08 table for
+    the new lineup).** The owner reviewed every combination (`reviewed: true` on all 16). Ten cells change from the
+    mapped v2 values (D-08 with corrections (a)/(b), Mesh dropped, the Galaxy art rows carried to the new slots):
+    -   **Standard Dark · Dawn, Paper, Dusk:** the Contacts header and the Digest header go from transparent to
+        **none** (page). Their count label stays transparent, at the D-37 level of 0.
+    -   **Standard Light · None:** List entries and Card entries go from transparent to **full** (page).
+    -   **Galaxy Dark · None:** List entries and Card entries go from transparent to **full** (chat).
+        -   Owner, before seeing it: "Galaxy dark - no background might need full scrims on the contact rows and cards
+            ... If it's the same dark grey as what I see on the SD-None option, then let's do full ... for the GD-None
+            as well."
+        -   On the render: "The GD-None looks good with the full scrim. I meant full scrim, not full transparency, so
+            you got it right here".
+    -   The other 11 combinations keep the mapped v2 values. Owner: "11 combinations I didn't mention are in fact good,
+        confirmed".
+    -   [DERIVED] Every changed cell is on one of the five table-driven components (List entries, Card entries, count
+        label, Contacts header, Digest header). 38.5-08 needs no new table-driven component. Top buttons and
+        search + toggle stay full, and Digest content stays none, in all 16 combinations (D-11, D-12).
+
+    **The v3 table.** **Bold** marks a cell changed from the mapped v2 value. The see-through levels are in D-37.
+
+| Combination | List entries | Card entries | Top buttons | Search + toggle | Count label | Contacts header | Digest header | Section headings | Up Next items | Horizon items | Your Week |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Galaxy Light · Deep Space | transparent | transparent | full | full | none | none | none | none | none | none | none |
+| Galaxy Light · Aurora | transparent | transparent | full | full | none | none | none | none | none | none | none |
+| Galaxy Light · Starfield | transparent | transparent | full | full | none | none | none | none | none | none | none |
+| Galaxy Light · None (solid) | full | full | full | full | none | none | none | none | none | none | none |
+| Galaxy Dark · Deep Space | transparent | transparent | full | full | transparent | transparent | transparent | none | none | none | none |
+| Galaxy Dark · Aurora | transparent | transparent | full | full | transparent | transparent | transparent | none | none | none | none |
+| Galaxy Dark · Starfield | transparent | transparent | full | full | transparent | transparent | transparent | none | none | none | none |
+| Galaxy Dark · None (solid) | **full** | **full** | full | full | transparent | transparent | transparent | none | none | none | none |
+| Standard Light · Dawn | transparent | transparent | full | full | none | none | none | none | none | none | none |
+| Standard Light · Paper | full | full | full | full | none | none | none | none | none | none | none |
+| Standard Light · Dusk | transparent | transparent | full | full | none | none | none | none | none | none | none |
+| Standard Light · None (solid) | **full** | **full** | full | full | transparent | transparent | transparent | none | none | none | none |
+| Standard Dark · Dawn | transparent | transparent | full | full | transparent | **none** | **none** | none | none | none | none |
+| Standard Dark · Paper | transparent | transparent | full | full | transparent | **none** | **none** | none | none | none | none |
+| Standard Dark · Dusk | transparent | transparent | full | full | transparent | **none** | **none** | none | none | none | none |
+| Standard Dark · None (solid) | full | full | full | full | full | full | full | none | none | none | none |
+
+-   **[DECIDED · 2026-09-29] D-37 --- The see-through levels (resolves the D-06/D-09 opacities).** "transparent" means
+    a `surface` tint at these opacities.
+    -   **Galaxy Light:**
+        -   List rows **0.05**, Cards **0.05** (rung R2, "like Galaxy Dark's card transparency").
+    -   **Galaxy Dark:**
+        -   List rows **0.05** (R2).
+        -   Cards **0.05** (today's level, kept; see D-42).
+        -   Count label and headers **0.05** (today's level; not asked).
+    -   **Standard Light:**
+        -   List rows **0.05** (typed on the page; not a rung).
+        -   Cards **0.05** (see D-42).
+        -   Count label and headers **0.50** (today's level; not asked; used only on None).
+        -   Owner on the List rows: "Let's keep these the same as the galaxy light options so you can actually see the
+            nice new backgrounds."
+    -   **Standard Dark:**
+        -   List rows **0.05** and Cards **0.05** (R2).
+        -   The "slightly-black" count label **0** (rung R1). A 0% see-through backing draws no visible tint; this is
+            the owner's pick.
+    -   **Off-ladder values.** Standard Light List rows 0.05 and Cards 0.05 were rendered on Dawn and Dusk and
+        contrast-checked (`art-signoff-candidates.ts --check-value`: `contrastSafe: true`, no failures, COMPUTED).
+        The owner confirmed them on the render: "The SL-Dawn and Dusk look great on the 5% scrims, keep new value".
+-   **[DECIDED · 2026-09-29] D-42 --- Card-blend (resolves O-8, per D-27/D-28).** This covers the Contacts card entries
+    only; other content cards keep ADR-115.
+    -   **Galaxy Dark cards: keep today's level** (0.05).
+    -   **Standard Light cards: 0.05**, more see-through than today's 0.50.
+        -   On the page the owner chose the 0% variant.
+        -   In chat: "For Q3b, I'd prefer to keep these the same as the galaxy list rows actually, let's do 5% even
+            though I marked 0%".
+    -   [DERIVED] 38.5-08 sets the Standard Light `cardEntry` see-through group to 0.05 and leaves
+        `CARD_GLASS_OPACITY.standard` (other cards) unchanged.
+-   **[DECIDED · 2026-09-29] D-43 --- The ⋯ in the Contacts header follows the header (resolves the D-04 vs D-08
+    tension).**
+    -   Wherever the Contacts header has no backing, the ⋯ has none either; there is no local backing. With D-36 that
+        covers every Galaxy Light background, Standard Light Dawn/Paper/Dusk and Standard Dark Dawn/Paper/Dusk.
+    -   D-04 keeps scrims on buttons that open overlay menus. For this one button on a bare header, the owner chose
+        "follow" over a local backing. This is his ruling on the collision, which the sheet asked explicitly
+        (research Open Question 2).
+    -   The Population/Filters/Sort buttons and every overlay menu keep their full scrims (D-12, unchanged).
+-   **[DECIDED · 2026-09-29] D-44 --- Text on the see-through contact entries uses the mode's default colours (amends
+    the D-09/D-10 text flip for the new art).**
+    -   Galaxy Light and Standard Dark both answered "mode". The new art already matches each mode, so no entry text
+        flips.
+    -   No cell carries an inverse foreground. 38.5-08 builds no inverse palette and records that D-10 resolved to the
+        mode default on mode-matched art.
+-   **[DECIDED · 2026-09-29] D-45 --- The WATCH Digest outliers are accepted (D-11).** The owner checked Galaxy Light,
+    Standard Dark and Dusk and answered "ok".
+    -   His note, verbatim: "I indicated to remove the header scrims from pretty much everything with I think 1-2
+        exceptions. So that's off in these shots but otherwise they look good."
+    -   [DERIVED] The WATCH shots were taken at the v2 values, before his D-36 header changes. The Digest content was
+        accepted as shown.
+    -   **Not ruled here:** the active Population/Filters/Sort buttons have no fill today (H-3, I1). The sheet showed
+        this for information only. It stays on the end-of-phase gap list (D-28).
 
 ## Primary Input: the 38.4 Background-Art Brief
 
@@ -530,6 +638,8 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
     the owner's.
     -   **Scope note 2026-09-27:** D-08 and D-09 decide the Contacts List rows and Card-view cards per combination. Card-blend
         for every other content card is still open, and it is still the owner's call.
+    -   **Outcome 2026-09-29 → D-42:** Galaxy Dark Contacts cards keep 0.05. Standard Light Contacts cards go to 0.05
+        (from 0.50). Other content cards keep ADR-115 (D-28).
 -   **[RESOLVED · 2026-09-28 → PASS] O-9 --- Spike: can `codex-edu` exec make and edit image files non-interactively?**
     **Result (MEASURED 2026-09-28): PASS.**
     -   The command was `CODEX_HOME="$HOME/.codex-edu" codex exec -m gpt-6-astra --sandbox workspace-write
@@ -686,3 +796,13 @@ O-5 is resolved by D-08, and O-9 is new. O-3, O-6 and O-8 are unchanged (O-8 has
 -   2026-09-29 --- D-35 recorded in the "Art Sign-off" section: the owner had both Aurora images mirrored left↔right
     (mechanical flip, no regeneration) so the ribbon sits away from the left-aligned content. Record:
     `38.5-ART-SIGNOFF.md` §4.
+-   2026-09-29 --- Re-sign-off v3 (D-13 step 3, plan 38.5-07): D-36, D-37 and D-42..D-45 recorded in a new "Re-sign-off
+    v3 (D-13 step 3)" section.
+    -   D-36: the v3 table for the 16 combinations. Standard Dark Dawn/Paper/Dusk headers are none; Standard Light · None
+        and Galaxy Dark · None have full rows and cards.
+    -   D-37: the see-through levels.
+    -   D-42: card-blend (Galaxy Dark keeps 0.05; Standard Light Contacts cards 0.05).
+    -   D-43: the ⋯ follows the header.
+    -   D-44: mode-default text on the see-through entries.
+    -   D-45: the WATCH outliers are accepted.
+    -   O-8 is resolved. Record: `38.5-SIGNOFF-V3.md`; answers: `38.5-scrim-signoff-v3.json`.
