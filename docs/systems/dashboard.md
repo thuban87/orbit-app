@@ -1,7 +1,7 @@
 # Contacts
 
-**Last updated:** 2026-09-23
-**Updated by phase:** 38.4-audit-remediation-ui-performance-release
+**Last updated:** 2026-09-26
+**Updated by phase:** 38.5-background-art-text-contrast
 **Owners:** `src/db/dashboard-read.ts`, `src/logic/dashboard-query-logic.ts`, `src/logic/dashboard-gravity-filter.ts`, `src/db/knowledge-search-read.ts`, `src/services/knowledge-search.ts`, `src/logic/dashboard-search-match.ts`, `src/stores/dashboard-query-store.ts`, `src/stores/dashboard-session-store.ts`, `src/stores/dashboard-selection-store.ts`, `src/components/control-surface/`, `src/screens/HomeScreen.tsx`
 
 ## Purpose
@@ -99,7 +99,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 
 ### Changing the visible Dashboard state
 
-1. `DashboardControlRow` renders Population, Filters, and Sort as separate equal controls. Their summaries use one control-label source and collapse additional selected names to `+N`.
+1. `DashboardControlRow` renders Population, Filters, and Sort as separate equal controls. Their summaries use one control-label source and collapse additional selected names to `+N`. Every trigger has a solid `surface` fill; an active trigger (one with something set) switches its border to `accent` and its label and summary to `accentText` (`controlTriggerLook`, `src/components/control-surface/trigger-look.ts`; ADR-179).
 2. A control opens intent-only option content through `DashboardOverlayHost`; the host presents one centered in-tree floating surface at a time. The visible Dashboard stays readable behind its themed scrim, but its background regions are touch- and accessibility-inert until dismissal.
 3. Option changes derive their next value from the current query-store state and persist through the validated settings DAO. They apply immediately; no Apply or Done step exists, and a zero-result selection leaves the panel open.
 4. The floating surface dismisses on a repeat press, outside press, or shell transient-first Back. Its content scrolls within a viewport cap so every Filter option remains reachable.
@@ -129,6 +129,7 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 2. A normal row shows name, local-calendar recency plus category, and the selected context or a stable completeness prompt. Its same-weight tokenized border and decorative glyph communicate a real status; null status is neutral and glyph-less, while a current snooze uses the neutral snooze presentation without mutating domain status.
 3. The Favourite star is binary membership. The screen keeps an optimistic per-contact overlay while a write is pending, records every successful durable settlement into the base row, and reveals that committed membership if a newer write fails.
 4. A closed row opens Profile. A partially open row closes first. Right swipe and its accessibility action read the global action only at commitment, then run shared Quick Log or navigate to Log Contact; left swipe and its accessibility action route to Edit Contact. Only one row remains open.
+   - The row's backing comes from the signed art-treatment table (ADR-177): `full`, see-through at the signed level, or `none`. While a see-through row's swipe translation is non-zero, its tint steps to `SWIPE_ROW_BACKING_OPACITY` (0.5) so the Log/Edit action panel does not show through the row text (ADR-179). `HomeScreen` mirrors the `ReanimatedSwipeable` translation into the row's shared value; the tint is driven on the UI thread, never by React state.
 5. Search keeps identity on line one and replaces normal secondary content with a compact match explanation and strongest highlighted descriptor. Relevance-ranked corpus matches stay in scorer order; name-only and fuel-only fallbacks append in Dashboard order.
 6. The row's accessible description is the identity summary (name, category, recency, favourite, status) followed by the context the row actually renders (RG-031, ui-accessibility/AUD-UIA-007). In search, that context is the match explanation plus the displayed snippet in quotes (`buildSearchRowContext`). Outside search, it is the adaptive line-three text. When no context is shown, the description is the unchanged identity summary. Text the row does not display is never passed as context.
 7. Row text resolves `fontFamily` through `resolveFontFamily` (`src/theme/tokens/typography.ts`), which AppText uses too. The result is always a key `fonts.ts` registers (`Inter-Regular`, `Inter-SemiBold`, `SpaceGrotesk-SemiBold`), never the bare semantic family (RG-031, ui-accessibility/AUD-UIA-015).
@@ -139,7 +140,8 @@ The Dashboard owns no table. It reads `contacts` and related local data, while i
 2. `CardGrid` remounts its keyed `FlatList` when width or font scale changes the responsive column count. In normal mode `GridCard` presents name and recency only; it uses a status ring plus glyph, neutralizes the ring with a snooze glyph when snoozed, and suppresses the glyph for a never-contacted row.
 3. The Card star uses the host-owned optimistic binary favourite path. Search may render its own third-line match explanation; ordinary List retains the selected context/excerpt path, while normal Grid does not.
 4. A normal tap opens Profile. Long-press and equivalent accessibility actions expose the fixed per-contact action menu; Card View does not copy List swipe gestures.
-5. `GridCard` uses the same description builder and registered-font mapping as `ListRow`. In search, the description includes the rendered explanation and snippet. Normal Grid announces no line-three context, because it renders none (38.1).
+5. `GridCard`'s card takes its backing from the signed art-treatment table through `GlassSurface treatment="contact-entry"` (ADR-177).
+6. `GridCard` uses the same description builder and registered-font mapping as `ListRow`. In search, the description includes the rendered explanation and snippet. Normal Grid announces no line-three context, because it renders none (38.1).
 
 ### Selecting and applying bulk actions
 
@@ -215,6 +217,8 @@ The Group Events header and redundant overflow entries navigate to the local rev
 - **ADR-169:** Standard-Light Glass Foreground Scope, Both-Extrema Contrast Proof, and Accent Role Contract — foregrounds on glass read through the glass scope, and `accentText` / `onAccent` / `accent` roles are enforced by AST contracts.
 - **ADR-172:** Contacts Header Counts the Contacts on Screen — the header shows the active view's displayed rows; `countLiveContacts` serves only the empty state.
 - **ADR-173:** Universal FAB Semantic Visibility, Open-Dial Containment, Non-Collapsable Shell Overlays, Border, and Bottom Clearance — closed dial is inert to assistive tech, box-none overlays are `collapsable={false}`, permanent `onAccent` ring, route-derived clearance.
+- **ADR-177:** Mode-Specific Background Art and Signed Per-Combination Art Treatments — the List rows, Card-view cards, count label and Contacts header take their backing from the owner-signed per-combination table.
+- **ADR-179:** Owner-Ruled Art Treatments Beyond the Signed Table — active triggers keep the fill with accent border and text; a swiped see-through List row is backed at 50%.
 
 ## Gotchas
 
@@ -238,6 +242,7 @@ The Group Events header and redundant overflow entries navigate to the local rev
 18. **Panel open state has one owner — `dashboard-panel-store.ts`.** Home derives its background inertness with `selectPanelOpen`; never mirror it in component state, and when dismissing capture the request before `close()` (RG-020, react-native/AUD-RN-001). Scrim tap and Android Back reach the owner through `dismissDashboardPanel`; the trigger re-tap closes the store directly. The `accessible={!panelOpen}` grouping on Home's two wrappers stays: the owner's on-device TalkBack traversal (D-05) found every control individually reachable with correct panel-return focus, so ui-accessibility/AUD-UIA-022 was not reproduced and the wrapper fix was not applied; `no-hide-descendants` and `pointerEvents="none"` while a panel is open stay as ADR-095 isolation.
 19. **Home refresh has one owner — the refresh scheduler.** Never call a Home state setter from a read outside `publishDashboardRead`, never put `appActive`, `isFocused`, `reducedMotion` or `resultProgress` back into `reload`'s dependency list (a structural test pins this), never add a private `AppState` read listener (resume is the post-sweep foreground tick, D-14), and never follow a bulk `bumpShellRefresh()` with a direct `reload` (RG-022, D-23).
 20. **A `box-none` shell overlay whose accessibility props toggle must be `collapsable={false}` (D-33, GAP-G2).** Fabric flattens a View whose only view-forming props are its toggling a11y props (`pointerEvents: box-none` alone does not form a view). When the node forms a view again, Android re-creates it WITHOUT the unchanged `box-none`, so the new view defaults to `auto` and becomes a full-screen touch sink. The universal FAB's dial container did this on every dial close: the Contacts controls, list, every tab and Profile scrolling went dead until a cold start, and only the FAB still answered. That was the owner's "Contacts freeze" (`38.4-G2-INVESTIGATION.md`). The rule is pinned by `src/components/control-surface/dashboard-controls-responsiveness.test.ts` for every static `box-none` View with toggling a11y props (UniversalFab dial, Snackbar, AssistBanner). The Contacts controls path itself (store write → scheduler read → publish) was cleared on the device.
+21. **The swiped-row tint is a step, not a ramp (ADR-179).** `ReanimatedSwipeable` shows the action panel on the first non-zero translation, and the row text (74 px in) already sits over the 96 px panel at small translations, so a ramp would leave text over the panel below the proven 0.5. The row's trailing icons and ring cross the panel glyphs in motion and fail there at 0.5; that is an owner-accepted exemption for icons and the ring only, recorded in `src/theme/tokens/surface.test.ts` ("Swiped see-through List row"). Any new row text must stay clear of the panel glyphs.
 
 ## Related Systems
 
@@ -278,3 +283,4 @@ The Group Events header and redundant overflow entries navigate to the local rev
 | 2026-09-26 | 38.4 | Favourite toggle publishes through the scheduler (38.3 REVIEW A-WR-05 / VERIFICATION W4, D-10): new non-deferrable `favourite` source requested after the write commits, so a stale in-flight read cannot revert the star and population counts are re-read; `dashboardFadeStart` settles favourite reads at fade start 1 (no list re-fade); `isDashboardVisible` now delegates to the shared `isForegroundVisible` (W2). No legacy-data repair (38.2 D-23). |
 | 2026-09-27 | 38.4 | Contacts controls freeze fixed (D-33, GAP-G2): the root cause was the FAB dial container re-forming as a full-screen touch sink after the dial closed, not the controls. `collapsable={false}` on the static `box-none` shell overlays (UniversalFab dial, Snackbar, AssistBanner), pinned by a source contract. |
 | 2026-09-27 | 38.4 | Contacts header count shows the contacts on screen (D-55, OA-E1; supersedes the Phase 26 total-live rule): `dashboardHeaderCount` over the displayed List/Card rows, hidden on error, initial load and zero rows; the live count stays for the empty state. |
+| 2026-09-26 | 38.5 | Contacts entries, count label and header follow the signed per-combination art table (ADR-177). Active Population/Filters/Sort triggers are filled with accent border and text (D-46), and a swiped see-through List row is backed at 50% (D-48; ADR-179). |
