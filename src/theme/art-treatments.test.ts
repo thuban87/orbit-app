@@ -1,10 +1,14 @@
 /**
- * Per-combination art treatment table (38.5-06; D-08, D-13, D-28).
+ * Per-combination art treatment table: the v3 sync guard (38.5-08; D-08, D-13,
+ * D-27, D-28, D-36, D-37, D-42..D-44).
  *
- * The production table reproduces TODAY's shipped treatment for every
- * combination and marked component (identity proof), so nothing shipped moves
- * before the owner re-signs over the new art (D-13). Unsigned see-through
- * opacities stay null and are never selectable (D-06, D-09).
+ * The production table and the see-through opacities are the owner's signed
+ * re-sign-off v3 answers (`38.5-scrim-signoff-v3.json`, the assembled answer
+ * with his chat amendments). Every cell and every signed level is compared with
+ * that file, so the newer answer governs mechanically: an edit to either side
+ * that the other does not mirror fails here (T-38.5-08-01). The file's
+ * `transparent` is the table's `seeThrough` (the literal `transparent` lives
+ * only in this test's mapping; `check:colors` flags it outside `/theme/`).
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -13,7 +17,9 @@ import {
   ART_COMBINATION_KEYS,
   ART_COMPONENTS,
   ART_TREATMENTS,
+  type ArtBacking,
   type ArtComponent,
+  type ArtForeground,
   applyArtDevOverrides,
   artBackgroundKey,
   artCombinationKey,
@@ -25,22 +31,25 @@ import {
   listRowBacking,
   resolveArtCell,
   resolveArtTreatment,
+  TABLE_DRIVEN_COMPONENTS,
 } from "./art-treatments";
 import { BACKGROUND_ORDER, resolveBackground } from "./backgrounds";
 import type { ResolvedMode, ThemePackage } from "./theme-types";
 import {
   ART_SEE_THROUGH_OPACITY,
+  type ArtOpacityGroup,
   artBackingOpacity,
   CARD_GLASS_OPACITY,
-  cardMatchesMode,
   cardTintOpacity,
   chromeScrimOpacity,
   SURFACE,
 } from "./tokens/surface";
 
 const REPO = join(__dirname, "..", "..");
+const PHASE = ".planning/phases/38.5-background-art-text-contrast";
 const PACKAGES: ThemePackage[] = ["galaxy", "standard"];
 const MODES: ResolvedMode[] = ["light", "dark"];
+const GROUPS: ArtOpacityGroup[] = ["listEntry", "cardEntry", "artChrome"];
 
 /** Every (package, mode, background key) the lineup can render. */
 const COMBOS = PACKAGES.flatMap((pkg) =>
@@ -54,6 +63,61 @@ const COMBOS = PACKAGES.flatMap((pkg) =>
   ),
 );
 
+/** The shape of the signed v3 file this guard reads (only what it checks). */
+interface SignoffV3 {
+  combos: Record<
+    string,
+    Record<string, unknown> & {
+      theme: string;
+      mode: string;
+      bg: string;
+      reviewed: boolean;
+      /** Optional per-component foreground flag (none in the signed file). */
+      foreground?: Partial<Record<ArtComponent, string>>;
+    }
+  >;
+  treatmentValues: Record<string, Partial<Record<ArtOpacityGroup, number>>>;
+  questions: {
+    contactsHeaderOverflowBacking: string;
+    seeThroughEntryForeground: Record<string, string>;
+  };
+  _meta: { unanswered: unknown[] };
+}
+
+const V3 = JSON.parse(
+  readFileSync(join(REPO, PHASE, "38.5-scrim-signoff-v3.json"), "utf8"),
+) as SignoffV3;
+
+/** The sheet's vocabulary mapped to the table's (38.5-08: transparent -> seeThrough). */
+const V3_BACKING: Record<string, ArtBacking> = {
+  full: "full",
+  transparent: "seeThrough",
+  none: "none",
+};
+
+/** A foreground answer mapped to the table's: `flip` / `inverse` -> inverse. */
+function mappedForeground(answer: string | undefined): ArtForeground {
+  return answer === "flip" || answer === "inverse" ? "inverse" : "mode";
+}
+
+/** The signed foreground of one cell: its own flag, else the Q6 answer for a see-through entry, else the mode. */
+function expectedForeground(
+  comboKey: string,
+  component: ArtComponent,
+): ArtForeground {
+  const combo = V3.combos[comboKey];
+  const own = combo.foreground?.[component];
+  if (own !== undefined) return mappedForeground(own);
+  const entry =
+    component === "contactsListEntries" || component === "contactsCardEntries";
+  if (entry && V3_BACKING[String(combo[component])] === "seeThrough") {
+    return mappedForeground(
+      V3.questions.seeThroughEntryForeground[`${combo.theme}-${combo.mode}`],
+    );
+  }
+  return "mode";
+}
+
 function opacityOf(
   pkg: ThemePackage,
   mode: ResolvedMode,
@@ -66,19 +130,14 @@ function opacityOf(
   return artBackingOpacity(pkg, mode, group, cell.backing);
 }
 
-describe("ART_COMPONENTS — the v2 sheet's field names (D-08)", () => {
-  it("equals the component field set of the signed v2 answers exactly", () => {
-    const v2 = JSON.parse(
-      readFileSync(
-        join(
-          REPO,
-          ".planning/phases/38.5-background-art-text-contrast/38.5-scrim-signoff-v2.json",
-        ),
-        "utf8",
-      ),
-    ) as { combos: Record<string, Record<string, unknown>> };
+describe("ART_COMPONENTS — the sheet's field names (D-08, D-27)", () => {
+  function fieldsOf(file: string): Set<string> {
+    const json = JSON.parse(readFileSync(join(REPO, PHASE, file), "utf8")) as {
+      combos: Record<string, Record<string, unknown>>;
+    };
     const meta = new Set([
       "bg",
+      "foreground",
       "mode",
       "note",
       "reviewed",
@@ -86,10 +145,19 @@ describe("ART_COMPONENTS — the v2 sheet's field names (D-08)", () => {
       "updatedAt",
     ]);
     const fields = new Set<string>();
-    for (const combo of Object.values(v2.combos)) {
+    for (const combo of Object.values(json.combos)) {
       for (const key of Object.keys(combo)) if (!meta.has(key)) fields.add(key);
     }
-    expect([...ART_COMPONENTS].sort()).toEqual([...fields].sort());
+    return fields;
+  }
+
+  it("equals the component field set of the signed v2 and v3 answers exactly", () => {
+    expect([...ART_COMPONENTS].sort()).toEqual(
+      [...fieldsOf("38.5-scrim-signoff-v2.json")].sort(),
+    );
+    expect([...ART_COMPONENTS].sort()).toEqual(
+      [...fieldsOf("38.5-scrim-signoff-v3.json")].sort(),
+    );
     expect(ART_COMPONENTS).toHaveLength(11);
   });
 });
@@ -106,7 +174,7 @@ describe("combination keys", () => {
     );
   });
 
-  it("uses the v2 JSON key format <theme>-<mode>-<bg>", () => {
+  it("uses the sheet's key format <theme>-<mode>-<bg>", () => {
     expect(artCombinationKey("galaxy", "dark", "starfield")).toBe(
       "galaxy-dark-starfield",
     );
@@ -147,63 +215,67 @@ describe("combination keys", () => {
   });
 });
 
-describe("identity: the production table reproduces today's treatment (D-13)", () => {
-  it.each(COMBOS.map((c) => [`${c.pkg}-${c.mode}-${c.key}`, c]))(
-    "%s",
-    (_label, { pkg, mode, key }) => {
-      // Count label and both headers: today's chromeScrimOpacity.
-      for (const component of [
-        "contactsCountLabel",
-        "contactsHeader",
-        "digestHeader",
-      ] as const) {
-        expect(opacityOf(pkg, mode, key, component)).toBe(
-          chromeScrimOpacity(pkg, mode),
+describe("v3 sync guard: the production table equals the signed answers (D-13, D-36)", () => {
+  it("the signed file covers exactly the lineup's 16 combinations, all reviewed, none unanswered", () => {
+    expect(Object.keys(V3.combos).sort()).toEqual(
+      [...ART_COMBINATION_KEYS].sort(),
+    );
+    for (const [key, combo] of Object.entries(V3.combos)) {
+      expect(
+        artCombinationKey(
+          combo.theme as ThemePackage,
+          combo.mode as ResolvedMode,
+          combo.bg,
+        ),
+      ).toBe(key);
+      expect(combo.reviewed, key).toBe(true);
+      for (const component of ART_COMPONENTS) {
+        expect(Object.keys(V3_BACKING), `${key}.${component}`).toContain(
+          combo[component],
         );
       }
-      // Card entries: today's GridCard dense card tint.
-      expect(opacityOf(pkg, mode, key, "contactsCardEntries")).toBe(
-        cardTintOpacity(pkg, mode, "dense"),
-      );
-      // List entries: today's solid fill.
-      const list = resolveArtCell(
-        ART_TREATMENTS,
-        pkg,
-        mode,
-        key,
-        "contactsListEntries",
-      );
-      expect(list.backing).toBe("full");
-      expect(opacityOf(pkg, mode, key, "contactsListEntries")).toBe(1);
-      // Top buttons and search stay full; Digest content has no backing.
-      for (const component of [
-        "contactsTopButtons",
-        "contactsSearchAndToggle",
-      ] as const) {
-        expect(
-          resolveArtCell(ART_TREATMENTS, pkg, mode, key, component).backing,
-        ).toBe("full");
-      }
-      for (const component of [
-        "digestSectionHeadings",
-        "digestUpNextItems",
-        "digestHorizonItems",
-        "digestYourWeek",
-      ] as const) {
-        expect(
-          resolveArtCell(ART_TREATMENTS, pkg, mode, key, component).backing,
-        ).toBe("none");
-      }
-      // One foreground per combination x component, and it is the mode's.
+    }
+    expect(V3._meta.unanswered).toEqual([]);
+  });
+
+  it.each(ART_COMBINATION_KEYS.map((key) => [key]))(
+    "%s: every cell's backing, foreground and ⋯ backing equal the signed answer",
+    (key) => {
+      const combo = V3.combos[key];
+      const keepLocal =
+        V3.questions.contactsHeaderOverflowBacking === "keep-local-backing";
       for (const component of ART_COMPONENTS) {
-        const cell = resolveArtCell(ART_TREATMENTS, pkg, mode, key, component);
-        expect(cell.foreground).toBe("mode");
-        expect(cell.overflowLocalBacking).toBe(false);
+        const cell = ART_TREATMENTS[key][component];
+        const label = `${key}.${component}`;
+        expect(cell.backing, label).toBe(V3_BACKING[String(combo[component])]);
+        expect(cell.foreground, label).toBe(expectedForeground(key, component));
+        expect(cell.overflowLocalBacking, label).toBe(
+          keepLocal &&
+            component === "contactsHeader" &&
+            cell.backing === "none",
+        );
       }
     },
   );
 
-  it("the active Population/Filters/Sort trigger keeps today's border-only look (H-3 gap, recorded)", () => {
+  it("the ⋯ follows the header: no cell draws a local ⋯ backing (D-43)", () => {
+    expect(V3.questions.contactsHeaderOverflowBacking).toBe("followHeader");
+    for (const key of ART_COMBINATION_KEYS) {
+      for (const component of ART_COMPONENTS) {
+        expect(ART_TREATMENTS[key][component].overflowLocalBacking).toBe(false);
+      }
+    }
+  });
+
+  it("no cell is inverse: text keeps the mode default on the mode-matched art (D-44, D-10)", () => {
+    for (const key of ART_COMBINATION_KEYS) {
+      for (const component of ART_COMPONENTS) {
+        expect(ART_TREATMENTS[key][component].foreground).toBe("mode");
+      }
+    }
+  });
+
+  it("the active Population/Filters/Sort trigger keeps the production border-only look (I1 not ruled; gap list, D-28)", () => {
     for (const key of ART_COMBINATION_KEYS) {
       const row = ART_TREATMENTS[key];
       expect(row.contactsTopButtons.activeTriggerBacking).toBe("none");
@@ -213,23 +285,47 @@ describe("identity: the production table reproduces today's treatment (D-13)", (
       }
     }
   });
+});
 
-  it("currentArtCell encodes the mode-matched rule (ADR-115)", () => {
+describe("v3 sync guard: the see-through levels equal the signed treatmentValues (D-37, D-42)", () => {
+  it("ART_SEE_THROUGH_OPACITY equals treatmentValues for every package × mode × group; an unsigned group is null", () => {
     for (const pkg of PACKAGES) {
       for (const mode of MODES) {
-        const glassy = cardMatchesMode(pkg, mode);
-        expect(currentArtCell(pkg, mode, "contactsCardEntries").backing).toBe(
-          glassy ? "seeThrough" : "full",
-        );
-        expect(currentArtCell(pkg, mode, "contactsListEntries").backing).toBe(
-          "full",
-        );
+        const signed = V3.treatmentValues[`${pkg}-${mode}`] ?? {};
+        for (const group of GROUPS) {
+          expect(
+            ART_SEE_THROUGH_OPACITY[pkg][mode][group],
+            `${pkg}-${mode}.${group}`,
+          ).toBe(signed[group] ?? null);
+        }
+      }
+    }
+    // Every signed level is carried (no extra key in the file is dropped).
+    for (const [pkgMode, groups] of Object.entries(V3.treatmentValues)) {
+      const [pkg, mode] = pkgMode.split("-") as [ThemePackage, ResolvedMode];
+      for (const [group, value] of Object.entries(groups)) {
+        expect(
+          ART_SEE_THROUGH_OPACITY[pkg][mode][group as ArtOpacityGroup],
+          `${pkgMode}.${group}`,
+        ).toBe(value);
       }
     }
   });
-});
 
-describe("see-through opacities (D-06, D-09)", () => {
+  it("the unsigned (null) groups are exactly Galaxy Light artChrome, and no see-through cell uses it", () => {
+    const nulls: string[] = [];
+    for (const pkg of PACKAGES) {
+      for (const mode of MODES) {
+        for (const group of GROUPS) {
+          if (ART_SEE_THROUGH_OPACITY[pkg][mode][group] === null) {
+            nulls.push(`${pkg}-${mode}.${group}`);
+          }
+        }
+      }
+    }
+    expect(nulls).toEqual(["galaxy-light.artChrome"]);
+  });
+
   it("no see-through cell of the production table has an unsigned (null) opacity", () => {
     for (const key of ART_COMBINATION_KEYS) {
       const [pkg, mode] = key.split("-") as [ThemePackage, ResolvedMode];
@@ -247,30 +343,38 @@ describe("see-through opacities (D-06, D-09)", () => {
     }
   });
 
-  it("the only seeded values are today's shipped see-through values, by reference", () => {
-    expect(ART_SEE_THROUGH_OPACITY.galaxy.dark).toEqual({
-      listEntry: null,
-      cardEntry: CARD_GLASS_OPACITY.galaxy,
-      artChrome: chromeScrimOpacity("galaxy", "dark"),
-    });
-    expect(ART_SEE_THROUGH_OPACITY.standard.light).toEqual({
-      listEntry: null,
-      cardEntry: CARD_GLASS_OPACITY.standard,
-      artChrome: chromeScrimOpacity("standard", "light"),
-    });
-    for (const [pkg, mode] of [
-      ["galaxy", "light"],
-      ["standard", "dark"],
-    ] as const) {
-      expect(ART_SEE_THROUGH_OPACITY[pkg][mode]).toEqual({
-        listEntry: null,
-        cardEntry: null,
-        artChrome: null,
-      });
-    }
+  it("today's values the owner kept stay by reference; other cards and chrome keep today's constants (D-28, D-42)", () => {
+    expect(ART_SEE_THROUGH_OPACITY.galaxy.dark.cardEntry).toBe(
+      CARD_GLASS_OPACITY.galaxy,
+    );
+    expect(ART_SEE_THROUGH_OPACITY.galaxy.dark.artChrome).toBe(
+      chromeScrimOpacity("galaxy", "dark"),
+    );
+    expect(ART_SEE_THROUGH_OPACITY.standard.light.artChrome).toBe(
+      chromeScrimOpacity("standard", "light"),
+    );
+    const source = readFileSync(
+      join(__dirname, "tokens", "surface.ts"),
+      "utf8",
+    );
+    expect(source).toMatch(/cardEntry: CARD_GLASS_OPACITY\.galaxy,/);
+    expect(source).toMatch(
+      /artChrome: chromeScrimOpacity\("galaxy", "dark"\),/,
+    );
+    expect(source).toMatch(
+      /artChrome: chromeScrimOpacity\("standard", "light"\),/,
+    );
+    // The Contacts-card level moved (0.5 -> 0.05); every other card did not.
+    expect(CARD_GLASS_OPACITY.standard).toBe(0.5);
+    expect(cardTintOpacity("standard", "light", "dense")).toBe(
+      CARD_GLASS_OPACITY.standard,
+    );
+    expect(ART_SEE_THROUGH_OPACITY.standard.light.cardEntry).not.toBe(
+      CARD_GLASS_OPACITY.standard,
+    );
   });
 
-  it("artBackingOpacity: full is today's opaque value, none draws nothing, an unsigned see-through fails safe to full", () => {
+  it("artBackingOpacity: full is today's opaque value, none draws nothing, see-through is the signed level (fail-safe to full if unsigned)", () => {
     for (const pkg of PACKAGES) {
       for (const mode of MODES) {
         expect(artBackingOpacity(pkg, mode, "listEntry", "full")).toBe(1);
@@ -279,7 +383,7 @@ describe("see-through opacities (D-06, D-09)", () => {
             SURFACE[pkg].densityOpacity.dense,
           );
         }
-        for (const group of ["listEntry", "cardEntry", "artChrome"] as const) {
+        for (const group of GROUPS) {
           expect(artBackingOpacity(pkg, mode, group, "none")).toBeNull();
           const signed = ART_SEE_THROUGH_OPACITY[pkg][mode][group];
           expect(artBackingOpacity(pkg, mode, group, "seeThrough")).toBe(
@@ -288,24 +392,42 @@ describe("see-through opacities (D-06, D-09)", () => {
         }
       }
     }
+    // A signed 0 (Standard Dark count label, Q2g R1) is a real level, not "unsigned".
+    expect(
+      artBackingOpacity("standard", "dark", "artChrome", "seeThrough"),
+    ).toBe(0);
   });
 
-  it("artOpacityGroup maps the five marked components and nothing else", () => {
+  it("every production cell's opacity is its group's signed level or today's full value", () => {
+    for (const { pkg, mode, key } of COMBOS) {
+      for (const component of TABLE_DRIVEN_COMPONENTS) {
+        const group = artOpacityGroup(component) as ArtOpacityGroup;
+        const backing =
+          V3_BACKING[String(V3.combos[`${pkg}-${mode}-${key}`][component])];
+        const want =
+          backing === "none"
+            ? null
+            : backing === "full"
+              ? group === "listEntry"
+                ? 1
+                : SURFACE[pkg].densityOpacity.dense
+              : V3.treatmentValues[`${pkg}-${mode}`][group];
+        expect(
+          opacityOf(pkg, mode, key, component),
+          `${pkg}-${mode}-${key}.${component}`,
+        ).toBe(want);
+      }
+    }
+  });
+
+  it("artOpacityGroup maps the five table-driven components and nothing else", () => {
     expect(artOpacityGroup("contactsListEntries")).toBe("listEntry");
     expect(artOpacityGroup("contactsCardEntries")).toBe("cardEntry");
     expect(artOpacityGroup("contactsCountLabel")).toBe("artChrome");
     expect(artOpacityGroup("contactsHeader")).toBe("artChrome");
     expect(artOpacityGroup("digestHeader")).toBe("artChrome");
     for (const component of ART_COMPONENTS) {
-      if (
-        [
-          "contactsListEntries",
-          "contactsCardEntries",
-          "contactsCountLabel",
-          "contactsHeader",
-          "digestHeader",
-        ].includes(component)
-      )
+      if ((TABLE_DRIVEN_COMPONENTS as readonly string[]).includes(component))
         continue;
       expect(artOpacityGroup(component)).toBeNull();
     }
@@ -317,8 +439,101 @@ describe("see-through opacities (D-06, D-09)", () => {
   });
 });
 
+describe("TABLE_DRIVEN_COMPONENTS — only the marked components move (D-28)", () => {
+  /** Where each table-driven component opts in (the source-scan contract in art-treatment-scope-contract.test.ts). */
+  const OPT_IN: Record<string, { file: string; pattern: RegExp }> = {
+    contactsListEntries: {
+      file: "src/components/ListRow.tsx",
+      pattern: /useArtTreatment\("contactsListEntries"\)/,
+    },
+    contactsCardEntries: {
+      file: "src/components/ui/GlassSurface.tsx",
+      pattern: /"contact-entry" \? "contactsCardEntries"/,
+    },
+    contactsCountLabel: {
+      file: "src/screens/HomeScreen.tsx",
+      pattern: /artComponent="contactsCountLabel"/,
+    },
+    contactsHeader: {
+      file: "src/screens/HomeScreen.tsx",
+      pattern: /artComponent="contactsHeader"/,
+    },
+    digestHeader: {
+      file: "src/screens/DigestScreen.tsx",
+      pattern: /artComponent="digestHeader"/,
+    },
+  };
+
+  it("is the five v2-marked components (v3 changed nothing outside them)", () => {
+    expect([...TABLE_DRIVEN_COMPONENTS].sort()).toEqual(
+      [
+        "contactsCardEntries",
+        "contactsCountLabel",
+        "contactsHeader",
+        "contactsListEntries",
+        "digestHeader",
+      ].sort(),
+    );
+  });
+
+  it("every component whose signed column differs from its pre-38.5 behaviour is table-driven", () => {
+    const changed = new Set<ArtComponent>();
+    for (const { pkg, mode, key } of COMBOS) {
+      for (const component of ART_COMPONENTS) {
+        const before = currentArtCell(pkg, mode, component);
+        const now = resolveArtCell(ART_TREATMENTS, pkg, mode, key, component);
+        const opacityMoved =
+          artOpacityGroup(component) !== null &&
+          opacityOf(pkg, mode, key, component) !==
+            artBackingOpacity(
+              pkg,
+              mode,
+              artOpacityGroup(component) as ArtOpacityGroup,
+              before.backing,
+            );
+        if (
+          now.backing !== before.backing ||
+          now.foreground !== before.foreground ||
+          now.overflowLocalBacking !== before.overflowLocalBacking ||
+          now.activeTriggerBacking !== before.activeTriggerBacking ||
+          opacityMoved
+        ) {
+          changed.add(component);
+        }
+      }
+    }
+    for (const component of changed) {
+      expect(TABLE_DRIVEN_COMPONENTS, component).toContain(component);
+    }
+  });
+
+  it("every other component's signed column equals its pre-38.5 behaviour in every combination", () => {
+    for (const { pkg, mode, key } of COMBOS) {
+      for (const component of ART_COMPONENTS) {
+        if ((TABLE_DRIVEN_COMPONENTS as readonly string[]).includes(component))
+          continue;
+        expect(
+          resolveArtCell(ART_TREATMENTS, pkg, mode, key, component),
+          `${pkg}-${mode}-${key}.${component}`,
+        ).toEqual(currentArtCell(pkg, mode, component));
+      }
+    }
+  });
+
+  it("each table-driven component has exactly its opt-in consumer", () => {
+    for (const component of TABLE_DRIVEN_COMPONENTS) {
+      const optIn = OPT_IN[component];
+      expect(optIn, component).toBeDefined();
+      expect(
+        readFileSync(join(REPO, optIn.file), "utf8"),
+        `${component} opt-in in ${optIn.file}`,
+      ).toMatch(optIn.pattern);
+    }
+  });
+});
+
 describe("resolveArtTreatment — the hook's pure core", () => {
-  it("resolves the stored background through the resolver and returns cell + opacity", () => {
+  it("resolves the stored background through the resolver and returns cell + signed opacity", () => {
     const t = resolveArtTreatment(
       "galaxy",
       "dark",
@@ -326,17 +541,27 @@ describe("resolveArtTreatment — the hook's pure core", () => {
       "contactsCountLabel",
     );
     expect(t.backing).toBe("seeThrough");
-    expect(t.opacity).toBe(chromeScrimOpacity("galaxy", "dark"));
+    expect(t.opacity).toBe(ART_SEE_THROUGH_OPACITY.galaxy.dark.artChrome);
     expect(t.foreground).toBe("mode");
     expect(t.overflowLocalBacking).toBe(false);
+    // Galaxy Light, the default slot: see-through cards at the signed level.
     const light = resolveArtTreatment(
       "galaxy",
       "light",
       null,
       "contactsCardEntries",
     );
-    expect(light.backing).toBe("full");
-    expect(light.opacity).toBe(cardTintOpacity("galaxy", "light", "dense"));
+    expect(light.backing).toBe("seeThrough");
+    expect(light.opacity).toBe(V3.treatmentValues["galaxy-light"].cardEntry);
+    // Standard Dark · Dawn: the Contacts header has no backing (D-36).
+    const header = resolveArtTreatment(
+      "standard",
+      "dark",
+      "standard-dawn",
+      "contactsHeader",
+    );
+    expect(header.backing).toBe("none");
+    expect(header.opacity).toBeNull();
   });
 
   it("a component without an opacity group reports opacity 1 when backed and null when bare", () => {
@@ -400,25 +625,54 @@ describe("listRowBacking — the table-driven List row (38.5-06 Task 2)", () => 
     });
   });
 
-  it("the production List cell is today's solid row in every combination", () => {
-    for (const { pkg, mode, slot } of COMBOS) {
+  it("the production List row follows the signed cell in every combination (D-36, D-37)", () => {
+    for (const { pkg, mode, slot, key } of COMBOS) {
+      const signed =
+        V3_BACKING[
+          String(V3.combos[`${pkg}-${mode}-${key}`].contactsListEntries)
+        ];
+      const want =
+        signed === "full"
+          ? { solidFill: true, tintOpacity: null, scoped: false }
+          : signed === "none"
+            ? { solidFill: false, tintOpacity: null, scoped: false }
+            : {
+                solidFill: false,
+                tintOpacity: V3.treatmentValues[`${pkg}-${mode}`].listEntry,
+                scoped: true,
+              };
       expect(
         listRowBacking(
           resolveArtTreatment(pkg, mode, slot, "contactsListEntries"),
         ),
-      ).toEqual({ solidFill: true, tintOpacity: null, scoped: false });
+        `${pkg}-${mode}-${key}`,
+      ).toEqual(want);
     }
   });
 });
 
 describe("contact-entry cards — GlassSurface treatment (38.5-06 Task 2)", () => {
-  it("the Card-entry backing equals today's dense card tint, scoped, in every combination", () => {
-    for (const { pkg, mode, slot } of COMBOS) {
+  it("the Card-entry backing follows the signed cell, scoped, in every combination (D-36, D-42)", () => {
+    for (const { pkg, mode, slot, key } of COMBOS) {
+      const signed =
+        V3_BACKING[
+          String(V3.combos[`${pkg}-${mode}-${key}`].contactsCardEntries)
+        ];
       const t = resolveArtTreatment(pkg, mode, slot, "contactsCardEntries");
-      expect(artScrimBacking(t, cardTintOpacity(pkg, mode, "dense"))).toEqual({
-        opacity: cardTintOpacity(pkg, mode, "dense"),
-        scoped: true,
-      });
+      expect(
+        artScrimBacking(t, cardTintOpacity(pkg, mode, "dense")),
+        `${pkg}-${mode}-${key}`,
+      ).toEqual(
+        signed === "none"
+          ? { opacity: null, scoped: false }
+          : {
+              opacity:
+                signed === "full"
+                  ? SURFACE[pkg].densityOpacity.dense
+                  : V3.treatmentValues[`${pkg}-${mode}`].cardEntry,
+              scoped: true,
+            },
+      );
     }
   });
 });
