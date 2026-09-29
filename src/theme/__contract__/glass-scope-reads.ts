@@ -24,7 +24,10 @@
  *
  * Scope regions: `<GlassSurface>` children (unless `treatment="orrery-overlay"`,
  * which keeps the root palette under ADR-149), `<ChromeScrim>` children, the
- * `<ShellAppBar trailing={…}>` value, and every auto-discovered scope slot
+ * `<ShellAppBar trailing={…}>` value, direct `<GlassForegroundScope>` children
+ * (38.5-06 C2-M1: a component that draws its own see-through backing, such as
+ * the table-driven `ListRow`, scopes its content directly), and every
+ * auto-discovered scope slot
  * (`discoverScopeWrappers`): a component whose `children` or other
  * `ReactNode`-typed prop renders inside a scope region, and a same-file render
  * helper whose `ReactNode` parameter renders inside one (its call-site argument
@@ -63,6 +66,33 @@ export const SCOPE_ELEMENTS = [
   { element: "ChromeScrim", slot: "children" },
   { element: "ShellAppBar", slot: "trailing" },
 ] as const;
+
+/**
+ * The scope labels `scopeRegions()` hard-codes (38.5-06 C2-M1). A superset of
+ * `SCOPE_ELEMENTS`: `GlassForegroundScope` is a scope but draws NO backing, so it
+ * is deliberately absent from `SCOPE_ELEMENTS` (38.5-01's `bare-text-sites.ts`
+ * reads that list as the BACKED glass set) and present here.
+ */
+export const SCOPE_REGION_SCOPES = [
+  "GlassSurface",
+  "ChromeScrim",
+  "ShellAppBar.trailing",
+  "GlassForegroundScope",
+] as const;
+
+/**
+ * Components whose scoped slots `scopeRegions()` hard-codes (with their own
+ * exceptions, e.g. the orrery overlay). Their implementations render
+ * `{children}` inside a `GlassForegroundScope`, so wrapper discovery would
+ * otherwise re-derive them WITHOUT those exceptions (an analyzer false
+ * positive); discovery skips them.
+ */
+const HARD_CODED_SCOPE_OWNERS: ReadonlySet<string> = new Set([
+  "GlassSurface",
+  "ChromeScrim",
+  "ShellAppBar",
+  "GlassForegroundScope",
+]);
 
 export type GlassScopeFindingKind =
   | "direct"
@@ -483,8 +513,11 @@ function scopeRegions(
   const helpers = wrappers.filter(
     (w) => w.kind === "render-helper" && w.file === file,
   );
+  // A discovered wrapper can re-derive a hard-coded region with the same range;
+  // keep one region per range so no read is reported twice.
   const add = (r: Region | undefined) => {
-    if (r) regions.push(r);
+    if (r && !regions.some((x) => x.start === r.start && x.end === r.end))
+      regions.push(r);
   };
   const visit = (node: ts.Node) => {
     if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
@@ -494,6 +527,8 @@ function scopeRegions(
         if (tag === "GlassSurface" && !isOrreryOverlay(opening, sf))
           add(childrenRegion(node, "GlassSurface"));
         if (tag === "ChromeScrim") add(childrenRegion(node, "ChromeScrim"));
+        if (tag === "GlassForegroundScope")
+          add(childrenRegion(node, "GlassForegroundScope"));
         for (const w of components) {
           if (w.owner === tag && w.slot === "children")
             add(childrenRegion(node, `${tag}.children`));
@@ -520,7 +555,7 @@ function scopeRegions(
             ? node.arguments[w.paramIndex]
             : undefined;
         if (arg)
-          regions.push({
+          add({
             start: arg.getStart(),
             end: arg.end,
             roots: [arg],
@@ -532,6 +567,18 @@ function scopeRegions(
   };
   visit(sf);
   return regions;
+}
+
+/**
+ * The scope label of every region in one file (test support: proves each
+ * hard-coded scope element yields a region, C2-M1).
+ */
+export function scopeRegionLabels(
+  file: string,
+  source: string,
+  wrappers: readonly ScopeWrapper[] = [],
+): string[] {
+  return scopeRegions(parse(file, source), file, wrappers).map((r) => r.scope);
 }
 
 function inside(node: ts.Node, region: Region): boolean {
@@ -620,6 +667,7 @@ export function discoverScopeWrappers(
       const regions = scopeRegions(sf, file, current);
       if (regions.length === 0) continue;
       for (const { name, fn } of namedFunctions(sf)) {
+        if (HARD_CODED_SCOPE_OWNERS.has(name)) continue;
         if (
           !fn.body ||
           !regions.some((r) => within(r.roots[0], fn.body as ts.Node))

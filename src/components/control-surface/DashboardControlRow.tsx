@@ -11,6 +11,8 @@ import type {
 import { useDashboardQueryStore } from "@/stores/dashboard-query-store";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
+import { controlTriggerBacking } from "@/theme/art-treatments";
+import { useArtTreatment } from "@/theme/use-art-treatment";
 import {
   AXIS_DEFAULT_LABELS,
   CONTROL_AXIS_LABELS,
@@ -30,6 +32,16 @@ const SORT_PANEL_ID = "dashboard-sort";
 
 export function DashboardControlRow() {
   const { colors } = useTheme();
+  // Orchestrator addition to 38.5-06 (38.5-01 gap H-3): an ACTIVE trigger reads
+  // its backing from the art treatment table (production: today's border-only
+  // look; D-08 marks "Top btns" F, so the re-sign-off decides). An inactive
+  // trigger keeps its fixed solid fill (D-04); the menus are never table-driven.
+  const activeTriggerBacking =
+    useArtTreatment("contactsTopButtons")?.activeTriggerBacking ?? null;
+  const triggerSurface = (isActive: boolean) =>
+    controlTriggerBacking(isActive, activeTriggerBacking) === "full"
+      ? { backgroundColor: colors.surface }
+      : null;
   const populations = useDashboardQueryStore((state) => state.populations);
   const filters = useDashboardQueryStore((state) => state.filters);
   const sort = useDashboardQueryStore((state) => state.sort);
@@ -314,9 +326,8 @@ export function DashboardControlRow() {
           onPress={open}
           style={[
             styles.trigger,
-            active
-              ? { borderColor: colors.accent }
-              : { borderColor: colors.border, backgroundColor: colors.surface },
+            { borderColor: active ? colors.accent : colors.border },
+            triggerSurface(active),
           ]}
         >
           <Text
@@ -349,9 +360,8 @@ export function DashboardControlRow() {
           onPress={openFilters}
           style={[
             styles.trigger,
-            filtersActive
-              ? { borderColor: colors.accent }
-              : { borderColor: colors.border, backgroundColor: colors.surface },
+            { borderColor: filtersActive ? colors.accent : colors.border },
+            triggerSurface(filtersActive),
           ]}
         >
           <Text
@@ -386,9 +396,8 @@ export function DashboardControlRow() {
           onPress={openSort}
           style={[
             styles.trigger,
-            sortActive
-              ? { borderColor: colors.accent }
-              : { borderColor: colors.border, backgroundColor: colors.surface },
+            { borderColor: sortActive ? colors.accent : colors.border },
+            triggerSurface(sortActive),
           ]}
         >
           <Text

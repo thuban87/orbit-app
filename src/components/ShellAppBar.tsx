@@ -8,7 +8,10 @@ import {
   useGlassForegroundColors,
   useTheme,
 } from "@/theme";
+import { artScrimBacking } from "@/theme/art-treatments";
+import { RADII } from "@/theme/tokens/radii";
 import { chromeScrimOpacity } from "@/theme/tokens/surface";
+import { useArtTreatment } from "@/theme/use-art-treatment";
 import { type OverflowAction, OverflowMenu } from "./OverflowMenu";
 
 interface TrailingFitOptions {
@@ -26,6 +29,11 @@ interface ShellAppBarProps {
   trailing?: TrailingContent;
   /** Expanded labels that this bar measures invisibly at the active OS text scale. */
   trailingLabelProbe?: readonly string[];
+  /**
+   * The v2-marked header this bar is (38.5-06 / D-08, D-28). Only the Contacts
+   * and Digest headers opt in; omitted, the bar renders exactly today's tree.
+   */
+  artComponent?: "contactsHeader" | "digestHeader";
 }
 
 const ROOT_HORIZONTAL_PADDING = 16;
@@ -37,6 +45,14 @@ const TWO_DESTINATION_CHROME_WIDTH = 64;
 /**
  * Shared screen-owned chrome for shell roots and future child surfaces. Root
  * destinations have a branded/title-only bar; child destinations add Back.
+ *
+ * ART TREATMENT OPT-IN (38.5-06 / D-08, D-10, D-28): with `artComponent`, the
+ * scrim comes from the per-combination table. Backing `none` draws no scrim, and
+ * the title/Back read the ROOT palette with trailing/overflow unscoped (text on
+ * the art takes the root, art-suited colour). With `overflowLocalBacking` (the
+ * owner's ⋯ question; false in production) only the ⋯ trigger gets a local
+ * backing at today's header value, inside the glass scope. The bottom hairline
+ * is unchanged for every backing.
  */
 export function ShellAppBar({
   variant,
@@ -44,12 +60,22 @@ export function ShellAppBar({
   overflow,
   trailing,
   trailingLabelProbe,
+  artComponent,
 }: ShellAppBarProps) {
   const { colors, mode, package: themePackage } = useTheme();
   // The bar draws its OWN chrome scrim below, so its title/Back read the glass
   // foreground palette directly (RG-029 / D-24: Standard Light over an asset
   // resolves the secondary Back label to primary).
   const glassColors = useGlassForegroundColors();
+  const treatment = useArtTreatment(artComponent);
+  const scrim = artScrimBacking(
+    treatment,
+    chromeScrimOpacity(themePackage, mode),
+  );
+  // Backing `none`: the text sits on the art, so it takes the root palette.
+  const barColors = scrim.scoped ? glassColors : colors;
+  const overflowLocalBacking =
+    !scrim.scoped && treatment?.overflowLocalBacking === true;
   const navigation = useNavigation();
   const [rootWidth, setRootWidth] = useState(0);
   const [titleWidth, setTitleWidth] = useState(0);
@@ -105,16 +131,18 @@ export function ShellAppBar({
       {/* Chrome scrim (31.1-05): a local surface backing so the title/Back stay
           AA-readable over the now-visible background veil. Token-only, behind the
           row (absolute fill), never intercepts touches. */}
-      <View
-        pointerEvents="none"
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            backgroundColor: colors.surface,
-            opacity: chromeScrimOpacity(themePackage, mode),
-          },
-        ]}
-      />
+      {scrim.opacity !== null ? (
+        <View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              backgroundColor: colors.surface,
+              opacity: scrim.opacity,
+            },
+          ]}
+        />
+      ) : null}
       {variant === "child" ? (
         <Pressable
           accessibilityRole="button"
@@ -123,9 +151,7 @@ export function ShellAppBar({
           onPress={onBack}
           style={styles.back}
         >
-          <Text
-            style={[styles.backLabel, { color: glassColors.textSecondary }]}
-          >
+          <Text style={[styles.backLabel, { color: barColors.textSecondary }]}>
             Back
           </Text>
         </Pressable>
@@ -141,19 +167,46 @@ export function ShellAppBar({
           );
           setTitleWidth((current) => (current === width ? current : width));
         }}
-        style={[styles.title, { color: glassColors.textPrimary }]}
+        style={[styles.title, { color: barColors.textPrimary }]}
       >
         {title}
       </Text>
       {trailingContent ? (
         <View style={styles.trailing}>
-          <GlassForegroundScope>{trailingContent}</GlassForegroundScope>
+          {scrim.scoped ? (
+            <GlassForegroundScope>{trailingContent}</GlassForegroundScope>
+          ) : (
+            trailingContent
+          )}
         </View>
       ) : null}
       {overflow && overflow.length > 0 ? (
-        <GlassForegroundScope>
+        overflowLocalBacking ? (
+          // The owner's ⋯ question (re-sign-off sheet): a local backing behind
+          // only the ⋯ trigger at today's header value; the trigger is scoped.
+          <View>
+            <View
+              pointerEvents="none"
+              style={[
+                StyleSheet.absoluteFill,
+                {
+                  backgroundColor: colors.surface,
+                  opacity: chromeScrimOpacity(themePackage, mode),
+                  borderRadius: RADII.sm,
+                },
+              ]}
+            />
+            <GlassForegroundScope>
+              <OverflowMenu actions={overflow} />
+            </GlassForegroundScope>
+          </View>
+        ) : scrim.scoped ? (
+          <GlassForegroundScope>
+            <OverflowMenu actions={overflow} />
+          </GlassForegroundScope>
+        ) : (
           <OverflowMenu actions={overflow} />
-        </GlassForegroundScope>
+        )
       ) : null}
       {trailingLabelProbe ? (
         <View

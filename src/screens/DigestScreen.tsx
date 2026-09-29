@@ -236,7 +236,7 @@ export function DigestContent({
     <View testID="digest-root" style={styles.root}>
       {/* The shared tab-root header row, full-bleed above the padded body in
           every phase (D-23, RG-037 ui-accessibility/AUD-UIA-016). */}
-      <ShellAppBar variant="root" title={DIGEST} />
+      <ShellAppBar variant="root" title={DIGEST} artComponent="digestHeader" />
       <View testID="digest-body" style={styles.content}>
         {state.phase === "error" ? (
           <ChromeScrim style={styles.messageScrim} radius={RADII.md}>

@@ -222,6 +222,7 @@ export function GridCard({
       <GlassSurface
         blurAvailable={false}
         density="dense"
+        treatment="contact-entry"
         style={styles.surface}
       >
         <ScopedPalette>

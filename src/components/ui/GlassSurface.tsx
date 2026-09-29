@@ -28,6 +28,7 @@ import { BlurView } from "expo-blur";
 import type { ReactNode } from "react";
 import { type StyleProp, StyleSheet, View, type ViewStyle } from "react-native";
 import { GlassForegroundScope, useTheme } from "@/theme";
+import { artScrimBacking } from "@/theme/art-treatments";
 import { RADII } from "@/theme/tokens/radii";
 import {
   cardTintOpacity,
@@ -36,8 +37,17 @@ import {
   type SurfaceDensity,
   surfaceBorder,
 } from "@/theme/tokens/surface";
+import { useArtTreatment } from "@/theme/use-art-treatment";
 
-export type GlassSurfaceTreatment = "card" | "orrery-overlay";
+/**
+ * `card` (default): the mode-aware content card. `orrery-overlay`: the Orrery's
+ * controlled-canvas tint (root palette, ADR-149). `contact-entry` (38.5-06 /
+ * D-08, D-28): the Contacts Card-view card ONLY (`GridCard`); its tint comes from
+ * the per-combination table's `contactsCardEntries` cell. Backing `none` draws
+ * no tint layer and no scope; otherwise the scope, border and glow are exactly
+ * the card treatment's.
+ */
+export type GlassSurfaceTreatment = "card" | "orrery-overlay" | "contact-entry";
 
 export interface GlassSurfaceProps {
   children?: ReactNode;
@@ -88,13 +98,26 @@ export function GlassSurface({
 }: GlassSurfaceProps) {
   const { colors, mode, package: themePackage } = useTheme();
   const s = resolveSurfaceStyle(themePackage, blurAvailable);
+  const contactEntry = useArtTreatment(
+    treatment === "contact-entry" ? "contactsCardEntries" : undefined,
+  );
 
   // The default preserves the mode-aware card path (31.1-06). Orrery overlays
   // opt into their dedicated always-translucent, AA-proven controlled-canvas tint.
+  // A contact entry takes its backing from the art treatment table (38.5-06); a
+  // `none` backing has no tint layer and no scope.
+  const entry = artScrimBacking(
+    contactEntry,
+    cardTintOpacity(themePackage, mode, density),
+  );
   const tintOpacity =
     treatment === "orrery-overlay"
       ? orreryOverlayTintOpacity(themePackage, mode)
-      : cardTintOpacity(themePackage, mode, density);
+      : treatment === "contact-entry"
+        ? entry.opacity
+        : cardTintOpacity(themePackage, mode, density);
+  const scoped =
+    treatment === "card" || (treatment === "contact-entry" && entry.scoped);
 
   const tintColor = colors[s.tintTokenKey];
   const border = surfaceBorder(colors, s.borderTokenKey, selected);
@@ -130,19 +153,21 @@ export function GlassSurface({
       ) : null}
       {/* The semi-opaque tint — the guaranteed-readable surface (AA-checked). Sits
           above the blur, below the content, so children stay fully opaque. */}
-      <View
-        style={[
-          StyleSheet.absoluteFill,
-          { backgroundColor: tintColor, opacity: tintOpacity },
-        ]}
-        pointerEvents="none"
-      />
+      {tintOpacity !== null ? (
+        <View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: tintColor, opacity: tintOpacity },
+          ]}
+          pointerEvents="none"
+        />
+      ) : null}
       {/* Card content renders on this glass, so it sees the glass foreground
           palette (RG-029 / D-12 / D-24: Standard Light over an asset resolves
           secondary text to primary). The Orrery overlay keeps the root palette
           under its own ADR-149 proof. */}
       <View style={styles.content}>
-        {treatment === "card" ? (
+        {scoped ? (
           <GlassForegroundScope>{children}</GlassForegroundScope>
         ) : (
           children

@@ -295,7 +295,12 @@ describe("DigestScreen composition", () => {
       // The header row is full-bleed: the outer container carries no padding;
       // the body below it does.
       expect(header.type).toBe("ShellAppBar");
-      expect(header.props).toEqual({ variant: "root", title: "Digest" });
+      // The Digest header is a v2-marked art-treatment site (38.5-06, D-08).
+      expect(header.props).toEqual({
+        variant: "root",
+        title: "Digest",
+        artComponent: "digestHeader",
+      });
       expect(body.type).toBe("View");
       expect(body.props.testID).toBe("digest-body");
       expect(root.props.style).not.toHaveProperty("padding");

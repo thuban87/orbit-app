@@ -23,7 +23,11 @@ vi.mock("@/components/ui/GlassSurface", () => ({
 }));
 vi.mock("@/theme", () => ({
   useTheme: () => ({ colors: THEME_PRESETS.galaxy.dark }),
+  useUnscopedTheme: () => ({ colors: THEME_PRESETS.galaxy.dark }),
+  GlassForegroundScope: ({ children }: { children?: ReactNode }) => children,
 }));
+// The List row's backing is table-driven (38.5-06); no treatment = today's row.
+vi.mock("@/theme/use-art-treatment", () => ({ useArtTreatment: () => null }));
 
 interface Node {
   readonly type: string;

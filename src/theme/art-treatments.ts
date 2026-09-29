@@ -303,3 +303,39 @@ export function artScrimBacking(
   if (treatment.backing === "none") return { opacity: null, scoped: false };
   return { opacity: treatment.opacity, scoped: true };
 }
+
+/**
+ * The List row's backing (38.5-06; D-08, D-09):
+ *   - no treatment or `full`: today's solid `surface` fill, content unscoped
+ *     (root palette, as today);
+ *   - `seeThrough`: no solid fill; an absolute-fill `surface` tint at the cell
+ *     opacity, and the content inside the glass foreground scope;
+ *   - `none`: neither fill nor tint; content unscoped (D-10: text on the art
+ *     takes the root, art-suited palette).
+ */
+export function listRowBacking(
+  treatment: Pick<ArtTreatment, "backing" | "opacity"> | null,
+): { solidFill: boolean; tintOpacity: number | null; scoped: boolean } {
+  if (treatment === null || treatment.backing === "full") {
+    return { solidFill: true, tintOpacity: null, scoped: false };
+  }
+  if (treatment.backing === "none") {
+    return { solidFill: false, tintOpacity: null, scoped: false };
+  }
+  return { solidFill: false, tintOpacity: treatment.opacity, scoped: true };
+}
+
+/**
+ * A Contacts Population/Filters/Sort trigger's backing (orchestrator addition to
+ * 38.5-06; 38.5-01 gap H-3). An INACTIVE trigger is always `full` (its solid
+ * `surface` fill; D-04: a button that opens an overlay menu keeps its scrim), so
+ * it is never table-driven. An ACTIVE trigger takes the table's
+ * `activeTriggerBacking`; with no treatment it keeps today's border-only look.
+ */
+export function controlTriggerBacking(
+  active: boolean,
+  activeTriggerBacking: ArtTriggerBacking | null,
+): ArtTriggerBacking {
+  if (!active) return "full";
+  return activeTriggerBacking ?? "none";
+}

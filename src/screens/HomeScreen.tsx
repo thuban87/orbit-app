@@ -1758,7 +1758,12 @@ export function HomeScreen({ navigation }: DashboardScreenProps<"Home">) {
         importantForAccessibility={panelOpen ? "no-hide-descendants" : "auto"}
         pointerEvents={panelOpen ? "none" : "auto"}
       >
-        <ShellAppBar variant="root" title="Orbit" overflow={overflowActions} />
+        <ShellAppBar
+          variant="root"
+          title="Orbit"
+          overflow={overflowActions}
+          artComponent="contactsHeader"
+        />
       </View>
       {selectionMode ? (
         <View

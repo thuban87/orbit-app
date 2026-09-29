@@ -94,7 +94,9 @@ describe("tab-root chrome contract (RG-037, D-22, D-23)", () => {
   it("Digest renders the shared header row, not its own display-role title (D-23)", () => {
     const source = screenSource("DigestScreen");
     expect(
-      source.match(/<ShellAppBar variant="root" title=\{DIGEST\} \/>/g),
+      source.match(
+        /<ShellAppBar variant="root" title=\{DIGEST\} artComponent="digestHeader" \/>/g,
+      ),
     ).toHaveLength(1);
     expect(source).not.toContain('role="display"');
   });

@@ -95,6 +95,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       mode: resolved,
       package: themePackage,
       ...(glassColors ? { glassColors } : {}),
+      // The art treatment table (38.5-06) keys on the rendered background.
+      backgroundId,
     };
   }, [
     themePackage,

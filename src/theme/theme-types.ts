@@ -291,6 +291,15 @@ export interface ResolvedTheme {
    * mocks stay valid.
    */
   glassColors?: ThemePalette;
+  /**
+   * The ACTIVE package's stored background id (38.5-06), exactly as the theme
+   * store holds it (null = package default; a retired or unknown id is kept, not
+   * rewritten). `useArtTreatment` resolves it to the rendered background's
+   * table key, so the shared primitives read the art treatment table from the
+   * theme context instead of subscribing to the store themselves. Optional so
+   * literal constructions and test mocks stay valid (absent = package default).
+   */
+  backgroundId?: StoredBackgroundId | null;
 }
 
 /**
