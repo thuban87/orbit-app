@@ -621,11 +621,16 @@ ACT (D-46) and SDH checks.
     Galaxy Dark art stay accepted under `E-1-bare` (3.58--4.00:1, above 3:1). The four strings that stay on screen as
     normal content get a scrim that brings them to 4.5:1 in Galaxy Dark: "Discard" (`BulkImportSetupScreen.tsx:469`),
     "Unlink source" (`ReconcileDetailScreen.tsx:474`), "Remove photo" (`PhotoSourcePicker.tsx:333`) and
-    "{absorbed} will be retired." (`MergeImpactSummary.tsx:126`). Gap plan; UAT gap `G-38.5-11`.
+    "{absorbed} will be retired." (`MergeImpactSummary.tsx:126`). UAT gap `G-38.5-11`.
+    -   *(Done inline, `806aa1e`, owner-approved instead of a gap plan: an opaque root-`background` backing in Galaxy
+        Dark only, 4.91:1; `src/theme/danger-scrim.ts` + its test.)*
 -   **[DECIDED · 2026-09-29] D-51 --- G1-LATER.** The Orrery "isn't responding" ANR (Pixel 3a, debug build) is
     investigated outside 38.5, first on the release build and the Pixel 6 Pro.
 -   **[DECIDED · 2026-09-29] D-52 --- G2-FIX.** The Galaxy Dark Aurora picker thumbnail is cropped toward the mirrored
-    ribbon (D-35) instead of the centre. The full-screen background render is unchanged. Gap plan; UAT gap `G-38.5-13`.
+    ribbon (D-35) instead of the centre. The full-screen background render is unchanged. UAT gap `G-38.5-13`.
+    -   *(Done inline, `1dc47ac`, owner-approved instead of a gap plan. The real cause was wider: the tile image had no
+        explicit width/height, so React Native drew every tile at the art's native size and showed its top-left
+        corner. Explicit sizing fixes all tiles; Aurora also gets a 2× crop anchored on the ribbon.)*
 -   **[DECIDED · 2026-09-29] D-53 --- G3-LATER.** The Your Week "Interactions" mid-word wrap at font scale 1.15 is logged
     for a later layout pass, not 38.5.
 
