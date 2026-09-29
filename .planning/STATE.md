@@ -2,17 +2,17 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 38.5
-current_phase_name: Background Art & Text-on-Art Contrast (INSERTED)
-status: executing
-stopped_at: Completed 38.5-09-PLAN.md
-last_updated: "2026-09-29T14:55:00.000Z"
+current_phase: 39
+current_phase_name: Onboarding
+status: planning
+stopped_at: Phase 38.5 complete, ready to plan Phase 39
+last_updated: "2026-09-29T16:37:27.896Z"
 last_activity: 2026-09-29
-last_activity_desc: Phase 38.5 all 9 plans executed; device pass + end-of-phase report done, awaiting verification and owner items
-state_head: 5fc1b91ee465c24cf303ccda1bf7cd53a1e19cd2
+last_activity_desc: Phase 38.5 complete, transitioned to Phase 39
+state_head: 02d1e79c0fc13b57b0b9b62960156d04f01b5955
 progress:
   total_phases: 27
-  completed_phases: 18
+  completed_phases: 19
   total_plans: 250
   completed_plans: 248
 carried_forward:
@@ -42,18 +42,18 @@ See: .planning/PROJECT.md (updated 2026-09-10 after Phase 31)
 
 ## Current Position
 
-Phase: 38.5 (Background Art & Text-on-Art Contrast (INSERTED)) — EXECUTING
-Plan: 9 of 9 (all executed)
-Status: All plans complete — awaiting phase verification and the owner's end-of-phase items (D-25, gap list G1–G3, device sign-off P6-*/3A/AUR/SWP/ACT/SDH; release APK delivery)
+Phase: 39 — Onboarding
+Plan: Not started
+Status: Ready to plan
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-29 — 38.5-09 device pass, treatment-aware D-24 (final 8.12/8.45/8.74%, extend holds), D-25/D-28 report, release APK orbit-38.5-release-2026-09-29-b77af87.apk built on droid (not delivered)
+Last activity: 2026-09-29 — Phase 38.5 complete, transitioned to Phase 39
 Progress: 11 completed v2.0 phases — 22, 23, 24.1, 24.2, 25, 26, 27, 28, 29, 30, 31
-Next: Run Phase 37.1 verification against the complete nine-plan implementation and retained physical-device evidence.
+Next: Plan Phase 39 (Onboarding). Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
@@ -69,7 +69,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 
 **Velocity:**
 
-- Total plans completed: 171
+- Total plans completed: 180
 - Average duration: —
 - Total execution time: 0 hours
 
@@ -95,6 +95,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | 38 | 8 | - | - |
 | 38.1 | 9 | - | - |
 | 38.4 | 23 | - | - |
+| 38.5 | 9 | - | - |
 
 **Recent Trend:**
 
@@ -957,7 +958,7 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 ## Session
 
 **Last session:** 2026-09-29T14:55:00.000Z
-**Stopped at:** Completed 38.5-09-PLAN.md
+**Stopped at:** Phase 38.5 complete, ready to plan Phase 39
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
