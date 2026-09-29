@@ -36,8 +36,12 @@ function stripComments(source: string): string {
     .replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
 }
 
-/** A module specifier naming a `__dev__/` module. */
-const DEV_SPECIFIER = String.raw`["'][^"'\n]*__dev__\/[^"'\n]*["']`;
+/**
+ * A module specifier naming a `__dev__/` module: a single-, double- or
+ * backtick-quoted string (code review IN-05: a template literal is a valid
+ * `require` / `import()` argument too).
+ */
+const DEV_SPECIFIER = String.raw`["'\`][^"'\`\n]*__dev__\/[^"'\`\n]*["'\`]`;
 
 /**
  * Every reference to a `__dev__/` module in `source` that is NOT inside the
@@ -79,6 +83,10 @@ describe("unguardedDevReferences — the rule itself", () => {
       "a plain string that is not a module reference",
       `if (file.includes("/__dev__/")) {}`,
     ],
+    [
+      "a guarded template-literal require",
+      "const o = __DEV__ ? require(`./__dev__/overrides.json`) : null;",
+    ],
   ])("passes %s", (_label, source) => {
     expect(unguardedDevReferences(source)).toEqual([]);
   });
@@ -96,6 +104,14 @@ describe("unguardedDevReferences — the rule itself", () => {
     [
       "a require behind a runtime flag, not __DEV__",
       `const m = enabled ? require("./__dev__/A") : null;`,
+    ],
+    [
+      "an unguarded template-literal require",
+      "const m = require(`./__dev__/A`);",
+    ],
+    [
+      "a template-literal dynamic import",
+      "const m = await import(`./__dev__/A`);",
     ],
   ])("fails %s", (_label, source) => {
     expect(unguardedDevReferences(source).length).toBeGreaterThan(0);
