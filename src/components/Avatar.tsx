@@ -3,21 +3,21 @@
  * grid/orrery/widget later. Two states:
  *
  *   - HAS-PHOTO: renders the stored RELATIVE path resolved to a local `file://`
- *     master via `resolvePhotoUri` (never a network URL — reads stay local),
+ *     master via `usePhotoDisplay` (never a network URL — reads stay local),
  *     cover-fit and circular. On a load error it degrades to the initials state.
  *   - NO-PHOTO / onError: a themed swatch (`colors.avatarSwatches[…]`) + centred
  *     initials (`colors.avatarSwatchText`). An empty name → the neutral swatch
  *     (index 0) with NO glyph.
  *
- * Cache correctness (review [claude/MED stale cache] + [cycle-2 MED sub-second]):
- * the derivable filename is STABLE per target, so a replace yields the SAME
- * `file://` URI and `cachePolicy="memory-disk"` would serve the cached DECODE.
- * The `cacheKey` (primary storage discriminator) and `recyclingKey` (blanks a
- * recycled view before reload) therefore fold BOTH the `cacheBust` prop (the
- * contact/profile `modified_at`, for the cross-session case) AND the per-write
- * revision from `photo-cache-bust-store` (closing the same-second `modified_at`
- * collision). Both together guarantee a fresh key — and a fresh decode — on every
- * write.
+ * Cache correctness (38.6 D-01/D-19/D-21): the filename is identity-derived and
+ * STABLE per target, so a replace overwrites the SAME file. On Android expo-image
+ * turns a `file://` source into a raw Glide model and IGNORES `cacheKey`, so the
+ * in-process display revision (bumped by the ownership layer's
+ * `notifyPhotoBytesChanged`) travels in the URI as `?v=<revision>` — or, under the
+ * `no-cache` fallback strategy, caching is off entirely. The image cache is
+ * in-memory only, so a restart starts clean. `usePhotoDisplay` supplies the
+ * source, cache policy and revision; `recyclingKey` folds the revision so a
+ * recycled view blanks before reloading.
  *
  * All colours resolve through `useTheme().colors.*` — no hex/hsl (check:colors).
  */
@@ -25,8 +25,7 @@ import { Image } from "expo-image";
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { getInitials, swatchIndex } from "@/components/avatar-initials";
-import { resolvePhotoUri } from "@/services/photos/photo-storage";
-import { usePhotoCacheBust } from "@/stores/photo-cache-bust-store";
+import { usePhotoDisplay } from "@/components/photo-display";
 import { useTheme } from "@/theme";
 
 interface AvatarProps {
@@ -38,44 +37,33 @@ interface AvatarProps {
   contactId?: number | string;
   /** Rendered diameter; the circle is `borderRadius: size / 2`. */
   size: number;
-  /** Cross-session cache discriminator (the contact/profile `modified_at`). */
+  /** Unused since 38.6-01 (the display revision replaced it); 38.6-03 removes it with every consumer. */
   cacheBust?: string | number;
 }
 
-export function Avatar({
-  photo,
-  name,
-  contactId,
-  size,
-  cacheBust,
-}: AvatarProps) {
+export function Avatar({ photo, name, contactId, size }: AvatarProps) {
   const { colors } = useTheme();
-  // Per-write revision for THIS photo path (closes the sub-second modified_at hole).
-  const rev = usePhotoCacheBust(photo);
+  // Display source for THIS canonical photo: the per-write revision rides in the
+  // URI (or a cacheKey bump with caching off), with an in-memory-only cache.
+  const display = usePhotoDisplay(photo);
   const [errored, setErrored] = useState(false);
 
   // A fresh photo/write must clear a prior load error so the image is retried
   // (e.g. a replace at the same path after an earlier onError fallback).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on identity+bust
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on identity+revision
   useEffect(() => {
     setErrored(false);
-  }, [photo, cacheBust, rev]);
+  }, [photo, display?.revision]);
 
-  const bust = [cacheBust, rev].filter((v) => v != null).join("#");
-  const showPhoto = photo != null && !errored;
-
-  if (showPhoto) {
+  if (display && !errored) {
     return (
       <Image
         testID="avatar-photo"
         accessibilityLabel={name ? `Photo of ${name}` : "Contact photo"}
-        source={{
-          uri: resolvePhotoUri(photo),
-          cacheKey: bust ? `${photo}#${bust}` : photo,
-        }}
+        source={display.source}
         contentFit="cover"
-        cachePolicy="memory-disk"
-        recyclingKey={bust ? `${contactId}#${bust}` : String(contactId)}
+        cachePolicy={display.cachePolicy}
+        recyclingKey={`${contactId}#${display.revision}`}
         onError={() => setErrored(true)}
         style={{ width: size, height: size, borderRadius: size / 2 }}
       />

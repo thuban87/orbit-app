@@ -1,25 +1,21 @@
 /**
- * Per-write photo cache-bust token store (PHOTO-04, review cycle-2 [MED]).
+ * In-process photo DISPLAY revision store (PHOTO-04; rewritten 38.6 D-19).
  *
- * expo-image caches a DECODE keyed by the image URI. Every photo master has a
- * STABLE `contactId`-derivable `file://` path (`avatars/contact-<id>.jpg`), so a
- * REPLACE writes new bytes to the SAME URI — `cachePolicy="memory-disk"` would
- * then serve the stale prior decode. The obvious discriminator, the contact's
- * `modified_at`, is only SECOND-resolution (`database.ts` `localDateTime` →
- * `YYYY-MM-DD HH:MM:SS`): two replaces within one wall-clock second reuse the
- * same path AND the same `modified_at` → the same cache key → a stale image.
+ * The single display revision per canonical photo path. Filenames are
+ * identity-derived and never change (D-21), so a replace overwrites the SAME
+ * `file://` path; on Android expo-image ignores `cacheKey` for `file://`, so the
+ * revision reaches the image loader through the display URI (`?v=<revision>`,
+ * see `components/photo-display.ts`).
  *
- * This store closes that sub-second hole with a MONOTONIC per-write counter keyed
- * by the photo relPath. Every photo WRITE site (05-05 / 05-08) calls
- * `bumpPhotoCacheBust(relPath)` right after a set/clear; `Avatar` folds the
- * current revision into its `cacheKey`/`recyclingKey`, so even a same-second
- * replace produces a strictly-new key and a fresh decode.
+ * The revision is bumped by the ownership layer's `notifyPhotoBytesChanged`
+ * (`services/photos/owned-master.ts`) wherever canonical bytes change. The crop
+ * screen's own call-site bumps are redundant and retire in 38.6-03. It is
+ * display-only and never the authorization `canonicalGeneration`.
  *
- * The counter (not `Date.now()`, which can collide at sub-ms) guarantees a
- * strictly-increasing value per key. The store is IN-MEMORY: after a restart a
- * key has no revision, so `Avatar` falls back to `photo#modified_at` — itself a
- * key never previously cached in the fresh process, forcing a clean disk read of
- * the current bytes. Correctness therefore holds across restart too.
+ * The counter (not `Date.now()`, which can collide at sub-ms) is strictly
+ * increasing per path. The store is IN-MEMORY: in a fresh process a path has no
+ * revision, so the display URI is the bare path — and with the in-memory-only
+ * image cache that is a fresh decode of the current bytes.
  */
 import { create } from "zustand";
 

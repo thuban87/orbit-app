@@ -280,12 +280,45 @@ export function resolvePhotoUriFromDocumentUri(
 }
 
 /**
+ * PURE display-URI composer (38.6 D-19/D-21). The canonical filename stays
+ * identity-derived; only the URI handed to expo-image changes. On Android
+ * expo-image turns a `file://` source into a raw Glide model and ignores
+ * `cacheKey`, so the in-process display revision travels as a `?v=` query.
+ * `assertSafeRelative` runs (via the guarded composer) BEFORE any suffix is
+ * added. With no revision the result is the bare `file://` URI. Only expo-image
+ * gets this URI — Skia, the manipulator, `File`, backup and the widget keep the
+ * plain path from `resolvePhotoUri`.
+ */
+export function photoDisplayUriFromDocumentUri(
+  documentUri: string,
+  relative: string,
+  revision: number | undefined,
+): string {
+  const base = resolvePhotoUriFromDocumentUri(documentUri, relative);
+  if (revision === undefined) return base;
+  if (!Number.isSafeInteger(revision) || revision < 0)
+    throw new Error("invalid photo display revision");
+  return `${base}?v=${revision}`;
+}
+
+/**
  * Thin wrapper: resolve a stored relative filename to an absolute `file://` URI
  * against the runtime document dir. Reads `Paths.document.uri` (native) and
  * delegates to the pure composer, so node tests never load the native module.
  */
 export function resolvePhotoUri(relative: string): string {
   return resolvePhotoUriFromDocumentUri(Paths.document.uri, relative);
+}
+
+/**
+ * Thin wrapper over {@link photoDisplayUriFromDocumentUri} against the runtime
+ * document dir — the expo-image display URI for a canonical photo.
+ */
+export function resolvePhotoDisplayUri(
+  relative: string,
+  revision: number | undefined,
+): string {
+  return photoDisplayUriFromDocumentUri(Paths.document.uri, relative, revision);
 }
 
 /** Resolve a recovery-only staging file without widening canonical-path rules. */

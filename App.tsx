@@ -63,6 +63,7 @@ import {
   runBackgroundReconciliation,
 } from "@/services/photos/background-reconcile-sweep";
 import { registerDerivativeCacheSweep } from "@/services/photos/derivative-cache";
+import { registerLegacyImageDiskCacheSweep } from "@/services/photos/legacy-image-disk-cache-sweep";
 import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-sweep";
 import { registerRestorePhotoFinalizeSweep } from "@/services/photos/restore-photo-finalize-sweep";
 import { registerWidgetSweep } from "@/services/widget/widget-refresh";
@@ -126,6 +127,7 @@ let backupCacheSweepRegistered = false;
 // SAME registry and under the SAME re-entrancy reasoning as the field sweep.
 let photoReconcileRegistered = false;
 let derivativeCacheSweepRegistered = false;
+let legacyImageDiskCacheSweepRegistered = false;
 let backgroundReconcileRegistered = false;
 let restorePhotoFinalizeSweepRegistered = false;
 // One-shot guard for the notification-schedule reconcile hook (NOTIF-01/04), on the
@@ -260,6 +262,13 @@ function AppShell() {
     if (!derivativeCacheSweepRegistered) {
       registerDerivativeCacheSweep();
       derivativeCacheSweepRegistered = true;
+    }
+    // 38.6: avatars are memory-only now, so the old memory-disk Glide entries
+    // (incl. deleted contacts' photos) are never read again. Clear them once,
+    // behind a device-local flag, on the first foreground launch of this build.
+    if (!legacyImageDiskCacheSweepRegistered) {
+      registerLegacyImageDiskCacheSweep();
+      legacyImageDiskCacheSweepRegistered = true;
     }
     // Profile image derivatives use their own UID-derived namespace and must
     // reconcile only after migrations expose template referrers. Register before

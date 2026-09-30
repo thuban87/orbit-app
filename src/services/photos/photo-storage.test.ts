@@ -105,11 +105,14 @@ import {
   listRestorePendingPhotos,
   type PhotoTargetDescriptor,
   persistMaster,
+  photoDisplayUriFromDocumentUri,
   photoFileExists,
   profilePhotoRelPath,
   reconcilePhotoDir,
   relPathForTarget,
   resolveImportStagingUri,
+  resolvePhotoDisplayUri,
+  resolvePhotoUri,
   resolvePhotoUriFromDocumentUri,
   resolveRestorePendingUri,
   restorePendingRelPath,
@@ -173,6 +176,57 @@ describe("resolvePhotoUriFromDocumentUri — pure rel -> file:// composer", () =
     expect(
       resolvePhotoUriFromDocumentUri("file:///docs", "avatars/contact-42.jpg"),
     ).toBe("file:///docs/avatars/contact-42.jpg");
+  });
+});
+
+describe("photoDisplayUriFromDocumentUri — expo-image display URI (38.6 D-19/D-21)", () => {
+  it("is the bare file:// URI when there is no revision", () => {
+    expect(
+      photoDisplayUriFromDocumentUri(
+        "file:///doc/",
+        "avatars/contact-1.jpg",
+        undefined,
+      ),
+    ).toBe("file:///doc/avatars/contact-1.jpg");
+  });
+
+  it("appends ?v=<revision> without changing the filename", () => {
+    expect(
+      photoDisplayUriFromDocumentUri("file:///doc", "avatars/contact-1.jpg", 3),
+    ).toBe("file:///doc/avatars/contact-1.jpg?v=3");
+    expect(
+      photoDisplayUriFromDocumentUri("file:///doc", "avatars/contact-1.jpg", 0),
+    ).toBe("file:///doc/avatars/contact-1.jpg?v=0");
+  });
+
+  it("rejects a revision that is not a non-negative safe integer", () => {
+    for (const bad of [-1, 1.5, Number.NaN, 2 ** 53]) {
+      expect(() =>
+        photoDisplayUriFromDocumentUri(
+          "file:///doc",
+          "avatars/contact-1.jpg",
+          bad,
+        ),
+      ).toThrow("invalid photo display revision");
+    }
+  });
+
+  it("rejects an unsafe relative path before any revision check", () => {
+    expect(() =>
+      photoDisplayUriFromDocumentUri("file:///doc", "../x.jpg", 3),
+    ).toThrow("unsafe photo relative path");
+    expect(() =>
+      photoDisplayUriFromDocumentUri("file:///doc", "../x.jpg", -1),
+    ).toThrow("unsafe photo relative path");
+  });
+
+  it("the runtime wrapper matches resolvePhotoUri when there is no revision", () => {
+    expect(resolvePhotoDisplayUri("avatars/contact-1.jpg", undefined)).toBe(
+      resolvePhotoUri("avatars/contact-1.jpg"),
+    );
+    expect(resolvePhotoDisplayUri("avatars/contact-1.jpg", 2)).toBe(
+      "file:///doc/avatars/contact-1.jpg?v=2",
+    );
   });
 });
 

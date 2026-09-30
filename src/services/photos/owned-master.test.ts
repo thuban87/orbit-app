@@ -35,12 +35,14 @@ import {
 } from "@/db/restore-photo-journal-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
+import { getPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import {
   canonicalGeneration,
   deleteStagedPhotosOwned,
   enqueueRemovalIntentOwned,
   executeDeleteIntentOwned,
   finalizeJournalEntryOwned,
+  notifyPhotoBytesChanged,
   persistOwnedMaster,
   reconcilePhotoWritesOwned,
   removeOwnedMaster,
@@ -277,5 +279,57 @@ describe("owned canonical master", () => {
     expect(h.fs!.files.get(kept)).toBe("committed");
     expect(h.fs!.files.has(orphan)).toBe(false);
     expect(await listJournalEntriesCore(exec)).toEqual([]);
+  });
+});
+
+describe("display revision (38.6 D-19) — separate from authorization generations", () => {
+  it("a persist bumps the display revision and the generation by exactly one each", async () => {
+    h.fs!.files.set("new", "newer");
+    const rev = getPhotoCacheBust(canonical) ?? 0;
+    const gen = canonicalGeneration(canonical);
+    await persistOwnedMaster(exec, "new", canonical);
+    expect(getPhotoCacheBust(canonical)).toBe(rev + 1);
+    expect(canonicalGeneration(canonical)).toBe(gen + 1);
+  });
+
+  it("a persist that throws bumps neither", async () => {
+    h.fs!.files.set("new", "newer");
+    const rev = getPhotoCacheBust(canonical);
+    const gen = canonicalGeneration(canonical);
+    await expect(
+      persistOwnedMaster(exec, "new", canonical, {
+        persist: async () => {
+          throw new Error("disk full");
+        },
+      }),
+    ).rejects.toThrow("disk full");
+    expect(getPhotoCacheBust(canonical)).toBe(rev);
+    expect(canonicalGeneration(canonical)).toBe(gen);
+  });
+
+  it("an unauthorized persist bumps neither", async () => {
+    const rev = getPhotoCacheBust(canonical);
+    const gen = canonicalGeneration(canonical);
+    await expect(
+      persistOwnedMaster(exec, "new", canonical, {
+        authorize: async () => false,
+      }),
+    ).rejects.toThrow("photo target changed");
+    expect(getPhotoCacheBust(canonical)).toBe(rev);
+    expect(canonicalGeneration(canonical)).toBe(gen);
+  });
+
+  it("notifyPhotoBytesChanged never touches the authorization generation", () => {
+    const rev = getPhotoCacheBust(canonical) ?? 0;
+    const gen = canonicalGeneration(canonical);
+    notifyPhotoBytesChanged(canonical);
+    expect(getPhotoCacheBust(canonical)).toBe(rev + 1);
+    expect(canonicalGeneration(canonical)).toBe(gen);
+  });
+
+  it("notifyPhotoBytesChanged rejects an unsafe path", () => {
+    expect(() => notifyPhotoBytesChanged("../x.jpg")).toThrow(
+      "unsafe photo relative path",
+    );
   });
 });

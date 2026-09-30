@@ -10,6 +10,7 @@ import {
 } from "@/db/restore-photo-journal-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
+import { bumpPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import {
   deletePhoto,
   deleteRestorePending,
@@ -44,6 +45,19 @@ export function canonicalGeneration(canonical: string): number {
 }
 function bump(canonical: string): void {
   generations.set(canonical, canonicalGeneration(canonical) + 1);
+}
+
+/**
+ * DISPLAY-ONLY notification that a canonical photo's bytes changed (38.6 D-19).
+ * Bumps the in-process display revision in `photo-cache-bust-store`, which the
+ * expo-image display URI carries as `?v=<revision>` (filenames never change,
+ * D-21). Deliberately separate from the AUTHORIZATION `generations` map above:
+ * retry and merge compare `canonicalGeneration`, so display must never bump or
+ * read it. Call wherever canonical bytes change.
+ */
+export function notifyPhotoBytesChanged(canonical: string): void {
+  assertSafeRelative(canonical);
+  bumpPhotoCacheBust(canonical);
 }
 
 export async function withCanonicalPathLocks<T>(
@@ -285,6 +299,7 @@ export async function persistOwnedMasterLocked(
   const result = opts.persist
     ? await opts.persist(srcUri, canonical)
     : await persistMaster(srcUri, canonical);
+  notifyPhotoBytesChanged(canonical);
   bump(canonical);
   return result;
 }
