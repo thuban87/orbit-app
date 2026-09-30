@@ -11,6 +11,13 @@ import type { SqlExecutor } from "@/db/types";
 
 export interface ExportManifestDeps {
   exportedAt: string;
+  /**
+   * Resolves a stored photo's base64 bytes. For a profile, contact or
+   * custom-field photo it resolves `""` when the file is genuinely missing or
+   * empty (38.6 D-29: skipped and counted), and rejects on any other read
+   * failure, which fails the export with `BackupPhotoUnreadableError`. The
+   * production reader is `readStoredPhotoBase64`.
+   */
   readPhotoBase64: (relativePath: string) => Promise<string>;
 }
 
@@ -42,11 +49,12 @@ function assertNoLocalOnlyKeys(value: unknown): void {
 }
 
 /**
- * One skip counter per export (38.6 D-24). An unreadable profile, contact or
- * custom-field photo no longer fails the whole backup: the row exports with
- * `photoBase64: null` plus the owner-approved optional marker
- * `photoSkipped: true` (D-26), so restore can tell "left out" from "removed".
- * Content-free: nothing about the skipped photo is logged or recorded.
+ * One skip counter per export (38.6 D-24, narrowed by D-29). A profile, contact
+ * or custom-field photo whose file is genuinely missing or empty no longer
+ * fails the whole backup: the row exports with `photoBase64: null` plus the
+ * owner-approved optional marker `photoSkipped: true` (D-26), so restore can
+ * tell "left out" from "removed". Content-free: nothing about the skipped photo
+ * is logged or recorded.
  */
 interface SkipCounter {
   skipped: number;
@@ -58,13 +66,19 @@ async function readPhotoOrSkip(
   counter: SkipCounter,
 ): Promise<string | null> {
   if (typeof relative === "string" && relative.length > 0) {
+    let bytes: string;
     try {
-      const bytes = await readPhotoBase64(relative);
-      if (bytes) return bytes;
+      bytes = await readPhotoBase64(relative);
     } catch {
-      // Fall through: skipped and counted (D-24). The reference is untouched (D-23).
+      // D-29: only a missing or empty file is skipped (the reader resolves ""
+      // for it). Any other read failure (permission, IO, memory) fails the
+      // backup as before D-24, so a system-wide fault can never produce
+      // photo-less "successful" backups that retention then prunes against.
+      throw new BackupPhotoUnreadableError();
     }
+    if (bytes) return bytes;
   }
+  // Skipped and counted (D-24/D-29). The reference is untouched (D-23).
   counter.skipped += 1;
   return null;
 }
@@ -305,13 +319,13 @@ async function readManifest(
 
 export interface ExportManifestReport {
   manifest: BackupManifest;
-  /** Profile, contact and custom-field photos left out as unreadable (D-24). */
+  /** Profile, contact and custom-field photos left out as missing or empty (D-24/D-29). */
   skippedPhotos: number;
 }
 
 /**
  * Build and validate a complete portable export under one mutex-held snapshot,
- * with the number of unreadable photos left out (38.6 D-24).
+ * with the number of missing or empty photos left out (38.6 D-24/D-29).
  */
 export function buildExportReport(
   exec: SqlExecutor,

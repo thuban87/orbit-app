@@ -1,7 +1,8 @@
 /**
- * Skipped-photo reporting for backups (38.6 D-24). A backup no longer fails on
- * one unreadable photo: it leaves that photo out and tells the user how many
- * were left out, on each writer's own surface (the manual export Alert, the
+ * Skipped-photo reporting for backups (38.6 D-24, narrowed by D-29). A backup no
+ * longer fails on a photo whose file is missing or empty: it leaves that photo
+ * out and tells the user how many were left out (any other read error still
+ * fails the backup), on each writer's own surface (the manual export Alert, the
  * Backup health card for the latest automatic backup, the Restore result for
  * the Replace-all safety backup).
  *

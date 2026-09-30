@@ -7,7 +7,10 @@ import type {
   LocalExportFiles,
 } from "@/services/backup/backup-service";
 import { resolveBackgroundUri } from "@/services/photos/background-storage";
-import { resolvePhotoUri } from "@/services/photos/photo-storage";
+import {
+  photoFileExists,
+  resolvePhotoUri,
+} from "@/services/photos/photo-storage";
 import {
   revokeBackupExportShare,
   shareBackupExport,
@@ -66,12 +69,28 @@ export function createLocalExportFiles(
   };
 }
 
-/** Read stored bytes through the existing safe relative-path photo boundary. */
-export function readStoredPhotoBase64(relativePath: string): Promise<string> {
-  const uri = relativePath.startsWith("profile-backgrounds/")
-    ? resolveBackgroundUri(relativePath)
-    : resolvePhotoUri(relativePath);
-  return new File(uri).base64();
+/**
+ * Read stored bytes through the existing safe relative-path photo boundary.
+ *
+ * For a contact, profile or custom-field photo (38.6 D-29), this resolves `""`
+ * when the file is genuinely missing or empty, so the export skips and counts
+ * it. Any other read failure rejects, and the backup fails with
+ * `BackupPhotoUnreadableError`. "Missing" is decided by `photoFileExists`, asked
+ * only AFTER the read failed: a file that still exists but cannot be read is an
+ * error, never a skip. A profile background (D-27) always rejects on failure.
+ */
+export async function readStoredPhotoBase64(
+  relativePath: string,
+): Promise<string> {
+  if (relativePath.startsWith("profile-backgrounds/"))
+    return new File(resolveBackgroundUri(relativePath)).base64();
+  const uri = resolvePhotoUri(relativePath);
+  try {
+    return await new File(uri).base64();
+  } catch (error) {
+    if (!photoFileExists(relativePath)) return "";
+    throw error;
+  }
 }
 
 /**

@@ -562,8 +562,10 @@ describe("buildExportManifest", () => {
   });
 
   // 38.6 D-24 reversed the old all-or-nothing rule for profile, contact and
-  // custom-field photos: an unreadable one is left out and counted. D-26 marks
-  // the row so restore never reads the gap as a removal.
+  // custom-field photos; D-29 narrowed it: only a missing or empty file (the
+  // reader resolves "") is left out and counted. Any other read error still
+  // fails the export. D-26 marks the row so restore never reads the gap as a
+  // removal.
   async function photoDb() {
     const exec = nodeSqliteExecutor(openTestDb());
     let count = 0;
@@ -584,7 +586,7 @@ describe("buildExportManifest", () => {
     );
   }
 
-  it("skips and counts unreadable profile, contact and custom photos, and marks each row (D-24/D-26)", async () => {
+  it("skips and counts missing or empty profile, contact and custom photos, and marks each row (D-24/D-26/D-29)", async () => {
     const exec = await photoDb();
     await addContact(exec, "contact-a", "avatars/contact-a.jpg");
     await addContact(exec, "contact-b", "avatars/contact-b.jpg");
@@ -599,11 +601,9 @@ describe("buildExportManifest", () => {
     );
     const report = await buildExportReport(exec, {
       exportedAt: NOW,
-      readPhotoBase64: async (relative) => {
-        if (relative === "avatars/contact-a.jpg") return "AQID";
-        if (relative === "avatars/profile.jpg") return "";
-        throw new Error("private local path details");
-      },
+      // The reader resolves "" for a missing or an empty file alike (D-29).
+      readPhotoBase64: async (relative) =>
+        relative === "avatars/contact-a.jpg" ? "AQID" : "",
     });
     expect(report.skippedPhotos).toBe(3);
     const { manifest } = report;
@@ -670,9 +670,7 @@ describe("buildExportManifest", () => {
     await addContact(exec, "contact-b", "avatars/contact-b.jpg");
     const deps = {
       exportedAt: NOW,
-      readPhotoBase64: async () => {
-        throw new Error("missing");
-      },
+      readPhotoBase64: async () => "",
     };
     expect(await buildExportManifest(exec, deps)).toEqual(
       (await buildExportReport(exec, deps)).manifest,
@@ -684,14 +682,59 @@ describe("buildExportManifest", () => {
     await addContact(exec, "contact-b", "avatars/contact-b.jpg");
     const { manifest } = await buildExportReport(exec, {
       exportedAt: NOW,
-      readPhotoBase64: async () => {
-        throw new Error("missing");
-      },
+      readPhotoBase64: async () => "",
     });
     const wire = JSON.parse(JSON.stringify(manifest));
     expect(parseBackupManifest(wire).contacts[0]?.photoSkipped).toBe(true);
     wire.contacts[0].photoSkipped = "yes";
     expect(() => parseBackupManifest(wire)).toThrow(/skipped-photo marker/);
+  });
+
+  it.each([
+    ["contact", "avatars/contact-b.jpg"],
+    ["profile", "avatars/profile.jpg"],
+    ["custom-field", "avatars/cv-1-pet.jpg"],
+  ])(
+    "fails the export when an existing %s photo cannot be read (D-29)",
+    async (_kind, broken) => {
+      const exec = await photoDb();
+      await addContact(exec, "contact-a", "avatars/contact-a.jpg");
+      await addContact(exec, "contact-b", "avatars/contact-b.jpg");
+      await exec.runAsync("UPDATE profile SET photo = 'avatars/profile.jpg'");
+      await exec.runAsync(
+        "INSERT INTO custom_field_defs(uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES('pet-def','pet','Pet','photo',0,0,0,0,'global',?,?)",
+        [NOW, NOW],
+      );
+      await exec.runAsync(
+        "INSERT INTO custom_field_values(uid,contact_id,field_def_id,value,created_at,modified_at) VALUES('pet-value',(SELECT id FROM contacts WHERE uid='contact-a'),(SELECT id FROM custom_field_defs WHERE uid='pet-def'),'avatars/cv-1-pet.jpg',?,?)",
+        [NOW, NOW],
+      );
+      const failure = buildExportReport(exec, {
+        exportedAt: NOW,
+        readPhotoBase64: async (relative) => {
+          if (relative === broken)
+            throw new Error("EACCES private local path details");
+          return "AQID";
+        },
+      });
+      await expect(failure).rejects.toBeInstanceOf(BackupPhotoUnreadableError);
+      // Content-free: the typed cue never carries the underlying error.
+      await expect(failure).rejects.not.toThrow(/EACCES|private/);
+    },
+  );
+
+  it("fails rather than skipping every photo when all reads fail (D-29)", async () => {
+    const exec = await photoDb();
+    await addContact(exec, "contact-a", "avatars/contact-a.jpg");
+    await addContact(exec, "contact-b", "avatars/contact-b.jpg");
+    await expect(
+      buildExportReport(exec, {
+        exportedAt: NOW,
+        readPhotoBase64: async () => {
+          throw new Error("out of memory");
+        },
+      }),
+    ).rejects.toBeInstanceOf(BackupPhotoUnreadableError);
   });
 
   it("raises a content-free repair cue for an unreadable profile background", async () => {

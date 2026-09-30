@@ -790,11 +790,14 @@ it.each(["merge", "replace-all"] as const)(
 );
 
 /*
- * 38.6 D-24 / D-26: an unreadable photo is left out of the backup, counted and
- * marked; restoring a marked row never removes a photo this phone still has.
+ * 38.6 D-24 / D-26 / D-29: a missing or empty photo is left out of the backup,
+ * counted and marked; restoring a marked row never removes a photo this phone
+ * still has.
  *
  * Fixture (source ids by insert order): `z-marked` id 1 owns contact-1.jpg and a
- * pet photo cv-1-pet.jpg, both on disk but unreadable at export time; `a-bytes`
+ * pet photo cv-1-pet.jpg, both on disk now but reported missing by the reader at
+ * export time (it resolved "", D-29), so the restore sees marked rows whose
+ * local files exist; `a-bytes`
  * id 2 owns contact-2.jpg (readable); `m-lost` id 3 names contact-3.jpg, which
  * is not on disk. Replace-all re-inserts contacts in uid order, so back on the
  * source `a-bytes` takes id 1 (z-marked's old id) and `z-marked` takes id 3.
@@ -828,17 +831,17 @@ async function skippedPhotoSource() {
   photo.files.set("avatars/contact-1.jpg", "QUFB"); // z-marked's own bytes
   photo.files.set("avatars/contact-2.jpg", "QkJC"); // a-bytes
   photo.files.set("avatars/cv-1-pet.jpg", "UEVU"); // z-marked's pet
-  const unreadable = new Set([
+  const missingAtExport = new Set([
     "avatars/contact-1.jpg",
     "avatars/cv-1-pet.jpg",
     "avatars/profile.jpg",
   ]);
   const report = await buildExportReport(source, {
     exportedAt: NOW,
+    // The production reader's D-29 contract: "" for a missing or empty file.
     readPhotoBase64: async (relative) => {
       const bytes = photo.files.get(relative);
-      if (bytes === undefined || unreadable.has(relative))
-        throw new Error(`unreadable ${relative}`);
+      if (bytes === undefined || missingAtExport.has(relative)) return "";
       return bytes;
     },
   });
@@ -890,7 +893,7 @@ async function journal(exec: Awaited<ReturnType<typeof db>>) {
   return exec.getAllAsync("SELECT * FROM restore_photo_journal");
 }
 
-it("exports unreadable photos as marked nulls and counts them (D-24/D-26)", async () => {
+it("exports missing photos as marked nulls and counts them (D-24/D-26/D-29)", async () => {
   const { source, manifest, skippedPhotos } = await skippedPhotoSource();
   expect(skippedPhotos).toBe(4);
   expect(manifest.profile).toMatchObject({

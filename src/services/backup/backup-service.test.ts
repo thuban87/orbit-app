@@ -20,7 +20,13 @@ const mocks = vi.hoisted(() => ({ buildExportReport: vi.fn() }));
 vi.mock("@/backup/export-manifest", () => ({
   buildExportReport: mocks.buildExportReport,
 }));
+vi.mock("expo-sqlite", () => ({}));
 
+import type * as ExportManifestModule from "@/backup/export-manifest";
+import { BackupPhotoUnreadableError } from "@/backup/types";
+import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
+import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
+import { runMigrations } from "@/db/migrations/runner";
 import {
   createAutomaticBackupReencryptionService,
   createAutomaticBackupService,
@@ -659,4 +665,150 @@ describe("skipped photos reach every writer's result (38.6 D-24)", () => {
       createVerifiedPreRestoreSnapshot(deps)(),
     ).resolves.toMatchObject({ status: "written", skippedPhotos: 2 });
   });
+});
+
+// 38.6 D-29 through the real export: only a missing or empty photo (the reader
+// resolves "") is skipped and counted. An existing photo whose read fails
+// fails every writer, so retention never prunes against a photo-less backup.
+describe("only missing photos are skipped, in every writer (38.6 D-29)", () => {
+  const NOW = manifest.metadata.exportedAt;
+  let exec: ReturnType<typeof nodeSqliteExecutor>;
+  beforeEach(async () => {
+    const actual = await vi.importActual<typeof ExportManifestModule>(
+      "@/backup/export-manifest",
+    );
+    mocks.buildExportReport
+      .mockReset()
+      .mockImplementation(actual.buildExportReport);
+    exec = nodeSqliteExecutor(openTestDb());
+    let count = 0;
+    await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
+      now: NOW,
+      newUid: () => `uid-${++count}`,
+    });
+    for (const uid of ["kept", "lost"])
+      await exec.runAsync(
+        "INSERT INTO contacts (uid, name, interval_days, photo, created_at, modified_at) VALUES (?, ?, 7, ?, ?, ?)",
+        [uid, uid, `avatars/${uid}.jpg`, NOW, NOW],
+      );
+  });
+
+  // "lost" is missing; "kept" reads, unless `broken` makes it fail.
+  const reader =
+    (broken: boolean) =>
+    async (relative: string): Promise<string> => {
+      if (relative === "avatars/lost.jpg") return "";
+      if (broken) throw new Error("EIO");
+      return "AQID";
+    };
+  const manualDeps = (broken: boolean) => {
+    const written: string[] = [];
+    const open = vi.fn(async () => {});
+    const service = createManualExportService({
+      exec,
+      exportedAt: NOW,
+      readPhotoBase64: reader(broken),
+      files: {
+        retireAll: async () => {},
+        retireStale: async () => {},
+        create: async () => ({
+          uri: "file:///export.json",
+          write: async (contents: string) => {
+            written.push(contents);
+          },
+          read: async () => written[0] ?? "",
+          delete: async () => {},
+        }),
+      },
+      share: { isAvailable: async () => true, open },
+    });
+    return { service, written, open };
+  };
+  const automaticDeps = (broken: boolean) => ({
+    exec,
+    exportedAt: NOW,
+    now: new Date("2026-08-25T00:00:00.000Z"),
+    readPhotoBase64: reader(broken),
+    directoryUri: "content://backup",
+    retentionDays: 7,
+    storage: {
+      writeVerified: vi.fn(async () => "content://backup/f"),
+      list: vi.fn(async () => [
+        "content://backup/orbit-auto-2020-01-01T00-00-00-000Z.json",
+      ]),
+      remove: vi.fn(async () => {}),
+    },
+  });
+
+  it("manual export skips and counts a missing photo", async () => {
+    const { service, written } = manualDeps(false);
+    await expect(service.sharePlaintextExport()).resolves.toEqual({
+      status: "shared",
+      skippedPhotos: 1,
+    });
+    const shared = JSON.parse(written[0]!);
+    const byUid = Object.fromEntries(
+      shared.contacts.map((row: { uid: string }) => [row.uid, row]),
+    );
+    expect(byUid.lost).toMatchObject({ photoBase64: null, photoSkipped: true });
+    expect(byUid.kept.photoBase64).toBe("AQID");
+  });
+
+  it("manual export fails and shares nothing when an existing photo cannot be read", async () => {
+    const { service, written, open } = manualDeps(true);
+    await expect(service.sharePlaintextExport()).resolves.toEqual({
+      status: "export-failed",
+    });
+    expect(written).toEqual([]);
+    expect(open).not.toHaveBeenCalled();
+    await expect(
+      mocks.buildExportReport.mock.results[0]!.value,
+    ).rejects.toBeInstanceOf(BackupPhotoUnreadableError);
+  });
+
+  it.each([
+    [
+      "automatic backup",
+      (deps: ReturnType<typeof automaticDeps>) =>
+        createAutomaticBackupService(deps).writeVerifiedSnapshot(),
+    ],
+    [
+      "pre-restore safety snapshot",
+      (deps: ReturnType<typeof automaticDeps>) =>
+        createVerifiedPreRestoreSnapshot(deps)(),
+    ],
+  ])("%s skips and counts a missing photo", async (_name, write) => {
+    const deps = automaticDeps(false);
+    await expect(write(deps)).resolves.toMatchObject({
+      status: "written",
+      skippedPhotos: 1,
+    });
+    expect(deps.storage.writeVerified).toHaveBeenCalledTimes(1);
+    // Retention runs after a good write, which is why a bad one must fail.
+    expect(deps.storage.remove).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      "automatic backup",
+      (deps: ReturnType<typeof automaticDeps>) =>
+        createAutomaticBackupService(deps).writeVerifiedSnapshot(),
+    ],
+    [
+      "pre-restore safety snapshot",
+      (deps: ReturnType<typeof automaticDeps>) =>
+        createVerifiedPreRestoreSnapshot(deps)(),
+    ],
+  ])(
+    "%s fails, writes nothing and prunes nothing when an existing photo cannot be read",
+    async (_name, write) => {
+      const deps = automaticDeps(true);
+      await expect(write(deps)).resolves.toEqual({ status: "failed" });
+      expect(deps.storage.writeVerified).not.toHaveBeenCalled();
+      expect(deps.storage.remove).not.toHaveBeenCalled();
+      await expect(
+        mocks.buildExportReport.mock.results[0]!.value,
+      ).rejects.toBeInstanceOf(BackupPhotoUnreadableError);
+    },
+  );
 });

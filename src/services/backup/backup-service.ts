@@ -471,7 +471,7 @@ export interface ExportShareAdapter {
 }
 
 export type ManualExportResult =
-  /** `skippedPhotos`: unreadable photos left out of the share (38.6 D-24). */
+  /** `skippedPhotos`: missing or empty photos left out of the share (38.6 D-24/D-29). */
   | { status: "shared"; skippedPhotos: number }
   | { status: "busy" }
   | { status: "sharing-unavailable" }
@@ -603,7 +603,7 @@ export function createAutomaticBackupService(
   deps: AutomaticBackupDependencies,
 ): {
   writeVerifiedSnapshot(): Promise<
-    /** `skippedPhotos`: unreadable photos left out (38.6 D-24). */
+    /** `skippedPhotos`: missing or empty photos left out (38.6 D-24/D-29). */
     | { status: "written"; filename: string; skippedPhotos: number }
     | { status: "failed" }
     | { status: "busy" }
