@@ -12,6 +12,7 @@ import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import { PhotoLightbox, type PhotoLightboxProps } from "./PhotoLightbox";
+import { LIGHTBOX_SCRIM_OPACITY } from "./photo-lightbox-logic";
 
 const hooks = vi.hoisted(() => ({
   log: [] as string[],
@@ -56,8 +57,49 @@ vi.mock("react-native", () => ({
   AccessibilityInfo: { setAccessibilityFocus: hooks.focus },
   findNodeHandle: () => 7,
 }));
-vi.mock("react-native-gesture-handler", () => ({
-  GestureHandlerRootView: "GestureHandlerRootView",
+vi.mock("react-native-gesture-handler", () => {
+  // Chainable builder stub: every configuration call returns the builder.
+  const builder = (kind: string) => {
+    const target: Record<string, unknown> = { kind };
+    const proxy: Record<string, unknown> = new Proxy(target, {
+      get: (object, key: string) => (key in object ? object[key] : () => proxy),
+    });
+    return proxy;
+  };
+  return {
+    GestureHandlerRootView: "GestureHandlerRootView",
+    GestureDetector: "GestureDetector",
+    Gesture: {
+      Pinch: () => builder("pinch"),
+      Pan: () => builder("pan"),
+      Tap: () => builder("tap"),
+      Race: (...gestures: unknown[]) => ({ kind: "race", gestures }),
+      Simultaneous: (...gestures: unknown[]) => ({
+        kind: "simultaneous",
+        gestures,
+      }),
+    },
+  };
+});
+vi.mock("react-native-reanimated", () => ({
+  default: { View: "AnimatedView" },
+  useSharedValue: (value: unknown) => {
+    hooks.log.push("useSharedValue");
+    return { value };
+  },
+  useAnimatedStyle: (fn: () => unknown) => {
+    hooks.log.push("useAnimatedStyle");
+    return fn();
+  },
+  withTiming: (value: unknown) => value,
+  withSpring: (value: unknown) => value,
+  runOnJS: (fn: unknown) => fn,
+}));
+vi.mock("@/theme/use-reduced-motion", () => ({
+  useReducedMotionShared: () => {
+    hooks.log.push("useReducedMotionShared");
+    return { value: false };
+  },
 }));
 vi.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => {
@@ -195,9 +237,28 @@ describe("PhotoLightbox", () => {
     const scrim = render(base).nodes.find(
       (node) => node.props.testID === "photo-lightbox-scrim",
     );
-    expect(flatStyle(scrim?.props.style).backgroundColor).toBe(
-      THEME_PRESETS.galaxy.dark.background,
-    );
+    const style = flatStyle(scrim?.props.style);
+    expect(style.backgroundColor).toBe(THEME_PRESETS.galaxy.dark.background);
+    // At rest (no swipe) the scrim sits at its near-opaque resting opacity.
+    expect(style.opacity).toBe(LIGHTBOX_SCRIM_OPACITY);
+  });
+
+  it("wraps the image in one gesture: double-tap racing pinch + pan", () => {
+    const nodes = render(base).nodes;
+    const detector = nodes.find((node) => node.type === "GestureDetector");
+    expect(detector?.props.gesture).toMatchObject({
+      kind: "race",
+      gestures: [
+        { kind: "tap" },
+        {
+          kind: "simultaneous",
+          gestures: [{ kind: "pinch" }, { kind: "pan" }],
+        },
+      ],
+    });
+    expect(
+      all(detector ? [detector] : []).some((node) => node.type === "Image"),
+    ).toBe(true);
   });
 
   it("shows the display-source image contained, labelled with the name", () => {

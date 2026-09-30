@@ -9,6 +9,7 @@ import {
   dismissProgress,
   doubleTapTarget,
   focalTranslate,
+  isZoomed,
   LIGHTBOX_DISMISS_DISTANCE,
   LIGHTBOX_DISMISS_VELOCITY,
   LIGHTBOX_DOUBLE_TAP_SCALE,
@@ -65,6 +66,14 @@ describe("focalTranslate", () => {
     // The image point under the focus stays under it: (f - t) / s is invariant.
     const t = focalTranslate(-100, 100, 2, 3);
     expect((100 - t) / 3).toBeCloseTo((100 - -100) / 2);
+  });
+});
+
+describe("isZoomed", () => {
+  it("treats float slack around 1× as unzoomed", () => {
+    expect(isZoomed(1)).toBe(false);
+    expect(isZoomed(1.005)).toBe(false);
+    expect(isZoomed(1.5)).toBe(true);
   });
 });
 
