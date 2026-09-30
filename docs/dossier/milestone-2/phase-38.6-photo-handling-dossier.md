@@ -264,6 +264,17 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     required, stop and ask.
 -   **[DECIDED · 2026-09-30] D-27 --- Profile background images stay all-or-nothing in backups (plan-check M2).** An
     unreadable profile background still fails the export as before; revisit only if it is ever seen.
+-   **[DECIDED · 2026-09-30] D-28 --- Replace-all keeps the "Photo unavailable" flag for an already-lost photo
+    (review WR2-01).** A marked row whose local photo file was already missing before a Replace-all ends with a
+    reference to its own new id-derived canonical path (no file there), so it shows "Photo unavailable" like the
+    profile; an old path is never written back (Replace-all re-assigns contact ids).
+-   **[DECIDED · 2026-09-30] D-29 --- Backups skip only genuinely missing photos (review WR2-03; narrows D-24).** A
+    photo is skipped and counted only when its file is missing or empty; any other read error (permission, IO,
+    memory) fails the backup as before, so a system-wide fault cannot produce photo-less "successful" backups that
+    retention then uses to delete complete ones.
+-   **[DECIDED · 2026-09-30] D-30 --- Restore result copy (review IN2-02).** The safety-backup count keeps "N photo(s)
+    couldn't be included."; photos already missing on the phone read "N photo(s) were already missing on this phone and
+    couldn't be restored."
 
 ### Engineering boundaries (recorded so planning cannot drift)
 
@@ -321,3 +332,5 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     unreadable photos with a count; F-1..F-3 photo surfaces added, F-4/F-5 not).
 -   **2026-09-30** --- Execution rulings D-26 (skip marker; restore never removes a photo for a skipped row), D-27
     (backgrounds unchanged); D-23 wording narrowed to Profile hero + photo editor (owner M3a).
+-   **2026-09-30** --- Review pass-2 rulings D-28 (Replace-all keeps the unavailable flag via the new canonical), D-29
+    (skip only missing photos), D-30 (restore result copy).
