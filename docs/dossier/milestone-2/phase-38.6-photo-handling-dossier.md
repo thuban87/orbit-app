@@ -301,10 +301,10 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
 -   **[DECIDED · 2026-09-30] D-37 --- D-11 memory fails; fix before release.** Orrery graphics memory at 20 s was +23 %
     / GL +32 % over the 512 JPEG baseline (limit 5 %). A gap plan finishes review IN-02 (cancel queued downsamples,
     size the Orrery photo cache to the photo count) and the ~5 s initials-on-return reload, then re-measures with the
-    same fixed method (plus a late sample). The release build waits for it.
+    same fixed method (plus a late sample). Done as direct fixes (no gap plan); the release build waits for them.
 -   **[DECIDED · 2026-09-30] D-38 --- The assist banner must not block other screens' top bars (device S12).** While a
     "Did you reach ...?" question is pending, the banner currently covers every screen's top (Profile Back/star/more,
-    dashboard search). Fixed in this phase by a gap plan.
+    dashboard search). Fixed in this phase as a direct fix.
 -   **[DECIDED · 2026-09-30] D-39 --- Encrypted-backup cap stays 8 MiB (closes D-20); over-cap errors say "too large".**
     Measured: 3.81 MB at 50 photo contacts, 6.23 MB at 100, cap projected at ~145. A gap plan makes the manual and
     automatic over-cap failures say the backup is too large instead of "Couldn't create export" / "Backup folder needs
