@@ -521,9 +521,3 @@ export async function reconcilePhotoWritesForCanonical(
     }
   }
 }
-
-/** Compatibility entry point; production launch sweep uses the locked owner. */
-export async function reconcilePhotoWrites(): Promise<void> {
-  for (const canonical of listCanonicalSidecarPaths())
-    await reconcilePhotoWritesForCanonical(canonical);
-}

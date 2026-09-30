@@ -2,11 +2,25 @@
  * Source-scan contract for canonical photo bytes and their display revision
  * (38.6 D-01/D-19).
  *
- * Display revisions are published only by the ownership layer
- * (`owned-master.ts` → `notifyPhotoBytesChanged`). This test makes a future
- * writer that bypasses it fail loudly: it pins which files may call the store's
- * bump, which files may import the raw byte writers from photo-storage, and
- * which files may resolve a plain (revision-less) photo URI.
+ * Display revisions are published by the ownership layer (`owned-master.ts` →
+ * `notifyPhotoBytesChanged`, the only caller of the store's bump). This scan
+ * makes a future writer that bypasses it fail loudly. It pins, over `src/`
+ * (tests excluded), exactly which files may:
+ *   - call or import the store's bump (`bumpPhotoCacheBust`);
+ *   - call or import `notifyPhotoBytesChanged` (owned-master, plus the
+ *     replace-all restore cleanup delete in restore-apply);
+ *   - import a raw canonical byte writer from photo-storage (`persistMaster`,
+ *     `deletePhoto`, and the `.bak`/`.tmp` reconcile move
+ *     `reconcilePhotoWritesForCanonical`, which only owned-master may import);
+ *   - import the plain (revision-less) photo URI resolver;
+ *   - import the display URI resolver (`resolvePhotoDisplayUri`, only via
+ *     `photo-display.ts`, so no surface builds a display URI with the wrong
+ *     cache policy).
+ *
+ * It checks WHO may touch these symbols — it does not prove that each
+ * byte-changing branch notifies. That positive coverage (every persist,
+ * delete intent, settle/finalize and reconcile publishes a revision) lives in
+ * `owned-master.test.ts` and the restore tests.
  *
  * Imports are read with the TypeScript parser, so every form counts: static
  * named / namespace / default imports, `export … from` re-exports, and dynamic
@@ -20,15 +34,46 @@ import ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 const PHOTO_STORAGE = "src/services/photos/photo-storage";
+const OWNED_MASTER = "src/services/photos/owned-master";
 const DISPLAY_STORE = "src/stores/photo-cache-bust-store";
 const BUMP = "bumpPhotoCacheBust";
-const RAW_WRITERS = ["persistMaster", "deletePhoto"] as const;
+const NOTIFY = "notifyPhotoBytesChanged";
+/** photo-storage exports that move a `.bak` onto a canonical (changes displayed bytes). */
+const RECONCILE_WRITERS = [
+  "reconcilePhotoWritesForCanonical",
+  // Deleted as dead surface (review WR-07); pinned so it cannot quietly return.
+  "reconcilePhotoWrites",
+] as const;
+const RAW_WRITERS = [
+  "persistMaster",
+  "deletePhoto",
+  ...RECONCILE_WRITERS,
+] as const;
 const PLAIN_RESOLVER = "resolvePhotoUri";
+const DISPLAY_RESOLVER = "resolvePhotoDisplayUri";
 
 /** Files allowed to publish a display revision (call or import the store's bump). */
 const REVISION_PUBLISHERS = [
   // The ownership layer: notifyPhotoBytesChanged is the single publisher.
   "src/services/photos/owned-master.ts",
+];
+
+/** Files allowed to call or import `notifyPhotoBytesChanged`. */
+const NOTIFY_CALLERS = [
+  // Defines it; every owned persist / delete intent / settle / reconcile calls it.
+  "src/services/photos/owned-master.ts",
+  // Replace-all restore cleanup: deletes a canonical under the path lock, then
+  // notifies only once the bytes are really gone.
+  "src/backup/restore-apply.ts",
+];
+
+/** Files allowed to import the `.bak` reconcile move (holds the path lock, notifies). */
+const RECONCILE_WRITER_IMPORTERS = ["src/services/photos/owned-master.ts"];
+
+/** Files allowed to import the display URI resolver. */
+const DISPLAY_RESOLVER_IMPORTERS = [
+  // The one display source (revision-query / no-cache) every surface uses.
+  "src/components/photo-display.ts",
 ];
 
 /** Files allowed to import the raw canonical byte writers from photo-storage. */
@@ -248,8 +293,24 @@ function publishesRevision(file: string, source: string): boolean {
     importedSymbols(file, source, DISPLAY_STORE, [BUMP]).length > 0
   );
 }
+function callsNotify(file: string, source: string): boolean {
+  return (
+    callsFunction(file, source, NOTIFY) ||
+    importedSymbols(file, source, OWNED_MASTER, [NOTIFY]).length > 0
+  );
+}
 function importsRawWriter(file: string, source: string): boolean {
   return importedSymbols(file, source, PHOTO_STORAGE, RAW_WRITERS).length > 0;
+}
+function importsReconcileWriter(file: string, source: string): boolean {
+  return (
+    importedSymbols(file, source, PHOTO_STORAGE, RECONCILE_WRITERS).length > 0
+  );
+}
+function importsDisplayResolver(file: string, source: string): boolean {
+  return (
+    importedSymbols(file, source, PHOTO_STORAGE, [DISPLAY_RESOLVER]).length > 0
+  );
 }
 function importsPlainResolver(file: string, source: string): boolean {
   return (
@@ -488,6 +549,95 @@ describe("expo-image + plain resolver matcher", () => {
   });
 });
 
+describe("reconcile writer matcher (WR-07)", () => {
+  it.each([
+    [
+      "static named",
+      'import { reconcilePhotoWritesForCanonical } from "@/services/photos/photo-storage";',
+    ],
+    [
+      "the removed whole-directory reconcile",
+      'import { reconcilePhotoWrites } from "@/services/photos/photo-storage";',
+    ],
+    [
+      "dynamic destructured, renamed",
+      'async function f() { const { reconcilePhotoWritesForCanonical: r } = await import("../photos/photo-storage"); }',
+    ],
+    ["static namespace", 'import * as ps from "../photos/photo-storage";'],
+  ])("detects %s (and counts it as a raw writer)", (_, source) => {
+    expect(importsReconcileWriter(AT, source)).toBe(true);
+    expect(importsRawWriter(AT, source)).toBe(true);
+  });
+  it.each([
+    [
+      "the sidecar listing",
+      'import { listCanonicalSidecarPaths } from "@/services/photos/photo-storage";',
+    ],
+    [
+      "the owned reconcile",
+      'import { reconcilePhotoWritesOwned } from "@/services/photos/owned-master";',
+    ],
+  ])("ignores %s", (_, source) => {
+    expect(importsReconcileWriter(AT, source)).toBe(false);
+  });
+});
+
+describe("notify caller matcher (WR-07)", () => {
+  it.each([
+    ["a direct call", `${NOTIFY}("avatars/contact-1.jpg");`],
+    ["a member call", `owned.${NOTIFY}(path);`],
+    [
+      "a renamed import",
+      `import { ${NOTIFY} as n } from "@/services/photos/owned-master";`,
+    ],
+    ["a relative import", `import { ${NOTIFY} } from "./owned-master";`],
+    [
+      "a dynamic destructured import",
+      `async function f() { const { ${NOTIFY} } = await import("@/services/photos/owned-master"); }`,
+    ],
+  ])("detects %s", (_, source) => {
+    expect(callsNotify(NEAR, source)).toBe(true);
+  });
+  it.each([
+    [
+      "another owned-master import",
+      'import { persistOwnedMaster } from "@/services/photos/owned-master";',
+    ],
+    ["a mention in a comment", `// the owner calls ${NOTIFY}(x) after`],
+    ["the store bump", `${BUMP}(canonical);`],
+  ])("ignores %s", (_, source) => {
+    expect(callsNotify(NEAR, source)).toBe(false);
+  });
+});
+
+describe("display resolver matcher (WR-07)", () => {
+  it.each([
+    [
+      "static named",
+      'import { resolvePhotoDisplayUri } from "@/services/photos/photo-storage";',
+    ],
+    [
+      "dynamic property read",
+      'async function f() { (await import("@/services/photos/photo-storage")).resolvePhotoDisplayUri(p, undefined); }',
+    ],
+    ["static namespace", 'import * as ps from "../photos/photo-storage";'],
+  ])("detects %s", (_, source) => {
+    expect(importsDisplayResolver(AT, source)).toBe(true);
+  });
+  it.each([
+    [
+      "the plain resolver",
+      'import { resolvePhotoUri } from "@/services/photos/photo-storage";',
+    ],
+    [
+      "the display hook",
+      'import { usePhotoDisplay } from "@/components/photo-display";',
+    ],
+  ])("ignores %s", (_, source) => {
+    expect(importsDisplayResolver(AT, source)).toBe(false);
+  });
+});
+
 // ---------------------------------------------------------------------------
 // The contract over the real tree
 // ---------------------------------------------------------------------------
@@ -517,6 +667,22 @@ describe("photo writer contract (src/, tests excluded)", () => {
 
   it("only the ownership layer publishes a display revision", () => {
     expect(matching(publishesRevision)).toEqual(REVISION_PUBLISHERS);
+  });
+
+  it("only owned-master and the restore cleanup call notifyPhotoBytesChanged", () => {
+    expect(matching(callsNotify)).toEqual([...NOTIFY_CALLERS].sort());
+  });
+
+  it("only owned-master imports the .bak reconcile move", () => {
+    expect(matching(importsReconcileWriter)).toEqual(
+      [...RECONCILE_WRITER_IMPORTERS].sort(),
+    );
+  });
+
+  it("display-resolver importers are exactly the allowlist", () => {
+    expect(matching(importsDisplayResolver)).toEqual(
+      [...DISPLAY_RESOLVER_IMPORTERS].sort(),
+    );
   });
 
   it("only the owned importers import the raw byte writers", () => {

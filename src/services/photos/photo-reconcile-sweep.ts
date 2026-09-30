@@ -7,9 +7,9 @@
  * behind are reconciled by the EXISTING launch sweep, NOT a background timer.
  * `registerPhotoReconcileSweep` mirrors `registerFieldSweep`: it pushes ONE
  * idempotent hook onto the Phase-2 `registerSweepHook` registry that calls
- * `reconcilePhotoWrites` (which deletes stale `.tmp`, deletes a completed-swap
- * `.bak`, and restores an interrupted-swap `.bak` whose canonical dest is
- * missing). Unlike `field-sweep` it needs no executor — the reconciliation is
+ * `reconcilePhotoWritesOwned` (per canonical, under its path lock: deletes a
+ * stale `.tmp`, deletes a completed-swap `.bak`, and restores an
+ * interrupted-swap `.bak` whose canonical dest is missing). Unlike `field-sweep` it needs no executor — the reconciliation is
  * FS-only — so it takes no args, and a second pass is safe (it finds no orphans).
  *
  * NEGATIVE rules inherited from the registry: importing this module runs nothing

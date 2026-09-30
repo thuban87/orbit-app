@@ -2,7 +2,7 @@
  * photo-storage — node-side proof of the PURE surface + the crash-safe persist
  * failure paths (PHOTO-03).
  *
- * The FS-touching functions (`persistMaster`, `deletePhoto`, `reconcilePhotoWrites`)
+ * The FS-touching functions (`persistMaster`, `deletePhoto`, `reconcilePhotoWritesForCanonical`)
  * are the only `expo-file-system` users, so the whole native module is replaced by
  * a faithful in-memory mock (`vi.mock`) driven through `vi.hoisted` shared state.
  * The mock records every copy/move/delete op and models an evictable filesystem as
