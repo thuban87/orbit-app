@@ -11,6 +11,7 @@ import {
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { bumpPhotoCacheBust } from "@/stores/photo-cache-bust-store";
+import { Logger } from "@/utils/logger";
 import {
   deletePhoto,
   deleteRestorePending,
@@ -54,10 +55,20 @@ function bump(canonical: string): void {
  * D-21). Deliberately separate from the AUTHORIZATION `generations` map above:
  * retry and merge compare `canonicalGeneration`, so display must never bump or
  * read it. Call wherever canonical bytes change.
+ *
+ * Never throws for a display failure (review IN-06): the bump runs zustand
+ * subscribers synchronously, and a throwing subscriber must not turn a write
+ * whose bytes already landed into a failed write (or skip the caller's
+ * authorization bump). The revision itself is set before subscribers run. An
+ * unsafe path still throws — that is a caller bug, not a display failure.
  */
 export function notifyPhotoBytesChanged(canonical: string): void {
   assertSafeRelative(canonical);
-  bumpPhotoCacheBust(canonical);
+  try {
+    bumpPhotoCacheBust(canonical);
+  } catch (error) {
+    Logger.error("owned-master", "display revision subscriber failed", error);
+  }
 }
 
 export async function withCanonicalPathLocks<T>(
@@ -305,8 +316,9 @@ export async function persistOwnedMasterLocked(
   const result = opts.persist
     ? await opts.persist(srcUri, canonical)
     : await persistMaster(srcUri, canonical);
-  notifyPhotoBytesChanged(canonical);
+  // Authorization first: retry and merge rely on it (IN-06).
   bump(canonical);
+  notifyPhotoBytesChanged(canonical);
   return result;
 }
 export function persistOwnedMaster(

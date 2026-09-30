@@ -4,7 +4,20 @@ import { FakePhotoFs } from "./__testkit__/fake-photo-fs";
 const h = vi.hoisted(() => ({
   fs: null as FakePhotoFs | null,
   failDelete: false,
+  /** Simulates a throwing zustand subscriber: the bump lands, then throws. */
+  throwAfterBump: false,
 }));
+vi.mock("@/stores/photo-cache-bust-store", async (original) => {
+  const actual =
+    await original<typeof import("@/stores/photo-cache-bust-store")>();
+  return {
+    ...actual,
+    bumpPhotoCacheBust: (relPath: string) => {
+      actual.bumpPhotoCacheBust(relPath);
+      if (h.throwAfterBump) throw new Error("subscriber boom");
+    },
+  };
+});
 vi.mock("@/services/photos/photo-storage", () => ({
   persistMaster: (src: string, canonical: string) =>
     h.fs!.persist(src, canonical),
@@ -66,6 +79,7 @@ let exec: SqlExecutor;
 beforeEach(async () => {
   h.fs = new FakePhotoFs();
   h.failDelete = false;
+  h.throwAfterBump = false;
   exec = nodeSqliteExecutor(openTestDb());
   await exec.execAsync(
     "CREATE TABLE contacts (id INTEGER PRIMARY KEY, uid TEXT, photo TEXT)",
@@ -325,6 +339,21 @@ describe("display revision (38.6 D-19) — separate from authorization generatio
     notifyPhotoBytesChanged(canonical);
     expect(getPhotoCacheBust(canonical)).toBe(rev + 1);
     expect(canonicalGeneration(canonical)).toBe(gen);
+  });
+
+  it("a throwing display subscriber never fails a landed persist (IN-06)", async () => {
+    h.fs!.files.set("new", "newer");
+    const gen = canonicalGeneration(canonical);
+    const rev = getPhotoCacheBust(canonical) ?? 0;
+    h.throwAfterBump = true;
+    await expect(persistOwnedMaster(exec, "new", canonical)).resolves.toBe(
+      canonical,
+    );
+    expect(h.fs!.files.get(canonical)).toBe("newer");
+    // Both the authorization generation and the display revision advanced.
+    expect(canonicalGeneration(canonical)).toBe(gen + 1);
+    expect(getPhotoCacheBust(canonical)).toBe(rev + 1);
+    expect(() => notifyPhotoBytesChanged(canonical)).not.toThrow();
   });
 
   it("notifyPhotoBytesChanged rejects an unsafe path", () => {
