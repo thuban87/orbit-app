@@ -433,6 +433,18 @@ export function photoFileExists(relative: string): boolean {
   return new File(Paths.document, relative).exists;
 }
 
+/**
+ * Whether a canonical has a `.bak` sidecar: a replace is mid-swap (the prior
+ * master is moved aside, the new bytes not yet in place) or was interrupted
+ * and the launch sweep will move the `.bak` back. Either way the canonical is
+ * not genuinely empty even when {@link photoFileExists} is false (38.6 review
+ * IN3-01/WR3-02). Read-only.
+ */
+export function photoSwapBackupExists(relative: string): boolean {
+  assertSafeRelative(relative);
+  return new File(Paths.document, `${relative}.bak`).exists;
+}
+
 /** A single reconciliation step over the avatars dir listing. */
 export type ReconcileAction =
   | { kind: "deleteTmp"; relative: string }

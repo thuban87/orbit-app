@@ -70,6 +70,8 @@ vi.mock("@/services/photos/photo-storage", () => ({
   },
   photoFileExists: (path: string) =>
     photoMocks.deleteLeavesFile || (photoMocks.fs?.files.has(path) ?? false),
+  photoSwapBackupExists: (path: string) =>
+    photoMocks.fs?.files.has(`${path}.bak`) ?? false,
   resolveRestorePendingUri: (relative: string) => `file:///doc/${relative}`,
   restorePendingRelPath: (
     target: { kind: string; uid?: string },

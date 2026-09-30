@@ -52,6 +52,7 @@ import { getPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import { Logger } from "@/utils/logger";
 import {
   canonicalGeneration,
+  canonicalPathLockBusy,
   deleteStagedPhotosOwned,
   enqueueRemovalIntentOwned,
   executeDeleteIntentOwned,
@@ -130,6 +131,22 @@ describe("owned canonical master", () => {
       await settleCanonicalLocked(exec, token, canonical);
     });
     expect(await listJournalEntriesCore(exec)).toEqual([]);
+  });
+  it("reports a canonical path lock as busy while it is held or awaited (review WR3-02)", async () => {
+    expect(canonicalPathLockBusy(canonical)).toBe(false);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const holder = withCanonicalPathLock(canonical, () => gate);
+    expect(canonicalPathLockBusy(canonical)).toBe(true);
+    expect(canonicalPathLockBusy("avatars/contact-999.jpg")).toBe(false);
+    const waiter = withCanonicalPathLock(canonical, async () => {});
+    release();
+    await holder;
+    await waiter;
+    expect(canonicalPathLockBusy(canonical)).toBe(false);
+    expect(() => canonicalPathLockBusy("../x.jpg")).toThrow();
   });
   it("retires an older pre-upgrade finalize before applying the later row", async () => {
     await stage();

@@ -112,6 +112,16 @@ export async function withCanonicalPathLocks<T>(
   };
   return run(0);
 }
+/**
+ * Whether an owned operation holds, or waits for, this canonical's path lock
+ * right now (process-local). For a caller that cannot take the lock itself,
+ * such as code inside a DB transaction (lock order: path, then DB), a busy
+ * lock means bytes may be about to land at this path (38.6 review WR3-02).
+ */
+export function canonicalPathLockBusy(canonical: string): boolean {
+  assertSafeRelative(canonical);
+  return tails.has(canonical);
+}
 export function withCanonicalPathLock<T>(
   canonical: string,
   fn: (token: CanonicalLockToken) => Promise<T>,

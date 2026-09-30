@@ -40,6 +40,7 @@ import { recomputeLastContactCore } from "@/db/recency-dao";
 import {
   enqueueDeleteIntentCore,
   insertFinalizeEntryCore,
+  listJournalForCanonicalCore,
   type RestorePhotoJournalEntry,
 } from "@/db/restore-photo-journal-dao";
 import { inWriteTransaction } from "@/db/transaction";
@@ -58,6 +59,7 @@ import {
 } from "@/services/photos/background-storage";
 import { stageLocalPhotoForRestore } from "@/services/photos/merge-photo-rehome";
 import {
+  canonicalPathLockBusy,
   executeDeleteIntentOwned,
   finalizeJournalEntryOwned,
   notifyPhotoBytesChanged,
@@ -69,6 +71,7 @@ import {
   deletePhoto,
   deleteRestorePending,
   photoFileExists,
+  photoSwapBackupExists,
   profilePhotoRelPath,
   type RestorePendingTarget,
   restorePendingRelPath,
@@ -2073,19 +2076,36 @@ export async function applyRestore(
       }
       // D-28 (Replace-all, and a moved Merge value: WR3-01): flag an
       // already-lost photo at the row's new canonical. With nothing on disk
-      // there, the reference is written now
-      // and no intent targets that path. A file there belongs to the old owner
-      // of the reused id: flagging now would show that contact's photo, so the
-      // file is deleted first (a durable intent) and the reference is written
-      // after, under the path lock. If that never completes, the row ends with
-      // no reference, never with another contact's photo.
+      // there, the reference is written now and no intent targets that path.
+      // A file there belongs to the old owner of the reused id: flagging now
+      // would show that contact's photo, so the file is deleted first (a
+      // durable intent) and the reference is written after, under the path
+      // lock. If that never completes, the row ends with no reference, never
+      // with another contact's photo (D-32).
+      //
+      // This transaction cannot take the path lock (lock order: path, then
+      // DB), so "nothing on disk" must also rule out bytes about to land
+      // there (review WR3-02): a committed finalize row for the path (the
+      // launch drain may be persisting it right now; it retires the row only
+      // after the bytes land, and cannot retire it while this transaction
+      // holds the DB), a `.bak` sidecar (a replace mid-swap, or one the launch
+      // sweep will move back), or any owned operation holding or awaiting the
+      // path lock. Any of these takes the deferred path, which serialises
+      // behind that writer on the lock.
       const flaggedPaths = new Set<string>();
       const deferredFlags: Array<{ target: PhotoTarget; canonical: string }> =
         [];
       for (const target of candidates.unavailable) {
         const canonical = await canonicalFor(exec, target);
         if (!canonical) continue;
-        if (exists(canonical)) {
+        if (
+          exists(canonical) ||
+          photoSwapBackupExists(canonical) ||
+          canonicalPathLockBusy(canonical) ||
+          (await listJournalForCanonicalCore(exec, canonical)).some(
+            (row) => row.action === "finalize",
+          )
+        ) {
           deferredFlags.push({ target, canonical });
           continue;
         }
@@ -2242,7 +2262,8 @@ export async function applyRestore(
     for (const { target, canonical } of deferredFlags) {
       try {
         await withCanonicalPathLock(canonical, async () => {
-          if (exists(canonical)) return;
+          // A `.bak` would be moved back onto this path by the launch sweep.
+          if (exists(canonical) || photoSwapBackupExists(canonical)) return;
           await inWriteTransaction(exec, async () => {
             if ((await canonicalFor(exec, target)) !== canonical) return;
             if ((await oldPhoto(exec, target)) !== null) return;

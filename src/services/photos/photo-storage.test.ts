@@ -112,6 +112,7 @@ import {
   persistMaster,
   photoDisplayUriFromDocumentUri,
   photoFileExists,
+  photoSwapBackupExists,
   profilePhotoRelPath,
   reconcilePhotoDir,
   relPathForTarget,
@@ -334,6 +335,14 @@ describe("restore pending staging — separate recovery-only namespace", () => {
     expect(photoFileExists("avatars/contact-42.jpg")).toBe(true);
     expect(() => photoFileExists("avatars/_restore_pending/x.jpg")).toThrow();
     expect(listRestorePendingPhotos()).toEqual([]);
+  });
+
+  it("reports a canonical's .bak swap sidecar, even with the canonical absent (review IN3-01/WR3-02)", () => {
+    expect(photoSwapBackupExists("avatars/contact-42.jpg")).toBe(false);
+    h.exists.add(`${DEST}.bak`);
+    expect(photoFileExists("avatars/contact-42.jpg")).toBe(false);
+    expect(photoSwapBackupExists("avatars/contact-42.jpg")).toBe(true);
+    expect(() => photoSwapBackupExists("../contact-42.jpg")).toThrow();
   });
 });
 

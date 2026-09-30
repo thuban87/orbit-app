@@ -23,6 +23,7 @@ vi.mock("@/services/photos/photo-storage", async () => {
         .filter((path) => path.startsWith("avatars/_restore_pending/"))
         .map((relative) => ({ relative, isStageTmpOrphan: false })),
     photoFileExists: (path: string) => photo.files.has(path),
+    photoSwapBackupExists: (path: string) => photo.files.has(`${path}.bak`),
     persistMaster: async (source: string, canonical: string) => {
       const bytes = photo.files.get(source);
       if (bytes === undefined) throw new Error("pending photo missing");
@@ -81,6 +82,7 @@ import { purgeContact } from "@/db/purge-dao";
 import { insertFinalizeEntryCore } from "@/db/restore-photo-journal-dao";
 import { snoozeContact } from "@/db/snooze-dao";
 import { inWriteTransaction } from "@/db/transaction";
+import { finalizeJournalEntryOwned } from "@/services/photos/owned-master";
 import { getPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 
 const NOW = "2026-09-01 00:00:00";
@@ -1322,4 +1324,113 @@ it("Replace-all never flags a lost photo onto another contact's leftover bytes (
   const rows = await photosByUid(source);
   expect(rows["m-lost"]).toMatchObject({ id: 2, photo: null });
   expect(photo.files.get("avatars/contact-2.jpg")).toBe("QkJC");
+});
+
+/*
+ * Review WR3-02: D-28's in-transaction "nothing on disk" decision cannot take
+ * the path lock, so it must also rule out bytes that are about to land there.
+ * Fixture: a-bytes's bytes travel in the backup, but on this phone its
+ * canonical contact-2.jpg is empty right now; m-lost (lost photo) takes id 2.
+ */
+const OLDER_PENDING = "avatars/_restore_pending/contact-a-bytes-older.jpg";
+async function olderFinalizeForContact2(exec: Awaited<ReturnType<typeof db>>) {
+  photo.files.delete("avatars/contact-2.jpg");
+  photo.files.set(OLDER_PENDING, "WFhY");
+  const stale = {
+    relativePath: OLDER_PENDING,
+    action: "finalize",
+    targetKind: "contact",
+    contactUid: "a-bytes",
+    valueUid: null,
+    fieldDefUid: null,
+    canonicalRelativePath: "avatars/contact-2.jpg",
+    createdAt: NOW,
+  } as const;
+  await inWriteTransaction(exec, () => insertFinalizeEntryCore(exec, stale));
+  return stale;
+}
+
+it("Replace-all never flags a lost photo at a path the launch drain is finalizing right now (review WR3-02)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  const stale = await olderFinalizeForContact2(source);
+  // The launch drain (after the backup picker returned) is mid-persist of an
+  // older restore's bytes for a-bytes at contact-2.jpg; they land only after
+  // the restore transaction has committed.
+  let committed!: () => void;
+  const commit = new Promise<void>((resolve) => {
+    committed = resolve;
+  });
+  let persisting!: () => void;
+  const started = new Promise<void>((resolve) => {
+    persisting = resolve;
+  });
+  const drain = finalizeJournalEntryOwned(source, stale, async (from, to) => {
+    persisting();
+    await commit;
+    photo.files.set(to, photo.files.get(from)!);
+  });
+  await started;
+  let bumped = false;
+  const watched: typeof source = {
+    ...source,
+    runAsync: (sql, params) => {
+      if (sql.includes("data_revision = data_revision + 1")) bumped = true;
+      return source.runAsync(sql, params);
+    },
+    execAsync: async (sql) => {
+      await source.execAsync(sql);
+      if (sql === "COMMIT" && bumped) committed();
+    },
+  };
+  const result = await applyRestore(watched, manifest, "replace-all");
+  await drain;
+  expect(result).toMatchObject({
+    status: "applied",
+    photoCleanupPending: 0,
+    restoredPhotosMissing: 1,
+  });
+  const lost = (await photosByUid(source))["m-lost"]!;
+  expect(lost.id).toBe(2);
+  // Flagged only after the drain's bytes landed and were deleted: the row
+  // never shows a-bytes's older photo.
+  expect(lost.photo).toBe("avatars/contact-2.jpg");
+  expect(photo.files.has("avatars/contact-2.jpg")).toBe(false);
+  expect(await journal(source)).toEqual([]);
+});
+
+it("Replace-all treats a committed finalize row for a lost row's new path as occupied (review WR3-02)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  await olderFinalizeForContact2(source);
+  const { recording, intents } = recordingDeleteIntents(source);
+  const result = await applyRestore(recording, manifest, "replace-all");
+  expect(result).toMatchObject({
+    status: "applied",
+    photoCleanupPending: 0,
+    restoredPhotosMissing: 1,
+  });
+  // The deferred path: the path is cleaned under its lock (the superseded
+  // finalize retired, its pending bytes deleted), then the flag lands.
+  expect(intents).toContain("avatars/contact-2.jpg");
+  expect((await photosByUid(source))["m-lost"]).toMatchObject({
+    id: 2,
+    photo: "avatars/contact-2.jpg",
+  });
+  expect(photo.files.has("avatars/contact-2.jpg")).toBe(false);
+  expect(photo.files.has(OLDER_PENDING)).toBe(false);
+  expect(await journal(source)).toEqual([]);
+});
+
+it("Replace-all never flags a lost photo at a path whose interrupted swap the launch sweep will restore (review WR3-02)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  // An interrupted replace left a-bytes's old photo as contact-2.jpg.bak; the
+  // next launch sweep moves it back onto contact-2.jpg.
+  photo.files.delete("avatars/contact-2.jpg");
+  photo.files.set("avatars/contact-2.jpg.bak", "QkJC");
+  const result = await applyRestore(source, manifest, "replace-all");
+  expect(result).toMatchObject({ status: "applied", restoredPhotosMissing: 1 });
+  // The D-32 fallback: no reference rather than another contact's photo.
+  expect((await photosByUid(source))["m-lost"]).toMatchObject({
+    id: 2,
+    photo: null,
+  });
 });
