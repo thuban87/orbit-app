@@ -219,16 +219,33 @@ async function settleRowLocked(
     deleteRestorePending(entry.relativePath);
     return;
   }
+  // Missing pending file (review WR-01, owner ruling D-23). `persist` copies the
+  // pending file and never moves it, and this function retires the row before
+  // deleting the pending file, so a crash here leaves either (row + pending) or
+  // (pending, no row). This branch therefore fires only after an external loss
+  // of `avatars/_restore_pending/*` or a state left by an older ordering.
+  // Retiring is safe: without pending bytes the journal can recover nothing.
+  // If the canonical is present the bytes landed. If it is missing, the stored
+  // reference is KEPT (never cleared: D-23) as the durable evidence of the lost
+  // photo; the Profile / photo editor show it as unavailable and the backup
+  // counts it (D-24). Never throw here: `settleCanonicalLocked` runs before
+  // every persist (a throw would wedge re-picking the photo), and a failed
+  // restore-photo-finalize sweep skips the backup hook (ADR-156 `requires`).
+  // No display revision: the bytes did not change.
   if (
     !listRestorePendingPhotos().some(
       (item) => item.relative === entry.relativePath,
     )
   ) {
+    const landed = photoFileExists(entry.canonicalRelativePath);
     await retire(exec, entry.relativePath);
+    if (!landed)
+      Logger.error(
+        "owned-master",
+        "restore photo bytes lost; reference kept (D-23)",
+      );
     return;
   }
-  // A missing pending file means a previous finalization reached the canonical
-  // but died before row cleanup. The row may safely retire.
   try {
     await persist(
       resolveRestorePendingUri(entry.relativePath),

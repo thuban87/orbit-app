@@ -37,6 +37,10 @@ import {
   View,
 } from "react-native";
 import { Avatar } from "@/components/Avatar";
+import {
+  PhotoUnavailableNotice,
+  usePhotoLoadFailure,
+} from "@/components/PhotoUnavailableNotice";
 import { runUrlSubmit } from "@/components/photo-url-submit";
 import {
   clearContactPhotoCore,
@@ -118,6 +122,9 @@ export function PhotoSourcePicker({
   const [urlText, setUrlText] = useState("");
   const [submittingUrl, setSubmittingUrl] = useState(false);
   const urlController = useRef<AbortController | null>(null);
+  // D-23: a kept reference whose file will not load shows "Photo unavailable";
+  // Change and Remove stay available (Remove still clears it, by the user).
+  const [photoFailed, onPhotoLoadErrorChange] = usePhotoLoadFailure();
   const abortUrl = useCallback(() => {
     urlController.current?.abort();
     urlController.current = null;
@@ -306,9 +313,11 @@ export function PhotoSourcePicker({
         name={name}
         contactId={avatarId}
         size={PREVIEW_SIZE}
+        onLoadErrorChange={onPhotoLoadErrorChange}
       />
 
       <View style={styles.actions}>
+        {hasPhoto && photoFailed ? <PhotoUnavailableNotice /> : null}
         <Pressable
           testID="photo-source-add-change"
           accessibilityRole="button"

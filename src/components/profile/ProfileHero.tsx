@@ -1,6 +1,7 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 import { Pressable, StyleSheet, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
+import { PhotoUnavailableNotice } from "@/components/PhotoUnavailableNotice";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import type { ProfileIdentity } from "@/db/profile-read";
@@ -88,6 +89,11 @@ export function ProfileHero({
         </AppText>
         {identity.categoryName ? (
           <AppText role="label">{identity.categoryName}</AppText>
+        ) : null}
+        {/* D-23: a kept reference whose file will not load says so. Under the
+            name, so the D-04 photo and name lines never move. */}
+        {identity.photo != null && !photoOpenable ? (
+          <PhotoUnavailableNotice />
         ) : null}
       </View>
       <View style={styles.actions}>

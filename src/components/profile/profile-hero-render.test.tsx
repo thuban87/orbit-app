@@ -174,3 +174,46 @@ describe("ProfileHero photo entry", () => {
     expect(wrapper?.props.onPress).toBeUndefined();
   });
 });
+
+describe("ProfileHero 'Photo unavailable' (38.6 D-23)", () => {
+  const identityBlock = (nodes: Node[]) => {
+    const root = nodes.find((node) => node.props.testID === "profile-hero");
+    return root?.children[1];
+  };
+
+  it("shows the notice under the name while a kept photo fails to load", () => {
+    const nodes = render({ categoryName: "Friends" }, false);
+    const block = identityBlock(nodes);
+    const children = block?.children ?? [];
+    expect(children[0]?.props.accessibilityRole).toBe("header");
+    const notice = children.at(-1);
+    expect(notice?.props.testID).toBe("photo-unavailable");
+    expect(notice?.props.accessible).toBe(true);
+    expect(notice?.props.accessibilityLabel).toBe("Photo unavailable");
+    expect(notice?.children.map((child) => child.type)).toEqual([
+      "Icon",
+      "AppText",
+    ]);
+    expect(notice?.children[0]?.props).toMatchObject({
+      name: "warning",
+      tone: "danger",
+    });
+    expect(notice?.children[1]?.props.role).toBe("caption");
+    expect(notice?.children[1]?.children).toEqual([]);
+    expect(notice?.children[1]?.props.children).toBe("Photo unavailable");
+  });
+
+  it("shows no notice when the photo loads", () => {
+    const nodes = render({}, true);
+    expect(
+      nodes.some((node) => node.props.testID === "photo-unavailable"),
+    ).toBe(false);
+  });
+
+  it("shows no notice when the contact has no photo", () => {
+    const nodes = render({ photo: null }, false);
+    expect(
+      nodes.some((node) => node.props.testID === "photo-unavailable"),
+    ).toBe(false);
+  });
+});

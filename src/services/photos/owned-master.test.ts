@@ -49,6 +49,7 @@ import {
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { getPhotoCacheBust } from "@/stores/photo-cache-bust-store";
+import { Logger } from "@/utils/logger";
 import {
   canonicalGeneration,
   deleteStagedPhotosOwned,
@@ -474,5 +475,147 @@ describe("display revision at every ownership-layer byte change (38.6-03 D-01/D-
     expect(h.fs!.files.get(canonical)).toBe("backup");
     expect(rev()).toBe(before + 1);
     expect(canonicalGeneration(canonical)).toBe(gen);
+  });
+});
+
+describe("lost restore master keeps its reference (38.6 D-23, review WR-01)", () => {
+  const rev = (path: string) => getPhotoCacheBust(path) ?? 0;
+  const profilePath = "avatars/profile.jpg";
+  const valuePath = "avatars/cv-7-pet.jpg";
+
+  async function stageTarget(kind: "contact" | "profile" | "customField") {
+    if (kind === "contact") {
+      const row = { ...entry };
+      await inWriteTransaction(exec, () => insertJournalEntryCore(exec, row));
+      return {
+        row,
+        path: canonical,
+        read: async () =>
+          (
+            await exec.getFirstAsync<{ photo: string | null }>(
+              "SELECT photo FROM contacts WHERE uid = 'u1'",
+            )
+          )?.photo,
+      };
+    }
+    if (kind === "profile") {
+      await exec.runAsync("INSERT INTO profile (id, photo) VALUES (1, ?)", [
+        profilePath,
+      ]);
+      const row = {
+        ...entry,
+        relativePath: "avatars/_restore_pending/profile-s1.jpg",
+        targetKind: "profile" as const,
+        contactUid: null,
+        canonicalRelativePath: profilePath,
+      };
+      await inWriteTransaction(exec, () => insertJournalEntryCore(exec, row));
+      return {
+        row,
+        path: profilePath,
+        read: async () =>
+          (
+            await exec.getFirstAsync<{ photo: string | null }>(
+              "SELECT photo FROM profile WHERE id = 1",
+            )
+          )?.photo,
+      };
+    }
+    await exec.runAsync(
+      "INSERT INTO custom_field_defs (id, uid, type) VALUES (3, 'd1', 'photo')",
+    );
+    await exec.runAsync(
+      "INSERT INTO custom_field_values (id, value, uid, contact_id, field_def_id) VALUES (1, ?, 'v1', 7, 3)",
+      [valuePath],
+    );
+    const row = {
+      ...entry,
+      relativePath: "avatars/_restore_pending/cv-u1-v1-s1.jpg",
+      targetKind: "customField" as const,
+      valueUid: "v1",
+      fieldDefUid: "d1",
+      canonicalRelativePath: valuePath,
+    };
+    await inWriteTransaction(exec, () => insertJournalEntryCore(exec, row));
+    return {
+      row,
+      path: valuePath,
+      read: async () =>
+        (
+          await exec.getFirstAsync<{ value: string | null }>(
+            "SELECT value FROM custom_field_values WHERE uid = 'v1'",
+          )
+        )?.value,
+    };
+  }
+
+  it("canonical present: the row retires silently and nothing else changes", async () => {
+    const error = vi.spyOn(Logger, "error").mockImplementation(() => {});
+    const { row, path, read } = await stageTarget("contact");
+    h.fs!.files.set(path, "landed");
+    const before = rev(path);
+    await expect(finalizeJournalEntryOwned(exec, row)).resolves.toBeUndefined();
+    expect(await listJournalEntriesCore(exec)).toEqual([]);
+    expect(await read()).toBe(path);
+    expect(h.fs!.files.get(path)).toBe("landed");
+    expect(error).not.toHaveBeenCalled();
+    expect(rev(path)).toBe(before);
+    error.mockRestore();
+  });
+
+  it.each(["contact", "profile", "customField"] as const)(
+    "canonical missing (%s): retires, keeps the reference, logs once content-free, never throws",
+    async (kind) => {
+      const error = vi.spyOn(Logger, "error").mockImplementation(() => {});
+      const { row, path, read } = await stageTarget(kind);
+      const before = rev(path);
+      const gen = canonicalGeneration(path);
+      await expect(
+        finalizeJournalEntryOwned(exec, row),
+      ).resolves.toBeUndefined();
+      expect(await listJournalEntriesCore(exec)).toEqual([]);
+      expect(await read()).toBe(path);
+      expect(error).toHaveBeenCalledTimes(1);
+      const logged = JSON.stringify(error.mock.calls[0]);
+      expect(logged).not.toContain("avatars/");
+      expect(logged).not.toContain("u1");
+      expect(logged).not.toContain("v1");
+      expect(rev(path)).toBe(before);
+      expect(canonicalGeneration(path)).toBe(gen);
+      error.mockRestore();
+    },
+  );
+
+  it("a re-pick after a lost-bytes settle persists normally (never wedged)", async () => {
+    const error = vi.spyOn(Logger, "error").mockImplementation(() => {});
+    await stageTarget("contact");
+    h.fs!.files.set("new", "repicked");
+    const gen = canonicalGeneration(canonical);
+    await persistOwnedMaster(exec, "new", canonical);
+    expect(h.fs!.files.get(canonical)).toBe("repicked");
+    expect(canonicalGeneration(canonical)).toBe(gen + 1);
+    expect(await listJournalEntriesCore(exec)).toEqual([]);
+    error.mockRestore();
+  });
+
+  it("the launch drain counts a lost-bytes row as recovered, so the backup hook still runs", async () => {
+    const error = vi.spyOn(Logger, "error").mockImplementation(() => {});
+    await stageTarget("contact");
+    const { drainRestorePhotoJournal } = await import(
+      "./restore-photo-finalize-sweep"
+    );
+    expect(await drainRestorePhotoJournal(exec)).toEqual({
+      unrecoveredFinalize: 0,
+      failed: 0,
+    });
+    expect(await listJournalEntriesCore(exec)).toEqual([]);
+    error.mockRestore();
+  });
+
+  it("the ownership layer never writes a photo reference itself (source guard)", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const source = readFileSync(join(__dirname, "owned-master.ts"), "utf8");
+    expect(source).not.toMatch(/\bSET\s+(photo|value)\b/i);
   });
 });
