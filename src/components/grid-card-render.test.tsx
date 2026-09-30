@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import { GridCard } from "./GridCard";
+import { gridCardGeometry } from "./grid-card-geometry";
 import { ListRow } from "./ListRow";
 
 vi.mock("react-native", () => ({
@@ -73,6 +74,7 @@ const baseProps = {
   status: "stable" as const,
   now: "2026-09-20 12:00:00",
   onPress: vi.fn(),
+  geometry: gridCardGeometry(393, 3),
 };
 
 describe("GridCard line-three presentation", () => {
@@ -263,5 +265,21 @@ describe("Card-view status ring is a circle (D-73a, supersedes D-70)", () => {
     expect(ringStyle.borderRadius).toBeGreaterThanOrEqual(
       (areaStyle.width as number) / 2,
     );
+  });
+
+  it("sizes the photo and its ring box from the card geometry (D-06)", () => {
+    const geometry = gridCardGeometry(393, 2);
+    const nodes = all(resolve(GridCard({ ...baseProps, geometry })));
+    const area = nodes.find((node) =>
+      node.children.some(
+        (child) => child.props.testID === "dashboard-grid-card-ring-7",
+      ),
+    );
+    const areaStyle = flatten(area?.props.style);
+    expect(areaStyle.width).toBe(geometry.ringBox);
+    expect(areaStyle.height).toBe(geometry.ringBox);
+    const avatar = nodes.find((node) => node.type === "Avatar");
+    expect(avatar?.props.size).toBe(geometry.avatarSize);
+    expect(avatar?.props.size).toBe(96);
   });
 });
