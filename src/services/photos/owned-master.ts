@@ -177,6 +177,9 @@ export async function executeDeleteIntentLocked(
       throw new PhotoRecoveryPendingError(
         `photo deletion needs retry: ${canonical}`,
       );
+    // Only after the recheck: deletePhoto swallows errors, so the file could
+    // still be on disk straight after remove() (38.6 D-01).
+    notifyPhotoBytesChanged(canonical);
   }
   await retire(exec, relative);
 }
@@ -226,6 +229,9 @@ async function settleRowLocked(
       { cause: error },
     );
   }
+  // Display only: restore / merge re-homing changed the canonical bytes. The
+  // authorization generation is deliberately untouched here (D-19).
+  notifyPhotoBytesChanged(entry.canonicalRelativePath);
   await retire(exec, entry.relativePath);
   deleteRestorePending(entry.relativePath);
 }
@@ -364,8 +370,11 @@ export async function deleteStagedPhotosOwned(
 export async function reconcilePhotoWritesOwned(): Promise<void> {
   const { listCanonicalSidecarPaths } = await import("./photo-storage");
   for (const canonical of listCanonicalSidecarPaths()) {
-    await withCanonicalPathLock(canonical, () =>
-      reconcilePhotoWritesForCanonical(canonical),
-    );
+    await withCanonicalPathLock(canonical, async () => {
+      await reconcilePhotoWritesForCanonical(canonical);
+      // A restored interrupted-swap `.bak` changes the displayed bytes; a
+      // spurious bump only costs one extra decode (display only, D-19).
+      notifyPhotoBytesChanged(canonical);
+    });
   }
 }

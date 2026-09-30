@@ -333,3 +333,117 @@ describe("display revision (38.6 D-19) — separate from authorization generatio
     );
   });
 });
+
+describe("display revision at every ownership-layer byte change (38.6-03 D-01/D-19)", () => {
+  const rev = () => getPhotoCacheBust(canonical) ?? 0;
+
+  it("a matching restore finalize bumps the revision once and leaves the generation", async () => {
+    await stage();
+    const before = rev();
+    const gen = canonicalGeneration(canonical);
+    await finalizeJournalEntryOwned(exec, entry);
+    expect(h.fs!.files.get(canonical)).toBe("recovered");
+    expect(rev()).toBe(before + 1);
+    expect(canonicalGeneration(canonical)).toBe(gen);
+  });
+
+  it("an unreferenced finalize retires without persisting and does not bump", async () => {
+    await exec.runAsync("UPDATE contacts SET photo = NULL WHERE id = 7");
+    await stage();
+    const before = rev();
+    const gen = canonicalGeneration(canonical);
+    await finalizeJournalEntryOwned(exec, entry);
+    expect(h.fs!.files.has(canonical)).toBe(false);
+    expect(await listJournalEntriesCore(exec)).toEqual([]);
+    expect(rev()).toBe(before);
+    expect(canonicalGeneration(canonical)).toBe(gen);
+  });
+
+  it("a superseded finalize does not bump; only the persisted newer row does", async () => {
+    await stage();
+    const later = {
+      ...entry,
+      relativePath: "avatars/_restore_pending/contact-u1-s3.jpg",
+    };
+    h.fs!.files.set(later.relativePath, "later");
+    await inWriteTransaction(exec, () => insertJournalEntryCore(exec, later));
+    const before = rev();
+    await finalizeJournalEntryOwned(exec, later);
+    expect(h.fs!.writes).toEqual([canonical]);
+    expect(rev()).toBe(before + 1);
+  });
+
+  it("a delete intent that removes the file bumps once, after the exists recheck", async () => {
+    await exec.runAsync("UPDATE contacts SET photo = NULL WHERE id = 7");
+    h.fs!.files.set(canonical, "old");
+    await inWriteTransaction(exec, () =>
+      enqueueDeleteIntentCore(exec, canonical),
+    );
+    const before = rev();
+    const gen = canonicalGeneration(canonical);
+    let revAtRecheck = -1;
+    await executeDeleteIntentOwned(
+      exec,
+      canonical,
+      (path) => h.fs!.files.delete(path),
+      (path) => {
+        revAtRecheck = rev();
+        return h.fs!.files.has(path);
+      },
+    );
+    expect(h.fs!.files.has(canonical)).toBe(false);
+    expect(revAtRecheck).toBe(before);
+    expect(rev()).toBe(before + 1);
+    expect(canonicalGeneration(canonical)).toBe(gen);
+  });
+
+  it("a delete intent forbidden by a live reference does not bump", async () => {
+    h.fs!.files.set(canonical, "live");
+    await inWriteTransaction(exec, () =>
+      enqueueDeleteIntentCore(exec, canonical),
+    );
+    const before = rev();
+    await executeDeleteIntentOwned(exec, canonical);
+    expect(h.fs!.files.get(canonical)).toBe("live");
+    expect(rev()).toBe(before);
+  });
+
+  it("a delete whose remove silently fails throws recovery-pending and does not bump", async () => {
+    await exec.runAsync("UPDATE contacts SET photo = NULL WHERE id = 7");
+    h.fs!.files.set(canonical, "stuck");
+    h.failDelete = true;
+    await inWriteTransaction(exec, () =>
+      enqueueDeleteIntentCore(exec, canonical),
+    );
+    const before = rev();
+    await expect(executeDeleteIntentOwned(exec, canonical)).rejects.toThrow(
+      "needs retry",
+    );
+    expect(h.fs!.files.get(canonical)).toBe("stuck");
+    expect(rev()).toBe(before);
+  });
+
+  it("removeOwnedMaster bumps the revision via the delete intent and the generation once", async () => {
+    h.fs!.files.set(canonical, "prior");
+    const before = rev();
+    const gen = canonicalGeneration(canonical);
+    await removeOwnedMaster(exec, canonical, {
+      clearReferenceCore: async (db) => {
+        await db.runAsync("UPDATE contacts SET photo = NULL WHERE id = 7");
+      },
+    });
+    expect(h.fs!.files.has(canonical)).toBe(false);
+    expect(rev()).toBe(before + 1);
+    expect(canonicalGeneration(canonical)).toBe(gen + 1);
+  });
+
+  it("launch reconcile of an interrupted-swap .bak bumps the revision, not the generation", async () => {
+    h.fs!.files.set(`${canonical}.bak`, "backup");
+    const before = rev();
+    const gen = canonicalGeneration(canonical);
+    await reconcilePhotoWritesOwned();
+    expect(h.fs!.files.get(canonical)).toBe("backup");
+    expect(rev()).toBe(before + 1);
+    expect(canonicalGeneration(canonical)).toBe(gen);
+  });
+});

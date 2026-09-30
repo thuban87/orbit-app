@@ -38,10 +38,18 @@ import {
   setRowContact,
 } from "@/db/import-session-dao";
 import { runMigrations } from "@/db/migrations/runner";
-import { enqueueDeleteIntentCore } from "@/db/restore-photo-journal-dao";
+import {
+  enqueueDeleteIntentCore,
+  insertJournalEntryCore,
+  listJournalEntriesCore,
+} from "@/db/restore-photo-journal-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
-import { persistOwnedMaster } from "@/services/photos/owned-master";
+import {
+  canonicalGeneration,
+  persistOwnedMaster,
+} from "@/services/photos/owned-master";
+import { getPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import {
   type RetryPhotoFs,
   retryImportedPhoto,
@@ -234,6 +242,34 @@ describe("photo-only import retry", () => {
     expect(await retryImportedPhoto(exec, fs(), rowId, NOW)).toBe(true);
     expect(h.files.get(canonical())).toBe("imported-bytes");
     expect(await row()).toMatchObject({ photo_rel_path: null });
+  });
+
+  it("still publishes when settle retires a stale journal row (settle never touches the generation)", async () => {
+    // The contact has no photo, so this old finalize is unreferenced: settle
+    // retires it without persisting. The retry's authorization must survive.
+    const stale = "avatars/_restore_pending/contact-stale-s1.jpg";
+    h.files.set(stale, "stale");
+    const contactUid = (await photo())!.uid;
+    await inWriteTransaction(exec, () =>
+      insertJournalEntryCore(exec, {
+        relativePath: stale,
+        action: "finalize",
+        targetKind: "contact",
+        contactUid,
+        valueUid: null,
+        fieldDefUid: null,
+        canonicalRelativePath: canonical(),
+        createdAt: NOW,
+      }),
+    );
+    const gen = canonicalGeneration(canonical());
+    const rev = getPhotoCacheBust(canonical()) ?? 0;
+    expect(await retryImportedPhoto(exec, fs(), rowId, NOW)).toBe(true);
+    expect(h.files.get(canonical())).toBe("imported-bytes");
+    expect((await photo())?.photo).toBe(canonical());
+    expect(await listJournalEntriesCore(exec)).toEqual([]);
+    expect(canonicalGeneration(canonical())).toBe(gen + 1);
+    expect(getPhotoCacheBust(canonical())).toBe(rev + 1);
   });
 
   it("cleans up bytes when purge wins after authorization but before publication", async () => {

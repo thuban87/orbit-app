@@ -59,6 +59,7 @@ import {
 import {
   executeDeleteIntentOwned,
   finalizeJournalEntryOwned,
+  notifyPhotoBytesChanged,
   withCanonicalPathLock,
 } from "@/services/photos/owned-master";
 import {
@@ -1907,8 +1908,13 @@ export async function applyRestore(
                     journalEntry.canonicalRelativePath,
                   ],
                 );
-                if (owner?.uid === journalEntry.contactUid)
+                if (owner?.uid === journalEntry.contactUid) {
                   remove(journalEntry.canonicalRelativePath);
+                  // deletePhoto swallows errors: publish a display revision
+                  // only once the bytes are really gone (38.6 D-01).
+                  if (!exists(journalEntry.canonicalRelativePath))
+                    notifyPhotoBytesChanged(journalEntry.canonicalRelativePath);
+                }
               },
             );
           } catch {

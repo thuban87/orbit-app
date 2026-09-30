@@ -30,6 +30,11 @@ vi.mock("@/services/photos/photo-storage", async () => {
       return canonical;
     },
     resolveRestorePendingUri: (path: string) => path,
+    resolvePhotoUri: (path: string) => `file:///docs/${path}`,
+    resolvePhotoDisplayUri: (path: string, revision?: number) =>
+      revision === undefined
+        ? `file:///docs/${path}`
+        : `file:///docs/${path}?v=${revision}`,
     restorePendingRelPath: paths.restorePendingRelPath,
     stageRestorePendingBase64: async (base64: string, path: string) => {
       photo.files.set(path, base64);
@@ -54,6 +59,7 @@ vi.mock("@/services/notifications/digest-schedule", () => ({
 import { parseBackupManifest } from "@/backup/backup-schema";
 import { buildExportManifest } from "@/backup/export-manifest";
 import { applyRestore } from "@/backup/restore-apply";
+import { getPhotoDisplay } from "@/components/photo-display";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { updateAppSettings } from "@/db/app-settings-dao";
 import { archiveContact } from "@/db/contacts-dao";
@@ -63,6 +69,7 @@ import { runMigrations } from "@/db/migrations/runner";
 import { completeGlobalPairsCore } from "@/db/pair-matrix";
 import { purgeContact } from "@/db/purge-dao";
 import { snoozeContact } from "@/db/snooze-dao";
+import { getPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 
 const NOW = "2026-09-01 00:00:00";
 let next = 0;
@@ -593,4 +600,96 @@ it("imports a newer tombstone with no row action and lets equal-second deletion 
       "SELECT uid FROM contacts WHERE uid='gone'",
     ),
   ).toBeNull();
+});
+
+it("a restore that finalizes a contact photo publishes a new display revision in-process (38.6 D-01)", async () => {
+  photo.files.clear();
+  const source = await db();
+  const destination = await db();
+  await contact(source, "photo-owner");
+  await source.runAsync(
+    "UPDATE contacts SET photo='avatars/source.jpg' WHERE uid='photo-owner'",
+  );
+  // The destination already shows an older photo at the same canonical path.
+  await contact(destination, "photo-owner");
+  const local = await destination.getFirstAsync<{ id: number }>(
+    "SELECT id FROM contacts WHERE uid='photo-owner'",
+  );
+  const canonical = `avatars/contact-${local!.id}.jpg`;
+  await destination.runAsync(
+    "UPDATE contacts SET photo=?, modified_at='2000-01-01 00:00:00' WHERE uid='photo-owner'",
+    [canonical],
+  );
+  photo.files.set(canonical, "OLD");
+  const before = getPhotoDisplay(canonical)!;
+  expect(
+    (await applyRestore(destination, await exported(source), "merge")).status,
+  ).toBe("applied");
+  expect(photo.files.get(canonical)).toBe("AQID");
+  const after = getPhotoDisplay(canonical)!;
+  expect(after.revision).toBeGreaterThan(before.revision);
+  expect(after.source.uri).not.toBe(before.source.uri);
+});
+
+async function replaceAllCleanupFixture() {
+  photo.files.clear();
+  const source = await db();
+  const destination = await db();
+  await contact(source, "incoming");
+  await source.runAsync(
+    "UPDATE contacts SET photo='avatars/source.jpg' WHERE uid='incoming'",
+  );
+  // A different destination contact owned the same identity-derived path.
+  await destination.runAsync(
+    "INSERT INTO contacts(uid,name,photo,interval_days,created_at,modified_at) VALUES('old','Old','avatars/contact-1.jpg',30,?,?)",
+    [NOW, NOW],
+  );
+  photo.files.set("avatars/contact-1.jpg", "OLD");
+  return { destination, manifest: await exported(source) };
+}
+
+it("replace-all cleanup after a failed finalize publishes a revision only once the bytes are gone", async () => {
+  const { destination, manifest } = await replaceAllCleanupFixture();
+  const canonical = "avatars/contact-1.jpg";
+  const before = getPhotoCacheBust(canonical) ?? 0;
+  const result = await applyRestore(destination, manifest, "replace-all", {
+    persistPhoto: async () => {
+      throw new Error("disk unavailable");
+    },
+  });
+  expect(result).toMatchObject({
+    status: "applied",
+    photosNeedingAttention: 1,
+  });
+  expect(
+    await destination.getFirstAsync<{ photo: string }>(
+      "SELECT photo FROM contacts WHERE uid='incoming'",
+    ),
+  ).toEqual({ photo: canonical });
+  expect(photo.files.has(canonical)).toBe(false);
+  expect(getPhotoCacheBust(canonical) ?? 0).toBe(before + 1);
+});
+
+it("replace-all cleanup whose delete silently fails does not publish a revision", async () => {
+  const { destination, manifest } = await replaceAllCleanupFixture();
+  const canonical = "avatars/contact-1.jpg";
+  const before = getPhotoCacheBust(canonical) ?? 0;
+  const removed: string[] = [];
+  const result = await applyRestore(destination, manifest, "replace-all", {
+    persistPhoto: async () => {
+      throw new Error("disk unavailable");
+    },
+    // deletePhoto swallows errors: the file is still on disk afterwards.
+    deleteCanonicalPhoto: (path) => {
+      removed.push(path);
+    },
+    canonicalPhotoExists: (path) => photo.files.has(path),
+  });
+  expect(result).toMatchObject({
+    status: "applied",
+    photosNeedingAttention: 1,
+  });
+  expect(removed).toContain(canonical);
+  expect(photo.files.get(canonical)).toBe("OLD");
+  expect(getPhotoCacheBust(canonical) ?? 0).toBe(before);
 });
