@@ -91,7 +91,8 @@ export interface RestoreApplyDependencies {
   /**
    * Replace-all only (38.6 D-26): stage this phone's current bytes for a row
    * whose backup photo was skipped. Resolves false when there is nothing to
-   * stage (the local file is gone).
+   * stage (the local file is gone). A rejection (the file exists but could not
+   * be copied) aborts the whole restore before any write (review CR2-01).
    */
   stageLocalPhoto?: (
     canonicalRelativePath: string,
@@ -1205,16 +1206,22 @@ async function stageCandidates(
         continue;
       }
       if (localReference === null) continue;
-      let stagedLocal = false;
+      // The stager resolves false only when the local file is genuinely gone:
+      // that row ends with no photo (counted). A throw means the file is there
+      // but could not be copied (full disk, I/O error). Replace-all would then
+      // delete bytes this phone still has, so abort before any write, exactly
+      // like a failed backup-byte stage above (D-26; review CR2-01). `finally`
+      // in applyRestore cleans every pending file staged so far.
+      let stagedLocal: boolean;
       try {
         stagedLocal = await local.stageLocal(localReference, relativePath);
-      } catch {
-        // Unreadable: nothing staged, the row ends with no photo (counted).
+      } catch (error) {
         try {
           deleteRestorePending(relativePath);
         } catch {
           /* best effort */
         }
+        throw error;
       }
       if (stagedLocal)
         staged.set(`${entity}\0${row.uid}`, { target, relativePath });

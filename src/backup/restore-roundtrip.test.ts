@@ -1021,3 +1021,34 @@ it("Replace-all back onto the source moves each marked row's local bytes to its 
     ),
   ).toEqual([]);
 });
+
+it("Replace-all aborts before any write when a marked row's existing local file cannot be copied (review CR2-01)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  const rowsBefore = await photosByUid(source);
+  const petBefore = await petValue(source);
+  const filesBefore = new Map(photo.files);
+  const copied: string[] = [];
+  await expect(
+    applyRestore(source, manifest, "replace-all", {
+      stageLocalPhoto: async (canonical, pending) => {
+        // Genuinely absent (m-lost): nothing to stage, the restore continues.
+        if (!photo.files.has(canonical)) return false;
+        // z-marked's photo is on disk but the copy fails (a full disk).
+        if (canonical === "avatars/contact-1.jpg")
+          throw new Error("ENOSPC: no space left on device");
+        photo.files.set(pending, photo.files.get(canonical)!);
+        copied.push(canonical);
+        return true;
+      },
+    }),
+  ).rejects.toThrow("ENOSPC");
+  // The profile's local bytes were staged before the failure.
+  expect(copied).toContain("avatars/profile.jpg");
+  // Nothing was written: every row, reference and byte is as it was, and no
+  // staged copy or journal row is left behind.
+  expect(await photosByUid(source)).toEqual(rowsBefore);
+  expect(await petValue(source)).toBe(petBefore);
+  expect(await profilePhoto(source)).toBe("avatars/profile.jpg");
+  expect(await journal(source)).toEqual([]);
+  expect(photo.files).toEqual(filesBefore);
+});
