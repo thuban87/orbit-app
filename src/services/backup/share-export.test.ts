@@ -8,6 +8,10 @@ const state = vi.hoisted(() => ({
   reads: new Map<string, string | Error>(),
   /** Relative paths `photoFileExists` reports as present. */
   present: new Set<string>(),
+  /** Relative paths with a `.bak` swap sidecar. */
+  sidecars: new Set<string>(),
+  /** Successive photo reads by URI (consumed before `reads`). */
+  sequence: new Map<string, Array<string | Error>>(),
 }));
 vi.mock("expo-file-system", () => {
   class File {
@@ -30,7 +34,9 @@ vi.mock("expo-file-system", () => {
       return Promise.resolve("");
     }
     base64() {
-      const read = state.reads.get(String(this.parent));
+      const read =
+        state.sequence.get(String(this.parent))?.shift() ??
+        state.reads.get(String(this.parent));
       if (read === undefined)
         return Promise.reject(new Error("FileNotFound (native)"));
       return read instanceof Error
@@ -57,6 +63,7 @@ vi.mock("../../../modules/orbit-backup-share", () => ({
 vi.mock("@/services/photos/photo-storage", () => ({
   resolvePhotoUri: (relative: string) => `file:///doc/${relative}`,
   photoFileExists: (relative: string) => state.present.has(relative),
+  photoSwapBackupExists: (relative: string) => state.sidecars.has(relative),
 }));
 vi.mock("@/services/photos/background-storage", () => ({
   resolveBackgroundUri: (relative: string) => `file:///doc/${relative}`,
@@ -109,6 +116,8 @@ describe("readStoredPhotoBase64", () => {
   beforeEach(() => {
     state.reads.clear();
     state.present.clear();
+    state.sidecars.clear();
+    state.sequence.clear();
   });
 
   it("returns the stored bytes", async () => {
@@ -137,6 +146,31 @@ describe("readStoredPhotoBase64", () => {
   it("treats a file deleted during the read as missing (checked after the failure)", async () => {
     state.reads.set(uri, new Error("vanished mid-read"));
     await expect(readStoredPhotoBase64(photo)).resolves.toBe("");
+  });
+
+  it("reads a photo caught mid-swap once more instead of skipping it (review IN3-01)", async () => {
+    // The prior master is moved aside to .bak; the new bytes land next.
+    state.sidecars.add(photo);
+    state.sequence.set(uri, [new Error("FileNotFound (mid-swap)"), "AQID"]);
+    await expect(
+      readStoredPhotoBase64(photo, { retryDelayMs: 0 }),
+    ).resolves.toBe("AQID");
+  });
+
+  it("rejects, never skips, a photo whose interrupted swap left only its .bak (review IN3-01)", async () => {
+    state.sidecars.add(photo);
+    await expect(
+      readStoredPhotoBase64(photo, { retryDelayMs: 0 }),
+    ).rejects.toThrow("FileNotFound");
+  });
+
+  it('resolves "" when the photo went away during the retry (review IN3-01)', async () => {
+    state.sidecars.add(photo);
+    const read = readStoredPhotoBase64(photo, { retryDelayMs: 20 });
+    // The swap finished and the photo was then removed, before the retry.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    state.sidecars.clear();
+    await expect(read).resolves.toBe("");
   });
 
   it("still rejects for a missing profile background (D-27)", async () => {

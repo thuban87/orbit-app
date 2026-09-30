@@ -9,6 +9,7 @@ import type {
 import { resolveBackgroundUri } from "@/services/photos/background-storage";
 import {
   photoFileExists,
+  photoSwapBackupExists,
   resolvePhotoUri,
 } from "@/services/photos/photo-storage";
 import {
@@ -17,6 +18,11 @@ import {
 } from "../../../modules/orbit-backup-share";
 
 const EXPORT_DIRECTORY = "backup-exports";
+/**
+ * How long a backup photo read waits before its one retry when it caught a
+ * replace mid-swap (38.6 review IN3-01). A swap is two renames.
+ */
+const SWAP_RETRY_DELAY_MS = 100;
 
 /** Revoke the chosen share target's grant (ADR-155), then delete the file. */
 function retire(file: File): void {
@@ -78,9 +84,17 @@ export function createLocalExportFiles(
  * `BackupPhotoUnreadableError`. "Missing" is decided by `photoFileExists`, asked
  * only AFTER the read failed: a file that still exists but cannot be read is an
  * error, never a skip. A profile background (D-27) always rejects on failure.
+ *
+ * A replace caught mid-swap (the prior master moved aside to `<path>.bak`, the
+ * new bytes not yet in place) is not a missing photo (review IN3-01). The
+ * export cannot wait for the path lock (it holds the DB mutex, and the lock
+ * order is path, then DB), so it waits briefly and reads once more. A `.bak`
+ * that is still there with no canonical is an interrupted swap the launch sweep
+ * moves back: the photo exists, so the read fails rather than skip it.
  */
 export async function readStoredPhotoBase64(
   relativePath: string,
+  options: { retryDelayMs?: number } = {},
 ): Promise<string> {
   if (relativePath.startsWith("profile-backgrounds/"))
     return new File(resolveBackgroundUri(relativePath)).base64();
@@ -88,7 +102,17 @@ export async function readStoredPhotoBase64(
   try {
     return await new File(uri).base64();
   } catch (error) {
-    if (!photoFileExists(relativePath)) return "";
+    if (photoFileExists(relativePath)) throw error;
+    if (!photoSwapBackupExists(relativePath)) return "";
+  }
+  await new Promise((resolve) =>
+    setTimeout(resolve, options.retryDelayMs ?? SWAP_RETRY_DELAY_MS),
+  );
+  try {
+    return await new File(uri).base64();
+  } catch (error) {
+    if (!photoFileExists(relativePath) && !photoSwapBackupExists(relativePath))
+      return "";
     throw error;
   }
 }
