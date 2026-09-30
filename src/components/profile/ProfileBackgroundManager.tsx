@@ -1,6 +1,5 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText/Button semantic roles are domain props.
 
-import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -64,7 +63,7 @@ import {
   persistBackgroundDerivative,
   resolveBackgroundUri,
 } from "@/services/photos/background-storage";
-import { discardDerivative } from "@/services/photos/derivative-cache";
+import { renderBackgroundDerivative } from "@/services/photos/manipulator-derivatives";
 import { profileBackgroundTarget } from "@/services/photos/profile-background-target";
 import { useShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
@@ -401,27 +400,8 @@ export function ProfileBackgroundManager({
           profileAspect,
         ),
         output: cropTarget.output,
-        cropAndResize: async ({ rawUri, crop, output }) => {
-          const rendered = await ImageManipulator.manipulate(rawUri)
-            .crop(crop)
-            .resize(output)
-            .renderAsync();
-          const saved = await rendered.saveAsync({
-            format: SaveFormat.JPEG,
-            compress: 0.82,
-          });
-          return {
-            uri: saved.uri,
-            release: () => {
-              discardDerivative(saved.uri);
-              try {
-                (rendered as unknown as { release?: () => void }).release?.();
-              } catch {
-                Logger.warn(LOG_SCOPE, "background image release failed");
-              }
-            },
-          };
-        },
+        // Releases the rendered image and its context once saved (D-11, WR-02).
+        cropAndResize: renderBackgroundDerivative,
         persist: (preparedUri) =>
           persistBackgroundDerivative(preparedUri, relativePath),
       });

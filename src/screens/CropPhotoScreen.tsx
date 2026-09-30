@@ -48,7 +48,6 @@ import {
   Image as SkiaImage,
   useImage,
 } from "@shopify/react-native-skia";
-import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -69,6 +68,7 @@ import { setProfilePhoto } from "@/db/profile-dao";
 import type { RootStackScreenProps } from "@/navigation/types";
 import { cropRectFromTransform } from "@/services/photos/crop-geometry";
 import { discardDerivative } from "@/services/photos/derivative-cache";
+import { renderPreviewDownscale } from "@/services/photos/manipulator-derivatives";
 import { withCanonicalPathLock } from "@/services/photos/owned-master";
 import {
   PhotoPipelineError,
@@ -196,20 +196,15 @@ export function CropPhotoScreen({
     const timer = setTimeout(() => {
       void (async () => {
         try {
-          const rendered = await ImageManipulator.manipulate(rawUri)
-            .resize({ width: DOWNSCALE_MAX_EDGE })
-            .renderAsync();
-          const out = await rendered.saveAsync({
-            format: SaveFormat.JPEG,
-            compress: 0.9,
-          });
+          // Releases the rendered image and its context (D-11, review WR-02).
+          const uri = await renderPreviewDownscale(rawUri, DOWNSCALE_MAX_EDGE);
           if (!active) {
-            discardDerivative(out.uri);
+            discardDerivative(uri);
           } else {
             if (fallbackUriRef.current)
               discardDerivative(fallbackUriRef.current);
-            fallbackUriRef.current = out.uri;
-            setSourceUri(out.uri);
+            fallbackUriRef.current = uri;
+            setSourceUri(uri);
           }
         } catch (err) {
           Logger.error(LOG_SCOPE, `decode-fallback downscale failed`, err);
