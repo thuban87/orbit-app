@@ -22,10 +22,11 @@
  * a path, so every hook runs unconditionally above the single null return.
  */
 import { Image } from "expo-image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   findNodeHandle,
+  type LayoutChangeEvent,
   Pressable,
   Modal as RNModal,
   StyleSheet,
@@ -98,6 +99,19 @@ export function PhotoLightbox({
   const ty = useSharedValue(0);
   const dismissY = useSharedValue(0);
   const startScale = useSharedValue(1);
+  // IN-03: the gesture stage's MEASURED size. The Modal is status- and
+  // navigation-bar translucent, so the stage can be taller than the window
+  // height; its centre and bounds — not the window's — anchor the focal and
+  // clamp math. Window dims are only the pre-layout default.
+  const stageW = useSharedValue(width);
+  const stageH = useSharedValue(height);
+  const onStageLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      stageW.value = event.nativeEvent.layout.width;
+      stageH.value = event.nativeEvent.layout.height;
+    },
+    [stageW, stageH],
+  );
 
   const side = Math.min(width, height);
 
@@ -135,17 +149,19 @@ export function PhotoLightbox({
         "worklet";
         const next = clampScale(startScale.value * e.scale);
         const prev = scale.value;
+        const w = stageW.value;
+        const h = stageH.value;
         tx.value = clampTranslate(
-          focalTranslate(tx.value, e.focalX - width / 2, prev, next),
+          focalTranslate(tx.value, e.focalX - w / 2, prev, next),
           side,
           next,
-          width,
+          w,
         );
         ty.value = clampTranslate(
-          focalTranslate(ty.value, e.focalY - height / 2, prev, next),
+          focalTranslate(ty.value, e.focalY - h / 2, prev, next),
           side,
           next,
-          height,
+          h,
         );
         scale.value = next;
       });
@@ -156,8 +172,18 @@ export function PhotoLightbox({
         "worklet";
         const s = scale.value;
         if (isZoomed(s)) {
-          tx.value = clampTranslate(tx.value + e.changeX, side, s, width);
-          ty.value = clampTranslate(ty.value + e.changeY, side, s, height);
+          tx.value = clampTranslate(
+            tx.value + e.changeX,
+            side,
+            s,
+            stageW.value,
+          );
+          ty.value = clampTranslate(
+            ty.value + e.changeY,
+            side,
+            s,
+            stageH.value,
+          );
           return;
         }
         // At 1× a one-finger downward drag is the swipe-to-close.
@@ -169,7 +195,7 @@ export function PhotoLightbox({
         "worklet";
         if (dismissY.value <= 0) return;
         if (shouldDismiss(scale.value, dismissY.value, e.velocityY)) {
-          dismissY.value = withTiming(height, {
+          dismissY.value = withTiming(stageH.value, {
             duration: reducedMotion.value ? 0 : LIGHTBOX_ANIMATION_MS,
           });
           runOnJS(onClose)();
@@ -185,23 +211,25 @@ export function PhotoLightbox({
         if (!success) return;
         const prev = scale.value;
         const next = doubleTapTarget(prev);
+        const w = stageW.value;
+        const h = stageH.value;
         const nextTx =
           next === 1
             ? 0
             : clampTranslate(
-                focalTranslate(tx.value, e.x - width / 2, prev, next),
+                focalTranslate(tx.value, e.x - w / 2, prev, next),
                 side,
                 next,
-                width,
+                w,
               );
         const nextTy =
           next === 1
             ? 0
             : clampTranslate(
-                focalTranslate(ty.value, e.y - height / 2, prev, next),
+                focalTranslate(ty.value, e.y - h / 2, prev, next),
                 side,
                 next,
-                height,
+                h,
               );
         const timing = {
           duration: reducedMotion.value ? 0 : LIGHTBOX_ANIMATION_MS,
@@ -213,8 +241,8 @@ export function PhotoLightbox({
 
     return Gesture.Race(doubleTap, Gesture.Simultaneous(pinch, pan));
   }, [
-    width,
-    height,
+    stageW,
+    stageH,
     side,
     onClose,
     reducedMotion,
@@ -259,7 +287,11 @@ export function PhotoLightbox({
               ]}
             />
             <GestureDetector gesture={gesture}>
-              <View collapsable={false} style={styles.stage}>
+              <View
+                collapsable={false}
+                onLayout={onStageLayout}
+                style={styles.stage}
+              >
                 <Animated.View style={imageStyle}>
                   {failed ? (
                     <Avatar photo={null} name={name} size={side} />

@@ -16,6 +16,8 @@ import { LIGHTBOX_SCRIM_OPACITY } from "./photo-lightbox-logic";
 
 const hooks = vi.hoisted(() => ({
   log: [] as string[],
+  /** Every shared value of the latest render, in creation order. */
+  shared: [] as Array<{ value: unknown }>,
   focus: vi.fn(),
   /** The value every useState returns (the lightbox's one state: `failed`). */
   state: undefined as unknown,
@@ -68,9 +70,17 @@ vi.mock("react-native", () => ({
 vi.mock("react-native-gesture-handler", () => {
   // Chainable builder stub: every configuration call returns the builder.
   const builder = (kind: string) => {
-    const target: Record<string, unknown> = { kind };
+    // Callbacks are kept on `handlers` so a test can run a gesture worklet.
+    const handlers: Record<string, unknown> = {};
+    const target: Record<string, unknown> = { kind, handlers };
     const proxy: Record<string, unknown> = new Proxy(target, {
-      get: (object, key: string) => (key in object ? object[key] : () => proxy),
+      get: (object, key: string) =>
+        key in object
+          ? object[key]
+          : (arg: unknown) => {
+              handlers[key] = arg;
+              return proxy;
+            },
     });
     return proxy;
   };
@@ -93,7 +103,9 @@ vi.mock("react-native-reanimated", () => ({
   default: { View: "AnimatedView" },
   useSharedValue: (value: unknown) => {
     hooks.log.push("useSharedValue");
-    return { value };
+    const shared = { value };
+    hooks.shared.push(shared);
+    return shared;
   },
   useAnimatedStyle: (fn: () => unknown) => {
     hooks.log.push("useAnimatedStyle");
@@ -183,6 +195,7 @@ const base: PhotoLightboxProps = {
 /** One render of the (conceptually persistent) instance: its tree and hook sequence. */
 function render(props: PhotoLightboxProps) {
   hooks.log.length = 0;
+  hooks.shared.length = 0;
   const tree = resolve(PhotoLightbox(props));
   return { nodes: all(tree), hooks: [...hooks.log] };
 }
@@ -313,5 +326,45 @@ describe("PhotoLightbox", () => {
     hooks.state = true;
     render(base);
     expect(hooks.setState).toContain(false);
+  });
+
+  describe("focal math uses the measured stage, not the window (IN-03)", () => {
+    // Shared values in creation order: scale, tx, ty, dismissY, startScale, stageW, stageH.
+    function pinchAt(stage: { width: number; height: number } | null) {
+      const { nodes } = render(base);
+      const [, tx, ty] = hooks.shared;
+      const stageView = nodes.find(
+        (node) => node.type === "View" && node.props.onLayout,
+      );
+      if (stage) {
+        const onLayout = stageView?.props.onLayout as (event: unknown) => void;
+        onLayout({ nativeEvent: { layout: stage } });
+      }
+      const detector = nodes.find((node) => node.type === "GestureDetector");
+      const gesture = detector?.props.gesture as {
+        gestures: [
+          unknown,
+          { gestures: [{ handlers: Record<string, unknown> }] },
+        ];
+      };
+      const pinch = gesture.gestures[1].gestures[0].handlers;
+      (pinch.onStart as () => void)();
+      // A 3× pinch centred on the (taller, translucent-nav) stage.
+      (pinch.onUpdate as (e: object) => void)({
+        scale: 3,
+        focalX: 200,
+        focalY: 430,
+      });
+      return { tx: tx.value, ty: ty.value };
+    }
+
+    it("keeps a pinch at the stage centre centred", () => {
+      expect(pinchAt({ width: 400, height: 860 })).toEqual({ tx: 0, ty: 0 });
+    });
+
+    it("falls back to the window size before the stage is measured", () => {
+      // Window 400×800: y 430 is 30 below its centre, so a 3× zoom moves -60.
+      expect(pinchAt(null)).toEqual({ tx: 0, ty: -60 });
+    });
   });
 });
