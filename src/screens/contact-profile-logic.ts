@@ -68,6 +68,9 @@ export type ProfileOverlay =
   | "layout"
   | "templates"
   | "background"
+  // 38.6 D-16: the Profile photo lightbox joins the single-overlay model, so
+  // Back closes it first and never leaks to the screen underneath.
+  | "photo"
   | null;
 
 export type ProfileOverflowEntry =

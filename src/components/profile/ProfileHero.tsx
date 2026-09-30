@@ -16,6 +16,7 @@ export function ProfileHero({
   actionableMethods,
   messageContext,
   onToggleFavourite,
+  onOpenPhoto,
   onMessage,
   onCall,
   pendingFavourite = false,
@@ -28,6 +29,8 @@ export function ProfileHero({
    */
   messageContext: ProfileHeroMessageContext;
   onToggleFavourite: () => void;
+  /** Opens the photo lightbox (38.6 D-03/D-15); only reachable with a photo. */
+  onOpenPhoto: () => void;
   onMessage: () => void;
   onCall: () => void;
   pendingFavourite?: boolean;
@@ -53,12 +56,28 @@ export function ProfileHero({
           />
         </Pressable>
       </View>
-      <Avatar
-        photo={identity.photo}
-        name={identity.name}
-        contactId={identity.id}
-        size={112}
-      />
+      {identity.photo != null ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`View photo of ${identity.name}`}
+          onPress={onOpenPhoto}
+        >
+          <Avatar
+            photo={identity.photo}
+            name={identity.name}
+            contactId={identity.id}
+            size={112}
+          />
+        </Pressable>
+      ) : (
+        // No photo: the initials avatar has no lightbox entry (38.6 D-15).
+        <Avatar
+          photo={identity.photo}
+          name={identity.name}
+          contactId={identity.id}
+          size={112}
+        />
+      )}
       <View style={styles.identity}>
         <AppText role="display" accessibilityRole="header" style={styles.name}>
           {identity.name}

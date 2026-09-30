@@ -292,6 +292,8 @@ describe("integrated Profile controller contracts", () => {
     expect(closeTopmostProfileOverlay("templates")).toBe(null);
     expect(closeTopmostProfileOverlay("layout")).toBe(null);
     expect(closeTopmostProfileOverlay("overflow")).toBe(null);
+    // 38.6 D-16: the photo lightbox is one more topmost overlay.
+    expect(closeTopmostProfileOverlay("photo")).toBe(null);
     expect(closeTopmostProfileOverlay(null)).toBe(null);
   });
 

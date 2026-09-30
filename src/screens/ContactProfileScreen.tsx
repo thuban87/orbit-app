@@ -4,6 +4,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, AppState, ScrollView, StyleSheet, View } from "react-native";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { PhotoLightbox } from "@/components/PhotoLightbox";
 import { ProfileBackgroundManager } from "@/components/profile/ProfileBackgroundManager";
 import { ProfileHero } from "@/components/profile/ProfileHero";
 import { ProfileLayoutEditor } from "@/components/profile/ProfileLayoutEditor";
@@ -473,6 +474,7 @@ export function ContactProfileScreen({
                   pendingFavourite || lifecycle.kind !== "bound"
                 }
                 onToggleFavourite={() => void toggleFavourite()}
+                onOpenPhoto={() => setOverlay("photo")}
                 onMessage={() =>
                   navigation.navigate("Compose", {
                     contactId,
@@ -716,6 +718,12 @@ export function ContactProfileScreen({
               contactName={snapshot.identity.name}
               onRequestClose={closeOverlay}
               onCommitted={() => void load()}
+            />
+            <PhotoLightbox
+              visible={overlay === "photo"}
+              photo={snapshot.identity.photo}
+              name={snapshot.identity.name}
+              onClose={closeOverlay}
             />
             <ReachOutRouter
               visible={reachOutOpen}
