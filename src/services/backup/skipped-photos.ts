@@ -21,6 +21,19 @@ export function skippedPhotosCopy(count: number): string | null {
   return `${count} photo${count === 1 ? "" : "s"} couldn't be included.`;
 }
 
+/**
+ * The Restore result line for rows whose backup photo was skipped (D-26 marker)
+ * and that this phone had no photo for either (38.6 D-30, review IN2-02). Kept
+ * apart from {@link skippedPhotosCopy}, which the safety-backup line keeps, so
+ * the two counts never read the same. Null below 1.
+ */
+export function restoredPhotosMissingCopy(count: number): string | null {
+  if (!Number.isInteger(count) || count < 1) return null;
+  return count === 1
+    ? "1 photo was already missing on this phone and couldn't be restored."
+    : `${count} photos were already missing on this phone and couldn't be restored.`;
+}
+
 /** Versioned device-local key: the skipped count of the latest automatic backup. */
 export const AUTOMATIC_SKIPPED_PHOTOS_KEY = "backup_auto_skipped_photos_v1";
 

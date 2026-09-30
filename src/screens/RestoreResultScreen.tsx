@@ -7,7 +7,10 @@ import {
   restoreReturnLabel,
   restoreReturnRouteName,
 } from "@/screens/backup-dualhome-logic";
-import { skippedPhotosCopy } from "@/services/backup/skipped-photos";
+import {
+  restoredPhotosMissingCopy,
+  skippedPhotosCopy,
+} from "@/services/backup/skipped-photos";
 import { useTheme } from "@/theme";
 
 export function RestoreResultScreen({
@@ -31,9 +34,9 @@ export function RestoreResultScreen({
     restoredPhotosMissing,
   } = route.params;
   // 38.6 D-24 / D-26: photos left out of the safety backup, and skipped-photo
-  // rows this phone had no photo for either.
+  // rows this phone had no photo for either. Each has its own copy (D-30).
   const safetySkipped = skippedPhotosCopy(replaceSafetySnapshotSkippedPhotos);
-  const restoredMissing = skippedPhotosCopy(restoredPhotosMissing);
+  const restoredMissing = restoredPhotosMissingCopy(restoredPhotosMissing);
   const pending = [
     photosNeedingAttention > 0
       ? `${photosNeedingAttention} photo${photosNeedingAttention === 1 ? "" : "s"}`

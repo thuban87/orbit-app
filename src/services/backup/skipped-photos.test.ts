@@ -7,6 +7,7 @@ import {
   automaticSkippedPhotosLine,
   readAutomaticSkippedPhotos,
   recordAutomaticSkippedPhotos,
+  restoredPhotosMissingCopy,
   type SkippedPhotosStorage,
   skippedPhotosCopy,
 } from "./skipped-photos";
@@ -28,6 +29,23 @@ describe("skipped-photo copy (38.6 D-24)", () => {
     expect(skippedPhotosCopy(3)).toBe("3 photos couldn't be included.");
     expect(skippedPhotosCopy(0)).toBeNull();
     expect(skippedPhotosCopy(-1)).toBeNull();
+  });
+});
+
+describe("restored-photos-missing copy (38.6 D-30)", () => {
+  it("says the photo was already missing, singular for one, plural otherwise", () => {
+    expect(restoredPhotosMissingCopy(1)).toBe(
+      "1 photo was already missing on this phone and couldn't be restored.",
+    );
+    expect(restoredPhotosMissingCopy(4)).toBe(
+      "4 photos were already missing on this phone and couldn't be restored.",
+    );
+    expect(restoredPhotosMissingCopy(0)).toBeNull();
+    expect(restoredPhotosMissingCopy(1.5)).toBeNull();
+  });
+
+  it("never reads like the safety-backup line", () => {
+    expect(restoredPhotosMissingCopy(2)).not.toBe(skippedPhotosCopy(2));
   });
 });
 
