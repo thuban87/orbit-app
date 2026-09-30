@@ -1169,20 +1169,65 @@ async function petOwner(exec: Awaited<ReturnType<typeof db>>) {
   );
 }
 
-it("a Merge whose marked value arrives under another contact keeps this phone's file (review IN2-01)", async () => {
+it("a Merge whose marked value arrives under another contact keeps its photo at the row's new canonical (review IN2-01/WR3-01)", async () => {
   const { source, manifest } = await skippedPhotoSource();
   const moved = petMovedToNewContact(manifest);
   const { recording, intents } = recordingDeleteIntents(source);
   const result = await applyRestore(recording, moved, "merge");
-  expect(result).toMatchObject({ status: "applied", photoCleanupPending: 0 });
-  expect((await petOwner(source))?.uid).toBe("n-new");
-  // The reference could not follow (it names z-marked's canonical), but the
-  // bytes this phone had are neither queued for deletion nor deleted.
-  expect(intents).not.toContain("avatars/cv-1-pet.jpg");
-  expect(photo.files.get("avatars/cv-1-pet.jpg")).toBe("UEVU");
+  // Nothing was missing on this phone: the pet photo is not counted.
+  expect(result).toMatchObject({
+    status: "applied",
+    photosNeedingAttention: 0,
+    photoCleanupPending: 0,
+    restoredPhotosMissing: 0,
+  });
+  const owner = await petOwner(source);
+  expect(owner?.uid).toBe("n-new");
+  // The reference follows the row to n-new's own canonical, and the bytes
+  // this phone had land there (never NULL, never z-marked's old path).
+  const pet = await petValue(source);
+  expect(pet).toBe(`avatars/cv-${owner!.id}-pet.jpg`);
+  expect(photo.files.get(pet!)).toBe("UEVU");
+  // The old copy is cleaned up only because it was carried over: no orphan.
+  expect(intents).toContain("avatars/cv-1-pet.jpg");
+  expect(photo.files.has("avatars/cv-1-pet.jpg")).toBe(false);
   // z-marked itself is gone, so its own photo is still cleaned up.
   expect(intents).toContain("avatars/contact-1.jpg");
   expect(photo.files.has("avatars/contact-1.jpg")).toBe(false);
+  // Every marked row that stays in place keeps its path and gets no intent.
+  expect(intents).not.toContain("avatars/contact-3.jpg");
+  expect(intents).not.toContain("avatars/profile.jpg");
+  expect((await photosByUid(source))["m-lost"]?.photo).toBe(
+    "avatars/contact-3.jpg",
+  );
+  expect(await journal(source)).toEqual([]);
+  expect(
+    [...photo.files.keys()].filter((path) =>
+      path.startsWith("avatars/_restore_pending/"),
+    ),
+  ).toEqual([]);
+});
+
+it("a Merge whose marked value arrives under another contact with its file already lost flags it at the new canonical (D-28, review WR3-01)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  photo.files.delete("avatars/cv-1-pet.jpg");
+  const result = await applyRestore(
+    source,
+    petMovedToNewContact(manifest),
+    "merge",
+  );
+  expect(result).toMatchObject({
+    status: "applied",
+    photoCleanupPending: 0,
+    restoredPhotosMissing: 1,
+  });
+  const owner = await petOwner(source);
+  // "Photo unavailable" evidence at the row's own new canonical, not NULL and
+  // not z-marked's old path; nothing is on disk there.
+  const pet = await petValue(source);
+  expect(pet).toBe(`avatars/cv-${owner!.id}-pet.jpg`);
+  expect(photo.files.has(pet!)).toBe(false);
+  expect(await journal(source)).toEqual([]);
 });
 
 it("a Replace-all whose marked value arrives under another contact moves this phone's bytes to the row's new canonical (review CR3-01)", async () => {

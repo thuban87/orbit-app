@@ -89,8 +89,10 @@ export interface RestoreApplyDependencies {
   createVerifiedPreRestoreSnapshot?: () => Promise<PreRestoreSnapshotResult>;
   stagePhoto?: (base64: string, relative: string) => Promise<void>;
   /**
-   * Replace-all only (38.6 D-26): stage this phone's current bytes for a row
-   * whose backup photo was skipped. Resolves false when there is nothing to
+   * 38.6 D-26: stage this phone's current bytes for a row whose backup photo
+   * was skipped and whose id-derived canonical changes here: every such row in
+   * Replace-all, and in Merge a custom value that arrives under another
+   * contact or field (review WR3-01). Resolves false when there is nothing to
    * stage (the local file is gone). A rejection (the file exists but could not
    * be copied) aborts the whole restore before any write (review CR2-01).
    */
@@ -172,11 +174,19 @@ type DeleteCandidate = {
   canonicalRelativePath: string;
   clearReference: boolean;
 };
-/** Merge (D-26): a skipped-photo row's local reference, written back after the upserts. */
+/**
+ * Merge (D-26): a skipped-photo row's local reference, written back after the
+ * upserts while the row still derives the same canonical. When it does not
+ * (a value that arrives under another contact), the row takes its staged local
+ * bytes at its new canonical instead, or the D-28 flag when the file was
+ * already gone (review WR3-01).
+ */
 type KeepCandidate = {
   target: PhotoTarget;
   reference: string;
   canonicalBefore: string | null;
+  staged: FinalizeCandidate | null;
+  lost: boolean;
 };
 type BackgroundFinalizeCandidate = {
   uid: string;
@@ -1187,6 +1197,37 @@ async function localReferenceOf(
     )?.value ?? null
   );
 }
+/**
+ * Merge (review WR3-01): a marked custom value's local reference when its row
+ * will derive another canonical here, because it arrives under another contact
+ * or field, or its field's column is renamed. Merge keeps ids, so any other
+ * marked row keeps its reference in place and needs no staged copy.
+ */
+async function movingValueReference(
+  exec: SqlExecutor,
+  row: Row,
+  incomingDefs: ReadonlyMap<string, IncomingDef>,
+): Promise<string | null> {
+  const current = await exec.getFirstAsync<{
+    contactUid: string;
+    fieldDefUid: string;
+    colName: string;
+    value: string | null;
+  }>(
+    "SELECT c.uid AS contactUid,d.uid AS fieldDefUid,d.col_name AS colName,v.value FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id JOIN custom_field_defs d ON d.id=v.field_def_id WHERE v.uid=?",
+    [row.uid],
+  );
+  if (!current) return null;
+  const colAfter =
+    (typeof row.fieldDefUid === "string"
+      ? incomingDefs.get(row.fieldDefUid)?.colName
+      : undefined) ?? current.colName;
+  return current.contactUid !== row.contactUid ||
+    current.fieldDefUid !== row.fieldDefUid ||
+    colAfter !== current.colName
+    ? current.value
+    : null;
+}
 async function stageCandidates(
   exec: SqlExecutor,
   manifest: BackupManifest,
@@ -1196,7 +1237,10 @@ async function stageCandidates(
   local: {
     mode: RestoreMode;
     stageLocal: NonNullable<RestoreApplyDependencies["stageLocalPhoto"]>;
-    /** Replace-all (D-28): marked contact/value rows whose local file is gone. */
+    /**
+     * D-28: marked rows needing a new canonical (every contact/value row in
+     * Replace-all, a moving value in Merge) whose local file is already gone.
+     */
     lost: Set<string>;
   },
 ): Promise<void> {
@@ -1218,9 +1262,15 @@ async function stageCandidates(
       // up by row uid alone, like the Merge keep (review IN2-01/CR3-01): a
       // value that arrives under another contact still carries the bytes this
       // phone has for it, instead of being counted missing and deleted.
+      // Merge keeps ids, so only a value that moves to another contact or field
+      // needs its bytes carried to its new canonical (review WR3-01).
       const localReference =
-        bytes === null && local.mode === "replace-all" && photoSkipped(row)
-          ? await localReferenceOf(exec, entity, row.uid)
+        bytes === null && photoSkipped(row)
+          ? local.mode === "replace-all"
+            ? await localReferenceOf(exec, entity, row.uid)
+            : entity === "custom_field_values"
+              ? await movingValueReference(exec, row, incomingDefs)
+              : null
           : null;
       if (
         bytes === null &&
@@ -1246,8 +1296,8 @@ async function stageCandidates(
       }
       if (localReference === null) continue;
       // The stager resolves false only when the local file is genuinely gone:
-      // that row ends with no photo (counted). A throw means the file is there
-      // but could not be copied (full disk, I/O error). Replace-all would then
+      // that row is counted and flagged (D-28). A throw means the file is there
+      // but could not be copied (full disk, I/O error). The restore would then
       // delete bytes this phone still has, so abort before any write, exactly
       // like a failed backup-byte stage above (D-26; review CR2-01). `finally`
       // in applyRestore cleans every pending file staged so far.
@@ -1264,7 +1314,7 @@ async function stageCandidates(
       if (stagedLocal)
         staged.set(`${entity}\0${row.uid}`, { target, relativePath });
       // D-28: the reference existed but its file was already gone. The profile
-      // is never reset, so it keeps its own reference and is not listed.
+      // is never reset or moved, so it keeps its own reference and is not listed.
       else if (target.kind !== "profile")
         local.lost.add(`${entity}\0${row.uid}`);
     }
@@ -1280,9 +1330,7 @@ async function planPhotoCandidates(
   finalize: FinalizeCandidate[];
   deletes: DeleteCandidate[];
   keep: KeepCandidate[];
-  /** Merge (D-26): local photo paths of marked winning rows; never deleted. */
-  keepPaths: Set<string>;
-  /** Replace-all (D-28): rows flagged "Photo unavailable" at their new canonical. */
+  /** D-28: rows flagged "Photo unavailable" at their new canonical. */
   unavailable: PhotoTarget[];
   missing: number;
 }> {
@@ -1290,7 +1338,6 @@ async function planPhotoCandidates(
   const finalize: FinalizeCandidate[] = [];
   const deletes: DeleteCandidate[] = [];
   const keep: KeepCandidate[] = [];
-  const keepPaths = new Set<string>();
   const unavailable: PhotoTarget[] = [];
   let missing = 0;
   for (const entity of ["profile", "contacts", "custom_field_values"] as const)
@@ -1312,35 +1359,36 @@ async function planPhotoCandidates(
       ) {
         // D-26: a skipped photo never removes a photo on restore: no delete
         // intent and no reference clear, in either mode.
-        if (mode === "merge")
-          // Looked up by row uid alone, so a value that arrives under another
-          // contact still protects the file it has here (review IN2-01).
-          addStoredPath(keepPaths, await localReferenceOf(exec, entity, a.uid));
-        const candidate = staged.get(`${entity}\0${a.uid}`);
-        if (candidate) {
-          // Replace-all: this phone's bytes land at the row's new canonical.
-          finalize.push(candidate);
-          continue;
-        }
-        if (mode === "replace-all" && lost.has(`${entity}\0${a.uid}`)) {
-          // D-28: this phone's photo was already lost. The row keeps the
+        const key = `${entity}\0${a.uid}`;
+        const candidate = staged.get(key) ?? null;
+        if (mode === "replace-all") {
+          if (candidate) {
+            // This phone's bytes land at the row's new canonical.
+            finalize.push(candidate);
+            continue;
+          }
+          // D-28: when this phone's photo was already lost, the row keeps the
           // "Photo unavailable" evidence at its OWN new id-derived canonical;
           // an old path is never written back (Replace-all re-assigns ids).
-          unavailable.push(target);
+          if (lost.has(key)) unavailable.push(target);
           missing += 1;
           continue;
         }
-        const existing = mode === "merge" ? await oldPhoto(exec, target) : null;
+        // Merge: looked up by row uid alone, so a value that arrives under
+        // another contact still finds the photo it has here (review IN2-01).
+        const existing = await localReferenceOf(exec, entity, a.uid);
         if (existing === null) {
           missing += 1;
           continue;
         }
-        // Merge: ids stay, so the local reference is written back after the
+        // Ids stay, so the local reference is normally written back after the
         // upserts (the custom value upsert writes the wire's null value).
         keep.push({
           target,
           reference: existing,
           canonicalBefore: await canonicalFor(exec, target),
+          staged: candidate,
+          lost: lost.has(key),
         });
       } else if (
         a.kind === "delete" ||
@@ -1357,7 +1405,7 @@ async function planPhotoCandidates(
           });
       }
     }
-  return { finalize, deletes, keep, keepPaths, unavailable, missing };
+  return { finalize, deletes, keep, unavailable, missing };
 }
 async function stageBackgroundCandidates(
   manifest: BackupManifest,
@@ -1993,17 +2041,39 @@ export async function applyRestore(
       // D-26, Merge: restore a skipped-photo row's local reference that an
       // upsert overwrote (the custom value upsert writes the wire's null), but
       // only while the row still derives the same canonical (same contact and
-      // field), so a reference never points at another row's photo.
+      // field), so a reference never points at another row's photo. Text left
+      // in a photo field (D-31) names no file, so it is always written back.
+      // A row that now derives another canonical (a value that arrived under
+      // another contact) takes its staged local bytes at its new canonical,
+      // like Replace-all, or the D-28 flag when its file was already gone
+      // (review WR3-01). Every local photo path a marked row still names gets
+      // no delete intent, so nothing relies on the post-commit
+      // mayDeleteCanonicalCore recheck to save it (review IN2-01).
       let restoredPhotosMissing = candidates.missing;
+      const keepPaths = new Set<string>();
       for (const kept of candidates.keep) {
-        if ((await canonicalFor(exec, kept.target)) !== kept.canonicalBefore) {
-          restoredPhotosMissing += 1;
+        if (
+          (await canonicalFor(exec, kept.target)) === kept.canonicalBefore ||
+          !SAFE_RELATIVE.test(kept.reference)
+        ) {
+          await writePhotoReference(exec, kept.target, kept.reference);
+          addStoredPath(keepPaths, kept.reference);
           continue;
         }
-        await writePhotoReference(exec, kept.target, kept.reference);
+        if (kept.staged) {
+          // Finalized below, like a backup photo. The old path is not kept: its
+          // bytes are staged under this restore's journal.
+          candidates.finalize.push(kept.staged);
+          continue;
+        }
+        // Moved without a staged copy: the old bytes stay where they are.
+        addStoredPath(keepPaths, kept.reference);
+        restoredPhotosMissing += 1;
+        if (kept.lost) candidates.unavailable.push(kept.target);
       }
-      // D-28, Replace-all: flag an already-lost photo at the row's new
-      // canonical. With nothing on disk there, the reference is written now
+      // D-28 (Replace-all, and a moved Merge value: WR3-01): flag an
+      // already-lost photo at the row's new canonical. With nothing on disk
+      // there, the reference is written now
       // and no intent targets that path. A file there belongs to the old owner
       // of the reused id: flagging now would show that contact's photo, so the
       // file is deleted first (a durable intent) and the reference is written
@@ -2043,11 +2113,8 @@ export async function applyRestore(
           await writePhotoReference(exec, candidate.target, null);
       for (const candidate of candidates.deletes)
         fileDeletes.paths.add(candidate.canonicalRelativePath);
-      // D-26, Merge: a marked winning row's local photo gets no delete intent,
-      // even when its reference could not be written back (the row now derives
-      // another canonical). The bytes stay; nothing relies on the post-commit
-      // mayDeleteCanonicalCore recheck to save them (review IN2-01).
-      for (const kept of candidates.keepPaths) fileDeletes.paths.delete(kept);
+      // D-26, Merge: see the keep loop above (review IN2-01).
+      for (const kept of keepPaths) fileDeletes.paths.delete(kept);
       for (const flagged of flaggedPaths) fileDeletes.paths.delete(flagged);
       for (const { canonical } of deferredFlags)
         fileDeletes.paths.add(canonical);
