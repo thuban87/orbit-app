@@ -355,7 +355,8 @@ describe("Grid card corners, names and row height (D-07, D-08, D-09)", () => {
     const star = byTestId(nodes, "dashboard-grid-card-favourite-7");
     expectCorner(star, "right");
     expect(star?.type).toBe("Pressable");
-    expect(star?.props.hitSlop).toBe(8);
+    // WR-05: the 48×48 box is the whole target — no inward slop over the photo.
+    expect(star?.props.hitSlop).toBeUndefined();
     // A direct child of the GlassSurface content, above the photo layout.
     expect(surfaceChildren(nodes)).toContain(star);
   });
@@ -369,7 +370,7 @@ describe("Grid card corners, names and row height (D-07, D-08, D-09)", () => {
     expect(star?.type).toBe("View");
     const checkbox = byTestId(nodes, "dashboard-grid-card-select-7");
     expectCorner(checkbox, "left");
-    expect(checkbox?.props.hitSlop).toBe(8);
+    expect(checkbox?.props.hitSlop).toBeUndefined();
     expect(surfaceChildren(nodes)).toContain(checkbox);
   });
 

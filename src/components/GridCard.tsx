@@ -251,14 +251,15 @@ export function GridCard({
                 {/* D-07: the corner controls sit at the card corners, above the
                     photo. Each 48×48 hit area is anchored at its corner and
                     extends inward (GlassSurface clips, and Android does not
-                    deliver touches outside parent bounds). */}
+                    deliver touches outside parent bounds). No hitSlop: the
+                    box alone meets the 48 target, and inward slop would grow
+                    the control further over the photo (review WR-05). */}
                 {selectionMode ? (
                   <Pressable
                     testID={`dashboard-grid-card-select-${contactId}`}
                     accessibilityRole="checkbox"
                     accessibilityLabel={`${selected ? "Deselect" : "Select"} ${name}`}
                     accessibilityState={{ checked: selected }}
-                    hitSlop={SPACING.sm}
                     onPress={onToggleSelect}
                     style={[styles.corner, styles.cornerLeft]}
                   >
@@ -293,7 +294,6 @@ export function GridCard({
                       isFavourite ? "Remove favourite" : "Add favourite"
                     }
                     accessibilityState={{ selected: isFavourite }}
-                    hitSlop={SPACING.sm}
                     onPress={onToggleFavourite}
                     style={[styles.corner, styles.cornerRight]}
                   >
