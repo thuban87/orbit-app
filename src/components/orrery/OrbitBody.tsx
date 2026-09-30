@@ -15,12 +15,11 @@ import {
   Image as SkiaImage,
   type SkTypefaceFontProvider,
   TextAlign,
-  useImage,
 } from "@shopify/react-native-skia";
 import { useMemo } from "react";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 import type { BillboardPose } from "@/logic/orrery-frame";
-import { resolvePhotoUri } from "@/services/photos/photo-storage";
+import { useOrreryPhoto } from "./use-orrery-photo";
 
 export interface OrbitBodyProps {
   projection?: SharedValue<BillboardPose>;
@@ -31,7 +30,7 @@ export interface OrbitBodyProps {
   cy: number;
   /** Planet photo-circle radius (`C.PLANET_RADIUS`). */
   radius: number;
-  /** Raw relative photo path or null (C2-1 — null-guarded before resolvePhotoUri). */
+  /** Raw relative photo path or null (C2-1 — `useOrreryPhoto` null-guards it). */
   photo: string | null;
   /** The canonical status body treatment / outline colour (`orreryRingStyle.bodyFill`). */
   bodyFill: string;
@@ -76,8 +75,9 @@ export function OrbitBody({
     paint.setAlphaf(projection?.value.opacity ?? 1);
     return paint;
   });
-  // C2-1: unconditional hook, null-guarded source (photo may be null).
-  const image = useImage(photo ? resolvePhotoUri(photo) : null);
+  // C2-1: unconditional hook, null-guarded source (photo may be null). D-11:
+  // useOrreryPhoto caps the texture at 512 px and owns SkImage disposal.
+  const image = useOrreryPhoto(photo);
 
   // Inner disc sits inside the status outline ring.
   const innerR = Math.max(1, radius - OUTLINE_WIDTH / 2);

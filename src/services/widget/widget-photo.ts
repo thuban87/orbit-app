@@ -1,7 +1,7 @@
 /**
  * widget-photo — the base64 tile-thumbnail encoder (WDG-01), one of this phase's
- * two node-testable correctness cores. It turns a contact's 512px photo master
- * into a small `data:image/jpeg;base64,…` URI the headless RemoteViews render
+ * two node-testable correctness cores. It turns a contact's photo master (512
+ * JPEG or up to 1024 WebP, D-12) into a small `data:image/jpeg;base64,…` URI the headless RemoteViews render
  * feeds to `ImageWidget`.
  *
  * WHY base64, not file://: RemoteViews CANNOT read a `file://` source, and a
@@ -43,7 +43,8 @@ const THUMB_PX = 88;
 const THUMB_Q = 0.6;
 
 /**
- * Encode a contact's 512px photo master (identified by its stored RELATIVE path)
+ * Encode a contact's photo master (512 JPEG or up to 1024 WebP, D-12; identified
+ * by its stored RELATIVE path)
  * into a `data:image/jpeg;base64,…` URI for the headless widget render.
  *
  * Returns `null` — the initials-fallback signal — in every non-emitting case:
@@ -63,15 +64,26 @@ export async function encodeWidgetThumb(
   if (!relativePath) return null;
 
   try {
-    const fileUri = resolvePhotoUri(relativePath); // file:// of the 512px master
+    // file:// of the master (512 JPEG or up to 1024 WebP, D-12).
+    const fileUri = resolvePhotoUri(relativePath);
     const rendered = await ImageManipulator.manipulate(fileUri)
       .resize({ width: THUMB_PX, height: THUMB_PX })
       .renderAsync();
-    const out = await rendered.saveAsync({
-      format: SaveFormat.JPEG,
-      compress: THUMB_Q,
-      base64: true,
-    });
+    let out: Awaited<ReturnType<typeof rendered.saveAsync>>;
+    try {
+      out = await rendered.saveAsync({
+        format: SaveFormat.JPEG,
+        compress: THUMB_Q,
+        base64: true,
+      });
+    } finally {
+      // Release the native bitmap exactly once, on success and on a save throw.
+      try {
+        rendered.release();
+      } catch {
+        Logger.warn(LOG_SCOPE, "thumbnail bitmap release failed");
+      }
+    }
 
     try {
       // Native saveAsync writes a cache file even with base64:true.
@@ -101,4 +113,39 @@ export async function encodeWidgetThumb(
     );
     return null;
   }
+}
+
+/** A widget tile's photo identity, as `encodeTileThumbs` needs it. */
+export interface ThumbTile {
+  id: number | string;
+  relativePhoto: string | null;
+}
+
+/**
+ * Encode every tile's thumbnail ONE AT A TIME (D-11): each encode decodes a full
+ * master (up to 1024² now), so a sequential loop caps the transient full-size
+ * decode peak at one master instead of one per tile. Per-tile fault isolation is
+ * kept: a throwing encode degrades THAT tile to its initials swatch (M2).
+ */
+export async function encodeTileThumbs<T extends ThumbTile>(
+  tiles: readonly T[],
+  encode: (relativePath: string | null) => Promise<string | null> = (path) =>
+    encodeWidgetThumb(path),
+): Promise<Array<{ tile: T; thumb: string | null }>> {
+  const rendered: Array<{ tile: T; thumb: string | null }> = [];
+  for (const tile of tiles) {
+    let thumb: string | null = null;
+    try {
+      thumb = await encode(tile.relativePhoto);
+    } catch (error) {
+      Logger.error(
+        LOG_SCOPE,
+        `tile ${tile.id} thumb encode threw; falling back to initials`,
+        error,
+      );
+      thumb = null;
+    }
+    rendered.push({ tile, thumb });
+  }
+  return rendered;
 }

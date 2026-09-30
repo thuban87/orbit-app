@@ -26,7 +26,8 @@
  * theme-presets colour strings, so they are cast through `asColor` at the seam.
  *
  * PER-TILE FAULT ISOLATION (Codex/Claude M2): each tile's `encodeWidgetThumb` is
- * wrapped in its own try/catch (belt-and-suspenders with 12-03, which already
+ * wrapped in its own try/catch inside the sequential `encodeTileThumbs` loop
+ * (D-11: one full-size master decode at a time) (belt-and-suspenders with 12-03, which already
  * returns null on decode failure), so a single corrupt/evicted master downgrades
  * THAT tile to its initials swatch and NEVER rejects the whole render / blanks the
  * grid. The image source is ALWAYS the base64 `data:` URI (T-12-05) — never a
@@ -53,7 +54,6 @@ import {
 } from "react-native-android-widget";
 import { getExecutor, openAndMigrate } from "@/db/database";
 import { getDeviceRegion } from "@/services/device-region";
-import { Logger } from "@/utils/logger";
 import {
   ringColor,
   ringWeight,
@@ -61,9 +61,7 @@ import {
   widgetPalette,
 } from "./widget-colors";
 import { loadWidgetTiles, type WidgetTile } from "./widget-data";
-import { encodeWidgetThumb } from "./widget-photo";
-
-const LOG_SCOPE = "widget-render";
+import { encodeTileThumbs } from "./widget-photo";
 
 // --- Tunable constants (top-of-file per project convention) ------------------
 
@@ -164,23 +162,10 @@ export async function renderFavourites(
 
   // Per-tile fault isolation: one corrupt/evicted master must degrade THAT tile
   // to its initials swatch, never reject the whole render (M2). encodeWidgetThumb
-  // already returns null on failure; the try/catch is a belt-and-suspenders.
-  const rendered: RenderTile[] = await Promise.all(
-    tiles.map(async (tile) => {
-      let thumb: string | null = null;
-      try {
-        thumb = await encodeWidgetThumb(tile.relativePhoto);
-      } catch (error) {
-        Logger.error(
-          LOG_SCOPE,
-          `tile ${tile.id} thumb encode threw; falling back to initials`,
-          error,
-        );
-        thumb = null;
-      }
-      return { tile, thumb };
-    }),
-  );
+  // already returns null on failure; encodeTileThumbs adds a per-tile try/catch.
+  // D-11: tiles encode sequentially (for…of), capping the transient full-size
+  // master decode at one master, not one per tile.
+  const rendered: RenderTile[] = await encodeTileThumbs(tiles);
 
   return bucket === "large" ? (
     <LargeGrid rendered={rendered} palette={palette} />

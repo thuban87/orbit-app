@@ -2,13 +2,14 @@
  * SunBody (ORR-05) — the orrery's centre sun, rendered ONCE (never in a map) as a
  * child of the `OrreryCanvas` `<Canvas>` subtree.
  *
- * Owns the sun's OWN Skia `useImage` (the occupant photo) — kept in its own
- * component for the same Rules-of-Hooks reason as `OrbitBody` (13-07 adds a
- * glow-pulse `useDerivedValue` here). C2-1 — the photo hook is UNCONDITIONAL but
- * its source is null-guarded (`useImage(occupantPhoto ? resolvePhotoUri(...) :
- * null)`), because the occupant photo is nullable (self with no profile photo, or
- * a contact with no photo) and `resolvePhotoUri` requires a `string`; a null image
- * → the swatch + initials fallback.
+ * Owns the sun's OWN photo hook, `useOrreryPhoto` (the occupant photo) — kept in
+ * its own component for the same Rules-of-Hooks reason as `OrbitBody` (13-07 adds
+ * a glow-pulse `useDerivedValue` here). C2-1 — the photo hook is UNCONDITIONAL
+ * and takes the nullable occupant photo directly (self with no profile photo, or
+ * a contact with no photo); a null path or a failed load → a null image → the
+ * swatch + initials fallback. D-11: `useOrreryPhoto` caps the Skia texture at
+ * 512 px (a 1024 WebP master is downsampled, a legacy 512 master passes through)
+ * and disposes every SkImage it creates.
  *
  * The glow colour is resolved upstream by `resolveSunOccupant`: self → the picked
  * `starPalette` token; a contact → that contact's status colour; a never-contacted
@@ -25,14 +26,13 @@ import {
   Image as SkiaImage,
   type SkTypefaceFontProvider,
   TextAlign,
-  useImage,
 } from "@shopify/react-native-skia";
 import { useMemo } from "react";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 import type { BillboardPose } from "@/logic/orrery-frame";
-import { resolvePhotoUri } from "@/services/photos/photo-storage";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { useOrreryClock } from "./orrery-clock-context";
+import { useOrreryPhoto } from "./use-orrery-photo";
 
 export interface SunBodyProps {
   projection?: SharedValue<BillboardPose>;
@@ -98,7 +98,7 @@ export function SunBody({
     return paint;
   });
   // C2-1: unconditional hook, null-guarded source.
-  const image = useImage(photo ? resolvePhotoUri(photo) : null);
+  const image = useOrreryPhoto(photo);
 
   // ORR-03 — slow sun-glow pulse off the ambient clock provided by OrreryCanvas
   // (M5 — SunBody never calls useClock itself). When no clock is in scope (unit

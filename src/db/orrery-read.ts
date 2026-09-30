@@ -36,8 +36,9 @@
  * and appended ONLY when non-null; null/undefined excludes nobody.
  *
  * PHOTO (C2-1): `photo` is returned as the RAW relative path (or null) — this read
- * never resolves it. The consumer (13-05 OrbitBody/SunBody) MUST null-guard before
- * `resolvePhotoUri`: `photo ? resolvePhotoUri(photo) : null`.
+ * never resolves it. The consumers (OrbitBody/SunBody) pass it straight to
+ * `useOrreryPhoto` (38.6 D-11), which null-guards it and resolves the plain file
+ * URI itself.
  *
  * INJECTION: the query is a static string; the only interpolated values are the
  * closed status fragments. The sole runtime value (`excludeContactId`) is `?`-bound.

@@ -51,9 +51,8 @@ const PLAIN_RESOLVER_IMPORTERS = [
   "src/services/backup/share-export.ts",
   // Stages canonical bytes for a merge re-home (file copy source).
   "src/services/photos/merge-photo-rehome.ts",
-  // Orrery Skia bodies: 38.6-04 replaces these with its orrery hook and updates this list.
-  "src/components/orrery/OrbitBody.tsx",
-  "src/components/orrery/SunBody.tsx",
+  // Orrery Skia texture gate (38.6-04 D-11): Skia and the manipulator read the plain file.
+  "src/components/orrery/use-orrery-photo.ts",
 ];
 
 // ---------------------------------------------------------------------------

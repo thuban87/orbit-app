@@ -21,7 +21,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Hoisted mock state: control the manipulator chain's outcome per test.
 const h = vi.hoisted(() => ({
-  cfg: {} as { renderThrows?: boolean; saveBase64?: string | undefined },
+  cfg: {} as {
+    renderThrows?: boolean;
+    saveThrows?: boolean;
+    saveBase64?: string | undefined;
+  },
+  releases: [] as number[],
 }));
 
 vi.mock("expo-image-manipulator", () => {
@@ -35,8 +40,13 @@ vi.mock("expo-image-manipulator", () => {
           },
           async renderAsync() {
             if (h.cfg.renderThrows) throw new Error("mock decode failed");
+            const index = h.releases.push(0) - 1;
             return {
+              release() {
+                h.releases[index] += 1;
+              },
               async saveAsync(_opts: unknown) {
+                if (h.cfg.saveThrows) throw new Error("mock encode failed");
                 return {
                   uri: "file:///cache/thumb.jpg",
                   base64: h.cfg.saveBase64,
@@ -59,11 +69,35 @@ vi.mock("@/services/photos/derivative-cache", () => ({
   discardDerivative: vi.fn(),
 }));
 
-import { encodeWidgetThumb } from "./widget-photo";
+import { encodeTileThumbs, encodeWidgetThumb } from "./widget-photo";
 
 describe("encodeWidgetThumb", () => {
   beforeEach(() => {
     h.cfg = { saveBase64: "QUJD" };
+    h.releases.length = 0;
+  });
+
+  it("releases the rendered bitmap exactly once on success (D-11)", async () => {
+    await expect(encodeWidgetThumb("avatars/contact-1.jpg")).resolves.toBe(
+      "data:image/jpeg;base64,QUJD",
+    );
+    expect(h.releases).toEqual([1]);
+  });
+
+  it("releases the rendered bitmap exactly once when saveAsync rejects", async () => {
+    h.cfg = { saveThrows: true };
+    await expect(
+      encodeWidgetThumb("avatars/contact-1.jpg"),
+    ).resolves.toBeNull();
+    expect(h.releases).toEqual([1]);
+  });
+
+  it("releases the rendered bitmap exactly once when base64 is missing", async () => {
+    h.cfg = { saveBase64: undefined };
+    await expect(
+      encodeWidgetThumb("avatars/contact-1.jpg"),
+    ).resolves.toBeNull();
+    expect(h.releases).toEqual([1]);
   });
 
   it("returns null for a null path (no photo -> initials fallback)", async () => {
@@ -127,5 +161,41 @@ describe("encodeWidgetThumb", () => {
     await expect(
       encodeWidgetThumb("avatars/contact-1.jpg"),
     ).resolves.toBeNull();
+  });
+});
+
+describe("encodeTileThumbs (D-11: one master decode at a time)", () => {
+  const tiles = [1, 2, 3, 4, 5, 6].map((id) => ({
+    id,
+    relativePhoto: `avatars/contact-${id}.jpg`,
+  }));
+
+  it("encodes tiles sequentially, in order", async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const encode = vi.fn(async (path: string | null) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 1));
+      inFlight -= 1;
+      return `thumb:${path}`;
+    });
+    const out = await encodeTileThumbs(tiles, encode);
+    expect(maxInFlight).toBe(1);
+    expect(out.map((row) => row.tile.id)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(out.map((row) => row.thumb)).toEqual(
+      tiles.map((tile) => `thumb:${tile.relativePhoto}`),
+    );
+  });
+
+  it("a throwing tile falls back to initials while the others still encode", async () => {
+    const encode = vi.fn(async (path: string | null) => {
+      if (path === "avatars/contact-3.jpg") throw new Error("boom");
+      return `thumb:${path}`;
+    });
+    const out = await encodeTileThumbs(tiles, encode);
+    expect(encode).toHaveBeenCalledTimes(6);
+    expect(out[2]).toEqual({ tile: tiles[2], thumb: null });
+    expect(out.filter((row) => row.thumb !== null)).toHaveLength(5);
   });
 });

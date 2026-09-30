@@ -60,6 +60,8 @@ vi.mock("@/services/photos/photo-storage", () => ({
   resolvePhotoUri: (path: string) => path,
 }));
 vi.mock("./orrery-clock-context", () => ({ useOrreryClock: () => null }));
+// The bodies' photo hook (38.6-04 D-11) — a photo-less render, as `useImage: () => null` was.
+vi.mock("./use-orrery-photo", () => ({ useOrreryPhoto: () => null }));
 vi.mock("@/theme/use-reduced-motion", () => ({
   useReducedMotionShared: () => ({ value: false }),
 }));
