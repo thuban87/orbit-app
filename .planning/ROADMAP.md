@@ -1327,7 +1327,7 @@ Plans:
 **Goal**: A contact's photo is the same, current photo everywhere Orbit shows that contact; photos are bigger on the Profile (~2×, growing upwards), the Contacts List (+50%) and the Contacts Grid (~2×, with corner controls 5px from the card edges and two-line names at uniform row height); and tapping the Profile photo opens a full-screen, zoomable lightbox.
 **Depends on**: Phase 38.5
 **Requirements**: None formal — owner requests D-01..D-09 (2026-09-29); promotes backlog 999.1 (38.4 D-73)
-**Success Criteria**: A photo changed by any writer (crop, remove, import, import retry, reconcile, merge, restore) shows on every surface without an app restart and after one; no surface that shows an existing Orbit contact falls back to initials when a photo exists (scope per O-2); size, grid and lightbox behaviour signed off by the owner on device (Pixel 6 Pro + Pixel 3a)
+**Success Criteria**: A photo changed by any writer (crop, remove, import, import retry, reconcile, merge, restore) shows on every surface without an app restart and after one; no surface that shows an existing Orbit contact falls back to initials when a photo exists (scope per O-2); size, grid and lightbox behaviour signed off by the owner on one test phone (owner ruling 2026-09-30: one phone is sufficient)
 **Scope source**: docs/dossier/milestone-2/phase-38.6-photo-handling-dossier.md (authoritative)
 **Canonical refs**: docs/dossier/07-photos.md (photo domain: 512 master, storage, backup); 38.2 RG-010 photo ownership primitives
 **UI hint**: yes
