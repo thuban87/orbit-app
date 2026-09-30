@@ -150,5 +150,12 @@ describe("PendingConfirmationsSheet photos (38.6 D-14)", () => {
       "Did you text Grace Hopper?",
       "Did you reach Ada Lovelace?",
     ]);
+    // One TalkBack stop per row with one label (review WR2-04).
+    expect(
+      rows.map((row) => [row.props.accessible, row.props.accessibilityLabel]),
+    ).toEqual([
+      [true, "Did you text Grace Hopper?"],
+      [true, "Did you reach Ada Lovelace?"],
+    ]);
   });
 });

@@ -73,6 +73,7 @@ export function AssistBanner() {
   }
 
   const assistUid = newest.uid;
+  const question = questionFor(newest.channel, newest.contact_name);
 
   // Confirm/dismiss run through the shared runner + publisher
   // (src/services/assist-commit.ts). Both handlers always resolve: a write
@@ -150,7 +151,14 @@ export function AssistBanner() {
           { backgroundColor: colors.surface, borderColor: colors.border },
         ]}
       >
-        <View style={styles.questionRow}>
+        {/* One TalkBack stop with one label, like the import choice rows:
+            the Avatar's own "Photo of …" must not read the name twice
+            (review WR2-04). */}
+        <View
+          accessible
+          accessibilityLabel={question}
+          style={styles.questionRow}
+        >
           <Avatar
             photo={newest.contact_photo}
             name={newest.contact_name}
@@ -161,7 +169,7 @@ export function AssistBanner() {
             numberOfLines={1}
             style={[styles.question, { color: colors.textPrimary }]}
           >
-            {questionFor(newest.channel, newest.contact_name)}
+            {question}
           </Text>
         </View>
         {morePendingCount > 0 ? (

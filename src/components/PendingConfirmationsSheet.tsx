@@ -201,7 +201,16 @@ export function PendingConfirmationsSheet({
                   key={assist.uid}
                   style={[styles.item, { borderColor: colors.border }]}
                 >
-                  <View style={styles.questionRow}>
+                  {/* One TalkBack stop with one label (review WR2-04): the
+                      Avatar's "Photo of …" must not read the name twice. */}
+                  <View
+                    accessible
+                    accessibilityLabel={questionFor(
+                      assist.channel,
+                      assist.contact_name,
+                    )}
+                    style={styles.questionRow}
+                  >
                     <Avatar
                       photo={assist.contact_photo}
                       name={assist.contact_name}

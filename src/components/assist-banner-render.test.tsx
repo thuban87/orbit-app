@@ -157,6 +157,19 @@ describe("AssistBanner photo (38.6 D-25 F-2)", () => {
     expect(flatStyle(question)).toMatchObject({ flex: 1 });
   });
 
+  it("gives the row one accessible label so TalkBack reads the name once (review WR2-04)", () => {
+    const row = render(NEWEST).find(
+      (node) =>
+        node.type === "View" &&
+        Array.isArray(node.props.children) &&
+        (node.props.children as TestElement[]).some(
+          (kid) => kid?.type === "Avatar",
+        ),
+    );
+    expect(row?.props.accessible).toBe(true);
+    expect(row?.props.accessibilityLabel).toBe("Did you text Grace Hopper?");
+  });
+
   it("gives the Avatar null (initials) when the contact has no photo", () => {
     const avatar = render({ ...NEWEST, contact_photo: null }).find(
       (node) => node.type === "Avatar",
