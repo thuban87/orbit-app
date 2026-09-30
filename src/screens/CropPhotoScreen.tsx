@@ -5,13 +5,16 @@
  * square viewport (pan + pinch, NO rotation — 05-UI-SPEC), then on "Use photo"
  * computes the source-pixel crop rect via the PURE `crop-geometry` and runs the
  * Plan 04 pipeline (`persistCroppedMaster`), dispatching by target kind:
- *   - contact  → `setContactPhoto`  + `bumpPhotoCacheBust`
- *   - profile  → `setProfilePhoto`  + `bumpPhotoCacheBust`
+ *   - contact  → `setContactPhoto`
+ *   - profile  → `setProfilePhoto`
+ *   (the display revision is published by the ownership layer's persist —
+ *   `notifyPhotoBytesChanged` in owned-master, 38.6 D-01 — not by this screen)
  *   - customField → persist the file ONLY (the awaiting widget learns of success
  *     via a Plan-08 `photo-result-store` publish keyed on `route.params.requestId`
  *     — that store does not exist in this wave, so here the branch just persists
  *     and the serializable `requestId` is carried through the route untouched).
- * Every branch then `goBack()`s so the avatar refreshes on the caller's focus.
+ * Every branch then `goBack()`s; mounted avatars already refreshed from the
+ * display revision the owned persist published for the canonical path.
  *
  * RENDER-LOOP RULE (CLAUDE.md, non-negotiable): the pan/zoom transform is driven
  * ONLY by Reanimated SHARED VALUES, read into Skia via `useDerivedValue`. React
@@ -73,7 +76,6 @@ import {
 } from "@/services/photos/photo-pipeline";
 import { relPathForTarget } from "@/services/photos/photo-storage";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
-import { bumpPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import { publishCropResult } from "@/stores/photo-result-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
@@ -323,23 +325,18 @@ export function CropPhotoScreen({
               relative,
               now,
             );
-            // Sub-second cache-bust: a same-second replace shares `modified_at`, so
-            // the per-write revision is what forces the returning Avatar to redecode.
-            bumpPhotoCacheBust(relative);
             // A contact photo is widget-visible (the tile avatar). Profile/customField
             // photos are NOT, so this publish lives inside the contact branch only.
             notifyWidgetDataChanged();
           } else if (target.kind === "profile") {
             await setProfilePhoto(exec, relative, now);
-            bumpPhotoCacheBust(relative);
           } else if (target.kind === "customField" && route.params.requestId) {
             // customField: the master is already persisted at its derivable cv- path;
             // no DB write here (the field value is set through the edit form's Save).
             // Publish the crop-success on the serializable requestId (the cv- relPath)
-            // so the awaiting widget sets its value on focus, and bump the cache-bust
-            // token (requestId IS the relPath) so a same-second re-crop redecodes.
+            // so the awaiting widget sets its value on focus. The display revision
+            // for that same cv- path was already published by the owned persist.
             publishCropResult(route.params.requestId, true);
-            bumpPhotoCacheBust(route.params.requestId);
           }
         },
       );

@@ -8,9 +8,9 @@
  * see `components/photo-display.ts`).
  *
  * The revision is bumped by the ownership layer's `notifyPhotoBytesChanged`
- * (`services/photos/owned-master.ts`) wherever canonical bytes change. The crop
- * screen's own call-site bumps are redundant and retire in 38.6-03. It is
- * display-only and never the authorization `canonicalGeneration`.
+ * (`services/photos/owned-master.ts`) wherever canonical bytes change, and ONLY
+ * there — `photo-writer-contract.test.ts` fails if any other file calls it. It
+ * is display-only and never the authorization `canonicalGeneration`.
  *
  * The counter (not `Date.now()`, which can collide at sub-ms) is strictly
  * increasing per path. The store is IN-MEMORY: in a fresh process a path has no
@@ -38,9 +38,9 @@ const usePhotoCacheBustStore = create<PhotoCacheBustStore>((set) => ({
 }));
 
 /**
- * Bump the cache-bust revision for a photo relPath — call from every photo WRITE
- * site (set/replace/clear) immediately after the DAO write. Non-hook: usable
- * outside React (services/pipeline).
+ * Bump the display revision for a photo relPath. Called only by the ownership
+ * layer's `notifyPhotoBytesChanged` after canonical bytes change (38.6 D-01);
+ * never from a screen or DAO call site. Non-hook: usable outside React.
  */
 export function bumpPhotoCacheBust(relPath: string): void {
   usePhotoCacheBustStore.getState().bump(relPath);
