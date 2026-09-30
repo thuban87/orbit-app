@@ -299,7 +299,7 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     as measured, optical offset 0 (D-07), lightbox 4x pinch / 2.5x double-tap / 120 dp dismiss (D-16), "Photo
     unavailable" look (D-23), and the 360 dp star hit-area overlap accepted (T-a). WebP quality stays 0.8.
 -   **[DECIDED · 2026-09-30] D-37 --- D-11 memory fails; fix before release.** Orrery graphics memory at 20 s was +23 %
-    / GL +32 % over the 512 JPEG baseline (limit 5 %). A gap plan finishes review IN-02 (cancel queued downsamples,
+    / GL +32 % over the 512 JPEG baseline (limit 5 %). A direct fix finishes review IN-02 (cancel queued downsamples,
     size the Orrery photo cache to the photo count) and the ~5 s initials-on-return reload, then re-measures with the
     same fixed method (plus a late sample). Done as direct fixes (no gap plan); the release build waits for them.
 -   **[DECIDED · 2026-09-30] D-38 --- The assist banner must not block other screens' top bars (device S12).** While a
