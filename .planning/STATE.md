@@ -4,16 +4,16 @@ milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.6
 current_phase_name: Photo Handling — Sync, Sizes & Lightbox
-status: planning
-stopped_at: Phase 38.6 context gathered (D-10..D-19), ready for plan-phase
-last_updated: "2026-09-29T16:37:27.896Z"
-last_activity: 2026-09-29
-last_activity_desc: Phase 38.6 Photo Handling inserted before Phase 39 (promotes backlog 999.1)
-state_head: 02d1e79c0fc13b57b0b9b62960156d04f01b5955
+status: ready_to_execute
+stopped_at: Phase 38.6 planned (7 plans, 4 waves; D-01..D-22), ready for execute-phase
+last_updated: "2026-09-30T05:00:37.378Z"
+last_activity: 2026-09-30
+last_activity_desc: Phase 38.6 planned — 7 plans; post-research rulings D-20..D-22
+state_head: 7bcbe94b7e1ab5c08e9b27b83593e36de1812848
 progress:
   total_phases: 28
   completed_phases: 19
-  total_plans: 250
+  total_plans: 257
   completed_plans: 248
 carried_forward:
 
@@ -43,9 +43,9 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 
 ## Current Position
 
-Phase: 38.6 — Photo Handling — Sync, Sizes & Lightbox (INSERTED)
+Phase: 38.6 (Photo Handling — Sync, Sizes & Lightbox) — READY TO EXECUTE
 Plan: Not started
-Status: Ready for discuss-phase
+Status: Ready to execute (7 plans, 4 waves)
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
