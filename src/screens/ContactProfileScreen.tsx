@@ -56,6 +56,7 @@ import {
   PROFILE_APP_BAR_SCROLL_SCRIM,
   type ProfileOverlay,
   profileAppBarScrolled,
+  profileErrorPlacement,
   profileKnowledgeDestination,
   profileLifecycleView,
   profileOverflowEntries,
@@ -521,6 +522,11 @@ export function ContactProfileScreen({
     ],
   );
 
+  const errorPlacement = profileErrorPlacement(
+    error,
+    snapshot !== null && presentation !== null,
+  );
+
   const backgroundUri =
     presentation && presentation.background.source !== "theme"
       ? resolveBackgroundUri(presentation.background.imagePath)
@@ -574,7 +580,7 @@ export function ContactProfileScreen({
           ]}
         >
           {loading && !snapshot ? <AppText>Loading Profile…</AppText> : null}
-          {error ? <AppText>{error}</AppText> : null}
+          {errorPlacement === "top" ? <AppText>{error}</AppText> : null}
           {snapshot && presentation ? (
             <>
               <ProfileHero
@@ -596,6 +602,11 @@ export function ContactProfileScreen({
                   if (phone) void launchMethod(phone, "call");
                 }}
               />
+              {errorPlacement === "below-hero" ? (
+                // WR-04: a failed refresh over a loaded Profile — kept out of
+                // the overlay bar and off the D-04 photo/name lines.
+                <AppText testID="profile-refresh-error">{error}</AppText>
+              ) : null}
               {lifecycle.kind !== "bound" ? (
                 <View
                   style={[

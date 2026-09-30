@@ -227,6 +227,21 @@ export function profileAppBarHitBoxClearance(
   ]);
 }
 
+/**
+ * WR-04: where the Profile shows a load/refresh error. With content on screen
+ * the overlay app bar (D-17) covers the scroll top and the D-04 photo and name
+ * lines are pinned from it, so an error from a failed focus refresh renders
+ * BELOW the hero rather than under the bar, pushing the hero down. With no
+ * content there is no bar and no hero, so it stays at the top.
+ */
+export function profileErrorPlacement(
+  error: string | null,
+  hasContent: boolean,
+): "top" | "below-hero" | null {
+  if (!error) return null;
+  return hasContent ? "below-hero" : "top";
+}
+
 /** Whether content has scrolled far enough under the bar to show its scrim. */
 export function profileAppBarScrolled(scrollY: number): boolean {
   return scrollY > PROFILE_APP_BAR_SCRIM_THRESHOLD;

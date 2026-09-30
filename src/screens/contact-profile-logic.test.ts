@@ -17,6 +17,7 @@ import {
   profileAppBarHitBoxClearance,
   profileAppBarScrolled,
   profileContentTopPadding,
+  profileErrorPlacement,
   profileKnowledgeDestination,
   profileLifecycleView,
   profileMethodGroups,
@@ -356,6 +357,15 @@ describe("integrated Profile controller contracts", () => {
       expect(profileAppBarScrolled(PROFILE_APP_BAR_SCRIM_THRESHOLD + 1)).toBe(
         true,
       );
+    });
+
+    it("keeps a refresh error off the overlay bar and the D-04 lines (WR-04)", () => {
+      expect(profileErrorPlacement(null, true)).toBeNull();
+      expect(profileErrorPlacement(null, false)).toBeNull();
+      // Loaded Profile + failed refresh: below the hero, never at the top.
+      expect(profileErrorPlacement("Couldn't load", true)).toBe("below-hero");
+      // No content (and so no bar): the error is the page.
+      expect(profileErrorPlacement("Couldn't load", false)).toBe("top");
     });
 
     it("lands in-Profile scroll targets below the overlay bar", () => {

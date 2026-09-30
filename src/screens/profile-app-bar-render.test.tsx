@@ -218,3 +218,23 @@ describe("Profile screen accessibility order (review WR-03)", () => {
     );
   });
 });
+
+describe("Profile refresh error placement (review WR-04)", () => {
+  const source = readFileSync(
+    join(__dirname, "ContactProfileScreen.tsx"),
+    "utf8",
+  );
+  const screen = source.slice(
+    source.indexOf("export function ContactProfileScreen"),
+  );
+
+  it("renders the error at the top only without content, else below the hero", () => {
+    expect(screen).not.toMatch(/\{error \? <AppText>/);
+    const top = screen.indexOf('errorPlacement === "top"');
+    const hero = screen.indexOf("<ProfileHero");
+    const belowHero = screen.indexOf('errorPlacement === "below-hero"');
+    expect(top).toBeGreaterThan(0);
+    expect(top).toBeLessThan(hero);
+    expect(belowHero).toBeGreaterThan(hero);
+  });
+});
