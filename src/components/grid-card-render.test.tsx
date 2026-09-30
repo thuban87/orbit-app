@@ -11,7 +11,7 @@ import {
   GRID_CORNER_OPTICAL_OFFSET,
   gridCardGeometry,
 } from "./grid-card-geometry";
-import { ListRow } from "./ListRow";
+import { LIST_AVATAR_SIZE, LIST_ROW_PADDING, ListRow } from "./ListRow";
 
 vi.mock("react-native", () => ({
   Pressable: "Pressable",
@@ -486,5 +486,38 @@ describe("GlassSurface contentStyle (D-09; other consumers unchanged)", () => {
       position: "relative",
       flexGrow: 1,
     });
+  });
+});
+
+describe("List row photos are 72 (D-05)", () => {
+  it("renders the Avatar at LIST_AVATAR_SIZE and grows the row to fit", () => {
+    expect(LIST_AVATAR_SIZE).toBe(72);
+    expect(LIST_ROW_PADDING).toBe(12);
+    const nodes = all(resolve(ListRow(baseProps)));
+    const avatar = nodes.find((node) => node.type === "Avatar");
+    expect(avatar?.props.size).toBe(LIST_AVATAR_SIZE);
+    const row = nodes.find(
+      (node) => node.props.testID === "dashboard-list-row-7",
+    );
+    const rowStyle = flattenStyle(row?.props.style);
+    expect(rowStyle.minHeight).toBe(LIST_AVATAR_SIZE + 2 * LIST_ROW_PADDING);
+    expect(rowStyle.padding).toBe(LIST_ROW_PADDING);
+  });
+
+  it("keeps the name, meta and line three rendering", () => {
+    const nodes = all(
+      resolve(ListRow({ ...baseProps, line3: { text: "Birthday in 3 days" } })),
+    );
+    const nameNode = nodes.find(
+      (node) => node.props.testID === "dashboard-list-row-name-7",
+    );
+    expect(nameNode?.props.numberOfLines).toBe(1);
+    expect(nameNode?.props.children).toBe("Alex");
+    expect(
+      nodes.find((node) => node.props.testID === "dashboard-list-row-meta-7"),
+    ).toBeDefined();
+    expect(
+      nodes.find((node) => node.props.testID === "dashboard-list-row-line3-7"),
+    ).toBeDefined();
   });
 });
