@@ -161,6 +161,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.3: Runtime Correctness, Navigation & State Coherence** (INSERTED) - Completed 2026-09-26: 16/16 plans; verification passed 94/94 truths with Pixel device UAT (isolated synthetic package) for RG-019–026, 035, 042, plus a device re-check of the 14 post-review fixes on `3b63f86`. UAT-020b TalkBack passed (AUD-UIA-022 not reproduced; D-05 fix not needed). Explicitly recorded owner dispositions (not passes): UAT-023a widget leg deferred to the widget-overhaul phase; UAT-042, UAT-024b month/year, UAT-026b in-range keep and the UAT-022 warm-Mark leg accepted risk.
 - [x] **Phase 38.4: UI Consistency, Accessibility, Performance & Release Polish** (INSERTED) - Completed 2026-09-28: 23/23 plans + D-37 deep code review (1 critical, 14 warnings, all fixed in two passes) + device-pass fix passes D-72/D-73/D-74; verification passed 32/32 (Pixel 3a device pass + owner checklist). Migrations 031–032 (TARGET_VERSION 32). Final release orbit-38.4-release-2026-09-28-d69a2e3.apk. Owner-routed: text-on-art → 38.5; widget contact tap → widget phase; large-text reflow outside sheets + Light/Dark latency → Phase 40; profile photos → backlog 999.1; remaining minor items → todos (2026-09-28-*).
 - [x] **Phase 38.5: Background Art & Text-on-Art Contrast** (INSERTED) - Completed 2026-09-29: 9/9 plans + 3-pass code review (all fixed); verification passed 14/14 after owner UAT (Pixel 6 Pro + Pixel 3a sign-off). 12 lossless light/dark WebPs, signed v3 treatment table, ADR-177. End-of-phase rulings D-50..D-53: the four persistent Galaxy Dark danger strings get an opaque backing (D25-B) and the picker tiles are fixed (G2); Orrery ANR (G1) and the Your Week wrap (G3) are deferred. D-54: the Events list and detail show the art under full cards. Final release orbit-38.5-release-2026-09-29-b74eed7.apk (owner-approved). No migration, no backup bump.
+- [ ] **Phase 38.6: Photo Handling — Sync, Sizes & Lightbox** (INSERTED) - Contact photos current on every surface (Android file:// image-cache staleness + initials-only surfaces), bigger Profile/List/Grid photos, Grid card corner controls and two-line names, Profile photo lightbox. Promotes backlog 999.1. Needs discuss-phase.
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
 
@@ -1321,6 +1322,19 @@ Plans:
 > - The background images are made by a Codex agent (`codex-edu`, `gpt-6-astra`) in a Claude-verified loop that ends at a blocking owner sign-off. Claude does all other work.
 > **Updated 2026-09-27 (owner rulings, 38.5 D-15..D-16).** The owner confirms the ADR-115 supersession (D-15): contact entries truly transparent in Galaxy Light and Standard Dark, see-through List rows, and no backing on the count label and headers where the sign-off says none. 38.5 writes the superseding ADR. A pearl planet limb may be created as an exploration for the owner to look at, not a commitment; the Phase 31 "no planets" art rule is relaxed for that exploration only (D-16).
 
+### Phase 38.6: Photo Handling — Sync, Sizes & Lightbox (INSERTED)
+
+**Goal**: A contact's photo is the same, current photo everywhere Orbit shows that contact; photos are bigger on the Profile (~2×, growing upwards), the Contacts List (+50%) and the Contacts Grid (~2×, with corner controls 5px from the card edges and two-line names at uniform row height); and tapping the Profile photo opens a full-screen, zoomable lightbox.
+**Depends on**: Phase 38.5
+**Requirements**: None formal — owner requests D-01..D-09 (2026-09-29); promotes backlog 999.1 (38.4 D-73)
+**Success Criteria**: A photo changed by any writer (crop, remove, import, import retry, reconcile, merge, restore) shows on every surface without an app restart and after one; no surface that shows an existing Orbit contact falls back to initials when a photo exists (scope per O-2); size, grid and lightbox behaviour signed off by the owner on device (Pixel 6 Pro + Pixel 3a)
+**Scope source**: docs/dossier/milestone-2/phase-38.6-photo-handling-dossier.md (authoritative)
+**Canonical refs**: docs/dossier/07-photos.md (photo domain: 512 master, storage, backup); 38.2 RG-010 photo ownership primitives
+**UI hint**: yes
+**Plans**: 0 plans — needs discuss-phase
+
+> **Inserted 2026-09-29 (owner).** See `38.6-CONTEXT.md` (shim) and the dossier's OPEN items: O-1 photo resolution (the 512 master looks soft at the new sizes and in a lightbox; changing it reverses `07-photos.md` Cluster B), O-2 coverage scope, O-3 lightbox reach, O-4 lightbox behaviour, and a possible pull-in of the restore-progress photo-library todo.
+
 ### Phase 39: Onboarding
 
 **Goal**: First-run setup and teaching designed against the real, implemented product rather than an imagined one.
@@ -1372,6 +1386,7 @@ Plans:
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
+| 38.6 Photo Handling — Sync, Sizes & Lightbox | 0/TBD | Not started | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
@@ -1383,15 +1398,4 @@ Phases 37–40 carry no requirements by design; theirs are defined when they are
 
 ## Backlog
 
-### Phase 999.1: Profile photos — bigger Card-view photos, cross-screen photo sync, Profile photo lightbox (BACKLOG)
-
-**Goal:** [Captured for future planning] Owner, 2026-09-28 (38.4 owner checklist item 10, D-73):
-(1) Card-view contact photos about twice as big — accept fewer cards on screen, without breaking the card layout;
-(2) profile photos are out of sync across screens — the same contact shows a different or stale photo on different pages;
-(3) new feature: tapping the photo on a contact's Profile opens a lightbox (full-size view).
-**Requirements:** TBD
-**Plans:** 0 plans
-
-Plans:
-
-- [ ] TBD (promote with /gsd-review-backlog when ready)
+*Backlog 999.1 (profile photos) promoted to Phase 38.6 on 2026-09-29.*

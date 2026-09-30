@@ -2,21 +2,22 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
-current_phase: 39
-current_phase_name: Onboarding
+current_phase: 38.6
+current_phase_name: Photo Handling — Sync, Sizes & Lightbox
 status: planning
-stopped_at: Phase 38.5 complete, ready to plan Phase 39
+stopped_at: Phase 38.6 inserted (pre-discuss shim + dossier), ready for discuss-phase
 last_updated: "2026-09-29T16:37:27.896Z"
 last_activity: 2026-09-29
-last_activity_desc: Phase 38.5 complete, transitioned to Phase 39
+last_activity_desc: Phase 38.6 Photo Handling inserted before Phase 39 (promotes backlog 999.1)
 state_head: 02d1e79c0fc13b57b0b9b62960156d04f01b5955
 progress:
-  total_phases: 27
+  total_phases: 28
   completed_phases: 19
   total_plans: 250
   completed_plans: 248
 carried_forward:
 
+  - "38.6 INSERTED (owner 2026-09-29): Phase 38.6 Photo Handling — Sync, Sizes & Lightbox, before Phase 39. Promotes backlog 999.1 (38.4 D-73), retired from the backlog. Owner requests D-01..D-09. Root cause of stale photos verified: expo-image on Android ignores cacheKey for file:// URIs + fixed per-contact photo path. OPEN for discuss: O-1 photo resolution (reverses 07-photos 512-master decision if changed), O-2 coverage scope, O-3/O-4 lightbox reach/behaviour, restore-progress photo-library todo pull-in. Dossier docs/dossier/milestone-2/phase-38.6-photo-handling-dossier.md."
   - "38.3 owner dispositions (2026-09-26, not passes): UAT-023a widget leg DEFERRED to the widget-overhaul phase; UAT-042 A-then-B chronology, UAT-024b month/year rollover, UAT-026b in-range keep and UAT-022 warm-Mark-while-backgrounded ACCEPTED-RISK (unit tests only). O-3 → homed in 38.4 Workstream I (D-10)."
   - "38.3 loose ends (owner 2026-09-26): 38.3 review A-WR-05 (Home favourite toggle bypasses the publication seam — not a widget item) and verifier W2/W3 (Digest/Profile background read on warm notification action; O-1 expo-sqlite 'shared object already released') → homed in 38.4 Workstream I (38.4 D-10, owner 2026-09-26)."
   - "WIDGET OVERHAUL (owner 2026-09-25): owner wants a dedicated widget phase (dislikes current widget in several ways). RG-001 remaining checks (max-size resize, visible explicit refresh) are DEFERRED there — not passes. RG-032 widget action accessible names also deferred there as a hard requirement (38.4 D-16, 2026-09-26)."
@@ -38,22 +39,22 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 39 — Onboarding
+**Current focus:** Phase 38.6 — Photo Handling (inserted), then Phase 39 — Onboarding
 
 ## Current Position
 
-Phase: 39 — Onboarding
+Phase: 38.6 — Photo Handling — Sync, Sizes & Lightbox (INSERTED)
 Plan: Not started
-Status: Ready to plan
+Status: Ready for discuss-phase
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-29 — Phase 38.5 complete, transitioned to Phase 39
+Last activity: 2026-09-29 — Phase 38.6 inserted before Phase 39 (promotes backlog 999.1)
 Progress: v2.0 phases checked complete in ROADMAP — 22, 23, 24.1, 24.2, 25, 26, 27, 29, 31, 31.1, 32, 33, 34, 35, 37, 38, 38.1, 38.2, 38.3, 38.4, 38.5. Still unchecked in ROADMAP: 28 and 30 (reconcile; see FYI above), 36, 37.1, 39, 40.
-Next: Plan Phase 39 (Onboarding). Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
+Next: Discuss Phase 38.6 (Photo Handling), then plan Phase 39 (Onboarding). Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
 
 **Milestone v2.0 structure (pre-decided by the owner from the fifteen milestone-2 dossiers + the
 2026-09-01 cross-dossier audit; not re-derived):** 22 App Shell · 23 Theme · 24 Contact Knowledge ·
