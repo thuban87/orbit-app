@@ -109,7 +109,7 @@ describe("ExistingContactChoiceSheet (38.6 D-25 F-1)", () => {
       transparent: true,
       animationType: "fade",
     });
-    (modal?.props.onRequestClose as () => void)();
+    ((modal as TestElement).props.onRequestClose as () => void)();
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(
       sheet().some(
@@ -181,7 +181,7 @@ describe("ExistingContactChoiceSheet (38.6 D-25 F-1)", () => {
     const pressables = sheet({ onChoose }).filter(
       (node) => node.type === "Pressable",
     );
-    (pressables[1]?.props.onPress as () => void)();
+    ((pressables[1] as TestElement).props.onPress as () => void)();
     expect(onChoose).toHaveBeenCalledWith(CHOICES[1]);
   });
 

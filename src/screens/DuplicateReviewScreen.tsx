@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   type BulkAction,
   CandidateCardGrid,
   type CandidateChoice,
   type CandidateItem,
 } from "@/components/CandidateCardGrid";
+import { ExistingContactChoiceSheet } from "@/components/ExistingContactChoice";
 import { getContactHeader } from "@/db/contact-read";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
@@ -33,6 +34,7 @@ import {
   runBulkResolveThenRecover,
   runResolveThenRecover,
 } from "./duplicate-review-logic";
+import { resolveExistingContactChoices } from "./existing-contact-choices";
 import { useOpenImportSession } from "./use-open-import-session";
 
 const LOG_SCOPE = "duplicate-review";
@@ -69,18 +71,15 @@ async function choicesForRow(
       typeof (candidate as DurableCandidate).contactId === "number",
   );
   const exec = getExecutor();
-  const choices: Array<CandidateChoice | null> = await Promise.all(
-    candidates.map(async (candidate) => {
-      const contact = await getContactHeader(exec, candidate.contactId);
-      if (!contact) return null;
-      return {
-        contactId: contact.id,
-        name: contact.name,
-        evidenceHint: evidenceHint(candidate),
-      };
-    }),
+  const resolved = await resolveExistingContactChoices(candidates, (id) =>
+    getContactHeader(exec, id),
   );
-  return choices.filter((choice): choice is CandidateChoice => choice !== null);
+  return resolved.map((candidate) => ({
+    contactId: candidate.contactId,
+    name: candidate.name,
+    photo: candidate.photo,
+    evidenceHint: evidenceHint(candidate),
+  }));
 }
 
 export function DuplicateReviewScreen({
@@ -361,48 +360,13 @@ export function DuplicateReviewScreen({
           recommendationExcludes="needs_review"
         />
       )}
-      <Modal
+      <ExistingContactChoiceSheet
         visible={currentLink !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCurrentLink(null)}
-      >
-        <View style={styles.modalRoot}>
-          <View
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: colors.surfaceElevated,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            <Text style={[styles.sheetTitle, { color: colors.textPrimary }]}>
-              Choose an existing contact
-            </Text>
-            {currentChoices.map((choice) => (
-              <Pressable
-                key={choice.contactId}
-                accessibilityRole="button"
-                accessibilityState={{ disabled: writing }}
-                disabled={writing}
-                onPress={() => void chooseLink(choice)}
-                style={[styles.choice, { borderColor: colors.border }]}
-              >
-                <Text style={{ color: colors.textPrimary }}>{choice.name}</Text>
-                <Text style={{ color: colors.textSecondary }}>
-                  {choice.evidenceHint}
-                </Text>
-              </Pressable>
-            ))}
-            {currentChoices.length === 0 ? (
-              <Text style={{ color: colors.textSecondary }}>
-                This matching contact is no longer available.
-              </Text>
-            ) : null}
-          </View>
-        </View>
-      </Modal>
+        choices={currentChoices}
+        writing={writing}
+        onChoose={(choice) => void chooseLink(choice)}
+        onClose={() => setCurrentLink(null)}
+      />
     </View>
   );
 }
@@ -427,16 +391,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     minHeight: 44,
     paddingHorizontal: 16,
-  },
-  modalRoot: { flex: 1, justifyContent: "center", paddingHorizontal: 24 },
-  sheet: { borderRadius: 12, borderWidth: 1, gap: 8, padding: 16 },
-  sheetTitle: { fontSize: 18, fontWeight: "700" },
-  choice: {
-    borderWidth: 1,
-    borderRadius: 10,
-    gap: 4,
-    minHeight: 44,
-    justifyContent: "center",
-    padding: 12,
   },
 });

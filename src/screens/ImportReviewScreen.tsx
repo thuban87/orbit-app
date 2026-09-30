@@ -22,6 +22,7 @@ import {
   toMethodDrafts,
   updateMethodDraft,
 } from "@/components/contact-methods-editor-model";
+import { LinkExistingChoiceButton } from "@/components/ExistingContactChoice";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
 import { getAppSettings } from "@/db/app-settings-dao";
 import { getContactHeader, listCategories } from "@/db/contact-read";
@@ -56,6 +57,7 @@ import { useTheme } from "@/theme";
 import { FREQUENCY_DAYS } from "@/types";
 import { Logger } from "@/utils/logger";
 import { boundFrequencyBlocksImport } from "./bulk-import-setup-logic";
+import { resolveExistingContactChoices } from "./existing-contact-choices";
 import { useImportLeaveGuard } from "./use-import-leave-guard";
 import { useOpenImportSession } from "./use-open-import-session";
 
@@ -67,7 +69,11 @@ type Snapshot = {
   birthday: string | null;
 };
 
-type DuplicateChoice = DuplicateEvidenceCandidate & { name: string };
+type DuplicateChoice = DuplicateEvidenceCandidate & {
+  name: string;
+  /** The existing contact's stored RELATIVE photo path (38.6 D-25 F-1). */
+  photo: string | null;
+};
 
 function parseSnapshot(value: string): Snapshot | null {
   try {
@@ -285,14 +291,10 @@ export function ImportReviewScreen({
         await importAsNew();
         return;
       }
-      const choices = await Promise.all(
-        result.candidates.map(async (candidate) => {
-          const contact = await getContactHeader(exec, candidate.contactId);
-          return contact ? { ...candidate, name: contact.name } : null;
-        }),
-      );
       setDuplicateChoices(
-        choices.filter((choice): choice is DuplicateChoice => choice !== null),
+        await resolveExistingContactChoices(result.candidates, (id) =>
+          getContactHeader(exec, id),
+        ),
       );
       setDuplicateOutcome(result.outcome);
     } catch (error) {
@@ -637,47 +639,13 @@ export function ImportReviewScreen({
               We found someone who might already be in Orbit.
             </Text>
             {duplicateChoices.map((choice) => (
-              <Pressable
+              <LinkExistingChoiceButton
                 key={choice.contactId}
+                choice={choice}
+                single={duplicateChoices.length === 1}
                 disabled={saving}
                 onPress={() => void linkToExisting(choice)}
-                style={[
-                  styles.duplicateChoice,
-                  {
-                    backgroundColor:
-                      duplicateChoices.length === 1
-                        ? colors.accent
-                        : colors.surface,
-                    borderColor:
-                      duplicateChoices.length === 1
-                        ? colors.accent
-                        : colors.border,
-                  },
-                ]}
-              >
-                <Text
-                  style={{
-                    color:
-                      duplicateChoices.length === 1
-                        ? colors.onAccent
-                        : colors.textPrimary,
-                  }}
-                >
-                  {duplicateChoices.length === 1
-                    ? "Link to Existing"
-                    : "Choose this one"}
-                </Text>
-                <Text
-                  style={{
-                    color:
-                      duplicateChoices.length === 1
-                        ? colors.onAccent
-                        : colors.textSecondary,
-                  }}
-                >
-                  {choice.name}
-                </Text>
-              </Pressable>
+              />
             ))}
             <Pressable
               disabled={saving}

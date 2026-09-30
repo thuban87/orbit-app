@@ -34,7 +34,11 @@ export type BulkAction =
 export interface CandidateChoice {
   contactId: number;
   name: string;
-  photoUri?: string | null;
+  /**
+   * The existing Orbit contact's stored RELATIVE photo path, rendered through
+   * Avatar so it follows the display revision (38.6 D-01, D-25 F-1).
+   */
+  photo?: string | null;
   evidenceHint?: string;
 }
 
