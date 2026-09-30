@@ -218,6 +218,23 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     During the device pass, restore a backup holding ~50 photo contacts and confirm the progress treatment and Back
     behaviour before the result screen. No new code unless it finds a bug. Close the todo at phase end.
 
+### Post-research rulings (owner, 2026-09-29)
+
+-   **[DECIDED · 2026-09-29] D-20 --- Encrypted-backup cap: measure first (research F-3).** The 1024 WebP masters
+    make encrypted backups hit the approved 8 MiB ciphertext cap (`src/services/backup/encryption.ts:23`) at roughly
+    40--85 photo contacts instead of 100--200 (estimates). This phase does not change the encryption profile. The
+    device pass measures real encrypted and automatic backup sizes with a 50--100 photo-contact library and reports
+    them; the owner then decides (accept / raise the cap). Raising the cap is not in this phase.
+-   **[DECIDED · 2026-09-29] D-21 --- Filenames unchanged; WebP bytes under the `.jpg` names (research F-1/F-2).**
+    38.2 D-09 / ADR-021 identity-derived filenames stay. New masters are WebP content stored at the existing
+    `avatars/contact-<id>.jpg` / `avatars/cv-<id>-<col>.jpg` paths; readers decode by content. D-12's "mixed
+    `.jpg`/`.webp` library" means mixed JPEG/WebP *content* and 512/1024 sizes, not mixed extensions. This
+    supersedes D-19's "new filename per write" direction: the stale-photo fix must not rename files (research's
+    display-revision approach). If the fix can only work by renaming, stop and ask the owner.
+-   **[DECIDED · 2026-09-29] D-22 --- Imported phone photos stay thumbnail-sized (research F-4).** The native picker
+    reads the contact's thumbnail (`OrbitContactPickerModule.kt:207-208`); under D-10's never-upscale rule it is
+    stored at that size. No native change in this phase; logged as a future item.
+
 ### Engineering boundaries (recorded so planning cannot drift)
 
 -   **[DERIVED] D-19 --- Stale-photo fix and its trip-wires.** The D-01 cache fix approach is an engineering call
@@ -268,3 +285,5 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
 -   **2026-09-29** --- Discuss session: D-10..D-19 recorded; O-1..O-4 resolved; photo-coverage table corrected (import
     review, consolidation prompt and legacy picker already show phone photos); 07-photos Cluster B 512 JPEG size
     superseded by D-10; restore-progress todo pulled in.
+-   **2026-09-29** --- Post-research rulings D-20..D-22 (encrypted-backup cap measured not changed; filenames unchanged
+    with WebP bytes under `.jpg` names, superseding D-19's new-filename direction; imported photos stay thumbnails).
