@@ -25,7 +25,12 @@
  * `photo-pipeline.ts`, which rethrows a typed `PhotoPipelineError`: that pipeline
  * runs per user action, this runs per tile in a batch render.
  */
-import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
+import {
+  ImageManipulator,
+  type ImageRef,
+  type ImageResult,
+  SaveFormat,
+} from "expo-image-manipulator";
 import { discardDerivative } from "@/services/photos/derivative-cache";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
 import { Logger } from "@/utils/logger";
@@ -66,22 +71,32 @@ export async function encodeWidgetThumb(
   try {
     // file:// of the master (512 JPEG or up to 1024 WebP, D-12).
     const fileUri = resolvePhotoUri(relativePath);
-    const rendered = await ImageManipulator.manipulate(fileUri)
-      .resize({ width: THUMB_PX, height: THUMB_PX })
-      .renderAsync();
-    let out: Awaited<ReturnType<typeof rendered.saveAsync>>;
+    // WR-02: the context is released too — on Android its finished task still
+    // holds the thumbnail Bitmap after the ImageRef is released (D-11).
+    const context = ImageManipulator.manipulate(fileUri);
+    let rendered: ImageRef | null = null;
+    let out: ImageResult;
     try {
+      rendered = await context
+        .resize({ width: THUMB_PX, height: THUMB_PX })
+        .renderAsync();
       out = await rendered.saveAsync({
         format: SaveFormat.JPEG,
         compress: THUMB_Q,
         base64: true,
       });
     } finally {
-      // Release the native bitmap exactly once, on success and on a save throw.
+      // Release the native bitmap and its context exactly once each, on
+      // success and on a render/save throw.
       try {
-        rendered.release();
+        rendered?.release();
       } catch {
         Logger.warn(LOG_SCOPE, "thumbnail bitmap release failed");
+      }
+      try {
+        context.release();
+      } catch {
+        Logger.warn(LOG_SCOPE, "thumbnail context release failed");
       }
     }
 

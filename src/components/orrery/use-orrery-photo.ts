@@ -91,10 +91,14 @@ async function downsampleWithManipulator(
   const { ImageManipulator, SaveFormat } = (await import(
     "expo-image-manipulator"
   )) as typeof ExpoImageManipulator;
-  const rendered = await ImageManipulator.manipulate(uri)
-    .resize({ width: ORRERY_TEXTURE_MAX, height: ORRERY_TEXTURE_MAX })
-    .renderAsync();
+  // WR-02: release the context too — on Android its finished task still holds
+  // the downsampled Bitmap after the ImageRef is released (D-11).
+  const context = ImageManipulator.manipulate(uri);
+  let rendered: Awaited<ReturnType<typeof context.renderAsync>> | null = null;
   try {
+    rendered = await context
+      .resize({ width: ORRERY_TEXTURE_MAX, height: ORRERY_TEXTURE_MAX })
+      .renderAsync();
     const out = await rendered.saveAsync({
       format: SaveFormat.JPEG,
       compress: ORRERY_DERIVATIVE_QUALITY,
@@ -107,9 +111,14 @@ async function downsampleWithManipulator(
     return { base64: out.base64, uri: out.uri };
   } finally {
     try {
-      rendered.release();
+      rendered?.release();
     } catch {
       Logger.warn(LOG_SCOPE, "downsample bitmap release failed");
+    }
+    try {
+      context.release();
+    } catch {
+      Logger.warn(LOG_SCOPE, "downsample context release failed");
     }
   }
 }

@@ -62,7 +62,20 @@ type RenderedRef = Awaited<
   >
 >;
 
-function releaseQuietly(ref: RenderedRef | null): void {
+type ManipulatorContext = ReturnType<
+  Manipulator["ImageManipulator"]["manipulate"]
+>;
+
+/**
+ * Release a native `SharedObject` — a rendered `ImageRef` or the
+ * `ImageManipulatorContext` that produced it. BOTH must be released: on Android
+ * the context's finished task still holds the final `Bitmap` after the
+ * `ImageRef` is released, so releasing only the ref leaves the bitmap reachable
+ * until an unrelated JS GC collects the context wrapper (D-11). The chainable
+ * `crop`/`resize` calls return the SAME native context, so releasing the one
+ * `manipulate()` returned covers the whole chain.
+ */
+function releaseQuietly(ref: RenderedRef | ManipulatorContext | null): void {
   if (!ref) return;
   try {
     ref.release();
@@ -92,7 +105,8 @@ async function saveMaster(
  *   and keep its own size up to `MASTER_MAX_EDGE` (D-13/D-22: an imported
  *   thumbnail is neither upscaled nor distorted).
  *
- * Every `ImageRef` rendered here is released exactly once in a `finally`.
+ * Every `ImageRef` rendered here, and every manipulator context that rendered
+ * one, is released exactly once in a `finally`.
  */
 export async function encodeMaster(
   sourceUri: string,
@@ -103,33 +117,42 @@ export async function encodeMaster(
 
   if (crop) {
     const edge = masterEdge(crop.width, crop.height);
-    let context = ImageManipulator.manipulate(sourceUri).crop(crop);
-    if (edge < Math.floor(Math.min(crop.width, crop.height))) {
-      context = context.resize({ width: edge, height: edge });
-    }
-    const rendered = await context.renderAsync();
+    const context = ImageManipulator.manipulate(sourceUri);
+    let rendered: RenderedRef | null = null;
     try {
+      let chain = context.crop(crop);
+      if (edge < Math.floor(Math.min(crop.width, crop.height))) {
+        chain = chain.resize({ width: edge, height: edge });
+      }
+      rendered = await chain.renderAsync();
       return await saveMaster(mod, rendered);
     } finally {
       releaseQuietly(rendered);
+      releaseQuietly(context);
     }
   }
 
+  let baseContext: ManipulatorContext | null = null;
   let base: RenderedRef | null = null;
+  let context: ManipulatorContext | null = null;
   let rendered: RenderedRef | null = null;
   try {
-    base = await ImageManipulator.manipulate(sourceUri).renderAsync();
+    baseContext = ImageManipulator.manipulate(sourceUri);
+    base = await baseContext.renderAsync();
     const square = centerSquare(base.width, base.height);
     const edge = masterEdge(square.width, square.height);
-    let context = ImageManipulator.manipulate(base);
-    if (base.width !== base.height) context = context.crop(square);
+    context = ImageManipulator.manipulate(base);
+    let chain = context;
+    if (base.width !== base.height) chain = chain.crop(square);
     if (edge < square.width) {
-      context = context.resize({ width: edge, height: edge });
+      chain = chain.resize({ width: edge, height: edge });
     }
-    rendered = await context.renderAsync();
+    rendered = await chain.renderAsync();
     return await saveMaster(mod, rendered);
   } finally {
     releaseQuietly(rendered);
+    releaseQuietly(context);
     releaseQuietly(base);
+    releaseQuietly(baseContext);
   }
 }

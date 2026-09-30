@@ -11,10 +11,13 @@ interface FakeRef {
 const h = vi.hoisted(() => ({
   calls: [] as Array<{ op: string; arg: unknown }>,
   refs: [] as FakeRef[],
+  /** Release counts of every manipulator context, in creation order (WR-02). */
+  contextReleases: [] as number[],
   /** Source dimensions for a plain (no crop) render of a URI. */
   sourceSize: { width: 100, height: 100 },
   saves: [] as unknown[],
   saveError: null as Error | null,
+  renderError: null as Error | null,
 }));
 
 vi.mock("expo-image-manipulator", () => {
@@ -47,7 +50,11 @@ vi.mock("expo-image-manipulator", () => {
                 width: (source as FakeRef).width,
                 height: (source as FakeRef).height,
               };
+        const ctxIndex = h.contextReleases.push(0) - 1;
         const ctx = {
+          release() {
+            h.contextReleases[ctxIndex] += 1;
+          },
           crop(rect: { width: number; height: number }) {
             h.calls.push({ op: "crop", arg: rect });
             size = { width: rect.width, height: rect.height };
@@ -60,6 +67,7 @@ vi.mock("expo-image-manipulator", () => {
           },
           async renderAsync() {
             h.calls.push({ op: "render", arg: null });
+            if (h.renderError) throw h.renderError;
             return makeRef(size.width, size.height);
           },
         };
@@ -80,8 +88,10 @@ import {
 beforeEach(() => {
   h.calls.length = 0;
   h.refs.length = 0;
+  h.contextReleases.length = 0;
   h.saves.length = 0;
   h.saveError = null;
+  h.renderError = null;
   h.sourceSize = { width: 100, height: 100 };
 });
 
@@ -165,6 +175,22 @@ describe("encodeMaster with a crop", () => {
     });
     expect(h.refs).toHaveLength(1);
     expect(h.refs[0].releases).toBe(1);
+    // WR-02: the context still holds the final bitmap — it is released too.
+    expect(h.contextReleases).toEqual([1]);
+  });
+
+  it("releases the context when renderAsync rejects (no ref to release)", async () => {
+    h.renderError = new Error("decode");
+    await expect(
+      encodeMaster("file:///src.jpg", {
+        originX: 0,
+        originY: 0,
+        width: 600,
+        height: 600,
+      }),
+    ).rejects.toThrow("decode");
+    expect(h.refs).toHaveLength(0);
+    expect(h.contextReleases).toEqual([1]);
   });
 
   it("releases the rendered ref exactly once when saveAsync rejects", async () => {
@@ -179,6 +205,7 @@ describe("encodeMaster with a crop", () => {
     ).rejects.toThrow("encode");
     expect(h.refs).toHaveLength(1);
     expect(h.refs[0].releases).toBe(1);
+    expect(h.contextReleases).toEqual([1]);
   });
 });
 
@@ -219,10 +246,14 @@ describe("encodeMaster without a crop (import, retry, reconcile)", () => {
     h.sourceSize = { width: 1500, height: 1500 };
     await encodeMaster("file:///staged.jpg");
     expect(h.refs.map((r) => r.releases)).toEqual([1, 1]);
+    // WR-02: both contexts (the base decode and the square/resize) are released.
+    expect(h.contextReleases).toEqual([1, 1]);
 
     h.refs.length = 0;
+    h.contextReleases.length = 0;
     h.saveError = new Error("encode");
     await expect(encodeMaster("file:///staged.jpg")).rejects.toThrow("encode");
     expect(h.refs.map((r) => r.releases)).toEqual([1, 1]);
+    expect(h.contextReleases).toEqual([1, 1]);
   });
 });

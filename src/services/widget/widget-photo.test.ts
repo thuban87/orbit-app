@@ -27,6 +27,8 @@ const h = vi.hoisted(() => ({
     saveBase64?: string | undefined;
   },
   releases: [] as number[],
+  /** Release counts of each manipulator context (WR-02). */
+  contextReleases: [] as number[],
 }));
 
 vi.mock("expo-image-manipulator", () => {
@@ -34,7 +36,11 @@ vi.mock("expo-image-manipulator", () => {
     SaveFormat: { JPEG: "jpeg" },
     ImageManipulator: {
       manipulate(_uri: string) {
+        const ctxIndex = h.contextReleases.push(0) - 1;
         const chain = {
+          release() {
+            h.contextReleases[ctxIndex] += 1;
+          },
           resize(_opts: unknown) {
             return chain;
           },
@@ -75,6 +81,7 @@ describe("encodeWidgetThumb", () => {
   beforeEach(() => {
     h.cfg = { saveBase64: "QUJD" };
     h.releases.length = 0;
+    h.contextReleases.length = 0;
   });
 
   it("releases the rendered bitmap exactly once on success (D-11)", async () => {
@@ -82,6 +89,7 @@ describe("encodeWidgetThumb", () => {
       "data:image/jpeg;base64,QUJD",
     );
     expect(h.releases).toEqual([1]);
+    expect(h.contextReleases).toEqual([1]);
   });
 
   it("releases the rendered bitmap exactly once when saveAsync rejects", async () => {
@@ -90,6 +98,7 @@ describe("encodeWidgetThumb", () => {
       encodeWidgetThumb("avatars/contact-1.jpg"),
     ).resolves.toBeNull();
     expect(h.releases).toEqual([1]);
+    expect(h.contextReleases).toEqual([1]);
   });
 
   it("releases the rendered bitmap exactly once when base64 is missing", async () => {
@@ -98,6 +107,16 @@ describe("encodeWidgetThumb", () => {
       encodeWidgetThumb("avatars/contact-1.jpg"),
     ).resolves.toBeNull();
     expect(h.releases).toEqual([1]);
+    expect(h.contextReleases).toEqual([1]);
+  });
+
+  it("releases the context even when the render rejects (WR-02)", async () => {
+    h.cfg = { renderThrows: true };
+    await expect(
+      encodeWidgetThumb("avatars/contact-1.jpg"),
+    ).resolves.toBeNull();
+    expect(h.releases).toEqual([]);
+    expect(h.contextReleases).toEqual([1]);
   });
 
   it("returns null for a null path (no photo -> initials fallback)", async () => {

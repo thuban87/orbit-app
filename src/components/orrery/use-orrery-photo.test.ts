@@ -9,7 +9,43 @@ import type { SkData, SkImage } from "@shopify/react-native-skia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@shopify/react-native-skia", () => ({ Skia: {} }));
-vi.mock("expo-image-manipulator", () => ({}));
+// The real manipulator path (`defaultOrreryImageDeps.downsample`) is exercised
+// only by the WR-02 release test below; everything else injects fakes.
+const m = vi.hoisted(() => ({
+  refReleases: [] as number[],
+  contextReleases: [] as number[],
+  renderThrows: false,
+  saveBase64: "QUJD" as string | undefined,
+}));
+vi.mock("expo-image-manipulator", () => ({
+  SaveFormat: { JPEG: "jpeg" },
+  ImageManipulator: {
+    manipulate(_uri: string) {
+      const ctxIndex = m.contextReleases.push(0) - 1;
+      const ctx = {
+        release() {
+          m.contextReleases[ctxIndex] += 1;
+        },
+        resize(_size: unknown) {
+          return ctx;
+        },
+        async renderAsync() {
+          if (m.renderThrows) throw new Error("mock decode failed");
+          const refIndex = m.refReleases.push(0) - 1;
+          return {
+            release() {
+              m.refReleases[refIndex] += 1;
+            },
+            async saveAsync(_opts: unknown) {
+              return { uri: "file:///cache/small.jpg", base64: m.saveBase64 };
+            },
+          };
+        },
+      };
+      return ctx;
+    },
+  },
+}));
 vi.mock("@/services/photos/photo-storage", () => ({
   resolvePhotoUri: (relative: string) => `file:///docs/${relative}`,
 }));
@@ -22,6 +58,7 @@ vi.mock("@/utils/logger", () => ({
 
 import {
   createOrreryImageSlot,
+  defaultOrreryImageDeps,
   loadOrreryImage,
   ORRERY_DERIVATIVE_CACHE_BYTES,
   ORRERY_DOWNSAMPLE_CONCURRENCY,
@@ -417,5 +454,40 @@ describe("createOrreryImageSlot — the hook's SkImage lifecycle", () => {
     expect(undisposed).toEqual([committed]);
     expect(created.every((image) => image.disposeCount <= 1)).toBe(true);
     expect(slot.published).toBe(asSk(committed!));
+  });
+});
+
+describe("defaultOrreryImageDeps.downsample — native release (WR-02)", () => {
+  beforeEach(() => {
+    m.refReleases.length = 0;
+    m.contextReleases.length = 0;
+    m.renderThrows = false;
+    m.saveBase64 = "QUJD";
+  });
+
+  it("releases the rendered ref AND its context once on success", async () => {
+    await expect(
+      defaultOrreryImageDeps.downsample("file:///docs/avatars/contact-1.jpg"),
+    ).resolves.toEqual({ base64: "QUJD", uri: "file:///cache/small.jpg" });
+    expect(m.refReleases).toEqual([1]);
+    expect(m.contextReleases).toEqual([1]);
+  });
+
+  it("releases both when the payload is missing", async () => {
+    m.saveBase64 = undefined;
+    await expect(
+      defaultOrreryImageDeps.downsample("file:///docs/avatars/contact-1.jpg"),
+    ).rejects.toThrow("no base64 payload");
+    expect(m.refReleases).toEqual([1]);
+    expect(m.contextReleases).toEqual([1]);
+  });
+
+  it("releases the context when the render itself rejects", async () => {
+    m.renderThrows = true;
+    await expect(
+      defaultOrreryImageDeps.downsample("file:///docs/avatars/contact-1.jpg"),
+    ).rejects.toThrow("mock decode failed");
+    expect(m.refReleases).toEqual([]);
+    expect(m.contextReleases).toEqual([1]);
   });
 });
