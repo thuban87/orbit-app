@@ -235,6 +235,25 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     reads the contact's thumbnail (`OrbitContactPickerModule.kt:207-208`); under D-10's never-upscale rule it is
     stored at that size. No native change in this phase; logged as a future item.
 
+### Execution rulings (owner, 2026-09-30)
+
+-   **[DECIDED · 2026-09-30] D-23 --- A missing photo file keeps its reference and is flagged (code review WR-01).**
+    When the ownership layer finds a contact's (or self / custom-field) canonical photo file missing -- including
+    `settleRowLocked` retiring a finalize row whose pending file is gone -- it must NOT clear the stored photo
+    reference. The reference stays; the Profile (and any surface showing that photo) shows a visible "photo
+    unavailable" error state, not a silent initials fallback. Rejected: clearing the reference so backups pass
+    (owner: a unique photo must never be dropped from the record by an automatic path).
+-   **[DECIDED · 2026-09-30] D-24 --- Backups skip an unreadable photo instead of failing (code review WR-01).**
+    Manual and automatic export no longer fail wholesale on one unreadable photo (`BackupPhotoUnreadableError`,
+    `src/backup/export-manifest.ts`): the backup completes without that photo and tells the user how many photos
+    couldn't be included ("1 photo couldn't be included"). No backup-format bump (stays 7) unless unavoidable --
+    if it is, stop and ask the owner.
+-   **[DECIDED · 2026-09-30] D-25 --- More existing-contact photo surfaces (38.6-02 audit F-1..F-5).** Add the
+    contact's Orbit photo to: F-1 import's "Choose an existing contact" sheet and the "might already be in Orbit"
+    choices; F-2 the Home assist banner ("Did you reach ...?"); F-3 Update from Contacts' "keep Orbit photo" option
+    (Orbit photo beside the phone photo; header stays text). Not added: F-4 group-event participants / System builder
+    chips (owner: already acceptable as-is), F-5 birthday-flag review and AI per-contact permission lists.
+
 ### Engineering boundaries (recorded so planning cannot drift)
 
 -   **[DERIVED] D-19 --- Stale-photo fix and its trip-wires.** The D-01 cache fix approach is an engineering call
@@ -287,3 +306,5 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     superseded by D-10; restore-progress todo pulled in.
 -   **2026-09-29** --- Post-research rulings D-20..D-22 (encrypted-backup cap measured not changed; filenames unchanged
     with WebP bytes under `.jpg` names, superseding D-19's new-filename direction; imported photos stay thumbnails).
+-   **2026-09-30** --- Execution rulings D-23..D-25 (missing photo file keeps its reference and is flagged; backups skip
+    unreadable photos with a count; F-1..F-3 photo surfaces added, F-4/F-5 not).
