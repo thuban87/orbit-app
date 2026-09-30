@@ -1331,7 +1331,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.6-photo-handling-dossier.md (authoritative)
 **Canonical refs**: docs/dossier/07-photos.md (photo domain: 512 master, storage, backup); 38.2 RG-010 photo ownership primitives
 **UI hint**: yes
-**Plans**: 7/9 plans executed
+**Plans**: 8/9 plans executed
 
 Plans:
 
@@ -1341,7 +1341,7 @@ Plans:
 - [x] 38.6-04-PLAN.md — One ≤1024 WebP master for every new photo; orrery textures ≤512; sequential widget thumbnails (W3)
 - [x] 38.6-05-PLAN.md — Profile: 224 photo growing upward, star in the app bar beside ⋮, reusable zoomable lightbox (W3)
 - [x] 38.6-06-PLAN.md — Contacts List 72 and width-sized Grid photos, 5 px corner controls, two-line names, row-uniform height (W3)
-- [ ] 38.6-08-PLAN.md — Missing photo keeps its reference + "Photo unavailable" state (D-23); backups skip and count unreadable photos (D-24); manipulator release fold-in (W4)
+- [x] 38.6-08-PLAN.md — Missing photo keeps its reference + "Photo unavailable" state (D-23); backups skip and count unreadable photos (D-24); manipulator release fold-in (W4)
 - [x] 38.6-09-PLAN.md — Orbit photos on import existing-contact choices, Home assist banner, Update from Contacts keep-photo option (D-25) (W4)
 - [ ] 38.6-07-PLAN.md — Device pass: writer × surface matrix, D-11 memory, D-18 restore progress, D-20 backup sizes, D-23..D-25 checks, owner sign-off, one release build (W5)
 
@@ -1398,7 +1398,7 @@ Plans:
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
-| 38.6 Photo Handling — Sync, Sizes & Lightbox | 7/9 | In Progress|  |
+| 38.6 Photo Handling — Sync, Sizes & Lightbox | 8/9 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
