@@ -7,7 +7,16 @@ import { useTheme } from "@/theme";
 
 export interface PhotoChoiceOption<T extends string = string> {
   id: T;
-  /** Already-resolved local file URI. A raw/staged relative path is never accepted. */
+  /**
+   * The existing Orbit contact's stored RELATIVE photo path, rendered through
+   * Avatar so it follows the display revision (38.6 D-01/D-14). Takes
+   * precedence over `uri`.
+   */
+  photo?: string | null;
+  /**
+   * Already-resolved local staging file URI (e.g. the reconcile source preview).
+   * A raw/staged relative path is never accepted — use `photo` for canonical ones.
+   */
   uri: string | null;
   name: string;
   provenance: string;
@@ -69,10 +78,15 @@ export function PhotoChoice<T extends string>({
                 },
               ]}
             >
-              {showPhoto ? (
+              {option.photo ? (
+                <Avatar photo={option.photo} name={option.name} size={96} />
+              ) : showPhoto ? (
+                // The reconcile staging path is reused across scans, so a cached
+                // decode could be stale: never serve this preview from the cache.
                 <Image
                   source={{ uri: option.uri! }}
                   contentFit="cover"
+                  cachePolicy="none"
                   style={styles.image}
                   onError={() =>
                     setErrors((current) => new Set([...current, option.id]))

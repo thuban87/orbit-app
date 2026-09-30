@@ -14,6 +14,8 @@ export type EligiblePendingAssist = {
   handoff_at: string;
   created_at: string;
   contact_name: string;
+  /** The contact's stored RELATIVE photo path, rendered through Avatar (38.6 D-14); null without one. */
+  contact_photo: string | null;
 };
 
 export type ReachRoutes = {
@@ -30,14 +32,15 @@ const ELIGIBILITY_SQL = `
   AND (CAST(strftime('%s', ?) AS INTEGER) - CAST(strftime('%s', a.handoff_at) AS INTEGER)) >= ${ELIGIBLE_AFTER_SECONDS}
   AND (CAST(strftime('%s', ?) AS INTEGER) - CAST(strftime('%s', a.handoff_at) AS INTEGER)) <= ${EXPIRE_AFTER_HOURS * 60 * 60}`;
 
-/** Read the stable, eligible pending queue with the target name needed by the banner. */
+/** Read the stable, eligible pending queue with the target name (and photo) needed by the banner and sheet. */
 export function listEligiblePendingAssists(
   exec: SqlExecutor,
   now: string,
 ): Promise<EligiblePendingAssist[]> {
   return exec.getAllAsync<EligiblePendingAssist>(
     `SELECT a.id, a.uid, a.contact_id, a.channel, a.endpoint_value,
-            a.handoff_at, a.created_at, c.name AS contact_name
+            a.handoff_at, a.created_at, c.name AS contact_name,
+            c.photo AS contact_photo
        FROM interaction_assists a
        JOIN contacts c ON c.id = a.contact_id
       WHERE ${ELIGIBILITY_SQL}

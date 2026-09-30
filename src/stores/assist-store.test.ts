@@ -62,6 +62,7 @@ const queue = [
     handoff_at: "2026-08-31 12:00:00",
     created_at: "2026-08-31 12:00:01",
     contact_name: "Taylor",
+    contact_photo: null,
   },
   {
     id: 1,
@@ -72,6 +73,7 @@ const queue = [
     handoff_at: "2026-08-31 12:00:00",
     created_at: "2026-08-31 12:00:00",
     contact_name: "Morgan",
+    contact_photo: null,
   },
 ];
 

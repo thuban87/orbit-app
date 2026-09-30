@@ -43,7 +43,16 @@ export interface CandidateItem {
   name: string;
   outcome: ConfidenceOutcome;
   evidenceHint: string;
-  /** A caller-resolved file URI. Raw stored photo paths must never be supplied here. */
+  /**
+   * The existing Orbit contact's stored RELATIVE photo path, rendered through
+   * Avatar so it follows the display revision (38.6 D-01/D-14). Takes
+   * precedence over `photoUri`.
+   */
+  photo?: string | null;
+  /**
+   * A caller-resolved staging file URI (pre-import / phone photo). Raw stored
+   * photo paths must never be supplied here — use `photo` for those.
+   */
   photoUri: string | null;
   candidates?: CandidateChoice[];
   /** Reconciliation supplies advisory copy instead of import-match copy. */
@@ -218,7 +227,14 @@ export function CandidateCardGrid({
                   />
                 </View>
               ) : null}
-              {showPhoto ? (
+              {item.photo ? (
+                <Avatar
+                  photo={item.photo}
+                  name={item.name}
+                  contactId={item.id}
+                  size={48}
+                />
+              ) : showPhoto ? (
                 <Image
                   accessibilityLabel={`Photo of ${item.name}`}
                   source={{ uri: item.photoUri ?? undefined }}

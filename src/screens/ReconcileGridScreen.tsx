@@ -46,10 +46,7 @@ import {
   withReconcileFlowActive,
 } from "@/services/import/reconcile-flow-guard";
 import { discardDerivative } from "@/services/photos/derivative-cache";
-import {
-  deleteReconcileStaging,
-  resolvePhotoUri,
-} from "@/services/photos/photo-storage";
+import { deleteReconcileStaging } from "@/services/photos/photo-storage";
 import { stageReconcileSourcePhoto } from "@/services/photos/reconcile-photo";
 import { useTheme } from "@/theme";
 import {
@@ -357,7 +354,9 @@ export function ReconcileGridScreen({
       outcome: "needs_review",
       chipLabel: chipLabel(diff),
       evidenceHint: `${card.unresolvedCount} difference${card.unresolvedCount === 1 ? "" : "s"} left`,
-      photoUri: identity?.photo ? resolvePhotoUri(identity.photo) : null,
+      // Canonical Orbit photo through Avatar (follows the display revision, 38.6 D-01).
+      photo: identity?.photo ?? null,
+      photoUri: null,
     };
   });
 

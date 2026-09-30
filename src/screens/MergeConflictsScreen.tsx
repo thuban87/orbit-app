@@ -17,7 +17,6 @@ import {
   hasResolvedMergeConflicts,
   type MergeConflictChoice,
 } from "@/screens/merge-conflict-logic";
-import { resolvePhotoUri } from "@/services/photos/photo-storage";
 import { useTheme } from "@/theme";
 
 type ContactConflictRow = {
@@ -327,13 +326,15 @@ export function MergeConflictsScreen({
           options={[
             {
               id: "survivor",
-              uri: resolvePhotoUri(data.survivor.photo!),
+              photo: data.survivor.photo,
+              uri: null,
               name: data.survivor.name,
               provenance: provenance(data.survivor.name),
             },
             {
               id: "absorbed",
-              uri: resolvePhotoUri(data.absorbed.photo!),
+              photo: data.absorbed.photo,
+              uri: null,
               name: data.absorbed.name,
               provenance: provenance(data.absorbed.name),
             },

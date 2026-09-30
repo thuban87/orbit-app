@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { AssistConfirmation } from "@/components/AssistConfirmation";
+import { Avatar } from "@/components/Avatar";
 import { getExecutor, localDateTime } from "@/db/database";
 import {
   markAssistDismissed,
@@ -24,8 +25,12 @@ import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useAssistBanner } from "@/stores/assist-store";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import type { InFlightRef } from "@/utils/single-flight";
+
+/** Per-row contact avatar diameter (40): the queued contact's photo or initials (38.6 D-14). */
+const PENDING_AVATAR_SIZE = SPACING["2xl"] - SPACING.sm;
 
 const LOG_SCOPE = "pending-confirmations";
 
@@ -196,12 +201,20 @@ export function PendingConfirmationsSheet({
                   key={assist.uid}
                   style={[styles.item, { borderColor: colors.border }]}
                 >
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.question, { color: colors.textPrimary }]}
-                  >
-                    {questionFor(assist.channel, assist.contact_name)}
-                  </Text>
+                  <View style={styles.questionRow}>
+                    <Avatar
+                      photo={assist.contact_photo}
+                      name={assist.contact_name}
+                      contactId={assist.contact_id}
+                      size={PENDING_AVATAR_SIZE}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[styles.question, { color: colors.textPrimary }]}
+                    >
+                      {questionFor(assist.channel, assist.contact_name)}
+                    </Text>
+                  </View>
                   <AssistConfirmation
                     channel={assist.channel}
                     onConfirm={(connected, note) =>
@@ -237,7 +250,8 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     gap: 10,
   },
-  question: { fontSize: 16, fontWeight: "700" },
+  questionRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  question: { flex: 1, fontSize: 16, fontWeight: "700" },
   empty: { gap: 4, paddingVertical: 12 },
   emptyTitle: { fontSize: 17, fontWeight: "700" },
   emptyBody: { fontSize: 15 },

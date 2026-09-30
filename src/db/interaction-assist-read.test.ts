@@ -121,6 +121,24 @@ describe("interaction assist queue reads", () => {
     expect(rows[0].id).toBeGreaterThan(rows[1].id);
   });
 
+  it("returns each contact's stored photo path, null without one, for archived contacts too (38.6 D-14)", async () => {
+    const archived = await contact("Archived Alex", true);
+    const plain = await contact("Plain Parker");
+    await exec.runAsync("UPDATE contacts SET photo = ? WHERE id = ?", [
+      `avatars/contact-${archived}.jpg`,
+      archived,
+    ]);
+    await assist(archived, "2026-08-31 11:00:00", "2026-08-31 11:00:00");
+    await assist(plain, "2026-08-31 11:30:00", "2026-08-31 11:30:00");
+
+    const rows = await listEligiblePendingAssists(exec, NOW);
+
+    expect(rows.map((row) => [row.contact_name, row.contact_photo])).toEqual([
+      ["Plain Parker", null],
+      ["Archived Alex", `avatars/contact-${archived}.jpg`],
+    ]);
+  });
+
   it("selects actionable primaries and derives routes with no database read", () => {
     const phone = method({ id: 2, is_primary: 0 });
     const email = method({

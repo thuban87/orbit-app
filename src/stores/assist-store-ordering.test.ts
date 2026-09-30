@@ -43,6 +43,7 @@ function row(id: number, uid: string) {
     handoff_at: "2026-08-31 12:00:00",
     created_at: `2026-08-31 12:00:0${id}`,
     contact_name: "Name",
+    contact_photo: null,
   };
 }
 
