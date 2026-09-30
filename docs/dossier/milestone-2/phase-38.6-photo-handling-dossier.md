@@ -285,6 +285,12 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
 -   **[DECIDED · 2026-09-30] D-33 --- Restore result copy, supersedes D-30's second sentence (review IN3-03).** Photos
     restore could not bring back read "1 photo wasn't in the backup and couldn't be restored." / "N photos weren't in
     the backup and couldn't be restored."
+-   **[DECIDED · 2026-09-30] D-34 --- Text left in a photo field shows "Photo unavailable" (corrects D-31's display
+    assumption).** A photo-field value that is not a stored photo path never reaches the image resolver (today it
+    crashes Edit Contact and the Profile says "Photo added"); it renders as initials plus the existing "Photo
+    unavailable" notice with Change/Remove, and the Profile does not claim "Photo added". The text stays in the data and
+    backups (D-31).
+-   **[DECIDED · 2026-09-30] D-35 --- D-28 flag also applies to a Merge-moved photo value whose file was already gone.**
 
 ### Engineering boundaries (recorded so planning cannot drift)
 
@@ -346,3 +352,5 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     (skip only missing photos), D-30 (restore result copy).
 -   **2026-09-30** --- Review pass-3 rulings D-31 (text in a photo field backed up as text), D-32 (D-28 fallback
     accepted), D-33 (restore copy, supersedes D-30's second sentence).
+-   **2026-09-30** --- D-34 (text in a photo field shows Photo unavailable; D-31's "existing error state" did not
+    exist), D-35 (D-28 flag extended to the Merge-moved case).
