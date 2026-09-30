@@ -1,9 +1,9 @@
 # Phase 38.6 --- Photo Handling: Sync, Sizes & Lightbox Dossier
 
-**Status:** INSERTED 2026-09-29, pre-discuss. Authored at phase insertion from the owner's request of 2026-09-29 and a
+**Status:** INSERTED 2026-09-29; discussed 2026-09-29 (O-1..O-4 resolved as D-10..D-19, see Discuss Rulings). Authored at phase insertion from the owner's request of 2026-09-29 and a
 read-only grounding pass over the photo code (findings below are verified against source unless labelled LIKELY). This
 phase promotes backlog item **999.1** (38.4 D-73: bigger Card-view photos, cross-screen photo sync, Profile lightbox),
-which is retired from the backlog. Run gsd-discuss-phase to resolve the OPEN items before planning.
+which is retired from the backlog. The OPEN items were resolved in the 2026-09-29 discuss session.
 
 ## Decision Legend
 
@@ -88,9 +88,9 @@ code, not trust it:
 |---|---|---|
 | Digest › Your Week day detail | `src/components/digest/DigestDayDetail.tsx:122` | `photo={null}`: initials only (owner's example) |
 | Duplicate review / reconcile candidate grid | `src/components/CandidateCardGrid.tsx:232` | Initials only |
-| Import review | `src/screens/ImportReviewScreen.tsx:404` | Initials (pre-import device contact) |
-| Consolidation prompt | `src/components/ConsolidationPrompt.tsx:46` | Initials |
-| Legacy device-contact picker | `src/screens/LegacyContactPickerScreen.tsx:287` | Initials (device contacts) |
+| Import review | `src/screens/ImportReviewScreen.tsx:396-404` | **Corrected 2026-09-29:** already shows the phone photo (staged) when the device contact has one; initials only when it has none |
+| Consolidation prompt | `src/components/ConsolidationPrompt.tsx:27-46` | **Corrected 2026-09-29:** already shows the staged phone photo; initials fallback only |
+| Legacy device-contact picker | `src/screens/LegacyContactPickerScreen.tsx:278-287` | **Corrected 2026-09-29:** already shows the device thumbnail (`photoThumbUri`); initials fallback only |
 | History DateDetailSheet | `src/components/history/DateDetailSheet.tsx` | No avatar (icons only) |
 | Pending confirmations sheet | `src/components/PendingConfirmationsSheet.tsx` | No avatar (text only) |
 | Reach-out router | `src/components/ReachOutRouter.tsx` | No avatar |
@@ -136,29 +136,102 @@ self photo, custom photo field, and the widget.
 -   **[DERIVED] Resolution.** Masters are 512px. A 224dp Profile photo on the Pixel 6 Pro (~3.5×) needs ~780px, and a full-
     screen lightbox needs ~1440px. Both will look soft on today's master. See O-1.
 
-## OPEN (owner, for discuss)
+## OPEN (owner, for discuss) --- all RESOLVED 2026-09-29
 
--   **[OPEN] O-1 --- Photo resolution vs the bigger Profile photo and the lightbox.** `07-photos.md` Cluster B **decided** one
+Kept for the record. The rulings are in **Discuss Rulings (2026-09-29)** below: O-1 → D-10..D-13, O-2 → D-14,
+O-3 → D-15, O-4 → D-16.
+
+-   **[RESOLVED · was OPEN] O-1 --- Photo resolution vs the bigger Profile photo and the lightbox.** `07-photos.md` Cluster B **decided** one
     512×512 master and **rejected** "512 + original" and "original only". Options: (a) keep 512 and accept a soft
     lightbox and Profile photo; (b) raise the single master (for example to 1024) for new photos only, with existing
     photos staying 512 until re-picked; this reverses the decided 512 size, costs ~4× orrery texture memory per photo and
     backup size, and needs a widget-thumbnail check; (c) keep a second, larger lightbox-only file; this is close to the
     rejected "512 + original" and would reverse that rejection. Any change here reverses a recorded decision, so it is
     the owner's call.
--   **[OPEN] O-2 --- Coverage scope (D-02).** Recommendation: every surface that shows an **existing Orbit contact** with an
+-   **[RESOLVED · was OPEN] O-2 --- Coverage scope (D-02).** Recommendation: every surface that shows an **existing Orbit contact** with an
     initials bubble gets the real photo (Digest day detail, the duplicate/reconcile candidate grid). Pre-import device-
     contact surfaces (import review, consolidation prompt, legacy picker) keep initials, because there is no Orbit photo
     yet. Text-only surfaces (DateDetailSheet, pending confirmations, reach-out router, archived contacts, merge impact)
     stay text-only unless the owner wants avatars added there.
--   **[OPEN] O-3 --- Lightbox reach.** The Profile photo only (D-03), or also the Edit Contact photo preview and the Settings
+-   **[RESOLVED · was OPEN] O-3 --- Lightbox reach.** The Profile photo only (D-03), or also the Edit Contact photo preview and the Settings
     self photo? Recommendation: Profile only, with the component reusable.
--   **[OPEN] O-4 --- Lightbox behaviour.** Pinch-zoom and pan, double-tap to zoom, Back/tap/swipe-down to close. Background
+-   **[RESOLVED · was OPEN] O-4 --- Lightbox behaviour.** Pinch-zoom and pan, double-tap to zoom, Back/tap/swipe-down to close. Background
     black or theme-token scrim. Recommendation: pinch + double-tap + pan, Back or swipe-down closes, a near-opaque scrim from
     theme tokens.
 
+## Discuss Rulings (2026-09-29)
+
+Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-request numbering.
+
+### Photo resolution (O-1)
+
+-   **[DECIDED · 2026-09-29] D-10 --- One 1024 WebP master for every new photo.** Every write of a new photo
+    (crop/picker, URL download, device import, import retry, reconcile, custom photo field, self photo) saves one
+    square master at up to 1024×1024 as **WebP** instead of 512×512 JPEG. Never upscale: a source smaller than 1024 is
+    saved at its own size (still square). Quality setting is tuned for visual parity with today's q 0.75 JPEG. **This
+    reverses `07-photos.md` Cluster B's "one 512×512 JPEG master".** The owner asked for the 512 rationale first
+    (orrery GPU texture memory, the widget Binder ceiling, backup size) and chose this knowing: storage and backup size
+    ≈ 2.5--3× today (~10--12 MB per 100 contacts vs ~4 MB), accepted. Still one file per photo, so Cluster B's
+    "no thumbnail pair / no original" stands.
+-   **[DECIDED · 2026-09-29] D-11 --- Working memory stays flat.** expo-image surfaces already decode at display size
+    (`allowDownscaling`), so a 1024 master costs them nothing extra. The Skia Orrery (`OrbitBody.tsx`, `SunBody.tsx`
+    `useImage`) decodes full-size, so it must get a downsampled image (≤ today's 512, or body-sized) so its GPU texture
+    memory is no higher than today. How is an engineering call. The widget already re-encodes its own small copy
+    (`src/services/widget/widget-photo.ts`); verify it stays within the RemoteViews ceiling from a 1024 WebP source.
+-   **[DECIDED · 2026-09-29] D-12 --- Existing photos stay as-is.** Saved 512 JPEG masters are not converted or
+    re-encoded. A contact moves to D-10 only when a new photo is written for it. Every reader, the backup exporter,
+    restore, merge re-homing and the launch sweep must handle a mixed library (`.jpg` and `.webp`, 512 and 1024).
+-   **[REJECTED · 2026-09-29] 512 master + 1024 lightbox-only file** (the owner's own first idea, "most apps keep a
+    small and a large copy"). Rejected once it was clear that two files use **more** storage than one 1024 file
+    (≈3.5--4× vs ≈2.5--3×), would leave the bigger Profile photo soft, and working memory is flat either way (D-11).
+-   **[REJECTED · 2026-09-29] 1024 JPEG** (≈4× storage) and **keep 512** (soft Profile photo and lightbox).
+-   **[DECIDED · 2026-09-29] D-13 --- Imported phone photos follow D-10.** Import already brings in the device
+    contact's photo as the Orbit photo (`import-acquire.ts` → `import-photo.ts`, today resized to 512 JPEG); it now
+    uses the D-10 master rule. The owner's "use phone photos when importing" wish is therefore already built; only
+    the size/format changes.
+
+### Coverage (O-2)
+
+-   **[DECIDED · 2026-09-29] D-14 --- Where real photos appear.** Real photos replace initials on every surface showing
+    an existing Orbit contact: the Digest Your Week day detail and the duplicate/reconcile candidate grid (plus
+    anything the phase's own audit finds). **Pending confirmations** gains contact photos. The other text-only
+    surfaces (History DateDetailSheet, reach-out chooser, archived contacts, merge impact summary) stay text-only.
+    Pre-import surfaces already show the phone photo (grounding table corrected above).
+
+### Lightbox (O-3, O-4)
+
+-   **[DECIDED · 2026-09-29] D-15 --- Lightbox on the Profile photo only**, built as a reusable component.
+-   **[DECIDED · 2026-09-29] D-16 --- Full gestures.** Pinch to zoom, double-tap to zoom in/out, pan when zoomed.
+    Close with Back, a labelled ✕ button, or swipe down. Near-opaque scrim from theme tokens. TalkBack can reach and
+    operate the close button.
+
+### Profile layout (D-04 follow-up)
+
+-   **[DECIDED · 2026-09-29] D-17 --- The Profile favourite star moves into the top app bar**, beside the ⋮ overflow
+    button. The star's own utility row above the photo is removed, freeing space for D-04's upward growth; the photo
+    may also rise into the empty middle band of the app bar (device tuning). The star keeps its ≥44 hit area and its
+    Add/Remove Favorites accessibility labels.
+
+### Scope pull-in
+
+-   **[DECIDED · 2026-09-29] D-18 --- Pull in todo `2026-08-26-validate-restore-progress-with-imported-photo-library`.**
+    During the device pass, restore a backup holding ~50 photo contacts and confirm the progress treatment and Back
+    behaviour before the result screen. No new code unless it finds a bug. Close the todo at phase end.
+
+### Engineering boundaries (recorded so planning cannot drift)
+
+-   **[DERIVED] D-19 --- Stale-photo fix and its trip-wires.** The D-01 cache fix approach is an engineering call
+    (a new filename per write is the preferred direction, see Current State). It must cover every writer, go through the
+    38.2 RG-010 ownership primitives, and handle D-12's mixed library. Backups carry `photoBase64` with no extension or
+    MIME (`src/backup/backup-schema.ts`), so restore must write WebP bytes to a WebP-appropriate path (or otherwise
+    stay correct). **If the fix or D-10 needs a backup-format bump (today `BACKUP_FORMAT_VERSION = 7`), stop and ask
+    the owner.** Any schema change is a migration at head+1 verified on disk.
+-   **[PLANNING NOTE] KB follow-up.** D-10 supersedes a `07-photos.md` Cluster B decision; phase KB extraction must
+    record it as a new ADR superseding whatever ADR carries the 512 master (check `npm run graph:ask`).
+
 ## Carried Constraints
 
--   `07-photos.md` (photo domain, all [DECIDED] items): single 512 master, persistent document dir, base64 photos in backup,
+-   `07-photos.md` (photo domain, all [DECIDED] items) **except the 512 JPEG size, superseded by D-10**: single master, persistent document dir, base64 photos in backup,
     themed initials fallback colour.
 -   38.2 RG-010 photo ownership primitives (owned master, reference-safe intents, in-flight staging, merge re-homing,
     durable deletion intents). A versioned filename must go through them.
@@ -171,8 +244,7 @@ self photo, custom photo field, and the widget.
 
 -   **Backlog 999.1** --- promoted into this phase (D-01, D-03, D-06 cover it) and removed from the backlog.
 -   **Todo `2026-08-26-validate-restore-progress-with-imported-photo-library`** --- a device observation that needs ~50
-    contacts with photos. Candidate pull-in: this phase's device pass will already build a photo-heavy fixture set. Owner
-    to confirm.
+    contacts with photos. **Pulled in (D-18).**
 -   **Todo `2026-09-29-your-week-interactions-wrap`** --- Your Week stat label wrap at font 1.15. Same screen as D-02's
     example but a large-text layout item slated for Phase 40. Not pulled in unless the owner wants it.
 -   No other backlog item or pending todo concerns photos.
@@ -185,3 +257,14 @@ self photo, custom photo field, and the widget.
     and see it update on the Profile, List, Grid, Orrery, Digest, pickers and the widget without an app restart, and after
     a restart. Lightbox open, zoom, close, and TalkBack. Grid at 2/3/4 columns and large text.
 -   Owner device checkpoint on the Profile and Grid sizes (D-04, D-06 expect tuning).
+-   Added 2026-09-29: lightbox pinch / double-tap / pan / Back / ✕ / swipe-down (D-16); a mixed library of old 512 JPEG
+    and new 1024 WebP photos renders, backs up, restores and merges correctly (D-12); Orrery memory no higher than
+    before with many 1024 photos (D-11, physical phone only); widget still renders from a WebP master; restore
+    progress with ~50 photo contacts (D-18).
+
+## Revision Log
+
+-   **2026-09-29** --- Inserted (D-01..D-09, grounding, O-1..O-4).
+-   **2026-09-29** --- Discuss session: D-10..D-19 recorded; O-1..O-4 resolved; photo-coverage table corrected (import
+    review, consolidation prompt and legacy picker already show phone photos); 07-photos Cluster B 512 JPEG size
+    superseded by D-10; restore-progress todo pulled in.
