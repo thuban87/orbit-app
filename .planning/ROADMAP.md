@@ -1331,13 +1331,13 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.6-photo-handling-dossier.md (authoritative)
 **Canonical refs**: docs/dossier/07-photos.md (photo domain: 512 master, storage, backup); 38.2 RG-010 photo ownership primitives
 **UI hint**: yes
-**Plans**: 2/7 plans executed
+**Plans**: 3/7 plans executed
 
 Plans:
 
 - [x] 38.6-01-PLAN.md — Display-revision tracer + D-01 device spike (no filename change; owner stop if both strategies fail) (W1)
 - [x] 38.6-02-PLAN.md — Photo coverage: Your Week day detail, Pending confirmations, reconcile/merge review via Avatar; code-derived audit (W1)
-- [ ] 38.6-03-PLAN.md — Photo sync on every writer (restore/merge/delete/crash recovery), writer contract scan, retire the timestamp cache prop (W2)
+- [x] 38.6-03-PLAN.md — Photo sync on every writer (restore/merge/delete/crash recovery), writer contract scan, retire the timestamp cache prop (W2)
 - [ ] 38.6-04-PLAN.md — One ≤1024 WebP master for every new photo; orrery textures ≤512; sequential widget thumbnails (W3)
 - [ ] 38.6-05-PLAN.md — Profile: 224 photo growing upward, star in the app bar beside ⋮, reusable zoomable lightbox (W3)
 - [ ] 38.6-06-PLAN.md — Contacts List 72 and width-sized Grid photos, 5 px corner controls, two-line names, row-uniform height (W3)
@@ -1396,7 +1396,7 @@ Plans:
 | 38.3 Runtime Correctness, Navigation & State Coherence | 16/16 | In Progress|  |
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
-| 38.6 Photo Handling — Sync, Sizes & Lightbox | 2/7 | In Progress|  |
+| 38.6 Photo Handling — Sync, Sizes & Lightbox | 3/7 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
