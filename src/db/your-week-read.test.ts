@@ -22,11 +22,12 @@ async function contact(
   uid: string,
   name: string,
   archived = false,
+  photo: string | null = null,
 ): Promise<number> {
   const result = await exec.runAsync(
-    `INSERT INTO contacts(uid,name,interval_days,archived_at,created_at,modified_at)
-     VALUES(?,?,?,?,?,?)`,
-    [uid, name, 7, archived ? NOW : null, NOW, NOW],
+    `INSERT INTO contacts(uid,name,interval_days,archived_at,photo,created_at,modified_at)
+     VALUES(?,?,?,?,?,?,?)`,
+    [uid, name, 7, archived ? NOW : null, photo, NOW, NOW],
   );
   return result.lastInsertRowId;
 }
@@ -136,6 +137,28 @@ describe("Your Week app-wide reads", () => {
     ).toEqual([{ d: "2026-09-18", n: 1 }]);
     expect(await readYourWeekDay(exec, "2026-09-18")).toEqual([
       expect.objectContaining({ kind: "group_event", title: "Reunion" }),
+    ]);
+  });
+
+  it("day rows carry the contact's stored photo path; null without a photo and for group events (38.6 D-02/D-14)", async () => {
+    const ada = await contact("ph-ada", "Ada");
+    const withPhoto = await contact("ph-grace", "Grace");
+    await exec.runAsync("UPDATE contacts SET photo = ? WHERE id = ?", [
+      `avatars/contact-${withPhoto}.jpg`,
+      withPhoto,
+    ]);
+    const lunch = await groupEvent("ph-lunch", "Lunch", "2026-09-16 13:00:00");
+    await interaction("ph-lunch-ada", ada, "2026-09-16 13:00:00", lunch);
+    await interaction("ph-coffee-grace", withPhoto, "2026-09-16 09:00:00");
+    await interaction("ph-walk-ada", ada, "2026-09-16 08:00:00");
+
+    const rows = await readYourWeekDay(exec, "2026-09-16");
+    expect(
+      rows.map((row) => [row.kind, row.contactName, row.contactPhoto]),
+    ).toEqual([
+      ["group_event", null, null],
+      ["interaction", "Grace", `avatars/contact-${withPhoto}.jpg`],
+      ["interaction", "Ada", null],
     ]);
   });
 });
@@ -248,7 +271,8 @@ const LEGACY_DAY_SQL = `SELECT 'group_event' AS kind,
             ge.occurred_at AS occurredAt,
             ge.title AS title,
             NULL AS contactId,
-            NULL AS contactName
+            NULL AS contactName,
+            NULL AS contactPhoto
        FROM group_events ge
       WHERE date(ge.occurred_at) = date(?)
       UNION ALL
@@ -257,7 +281,8 @@ const LEGACY_DAY_SQL = `SELECT 'group_event' AS kind,
             i.occurred_at AS occurredAt,
             NULL AS title,
             c.id AS contactId,
-            c.name AS contactName
+            c.name AS contactName,
+            c.photo AS contactPhoto
        FROM interactions i
        JOIN contacts c ON c.id = i.contact_id
       WHERE i.group_event_id IS NULL
@@ -325,7 +350,7 @@ async function snapshotAll() {
  * the documented accepted exception (T-38.4-01-04) and is deliberately absent.
  */
 async function seedParityFixture() {
-  const ada = await contact("p-ada", "Ada");
+  const ada = await contact("p-ada", "Ada", false, "avatars/contact-p-ada.jpg");
   const bea = await contact("p-bea", "Bea");
   const cal = await contact("p-cal", "Cal");
   const arc = await contact("p-arc", "Archived", true);

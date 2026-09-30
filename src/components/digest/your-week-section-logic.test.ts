@@ -361,6 +361,7 @@ describe("Your Week day detail (38.3 D-16, request-scoped)", () => {
       title: null,
       contactId: 2,
       contactName: "Lin",
+      contactPhoto: null,
     },
   ];
 

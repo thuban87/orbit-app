@@ -34,6 +34,12 @@ export interface YourWeekDayRow {
   readonly title: string | null;
   readonly contactId: number | null;
   readonly contactName: string | null;
+  /**
+   * The contact's stored RELATIVE photo path (`contacts.photo`) for an
+   * interaction row, rendered through `Avatar` (38.6 D-02/D-14); null for a
+   * contact without a photo and always null for a group-event row.
+   */
+  readonly contactPhoto: string | null;
 }
 
 /**
@@ -119,7 +125,8 @@ export const YOUR_WEEK_DAY_SQL = `SELECT 'group_event' AS kind,
             ge.occurred_at AS occurredAt,
             ge.title AS title,
             NULL AS contactId,
-            NULL AS contactName
+            NULL AS contactName,
+            NULL AS contactPhoto
        FROM group_events ge
       WHERE ge.occurred_at >= date(?) AND ge.occurred_at < date(?, '+1 day')
         AND date(ge.occurred_at) = date(?)
@@ -129,7 +136,8 @@ export const YOUR_WEEK_DAY_SQL = `SELECT 'group_event' AS kind,
             i.occurred_at AS occurredAt,
             NULL AS title,
             c.id AS contactId,
-            c.name AS contactName
+            c.name AS contactName,
+            c.photo AS contactPhoto
        FROM interactions i
        JOIN contacts c ON c.id = i.contact_id
       WHERE i.group_event_id IS NULL

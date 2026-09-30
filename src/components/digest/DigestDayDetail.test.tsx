@@ -56,6 +56,7 @@ describe("DigestDayDetail", () => {
               title: "Dinner with Ada and Grace",
               contactId: null,
               contactName: null,
+              contactPhoto: null,
             },
             {
               kind: "interaction",
@@ -64,6 +65,16 @@ describe("DigestDayDetail", () => {
               title: null,
               contactId: 2,
               contactName: "Lin",
+              contactPhoto: "avatars/contact-2.jpg",
+            },
+            {
+              kind: "interaction",
+              id: 9,
+              occurredAt: "2026-09-18 10:00:00",
+              title: null,
+              contactId: 3,
+              contactName: "Noor",
+              contactPhoto: null,
             },
           ],
         },
@@ -80,8 +91,54 @@ describe("DigestDayDetail", () => {
         (node) => node.props.testID === "digest-day-detail-interaction-8",
       )?.props.accessibilityLabel,
     ).toContain("Lin");
-    expect(tree.find((node) => node.type === "Avatar")?.props.name).toBe("Lin");
+    const avatars = tree.filter((node) => node.type === "Avatar");
+    expect(avatars).toHaveLength(2);
+    expect(avatars[0]?.props.name).toBe("Lin");
     expect(text(tree)).not.toContain("No activity");
+  });
+
+  it("passes each interaction contact's stored photo to its Avatar; null keeps initials (38.6 D-02/D-14)", () => {
+    const tree = nodes(
+      DigestDayDetail({
+        date: DATE,
+        state: {
+          status: "loaded",
+          date: DATE,
+          rows: [
+            {
+              kind: "interaction",
+              id: 8,
+              occurredAt: "2026-09-18 12:00:00",
+              title: null,
+              contactId: 2,
+              contactName: "Lin",
+              contactPhoto: "avatars/contact-2.jpg",
+            },
+            {
+              kind: "interaction",
+              id: 9,
+              occurredAt: "2026-09-18 10:00:00",
+              title: null,
+              contactId: 3,
+              contactName: "Noor",
+              contactPhoto: null,
+            },
+          ],
+        },
+        onRetry: vi.fn(),
+      }),
+    );
+    const avatars = tree.filter((node) => node.type === "Avatar");
+    expect(
+      avatars.map((node) => [
+        node.props.name,
+        node.props.contactId,
+        node.props.photo,
+      ]),
+    ).toEqual([
+      ["Lin", 2, "avatars/contact-2.jpg"],
+      ["Noor", 3, null],
+    ]);
   });
 
   it("shows 'No activity on this date.' only after a successful empty read", () => {
@@ -143,6 +200,7 @@ describe("DigestDayDetail", () => {
       title: null,
       contactId: id,
       contactName: `C${id}`,
+      contactPhoto: null,
     });
     const tree = nodes(
       DigestDayDetail({

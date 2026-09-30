@@ -120,7 +120,7 @@ function renderDayRows(
             style={[styles.row, { borderColor: colors.border }]}
           >
             <Avatar
-              photo={null}
+              photo={row.contactPhoto ?? null}
               name={row.contactName ?? ""}
               contactId={row.contactId ?? undefined}
               size={AVATAR_SIZE}
