@@ -1,11 +1,16 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 /**
- * ProfileHero render contract (38.6 D-03/D-15): the photo opens the lightbox
- * only when the contact has one; the initials avatar has no lightbox entry.
+ * ProfileHero render contract (38.6 D-03/D-04/D-15/D-17): the photo is
+ * PROFILE_HERO_AVATAR_SIZE and opens the lightbox only when the contact has
+ * one; the favourite star left the hero for the app bar (no utility row).
  */
 import type { ReactElement, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProfileIdentity } from "@/db/profile-read";
+import {
+  PROFILE_HERO_AVATAR_SIZE,
+  PROFILE_HERO_GAP,
+} from "@/screens/contact-profile-logic";
 import { ProfileHero } from "./ProfileHero";
 
 vi.mock("react-native", () => ({
@@ -69,7 +74,6 @@ function render(overrides: Partial<ProfileIdentity> = {}) {
         identity: { ...identity, ...overrides },
         actionableMethods: { phone: null, email: null },
         messageContext: { archived: false, settingsHosted: false },
-        onToggleFavourite: () => {},
         onOpenPhoto,
         onMessage: () => {},
         onCall: () => {},
@@ -79,6 +83,35 @@ function render(overrides: Partial<ProfileIdentity> = {}) {
 }
 
 beforeEach(() => onOpenPhoto.mockReset());
+
+describe("ProfileHero layout (38.6 D-04/D-17)", () => {
+  it("renders the photo at PROFILE_HERO_AVATAR_SIZE with the hero gap", () => {
+    const nodes = render();
+    expect(nodes.find((node) => node.type === "Avatar")?.props.size).toBe(
+      PROFILE_HERO_AVATAR_SIZE,
+    );
+    const root = nodes.find((node) => node.props.testID === "profile-hero");
+    expect((root?.props.style as { gap?: number }).gap).toBe(PROFILE_HERO_GAP);
+  });
+
+  it("has no favourite control and no utility row", () => {
+    const nodes = render();
+    expect(
+      nodes.some((node) =>
+        /Favorites$/.test(String(node.props.accessibilityLabel ?? "")),
+      ),
+    ).toBe(false);
+    expect(
+      nodes.some(
+        (node) => node.type === "Icon" && node.props.name === "favorite",
+      ),
+    ).toBe(false);
+    // The photo (or its opener) is the hero's first child.
+    const root = nodes.find((node) => node.props.testID === "profile-hero");
+    expect(root?.children[0]?.type).toBe("Pressable");
+    expect(root?.children[0]?.children[0]?.type).toBe("Avatar");
+  });
+});
 
 describe("ProfileHero photo entry", () => {
   it("wraps the photo in a button that opens the lightbox", () => {

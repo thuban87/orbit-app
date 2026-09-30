@@ -7,10 +7,22 @@ import {
   consumeProfileReachOutIntent,
   createProfileSnapshotLoader,
   PROFILE_APP_BAR,
+  PROFILE_APP_BAR_SCRIM_OPACITY,
+  PROFILE_APP_BAR_SCRIM_THRESHOLD,
+  PROFILE_APP_BAR_SCROLL_SCRIM,
+  PROFILE_HERO_AVATAR_SIZE,
+  PROFILE_HERO_GAP,
+  PROFILE_LEGACY_NAME_TOP,
+  profileAppBarGlyphClearance,
+  profileAppBarHitBoxClearance,
+  profileAppBarScrolled,
+  profileContentTopPadding,
   profileKnowledgeDestination,
   profileLifecycleView,
   profileMethodGroups,
+  profileNameTop,
   profileOverflowEntries,
+  profileScrollTargetY,
   shouldRunProfileShellRefresh,
   unbindConfirmation,
 } from "@/screens/contact-profile-logic";
@@ -249,6 +261,83 @@ describe("integrated Profile controller contracts", () => {
 
   it("uses one standard compact app bar with reachable icon targets", () => {
     expect(PROFILE_APP_BAR).toEqual({ height: 56, touchTarget: 44 });
+  });
+
+  describe("38.6 D-04/D-17 hero geometry", () => {
+    it("doubles the photo and pins today's name line", () => {
+      expect(PROFILE_HERO_AVATAR_SIZE).toBe(224);
+      expect(PROFILE_HERO_GAP).toBe(16);
+      // bar 56 + pad 16 + star row 44 + gap 16 + photo 112 + gap 16.
+      expect(PROFILE_LEGACY_NAME_TOP).toBe(56 + 16 + 44 + 16 + 112 + 16);
+      expect(PROFILE_LEGACY_NAME_TOP).toBe(260);
+    });
+
+    it("starts the 224 photo 20 px below the bar top so the name stays at 260", () => {
+      expect(profileContentTopPadding(224)).toBe(20);
+      expect(profileContentTopPadding()).toBe(20);
+      expect(profileNameTop(profileContentTopPadding(224), 224)).toBe(260);
+    });
+
+    it("never lowers the name and never pads negatively", () => {
+      for (let size = 112; size <= 244; size += 4) {
+        expect(
+          profileNameTop(profileContentTopPadding(size), size),
+        ).toBeLessThanOrEqual(PROFILE_LEGACY_NAME_TOP);
+      }
+      for (const size of [112, 224, 244, 260, 400]) {
+        expect(profileContentTopPadding(size)).toBeGreaterThanOrEqual(0);
+      }
+    });
+
+    it.each([360, 393, 412])(
+      "keeps the back, star and ⋮ glyphs clear of the photo at %i dp",
+      (width) => {
+        expect(
+          profileAppBarGlyphClearance(width, 224, 20),
+        ).toBeGreaterThanOrEqual(0);
+      },
+    );
+
+    it.each([393, 412])(
+      "keeps every 44-tall app-bar hit box clear of the photo at %i dp",
+      (width) => {
+        expect(
+          profileAppBarHitBoxClearance(width, 224, 20),
+        ).toBeGreaterThanOrEqual(0);
+      },
+    );
+
+    it("pins the known star hit-box overlap at 360 dp for the owner's look (38.6-07 Task 4)", () => {
+      // Star hit box corner (248, 50) is ≈106.5 from the photo centre (180, 132);
+      // radius 112 → ≈-5.5. Any size tuning that changes this is visible here.
+      expect(
+        Number(profileAppBarHitBoxClearance(360, 224, 20).toFixed(1)),
+      ).toBe(-5.5);
+    });
+
+    it("reports a negative clearance when a control overlaps the photo", () => {
+      expect(profileAppBarGlyphClearance(360, 224, -40)).toBeLessThan(0);
+    });
+  });
+
+  describe("38.6 D-17 overlay app bar", () => {
+    it("has a switchable token scrim past a small scroll threshold", () => {
+      expect(PROFILE_APP_BAR_SCROLL_SCRIM).toBe(true);
+      expect(PROFILE_APP_BAR_SCRIM_OPACITY).toBe(0.92);
+      expect(PROFILE_APP_BAR_SCRIM_THRESHOLD).toBe(8);
+      expect(profileAppBarScrolled(0)).toBe(false);
+      expect(profileAppBarScrolled(PROFILE_APP_BAR_SCRIM_THRESHOLD)).toBe(
+        false,
+      );
+      expect(profileAppBarScrolled(PROFILE_APP_BAR_SCRIM_THRESHOLD + 1)).toBe(
+        true,
+      );
+    });
+
+    it("lands in-Profile scroll targets below the overlay bar", () => {
+      expect(profileScrollTargetY(500)).toBe(500 - PROFILE_APP_BAR.height);
+      expect(profileScrollTargetY(20)).toBe(0);
+    });
   });
 
   it("keeps the required overflow ordering and only exposes conditional presentation actions", () => {
