@@ -78,7 +78,9 @@ import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import { completeGlobalPairsCore } from "@/db/pair-matrix";
 import { purgeContact } from "@/db/purge-dao";
+import { insertFinalizeEntryCore } from "@/db/restore-photo-journal-dao";
 import { snoozeContact } from "@/db/snooze-dao";
+import { inWriteTransaction } from "@/db/transaction";
 import { getPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 
 const NOW = "2026-09-01 00:00:00";
@@ -1054,4 +1056,42 @@ it("Replace-all aborts before any write when a marked row's existing local file 
   expect(await profilePhoto(source)).toBe("avatars/profile.jpg");
   expect(await journal(source)).toEqual([]);
   expect(photo.files).toEqual(filesBefore);
+});
+
+it("Replace-all settles an unfinished finalize before staging a marked row's local bytes, so the newer photo survives (review WR2-02)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  // An earlier restore committed newer bytes for z-marked's canonical, but its
+  // post-commit finalize failed: the stale bytes are still at contact-1.jpg.
+  const pending = "avatars/_restore_pending/contact-z-marked-older.jpg";
+  photo.files.set(pending, "TkVX");
+  await inWriteTransaction(source, () =>
+    insertFinalizeEntryCore(source, {
+      relativePath: pending,
+      action: "finalize",
+      targetKind: "contact",
+      contactUid: "z-marked",
+      valueUid: null,
+      fieldDefUid: null,
+      canonicalRelativePath: "avatars/contact-1.jpg",
+      createdAt: NOW,
+    }),
+  );
+  const result = await applyRestore(source, manifest, "replace-all");
+  expect(result).toMatchObject({
+    status: "applied",
+    photosNeedingAttention: 0,
+    restoredPhotosMissing: 1,
+  });
+  const rows = await photosByUid(source);
+  const marked = rows["z-marked"]!;
+  expect(marked.photo).toBe(`avatars/contact-${marked.id}.jpg`);
+  // The newer bytes, not the stale canonical's.
+  expect(photo.files.get(marked.photo!)).toBe("TkVX");
+  expect(photo.files.get("avatars/contact-1.jpg")).toBe("QkJC");
+  expect(await journal(source)).toEqual([]);
+  expect(
+    [...photo.files.keys()].filter((path) =>
+      path.startsWith("avatars/_restore_pending/"),
+    ),
+  ).toEqual([]);
 });

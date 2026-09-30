@@ -1652,7 +1652,13 @@ export async function applyRestore(
       restoreSessionToken,
       deps.stagePhoto ?? stageRestorePendingBase64,
       stagedPhotos,
-      { mode, stageLocal: deps.stageLocalPhoto ?? stageLocalPhotoForRestore },
+      {
+        mode,
+        stageLocal:
+          deps.stageLocalPhoto ??
+          ((canonical, pending) =>
+            stageLocalPhotoForRestore(exec, canonical, pending)),
+      },
     );
     await stageBackgroundCandidates(
       manifest,

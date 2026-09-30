@@ -20,6 +20,7 @@ import {
   executeDeleteIntentOwned,
   finalizeJournalEntryLocked,
   settleCanonicalLocked,
+  withCanonicalPathLock,
   withCanonicalPathLocks,
 } from "./owned-master";
 import {
@@ -240,17 +241,27 @@ export async function mergeContactsWithPhotoOwnership(
  * D-26). A Replace-all restore re-assigns contact ids, so a backup row whose
  * photo was skipped (D-24) cannot keep its old id-derived path: its local bytes
  * are staged like backup bytes and land at the row's new canonical through the
- * same journal finalize. Resolves false (nothing staged) when the file is gone;
- * the copy is the same file-copy stager merge re-homing uses.
+ * same journal finalize. Resolves false (nothing staged) only when the file is
+ * genuinely gone; a failed copy of a file that exists rejects.
+ *
+ * Reads the canonical like merge re-homing does (review WR2-02): under its path
+ * lock, so an owned write mid-swap (canonical moved aside to `.bak`) finishes
+ * first, and after settling its journal, so an unfinished finalize (newer bytes
+ * still in `_restore_pending`) lands before the copy instead of being dropped.
+ * Called before the restore transaction opens (lock order: path, then DB).
  */
-export async function stageLocalPhotoForRestore(
+export function stageLocalPhotoForRestore(
+  exec: SqlExecutor,
   canonicalRelativePath: string,
   pendingRelativePath: string,
 ): Promise<boolean> {
-  if (!photoFileExists(canonicalRelativePath)) return false;
-  await stageRestorePending(
-    resolvePhotoUri(canonicalRelativePath),
-    pendingRelativePath,
-  );
-  return true;
+  return withCanonicalPathLock(canonicalRelativePath, async (token) => {
+    await settleCanonicalLocked(exec, token, canonicalRelativePath);
+    if (!photoFileExists(canonicalRelativePath)) return false;
+    await stageRestorePending(
+      resolvePhotoUri(canonicalRelativePath),
+      pendingRelativePath,
+    );
+    return true;
+  });
 }

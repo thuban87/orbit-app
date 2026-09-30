@@ -36,7 +36,10 @@ import {
 } from "@/db/restore-photo-journal-dao";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
-import { mergeContactsWithPhotoOwnership } from "./merge-photo-rehome";
+import {
+  mergeContactsWithPhotoOwnership,
+  stageLocalPhotoForRestore,
+} from "./merge-photo-rehome";
 import { persistOwnedMaster } from "./owned-master";
 import { drainRestorePhotoJournal } from "./restore-photo-finalize-sweep";
 
@@ -322,5 +325,67 @@ describe("merge photo ownership", () => {
     await expect(crop).rejects.toThrow();
     expect(h.fs!.files.get(s.path)).toBe("Absorbed");
     expect(h.fs!.files.has(a.path)).toBe(false);
+  });
+});
+
+describe("stageLocalPhotoForRestore (38.6 D-26, review WR2-02)", () => {
+  const STAGED = "avatars/_restore_pending/contact-local-session.jpg";
+
+  it("settles a committed finalize first, so it stages the newer pending bytes", async () => {
+    const a = await contact("Stale", true);
+    const pending = `avatars/_restore_pending/contact-${a.uid}-old.jpg`;
+    h.fs!.files.set(pending, "Newer");
+    await inWriteTransaction(exec, () =>
+      insertFinalizeEntryCore(exec, {
+        relativePath: pending,
+        action: "finalize",
+        targetKind: "contact",
+        contactUid: a.uid,
+        valueUid: null,
+        fieldDefUid: null,
+        canonicalRelativePath: a.path,
+        createdAt: NOW,
+      }),
+    );
+    expect(await stageLocalPhotoForRestore(exec, a.path, STAGED)).toBe(true);
+    expect(h.fs!.files.get(STAGED)).toBe("Newer");
+    expect(h.fs!.files.get(a.path)).toBe("Newer");
+    expect(await listJournalEntriesCore(exec)).toEqual([]);
+    expect(h.fs!.files.has(pending)).toBe(false);
+  });
+
+  it("waits for an owned write mid-swap instead of seeing no file", async () => {
+    const a = await contact("Before", true);
+    let release!: () => void;
+    let swapped!: () => void;
+    const entered = new Promise<void>((resolve) => {
+      swapped = resolve;
+    });
+    const hold = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // The canonical has been moved aside to .bak and the new bytes are not in
+    // place yet: an unlocked exists-check here reads "no photo".
+    h.fs!.barrier = async (point, path) => {
+      if (point === "bak" && path === a.path) {
+        swapped();
+        await hold;
+      }
+    };
+    h.fs!.files.set("crop", "After");
+    const writing = persistOwnedMaster(exec, "crop", a.path);
+    await entered;
+    expect(h.fs!.files.has(a.path)).toBe(false);
+    const staging = stageLocalPhotoForRestore(exec, a.path, STAGED);
+    release();
+    await writing;
+    expect(await staging).toBe(true);
+    expect(h.fs!.files.get(STAGED)).toBe("After");
+  });
+
+  it("resolves false only when the local file is genuinely gone", async () => {
+    const a = await contact("Missing");
+    expect(await stageLocalPhotoForRestore(exec, a.path, STAGED)).toBe(false);
+    expect(h.fs!.files.has(STAGED)).toBe(false);
   });
 });
