@@ -1095,3 +1095,72 @@ it("Replace-all settles an unfinished finalize before staging a marked row's loc
     ),
   ).toEqual([]);
 });
+
+/** Records every delete intent a restore enqueues (before the drain retires it). */
+function recordingDeleteIntents(exec: Awaited<ReturnType<typeof db>>) {
+  const intents: string[] = [];
+  const recording: typeof exec = {
+    ...exec,
+    runAsync: (sql, params) => {
+      if (sql.includes("restore_photo_journal") && sql.includes("'delete'"))
+        intents.push(String((params as unknown[])[1]));
+      return exec.runAsync(sql, params);
+    },
+  };
+  return { recording, intents };
+}
+
+it("a Merge of NEWER marked rows queues no delete intent for any photo it keeps (review IN2-01)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  const { recording, intents } = recordingDeleteIntents(source);
+  expect(await applyRestore(recording, newer(manifest), "merge")).toMatchObject(
+    { status: "applied" },
+  );
+  for (const kept of [
+    "avatars/contact-1.jpg",
+    "avatars/contact-3.jpg",
+    "avatars/cv-1-pet.jpg",
+    "avatars/profile.jpg",
+  ])
+    expect(intents).not.toContain(kept);
+});
+
+it("a Merge whose marked value arrives under another contact keeps this phone's file (review IN2-01)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  // Elsewhere z-marked was merged into a new contact: z-marked is tombstoned
+  // and its value rows (the marked pet photo included) moved to n-new.
+  const moved = newer(manifest);
+  const marked = moved.contacts.find((row) => row.uid === "z-marked")!;
+  const merged: Record<string, unknown> = {
+    ...marked,
+    uid: "n-new",
+    photoBase64: null,
+  };
+  delete merged.photoSkipped;
+  moved.contacts = [
+    ...moved.contacts.filter((row) => row.uid !== "z-marked"),
+    merged,
+  ];
+  for (const row of moved.customFieldValues)
+    if (row.contactUid === "z-marked") row.contactUid = "n-new";
+  moved.tombstones.push({
+    entityType: "contact",
+    entityUid: "z-marked",
+    deletedAt: LATER,
+  });
+  const { recording, intents } = recordingDeleteIntents(source);
+  const result = await applyRestore(recording, moved, "merge");
+  expect(result).toMatchObject({ status: "applied", photoCleanupPending: 0 });
+  expect(
+    await source.getFirstAsync<{ uid: string }>(
+      "SELECT c.uid FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id WHERE v.uid='pet-value'",
+    ),
+  ).toEqual({ uid: "n-new" });
+  // The reference could not follow (it names z-marked's canonical), but the
+  // bytes this phone had are neither queued for deletion nor deleted.
+  expect(intents).not.toContain("avatars/cv-1-pet.jpg");
+  expect(photo.files.get("avatars/cv-1-pet.jpg")).toBe("UEVU");
+  // z-marked itself is gone, so its own photo is still cleaned up.
+  expect(intents).toContain("avatars/contact-1.jpg");
+  expect(photo.files.has("avatars/contact-1.jpg")).toBe(false);
+});

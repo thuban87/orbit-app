@@ -1153,6 +1153,38 @@ async function canonicalFor(
 function photoSkipped(row: Record<string, unknown>): boolean {
   return row.photoSkipped === true && typeof row.photoBase64 !== "string";
 }
+/** A row's current local photo reference, by its uid alone (review IN2-01). */
+async function localReferenceOf(
+  exec: SqlExecutor,
+  entity: "profile" | "contacts" | "custom_field_values",
+  uid: string,
+): Promise<string | null> {
+  if (entity === "profile")
+    return (
+      (
+        await exec.getFirstAsync<{ photo: string | null }>(
+          "SELECT photo FROM profile WHERE id=1",
+        )
+      )?.photo ?? null
+    );
+  if (entity === "contacts")
+    return (
+      (
+        await exec.getFirstAsync<{ photo: string | null }>(
+          "SELECT photo FROM contacts WHERE uid=?",
+          [uid],
+        )
+      )?.photo ?? null
+    );
+  return (
+    (
+      await exec.getFirstAsync<{ value: string | null }>(
+        "SELECT value FROM custom_field_values WHERE uid=?",
+        [uid],
+      )
+    )?.value ?? null
+  );
+}
 async function stageCandidates(
   exec: SqlExecutor,
   manifest: BackupManifest,
@@ -1236,12 +1268,15 @@ async function planPhotoCandidates(
   finalize: FinalizeCandidate[];
   deletes: DeleteCandidate[];
   keep: KeepCandidate[];
+  /** Merge (D-26): local photo paths of marked winning rows; never deleted. */
+  keepPaths: Set<string>;
   missing: number;
 }> {
   const incomingDefs = incomingPhotoDefs(manifest);
   const finalize: FinalizeCandidate[] = [];
   const deletes: DeleteCandidate[] = [];
   const keep: KeepCandidate[] = [];
+  const keepPaths = new Set<string>();
   let missing = 0;
   for (const entity of ["profile", "contacts", "custom_field_values"] as const)
     for (const a of plan[entity]) {
@@ -1262,6 +1297,10 @@ async function planPhotoCandidates(
       ) {
         // D-26: a skipped photo never removes a photo on restore: no delete
         // intent and no reference clear, in either mode.
+        if (mode === "merge")
+          // Looked up by row uid alone, so a value that arrives under another
+          // contact still protects the file it has here (review IN2-01).
+          addStoredPath(keepPaths, await localReferenceOf(exec, entity, a.uid));
         const candidate = staged.get(`${entity}\0${a.uid}`);
         if (candidate) {
           // Replace-all: this phone's bytes land at the row's new canonical.
@@ -1295,7 +1334,7 @@ async function planPhotoCandidates(
           });
       }
     }
-  return { finalize, deletes, keep, missing };
+  return { finalize, deletes, keep, keepPaths, missing };
 }
 async function stageBackgroundCandidates(
   manifest: BackupManifest,
@@ -1957,6 +1996,11 @@ export async function applyRestore(
           await writePhotoReference(exec, candidate.target, null);
       for (const candidate of candidates.deletes)
         fileDeletes.paths.add(candidate.canonicalRelativePath);
+      // D-26, Merge: a marked winning row's local photo gets no delete intent,
+      // even when its reference could not be written back (the row now derives
+      // another canonical). The bytes stay; nothing relies on the post-commit
+      // mayDeleteCanonicalCore recheck to save them (review IN2-01).
+      for (const kept of candidates.keepPaths) fileDeletes.paths.delete(kept);
       for (const canonical of fileDeletes.paths)
         await enqueueDeleteIntentCore(exec, canonical);
       if (applySettings) {
