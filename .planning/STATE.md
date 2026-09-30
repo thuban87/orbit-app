@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Release Readiness
 current_phase: 38.6
-current_phase_name: Photo Handling — Sync, Sizes & Lightbox
-status: ready_to_execute
+current_phase_name: Photo Handling — Sync, Sizes & Lightbox (INSERTED)
+status: executing
 stopped_at: Phase 38.6 planned + cross-AI converged (3 cycles, codex+claude; 7 plans, 4 waves), ready for execute-phase
-last_updated: "2026-09-30T05:53:57.738Z"
+last_updated: "2026-09-30T05:58:56.032Z"
 last_activity: 2026-09-30
-last_activity_desc: Phase 38.6 planned — 7 plans; post-research rulings D-20..D-22
-state_head: 0a833abde2fe8346e075b42dd96d2a304d3bdd93
+last_activity_desc: Phase 38.6 execution started
+state_head: 1ddf2ec2a827a9aaba3538186d0597ddaffcd448
 progress:
   total_phases: 28
   completed_phases: 19
@@ -39,20 +39,20 @@ carried_forward:
 See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 
 **Core value:** Collapse the taps between "you're overdue with X" and the message actually being sent.
-**Current focus:** Phase 38.6 — Photo Handling (inserted), then Phase 39 — Onboarding
+**Current focus:** Phase 38.6 — Photo Handling — Sync, Sizes & Lightbox (INSERTED)
 
 ## Current Position
 
-Phase: 38.6 (Photo Handling — Sync, Sizes & Lightbox) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute (7 plans, 4 waves)
+Phase: 38.6 (Photo Handling — Sync, Sizes & Lightbox (INSERTED)) — EXECUTING
+Plan: 1 of 7
+Status: Executing Phase 38.6
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI (separate): Phase 30 (Orrery Systems) still shows [ ] in ROADMAP with dirty 30-REVIEW files — reconcile independently.
 Carried forward (owner's bucket, NOT resolved here): D-11 default Memory-type display name — reconcile before Phase 34.
 Surface to owner (24.2-07, KNOW-15): milestone plan said Phase 36 owns the backup format-4 bump, but 24.1 already bumped to 4 (d677e2c); Plan 07 emits into the live format 4 with NO bump — that milestone instruction is stale.
 Deferred to Phase 31 (recorded in Plan 05): durable contact-scoped-def ownership + owner-purge semantics. Deferred to Phase 36 (ROADMAP breadcrumb): legacy AI-fuel confirm-path code removal.
-Last activity: 2026-09-29 — Phase 38.6 inserted before Phase 39 (promotes backlog 999.1)
+Last activity: 2026-09-30 — Phase 38.6 execution started
 Progress: v2.0 phases checked complete in ROADMAP — 22, 23, 24.1, 24.2, 25, 26, 27, 29, 31, 31.1, 32, 33, 34, 35, 37, 38, 38.1, 38.2, 38.3, 38.4, 38.5. Still unchecked in ROADMAP: 28 and 30 (reconcile; see FYI above), 36, 37.1, 39, 40.
 Next: Plan Phase 38.6 (Photo Handling; discussed 2026-09-29, D-10..D-19 in the dossier), then plan Phase 39 (Onboarding). Deferred from 38.5: G1 Orrery ANR (re-check on the release build + Pixel 6 Pro first), G3 Your Week "Interactions" wrap at font 1.15.
 
