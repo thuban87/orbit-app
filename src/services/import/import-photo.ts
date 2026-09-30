@@ -4,8 +4,13 @@
  * A contact and its import row have already committed before this module runs.
  * Keeping image decoding, file persistence, and the later photo-column update
  * here means a corrupt source photo can never roll back the imported contact.
+ *
+ * The staged phone photo (usually a small thumbnail) becomes the contact's
+ * master through the shared `encodeMaster` (D-10/D-13): centre-squared, stored
+ * at its own size up to 1024 px as lossy WebP, never upscaled or distorted
+ * (D-22), under the unchanged `avatars/contact-<id>.jpg` name (D-21). Import
+ * retry inherits this through `retryPhotoFs`.
  */
-import type * as ExpoImageManipulator from "expo-image-manipulator";
 import { setContactPhoto } from "@/db/contacts-dao";
 import { retireRowStagedPhoto } from "@/db/import-session-dao";
 import type { SqlExecutor } from "@/db/types";
@@ -13,8 +18,6 @@ import { discardDerivative } from "@/services/photos/derivative-cache";
 import { Logger } from "@/utils/logger";
 
 const LOG_SCOPE = "import-photo";
-const MASTER_SIZE = 512;
-const MASTER_COMPRESS = 0.75;
 
 export interface ImportedPhotoFs {
   resolveStagedPhotoPath: (relative: string) => string | Promise<string>;
@@ -32,17 +35,8 @@ export interface ImportedPhotoFs {
 }
 
 async function resizeToMaster(stagedPhotoPath: string): Promise<string> {
-  const { ImageManipulator, SaveFormat } = (await import(
-    "expo-image-manipulator"
-  )) as typeof ExpoImageManipulator;
-  const rendered = await ImageManipulator.manipulate(stagedPhotoPath)
-    .resize({ width: MASTER_SIZE, height: MASTER_SIZE })
-    .renderAsync();
-  const saved = await rendered.saveAsync({
-    format: SaveFormat.JPEG,
-    compress: MASTER_COMPRESS,
-  });
-  return saved.uri;
+  const { encodeMaster } = await import("@/services/photos/master-encode");
+  return encodeMaster(stagedPhotoPath);
 }
 
 async function resolveStagedPhotoPath(relative: string): Promise<string> {

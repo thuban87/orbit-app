@@ -21,6 +21,7 @@ const h = vi.hoisted(() => ({
   cfg: {} as { copyThrows?: boolean; moveTmpToDestThrows?: boolean },
   ops: [] as string[],
   exists: new Set<string>(),
+  bytes: new Map<string, Uint8Array>(),
 }));
 
 vi.mock("expo-file-system", () => {
@@ -58,11 +59,15 @@ vi.mock("expo-file-system", () => {
       }
       h.exists.delete(this.uri);
       h.exists.add(dest.uri);
+      const moved = h.bytes.get(this.uri);
+      h.bytes.delete(this.uri);
+      if (moved) h.bytes.set(dest.uri, moved);
       this.uri = dest.uri;
     }
-    write(_bytes: Uint8Array): void {
+    write(bytes: Uint8Array): void {
       h.ops.push(`write ${this.uri}`);
       h.exists.add(this.uri);
+      h.bytes.set(this.uri, bytes);
     }
     delete(): void {
       h.ops.push(`delete ${this.uri}`);
@@ -127,6 +132,7 @@ beforeEach(() => {
   h.cfg = {};
   h.ops = [];
   h.exists = new Set();
+  h.bytes = new Map();
 });
 
 describe("filename builders — contactId-derivable, validated by construction", () => {
@@ -300,6 +306,27 @@ describe("restore pending staging — separate recovery-only namespace", () => {
     expect(h.ops).toContain(
       `move file:///doc/${relative}.stage-tmp -> file:///doc/${relative}`,
     );
+  });
+
+  it("writes RIFF/WEBP backup bytes verbatim under the .jpg pending name (D-12/D-19/D-21)", async () => {
+    const relative = restorePendingRelPath(
+      { kind: "contact", uid: "webp_uid" },
+      "session_3",
+    );
+    expect(relative.endsWith(".jpg")).toBe(true);
+    // "RIFF" + 4-byte little-endian size + "WEBP" + "VP8 " chunk header.
+    const webp = Uint8Array.from([
+      0x52, 0x49, 0x46, 0x46, 0x1a, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
+      0x56, 0x50, 0x38, 0x20, 0x0e, 0x00, 0x00, 0x00, 0x30, 0x01, 0x00, 0x9d,
+      0x01, 0x2a,
+    ]);
+    const base64 = btoa(String.fromCharCode(...webp));
+    await stageRestorePendingBase64(base64, relative);
+    const written = h.bytes.get(`file:///doc/${relative}`);
+    expect(written).toEqual(webp);
+    expect(String.fromCharCode(...(written ?? []).slice(0, 4))).toBe("RIFF");
+    expect(String.fromCharCode(...(written ?? []).slice(8, 12))).toBe("WEBP");
+    expect(h.exists.has(`file:///doc/${relative}.stage-tmp`)).toBe(false);
   });
 
   it("reports canonical existence only after validating a canonical relative path", () => {

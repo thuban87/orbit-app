@@ -1,9 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SqlExecutor } from "@/db/types";
 
+const h = vi.hoisted(() => ({
+  encodeMaster: vi.fn(async (_uri: string, _crop?: unknown) => {
+    return "file:///cache/ImageManipulator/master.webp";
+  }),
+}));
 vi.mock("expo-image-manipulator", () => ({
   ImageManipulator: {},
-  SaveFormat: { JPEG: "jpeg" },
+  SaveFormat: { JPEG: "jpeg", PNG: "png", WEBP: "webp" },
+}));
+vi.mock("@/services/photos/master-encode", () => ({
+  encodeMaster: h.encodeMaster,
 }));
 vi.mock("@/db/contacts-dao", () => ({ setContactPhoto: vi.fn() }));
 vi.mock("@/db/database", () => ({ getExecutor: () => ({ marker: "db" }) }));
@@ -34,6 +42,7 @@ import {
   importedPhotoFs,
   persistImportedPhotoPostCommit,
 } from "@/services/import/import-photo";
+import { retryPhotoFs } from "@/services/import/import-photo-retry";
 import { persistOwnedMaster } from "@/services/photos/owned-master";
 
 const NOW = "2026-08-29 12:00:00";
@@ -71,7 +80,23 @@ describe("persistImportedPhotoPostCommit", () => {
       "avatars/contact-42.jpg",
     );
   });
-  it("persists a stable 512px master and records the contact photo", async () => {
+  it("resizeToMaster delegates to the shared D-10 encoder with no crop", async () => {
+    await expect(
+      importedPhotoFs.resizeToMaster(
+        "file:///documents/import-staging/import-session-row.jpg",
+      ),
+    ).resolves.toBe("file:///cache/ImageManipulator/master.webp");
+    expect(h.encodeMaster).toHaveBeenCalledTimes(1);
+    expect(h.encodeMaster.mock.calls[0]).toEqual([
+      "file:///documents/import-staging/import-session-row.jpg",
+    ]);
+  });
+
+  it("import retry inherits the same D-10 master encoder", () => {
+    expect(retryPhotoFs.resizeToMaster).toBe(importedPhotoFs.resizeToMaster);
+  });
+
+  it("persists the D-10 master under the canonical name and records the contact photo", async () => {
     const fs = createFs();
 
     await expect(

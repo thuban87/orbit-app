@@ -1,6 +1,6 @@
-import type * as ExpoImageManipulator from "expo-image-manipulator";
 import { assertSafeRelative } from "@/db/photo-relative-path";
 import { discardDerivative } from "@/services/photos/derivative-cache";
+import { encodeMaster } from "@/services/photos/master-encode";
 import {
   contactPhotoRelPath,
   reconcileStagingRelPath,
@@ -8,9 +8,6 @@ import {
   stageReconcilePhoto,
 } from "@/services/photos/photo-storage";
 import { Logger } from "@/utils/logger";
-
-const MASTER_SIZE = 512;
-const MASTER_COMPRESS = 0.75;
 
 export interface ReconcilePhotoFs {
   stage: (cacheUri: string, relative: string) => Promise<void>;
@@ -56,19 +53,13 @@ async function readStagedBytes(uri: string): Promise<Uint8Array> {
   return new File(uri).bytes();
 }
 
-async function resizeToMaster(uri: string): Promise<string> {
-  const { ImageManipulator, SaveFormat } = (await import(
-    "expo-image-manipulator"
-  )) as typeof ExpoImageManipulator;
-  const rendered = await ImageManipulator.manipulate(uri)
-    .resize({ width: MASTER_SIZE, height: MASTER_SIZE })
-    .renderAsync();
-  return (
-    await rendered.saveAsync({
-      format: SaveFormat.JPEG,
-      compress: MASTER_COMPRESS,
-    })
-  ).uri;
+/**
+ * The promoted reconcile photo follows the one master rule (D-10/D-13): the
+ * shared `encodeMaster` centre-squares it and keeps its own size up to 1024 px
+ * as lossy WebP, never upscaled, under the unchanged `.jpg` name (D-21).
+ */
+function resizeToMaster(uri: string): Promise<string> {
+  return encodeMaster(uri);
 }
 
 export const reconcilePhotoFs: ReconcilePhotoFs = {

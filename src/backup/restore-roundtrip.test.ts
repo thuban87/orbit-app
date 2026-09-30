@@ -59,6 +59,7 @@ vi.mock("@/services/notifications/digest-schedule", () => ({
 import { parseBackupManifest } from "@/backup/backup-schema";
 import { buildExportManifest } from "@/backup/export-manifest";
 import { applyRestore } from "@/backup/restore-apply";
+import { BACKUP_FORMAT_VERSION } from "@/backup/types";
 import { getPhotoDisplay } from "@/components/photo-display";
 import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { updateAppSettings } from "@/db/app-settings-dao";
@@ -693,3 +694,86 @@ it("replace-all cleanup whose delete silently fails does not publish a revision"
   expect(photo.files.get(canonical)).toBe("OLD");
   expect(getPhotoCacheBust(canonical) ?? 0).toBe(before);
 });
+
+function bytesToBase64(bytes: number[]): string {
+  return btoa(String.fromCharCode(...bytes));
+}
+// "RIFF" + size + "WEBP" + "VP8 " header: a (38.6 D-10) WebP master's leading bytes.
+const WEBP_BASE64 = bytesToBase64([
+  0x52, 0x49, 0x46, 0x46, 0x1a, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50, 0x56,
+  0x50, 0x38, 0x20, 0x0e, 0x00, 0x00, 0x00,
+]);
+// FF D8 FF: a legacy 512 JPEG master's leading bytes (D-12: never re-encoded).
+const JPEG_BASE64 = bytesToBase64([
+  0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+]);
+
+it.each(["merge", "replace-all"] as const)(
+  "a mixed JPEG/WebP library restores and re-exports byte-for-byte under the unchanged .jpg names in %s (38.6 D-12/D-19/D-21)",
+  async (mode) => {
+    expect(BACKUP_FORMAT_VERSION).toBe(7);
+    photo.files.clear();
+    const source = await db();
+    const destination = await db();
+    await contact(source, "webp-owner");
+    await contact(source, "jpeg-owner");
+    await source.runAsync(
+      "UPDATE contacts SET photo='avatars/source-webp.jpg' WHERE uid='webp-owner'",
+    );
+    await source.runAsync(
+      "UPDATE contacts SET photo='avatars/source-jpeg.jpg' WHERE uid='jpeg-owner'",
+    );
+    photo.files.set("avatars/source-webp.jpg", WEBP_BASE64);
+    photo.files.set("avatars/source-jpeg.jpg", JPEG_BASE64);
+    const readMap = async (relative: string) => {
+      const bytes = photo.files.get(relative);
+      if (bytes === undefined) throw new Error(`missing ${relative}`);
+      return bytes;
+    };
+    const manifest = parseBackupManifest(
+      await buildExportManifest(source, {
+        exportedAt: NOW,
+        readPhotoBase64: readMap,
+      }),
+    );
+    expect(manifest.backupFormatVersion).toBe(7);
+    const wire = Object.fromEntries(
+      manifest.contacts.map((row) => [row.uid, row.photoBase64]),
+    );
+    expect(wire).toEqual({
+      "jpeg-owner": JPEG_BASE64,
+      "webp-owner": WEBP_BASE64,
+    });
+
+    expect((await applyRestore(destination, manifest, mode)).status).toBe(
+      "applied",
+    );
+    const restored = await destination.getAllAsync<{
+      id: number;
+      uid: string;
+      photo: string;
+    }>("SELECT id, uid, photo FROM contacts ORDER BY uid");
+    expect(restored.map((row) => row.uid)).toEqual([
+      "jpeg-owner",
+      "webp-owner",
+    ]);
+    for (const row of restored) {
+      expect(row.photo).toBe(`avatars/contact-${row.id}.jpg`);
+      expect(photo.files.get(row.photo)).toBe(
+        row.uid === "webp-owner" ? WEBP_BASE64 : JPEG_BASE64,
+      );
+    }
+
+    const reexported = parseBackupManifest(
+      await buildExportManifest(destination, {
+        exportedAt: NOW,
+        readPhotoBase64: readMap,
+      }),
+    );
+    expect(
+      Object.fromEntries(
+        reexported.contacts.map((row) => [row.uid, row.photoBase64]),
+      ),
+    ).toEqual(wire);
+  },
+);

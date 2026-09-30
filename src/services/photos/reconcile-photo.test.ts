@@ -1,8 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 
+const h = vi.hoisted(() => ({
+  encodeMaster: vi.fn(async (_uri: string, _crop?: unknown) => {
+    return "file:///cache/ImageManipulator/master.webp";
+  }),
+}));
 vi.mock("expo-image-manipulator", () => ({
   ImageManipulator: {},
-  SaveFormat: { JPEG: "jpeg" },
+  SaveFormat: { JPEG: "jpeg", PNG: "png", WEBP: "webp" },
+}));
+vi.mock("@/services/photos/master-encode", () => ({
+  encodeMaster: h.encodeMaster,
 }));
 vi.mock("@/db/database", () => ({ getExecutor: () => ({ marker: "db" }) }));
 vi.mock("@/services/photos/owned-master", () => ({
@@ -67,6 +75,16 @@ describe("reconcile photo staging", () => {
       "file:///cache/resized.jpg",
       "avatars/contact-42.jpg",
     );
+  });
+  it("resizeToMaster delegates to the shared D-10 encoder with no crop", async () => {
+    await expect(
+      reconcilePhotoFs.resizeToMaster(
+        "file:///documents/reconcile-staging/a.jpg",
+      ),
+    ).resolves.toBe("file:///cache/ImageManipulator/master.webp");
+    expect(h.encodeMaster.mock.calls).toEqual([
+      ["file:///documents/reconcile-staging/a.jpg"],
+    ]);
   });
   it("stages cache input durably and hashes the staged bytes deterministically", async () => {
     const boundary = fs();
