@@ -1,7 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText role is a typography role.
 import { Pressable, StyleSheet, View } from "react-native";
 import { Avatar } from "@/components/Avatar";
-import { Icon } from "@/components/icons/Icon";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import type { ProfileIdentity } from "@/db/profile-read";
@@ -9,17 +8,19 @@ import {
   type ProfileHeroMessageContext,
   profileHeroActionState,
 } from "@/profile/relationship-sheet-model";
+import {
+  PROFILE_HERO_AVATAR_SIZE,
+  PROFILE_HERO_GAP,
+} from "@/screens/contact-profile-logic";
 import { SPACING } from "@/theme/tokens/spacing";
 
 export function ProfileHero({
   identity,
   actionableMethods,
   messageContext,
-  onToggleFavourite,
   onOpenPhoto,
   onMessage,
   onCall,
-  pendingFavourite = false,
 }: {
   identity: ProfileIdentity;
   actionableMethods: Parameters<typeof profileHeroActionState>[0];
@@ -28,34 +29,14 @@ export function ProfileHero({
    * Message still renders — disabled, with its reason caption — never hidden.
    */
   messageContext: ProfileHeroMessageContext;
-  onToggleFavourite: () => void;
   /** Opens the photo lightbox (38.6 D-03/D-15); only reachable with a photo. */
   onOpenPhoto: () => void;
   onMessage: () => void;
   onCall: () => void;
-  pendingFavourite?: boolean;
 }) {
   const actions = profileHeroActionState(actionableMethods, messageContext);
   return (
     <View testID="profile-hero" style={styles.root}>
-      <View style={styles.utilityRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={
-            identity.favouriteRank === null
-              ? `Add ${identity.name} to Favorites`
-              : `Remove ${identity.name} from Favorites`
-          }
-          disabled={pendingFavourite}
-          onPress={onToggleFavourite}
-          style={styles.iconAction}
-        >
-          <Icon
-            name="favorite"
-            state={identity.favouriteRank === null ? "default" : "active"}
-          />
-        </Pressable>
-      </View>
       {identity.photo != null ? (
         <Pressable
           accessibilityRole="button"
@@ -66,7 +47,7 @@ export function ProfileHero({
             photo={identity.photo}
             name={identity.name}
             contactId={identity.id}
-            size={112}
+            size={PROFILE_HERO_AVATAR_SIZE}
           />
         </Pressable>
       ) : (
@@ -75,7 +56,7 @@ export function ProfileHero({
           photo={identity.photo}
           name={identity.name}
           contactId={identity.id}
-          size={112}
+          size={PROFILE_HERO_AVATAR_SIZE}
         />
       )}
       <View style={styles.identity}>
@@ -125,18 +106,9 @@ export function ProfileHero({
 }
 
 const styles = StyleSheet.create({
-  root: { alignItems: "center", gap: SPACING.base },
-  utilityRow: {
-    alignSelf: "stretch",
-    flexDirection: "row",
-    justifyContent: "flex-end",
-  },
-  iconAction: {
-    minWidth: 44,
-    minHeight: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  // 38.6 D-04/D-17: the favourite star moved to the app bar, so the photo is
+  // the hero's first child and grows upward (see profileContentTopPadding).
+  root: { alignItems: "center", gap: PROFILE_HERO_GAP },
   identity: { alignItems: "center", gap: SPACING.xs },
   name: { textAlign: "center" },
   actions: {

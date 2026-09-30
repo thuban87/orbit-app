@@ -2,8 +2,18 @@
 
 import { useFocusEffect } from "@react-navigation/native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, AppState, ScrollView, StyleSheet, View } from "react-native";
+import {
+  Alert,
+  AppState,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from "react-native";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
+import { Icon } from "@/components/icons/Icon";
 import { PhotoLightbox } from "@/components/PhotoLightbox";
 import { ProfileBackgroundManager } from "@/components/profile/ProfileBackgroundManager";
 import { ProfileHero } from "@/components/profile/ProfileHero";
@@ -41,10 +51,15 @@ import {
   consumeProfileReachOutIntent,
   createProfileSnapshotLoader,
   PROFILE_APP_BAR,
+  PROFILE_APP_BAR_SCRIM_OPACITY,
+  PROFILE_APP_BAR_SCROLL_SCRIM,
   type ProfileOverlay,
+  profileAppBarScrolled,
+  profileContentTopPadding,
   profileKnowledgeDestination,
   profileLifecycleView,
   profileOverflowEntries,
+  profileScrollTargetY,
   shouldRunProfileShellRefresh,
   unbindConfirmation,
 } from "@/screens/contact-profile-logic";
@@ -74,6 +89,76 @@ const LOG_SCOPE = "contact-profile";
  */
 export type ContactProfileHost = "settings";
 
+/**
+ * The Profile's top app bar (38.6 D-17): back, then the favourite star, then ⋮.
+ * It OVERLAYS the scroll content so the D-04 photo can rise into its middle
+ * band; `box-none` passes touches on its empty area through to the photo, and
+ * its scroll scrim is `pointerEvents="none"` so a full-bleed backing never
+ * swallows a tap or drag on the photo under the bar strip.
+ */
+export function ProfileAppBar({
+  name,
+  favourite,
+  favouriteDisabled,
+  scrolled,
+  onBack,
+  onToggleFavourite,
+  onOpenOverflow,
+}: {
+  name: string;
+  favourite: boolean;
+  favouriteDisabled: boolean;
+  /** Content is scrolled under the bar (drives the token scrim). */
+  scrolled: boolean;
+  onBack: () => void;
+  onToggleFavourite: () => void;
+  onOpenOverflow: () => void;
+}) {
+  const { colors } = useTheme();
+  return (
+    <View pointerEvents="box-none" style={styles.appBar}>
+      {scrolled ? (
+        <View
+          testID="profile-app-bar-scrim"
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFill,
+            styles.appBarScrim,
+            { backgroundColor: colors.background },
+          ]}
+        />
+      ) : null}
+      <Button
+        role="iconOnly"
+        icon="back"
+        accessibilityLabel="Back"
+        onPress={onBack}
+      />
+      <View style={styles.appBarEnd}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            favourite
+              ? `Remove ${name} from Favorites`
+              : `Add ${name} to Favorites`
+          }
+          disabled={favouriteDisabled}
+          onPress={onToggleFavourite}
+          style={styles.appBarStar}
+        >
+          <Icon name="favorite" state={favourite ? "active" : "default"} />
+        </Pressable>
+        <Button
+          role="iconOnly"
+          icon="overflow"
+          accessibilityLabel={`More actions for ${name}`}
+          onPress={onOpenOverflow}
+        />
+      </View>
+    </View>
+  );
+}
+
 /** One local coherent snapshot drives the fixed Hero and resolved module host. */
 export function ContactProfileScreen({
   navigation,
@@ -100,6 +185,19 @@ export function ContactProfileScreen({
   // in-Profile History section — instant under reduced motion.
   const scrollRef = useRef<ScrollView>(null);
   const reducedMotion = useReducedMotion();
+  // 38.6 D-17: the overlay app bar shows its token scrim once content scrolls
+  // under it. State changes only on a threshold crossing, never per frame.
+  const [barScrolled, setBarScrolled] = useState(false);
+  const barScrolledRef = useRef(false);
+  const onContentScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const next = profileAppBarScrolled(event.nativeEvent.contentOffset.y);
+      if (next === barScrolledRef.current) return;
+      barScrolledRef.current = next;
+      setBarScrolled(next);
+    },
+    [],
+  );
 
   // The Profile is the single invalidation owner for its two projections
   // (38.3 RG-024): every current snapshot publication bumps `historyRevision`,
@@ -431,22 +529,6 @@ export function ContactProfileScreen({
       readability="profile"
     >
       <View testID="contact-profile-screen" style={styles.root}>
-        {snapshot && presentation ? (
-          <View style={styles.appBar}>
-            <Button
-              role="iconOnly"
-              icon="back"
-              accessibilityLabel="Back"
-              onPress={() => navigation.goBack()}
-            />
-            <Button
-              role="iconOnly"
-              icon="overflow"
-              accessibilityLabel={`More actions for ${snapshot.identity.name}`}
-              onPress={() => setOverlay("overflow")}
-            />
-          </View>
-        ) : null}
         <ScrollView
           ref={scrollRef}
           // Sheets opened from this Profile (e.g. the group title prompt) are
@@ -454,9 +536,16 @@ export function ContactProfileScreen({
           // Modal window; without "handled" its responder capture swallows
           // the first tap on their buttons while the keyboard is up (D-72).
           keyboardShouldPersistTaps="handled"
+          onScroll={PROFILE_APP_BAR_SCROLL_SCRIM ? onContentScroll : undefined}
+          scrollEventThrottle={16}
           contentContainerStyle={[
             styles.content,
-            { paddingBottom: bottomClearance },
+            // 38.6 D-04: the app bar overlays the content and the photo grows
+            // upward into it, keeping the name at its pre-38.6 line.
+            {
+              paddingTop: profileContentTopPadding(),
+              paddingBottom: bottomClearance,
+            },
           ]}
         >
           {loading && !snapshot ? <AppText>Loading Profile…</AppText> : null}
@@ -470,10 +559,6 @@ export function ContactProfileScreen({
                   archived: snapshot.identity.archivedAt !== null,
                   settingsHosted: host === "settings",
                 }}
-                pendingFavourite={
-                  pendingFavourite || lifecycle.kind !== "bound"
-                }
-                onToggleFavourite={() => void toggleFavourite()}
                 onOpenPhoto={() => setOverlay("photo")}
                 onMessage={() =>
                   navigation.navigate("Compose", {
@@ -524,8 +609,13 @@ export function ContactProfileScreen({
                 presentation={presentation}
                 todayLocal={todayLocal}
                 historyRevision={historyRevision}
+                // The overlay app bar would cover a target scrolled to y
+                // itself (38.6 D-17), so land it just below the bar.
                 onRequestScrollTo={(y) =>
-                  scrollRef.current?.scrollTo({ y, animated: !reducedMotion })
+                  scrollRef.current?.scrollTo({
+                    y: profileScrollTargetY(y),
+                    animated: !reducedMotion,
+                  })
                 }
                 onSetFrequency={setFrequency}
                 onSnooze={snooze}
@@ -550,6 +640,19 @@ export function ContactProfileScreen({
             </>
           ) : null}
         </ScrollView>
+        {snapshot && presentation ? (
+          // Rendered after the ScrollView so it overlays it (38.6 D-17); same
+          // parent and top edge as before, so no inset changes.
+          <ProfileAppBar
+            name={snapshot.identity.name}
+            favourite={snapshot.identity.favouriteRank !== null}
+            favouriteDisabled={pendingFavourite || lifecycle.kind !== "bound"}
+            scrolled={PROFILE_APP_BAR_SCROLL_SCRIM && barScrolled}
+            onBack={() => navigation.goBack()}
+            onToggleFavourite={() => void toggleFavourite()}
+            onOpenOverflow={() => setOverlay("overflow")}
+          />
+        ) : null}
         {snapshot && presentation ? (
           <>
             <Sheet
@@ -743,11 +846,24 @@ export function ContactProfileScreen({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   appBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
     alignItems: "center",
     flexDirection: "row",
     height: PROFILE_APP_BAR.height,
     justifyContent: "space-between",
     paddingHorizontal: SPACING.base,
+  },
+  appBarScrim: { opacity: PROFILE_APP_BAR_SCRIM_OPACITY },
+  appBarEnd: { alignItems: "center", flexDirection: "row" },
+  appBarStar: {
+    minWidth: PROFILE_APP_BAR.touchTarget,
+    minHeight: PROFILE_APP_BAR.touchTarget,
+    alignItems: "center",
+    justifyContent: "center",
   },
   content: {
     gap: SPACING.base,

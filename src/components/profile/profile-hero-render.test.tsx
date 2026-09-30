@@ -91,7 +91,8 @@ describe("ProfileHero layout (38.6 D-04/D-17)", () => {
       PROFILE_HERO_AVATAR_SIZE,
     );
     const root = nodes.find((node) => node.props.testID === "profile-hero");
-    expect((root?.props.style as { gap?: number }).gap).toBe(PROFILE_HERO_GAP);
+    const style = root?.props.style as { gap?: number } | undefined;
+    expect(style?.gap).toBe(PROFILE_HERO_GAP);
   });
 
   it("has no favourite control and no utility row", () => {

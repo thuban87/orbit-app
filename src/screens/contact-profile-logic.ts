@@ -88,6 +88,128 @@ export type ProfileOverflowEntry =
 /** One compact Profile app-bar row and the shared minimum icon target. */
 export const PROFILE_APP_BAR = Object.freeze({ height: 56, touchTarget: 44 });
 
+// ── 38.6 D-04/D-17 hero geometry — device-tuned with the owner in 38.6-07 ──
+// Every size is a named constant so tuning is a single-number edit.
+
+/** The Profile photo side (D-04: about 2× the old 112). */
+export const PROFILE_HERO_AVATAR_SIZE = 224;
+
+/** The hero's vertical gap between photo, identity and actions (SPACING.base). */
+export const PROFILE_HERO_GAP = 16;
+
+/**
+ * Where the contact name's top edge sat before 38.6, measured from the app
+ * bar's top: bar 56 + content padding 16 + star row 44 + gap 16 + photo 112 +
+ * gap 16 = 260. D-04: content below the photo must never sit lower than this.
+ */
+export const PROFILE_LEGACY_NAME_TOP = 260;
+
+/** D-17: show a token scrim behind the overlay app bar once content scrolls under it. */
+export const PROFILE_APP_BAR_SCROLL_SCRIM = true;
+
+/** Opacity of the app-bar scrim over `colors.background`. */
+export const PROFILE_APP_BAR_SCRIM_OPACITY = 0.92;
+
+/** Scroll offset (dp) past which the app-bar scrim shows. */
+export const PROFILE_APP_BAR_SCRIM_THRESHOLD = 8;
+
+/**
+ * Scroll-content top padding (from the overlay app bar's top) that keeps the
+ * name at PROFILE_LEGACY_NAME_TOP: the photo grows upward into the bar band.
+ */
+export function profileContentTopPadding(
+  avatarSize: number = PROFILE_HERO_AVATAR_SIZE,
+): number {
+  return Math.max(0, PROFILE_LEGACY_NAME_TOP - avatarSize - PROFILE_HERO_GAP);
+}
+
+/** The name's top edge (from the app bar's top) for a padding and photo size. */
+export function profileNameTop(
+  contentTopPadding: number,
+  avatarSize: number,
+): number {
+  return contentTopPadding + avatarSize + PROFILE_HERO_GAP;
+}
+
+interface BarBox {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/** Minimum distance (negative when overlapping) from the photo circle to boxes. */
+function circleClearance(
+  windowWidth: number,
+  avatarSize: number,
+  contentTopPadding: number,
+  boxes: readonly BarBox[],
+): number {
+  const radius = avatarSize / 2;
+  const cx = windowWidth / 2;
+  const cy = contentTopPadding + radius;
+  return Math.min(
+    ...boxes.map((box) => {
+      const dx = Math.max(box.left - cx, 0, cx - box.right);
+      const dy = Math.max(box.top - cy, 0, cy - box.bottom);
+      return Math.hypot(dx, dy) - radius;
+    }),
+  );
+}
+
+/**
+ * Clearance of the back, star and ⋮ GLYPHS (20×20, vertically centred in the
+ * 56 bar) from the photo circle. Bar padding 16; ⋮ Button 52 wide; the star
+ * Pressable 44 wide immediately left of it.
+ */
+export function profileAppBarGlyphClearance(
+  windowWidth: number,
+  avatarSize: number,
+  contentTopPadding: number,
+): number {
+  const top = (PROFILE_APP_BAR.height - 20) / 2;
+  const bottom = top + 20;
+  return circleClearance(windowWidth, avatarSize, contentTopPadding, [
+    { left: 32, right: 52, top, bottom },
+    { left: windowWidth - 100, right: windowWidth - 80, top, bottom },
+    { left: windowWidth - 52, right: windowWidth - 32, top, bottom },
+  ]);
+}
+
+/**
+ * Clearance of the controls' full 44-tall HIT BOXES from the photo circle — a
+ * tap on a hit box overlapping the photo toggles Favourite instead of opening
+ * the lightbox. At 360 dp the star's box overlaps by ≈5.5 px; clearing it would
+ * change an owner-set size (D-04 photo, name line, or D-17 star), so it is
+ * pinned by test and put to the owner in 38.6-07 Task 4.
+ */
+export function profileAppBarHitBoxClearance(
+  windowWidth: number,
+  avatarSize: number,
+  contentTopPadding: number,
+): number {
+  const top = (PROFILE_APP_BAR.height - PROFILE_APP_BAR.touchTarget) / 2;
+  const bottom = top + PROFILE_APP_BAR.touchTarget;
+  return circleClearance(windowWidth, avatarSize, contentTopPadding, [
+    { left: 16, right: 68, top, bottom },
+    { left: windowWidth - 112, right: windowWidth - 68, top, bottom },
+    { left: windowWidth - 68, right: windowWidth - 16, top, bottom },
+  ]);
+}
+
+/** Whether content has scrolled far enough under the bar to show its scrim. */
+export function profileAppBarScrolled(scrollY: number): boolean {
+  return scrollY > PROFILE_APP_BAR_SCRIM_THRESHOLD;
+}
+
+/**
+ * An in-Profile scroll target (e.g. History reveal) lands below the overlay
+ * app bar instead of underneath it.
+ */
+export function profileScrollTargetY(y: number): number {
+  return Math.max(0, y - PROFILE_APP_BAR.height);
+}
+
 /** The screen presents exactly one modal surface, so Back never leaks to its underlay. */
 export function closeTopmostProfileOverlay(_overlay: ProfileOverlay): null {
   return null;
