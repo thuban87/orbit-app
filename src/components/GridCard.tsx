@@ -21,6 +21,7 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
 import { isSnoozed } from "@/utils/dates";
+import type { GridCardGeometry } from "./grid-card-geometry";
 import {
   buildRowAccessibilityDescription,
   buildSearchRowContext,
@@ -68,17 +69,14 @@ function HighlightedSnippet({
   );
 }
 
-/** The card avatar diameter (unchanged by D-73; bigger photos are backlog 999.1). */
-const AVATAR_SIZE = SPACING["2xl"];
-/**
- * The status ring's square box: the avatar plus a thin gap on every side. A
- * fixed square (not a box stretched to the card width) keeps the full-radius
- * ring a circle around the avatar at every font and display size (D-73a).
- */
-const RING_BOX = AVATAR_SIZE + SPACING.xs * 2;
-
 export interface GridCardProps {
   contactId: number;
+  /**
+   * The photo size and ring box for this grid width (38.6 D-06), from
+   * `gridCardGeometry`. The ring box is a fixed square (not stretched to the
+   * card width), so the full-radius ring stays a circle (D-73a).
+   */
+  geometry: GridCardGeometry;
   name: string;
   photo: string | null;
   categoryLabel: string | null;
@@ -114,6 +112,7 @@ export interface GridCardProps {
 
 export function GridCard({
   contactId,
+  geometry,
   name,
   photo,
   categoryLabel,
@@ -287,7 +286,12 @@ export function GridCard({
                   </Pressable>
                 )}
 
-                <View style={styles.avatarArea}>
+                <View
+                  style={[
+                    styles.avatarArea,
+                    { height: geometry.ringBox, width: geometry.ringBox },
+                  ]}
+                >
                   <View
                     testID={`dashboard-grid-card-ring-${contactId}`}
                     accessible={false}
@@ -305,7 +309,7 @@ export function GridCard({
                     photo={photo}
                     name={name}
                     contactId={contactId}
-                    size={AVATAR_SIZE}
+                    size={geometry.avatarSize}
                   />
                   {displayState !== null ? (
                     <View
@@ -406,12 +410,10 @@ const styles = StyleSheet.create({
   avatarArea: {
     alignItems: "center",
     alignSelf: "center",
-    height: RING_BOX,
     justifyContent: "center",
     // Only a small pull-up: the circle keeps clear of the favourite star.
     marginTop: -SPACING.xs,
     position: "relative",
-    width: RING_BOX,
   },
   statusRing: {
     borderRadius: RADII.full,

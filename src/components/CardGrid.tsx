@@ -1,5 +1,5 @@
 /** Virtualized, responsive Dashboard card renderer over the shared result model. */
-import type { ReactElement } from "react";
+import { type ReactElement, useMemo } from "react";
 import {
   FlatList,
   RefreshControl,
@@ -10,8 +10,16 @@ import type { IconName } from "@/components/icons/icon-registry";
 import type { DashboardRow } from "@/db/dashboard-read";
 import type { DashboardSearchResult } from "@/logic/dashboard-search-match";
 import { useTheme } from "@/theme";
-import { SPACING } from "@/theme/tokens/spacing";
 import { GridCard } from "./GridCard";
+import {
+  GRID_COLUMN_GAP,
+  GRID_CONTENT_PADDING,
+  gridCardGeometry,
+  gridColumnCount,
+} from "./grid-card-geometry";
+
+// Moved to the pure geometry module (38.6 D-06); re-exported for existing imports.
+export { gridColumnCount };
 
 export interface CardGridProps {
   rows: DashboardRow[];
@@ -41,14 +49,6 @@ export interface CardGridProps {
   refreshing: boolean;
   onRefresh: () => void;
   bottomClearance: number;
-}
-
-/** Portrait grid count; device UAT owns the exact thresholds. */
-export function gridColumnCount(width: number, fontScale: number): number {
-  if (width < 360 || fontScale >= 1.4) return 2;
-  if (width >= 768 && fontScale <= 1.2) return 5;
-  if (width >= 600 && fontScale <= 1.3) return 4;
-  return 3;
 }
 
 export function CardGrid({
@@ -82,6 +82,11 @@ export function CardGrid({
   const { colors } = useTheme();
   const { fontScale, width } = useWindowDimensions();
   const numColumns = gridColumnCount(width, fontScale);
+  // D-06: every card's photo is sized from the nominal card width.
+  const geometry = useMemo(
+    () => gridCardGeometry(width, numColumns),
+    [width, numColumns],
+  );
 
   return (
     <FlatList
@@ -94,6 +99,7 @@ export function CardGrid({
         isSearchMode,
         selectionMode,
         selectedIds,
+        geometry,
       }}
       numColumns={numColumns}
       keyExtractor={(item) => String(item.id)}
@@ -118,6 +124,7 @@ export function CardGrid({
         return (
           <GridCard
             contactId={item.id}
+            geometry={geometry}
             name={item.name}
             photo={item.photo}
             categoryLabel={item.categoryLabel}
@@ -166,11 +173,11 @@ export function CardGrid({
 
 const styles = StyleSheet.create({
   content: {
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.base,
-    paddingTop: SPACING.base,
+    gap: GRID_COLUMN_GAP,
+    paddingHorizontal: GRID_CONTENT_PADDING,
+    paddingTop: GRID_CONTENT_PADDING,
   },
   row: {
-    gap: SPACING.sm,
+    gap: GRID_COLUMN_GAP,
   },
 });
