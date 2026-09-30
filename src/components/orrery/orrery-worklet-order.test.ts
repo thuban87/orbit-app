@@ -24,6 +24,9 @@ const TARGETS = [
   // The List row's swipe-aware tint (38.5 review WR-01, D-48).
   "src/components/list-row-swipe-backing.ts",
   "src/components/ListRow.tsx",
+  // The Profile photo lightbox's gesture worklets and their math (38.6 D-16).
+  "src/components/photo-lightbox-logic.ts",
+  "src/components/PhotoLightbox.tsx",
 ];
 
 function isWorkletFunction(node: ts.Node | undefined): boolean {
