@@ -339,6 +339,13 @@ export function toRestoreResultParams(
           ? ("verified" as const)
           : ("not-configured" as const)
         : null,
+    // 38.6 D-24: photos the Replace-all safety backup left out (Merge takes none).
+    replaceSafetySnapshotSkippedPhotos:
+      result.mode === "replace-all"
+        ? result.preRestoreSnapshotSkippedPhotos
+        : 0,
+    // 38.6 D-26: skipped-photo rows that end with no photo on this phone.
+    restoredPhotosMissing: result.restoredPhotosMissing,
   };
 }
 

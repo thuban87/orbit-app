@@ -15,6 +15,7 @@ import {
 import { backupPassphraseStore } from "@/services/backup/passphrase-store";
 import { createSafStorage } from "@/services/backup/saf-storage";
 import { readStoredPhotoBase64 } from "@/services/backup/share-export";
+import { recordAutomaticSkippedPhotos } from "@/services/backup/skipped-photos";
 import { registerSweepHook, SWEEP_IDS } from "@/services/launch-sweep";
 import { Logger } from "@/utils/logger";
 
@@ -30,6 +31,9 @@ export function registerBackupSweep(
       const revision = await readDataRevision(exec);
       const now = new Date();
       if (!shouldRunAutomaticBackup(settings, revision, now)) return;
+      // One timestamp for both the health row and the skipped-photo record, so
+      // the Backup screen can tell the record belongs to this backup (D-24).
+      const writtenAt = localDateTime(now);
       const result = await createAutomaticBackupService({
         exec,
         exportedAt: localDateTime(now),
@@ -61,12 +65,22 @@ export function registerBackupSweep(
             recordAutomaticBackupHealthCore(exec, {
               backupFolderAccessible: 1,
               backupFolderDiagnostic: null,
-              lastAutomaticBackupAt: localDateTime(now),
+              lastAutomaticBackupAt: writtenAt,
               lastBackupDataRevision: revision,
             }),
           );
         } catch {
           Logger.error("backup-sweep", "backup health write failed");
+        }
+        // Device-local (38.6 D-24). A failed record never fails the hook: the
+        // backup itself is written and verified.
+        try {
+          await recordAutomaticSkippedPhotos({
+            at: writtenAt,
+            count: result.skippedPhotos,
+          });
+        } catch {
+          Logger.error("backup-sweep", "skipped-photo record failed");
         }
         return;
       }

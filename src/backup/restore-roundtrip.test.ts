@@ -39,6 +39,12 @@ vi.mock("@/services/photos/photo-storage", async () => {
     stageRestorePendingBase64: async (base64: string, path: string) => {
       photo.files.set(path, base64);
     },
+    // The file-copy stager merge re-homing and the D-26 local stager use.
+    stageRestorePending: async (sourceUri: string, path: string) => {
+      const bytes = photo.files.get(sourceUri.replace("file:///docs/", ""));
+      if (bytes === undefined) throw new Error("source photo missing");
+      photo.files.set(path, bytes);
+    },
   };
 });
 vi.mock("@/services/photos/background-storage", () => ({
@@ -57,7 +63,10 @@ vi.mock("@/services/notifications/digest-schedule", () => ({
 }));
 
 import { parseBackupManifest } from "@/backup/backup-schema";
-import { buildExportManifest } from "@/backup/export-manifest";
+import {
+  buildExportManifest,
+  buildExportReport,
+} from "@/backup/export-manifest";
 import { applyRestore } from "@/backup/restore-apply";
 import { BACKUP_FORMAT_VERSION } from "@/backup/types";
 import { getPhotoDisplay } from "@/components/photo-display";
@@ -777,3 +786,238 @@ it.each(["merge", "replace-all"] as const)(
     ).toEqual(wire);
   },
 );
+
+/*
+ * 38.6 D-24 / D-26: an unreadable photo is left out of the backup, counted and
+ * marked; restoring a marked row never removes a photo this phone still has.
+ *
+ * Fixture (source ids by insert order): `z-marked` id 1 owns contact-1.jpg and a
+ * pet photo cv-1-pet.jpg, both on disk but unreadable at export time; `a-bytes`
+ * id 2 owns contact-2.jpg (readable); `m-lost` id 3 names contact-3.jpg, which
+ * is not on disk. Replace-all re-inserts contacts in uid order, so back on the
+ * source `a-bytes` takes id 1 (z-marked's old id) and `z-marked` takes id 3.
+ */
+const LATER = "2026-09-02 00:00:00";
+async function skippedPhotoSource() {
+  photo.files.clear();
+  const source = await db();
+  for (const [uid, path] of [
+    ["z-marked", "avatars/contact-1.jpg"],
+    ["a-bytes", "avatars/contact-2.jpg"],
+    ["m-lost", "avatars/contact-3.jpg"],
+  ] as const) {
+    await contact(source, uid);
+    await source.runAsync("UPDATE contacts SET photo=? WHERE uid=?", [
+      path,
+      uid,
+    ]);
+  }
+  await source.runAsync(
+    "INSERT INTO custom_field_defs(uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES('pet-def','pet','Pet','photo',0,0,0,0,'global',?,?)",
+    [NOW, NOW],
+  );
+  await source.runAsync(
+    "INSERT INTO custom_field_values(uid,contact_id,field_def_id,value,created_at,modified_at) VALUES('pet-value',(SELECT id FROM contacts WHERE uid='z-marked'),(SELECT id FROM custom_field_defs WHERE uid='pet-def'),'avatars/cv-1-pet.jpg',?,?)",
+    [NOW, NOW],
+  );
+  await completeGlobalPairsCore(source);
+  await source.runAsync("UPDATE profile SET photo='avatars/profile.jpg'");
+  photo.files.set("avatars/profile.jpg", "U0VMRg"); // self photo
+  photo.files.set("avatars/contact-1.jpg", "QUFB"); // z-marked's own bytes
+  photo.files.set("avatars/contact-2.jpg", "QkJC"); // a-bytes
+  photo.files.set("avatars/cv-1-pet.jpg", "UEVU"); // z-marked's pet
+  const unreadable = new Set([
+    "avatars/contact-1.jpg",
+    "avatars/cv-1-pet.jpg",
+    "avatars/profile.jpg",
+  ]);
+  const report = await buildExportReport(source, {
+    exportedAt: NOW,
+    readPhotoBase64: async (relative) => {
+      const bytes = photo.files.get(relative);
+      if (bytes === undefined || unreadable.has(relative))
+        throw new Error(`unreadable ${relative}`);
+      return bytes;
+    },
+  });
+  // Through the wire, as a real backup file would be.
+  const manifest = parseBackupManifest(
+    JSON.parse(JSON.stringify(report.manifest)),
+  );
+  return { source, manifest, skippedPhotos: report.skippedPhotos };
+}
+function newer(
+  manifest: ReturnType<typeof parseBackupManifest>,
+  change: (row: Record<string, unknown>) => void = () => {},
+) {
+  const copy = parseBackupManifest(JSON.parse(JSON.stringify(manifest)));
+  for (const row of [
+    ...copy.contacts,
+    ...copy.customFieldValues,
+    ...(copy.profile ? [copy.profile] : []),
+  ]) {
+    row.modifiedAt = LATER;
+    change(row);
+  }
+  return copy;
+}
+async function photosByUid(exec: Awaited<ReturnType<typeof db>>) {
+  return Object.fromEntries(
+    (
+      await exec.getAllAsync<{ id: number; uid: string; photo: string | null }>(
+        "SELECT id, uid, photo FROM contacts",
+      )
+    ).map((row) => [row.uid, row]),
+  );
+}
+async function petValue(exec: Awaited<ReturnType<typeof db>>) {
+  return (
+    await exec.getFirstAsync<{ value: string | null }>(
+      "SELECT value FROM custom_field_values WHERE uid='pet-value'",
+    )
+  )?.value;
+}
+async function profilePhoto(exec: Awaited<ReturnType<typeof db>>) {
+  return (
+    await exec.getFirstAsync<{ photo: string | null }>(
+      "SELECT photo FROM profile WHERE id=1",
+    )
+  )?.photo;
+}
+async function journal(exec: Awaited<ReturnType<typeof db>>) {
+  return exec.getAllAsync("SELECT * FROM restore_photo_journal");
+}
+
+it("exports unreadable photos as marked nulls and counts them (D-24/D-26)", async () => {
+  const { source, manifest, skippedPhotos } = await skippedPhotoSource();
+  expect(skippedPhotos).toBe(4);
+  expect(manifest.profile).toMatchObject({
+    photoBase64: null,
+    photoSkipped: true,
+  });
+  expect(manifest.backupFormatVersion).toBe(7);
+  const byUid = Object.fromEntries(manifest.contacts.map((r) => [r.uid, r]));
+  expect(byUid["a-bytes"]?.photoBase64).toBe("QkJC");
+  expect(byUid["a-bytes"]).not.toHaveProperty("photoSkipped");
+  for (const uid of ["z-marked", "m-lost"])
+    expect(byUid[uid]).toMatchObject({ photoBase64: null, photoSkipped: true });
+  const values = Object.fromEntries(
+    manifest.customFieldValues.map((r) => [r.uid, r]),
+  );
+  expect(values["pet-value"]).toMatchObject({
+    value: null,
+    photoBase64: null,
+    photoSkipped: true,
+  });
+  // A photo-type pair with no photo is not marked.
+  for (const [uid, row] of Object.entries(values))
+    if (uid !== "pet-value") expect(row).not.toHaveProperty("photoSkipped");
+  // The export never touches a reference (D-23).
+  expect((await photosByUid(source))["m-lost"]?.photo).toBe(
+    "avatars/contact-3.jpg",
+  );
+});
+
+it("Replace-all into a fresh phone gives marked rows no photo and restores every other photo byte-identical", async () => {
+  const { manifest } = await skippedPhotoSource();
+  const destination = await db();
+  const result = await applyRestore(destination, manifest, "replace-all");
+  expect(result).toMatchObject({ status: "applied", restoredPhotosMissing: 4 });
+  expect(await profilePhoto(destination)).toBeNull();
+  const rows = await photosByUid(destination);
+  expect(rows["z-marked"]?.photo).toBeNull();
+  expect(rows["m-lost"]?.photo).toBeNull();
+  expect(await petValue(destination)).toBeNull();
+  const keeps = rows["a-bytes"]!;
+  expect(keeps.photo).toBe(`avatars/contact-${keeps.id}.jpg`);
+  expect(photo.files.get(keeps.photo!)).toBe("QkJC");
+  expect(await journal(destination)).toEqual([]);
+});
+
+it("a same-age Merge back onto the source keeps every local photo (local wins the tie)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  const before = await photosByUid(source);
+  expect(await applyRestore(source, manifest, "merge")).toMatchObject({
+    status: "applied",
+  });
+  expect(await photosByUid(source)).toEqual(before);
+  expect(await petValue(source)).toBe("avatars/cv-1-pet.jpg");
+  expect(await journal(source)).toEqual([]);
+});
+
+it("a Merge of NEWER marked rows leaves local bytes and references untouched and deletes nothing (D-26)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  const result = await applyRestore(source, newer(manifest), "merge");
+  expect(result).toMatchObject({
+    status: "applied",
+    photoCleanupPending: 0,
+    restoredPhotosMissing: 0,
+  });
+  const rows = await photosByUid(source);
+  expect(rows["z-marked"]?.photo).toBe("avatars/contact-1.jpg");
+  expect(rows["m-lost"]?.photo).toBe("avatars/contact-3.jpg");
+  expect(await petValue(source)).toBe("avatars/cv-1-pet.jpg");
+  // Kept bytes survive the finalize/delete phase.
+  expect(photo.files.get("avatars/contact-1.jpg")).toBe("QUFB");
+  expect(photo.files.get("avatars/cv-1-pet.jpg")).toBe("UEVU");
+  expect(photo.files.get("avatars/contact-2.jpg")).toBe("QkJC");
+  expect(await profilePhoto(source)).toBe("avatars/profile.jpg");
+  expect(photo.files.get("avatars/profile.jpg")).toBe("U0VMRg");
+  expect(await journal(source)).toEqual([]);
+});
+
+it("an UNMARKED null on a newer row still removes the photo (unchanged meaning)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  const cleared = newer(manifest, (row) => {
+    delete row.photoSkipped;
+  });
+  expect(await applyRestore(source, cleared, "merge")).toMatchObject({
+    status: "applied",
+  });
+  const rows = await photosByUid(source);
+  expect(rows["z-marked"]?.photo).toBeNull();
+  expect(photo.files.has("avatars/contact-1.jpg")).toBe(false);
+});
+
+it("Replace-all back onto the source moves each marked row's local bytes to its new id-derived canonical (id reuse, D-26)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  const result = await applyRestore(source, manifest, "replace-all");
+  // m-lost's local file was already gone: no photo, counted.
+  expect(result).toMatchObject({
+    status: "applied",
+    photosNeedingAttention: 0,
+    restoredPhotosMissing: 1,
+  });
+  const rows = await photosByUid(source);
+  // a-bytes took z-marked's old id 1.
+  expect(rows["a-bytes"]).toMatchObject({
+    id: 1,
+    photo: "avatars/contact-1.jpg",
+  });
+  expect(photo.files.get("avatars/contact-1.jpg")).toBe("QkJC");
+  const marked = rows["z-marked"]!;
+  expect(marked.id).not.toBe(1);
+  expect(marked.photo).toBe(`avatars/contact-${marked.id}.jpg`);
+  expect(photo.files.get(marked.photo!)).toBe("QUFB");
+  expect(rows["m-lost"]?.photo).toBeNull();
+  // The pet photo followed its contact to the new canonical.
+  expect(await profilePhoto(source)).toBe("avatars/profile.jpg");
+  expect(photo.files.get("avatars/profile.jpg")).toBe("U0VMRg");
+  const pet = await petValue(source);
+  expect(pet).toBe(`avatars/cv-${marked.id}-pet.jpg`);
+  expect(photo.files.get(pet!)).toBe("UEVU");
+  // No two rows share a reference, and every kept path still has its bytes.
+  const references = [
+    ...Object.values(rows).map((row) => row.photo),
+    pet,
+  ].filter((value): value is string => value !== null);
+  expect(new Set(references).size).toBe(references.length);
+  for (const reference of references)
+    expect(photo.files.has(reference)).toBe(true);
+  expect(await journal(source)).toEqual([]);
+  expect(
+    [...photo.files.keys()].filter((path) =>
+      path.startsWith("avatars/_restore_pending/"),
+    ),
+  ).toEqual([]);
+});

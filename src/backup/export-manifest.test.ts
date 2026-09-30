@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("expo-sqlite", () => ({}));
 
-import { buildExportManifest } from "@/backup/export-manifest";
+import { parseBackupManifest } from "@/backup/backup-schema";
+import {
+  buildExportManifest,
+  buildExportReport,
+} from "@/backup/export-manifest";
 import {
   BACKUP_FORMAT_VERSION,
   BackupPhotoUnreadableError,
@@ -557,25 +561,137 @@ describe("buildExportManifest", () => {
     }
   });
 
-  it("aborts rather than emitting a partial manifest when one referenced photo cannot be read", async () => {
+  // 38.6 D-24 reversed the old all-or-nothing rule for profile, contact and
+  // custom-field photos: an unreadable one is left out and counted. D-26 marks
+  // the row so restore never reads the gap as a removal.
+  async function photoDb() {
     const exec = nodeSqliteExecutor(openTestDb());
     let count = 0;
     await runMigrations(exec, MIGRATIONS, TARGET_VERSION, {
       now: NOW,
       newUid: () => `uid-${++count}`,
     });
+    return exec;
+  }
+  async function addContact(
+    exec: Awaited<ReturnType<typeof photoDb>>,
+    uid: string,
+    photo: string | null,
+  ) {
     await exec.runAsync(
-      `INSERT INTO contacts (uid, name, interval_days, photo, created_at, modified_at) VALUES (?, ?, ?, ?, ?, ?)`,
-      ["contact-a", "Ada", 7, "avatars/contact-1.jpg", NOW, NOW],
+      "INSERT INTO contacts (uid, name, interval_days, photo, created_at, modified_at) VALUES (?, ?, 7, ?, ?, ?)",
+      [uid, uid, photo, NOW, NOW],
     );
-    await expect(
-      buildExportManifest(exec, {
-        exportedAt: NOW,
-        readPhotoBase64: async () => {
-          throw new Error("missing");
-        },
+  }
+
+  it("skips and counts unreadable profile, contact and custom photos, and marks each row (D-24/D-26)", async () => {
+    const exec = await photoDb();
+    await addContact(exec, "contact-a", "avatars/contact-a.jpg");
+    await addContact(exec, "contact-b", "avatars/contact-b.jpg");
+    await exec.runAsync("UPDATE profile SET photo = 'avatars/profile.jpg'");
+    await exec.runAsync(
+      "INSERT INTO custom_field_defs(uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES('pet-def','pet','Pet','photo',0,0,0,0,'global',?,?)",
+      [NOW, NOW],
+    );
+    await exec.runAsync(
+      "INSERT INTO custom_field_values(uid,contact_id,field_def_id,value,created_at,modified_at) VALUES('pet-value',(SELECT id FROM contacts WHERE uid='contact-a'),(SELECT id FROM custom_field_defs WHERE uid='pet-def'),'avatars/cv-1-pet.jpg',?,?)",
+      [NOW, NOW],
+    );
+    const report = await buildExportReport(exec, {
+      exportedAt: NOW,
+      readPhotoBase64: async (relative) => {
+        if (relative === "avatars/contact-a.jpg") return "AQID";
+        if (relative === "avatars/profile.jpg") return "";
+        throw new Error("private local path details");
+      },
+    });
+    expect(report.skippedPhotos).toBe(3);
+    const { manifest } = report;
+    expect(manifest.backupFormatVersion).toBe(7);
+    expect(parseBackupManifest(manifest)).toEqual(manifest);
+    const byUid = Object.fromEntries(manifest.contacts.map((r) => [r.uid, r]));
+    expect(byUid["contact-a"]?.photoBase64).toBe("AQID");
+    expect(byUid["contact-a"]).not.toHaveProperty("photoSkipped");
+    expect(byUid["contact-b"]).toMatchObject({
+      photoBase64: null,
+      photoSkipped: true,
+    });
+    expect(manifest.profile).toMatchObject({
+      photoBase64: null,
+      photoSkipped: true,
+    });
+    expect(manifest.customFieldValues).toEqual([
+      expect.objectContaining({
+        uid: "pet-value",
+        value: null,
+        photoBase64: null,
+        photoSkipped: true,
       }),
-    ).rejects.toThrow(/repair/i);
+    ]);
+    // The export never touches a stored reference (D-23).
+    expect(
+      await exec.getAllAsync("SELECT uid, photo FROM contacts ORDER BY uid"),
+    ).toEqual([
+      { uid: "contact-a", photo: "avatars/contact-a.jpg" },
+      { uid: "contact-b", photo: "avatars/contact-b.jpg" },
+    ]);
+  });
+
+  it("skips and counts a reference that is not a non-empty string", async () => {
+    const exec = await photoDb();
+    await addContact(exec, "contact-empty", "");
+    const report = await buildExportReport(exec, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "AQID",
+    });
+    expect(report.skippedPhotos).toBe(1);
+    expect(report.manifest.contacts[0]).toMatchObject({
+      photoBase64: null,
+      photoSkipped: true,
+    });
+  });
+
+  it("neither skips nor counts a row with no photo", async () => {
+    const exec = await photoDb();
+    await addContact(exec, "contact-none", null);
+    const report = await buildExportReport(exec, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => {
+        throw new Error("never read");
+      },
+    });
+    expect(report.skippedPhotos).toBe(0);
+    expect(report.manifest.contacts[0]?.photoBase64).toBeNull();
+    expect(report.manifest.contacts[0]).not.toHaveProperty("photoSkipped");
+  });
+
+  it("buildExportManifest returns the report's manifest", async () => {
+    const exec = await photoDb();
+    await addContact(exec, "contact-b", "avatars/contact-b.jpg");
+    const deps = {
+      exportedAt: NOW,
+      readPhotoBase64: async () => {
+        throw new Error("missing");
+      },
+    };
+    expect(await buildExportManifest(exec, deps)).toEqual(
+      (await buildExportReport(exec, deps)).manifest,
+    );
+  });
+
+  it("parseBackupManifest accepts the skip marker and rejects a non-boolean one (D-26)", async () => {
+    const exec = await photoDb();
+    await addContact(exec, "contact-b", "avatars/contact-b.jpg");
+    const { manifest } = await buildExportReport(exec, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => {
+        throw new Error("missing");
+      },
+    });
+    const wire = JSON.parse(JSON.stringify(manifest));
+    expect(parseBackupManifest(wire).contacts[0]?.photoSkipped).toBe(true);
+    wire.contacts[0].photoSkipped = "yes";
+    expect(() => parseBackupManifest(wire)).toThrow(/skipped-photo marker/);
   });
 
   it("raises a content-free repair cue for an unreadable profile background", async () => {

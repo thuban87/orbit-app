@@ -7,7 +7,7 @@ import {
   parseBackupManifest,
   UPDATE_FIRST_MESSAGE,
 } from "@/backup/backup-schema";
-import { buildExportManifest } from "@/backup/export-manifest";
+import { buildExportReport } from "@/backup/export-manifest";
 import type { BackupEncryptionProfile, BackupManifest } from "@/backup/types";
 import type { SqlExecutor } from "@/db/types";
 import {
@@ -471,7 +471,8 @@ export interface ExportShareAdapter {
 }
 
 export type ManualExportResult =
-  | { status: "shared" }
+  /** `skippedPhotos`: unreadable photos left out of the share (38.6 D-24). */
+  | { status: "shared"; skippedPhotos: number }
   | { status: "busy" }
   | { status: "sharing-unavailable" }
   | { status: "share-failed" }
@@ -533,11 +534,11 @@ export function createManualExportService(deps: ManualExportDependencies): {
           encryption?.passphrase ?? { status: "absent" },
         );
         if (mode.mode === "blocked") return { status: "export-failed" };
-        const manifest = await buildExportManifest(deps.exec, {
+        const report = await buildExportReport(deps.exec, {
           exportedAt: deps.exportedAt,
           readPhotoBase64: deps.readPhotoBase64,
         });
-        const plaintext = JSON.stringify(manifest);
+        const plaintext = JSON.stringify(report.manifest);
         // Validate the portable source before encrypting or writing it.
         parseBackupManifest(JSON.parse(plaintext));
         let contents = plaintext;
@@ -574,7 +575,7 @@ export function createManualExportService(deps: ManualExportDependencies): {
           }
           await deps.share.open(file.uri);
           handedOff = true;
-          return { status: "shared" };
+          return { status: "shared", skippedPhotos: report.skippedPhotos };
         } catch {
           return { status: "share-failed" };
         }
@@ -602,7 +603,8 @@ export function createAutomaticBackupService(
   deps: AutomaticBackupDependencies,
 ): {
   writeVerifiedSnapshot(): Promise<
-    | { status: "written"; filename: string }
+    /** `skippedPhotos`: unreadable photos left out (38.6 D-24). */
+    | { status: "written"; filename: string; skippedPhotos: number }
     | { status: "failed" }
     | { status: "busy" }
     | {
@@ -628,11 +630,11 @@ export function createAutomaticBackupService(
           );
           if (mode.mode === "blocked")
             return { status: "blocked", reason: mode.reason } as const;
-          const manifest = await buildExportManifest(deps.exec, {
+          const report = await buildExportReport(deps.exec, {
             exportedAt: deps.exportedAt,
             readPhotoBase64: deps.readPhotoBase64,
           });
-          const plaintext = JSON.stringify(manifest);
+          const plaintext = JSON.stringify(report.manifest);
           parseBackupManifest(JSON.parse(plaintext));
           const contents =
             mode.mode === "encrypted"
@@ -664,7 +666,11 @@ export function createAutomaticBackupService(
           } catch {
             // Listing/pruning failure never negates a verified write or health.
           }
-          return { status: "written", filename } as const;
+          return {
+            status: "written",
+            filename,
+            skippedPhotos: report.skippedPhotos,
+          } as const;
         });
       } catch {
         return { status: "failed" } as const;

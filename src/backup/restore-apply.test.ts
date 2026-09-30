@@ -2161,6 +2161,58 @@ describe("applyRestore", () => {
     expect(snapshot).toHaveBeenCalledTimes(1);
   });
 
+  it("carries the safety backup's skipped-photo count into the applied result (38.6 D-24)", async () => {
+    const source = await db();
+    const manifest = await buildExportManifest(source, {
+      exportedAt: NOW,
+      readPhotoBase64: async () => "",
+    });
+    const configured = async () => {
+      const destination = await db();
+      await destination.runAsync(
+        "UPDATE app_settings SET backup_folder_uri=? WHERE id=1",
+        ["content://configured"],
+      );
+      return destination;
+    };
+    await expect(
+      applyRestore(await configured(), manifest, "replace-all", {
+        createVerifiedPreRestoreSnapshot: async () => ({
+          status: "written" as const,
+          skippedPhotos: 1,
+        }),
+      }),
+    ).resolves.toMatchObject({
+      status: "applied",
+      preRestoreSnapshotCreated: true,
+      preRestoreSnapshotSkippedPhotos: 1,
+    });
+    await expect(
+      applyRestore(await configured(), manifest, "replace-all", {
+        createVerifiedPreRestoreSnapshot: async () => ({
+          status: "written" as const,
+        }),
+      }),
+    ).resolves.toMatchObject({
+      status: "applied",
+      preRestoreSnapshotSkippedPhotos: 0,
+    });
+    // Merge takes no snapshot; the no-op early return carries the same value.
+    await expect(
+      applyRestore(await db(), manifest, "merge", {
+        createVerifiedPreRestoreSnapshot: async () => ({
+          status: "written" as const,
+          skippedPhotos: 5,
+        }),
+      }),
+    ).resolves.toMatchObject({
+      status: "applied",
+      preRestoreSnapshotCreated: false,
+      preRestoreSnapshotSkippedPhotos: 0,
+      restoredPhotosMissing: 0,
+    });
+  });
+
   it("commits restore while exposing schedule resync failures for the launch sweep to heal", async () => {
     const source = await db();
     await source.runAsync(

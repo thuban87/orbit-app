@@ -967,6 +967,14 @@ function validate(manifest: RawManifest): BackupManifest {
   ) {
     fail("backup has invalid photo bytes");
   }
+  // 38.6 D-26: the optional skipped-photo marker is a boolean when present.
+  for (const row of [
+    ...arrays.contacts,
+    ...arrays.customFieldValues,
+    ...(profile ? [profile] : []),
+  ])
+    if (row.photoSkipped !== undefined && typeof row.photoSkipped !== "boolean")
+      fail("backup has an invalid skipped-photo marker");
   return {
     backupFormatVersion: BACKUP_FORMAT_VERSION,
     envelopeVersion: manifest.envelopeVersion as number,

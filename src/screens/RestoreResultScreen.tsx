@@ -7,6 +7,7 @@ import {
   restoreReturnLabel,
   restoreReturnRouteName,
 } from "@/screens/backup-dualhome-logic";
+import { skippedPhotosCopy } from "@/services/backup/skipped-photos";
 import { useTheme } from "@/theme";
 
 export function RestoreResultScreen({
@@ -26,7 +27,13 @@ export function RestoreResultScreen({
     photoCleanupPending,
     scheduleResyncPending,
     replaceSafetySnapshot,
+    replaceSafetySnapshotSkippedPhotos,
+    restoredPhotosMissing,
   } = route.params;
+  // 38.6 D-24 / D-26: photos left out of the safety backup, and skipped-photo
+  // rows this phone had no photo for either.
+  const safetySkipped = skippedPhotosCopy(replaceSafetySnapshotSkippedPhotos);
+  const restoredMissing = skippedPhotosCopy(restoredPhotosMissing);
   const pending = [
     photosNeedingAttention > 0
       ? `${photosNeedingAttention} photo${photosNeedingAttention === 1 ? "" : "s"}`
@@ -61,6 +68,11 @@ export function RestoreResultScreen({
           Added: {added} · Updated: {updated} · Newer local kept:{" "}
           {newerLocalKept} · Deletions applied: {deletionsApplied}
         </Text>
+        {restoredMissing ? (
+          <Text style={[styles.body, { color: colors.textSecondary }]}>
+            {restoredMissing}
+          </Text>
+        ) : null}
         {pending ? (
           <Text style={[styles.body, { color: colors.textSecondary }]}>
             Your data is restored. {pending} will be retried the next time Orbit
@@ -70,6 +82,7 @@ export function RestoreResultScreen({
         {replaceSafetySnapshot === "verified" ? (
           <Text style={[styles.body, { color: colors.textSecondary }]}>
             A verified backup of this device was created first.
+            {safetySkipped ? ` ${safetySkipped}` : ""}
           </Text>
         ) : null}
         {replaceSafetySnapshot === "not-configured" ? (

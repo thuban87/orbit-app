@@ -218,6 +218,10 @@ export type BackupStackParamList = {
     photoCleanupPending: number;
     scheduleResyncPending: boolean;
     replaceSafetySnapshot: "verified" | "not-configured" | null;
+    /** Photos the Replace-all safety backup left out (38.6 D-24). */
+    replaceSafetySnapshotSkippedPhotos: number;
+    /** Skipped-photo rows with no photo left to keep (38.6 D-26). */
+    restoredPhotosMissing: number;
   };
 };
 
@@ -332,6 +336,10 @@ export type SettingsStackParamList = {
     photoCleanupPending: number;
     scheduleResyncPending: boolean;
     replaceSafetySnapshot: "verified" | "not-configured" | null;
+    /** Photos the Replace-all safety backup left out (38.6 D-24). */
+    replaceSafetySnapshotSkippedPhotos: number;
+    /** Skipped-photo rows with no photo left to keep (38.6 D-26). */
+    restoredPhotosMissing: number;
   };
   /**
    * Categories IA reservation (D-03 / §K). A stable internal route NAME held for

@@ -56,6 +56,7 @@ import {
   deleteBackgroundRestorePending,
   stageBackgroundRestorePendingBase64,
 } from "@/services/photos/background-storage";
+import { stageLocalPhotoForRestore } from "@/services/photos/merge-photo-rehome";
 import {
   executeDeleteIntentOwned,
   finalizeJournalEntryOwned,
@@ -80,12 +81,22 @@ import {
 
 export type RestoreMode = "merge" | "replace-all";
 export type PreRestoreSnapshotResult =
-  | { status: "written" }
+  /** `skippedPhotos`: photos the safety backup left out (38.6 D-24). */
+  | { status: "written"; skippedPhotos?: number }
   | { status: "failed" | "busy" | "blocked"; reason?: string };
 export interface RestoreApplyDependencies {
   /** Required when the destination is configured: failure blocks Replace-all. */
   createVerifiedPreRestoreSnapshot?: () => Promise<PreRestoreSnapshotResult>;
   stagePhoto?: (base64: string, relative: string) => Promise<void>;
+  /**
+   * Replace-all only (38.6 D-26): stage this phone's current bytes for a row
+   * whose backup photo was skipped. Resolves false when there is nothing to
+   * stage (the local file is gone).
+   */
+  stageLocalPhoto?: (
+    canonicalRelativePath: string,
+    pendingRelativePath: string,
+  ) => Promise<boolean>;
   persistPhoto?: (
     sourceUri: string,
     canonicalRelativePath: string,
@@ -130,6 +141,13 @@ export type RestoreApplyResult =
       photoCleanupPending: number;
       scheduleResyncPending: boolean;
       preRestoreSnapshotCreated: boolean;
+      /** Photos the Replace-all safety backup left out (38.6 D-24). */
+      preRestoreSnapshotSkippedPhotos: number;
+      /**
+       * Rows whose backup photo was skipped (D-26 marker) and for which this
+       * phone had no photo to keep either, so they end with no photo.
+       */
+      restoredPhotosMissing: number;
     }
   | { status: "incompatible-destination"; incompatibilities: number }
   | { status: "pre-restore-snapshot-failed" }
@@ -150,6 +168,12 @@ type DeleteCandidate = {
   target: PhotoTarget;
   canonicalRelativePath: string;
   clearReference: boolean;
+};
+/** Merge (D-26): a skipped-photo row's local reference, written back after the upserts. */
+type KeepCandidate = {
+  target: PhotoTarget;
+  reference: string;
+  canonicalBefore: string | null;
 };
 type BackgroundFinalizeCandidate = {
   uid: string;
@@ -1124,12 +1148,20 @@ async function canonicalFor(
   );
   return row ? customFieldPhotoRelPath(row.id, row.col_name) : null;
 }
+/** The D-26 marker: this row's photo was left out of the backup, not removed. */
+function photoSkipped(row: Record<string, unknown>): boolean {
+  return row.photoSkipped === true && typeof row.photoBase64 !== "string";
+}
 async function stageCandidates(
   exec: SqlExecutor,
   manifest: BackupManifest,
   session: string,
   stage: RestoreApplyDependencies["stagePhoto"],
   staged: Map<string, FinalizeCandidate>,
+  local: {
+    mode: RestoreMode;
+    stageLocal: NonNullable<RestoreApplyDependencies["stageLocalPhoto"]>;
+  },
 ): Promise<void> {
   const incomingDefs = incomingPhotoDefs(manifest);
   const reservedUids = new Set([
@@ -1140,7 +1172,21 @@ async function stageCandidates(
   for (const entity of ["profile", "contacts", "custom_field_values"] as const)
     for (const row of incomingRows(manifest, entity)) {
       const target = await targetFor(exec, entity, row, incomingDefs);
-      if (!target || typeof row.photoBase64 !== "string") continue;
+      if (!target) continue;
+      const bytes =
+        typeof row.photoBase64 === "string" ? row.photoBase64 : null;
+      // D-26, Replace-all: a skipped-photo row carries this phone's current
+      // bytes instead. Staged here, before the reset and before any finalize
+      // can overwrite a canonical that Replace-all's new ids re-assign.
+      const localReference =
+        bytes === null && local.mode === "replace-all" && photoSkipped(row)
+          ? await oldPhoto(exec, target)
+          : null;
+      if (
+        bytes === null &&
+        (localReference === null || !SAFE_RELATIVE.test(localReference))
+      )
+        continue;
       // An arbitrary wire UID may contain punctuation. Keep safe existing
       // staging names; give unsafe ones a collision-free disposable slot.
       // Canonical paths remain ADR-021's contact-ID/field-derived names.
@@ -1153,8 +1199,25 @@ async function stageCandidates(
         stagingTarget = { ...target, uid: safeUid };
       }
       const relativePath = restorePendingRelPath(stagingTarget, session);
-      staged.set(`${entity}\0${row.uid}`, { target, relativePath });
-      await stage!(row.photoBase64, relativePath);
+      if (bytes !== null) {
+        staged.set(`${entity}\0${row.uid}`, { target, relativePath });
+        await stage!(bytes, relativePath);
+        continue;
+      }
+      if (localReference === null) continue;
+      let stagedLocal = false;
+      try {
+        stagedLocal = await local.stageLocal(localReference, relativePath);
+      } catch {
+        // Unreadable: nothing staged, the row ends with no photo (counted).
+        try {
+          deleteRestorePending(relativePath);
+        } catch {
+          /* best effort */
+        }
+      }
+      if (stagedLocal)
+        staged.set(`${entity}\0${row.uid}`, { target, relativePath });
     }
 }
 async function planPhotoCandidates(
@@ -1162,10 +1225,18 @@ async function planPhotoCandidates(
   manifest: BackupManifest,
   plan: Plan,
   staged: ReadonlyMap<string, FinalizeCandidate>,
-): Promise<{ finalize: FinalizeCandidate[]; deletes: DeleteCandidate[] }> {
+  mode: RestoreMode,
+): Promise<{
+  finalize: FinalizeCandidate[];
+  deletes: DeleteCandidate[];
+  keep: KeepCandidate[];
+  missing: number;
+}> {
   const incomingDefs = incomingPhotoDefs(manifest);
   const finalize: FinalizeCandidate[] = [];
   const deletes: DeleteCandidate[] = [];
+  const keep: KeepCandidate[] = [];
+  let missing = 0;
   for (const entity of ["profile", "contacts", "custom_field_values"] as const)
     for (const a of plan[entity]) {
       if (!a.row) continue;
@@ -1179,6 +1250,30 @@ async function planPhotoCandidates(
         const candidate = staged.get(`${entity}\0${a.uid}`);
         if (!candidate) throw new Error("winning photo was not staged");
         finalize.push(candidate);
+      } else if (
+        (a.kind === "insert" || a.kind === "update") &&
+        photoSkipped(a.row)
+      ) {
+        // D-26: a skipped photo never removes a photo on restore: no delete
+        // intent and no reference clear, in either mode.
+        const candidate = staged.get(`${entity}\0${a.uid}`);
+        if (candidate) {
+          // Replace-all: this phone's bytes land at the row's new canonical.
+          finalize.push(candidate);
+          continue;
+        }
+        const existing = mode === "merge" ? await oldPhoto(exec, target) : null;
+        if (existing === null) {
+          missing += 1;
+          continue;
+        }
+        // Merge: ids stay, so the local reference is written back after the
+        // upserts (the custom value upsert writes the wire's null value).
+        keep.push({
+          target,
+          reference: existing,
+          canonicalBefore: await canonicalFor(exec, target),
+        });
       } else if (
         a.kind === "delete" ||
         ((a.kind === "insert" || a.kind === "update") &&
@@ -1194,7 +1289,7 @@ async function planPhotoCandidates(
           });
       }
     }
-  return { finalize, deletes };
+  return { finalize, deletes, keep, missing };
 }
 async function stageBackgroundCandidates(
   manifest: BackupManifest,
@@ -1521,6 +1616,7 @@ export async function applyRestore(
       unavailable: needingConsent.length,
     };
   let preRestoreSnapshotCreated = false;
+  let preRestoreSnapshotSkippedPhotos = 0;
   const configured = Boolean(
     (
       await exec.getFirstAsync<{ backup_folder_uri: string | null }>(
@@ -1529,12 +1625,13 @@ export async function applyRestore(
     )?.backup_folder_uri,
   );
   if (mode === "replace-all" && configured) {
-    if (
-      !deps.createVerifiedPreRestoreSnapshot ||
-      (await deps.createVerifiedPreRestoreSnapshot()).status !== "written"
-    )
+    const snapshot = deps.createVerifiedPreRestoreSnapshot
+      ? await deps.createVerifiedPreRestoreSnapshot()
+      : null;
+    if (snapshot?.status !== "written")
       return { status: "pre-restore-snapshot-failed" };
     preRestoreSnapshotCreated = true;
+    preRestoreSnapshotSkippedPhotos = snapshot.skippedPhotos ?? 0;
   }
   const restoreSessionToken = deps.sessionToken ?? newUid();
   beginStagingSession(restoreSessionToken);
@@ -1549,6 +1646,7 @@ export async function applyRestore(
       restoreSessionToken,
       deps.stagePhoto ?? stageRestorePendingBase64,
       stagedPhotos,
+      { mode, stageLocal: deps.stageLocalPhoto ?? stageLocalPhotoForRestore },
     );
     await stageBackgroundCandidates(
       manifest,
@@ -1714,6 +1812,8 @@ export async function applyRestore(
             photoCleanupPending: 0,
             scheduleResyncPending: false,
             preRestoreSnapshotCreated,
+            preRestoreSnapshotSkippedPhotos,
+            restoredPhotosMissing: 0,
           },
         };
       const fileDeletes = await captureRestoreDeletes(exec, plan, mode);
@@ -1722,6 +1822,7 @@ export async function applyRestore(
         manifest,
         plan,
         stagedPhotos,
+        mode,
       );
       const backgroundCandidates = stagedBackgrounds.filter((candidate) =>
         writes(plan, "profile_background_templates").some(
@@ -1811,6 +1912,18 @@ export async function applyRestore(
         if (contact)
           await recomputeLastContactCore(exec, contact.id, contact.modified_at);
       }
+      // D-26, Merge: restore a skipped-photo row's local reference that an
+      // upsert overwrote (the custom value upsert writes the wire's null), but
+      // only while the row still derives the same canonical (same contact and
+      // field), so a reference never points at another row's photo.
+      let restoredPhotosMissing = candidates.missing;
+      for (const kept of candidates.keep) {
+        if ((await canonicalFor(exec, kept.target)) !== kept.canonicalBefore) {
+          restoredPhotosMissing += 1;
+          continue;
+        }
+        await writePhotoReference(exec, kept.target, kept.reference);
+      }
       const finalizeEntries: RestorePhotoJournalEntry[] = [];
       for (const candidate of candidates.finalize) {
         const canonical = await canonicalFor(exec, candidate.target);
@@ -1862,6 +1975,7 @@ export async function applyRestore(
         totals,
         finalizeEntries,
         fileDeletes,
+        restoredPhotosMissing,
       };
     });
     if (prepared.result) return prepared.result;
@@ -1871,6 +1985,7 @@ export async function applyRestore(
       totals,
       finalizeEntries,
       fileDeletes,
+      restoredPhotosMissing,
     } = prepared;
     const committedPaths = new Set(
       candidates.finalize.map((candidate) => candidate.relativePath),
@@ -1976,6 +2091,8 @@ export async function applyRestore(
       photoCleanupPending,
       scheduleResyncPending,
       preRestoreSnapshotCreated,
+      preRestoreSnapshotSkippedPhotos,
+      restoredPhotosMissing,
     };
   } finally {
     for (const [key, candidate] of stagedPhotos) {

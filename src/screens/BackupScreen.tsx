@@ -33,6 +33,11 @@ import {
   createLocalExportFiles,
   readStoredPhotoBase64,
 } from "@/services/backup/share-export";
+import {
+  automaticSkippedPhotosLine,
+  readAutomaticSkippedPhotos,
+  skippedPhotosCopy,
+} from "@/services/backup/skipped-photos";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
 import {
@@ -87,6 +92,10 @@ export function BackupScreen({
   const { colors } = useTheme();
   const bottomClearance = useBottomClearance();
   const [health, setHealth] = useState<BackupHealth | null>(null);
+  // D-24: photos the latest automatic backup left out (device-local record).
+  const [automaticSkippedLine, setAutomaticSkippedLine] = useState<
+    string | null
+  >(null);
   const [encryptionEnabled, setEncryptionEnabled] = useState(false);
   const [showNudge, setShowNudge] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -104,7 +113,7 @@ export function BackupScreen({
     void (async () => {
       try {
         const exec = getExecutor();
-        const [settings, meaningful] = await Promise.all([
+        const [settings, meaningful, skippedRecord] = await Promise.all([
           getAppSettings(exec),
           exec.getFirstAsync<{ meaningful: number }>(
             `SELECT EXISTS(
@@ -118,6 +127,7 @@ export function BackupScreen({
               UNION ALL SELECT 1 FROM profile WHERE name IS NOT NULL OR photo IS NOT NULL
             ) AS meaningful`,
           ),
+          readAutomaticSkippedPhotos(),
         ]);
         const nudge = resolveBackupNudge(
           {
@@ -149,11 +159,20 @@ export function BackupScreen({
             new Date(),
           ),
         );
+        setAutomaticSkippedLine(
+          automaticSkippedPhotosLine(
+            skippedRecord,
+            settings.lastAutomaticBackupAt,
+          ),
+        );
         setEncryptionEnabled(settings.encryptionEnabled === 1);
         setShowNudge(nudge.shouldShow);
       } catch (error) {
         Logger.error(LOG_SCOPE, "failed to load backup health", error);
-        if (!cancelled) setHealth(null);
+        if (!cancelled) {
+          setHealth(null);
+          setAutomaticSkippedLine(null);
+        }
       }
     })();
     return () => {
@@ -205,6 +224,12 @@ export function BackupScreen({
         }).shareExport({ readableOverride });
         const message = exportFailureCopy(result);
         if (message) Alert.alert("Couldn't create export", message);
+        // D-24: the export completed without some unreadable photos.
+        const skipped =
+          result.status === "shared"
+            ? skippedPhotosCopy(result.skippedPhotos)
+            : null;
+        if (skipped) Alert.alert("Export shared", skipped);
       } catch (error) {
         Logger.error(LOG_SCOPE, "manual export failed", error);
         Alert.alert(
@@ -414,6 +439,14 @@ export function BackupScreen({
           {heroDetail ? (
             <Text style={[styles.detail, { color: colors.textSecondary }]}>
               {heroDetail}
+            </Text>
+          ) : null}
+          {automaticSkippedLine ? (
+            <Text
+              testID="backup-automatic-skipped-photos"
+              style={[styles.detail, { color: colors.textSecondary }]}
+            >
+              {automaticSkippedLine}
             </Text>
           ) : null}
           <Pressable

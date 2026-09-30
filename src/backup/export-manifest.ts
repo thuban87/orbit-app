@@ -41,30 +41,55 @@ function assertNoLocalOnlyKeys(value: unknown): void {
   }
 }
 
+/**
+ * One skip counter per export (38.6 D-24). An unreadable profile, contact or
+ * custom-field photo no longer fails the whole backup: the row exports with
+ * `photoBase64: null` plus the owner-approved optional marker
+ * `photoSkipped: true` (D-26), so restore can tell "left out" from "removed".
+ * Content-free: nothing about the skipped photo is logged or recorded.
+ */
+interface SkipCounter {
+  skipped: number;
+}
+
+async function readPhotoOrSkip(
+  relative: unknown,
+  readPhotoBase64: ExportManifestDeps["readPhotoBase64"],
+  counter: SkipCounter,
+): Promise<string | null> {
+  if (typeof relative === "string" && relative.length > 0) {
+    try {
+      const bytes = await readPhotoBase64(relative);
+      if (bytes) return bytes;
+    } catch {
+      // Fall through: skipped and counted (D-24). The reference is untouched (D-23).
+    }
+  }
+  counter.skipped += 1;
+  return null;
+}
+
 async function withPhoto<T extends Record<string, unknown>>(
   row: T,
   readPhotoBase64: ExportManifestDeps["readPhotoBase64"],
-): Promise<T & { photoBase64: string | null }> {
+  counter: SkipCounter,
+): Promise<T & { photoBase64: string | null; photoSkipped?: true }> {
   const relative = row.photo;
   const base = { ...row, photo: undefined, photoBase64: null } as T & {
     photoBase64: string | null;
   };
   delete (base as Record<string, unknown>).photo;
   if (relative === null || relative === undefined) return base;
-  if (typeof relative !== "string") throw new BackupPhotoUnreadableError();
-  try {
-    const bytes = await readPhotoBase64(relative);
-    if (!bytes) throw new Error("empty photo");
-    return { ...base, photoBase64: bytes };
-  } catch {
-    throw new BackupPhotoUnreadableError();
-  }
+  const bytes = await readPhotoOrSkip(relative, readPhotoBase64, counter);
+  if (bytes === null) return { ...base, photoSkipped: true };
+  return { ...base, photoBase64: bytes };
 }
 
 async function readManifest(
   ro: ReadOnlyExecutor,
   deps: ExportManifestDeps,
-): Promise<BackupManifest> {
+): Promise<ExportManifestReport> {
+  const counter: SkipCounter = { skipped: 0 };
   const [settings, userVersion] = await Promise.all([
     getPortableSettingsSnapshot(ro),
     ro.getFirstAsync<{ user_version: number }>("PRAGMA user_version"),
@@ -202,19 +227,15 @@ async function readManifest(
     rawValues.map(async ({ fieldType, colName, contactId, value, ...row }) => {
       if (fieldType !== "photo" || value === null)
         return { ...row, value, photoBase64: null };
-      const relative = typeof value === "string" ? value : null;
-      if (!relative) throw new BackupPhotoUnreadableError();
-      try {
-        return {
-          ...row,
-          value: null,
-          photoBase64: await deps.readPhotoBase64(relative),
-        };
-      } catch {
-        throw new BackupPhotoUnreadableError();
-      }
+      const bytes = await readPhotoOrSkip(value, deps.readPhotoBase64, counter);
+      // A photo value always exports `value: null`; the marker is how restore
+      // tells a skipped photo from a cleared one (D-26).
+      if (bytes === null)
+        return { ...row, value: null, photoBase64: null, photoSkipped: true };
+      return { ...row, value: null, photoBase64: bytes };
     }),
   );
+  // D-27: profile background images stay all-or-nothing (unchanged).
   const backgroundsWithBytes = await Promise.all(
     profileBackgroundTemplates.map(async (row) => {
       if (typeof row.imagePath !== "string")
@@ -238,11 +259,11 @@ async function readManifest(
     appSettings: { ...portable, sunContactUid: sunContactUid ?? null },
     categories,
     profile: profileRows[0]
-      ? await withPhoto(profileRows[0], deps.readPhotoBase64)
+      ? await withPhoto(profileRows[0], deps.readPhotoBase64, counter)
       : null,
     contacts: await Promise.all(
       contactRows.map(async ({ localContactId: _localContactId, ...row }) =>
-        withPhoto(row, deps.readPhotoBase64),
+        withPhoto(row, deps.readPhotoBase64, counter),
       ),
     ),
     contactMethods,
@@ -276,13 +297,36 @@ async function readManifest(
     })),
   };
   assertNoLocalOnlyKeys(manifest);
-  return parseBackupManifest(manifest);
+  return {
+    manifest: parseBackupManifest(manifest),
+    skippedPhotos: counter.skipped,
+  };
 }
 
-/** Build and validate a complete portable export under one mutex-held snapshot. */
-export function buildExportManifest(
+export interface ExportManifestReport {
+  manifest: BackupManifest;
+  /** Profile, contact and custom-field photos left out as unreadable (D-24). */
+  skippedPhotos: number;
+}
+
+/**
+ * Build and validate a complete portable export under one mutex-held snapshot,
+ * with the number of unreadable photos left out (38.6 D-24).
+ */
+export function buildExportReport(
+  exec: SqlExecutor,
+  deps: ExportManifestDeps,
+): Promise<ExportManifestReport> {
+  return inReadSnapshot(exec, (ro) => readManifest(ro, deps));
+}
+
+/**
+ * The manifest alone. Production writers use {@link buildExportReport} so the
+ * skipped-photo count is never dropped; this wrapper serves tests and tools.
+ */
+export async function buildExportManifest(
   exec: SqlExecutor,
   deps: ExportManifestDeps,
 ): Promise<BackupManifest> {
-  return inReadSnapshot(exec, (ro) => readManifest(ro, deps));
+  return (await buildExportReport(exec, deps)).manifest;
 }

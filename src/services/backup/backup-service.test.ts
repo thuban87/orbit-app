@@ -16,9 +16,9 @@ const manifest = {
   customFieldValues: [],
   tombstones: [],
 };
-const mocks = vi.hoisted(() => ({ buildExportManifest: vi.fn() }));
+const mocks = vi.hoisted(() => ({ buildExportReport: vi.fn() }));
 vi.mock("@/backup/export-manifest", () => ({
-  buildExportManifest: mocks.buildExportManifest,
+  buildExportReport: mocks.buildExportReport,
 }));
 
 import {
@@ -34,7 +34,9 @@ import {
 
 describe("manual backup service", () => {
   beforeEach(() => {
-    mocks.buildExportManifest.mockReset().mockResolvedValue(manifest);
+    mocks.buildExportReport
+      .mockReset()
+      .mockResolvedValue({ manifest, skippedPhotos: 0 });
   });
 
   it("writes, reads and parses before opening the share sheet", async () => {
@@ -67,6 +69,7 @@ describe("manual backup service", () => {
     });
     await expect(service.sharePlaintextExport()).resolves.toEqual({
       status: "shared",
+      skippedPhotos: 0,
     });
     expect(steps).toEqual(["write", "read", "share"]);
   });
@@ -174,7 +177,10 @@ describe("manual backup service", () => {
       status: "busy",
     });
     release();
-    await expect(first).resolves.toEqual({ status: "shared" });
+    await expect(first).resolves.toEqual({
+      status: "shared",
+      skippedPhotos: 0,
+    });
   });
 
   for (const encrypted of [false, true]) {
@@ -226,9 +232,11 @@ describe("manual backup service", () => {
               }
             : undefined,
         });
-        await expect(service.shareExport()).resolves.toEqual({
-          status: outcome,
-        });
+        await expect(service.shareExport()).resolves.toEqual(
+          outcome === "shared"
+            ? { status: outcome, skippedPhotos: 0 }
+            : { status: outcome },
+        );
         expect(retireAll).toHaveBeenCalledOnce();
         expect(remove).toHaveBeenCalledTimes(outcome === "shared" ? 0 : 1);
       });
@@ -505,7 +513,7 @@ describe("backup encryption safety", () => {
   });
 
   it("fails closed before writing a byte when enabled encryption has no usable passphrase", async () => {
-    mocks.buildExportManifest.mockClear();
+    mocks.buildExportReport.mockClear();
     const writeVerified = vi.fn();
     const service = createAutomaticBackupService({
       exec: {} as never,
@@ -530,7 +538,7 @@ describe("backup encryption safety", () => {
       reason: "passphrase-unavailable",
     });
     expect(writeVerified).not.toHaveBeenCalled();
-    expect(mocks.buildExportManifest).not.toHaveBeenCalled();
+    expect(mocks.buildExportReport).not.toHaveBeenCalled();
   });
 
   it("keeps the flag independent from the three passphrase read states", () => {
@@ -597,5 +605,58 @@ describe("backup encryption safety", () => {
     release();
     await Promise.all([first, second]);
     expect(order).toEqual(["first-start", "first-end", "second"]);
+  });
+});
+
+describe("skipped photos reach every writer's result (38.6 D-24)", () => {
+  beforeEach(() => {
+    mocks.buildExportReport
+      .mockReset()
+      .mockResolvedValue({ manifest, skippedPhotos: 2 });
+  });
+
+  it("manual share carries the report's count", async () => {
+    const service = createManualExportService({
+      exec: {} as never,
+      exportedAt: manifest.metadata.exportedAt,
+      readPhotoBase64: async () => "",
+      files: {
+        retireAll: async () => {},
+        retireStale: async () => {},
+        create: async () => ({
+          uri: "file:///export.json",
+          write: async () => {},
+          read: async () => JSON.stringify(manifest),
+          delete: async () => {},
+        }),
+      },
+      share: { isAvailable: async () => true, open: async () => {} },
+    });
+    await expect(service.sharePlaintextExport()).resolves.toEqual({
+      status: "shared",
+      skippedPhotos: 2,
+    });
+  });
+
+  it("the automatic snapshot and the pre-restore snapshot carry the count", async () => {
+    const deps = {
+      exec: {} as never,
+      exportedAt: manifest.metadata.exportedAt,
+      now: new Date("2026-08-25T00:00:00.000Z"),
+      readPhotoBase64: async () => "",
+      directoryUri: "content://backup",
+      retentionDays: 7,
+      storage: {
+        writeVerified: vi.fn(async () => "content://backup/f"),
+        list: async () => [],
+        remove: async () => {},
+      },
+    };
+    await expect(
+      createAutomaticBackupService(deps).writeVerifiedSnapshot(),
+    ).resolves.toMatchObject({ status: "written", skippedPhotos: 2 });
+    await expect(
+      createVerifiedPreRestoreSnapshot(deps)(),
+    ).resolves.toMatchObject({ status: "written", skippedPhotos: 2 });
   });
 });

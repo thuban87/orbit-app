@@ -234,3 +234,23 @@ export async function mergeContactsWithPhotoOwnership(
   if (!committed) throw new Error("merge did not commit");
   return { recoveryPending };
 }
+
+/**
+ * Copy a canonical photo's CURRENT local bytes into restore staging (38.6
+ * D-26). A Replace-all restore re-assigns contact ids, so a backup row whose
+ * photo was skipped (D-24) cannot keep its old id-derived path: its local bytes
+ * are staged like backup bytes and land at the row's new canonical through the
+ * same journal finalize. Resolves false (nothing staged) when the file is gone;
+ * the copy is the same file-copy stager merge re-homing uses.
+ */
+export async function stageLocalPhotoForRestore(
+  canonicalRelativePath: string,
+  pendingRelativePath: string,
+): Promise<boolean> {
+  if (!photoFileExists(canonicalRelativePath)) return false;
+  await stageRestorePending(
+    resolvePhotoUri(canonicalRelativePath),
+    pendingRelativePath,
+  );
+  return true;
+}

@@ -471,6 +471,8 @@ describe("restore apply decisions", () => {
         photoCleanupPending: 1,
         scheduleResyncPending: true,
         preRestoreSnapshotCreated: true,
+        preRestoreSnapshotSkippedPhotos: 2,
+        restoredPhotosMissing: 1,
       }),
     ).toEqual({
       added: 3,
@@ -481,7 +483,34 @@ describe("restore apply decisions", () => {
       photoCleanupPending: 1,
       scheduleResyncPending: true,
       replaceSafetySnapshot: "verified",
+      replaceSafetySnapshotSkippedPhotos: 2,
+      restoredPhotosMissing: 1,
     });
+  });
+
+  it("carries the safety-backup skip count only for Replace-all (38.6 D-24)", () => {
+    const base = {
+      status: "applied" as const,
+      inserted: 0,
+      updated: 0,
+      retained: 0,
+      deleted: 0,
+      blocked: 0,
+      photosNeedingAttention: 0,
+      photoCleanupPending: 0,
+      scheduleResyncPending: false,
+      preRestoreSnapshotCreated: false,
+      preRestoreSnapshotSkippedPhotos: 3,
+      restoredPhotosMissing: 0,
+    };
+    expect(
+      toRestoreResultParams({ ...base, mode: "merge" })
+        .replaceSafetySnapshotSkippedPhotos,
+    ).toBe(0);
+    expect(
+      toRestoreResultParams({ ...base, mode: "replace-all" })
+        .replaceSafetySnapshotSkippedPhotos,
+    ).toBe(3);
   });
 
   it("keeps pre-commit apply failures on the preview with no optimistic result", () => {
