@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.6
 current_phase_name: Photo Handling — Sync, Sizes & Lightbox (INSERTED)
 status: executing
-stopped_at: Completed 38.6-01-PLAN.md
-last_updated: "2026-09-30T06:19:34.085Z"
+stopped_at: Completed 38.6-02-PLAN.md
+last_updated: "2026-09-30T06:30:51.199Z"
 last_activity: 2026-09-30
 last_activity_desc: Phase 38.6 execution started
-state_head: a29a4e8ea41e3b75ddb965f74b112172a53bb7cd
+state_head: 2a93d1972f4df700cebd3f9634746a7fd25c3917
 progress:
   total_phases: 28
   completed_phases: 19
   total_plans: 257
-  completed_plans: 249
+  completed_plans: 250
 carried_forward:
 
   - "38.6 INSERTED (owner 2026-09-29): Phase 38.6 Photo Handling — Sync, Sizes & Lightbox, before Phase 39. Promotes backlog 999.1 (38.4 D-73), retired from the backlog. Owner requests D-01..D-09. Root cause of stale photos verified: expo-image on Android ignores cacheKey for file:// URIs + fixed per-contact photo path. OPEN for discuss: O-1 photo resolution (reverses 07-photos 512-master decision if changed), O-2 coverage scope, O-3/O-4 lightbox reach/behaviour, restore-progress photo-library todo pull-in. Dossier docs/dossier/milestone-2/phase-38.6-photo-handling-dossier.md."
@@ -44,7 +44,7 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 ## Current Position
 
 Phase: 38.6 (Photo Handling — Sync, Sizes & Lightbox (INSERTED)) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
@@ -402,6 +402,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.5 P07 | 230min | 4 tasks | 14 files |
 | Phase 38.5 P08 | 18min | 3 tasks | 16 files |
 | Phase 38.6 P01 | 20 min | 2 tasks | 13 files |
+| Phase 38.6 P02 | 10min | 3 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -895,6 +896,7 @@ Foundational decisions affecting current work:
 - [Phase 38.5]: 38.5-09: release APK left in droid build output, not copied to Drive (owner rule); debug APK not rebuilt (no native change since 2026-09-27)
 - [Phase 38.6]: 38.6-01: display strategy is revision-query (device-proven on Pixel 6 Pro): ?v=<revision> display URI + cachePolicy memory; filenames unchanged (D-21); no-cache fallback not needed
 - [Phase 38.6]: 38.6-01: legacy expo-image disk-cache clear flag is device-local AsyncStorage (expo_image_disk_cache_cleared_v1), not app_settings — no migration, not backed up
+- [Phase 38.6]: 38.6-02: existing-contact review surfaces take an optional canonical photo field rendered through Avatar; staging URIs keep their own field (raw Image, uncached for reconcile staging)
 
 ### Pending Todos
 
@@ -964,8 +966,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-09-30T06:19:23.511Z
-**Stopped at:** Completed 38.6-01-PLAN.md
+**Last session:** 2026-09-30T06:30:40.544Z
+**Stopped at:** Completed 38.6-02-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
