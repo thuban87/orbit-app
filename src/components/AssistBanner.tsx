@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { AssistConfirmation } from "@/components/AssistConfirmation";
+import { Avatar } from "@/components/Avatar";
 import { PendingConfirmationsSheet } from "@/components/PendingConfirmationsSheet";
 import {
   fabDialBackgroundA11y,
@@ -22,8 +23,12 @@ import { useAssistBanner } from "@/stores/assist-store";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
+import { SPACING } from "@/theme/tokens/spacing";
 import { Logger } from "@/utils/logger";
 import type { InFlightRef } from "@/utils/single-flight";
+
+/** Banner contact avatar (40); matches the Pending confirmations sheet it opens (38.6 D-25 F-2). */
+const ASSIST_BANNER_AVATAR_SIZE = SPACING["2xl"] - SPACING.sm;
 
 const LOG_SCOPE = "assist-banner";
 
@@ -145,12 +150,20 @@ export function AssistBanner() {
           { backgroundColor: colors.surface, borderColor: colors.border },
         ]}
       >
-        <Text
-          numberOfLines={1}
-          style={[styles.question, { color: colors.textPrimary }]}
-        >
-          {questionFor(newest.channel, newest.contact_name)}
-        </Text>
+        <View style={styles.questionRow}>
+          <Avatar
+            photo={newest.contact_photo}
+            name={newest.contact_name}
+            contactId={newest.contact_id}
+            size={ASSIST_BANNER_AVATAR_SIZE}
+          />
+          <Text
+            numberOfLines={1}
+            style={[styles.question, { color: colors.textPrimary }]}
+          >
+            {questionFor(newest.channel, newest.contact_name)}
+          </Text>
+        </View>
         {morePendingCount > 0 ? (
           <Pressable
             accessibilityRole="button"
@@ -194,7 +207,13 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 8,
   },
+  questionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+  },
   question: {
+    flex: 1,
     fontSize: 16,
     fontWeight: "700",
   },

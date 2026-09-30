@@ -24,12 +24,31 @@ export interface PhotoChoiceOption<T extends string = string> {
 
 export const KEEP_ORBIT_PHOTO = "keep-orbit" as const;
 
+/** The keep option's copy (shared by the full-width row and the photo card). */
+const KEEP_ORBIT_PHOTO_TEXT = "No meaningful change — keep Orbit photo";
+
+/**
+ * The contact's current Orbit photo for the keep option (38.6 D-25 F-3): the
+ * stored RELATIVE path, rendered through Avatar (display revision, D-01).
+ */
+export interface KeepOrbitPhoto {
+  photo: string | null;
+  name: string;
+  contactId?: number | string;
+}
+
 interface PhotoChoiceProps<T extends string> {
   label?: string;
   options: readonly PhotoChoiceOption<T>[];
   mode: FieldChoiceMode;
   selectedId?: T | typeof KEEP_ORBIT_PHOTO | null;
   onChange: (selection: T | typeof KEEP_ORBIT_PHOTO) => void;
+  /**
+   * When set, the keep option is a photo card beside the option cards showing
+   * the contact's Orbit photo (Update from Contacts). When absent it stays the
+   * full-width row below them (Merge conflicts).
+   */
+  keepPhoto?: KeepOrbitPhoto;
 }
 
 /** A photo-specialized, write-free sibling of FieldChoiceGroup. */
@@ -39,6 +58,7 @@ export function PhotoChoice<T extends string>({
   mode,
   selectedId,
   onChange,
+  keepPhoto,
 }: PhotoChoiceProps<T>) {
   const { colors } = useTheme();
   const [selected, setSelected] = useState<T | typeof KEEP_ORBIT_PHOTO | null>(
@@ -46,6 +66,53 @@ export function PhotoChoice<T extends string>({
   );
   const [errors, setErrors] = useState<Set<T>>(new Set());
   const activeId = selectedId === undefined ? selected : selectedId;
+
+  // Built once so the keep option has a single ✓ block, rendered as a card in
+  // the ScrollView (with `keepPhoto`) or as the full-width row below it.
+  const keepOption = (
+    <Pressable
+      accessibilityRole="radio"
+      accessibilityState={{ selected: activeId === KEEP_ORBIT_PHOTO }}
+      {...(keepPhoto
+        ? { accessibilityLabel: `${label}: ${KEEP_ORBIT_PHOTO_TEXT}` }
+        : {})}
+      onPress={() => {
+        if (selectedId === undefined) setSelected(KEEP_ORBIT_PHOTO);
+        onChange(KEEP_ORBIT_PHOTO);
+      }}
+      style={[
+        keepPhoto ? styles.option : styles.keep,
+        {
+          backgroundColor: colors.surface,
+          borderColor:
+            activeId === KEEP_ORBIT_PHOTO ? colors.borderStrong : colors.border,
+        },
+      ]}
+    >
+      {keepPhoto ? (
+        <Avatar
+          photo={keepPhoto.photo}
+          name={keepPhoto.name}
+          contactId={keepPhoto.contactId}
+          size={96}
+        />
+      ) : null}
+      <Text
+        {...(keepPhoto ? { numberOfLines: 3 } : {})}
+        style={{ color: colors.textPrimary }}
+      >
+        {KEEP_ORBIT_PHOTO_TEXT}
+      </Text>
+      {activeId === KEEP_ORBIT_PHOTO ? (
+        <Text
+          accessibilityLabel="Selected"
+          style={[styles.check, { color: colors.accentText }]}
+        >
+          ✓
+        </Text>
+      ) : null}
+    </Pressable>
+  );
 
   return (
     <View accessibilityLabel={`${label} choice`} style={styles.group}>
@@ -112,37 +179,9 @@ export function PhotoChoice<T extends string>({
             </Pressable>
           );
         })}
+        {keepPhoto ? keepOption : null}
       </ScrollView>
-      <Pressable
-        accessibilityRole="radio"
-        accessibilityState={{ selected: activeId === KEEP_ORBIT_PHOTO }}
-        onPress={() => {
-          if (selectedId === undefined) setSelected(KEEP_ORBIT_PHOTO);
-          onChange(KEEP_ORBIT_PHOTO);
-        }}
-        style={[
-          styles.keep,
-          {
-            backgroundColor: colors.surface,
-            borderColor:
-              activeId === KEEP_ORBIT_PHOTO
-                ? colors.borderStrong
-                : colors.border,
-          },
-        ]}
-      >
-        <Text style={{ color: colors.textPrimary }}>
-          No meaningful change — keep Orbit photo
-        </Text>
-        {activeId === KEEP_ORBIT_PHOTO ? (
-          <Text
-            accessibilityLabel="Selected"
-            style={[styles.check, { color: colors.accentText }]}
-          >
-            ✓
-          </Text>
-        ) : null}
-      </Pressable>
+      {keepPhoto ? null : keepOption}
     </View>
   );
 }

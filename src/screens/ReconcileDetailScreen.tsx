@@ -74,6 +74,11 @@ type ActiveLink = { id: number; external_contact_id: string; provider: string };
 interface ScanState {
   /** The Orbit contact under review — the screen must name the real person. */
   contactName: string;
+  /**
+   * The contact's current stored RELATIVE photo path, shown on the keep-Orbit
+   * photo card beside the phone photo (38.6 D-25 F-3).
+   */
+  orbitPhoto: string | null;
   diff: ReconcileDiffResult;
   sourcePhotoUri: string | null;
   links: ActiveLink[];
@@ -233,6 +238,7 @@ export function ReconcileDetailScreen({
         if (diff.fields.length === 0) setMessage("No changes from Contacts.");
         setScan({
           contactName: contact.name,
+          orbitPhoto: contact.photo,
           diff,
           sourcePhotoUri: stagedRelative
             ? resolveReconcileStagingUri(stagedRelative)
@@ -524,6 +530,11 @@ export function ReconcileDetailScreen({
                 },
               ]}
               mode={field.outcome === "conflict" ? "conflict" : "additive"}
+              keepPhoto={{
+                photo: scan.orbitPhoto,
+                name: scan.contactName,
+                contactId,
+              }}
               selectedId={
                 choices.photo?.startsWith("source:")
                   ? "source"
