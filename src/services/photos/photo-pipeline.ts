@@ -1,7 +1,10 @@
 /**
  * Photo pipeline orchestration (PHOTO-01 + PHOTO-03) — the single engine every
  * capture path (library pick, pasted-URL download) reuses to turn a raw source
- * image + a source-pixel crop rect into the ONE 512×512 JPEG master.
+ * image + a source-pixel crop rect into the ONE master: one square WebP master
+ * up to 1024 px (D-10), stored under the identity-derived `.jpg` name (D-21).
+ * Encoding lives in `master-encode.ts` (`encodeMaster`), shared with import,
+ * import retry and reconcile.
  *
  * The pixel crop runs through `expo-image-manipulator` on the ORIGINAL `rawUri`
  * at full fidelity — NEVER a Skia `makeImageSnapshot()` (that rasterizes at lossy
@@ -22,11 +25,11 @@
  * not publish a photo reference. Contact/profile publication remains at the
  * call site; custom-field values still wait for the form Save.
  */
-import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import type { SqlExecutor } from "@/db/types";
 import { Logger } from "@/utils/logger";
 import type { CropRect } from "./crop-geometry";
 import { discardDerivative } from "./derivative-cache";
+import { encodeMaster } from "./master-encode";
 import {
   type CanonicalLockToken,
   type OwnedWriteOptions,
@@ -36,12 +39,6 @@ import {
 import { type PhotoTargetDescriptor, relPathForTarget } from "./photo-storage";
 
 const LOG_SCOPE = "photo-pipeline";
-
-/** The one master's edge length, in px (05-RESEARCH: one 512×512 JPEG master). */
-const MASTER_SIZE = 512;
-
-/** JPEG quality for the master (~30-60 KB at 512px; 05-RESEARCH q≈0.75). */
-const MASTER_COMPRESS = 0.75;
 
 /**
  * Thrown when the source image cannot be decoded/cropped/encoded. The caller
@@ -69,8 +66,9 @@ export interface PersistCroppedMasterArgs {
 }
 
 /**
- * Crop the ORIGINAL `rawUri` to `cropRect`, resize to 512×512, JPEG-encode at
- * ~0.75, copy the (evictable-cache) result out into the document dir via the
+ * Crop the ORIGINAL `rawUri` to `cropRect` and encode one square WebP master up
+ * to 1024 px (D-10, `encodeMaster`), copy the (evictable-cache) result out into
+ * the document dir under the identity-derived `.jpg` name (D-21) via the
  * crash-safe `persistMaster`, and return the RELATIVE path the DB stores.
  *
  * Throws {@link PhotoPipelineError} on a decode/manipulate/encode failure (caller
@@ -88,16 +86,7 @@ export async function persistCroppedMaster({
 }: PersistCroppedMasterArgs): Promise<string> {
   let out: { uri: string };
   try {
-    // Chainable context API (SDK 52+): manipulate → crop → resize → renderAsync,
-    // then saveAsync on the rendered ImageRef. NOT the deprecated manipulateAsync.
-    const rendered = await ImageManipulator.manipulate(rawUri)
-      .crop(cropRect)
-      .resize({ width: MASTER_SIZE, height: MASTER_SIZE })
-      .renderAsync();
-    out = await rendered.saveAsync({
-      format: SaveFormat.JPEG,
-      compress: MASTER_COMPRESS,
-    });
+    out = { uri: await encodeMaster(rawUri, cropRect) };
   } catch (error) {
     Logger.error(LOG_SCOPE, `manipulate/encode failed for ${rawUri}`, error);
     throw new PhotoPipelineError("That image couldn't be used.", {
