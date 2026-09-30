@@ -62,7 +62,9 @@ export function selectFabDialOpen(state: {
 
 /**
  * Accessibility props for a same-window shell overlay that sits OUTSIDE the
- * tab navigator (App.tsx: the Quick Log undo `Snackbar`, the `AssistBanner`).
+ * tab navigator (App.tsx: the Quick Log undo `Snackbar`). The `AssistBanner`
+ * keeps them too, although since 38.6 D-38 it renders in flow inside the
+ * navigator's container, which already hides it while the dial is open.
  * While the dial is open they are hidden from TalkBack and Switch Access like
  * the navigator itself (D-31; owner default D-42 A). Only these two props:
  * `accessible` would merge the overlay into one node, and touch is unchanged

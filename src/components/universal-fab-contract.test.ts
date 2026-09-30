@@ -90,12 +90,13 @@ describe("open dial keeps focus in the dial (D-31)", () => {
 
   /**
    * The opener of the `<SafeAreaView` that wraps `<Tab.Navigator`. RootNavigator
-   * renders the navigator as the only child of `TabNavigatorContainer`, whose
-   * single `<SafeAreaView` is that container.
+   * renders the in-flow assist banner (38.6 D-38) and the navigator as the
+   * children of `TabNavigatorContainer`, whose single `<SafeAreaView` is that
+   * container.
    */
   function navigatorContainerOpener(): string {
     expect(navigator).toMatch(
-      /<TabNavigatorContainer>\s*<Tab\.Navigator[\s\S]*<\/Tab\.Navigator>\s*<\/TabNavigatorContainer>/,
+      /<TabNavigatorContainer>(?:\s*\{\/\*[\s\S]*?\*\/\})?\s*<AssistBanner \/>\s*<Tab\.Navigator[\s\S]*<\/Tab\.Navigator>\s*<\/TabNavigatorContainer>/,
     );
     const container = navigator.slice(
       navigator.indexOf("function TabNavigatorContainer("),

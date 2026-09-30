@@ -47,7 +47,17 @@ function questionFor(channel: "call" | "text" | "email", name: string): string {
   }
 }
 
-/** A shell overlay that leaves Android Back untouched. */
+/**
+ * The shell assist banner, which leaves Android Back untouched.
+ *
+ * 38.6 D-38: it renders IN FLOW at the top of the tab navigator's safe-area
+ * column (`RootNavigator`'s `TabNavigatorContainer`, below the status-bar
+ * inset), so while a question is pending every screen's content, including its
+ * app bar (Profile Back/star/more, the dashboard search row), is pushed down
+ * below the banner instead of being covered by an absolute overlay. It
+ * occupies and takes touch only inside its own bounds and never floats over
+ * another screen's touch targets.
+ */
 export function AssistBanner() {
   const { colors } = useTheme();
   const newest = useAssistBanner((state) => state.newest);
@@ -201,13 +211,11 @@ export function AssistBanner() {
 }
 
 const styles = StyleSheet.create({
+  // In flow (38.6 D-38): no absolute position, zIndex or elevation.
   root: {
-    position: "absolute",
-    top: 64,
-    right: 12,
-    left: 12,
-    zIndex: 32,
-    elevation: 32,
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+    paddingBottom: SPACING.xs,
   },
   banner: {
     borderWidth: 1,

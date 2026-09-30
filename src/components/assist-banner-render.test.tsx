@@ -193,3 +193,42 @@ describe("AssistBanner photo (38.6 D-25 F-2)", () => {
     expect(render(null).some((node) => node.type === "Avatar")).toBe(false);
   });
 });
+
+describe("AssistBanner layout (38.6 D-38)", () => {
+  it("renders in flow: no absolute position, offset, zIndex or elevation on its root", () => {
+    const root = render(NEWEST)[0];
+    expect(root?.type).toBe("View");
+    const style = flatStyle(root);
+    expect(style.position).toBeUndefined();
+    for (const key of ["top", "left", "right", "bottom", "zIndex", "elevation"])
+      expect(style[key], key).toBeUndefined();
+    expect(style).toMatchObject({ paddingHorizontal: 12, paddingTop: 8 });
+  });
+
+  it("takes touch only inside its own card, never over the screen below", () => {
+    const tree = render(NEWEST);
+    expect(tree[0]?.props.pointerEvents).toBe("box-none");
+    expect(tree[0]?.props.collapsable).toBe(false);
+    // Only the root is box-none; the card keeps its own controls tappable.
+    const card = tree[1];
+    expect(card?.type).toBe("View");
+    expect(card?.props.pointerEvents).toBeUndefined();
+  });
+
+  it("still opens Pending confirmations from the more-pending control", () => {
+    const tree = render(NEWEST, 2);
+    const more = tree.find(
+      (node) =>
+        node.type === "Pressable" &&
+        node.props.accessibilityLabel === "2 more pending",
+    );
+    expect(typeof more?.props.onPress).toBe("function");
+    expect(tree.some((node) => node.type === "PendingConfirmationsSheet")).toBe(
+      true,
+    );
+  });
+
+  it("renders nothing in the layout when no question is pending", () => {
+    expect(render(null)).toEqual([]);
+  });
+});

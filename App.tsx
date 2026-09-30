@@ -13,7 +13,6 @@ import {
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { AssistBanner } from "@/components/AssistBanner";
 import { BackupEncryptionBenchmarkHarness } from "@/components/BackupEncryptionBenchmarkHarness";
 import { ResumeImportPrompt } from "@/components/ResumeImportPrompt";
 import { ResumeReconcilePrompt } from "@/components/ResumeReconcilePrompt";
@@ -431,7 +430,6 @@ function AppShell() {
       <RootNavigator />
       <UniversalFab />
       <Snackbar />
-      <AssistBanner />
       {resolveActiveResumePrompt(resumableImport, resumableReconcile) ===
       "import" ? (
         <ResumeImportPrompt

@@ -17,6 +17,14 @@ const read = (path: string) => readFileSync(path, "utf8");
 /** Components hidden while the dial is open (same window, outside the navigator). */
 const HIDDEN_WHILE_DIAL_OPEN = {
   Snackbar: "src/components/Snackbar.tsx",
+} as const;
+
+/**
+ * 38.6 D-38: the assist banner moved IN FLOW into the navigator's safe-area
+ * column (`RootNavigator`'s `TabNavigatorContainer`), so the container hides it
+ * with the rest of the shell. It keeps its own D-31 props as well.
+ */
+const HIDDEN_INSIDE_NAVIGATOR = {
   AssistBanner: "src/components/AssistBanner.tsx",
 } as const;
 
@@ -103,7 +111,25 @@ describe("App.tsx shell overlays outside the tab navigator (D-42 A)", () => {
     }
   });
 
-  for (const [name, path] of Object.entries(HIDDEN_WHILE_DIAL_OPEN)) {
+  it("mounts the assist banner in flow inside the navigator, not over it (38.6 D-38)", () => {
+    expect(container).not.toContain("<AssistBanner");
+    const navigator = read("src/navigation/RootNavigator.tsx");
+    const inside = navigator.slice(
+      navigator.indexOf("<TabNavigatorContainer>"),
+      navigator.indexOf("<Tab.Navigator"),
+    );
+    expect(inside).toContain("<AssistBanner />");
+    expect(navigator.match(/<AssistBanner\b/g)).toHaveLength(1);
+    const banner = read(HIDDEN_INSIDE_NAVIGATOR.AssistBanner);
+    const styles = banner.slice(banner.indexOf("StyleSheet.create("));
+    expect(styles).not.toMatch(/position:\s*"absolute"/);
+    expect(styles).not.toMatch(/\b(?:zIndex|elevation):/);
+  });
+
+  for (const [name, path] of Object.entries({
+    ...HIDDEN_WHILE_DIAL_OPEN,
+    ...HIDDEN_INSIDE_NAVIGATOR,
+  })) {
     describe(`${name} is hidden while the dial is open`, () => {
       const source = read(path);
       const render = source.slice(source.indexOf(`export function ${name}(`));

@@ -47,7 +47,7 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | `src/db/migrations/014-interaction-assists.ts` | Creates `interaction_assists` (+ pending index, FK cascade) and the settings column. |
 | `src/components/ReachOutRouter.tsx` | Themed channel chooser; hides on no-route, launches directly on one endpoint, opens the selector on many. |
 | `src/components/EndpointSelector.tsx` | Scrollable phone/email chooser with the primary method emphasized. |
-| `src/components/AssistBanner.tsx` | App-global non-modal overlay; runs confirm/dismiss through the shared `assist-commit` runner and publishers. |
+| `src/components/AssistBanner.tsx` | App-global non-modal banner, in flow above the tab navigator (38.6 D-38); runs confirm/dismiss through the shared `assist-commit` runner and publishers. |
 | `src/components/AssistConfirmation.tsx` | Presentational attestation controls (Yes / No answer / Don't log) + optional Notes expander; disabled while the owner's write is `pending`. |
 | `src/components/PendingConfirmationsSheet.tsx` | Transient multi-item pending-queue review surface. |
 | `src/screens/ComposeScreen.tsx` | Compose-attached Yes / Not yet panel that supplements, never replaces, the durable queue surfaces. |
@@ -140,3 +140,4 @@ One durable local table plus one settings column, shipped by migration 014. Ther
 | 2026-09-26 | 38.3 | `markAssistLogged` now resolves `logged` / `already-logged` / `closed`; a confirm of a dismissed or expired assist is shown as "Already closed" and never as logged (Compose no longer exits as "logged" for it). Guard, handoff-time stamp and pending recheck unchanged (review B-WR-05). |
 | 2026-09-25 | 38.3 | Shared assist publisher + RN-013 failure handling (RG-023): banner, pending sheet and Compose share `assist-commit.ts` (latched runner, widget + queue + shell-tick publication that never reports a post-commit failure, Alert on write failure with typed clock-rollback copy); the queue refresh is latest-request gated. |
 | 2026-09-23 | 38.4 | While the FAB speed dial is open, the AssistBanner is hidden from accessibility, and its root is `collapsable={false}` so Fabric cannot re-form it as a touch sink (D-42 A, D-33/GAP-G2; ADR-173). The pending-confirmations sheet was checked at maximum text and kept as an RN `Modal` with explicit-action exits; its minor large-text findings are in todo `2026-09-28-pending-confirmations-sheet-large-text.md` (D-49). |
+| 2026-09-30 | 38.6 | The banner renders in flow at the top of the navigator's safe-area column instead of as an absolute overlay, so it no longer covers other screens' app bars (D-38). |

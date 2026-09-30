@@ -14,6 +14,7 @@ import {
 import { type ReactNode, useEffect, useState } from "react";
 import { BackHandler, Keyboard, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { AssistBanner } from "@/components/AssistBanner";
 import { Icon } from "@/components/icons/Icon";
 import { TAB_ICON } from "@/components/icons/icon-registry";
 import { BackgroundHost } from "@/components/ui/BackgroundHost";
@@ -231,6 +232,11 @@ export function RootNavigator() {
     >
       {ArtSheetComboSync ? <ArtSheetComboSync /> : null}
       <TabNavigatorContainer>
+        {/* 38.6 D-38: the assist banner sits IN FLOW above the navigator, inside
+            the top safe area, so it pushes every screen down while a question
+            is pending instead of covering its app bar. The container hides it
+            from accessibility with the rest of the shell while the dial is open. */}
+        <AssistBanner />
         <Tab.Navigator
           initialRouteName={INITIAL_TAB}
           tabBar={(props) => <MeasuredTabBar {...props} />}
