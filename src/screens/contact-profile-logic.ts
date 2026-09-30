@@ -123,6 +123,36 @@ export function profileContentTopPadding(
   return Math.max(0, PROFILE_LEGACY_NAME_TOP - avatarSize - PROFILE_HERO_GAP);
 }
 
+/**
+ * WR-03: how far (dp) the Profile ScrollView starts below the overlay app bar's
+ * top edge — exactly ONE physical pixel. Android orders a container's
+ * accessibility children by screen bounds (top edge, then left, then the TALLER
+ * view first), not by child index. With a shared top edge the full-height
+ * ScrollView sorted ahead of the 56 dp bar, so TalkBack reached Back, the star
+ * and ⋮ only after the whole Profile. One pixel lower puts the bar strictly
+ * first by top edge. The scroll content's top padding shrinks by the same
+ * amount, and a whole pixel keeps every rounded position identical, so the
+ * D-04 photo and name lines do not move.
+ */
+export function profileScrollA11yOffset(pixelRatio: number): number {
+  return Number.isFinite(pixelRatio) && pixelRatio > 0 ? 1 / pixelRatio : 1;
+}
+
+/**
+ * The ScrollView content's own top padding: `profileContentTopPadding` less
+ * the ScrollView's `profileScrollA11yOffset`, so offset + padding still puts
+ * the photo top — and the name — exactly where D-04 pins them.
+ */
+export function profileScrollContentTopPadding(
+  pixelRatio: number,
+  avatarSize: number = PROFILE_HERO_AVATAR_SIZE,
+): number {
+  return Math.max(
+    0,
+    profileContentTopPadding(avatarSize) - profileScrollA11yOffset(pixelRatio),
+  );
+}
+
 /** The name's top edge (from the app bar's top) for a padding and photo size. */
 export function profileNameTop(
   contentTopPadding: number,

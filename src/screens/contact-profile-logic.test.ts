@@ -22,6 +22,8 @@ import {
   profileMethodGroups,
   profileNameTop,
   profileOverflowEntries,
+  profileScrollA11yOffset,
+  profileScrollContentTopPadding,
   profileScrollTargetY,
   shouldRunProfileShellRefresh,
   unbindConfirmation,
@@ -276,6 +278,28 @@ describe("integrated Profile controller contracts", () => {
       expect(profileContentTopPadding(224)).toBe(20);
       expect(profileContentTopPadding()).toBe(20);
       expect(profileNameTop(profileContentTopPadding(224), 224)).toBe(260);
+    });
+
+    it("offsets the ScrollView by exactly one pixel without moving the D-04 lines (WR-03)", () => {
+      for (const ratio of [1, 2, 2.625, 3, 3.5]) {
+        // One physical pixel: enough for Android's bounds sort to read the bar first.
+        expect(profileScrollA11yOffset(ratio) * ratio).toBeCloseTo(1, 10);
+        // Offset + content padding is still the D-04 top padding, so the name
+        // stays on the 260 line.
+        expect(
+          profileScrollA11yOffset(ratio) +
+            profileScrollContentTopPadding(ratio),
+        ).toBeCloseTo(profileContentTopPadding(), 10);
+        expect(
+          profileNameTop(
+            profileScrollA11yOffset(ratio) +
+              profileScrollContentTopPadding(ratio),
+            224,
+          ),
+        ).toBeCloseTo(PROFILE_LEGACY_NAME_TOP, 10);
+      }
+      expect(profileScrollA11yOffset(0)).toBe(1);
+      expect(profileScrollA11yOffset(Number.NaN)).toBe(1);
     });
 
     it("never lowers the name and never pads negatively", () => {

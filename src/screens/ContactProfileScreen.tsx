@@ -10,6 +10,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { FrequencyPicker } from "@/components/FrequencyPicker";
@@ -55,10 +56,11 @@ import {
   PROFILE_APP_BAR_SCROLL_SCRIM,
   type ProfileOverlay,
   profileAppBarScrolled,
-  profileContentTopPadding,
   profileKnowledgeDestination,
   profileLifecycleView,
   profileOverflowEntries,
+  profileScrollA11yOffset,
+  profileScrollContentTopPadding,
   profileScrollTargetY,
   shouldRunProfileShellRefresh,
   unbindConfirmation,
@@ -168,6 +170,8 @@ export function ContactProfileScreen({
   const { colors, package: themePackage } = useTheme();
   // The last item scrolls fully above the shell FAB (38.4 D-52, OA-E3).
   const bottomClearance = useBottomClearance();
+  // WR-03: the ScrollView's one-pixel accessibility-order offset.
+  const { scale: pixelRatio } = useWindowDimensions();
   const contactId = route.params.contactId;
   const [snapshot, setSnapshot] = useState<ProfileSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -529,8 +533,28 @@ export function ContactProfileScreen({
       readability="profile"
     >
       <View testID="contact-profile-screen" style={styles.root}>
+        {snapshot && presentation ? (
+          // 38.6 D-17 overlay app bar, first in child order (WR-03) so any
+          // index-ordered accessibility traversal reads Back, the star and ⋮
+          // before the Profile, as before 38.6; its `zIndex` still draws and
+          // hit-tests it above the scroll content. Android sorts by bounds —
+          // see profileScrollA11yOffset on the ScrollView. Same parent and
+          // top edge as before, so no inset changes.
+          <ProfileAppBar
+            name={snapshot.identity.name}
+            favourite={snapshot.identity.favouriteRank !== null}
+            favouriteDisabled={pendingFavourite || lifecycle.kind !== "bound"}
+            scrolled={PROFILE_APP_BAR_SCROLL_SCRIM && barScrolled}
+            onBack={() => navigation.goBack()}
+            onToggleFavourite={() => void toggleFavourite()}
+            onOpenOverflow={() => setOverlay("overflow")}
+          />
+        ) : null}
         <ScrollView
           ref={scrollRef}
+          // WR-03: start one pixel below the bar so Android's bounds-sorted
+          // accessibility order reads the app bar first.
+          style={{ marginTop: profileScrollA11yOffset(pixelRatio) }}
           // Sheets opened from this Profile (e.g. the group title prompt) are
           // React descendants of this ScrollView even though they render in a
           // Modal window; without "handled" its responder capture swallows
@@ -541,9 +565,10 @@ export function ContactProfileScreen({
           contentContainerStyle={[
             styles.content,
             // 38.6 D-04: the app bar overlays the content and the photo grows
-            // upward into it, keeping the name at its pre-38.6 line.
+            // upward into it, keeping the name at its pre-38.6 line. The
+            // ScrollView's WR-03 offset is taken out of this padding.
             {
-              paddingTop: profileContentTopPadding(),
+              paddingTop: profileScrollContentTopPadding(pixelRatio),
               paddingBottom: bottomClearance,
             },
           ]}
@@ -640,19 +665,6 @@ export function ContactProfileScreen({
             </>
           ) : null}
         </ScrollView>
-        {snapshot && presentation ? (
-          // Rendered after the ScrollView so it overlays it (38.6 D-17); same
-          // parent and top edge as before, so no inset changes.
-          <ProfileAppBar
-            name={snapshot.identity.name}
-            favourite={snapshot.identity.favouriteRank !== null}
-            favouriteDisabled={pendingFavourite || lifecycle.kind !== "bound"}
-            scrolled={PROFILE_APP_BAR_SCROLL_SCRIM && barScrolled}
-            onBack={() => navigation.goBack()}
-            onToggleFavourite={() => void toggleFavourite()}
-            onOpenOverflow={() => setOverlay("overflow")}
-          />
-        ) : null}
         {snapshot && presentation ? (
           <>
             <Sheet

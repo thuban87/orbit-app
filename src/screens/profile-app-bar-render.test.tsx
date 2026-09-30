@@ -6,6 +6,8 @@
  * The screen module is imported with every data/service dependency stubbed —
  * only the exported `ProfileAppBar` is rendered, shallowly.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
@@ -181,5 +183,38 @@ describe("ProfileAppBar (38.6 D-17)", () => {
     const style = flatStyle(scrim?.props.style);
     expect(style.backgroundColor).toBe(THEME_PRESETS.galaxy.dark.background);
     expect(style.opacity).toBe(PROFILE_APP_BAR_SCRIM_OPACITY);
+  });
+});
+
+describe("Profile screen accessibility order (review WR-03)", () => {
+  // The screen itself is too wide to render here; pin its JSX structure.
+  const source = readFileSync(
+    join(__dirname, "ContactProfileScreen.tsx"),
+    "utf8",
+  );
+  const screen = source.slice(
+    source.indexOf("export function ContactProfileScreen"),
+  );
+
+  it("renders the overlay app bar before the ScrollView", () => {
+    const bar = screen.indexOf("<ProfileAppBar");
+    const scroll = screen.search(/<ScrollView\s/);
+    expect(bar).toBeGreaterThan(0);
+    expect(scroll).toBeGreaterThan(0);
+    expect(bar).toBeLessThan(scroll);
+    expect(screen.indexOf("<ProfileAppBar", bar + 1)).toBe(-1);
+  });
+
+  it("starts the ScrollView one pixel below the bar and takes it out of the padding", () => {
+    const scroll = screen.slice(
+      screen.search(/<ScrollView\s/),
+      screen.indexOf("</ScrollView>"),
+    );
+    expect(scroll).toContain(
+      "style={{ marginTop: profileScrollA11yOffset(pixelRatio) }}",
+    );
+    expect(scroll).toContain(
+      "paddingTop: profileScrollContentTopPadding(pixelRatio)",
+    );
   });
 });
