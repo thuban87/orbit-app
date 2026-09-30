@@ -275,6 +275,16 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
 -   **[DECIDED · 2026-09-30] D-30 --- Restore result copy (review IN2-02).** The safety-backup count keeps "N photo(s)
     couldn't be included."; photos already missing on the phone read "N photo(s) were already missing on this phone and
     couldn't be restored."
+-   **[DECIDED · 2026-09-30] D-31 --- Text left in a photo field is backed up as text (review WR3-03).** A custom
+    photo-field value that is not a stored photo path (e.g. "Rex" kept after a Text→Photo type change) is exported
+    as its text value, not skipped and not a backup failure; restore writes it back and the field shows its existing
+    error state ("type changes never destroy data").
+-   **[DECIDED · 2026-09-30] D-32 --- D-28 crash/delete-failure fallback accepted (review IN3-02).** If the stale-file
+    delete fails (or the app dies) during D-28's deferred write, the already-lost row ends with no photo reference
+    rather than risk showing another contact's photo. Accepted as rare; no re-flag sweep.
+-   **[DECIDED · 2026-09-30] D-33 --- Restore result copy, supersedes D-30's second sentence (review IN3-03).** Photos
+    restore could not bring back read "1 photo wasn't in the backup and couldn't be restored." / "N photos weren't in
+    the backup and couldn't be restored."
 
 ### Engineering boundaries (recorded so planning cannot drift)
 
@@ -334,3 +344,5 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     (backgrounds unchanged); D-23 wording narrowed to Profile hero + photo editor (owner M3a).
 -   **2026-09-30** --- Review pass-2 rulings D-28 (Replace-all keeps the unavailable flag via the new canonical), D-29
     (skip only missing photos), D-30 (restore result copy).
+-   **2026-09-30** --- Review pass-3 rulings D-31 (text in a photo field backed up as text), D-32 (D-28 fallback
+    accepted), D-33 (restore copy, supersedes D-30's second sentence).
