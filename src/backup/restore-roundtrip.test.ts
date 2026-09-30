@@ -1134,10 +1134,14 @@ it("a Merge of NEWER marked rows queues no delete intent for any photo it keeps 
     expect(intents).not.toContain(kept);
 });
 
-it("a Merge whose marked value arrives under another contact keeps this phone's file (review IN2-01)", async () => {
-  const { source, manifest } = await skippedPhotoSource();
-  // Elsewhere z-marked was merged into a new contact: z-marked is tombstoned
-  // and its value rows (the marked pet photo included) moved to n-new.
+/**
+ * Elsewhere z-marked was merged into a new contact: z-marked is tombstoned and
+ * its value rows (the marked pet photo included) moved to n-new, keeping their
+ * uids. Every row is newer than this phone's, so the backup wins a Merge.
+ */
+function petMovedToNewContact(
+  manifest: ReturnType<typeof parseBackupManifest>,
+) {
   const moved = newer(manifest);
   const marked = moved.contacts.find((row) => row.uid === "z-marked")!;
   const merged: Record<string, unknown> = {
@@ -1157,14 +1161,21 @@ it("a Merge whose marked value arrives under another contact keeps this phone's 
     entityUid: "z-marked",
     deletedAt: LATER,
   });
+  return moved;
+}
+async function petOwner(exec: Awaited<ReturnType<typeof db>>) {
+  return exec.getFirstAsync<{ id: number; uid: string }>(
+    "SELECT c.id, c.uid FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id WHERE v.uid='pet-value'",
+  );
+}
+
+it("a Merge whose marked value arrives under another contact keeps this phone's file (review IN2-01)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  const moved = petMovedToNewContact(manifest);
   const { recording, intents } = recordingDeleteIntents(source);
   const result = await applyRestore(recording, moved, "merge");
   expect(result).toMatchObject({ status: "applied", photoCleanupPending: 0 });
-  expect(
-    await source.getFirstAsync<{ uid: string }>(
-      "SELECT c.uid FROM custom_field_values v JOIN contacts c ON c.id=v.contact_id WHERE v.uid='pet-value'",
-    ),
-  ).toEqual({ uid: "n-new" });
+  expect((await petOwner(source))?.uid).toBe("n-new");
   // The reference could not follow (it names z-marked's canonical), but the
   // bytes this phone had are neither queued for deletion nor deleted.
   expect(intents).not.toContain("avatars/cv-1-pet.jpg");
@@ -1172,6 +1183,33 @@ it("a Merge whose marked value arrives under another contact keeps this phone's 
   // z-marked itself is gone, so its own photo is still cleaned up.
   expect(intents).toContain("avatars/contact-1.jpg");
   expect(photo.files.has("avatars/contact-1.jpg")).toBe(false);
+});
+
+it("a Replace-all whose marked value arrives under another contact moves this phone's bytes to the row's new canonical (review CR3-01)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  const result = await applyRestore(
+    source,
+    petMovedToNewContact(manifest),
+    "replace-all",
+  );
+  // Only m-lost's photo was really missing on this phone (D-28).
+  expect(result).toMatchObject({
+    status: "applied",
+    photosNeedingAttention: 0,
+    photoCleanupPending: 0,
+    restoredPhotosMissing: 1,
+  });
+  const owner = await petOwner(source);
+  expect(owner?.uid).toBe("n-new");
+  const pet = await petValue(source);
+  expect(pet).toBe(`avatars/cv-${owner!.id}-pet.jpg`);
+  expect(photo.files.get(pet!)).toBe("UEVU");
+  expect(await journal(source)).toEqual([]);
+  expect(
+    [...photo.files.keys()].filter((path) =>
+      path.startsWith("avatars/_restore_pending/"),
+    ),
+  ).toEqual([]);
 });
 
 it("Replace-all flags every already-lost marked contact and custom photo at its own new canonical, never aliasing (D-28)", async () => {

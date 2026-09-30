@@ -1214,10 +1214,13 @@ async function stageCandidates(
         typeof row.photoBase64 === "string" ? row.photoBase64 : null;
       // D-26, Replace-all: a skipped-photo row carries this phone's current
       // bytes instead. Staged here, before the reset and before any finalize
-      // can overwrite a canonical that Replace-all's new ids re-assign.
+      // can overwrite a canonical that Replace-all's new ids re-assign. Looked
+      // up by row uid alone, like the Merge keep (review IN2-01/CR3-01): a
+      // value that arrives under another contact still carries the bytes this
+      // phone has for it, instead of being counted missing and deleted.
       const localReference =
         bytes === null && local.mode === "replace-all" && photoSkipped(row)
-          ? await oldPhoto(exec, target)
+          ? await localReferenceOf(exec, entity, row.uid)
           : null;
       if (
         bytes === null &&
