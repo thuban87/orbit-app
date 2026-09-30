@@ -1216,11 +1216,10 @@ async function stageCandidates(
       try {
         stagedLocal = await local.stageLocal(localReference, relativePath);
       } catch (error) {
-        try {
-          deleteRestorePending(relativePath);
-        } catch {
-          /* best effort */
-        }
+        // Both never throw. A copy that failed part-way leaves the stager's
+        // half-written `.stage-tmp`, not the pending file (review IN2-03).
+        deleteRestorePending(relativePath);
+        deleteRestorePending(`${relativePath}.stage-tmp`);
         throw error;
       }
       if (stagedLocal)

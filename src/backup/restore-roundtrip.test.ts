@@ -1033,9 +1033,12 @@ it("Replace-all aborts before any write when a marked row's existing local file 
       stageLocalPhoto: async (canonical, pending) => {
         // Genuinely absent (m-lost): nothing to stage, the restore continues.
         if (!photo.files.has(canonical)) return false;
-        // z-marked's photo is on disk but the copy fails (a full disk).
-        if (canonical === "avatars/contact-1.jpg")
+        // z-marked's photo is on disk but the copy fails part-way (a full
+        // disk), leaving the stager's half-written temp file (review IN2-03).
+        if (canonical === "avatars/contact-1.jpg") {
+          photo.files.set(`${pending}.stage-tmp`, "partial");
           throw new Error("ENOSPC: no space left on device");
+        }
         photo.files.set(pending, photo.files.get(canonical)!);
         copied.push(canonical);
         return true;
