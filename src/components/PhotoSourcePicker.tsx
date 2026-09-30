@@ -47,6 +47,7 @@ import {
   getContactPhotoIdentity,
 } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
+import { isUnusablePhotoReference } from "@/db/photo-relative-path";
 import { clearProfilePhotoCore } from "@/db/profile-dao";
 import type { RootStackParamList } from "@/navigation/types";
 import {
@@ -305,11 +306,16 @@ export function PhotoSourcePicker({
   }, [submittingUrl, urlText, navigation, target, abortUrl]);
 
   const hasPhoto = photo != null;
+  // D-34: a value that is not a stored photo path (text left in a custom photo
+  // field) is never resolved: the preview shows initials, the notice shows at
+  // once, and Change / Remove stay available. The value itself is untouched.
+  const unusable = isUnusablePhotoReference(photo);
+  const showUnavailable = hasPhoto && (photoFailed || unusable);
 
   return (
     <View style={styles.root}>
       <Avatar
-        photo={photo}
+        photo={unusable ? null : photo}
         name={name}
         contactId={avatarId}
         size={PREVIEW_SIZE}
@@ -317,7 +323,7 @@ export function PhotoSourcePicker({
       />
 
       <View style={styles.actions}>
-        {hasPhoto && photoFailed ? <PhotoUnavailableNotice /> : null}
+        {showUnavailable ? <PhotoUnavailableNotice /> : null}
         <Pressable
           testID="photo-source-add-change"
           accessibilityRole="button"

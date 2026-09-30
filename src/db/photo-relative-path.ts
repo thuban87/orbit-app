@@ -42,6 +42,21 @@ export const SAFE_RECONCILE_STAGING_RELATIVE =
   /^reconcile-staging\/[A-Za-z0-9_-]+\.(jpg|jpeg|png|webp)(?:\.stage-tmp)?$/;
 
 /**
+ * True when `value` is a stored photo path (`avatars/<name>.<ext>`, the
+ * SAFE_RELATIVE shape) — the one predicate `assertSafeRelative` also uses.
+ * Read surfaces call it before any image resolver: a custom photo field can
+ * hold text (e.g. "Rex" kept after a Text→Photo type change), which is data to
+ * preserve (D-31), never a path to resolve (38.6 D-34).
+ */
+export function isStoredPhotoPath(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    !value.includes("\0") &&
+    SAFE_RELATIVE.test(value)
+  );
+}
+
+/**
  * Throw unless `relative` is a safe `avatars/<name>.<ext>` relative path. Used at
  * the FS chokepoint AND at the DAO write boundary as defense-in-depth: a stored
  * absolute/`cache://` value would otherwise reach `resolvePhotoUri` and throw
@@ -49,13 +64,18 @@ export const SAFE_RECONCILE_STAGING_RELATIVE =
  * screen. Rejecting at write time keeps the bad value out of the DB entirely.
  */
 export function assertSafeRelative(relative: string): void {
-  if (
-    typeof relative !== "string" ||
-    relative.includes("\0") ||
-    !SAFE_RELATIVE.test(relative)
-  ) {
+  if (!isStoredPhotoPath(relative)) {
     throw new Error(`unsafe photo relative path: ${JSON.stringify(relative)}`);
   }
+}
+
+/**
+ * True for a non-empty value that is NOT a stored photo path: a reference the
+ * app must show as "Photo unavailable" (38.6 D-34) and never resolve. Null and
+ * "" mean no photo.
+ */
+export function isUnusablePhotoReference(value: string | null): boolean {
+  return value != null && value !== "" && !isStoredPhotoPath(value);
 }
 
 /** Throw unless a recovery-only restore staging path is safe. */

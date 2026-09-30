@@ -151,6 +151,14 @@ describe("tunables", () => {
 });
 
 describe("loadOrreryImage — pass-through and downsample", () => {
+  it("returns null for a value that is not a stored photo path, without reading anything (38.6 D-34)", async () => {
+    const fileUri = vi.fn((relative: string) => `file:///docs/${relative}`);
+    const { d, calls } = deps({}, { fileUri });
+    await expect(loadOrreryImage("Rex", 1, d)).resolves.toBeNull();
+    expect(fileUri).not.toHaveBeenCalled();
+    expect(calls.fileUris).toEqual([]);
+  });
+
   it("returns a ≤512 image as decoded and never calls the manipulator", async () => {
     const { d, calls } = deps({ "file:///docs/avatars/contact-1.jpg": 512 });
     const image = await loadOrreryImage("avatars/contact-1.jpg", undefined, d);

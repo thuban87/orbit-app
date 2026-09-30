@@ -20,6 +20,7 @@
  * authorization `canonicalGeneration`.
  */
 import { useMemo } from "react";
+import { isStoredPhotoPath } from "@/db/photo-relative-path";
 import {
   resolvePhotoDisplayUri,
   resolvePhotoUri,
@@ -79,26 +80,32 @@ const RUNTIME_RESOLVERS: PhotoDisplayResolvers = {
   plain: resolvePhotoUri,
 };
 
-/** Reactive display source for a canonical photo path (null when photo-less). */
+/**
+ * Reactive display source for a canonical photo path. Null when photo-less AND
+ * when the value is not a stored photo path (38.6 D-34: e.g. text left in a
+ * custom photo field) — such a value never reaches the resolvers, whose
+ * `assertSafeRelative` would otherwise throw during render.
+ */
 export function usePhotoDisplay(relative: string | null): PhotoDisplay | null {
-  const revision = usePhotoCacheBust(relative);
+  const stored = isStoredPhotoPath(relative) ? relative : null;
+  const revision = usePhotoCacheBust(stored);
   return useMemo(
     () =>
-      relative
+      stored
         ? photoDisplayFor(
-            relative,
+            stored,
             revision,
             PHOTO_DISPLAY_STRATEGY,
             RUNTIME_RESOLVERS,
           )
         : null,
-    [relative, revision],
+    [stored, revision],
   );
 }
 
-/** Non-hook read of the current display source (null when photo-less). */
+/** Non-hook read of the current display source (null as for `usePhotoDisplay`). */
 export function getPhotoDisplay(relative: string | null): PhotoDisplay | null {
-  if (!relative) return null;
+  if (!isStoredPhotoPath(relative)) return null;
   return photoDisplayFor(
     relative,
     getPhotoCacheBust(relative),

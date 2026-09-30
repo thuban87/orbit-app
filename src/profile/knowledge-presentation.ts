@@ -1,4 +1,6 @@
+import { PHOTO_UNAVAILABLE_LABEL } from "@/constants/photo-copy";
 import type { MemoryRow } from "@/db/memories-read";
+import { isStoredPhotoPath } from "@/db/photo-relative-path";
 import type {
   ProfileCollection,
   ProfileCustomFieldValue,
@@ -269,7 +271,10 @@ export function formatCustomFieldValue(
     case "toggle":
       return value === "1" ? "Yes" : "No";
     case "photo":
-      return "Photo added";
+      // 38.6 D-34: text left in a photo field (e.g. after a Text→Photo type
+      // change) is not a photo; it says so, like a lost photo. The text itself
+      // is kept in the data and backups (D-31) — this is display only.
+      return isStoredPhotoPath(value) ? "Photo added" : PHOTO_UNAVAILABLE_LABEL;
     default:
       return assertNever(type);
   }

@@ -127,6 +127,11 @@ describe("encodeWidgetThumb", () => {
     await expect(encodeWidgetThumb("")).resolves.toBeNull();
   });
 
+  it("returns null for a value that is not a stored photo path, without touching the manipulator (38.6 D-34)", async () => {
+    await expect(encodeWidgetThumb("Rex")).resolves.toBeNull();
+    expect(h.contextReleases).toEqual([]);
+  });
+
   it("returns a data:image/jpeg;base64 URI for a real path", async () => {
     h.cfg = { saveBase64: "QUJD" };
     const out = await encodeWidgetThumb("avatars/contact-1.jpg");

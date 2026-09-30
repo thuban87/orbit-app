@@ -1,18 +1,49 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("@/services/photos/photo-storage", () => ({
-  resolvePhotoDisplayUri: (relative: string, revision: number | undefined) =>
-    revision === undefined
-      ? `file:///doc/${relative}`
-      : `file:///doc/${relative}?v=${revision}`,
-  resolvePhotoUri: (relative: string) => `file:///doc/${relative}`,
+// The resolvers keep the real guard: an unsafe path throws, as on device.
+vi.mock("@/services/photos/photo-storage", async () => {
+  const { assertSafeRelative } = await import("@/db/photo-relative-path");
+  return {
+    resolvePhotoDisplayUri: (
+      relative: string,
+      revision: number | undefined,
+    ) => {
+      assertSafeRelative(relative);
+      return revision === undefined
+        ? `file:///doc/${relative}`
+        : `file:///doc/${relative}?v=${revision}`;
+    },
+    resolvePhotoUri: (relative: string) => {
+      assertSafeRelative(relative);
+      return `file:///doc/${relative}`;
+    },
+  };
+});
+// Run the hook inline (no renderer): useMemo computes, the store read is plain.
+vi.mock("react", async (original) => ({
+  ...(await original<typeof import("react")>()),
+  useMemo: (factory: () => unknown) => factory(),
 }));
+vi.mock("@/stores/photo-cache-bust-store", async (original) => {
+  const actual =
+    await original<typeof import("@/stores/photo-cache-bust-store")>();
+  return {
+    ...actual,
+    usePhotoCacheBust: (relPath: string | null) =>
+      actual.getPhotoCacheBust(relPath),
+  };
+});
 
+import {
+  isStoredPhotoPath,
+  isUnusablePhotoReference,
+} from "@/db/photo-relative-path";
 import { bumpPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import {
   getPhotoDisplay,
   PHOTO_DISPLAY_STRATEGY,
   photoDisplayFor,
+  usePhotoDisplay,
 } from "./photo-display";
 
 const rel = "avatars/contact-1.jpg";
@@ -73,5 +104,53 @@ describe("getPhotoDisplay", () => {
         `file:///doc/avatars/contact-1.jpg?v=${after.revision}`,
       );
     }
+  });
+});
+
+// 38.6 D-34: a value that is not a stored photo path (text left in a custom
+// photo field) is "no image", never a render-time throw.
+const NOT_PATHS = [
+  "Rex",
+  " ",
+  "/photos/pet.jpg",
+  "file:///doc/avatars/contact-1.jpg",
+  "avatars/../secret.jpg",
+  "avatars/contact-1.gif",
+  "avatars/contact-1.jpg\0",
+];
+
+describe("non-path photo values (D-34)", () => {
+  it("getPhotoDisplay returns null instead of throwing", () => {
+    for (const value of NOT_PATHS) {
+      expect(() => getPhotoDisplay(value)).not.toThrow();
+      expect(getPhotoDisplay(value)).toBeNull();
+    }
+  });
+
+  // The hook runs inline here (useMemo and the store read are mocked above).
+  const displayHook = usePhotoDisplay;
+
+  it("usePhotoDisplay returns null instead of throwing", () => {
+    for (const value of NOT_PATHS) {
+      expect(() => displayHook(value)).not.toThrow();
+      expect(displayHook(value)).toBeNull();
+    }
+    expect(displayHook(null)).toBeNull();
+    expect(displayHook(rel)?.source.uri.startsWith(`file:///doc/${rel}`)).toBe(
+      true,
+    );
+  });
+
+  it("the predicates share the SAFE_RELATIVE rule", () => {
+    expect(isStoredPhotoPath(rel)).toBe(true);
+    expect(isStoredPhotoPath("avatars/cv-7-pet.webp")).toBe(true);
+    for (const value of NOT_PATHS) {
+      expect(isStoredPhotoPath(value)).toBe(false);
+      expect(isUnusablePhotoReference(value)).toBe(true);
+    }
+    expect(isStoredPhotoPath(null)).toBe(false);
+    expect(isUnusablePhotoReference(null)).toBe(false);
+    expect(isUnusablePhotoReference("")).toBe(false);
+    expect(isUnusablePhotoReference(rel)).toBe(false);
   });
 });

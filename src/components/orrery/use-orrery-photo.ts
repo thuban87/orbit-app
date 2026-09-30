@@ -39,6 +39,7 @@
 import { type SkData, type SkImage, Skia } from "@shopify/react-native-skia";
 import type * as ExpoImageManipulator from "expo-image-manipulator";
 import { useEffect, useRef, useState } from "react";
+import { isStoredPhotoPath } from "@/db/photo-relative-path";
 import { discardDerivative } from "@/services/photos/derivative-cache";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
 import { usePhotoCacheBust } from "@/stores/photo-cache-bust-store";
@@ -279,6 +280,9 @@ export async function loadOrreryImage(
   revision: number | undefined,
   deps: OrreryImageDeps = defaultOrreryImageDeps,
 ): Promise<SkImage | null> {
+  // 38.6 D-34: a value that is not a stored photo path is never resolved (and
+  // never logged — it can be user text); the body shows its initials.
+  if (!isStoredPhotoPath(relative)) return null;
   const key = cacheKey(relative, revision);
   try {
     const hit = cacheGet(key);

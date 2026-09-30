@@ -100,13 +100,16 @@ function resolve(node: ReactNode): Node[] {
   ];
 }
 
-function render(photo: string | null) {
+function render(
+  photo: string | null,
+  target: Parameters<typeof PhotoSourcePicker>[0]["target"] = {
+    kind: "contact",
+    contactId: 7,
+  },
+  onValueChange?: (value: string | null) => void,
+) {
   const [root] = resolve(
-    PhotoSourcePicker({
-      target: { kind: "contact", contactId: 7 },
-      photo,
-      name: "Ada",
-    }),
+    PhotoSourcePicker({ target, photo, name: "Ada", onValueChange }),
   );
   return root;
 }
@@ -153,5 +156,43 @@ describe("PhotoSourcePicker 'Photo unavailable' (38.6 D-23)", () => {
     const actions = actionsOf(render(null));
     expect(testIds(actions)).not.toContain("PhotoUnavailableNotice");
     expect(testIds(actions)[0]).toBe("photo-source-add-change");
+  });
+});
+
+describe("PhotoSourcePicker with text in a photo field (38.6 D-34)", () => {
+  const field = { kind: "customField", contactId: 7, colName: "dog" } as const;
+
+  it("never hands the text to the Avatar, shows the notice at once, keeps Change and Remove", () => {
+    const onValueChange = vi.fn();
+    const root = render("Rex", field, onValueChange);
+    expect(root?.children[0]?.props.photo).toBeNull();
+    expect(testIds(actionsOf(root))).toEqual([
+      "PhotoUnavailableNotice",
+      "photo-source-add-change",
+      "photo-source-remove",
+    ]);
+    expect(actionsOf(root)?.children[1]?.props.accessibilityLabel).toBe(
+      "Change photo",
+    );
+    // Display only: the value is never cleared or rewritten by rendering.
+    expect(onValueChange).not.toHaveBeenCalled();
+  });
+
+  it("treats any non-path value the same way (contact target too)", () => {
+    for (const text of [
+      "/photos/pet.jpg",
+      "file:///x.jpg",
+      "avatars/../x.jpg",
+    ]) {
+      const root = render(text);
+      expect(root?.children[0]?.props.photo).toBeNull();
+      expect(testIds(actionsOf(root))[0]).toBe("PhotoUnavailableNotice");
+    }
+  });
+
+  it("a stored photo path still reaches the Avatar with no notice", () => {
+    const root = render("avatars/cv-7-dog.jpg", field);
+    expect(root?.children[0]?.props.photo).toBe("avatars/cv-7-dog.jpg");
+    expect(testIds(actionsOf(root))).not.toContain("PhotoUnavailableNotice");
   });
 });

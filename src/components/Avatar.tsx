@@ -26,6 +26,7 @@ import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { getInitials, swatchIndex } from "@/components/avatar-initials";
 import { usePhotoDisplay } from "@/components/photo-display";
+import { isUnusablePhotoReference } from "@/db/photo-relative-path";
 import { useTheme } from "@/theme";
 
 interface AvatarProps {
@@ -41,7 +42,8 @@ interface AvatarProps {
    * Told whether the photo currently fails to load (true after `onError`, false
    * again once a new photo or revision retries it). Lets a parent drop a
    * photo-only affordance — e.g. the Profile lightbox entry (38.6 review WR-06)
-   * — while the initials are showing.
+   * — while the initials are showing. A value that is not a stored photo path
+   * (38.6 D-34: text in a photo field) reports true: it never loads.
    */
   onLoadErrorChange?: (errored: boolean) => void;
 }
@@ -67,11 +69,14 @@ export function Avatar({
   }, [photo, display?.revision]);
 
   // Report the load state; a ref keeps an inline parent callback from re-firing.
+  // D-34: a non-path value (text) never reaches a resolver (`display` is null)
+  // and is reported as a failure, so the parent says "Photo unavailable".
+  const failed = errored || isUnusablePhotoReference(photo);
   const onLoadErrorChangeRef = useRef(onLoadErrorChange);
   onLoadErrorChangeRef.current = onLoadErrorChange;
   useEffect(() => {
-    onLoadErrorChangeRef.current?.(errored);
-  }, [errored]);
+    onLoadErrorChangeRef.current?.(failed);
+  }, [failed]);
 
   if (display && !errored) {
     return (

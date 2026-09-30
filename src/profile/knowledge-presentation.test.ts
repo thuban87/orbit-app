@@ -263,7 +263,7 @@ describe("knowledge presentation", () => {
     expect(formatCustomFieldValue("date", "2026-09-09")).toBe("2026-09-09");
     expect(formatCustomFieldValue("toggle", "1")).toBe("Yes");
     expect(formatCustomFieldValue("number", "3")).toBe("3");
-    expect(formatCustomFieldValue("photo", "/photos/pet.jpg")).toBe(
+    expect(formatCustomFieldValue("photo", "avatars/cv-7-pet.jpg")).toBe(
       "Photo added",
     );
     expect(formatCustomFieldValue("url", "orbit.example")).toBe(
@@ -273,5 +273,48 @@ describe("knowledge presentation", () => {
       "me@example.test",
     );
     expect(formatCustomFieldValue("phone", "+1 555 0100")).toBe("+1 555 0100");
+  });
+
+  it("never claims 'Photo added' for a photo value that is not a stored photo path (38.6 D-34)", () => {
+    for (const text of ["Rex", "/photos/pet.jpg", "file:///x.jpg", " "]) {
+      expect(formatCustomFieldValue("photo", text)).toBe("Photo unavailable");
+    }
+    expect(formatCustomFieldValue("photo", null)).toBe("Not available yet");
+    expect(formatCustomFieldValue("photo", "")).toBe("Not available yet");
+
+    const withText: KnowledgePresentationInput = {
+      ...input,
+      knowledge: {
+        ...input.knowledge,
+        customFields: [
+          {
+            name: null,
+            items: [
+              {
+                fieldDefId: 30,
+                valueUid: "value-30",
+                label: "Dog",
+                type: "photo",
+                options: null,
+                rawValue: "Rex",
+                parsed: { ok: true, value: "Rex" },
+                shareWithAi: 0,
+                historyRetained: 0,
+                historyKey: null,
+              },
+            ],
+          },
+        ],
+      },
+    };
+    const item = buildKnowledgePresentation(withText).children.find(
+      (child) => child.id === "custom-fields",
+    )?.items[0];
+    // Display only: the raw text is carried through unchanged (D-31).
+    expect(item).toMatchObject({
+      preview: "Photo unavailable",
+      rawValue: "Rex",
+      invalid: false,
+    });
   });
 });

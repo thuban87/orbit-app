@@ -31,6 +31,7 @@ import {
   type ImageResult,
   SaveFormat,
 } from "expo-image-manipulator";
+import { isStoredPhotoPath } from "@/db/photo-relative-path";
 import { discardDerivative } from "@/services/photos/derivative-cache";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
 import { Logger } from "@/utils/logger";
@@ -53,7 +54,8 @@ const THUMB_Q = 0.6;
  * into a `data:image/jpeg;base64,…` URI for the headless widget render.
  *
  * Returns `null` — the initials-fallback signal — in every non-emitting case:
- *   - a null/empty `relativePath` (the contact has no photo);
+ *   - a null/empty `relativePath` (the contact has no photo), or one that is not
+ *     a stored photo path (38.6 D-34);
  *   - the manipulator throws (a corrupt or evicted master) — Logger-logged, NOT
  *     rethrown, so one bad photo downgrades that tile rather than blanking the
  *     whole grid;
@@ -66,7 +68,9 @@ export async function encodeWidgetThumb(
   relativePath: string | null,
   discard: (uri: string) => boolean = discardDerivative,
 ): Promise<string | null> {
-  if (!relativePath) return null;
+  // 38.6 D-34: a value that is not a stored photo path is never resolved (and
+  // never logged — it can be user text); the tile shows its initials.
+  if (!isStoredPhotoPath(relativePath)) return null;
 
   try {
     // file:// of the master (512 JPEG or up to 1024 WebP, D-12).
