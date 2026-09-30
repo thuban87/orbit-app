@@ -501,7 +501,14 @@ describe("List row photos are 72 (D-05)", () => {
       (node) => node.props.testID === "dashboard-list-row-7",
     );
     const rowStyle = flattenStyle(row?.props.style);
-    expect(rowStyle.minHeight).toBe(LIST_AVATAR_SIZE + 2 * LIST_ROW_PADDING);
+    // IN-05: minHeight includes the 2 px border on both sides (72+24+2+2).
+    expect(rowStyle.borderWidth).toBe(2);
+    expect(rowStyle.minHeight).toBe(
+      LIST_AVATAR_SIZE +
+        2 * LIST_ROW_PADDING +
+        2 * (rowStyle.borderWidth as number),
+    );
+    expect(rowStyle.minHeight).toBe(100);
     expect(rowStyle.padding).toBe(LIST_ROW_PADDING);
   });
 

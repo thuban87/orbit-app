@@ -55,7 +55,9 @@ import { swipeRowTintOpacity } from "./list-row-swipe-backing";
 export const LIST_AVATAR_SIZE = SPACING["2xl"] * 1.5;
 /**
  * The List row's inner padding; the row's minimum height is the photo plus this
- * on both sides. Device-tuned with the owner in 38.6-07 (e.g. 8 gives an 88 px row).
+ * and the row border (SPACING.xs / 2) on both sides — RN's minHeight includes
+ * both. Device-tuned with the owner in 38.6-07 (e.g. 8 gives a 92 px row; 12
+ * gives 100).
  */
 export const LIST_ROW_PADDING = SPACING.md;
 
@@ -428,7 +430,7 @@ const styles = StyleSheet.create({
     borderWidth: SPACING.xs / 2,
     flexDirection: "row",
     gap: SPACING.md,
-    minHeight: LIST_AVATAR_SIZE + LIST_ROW_PADDING * 2,
+    minHeight: LIST_AVATAR_SIZE + LIST_ROW_PADDING * 2 + SPACING.xs, // + both borders (IN-05)
     padding: LIST_ROW_PADDING,
   },
   tint: {
