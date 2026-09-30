@@ -2003,11 +2003,19 @@ function swipePanelFailures(
   return failures;
 }
 
-/** The row's content column inset from either row edge (ListRow styles). */
+/** ListRow's `LIST_AVATAR_SIZE` (38.6 D-05: 48 → 72). */
+const LIST_ROW_AVATAR = SPACING["2xl"] * 1.5;
+/** ListRow's `LIST_ROW_PADDING`. */
+const LIST_ROW_PADDING = SPACING.md;
+/**
+ * The row's content column inset from either row edge (ListRow styles): the
+ * nearer of the two sides. Since 38.6 D-05 the left side (72 Avatar) sits
+ * further in than the right (48 favourite button column), so the right binds.
+ */
 const ROW_CONTENT_INSET =
   SPACING.xs / 2 + // row border
-  SPACING.md + // row padding
-  SPACING["2xl"] + // Avatar (left) / favourite button column (right)
+  LIST_ROW_PADDING + // row padding
+  Math.min(LIST_ROW_AVATAR, SPACING["2xl"]) + // Avatar (left) / favourite button column (right)
   SPACING.md; // row gap
 /** HomeScreen's `SWIPE_ACTION_WIDTH`. */
 const SWIPE_PANEL_WIDTH = 96;
@@ -2144,9 +2152,14 @@ describe("Swiped see-through List row (38.5 review WR-01, D-48)", () => {
     // The inputs of ROW_CONTENT_INSET, pinned to the sources.
     expect(listRow).toMatch(/borderWidth: SPACING\.xs \/ 2,/);
     expect(listRow).toMatch(
-      /gap: SPACING\.md,\s+minHeight:[^\n]+\n\s+padding: SPACING\.md,/,
+      /gap: SPACING\.md,\s+minHeight:[^\n]+\n\s+padding: LIST_ROW_PADDING,/,
     );
-    expect(listRow).toMatch(/size=\{SPACING\["2xl"\]\}/);
+    expect(listRow).toMatch(/export const LIST_ROW_PADDING = SPACING\.md;/);
+    expect(listRow).toMatch(/size=\{LIST_AVATAR_SIZE\}/);
+    expect(listRow).toMatch(
+      /export const LIST_AVATAR_SIZE = SPACING\["2xl"\] \* 1\.5;/,
+    );
+    expect(LIST_ROW_AVATAR).toBeGreaterThanOrEqual(SPACING["2xl"]);
     expect(listRow).toMatch(
       /favouriteButton: \{[^}]*minWidth: SPACING\["2xl"\],/,
     );

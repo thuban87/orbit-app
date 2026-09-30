@@ -51,6 +51,14 @@ import {
 } from "./list-row-content";
 import { swipeRowTintOpacity } from "./list-row-swipe-backing";
 
+/** D-05: Contacts List photos are 50% bigger (48 → 72). Device-tuned in 38.6-07. */
+export const LIST_AVATAR_SIZE = SPACING["2xl"] * 1.5;
+/**
+ * The List row's inner padding; the row's minimum height is the photo plus this
+ * on both sides. Device-tuned with the owner in 38.6-07 (e.g. 8 gives an 88 px row).
+ */
+export const LIST_ROW_PADDING = SPACING.md;
+
 /**
  * A see-through row's tint while it can be swiped (review WR-01, D-48). The
  * opacity follows the swipe translation shared value on the UI thread: the
@@ -263,7 +271,7 @@ export function ListRow({
               photo={photo}
               name={name}
               contactId={contactId}
-              size={SPACING["2xl"]}
+              size={LIST_AVATAR_SIZE}
             />
             <View style={styles.content}>
               <Text
@@ -420,8 +428,8 @@ const styles = StyleSheet.create({
     borderWidth: SPACING.xs / 2,
     flexDirection: "row",
     gap: SPACING.md,
-    minHeight: SPACING["2xl"] + SPACING.lg,
-    padding: SPACING.md,
+    minHeight: LIST_AVATAR_SIZE + LIST_ROW_PADDING * 2,
+    padding: LIST_ROW_PADDING,
   },
   tint: {
     borderRadius: RADII.lg,
