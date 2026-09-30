@@ -34,7 +34,7 @@ export function RestoreResultScreen({
     restoredPhotosMissing,
   } = route.params;
   // 38.6 D-24 / D-26: photos left out of the safety backup, and skipped-photo
-  // rows this phone had no photo for either. Each has its own copy (D-30).
+  // rows this phone had no photo for either. Each has its own copy (D-33).
   const safetySkipped = skippedPhotosCopy(replaceSafetySnapshotSkippedPhotos);
   const restoredMissing = restoredPhotosMissingCopy(restoredPhotosMissing);
   const pending = [

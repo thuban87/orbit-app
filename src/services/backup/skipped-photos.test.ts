@@ -32,13 +32,13 @@ describe("skipped-photo copy (38.6 D-24)", () => {
   });
 });
 
-describe("restored-photos-missing copy (38.6 D-30)", () => {
-  it("says the photo was already missing, singular for one, plural otherwise", () => {
+describe("restored-photos-missing copy (38.6 D-33)", () => {
+  it("says the photo was not in the backup, singular for one, plural otherwise", () => {
     expect(restoredPhotosMissingCopy(1)).toBe(
-      "1 photo was already missing on this phone and couldn't be restored.",
+      "1 photo wasn't in the backup and couldn't be restored.",
     );
     expect(restoredPhotosMissingCopy(4)).toBe(
-      "4 photos were already missing on this phone and couldn't be restored.",
+      "4 photos weren't in the backup and couldn't be restored.",
     );
     expect(restoredPhotosMissingCopy(0)).toBeNull();
     expect(restoredPhotosMissingCopy(1.5)).toBeNull();

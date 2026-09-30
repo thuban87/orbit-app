@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 
 /**
- * Shallow render of the Restore result (38.6 D-30, review IN2-02): photos the
+ * Shallow render of the Restore result (38.6 D-30/D-33, reviews IN2-02/IN3-03): photos the
  * backup left out that this phone did not have either, and photos left out of
  * the Replace-all safety backup, each read in their own words.
  */
@@ -66,14 +66,14 @@ function render(params: {
     .map(textOf);
 }
 
-describe("Restore result photo copy (38.6 D-30)", () => {
-  it("says already-missing photos were already missing, apart from the safety-backup count", () => {
+describe("Restore result photo copy (38.6 D-30/D-33)", () => {
+  it("says restore-missing photos were not in the backup, apart from the safety-backup count", () => {
     const lines = render({
       restoredPhotosMissing: 2,
       replaceSafetySnapshotSkippedPhotos: 1,
     });
     expect(lines).toContain(
-      "2 photos were already missing on this phone and couldn't be restored.",
+      "2 photos weren't in the backup and couldn't be restored.",
     );
     expect(lines).toContain(
       "A verified backup of this device was created first. 1 photo couldn't be included.",
@@ -86,9 +86,7 @@ describe("Restore result photo copy (38.6 D-30)", () => {
         restoredPhotosMissing: 1,
         replaceSafetySnapshotSkippedPhotos: 0,
       }),
-    ).toContain(
-      "1 photo was already missing on this phone and couldn't be restored.",
-    );
+    ).toContain("1 photo wasn't in the backup and couldn't be restored.");
     const none = render({
       restoredPhotosMissing: 0,
       replaceSafetySnapshotSkippedPhotos: 0,
