@@ -292,6 +292,30 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     backups (D-31).
 -   **[DECIDED · 2026-09-30] D-35 --- D-28 flag also applies to a Merge-moved photo value whose file was already gone.**
 
+### Device-pass rulings (owner, 2026-09-30)
+
+-   **[DECIDED · 2026-09-30] D-36 --- Sizes and looks signed off as built.** Profile photo 224 (D-04), app-bar scroll
+    scrim on (D-17), List 72 / padding 12 (D-05), Grid max 96 / padding 8 / ring gap 4 (D-06), Grid corner controls
+    as measured, optical offset 0 (D-07), lightbox 4x pinch / 2.5x double-tap / 120 dp dismiss (D-16), "Photo
+    unavailable" look (D-23), and the 360 dp star hit-area overlap accepted (T-a). WebP quality stays 0.8.
+-   **[DECIDED · 2026-09-30] D-37 --- D-11 memory fails; fix before release.** Orrery graphics memory at 20 s was +23 %
+    / GL +32 % over the 512 JPEG baseline (limit 5 %). A gap plan finishes review IN-02 (cancel queued downsamples,
+    size the Orrery photo cache to the photo count) and the ~5 s initials-on-return reload, then re-measures with the
+    same fixed method (plus a late sample). The release build waits for it.
+-   **[DECIDED · 2026-09-30] D-38 --- The assist banner must not block other screens' top bars (device S12).** While a
+    "Did you reach ...?" question is pending, the banner currently covers every screen's top (Profile Back/star/more,
+    dashboard search). Fixed in this phase by a gap plan.
+-   **[DECIDED · 2026-09-30] D-39 --- Encrypted-backup cap stays 8 MiB (closes D-20); over-cap errors say "too large".**
+    Measured: 3.81 MB at 50 photo contacts, 6.23 MB at 100, cap projected at ~145. A gap plan makes the manual and
+    automatic over-cap failures say the backup is too large instead of "Couldn't create export" / "Backup folder needs
+    reconnecting".
+-   **[DECIDED · 2026-09-30] D-40 --- Other device-pass dispositions.** Stock photos accepted as D-10/D-20 sources;
+    import retry accepted as unit-tested only; F-1 duplicate-review sheet accepted as render-tested; the two real
+    contacts imported into Orbit test data are removed at the end of the pass (phone Contacts untouched); backlog item:
+    carry favourites in backups (Replace-all drops them); logged for later: F-3 card copy truncation, S1 double Profile
+    push on Save, S6 FAB overlap, S10 picker after font/display change, S11 resume prompt over crop, S13 grid columns at
+    exactly 1.4; left as is: S7, the Replace-all lost profile reference, the restore preview skip note, IN4-04 count.
+
 ### Engineering boundaries (recorded so planning cannot drift)
 
 -   **[DERIVED] D-19 --- Stale-photo fix and its trip-wires.** The D-01 cache fix approach is an engineering call
@@ -354,3 +378,5 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     accepted), D-33 (restore copy, supersedes D-30's second sentence).
 -   **2026-09-30** --- D-34 (text in a photo field shows Photo unavailable; D-31's "existing error state" did not
     exist), D-35 (D-28 flag extended to the Merge-moved case).
+-   **2026-09-30** --- Device-pass rulings D-36..D-40 (looks signed off; D-11 fix before release; banner fix; cap kept +
+    "too large" copy; dispositions).
