@@ -21,7 +21,14 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import { resolveFontFamily, TYPOGRAPHY } from "@/theme/tokens/typography";
 import { isSnoozed } from "@/utils/dates";
-import type { GridCardGeometry } from "./grid-card-geometry";
+import {
+  GRID_CARD_BORDER,
+  GRID_CARD_PADDING,
+  GRID_CORNER_HIT,
+  GRID_CORNER_INSET,
+  GRID_CORNER_OPTICAL_OFFSET,
+  type GridCardGeometry,
+} from "./grid-card-geometry";
 import {
   buildRowAccessibilityDescription,
   buildSearchRowContext,
@@ -68,6 +75,14 @@ function HighlightedSnippet({
     </>
   );
 }
+
+/**
+ * The corner glyph's padding inside its hit box (D-07): the box sits inside the
+ * GlassSurface border, so the visible glyph lands GRID_CORNER_INSET from the
+ * card's outer edge.
+ */
+const CORNER_GLYPH_PADDING =
+  GRID_CORNER_INSET - GRID_CARD_BORDER + GRID_CORNER_OPTICAL_OFFSET;
 
 export interface GridCardProps {
   contactId: number;
@@ -221,6 +236,7 @@ export function GridCard({
         density="dense"
         treatment="contact-entry"
         style={styles.surface}
+        contentStyle={styles.surfaceContent}
       >
         <ScopedPalette>
           {(scoped) => {
@@ -232,6 +248,10 @@ export function GridCard({
             );
             return (
               <>
+                {/* D-07: the corner controls sit at the card corners, above the
+                    photo. Each 48×48 hit area is anchored at its corner and
+                    extends inward (GlassSurface clips, and Android does not
+                    deliver touches outside parent bounds). */}
                 {selectionMode ? (
                   <Pressable
                     testID={`dashboard-grid-card-select-${contactId}`}
@@ -240,7 +260,7 @@ export function GridCard({
                     accessibilityState={{ checked: selected }}
                     hitSlop={SPACING.sm}
                     onPress={onToggleSelect}
-                    style={styles.selectionButton}
+                    style={[styles.corner, styles.cornerLeft]}
                   >
                     <Icon
                       name="select"
@@ -256,7 +276,7 @@ export function GridCard({
                     testID={`dashboard-grid-card-favourite-${contactId}`}
                     accessible={false}
                     accessibilityElementsHidden
-                    style={styles.favouriteButton}
+                    style={[styles.corner, styles.cornerRight]}
                   >
                     <Icon
                       name="favorite"
@@ -275,7 +295,7 @@ export function GridCard({
                     accessibilityState={{ selected: isFavourite }}
                     hitSlop={SPACING.sm}
                     onPress={onToggleFavourite}
-                    style={styles.favouriteButton}
+                    style={[styles.corner, styles.cornerRight]}
                   >
                     <Icon
                       name="favorite"
@@ -286,88 +306,110 @@ export function GridCard({
                   </Pressable>
                 )}
 
-                <View
-                  style={[
-                    styles.avatarArea,
-                    { height: geometry.ringBox, width: geometry.ringBox },
-                  ]}
-                >
+                <View style={styles.layout}>
                   <View
-                    testID={`dashboard-grid-card-ring-${contactId}`}
-                    accessible={false}
-                    accessibilityElementsHidden
                     style={[
-                      styles.statusRing,
+                      styles.avatarArea,
                       {
-                        borderColor: ring.color,
-                        borderWidth: ring.width,
-                        opacity: ring.opacity,
+                        height: geometry.ringBox,
+                        // avatarTop is measured from the card's OUTER edge;
+                        // this View sits inside the 1 px border.
+                        marginTop: geometry.avatarTop - GRID_CARD_BORDER,
+                        width: geometry.ringBox,
                       },
                     ]}
-                  />
-                  <Avatar
-                    photo={photo}
-                    name={name}
-                    contactId={contactId}
-                    size={geometry.avatarSize}
-                  />
-                  {displayState !== null ? (
+                  >
                     <View
+                      testID={`dashboard-grid-card-ring-${contactId}`}
                       accessible={false}
                       accessibilityElementsHidden
-                      style={styles.statusGlyph}
-                    >
-                      <StatusGlyph state={displayState} size="sm" />
-                    </View>
-                  ) : null}
-                </View>
+                      style={[
+                        styles.statusRing,
+                        {
+                          borderColor: ring.color,
+                          borderWidth: ring.width,
+                          opacity: ring.opacity,
+                        },
+                      ]}
+                    />
+                    <Avatar
+                      photo={photo}
+                      name={name}
+                      contactId={contactId}
+                      size={geometry.avatarSize}
+                    />
+                    {displayState !== null ? (
+                      <View
+                        accessible={false}
+                        accessibilityElementsHidden
+                        style={styles.statusGlyph}
+                      >
+                        <StatusGlyph state={displayState} size="sm" />
+                      </View>
+                    ) : null}
+                  </View>
 
-                <View style={styles.content}>
+                  {/* D-08: fill line 1 first; only the overflow goes to line 2
+                      (Android's default highQuality strategy balances lines). */}
                   <Text
                     testID={`dashboard-grid-card-name-${contactId}`}
-                    numberOfLines={1}
+                    numberOfLines={2}
                     ellipsizeMode="tail"
+                    textBreakStrategy="simple"
                     style={[styles.name, { color: colors.textPrimary }]}
                   >
                     {name}
                   </Text>
-                  {isSearchMode ? (
-                    <Text
-                      testID={`dashboard-grid-card-match-explanation-${contactId}`}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      style={[styles.recency, { color: scoped.textSecondary }]}
-                    >
-                      {searchExplanation}
-                    </Text>
-                  ) : (
-                    <Text
-                      testID={`dashboard-grid-card-recency-${contactId}`}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      style={[styles.recency, { color: scoped.textSecondary }]}
-                    >
-                      {recency}
-                    </Text>
-                  )}
-                  {isSearchMode ? (
-                    <Text
-                      testID={`dashboard-grid-card-search-snippet-${contactId}`}
-                      numberOfLines={1}
-                      ellipsizeMode="tail"
-                      style={[
-                        styles.recency,
-                        styles.line3Text,
-                        { color: scoped.textSecondary },
-                      ]}
-                    >
-                      <HighlightedSnippet
-                        text={displayedSearchSnippet ?? ""}
-                        highlights={strongestMatch?.highlights ?? []}
-                        color={colors.textPrimary}
-                      />
-                    </Text>
-                  ) : null}
+
+                  {/* D-09: the FlatList row stretches every card to the row's
+                      height; pinning the secondary lines to the bottom makes a
+                      one-line name reserve line 2 only in a row where another
+                      name wraps. No text measurement, no second layout pass. */}
+                  <View style={styles.secondary}>
+                    {isSearchMode ? (
+                      <Text
+                        testID={`dashboard-grid-card-match-explanation-${contactId}`}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={[
+                          styles.recency,
+                          { color: scoped.textSecondary },
+                        ]}
+                      >
+                        {searchExplanation}
+                      </Text>
+                    ) : (
+                      <Text
+                        testID={`dashboard-grid-card-recency-${contactId}`}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={[
+                          styles.recency,
+                          { color: scoped.textSecondary },
+                        ]}
+                      >
+                        {recency}
+                      </Text>
+                    )}
+                    {isSearchMode ? (
+                      <Text
+                        testID={`dashboard-grid-card-search-snippet-${contactId}`}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                        style={[
+                          styles.recency,
+                          styles.line3Text,
+                          { color: scoped.textSecondary },
+                        ]}
+                      >
+                        <HighlightedSnippet
+                          text={displayedSearchSnippet ?? ""}
+                          highlights={strongestMatch?.highlights ?? []}
+                          color={colors.textPrimary}
+                        />
+                      </Text>
+                    ) : null}
+                  </View>
                 </View>
               </>
             );
@@ -384,35 +426,44 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   surface: {
+    flexGrow: 1,
     minHeight: SPACING["2xl"] * 3,
-    padding: SPACING.md,
+    padding: 0,
   },
-  favouriteButton: {
-    alignItems: "center",
-    alignSelf: "flex-end",
-    justifyContent: "center",
-    minHeight: SPACING["2xl"],
-    minWidth: SPACING["2xl"],
-    marginBottom: -SPACING.sm,
-    marginEnd: -SPACING.sm,
-    marginTop: -SPACING.sm,
+  surfaceContent: {
+    flexGrow: 1,
   },
-  selectionButton: {
-    alignItems: "center",
-    justifyContent: "center",
-    left: SPACING.xs,
-    minHeight: SPACING["2xl"],
-    minWidth: SPACING["2xl"],
+  corner: {
+    height: GRID_CORNER_HIT,
+    justifyContent: "flex-start",
+    paddingTop: CORNER_GLYPH_PADDING,
     position: "absolute",
-    top: SPACING.xs,
+    top: 0,
+    width: GRID_CORNER_HIT,
     zIndex: 1,
+  },
+  cornerLeft: {
+    alignItems: "flex-start",
+    left: 0,
+    paddingLeft: CORNER_GLYPH_PADDING,
+  },
+  cornerRight: {
+    alignItems: "flex-end",
+    paddingRight: CORNER_GLYPH_PADDING,
+    right: 0,
+  },
+  layout: {
+    alignItems: "center",
+    flexGrow: 1,
+    minWidth: 0,
+    paddingBottom: GRID_CARD_PADDING,
+    paddingHorizontal: GRID_CARD_PADDING,
+    paddingTop: 0,
   },
   avatarArea: {
     alignItems: "center",
     alignSelf: "center",
     justifyContent: "center",
-    // Only a small pull-up: the circle keeps clear of the favourite star.
-    marginTop: -SPACING.xs,
     position: "relative",
   },
   statusRing: {
@@ -432,13 +483,17 @@ const styles = StyleSheet.create({
     right: -SPACING.xs,
     width: ICON_SIZE.sm,
   },
-  content: {
+  secondary: {
     alignItems: "center",
+    alignSelf: "stretch",
     gap: SPACING.xs,
-    marginTop: SPACING.md,
+    marginTop: "auto",
     minWidth: 0,
+    paddingTop: SPACING.xs,
   },
   name: {
+    alignSelf: "stretch",
+    marginTop: SPACING.md,
     fontFamily: resolveFontFamily(
       TYPOGRAPHY.label.family,
       TYPOGRAPHY.label.weight,

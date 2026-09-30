@@ -72,6 +72,12 @@ export interface GlassSurfaceProps {
   selected?: boolean;
   /** Extra layout style (padding/margins/size) — never colour. */
   style?: StyleProp<ViewStyle>;
+  /**
+   * Extra layout style for the content wrapper (e.g. `flexGrow` so content can
+   * fill a stretched surface, 38.6 D-09) — never colour. Optional; without it
+   * the wrapper renders exactly as before.
+   */
+  contentStyle?: StyleProp<ViewStyle>;
 }
 
 /** Blur intensity for the glass surface (device-UAT tunable). */
@@ -95,6 +101,7 @@ export function GlassSurface({
   treatment = "card",
   selected = false,
   style,
+  contentStyle,
 }: GlassSurfaceProps) {
   const { colors, mode, package: themePackage } = useTheme();
   const s = resolveSurfaceStyle(themePackage, blurAvailable);
@@ -166,7 +173,13 @@ export function GlassSurface({
           palette (RG-029 / D-12 / D-24: Standard Light over an asset resolves
           secondary text to primary). The Orrery overlay keeps the root palette
           under its own ADR-149 proof. */}
-      <View style={styles.content}>
+      <View
+        style={
+          contentStyle === undefined
+            ? styles.content
+            : [styles.content, contentStyle]
+        }
+      >
         {scoped ? (
           <GlassForegroundScope>{children}</GlassForegroundScope>
         ) : (
