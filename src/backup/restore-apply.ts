@@ -146,7 +146,9 @@ export type RestoreApplyResult =
       preRestoreSnapshotSkippedPhotos: number;
       /**
        * Rows whose backup photo was skipped (D-26 marker) and for which this
-       * phone had no photo to keep either, so they end with no photo.
+       * phone had no photo to keep either, so no photo is restored. A row whose
+       * local file was already lost keeps a reference to its own canonical and
+       * shows "Photo unavailable" (D-28).
        */
       restoredPhotosMissing: number;
     }
@@ -1194,6 +1196,8 @@ async function stageCandidates(
   local: {
     mode: RestoreMode;
     stageLocal: NonNullable<RestoreApplyDependencies["stageLocalPhoto"]>;
+    /** Replace-all (D-28): marked contact/value rows whose local file is gone. */
+    lost: Set<string>;
   },
 ): Promise<void> {
   const incomingDefs = incomingPhotoDefs(manifest);
@@ -1256,6 +1260,10 @@ async function stageCandidates(
       }
       if (stagedLocal)
         staged.set(`${entity}\0${row.uid}`, { target, relativePath });
+      // D-28: the reference existed but its file was already gone. The profile
+      // is never reset, so it keeps its own reference and is not listed.
+      else if (target.kind !== "profile")
+        local.lost.add(`${entity}\0${row.uid}`);
     }
 }
 async function planPhotoCandidates(
@@ -1264,12 +1272,15 @@ async function planPhotoCandidates(
   plan: Plan,
   staged: ReadonlyMap<string, FinalizeCandidate>,
   mode: RestoreMode,
+  lost: ReadonlySet<string>,
 ): Promise<{
   finalize: FinalizeCandidate[];
   deletes: DeleteCandidate[];
   keep: KeepCandidate[];
   /** Merge (D-26): local photo paths of marked winning rows; never deleted. */
   keepPaths: Set<string>;
+  /** Replace-all (D-28): rows flagged "Photo unavailable" at their new canonical. */
+  unavailable: PhotoTarget[];
   missing: number;
 }> {
   const incomingDefs = incomingPhotoDefs(manifest);
@@ -1277,6 +1288,7 @@ async function planPhotoCandidates(
   const deletes: DeleteCandidate[] = [];
   const keep: KeepCandidate[] = [];
   const keepPaths = new Set<string>();
+  const unavailable: PhotoTarget[] = [];
   let missing = 0;
   for (const entity of ["profile", "contacts", "custom_field_values"] as const)
     for (const a of plan[entity]) {
@@ -1307,6 +1319,14 @@ async function planPhotoCandidates(
           finalize.push(candidate);
           continue;
         }
+        if (mode === "replace-all" && lost.has(`${entity}\0${a.uid}`)) {
+          // D-28: this phone's photo was already lost. The row keeps the
+          // "Photo unavailable" evidence at its OWN new id-derived canonical;
+          // an old path is never written back (Replace-all re-assigns ids).
+          unavailable.push(target);
+          missing += 1;
+          continue;
+        }
         const existing = mode === "merge" ? await oldPhoto(exec, target) : null;
         if (existing === null) {
           missing += 1;
@@ -1334,7 +1354,7 @@ async function planPhotoCandidates(
           });
       }
     }
-  return { finalize, deletes, keep, keepPaths, missing };
+  return { finalize, deletes, keep, keepPaths, unavailable, missing };
 }
 async function stageBackgroundCandidates(
   manifest: BackupManifest,
@@ -1681,6 +1701,8 @@ export async function applyRestore(
   const restoreSessionToken = deps.sessionToken ?? newUid();
   beginStagingSession(restoreSessionToken);
   const stagedPhotos = new Map<string, FinalizeCandidate>();
+  const lostLocalPhotos = new Set<string>();
+  const exists = deps.canonicalPhotoExists ?? photoFileExists;
   const stagedBackgrounds: BackgroundFinalizeCandidate[] = [];
   const committedPhotoKeys = new Set<string>();
   const committedBackgroundUids = new Set<string>();
@@ -1697,6 +1719,7 @@ export async function applyRestore(
           deps.stageLocalPhoto ??
           ((canonical, pending) =>
             stageLocalPhotoForRestore(exec, canonical, pending)),
+        lost: lostLocalPhotos,
       },
     );
     await stageBackgroundCandidates(
@@ -1874,6 +1897,7 @@ export async function applyRestore(
         plan,
         stagedPhotos,
         mode,
+        lostLocalPhotos,
       );
       const backgroundCandidates = stagedBackgrounds.filter((candidate) =>
         writes(plan, "profile_background_templates").some(
@@ -1975,6 +1999,26 @@ export async function applyRestore(
         }
         await writePhotoReference(exec, kept.target, kept.reference);
       }
+      // D-28, Replace-all: flag an already-lost photo at the row's new
+      // canonical. With nothing on disk there, the reference is written now
+      // and no intent targets that path. A file there belongs to the old owner
+      // of the reused id: flagging now would show that contact's photo, so the
+      // file is deleted first (a durable intent) and the reference is written
+      // after, under the path lock. If that never completes, the row ends with
+      // no reference, never with another contact's photo.
+      const flaggedPaths = new Set<string>();
+      const deferredFlags: Array<{ target: PhotoTarget; canonical: string }> =
+        [];
+      for (const target of candidates.unavailable) {
+        const canonical = await canonicalFor(exec, target);
+        if (!canonical) continue;
+        if (exists(canonical)) {
+          deferredFlags.push({ target, canonical });
+          continue;
+        }
+        await writePhotoReference(exec, target, canonical);
+        flaggedPaths.add(canonical);
+      }
       const finalizeEntries: RestorePhotoJournalEntry[] = [];
       for (const candidate of candidates.finalize) {
         const canonical = await canonicalFor(exec, candidate.target);
@@ -2001,6 +2045,9 @@ export async function applyRestore(
       // another canonical). The bytes stay; nothing relies on the post-commit
       // mayDeleteCanonicalCore recheck to save them (review IN2-01).
       for (const kept of candidates.keepPaths) fileDeletes.paths.delete(kept);
+      for (const flagged of flaggedPaths) fileDeletes.paths.delete(flagged);
+      for (const { canonical } of deferredFlags)
+        fileDeletes.paths.add(canonical);
       for (const canonical of fileDeletes.paths)
         await enqueueDeleteIntentCore(exec, canonical);
       if (applySettings) {
@@ -2031,6 +2078,7 @@ export async function applyRestore(
         totals,
         finalizeEntries,
         fileDeletes,
+        deferredFlags,
         restoredPhotosMissing,
       };
     });
@@ -2041,6 +2089,7 @@ export async function applyRestore(
       totals,
       finalizeEntries,
       fileDeletes,
+      deferredFlags,
       restoredPhotosMissing,
     } = prepared;
     const committedPaths = new Set(
@@ -2052,7 +2101,6 @@ export async function applyRestore(
     for (const candidate of backgroundCandidates)
       committedBackgroundUids.add(candidate.uid);
     const remove = deps.deleteCanonicalPhoto ?? deletePhoto;
-    const exists = deps.canonicalPhotoExists ?? photoFileExists;
     let photosNeedingAttention = 0;
     let photoCleanupPending = 0;
     for (const journalEntry of finalizeEntries) {
@@ -2117,6 +2165,23 @@ export async function applyRestore(
         await executeDeleteIntentOwned(exec, canonical, remove, exists);
       } catch {
         photoCleanupPending += 1;
+      }
+    }
+    // D-28: the old owner's file is gone now; flag the lost photo. Guarded so
+    // it never lands on stale bytes or on a row that changed since commit.
+    for (const { target, canonical } of deferredFlags) {
+      try {
+        await withCanonicalPathLock(canonical, async () => {
+          if (exists(canonical)) return;
+          await inWriteTransaction(exec, async () => {
+            if ((await canonicalFor(exec, target)) !== canonical) return;
+            if ((await oldPhoto(exec, target)) !== null) return;
+            await writePhotoReference(exec, target, canonical);
+            await bumpDataRevisionCore(exec);
+          });
+        });
+      } catch {
+        // The row keeps no reference; it is already counted as missing.
       }
     }
     let scheduleResyncPending = false;

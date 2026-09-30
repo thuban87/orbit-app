@@ -984,7 +984,7 @@ it("an UNMARKED null on a newer row still removes the photo (unchanged meaning)"
 it("Replace-all back onto the source moves each marked row's local bytes to its new id-derived canonical (id reuse, D-26)", async () => {
   const { source, manifest } = await skippedPhotoSource();
   const result = await applyRestore(source, manifest, "replace-all");
-  // m-lost's local file was already gone: no photo, counted.
+  // m-lost's local file was already gone: flagged unavailable, counted (D-28).
   expect(result).toMatchObject({
     status: "applied",
     photosNeedingAttention: 0,
@@ -1001,7 +1001,13 @@ it("Replace-all back onto the source moves each marked row's local bytes to its 
   expect(marked.id).not.toBe(1);
   expect(marked.photo).toBe(`avatars/contact-${marked.id}.jpg`);
   expect(photo.files.get(marked.photo!)).toBe("QUFB");
-  expect(rows["m-lost"]?.photo).toBeNull();
+  // D-28: m-lost references its OWN new canonical, never its old path. It took
+  // a-bytes's old id 2, whose stale bytes were deleted before the flag landed,
+  // so nothing loads there and the profile shows "Photo unavailable".
+  const lost = rows["m-lost"]!;
+  expect(lost.id).toBe(2);
+  expect(lost.photo).toBe("avatars/contact-2.jpg");
+  expect(photo.files.has(lost.photo!)).toBe(false);
   // The pet photo followed its contact to the new canonical.
   expect(await profilePhoto(source)).toBe("avatars/profile.jpg");
   expect(photo.files.get("avatars/profile.jpg")).toBe("U0VMRg");
@@ -1015,7 +1021,7 @@ it("Replace-all back onto the source moves each marked row's local bytes to its 
   ].filter((value): value is string => value !== null);
   expect(new Set(references).size).toBe(references.length);
   for (const reference of references)
-    expect(photo.files.has(reference)).toBe(true);
+    if (reference !== lost.photo) expect(photo.files.has(reference)).toBe(true);
   expect(await journal(source)).toEqual([]);
   expect(
     [...photo.files.keys()].filter((path) =>
@@ -1163,4 +1169,71 @@ it("a Merge whose marked value arrives under another contact keeps this phone's 
   // z-marked itself is gone, so its own photo is still cleaned up.
   expect(intents).toContain("avatars/contact-1.jpg");
   expect(photo.files.has("avatars/contact-1.jpg")).toBe(false);
+});
+
+it("Replace-all flags every already-lost marked contact and custom photo at its own new canonical, never aliasing (D-28)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  // z-marked's own photo and pet photo are gone from this phone too.
+  photo.files.delete("avatars/contact-1.jpg");
+  photo.files.delete("avatars/cv-1-pet.jpg");
+  // Old m-lost (id 3) left a stale pet file behind; z-marked reuses id 3.
+  photo.files.set("avatars/cv-3-pet.jpg", "U1RBTEU");
+  const { recording, intents } = recordingDeleteIntents(source);
+  const result = await applyRestore(recording, manifest, "replace-all");
+  expect(result).toMatchObject({
+    status: "applied",
+    photosNeedingAttention: 0,
+    photoCleanupPending: 0,
+    restoredPhotosMissing: 3,
+  });
+  const rows = await photosByUid(source);
+  expect(rows["a-bytes"]).toMatchObject({
+    id: 1,
+    photo: "avatars/contact-1.jpg",
+  });
+  expect(photo.files.get("avatars/contact-1.jpg")).toBe("QkJC");
+  // m-lost took id 2: a-bytes's old bytes there were deleted first.
+  expect(rows["m-lost"]).toMatchObject({
+    id: 2,
+    photo: "avatars/contact-2.jpg",
+  });
+  expect(photo.files.has("avatars/contact-2.jpg")).toBe(false);
+  // z-marked took id 3: nothing was on disk, so no intent targeted the path.
+  expect(rows["z-marked"]).toMatchObject({
+    id: 3,
+    photo: "avatars/contact-3.jpg",
+  });
+  expect(photo.files.has("avatars/contact-3.jpg")).toBe(false);
+  expect(intents).not.toContain("avatars/contact-3.jpg");
+  // The pet value follows z-marked; the stale file was deleted first.
+  expect(await petValue(source)).toBe("avatars/cv-3-pet.jpg");
+  expect(photo.files.has("avatars/cv-3-pet.jpg")).toBe(false);
+  const references = [
+    ...Object.values(rows).map((row) => row.photo),
+    await petValue(source),
+  ].filter((value): value is string => value != null);
+  expect(new Set(references).size).toBe(references.length);
+  expect(await profilePhoto(source)).toBe("avatars/profile.jpg");
+  expect(photo.files.get("avatars/profile.jpg")).toBe("U0VMRg");
+  expect(await journal(source)).toEqual([]);
+});
+
+it("Replace-all never flags a lost photo onto another contact's leftover bytes (D-28)", async () => {
+  const { source, manifest } = await skippedPhotoSource();
+  // The stale file at m-lost's new canonical (a-bytes's old id 2) cannot be
+  // deleted: deletePhoto swallows the error and the file stays.
+  const result = await applyRestore(source, manifest, "replace-all", {
+    deleteCanonicalPhoto: (path) => {
+      if (path !== "avatars/contact-2.jpg") photo.files.delete(path);
+    },
+    canonicalPhotoExists: (path) => photo.files.has(path),
+  });
+  expect(result).toMatchObject({
+    status: "applied",
+    photoCleanupPending: 1,
+    restoredPhotosMissing: 1,
+  });
+  const rows = await photosByUid(source);
+  expect(rows["m-lost"]).toMatchObject({ id: 2, photo: null });
+  expect(photo.files.get("avatars/contact-2.jpg")).toBe("QkJC");
 });
