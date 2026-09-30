@@ -240,8 +240,10 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
 -   **[DECIDED · 2026-09-30] D-23 --- A missing photo file keeps its reference and is flagged (code review WR-01).**
     When the ownership layer finds a contact's (or self / custom-field) canonical photo file missing -- including
     `settleRowLocked` retiring a finalize row whose pending file is gone -- it must NOT clear the stored photo
-    reference. The reference stays; the Profile (and any surface showing that photo) shows a visible "photo
-    unavailable" error state, not a silent initials fallback. Rejected: clearing the reference so backups pass
+    reference. The reference stays; the Profile hero and the photo editor (Edit Contact / Settings self photo / custom
+    photo field) show a visible "Photo unavailable" state (existing warning icon + caption). Smaller photos (List, Grid,
+    pickers, Orrery, widget) keep plain initials (owner, 2026-09-30, M3a; an earlier wording of this entry said "any
+    surface", which overstated the owner's ruling). Rejected: clearing the reference so backups pass
     (owner: a unique photo must never be dropped from the record by an automatic path).
 -   **[DECIDED · 2026-09-30] D-24 --- Backups skip an unreadable photo instead of failing (code review WR-01).**
     Manual and automatic export no longer fail wholesale on one unreadable photo (`BackupPhotoUnreadableError`,
@@ -253,6 +255,15 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     choices; F-2 the Home assist banner ("Did you reach ...?"); F-3 Update from Contacts' "keep Orbit photo" option
     (Orbit photo beside the phone photo; header stays text). Not added: F-4 group-event participants / System builder
     chips (owner: already acceptable as-is), F-5 birthday-flag review and AI per-contact permission lists.
+-   **[DECIDED · 2026-09-30] D-26 --- A skipped photo is marked in the backup and never removes a photo on restore
+    (plan-check M1).** Rows exported with a skipped photo (D-24) carry an optional per-row marker (e.g.
+    `photoSkipped: true`) next to `photoBase64: null`. On restore -- Merge and Replace-all alike -- a marked row
+    leaves the local photo bytes and the local photo reference untouched (no delete intent, no reference clear); an
+    unmarked `photoBase64: null` keeps its existing meaning (the user removed the photo). New optional manifest key
+    approved by the owner; no `BACKUP_FORMAT_VERSION` bump (stays 7) and no migration -- if either turns out to be
+    required, stop and ask.
+-   **[DECIDED · 2026-09-30] D-27 --- Profile background images stay all-or-nothing in backups (plan-check M2).** An
+    unreadable profile background still fails the export as before; revisit only if it is ever seen.
 
 ### Engineering boundaries (recorded so planning cannot drift)
 
@@ -308,3 +319,5 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     with WebP bytes under `.jpg` names, superseding D-19's new-filename direction; imported photos stay thumbnails).
 -   **2026-09-30** --- Execution rulings D-23..D-25 (missing photo file keeps its reference and is flagged; backups skip
     unreadable photos with a count; F-1..F-3 photo surfaces added, F-4/F-5 not).
+-   **2026-09-30** --- Execution rulings D-26 (skip marker; restore never removes a photo for a skipped row), D-27
+    (backgrounds unchanged); D-23 wording narrowed to Profile hero + photo editor (owner M3a).
