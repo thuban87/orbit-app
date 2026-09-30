@@ -6,6 +6,7 @@ import {
   BackupPhotoUnreadableError,
 } from "@/backup/types";
 import { getPortableSettingsSnapshot } from "@/db/app-settings-dao";
+import { SAFE_RELATIVE } from "@/db/photo-relative-path";
 import { inReadSnapshot, type ReadOnlyExecutor } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 
@@ -240,6 +241,12 @@ async function readManifest(
   const values = await Promise.all(
     rawValues.map(async ({ fieldType, colName, contactId, value, ...row }) => {
       if (fieldType !== "photo" || value === null)
+        return { ...row, value, photoBase64: null };
+      // 38.6 D-31: text left in a photo field (a Text→Photo type change never
+      // rewrites values, §14) names no stored photo. It travels as its text
+      // value: not read, not skipped or counted, never a backup failure, and
+      // restore writes it back unchanged (the field keeps its error state).
+      if (typeof value !== "string" || !SAFE_RELATIVE.test(value))
         return { ...row, value, photoBase64: null };
       const bytes = await readPhotoOrSkip(value, deps.readPhotoBase64, counter);
       // A photo value always exports `value: null`; the marker is how restore

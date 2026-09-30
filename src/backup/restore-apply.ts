@@ -1168,6 +1168,16 @@ async function canonicalFor(
 function photoSkipped(row: Record<string, unknown>): boolean {
   return row.photoSkipped === true && typeof row.photoBase64 !== "string";
 }
+/**
+ * 38.6 D-31: a photo-field value that is text, not a stored photo path (text
+ * left after a Text→Photo type change). The backup carries it as its `value`
+ * with `photoBase64: null` and no marker. It is not a photo removal: the upsert
+ * writes the text back unchanged and no reference clear follows. A path-shaped
+ * value never qualifies, so a wire row can never plant another row's path.
+ */
+function photoFieldText(row: Record<string, unknown>): boolean {
+  return typeof row.value === "string" && !SAFE_RELATIVE.test(row.value);
+}
 /** A row's current local photo reference, by its uid alone (review IN2-01). */
 async function localReferenceOf(
   exec: SqlExecutor,
@@ -1397,7 +1407,8 @@ async function planPhotoCandidates(
         a.kind === "delete" ||
         ((a.kind === "insert" || a.kind === "update") &&
           photoPresent &&
-          a.row.photoBase64 === null)
+          a.row.photoBase64 === null &&
+          !photoFieldText(a.row))
       ) {
         const existing = await oldPhoto(exec, target);
         if (existing && SAFE_RELATIVE.test(existing))

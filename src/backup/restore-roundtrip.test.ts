@@ -78,6 +78,7 @@ import { readDataRevision } from "@/db/data-revision-dao";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import { completeGlobalPairsCore } from "@/db/pair-matrix";
+import { assertSafeRelative } from "@/db/photo-relative-path";
 import { purgeContact } from "@/db/purge-dao";
 import { insertFinalizeEntryCore } from "@/db/restore-photo-journal-dao";
 import { snoozeContact } from "@/db/snooze-dao";
@@ -1433,4 +1434,71 @@ it("Replace-all never flags a lost photo at a path whose interrupted swap the la
     id: 2,
     photo: null,
   });
+});
+
+/*
+ * 38.6 D-31 (review WR3-03): text left in a photo field (a Text→Photo type
+ * change never rewrites values) is backed up as its text and restored as-is.
+ */
+async function textInPhotoFieldSource() {
+  photo.files.clear();
+  const source = await db();
+  await contact(source, "rex-owner");
+  await source.runAsync(
+    "INSERT INTO custom_field_defs(uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES('pet-def','pet','Pet','photo',0,0,0,0,'global',?,?)",
+    [NOW, NOW],
+  );
+  await source.runAsync(
+    "INSERT INTO custom_field_values(uid,contact_id,field_def_id,value,created_at,modified_at) VALUES('pet-value',(SELECT id FROM contacts WHERE uid='rex-owner'),(SELECT id FROM custom_field_defs WHERE uid='pet-def'),'Rex',?,?)",
+    [NOW, NOW],
+  );
+  await completeGlobalPairsCore(source);
+  const report = await buildExportReport(source, {
+    exportedAt: NOW,
+    // The production reader's path assertion rejects "Rex" (never reached).
+    readPhotoBase64: async (relative) => {
+      assertSafeRelative(relative);
+      return photo.files.get(relative) ?? "";
+    },
+  });
+  const manifest = parseBackupManifest(
+    JSON.parse(JSON.stringify(report.manifest)),
+  );
+  return { source, manifest, skippedPhotos: report.skippedPhotos };
+}
+
+it.each(["merge", "replace-all"] as const)(
+  "restores text left in a photo field unchanged onto a fresh phone in %s (D-31)",
+  async (mode) => {
+    const { manifest, skippedPhotos } = await textInPhotoFieldSource();
+    expect(skippedPhotos).toBe(0);
+    const destination = await db();
+    expect(await applyRestore(destination, manifest, mode)).toMatchObject({
+      status: "applied",
+      restoredPhotosMissing: 0,
+    });
+    expect(await petValue(destination)).toBe("Rex");
+  },
+);
+
+it("a Merge of newer text over a local photo in that field writes the text back, never a cleared value (D-31)", async () => {
+  const { source, manifest } = await textInPhotoFieldSource();
+  // On this phone the value is an older real photo.
+  const owner = (await photosByUid(source))["rex-owner"]!;
+  const local = `avatars/cv-${owner.id}-pet.jpg`;
+  await source.runAsync("UPDATE custom_field_values SET value=? WHERE uid=?", [
+    local,
+    "pet-value",
+  ]);
+  photo.files.set(local, "UEVU");
+  const result = await applyRestore(source, newer(manifest), "merge");
+  expect(result).toMatchObject({
+    status: "applied",
+    photoCleanupPending: 0,
+    restoredPhotosMissing: 0,
+  });
+  expect(await petValue(source)).toBe("Rex");
+  // The newer text replaced the photo, so its unreferenced file is cleaned up.
+  expect(photo.files.has(local)).toBe(false);
+  expect(await journal(source)).toEqual([]);
 });

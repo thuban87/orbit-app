@@ -19,6 +19,7 @@ import {
   dissolveGroupEvent,
 } from "@/db/group-events-dao";
 import { runMigrations } from "@/db/migrations/runner";
+import { assertSafeRelative } from "@/db/photo-relative-path";
 
 const NOW = "2026-08-25 12:00:00";
 
@@ -663,6 +664,42 @@ describe("buildExportManifest", () => {
     expect(report.skippedPhotos).toBe(0);
     expect(report.manifest.contacts[0]?.photoBase64).toBeNull();
     expect(report.manifest.contacts[0]).not.toHaveProperty("photoSkipped");
+  });
+
+  it("exports text left in a photo field as its text value, never reading, skipping or failing it (D-31)", async () => {
+    const exec = await photoDb();
+    await addContact(exec, "contact-a", null);
+    await exec.runAsync(
+      "INSERT INTO custom_field_defs(uid,col_name,label,type,show_on_new,always_show,display_order,share_with_ai,scope,created_at,modified_at) VALUES('pet-def','pet','Pet','photo',0,0,0,0,'global',?,?)",
+      [NOW, NOW],
+    );
+    // "Rex" was typed while Pet was a text field; the Text→Photo change kept it.
+    await exec.runAsync(
+      "INSERT INTO custom_field_values(uid,contact_id,field_def_id,value,created_at,modified_at) VALUES('pet-value',(SELECT id FROM contacts WHERE uid='contact-a'),(SELECT id FROM custom_field_defs WHERE uid='pet-def'),'Rex',?,?)",
+      [NOW, NOW],
+    );
+    const report = await buildExportReport(exec, {
+      exportedAt: NOW,
+      // The production reader's path assertion: "Rex" names no stored photo.
+      readPhotoBase64: async (relative) => {
+        assertSafeRelative(relative);
+        return "AQID";
+      },
+    });
+    expect(report.skippedPhotos).toBe(0);
+    const [value] = report.manifest.customFieldValues;
+    expect(value).toMatchObject({
+      uid: "pet-value",
+      value: "Rex",
+      photoBase64: null,
+    });
+    expect(value).not.toHaveProperty("photoSkipped");
+    expect(report.manifest.backupFormatVersion).toBe(7);
+    // The backup schema accepts a text value on a photo-type field.
+    expect(
+      parseBackupManifest(JSON.parse(JSON.stringify(report.manifest)))
+        .customFieldValues[0],
+    ).toMatchObject({ value: "Rex", photoBase64: null });
   });
 
   it("buildExportManifest returns the report's manifest", async () => {
