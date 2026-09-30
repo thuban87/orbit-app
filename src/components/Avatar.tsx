@@ -37,8 +37,6 @@ interface AvatarProps {
   contactId?: number | string;
   /** Rendered diameter; the circle is `borderRadius: size / 2`. */
   size: number;
-  /** Unused since 38.6-01 (the display revision replaced it); 38.6-03 removes it with every consumer. */
-  cacheBust?: string | number;
 }
 
 export function Avatar({ photo, name, contactId, size }: AvatarProps) {

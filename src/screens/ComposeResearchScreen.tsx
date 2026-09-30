@@ -166,7 +166,6 @@ export function ComposeResearchScreen({
                 photo={header.photo}
                 name={header.name}
                 contactId={contactId}
-                cacheBust={header.modified_at}
                 size={48}
               />
               <AppText role="heading" accessibilityRole="header">

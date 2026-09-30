@@ -90,7 +90,6 @@ export function OrreryContactsSheet({
               photo={member.photo}
               name={member.name}
               contactId={member.uid}
-              cacheBust={scene?.dataRevision}
               size={44}
             />
             <AppText>{member.name}</AppText>

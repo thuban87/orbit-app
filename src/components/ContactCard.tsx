@@ -8,8 +8,9 @@
  * (threat T-08-10).
  *
  * LOCKED content contract (08-UI-SPEC § Card Content Contract): Avatar
- * (recyclingKey=contactId + cacheBust=modified_at — an anti-face-flash CORRECTNESS
- * requirement in the recycling FlatList, NOT an optimization), a status ring
+ * (recyclingKey=contactId + the canonical path's display revision — an
+ * anti-face-flash CORRECTNESS requirement in the recycling FlatList, NOT an
+ * optimization; the revision lives in `photo-display`, 38.6 D-01), a status ring
  * coloured + weighted by the band, the name (one line), the ranked fuel line OR a
  * fuel-match snippet, a category label (hidden when null), and a favourite marker.
  *
@@ -55,8 +56,6 @@ export interface ContactCardProps {
   name: string;
   /** Stored RELATIVE photo path, or null for the themed initials fallback. */
   photo: string | null;
-  /** The contact's `modified_at` — Avatar's cross-session cache-bust discriminator. */
-  modifiedAt: string | undefined;
   /** Query-time status (null for a never-contacted contact — renders neutral). */
   status: ProfileStatus | null;
   /** Single-select category label, or null when the contact has no category. */
@@ -96,7 +95,6 @@ export function ContactCard({
   contactId,
   name,
   photo,
-  modifiedAt,
   status,
   categoryLabel,
   isFavourite,
@@ -124,13 +122,7 @@ export function ContactCard({
       ]}
     >
       <View style={styles.avatarWrap}>
-        <Avatar
-          photo={photo}
-          name={name}
-          contactId={contactId}
-          size={48}
-          cacheBust={modifiedAt}
-        />
+        <Avatar photo={photo} name={name} contactId={contactId} size={48} />
         {/* Status ring — real colour + escalating weight (OD-1 retired). */}
         <View
           testID={`dashboard-card-status-${contactId}`}

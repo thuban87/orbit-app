@@ -41,9 +41,9 @@
  *     setTimeout — NEVER a per-frame React-state animation (CLAUDE.md). The timer
  *     is cleared on unmount and cancelled the moment the note affordance is touched.
  *   - Every colour resolves through `useTheme().colors.*` — zero hex literals
- *     (CLAUDE.md / check:colors). `Avatar` is used verbatim (size 64,
- *     cacheBust=modified_at) — its recyclingKey anti-face-flash is a correctness
- *     requirement in the recycling grid.
+ *     (CLAUDE.md / check:colors). `Avatar` is used verbatim (size 64) — its
+ *     recyclingKey anti-face-flash is a correctness requirement in the recycling
+ *     grid; photo freshness comes from the display revision (38.6 D-01).
  * =============================================================================
  */
 import { useFocusEffect } from "@react-navigation/native";
@@ -715,7 +715,6 @@ export function CaptureScreen(_props: RootStackScreenProps<"Capture">) {
             photo={row.photo}
             name={row.name}
             contactId={row.id}
-            cacheBust={row.modified_at}
             size={64}
           />
           {isSelected ? (

@@ -67,7 +67,6 @@ const baseProps = {
   contactId: 7,
   name: "Alex",
   photo: null,
-  modifiedAt: "2026-09-20 12:00:00",
   categoryLabel: null,
   lastContact: "2026-09-19 12:00:00",
   snoozeUntil: null,

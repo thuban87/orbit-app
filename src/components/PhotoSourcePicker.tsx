@@ -74,8 +74,6 @@ interface PhotoSourcePickerProps {
   photo: string | null;
   /** Display name — seeds the preview Avatar's initials/swatch fallback. */
   name: string;
-  /** Forwarded to the inner `<Avatar cacheBust>` so a same-path replace refreshes. */
-  cacheBust?: string | number;
   /** Refresh callback the contact/profile targets fire after their inline DAO write. */
   onChanged?: () => void;
   /** The customField target clears its form value on Remove via this callback. */
@@ -105,7 +103,6 @@ export function PhotoSourcePicker({
   target,
   photo,
   name,
-  cacheBust,
   onChanged,
   onValueChange,
 }: PhotoSourcePickerProps) {
@@ -308,7 +305,6 @@ export function PhotoSourcePicker({
         photo={photo}
         name={name}
         contactId={avatarId}
-        cacheBust={cacheBust}
         size={PREVIEW_SIZE}
       />
 

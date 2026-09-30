@@ -81,7 +81,6 @@ export interface GridCardProps {
   contactId: number;
   name: string;
   photo: string | null;
-  modifiedAt: string;
   categoryLabel: string | null;
   lastContact: string | null;
   snoozeUntil: string | null;
@@ -117,7 +116,6 @@ export function GridCard({
   contactId,
   name,
   photo,
-  modifiedAt,
   categoryLabel,
   lastContact,
   snoozeUntil,
@@ -308,7 +306,6 @@ export function GridCard({
                     name={name}
                     contactId={contactId}
                     size={AVATAR_SIZE}
-                    cacheBust={modifiedAt}
                   />
                   {displayState !== null ? (
                     <View

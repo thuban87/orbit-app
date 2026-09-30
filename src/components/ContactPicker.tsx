@@ -277,7 +277,6 @@ export function ContactPicker(props: ContactPickerProps) {
                       photo={item.photo}
                       name={item.name}
                       size={40}
-                      cacheBust={item.modified_at}
                       contactId={`picker-${item.id}`}
                     />
                     <View style={styles.rowCopy}>

@@ -120,7 +120,6 @@ export function CardGrid({
             contactId={item.id}
             name={item.name}
             photo={item.photo}
-            modifiedAt={item.modified_at}
             categoryLabel={item.categoryLabel}
             lastContact={item.last_contact}
             snoozeUntil={item.snooze_until}

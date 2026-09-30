@@ -35,7 +35,6 @@ export interface ProfileIdentity {
   name: string;
   categoryName: string | null;
   photo: string | null;
-  photoCacheBust: string;
   favouriteRank: number | null;
   archivedAt: string | null;
   trackingEnabled: number;
@@ -166,7 +165,6 @@ export function readProfileSnapshot(
         name: header.name,
         categoryName: category?.name ?? null,
         photo: header.photo,
-        photoCacheBust: header.modified_at,
         favouriteRank: header.favourite_rank,
         archivedAt: header.archived_at,
         trackingEnabled: header.trackingEnabled,

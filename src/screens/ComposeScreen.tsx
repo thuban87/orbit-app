@@ -1251,7 +1251,6 @@ export function ComposeScreen({
           photo={header.photo}
           name={header.name}
           contactId={contactId}
-          cacheBust={header.modified_at}
           size={64}
         />
         <ChromeScrim style={styles.nameScrim} radius={RADII.sm}>

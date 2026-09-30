@@ -196,9 +196,6 @@ export function SettingsAppearanceScreen() {
   // initials avatar deterministic ("Y") until a self-name editor sets it.
   const [selfPhoto, setSelfPhoto] = useState<string | null>(null);
   const [selfName, setSelfName] = useState<string | null>(null);
-  const [selfModifiedAt, setSelfModifiedAt] = useState<string | undefined>(
-    undefined,
-  );
 
   // "Orbit Appearance" / Orbit Center (migrated from the monolith's "Your
   // orbit" group). `selfSunColour` is the raw stored self-star hex or NULL; NULL
@@ -256,7 +253,6 @@ export function SettingsAppearanceScreen() {
       setSelfName(profile?.name ?? null);
       setSelfNameDraft(profile?.name ?? "");
       lastCommittedNameRef.current = profile?.name ?? null;
-      setSelfModifiedAt(profile?.modified_at);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to load self profile", err);
     }
@@ -881,7 +877,6 @@ export function SettingsAppearanceScreen() {
               target={{ kind: "profile" }}
               photo={selfPhoto}
               name={selfName ?? "You"}
-              cacheBust={selfModifiedAt}
               onChanged={() => void reloadProfile()}
             />
           </View>

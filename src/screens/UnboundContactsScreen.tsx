@@ -251,7 +251,6 @@ export function UnboundContactsScreen({
                         photo={item.photo}
                         name={item.name}
                         contactId={item.id}
-                        cacheBust={item.modified_at}
                         size={40}
                       />
                       <View style={styles.rowText}>

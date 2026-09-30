@@ -439,7 +439,6 @@ export function EditContactScreen({
   // buildEditInput/updateContactFull clean AND lets the focus re-read update only
   // the photo without reseeding — and discarding — unsaved form edits.
   const [photo, setPhoto] = useState<string | null>(null);
-  const [photoModifiedAt, setPhotoModifiedAt] = useState<string | undefined>();
   const formRef = useRef<EditFormState | null>(null);
   const linksDraftRef = useRef<LinkDraft[]>([]);
   // The custom-field values actually COMMITTED to the DB — seeded pre-edit, and
@@ -616,7 +615,6 @@ export function EditContactScreen({
       // The committed baseline for orphan cleanup: the pre-edit custom values.
       committedValuesRef.current = { ...result.values };
       setPhoto(result.contact.photo);
-      setPhotoModifiedAt(result.contact.modified_at);
       setSeededLinks(result.links);
       setLinksDraft(toLinkDrafts(result.links));
     } catch (err) {
@@ -630,9 +628,10 @@ export function EditContactScreen({
     void requestInitialCategories();
   }, [load, requestInitialCategories]);
 
-  // LIGHT photo-only re-read: refresh ONLY the photo + its cache-bust token, never
-  // the form. Wired to `useFocusEffect` so returning from CropPhotoScreen (which
-  // writes setContactPhoto then goBack()s) updates the edit-surface avatar WITHOUT
+  // LIGHT photo-only re-read: refresh ONLY the photo path, never the form (the
+  // Avatar's display revision is published by the ownership layer, 38.6 D-01).
+  // Wired to `useFocusEffect` so returning from CropPhotoScreen (which writes
+  // setContactPhoto then goBack()s) updates the edit-surface avatar WITHOUT
   // calling load() — reseeding `form` would DISCARD the user's unsaved name/phone/
   // etc. edits. Also fired by the picker's `onChanged` (its Remove branch writes
   // the DAO inline).
@@ -640,7 +639,6 @@ export function EditContactScreen({
     try {
       const row = await getContactHeader(getExecutor(), contactId);
       setPhoto(row?.photo ?? null);
-      setPhotoModifiedAt(row?.modified_at);
     } catch (err) {
       Logger.error(LOG_SCOPE, "failed to refresh photo", err);
     }
@@ -1194,7 +1192,6 @@ export function EditContactScreen({
             target={{ kind: "contact", contactId }}
             photo={photo}
             name={form.name}
-            cacheBust={photoModifiedAt}
             onChanged={refreshPhoto}
           />
         </View>

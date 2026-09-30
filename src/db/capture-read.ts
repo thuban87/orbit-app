@@ -30,8 +30,9 @@ import type { SqlExecutor } from "@/db/types";
 
 /**
  * One row of the capture picker grid. `last_captured` is the contact's most
- * recent `fuel.created_at` (NULL when never captured) and drives the MRU band;
- * `modified_at` is the Avatar `cacheBust` key.
+ * recent `fuel.created_at` (NULL when never captured) and drives the MRU band.
+ * `modified_at` is the row timestamp only (Avatar freshness comes from the
+ * display revision, 38.6 D-01).
  */
 export interface CapturePickRow {
   id: number;

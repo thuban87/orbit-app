@@ -125,7 +125,6 @@ export interface ListRowProps {
   contactId: number;
   name: string;
   photo: string | null;
-  modifiedAt: string;
   categoryLabel: string | null;
   lastContact: string | null;
   snoozeUntil: string | null;
@@ -156,7 +155,6 @@ export function ListRow({
   contactId,
   name,
   photo,
-  modifiedAt,
   categoryLabel,
   lastContact,
   snoozeUntil,
@@ -266,7 +264,6 @@ export function ListRow({
               name={name}
               contactId={contactId}
               size={SPACING["2xl"]}
-              cacheBust={modifiedAt}
             />
             <View style={styles.content}>
               <Text

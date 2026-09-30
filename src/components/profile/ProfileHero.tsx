@@ -57,7 +57,6 @@ export function ProfileHero({
         photo={identity.photo}
         name={identity.name}
         contactId={identity.id}
-        cacheBust={identity.photoCacheBust}
         size={112}
       />
       <View style={styles.identity}>

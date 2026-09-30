@@ -76,10 +76,8 @@ export function getContactHeader(
   /** Stored RELATIVE photo path (`avatars/…`), or null — the Avatar `photo` prop. */
   photo: string | null;
   /**
-   * Second-resolution row timestamp — the cross-session cache-bust token the
-   * profile passes to `<Avatar cacheBust={…}>`. The sub-second collision (two
-   * replaces in one wall-clock second) is closed separately by the per-write
-   * revision in `photo-cache-bust-store`.
+   * Second-resolution row timestamp. Not a photo identity: Avatar freshness comes
+   * from the ownership layer's display revision (`photo-display`, 38.6 D-01).
    */
   modified_at: string;
   /**
