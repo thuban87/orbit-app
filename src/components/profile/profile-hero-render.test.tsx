@@ -67,11 +67,18 @@ const identity: ProfileIdentity = {
 
 const onOpenPhoto = vi.fn();
 
-function render(overrides: Partial<ProfileIdentity> = {}) {
+const onPhotoLoadErrorChange = vi.fn();
+
+function render(
+  overrides: Partial<ProfileIdentity> = {},
+  photoOpenable?: boolean,
+) {
   return all(
     resolve(
       ProfileHero({
         identity: { ...identity, ...overrides },
+        photoOpenable,
+        onPhotoLoadErrorChange,
         actionableMethods: { phone: null, email: null },
         messageContext: { archived: false, settingsHosted: false },
         onOpenPhoto,
@@ -121,6 +128,8 @@ describe("ProfileHero photo entry", () => {
     );
     expect(opener?.type).toBe("Pressable");
     expect(opener?.props.accessibilityRole).toBe("button");
+    expect(opener?.props.importantForAccessibility).toBe("auto");
+    expect(opener?.props.disabled).toBe(false);
     expect(opener?.children.map((child) => child.type)).toEqual(["Avatar"]);
     const press = opener?.props.onPress as () => void;
     press();
@@ -136,5 +145,32 @@ describe("ProfileHero photo entry", () => {
     ).toBe(false);
     const avatar = nodes.find((node) => node.type === "Avatar");
     expect(avatar?.props.photo).toBe(null);
+  });
+
+  it("forwards the Avatar's load state to the screen", () => {
+    const avatar = render().find((node) => node.type === "Avatar");
+    expect(avatar?.props.onLoadErrorChange).toBe(onPhotoLoadErrorChange);
+  });
+
+  it("is no lightbox entry while the photo fails to load (WR-06)", () => {
+    const nodes = render({}, false);
+    expect(
+      nodes.some((node) =>
+        String(node.props.accessibilityLabel ?? "").startsWith("View photo"),
+      ),
+    ).toBe(false);
+    // Same wrapper (the Avatar is not remounted), but inert and not focusable.
+    const root = nodes.find((node) => node.props.testID === "profile-hero");
+    const wrapper = root?.children[0];
+    expect(wrapper?.type).toBe("Pressable");
+    expect(wrapper?.children[0]?.type).toBe("Avatar");
+    expect(wrapper?.props.disabled).toBe(true);
+    expect(wrapper?.props.accessible).toBe(false);
+    // Out of the a11y tree (TalkBack reads the initials Avatar), and no stale
+    // "View photo" description left on the native view.
+    expect(wrapper?.props.importantForAccessibility).toBe("no");
+    expect(wrapper?.props.accessibilityLabel).toBe("");
+    expect(wrapper?.props.accessibilityRole).toBeUndefined();
+    expect(wrapper?.props.onPress).toBeUndefined();
   });
 });

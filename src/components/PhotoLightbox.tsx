@@ -22,7 +22,7 @@
  * a path, so every hook runs unconditionally above the single null return.
  */
 import { Image } from "expo-image";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
   findNodeHandle,
@@ -45,6 +45,7 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Avatar } from "@/components/Avatar";
 import { Icon } from "@/components/icons/Icon";
 import { usePhotoDisplay } from "@/components/photo-display";
 import {
@@ -89,6 +90,8 @@ export function PhotoLightbox({
   const { colors } = useTheme();
   const reducedMotion = useReducedMotionShared();
   const closeRef = useRef<View>(null);
+  // WR-06: the photo failed to load — show the initials, never a blank scrim.
+  const [failed, setFailed] = useState(false);
 
   const scale = useSharedValue(1);
   const tx = useSharedValue(0);
@@ -107,6 +110,12 @@ export function PhotoLightbox({
     dismissY.value = 0;
     startScale.value = 1;
   }, [visible, scale, tx, ty, dismissY, startScale]);
+
+  // Each open, photo or display revision retries the image.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset keyed on open+identity+revision
+  useEffect(() => {
+    setFailed(false);
+  }, [visible, photo, display?.revision]);
 
   // TalkBack focus lands on the ✕ when the lightbox opens (overlay-base idiom).
   useEffect(() => {
@@ -252,13 +261,18 @@ export function PhotoLightbox({
             <GestureDetector gesture={gesture}>
               <View collapsable={false} style={styles.stage}>
                 <Animated.View style={imageStyle}>
-                  <Image
-                    source={display.source}
-                    cachePolicy={display.cachePolicy}
-                    contentFit="contain"
-                    accessibilityLabel={`Photo of ${name}`}
-                    style={{ width: side, height: side }}
-                  />
+                  {failed ? (
+                    <Avatar photo={null} name={name} size={side} />
+                  ) : (
+                    <Image
+                      source={display.source}
+                      cachePolicy={display.cachePolicy}
+                      contentFit="contain"
+                      accessibilityLabel={`Photo of ${name}`}
+                      onError={() => setFailed(true)}
+                      style={{ width: side, height: side }}
+                    />
+                  )}
                 </Animated.View>
               </View>
             </GestureDetector>

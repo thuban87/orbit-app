@@ -18,6 +18,8 @@ export function ProfileHero({
   identity,
   actionableMethods,
   messageContext,
+  photoOpenable = true,
+  onPhotoLoadErrorChange,
   onOpenPhoto,
   onMessage,
   onCall,
@@ -29,7 +31,15 @@ export function ProfileHero({
    * Message still renders — disabled, with its reason caption — never hidden.
    */
   messageContext: ProfileHeroMessageContext;
-  /** Opens the photo lightbox (38.6 D-03/D-15); only reachable with a photo. */
+  /**
+   * False while the photo fails to load (the Avatar shows initials): the photo
+   * is then not a lightbox entry, so a tap never opens a blank lightbox
+   * (38.6 review WR-06). Driven by `onPhotoLoadErrorChange`.
+   */
+  photoOpenable?: boolean;
+  /** Forwarded to the hero Avatar's `onLoadErrorChange`. */
+  onPhotoLoadErrorChange?: (errored: boolean) => void;
+  /** Opens the photo lightbox (38.6 D-03/D-15); only reachable with a loadable photo. */
   onOpenPhoto: () => void;
   onMessage: () => void;
   onCall: () => void;
@@ -38,16 +48,29 @@ export function ProfileHero({
   return (
     <View testID="profile-hero" style={styles.root}>
       {identity.photo != null ? (
+        // WR-06: the same wrapper whether or not the photo loads, so the Avatar
+        // is never remounted (a remount would reset its load error and flip
+        // back). Unloadable, it is inert and TalkBack reads the initials.
         <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`View photo of ${identity.name}`}
-          onPress={onOpenPhoto}
+          accessible={photoOpenable}
+          // Unloadable: out of the accessibility tree, so TalkBack reads the
+          // initials Avatar alone (no "View photo", no "disabled" wrapper).
+          importantForAccessibility={photoOpenable ? "auto" : "no"}
+          accessibilityRole={photoOpenable ? "button" : undefined}
+          // An explicit "": an omitted label left the native view's old
+          // "View photo" description in place on device.
+          accessibilityLabel={
+            photoOpenable ? `View photo of ${identity.name}` : ""
+          }
+          disabled={!photoOpenable}
+          onPress={photoOpenable ? onOpenPhoto : undefined}
         >
           <Avatar
             photo={identity.photo}
             name={identity.name}
             contactId={identity.id}
             size={PROFILE_HERO_AVATAR_SIZE}
+            onLoadErrorChange={onPhotoLoadErrorChange}
           />
         </Pressable>
       ) : (

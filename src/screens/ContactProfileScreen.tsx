@@ -185,6 +185,8 @@ export function ContactProfileScreen({
   const [bindIntervalValid, setBindIntervalValid] = useState(false);
   const [transitioning, setTransitioning] = useState(false);
   const [reachOutOpen, setReachOutOpen] = useState(false);
+  // WR-06: the hero photo failed to load (initials showing) — no lightbox entry.
+  const [heroPhotoFailed, setHeroPhotoFailed] = useState(false);
   const [assistEnabled, setAssistEnabled] = useState(false);
   // 38.3 RG-021 (D-10): History actions scroll this ScrollView to the
   // in-Profile History section — instant under reduced motion.
@@ -590,6 +592,8 @@ export function ContactProfileScreen({
                   archived: snapshot.identity.archivedAt !== null,
                   settingsHosted: host === "settings",
                 }}
+                photoOpenable={!heroPhotoFailed}
+                onPhotoLoadErrorChange={setHeroPhotoFailed}
                 onOpenPhoto={() => setOverlay("photo")}
                 onMessage={() =>
                   navigation.navigate("Compose", {

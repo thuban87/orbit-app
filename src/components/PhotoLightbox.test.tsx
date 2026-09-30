@@ -17,6 +17,9 @@ import { LIGHTBOX_SCRIM_OPACITY } from "./photo-lightbox-logic";
 const hooks = vi.hoisted(() => ({
   log: [] as string[],
   focus: vi.fn(),
+  /** The value every useState returns (the lightbox's one state: `failed`). */
+  state: undefined as unknown,
+  setState: [] as unknown[],
 }));
 
 vi.mock("react", async (original) => ({
@@ -39,7 +42,12 @@ vi.mock("react", async (original) => ({
   },
   useState: (value: unknown) => {
     hooks.log.push("useState");
-    return [value, () => {}];
+    return [
+      hooks.state === undefined ? value : hooks.state,
+      (next: unknown) => {
+        hooks.setState.push(next);
+      },
+    ];
   },
 }));
 vi.mock("react-native", () => ({
@@ -109,6 +117,7 @@ vi.mock("react-native-safe-area-context", () => ({
 }));
 vi.mock("expo-image", () => ({ Image: "Image" }));
 vi.mock("@/components/icons/Icon", () => ({ Icon: "Icon" }));
+vi.mock("@/components/Avatar", () => ({ Avatar: "Avatar" }));
 vi.mock("@/components/photo-display", () => ({
   usePhotoDisplay: (relative: string | null) => {
     hooks.log.push("usePhotoDisplay");
@@ -181,6 +190,8 @@ function render(props: PhotoLightboxProps) {
 beforeEach(() => {
   onClose.mockReset();
   hooks.focus.mockReset();
+  hooks.state = undefined;
+  hooks.setState.length = 0;
 });
 
 describe("PhotoLightbox", () => {
@@ -274,5 +285,33 @@ describe("PhotoLightbox", () => {
       width: 400,
       height: 400,
     });
+  });
+
+  it("falls back to the initials, never a blank scrim, when the photo fails (WR-06)", () => {
+    const image = render(base).nodes.find((node) => node.type === "Image");
+    hooks.setState.length = 0;
+    const onError = image?.props.onError as () => void;
+    onError();
+    expect(hooks.setState).toEqual([true]);
+
+    hooks.state = true;
+    const nodes = render(base).nodes;
+    expect(nodes.some((node) => node.type === "Image")).toBe(false);
+    const avatar = nodes.find((node) => node.type === "Avatar");
+    expect(avatar?.props).toMatchObject({
+      photo: null,
+      name: "Alex",
+      size: 400,
+    });
+    // The ✕ is still there to close it.
+    expect(
+      nodes.some((node) => node.props.accessibilityLabel === "Close photo"),
+    ).toBe(true);
+  });
+
+  it("retries the image on every open (the failure resets)", () => {
+    hooks.state = true;
+    render(base);
+    expect(hooks.setState).toContain(false);
   });
 });

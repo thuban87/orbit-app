@@ -22,7 +22,7 @@
  * All colours resolve through `useTheme().colors.*` — no hex/hsl (check:colors).
  */
 import { Image } from "expo-image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { getInitials, swatchIndex } from "@/components/avatar-initials";
 import { usePhotoDisplay } from "@/components/photo-display";
@@ -37,9 +37,22 @@ interface AvatarProps {
   contactId?: number | string;
   /** Rendered diameter; the circle is `borderRadius: size / 2`. */
   size: number;
+  /**
+   * Told whether the photo currently fails to load (true after `onError`, false
+   * again once a new photo or revision retries it). Lets a parent drop a
+   * photo-only affordance — e.g. the Profile lightbox entry (38.6 review WR-06)
+   * — while the initials are showing.
+   */
+  onLoadErrorChange?: (errored: boolean) => void;
 }
 
-export function Avatar({ photo, name, contactId, size }: AvatarProps) {
+export function Avatar({
+  photo,
+  name,
+  contactId,
+  size,
+  onLoadErrorChange,
+}: AvatarProps) {
   const { colors } = useTheme();
   // Display source for THIS canonical photo: the per-write revision rides in the
   // URI (or a cacheKey bump with caching off), with an in-memory-only cache.
@@ -52,6 +65,13 @@ export function Avatar({ photo, name, contactId, size }: AvatarProps) {
   useEffect(() => {
     setErrored(false);
   }, [photo, display?.revision]);
+
+  // Report the load state; a ref keeps an inline parent callback from re-firing.
+  const onLoadErrorChangeRef = useRef(onLoadErrorChange);
+  onLoadErrorChangeRef.current = onLoadErrorChange;
+  useEffect(() => {
+    onLoadErrorChangeRef.current?.(errored);
+  }, [errored]);
 
   if (display && !errored) {
     return (
