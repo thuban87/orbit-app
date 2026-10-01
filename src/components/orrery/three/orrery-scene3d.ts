@@ -6,9 +6,15 @@
  * packet inside its own requestAnimationFrame loop.
  *
  * Coordinates: orrery (x, y) → three (X = x, Y = up, Z = y). The camera comes
- * from `orreryCameraRig`, which reproduces `projectWorldPoint` exactly, so the
- * published UI-thread frame (hits, labels, focus card, reorder) matches what
- * is drawn here.
+ * from `orreryCameraRig`: a REAL perspective camera (fixed ~50° FOV, dolly
+ * distance F/zoom, default tilt ~62°; see LAB_FOCAL_PX in orrery-camera-logic).
+ * The UI thread projects with the same pinhole math, so the published frame
+ * (hits, labels, focus card, reorder) lands on what is drawn here.
+ *
+ * Depth cues: sun = point light (lit side / terminator on spheres AND on the
+ * photo billboards via a per-instance view-space sun vector), range fog to the
+ * background token (far side hazier), a star SPHERE around the camera (parallax
+ * under yaw/tilt), additive sun glow, rings as thin strips lying in the plane.
  *
  * Layers:
  *   1. starfield    — 2k instanced sprites in a slab under the plane (additive)
@@ -34,6 +40,8 @@ import {
   instancedBufferAttribute,
   instancedDynamicBufferAttribute,
   materialColor,
+  normalView,
+  positionView,
   positionGeometry,
   select,
   texture,
@@ -65,29 +73,37 @@ import {
 // --- Tunables -------------------------------------------------------------------
 /** Max bodies (contacts + sun + satellites) per frame. */
 export const MAX_BODIES = 640;
-const STAR_COUNT = 2000;
-/** Star dome radius in focal distances. */
-/** Slab radius in view heights (at the current zoom); depth range below the plane in slab radii. */
-const STAR_FIELD_RADIUS = 1.6;
-/** 1 = stars locked to the pivot (skybox), 0 = locked to the plane. */
-const STAR_PARALLAX = 0.85;
-const STAR_DEPTH_MIN = 0.04;
-const STAR_DEPTH_MAX = 0.45;
+const STAR_COUNT = 2600;
+/** Star sphere radius in dolly distances (camera far plane is 40×). */
+const STAR_SPHERE_RADIUS = 20;
+/** Fog: starts at this fraction of the dolly distance, ends past the far rim. */
+const FOG_NEAR_FRACTION = 0.8;
+const FOG_FAR_EXTENTS = 1.9;
 const STAR_PX_MIN = 1.6;
 const STAR_PX_MAX = 4.6;
 const TWINKLE_SPEED = 0.0024;
 /** Face disc radius as a fraction of the body radius (rest = lit sphere rim). */
-const FACE_FRACTION = 0.74;
-const SUN_GLOW_SCALE = 3.6;
+const FACE_FRACTION = 0.62;
+/** The sun's occupant billboard is a small medallion in front of the lit core. */
+const SUN_FACE_FRACTION = 0.5;
+/** Wide faint corona sprite around the sun (additive), in sun radii. */
+const SUN_CORONA_SCALE = 16;
+const SUN_CORONA_OPACITY = 0.22;
+/** Rings fade from full opacity at the pivot distance to this floor at the far rim. */
+const RING_FAR_OPACITY = 0.18;
+const SUN_GLOW_SCALE = 6.5;
 const SUN_PULSE_SPEED = 0.002;
 /** Dash period in logical px (6 on / 6 off, as the Skia DashPathEffect). */
 const RING_DASH_PX = 12;
 /** Token stroke widths (2–4 px) read heavier on the GPU path; scale them. */
-const RING_STROKE_SCALE = 0.6;
+const RING_STROKE_SCALE = 0.45;
 const POLARIS_WORLD = 10;
 const FOCUS_RING_GAP_PX = 4;
-const KEY_LIGHT_INTENSITY = 2.4;
-const AMBIENT_INTENSITY = 0.55;
+const KEY_LIGHT_INTENSITY = 3.2;
+const AMBIENT_INTENSITY = 0.22;
+/** Photo billboard shading: ambient floor + lambert gain toward the sun. */
+const FACE_AMBIENT = 0.3;
+const FACE_DIFFUSE = 0.95;
 /** Upload the atlas at most this often while photos stream in (ms). */
 const ATLAS_UPLOAD_INTERVAL = 250;
 const LABEL_CACHE_MAX = 96;
@@ -147,6 +163,7 @@ const tmpQuat = new THREE.Quaternion();
 const tmpVec = new THREE.Vector3();
 const tmpScale = new THREE.Vector3();
 const tmpColor = new THREE.Color();
+const tmpSun = new THREE.Vector3();
 
 const colorCache = new Map<string, THREE.Color>();
 /** Theme token → cached three Color (treat as read-only; copy before mutating). */
@@ -220,8 +237,8 @@ export class OrreryScene3D {
   // bodies
   private sphereGeo = new THREE.SphereGeometry(1, 24, 16);
   private sphereMat = new THREE.MeshStandardNodeMaterial({
-    roughness: 0.62,
-    metalness: 0.05,
+    roughness: 0.38,
+    metalness: 0.08,
   });
   private spheres: THREE.InstancedMesh;
   private sunMat = new THREE.MeshBasicNodeMaterial();
@@ -253,6 +270,12 @@ export class OrreryScene3D {
     new Float32Array(MAX_BODIES),
     1,
   );
+  /** View-space unit vector body → sun (lit side of the billboard disc). */
+  private faceSun = new THREE.InstancedBufferAttribute(
+    new Float32Array(MAX_BODIES * 3),
+    3,
+  );
+  private fog = new THREE.Fog(0x000000, 1, 1000);
   private faces: THREE.Sprite;
 
   // stars
@@ -270,6 +293,14 @@ export class OrreryScene3D {
     blending: THREE.AdditiveBlending,
   });
   private glow: THREE.Sprite;
+  private coronaMat = new THREE.SpriteNodeMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  private corona: THREE.Sprite;
+  private ringFadeNear = uniform(1);
+  private ringFadeFar = uniform(2);
   private polarisMat = new THREE.SpriteNodeMaterial({
     transparent: true,
     depthWrite: false,
@@ -381,13 +412,24 @@ export class OrreryScene3D {
       const radiusV = varying(radiusNode);
       const dashedV = varying(styleNode.x);
       const colorV = varying(colorNode);
+      const viewDist = varying(positionView.z.negate());
       this.ringMat.colorNode = colorV.xyz;
       this.ringMat.opacityNode = Fn(() => {
         const edge = float(1).sub(abs(side)).mul(halfPxV).clamp(0, 1);
         const arc = atan(dir.x, dir.y.negate()).mul(radiusV);
         const on = fract(arc.div(this.ringDashWorld)).lessThan(0.5);
         const dash = select(dashedV.greaterThan(0.5), select(on, 1, 0), 1);
-        const alpha = edge.mul(colorV.w).mul(dash);
+        // Depth falloff: far rings dimmer (on top of the scene fog).
+        const fade = float(1)
+          .sub(
+            viewDist
+              .sub(this.ringFadeNear)
+              .div(this.ringFadeFar.sub(this.ringFadeNear))
+              .clamp(0, 1),
+          )
+          .mul(1 - RING_FAR_OPACITY)
+          .add(RING_FAR_OPACITY);
+        const alpha = edge.mul(colorV.w).mul(dash).mul(fade);
         If(alpha.lessThan(0.004), () => {
           Discard();
         });
@@ -416,8 +458,10 @@ export class OrreryScene3D {
       this.faceScale,
       this.faceUv,
       this.faceOpacity,
+      this.faceSun,
     ])
       a.setUsage(THREE.DynamicDrawUsage);
+    this.scene.fog = this.fog;
     const faceMat = new THREE.SpriteNodeMaterial({ transparent: true });
     const tile = 1 / ATLAS_COLS;
     const faceUvNode = instancedDynamicBufferAttribute<"vec2">(
@@ -436,10 +480,23 @@ export class OrreryScene3D {
       this.faceScale,
       "float",
     );
-    faceMat.colorNode = texture(
-      this.atlasTex,
-      vec2(uv().x, uv().y.oneMinus()).mul(tile).add(faceUvNode),
+    const faceSunNode = instancedDynamicBufferAttribute<"vec3">(
+      this.faceSun,
+      "vec3",
     );
+    faceMat.colorNode = Fn(() => {
+      const tex = texture(
+        this.atlasTex,
+        vec2(uv().x, uv().y.oneMinus()).mul(tile).add(faceUvNode),
+      );
+      // Treat the disc as the camera-facing hemisphere: per-pixel normal from
+      // the disc uv, lambert against the view-space sun direction.
+      const p = uv().sub(0.5).mul(2);
+      const nz = float(1).sub(p.dot(p)).max(0).sqrt();
+      const lambert = vec3(p.x, p.y, nz).dot(faceSunNode).max(0);
+      const shade = lambert.mul(FACE_DIFFUSE).add(FACE_AMBIENT);
+      return vec4(tex.rgb.mul(shade), tex.a);
+    })();
     faceMat.opacityNode = Fn(() => {
       const d = uv().sub(0.5).length();
       If(d.greaterThan(0.5), () => {
@@ -468,11 +525,11 @@ export class OrreryScene3D {
     // ~2–8°), so a sky dome at infinity shows almost no stars; a slab under the
     // plane fills the view and parallaxes against the orbits under pan/tilt.
     for (let i = 0; i < STAR_COUNT; i++) {
-      const rr = Math.sqrt(seeded(i + 1));
+      // Uniform points on the unit sphere (a sky around the camera).
+      const z = seeded(i + 1) * 2 - 1;
       const t = seeded(i + 1001) * Math.PI * 2;
-      const depth =
-        STAR_DEPTH_MIN + seeded(i + 4001) * (STAR_DEPTH_MAX - STAR_DEPTH_MIN);
-      starPos.set([rr * Math.cos(t), -depth, rr * Math.sin(t)], i * 3);
+      const rr = Math.sqrt(Math.max(0, 1 - z * z));
+      starPos.set([rr * Math.cos(t), z, rr * Math.sin(t)], i * 3);
       starSize[i] =
         STAR_PX_MIN + seeded(i + 2001) ** 3 * (STAR_PX_MAX - STAR_PX_MIN);
       const tone = starTones[i % starTones.length];
@@ -489,6 +546,7 @@ export class OrreryScene3D {
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
+    starMat.fog = false;
     const phase = instancedBufferAttribute<"float">(
       staticAttr(starPhase, 1),
       "float",
@@ -519,11 +577,26 @@ export class OrreryScene3D {
     this.scene.add(this.stars);
 
     // Sun glow, Polaris, focus rings ------------------------------------------
+    this.glowMat.fog = false;
+    this.focusMat.fog = false;
     this.glowMat.colorNode = texture(this.glowTex).mul(vec4(materialColor, 1));
     this.glow = new THREE.Sprite(this.glowMat);
     this.glow.renderOrder = 1;
     this.glow.visible = false;
     this.scene.add(this.glow);
+    this.coronaMat.fog = false;
+    this.coronaMat.colorNode = texture(this.glowTex).mul(
+      vec4(materialColor, 1),
+    );
+    this.corona = new THREE.Sprite(this.coronaMat);
+    this.corona.renderOrder = 0;
+    this.corona.visible = false;
+    this.scene.add(this.corona);
+    // Sun core: emissive sphere with a hot centre and darker limb (3D, not a disc).
+    this.sunMat.colorNode = materialColor.mul(
+      normalView.z.max(0).pow(1.4).mul(0.95).add(0.55),
+    );
+    this.sunMat.fog = false;
     this.polarisMat.colorNode = texture(this.glowTex).mul(
       vec4(materialColor, 1),
     );
@@ -545,6 +618,7 @@ export class OrreryScene3D {
     this.colors = colors;
     // autoClear is off (two passes), so the background is the clear colour.
     this.renderer.setClearColor(color(colors.background), 1);
+    this.fog.color.copy(color(colors.background));
     this.keyLight.color.copy(
       color(colors.starPalette[0] ?? colors.textPrimary),
     );
@@ -640,7 +714,7 @@ export class OrreryScene3D {
     const W = viewport.width;
     const H = viewport.height;
 
-    // Camera (pinhole parity) ---------------------------------------------------
+    // Camera (true perspective; same pinhole the UI thread projects with) -------
     const rig = orreryCameraRig(pose, viewport);
     this.camera.fov = rig.fovDeg;
     this.camera.aspect = rig.aspect;
@@ -654,15 +728,30 @@ export class OrreryScene3D {
     const camPos = tmpVec.set(...rig.position).clone();
     const zoom = pose.zoom;
 
-    // Star slab: sized to the VIEW (not the scene) so density is constant at
-    // every zoom, and it trails the pivot (STAR_PARALLAX) so it drifts slower
-    // than the orbital plane under pan — a deep-field depth cue. Constant pixel
-    // size (sizeAttenuation off: px = modelScale · scaleNode · F).
-    const slab = (Math.max(W, H) / zoom) * STAR_FIELD_RADIUS;
-    this.stars.position.set(pose.x * STAR_PARALLAX, 0, pose.y * STAR_PARALLAX);
-    this.stars.scale.setScalar(slab);
-    this.starScale.value = 1 / (rig.focalPx * slab);
+    // Star sphere centred on the camera: pure rotation parallax (a skybox) as
+    // the camera yaws/tilts. Constant pixel size (sizeAttenuation off:
+    // px = modelScale · scaleNode · F).
+    const dolly = pose.focalDistance ?? rig.focalPx / zoom;
+    const sky = dolly * STAR_SPHERE_RADIUS;
+    this.stars.position.copy(camPos);
+    this.stars.scale.setScalar(sky);
+    this.starScale.value = 1 / (rig.focalPx * sky);
     this.starTime.value = reducedMotion ? 0 : timeMs;
+    // Depth haze toward the background token: the far rim reads hazier.
+    this.fog.near = dolly * FOG_NEAR_FRACTION;
+    this.fog.far = dolly + FOG_FAR_EXTENTS * Math.max(1, packet.extent);
+    this.ringFadeNear.value = dolly;
+    this.ringFadeFar.value = dolly + 1.2 * Math.max(1, packet.extent);
+    const viewInverse = this.camera.matrixWorldInverse;
+    // Sun position for billboard shading (pre-pass; it may sit anywhere).
+    let sunX = 0;
+    let sunZ = 0;
+    for (let i = 0; i < Math.min(packet.keys.length, MAX_BODIES); i++)
+      if (packet.bodies[i * BODY_STRIDE + 5] === KIND_SUN) {
+        sunX = packet.bodies[i * BODY_STRIDE];
+        sunZ = packet.bodies[i * BODY_STRIDE + 1];
+        break;
+      }
 
     // Bodies ---------------------------------------------------------------------
     const { keys, bodies } = packet;
@@ -699,6 +788,11 @@ export class OrreryScene3D {
         this.glow.position.set(wx, 0, wz);
         this.glow.scale.setScalar(radius * SUN_GLOW_SCALE * (1 + 0.08 * pulse));
         this.glowMat.opacity = opacity * (0.55 + 0.15 * pulse);
+        this.coronaMat.color.copy(color(glowToken));
+        this.corona.visible = this.glow.visible;
+        this.corona.position.set(wx, 0, wz);
+        this.corona.scale.setScalar(radius * SUN_CORONA_SCALE);
+        this.coronaMat.opacity = opacity * SUN_CORONA_OPACITY;
         this.keyLight.position.set(wx, radius * 0.4, wz);
         this.keyLight.color
           .copy(color(glowToken))
@@ -763,13 +857,26 @@ export class OrreryScene3D {
           dir.y * lift,
           wz + dir.z * lift,
         );
-        this.faceScale.setX(faceCount, visibleRadius * 2 * FACE_FRACTION);
+        this.faceScale.setX(
+          faceCount,
+          visibleRadius *
+            2 *
+            (kind === KIND_SUN ? SUN_FACE_FRACTION : FACE_FRACTION),
+        );
         this.faceUv.setXY(
           faceCount,
           (slot % ATLAS_COLS) * tileUv,
           Math.floor(slot / ATLAS_COLS) * tileUv,
         );
         this.faceOpacity.setX(faceCount, Math.min(1, opacity));
+        if (kind === KIND_SUN) this.faceSun.setXYZ(faceCount, 0, 0, 1.25);
+        else {
+          const sv = tmpSun
+            .set(sunX - wx, 0, sunZ - wz)
+            .normalize()
+            .transformDirection(viewInverse);
+          this.faceSun.setXYZ(faceCount, sv.x, sv.y, sv.z);
+        }
         faceCount++;
       }
       // Focus ring ----------------------------------------------------------------
@@ -788,6 +895,7 @@ export class OrreryScene3D {
     if (!sunSeen) {
       this.sun.visible = false;
       this.glow.visible = false;
+      this.corona.visible = false;
     }
     for (let i = focusUsed; i < this.focusPool.length; i++)
       this.focusPool[i].visible = false;
@@ -806,6 +914,7 @@ export class OrreryScene3D {
       this.faceScale,
       this.faceUv,
       this.faceOpacity,
+      this.faceSun,
     ])
       a.needsUpdate = true;
     this.polaris.position.set(0, 0, -Math.max(32, 0.85 * packet.extent));
@@ -925,6 +1034,7 @@ export class OrreryScene3D {
     (this.faces.material as THREE.Material).dispose();
     (this.stars.material as THREE.Material).dispose();
     this.glowMat.dispose();
+    this.coronaMat.dispose();
     this.polarisMat.dispose();
     this.focusMat.dispose();
     this.labelGeo.dispose();

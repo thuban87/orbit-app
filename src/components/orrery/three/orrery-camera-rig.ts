@@ -1,5 +1,11 @@
 /**
- * ORRERY LAB C — the 3D camera that reproduces the ADR-077 pinhole projection.
+ * ORRERY LAB C — the true-3D perspective camera.
+ *
+ * Since the Lab C camera redo the pose's focal distance is a real DOLLY
+ * distance F/zoom with a fixed focal length F = LAB_FOCAL_PX (≈50° vertical
+ * FOV), and the default tilt looks down ~62°, so the system recedes into
+ * depth. The pinhole formula below is still shared with the UI-thread
+ * projection, which is what keeps drawn == tappable (not old-view parity).
  *
  * Source of truth stays `projectWorldPoint` in `src/logic/orrery-camera-logic.ts`:
  *   plane  = rotate(p − pivot, yaw)

@@ -117,7 +117,7 @@ import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 
 /** ORRERY LAB C: true-3D renderer (three.js WebGPU) instead of the Skia world. */
-const LAB_C_TRUE_3D = false;
+const LAB_C_TRUE_3D = true;
 const World = LAB_C_TRUE_3D ? OrreryWorld3D : OrreryWorld;
 
 const acknowledgeReorder = () => {

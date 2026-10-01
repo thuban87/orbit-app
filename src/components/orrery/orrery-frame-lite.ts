@@ -28,6 +28,8 @@ import type { AnimatedFrame, AnimatedWorldBody } from "@/logic/orrery-frame";
 
 /** Mirrors orrery-camera-logic's private MAX_DEPTH_FRACTION. */
 const MAX_DEPTH_FRACTION = 0.45;
+/** Lab C: bodies closer than this fraction of the dolly distance are culled. */
+const NEAR_CULL_FRACTION = 0.12;
 
 export function projectAnimatedFrameLite(
   world: readonly AnimatedWorldBody[],
@@ -55,6 +57,7 @@ export function projectAnimatedFrameLite(
   const cosT = Math.cos(tilt);
   const sinT = Math.sin(tilt);
   const zoom = current.zoom;
+  const focal = current.focalDistance ?? 1;
   const centerScale = perspectiveScale({ x: 0, y: 0 }, current) * zoom;
   const ox = -current.x;
   const oy = -current.y;
@@ -70,11 +73,14 @@ export function projectAnimatedFrameLite(
     const px = dx * c - dy * s;
     const py = dx * s + dy * c;
     const scale = zoom * perspectiveScale(body, current);
+    // Lab C true-3D: bodies at/behind the near plane are culled (not tappable).
+    const inFront =
+      focal - py * sinT > focal * NEAR_CULL_FRACTION + body.radius;
     const x = cx + px * scale;
     const y = cy + py * cosT * scale;
     const radius = body.radius * scale;
     const reach = radius * (body.kind === "sun" ? 2 : 1.3);
-    const opacity = body.opacity;
+    const opacity = inFront ? body.opacity : 0;
     bodies.push({
       ...body,
       x,

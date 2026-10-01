@@ -57,11 +57,26 @@ export interface ProjectedFrame {
   bodies: ProjectedBody[];
   center: WorldPoint;
 }
+/**
+ * ORRERY LAB C — TRUE 3D camera model (supersedes the 2.5D pinhole parity).
+ * A real perspective camera: fixed focal length LAB_FOCAL_PX (logical px, i.e.
+ * a fixed ~50° vertical FOV on a phone) dollied to distance F / zoom from the
+ * pivot, so "zoom" is a DOLLY, not a telephoto narrowing. The projection math
+ * below is unchanged (it always was a true pinhole); only the focal distance
+ * is now short, which makes near bodies visibly bigger than far ones.
+ */
+export const LAB_FOCAL_PX = 720;
+/** Default look-down angle from vertical (~62°): the system recedes into depth. */
+export const LAB_HOME_TILT = 1.08;
+export function labFocalDistance(zoom: number): number {
+  "worklet";
+  return LAB_FOCAL_PX / Math.max(1e-3, zoom);
+}
 export const HOME_CAMERA: CameraPose = {
   x: 0,
   y: 0,
   zoom: 1,
-  tilt: 0,
+  tilt: LAB_HOME_TILT,
   yaw: 0,
   focalDistance: 256,
 };
@@ -69,7 +84,7 @@ export const IDENTITY_ZOOM = 2;
 export const FOCUS_MS = 300;
 export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 4;
-export const MAX_TILT = Math.PI / 3;
+export const MAX_TILT = 1.32;
 export const MIN_READABLE_RADIUS = 10;
 export const MIN_HIT_RADIUS = 22;
 const MIN_FOCAL_DISTANCE = 256;
@@ -200,9 +215,10 @@ export function perspectiveScale(point: WorldPoint, pose: CameraPose): number {
   const focal = pose.focalDistance ?? MIN_FOCAL_DISTANCE;
   const denominator =
     focal - cameraPlane(point, pose).y * Math.sin(pose.tilt ?? 0);
-  if (!Number.isFinite(denominator) || denominator <= 0)
-    throw new Error("Point outside finite Orrery camera plane");
-  return focal / denominator;
+  if (!Number.isFinite(denominator)) return 1;
+  // Lab C: points at/behind the camera get a huge-but-finite scale; frame
+  // consumers cull them (see orrery-frame-lite) instead of throwing on the UI thread.
+  return focal / Math.max(denominator, focal * 0.02);
 }
 
 function assertProjection(
@@ -245,7 +261,11 @@ export function clampCameraPose(pose: CameraPose, extent: number): CameraPose {
     yaw: Number.isFinite(pose.yaw ?? 0)
       ? (((pose.yaw ?? 0) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
       : 0,
-    focalDistance: deriveFocalDistance(bound),
+    focalDistance: labFocalDistance(
+      Number.isFinite(pose.zoom)
+        ? Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pose.zoom))
+        : 1,
+    ),
   };
 }
 export const constrainCamera = clampCameraPose;
@@ -314,9 +334,10 @@ export function unprojectToWorldPlane(
   const sx = (point.x - center.x) / pose.zoom,
     sy = (point.y - center.y) / pose.zoom;
   const denominator = focal * Math.cos(tilt) + sy * Math.sin(tilt);
-  if (!Number.isFinite(denominator) || denominator <= 0)
-    throw new Error("Point outside inverse Orrery camera plane");
-  const y = (sy * focal) / denominator,
+  if (!Number.isFinite(denominator)) return { x: pose.x, y: pose.y };
+  // Lab C: sky above the horizon maps to a far point on the plane (no throw).
+  const safe = Math.max(denominator, focal * 0.05);
+  const y = (sy * focal) / safe,
     x = (sx * (focal - y * Math.sin(tilt))) / focal;
   return {
     x: pose.x + x * Math.cos(yaw) + y * Math.sin(yaw),
@@ -609,8 +630,9 @@ export function panCamera(
     const reach = 2 * Math.SQRT2 * Math.max(1, extent);
     const minY =
       (-reach * Math.cos(tilt) * focal) / (focal + reach * Math.sin(tilt));
+    const farDen = focal - reach * Math.sin(tilt);
     const maxY =
-      (reach * Math.cos(tilt) * focal) / (focal - reach * Math.sin(tilt));
+      farDen > 0 ? (reach * Math.cos(tilt) * focal) / farDen : Infinity;
     // Restrict gesture sampling to the reachable plane before inverse math;
     // projection itself is never patched with a denominator clamp.
     const sampleY = clamp(-dy / start.zoom, minY, maxY, 0);

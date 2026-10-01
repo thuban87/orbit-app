@@ -11,9 +11,10 @@
  *   - `createOrreryGestures` with the same callbacks.
  * What changes: drawing. The UI thread packs a small `OrreryPacket` (camera
  * pose + world positions + allocated label rects) whenever the frame changes
- * and hands it to JS; `OrreryScene3D` draws it with a three camera built by
- * `orreryCameraRig`, which reproduces the pinhole projection exactly (vitest
- * parity: orrery-camera-rig.test.ts), so drawn == published.
+ * and hands it to JS; `OrreryScene3D` draws it with a REAL perspective three camera built by
+ * `orreryCameraRig` (fixed ~50° FOV, dolly F/zoom, default tilt ~62°). The UI
+ * thread projects with the identical pinhole (orrery-camera-rig.test.ts), so
+ * drawn == tappable.
  *
  * Lifecycle: the GPU loop is a requestAnimationFrame owned by this component
  * and stops on unmount (OrreryScreen unmounts the world on blur/background).
@@ -115,14 +116,12 @@ const LABEL_BODY_GAP = 8;
 /** GPU fill tunables (Pixel 6 Pro native dpr is 3.5 → 1439×2538 buffer). */
 const RENDER_MAX_PIXEL_RATIO = 2.5;
 const RENDER_ANTIALIAS = true;
-/** Leak bisect: "full" | "init" (renderer only, no scene). */
-const LAB_STAGE: string = "context";
-/** Lab-only badge tap: [tilt, yaw] presets (tilt is clamped to 60° anyway). */
+/** Lab-only badge tap: [tilt, yaw] presets swinging the 3D camera around the sun. */
 const LAB_TILT_PRESETS: readonly [number, number][] = [
-  [0, 0],
-  [0.65, 0],
-  [1.0, 0.5],
-  [1.04, 2.2],
+  [1.08, 0],
+  [1.28, 0.7],
+  [0.75, 2.2],
+  [1.2, 3.8],
 ];
 /** Frame-time log cadence (ms). */
 const STATS_INTERVAL = 5000;
@@ -631,7 +630,7 @@ export function OrreryWorld3D({
       console.log(
         `[lab-c] stage canvas ${nativeCanvas.clientWidth}x${nativeCanvas.clientHeight} -> ${nativeCanvas.width}x${nativeCanvas.height}`,
       );
-      if (cancelled || LAB_STAGE === "context") return;
+      if (cancelled) return;
       renderer = new THREE.WebGPURenderer({
         antialias: RENDER_ANTIALIAS,
         canvas: context.canvas as unknown as HTMLCanvasElement,
@@ -644,7 +643,6 @@ export function OrreryWorld3D({
         disposeRenderer(renderer);
         return;
       }
-      if (LAB_STAGE === "init") return;
       const inputs = latestInputs.current;
       s = new OrreryScene3D(renderer, inputs.colors, inputs.fontProvider, dpr);
       sceneRef.current = s;
