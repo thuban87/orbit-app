@@ -37,6 +37,7 @@ vi.mock("@/backup/auto-backup-policy", () => ({
   shouldRunAutomaticBackup: () => true,
 }));
 vi.mock("@/services/backup/backup-service", () => ({
+  AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC: "too-large-diagnostic",
   createAutomaticBackupService: () => ({
     writeVerifiedSnapshot: async () => h.result,
   }),
@@ -117,5 +118,35 @@ describe("backup sweep skipped-photo record (38.6 D-24)", () => {
     await expect(runBackupHook()).resolves.toBeUndefined();
     expect(h.record).toHaveBeenCalledOnce();
     expect(h.health).toHaveBeenCalledOnce();
+  });
+});
+
+describe("backup sweep health on failure (38.6 D-39)", () => {
+  it("an over-cap backup records the too-large diagnostic and leaves the folder accessible", async () => {
+    h.result = { status: "too-large" };
+    await runBackupHook();
+    expect(h.health).toHaveBeenCalledOnce();
+    expect(h.health.mock.calls[0]?.[1]).toEqual({
+      backupFolderDiagnostic: "too-large-diagnostic",
+    });
+    expect(h.record).not.toHaveBeenCalled();
+  });
+
+  it("a real write failure still marks the folder as needing reconnection", async () => {
+    h.result = { status: "failed" };
+    await runBackupHook();
+    expect(h.health.mock.calls[0]?.[1]).toEqual({
+      backupFolderAccessible: 0,
+      backupFolderDiagnostic: "Unable to access the backup folder.",
+    });
+  });
+
+  it("a verified write clears the diagnostic", async () => {
+    h.result = { status: "written", filename: "f", skippedPhotos: 0 };
+    await runBackupHook();
+    expect(h.health.mock.calls[0]?.[1]).toMatchObject({
+      backupFolderAccessible: 1,
+      backupFolderDiagnostic: null,
+    });
   });
 });

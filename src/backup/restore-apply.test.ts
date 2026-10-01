@@ -2151,6 +2151,19 @@ describe("applyRestore", () => {
         "SELECT count(*) AS count FROM contacts",
       ),
     ).resolves.toEqual({ count: 0 });
+    // 38.6 D-39: an over-cap safety backup blocks too, with its own reason.
+    await expect(
+      applyRestore(destination, manifest, "replace-all", {
+        createVerifiedPreRestoreSnapshot: async () => ({
+          status: "too-large" as const,
+        }),
+      }),
+    ).resolves.toEqual({ status: "pre-restore-snapshot-too-large" });
+    await expect(
+      destination.getFirstAsync<{ count: number }>(
+        "SELECT count(*) AS count FROM contacts",
+      ),
+    ).resolves.toEqual({ count: 0 });
     const snapshot = vi.fn(async () => ({ status: "written" as const }));
     await expect(
       applyRestore(destination, manifest, "replace-all", {

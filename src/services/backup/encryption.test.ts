@@ -5,6 +5,7 @@ import {
   APPROVED_BACKUP_ENCRYPTION_PROFILE,
   BackupEnvelopeError,
   createBackupEnvelopeCrypto,
+  isBackupTooLargeError,
 } from "@/services/backup/encryption";
 
 const profile: BackupEncryptionProfile = {
@@ -238,5 +239,55 @@ describe("backup encryption envelope", () => {
     expect(crypto.measurePbkdf2({ passphrase: "candidate", profile })).toEqual({
       durationMs: 0,
     });
+  });
+});
+
+describe("encrypted backup size cap (38.6 D-39)", () => {
+  it("refuses a ciphertext over maxCiphertextBytes with the distinct too-large code", () => {
+    const crypto = createBackupEnvelopeCrypto({
+      profiles: [profile],
+      backend: createTestBackend(),
+    });
+    // GCM adds a 16-byte tag: 1,009 plaintext bytes → 1,025 > the 1,024 cap.
+    let thrown: unknown;
+    try {
+      crypto.encrypt({
+        passphrase: "passphrase",
+        plaintext: new Uint8Array(profile.maxCiphertextBytes - 16 + 1),
+        profile,
+      });
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeInstanceOf(BackupEnvelopeError);
+    expect((thrown as BackupEnvelopeError).code).toBe("too-large");
+    expect((thrown as BackupEnvelopeError).message).toBe(
+      "The encrypted backup is too large.",
+    );
+    expect(isBackupTooLargeError(thrown)).toBe(true);
+  });
+
+  it("still encrypts exactly at the cap", () => {
+    const crypto = createBackupEnvelopeCrypto({
+      profiles: [profile],
+      backend: createTestBackend(),
+    });
+    expect(() =>
+      crypto.encrypt({
+        passphrase: "passphrase",
+        plaintext: new Uint8Array(profile.maxCiphertextBytes - 16),
+        profile,
+      }),
+    ).not.toThrow();
+  });
+
+  it("keeps every other failure distinct from too large, and the shipping cap unchanged", () => {
+    expect(
+      isBackupTooLargeError(new BackupEnvelopeError("encryption-failed")),
+    ).toBe(false);
+    expect(isBackupTooLargeError(new Error("too-large"))).toBe(false);
+    expect(APPROVED_BACKUP_ENCRYPTION_PROFILE.maxCiphertextBytes).toBe(
+      8_388_608,
+    );
   });
 });

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  MANUAL_EXPORT_TOO_LARGE_COPY,
+  manualExportFailureCopy,
   resolveBackupHealth,
   resolveBackupNudge,
 } from "@/screens/backup-health-logic";
+import { AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC } from "@/services/backup/backup-service";
 
 const now = new Date("2026-08-25T12:00:00.000Z");
 
@@ -163,5 +166,71 @@ describe("resolveBackupNudge — rare meaningful-data prompt", () => {
         now,
       ).shouldShow,
     ).toBe(false);
+  });
+});
+
+describe("over-cap backups say too large (38.6 D-39)", () => {
+  const base = {
+    folderUri: "content://provider/tree/orbit",
+    folderName: "Orbit backups",
+    folderAccessible: true,
+    lastAutomaticBackupAt: "2026-08-20 12:00:00",
+    currentDataRevision: 5,
+    lastBackupDataRevision: 4,
+    intervalDays: 7,
+  };
+
+  it("the health card says the backup is too large, not that the folder needs reconnecting", () => {
+    expect(
+      resolveBackupHealth(
+        { ...base, folderDiagnostic: AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC },
+        now,
+      ),
+    ).toEqual({
+      kind: "too-large",
+      headline: "Your backup is too large",
+      body: "Orbit couldn't create an automatic backup because it's too large. Earlier backups in your folder haven't changed.",
+      lastAutomaticBackupAt: "2026-08-20 12:00:00",
+    });
+  });
+
+  it("a lost folder still wins: it must be reconnected first", () => {
+    expect(
+      resolveBackupHealth(
+        {
+          ...base,
+          folderAccessible: false,
+          folderDiagnostic: AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC,
+        },
+        now,
+      ).kind,
+    ).toBe("lost-folder");
+  });
+
+  it("any other diagnostic falls through to the ordinary states", () => {
+    expect(
+      resolveBackupHealth(
+        { ...base, folderDiagnostic: "Unable to access the backup folder." },
+        now,
+      ).kind,
+    ).toBe("stale");
+    expect(
+      resolveBackupHealth({ ...base, folderDiagnostic: null }, now).kind,
+    ).toBe("stale");
+  });
+
+  it("the manual export Alert body says the backup is too large to create", () => {
+    expect(MANUAL_EXPORT_TOO_LARGE_COPY).toBe(
+      "Your backup is too large to create. Nothing was shared.",
+    );
+    expect(manualExportFailureCopy({ status: "too-large" })).toBe(
+      MANUAL_EXPORT_TOO_LARGE_COPY,
+    );
+    expect(manualExportFailureCopy({ status: "export-failed" })).toBe(
+      "Nothing was shared. Please try again.",
+    );
+    expect(
+      manualExportFailureCopy({ status: "shared", skippedPhotos: 0 }),
+    ).toBeNull();
   });
 });

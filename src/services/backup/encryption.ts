@@ -27,7 +27,9 @@ export type BackupEnvelopeErrorCode =
   | "invalid-envelope"
   | "unsupported-profile"
   | "authentication-failed"
-  | "encryption-failed";
+  | "encryption-failed"
+  /** 38.6 D-39: the ciphertext would exceed the profile's `maxCiphertextBytes`. */
+  | "too-large";
 
 /** A safe, content-free error for corrupted, unsupported, or unauthentic files. */
 export class BackupEnvelopeError extends Error {
@@ -36,9 +38,20 @@ export class BackupEnvelopeError extends Error {
     super(
       code === "authentication-failed"
         ? "The encrypted backup could not be authenticated."
-        : "The encrypted backup is invalid.",
+        : code === "too-large"
+          ? "The encrypted backup is too large."
+          : "The encrypted backup is invalid.",
     );
   }
+}
+
+/**
+ * True for the encrypted-backup size cap failure (38.6 D-39), so every writer
+ * can tell "too large" apart from a generic failure. The cap itself is the
+ * approved profile's `maxCiphertextBytes` and is unchanged.
+ */
+export function isBackupTooLargeError(error: unknown): boolean {
+  return error instanceof BackupEnvelopeError && error.code === "too-large";
 }
 
 export interface BackupEncryptionBackend {
@@ -428,7 +441,7 @@ export function createBackupEnvelopeCrypto(
           throw new BackupEnvelopeError("encryption-failed");
         const ciphertext = concatenate(encrypted.ciphertext, encrypted.tag);
         if (ciphertext.length > selected.maxCiphertextBytes)
-          throw new BackupEnvelopeError("encryption-failed");
+          throw new BackupEnvelopeError("too-large");
         return { ...technicalHeader, ciphertextBase64: base64(ciphertext) };
       } catch (error) {
         if (error instanceof BackupEnvelopeError) throw error;

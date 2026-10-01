@@ -86,7 +86,8 @@ export type RestoreMode = "merge" | "replace-all";
 export type PreRestoreSnapshotResult =
   /** `skippedPhotos`: photos the safety backup left out (38.6 D-24). */
   | { status: "written"; skippedPhotos?: number }
-  | { status: "failed" | "busy" | "blocked"; reason?: string };
+  /** `too-large`: over the encrypted size cap (38.6 D-39). */
+  | { status: "failed" | "busy" | "blocked" | "too-large"; reason?: string };
 export interface RestoreApplyDependencies {
   /** Required when the destination is configured: failure blocks Replace-all. */
   createVerifiedPreRestoreSnapshot?: () => Promise<PreRestoreSnapshotResult>;
@@ -159,6 +160,8 @@ export type RestoreApplyResult =
     }
   | { status: "incompatible-destination"; incompatibilities: number }
   | { status: "pre-restore-snapshot-failed" }
+  /** 38.6 D-39: the safety backup was over the encrypted size cap. */
+  | { status: "pre-restore-snapshot-too-large" }
   /**
    * An unavailable background id in settings this restore would write, and no
    * consent to the default (D-47, RA-a / D-49).
@@ -1758,6 +1761,8 @@ export async function applyRestore(
     const snapshot = deps.createVerifiedPreRestoreSnapshot
       ? await deps.createVerifiedPreRestoreSnapshot()
       : null;
+    if (snapshot?.status === "too-large")
+      return { status: "pre-restore-snapshot-too-large" };
     if (snapshot?.status !== "written")
       return { status: "pre-restore-snapshot-failed" };
     preRestoreSnapshotCreated = true;

@@ -349,12 +349,18 @@ export function toRestoreResultParams(
   };
 }
 
+/** 38.6 D-39: Replace-all's safety backup of this device was over the size cap. */
+export const RESTORE_SAFETY_BACKUP_TOO_LARGE_COPY =
+  "Couldn't back up this device first because the backup is too large. Your local data hasn't changed.";
+
 export function restoreApplyRecovery(
-  _reason: Exclude<RestoreApplyResult["status"], "applied"> | "unexpected",
+  reason: Exclude<RestoreApplyResult["status"], "applied"> | "unexpected",
 ): { step: "preview"; message: string } {
   return {
     step: "preview",
     message:
-      "Couldn't restore this backup. Your local data hasn't changed. Please try again.",
+      reason === "pre-restore-snapshot-too-large"
+        ? RESTORE_SAFETY_BACKUP_TOO_LARGE_COPY
+        : "Couldn't restore this backup. Your local data hasn't changed. Please try again.",
   };
 }

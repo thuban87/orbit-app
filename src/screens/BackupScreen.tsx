@@ -21,7 +21,6 @@ import { useBottomClearance } from "@/navigation/use-bottom-clearance";
 import {
   createManualExportService,
   loadBackupForRestore,
-  type ManualExportResult,
 } from "@/services/backup/backup-service";
 import {
   APPROVED_BACKUP_ENCRYPTION_PROFILE,
@@ -52,6 +51,7 @@ import {
 } from "./backup-dualhome-logic";
 import {
   type BackupHealth,
+  manualExportFailureCopy,
   resolveBackupHealth,
   resolveBackupNudge,
 } from "./backup-health-logic";
@@ -77,12 +77,6 @@ function relativeTime(value: string): string {
   if (hours < 48) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
   const days = Math.round(hours / 24);
   return `${days} days ago`;
-}
-
-function exportFailureCopy(result: ManualExportResult): string | null {
-  return result.status === "shared"
-    ? null
-    : "Nothing was shared. Please try again.";
 }
 
 export function BackupScreen({
@@ -151,6 +145,7 @@ export function BackupScreen({
               folderUri: settings.backupFolderUri,
               folderName: settings.backupFolderName,
               folderAccessible: settings.backupFolderAccessible === 1,
+              folderDiagnostic: settings.backupFolderDiagnostic,
               lastAutomaticBackupAt: settings.lastAutomaticBackupAt,
               currentDataRevision: settings.dataRevision,
               lastBackupDataRevision: settings.lastBackupDataRevision,
@@ -222,7 +217,7 @@ export function BackupScreen({
             profile: APPROVED_BACKUP_ENCRYPTION_PROFILE,
           },
         }).shareExport({ readableOverride });
-        const message = exportFailureCopy(result);
+        const message = manualExportFailureCopy(result);
         if (message) Alert.alert("Couldn't create export", message);
         // D-24: the export completed without some unreadable photos.
         const skipped =
@@ -395,7 +390,8 @@ export function BackupScreen({
   const heroDetail =
     health?.kind === "healthy"
       ? `Automatic backup: ${relativeTime(health.lastAutomaticBackupAt)}\n${health.automaticFileCount} backup${health.automaticFileCount === 1 ? "" : "s"} kept in ${health.folderName}`
-      : health?.kind === "stale" && health.lastAutomaticBackupAt
+      : (health?.kind === "stale" || health?.kind === "too-large") &&
+          health.lastAutomaticBackupAt
         ? `Automatic backup: ${relativeTime(health.lastAutomaticBackupAt)}`
         : null;
   const healthColor =

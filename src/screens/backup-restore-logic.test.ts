@@ -523,6 +523,14 @@ describe("restore apply decisions", () => {
       "preview",
     );
   });
+
+  it("says the safety backup was too large when it was over the cap (38.6 D-39)", () => {
+    expect(restoreApplyRecovery("pre-restore-snapshot-too-large")).toEqual({
+      step: "preview",
+      message:
+        "Couldn't back up this device first because the backup is too large. Your local data hasn't changed.",
+    });
+  });
 });
 
 /**

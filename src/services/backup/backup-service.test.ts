@@ -28,6 +28,7 @@ import { nodeSqliteExecutor, openTestDb } from "@/db/__testkit__/node-sqlite";
 import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import {
+  AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC,
   createAutomaticBackupReencryptionService,
   createAutomaticBackupService,
   createBackupEncryptionLifecycle,
@@ -37,6 +38,7 @@ import {
   resolveWriteEncryptionMode,
   withBackupServiceLock,
 } from "@/services/backup/backup-service";
+import { BackupEnvelopeError } from "@/services/backup/encryption";
 
 describe("manual backup service", () => {
   beforeEach(() => {
@@ -811,4 +813,102 @@ describe("only missing photos are skipped, in every writer (38.6 D-29)", () => {
       ).rejects.toBeInstanceOf(BackupPhotoUnreadableError);
     },
   );
+});
+
+describe("over-cap encrypted backups report too-large (38.6 D-39)", () => {
+  beforeEach(() => {
+    mocks.buildExportReport
+      .mockReset()
+      .mockResolvedValue({ manifest, skippedPhotos: 0 });
+  });
+  const overCap = () => {
+    throw new BackupEnvelopeError("too-large");
+  };
+
+  it("manual encrypted export returns too-large and creates no staged file", async () => {
+    const create = vi.fn();
+    const open = vi.fn();
+    const service = createManualExportService({
+      exec: {} as never,
+      exportedAt: manifest.metadata.exportedAt,
+      readPhotoBase64: async () => "",
+      files: { retireAll: async () => {}, retireStale: async () => {}, create },
+      share: { isAvailable: async () => true, open },
+      encryption: {
+        enabled: true,
+        passphrase: { status: "present", passphrase: "secret" },
+        crypto: {
+          encrypt: overCap,
+          decrypt: vi.fn(),
+          measurePbkdf2: vi.fn(),
+        } as never,
+        profile: {} as never,
+      },
+    });
+    await expect(service.shareExport()).resolves.toEqual({
+      status: "too-large",
+    });
+    expect(create).not.toHaveBeenCalled();
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it("any other encryption failure is still export-failed", async () => {
+    const service = createManualExportService({
+      exec: {} as never,
+      exportedAt: manifest.metadata.exportedAt,
+      readPhotoBase64: async () => "",
+      files: {
+        retireAll: async () => {},
+        retireStale: async () => {},
+        create: vi.fn(),
+      },
+      share: { isAvailable: async () => true, open: vi.fn() },
+      encryption: {
+        enabled: true,
+        passphrase: { status: "present", passphrase: "secret" },
+        crypto: {
+          encrypt: () => {
+            throw new BackupEnvelopeError("encryption-failed");
+          },
+          decrypt: vi.fn(),
+          measurePbkdf2: vi.fn(),
+        } as never,
+        profile: {} as never,
+      },
+    });
+    await expect(service.shareExport()).resolves.toEqual({
+      status: "export-failed",
+    });
+  });
+
+  it("the automatic and pre-restore snapshots return too-large and write nothing", async () => {
+    const writeVerified = vi.fn();
+    const deps = {
+      exec: {} as never,
+      exportedAt: manifest.metadata.exportedAt,
+      now: new Date("2026-08-25T00:00:00.000Z"),
+      readPhotoBase64: async () => "",
+      directoryUri: "content://backup",
+      retentionDays: 7,
+      storage: { writeVerified, list: async () => [], remove: async () => {} },
+      encryption: {
+        enabled: true,
+        passphrase: { status: "present" as const, passphrase: "secret" },
+        encrypt: overCap,
+      },
+    };
+    await expect(
+      createAutomaticBackupService(deps).writeVerifiedSnapshot(),
+    ).resolves.toEqual({ status: "too-large" });
+    await expect(createVerifiedPreRestoreSnapshot(deps)()).resolves.toEqual({
+      status: "too-large",
+    });
+    expect(writeVerified).not.toHaveBeenCalled();
+  });
+
+  it("pins the device-local health diagnostic the Backup card reads", () => {
+    expect(AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC).toBe(
+      "The latest automatic backup was too large to create.",
+    );
+  });
 });

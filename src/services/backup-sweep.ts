@@ -7,7 +7,10 @@ import { readDataRevision } from "@/db/data-revision-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
-import { createAutomaticBackupService } from "@/services/backup/backup-service";
+import {
+  AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC,
+  createAutomaticBackupService,
+} from "@/services/backup/backup-service";
 import {
   APPROVED_BACKUP_ENCRYPTION_PROFILE,
   createBackupEnvelopeCrypto,
@@ -82,6 +85,21 @@ export function registerBackupSweep(
         } catch {
           Logger.error("backup-sweep", "skipped-photo record failed");
         }
+        return;
+      }
+      if (result.status === "too-large") {
+        // 38.6 D-39: the folder is fine; record why instead of marking it
+        // inaccessible, so the health card says "too large", not "reconnect".
+        try {
+          await inWriteTransaction(exec, () =>
+            recordAutomaticBackupHealthCore(exec, {
+              backupFolderDiagnostic: AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC,
+            }),
+          );
+        } catch {
+          Logger.error("backup-sweep", "backup health write failed");
+        }
+        Logger.warn("backup-sweep", "automatic backup was over the size cap");
         return;
       }
       if (result.status === "failed") {

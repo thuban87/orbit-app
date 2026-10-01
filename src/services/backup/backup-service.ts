@@ -13,6 +13,7 @@ import type { SqlExecutor } from "@/db/types";
 import {
   type BackupEnvelopeCrypto,
   BackupEnvelopeError,
+  isBackupTooLargeError,
 } from "@/services/backup/encryption";
 import type {
   BackupPassphraseChangeStore,
@@ -476,7 +477,19 @@ export type ManualExportResult =
   | { status: "busy" }
   | { status: "sharing-unavailable" }
   | { status: "share-failed" }
-  | { status: "export-failed" };
+  | { status: "export-failed" }
+  /** 38.6 D-39: the encrypted export is over the size cap; nothing was written. */
+  | { status: "too-large" };
+
+/**
+ * 38.6 D-39: the `backup_folder_diagnostic` value an automatic backup that was
+ * over the encrypted size cap records (device-local; never exported). The
+ * folder itself is fine, so its accessibility is left as it was; the Backup
+ * health card reads this value to say the backup is too large rather than that
+ * the folder needs reconnecting. A verified write clears it.
+ */
+export const AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC =
+  "The latest automatic backup was too large to create.";
 
 export interface ManualExportDependencies {
   exec: SqlExecutor;
@@ -579,7 +592,8 @@ export function createManualExportService(deps: ManualExportDependencies): {
         } catch {
           return { status: "share-failed" };
         }
-      } catch {
+      } catch (error) {
+        if (isBackupTooLargeError(error)) return { status: "too-large" };
         return { status: "export-failed" };
       } finally {
         if (file && !handedOff) {
@@ -606,6 +620,8 @@ export function createAutomaticBackupService(
     /** `skippedPhotos`: missing or empty photos left out (38.6 D-24/D-29). */
     | { status: "written"; filename: string; skippedPhotos: number }
     | { status: "failed" }
+    /** 38.6 D-39: over the encrypted size cap; nothing was written. */
+    | { status: "too-large" }
     | { status: "busy" }
     | {
         status: "blocked";
@@ -672,7 +688,9 @@ export function createAutomaticBackupService(
             skippedPhotos: report.skippedPhotos,
           } as const;
         });
-      } catch {
+      } catch (error) {
+        if (isBackupTooLargeError(error))
+          return { status: "too-large" } as const;
         return { status: "failed" } as const;
       } finally {
         inFlight = false;
