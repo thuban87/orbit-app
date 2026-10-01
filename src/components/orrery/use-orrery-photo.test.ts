@@ -1,11 +1,12 @@
 /**
- * use-orrery-photo — node proof of the D-11 orrery texture gate: the ≤512
- * pass-through, the 1024→512 downsample, the byte-budgeted LRU of encoded
- * derivatives sized to the Orrery's live photos (38.6 D-37), cancellation of
- * queued downsamples and the late-older-revision guard (review IN-02), the
- * downsample concurrency cap, and SkImage disposal (loader and the pure
- * lifecycle helper the hook drives). Every native boundary is a fake;
- * nothing loads Skia or the manipulator.
+ * use-orrery-photo — node proof of the D-11 orrery texture gate with the D-41
+ * on-disk derivative: the ≤512 pass-through, a derivative HIT that never reads
+ * or decodes the >512 master, a MISS that generates and installs one, a stale
+ * signature and a corrupt / oversized derivative that are ignored and
+ * regenerated, cancellation of queued generations (review IN-02), the
+ * generation concurrency cap, and SkImage disposal (loader and the pure
+ * lifecycle helper the hook drives). Every native boundary is a fake; nothing
+ * loads Skia, the manipulator or the file system.
  */
 import type { SkData, SkImage } from "@shopify/react-native-skia";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,7 +18,8 @@ const m = vi.hoisted(() => ({
   refReleases: [] as number[],
   contextReleases: [] as number[],
   renderThrows: false,
-  saveBase64: "QUJD" as string | undefined,
+  saveOptions: [] as unknown[],
+  saveUri: "file:///cache/ImageManipulator/small.jpg" as string | undefined,
 }));
 vi.mock("expo-image-manipulator", () => ({
   SaveFormat: { JPEG: "jpeg" },
@@ -38,8 +40,9 @@ vi.mock("expo-image-manipulator", () => ({
             release() {
               m.refReleases[refIndex] += 1;
             },
-            async saveAsync(_opts: unknown) {
-              return { uri: "file:///cache/small.jpg", base64: m.saveBase64 };
+            async saveAsync(opts: unknown) {
+              m.saveOptions.push(opts);
+              return { uri: m.saveUri };
             },
           };
         },
@@ -51,8 +54,11 @@ vi.mock("expo-image-manipulator", () => ({
 vi.mock("@/services/photos/photo-storage", () => ({
   resolvePhotoUri: (relative: string) => `file:///docs/${relative}`,
 }));
-vi.mock("@/services/photos/derivative-cache", () => ({
-  discardDerivative: vi.fn(),
+vi.mock("@/services/photos/orrery-derivative-store", () => ({
+  dropOrreryDerivative: vi.fn(),
+  findOrreryDerivative: vi.fn(() => null),
+  installOrreryDerivative: vi.fn(),
+  orreryMasterSignature: vi.fn(() => null),
 }));
 vi.mock("@/utils/logger", () => ({
   Logger: { warn: vi.fn(), error: vi.fn() },
@@ -63,16 +69,12 @@ import {
   createOrreryImageSlot,
   defaultOrreryImageDeps,
   loadOrreryImage,
-  ORRERY_DERIVATIVE_CACHE_MAX_BYTES,
-  ORRERY_DERIVATIVE_CACHE_SPARE_BYTES,
+  ORRERY_DERIVATIVE_QUALITY,
   ORRERY_DOWNSAMPLE_CONCURRENCY,
   ORRERY_TEXTURE_MAX,
   type OrreryImageDeps,
   type OrreryLoadToken,
-  orreryDerivativeCacheBudget,
-  orreryDerivativeCacheState,
-  resetOrreryPhotoCacheForTests,
-  retainOrreryPhoto,
+  resetOrreryPhotoQueueForTests,
 } from "./use-orrery-photo";
 
 interface FakeImage {
@@ -103,50 +105,87 @@ function fakeImage(label: string, size: number): FakeImage {
 
 const asSk = (image: FakeImage) => image as unknown as SkImage;
 
+/** A derivative file on the fake disk: `corrupt` → undecodable. */
+interface FakeDerivative {
+  size: number;
+  corrupt?: boolean;
+  unreadable?: boolean;
+}
+
 /**
- * Fake native boundary. `readData(uri)` yields `{file: uri}`; `fromBase64(b64)`
- * yields `{b64}`; `decode` makes a fake image sized by `sizes[uri]` (files) or
- * `ORRERY_TEXTURE_MAX` (derivatives).
+ * A fake world: masters (px edge + durable signature) and the derivative
+ * files on "disk". Derivative URIs are `deriv:<relative>@<signature>`, so a
+ * lookup only ever matches the exact signature. `readData(uri)` yields
+ * `{file: uri}`; `decode` sizes masters from `masters` and derivatives from
+ * `disk` (a corrupt one decodes to null).
  */
-function deps(
-  sizes: Record<string, number>,
+function world(
+  masters: Record<string, { size: number; sig: string | null }>,
   overrides: Partial<OrreryImageDeps> = {},
 ) {
+  const disk = new Map<string, FakeDerivative>();
   const calls = {
-    fileUris: [] as string[],
+    reads: [] as string[],
     downsamples: [] as string[],
-    discards: [] as string[],
+    installs: [] as string[],
+    drops: [] as string[],
   };
+  const masterUri = (relative: string) => `file:///docs/${relative}`;
+  const derivUri = (relative: string, sig: string) =>
+    `deriv:${relative}@${sig}`;
   const d: OrreryImageDeps = {
-    fileUri: (relative) => `file:///docs/${relative}`,
+    fileUri: masterUri,
     readData: async (uri) => {
-      calls.fileUris.push(uri);
+      calls.reads.push(uri);
+      if (disk.get(uri)?.unreadable) throw new Error("read failed");
       return { file: uri } as unknown as SkData;
     },
     decode: (data) => {
-      const raw = data as unknown as { file?: string; b64?: string };
-      if (raw.file !== undefined)
-        return asSk(fakeImage(`large:${raw.file}`, sizes[raw.file] ?? 512));
-      return asSk(fakeImage(`small:${raw.b64}`, ORRERY_TEXTURE_MAX));
+      const uri = (data as unknown as { file: string }).file;
+      if (uri.startsWith("deriv:")) {
+        const file = disk.get(uri);
+        if (!file || file.corrupt) return null;
+        return asSk(fakeImage(`small:${uri}`, file.size));
+      }
+      const relative = uri.slice("file:///docs/".length);
+      return asSk(
+        fakeImage(
+          `large:${uri}`,
+          masters[relative]?.size ?? ORRERY_TEXTURE_MAX,
+        ),
+      );
     },
-    fromBase64: (b64) => ({ b64 }) as unknown as SkData,
+    signature: (relative) => masters[relative]?.sig ?? null,
+    findDerivative: (relative, sig) => {
+      const uri = derivUri(relative, sig);
+      return disk.has(uri) ? uri : null;
+    },
     downsample: async (uri) => {
       calls.downsamples.push(uri);
-      return { base64: `small-of-${uri}`, uri: `file:///cache/${uri.length}` };
+      return { uri: `tmp:${uri}` };
     },
-    discard: (uri) => {
-      calls.discards.push(uri);
+    install: async (tempUri, relative, sig) => {
+      calls.installs.push(tempUri);
+      const uri = derivUri(relative, sig);
+      disk.set(uri, { size: ORRERY_TEXTURE_MAX });
+      return uri;
+    },
+    dropDerivative: (uri) => {
+      calls.drops.push(uri);
+      disk.delete(uri);
     },
     ...overrides,
   };
-  return { d, calls };
+  return { d, calls, disk, derivUri, masterUri };
 }
 
 const disposeCounts = () => created.map((image) => image.disposeCount);
+const larges = () => created.filter((c) => c.label.startsWith("large:"));
+const smalls = () => created.filter((c) => c.label.startsWith("small:"));
 
 beforeEach(() => {
   created = [];
-  resetOrreryPhotoCacheForTests();
+  resetOrreryPhotoQueueForTests();
   vi.mocked(Logger.warn).mockClear();
 });
 
@@ -155,322 +194,214 @@ async function flush(turns = 4): Promise<void> {
   for (let i = 0; i < turns; i++) await new Promise((r) => setTimeout(r, 0));
 }
 
+const BIG = { size: 1024, sig: "36109-1000" };
+
 describe("tunables", () => {
-  it("pins the D-11 bounds", () => {
+  it("pins the D-11 / D-41 bounds", () => {
     expect(ORRERY_TEXTURE_MAX).toBe(512);
     expect(ORRERY_DOWNSAMPLE_CONCURRENCY).toBe(1);
-    expect(ORRERY_DERIVATIVE_CACHE_SPARE_BYTES).toBe(4 * 1024 * 1024);
-    expect(ORRERY_DERIVATIVE_CACHE_MAX_BYTES).toBe(24 * 1024 * 1024);
-    // Before any body mounts, the budget is the spare allowance alone.
-    expect(orreryDerivativeCacheBudget()).toBe(
-      ORRERY_DERIVATIVE_CACHE_SPARE_BYTES,
-    );
+    expect(ORRERY_DERIVATIVE_QUALITY).toBe(0.9);
   });
 });
 
-describe("loadOrreryImage — pass-through and downsample", () => {
+describe("loadOrreryImage — pass-through", () => {
   it("returns null for a value that is not a stored photo path, without reading anything (38.6 D-34)", async () => {
+    const signature = vi.fn(() => "1-1");
     const fileUri = vi.fn((relative: string) => `file:///docs/${relative}`);
-    const { d, calls } = deps({}, { fileUri });
-    await expect(loadOrreryImage("Rex", 1, d)).resolves.toBeNull();
+    const { d, calls } = world({}, { fileUri, signature });
+    await expect(loadOrreryImage("Rex", d)).resolves.toBeNull();
+    expect(signature).not.toHaveBeenCalled();
     expect(fileUri).not.toHaveBeenCalled();
-    expect(calls.fileUris).toEqual([]);
+    expect(calls.reads).toEqual([]);
   });
 
-  it("returns a ≤512 image as decoded and never calls the manipulator", async () => {
-    const { d, calls } = deps({ "file:///docs/avatars/contact-1.jpg": 512 });
-    const image = await loadOrreryImage("avatars/contact-1.jpg", undefined, d);
+  it("returns null for a missing master without reading anything (D-23 initials)", async () => {
+    const { d, calls } = world({});
+    await expect(loadOrreryImage("avatars/gone.jpg", d)).resolves.toBeNull();
+    expect(calls.reads).toEqual([]);
+    expect(created).toEqual([]);
+    expect(Logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("returns a ≤512 master as decoded and never makes a derivative", async () => {
+    const { d, calls } = world({
+      "avatars/contact-1.jpg": { size: 512, sig: "20607-1" },
+      "avatars/contact-2.jpg": { size: 96, sig: "3000-2" },
+    });
+    const image = await loadOrreryImage("avatars/contact-1.jpg", d);
     expect((image as unknown as FakeImage).label).toBe(
       "large:file:///docs/avatars/contact-1.jpg",
     );
+    await loadOrreryImage("avatars/contact-2.jpg", d);
     expect(calls.downsamples).toEqual([]);
-    expect(disposeCounts()).toEqual([0]);
-
-    const thumb = deps({ "file:///docs/avatars/contact-2.jpg": 96 });
-    await loadOrreryImage("avatars/contact-2.jpg", 3, thumb.d);
-    expect(thumb.calls.downsamples).toEqual([]);
+    expect(calls.installs).toEqual([]);
+    expect(disposeCounts()).toEqual([0, 0]);
   });
+});
 
-  it("downsamples a 1024 master, discards the derivative, disposes the large image undrawn", async () => {
-    const { d, calls } = deps({ "file:///docs/avatars/contact-1.jpg": 1024 });
+describe("loadOrreryImage — on-disk derivative (38.6 D-41)", () => {
+  it("MISS: generates and installs a derivative, draws it, disposes the large image undrawn", async () => {
+    const w = world({ "avatars/contact-1.jpg": BIG });
     const image = (await loadOrreryImage(
       "avatars/contact-1.jpg",
-      2,
-      d,
+      w.d,
     )) as unknown as FakeImage;
-    expect(calls.downsamples).toEqual(["file:///docs/avatars/contact-1.jpg"]);
-    expect(calls.discards).toHaveLength(1);
+    expect(w.calls.downsamples).toEqual(["file:///docs/avatars/contact-1.jpg"]);
+    expect(w.calls.installs).toEqual([
+      "tmp:file:///docs/avatars/contact-1.jpg",
+    ]);
     expect(image.label).toBe(
-      "small:small-of-file:///docs/avatars/contact-1.jpg",
+      `small:${w.derivUri("avatars/contact-1.jpg", BIG.sig)}`,
     );
-    const large = created.find((c) => c.label.startsWith("large:"))!;
-    expect(large.disposeCount).toBe(1);
+    expect(larges()).toHaveLength(1);
+    expect(larges()[0].disposeCount).toBe(1);
     expect(image.disposeCount).toBe(0);
   });
 
+  it("HIT: never reads or decodes a >512 master once a valid derivative exists", async () => {
+    const w = world({ "avatars/contact-1.jpg": BIG });
+    w.disk.set(w.derivUri("avatars/contact-1.jpg", BIG.sig), {
+      size: ORRERY_TEXTURE_MAX,
+    });
+    const image = await loadOrreryImage("avatars/contact-1.jpg", w.d);
+    expect(image).not.toBeNull();
+    expect(w.calls.reads).toEqual([
+      w.derivUri("avatars/contact-1.jpg", BIG.sig),
+    ]);
+    expect(w.calls.reads).not.toContain(w.masterUri("avatars/contact-1.jpg"));
+    expect(larges()).toEqual([]);
+    expect(w.calls.downsamples).toEqual([]);
+  });
+
+  it("generates once: every later load (a return visit, or a restart) is a disk hit", async () => {
+    const w = world({ "avatars/contact-1.jpg": BIG });
+    await loadOrreryImage("avatars/contact-1.jpg", w.d);
+    // A restart clears every in-process structure; the disk survives.
+    resetOrreryPhotoQueueForTests();
+    created = [];
+    for (let i = 0; i < 3; i++)
+      expect(
+        await loadOrreryImage("avatars/contact-1.jpg", w.d),
+      ).not.toBeNull();
+    expect(w.calls.downsamples).toHaveLength(1);
+    expect(larges()).toEqual([]);
+  });
+
+  it("STALE: a derivative for an older signature is never used; the new bytes get their own", async () => {
+    const masters = { "avatars/contact-1.jpg": { ...BIG } };
+    const w = world(masters);
+    w.disk.set(w.derivUri("avatars/contact-1.jpg", "11111-1"), {
+      size: ORRERY_TEXTURE_MAX,
+    });
+    const image = (await loadOrreryImage(
+      "avatars/contact-1.jpg",
+      w.d,
+    )) as unknown as FakeImage;
+    expect(w.calls.reads).not.toContain(
+      w.derivUri("avatars/contact-1.jpg", "11111-1"),
+    );
+    expect(w.calls.downsamples).toHaveLength(1);
+    expect(image.label).toBe(
+      `small:${w.derivUri("avatars/contact-1.jpg", BIG.sig)}`,
+    );
+
+    // The master is replaced (new signature): the next load regenerates.
+    masters["avatars/contact-1.jpg"].sig = "40000-2000";
+    const next = (await loadOrreryImage(
+      "avatars/contact-1.jpg",
+      w.d,
+    )) as unknown as FakeImage;
+    expect(w.calls.downsamples).toHaveLength(2);
+    expect(next.label).toBe(
+      `small:${w.derivUri("avatars/contact-1.jpg", "40000-2000")}`,
+    );
+  });
+
+  it.each([
+    ["undecodable", { size: ORRERY_TEXTURE_MAX, corrupt: true }],
+    ["unreadable", { size: ORRERY_TEXTURE_MAX, unreadable: true }],
+    ["oversized", { size: 1024 }],
+    ["empty-edged", { size: 0 }],
+  ])(
+    "CORRUPT (%s): the derivative is dropped and regenerated",
+    async (_, file) => {
+      const w = world({ "avatars/contact-1.jpg": BIG });
+      const uri = w.derivUri("avatars/contact-1.jpg", BIG.sig);
+      w.disk.set(uri, file);
+      const image = (await loadOrreryImage(
+        "avatars/contact-1.jpg",
+        w.d,
+      )) as unknown as FakeImage;
+      expect(w.calls.drops).toEqual([uri]);
+      expect(w.calls.downsamples).toHaveLength(1);
+      expect(image.label).toBe(`small:${uri}`);
+      expect(image.size).toBe(ORRERY_TEXTURE_MAX);
+      // Whatever the bad derivative decoded to was disposed, never returned.
+      for (const bad of smalls().filter((s) => s !== image))
+        expect(bad.disposeCount).toBe(1);
+    },
+  );
+
+  it("a freshly installed derivative that will not decode resolves null (dropped, logged)", async () => {
+    const w = world({ "avatars/contact-1.jpg": BIG });
+    w.d.install = async (_temp, relative, sig) => {
+      const uri = w.derivUri(relative, sig);
+      w.disk.set(uri, { size: ORRERY_TEXTURE_MAX, corrupt: true });
+      return uri;
+    };
+    await expect(
+      loadOrreryImage("avatars/contact-1.jpg", w.d),
+    ).resolves.toBeNull();
+    expect(w.calls.drops).toHaveLength(1);
+    expect(Logger.warn).toHaveBeenCalledTimes(1);
+    expect(larges()[0].disposeCount).toBe(1);
+  });
+
+  it("resolves null when the master changed during generation (nothing installed)", async () => {
+    const w = world(
+      { "avatars/contact-1.jpg": BIG },
+      {
+        install: async () => null,
+      },
+    );
+    await expect(
+      loadOrreryImage("avatars/contact-1.jpg", w.d),
+    ).resolves.toBeNull();
+    expect(smalls()).toEqual([]);
+    expect(larges()[0].disposeCount).toBe(1);
+    expect(Logger.warn).not.toHaveBeenCalled();
+  });
+
   it("feeds Skia and the manipulator the plain file URI (no ?v= query)", async () => {
-    const { d, calls } = deps({ "file:///docs/avatars/contact-1.jpg": 1024 });
-    await loadOrreryImage("avatars/contact-1.jpg", 9, d);
-    for (const uri of [...calls.fileUris, ...calls.downsamples])
+    const w = world({ "avatars/contact-1.jpg": BIG });
+    await loadOrreryImage("avatars/contact-1.jpg", w.d);
+    for (const uri of [...w.calls.reads, ...w.calls.downsamples])
       expect(uri).not.toContain("?");
   });
-
-  it("reuses the cached base64 for the same path + revision; a new revision re-derives", async () => {
-    const { d, calls } = deps({ "file:///docs/avatars/contact-1.jpg": 1024 });
-    await loadOrreryImage("avatars/contact-1.jpg", 1, d);
-    await loadOrreryImage("avatars/contact-1.jpg", 1, d);
-    expect(calls.downsamples).toHaveLength(1);
-    expect(calls.fileUris).toHaveLength(1);
-    await loadOrreryImage("avatars/contact-1.jpg", 2, d);
-    expect(calls.downsamples).toHaveLength(2);
-    expect(orreryDerivativeCacheState().keys).toEqual([
-      "avatars/contact-1.jpg#2",
-    ]);
-  });
 });
 
-describe("derivative cache — bounded by bytes, LRU, strings only", () => {
-  const len = Math.floor(ORRERY_DERIVATIVE_CACHE_SPARE_BYTES / 3);
-  function sized(label: string) {
-    return {
-      downsample: async () => ({
-        base64: label.padEnd(len, "x"),
-        uri: "file:///cache/d",
-      }),
-    };
-  }
-
-  it("evicts least-recently-used entries so the total never exceeds the budget", async () => {
-    const sizes = Object.fromEntries(
-      ["a", "b", "c", "d"].map((p) => [`file:///docs/avatars/${p}.jpg`, 1024]),
-    );
-    for (const p of ["a", "b", "c"]) {
-      await loadOrreryImage(`avatars/${p}.jpg`, 1, deps(sizes, sized(p)).d);
-    }
-    expect(orreryDerivativeCacheState().keys).toHaveLength(3);
-    // A hit refreshes recency: "a" becomes most recent, so "b" is evicted next.
-    const hit = deps(sizes, sized("a"));
-    await loadOrreryImage("avatars/a.jpg", 1, hit.d);
-    expect(hit.calls.downsamples).toEqual([]);
-    await loadOrreryImage("avatars/d.jpg", 1, deps(sizes, sized("d")).d);
-    const state = orreryDerivativeCacheState();
-    expect(state.keys).toEqual([
-      "avatars/c.jpg#1",
-      "avatars/a.jpg#1",
-      "avatars/d.jpg#1",
-    ]);
-    expect(state.bytes).toBeLessThanOrEqual(
-      ORRERY_DERIVATIVE_CACHE_SPARE_BYTES,
-    );
-    expect(state.bytes).toBe(3 * len);
-    for (const key of state.keys) expect(typeof key).toBe("string");
-  });
-
-  it("returns but does not cache an entry larger than the whole budget", async () => {
-    const huge = "z".repeat(ORRERY_DERIVATIVE_CACHE_SPARE_BYTES + 1);
-    const { d } = deps(
-      { "file:///docs/avatars/h.jpg": 1024 },
-      { downsample: async () => ({ base64: huge, uri: "file:///cache/h" }) },
-    );
-    const image = await loadOrreryImage("avatars/h.jpg", 1, d);
-    expect(image).not.toBeNull();
-    expect(orreryDerivativeCacheState()).toEqual({
-      keys: [],
-      bytes: 0,
-      live: [],
-    });
-  });
-});
-
-describe("derivative cache — sized to the Orrery's photos (38.6 D-37)", () => {
-  /** ~100 KB of base64, the size of a real 512 JPEG q0.9 derivative. */
-  const PHOTO_BYTES = 100_000;
-  const PHOTOS = 60; // 6 MB, well over the old fixed 4 MiB budget
-  const paths = Array.from({ length: PHOTOS }, (_, i) => `avatars/p${i}.jpg`);
-  const sizes = Object.fromEntries(
-    paths.map((p) => [`file:///docs/${p}`, 1024]),
-  );
-  function counting() {
-    const made = deps(sizes, {
-      downsample: async (uri) => {
-        made.calls.downsamples.push(uri);
-        return { base64: uri.padEnd(PHOTO_BYTES, "x"), uri: "file:///cache/d" };
-      },
-    });
-    return made;
-  }
-
-  it("keeps all 60 mounted photos, so a return to the Orrery re-derives none", async () => {
-    // First visit: every body mounts (retains its path) and loads.
-    let releases = paths.map((p) => retainOrreryPhoto(p));
-    const first = counting();
-    await Promise.all(paths.map((p) => loadOrreryImage(p, 1, first.d)));
-    expect(first.calls.downsamples).toHaveLength(PHOTOS);
-    expect(orreryDerivativeCacheState().keys).toHaveLength(PHOTOS);
-    expect(orreryDerivativeCacheState().bytes).toBe(PHOTOS * PHOTO_BYTES);
-    expect(orreryDerivativeCacheState().bytes).toBeGreaterThan(
-      ORRERY_DERIVATIVE_CACHE_SPARE_BYTES,
-    );
-
-    // Leave the tab: every body unmounts.
-    for (const release of releases) release();
-    expect(orreryDerivativeCacheState().live).toEqual([]);
-
-    // Return: every body remounts; every photo is a cache hit.
-    releases = paths.map((p) => retainOrreryPhoto(p));
-    const back = counting();
-    const images = await Promise.all(
-      paths.map((p) => loadOrreryImage(p, 1, back.d)),
-    );
-    expect(back.calls.downsamples).toEqual([]);
-    expect(back.calls.fileUris).toEqual([]);
-    expect(images.every((image) => image !== null)).toBe(true);
-    for (const release of releases) release();
-  });
-
-  it("a derivation finishing while the Orrery is away does not evict the photos it will show on return", async () => {
-    const releases = paths.map((p) => retainOrreryPhoto(p));
-    await Promise.all(paths.map((p) => loadOrreryImage(p, 1, counting().d)));
-    for (const release of releases) release();
-    // A late put with nothing mounted (e.g. the in-flight downsample at blur).
-    const late = deps(
-      { "file:///docs/avatars/late.jpg": 1024 },
-      {
-        downsample: async () => ({
-          base64: "l".repeat(PHOTO_BYTES),
-          uri: "file:///cache/l",
-        }),
-      },
-    );
-    await loadOrreryImage("avatars/late.jpg", 1, late.d);
-    const keys = orreryDerivativeCacheState().keys;
-    for (const p of paths) expect(keys).toContain(`${p}#1`);
-  });
-
-  it("evicts photos no mounted body shows before any live one", async () => {
-    // Two photos from a System viewed earlier, now unmounted (idle).
-    const idleLen = Math.floor(ORRERY_DERIVATIVE_CACHE_SPARE_BYTES / 2);
-    for (const p of ["avatars/old-a.jpg", "avatars/old-b.jpg"]) {
-      await loadOrreryImage(
-        p,
-        1,
-        deps(
-          { [`file:///docs/${p}`]: 1024 },
-          {
-            downsample: async () => ({
-              base64: "o".repeat(idleLen),
-              uri: "file:///cache/o",
-            }),
-          },
-        ).d,
-      );
-    }
-    // The current System's 60 photos mount and load.
-    const releases = paths.map((p) => retainOrreryPhoto(p));
-    await Promise.all(paths.map((p) => loadOrreryImage(p, 1, counting().d)));
-    const state = orreryDerivativeCacheState();
-    for (const p of paths) expect(state.keys).toContain(`${p}#1`);
-    expect(state.bytes).toBeLessThanOrEqual(orreryDerivativeCacheBudget());
-    expect(orreryDerivativeCacheBudget()).toBe(
-      PHOTOS * PHOTO_BYTES + ORRERY_DERIVATIVE_CACHE_SPARE_BYTES,
-    );
-    for (const release of releases) release();
-  });
-
-  it("never exceeds the hard cap, even when every photo is live", async () => {
-    const big = Math.floor(ORRERY_DERIVATIVE_CACHE_MAX_BYTES / 4) + 1;
-    const many = ["a", "b", "c", "d", "e"].map((p) => `avatars/${p}.jpg`);
-    const releases = many.map((p) => retainOrreryPhoto(p));
-    for (const p of many) {
-      await loadOrreryImage(
-        p,
-        1,
-        deps(
-          { [`file:///docs/${p}`]: 1024 },
-          {
-            downsample: async () => ({
-              base64: p.padEnd(big, "x"),
-              uri: "file:///cache/b",
-            }),
-          },
-        ).d,
-      );
-    }
-    const state = orreryDerivativeCacheState();
-    expect(state.bytes).toBeLessThanOrEqual(ORRERY_DERIVATIVE_CACHE_MAX_BYTES);
-    expect(orreryDerivativeCacheBudget()).toBe(
-      ORRERY_DERIVATIVE_CACHE_MAX_BYTES,
-    );
-    // Oldest live entries went first; the newest stays.
-    expect(state.keys[state.keys.length - 1]).toBe("avatars/e.jpg#1");
-    expect(state.keys).not.toContain("avatars/a.jpg#1");
-    for (const release of releases) release();
-  });
-
-  it("retain/release is reference-counted and release is idempotent", () => {
-    const one = retainOrreryPhoto("avatars/a.jpg");
-    const two = retainOrreryPhoto("avatars/a.jpg");
-    one();
-    one();
-    expect(orreryDerivativeCacheState().live).toEqual(["avatars/a.jpg"]);
-    two();
-    expect(orreryDerivativeCacheState().live).toEqual([]);
-  });
-});
-
-describe("derivative cache — a late older revision never evicts a newer one (IN-02)", () => {
-  it("keeps revision 2 when a revision-1 result lands afterwards, and does not cache revision 1", async () => {
-    const { d, calls } = deps({ "file:///docs/avatars/contact-1.jpg": 1024 });
-    await loadOrreryImage("avatars/contact-1.jpg", 2, d);
-    const late = await loadOrreryImage("avatars/contact-1.jpg", 1, d);
-    // The late caller still gets its image.
-    expect(late).not.toBeNull();
-    expect(calls.downsamples).toHaveLength(2);
-    expect(orreryDerivativeCacheState().keys).toEqual([
-      "avatars/contact-1.jpg#2",
-    ]);
-    // Revision 2 is still a hit.
-    await loadOrreryImage("avatars/contact-1.jpg", 2, d);
-    expect(calls.downsamples).toHaveLength(2);
-  });
-
-  it("a newer revision still replaces an older one", async () => {
-    const { d } = deps({ "file:///docs/avatars/contact-1.jpg": 1024 });
-    await loadOrreryImage("avatars/contact-1.jpg", 1, d);
-    await loadOrreryImage("avatars/contact-1.jpg", 3, d);
-    expect(orreryDerivativeCacheState().keys).toEqual([
-      "avatars/contact-1.jpg#3",
-    ]);
-  });
-});
-
-describe("cancellation — queued downsamples nobody wants never run (IN-02)", () => {
+describe("cancellation — queued generations nobody wants never run (IN-02)", () => {
   function blocking(paths: string[]) {
     const started: string[] = [];
     const releases: Array<() => void> = [];
-    const sizes = Object.fromEntries(
-      paths.map((p) => [`file:///docs/${p}`, 1024]),
-    );
-    const { d, calls } = deps(sizes, {
+    const w = world(Object.fromEntries(paths.map((p) => [p, { ...BIG }])), {
       downsample: (uri) => {
         started.push(uri);
         return new Promise((resolve) => {
-          releases.push(() =>
-            resolve({ base64: `s-${uri}`, uri: "file:///cache/x" }),
-          );
+          releases.push(() => resolve({ uri: `tmp:${uri}` }));
         });
       },
     });
-    return { d, calls, started, releases };
+    return { ...w, started, releases };
   }
   const token = (): OrreryLoadToken => ({ cancelled: false });
 
-  it("skips a queued downsample whose only requester cancelled and hands the slot on", async () => {
+  it("skips a queued generation whose only requester cancelled and hands the slot on", async () => {
     const run = blocking(["avatars/a.jpg", "avatars/b.jpg", "avatars/c.jpg"]);
     const [ta, tb, tc] = [token(), token(), token()];
-    const a = loadOrreryImage("avatars/a.jpg", 1, run.d, ta);
-    const b = loadOrreryImage("avatars/b.jpg", 1, run.d, tb);
-    const c = loadOrreryImage("avatars/c.jpg", 1, run.d, tc);
+    const a = loadOrreryImage("avatars/a.jpg", run.d, ta);
+    const b = loadOrreryImage("avatars/b.jpg", run.d, tb);
+    const c = loadOrreryImage("avatars/c.jpg", run.d, tc);
     await flush();
     expect(run.started).toEqual(["file:///docs/avatars/a.jpg"]);
 
@@ -486,21 +417,20 @@ describe("cancellation — queued downsamples nobody wants never run (IN-02)", (
     await expect(b).resolves.toBeNull();
     expect(await a).not.toBeNull();
     expect(await c).not.toBeNull();
-    // Nothing was cached for b; a cancellation is not a failure (no log).
-    expect(orreryDerivativeCacheState().keys).not.toContain("avatars/b.jpg#1");
+    // Nothing was installed for b; a cancellation is not a failure (no log).
+    expect(run.disk.has(run.derivUri("avatars/b.jpg", BIG.sig))).toBe(false);
     expect(Logger.warn).not.toHaveBeenCalled();
     // Every large header image, b's included, was disposed.
-    for (const image of created.filter((i) => i.label.startsWith("large:")))
-      expect(image.disposeCount).toBe(1);
+    for (const image of larges()) expect(image.disposeCount).toBe(1);
   });
 
-  it("still runs a queued downsample while any requester of it is live", async () => {
+  it("still runs a queued generation while any requester of it is live (two bodies, one generation)", async () => {
     const run = blocking(["avatars/a.jpg", "avatars/b.jpg"]);
-    const a = loadOrreryImage("avatars/a.jpg", 1, run.d, token());
+    const a = loadOrreryImage("avatars/a.jpg", run.d, token());
     const gone = token();
     const stays = token();
-    const b1 = loadOrreryImage("avatars/b.jpg", 1, run.d, gone);
-    const b2 = loadOrreryImage("avatars/b.jpg", 1, run.d, stays);
+    const b1 = loadOrreryImage("avatars/b.jpg", run.d, gone);
+    const b2 = loadOrreryImage("avatars/b.jpg", run.d, stays);
     await flush();
     gone.cancelled = true;
     run.releases.shift()?.();
@@ -513,28 +443,28 @@ describe("cancellation — queued downsamples nobody wants never run (IN-02)", (
     await a;
     await expect(b1).resolves.toBeNull();
     expect(await b2).not.toBeNull();
-    expect(orreryDerivativeCacheState().keys).toContain("avatars/b.jpg#1");
+    expect(run.calls.installs).toHaveLength(2);
   });
 
-  it("a load cancelled mid-derivation makes no SkImage but keeps the derivative for the next mount", async () => {
+  it("a load cancelled mid-generation makes no SkImage but installs the derivative for the next mount", async () => {
     const run = blocking(["avatars/a.jpg"]);
     const t = token();
-    const a = loadOrreryImage("avatars/a.jpg", 1, run.d, t);
+    const a = loadOrreryImage("avatars/a.jpg", run.d, t);
     await flush();
     t.cancelled = true;
     run.releases.shift()?.();
     await expect(a).resolves.toBeNull();
-    expect(created.filter((i) => i.label.startsWith("small:"))).toEqual([]);
-    expect(orreryDerivativeCacheState().keys).toEqual(["avatars/a.jpg#1"]);
-    const again = await loadOrreryImage("avatars/a.jpg", 1, run.d, token());
+    expect(smalls()).toEqual([]);
+    expect(run.disk.has(run.derivUri("avatars/a.jpg", BIG.sig))).toBe(true);
+    const again = await loadOrreryImage("avatars/a.jpg", run.d, token());
     expect(again).not.toBeNull();
     expect(run.started).toHaveLength(1);
   });
 
   it("a load cancelled before its file read resolves decodes nothing", async () => {
     const t = token();
-    const { d } = deps(
-      { "file:///docs/avatars/a.jpg": 1024 },
+    const w = world(
+      { "avatars/a.jpg": BIG },
       {
         readData: async (uri) => {
           t.cancelled = true;
@@ -542,36 +472,48 @@ describe("cancellation — queued downsamples nobody wants never run (IN-02)", (
         },
       },
     );
-    await expect(loadOrreryImage("avatars/a.jpg", 1, d, t)).resolves.toBeNull();
+    await expect(loadOrreryImage("avatars/a.jpg", w.d, t)).resolves.toBeNull();
+    expect(created).toEqual([]);
+  });
+
+  it("a cancelled derivative hit decodes nothing", async () => {
+    const t = token();
+    const w = world({ "avatars/a.jpg": BIG });
+    w.disk.set(w.derivUri("avatars/a.jpg", BIG.sig), {
+      size: ORRERY_TEXTURE_MAX,
+    });
+    const read = w.d.readData;
+    w.d.readData = async (uri) => {
+      t.cancelled = true;
+      return read(uri);
+    };
+    await expect(loadOrreryImage("avatars/a.jpg", w.d, t)).resolves.toBeNull();
     expect(created).toEqual([]);
   });
 });
 
-describe("downsample queue — at most ORRERY_DOWNSAMPLE_CONCURRENCY in flight", () => {
-  it("runs 10 concurrent 1024 loads one downsample at a time and resolves all", async () => {
+describe("generation queue — at most ORRERY_DOWNSAMPLE_CONCURRENCY in flight", () => {
+  it("runs 10 concurrent 1024 loads one generation at a time and resolves all", async () => {
     let inFlight = 0;
     let maxInFlight = 0;
     const releases: Array<() => void> = [];
-    const sizes = Object.fromEntries(
-      Array.from({ length: 10 }, (_, i) => [
-        `file:///docs/avatars/p${i}.jpg`,
-        1024,
-      ]),
+    const masters = Object.fromEntries(
+      Array.from({ length: 10 }, (_, i) => [`avatars/p${i}.jpg`, { ...BIG }]),
     );
-    const { d } = deps(sizes, {
+    const { d } = world(masters, {
       downsample: (uri) => {
         inFlight += 1;
         maxInFlight = Math.max(maxInFlight, inFlight);
         return new Promise((resolve) => {
           releases.push(() => {
             inFlight -= 1;
-            resolve({ base64: `s-${uri}`, uri: "file:///cache/x" });
+            resolve({ uri: `tmp:${uri}` });
           });
         });
       },
     });
     const loads = Array.from({ length: 10 }, (_, i) =>
-      loadOrreryImage(`avatars/p${i}.jpg`, 1, d),
+      loadOrreryImage(`avatars/p${i}.jpg`, d),
     );
     let resolvedCount = 0;
     while (resolvedCount < 10) {
@@ -587,24 +529,21 @@ describe("downsample queue — at most ORRERY_DOWNSAMPLE_CONCURRENCY in flight",
     expect(images.every((image) => image !== null)).toBe(true);
   });
 
-  it("a rejecting downsample releases its slot so the next one starts", async () => {
+  it("a rejecting generation releases its slot so the next one starts", async () => {
     let calls = 0;
-    const { d } = deps(
-      {
-        "file:///docs/avatars/x.jpg": 1024,
-        "file:///docs/avatars/y.jpg": 1024,
-      },
+    const { d } = world(
+      { "avatars/x.jpg": BIG, "avatars/y.jpg": BIG },
       {
         downsample: async (uri) => {
           calls += 1;
           if (uri.endsWith("x.jpg")) throw new Error("manipulator");
-          return { base64: "ok", uri: "file:///cache/y" };
+          return { uri: `tmp:${uri}` };
         },
       },
     );
     const [x, y] = await Promise.all([
-      loadOrreryImage("avatars/x.jpg", 1, d),
-      loadOrreryImage("avatars/y.jpg", 1, d),
+      loadOrreryImage("avatars/x.jpg", d),
+      loadOrreryImage("avatars/y.jpg", d),
     ]);
     expect(x).toBeNull();
     expect(y).not.toBeNull();
@@ -614,50 +553,34 @@ describe("downsample queue — at most ORRERY_DOWNSAMPLE_CONCURRENCY in flight",
 
 describe("loadOrreryImage — every error path disposes what it created", () => {
   it("disposes the large image when the downsample throws", async () => {
-    const { d } = deps(
-      { "file:///docs/avatars/a.jpg": 1024 },
+    const { d } = world(
+      { "avatars/a.jpg": BIG },
       {
         downsample: async () => {
           throw new Error("manipulator");
         },
       },
     );
-    await expect(loadOrreryImage("avatars/a.jpg", 1, d)).resolves.toBeNull();
+    await expect(loadOrreryImage("avatars/a.jpg", d)).resolves.toBeNull();
     expect(disposeCounts()).toEqual([1]);
   });
 
-  it("disposes the large image when fromBase64 or the small decode throws", async () => {
-    const base = deps({ "file:///docs/avatars/a.jpg": 1024 });
-    const throwingFromBase64 = {
-      ...base.d,
-      fromBase64: () => {
-        throw new Error("bad base64");
+  it("disposes the large image when the install throws", async () => {
+    const { d } = world(
+      { "avatars/a.jpg": BIG },
+      {
+        install: async () => {
+          throw new Error("move failed");
+        },
       },
-    };
-    await expect(
-      loadOrreryImage("avatars/a.jpg", 1, throwingFromBase64),
-    ).resolves.toBeNull();
-    expect(disposeCounts()).toEqual([1]);
-
-    created = [];
-    resetOrreryPhotoCacheForTests();
-    const throwingDecode = {
-      ...base.d,
-      decode: (data: SkData) => {
-        const raw = data as unknown as { file?: string };
-        if (raw.file === undefined) throw new Error("bad derivative");
-        return base.d.decode(data);
-      },
-    };
-    await expect(
-      loadOrreryImage("avatars/a.jpg", 1, throwingDecode),
-    ).resolves.toBeNull();
+    );
+    await expect(loadOrreryImage("avatars/a.jpg", d)).resolves.toBeNull();
     expect(disposeCounts()).toEqual([1]);
   });
 
-  it("resolves null when the read fails or the header decode fails", async () => {
-    const readFails = deps(
-      {},
+  it("resolves null when the master read fails or its header decode fails", async () => {
+    const readFails = world(
+      { "avatars/gone.jpg": BIG },
       {
         readData: async () => {
           throw new Error("missing");
@@ -665,11 +588,14 @@ describe("loadOrreryImage — every error path disposes what it created", () => 
       },
     );
     await expect(
-      loadOrreryImage("avatars/gone.jpg", 1, readFails.d),
+      loadOrreryImage("avatars/gone.jpg", readFails.d),
     ).resolves.toBeNull();
-    const decodeNull = deps({}, { decode: () => null });
+    const decodeNull = world(
+      { "avatars/corrupt.jpg": BIG },
+      { decode: () => null },
+    );
     await expect(
-      loadOrreryImage("avatars/corrupt.jpg", 1, decodeNull.d),
+      loadOrreryImage("avatars/corrupt.jpg", decodeNull.d),
     ).resolves.toBeNull();
     expect(created).toEqual([]);
   });
@@ -758,23 +684,27 @@ describe("defaultOrreryImageDeps.downsample — native release (WR-02)", () => {
   beforeEach(() => {
     m.refReleases.length = 0;
     m.contextReleases.length = 0;
+    m.saveOptions.length = 0;
     m.renderThrows = false;
-    m.saveBase64 = "QUJD";
+    m.saveUri = "file:///cache/ImageManipulator/small.jpg";
   });
 
-  it("releases the rendered ref AND its context once on success", async () => {
+  it("returns the encoded temp file (no base64 copy) and releases the rendered ref AND its context once", async () => {
     await expect(
       defaultOrreryImageDeps.downsample("file:///docs/avatars/contact-1.jpg"),
-    ).resolves.toEqual({ base64: "QUJD", uri: "file:///cache/small.jpg" });
+    ).resolves.toEqual({ uri: "file:///cache/ImageManipulator/small.jpg" });
+    expect(m.saveOptions).toEqual([
+      { format: "jpeg", compress: ORRERY_DERIVATIVE_QUALITY },
+    ]);
     expect(m.refReleases).toEqual([1]);
     expect(m.contextReleases).toEqual([1]);
   });
 
-  it("releases both when the payload is missing", async () => {
-    m.saveBase64 = undefined;
+  it("releases both when no file comes back", async () => {
+    m.saveUri = undefined;
     await expect(
       defaultOrreryImageDeps.downsample("file:///docs/avatars/contact-1.jpg"),
-    ).rejects.toThrow("no base64 payload");
+    ).rejects.toThrow("produced no file");
     expect(m.refReleases).toEqual([1]);
     expect(m.contextReleases).toEqual([1]);
   });

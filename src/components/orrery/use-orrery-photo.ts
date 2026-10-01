@@ -7,27 +7,30 @@
  * `useImage` would quadruple each planet's texture. This hook keeps the orrery at
  * today's level: a master ≤ `ORRERY_TEXTURE_MAX` (every legacy 512 JPEG master and
  * every imported thumbnail) is passed through exactly as before; a larger master
- * is downsampled once to 512 by the manipulator and only the small image is
- * drawn. The large image is created only to read its header (deferred decode) and
- * is disposed undrawn.
+ * is drawn from a small on-disk derivative instead.
  *
- * MEMORY BOUNDS (D-11, finished by 38.6 D-37 / review IN-02):
- *   - Only the small ENCODED bytes (base64 strings) are cached across mounts, per
- *     path + display revision, in a byte-bounded LRU. SkImage objects are never
- *     cached.
- *   - The cache is SIZED TO THE ORRERY'S PHOTOS, not a fixed few MB: every
- *     mounted body retains its path (`retainOrreryPhoto`), and the budget is the
- *     high-water bytes of those live photos plus `ORRERY_DERIVATIVE_CACHE_SPARE_BYTES`
- *     for photos no mounted body shows, capped at `ORRERY_DERIVATIVE_CACHE_MAX_BYTES`.
- *     Idle entries are evicted first; live ones only past the hard cap. So a
- *     return to the Orrery (which remounts every body) decodes each photo from
- *     the cache instead of re-deriving it serially with initials showing (D-37).
- *   - At most `ORRERY_DOWNSAMPLE_CONCURRENCY` downsamples run at once (a
- *     module-level FIFO queue), so a first Orrery mount never decodes N large
- *     masters in parallel. A queued downsample whose every requester cancelled
- *     (unmount, path or revision change) never runs (IN-02).
- *   - A late result for an older revision never evicts a newer revision of the
- *     same path (IN-02).
+ * ON-DISK DERIVATIVE (38.6 D-41, supersedes D-37's in-memory base64 cache):
+ *   - Each >512 master gets ONE ≤512 JPEG derivative in the app's cache dir
+ *     (`orrery-derivative-store.ts`), keyed by the master's durable signature
+ *     (byte size + mtime), which is re-read on every load. A load first looks
+ *     for the derivative of the CURRENT signature and, when it exists and
+ *     decodes, never reads or decodes the master at all — the same path a 512
+ *     JPEG master takes. A stale (other signature), empty or undecodable
+ *     derivative is ignored, deleted and regenerated.
+ *   - Why disk: generating the derivative runs the manipulator, whose Android
+ *     decode (Glide, no transform, API 29+) yields a HARDWARE Bitmap — GPU
+ *     graphics memory — that is freed only when the Java GC gets to it. With
+ *     the derivative only in memory, every cold start re-ran that for every
+ *     1024 master: the transient Graphics/GL excess measured at 20 s (D-37).
+ *     On disk, it runs once per photo per byte change.
+ *   - Generation is lazy (first load that needs it), at most
+ *     `ORRERY_DOWNSAMPLE_CONCURRENCY` at once (a module-level FIFO), and atomic
+ *     (the manipulator's temp file is renamed into place). A queued generation
+ *     whose every requester cancelled (unmount, path or revision change) never
+ *     runs (IN-02). Two bodies showing one photo share one generation.
+ *   - The ownership layer deletes a photo's derivatives whenever its bytes
+ *     change or are deleted (`notifyPhotoBytesChanged`), and a launch sweep
+ *     removes orphans. SkImage objects are never cached.
  *
  * SkImage OWNERSHIP: the hook owns exactly the image it published. Skia re-reads
  * the image prop on every Canvas re-record (`sksg/Recorder/commands/Drawing.ts`
@@ -42,15 +45,20 @@
  * which retires the live image until the reload publishes a fresh one.)
  *
  * Skia and the manipulator always receive the PLAIN file URI (no `?v=`
- * display query); the revision only keys the derivative cache and the effect.
- * All native access sits behind injectable `OrreryImageDeps`, so the loader and
- * the lifecycle helper are node-testable with fakes.
+ * display query); the display revision only re-runs the load effect. All native
+ * access sits behind injectable `OrreryImageDeps`, so the loader and the
+ * lifecycle helper are node-testable with fakes.
  */
 import { type SkData, type SkImage, Skia } from "@shopify/react-native-skia";
 import type * as ExpoImageManipulator from "expo-image-manipulator";
 import { useEffect, useRef, useState } from "react";
 import { isStoredPhotoPath } from "@/db/photo-relative-path";
-import { discardDerivative } from "@/services/photos/derivative-cache";
+import {
+  dropOrreryDerivative,
+  findOrreryDerivative,
+  installOrreryDerivative,
+  orreryMasterSignature,
+} from "@/services/photos/orrery-derivative-store";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
 import { usePhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import { Logger } from "@/utils/logger";
@@ -58,34 +66,23 @@ import { Logger } from "@/utils/logger";
 // --- Tunable constants (top-of-file per project convention) ------------------
 
 /**
- * D-11: the largest photo texture the orrery uploads, in px on the long edge.
- * Today's master edge; a planet (PLANET_RADIUS 16) at MAX_ZOOM 4 on a ~3.5×
- * density phone needs ~448 px, so 512 loses nothing visible.
+ * D-11: the largest photo texture the orrery uploads, in px on the long edge,
+ * and the edge of the on-disk derivative (D-41). Kept at today's master edge:
+ * a planet (PLANET_RADIUS 16, a 32 dp disc) at MAX_ZOOM 4 on a ~3.5× density
+ * phone draws ~448 px, and the sun (SUN_RADIUS 30, a 60 dp disc) ~840 px, so
+ * anything smaller would soften zoomed-in bodies; 512 also keeps texture memory
+ * equal to the 512 JPEG baseline D-11 is measured against.
  */
 export const ORRERY_TEXTURE_MAX = 512;
 
-/** JPEG quality of the cached 512 derivative (encoded bytes only, never shown larger). */
+/** JPEG quality of the on-disk derivative (never shown larger than 512). */
 export const ORRERY_DERIVATIVE_QUALITY = 0.9;
 
 /**
- * D-11: at most this many 1024→512 downsamples run at once. Each 1024² decode is
- * ≈4 MB RGBA; unbounded, a 50-planet first mount would spike ≈200 MB.
+ * D-11: at most this many 1024→512 derivative generations run at once. Each
+ * 1024² decode is ≈4 MB; unbounded, a 50-planet first mount would spike ≈200 MB.
  */
 export const ORRERY_DOWNSAMPLE_CONCURRENCY = 1;
-
-/**
- * D-37: bytes of cached base64 derivatives kept for photos no mounted Orrery body
- * shows (a previously viewed System), ON TOP of the live photos' high-water
- * bytes. Also the whole budget before any body has mounted.
- */
-export const ORRERY_DERIVATIVE_CACHE_SPARE_BYTES = 4 * 1024 * 1024;
-
-/**
- * D-37: hard ceiling on the derivative cache (JS heap). A 512 JPEG q0.9
- * derivative is roughly 70-120 KB of base64, so this holds the photos of about
- * 200-350 Orrery bodies; past it, even live photos are evicted oldest-first.
- */
-export const ORRERY_DERIVATIVE_CACHE_MAX_BYTES = 24 * 1024 * 1024;
 
 const LOG_SCOPE = "orrery-photo";
 
@@ -97,16 +94,28 @@ export interface OrreryImageDeps {
   readData: (uri: string) => Promise<SkData>;
   /** Deferred decode: `width()`/`height()` read the header only. */
   decode: (data: SkData) => SkImage | null;
-  fromBase64: (base64: string) => SkData;
-  /** Downsample a large master to `ORRERY_TEXTURE_MAX`, returning base64 + the derivative file. */
-  downsample: (uri: string) => Promise<{ base64: string; uri: string }>;
-  /** Retire the manipulator's derivative file. */
-  discard: (uri: string) => void;
+  /** The master's durable signature (size + mtime); null when it is missing. */
+  signature: (relative: string) => string | null;
+  /** The derivative file for exactly this signature, or null (miss / stale). */
+  findDerivative: (relative: string, signature: string) => string | null;
+  /** Downsample a large master to `ORRERY_TEXTURE_MAX` into a temp cache file. */
+  downsample: (uri: string) => Promise<{ uri: string }>;
+  /**
+   * Atomically move the temp file into place as the derivative for
+   * `signature`; null when the master changed meanwhile (nothing installed).
+   */
+  install: (
+    tempUri: string,
+    relative: string,
+    signature: string,
+  ) => Promise<string | null>;
+  /** Delete an unusable (empty / undecodable) derivative file. */
+  dropDerivative: (uri: string) => void;
 }
 
 async function downsampleWithManipulator(
   uri: string,
-): Promise<{ base64: string; uri: string }> {
+): Promise<{ uri: string }> {
   const { ImageManipulator, SaveFormat } = (await import(
     "expo-image-manipulator"
   )) as typeof ExpoImageManipulator;
@@ -118,16 +127,15 @@ async function downsampleWithManipulator(
     rendered = await context
       .resize({ width: ORRERY_TEXTURE_MAX, height: ORRERY_TEXTURE_MAX })
       .renderAsync();
+    // D-41: the encoded file itself is the derivative (renamed into place by
+    // the store); no base64 copy is made.
     const out = await rendered.saveAsync({
       format: SaveFormat.JPEG,
       compress: ORRERY_DERIVATIVE_QUALITY,
-      base64: true,
     });
-    if (typeof out.base64 !== "string" || out.base64.length === 0) {
-      discardDerivative(out.uri);
-      throw new Error("orrery downsample produced no base64 payload");
-    }
-    return { base64: out.base64, uri: out.uri };
+    if (typeof out.uri !== "string" || out.uri.length === 0)
+      throw new Error("orrery downsample produced no file");
+    return { uri: out.uri };
   } finally {
     try {
       rendered?.release();
@@ -146,30 +154,16 @@ export const defaultOrreryImageDeps: OrreryImageDeps = {
   fileUri: (relative) => resolvePhotoUri(relative),
   readData: (uri) => Skia.Data.fromURI(uri),
   decode: (data) => Skia.Image.MakeImageFromEncoded(data),
-  fromBase64: (base64) => Skia.Data.fromBase64(base64),
+  signature: (relative) => orreryMasterSignature(relative),
+  findDerivative: (relative, signature) =>
+    findOrreryDerivative(relative, signature),
   downsample: downsampleWithManipulator,
-  discard: (uri) => {
-    discardDerivative(uri);
+  install: (tempUri, relative, signature) =>
+    installOrreryDerivative(tempUri, relative, signature),
+  dropDerivative: (uri) => {
+    dropOrreryDerivative(uri);
   },
 };
-
-// --- Byte-budgeted LRU of encoded derivatives (strings only) -----------------
-
-interface DerivativeEntry {
-  relative: string;
-  /** Display revision (`undefined` → 0); strictly increasing per path. */
-  revision: number;
-  value: string;
-}
-
-/** Insertion order = recency order (oldest first). */
-const derivativeCache = new Map<string, DerivativeEntry>();
-let derivativeCacheBytes = 0;
-
-/** Mounted Orrery bodies per photo path (D-37: the live set the cache is sized to). */
-const livePhotoRefs = new Map<string, number>();
-/** High-water bytes of cached derivatives whose path was live at the same time. */
-let liveDemandHighWater = 0;
 
 /**
  * A cancellation token for one load. The hook flips `cancelled` in its effect
@@ -183,132 +177,21 @@ export interface OrreryLoadToken {
 const NEVER_CANCELLED: OrreryLoadToken = Object.freeze({ cancelled: false });
 
 /**
- * Rejection of a shared derivation whose every requester cancelled before it
+ * Rejection of a shared generation whose every requester cancelled before it
  * ran. A singleton compared by identity (no Error subclass `instanceof`).
  */
 const ORRERY_LOAD_CANCELLED = new Error("orrery downsample cancelled");
 
 interface PendingDerivative {
   requesters: Set<OrreryLoadToken>;
-  work: Promise<string>;
+  /** The installed derivative URI, or null when the master changed meanwhile. */
+  work: Promise<string | null>;
 }
 
-/** In-flight downsample per key, so two bodies showing one photo derive once. */
+/** In-flight generation per path + signature, so two bodies derive once. */
 const pendingDerivatives = new Map<string, PendingDerivative>();
 
-function cacheKey(relative: string, revision: number | undefined): string {
-  return `${relative}#${revision ?? 0}`;
-}
-
-function cacheDelete(key: string): void {
-  const entry = derivativeCache.get(key);
-  if (entry === undefined) return;
-  derivativeCache.delete(key);
-  derivativeCacheBytes -= entry.value.length;
-}
-
-function cacheGet(key: string): string | undefined {
-  const entry = derivativeCache.get(key);
-  if (entry === undefined) return undefined;
-  // Refresh recency.
-  derivativeCache.delete(key);
-  derivativeCache.set(key, entry);
-  return entry.value;
-}
-
-function isLive(entry: DerivativeEntry): boolean {
-  return livePhotoRefs.has(entry.relative);
-}
-
-function noteLiveDemand(): void {
-  let live = 0;
-  for (const entry of derivativeCache.values())
-    if (isLive(entry)) live += entry.value.length;
-  if (live > liveDemandHighWater) liveDemandHighWater = live;
-}
-
-/**
- * The current byte budget (D-37): the live photos' high-water bytes plus the
- * spare allowance, never above the hard cap.
- */
-export function orreryDerivativeCacheBudget(): number {
-  return Math.min(
-    ORRERY_DERIVATIVE_CACHE_MAX_BYTES,
-    liveDemandHighWater + ORRERY_DERIVATIVE_CACHE_SPARE_BYTES,
-  );
-}
-
-/**
- * Mark `relative` as shown by a mounted Orrery body until the returned release
- * runs (idempotent). Live entries are evicted only past the hard cap.
- */
-export function retainOrreryPhoto(relative: string): () => void {
-  livePhotoRefs.set(relative, (livePhotoRefs.get(relative) ?? 0) + 1);
-  noteLiveDemand();
-  let released = false;
-  return () => {
-    if (released) return;
-    released = true;
-    const next = (livePhotoRefs.get(relative) ?? 1) - 1;
-    if (next <= 0) livePhotoRefs.delete(relative);
-    else livePhotoRefs.set(relative, next);
-  };
-}
-
-/** Evict until within budget: idle entries oldest-first, then (past the cap) live ones. */
-function evictOverBudget(keep: string): void {
-  const budget = orreryDerivativeCacheBudget();
-  for (const [key, entry] of [...derivativeCache]) {
-    if (derivativeCacheBytes <= budget) return;
-    if (key !== keep && !isLive(entry)) cacheDelete(key);
-  }
-  for (const key of [...derivativeCache.keys()]) {
-    if (derivativeCacheBytes <= budget) return;
-    if (key !== keep) cacheDelete(key);
-  }
-  if (derivativeCacheBytes > budget) cacheDelete(keep);
-}
-
-function cachePut(
-  relative: string,
-  revision: number | undefined,
-  key: string,
-  value: string,
-): void {
-  const rev = revision ?? 0;
-  for (const [existingKey, entry] of [...derivativeCache]) {
-    if (entry.relative !== relative || existingKey === key) continue;
-    // IN-02: a late result for an older revision never evicts a newer entry
-    // (and is not cached: that revision can never be requested again).
-    if (entry.revision > rev) return;
-    // A superseded revision of the same path can never be requested again.
-    cacheDelete(existingKey);
-  }
-  cacheDelete(key);
-  if (value.length > ORRERY_DERIVATIVE_CACHE_MAX_BYTES) return;
-  derivativeCache.set(key, { relative, revision: rev, value });
-  derivativeCacheBytes += value.length;
-  noteLiveDemand();
-  evictOverBudget(key);
-}
-
-/**
- * Test/diagnostic view of the derivative cache: keys (oldest first), total
- * bytes, and the photo paths currently retained by mounted bodies.
- */
-export function orreryDerivativeCacheState(): {
-  keys: string[];
-  bytes: number;
-  live: string[];
-} {
-  return {
-    keys: [...derivativeCache.keys()],
-    bytes: derivativeCacheBytes,
-    live: [...livePhotoRefs.keys()],
-  };
-}
-
-// --- Downsample queue (at most ORRERY_DOWNSAMPLE_CONCURRENCY in flight) ------
+// --- Generation queue (at most ORRERY_DOWNSAMPLE_CONCURRENCY in flight) ------
 
 let activeDownsamples = 0;
 const downsampleWaiters: Array<() => void> = [];
@@ -333,14 +216,14 @@ function everyRequesterCancelled(requesters: Set<OrreryLoadToken>): boolean {
   return true;
 }
 
-function deriveSmall(
+function generateDerivative(
   relative: string,
-  revision: number | undefined,
-  key: string,
+  signature: string,
   uri: string,
   deps: OrreryImageDeps,
   token: OrreryLoadToken,
-): Promise<string> {
+): Promise<string | null> {
+  const key = `${relative}#${signature}`;
   const pending = pendingDerivatives.get(key);
   if (pending) {
     pending.requesters.add(token);
@@ -348,30 +231,26 @@ function deriveSmall(
   }
   const entry: PendingDerivative = {
     requesters: new Set([token]),
-    work: Promise.resolve(""),
+    work: Promise.resolve(null),
   };
   entry.work = (async () => {
     try {
       await acquireDownsampleSlot();
-      let out: { base64: string; uri: string };
+      let out: { uri: string };
       try {
-        // IN-02: a queued downsample whose every requester has gone never runs.
-        // The check, the slot hand-off and the entry removal below all happen
-        // in this one synchronous continuation, so no requester can join a
-        // derivation that has already given up.
+        // IN-02: a queued generation whose every requester has gone never
+        // runs. The check, the slot hand-off and the entry removal below all
+        // happen in this one synchronous continuation, so no requester can
+        // join a generation that has already given up.
         if (everyRequesterCancelled(entry.requesters))
           throw ORRERY_LOAD_CANCELLED;
         out = await deps.downsample(uri);
       } finally {
         releaseDownsampleSlot();
       }
-      try {
-        deps.discard(out.uri);
-      } catch {
-        Logger.warn(LOG_SCOPE, "orrery derivative cleanup failed");
-      }
-      cachePut(relative, revision, key, out.base64);
-      return out.base64;
+      // Installed even if every requester has since gone: the next mount
+      // reads it from disk instead of generating again.
+      return await deps.install(out.uri, relative, signature);
     } finally {
       if (pendingDerivatives.get(key) === entry) pendingDerivatives.delete(key);
     }
@@ -380,12 +259,8 @@ function deriveSmall(
   return entry.work;
 }
 
-/** Clear the derivative cache, live set and downsample queue (tests only). */
-export function resetOrreryPhotoCacheForTests(): void {
-  derivativeCache.clear();
-  derivativeCacheBytes = 0;
-  livePhotoRefs.clear();
-  liveDemandHighWater = 0;
+/** Clear the generation queue (tests only). */
+export function resetOrreryPhotoQueueForTests(): void {
   pendingDerivatives.clear();
   activeDownsamples = 0;
   downsampleWaiters.length = 0;
@@ -402,52 +277,105 @@ function disposeQuietly(image: SkImage | null): void {
   }
 }
 
+/** A derivative must decode to a non-empty image no larger than the cap. */
+function isUsableDerivative(image: SkImage): boolean {
+  const width = image.width();
+  const height = image.height();
+  return (
+    width > 0 && height > 0 && Math.max(width, height) <= ORRERY_TEXTURE_MAX
+  );
+}
+
 /**
- * Load the orrery image for a canonical relative photo path at a display
- * revision. A master ≤ `ORRERY_TEXTURE_MAX` is returned as decoded (today's
- * behaviour); a larger one is replaced by a cached/queued 512 derivative and
- * disposed undrawn. Any read/decode/manipulator failure resolves to `null` (the
- * body shows its initials swatch), after disposing every SkImage this call made.
- * A load cancelled through `token` resolves to `null` without logging and makes
- * no image once it notices; its queued downsample is skipped if no other body
+ * Decode a derivative file. `undefined` = unusable (unreadable, undecodable or
+ * oversized): it is deleted so the caller can regenerate. `null` = cancelled.
+ */
+async function decodeDerivative(
+  derivativeUri: string,
+  deps: OrreryImageDeps,
+  token: OrreryLoadToken,
+): Promise<SkImage | null | undefined> {
+  let data: SkData;
+  try {
+    data = await deps.readData(derivativeUri);
+  } catch {
+    deps.dropDerivative(derivativeUri);
+    return undefined;
+  }
+  if (token.cancelled) return null;
+  const image = deps.decode(data);
+  if (image && isUsableDerivative(image)) return image;
+  disposeQuietly(image);
+  deps.dropDerivative(derivativeUri);
+  return undefined;
+}
+
+/**
+ * Load the orrery image for a canonical relative photo path. A valid on-disk
+ * derivative for the master's current signature is decoded without touching
+ * the master (D-41). Otherwise the master's header is read: ≤
+ * `ORRERY_TEXTURE_MAX` is returned as decoded (today's pass-through); larger is
+ * replaced by a freshly generated derivative and disposed undrawn. Any
+ * read/decode/manipulator failure resolves to `null` (the body shows its
+ * initials swatch), after disposing every SkImage this call made. A load
+ * cancelled through `token` resolves to `null` without logging and makes no
+ * image once it notices; its queued generation is skipped if no other body
  * still wants it. The caller owns the returned image.
  */
 export async function loadOrreryImage(
   relative: string,
-  revision: number | undefined,
   deps: OrreryImageDeps = defaultOrreryImageDeps,
   token: OrreryLoadToken = NEVER_CANCELLED,
 ): Promise<SkImage | null> {
   // 38.6 D-34: a value that is not a stored photo path is never resolved (and
   // never logged — it can be user text); the body shows its initials.
   if (!isStoredPhotoPath(relative)) return null;
-  const key = cacheKey(relative, revision);
   try {
     if (token.cancelled) return null;
-    const hit = cacheGet(key);
-    if (hit !== undefined) return deps.decode(deps.fromBase64(hit));
+    // Missing master (D-23: small surfaces keep plain initials).
+    const signature = deps.signature(relative);
+    if (signature === null) return null;
+
+    const existing = deps.findDerivative(relative, signature);
+    if (existing !== null) {
+      const hit = await decodeDerivative(existing, deps, token);
+      if (hit !== undefined) return hit;
+      // Unusable derivative (deleted above): regenerate from the master.
+    }
 
     const uri = deps.fileUri(relative);
     const data = await deps.readData(uri);
     if (token.cancelled) return null;
     const large = deps.decode(data);
     if (!large) return null;
-    let small: string;
+    let derivative: string | null;
     let keepLarge = false;
     try {
       if (Math.max(large.width(), large.height()) <= ORRERY_TEXTURE_MAX) {
         keepLarge = true;
         return large;
       }
-      small = await deriveSmall(relative, revision, key, uri, deps, token);
+      derivative = await generateDerivative(
+        relative,
+        signature,
+        uri,
+        deps,
+        token,
+      );
     } finally {
-      // Never drawn: dispose on the downsample path and on every throw.
+      // Never drawn: dispose on the generation path and on every throw.
       if (!keepLarge) disposeQuietly(large);
     }
-    // Cancelled while queued or deriving: the derivative stays cached for a
-    // later mount, but no SkImage is made for a body that is gone.
-    if (token.cancelled) return null;
-    return deps.decode(deps.fromBase64(small));
+    // Cancelled while queued or generating: the derivative stays on disk for
+    // a later mount, but no SkImage is made for a body that is gone. Null
+    // derivative: the master changed meanwhile, and its revision bump reloads.
+    if (token.cancelled || derivative === null) return null;
+    const fresh = await decodeDerivative(derivative, deps, token);
+    if (fresh === undefined) {
+      Logger.warn(LOG_SCOPE, `orrery derivative unusable for ${relative}`);
+      return null;
+    }
+    return fresh;
   } catch (error) {
     if (error === ORRERY_LOAD_CANCELLED) return null;
     Logger.warn(LOG_SCOPE, `orrery photo load failed for ${relative}`, error);
@@ -524,6 +452,7 @@ export function useOrreryPhoto(relative: string | null): SkImage | null {
   const slot = slotRef.current;
   const [image, setImage] = useState<SkImage | null>(() => null);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `revision` is the reload trigger — the ownership layer bumps it when the canonical bytes change (D-19), and the loader re-reads the master's on-disk signature (D-41).
   useEffect(() => {
     const token: OrreryLoadToken = { cancelled: false };
     if (!relative) {
@@ -531,9 +460,7 @@ export function useOrreryPhoto(relative: string | null): SkImage | null {
       setImage(null);
       return;
     }
-    // D-37: while mounted, this body's photo counts toward the cache budget.
-    const release = retainOrreryPhoto(relative);
-    loadOrreryImage(relative, revision, defaultOrreryImageDeps, token).then(
+    loadOrreryImage(relative, defaultOrreryImageDeps, token).then(
       (next) => {
         if (slot.settle(next, token.cancelled)) setImage(next);
       },
@@ -543,11 +470,10 @@ export function useOrreryPhoto(relative: string | null): SkImage | null {
         setImage(null);
       },
     );
-    // Cancel (a queued downsample nobody else wants is skipped) and release the
-    // live mark only — the published image is retired by the effect below.
+    // Cancel only (a queued generation nobody else wants is skipped) — the
+    // published image is retired by the effect below.
     return () => {
       token.cancelled = true;
-      release();
     };
   }, [relative, revision, slot]);
 
