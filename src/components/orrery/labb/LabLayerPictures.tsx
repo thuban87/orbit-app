@@ -216,6 +216,14 @@ function drawBodyPoint(
   canvas.drawCircle(0, 0, core, paint);
 }
 
+/**
+ * R2 overview size floor (flag `bodySizeFloor`): a contact body smaller than
+ * the profile's `minBodyDp` is DRAWN larger, by at most this factor, so it reads
+ * as a world rather than a map pin. Hit radius, labels and the model are
+ * untouched (MIN_HIT_RADIUS already exceeds the drawn size).
+ */
+const SIZE_FLOOR_MAX_BOOST = 1.4;
+
 /** Flat / moon fallback defocus: alpha × (1 − FLAT_DEFOCUS × defocus). */
 const FLAT_DEFOCUS = 0.4;
 
@@ -635,6 +643,7 @@ export function LabBodiesPictures({
     fontProvider,
   ]);
   const { specs, sunKeys, effects, shaders, fonts } = layer;
+  const minBody = look.profile.stage.minBodyDp;
   const orders = EFFECT_ORDERS;
   const pictures = useDerivedValue(() => {
     const probe = probeStart();
@@ -655,6 +664,7 @@ export function LabBodiesPictures({
     const card =
       cardRect && fx?.flags.focusCardOcclusion ? cardRect.value : null;
     const pointLod = !!fx?.flags.bodyPointLod;
+    const sizeFloor = !!fx?.flags.bodySizeFloor;
     let sunDepth: number | null = null;
     for (let s = 0; s < sunKeys.length && sunDepth === null; s++) {
       const b = bodyAt(f, index, sunKeys[s]);
@@ -673,8 +683,20 @@ export function LabBodiesPictures({
         ),
       );
       for (let n = 0; n < items.length; n++) {
-        const planned = items[n];
-        const spec = specs[planned.i];
+        const raw = items[n];
+        const spec = specs[raw.i];
+        // R2 overview size floor (visual only; hit radii / labels unchanged).
+        const planned =
+          sizeFloor && !spec.moon && raw.s * spec.radius < minBody
+            ? {
+                ...raw,
+                s:
+                  Math.min(
+                    minBody,
+                    raw.s * spec.radius * SIZE_FLOOR_MAX_BOOST,
+                  ) / spec.radius,
+              }
+            : raw;
         const reach = planned.s * spec.radius * BODY_REACH;
         const item = underCard(
           card,

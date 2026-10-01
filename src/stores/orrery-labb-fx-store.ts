@@ -364,6 +364,61 @@ export const LAB_FLAG_REGISTRY = [
     default: true,
     heavy: true,
   },
+  // R2 art direction + hero moments.
+  {
+    id: "homeTilt",
+    label: "R2 Home tilts the orbital plane (≈32°; changes Home, C-66)",
+    section: "effects",
+    default: true,
+    note: "applied at Home / Recenter / switch Home; manual tilt unchanged",
+  },
+  {
+    id: "planeLight",
+    label: "R2 Sun light pool on the orbital plane",
+    section: "effects",
+    default: true,
+    heavy: true,
+  },
+  {
+    id: "planeGrid",
+    label: "R2 Orbital-plane grid with a gravity well around the sun",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "ringSunLight",
+    label: "R2 Rings rim-lit near the sun",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "bodySizeFloor",
+    label: "R2 Overview body size floor (worlds, not pins)",
+    section: "effects",
+    default: true,
+    note: "visual only: hit radii and labels unchanged",
+  },
+  {
+    id: "bloom",
+    label: "R2 EXPERIMENT bloom: one bright-pass + blur layer over the world",
+    section: "effects",
+    default: false,
+    heavy: true,
+  },
+  {
+    id: "lensFlare",
+    label: "R2 EXPERIMENT sun lens flare + anamorphic streak",
+    section: "effects",
+    default: false,
+    heavy: true,
+  },
+  {
+    id: "tiltShift",
+    label: "R2 EXPERIMENT tilt-shift depth of field (backdrop blur bands)",
+    section: "effects",
+    default: false,
+    heavy: true,
+  },
   // Debug instrumentation (research 03 §4).
   {
     id: "layerPictures",

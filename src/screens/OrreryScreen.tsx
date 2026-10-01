@@ -22,6 +22,7 @@ import {
   useSharedValue,
 } from "react-native-reanimated";
 import { LabBMarkerHost } from "@/components/orrery/labb/debug/LabFxPanel";
+import { labHomePose } from "@/components/orrery/labb/labb-home-tilt";
 import {
   CLUSTER_OBSTACLE,
   OrreryClusterPanel,
@@ -342,7 +343,8 @@ export function OrreryScreen() {
         (member) => member.id,
       );
       const destinationHome =
-        deriveHomePose(next.snapshot.world, viewport) ?? pose.value;
+        labHomePose(deriveHomePose(next.snapshot.world, viewport)) ??
+        pose.value;
       publishSwitch(
         next.snapshot,
         !!sourceIds,
@@ -971,7 +973,7 @@ export function OrreryScreen() {
       focusedBodies.length > 0
         ? frameBodies(focusedBodies, viewport, scene.extent, pose.value)?.pose
         : undefined,
-      deriveHomePose(scene.world, viewport),
+      labHomePose(deriveHomePose(scene.world, viewport)),
     );
     if (!home) return; // Preserve the previous valid pose through zero measurement.
     if (focusedBodies.length === 1)
@@ -1013,7 +1015,9 @@ export function OrreryScreen() {
     setClusterOpen(false);
     setFocusTargets([]);
     setFocusError(null);
-    const home = deriveHomePose(state.snapshot?.world ?? [], viewport);
+    const home = labHomePose(
+      deriveHomePose(state.snapshot?.world ?? [], viewport),
+    );
     if (!home) return;
     runOnUI(camera.recover)(home);
   };

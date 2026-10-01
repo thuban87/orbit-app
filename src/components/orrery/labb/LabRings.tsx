@@ -761,6 +761,7 @@ function RingClassesPicture({
   ringGap,
   anyFocus,
   trimKeys,
+  sunLight,
 }: {
   classes: readonly (readonly LabRingEntry[])[];
   frame: SharedValue<AnimatedFrame>;
@@ -773,6 +774,8 @@ function RingClassesPicture({
   ringGap: number;
   anyFocus: boolean;
   trimKeys: ReadonlySet<string>;
+  /** R2 rim light: [radius (world), gain] (flag `ringSunLight`). */
+  sunLight: readonly number[];
 }) {
   const ctx = useLabStillContext();
   const fxFlags = ctx?.fxFlags;
@@ -853,6 +856,7 @@ function RingClassesPicture({
           farAlpha,
           flowStrength: flowK * fade * fade,
           flowOn: true,
+          sunLight: fx?.flags.ringSunLight ? sunLight : undefined,
         });
         paint.setShader(effect.makeShader(flattenUniforms(u, RING_ORDER)));
       } else {
@@ -1071,6 +1075,12 @@ export function LabRings({
     [entries],
   );
   const anyFocus = entries.some((e) => e.focused);
+  // R2 rim light: the light radius is a fraction of the outermost ring.
+  const sunLight = useMemo(() => {
+    let outer = 1;
+    for (const e of entries) outer = Math.max(outer, e.ringRadius);
+    return [outer * profile.sunLightRadius, profile.sunLightGain];
+  }, [entries, profile.sunLightRadius, profile.sunLightGain]);
   const ringGap = useMemo(
     () => typicalRingGap(entries.map((e) => e.ringRadius)),
     [entries],
@@ -1280,6 +1290,7 @@ export function LabRings({
           ringGap={ringGap}
           anyFocus={anyFocus}
           trimKeys={trimKeys}
+          sunLight={sunLight}
         />
       ) : null}
       {(picture ? [] : classes).map((group) => (

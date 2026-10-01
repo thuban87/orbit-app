@@ -49,6 +49,8 @@ export interface LabFxProfile {
    * the world plane (null = none; Galaxy keeps its nebula drama instead).
    */
   chart: LabChartProfile | null;
+  /** R2 art direction: stage lighting, depth and hero-moment tunables. */
+  stage: LabStageProfile;
   /** Roles reserved for WP-1.1+ layers (environment / bodies / rings). */
   roles: {
     sky: LabColorToken;
@@ -184,6 +186,10 @@ export interface LabRingProfile {
   /** Compass chevron on the world rim (deferred from WP-1.2 Polaris). */
   compass: LabColorToken;
   compassAlpha: number;
+  /** R2 rim light (flag `ringSunLight`): light radius as a fraction of the
+   * outermost ring, and the alpha gain at the sun. */
+  sunLightRadius: number;
+  sunLightGain: number;
 }
 
 /**
@@ -224,6 +230,34 @@ export interface LabChartProfile {
   spokeDeg: number;
   /** Target number of range rings across the scene extent. */
   rings: number;
+}
+
+/**
+ * R2 stage profile: how the star lights its plane and the hero-moment effects.
+ * Strengths before the panel intensity. Colours are tokens (the sun's own
+ * glow colour comes from `resolveSunOccupant`, a starPalette token).
+ */
+export interface LabStageProfile {
+  /** Sun light pool on the orbital plane (flag `planeLight`). */
+  pool: number;
+  /** Pool radius as a fraction of the scene extent. */
+  poolRadius: number;
+  /** Additive (dark) or a srcOver warm wash (light). */
+  poolAdditive: boolean;
+  /** Orbital-plane grid with a gravity well (flag `planeGrid`). */
+  grid: number;
+  gridTone: LabColorToken;
+  /** Grid cells across the scene extent, and the well's pinch strength. */
+  gridCells: number;
+  well: number;
+  /** Bloom (flag `bloom`): bright-pass threshold 0..1, gain, blur sigma dp. */
+  bloomThreshold: number;
+  bloomGain: number;
+  bloomSigma: number;
+  /** Lens flare / anamorphic streak strength (flag `lensFlare`; 0 = never). */
+  flare: number;
+  /** Overview body size floor (flag `bodySizeFloor`): min drawn radius, dp. */
+  minBodyDp: number;
 }
 
 /**
@@ -353,6 +387,8 @@ const DARK_RINGS: LabRingProfile = {
   tickAlpha: 0.7,
   compass: "accent",
   compassAlpha: 0.6,
+  sunLightRadius: 0.32,
+  sunLightGain: 1.1,
 };
 const LIGHT_RINGS: LabRingProfile = {
   alpha: 0.7,
@@ -375,6 +411,8 @@ const LIGHT_RINGS: LabRingProfile = {
   tickAlpha: 0.75,
   compass: "accent",
   compassAlpha: 0.7,
+  sunLightRadius: 0.32,
+  sunLightGain: 0.35,
 };
 const DARK_LABELS: LabLabelProfile = {
   plate: "surface",
@@ -422,7 +460,11 @@ const STANDARD_DARK_ENV: LabEnvProfile = {
   twinkle: 0.06,
 };
 /** Standard Dark rings: calmer flow (C-04 stays on, at half strength). */
-const STANDARD_DARK_RINGS: LabRingProfile = { ...DARK_RINGS, flow: 0.45 };
+const STANDARD_DARK_RINGS: LabRingProfile = {
+  ...DARK_RINGS,
+  flow: 0.45,
+  sunLightGain: 0.6,
+};
 const STANDARD_DARK_CHART: LabChartProfile = {
   tone: "textSecondary",
   alpha: 0.1,
@@ -436,6 +478,50 @@ const STANDARD_LIGHT_CHART: LabChartProfile = {
   scaleAlpha: 0.26,
   spokeDeg: 30,
   rings: 6,
+};
+
+/** R2 stage: Galaxy Dark is the hero (light pool, grid, bloom, flare). */
+const DARK_STAGE: LabStageProfile = {
+  pool: 0.13,
+  poolRadius: 0.32,
+  poolAdditive: true,
+  grid: 0.05,
+  gridTone: "textSecondary",
+  gridCells: 10,
+  well: 1.4,
+  bloomThreshold: 0.74,
+  bloomGain: 0.7,
+  bloomSigma: 9,
+  flare: 0.55,
+  minBodyDp: 12,
+};
+/** Standard Dark: calmer — no grid (its chart graticule is the plane), less flare. */
+const STANDARD_DARK_STAGE: LabStageProfile = {
+  ...DARK_STAGE,
+  pool: 0.12,
+  grid: 0,
+  bloomGain: 0.6,
+  flare: 0.25,
+};
+/** Light themes: a warm wash instead of emission; no bloom / flare. */
+const LIGHT_STAGE: LabStageProfile = {
+  pool: 0.1,
+  poolRadius: 0.32,
+  poolAdditive: false,
+  grid: 0.06,
+  gridTone: "textSecondary",
+  gridCells: 10,
+  well: 1.4,
+  bloomThreshold: 1,
+  bloomGain: 0,
+  bloomSigma: 9,
+  flare: 0,
+  minBodyDp: 12,
+};
+const STANDARD_LIGHT_STAGE: LabStageProfile = {
+  ...LIGHT_STAGE,
+  pool: 0.07,
+  grid: 0,
 };
 
 const HUD: LabFxProfile["hud"] = {
@@ -464,6 +550,7 @@ export const LAB_FX_PROFILES: Readonly<
       env: DARK_ENV,
       bodies: DARK_BODIES,
       rings: DARK_RINGS,
+      stage: DARK_STAGE,
       labels: DARK_LABELS,
       chart: null,
       blend: "additive",
@@ -477,6 +564,7 @@ export const LAB_FX_PROFILES: Readonly<
       rings: LIGHT_RINGS,
       labels: LIGHT_LABELS,
       chart: null,
+      stage: LIGHT_STAGE,
       blend: "multiply",
       hud: HUD,
       roles: ROLES,
@@ -486,6 +574,7 @@ export const LAB_FX_PROFILES: Readonly<
     dark: {
       intensity: STANDARD_DARK_INTENSITY,
       env: STANDARD_DARK_ENV,
+      stage: STANDARD_DARK_STAGE,
       bodies: DARK_BODIES,
       rings: STANDARD_DARK_RINGS,
       labels: DARK_LABELS,
@@ -501,6 +590,7 @@ export const LAB_FX_PROFILES: Readonly<
       rings: LIGHT_RINGS,
       labels: LIGHT_LABELS,
       chart: STANDARD_LIGHT_CHART,
+      stage: STANDARD_LIGHT_STAGE,
       blend: "multiply",
       hud: HUD,
       roles: ROLES,

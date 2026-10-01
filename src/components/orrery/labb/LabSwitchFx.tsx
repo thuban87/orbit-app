@@ -765,9 +765,9 @@ export function LabSwitchOver(props: LabSwitchFxProps) {
 // --- EXPERIMENT: displacement shockwave image filter (flag fxShockFilter) ------
 
 /** Filter look (dp; scaled to layer pixels by the device pixel ratio). */
-const FILTER_AMP_DP = 28;
-const FILTER_BAND_DP = 34;
-const FILTER_CHROMA = 0.18;
+const FILTER_AMP_DP = 56;
+const FILTER_BAND_DP = 48;
+const FILTER_CHROMA = 0.3;
 const FILTER_BRIGHT = 0.22;
 
 /**
@@ -799,10 +799,23 @@ export function useShockFilterUniforms(
     const c = m ? applyHomography(m, 0, 0) : { x: f.center.x, y: f.center.y };
     const e = m ? applyHomography(m, front, 0) : { x: c.x + front, y: c.y };
     const radius = Math.sqrt((e.x - c.x) ** 2 + (e.y - c.y) ** 2);
+    // R2: under a tilted plane the front is an ellipse — mean of the near and
+    // far vertical radii over the horizontal one.
+    const n = m ? applyHomography(m, 0, front) : { x: c.x, y: c.y + front };
+    const fr = m ? applyHomography(m, 0, -front) : { x: c.x, y: c.y - front };
+    const squash =
+      radius > 0
+        ? (Math.abs(n.y - c.y) + Math.abs(c.y - fr.y)) / (2 * radius)
+        : 1;
     const k = pixelRatio > 0 ? pixelRatio : 1;
     return {
       uShock: [c.x * k, c.y * k, radius * k, FILTER_AMP_DP * s * k],
-      uShock2: [FILTER_BAND_DP * k, FILTER_CHROMA * s, FILTER_BRIGHT * s, 0],
+      uShock2: [
+        FILTER_BAND_DP * k,
+        FILTER_CHROMA * s,
+        FILTER_BRIGHT * s,
+        Math.max(0.05, Math.min(1, squash)),
+      ],
     };
   });
 }

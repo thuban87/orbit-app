@@ -503,10 +503,16 @@ export function LabBMarkerHost({
       if (cmd.pose) {
         const patch = cmd.pose;
         const rec = l.recover;
-        runOnUI((p: Partial<CameraPose>) => {
-          "worklet";
-          rec({ ...pose.value, ...p });
-        })(patch);
+        // R2: honour `delay` (the VIEW intent remounts the Orrery, whose Home
+        // framing would otherwise overwrite an immediate pose).
+        setTimeout(
+          () =>
+            runOnUI((p: Partial<CameraPose>) => {
+              "worklet";
+              rec({ ...pose.value, ...p });
+            })(patch),
+          cmd.delay,
+        );
       }
       const go = (ref: OrrerySystemRef, name: string) => {
         const current = l.catalog.find((e) => e.id === l.currentSystemId);

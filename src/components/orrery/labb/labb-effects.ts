@@ -503,6 +503,9 @@ half4 main(float2 xy) {
    *   uStyle = mode (0 arc-dashed ring, 1 plain, 2 radial-dashed),
    *            dash period dp (0 = solid), dash duty, far-side alpha
    *   uFlow  = time s, flow on, comet length (world), comet speed (world/s)
+   *   uSpin  = spool angle, spool boost, (R2) sun-light radius (world), gain
+   * R2 rim light: rings near the sun brighten (alpha × (1 + gain·e^(−r/R)))
+   * and lean toward the highlight tone, as if lit by the star. Gain 0 = off.
    * Depth fade: the side of the plane away from the camera fades toward
    * `uStyle.w` in proportion to tilt. Dashes are integer per circumference so
    * there is no seam at north. Flow = 3 comets per ring, same LINEAR speed for
@@ -549,6 +552,11 @@ half4 main(float2 p) {
     float comet = exp(-(1.0 - u) * k) * head * uHi.a * depth * mask * (1.0 + uSpin.y);
     col = mix(col, uHi.rgb, clamp(comet * 1.4, 0.0, 1.0));
     a = clamp(a + comet, 0.0, 1.0);
+  }
+  if (uSpin.w > 0.0) {
+    float lit = uSpin.w * exp(-r / max(uSpin.z, 1.0));
+    col = mix(col, uHi.rgb, clamp(lit * 0.35, 0.0, 0.5));
+    a = clamp(a * (1.0 + lit), 0.0, 1.0);
   }
   return half4(half3(col * a), half(a));
 }
@@ -606,13 +614,111 @@ half4 main(float2 p) {
 }
 `,
   /**
+   * R2 STAGE PLANE (flags `planeLight`, `planeGrid`): one full-screen draw that
+   * lights the orbital plane. Each screen point is taken back to the world
+   * plane through the INVERSE plane homography (rows uInv0..2), so the pool and
+   * grid tilt, yaw and zoom with the plane exactly like the rings.
+   *   uInv0..2 = inverse homography rows (screen dp → plane, homogeneous)
+   *   uPool    = glow rgb, pool strength (0 = off)
+   *   uPool2   = pool radius (world), additive 1 / wash 0, grid alpha, cell (world)
+   *   uGrid    = grid tone rgb, well pinch strength
+   *   uView    = zoom, scene extent, tilt depth 0..1, unused
+   * The pool: a broad gaussian plus a tight core falloff. The grid: square
+   * cells (offset half a cell, so no line crosses the sun as a crosshair)
+   * whose lookup is pinched toward the sun (q = p·(1 + well·e^(−r²/Rw²)),
+   * Rw = 0.3·extent)
+   * so lines crowd into a funnel — a gravity well — and fade with distance and
+   * the far side. Line width is kept ≈1 px from the local plane→screen scale
+   * (zoom / w, w = 1/h.z). Additive output = premultiplied rgb with alpha 0.
+   */
+  stagePlane: `
+uniform float3 uInv0;
+uniform float3 uInv1;
+uniform float3 uInv2;
+uniform float4 uPool;
+uniform float4 uPool2;
+uniform float4 uGrid;
+uniform float4 uView;
+half4 main(float2 xy) {
+  float3 s = float3(xy, 1.0);
+  float hz = dot(uInv2, s);
+  if (hz <= 0.0001) { return half4(0.0); }
+  float2 p = float2(dot(uInv0, s), dot(uInv1, s)) / hz;
+  float r = length(p);
+  float R = max(uPool2.x, 1.0);
+  float pool = uPool.a * (0.5 * exp(-(r * r) / (R * R)) + 0.6 * exp(-r / (R * 0.25)));
+  float3 col = uPool.rgb * pool;
+  float a = pool;
+  if (uPool2.z > 0.0) {
+    float cell = max(uPool2.w, 1.0);
+    float Rw = max(uView.y, 1.0) * 0.3;
+    float pinch = uGrid.a * exp(-(r * r) / (Rw * Rw));
+    float2 q = p * (1.0 + pinch) / cell + 0.5;
+    float2 g = abs(fract(q - 0.5) - 0.5) * cell / (1.0 + pinch);
+    float pxWorld = 1.0 / max(uView.x * hz, 0.0001);
+    float line = 1.0 - smoothstep(0.35 * pxWorld, 1.1 * pxWorld, min(g.x, g.y));
+    float ext = max(uView.y, 1.0);
+    float fade = 1.0 - smoothstep(ext * 0.55, ext * 1.25, r);
+    float well = 1.0 + 1.2 * pinch;
+    float ga = uPool2.z * line * fade * well;
+    col += uGrid.rgb * ga;
+    a += ga;
+  }
+  a = clamp(a, 0.0, 1.0);
+  if (uPool2.y > 0.5) { return half4(half3(col), 0.0); }
+  return half4(half3(col), half(a));
+}
+`,
+  /**
+   * R2 EXPERIMENT lens flare (flag `lensFlare`): one shader per ghost/streak
+   * draw is avoided — this is ONE full-screen additive shader evaluated only
+   * while the sun is on screen.
+   *   uSun   = sun screen x, y, sun screen radius, strength
+   *   uAxis  = screen centre x, y, viewport width, height
+   *   uTintA = rgb (sun glow), unused;  uTintB = rgb (accent), unused
+   * Elements: an anamorphic horizontal streak through the sun, a soft halo
+   * ring, and four ghosts on the line sun → centre → beyond (k = 0.55, 1.25,
+   * 1.6, 2.1), tinted from the glow and the accent. Strength rises as the sun
+   * nears the screen centre (the camera "looks at" it).
+   */
+  lensFlare: `
+uniform float4 uSun;
+uniform float4 uAxis;
+uniform float4 uTintA;
+uniform float4 uTintB;
+float ghost(float2 xy, float2 c, float rad, float soft) {
+  float d = length(xy - c) / max(rad, 0.001);
+  return smoothstep(1.0, 1.0 - soft, d);
+}
+half4 main(float2 xy) {
+  float2 sun = uSun.xy;
+  float2 ctr = uAxis.xy;
+  float sr = max(uSun.z, 1.0);
+  float2 d = xy - sun;
+  float streak = exp(-abs(d.y) / (sr * 0.06)) * exp(-abs(d.x) / (uAxis.z * 0.42));
+  float hd = (length(d) - sr * 3.2) / (sr * 0.35);
+  float halo = exp(-hd * hd) * 0.22;
+  float2 ax = ctr - sun;
+  float g = 0.0;
+  float3 gc = float3(0.0);
+  float gs = 0.0;
+  gs = ghost(xy, sun + ax * 0.55, sr * 0.55, 0.6) * 0.30; gc += uTintA.rgb * gs; g += gs;
+  gs = ghost(xy, sun + ax * 1.25, sr * 0.30, 0.3) * 0.38; gc += uTintB.rgb * gs; g += gs;
+  gs = ghost(xy, sun + ax * 1.60, sr * 1.10, 0.9) * 0.16; gc += uTintB.rgb * gs; g += gs;
+  gs = ghost(xy, sun + ax * 2.10, sr * 0.70, 0.15) * 0.20; gc += mix(uTintA.rgb, uTintB.rgb, 0.5) * gs; g += gs;
+  float3 col = uTintA.rgb * (streak * 0.9 + halo) + gc;
+  return half4(half3(col * uSun.w), 0.0);
+}
+`,
+  /**
    * WP-2.1 EXPERIMENT (flag `fxShockFilter`, default off): a displacement
    * shockwave as a runtime IMAGE FILTER over the world layer (rings, Polaris,
    * bodies; labels stay outside). A radial lens ring pushes pixels outward ahead
    * of the front and pulls them behind it, with an optional chroma split and a
    * brightening band. Coordinates are LAYER pixels (the caller scales dp → px).
    *   uShock  = centre x, centre y, front radius, amplitude (px; 0 = identity)
-   *   uShock2 = band half-width (px), chroma split, band brightening, unused
+   *   uShock2 = band half-width (px), chroma split, band brightening,
+   *             (R2) vertical squash of the front (tilted plane; 0/1 = circle)
    */
   shockFilter: `
 uniform shader image;
@@ -623,7 +729,8 @@ half4 main(float2 xy) {
     return image.eval(xy);
   }
   float2 d = xy - uShock.xy;
-  float dist = length(d);
+  float sq = uShock2.w > 0.0 ? uShock2.w : 1.0;
+  float dist = length(float2(d.x, d.y / sq));
   float x = (dist - uShock.z) / max(uShock2.x, 1.0);
   float prof = x * exp(-x * x);
   float2 dir = d / max(dist, 0.001);

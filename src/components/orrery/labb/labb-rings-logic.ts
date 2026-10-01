@@ -294,6 +294,8 @@ export function ringUniforms(
     farAlpha: number;
     flowStrength: number;
     flowOn: boolean;
+    /** R2 (flag `ringSunLight`): [light radius (world), gain]; omitted = off. */
+    sunLight?: readonly number[];
   },
 ): RingUniforms {
   "worklet";
@@ -308,7 +310,12 @@ export function ringUniforms(
     uCam: [cam[0], cam[1], cam[2], cam[3]],
     uStyle: [style.mode, style.dashPeriod, style.dashDuty, style.farAlpha],
     uFlow: [flow[0], style.flowOn ? flow[1] : 0, flow[2], flow[3]],
-    uSpin: [flow[5] ?? 0, flow[6] ?? 0, 0, 0],
+    uSpin: [
+      flow[5] ?? 0,
+      flow[6] ?? 0,
+      style.sunLight ? style.sunLight[0] : 0,
+      style.sunLight ? style.sunLight[1] : 0,
+    ],
   };
 }
 

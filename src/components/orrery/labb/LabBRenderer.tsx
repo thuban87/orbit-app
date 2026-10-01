@@ -129,6 +129,12 @@ import {
 import { LabPolaris } from "./LabPolaris";
 import { FLOW_LOD_MAX_RINGS, LabRings, LabRingsPathRebuild } from "./LabRings";
 import {
+  LabLensFlare,
+  LabStagePlane,
+  LabTiltShift,
+  labBloomPaint,
+} from "./LabStage";
+import {
   LabSwitchOver,
   LabSwitchUnder,
   useShockFilterUniforms,
@@ -593,6 +599,44 @@ function LabBRendererImpl(contract: LabRenderContract) {
   };
   const shockFilter =
     flags.fx && flags.fxShockFilter ? getLabEffect("shockFilter") : null;
+  // --- R2 stage + hero moments ------------------------------------------------
+  const sunGlowToken = useMemo(
+    () =>
+      resolveSunOccupant({
+        ...scene.sun,
+        starPalette: colors.starPalette,
+        colors,
+      }).glowColor,
+    [scene.sun, colors],
+  );
+  const sunGlow = useMemo(() => tokenToVec3(sunGlowToken), [sunGlowToken]);
+  const gridTone = useMemo(
+    () => tokenToVec3(labColor(colors, profile.stage.gridTone)),
+    [colors, profile.stage.gridTone],
+  );
+  const accent3 = useMemo(() => tokenToVec3(colors.accent), [colors.accent]);
+  const stageIntensity = profile.intensity * intensity;
+  const bloomPaint = useMemo(
+    () =>
+      flags.bloom
+        ? labBloomPaint(profile.stage, stageIntensity, PixelRatio.get())
+        : null,
+    [flags.bloom, profile.stage, stageIntensity],
+  );
+  const stagePlane =
+    (flags.planeLight && profile.stage.pool > 0) ||
+    (flags.planeGrid && profile.stage.grid > 0) ? (
+      <LabStagePlane
+        frame={frame}
+        extent={scene.extent}
+        glow={sunGlow}
+        tone={gridTone}
+        stage={profile.stage}
+        pool={flags.planeLight}
+        grid={flags.planeGrid}
+        intensity={stageIntensity}
+      />
+    ) : null;
   const shockUniforms = useShockFilterUniforms(
     frame,
     scene.extent,
@@ -615,6 +659,8 @@ function LabBRendererImpl(contract: LabRenderContract) {
     <>
       {/* L1 */}
       <Group>
+        {/* R2: the sun lights its plane (pool + gravity-well grid). */}
+        {stagePlane}
         {flags.stdChart && profile.chart ? (
           <LabChart
             frame={frame}
@@ -769,20 +815,35 @@ function LabBRendererImpl(contract: LabRenderContract) {
       >
         {/* WP-2.1 EXPERIMENT (fxShockFilter): sky + world (L0–L5, not the
             labels) inside ONE saveLayer with a displacement runtime filter. */}
-        {shockFilter ? (
-          <Group
-            layer={
-              <Paint>
-                <RuntimeShader source={shockFilter} uniforms={shockUniforms} />
-              </Paint>
-            }
-          >
-            {envLayer}
-            {worldLayers}
-          </Group>
-        ) : (
-          worldLayers
-        )}
+        {(() => {
+          // R2 EXPERIMENT bloom: one bright-pass + blur layer over sky + world.
+          const world = shockFilter ? (
+            <Group
+              layer={
+                <Paint>
+                  <RuntimeShader
+                    source={shockFilter}
+                    uniforms={shockUniforms}
+                  />
+                </Paint>
+              }
+            >
+              {envLayer}
+              {worldLayers}
+            </Group>
+          ) : (
+            worldLayers
+          );
+          return bloomPaint ? <Group layer={bloomPaint}>{world}</Group> : world;
+        })()}
+        {/* R2 EXPERIMENT tilt-shift: blur bands over the world, under the HUD. */}
+        {flags.tiltShift ? (
+          <LabTiltShift
+            frame={frame}
+            width={viewport.width}
+            height={viewport.height}
+          />
+        ) : null}
         {/* WP-2.2 target-lock reticles: over the bodies, under the labels. */}
         {flags.fx ? (
           <LabFocusPicture
@@ -790,6 +851,15 @@ function LabBRendererImpl(contract: LabRenderContract) {
             frameIndex={frameIndex}
             accent={accent}
             additive={profile.blend === "additive"}
+          />
+        ) : null}
+        {/* R2 EXPERIMENT lens flare (additive themes), under the labels. */}
+        {flags.lensFlare && profile.blend === "additive" ? (
+          <LabLensFlare
+            frame={frame}
+            glow={sunGlow}
+            accent={accent3}
+            strength={profile.stage.flare * stageIntensity}
           />
         ) : null}
         {/* L6 — labels stay outside any future effect/filter layer. */}
