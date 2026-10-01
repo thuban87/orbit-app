@@ -331,7 +331,7 @@ Commits: `80a9650b` (seed portraits) + the WP-1.4 docs/evidence commit.
 
 ## 2026-10-01 — WP-2.1 System-switch showcase
 
-Commits: `30026fda` (pass 1), WP-2.1 pass-2 commit (tuning, docs, evidence). Evidence:
+Commits: `30026fda` (pass 1), `413d6999` (pass 2: tuning, docs, evidence). Evidence:
 `evidence/06-wp2.1-switch/`. All device work: emulator, RELEASE build (see 11).
 
 1. **One signal, pure effects.** `sampleSwitchSignal(transition, progress)` (phase, rotation,
