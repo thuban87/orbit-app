@@ -308,3 +308,93 @@ export function tokenChannels(token: string): [number, number, number] {
   const c = Skia.Color(token);
   return [c[0], c[1], c[2]];
 }
+
+/**
+ * Orbital-plane pattern baked once (Checkpoint C perf): alpha = radial dust
+ * falloff + polar grid rings + spokes, edge-faded — the same terms the plane
+ * shader used to evaluate per fragment (atan + fract per pixel, full screen).
+ */
+export function planePattern(
+  size: number,
+  rings: number,
+  spokes: number,
+  dustOpacity: number,
+  lineOpacity: number,
+): RgbaImage {
+  const data = new Uint8Array(size * size * 4);
+  const half = size / 2;
+  const ss = (e0: number, e1: number, x: number) => {
+    const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+    return t * t * (3 - 2 * t);
+  };
+  const frac = (x: number) => x - Math.floor(x);
+  for (let j = 0; j < size; j++)
+    for (let i = 0; i < size; i++) {
+      const dx = (i + 0.5 - half) / half;
+      const dy = (j + 0.5 - half) / half;
+      const r = Math.hypot(dx, dy);
+      const o = (j * size + i) * 4;
+      data[o] = 255;
+      data[o + 1] = 255;
+      data[o + 2] = 255;
+      if (r >= 1) continue;
+      const ring = ss(0.9, 1, Math.abs(frac(r * rings) - 0.5) * 2);
+      const spoke =
+        ss(
+          0.94,
+          1,
+          Math.abs(frac((Math.atan2(dy, dx) / (Math.PI * 2)) * spokes) - 0.5) *
+            2,
+        ) * ss(0.12, 0.3, r);
+      const edge = 1 - ss(0.75, 1, r);
+      const dust = Math.max(0, 1 - r) ** 1.6 * dustOpacity;
+      const a = (dust + ring * lineOpacity + spoke * lineOpacity * 0.6) * edge;
+      // Store ×4 for 8-bit precision; the shader divides by 4.
+      data[o + 3] = Math.min(255, Math.round(a * 4 * 255));
+    }
+  return { data, width: size, height: size };
+}
+
+/** Tileable 2-octave value noise in alpha (sun granulation, baked once). */
+export function noiseTexture(size: number, seed = 7): RgbaImage {
+  const data = new Uint8Array(size * size * 4);
+  const lattice = (cells: number) => {
+    const g = new Float32Array(cells * cells);
+    for (let k = 0; k < g.length; k++) {
+      const x = Math.sin((k + 1) * 12.9898 + seed * 78.233) * 43758.5453;
+      g[k] = x - Math.floor(x);
+    }
+    return (u: number, v: number) => {
+      const x = u * cells;
+      const y = v * cells;
+      const x0 = Math.floor(x);
+      const y0 = Math.floor(y);
+      const fx = x - x0;
+      const fy = y - y0;
+      const sx = fx * fx * (3 - 2 * fx);
+      const sy = fy * fy * (3 - 2 * fy);
+      const at = (a: number, b: number) =>
+        g[
+          (((b % cells) + cells) % cells) * cells +
+            (((a % cells) + cells) % cells)
+        ];
+      const top = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * sx;
+      const bot = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * sx;
+      return top + (bot - top) * sy;
+    };
+  };
+  const o1 = lattice(8);
+  const o2 = lattice(16);
+  for (let j = 0; j < size; j++)
+    for (let i = 0; i < size; i++) {
+      const u = i / size;
+      const v = j / size;
+      const n = o1(u, v) * 0.67 + o2(u, v) * 0.33;
+      const o = (j * size + i) * 4;
+      data[o] = 255;
+      data[o + 1] = 255;
+      data[o + 2] = 255;
+      data[o + 3] = Math.round(n * 255);
+    }
+  return { data, width: size, height: size };
+}

@@ -40,7 +40,6 @@ import {
   instancedBufferAttribute,
   instancedDynamicBufferAttribute,
   materialColor,
-  mx_fractal_noise_float,
   normalLocal,
   normalView,
   positionView,
@@ -67,6 +66,8 @@ import {
   ATLAS_SIZE,
   annulus,
   BodyAtlas,
+  noiseTexture,
+  planePattern,
   type RgbaImage,
   radialGlow,
   rasterizeLabel,
@@ -99,8 +100,10 @@ const PLANE_GRID_RINGS = 9;
 const PLANE_GRID_SPOKES = 24;
 const PLANE_DUST_OPACITY = 0.08;
 const PLANE_LINE_OPACITY = 0.07;
+/** Baked plane pattern resolution (texels across the disc). */
+const PLANE_TEX_SIZE = 768;
 /** Wide faint corona sprite around the sun (additive), in sun radii. */
-const SUN_CORONA_SCALE = 16;
+const SUN_CORONA_SCALE = 11;
 const SUN_CORONA_OPACITY = 0.22;
 /** Rings fade from full opacity at the pivot distance to this floor at the far rim. */
 const RING_FAR_OPACITY = 0.18;
@@ -257,7 +260,7 @@ export class OrreryScene3D {
   private dpr: number;
 
   // bodies
-  private sphereGeo = new THREE.SphereGeometry(1, 24, 16);
+  private sphereGeo = new THREE.SphereGeometry(1, 20, 14);
   private sphereMat = new THREE.MeshStandardNodeMaterial({
     roughness: 0.38,
     metalness: 0.08,
@@ -315,6 +318,16 @@ export class OrreryScene3D {
 
   // sun glow / polaris / focus
   private glowTex = dataTexture(radialGlow(128));
+  private planeTex = dataTexture(
+    planePattern(
+      PLANE_TEX_SIZE,
+      PLANE_GRID_RINGS,
+      PLANE_GRID_SPOKES,
+      PLANE_DUST_OPACITY,
+      PLANE_LINE_OPACITY,
+    ),
+  );
+  private noiseTex = repeatTexture(dataTexture(noiseTexture(128)));
   private starTex = dataTexture(radialGlow(32, 1.2));
   private ringTex = dataTexture(annulus(128, 0.82, 0.98));
   private glowMat = new THREE.SpriteNodeMaterial({
@@ -473,7 +486,7 @@ export class OrreryScene3D {
         return alpha;
       })();
       this.ringMesh = new THREE.InstancedMesh(
-        ringStripGeometry(256),
+        ringStripGeometry(160),
         this.ringMat,
         MAX_BODIES,
       );
@@ -656,31 +669,9 @@ export class OrreryScene3D {
     // Orbital plane: faint dust disc + polar grid so the plane reads as a
     // surface in space (one draw, additive, theme-token tinted).
     {
-      const d = uv().sub(0.5).mul(2);
-      const r = d.length();
-      const ringLine = smoothstep(
-        0.9,
-        1,
-        abs(fract(r.mul(PLANE_GRID_RINGS)).sub(0.5)).mul(2),
-      );
-      const spokeLine = smoothstep(
-        0.94,
-        1,
-        abs(
-          fract(
-            atan(d.y, d.x)
-              .div(Math.PI * 2)
-              .mul(PLANE_GRID_SPOKES),
-          ).sub(0.5),
-        ).mul(2),
-      ).mul(smoothstep(0.12, 0.3, r));
-      const edge = smoothstep(1, 0.75, r);
-      const dust = float(1).sub(r).max(0).pow(1.6).mul(PLANE_DUST_OPACITY);
+      // Pattern baked once into a texture (was atan + fract per fragment).
       this.planeMat.colorNode = materialColor;
-      this.planeMat.opacityNode = dust
-        .add(ringLine.mul(PLANE_LINE_OPACITY))
-        .add(spokeLine.mul(PLANE_LINE_OPACITY * 0.6))
-        .mul(edge);
+      this.planeMat.opacityNode = texture(this.planeTex).a.mul(0.25);
       this.planeMat.blending = THREE.AdditiveBlending;
       this.planeMat.fog = false;
       this.plane = new THREE.Mesh(
@@ -715,12 +706,15 @@ export class OrreryScene3D {
     // noise on the sphere's local normal) + a hot white-ish core.
     {
       const limb = normalView.z.max(0);
-      const grain = mx_fractal_noise_float(
-        normalLocal.mul(5.5).add(vec3(this.sunTime.mul(0.00012), 0, 0)),
-        2,
-        2,
-        0.5,
-      );
+      // Baked tileable value noise (was 2-octave mx_fractal_noise per pixel),
+      // mapped by longitude/latitude of the local normal, drifting in u.
+      const lon = atan(normalLocal.z, normalLocal.x)
+        .div(Math.PI * 2)
+        .add(this.sunTime.mul(0.000006));
+      const lat = normalLocal.y.mul(0.5).add(0.5);
+      const grain = texture(this.noiseTex, vec2(lon.mul(2), lat.mul(1.4)))
+        .a.sub(0.5)
+        .mul(1.4);
       const surface = materialColor
         .mul(limb.pow(0.9).mul(0.75).add(0.35))
         .mul(grain.mul(0.35).add(1));
@@ -1210,8 +1204,17 @@ export class OrreryScene3D {
     this.glowTex.dispose();
     this.starTex.dispose();
     this.ringTex.dispose();
+    this.planeTex.dispose();
+    this.noiseTex.dispose();
     this.atlas.dispose();
   }
+}
+
+function repeatTexture(tex: THREE.DataTexture): THREE.DataTexture {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.needsUpdate = true;
+  return tex;
 }
 
 /** Static instanced attribute, flagged once so the backend uploads it. */

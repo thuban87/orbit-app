@@ -167,7 +167,7 @@ function effectiveLabelZoom(
   return ratios[Math.floor(ratios.length / 2)];
 }
 /** GPU fill tunables (Pixel 6 Pro native dpr is 3.5 → 1439×2538 buffer). */
-const RENDER_MAX_PIXEL_RATIO = 2.5;
+const RENDER_MAX_PIXEL_RATIO = 2.0;
 const RENDER_ANTIALIAS = true;
 /** Lab-only badge tap: [tilt, yaw, zoom multiplier] presets (adb cannot pinch);
  * the zoom steps reach the identity/detail label tiers for evidence. */

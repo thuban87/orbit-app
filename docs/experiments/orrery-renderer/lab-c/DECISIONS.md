@@ -171,3 +171,10 @@ rim tint now starts at 30% of the plate radius (was 60%) so the glow wraps furth
 replaces the tile. Evidence: `05-sun-occupant-glyph-overview.png`, `06-sun-occupant-glyph-close.png`.
 Side observation: one relaunch showed "Couldn't load this System" (transient; Reload System recovered it,
 no JS error logged) — likely the force-stop/relaunch racing the DB open; not investigated.
+
+## 2026-10-01 — Checkpoint C.4: performance recovery
+
+See `PERFORMANCE.md`. Plane pattern + star granulation baked into textures, corona 16→11 sun radii, lighter
+sphere/ring geometry, and the render DPR cap lowered 2.5 → 2.0 (visible softening is small at 411 dp width;
+it is the change that actually moved fps — the frame was fill-bound). The phone hit thermal SEVERE during the
+session; close-range targets were not met under that condition.
