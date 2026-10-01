@@ -1,10 +1,20 @@
 # Lab B — Interactions
 
 This covers camera, gestures, focus, zoom, System switching and reduced motion as of
-`bfc8f36c`. The R3 polish pass is **PENDING**. Every observation below comes from the
-**emulator**. Pinch cannot be injected with `adb input`, so zoom levels were reached through
-focus fly-ins, panel camera presets and pose deep links. No physical-touch session on a
-phone has happened yet (**phone pass PENDING**).
+`bfc8f36c`, with R3 and final-validation notes added (`research/R3-REPORT.md` §2–§4,
+`research/FINAL-VALIDATION.md`). Every observation below comes from the **emulator**. Pinch,
+twist and two-finger tilt cannot be injected with `adb input`, so zoom levels and yaw were
+reached through focus fly-ins, panel camera presets and pose deep links. No physical-touch
+session on a phone has happened yet (**phone pass pending — Pixel in use by Lab A**).
+
+R3 interaction changes:
+- `nearSizeClamp` (C-71) limits the drawn size of near bodies at detail zoom with the Home
+  tilt. It is applied to the frame, so hit radii, label gaps, reticle and card keep-out
+  follow it (`MIN_HIT_RADIUS` floor kept).
+- `immersiveChrome` (C-72) makes the floating header an obstacle (`orrery-lab-header`), so
+  Home framing and focus-card placement keep clear of it. The three controls become one
+  rail with the same names and 55 dp targets.
+- Home tilt applies only to the lab renderer (Legacy = production Home).
 
 ## 1. What did not change (semantic guarantees)
 
@@ -99,11 +109,13 @@ The focus logic is in `LabFocusFx.tsx` `useLabFocusState` and `labb-focus-logic.
 - a switch while focused (focus cleared, no stale reticle);
 - satellite focus (`evidence/08-wp2.2-focus/15-release-satellite-focus-small-reticle.jpg`).
 
-**Not verified on device:**
+**Verified later on the emulator (R3 `evidence/11-r3/03-paths/`, final `evidence/13-final/`):**
 
-- a far-zoom preset while focused;
-- a cluster (group) tap;
-- the Polaris north tap. The flare is built and unit-tested but was never captured.
+- a far-zoom (0.4) focus flies in and locks (`farfocus-*`);
+- a cluster (group) tap opens the group panel with a reticle per member (`cluster-1-panel.jpg`);
+- the Polaris north tap fires the flare **and** recovers yaw to north, in legacy and lab
+  (`13-final/01-polaris/`). R3's "no rotation" note was a recording that started after
+  the ≤ 850 ms recovery had finished (FINAL-VALIDATION §1).
 
 ## 4. Feedback (`fxFeedback`, `LabFeedbackPicture`)
 

@@ -112,12 +112,27 @@ top still reads as a productivity app. The ugliest elements, in order:
 - **Not changed:** choreography constants, focus lock, labels/allocation, reorder, theme
   tokens, reduced motion.
 
-## R3 — polish (PENDING)
+## R3 — integration polish (`13c706ad`, `1c339064`, `23bedb9c`, `883b84ed`)
 
-> _Placeholder. The R3 agent is working now. Add its decisions here as one table (decision,
-> why, SHA), and update any earlier row whose default or verdict it changes._
+| Decision | Why | SHA |
+|---|---|---|
+| Presets (Lab B best = registry defaults = Reset, Ship-safe, Everything, Legacy), one tap in the panel and `preset=` by deep link; debug instrumentation keeps its value | One-glance owner comparison and a fixed phone-pass matrix. Ship-safe membership is a lab judgement (C-73) | `13c706ad` |
+| `nearSizeClamp` default ON: perspective size growth knee'd at +6 %, drawn radius soft-capped at 8 % of the short side (9.5 % in iteration 1 was still a disc under the FAB), applied to the frame | Near bodies at detail zoom with the Home tilt slid under the FAB column. Applying it to the frame keeps hits, labels, reticle and card keep-out consistent (C-71) | `13c706ad` |
+| `immersiveChrome` default ON: the map runs under a floating `ShellAppBar` on a nested-band token scrim (abutting bands drew seams in iteration 1); the bar's hairline is clipped; the three controls become one HUD rail | The map should continue under the title. Shell-level pieces (status band, tab bar, "+") are out of scope (C-72) | `13c706ad` |
+| Fix: `moonShader` + layer pictures used `makeShaderWithChildren` without children → `makeShader`; the Skia test mock now throws like native | "Everything" crashed the app | `1c339064` |
+| Home tilt applies to the lab renderer only | The Legacy preset showed a tilted legacy map; Legacy must equal production | `23bedb9c` |
+| Legibility re-measured with the stage on: no regression; Standard Dark glass stays 4.42 (model) | R1 method, `tools/r3-legibility.sh` | `883b84ed` |
+| Nothing retuned in the earlier rows. Defaults now = "Lab B best" (all R2 defaults + the two R3 flags) | — | — |
 
-## Phone pass (PENDING)
+## Final validation (`adeb4576`)
+
+| Decision | Why |
+|---|---|
+| Polaris tap is not broken, so no code change | Legacy and lab both rotate to north (dossier D-08-069: tap resets yaw only). R3's "no rotation" was a recording that started after a recovery of 180–850 ms had already finished (FINAL-VALIDATION §1) |
+| The "Unavailable System" selector label after a cold start is listed, not fixed | Pre-existing on `main` in the shared store/screen; production code, not this experiment |
+| Contract exercise list validated on release + preset best; pinch, twist and tilt are delegated to the phone pass | adb injects a single pointer only |
+
+## Phone pass (pending — Pixel in use by Lab A)
 
 > _Placeholder. Record here any decision the Pixel numbers force: for example, opaque canvas
 > kept or rejected, R2 stage plane kept or simplified, bloom confirmed rejected, LOD

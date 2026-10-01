@@ -654,3 +654,20 @@ Report: `research/R3-REPORT.md`. Evidence: `evidence/11-r3/`.
    (actual layer order incl. stage / bloom / tilt-shift / flare), `labb-effects` (what warm-up
    really compiles). PHONE-PASS-SCRIPT + `r1-matrix.sh` now run the presets plus `bloom` /
    `nostage` rows into `evidence/12-phone/`.
+
+## 2026-10-01 — Final validation (release from `883b84ed`, preset best)
+
+1. **Polaris tap: no code change.** Intended behaviour = dossier phase 08 §O D-08-069 (tap
+   resets yaw only), `docs/systems/orrery.md` "Reset north changes yaw only". The `onNorth`
+   handler in `OrreryWorld` is shared by both renderers. After `yaw=0.75`, a tap on Polaris
+   rotates back to north in **both** Legacy and Lab B best
+   (`evidence/13-final/01-polaris/legacy-vs-best-before-after.jpg`). Starting the recording
+   1.5 s before the tap shows the turn plus the flare (`best-polaris-tap-sequence.jpg`). R3's
+   "no rotation" was a recording that started after the 180–850 ms recovery had finished.
+2. **Exercise list** (contract) validated on the emulator: all PASS
+   (`research/FINAL-VALIDATION.md`). Pinch, twist and tilt are left to the phone (adb is
+   single-pointer).
+3. **"Unavailable System" after a cold start with a custom last System:** pre-existing on
+   main (`OrreryScreen` restore passes no name; the store resolves names only for built-ins
+   and categories). Listed for main, not fixed in the lab.
+

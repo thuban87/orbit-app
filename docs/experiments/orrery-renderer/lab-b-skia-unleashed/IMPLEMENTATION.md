@@ -2,9 +2,20 @@
 
 This is the file, function, shader and algorithm map for reproducing the good ideas. Paths
 are relative to the repo root. SHAs are the commits that introduced each item (checked with
-`git log -S`). The state described is `bfc8f36c`; **R3 polish is PENDING**, and R3 has
-uncommitted edits in `OrreryWorld.tsx`, `LabFxPanel.tsx`, `orrery-frame-mapper.test.ts` and
-`orrery-labb-fx-store.ts` that are *not* described here.
+`git log -S`). The state described is `bfc8f36c`. R3 (`13c706ad`, `1c339064`, `23bedb9c`)
+added the items below; `research/R3-REPORT.md` has the detail.
+
+- **Presets:** `LAB_PRESETS` / `NOT_SHIP_SAFE` / preset apply in
+  `src/stores/orrery-labb-fx-store.ts`; the panel row and the `preset=` deep link in
+  `debug/LabFxPanel.tsx`.
+- **Near-size clamp:** `labClampNearSizes` in `labb/labb-near-size.ts` (+
+  `labb-near-size.test.ts`), applied in the model half's frame worklet in `OrreryWorld.tsx`.
+- **Immersive chrome:** `labb/LabImmersiveHeader.tsx`, `labb/labb-header-scrim.ts` (+ test),
+  `OrreryScreen.tsx`. `topInset` on `OrrerySystemSelector` / `OrreryViewOptions`, `rail` on
+  `OrreryControls`.
+- **Home tilt lab-only:** `labHomePose` checks the renderer (`23bedb9c`).
+- **Crash fix:** the moon effect uses `makeShader` (no children); the Skia test mock throws
+  on a missing `children` array (`1c339064`).
 
 ## 1. Shared model half: perf fixes that apply to BOTH renderers
 

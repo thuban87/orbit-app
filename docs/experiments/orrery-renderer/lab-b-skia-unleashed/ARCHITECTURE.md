@@ -1,8 +1,9 @@
 # Lab B — Architecture
 
 The renderer, data flow, dependencies, lifecycle and animation model as they stand at
-`bfc8f36c`. **R3 polish is pending** (see README placeholder); update this file if R3 changes
-structure.
+`bfc8f36c`. R3 did not change the structure. It added a frame post-process
+(`labClampNearSizes` in the model half's frame worklet), the `LabImmersiveHeader` overlay on
+the Orrery route, and presets in the FX store (README "R3 integration polish").
 
 Everything below was checked against the code on disk: `src/components/orrery/OrreryWorld.tsx`,
 `src/components/orrery/labb/*`, `src/logic/orrery-camera-logic.ts`, `src/logic/orrery-frame.ts`,
@@ -200,7 +201,7 @@ flat fallback. Nothing compiles at import time (`orrery-scene.test.ts` mocks Ski
 | Piece | What it is | Where / compromise |
 |---|---|---|
 | Panel + marker | Gated on applicationId `com.bwales.orbit.labb`, not `__DEV__`, so they work in release lab builds | `debug/LabFxPanel.tsx`, C-08 |
-| Flag registry | 64 flags at `bfc8f36c`; R3 is adding more in its working tree | `LAB_FLAG_REGISTRY` in `orrery-labb-fx-store.ts` |
+| Flag registry | 65 flags at `bfc8f36c` (counted in the registry), 67 after R3 (+ `nearSizeClamp`, `immersiveChrome`); presets in `LAB_PRESETS` | `LAB_FLAG_REGISTRY` in `orrery-labb-fx-store.ts` |
 | Theme profiles | Per package × mode effect profiles (`LabFxProfile`: env, bodies, rings, labels, chart, stage, blend, intensity) | `src/theme/orrery-lab-fx.ts` |
 | Deep links | `orbit://labb?…` (`parseLabCommand`) | |
 | Slow-mo | `timeScale` arg on `useOrrerySwitchRuntime` | C-46 |

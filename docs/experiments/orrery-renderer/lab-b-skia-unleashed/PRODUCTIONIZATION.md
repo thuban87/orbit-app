@@ -2,8 +2,8 @@
 
 What it would take to ship Lab B's ideas in a clean Orrery V2. The lab branch itself is
 **never merged**: V2 re-implements from `HARVEST.md`. This file is about cleanup, tests,
-accessibility, performance, dependencies and edge cases. **R3 (pending) and the phone pass
-(pending) may add rows.**
+accessibility, performance, dependencies and edge cases. R3 and the final validation are
+folded in. **The phone pass is pending (the Pixel is in use by Lab A) and may add rows.**
 
 ## 0. Order of work
 
@@ -89,9 +89,10 @@ accessibility, performance, dependencies and edge cases. **R3 (pending) and the 
 
 ## 4. Accessibility
 
-1. **Overlay contrast (GLASS).** Re-prove ADR-149 AA over the new sky in all 4 themes, after
-   R2/R3 and on a phone. Standard Dark was 4.45:1 (model) at R1, and the R2 pool and rim
-   light were never re-measured. Fix it canvas-side (occlude or dim under overlays), not with
+1. **Overlay contrast (GLASS).** Re-prove ADR-149 AA over the new sky in all 4 themes, on a
+   phone. Standard Dark was 4.45:1 (model) at R1 and is **4.42:1** in R3 with the R2 stage on
+   (also with "Everything" on). The extreme is still the initials glyph ink. The other themes
+   pass (R3-REPORT §1). Fix it canvas-side (occlude or dim under overlays), not with
    overlay opacity.
 2. **Ring contrast.** Hairlines (C-35), density fade (C-36) and rim light (C-68) lower outer
    and dense-ring contrast. Run a per-theme contrast check, and consider per-status alpha
@@ -164,7 +165,10 @@ shader-compile and fill characteristics.
 - System rename and re-key versus sky-hue stability (HUE).
 - An empty System; a 1-member System; a contact-occupied sun with no photo.
 - All Contacts at 940+.
-- The far zoom preset while focused, a cluster tap and a Polaris tap (not covered on device).
+- The far zoom preset while focused, a cluster tap and a Polaris tap: covered on the
+  emulator in R3 / final (`11-r3/03-paths/`, `13-final/01-polaris/`). Still needs a phone
+  run and real multi-touch (pinch / twist / two-finger tilt cannot be injected by adb).
+- Cold start with a custom System as the last System: the selector label (see below).
 - A photo decode failure (the procedural fallback must render).
 - A runtime-effect compile failure on a real GPU (null fallback) **and** a miscompile that
   is not null (no detection today, C-11): consider a one-frame self-test render at mount.
@@ -172,7 +176,28 @@ shader-compile and fill characteristics.
   screen recording.
 - Release builds without the debug keystore (C-43).
 
-## PLACEHOLDER — R3 / phone additions
+## R3 / final-validation additions
 
-> _TBD: any cleanup or test debt R3 introduces; any phone-pass finding that adds a
-> must-fix._
+- **Near-size clamp (C-71).** Don't ship it as a frame post-process. Put a semantic max drawn
+  radius into the projection, then re-tune the zoom levels around it. Port
+  `labb-near-size.test.ts` as the spec.
+- **Immersive chrome (C-72).**
+  - The lab wrapper clips `ShellAppBar`'s hairline from outside. V2 needs either a real
+    `ShellAppBar` "floating" variant or a shell-level "immersive route" contract (status
+    band, tab bar, "+" FAB).
+  - Re-check screen-reader order and focus with the bar floating over the canvas.
+  - `OrrerySystemSelector` / `OrreryViewOptions` `topInset` and `OrreryControls` `rail` are
+    lab additions to shared components. Keep or drop them with that decision.
+- **Presets (C-73).** A dev/QA tool only. Never expose the lab flag registry in a release
+  build: today it is gated on the applicationId (C-08).
+- **Test debt fixed in R3.** The Skia test mock used to default a missing `children` array
+  silently, which hid a native crash. V2's mock must throw like native (`1c339064`).
+- **Pre-existing main bug: "Unavailable System" after a cold start** (FINAL-VALIDATION §3).
+  `OrreryScreen` restores `preferences.lastSystem` with no name, and
+  `orrery-system-store.select` resolves names only for built-ins and categories. Resolve the
+  custom System's name on load success and add a cold-restore test. It is independent of V2
+  and belongs with the PORT fixes.
+
+## PLACEHOLDER — phone additions (pending — Pixel in use by Lab A)
+
+> _TBD: any phone-pass finding that adds a must-fix._

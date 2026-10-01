@@ -65,7 +65,17 @@ recovered. The raw log is `research/DEAD-ENDS-LOG.md`. Costs are **emulator-rela
 | Stacked full-width focus-card actions were clipped under the anchoring cap | — | One wrapping row |
 | Axis-aligned sun granulation read as blocky squares on device | — | Rotated, domain-warped lattice |
 
-## PLACEHOLDER — R3 / phone-pass dead ends
+## 7. R3 dead ends
 
-> _TBD: add any R3 experiments that were dropped, and anything the Pixel pass rejects (e.g.
-> if the opaque canvas or the stage plane fails on Mali)._
+| Idea | Why it was dropped | Where |
+|---|---|---|
+| Immersive header scrim as **abutting** stepped bands (17 bands, +0.5 dp overlaps) | The overlaps drew dark hairlines across the map at every band edge. Replaced by nested top-anchored bands solved to the target profile | `evidence/11-r3/01-iter1/02-overview-dense.jpg`; final `13c706ad` (`labb-header-scrim.ts`) |
+| Near-body cap at **9.5 %** of the short side | Still read as a disc under the FAB column at detail zoom → 8 % | `11-r3/01-iter1/04-detail-dense.jpg` vs `02-iter2/04-detail-dense.jpg` |
+| Keep the canvas below an opaque bar and only fade a strip | Rejected on analysis: it still reads as an app header over a picture | — |
+| Screenrecord at native 1280×2856 | Fails with `err=-22`; always pass `--size 720x1606` | tooling |
+| Judging a Polaris / Reset-north recovery from a screenrecord started *after* the tap | The recovery (≤ 850 ms) finishes before the recorder starts, so it looked like "no rotation". Start the recorder first (FINAL-VALIDATION §1) | `11-r3/03-paths/north-*`, `np-*` vs `13-final/01-polaris/` |
+
+## PLACEHOLDER — phone-pass dead ends (pending — Pixel in use by Lab A)
+
+> _TBD: anything the Pixel pass rejects (e.g. if the opaque canvas or the stage plane fails on
+> Mali)._

@@ -140,6 +140,8 @@ row separable from noise: with `ringFlow` on, the rings picture re-records on ev
 
 1. **Polaris tap does not recover north** (flare fires) — §4; needs a debug-build trace of the
    tap → `camera.recover` path (also check on main / legacy).
+   **Resolved after R3 (FINAL-VALIDATION §1):** not a bug. Legacy and lab both rotate to north.
+   The recordings started after the ≤ 850 ms recovery had finished.
 2. C-71 near-size clamp, C-72 immersive chrome, C-73 ship-safe membership — owner taste; C-66 Home
    tilt still the main owner decision (now lab-renderer only).
 3. Standard Dark glass `textSecondary` 4.42 (model) — R1 owner item C-02, unchanged.

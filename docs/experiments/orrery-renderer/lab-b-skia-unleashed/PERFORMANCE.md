@@ -4,10 +4,12 @@
 > (`emulator-5554`: sdk_gphone16k_x86_64, API 37, GLES translator over an Intel Arc B580, 4
 > vCPU, 1280×2856). Each number is valid only as an A/B **on that target in that session**.
 > None of them is a phone claim. The emulator cannot answer GPU-fill, thermal, battery or
-> absolute frame-time questions. The **Pixel phone pass is PENDING** (§9).
+> absolute frame-time questions. The **Pixel phone pass is pending — the Pixel is in use by
+> Lab A** (§9).
 >
 > The raw logs are in `research/PERF-LOG.md` (the per-run tables), `research/R1-REPORT.md`,
-> `research/R2-REPORT.md` and `research/SWITCH-STALL-INVESTIGATION.md`.
+> `research/R2-REPORT.md`, `research/R3-REPORT.md`, `research/FINAL-VALIDATION.md` and
+> `research/SWITCH-STALL-INVESTIGATION.md`.
 
 ## 1. Targets
 
@@ -161,9 +163,10 @@ evidence available):
 | All ambient effects off, idle clock on | 0 frames / 10 s (was 230) |
 | Defaults, idle clock on vs always-on | 189 vs 191 (ambient still animates, so no saving) |
 | Contacts tab / app backgrounded | 0 frames (canvas unmounted) |
+| Final validation, release, preset best, 6 s windows (`opaqueCanvas:0`, `perfProbe:1`): Orrery → Digest tab → Orrery → HOME → relaunch | 118 → **0** → 122 → **0** → 115 frames; UI-worklet probe lines 3 → 0 → 2 → 0 → 2 (`evidence/13-final/06-lifecycle/lifecycle-gfxinfo.txt`) |
 | 5-min idle, all on (M1, TextureView) | 23.5 frames/s steady, PSS stable |
 
-## 9. PLACEHOLDER — Pixel phone pass results (PENDING)
+## 9. PLACEHOLDER — Pixel phone pass results (pending — Pixel in use by Lab A)
 
 > **Not run.** Lab A owned the phone for the whole lab. Run `research/PHONE-PASS-SCRIPT.md`
 > once the owner releases it (arm64 builds, local adb 5037, never touch Lab A's package).
@@ -177,17 +180,31 @@ evidence available):
 > - Opaque vs TextureView presented rate, and overlay composition: _TBD_
 > - Does the 800-body crash stay fixed on ARM? _TBD_
 >
-> **Gaps in the script to fix before running:**
-> 1. There are no rows for the R2 stage. Add `planeLight:0,planeGrid:0` vs the defaults,
->    and `bloom:1` (R2-REPORT §4 asks for this; the script predates R2).
-> 2. The "lab minimal" config (`MIN` in `tools/r1-matrix.sh`) does not switch off the R2
->    flags (`homeTilt`, `planeLight`, `planeGrid`, `ringSunLight`, `bodySizeFloor`). After
->    R2, "lab minimal" therefore includes the full-screen stage shader and a tilted Home.
->    Add those flags to `MIN` or record the difference.
-> 3. The output folder `evidence/10-phone/` collides in number with `evidence/10-r2/`.
->    Consider `evidence/12-phone/`.
+> **Script gaps, closed in R3:** the script and `tools/r1-matrix.sh` now run the presets
+> (best / ship-safe / everything / legacy) plus `bloom` and `nostage` rows; `labmin` also
+> switches off the R2/R3 flags; the output folder is `evidence/12-phone/`.
+> **Still to add on the phone:** real multi-touch (pinch / twist / two-finger tilt), which
+> adb cannot inject, and the Stress 400 switch latency (~2 s from label to choreography on
+> the emulator, FINAL-VALIDATION §2 #13).
 
-## 10. PLACEHOLDER — R3 polish perf delta (PENDING)
+## 10. R3 polish perf delta (emulator, relative)
 
-> _TBD by the R3 agent: any changed defaults, and an emulator A/B against `bfc8f36c` using
-> `tools/r2-perf.sh`._
+R3 changed the defaults by adding `nearSizeClamp` and `immersiveChrome` (both ON), and added
+presets. Release `r3e`, Dense 120, `tools/r1-matrix.sh` on presets, `idleClock:0`,
+`opaqueCanvas:0` (raw: `evidence/11-r3/perf/summary.tsv`, PERF-LOG "R3 presets"). gfx ms:
+
+| Config | idle p50/p90 | pan p50/p90 | focus p50/p90 | switch in p50/p90 | GPU p50 idle/pan |
+|---|---|---|---|---|---|
+| Lab B best (= defaults) | 24 / 34 | 23 / 36 | 26 / 40 | 25 / 42 | 12 / 9 |
+| Ship-safe | **18 / 34** | **20 / 40** | **18 / 34** | **18 / 40** | 8 / 8 |
+| Everything | 25 / 34 | 25 / 40 | 28 / 48 | 20 / 53 | 12 / 9 |
+| best + bloom | 27 / 36 | 23 / 38 | 26 / 46 | 26 / 53 | 16 / 10 |
+| best − stage plane | 24 / 34 | 24 / 38 | 24 / 36 | 24 / 61 | 13 / 10 |
+| Legacy | 200 / 200 | 200 / 900 | 200 / 350 | 38 / 300 | 11 / 12 (36–64 skipped) |
+
+- **Ship-safe is the only row separable from noise** (−6…−8 ms p50). While `ringFlow` is on,
+  the rings picture re-records on every clock tick (659 runs vs 100 in the pan window).
+- The near-size clamp (`frame` probe 0.8–1.0 ms) and the immersive chrome (static views)
+  have no measurable cost. Bloom adds +4 ms GPU p50 at idle, the same hint as R2.
+- The final validation (release from HEAD, preset best) found no new cost signals and an
+  empty crash buffer. Its frame counts are lifecycle evidence (§8), not timing.

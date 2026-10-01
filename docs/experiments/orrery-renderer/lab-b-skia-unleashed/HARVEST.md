@@ -1,8 +1,8 @@
 # Lab B — Harvest
 
-This lists every idea that worked, in a form a V2 phase can lift. State is `bfc8f36c`; the
-**R3 polish pass and the Pixel phone pass are both PENDING**, and either may change a verdict
-or a cost.
+This lists every idea that worked, in a form a V2 phase can lift. State is `883b84ed` (R3
+rows added: H-C26–H-C28, H-E7; H-D5 updated by the final validation). The **Pixel phone pass
+is pending (the Pixel is in use by Lab A)** and may change a verdict or a cost.
 
 ## How to read this
 
@@ -320,6 +320,9 @@ These live in the shared model half (`OrreryWorld.tsx`, `src/logic/*`). They app
 | H-C23 | Per-theme effect profiles (intensity + additive/multiply physics) | SHIP (pattern) | R1 | `src/theme/orrery-lab-fx.ts`; `c8a82eaf` … | — | `05-m1-checkpoint/27-themes-*` | Standard Light ≈0.5× Galaxy Light (tested); OWNER C-15 for light-theme art direction |
 | H-C24 | Lens flare: the **anamorphic streak only** | SIMPLIFY (OWNER taste) | R2 | `lensFlare` in `LabStage.tsx` | Full-screen shader now; a thin gradient rect would do | `10-r2/03-iter2/crop-sun-art-bloom-flare.jpg` | Dark themes only; drop the ghosts |
 | H-C25 | Bloom look | COSTLY | R2 | `labBloomPaint` | Full-screen offscreen + blur every frame | `10-r2/final-hero-bloom-flare.jpg` | Harvest the *look* as baked per-element glows; maybe a sun-sprite-only bloom |
+| H-C26 | **Near-body size clamp** (perspective growth knee +6 %, soft cap 8 % of short side, applied to the frame) | SHIP the rule (OWNER C-71, only matters with H-C17) | R2 (post-process) → R1 in the projection | `labb/labb-near-size.ts` `labClampNearSizes`, `OrreryWorld.tsx`; `13c706ad` | `frame` probe 0.8–1.0 ms, not separable | `11-r3/01-iter1/04-detail-dense.jpg` vs `02-iter2/04-detail-dense.jpg` | V2: a semantic max drawn radius inside the projection so hits, labels, reticle and keep-out agree by construction; sun exempt; keep the `MIN_HIT_RADIUS` floor |
+| H-C27 | **Immersive Orrery chrome** (map under a floating title on a token scrim; HUD control rail) | SHIP (OWNER C-72 taste) | R1 | `labb/LabImmersiveHeader.tsx`, `labb-header-scrim.ts` (+ test), `OrreryControls` `rail`; `13c706ad` | Static views, no measurable cost | `11-r3/05-final/presets-02-overview-dense.jpg`, `11-r3/02-iter2/` | Nested top-anchored bands (abutting bands seam); bar stays an obstacle so framing is unchanged; title ≥ 9.9:1 model. Edge-to-edge needs a shell-level "immersive route" contract |
+| H-C28 | **Presets** (best / ship-safe / everything / legacy) | SHIP as a dev/QA tool, not a user feature | R0 | `orrery-labb-fx-store.ts` `LAB_PRESETS`, `NOT_SHIP_SAFE`; panel + `preset=` link; `13c706ad` | Ship-safe p50 18–20 ms vs best 23–26 ms (emulator, relative) | `11-r3/05-final/presets-*.jpg`, `panel-presets.jpg` | A fixed matrix for the phone pass and owner review; membership is a lab judgement (C-73) |
 
 ## D. Interaction and motion ideas
 
@@ -329,7 +332,7 @@ These live in the shared model half (`OrreryWorld.tsx`, `src/logic/*`). They app
 | H-D2 | Per-System sky hue | OWNER (C-05) | R1 | `systemSkyIndex`, `displayedSkyHue`; `30026fda` | A uniform | `06-wp2.1-switch/05-settled-inner-circle-galaxy-dark-gold-sky-hue.jpg` | Generation-ordered crossfade; decide hash stability across a re-key |
 | H-D3 | **Target-lock reticle with seek→lock tied to the camera** | SHIP | R1 | `LabFocusFx.tsx`, `labb-focus-logic.ts`; `11c21745`, `0acdc848` | Not separable | `08-wp2.2-focus/10-release-focus-flyin-lock-ripple-ping.mp4`, `13-release-sheet-*` | `mix`/`keys` only in an effect keyed on focus identity; static once locked |
 | H-D4 | World response (defocus others, focused atmosphere, vignette) | SHIP (OWNER C-52 a11y) | R1 | `BODY_LIT` `uK.w`; `11c21745` | — | `08-wp2.2-focus/07-debug-dense-120-focus-world-response.jpg` | The sun is never dimmed; reuses a spare uniform slot |
-| H-D5 | Tap feedback: ping / plane ripple / Polaris flare | SHIP | R1 | `LabFeedbackPicture`; `11c21745` | No re-record at rest | `08-wp2.2-focus/09-debug-sheet-ripple-recenter-ping-seek-lock.jpg` | V2 needs a clean feedback event channel, not a side-stamp (C-20/C-54); the north flare has never been captured on device |
+| H-D5 | Tap feedback: ping / plane ripple / Polaris flare | SHIP | R1 | `LabFeedbackPicture`; `11c21745` | No re-record at rest | `08-wp2.2-focus/09-debug-sheet-ripple-recenter-ping-seek-lock.jpg` | V2 needs a clean feedback event channel, not a side-stamp (C-20/C-54). North flare + north recovery captured on the emulator in R3 / final (`11-r3/03-paths/north-polaris-flare.jpg`, `13-final/01-polaris/best-polaris-tap-sequence.jpg`) |
 | H-D6 | Reorder hold language (charge arc, held-ring glow, slot flash) | SHIP (OWNER C-55: one reorder language) | R1 | `LabFeedbackPicture`; `11c21745` | — | `08-wp2.2-focus/12-*`, `16-*.mp4` | Haptic unchanged; slot flash event-driven |
 | H-D7 | **Focus-card anchoring** (keep-out box, side order, height cap) | SHIP | R0 | `src/components/orrery/orrery-focus-placement.ts` (+ test); `11c21745` | — | `08-wp2.2-focus/00-before-*` vs `01-*` | Fixes M1-critique item #1 (card over the focused body and label) |
 | H-D8 | Focus-card occlusion of world detail (glass untouched) | SHIP (OWNER C-61) | R2 (lab module-level channel) | `labb-card-channel.ts`; `2d043162` | — | `09-r1/shots/01-focus-card-occlusion-off-vs-on-dense-eli.jpg` | Keep ADR-149's glass value; build a proper overlay-rect channel |
@@ -345,6 +348,7 @@ These live in the shared model half (`OrreryWorld.tsx`, `src/logic/*`). They app
 | H-E4 | Stress seed 400/800 through the real DAOs | `src/__dev__/lab-b-seed.ts` (`bba4cf5b`) | Exercises the real read/scene/world/label paths |
 | H-E5 | Fictional test-portrait set | `assets/test-portraits/` | Face-legibility checks (never ship) |
 | H-E6 | Recursive worklet-order guard + the Hermes default-parameter rule | `orrery-worklet-order.test.ts` | Prevents device-only crashes vitest can't see |
+| H-E7 | Skia test mock that throws like native on a missing `children` array; path harness `tools/r3-paths.sh`; preset-aware `r3-legibility.sh` | `1c339064`, `13c706ad` | The mock's silent default hid the "Everything" crash until device |
 
 ---
 
@@ -371,9 +375,18 @@ These live in the shared model half (`OrreryWorld.tsx`, `src/logic/*`). They app
 4. **The moments:** the switch showcase (H-D1), the target-lock reticle with world response
    (H-D3/D4) and focus-card anchoring (H-D7).
 
-## PLACEHOLDER — R3 / phone updates
+## R3 / final-validation updates
 
-> _TBD: R3 may add or retune items (update rows in place). The phone pass must confirm or
-> overturn: H-B9 (opaque canvas), H-C18/C19 (full-screen stage shader on Mali), H-D1 switch
-> p99, H-A2 (crash fixed on ARM), H-A5 (Segmenter absent on the Pixel's Hermes), and the
-> face-legibility glance for H-C4._
+- Added H-C26 (near-size clamp), H-C27 (immersive chrome), H-C28 (presets) and H-E7.
+- H-D5: the Polaris flare and the north recovery are now captured on the emulator. The
+  shared tap → `camera.recover(northTarget)` path works in legacy and lab
+  (FINAL-VALIDATION §1).
+- No earlier verdict moved. Legibility with the R2 stage was re-measured with no regression.
+  Standard Dark glass is 4.42 (model), still the OWNER C-02 gate for H-C1.
+
+## PLACEHOLDER — phone updates (pending — Pixel in use by Lab A)
+
+> _TBD: the phone pass must confirm or overturn H-B9 (opaque canvas), H-C18/C19 (full-screen
+> stage shader on Mali), H-D1 switch p99, H-A2 (crash fixed on ARM), H-A5 (Segmenter absent on
+> the Pixel's Hermes), the face-legibility glance for H-C4, and the Ship-safe vs best gap
+> (H-C28)._

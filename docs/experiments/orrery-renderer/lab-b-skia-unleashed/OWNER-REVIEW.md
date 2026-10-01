@@ -18,10 +18,15 @@ How to read each item:
 - **(C-xx)**: the cross-reference into `research/COMPROMISES-LOG.md`, for later. You don't
   need it to answer.
 
-Two passes are still to come, and either may add items or change a picture:
+R3 polish and a final check on a release build are done (R3 added CLAMP, IMMERSE and
+SHIPSAFE below). One pass is still to come, and it may add items or change a picture:
 
-- **R3 polish**: running now.
-- **Real-phone test**: waiting for the phone, see item PHONE.
+- **Real-phone test**: pending, because the Pixel is in use by Lab A. See item PHONE.
+
+To compare everything at once, the lab panel has a one-tap **preset** row: "Lab B best" (all
+recommended effects), "Ship-safe", "Everything" and "Legacy" (today's Orrery). The side-by-side
+pictures are `11-r3/05-final/presets-01-overview-inner.jpg`, `presets-02-overview-dense.jpg`
+and `presets-05-focus-cleo.jpg`.
 
 ---
 
@@ -31,7 +36,7 @@ Two passes are still to come, and either may add items or change a picture:
 |---|---|---|---|---|
 | **TILT** ⚠ | When you open the Orrery or press Recenter, the map leans back about 32°. It looks like a game's star map seen from in front and above, not a flat target seen from straight above. You can still tilt it yourself. | Home is flat (tilt 0). The Orrery system doc says Recenter "restores all Home axes". | **Yes.** This is the single biggest improvement in the lab. It also turns on depth cues that were already built but hidden. If yes: write a new ADR for the Home camera, and check that the near side doesn't slide under the buttons at close zoom. | `10-r2/before-after-overview.jpg`, `10-r2/01-tilt-probe/sheet.jpg` |
 | **SKY** ⚠ | A painted deep-space sky behind the Orrery: soft nebula clouds and three layers of stars that drift slowly and move with the camera. | ADR-114/179 force a plain solid background on the Orrery screen (no art). | **Yes**, with a new ADR that supersedes the Orrery part of ADR-114/179. The sky is drawn by code from your theme colours; it is not an image. | `05-m1-checkpoint/28c-ab-legacy-left-vs-lab-right.png` |
-| **GLASS** ⚠ | Text on the see-through Orrery cards must stay readable over the brighter sky. In Standard Dark, secondary text measures **4.45:1** by the ADR-149 method, just under the 4.5:1 accessibility line. The bright pixel underneath is an initials letter on a contact. This has **not been re-measured since the R2 changes** (sun light on the plane, brighter inner rings). | ADR-149 proved the cards against the old, darker Orrery. | **Don't ship until it passes 4.5:1 in all four themes.** Fix it by dimming what the Orrery draws *under* the cards (the lab already does this for the focus card). Do not change the card opacity or your colours. Re-run the measuring tool after R3. | `09-r1/shots/04-legibility-after-4-themes.jpg`, `09-r1/shots/05-sun-glow-cap-standard-dark-before-after.jpg` |
+| **GLASS** ⚠ | Text on the see-through Orrery cards must stay readable over the brighter sky. In Standard Dark, secondary text measures **4.42:1** by the ADR-149 method (re-measured in R3 with all the R2 and R3 changes on, and with "Everything" on), just under the 4.5:1 accessibility line. It was 4.45–4.47 before. The bright pixel underneath is still an initials letter on a contact. The other three themes pass (4.51 / 5.56 / 5.10). (C-02) | ADR-149 proved the cards against the old, darker Orrery. | **Don't ship until it passes 4.5:1 in all four themes.** Fix it by dimming what the Orrery draws *under* the cards (the lab already does this for the focus card). Do not change the card opacity or your colours. | `11-r3/04-legibility-after/`, `09-r1/shots/05-sun-glow-cap-standard-dark-before-after.jpg` |
 | **PORT** | Six fixes found in the lab also fix the **current** Orrery: <br>• a 3–7 second freeze when switching between big Systems; <br>• an app crash with very large Systems (800+ people); <br>• slow label and position maths with many people; <br>• contact initials showing as a cut-off full name ("El…") instead of "EN" on Android. <br>None of them changes what the Orrery shows or does. | The freeze, the crash risk and the initials bug are in the shipping app. | **Yes, port them to main soon**, as their own small phase, separate from V2. Details: HARVEST.md section A. | `07-switch-stall/05-sheet-inner-to-dense-before-vs-after-normal-speed.jpg` |
 | **PHONE** | The lab never ran on a real phone, so every speed number is from the desktop emulator. A ready-made 20-minute script measures the real thing. | — | **Free up the Pixel for Lab B when Lab A is done**, then run `research/PHONE-PASS-SCRIPT.md`. Several items below depend on it. | — |
 
@@ -71,6 +76,14 @@ Two passes are still to come, and either may add items or change a picture:
 | **SWITCH** | The System switch becomes a cinematic moment: <br>• stars stretch into hyperspace streaks; <br>• people leaving dissolve into sparks; <br>• arriving people fly in behind comet tails and flash as they settle; <br>• a ring-shaped shockwave locks the new System in. <br>Sparks and comets pass over faces for under a third of a second. Timing is unchanged (2.1 s). With Reduced Motion it stays a plain crossfade. (C-44, C-47) | The same movement, without these effects. | **Yes.** It's the lab's strongest "game" moment. Trim the sparks and comets if the phone shows stutter. | `06-wp2.1-switch/27-sheet-dense-to-inner-slowmo20-pass2.jpg`, `06-wp2.1-switch/01-first-switch-after-cold-launch-work-to-inner-normal-speed.mp4`, `10-r2/final-switch.jpg` |
 | **HUE** | Each System gets its own sky colour, picked automatically from your star palette. All Contacts keeps the default. The sky changes colour during a switch. (C-05) | One sky. | **Yes**, but tie the colour to the System's permanent id so it never changes on a rename or restore. Later you could let people choose it. | `06-wp2.1-switch/05-settled-inner-circle-galaxy-dark-gold-sky-hue.jpg` |
 
+## Camera and screen layout (added in R3)
+
+| Code | What it is | Today's Orbit | Recommendation | Look at |
+|---|---|---|---|---|
+| **CLAMP** | At close zoom with the map tilted, contacts on the near side used to grow into big discs that slid under the buttons. The lab now limits how much the tilt can enlarge a contact (at most 6 % bigger) and caps any contact at 8 % of the screen width. Positions are unchanged; only the drawn size is limited. Tapping, labels and the focus marker follow the drawn size. (C-71) | No limit; Home is flat, so it barely mattered. | **Yes, if TILT is yes.** It only matters with the tilted Home. V2 should build the limit into the camera maths rather than adding it afterwards. | `11-r3/01-iter1/04-detail-dense.jpg` (before) vs `11-r3/02-iter2/04-detail-dense.jpg` (after) |
+| **IMMERSE** | On the Orrery tab, the map now continues up under the "Orrery" title, which floats on a soft fade in your background colour, instead of stopping at a hard edge below the header. The three Orrery buttons become one instrument strip. The status bar, tab bar and "+" button are unchanged; making those see-through too would change the whole app's shell. The title still reads at ≥ 9.9:1. (C-72) | The header is a solid bar; the map starts below it. | **Yes.** It's a taste call. If you want the map truly edge to edge, that is a separate app-shell decision. | `11-r3/05-final/presets-02-overview-dense.jpg` (columns 1 vs 4), `11-r3/02-iter2/` |
+| **SHIPSAFE** | The "Ship-safe" preset is the lab's guess at a first version: Lab B best minus FLOW, WAKE, DIM, the grid, the moving sky, the moon effect, and BLOOM / BLUR / FLARE / WOBBLE. It is also the only setting measurably cheaper on the emulator. Which effects belong in it is your call, item by item, via the codes above. (C-73) | — | **Use it as the starting point for the phone test**, not as a decision. Your answers above override it. | `11-r3/05-final/presets-*.jpg` (column 2) |
+
 ## Themes
 
 | Code | What it is | Today's Orbit | Recommendation | Look at |
@@ -88,13 +101,23 @@ Two passes are still to come, and either may add items or change a picture:
 | **BLUR** | Tilt-shift: blur the far and near parts of the map. | **Drop.** It blurs faces while names stay sharp. | `10-r2/03-iter2/sheet-hero.jpg` |
 | **WOBBLE** | A heat-haze ripple on the switch shockwave. | **Drop.** Only visible in slow motion. | `10-r2/05-shockfilter/lockslow-off-vs-on.jpg` |
 
+## Found during the final check (FYI)
+
+| Code | What it is | Recommendation | Look at |
+|---|---|---|---|
+| **LABEL** | A bug in **today's** Orbit, not caused by the lab: after a cold start, if the last System you viewed is one you created yourself, the System picker reads "Unavailable System" until you pick a System again. The map itself is correct. | **Fix on main as a small bug fix**, alongside PORT. Details: `research/FINAL-VALIDATION.md` §3. | `13-final/08-unavailable-system-cold-start.jpg` |
+
+The Polaris question from R3 is closed. Tapping Polaris does turn the map back to north, in
+today's Orbit and in the lab. The earlier test recorded too late to catch the turn.
+
 ---
 
 **Approve all recommendations** means:
 
 | Answer | Items |
 |---|---|
-| Yes | TILT, SKY, PORT, PHONE, RINGS, RIM, TETHER, STATUS, FACES (provisional), SUN, FLOOR, STAGE (pool yes, grid optional), DIM, CARD, CHROME, REORDER, SWITCH, HUE, STD, LIGHT (approach), TOKENS |
+| Yes | TILT, SKY, PORT, PHONE, RINGS, RIM, TETHER, STATUS, FACES (provisional), SUN, FLOOR, STAGE (pool yes, grid optional), CLAMP (with TILT), IMMERSE, DIM, CARD, CHROME, REORDER, SWITCH, HUE, STD, LIGHT (approach), TOKENS, LABEL (fix on main) |
+| Starting point only | SHIPSAFE |
 | No | FLOW, BLOOM, BLUR, WOBBLE |
 | Not now | WAKE |
 | Optional | FLARE |

@@ -1,8 +1,8 @@
 # Lab B — Recommendations
 
-My judgement after M1, M2, R1 and R2. All evidence is from the **emulator**. The **R3
-polish pass and the Pixel phone pass are PENDING**, and either could move a verdict; the
-placeholders below must be filled.
+My judgement after M1, M2, R1, R2, R3 and the final validation. All evidence is from the
+**emulator**. The **Pixel phone pass is pending (the Pixel is in use by Lab A)** and could
+move a verdict; its placeholder below must be filled.
 
 ## 1. Where is the practical visual ceiling of RN Skia for the Orrery?
 
@@ -164,11 +164,13 @@ the flare streak.
 
 In priority order:
 
-1. **Run the Pixel phone pass** (once the owner frees the phone). First fix the script gaps:
-   add the R2 rows (`planeLight/planeGrid` off, `bloom` on) and switch the R2 flags off in
-   `labmin`. Then fill PERFORMANCE §9. Everything below depends on it.
-2. **Re-run legibility** (`tools/r1-legibility.sh`) on the R2/R3 defaults in all 4 themes,
-   and fix any < 4.5:1 overlay case canvas-side (GLASS).
+1. **Run the Pixel phone pass** (once the owner frees the phone). R3 closed the script gaps:
+   the script now runs the presets plus `bloom` / `nostage` rows, and `labmin` turns off the
+   R2/R3 flags. Add a real multi-touch check (pinch, twist, two-finger tilt). Then fill
+   PERFORMANCE §9. Everything below depends on it.
+2. **Fix Standard Dark glass canvas-side** (GLASS, 4.42:1 model at R3). Legibility was
+   re-measured in R3: the only < 4.5 case is the initials glyph ink under the glass. Dim the
+   avatar swatch text under overlay rects, as the focus card already does.
 3. **Fold the stage plane into the nebula pass** (one full-screen pass instead of two), and
    time tilt (perspective) cost now that Home is tilted.
 4. **Cut switch p99:** one shared trim shader with per-ring uniforms instead of a Paint +
@@ -177,15 +179,35 @@ In priority order:
    bodies picture.
 6. **Prepare the PORT patch for main:** the six shared fixes as clean commits with tests,
    ready for a separate phase.
-7. **Fix the stale header comments** in `LabEnvironment.tsx`, `LabRings.tsx`,
-   `LabBRenderer.tsx` and `labb-effects.ts`.
+7. **Fix the "Unavailable System" label on main** (pre-existing, FINAL-VALIDATION §3), with
+   the PORT patch. (The stale header comments were fixed in R3.)
 
-## PLACEHOLDER — R3 polish outcome
+## R3 polish and final-validation outcome
 
-> _TBD: what R3 changed, whether any verdict above moved, and updated "best" evidence
-> images._
+- **What R3 changed:**
+  - presets (best / ship-safe / everything / legacy);
+  - the near-size clamp (C-71), which fixes the worst side-effect of the tilted Home;
+  - the immersive header + HUD rail (C-72);
+  - Home tilt now applies to the lab renderer only;
+  - a crash fix for "Everything".
+- **Did any verdict move?** No. The R2 stage does not regress legibility. The tilted Home
+  is now easier to recommend, because CLAMP removes the "near bodies slide under the FAB"
+  problem. "Ship-safe" (C-73) is the only preset that separates from noise on the emulator
+  (p50 18–20 ms vs 23–26 ms): `ringFlow` re-records the rings picture every tick, which
+  strengthens the "No" on FLOW.
+- **Final validation:** every item on the contract's exercise list passes on a release build
+  with preset best (FINAL-VALIDATION).
+  - The Polaris "no rotation" open item was a recording artifact. North recovery works in
+    legacy and lab.
+  - One pre-existing main bug was found (custom System label after a cold start).
+- **Updated best evidence:**
+  - `11-r3/05-final/presets-02-overview-dense.jpg` and `presets-05-focus-cleo.jpg` (four
+    presets side by side);
+  - `13-final/02-shots/sheet-a.jpg` / `sheet-c.jpg` (preset best, all four themes);
+  - `13-final/04-switching/switch-inner-to-stress400.mp4` (switch into 400);
+  - `13-final/01-polaris/best-polaris-tap-sequence.jpg`.
 
-## PLACEHOLDER — Phone pass outcome
+## PLACEHOLDER — Phone pass outcome (pending — Pixel in use by Lab A)
 
 > _TBD: which "unknown until the phone pass" items resolved, and how; whether the opaque
 > canvas, the stage plane and the switch FX stay default; and the final envelope for V2

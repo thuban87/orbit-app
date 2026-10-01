@@ -1,7 +1,10 @@
 # Lab B — Visual design
 
 Direction: **"Deep Field Cartography"** (research 03 §1). This doc describes the look at
-`bfc8f36c`. It does not cover **R3 polish (PENDING)**.
+`bfc8f36c`. R3 visual changes: the near-size clamp (near bodies cap at 8 % of the short
+side), the immersive header (the map continues under a floating title on a `background`-token
+scrim) and the HUD control rail. See `research/R3-REPORT.md` §2–§3 and
+`evidence/11-r3/05-final/`.
 
 All images are emulator captures (1280×2856). The colours are what a desktop GPU produces
 through the emulator's GLES translator; a Pixel panel or HDR has not been checked.
