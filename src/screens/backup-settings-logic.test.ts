@@ -12,6 +12,8 @@ import {
   backupSettingsPresentation,
   buildBackupSettingsPatch,
   commitThenRefresh,
+  encryptionErrorCopy,
+  REENCRYPTION_TOO_LARGE_COPY,
   validateEncryptionSetup,
   validateWholeBackupDays,
 } from "@/screens/backup-settings-logic";
@@ -217,5 +219,24 @@ describe("commitThenRefresh — a committed write is never reported as failed (D
     });
     expect(outcome).toBe("nothing-committed");
     expect(refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("passphrase-change error copy (38.6 D-39, WR5-03)", () => {
+  it("says too large, not reconnect, for an over-cap re-encryption", () => {
+    expect(encryptionErrorCopy("too-large")).toBe(REENCRYPTION_TOO_LARGE_COPY);
+    expect(REENCRYPTION_TOO_LARGE_COPY).toBe(
+      "An automatic backup in your folder is too large to re-encrypt, so your passphrase wasn't changed. You can still use the new passphrase for future backups only.",
+    );
+    expect(encryptionErrorCopy("too-large")).not.toMatch(/reconnect/i);
+  });
+
+  it("keeps the existing copy for the other outcomes", () => {
+    expect(encryptionErrorCopy("wrong-current-passphrase")).toBe(
+      "That passphrase doesn't match your current backup protection.",
+    );
+    expect(encryptionErrorCopy("needs-recovery")).toBe(
+      "Orbit couldn't safely re-encrypt every accessible automatic backup. Reconnect the folder and try again.",
+    );
   });
 });

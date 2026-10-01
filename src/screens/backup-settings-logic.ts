@@ -90,6 +90,21 @@ export function validateEncryptionSetup(
   return { ok: true };
 }
 
+/**
+ * 38.6 D-39 (review WR5-03): the copy for an over-cap source during a
+ * re-encrypting passphrase change. Same tone as the other "too large" copy.
+ */
+export const REENCRYPTION_TOO_LARGE_COPY =
+  "An automatic backup in your folder is too large to re-encrypt, so your passphrase wasn't changed. You can still use the new passphrase for future backups only.";
+
+/** The inline error for a passphrase change that didn't finish. */
+export function encryptionErrorCopy(status: string): string {
+  if (status === "wrong-current-passphrase")
+    return "That passphrase doesn't match your current backup protection.";
+  if (status === "too-large") return REENCRYPTION_TOO_LARGE_COPY;
+  return "Orbit couldn't safely re-encrypt every accessible automatic backup. Reconnect the folder and try again.";
+}
+
 export interface BackupSettingsPresentation {
   /** Render the folder and encryption groups at all. */
   readonly showGroups: boolean;

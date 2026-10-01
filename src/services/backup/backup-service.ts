@@ -294,7 +294,13 @@ export type AutomaticBackupReencryptionResult =
   | { status: "changed"; reencryptedCount: number }
   | { status: "wrong-current-passphrase" }
   | { status: "needs-attention" }
-  | { status: "needs-recovery" };
+  | { status: "needs-recovery" }
+  /**
+   * 38.6 D-39 (review WR5-03): a source re-encrypts to more than the encrypted
+   * size cap. The active passphrase is unchanged and retrying the same change
+   * can never succeed, so this is not a folder/recovery problem.
+   */
+  | { status: "too-large" };
 
 interface AutomaticBackupReencryptionDependencies {
   readonly directoryUri: string;
@@ -443,7 +449,24 @@ export function createAutomaticBackupReencryptionService(
           await deps.passphrases.setPassphrase(pending.nextPassphrase);
           await deps.passphrases.clearPendingPassphraseChange();
           return { status: "changed", reencryptedCount };
-        } catch {
+        } catch (error) {
+          if (isBackupTooLargeError(error)) {
+            // 38.6 D-39 (review WR5-03): an over-cap source (typically a
+            // plaintext automatic backup written while encryption was off) can
+            // never be re-encrypted, so a resume would fail the same way. When
+            // no replacement exists yet, nothing in the folder has changed and
+            // the journal is dropped so another change, or future-only, is not
+            // blocked by it. Once a replacement exists the journal is kept: it
+            // is the only record of which files already use the new passphrase.
+            if (pending.replacements.length === 0) {
+              try {
+                await deps.passphrases.clearPendingPassphraseChange();
+              } catch {
+                /* the journal still matches this exact input; a retry is safe */
+              }
+            }
+            return { status: "too-large" };
+          }
           // The journal and old active secret stay intact so the exact operation
           // can be resumed after SAF/keystore recovery; no source is removed
           // until a replacement has independently decrypted and parsed.

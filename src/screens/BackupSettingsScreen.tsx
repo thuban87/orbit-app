@@ -45,18 +45,13 @@ import {
   backupSettingsPresentation,
   buildBackupSettingsPatch,
   commitThenRefresh,
+  encryptionErrorCopy,
   validateEncryptionSetup,
 } from "./backup-settings-logic";
 
 const LOG_SCOPE = "backup-settings";
 type EncryptionFlow = "setup" | "change" | "forgotten";
 type ChangeMode = "reencrypt" | "future-only";
-
-function encryptionErrorCopy(status: string): string {
-  if (status === "wrong-current-passphrase")
-    return "That passphrase doesn't match your current backup protection.";
-  return "Orbit couldn't safely re-encrypt every accessible automatic backup. Reconnect the folder and try again.";
-}
 
 export function BackupSettingsScreen({
   navigation,

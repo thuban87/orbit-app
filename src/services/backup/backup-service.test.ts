@@ -906,6 +906,114 @@ describe("over-cap encrypted backups report too-large (38.6 D-39)", () => {
     expect(writeVerified).not.toHaveBeenCalled();
   });
 
+  function reencryptionHarness(sources: ReadonlyArray<[string, string]>) {
+    const entries = new Map<string, string>(sources);
+    const state = {
+      active: "old",
+      pending: null as null | {
+        oldPassphrase: string;
+        nextPassphrase: string;
+        replacements: ReadonlyArray<{
+          sourceUri: string;
+          replacementUri: string;
+        }>;
+      },
+    };
+    const service = createAutomaticBackupReencryptionService({
+      directoryUri: "content://backup",
+      now: new Date("2026-08-25T00:00:00.000Z"),
+      crypto: {
+        decrypt: ({ envelope }: { envelope: unknown }) =>
+          new TextEncoder().encode(
+            (envelope as { plaintext: string }).plaintext,
+          ),
+        // The real cap check, keyed on a marker so one source is over the cap.
+        encrypt: ({
+          passphrase,
+          plaintext,
+        }: {
+          passphrase: string;
+          plaintext: Uint8Array;
+        }) => {
+          const text = new TextDecoder().decode(plaintext);
+          if (text.includes('"oversized":true'))
+            throw new BackupEnvelopeError("too-large");
+          return { encrypted: true, passphrase, plaintext: text };
+        },
+      } as never,
+      profile: { formatVersion: 1 } as never,
+      passphrases: {
+        getPassphrase: async () => ({
+          status: "present" as const,
+          passphrase: state.active,
+        }),
+        setPassphrase: async (value) => {
+          state.active = value;
+        },
+        deletePassphrase: async () => {},
+        getPendingPassphraseChange: async () =>
+          state.pending === null
+            ? { status: "absent" as const }
+            : { status: "present" as const, change: state.pending },
+        setPendingPassphraseChange: async (change) => {
+          state.pending = change;
+        },
+        clearPendingPassphraseChange: async () => {
+          state.pending = null;
+        },
+      },
+      storage: {
+        list: async () => [...entries.keys()],
+        read: async (uri) => entries.get(uri)!,
+        writeVerified: async (_directory, name, contents) => {
+          const uri = `content://backup/${name}`;
+          entries.set(uri, contents);
+          return uri;
+        },
+        remove: async (uri) => {
+          entries.delete(uri);
+        },
+      },
+    });
+    return { entries, state, service };
+  }
+  // A plaintext automatic backup written while encryption was off.
+  const oversizedPlaintext = JSON.stringify({ ...manifest, oversized: true });
+
+  it("a passphrase change over an over-cap plaintext source returns too-large, keeps the passphrase and drops the unused journal (WR5-03)", async () => {
+    const source = "content://backup/orbit-auto-2026-08-24T00-00-00-000Z.json";
+    const { entries, state, service } = reencryptionHarness([
+      [source, oversizedPlaintext],
+    ]);
+    await expect(
+      service.change({ currentPassphrase: "old", nextPassphrase: "new" }),
+    ).resolves.toEqual({ status: "too-large" });
+    expect(state.active).toBe("old");
+    expect(state.pending).toBeNull();
+    expect([...entries.entries()]).toEqual([[source, oversizedPlaintext]]);
+    // A different new passphrase is not blocked by a stale journal.
+    await expect(
+      service.change({ currentPassphrase: "old", nextPassphrase: "other" }),
+    ).resolves.toEqual({ status: "too-large" });
+  });
+
+  it("keeps the journal when a replacement was already written before the over-cap source (WR5-03)", async () => {
+    const small = "content://backup/orbit-auto-2026-08-23T00-00-00-000Z.json";
+    const big = "content://backup/orbit-auto-2026-08-24T00-00-00-000Z.json";
+    const { entries, state, service } = reencryptionHarness([
+      [small, JSON.stringify(manifest)],
+      [big, oversizedPlaintext],
+    ]);
+    await expect(
+      service.change({ currentPassphrase: "old", nextPassphrase: "new" }),
+    ).resolves.toEqual({ status: "too-large" });
+    expect(state.active).toBe("old");
+    expect(state.pending?.replacements).toHaveLength(1);
+    expect(state.pending?.replacements[0]?.sourceUri).toBe(small);
+    expect(entries.has(small)).toBe(false);
+    expect(entries.get(big)).toBe(oversizedPlaintext);
+  });
+
   it("pins the device-local health diagnostic the Backup card reads", () => {
     expect(AUTOMATIC_BACKUP_TOO_LARGE_DIAGNOSTIC).toBe(
       "The latest automatic backup was too large to create.",
