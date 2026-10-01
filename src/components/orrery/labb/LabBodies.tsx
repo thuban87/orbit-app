@@ -50,6 +50,7 @@ import {
   type LabSunStatic,
   labBodyFrameUniforms,
   labBodyMaterial,
+  labLightDir,
   labMoonFrameUniforms,
   labSeed,
   labSunFrameUniforms,
@@ -173,6 +174,8 @@ export interface LabWorldLook {
   sky: string;
   /** Scene extent (world units) — normalises the depth haze. */
   extent: number;
+  /** `moonShader` flag: per-moon runtime shader instead of the cheap moon. */
+  moonShader?: boolean;
 }
 
 export interface LabBodyCommon {
@@ -480,6 +483,16 @@ export function LabSunBody({
   );
 }
 
+/** Cheap lit moon (default): dark disc + lit cap offset toward the sun + glint.
+ * Three plain circles, no runtime shader — moons are tiny and numerous, and a
+ * shader per moon cost ~14 ms gfx p50 on the emulator (PERF-LOG WP-1.2). */
+const MOON_DARK_ALPHA = 0.5;
+const MOON_CAP_R = 0.8;
+const MOON_CAP_OFFSET = 0.2;
+const MOON_GLINT_R = 0.22;
+const MOON_GLINT_OFFSET = 0.48;
+const MOON_GLINT_ALPHA = 0.8;
+
 export function LabMoon({
   identity,
   frame,
@@ -514,9 +527,13 @@ export function LabMoon({
       extent: look.extent,
     };
   }, [look]);
-  const effect = look?.lit && st ? getLabEffect("moon") : null;
+  const shaderOn = look?.lit && look.moonShader;
+  const effect = shaderOn && st ? getLabEffect("moon") : null;
+  // Worklets capture plain booleans only (not the effect / theme objects).
+  const useShader = effect !== null;
+  const cheap = !!look?.lit && !useShader;
   const uniforms = useDerivedValue(() => {
-    if (!st) return {};
+    if (!st || !useShader) return {};
     const f = frame.value;
     return labMoonFrameUniforms(
       bodyAt(f, frameIndex.value, identity),
@@ -526,12 +543,55 @@ export function LabMoon({
       ctx ? ctx.fxFlags.value : null,
     );
   });
+  // Cheap path: the cap/glint offset toward the sun (local units, r = 1).
+  const capT = useDerivedValue(() => {
+    if (!cheap) return [];
+    const f = frame.value;
+    const b = bodyAt(f, frameIndex.value, identity);
+    const l = labLightDir(b ? b.x : 0, b ? b.y : 0, f.center.x, f.center.y);
+    return [
+      { translateX: l[0] * MOON_CAP_OFFSET },
+      { translateY: l[1] * MOON_CAP_OFFSET },
+    ];
+  });
+  const glintT = useDerivedValue(() => {
+    if (!cheap) return [];
+    const f = frame.value;
+    const b = bodyAt(f, frameIndex.value, identity);
+    const l = labLightDir(b ? b.x : 0, b ? b.y : 0, f.center.x, f.center.y);
+    return [
+      { translateX: l[0] * MOON_GLINT_OFFSET },
+      { translateY: l[1] * MOON_GLINT_OFFSET },
+    ];
+  });
+  const tone = look
+    ? labColor(look.colors, look.profile.bodies.moonTone)
+    : color;
+  const hi = look
+    ? labColor(look.colors, look.profile.bodies.highlight)
+    : color;
   return (
     <Group transform={transform} zIndex={depth} opacity={opacity}>
       {effect ? (
         <Circle cx={0} cy={0} r={1}>
           <Shader source={effect} uniforms={uniforms} />
         </Circle>
+      ) : look?.lit ? (
+        <>
+          <Circle cx={0} cy={0} r={1} color={tone} opacity={MOON_DARK_ALPHA} />
+          <Group transform={capT}>
+            <Circle cx={0} cy={0} r={MOON_CAP_R} color={tone} />
+          </Group>
+          <Group transform={glintT}>
+            <Circle
+              cx={0}
+              cy={0}
+              r={MOON_GLINT_R}
+              color={hi}
+              opacity={MOON_GLINT_ALPHA}
+            />
+          </Group>
+        </>
       ) : (
         <Circle cx={0} cy={0} r={1} color={color} />
       )}

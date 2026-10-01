@@ -237,8 +237,9 @@ export function LabBRenderer(contract: LabRenderContract) {
       profile,
       sky,
       extent: scene.extent,
+      moonShader: flags.moonShader,
     }),
-    [flags.bodyLighting, colors, profile, sky, scene.extent],
+    [flags.bodyLighting, flags.moonShader, colors, profile, sky, scene.extent],
   );
   const warmupColor = useMemo(
     () => tokenToVec4(colors.background),
@@ -337,7 +338,7 @@ export function LabBRenderer(contract: LabRenderContract) {
                     frameIndex={frameIndex}
                     color={colors.textSecondary}
                     focusColor={focused ? colors.accent : undefined}
-                    look={flags.moonShader ? look : undefined}
+                    look={look}
                   />
                 );
               })

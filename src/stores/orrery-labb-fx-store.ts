@@ -151,9 +151,9 @@ export const LAB_FLAG_REGISTRY = [
   },
   {
     id: "moonShader",
-    label: "L4 Lit moon shader (off = flat moons)",
+    label: "L4 Moon runtime shader (off = cheap 3-circle lit moon)",
     section: "effects",
-    default: true,
+    default: false,
     heavy: true,
   },
   {

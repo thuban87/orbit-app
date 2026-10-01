@@ -139,3 +139,68 @@ WP-1.1 close commit (tuning, fallback fix, logs, evidence).
     `12-standard-dark-dense`, `13-force-fallback-fill-plus-atlas`. The selector label reads
     "Unavailable System" in several shots: the pre-existing restore bug noted in WP-1.0 (the
     panel confirms Lab B Dense is selected).
+
+## 2026-10-01 — WP-1.2 worlds: bodies, sun, moons, Polaris (L2–L5)
+
+Commits: `469440db` (lit worlds), `0922d223` (uniform packing), WP-1.2 close (cheap moons,
+logs, evidence).
+
+1. **One draw per body.** Each contact is ONE `Circle` of radius r·1.3 filled by a runtime
+   shader that paints the lit disc inside r and the atmosphere / contact shadow outside it.
+   The disc edge is computed in the shader (1-dp AA from `uPx` = local units per dp) at
+   exactly the world radius, and the root Group keeps the billboard transform, so the frame
+   radius, hit radius, labels and focus cards are untouched (render test pins `uA.x` = world
+   radius and the circle at r × `BODY_REACH`). Reach 1.3 r / 2 r = the existing culling reach.
+2. **Two body effects, one lighting core** (`BODY_LIT` in `labb-effects.ts`): `bodyPhoto`
+   (child `ImageShader`, photo in local coords) and `bodyProcedural` (initials bodies: banded
+   latitude "world" in the contact's swatch, noise-warped, seeded per `bodyKey`, highlight
+   streaks; glyph initials drawn on top). Both get the same Lambert + wrap lighting from the
+   screen-space body→sun vector (`frame.value.center`), floor 0.55 dark / 0.75 light, a
+   specular glint, a status Fresnel limb and a 1.5-dp crisp status rim, per-status
+   desaturation and far-side depth haze (negative projected `depth` / scene extent, ≤ 15 %).
+3. **Status materials** (`labBodyMaterial`): stable/wobble full atmosphere; decay 0.4
+   atmosphere, 25 % desaturated; rogue no atmosphere, 45 % desaturated, cold
+   `rogueExtinguished` rim; never-contacted matte, neutral `border` rim. Static — no
+   per-status animation (HANDOFF §7). Gravity unchanged (already in the world radius).
+4. **Light themes** keep the same lighting with a higher floor and swap the additive status
+   glow for an anti-sun contact shadow in `textPrimary` ink plus a faint status glow; corona
+   becomes a non-additive warm wash (highlight mixing reduced so no white sticker outline).
+5. **Sun**: `sunStar` = limb-darkened stellar surface in the occupant glow colour with
+   domain-warped granulation on a rotated lattice (the first axis-aligned version read as
+   blocky squares on device), white-hot core toward `avatarSwatchText`; `sunPhoto` = the photo
+   EMISSIVE (only a whisper of limb darkening) for a photo self-sun or a contact sun. Both
+   share a corona: inner glow, halo, two angular-noise ray bands that drift outward, bright
+   limb; ±6 % breathing on the legacy ~3.1 s pulse. Reduced motion pins time and pulse and
+   stops reading the ambient clock. Contact sun keeps `resolveSunOccupant` colour semantics
+   (status-colour corona) — verified on device with Gus Moreau as the centre.
+6. **Moons**: default is a cheap lit moon (dark disc at 50 % + sun-facing cap + glint, three
+   plain circles) after the emulator A/B; the per-moon shader is the `moonShader` flag.
+7. **Polaris** (`LabPolaris`): BlurMask halo in `starPalette[0]` (plus-blended on dark),
+   faint long diffraction spikes, crisp 4-point cross, core. Same `polarisProjection` and
+   hit semantics. Compass tick deferred to WP-1.3 (instrument register).
+8. **Uniform packing** (perf): RN Skia rebuilds every shader on every replay and resolves
+   uniforms by name; uniforms are `float4`-packed (bodies 10, sun 5, moon 4). A test asserts
+   that every uniform declared in each WP-1.2 SkSL source is supplied by its JS builder (a
+   missing uniform throws on device), and that values are finite.
+9. **FX flags** (registry): `bodyLighting` (heavy; off = WP-1.0 flat discs), `bodyAtmosphere`,
+   `bodyProcedural`, `depthHaze`, `sunCorona`, `sunPlasma`, `moonShader` (heavy, default off),
+   `polarisLab` (heavy). Force-fallback / a null effect renders the flat path.
+10. **Visual iteration on the emulator** (pass 1 → 3): corona was nearly invisible (only a limb
+    line) → stronger halo + outward-drifting streamers; granulation blocky → rotated,
+    domain-warped, finer; terminator too faint at overview → light z 0.55 → 0.4; status rim +
+    Fresnel read as the old thick outline → rim 2 → 1.5 dp, Fresnel 0.5 → 0.35; procedural
+    bands invisible → band contrast 0.55 → 0.8 toward black + highlight streaks; light-theme
+    corona had a white outline → highlight mix scaled by corona additivity.
+11. **Not done / open**: moon level fade-in (250 ms at identity) not built; face legibility
+    under the terminator only judged on seeded synthetic photos; the photo-less contact-sun
+    variant and Standard/Galaxy Light close-ups of decay/rogue bodies not separately captured.
+12. **Evidence** (`evidence/03-wp1.2/`): `00-pass1-overview-dense-galaxy-dark`,
+    `01-pass1-self-sun-detail-3.2-galaxy-dark`, `02-pass2-focus-flyin-cleo-dense`,
+    `03-pass2-inner-circle-overview`, `04-pass2-inner-circle-identity-2.2-photo-and-initials`,
+    `05-galaxy-light-inner-circle-overview`, `06-galaxy-light-identity-contact-shadow`,
+    `07-standard-dark-inner-circle`, `08-standard-light-inner-circle`,
+    `09-pass3-sun-finer-granulation-identity`, `10-dense-focus-eli-moon-labels-sun`,
+    `11-reduced-motion-forced-on-dense-static`,
+    `12-contact-sun-photo-emissive-status-corona-cheap-moons`,
+    `13-perf-run-D-lit-cheap-moons-rings-off`. Some shots show the selector as "Unavailable
+    System" (the pre-existing restore bug, WP-1.0 note).

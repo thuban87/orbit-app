@@ -81,3 +81,43 @@ debug emulator), not the bake. The bake itself shows no separate fallback phase.
 Forced ON: two screenshots 3 s apart differ only inside the HUD text box (pixel diff bbox
 `(43,580)-(593,609)`) → the environment is fully static. The clock still replays the canvas
 every frame (HUD still ticks): R2's "unmount the clock under reduced motion" is still open.
+
+## 2026-10-01 — WP-1.2 worlds (L2–L5) (commits 469440db → WP-1.2 close)
+
+**EMULATOR, DEBUG build — relative A/B only, never a phone claim.** Scene: **Lab B Dense**
+(≈120 contacts) with **Relationship Satellites ON** (≈67 moons — WP-1.1 runs had satellites
+OFF, so absolute numbers are not comparable across WPs), Home pose (recenter), Galaxy Dark,
+**rings OFF** (L1 still dominates otherwise, see WP-1.1), panel CLOSED, intensity 1.00, every
+flag state verified from a panel screenshot before closing. gfx = `dumpsys gfxinfo` 15 s idle
+after `reset` (main + RenderThread); HUD = lab clock cadence.
+
+| Run | Config | gfx frames / 15 s | gfx p50 / p90 ms | HUD fps |
+|---|---|---|---|---|
+| A | lit bodies, **25 scalar uniforms per body**, shader moons (469440db) | 163 | 65 / 81 | 32.9 |
+| A2 | same, fresh session | 183 | 65 / 69 | — |
+| C | A + moons flat | 198 | 48 / 65 | — |
+| A3 | **uniforms packed into float4s** (0922d223), shader moons | 262 | 48 / 48 | 49.7 |
+| C2 | A3 + moons flat | 320 | 34 / 48 | 52.9 |
+| **D** | **default at WP-1.2 close: packed lit bodies + cheap 3-circle moons** | 270 | **34** / 48 | 49.0 |
+| B / B2 | `bodyLighting` OFF (WP-1.0 flat discs) | 323 / 342 | 32 / 34 | 34.4 / 30.9 |
+| E | `bodies` OFF (no sun/bodies/moons) | 323 | 18 / 34 | 32.0 |
+
+Findings (relative, emulator only):
+1. **The cost of a runtime shader per body is CPU, not GPU.** GPU p50 stayed 8–11 ms in every
+   lit run. RN Skia rebuilds every `<Shader>` on every canvas replay (the ambient clock replays
+   the whole canvas each frame): `processUniforms` resolves each uniform **by name** (a JSI
+   call per uniform) and re-makes the shader — also for bodies collapsed to scale 0 off-screen.
+   25 scalar uniforms × ~190 shader bodies doubled gfx p50 (32 → 65 ms).
+2. **Packing uniforms into 8–10 `float4`s** cut that to 48 ms; replacing 67 per-moon shaders
+   with three plain circles brought the lit scene to **34 ms ≈ flat discs (32 ms)**. So the
+   lit-world look costs ≈ +2 ms p50 / +14 ms p90 over the flat WP-1.0 discs on this target.
+3. The body *structure* (≈190 keyed components with derived transforms, flat or lit) is itself
+   ≈ 14 ms p50 here (E 18 vs B 32 ms) — pre-existing O(N) mapper/replay cost, an R1 target
+   (e.g. a single derived "bodies buffer" or culled-subtree mounting).
+4. HUD cadence and gfx disagree (lit ~50 fps HUD vs flat ~31 fps HUD while gfx says lit is
+   the slower one). The HUD measures UI-thread clock deltas only; treat it as unreliable for
+   this A/B and prefer gfx until R1 repeats on a phone.
+
+Reduced motion (forced ON, Dense overview): two screenshots 3 s apart differ only inside the
+HUD box → the sun corona/granulation are static; with motion ON the sun region differs
+between the two frames (animated corona) — verified.
