@@ -56,6 +56,7 @@ import { getLabEffect, LAB_EFFECT_SOURCES } from "./labb-effects";
 import { focusDimFactor } from "./labb-focus-logic";
 import { bodyAt, type FrameIndex } from "./labb-frame-index";
 import { flattenUniforms, uniformOrder } from "./labb-layer-plan";
+import { probeEnd, probeStart } from "./labb-perf-probe";
 import {
   compassChevron,
   northTick,
@@ -421,6 +422,7 @@ function TrimRingPicture({
     return out;
   }, [entries, profile.alpha]);
   const picture = useDerivedValue(() => {
+    const probe = probeStart();
     const recorder = Skia.PictureRecorder();
     const canvas = recorder.beginRecording(
       Skia.XYWHRect(
@@ -502,7 +504,9 @@ function TrimRingPicture({
         }
       }
     }
-    return recorder.finishRecordingAsPicture();
+    const trimPicture = recorder.finishRecordingAsPicture();
+    probeEnd("trim", probe);
+    return trimPicture;
   });
   return <Picture picture={picture} />;
 }
@@ -746,6 +750,7 @@ function RingClassesPicture({
   const farAlpha = profile.farAlpha;
   const flowK = profile.flow;
   const picture = useDerivedValue(() => {
+    const probe = probeStart();
     const f = frame.value;
     const index = frameIndex.value;
     const zoom = f.pose.zoom;
@@ -817,7 +822,9 @@ function RingClassesPicture({
         canvas.drawCircle(0, 0, r, paint);
       }
     }
-    return recorder.finishRecordingAsPicture();
+    const ringsPicture = recorder.finishRecordingAsPicture();
+    probeEnd("rings", probe);
+    return ringsPicture;
   });
   return <Picture picture={picture} />;
 }
@@ -855,6 +862,7 @@ function WakesPicture({
   const widthDp = profile.wakeWidthDp;
   const farAlpha = profile.farAlpha;
   const picture = useDerivedValue(() => {
+    const probe = probeStart();
     const recorder = Skia.PictureRecorder();
     const canvas = recorder.beginRecording(
       Skia.XYWHRect(
@@ -895,7 +903,9 @@ function WakesPicture({
         canvas.drawCircle(0, 0, w.ringRadius, paint);
       }
     }
-    return recorder.finishRecordingAsPicture();
+    const wakesPicture = recorder.finishRecordingAsPicture();
+    probeEnd("wakes", probe);
+    return wakesPicture;
   });
   if (!effect) return null;
   return <Picture picture={picture} />;

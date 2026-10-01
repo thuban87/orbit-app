@@ -109,6 +109,7 @@ vi.mock("@/services/photos/photo-storage", () => ({
 vi.mock("../use-orrery-photo", () => ({ useOrreryPhoto: () => null }));
 vi.mock("@/theme/use-reduced-motion", () => ({
   useReducedMotionShared: () => ({ value: false }),
+  useReducedMotion: () => false,
 }));
 vi.mock("./LabCanvas", () => ({
   LabCanvas: ({ children }: { children: ReactNode }) => children,

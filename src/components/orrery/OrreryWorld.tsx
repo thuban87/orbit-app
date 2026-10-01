@@ -60,6 +60,7 @@ import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import { useLabFxStore } from "@/stores/orrery-labb-fx-store";
 import type { ThemePalette } from "@/theme/theme-types";
 import { LabBRenderer, type LabTapStamp } from "./labb/LabBRenderer";
+import { probeEnd, probeStart } from "./labb/labb-perf-probe";
 import { OrbitBody } from "./OrbitBody";
 import { OrreryCanvas } from "./OrreryCanvas";
 import { OrreryLabel, prepareOrreryText } from "./OrreryLabel";
@@ -275,6 +276,7 @@ export function OrreryWorld({
     [sceneMembers],
   );
   const frame = useDerivedValue(() => {
+    const probe = probeStart();
     const sampled = sampleSwitchChoreography(
       switchTransition.value,
       switchProgress.value,
@@ -300,7 +302,7 @@ export function OrreryWorld({
       semanticLevel(sampledCamera.zoom, level.value),
     );
     const completeWorld = [...world, ...moons];
-    return projectAnimatedFrame(
+    const projected = projectAnimatedFrame(
       {
         generation: switchTransition.value.generation,
         from: completeWorld,
@@ -311,6 +313,8 @@ export function OrreryWorld({
       viewport,
       ringPathMode.value < 0 ? true : held?.active ? held.id : false,
     );
+    probeEnd("frame", probe);
+    return projected;
   });
   // Conventional focus positioning consumes this same interpolated frame.
   useAnimatedReaction(
@@ -417,6 +421,7 @@ export function OrreryWorld({
     },
   );
   const allocations = useDerivedValue(() => {
+    const probe = probeStart();
     const current = frame.value;
     const candidates = measured.flatMap((label) => {
       const body = current.bodies.find((b) => bodyKey(b) === label.id);
@@ -440,12 +445,14 @@ export function OrreryWorld({
         width: b.radius * 2,
         height: b.radius * 2,
       }));
-    return allocateLabels(
+    const allocated = allocateLabels(
       candidates,
       semanticLevel(current.pose.zoom, level.value),
       current.viewport,
       exclusions,
     );
+    probeEnd("alloc", probe);
+    return allocated;
   });
   const identities = useMemo<OrreryContactTarget[]>(
     () => [

@@ -62,6 +62,7 @@ import type {
   GestureType,
 } from "react-native-gesture-handler";
 import {
+  runOnUI,
   type SharedValue,
   useAnimatedReaction,
   useDerivedValue,
@@ -93,7 +94,10 @@ import {
 } from "@/stores/orrery-labb-fx-store";
 import { labColor, resolveLabFxProfile } from "@/theme/orrery-lab-fx";
 import type { ThemePalette } from "@/theme/theme-types";
-import { useReducedMotionShared } from "@/theme/use-reduced-motion";
+import {
+  useReducedMotion,
+  useReducedMotionShared,
+} from "@/theme/use-reduced-motion";
 import { OrreryLabel, type PreparedOrreryText } from "../OrreryLabel";
 import { Polaris } from "../Polaris";
 import type {
@@ -129,9 +133,11 @@ import {
   LabSwitchUnder,
   useShockFilterUniforms,
 } from "./LabSwitchFx";
+import { labAmbientNeeded } from "./labb-clock-logic";
 import type { LabSwitchContext } from "./labb-context";
 import { getLabEffect, setLabEffectForceFallback } from "./labb-effects";
 import { indexFrame } from "./labb-frame-index";
+import { setLabProbeEnabled } from "./labb-perf-probe";
 import {
   displayedSkyHue,
   type LabSkyHueState,
@@ -328,6 +334,10 @@ function LabBRendererImpl(contract: LabRenderContract) {
   useEffect(() => {
     fxFlags.value = labFxSnapshot({ renderer, flags, intensity });
   }, [fxFlags, renderer, flags, intensity]);
+  // R1: the per-worklet timing probe (debug flag; logcat `[labb-probe]`).
+  useEffect(() => {
+    runOnUI(setLabProbeEnabled)(flags.perfProbe);
+  }, [flags.perfProbe]);
   const frameIndex = useDerivedValue(() => indexFrame(frame.value));
   const profile = useMemo(
     () =>
@@ -362,6 +372,11 @@ function LabBRendererImpl(contract: LabRenderContract) {
     }
     return out;
   }, [resources, scene, colors]);
+  // R1 idle mode: pause the ONE clock when nothing ambient animates (reduced
+  // motion, or every ambient effect off). React-side inputs only.
+  const reducedMotionState = useReducedMotion();
+  const ambientActive =
+    !flags.idleClock || labAmbientNeeded(flags, reducedMotionState, profile);
   const warmupColor = useMemo(
     () => tokenToVec4(colors.background),
     [colors.background],
@@ -729,6 +744,8 @@ function LabBRendererImpl(contract: LabRenderContract) {
       warmupColor={warmupColor}
       sw={sw}
       focus={focus}
+      ambientActive={ambientActive}
+      opaque={flags.opaqueCanvas}
     >
       {/* L0 (inside the filter layer instead while the experiment is on) */}
       {shockFilter ? null : envLayer}

@@ -352,6 +352,28 @@ export const LAB_FLAG_REGISTRY = [
     note: "off = one component per body / label (A/B baseline)",
   },
   {
+    id: "idleClock",
+    label:
+      "R1 Idle clock: stop the ambient clock when nothing ambient animates",
+    section: "debug",
+    default: true,
+    note: "off = the M1/M2 always-running clock (A/B baseline)",
+  },
+  {
+    id: "opaqueCanvas",
+    label: "R1 Opaque canvas (SurfaceView instead of TextureView)",
+    section: "debug",
+    default: false,
+    heavy: true,
+    note: "C-07: RN overlays must still composite over it",
+  },
+  {
+    id: "perfProbe",
+    label: "R1 Per-worklet timing probe (logcat [labb-probe])",
+    section: "debug",
+    default: false,
+  },
+  {
     id: "fpsHud",
     label: "FPS / frame-time HUD",
     section: "debug",

@@ -1340,6 +1340,26 @@ export function OrreryScreen() {
         catalog={systemCatalog}
         currentSystemId={state.requested.id}
         onSelectSystem={(ref, name) => void state.select(ref, name, true)}
+        onLabFocus={(name) => {
+          // R1 deep link (lab build only): the normal companion focus intent.
+          const snapshot = state.current();
+          if (!snapshot) return;
+          if (name === null) {
+            void onIntent({
+              kind: "clear",
+              ids: [],
+              generation: snapshot.generation,
+            });
+            return;
+          }
+          const member = snapshot.systemSnapshot.members.find(
+            (m) => m.name === name,
+          );
+          const intent = member
+            ? companionAction(snapshot, "focus", member.id)
+            : null;
+          if (intent) void onIntent(intent);
+        }}
       />
       <OrreryContactsSheet
         satellites={satellites}

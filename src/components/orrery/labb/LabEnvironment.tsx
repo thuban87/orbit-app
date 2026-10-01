@@ -72,6 +72,7 @@ import {
 } from "./labb-context";
 import { getLabEffect } from "./labb-effects";
 import { VIGNETTE_FOCUS } from "./labb-focus-logic";
+import { probeEnd, probeStart } from "./labb-perf-probe";
 import {
   buildStarField,
   type LabStarLayerSpec,
@@ -323,6 +324,7 @@ function useNebulaUniforms(
   const fxFlags = ctx?.fxFlags;
   const reducedMotion = ctx?.reducedMotion;
   return useDerivedValue(() => {
+    const probe = probeStart();
     const fx = fxFlags ? fxFlags.value : null;
     const flags = fx ? fx.flags : null;
     const k = envScale(st.intensity, fx);
@@ -373,9 +375,11 @@ function useNebulaUniforms(
           ? 0
           : st.starAlpha * (0.4 + 0.6 * Math.min(1.5, k)),
     };
-    return withTexSize
+    const out = withTexSize
       ? { ...base, uTexSize: st.uTexSize, uPer: st.uPer }
       : base;
+    probeEnd("nebula", probe);
+    return out;
   });
 }
 

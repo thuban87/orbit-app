@@ -27,19 +27,26 @@ import {
   Paint,
   RuntimeShader,
   Shader,
-  useClock,
 } from "@shopify/react-native-skia";
-import { type ReactNode, useMemo, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import {
   type ComposedGesture,
   GestureDetector,
   type GestureType,
 } from "react-native-gesture-handler";
 import {
+  type FrameInfo,
   runOnJS,
   type SharedValue,
   useAnimatedReaction,
   useDerivedValue,
+  useFrameCallback,
   useSharedValue,
 } from "react-native-reanimated";
 import type { LabFxSnapshot } from "@/stores/orrery-labb-fx-store";
@@ -103,6 +110,33 @@ function WarmUp({ color }: { color: number[] }) {
   );
 }
 
+/**
+ * R1 idle mode: the lab's ONE clock, as a PAUSABLE frame callback (RN Skia's
+ * `useClock` is the same frame callback, always on). `active` is React-side
+ * (flags + reduced-motion state twin, see `labAmbientNeeded`) and flips a few
+ * times per session, never per frame. Paused, nothing writes the clock, no
+ * ambient worklet re-runs and an untouched canvas stops redrawing (C-29).
+ * The value stays continuous across a pause (Reanimated restarts
+ * `timeSinceFirstFrame` at 0 on re-activation; `base` carries the offset).
+ */
+function useLabClock(active: boolean): SharedValue<number> {
+  const clock = useSharedValue(0);
+  const base = useSharedValue(0);
+  const tick = useCallback(
+    (info: FrameInfo) => {
+      "worklet";
+      if (info.timeSinceFirstFrame === 0) base.value = clock.value;
+      clock.value = base.value + info.timeSinceFirstFrame;
+    },
+    [clock, base],
+  );
+  const callback = useFrameCallback(tick, active);
+  useEffect(() => {
+    callback.setActive(active);
+  }, [callback, active]);
+  return clock;
+}
+
 export function LabCanvas({
   width,
   height,
@@ -112,6 +146,8 @@ export function LabCanvas({
   warmupColor,
   sw = null,
   focus = null,
+  ambientActive = true,
+  opaque = false,
   children,
 }: {
   width: number;
@@ -126,15 +162,20 @@ export function LabCanvas({
   sw?: LabSwitchContext | null;
   /** WP-2.2 focus state (null in the unit harness). */
   focus?: LabFocusContext | null;
+  /** R1 idle mode: false pauses the clock (nothing ambient to animate). */
+  ambientActive?: boolean;
+  /** R1: `opaque` Canvas experiment (flag `opaqueCanvas`). */
+  opaque?: boolean;
   children: ReactNode;
 }) {
-  // The ONE clock of the lab path.
-  const clock = useClock();
+  const [warming, setWarming] = useState(warmup);
+  // The ONE clock of the lab path. It also runs through the mount warm-up
+  // window (the warm-up timer reads it).
+  const clock = useLabClock(ambientActive || (warming && warmup));
   const reducedMotion = useReducedMotionShared();
   const ambient = useDerivedValue(() =>
     fxFlags.value.flags.freezeClock ? 0 : clock.value,
   );
-  const [warming, setWarming] = useState(warmup);
   // Worklet-side warm-up gate (switch FX draw a near-invisible probe instance).
   // A plain SharedValue flipped ONCE (a derived value over the clock would
   // re-run every FX mapper on every frame forever).
@@ -154,7 +195,7 @@ export function LabCanvas({
   );
   return (
     <GestureDetector gesture={gesture}>
-      <Canvas testID="orrery-canvas" style={{ width, height }}>
+      <Canvas testID="orrery-canvas" style={{ width, height }} opaque={opaque}>
         <OrreryClockContext.Provider value={ambient}>
           <LabRenderContext.Provider value={context}>
             {children}

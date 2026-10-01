@@ -111,6 +111,7 @@ import {
   planLabelDraws,
   uniformOrder,
 } from "./labb-layer-plan";
+import { probeEnd, probeStart } from "./labb-perf-probe";
 import { bodySwitchFx, switchFxLive } from "./labb-switch-logic";
 import { tokenToVec4 } from "./labb-uniforms";
 
@@ -592,6 +593,7 @@ export function LabBodiesPictures({
   const { specs, sunKeys, effects, shaders, fonts } = layer;
   const orders = EFFECT_ORDERS;
   const pictures = useDerivedValue(() => {
+    const probe = probeStart();
     const f = frame.value;
     const index = frameIndex.value;
     const fx = fxFlags ? fxFlags.value : null;
@@ -691,7 +693,9 @@ export function LabBodiesPictures({
       }
       return recorder.finishRecordingAsPicture();
     };
-    return { behind: record(plan.behind), front: record(plan.front) };
+    const out = { behind: record(plan.behind), front: record(plan.front) };
+    probeEnd("bodies", probe);
+    return out;
   });
   const behind = useDerivedValue(() => pictures.value.behind);
   const front = useDerivedValue(() => pictures.value.front);
@@ -769,6 +773,7 @@ export function LabLabelsPicture({
   const focus = ctx?.focus ?? null;
   const fxFlags = ctx?.fxFlags;
   const picture = useDerivedValue(() => {
+    const probe = probeStart();
     const f = frame.value;
     const index = frameIndex.value;
     // WP-2.2: other bodies' tags recede while something is focused.
@@ -866,7 +871,9 @@ export function LabLabelsPicture({
         canvas.restore();
       }
     }
-    return recorder.finishRecordingAsPicture();
+    const labelsPicture = recorder.finishRecordingAsPicture();
+    probeEnd("labels", probe);
+    return labelsPicture;
   });
   return <Picture picture={picture} />;
 }

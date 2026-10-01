@@ -24,6 +24,13 @@
  *   - unlinked relationships on ~30 contacts (Orrery satellites);
  *   - custom Systems: "Lab B Dense" (~120 members), "Lab B Inner Circle" (12),
  *     "Lab B Work" (30).
+ *   - R1 density envelope (`seedLabBStressIfAbsent`, research 03 §4 / C-19):
+ *     800 MORE synthetic contacts (unique names, light histories, procedural
+ *     photos on every 4th, moons on 60 of them) and the Systems
+ *     "Lab B Stress 400" (the first 400) and "Lab B Stress 800" (all 800). All
+ *     Contacts then holds 940. Idempotent by the "Lab B Stress 400" name, so an
+ *     already-seeded install gains the stress Systems on its next debug launch
+ *     without a `pm clear`.
  *
  * Idempotent: skipped when the "Lab B Dense" System already exists. No network,
  * no AI, no device Contacts. The procedural photo colours are fixture IMAGE
@@ -53,6 +60,42 @@ const PHOTO_EVERY_NTH = 5; // 2 of every 5 get a photo (see hasPhoto)
 const SATELLITE_PARENTS = 30;
 const PHOTO_PX = 256;
 const DENSE_NAME = "Lab B Dense";
+// R1 stress fixture.
+const STRESS_COUNT = 800;
+const STRESS_SMALL = 400;
+const STRESS_NAME = "Lab B Stress 400";
+const STRESS_PHOTO_EVERY = 4;
+const STRESS_SATELLITE_PARENTS = 60;
+/** Stress surnames: FIRST (30) × STRESS_LAST (27) = 810 unique names. */
+const STRESS_LAST = [
+  "Vance",
+  "Quill",
+  "Marsh",
+  "Ostrander",
+  "Pell",
+  "Rook",
+  "Sallow",
+  "Thorne",
+  "Upton",
+  "Varga",
+  "Wilde",
+  "Yates",
+  "Zeller",
+  "Ashby",
+  "Boone",
+  "Crane",
+  "Dahl",
+  "Eames",
+  "Frost",
+  "Gale",
+  "Hale",
+  "Ives",
+  "Jory",
+  "Kerr",
+  "Lund",
+  "Mott",
+  "Nash",
+];
 
 // --- WP-1.4 test portraits (fictional fixtures, never shipped) -----------------
 // Static requires so Metro can see them (dev bundle only, see header).
@@ -280,6 +323,7 @@ export async function seedLabBFixtureIfAbsent(): Promise<void> {
     const exec = getExecutor();
     if (await alreadySeeded(exec)) {
       console.log("[lab-b-seed] fixture already present");
+      await seedLabBStressIfAbsent(exec);
       return;
     }
     const t0 = Date.now();
@@ -396,6 +440,7 @@ export async function seedLabBFixtureIfAbsent(): Promise<void> {
       ids.filter((_, i) => i % 11 === 0).slice(0, INNER_SYSTEM_SIZE),
     );
     await system("Lab B Work", ids.slice(CONTACT_COUNT - WORK_SYSTEM_SIZE));
+    await seedLabBStressIfAbsent(exec);
     bumpShellRefresh();
     console.log(
       `[lab-b-seed] seeded contacts=${ids.length} touchpoints=${touchpoints} photos=${photos} portraits=${portraits} satellites=${sats} in ${Date.now() - t0}ms`,
@@ -405,4 +450,114 @@ export async function seedLabBFixtureIfAbsent(): Promise<void> {
   } finally {
     running = false;
   }
+}
+
+/**
+ * R1 density envelope: 800 extra synthetic contacts + "Lab B Stress 400" /
+ * "Lab B Stress 800". Same DAOs as the main fixture (every invariant writer is
+ * respected); lighter histories so the debug seed stays ~1–2 min. Called from
+ * `seedLabBFixtureIfAbsent` (already `__DEV__` + applicationId gated).
+ */
+async function seedLabBStressIfAbsent(exec: SqlExecutor): Promise<void> {
+  const row = await exec.getFirstAsync<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM systems WHERE name = ?",
+    [STRESS_NAME],
+  );
+  if ((row?.n ?? 0) > 0) {
+    console.log("[lab-b-seed] stress fixture already present");
+    return;
+  }
+  const t0 = Date.now();
+  const rand = rng(0x5_7e55);
+  const nowDate = new Date();
+  const now = localDateTime(nowDate);
+  const ids: number[] = [];
+  let photos = 0;
+  for (let i = 0; i < STRESS_COUNT; i += 1) {
+    const name = `${FIRST[i % FIRST.length]} ${STRESS_LAST[Math.floor(i / FIRST.length) % STRESS_LAST.length]}`;
+    const intervalDays = INTERVALS[Math.floor(rand() * INTERVALS.length)];
+    const never = rand() < 0.08;
+    const firstAgo = 1 + Math.floor(rand() * 700);
+    const { contactId } = await createContactFull(exec, {
+      uid: newUid(),
+      name,
+      intervalDays,
+      now,
+      firstInteraction: never
+        ? undefined
+        : {
+            uid: newUid(),
+            occurredAt: daysAgo(nowDate, firstAgo, 12),
+            channel: "Message",
+            direction: "mutual",
+            connected: 1,
+          },
+    });
+    ids.push(contactId);
+    if (!never) {
+      const extra = Math.floor(rand() ** 2.5 * 9);
+      for (let k = 0; k < extra; k += 1)
+        await recordTouchpoint(exec, {
+          contactId,
+          uid: newUid(),
+          occurredAt: daysAgo(
+            nowDate,
+            1 + Math.floor(rand() * Math.min(firstAgo, 400)),
+            9 + (k % 10),
+          ),
+          now,
+          channel: k % 2 ? "Call" : "Message",
+          direction: k % 2 ? "outbound" : "inbound",
+          connected: 1,
+        });
+    }
+    if (i % STRESS_PHOTO_EVERY === 1) {
+      const bytes = renderAvatarJpeg(rand);
+      if (bytes) {
+        const relative = `avatars/contact-${contactId}.jpg`;
+        new Directory(Paths.document, "avatars").create({
+          intermediates: true,
+          idempotent: true,
+        });
+        const file = new File(Paths.document, relative);
+        if (file.exists) file.delete();
+        file.write(bytes);
+        await setContactPhoto(exec, contactId, relative, now);
+        photos += 1;
+      }
+    }
+  }
+  let sats = 0;
+  for (let p = 0; p < STRESS_SATELLITE_PARENTS; p += 1) {
+    const contactId = ids[p * 5];
+    const n = 1 + Math.floor(rand() * 3);
+    for (let s = 0; s < n; s += 1) {
+      await addRelationship(exec, {
+        contactId,
+        personName: SAT_NAMES[(p + s) % SAT_NAMES.length],
+        relationType: RELATIONS[(p + s) % RELATIONS.length],
+        createdAt: now,
+        now,
+      });
+      sats += 1;
+    }
+  }
+  const system = async (name: string, members: number[]) =>
+    saveSystemDefinition(exec, {
+      systemRef: null,
+      name,
+      rules: [],
+      overrideIntent: members.map((contactId) => ({
+        contactId,
+        mode: "include" as const,
+      })),
+      prunableExclusionContactIds: [],
+      now,
+    });
+  await system(STRESS_NAME, ids.slice(0, STRESS_SMALL));
+  await system("Lab B Stress 800", ids);
+  bumpShellRefresh();
+  console.log(
+    `[lab-b-seed] stress seeded contacts=${ids.length} photos=${photos} satellites=${sats} in ${Date.now() - t0}ms`,
+  );
 }

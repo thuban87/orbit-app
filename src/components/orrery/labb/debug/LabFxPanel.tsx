@@ -363,6 +363,10 @@ export interface LabCommand {
   flags: [string, boolean][];
   pose?: Partial<CameraPose>;
   system?: string;
+  /** R1: focus the first System member with this name (normal intent path). */
+  focus?: string;
+  /** R1: clear the focus (normal companion "Clear focus" path). */
+  clear: boolean;
   replay: boolean;
   delay: number;
   panel?: boolean;
@@ -413,6 +417,8 @@ export function parseLabCommand(url: string): LabCommand | null {
     flags,
     pose: Object.keys(pose).length ? pose : undefined,
     system: q.get("system") || undefined,
+    focus: q.get("focus") || undefined,
+    clear: q.get("clear") === "1",
     replay: q.get("replay") === "1",
     delay: num("delay") ?? 0,
     panel: panel === undefined ? undefined : panel === "1",
@@ -431,6 +437,7 @@ export function LabBMarkerHost({
   catalog,
   currentSystemId,
   onSelectSystem,
+  onLabFocus,
 }: {
   colors: ThemePalette;
   pose: SharedValue<CameraPose>;
@@ -438,6 +445,8 @@ export function LabBMarkerHost({
   catalog: readonly SystemCatalogEntry[];
   currentSystemId: string | null;
   onSelectSystem: (ref: OrrerySystemRef, name: string) => void;
+  /** R1 deep link: focus a member by name (null = clear focus). */
+  onLabFocus?: (name: string | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [closeOnSwitch, setCloseOnSwitch] = useState(true);
@@ -448,8 +457,20 @@ export function LabBMarkerHost({
   // WP-2.1 adb remote control (lab build only): `orbit://labb?...` VIEW
   // intents drive the same store / select / camera paths as the panel, so a
   // recording never has the panel in frame and A/B runs are repeatable.
-  const latest = useRef({ catalog, currentSystemId, onSelectSystem, recover });
-  latest.current = { catalog, currentSystemId, onSelectSystem, recover };
+  const latest = useRef({
+    catalog,
+    currentSystemId,
+    onSelectSystem,
+    recover,
+    onLabFocus,
+  });
+  latest.current = {
+    catalog,
+    currentSystemId,
+    onSelectSystem,
+    recover,
+    onLabFocus,
+  };
   useEffect(() => {
     if (!lab) return;
     const sub = Linking.addEventListener("url", ({ url }) => {
@@ -483,6 +504,11 @@ export function LabBMarkerHost({
       } else if (cmd.replay && previousSystem.current) {
         const prev = previousSystem.current;
         go(prev.ref, prev.name);
+      }
+      if ((cmd.focus || cmd.clear) && l.onLabFocus) {
+        const target = cmd.focus ?? null;
+        const run = l.onLabFocus;
+        setTimeout(() => run(target), cmd.delay);
       }
       if (cmd.panel !== undefined) setOpen(cmd.panel);
     });
