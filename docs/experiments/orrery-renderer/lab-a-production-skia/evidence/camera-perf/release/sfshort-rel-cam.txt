@@ -1,0 +1,10 @@
+idle presents/s over 3s: 15.3
+idle presents/s over 3s: 21.0
+idle cpu win=12.7s ales.orbit.laba:17% RenderThread:9% mali-cmar-backe:3% mali-cmar-backe:2% hades:1% binder:32081_1:1%
+pan presents in last 1.0 s: 24  median gap 49.9 ms  p90 58.2 ms
+pan presents in last 1.0 s: 25  median gap 41.6 ms  p90 58.2 ms
+pan presents in last 1.0 s: 25  median gap 41.6 ms  p90 66.6 ms
+pan presents in last 1.0 s: 25  median gap 41.6 ms  p90 58.2 ms
+anim no burst
+anim no burst
+anim recovery burst: 3 presents over 50 ms = 40 fps, median gap 25.0 ms, max 25.0

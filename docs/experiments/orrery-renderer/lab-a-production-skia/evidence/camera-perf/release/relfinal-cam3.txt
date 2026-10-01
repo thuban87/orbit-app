@@ -1,0 +1,24 @@
+thermal Thermal Status: 1  level: 50  temperature: 349  Capacity level: 2 
+idle presents/s over 3s: 21.0
+idle presents/s over 3s: 21.0
+idle presents/s over 3s: 21.0
+idle refresh vsyncRate=120.00 Hz
+idle cpu win=12.6s ales.orbit.laba:32% mali-cmar-backe:3% binder:21306_4:1% hades:1% binder:21306_3:1% binder:21306_1:1%
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan cpu win=11.3s ales.orbit.laba:61% hades:4% mali-cmar-backe:4% binder:21306_2:1% binder:21306_3:1% RenderThread:1%
+rm presents/s over 3s: 0.0
+rm cpu win=12.5s ales.orbit.laba:13% mqt_v_js:0% Profile_Saver:0% queued-work-loo:0% pool-3-thread-1:0% perfetto_hprof_:0%
+anim recovery burst: 33 presents over 383 ms = 84 fps, median gap 8.3 ms, max 25.0
+anim recovery burst: 33 presents over 350 ms = 92 fps, median gap 8.3 ms, max 16.7
+anim recovery burst: 33 presents over 391 ms = 82 fps, median gap 8.3 ms, max 25.0
+cam3-mem-load NativeHeap:91352 EGLmtrack:161820 GLmtrack:87564 NativeHeap::91348 Graphics:249384:249384 TOTALPSS::449239 
+cam3-mem-10sw NativeHeap:158204 EGLmtrack:161820 GLmtrack:118244 NativeHeap::158200 Graphics:280064:280064 TOTALPSS::561896 
+soak start Thermal Status: 1  level: 50  temperature: 350  Capacity level: 2 
+soak end Thermal Status: 1  level: 50  temperature: 353  Capacity level: 2 

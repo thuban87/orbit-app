@@ -1,0 +1,46 @@
+Cmdline: /system/bin/simpleperf record --app com.bwales.orbit.laba --add-meta-info app_type=debuggable --in-app --tracepoint-events /data/local/tmp/tracepoint_events --out-fd 3 --stop-signal-fd 4 -t 23327 -f 3000 --duration 6 -g
+Arch: arm64
+Event: cpu-cycles (type 0, config 0x0, config1 0x0, config2: 0x0)
+Samples: 14963
+Event count: 12554167892
+
+Overhead  Shared Object
+29.22%    /data/app/~~UXBrFO7B48nrzmvgay7Msg==/com.bwales.orbit.laba-97kHZegkqPGeszp2cEmtug==/base.apk!/lib/arm64-v8a/librnskia.so
+22.99%    /data/app/~~UXBrFO7B48nrzmvgay7Msg==/com.bwales.orbit.laba-97kHZegkqPGeszp2cEmtug==/base.apk!/lib/arm64-v8a/libworklets.so
+22.67%    /data/app/~~UXBrFO7B48nrzmvgay7Msg==/com.bwales.orbit.laba-97kHZegkqPGeszp2cEmtug==/base.apk!/lib/arm64-v8a/libhermesvm.so
+12.19%    /apex/com.android.runtime/lib64/bionic/libc.so
+3.29%     /data/app/~~UXBrFO7B48nrzmvgay7Msg==/com.bwales.orbit.laba-97kHZegkqPGeszp2cEmtug==/base.apk!/lib/arm64-v8a/libreactnative.so
+2.85%     /apex/com.android.art/lib64/libart.so
+1.87%     /vendor/lib64/egl/libGLES_mali.so
+1.39%     [JIT app cache]
+0.95%     /data/app/~~UXBrFO7B48nrzmvgay7Msg==/com.bwales.orbit.laba-97kHZegkqPGeszp2cEmtug==/base.apk!/lib/arm64-v8a/libreanimated.so
+0.56%     /data/app/~~UXBrFO7B48nrzmvgay7Msg==/com.bwales.orbit.laba-97kHZegkqPGeszp2cEmtug==/base.apk!/lib/arm64-v8a/libc++_shared.so
+0.51%     [vdso]
+0.29%     /apex/com.android.runtime/lib64/bionic/libm.so
+0.29%     /data/app/~~UXBrFO7B48nrzmvgay7Msg==/com.bwales.orbit.laba-97kHZegkqPGeszp2cEmtug==/base.apk!/lib/arm64-v8a/libjsi.so
+0.14%     /data/app/~~UXBrFO7B48nrzmvgay7Msg==/com.bwales.orbit.laba-97kHZegkqPGeszp2cEmtug==/base.apk!/lib/arm64-v8a/libappmodules.so
+0.12%     /data/app/~~UXBrFO7B48nrzmvgay7Msg==/com.bwales.orbit.laba-97kHZegkqPGeszp2cEmtug==/base.apk!/lib/arm64-v8a/libfbjni.so
+0.12%     /system/lib64/libhwui.so
+0.11%     /system/lib64/libgui.so
+0.07%     /system/lib64/libinput.so
+0.05%     /system/lib64/libandroid_runtime.so
+0.04%     /system/lib64/libbinder.so
+0.04%     /apex/com.android.art/lib64/libc++.so
+0.03%     /data/app/~~UXBrFO7B48nrzmvgay7Msg==/com.bwales.orbit.laba-97kHZegkqPGeszp2cEmtug==/base.apk!/lib/arm64-v8a/libreact_codegen_safeareacontext.so
+0.03%     /vendor/lib64/hw/mapper.pixel.so
+0.03%     /system/lib64/libutils.so
+0.02%     /system/lib64/libGLESv2.so
+0.02%     /system/lib64/libcutils.so
+0.02%     /system/lib64/libc++.so
+0.01%     /system/lib64/libtracing_perfetto.so
+0.01%     /system/lib64/libEGL.so
+0.01%     /apex/com.android.art/lib64/libartpalette.so
+0.01%     /system/lib64/liblog.so
+0.01%     /system/lib64/libsensor.so
+0.01%     /system/lib64/libnativedisplay.so
+0.01%     /vendor/lib64/libc++.so
+0.01%     /data/app/~~UXBrFO7B48nrzmvgay7Msg==/com.bwales.orbit.laba-97kHZegkqPGeszp2cEmtug==/base.apk!/lib/arm64-v8a/librnscreens.so
+0.01%     /data/app/~~UXBrFO7B48nrzmvgay7Msg==/com.bwales.orbit.laba-97kHZegkqPGeszp2cEmtug==/base.apk!/lib/arm64-v8a/libreact_codegen_rnscreens.so
+0.01%     /apex/com.android.art/lib64/libdexfile.so
+0.01%     /system/lib64/libnativewindow.so
+0.00%     /apex/com.android.art/lib64/libopenjdk.so

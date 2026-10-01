@@ -1,0 +1,17 @@
+thermal Thermal Status: 1  level: 49  temperature: 348  Capacity level: 2 
+idle presents/s over 3s: 21.0
+idle presents/s over 3s: 21.0
+idle presents/s over 3s: 21.0
+idle refresh vsyncRate=120.00 Hz
+idle cpu win=12.2s ales.orbit.laba:32% mali-cmar-backe:3% binder:7911_4:1% hades:1% binder:7911_1:1% binder:7911_2:0%
+pan presents in last 1.0 s: 63  median gap 16.5 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan presents in last 1.0 s: 63  median gap 16.6 ms  p90 25.0 ms
+pan cpu win=11.3s ales.orbit.laba:63% hades:6% mali-cmar-backe:4% binder:7911_2:1% binder:7911_2:1% binder:7911_3:1%
+rm presents/s over 3s: 0.0
+rm cpu win=12.7s ales.orbit.laba:12% mqt_v_js:0% Profile_Saver:0% queued-work-loo:0% pool-3-thread-1:0% perfetto_hprof_:0%

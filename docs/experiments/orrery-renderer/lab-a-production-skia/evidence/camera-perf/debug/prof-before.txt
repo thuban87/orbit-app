@@ -1,0 +1,6 @@
+Current System: All Contacts
+before-pan-1 frames 105 p50 61 p90 77
+before-pan-2 frames 103 p50 65 p90 125
+pan cpu win=10.9s ales.orbit.laba:71% hades:4% RenderThread:3% mali-cmar-backe:2% mqt_v_js:1% mali-cmar-backe:0%
+before-idle frames 223 p50 7 p90 14
+idle cpu win=10.5s ales.orbit.laba:20% RenderThread:8% mali-cmar-backe:2% mali-cmar-backe:1% hades:1% binder:23327_5:1%
