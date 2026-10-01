@@ -40,7 +40,7 @@ const widgetConfig: WithAndroidWidgetsParams = {
   widgets: [
     {
       name: "OrbitFavourites",
-      label: "Orbit — Favourites",
+      label: "Orrery Lab B — Favourites",
       description: "Your favourite people, at a glance.",
       minWidth: "250dp",
       minHeight: "110dp",
@@ -60,7 +60,10 @@ const widgetConfig: WithAndroidWidgetsParams = {
 // Expo loads this TypeScript config natively (no `tsx/cjs` hook needed).
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: appName.APP_NAME,
+  // ORRERY LAB B (experiment/orrery-skia-unleashed): launcher label is
+  // overridden so this R&D build is unmistakable next to the real app. The
+  // in-app APP_NAME is untouched.
+  name: "Orrery Lab B",
   slug: "orbit",
   // The expo-share-intent config plugin REQUIRES a scheme (Phase 10, CAP-01).
   // None was previously set; "orbit" is the app's deep-link scheme.
@@ -72,7 +75,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // Owner-confirmed Android application id (FND-01 checkpoint, plan 01-05).
     // Install-locked and STABLE: it does NOT track the display name (APP_NAME).
     // Changing it after the first install requires uninstall/reinstall.
-    package: "com.bwales.orbit",
+    // ORRERY LAB B: separate applicationId so the experiment installs
+    // side-by-side with (and never overwrites the data of) com.bwales.orbit.
+    package: "com.bwales.orbit.labb",
     predictiveBackGestureEnabled: false,
     // PII-at-rest mitigation (T-02-13, dossier cluster G — [DECIDED]). The
     // app-private SQLite file holds third-party notes; allowBackup=false keeps

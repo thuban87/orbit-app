@@ -1307,6 +1307,16 @@ export function OrreryScreen() {
           </OrreryFeedback>
         ) : null}
       </View>
+      {/* ORRERY LAB B marker — experiment-only, non-interactive. */}
+      <View pointerEvents="none" style={styles.labMarker}>
+        <AppText
+          role="caption"
+          style={{ color: colors.accentText }}
+          accessibilityLabel="Orrery Lab B experiment build"
+        >
+          ORRERY LAB B — SKIA UNLEASHED
+        </AppText>
+      </View>
       <OrreryContactsSheet
         satellites={satellites}
         onReloadSatellites={reloadSatellites}
@@ -1327,6 +1337,13 @@ export function OrreryScreen() {
 }
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  labMarker: {
+    position: "absolute",
+    bottom: SPACING.xs,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+  },
   canvasArea: { flex: 1, alignItems: "center", justifyContent: "center" },
   feedback: {
     position: "absolute",

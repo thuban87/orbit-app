@@ -227,6 +227,12 @@ function AppShell() {
       const { registerUatProbes } =
         require("@/__dev__/uat-probes") as typeof import("@/__dev__/uat-probes");
       registerUatProbes();
+      // ORRERY LAB B: dev-only synthetic Orrery fixture; self-gated on the
+      // com.bwales.orbit.labb applicationId and idempotent.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { seedLabBFixtureIfAbsent } =
+        require("@/__dev__/lab-b-seed") as typeof import("@/__dev__/lab-b-seed");
+      void seedLabBFixtureIfAbsent();
     }
     // The confirmation queue has its own per-return subscription: unlike the
     // launch sweep, it refreshes for every real background-to-active return.
