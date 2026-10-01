@@ -15,11 +15,16 @@ const banner = vi.hoisted(() => ({
     morePendingCount: 0,
     refresh: () => Promise.resolve(),
   },
+  // useEffect bodies from the last shallow render, run on demand.
+  effects: [] as (() => unknown)[],
 }));
 
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useRef: (value: unknown) => ({ current: value }),
+  useEffect: (effect: () => unknown) => {
+    banner.effects.push(effect);
+  },
   useState: (value: unknown) => [
     typeof value === "function" ? (value as () => unknown)() : value,
     () => {},
@@ -78,6 +83,7 @@ vi.mock("@/stores/shell-refresh-store", () => ({ bumpShellRefresh: vi.fn() }));
 vi.mock("@/utils/logger", () => ({ Logger: { error: vi.fn() } }));
 
 const { AssistBanner } = await import("./AssistBanner");
+const { useShellOffsetStore } = await import("@/stores/shell-offset-store");
 
 type TestElement = ReactElement<Record<string, unknown>>;
 function nodes(node: ReactNode): TestElement[] {
@@ -118,6 +124,7 @@ function render(
   morePendingCount = 0,
 ): TestElement[] {
   banner.state = { ...banner.state, newest, morePendingCount };
+  banner.effects = [];
   return nodes(AssistBanner());
 }
 
@@ -230,5 +237,41 @@ describe("AssistBanner layout (38.6 D-38)", () => {
 
   it("renders nothing in the layout when no question is pending", () => {
     expect(render(null)).toEqual([]);
+  });
+});
+
+describe("AssistBanner shell offset (38.6 review WR5-01)", () => {
+  const offset = () => useShellOffsetStore.getState().topOffset;
+  const runEffects = () => {
+    const cleanups = banner.effects.map((effect) => effect());
+    return () => {
+      for (const cleanup of cleanups)
+        if (typeof cleanup === "function") cleanup();
+    };
+  };
+
+  it("publishes its in-flow height from its root's onLayout", () => {
+    useShellOffsetStore.setState({ topOffset: 0 });
+    const root = render(NEWEST)[0];
+    // Showing the banner does not reset the height its layout publishes.
+    runEffects();
+    (root?.props.onLayout as (event: unknown) => void)({
+      nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 184 } },
+    });
+    expect(offset()).toBe(184);
+  });
+
+  it("publishes 0 when the question is answered (no layout event fires) and on unmount", () => {
+    useShellOffsetStore.setState({ topOffset: 184 });
+    render(null);
+    runEffects();
+    expect(offset()).toBe(0);
+
+    useShellOffsetStore.setState({ topOffset: 184 });
+    render(NEWEST);
+    const unmount = runEffects();
+    expect(offset()).toBe(184);
+    unmount();
+    expect(offset()).toBe(0);
   });
 });

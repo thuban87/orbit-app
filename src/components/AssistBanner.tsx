@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { AssistConfirmation } from "@/components/AssistConfirmation";
 import { Avatar } from "@/components/Avatar";
@@ -20,6 +20,7 @@ import {
 } from "@/services/assist-commit";
 import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { useAssistBanner } from "@/stores/assist-store";
+import { setShellTopOffset } from "@/stores/shell-offset-store";
 import { bumpShellRefresh } from "@/stores/shell-refresh-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
@@ -72,6 +73,16 @@ export function AssistBanner() {
   // Hidden from accessibility while the FAB dial is open (D-31, D-42 A). The
   // review sheet is an RN Modal (its own window) and is not affected.
   const fabDialOpen = shellTransientStore(selectFabDialOpen);
+  // 38.6 review WR5-01: the banner's in-flow height moves every screen below
+  // it, so it is published as the shell top offset that window measurements
+  // re-measure on. The root's onLayout publishes it while shown; hiding the
+  // banner (no layout event fires) and unmounting publish 0. Kept as two
+  // effects so showing the banner never resets a height onLayout already set.
+  const shown = Boolean(newest);
+  useEffect(() => {
+    if (!shown) setShellTopOffset(0);
+  }, [shown]);
+  useEffect(() => () => setShellTopOffset(0), []);
 
   if (!newest) {
     return reviewOpen ? (
@@ -153,6 +164,7 @@ export function AssistBanner() {
       collapsable={false}
       pointerEvents="box-none"
       style={styles.root}
+      onLayout={(event) => setShellTopOffset(event.nativeEvent.layout.height)}
       {...fabDialBackgroundA11y(fabDialOpen)}
     >
       <View
