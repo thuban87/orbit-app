@@ -58,12 +58,14 @@ import {
   planeHomography,
   type RingInstrumentClass,
   type RingUniforms,
+  ringDensityFade,
   ringInstrumentClass,
   ringUniforms,
   type Segment,
   scaleTicks,
   tetherRect,
   tiltDepth,
+  typicalRingGap,
   type WakeUniforms,
   wakeAngle,
   wakeUniforms,
@@ -249,29 +251,34 @@ interface ClassCommon {
   profile: LabRingProfile;
   highlight: number[];
   shader: boolean;
+  /** Typical world gap between rings (density fade). */
+  ringGap: number;
 }
 
 /** Per-class uniforms for one shader mode. */
 function useClassUniforms(
-  { cls, cam, flow, profile, highlight }: ClassCommon,
+  { cls, cam, flow, profile, highlight, ringGap }: ClassCommon,
   mode: number,
   alpha: number,
   dashPeriod: number,
   dashDuty: number,
   flowOn: boolean,
+  densityFade = false,
 ): SharedValue<Uniforms> {
   const color = tokenToVec4(cls.color);
-  return useDerivedValue<Uniforms>(() =>
-    ringUniforms(color, highlight, cam.value, flow.value, {
+  return useDerivedValue<Uniforms>(() => {
+    // Crowded rings (far zoom, dense System) fade — base AND flow comets.
+    const fade = densityFade ? ringDensityFade(ringGap, cam.value[3]) : 1;
+    return ringUniforms(color, highlight, cam.value, flow.value, {
       mode,
-      alpha,
+      alpha: alpha * fade,
       dashPeriod,
       dashDuty,
       farAlpha: profile.farAlpha,
-      flowStrength: profile.flow,
+      flowStrength: profile.flow * fade * fade,
       flowOn,
-    }),
-  );
+    });
+  });
 }
 
 function RingClassGroup({
@@ -296,6 +303,7 @@ function RingClassGroup({
     profile.alpha * cls.alpha,
     cls.dashPeriod,
     cls.dashDuty,
+    true,
     true,
   );
   return (
@@ -449,6 +457,46 @@ function TetherClassGroup({
   );
 }
 
+/**
+ * The focused ring's lock line: full alpha, slightly heavier, but through the
+ * class shader so it KEEPS its status stroke style (a focused rogue ring is
+ * still a faint dotted trace, a wobble ring still dashed).
+ */
+function FocusLock({
+  common,
+  entry,
+  frameIndex,
+  strokeWidth,
+}: {
+  common: ClassCommon;
+  entry: LabRingEntry;
+  frameIndex: SharedValue<FrameIndex>;
+  strokeWidth: SharedValue<number>;
+}) {
+  const { cls, frame, shader } = common;
+  const effect = shader ? getLabEffect("ringInstrument") : null;
+  const uniforms = useClassUniforms(
+    common,
+    MODE_RING,
+    1,
+    cls.dashPeriod,
+    cls.dashDuty,
+    true,
+  );
+  return (
+    <Group style="stroke" color={cls.color}>
+      {effect ? <Shader source={effect} uniforms={uniforms} /> : null}
+      <RingCircle
+        identity={entry.key}
+        frame={frame}
+        frameIndex={frameIndex}
+        dim={1}
+        strokeWidth={strokeWidth}
+      />
+    </Group>
+  );
+}
+
 const CLASS_ORDER: RingInstrumentClass["id"][] = [
   "neutral",
   "stable",
@@ -494,6 +542,10 @@ export function LabRings({
     [entries],
   );
   const anyFocus = entries.some((e) => e.focused);
+  const ringGap = useMemo(
+    () => typicalRingGap(entries.map((e) => e.ringRadius)),
+    [entries],
+  );
   const matrix = useDerivedValue(
     () =>
       planeHomography(frame.value.pose, frame.value.viewport) ?? IDENTITY_3X3,
@@ -564,6 +616,7 @@ export function LabRings({
     profile,
     highlight,
     shader,
+    ringGap,
   });
   return (
     <Group matrix={matrix}>
@@ -615,15 +668,13 @@ export function LabRings({
       ))}
       {/* Focused ring at full opacity (instrument lock), above its class. */}
       {focused.map((e) => (
-        <Group key={`lock-${e.key}`} style="stroke" color={e.cls.color}>
-          <RingCircle
-            identity={e.key}
-            frame={frame}
-            frameIndex={frameIndex}
-            dim={1}
-            strokeWidth={focusLine}
-          />
-        </Group>
+        <FocusLock
+          key={`lock-${e.key}`}
+          common={commonFor(e.cls)}
+          entry={e}
+          frameIndex={frameIndex}
+          strokeWidth={focusLine}
+        />
       ))}
       {flags.ringTethers
         ? classes

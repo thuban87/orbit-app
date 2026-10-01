@@ -15,12 +15,16 @@ import {
   compassChevron,
   northTick,
   planeHomography,
+  RING_CLUTTER_FLOOR,
+  RING_CLUTTER_GAP_DP,
+  ringDensityFade,
   ringInstrumentClass,
   ringUniforms,
   scaleTicks,
   tetherRect,
   tetherSegment,
   tiltDepth,
+  typicalRingGap,
   wakeAngle,
   wakeUniforms,
 } from "./labb-rings-logic";
@@ -231,5 +235,21 @@ describe("ringInstrument uniform contract (a missing uniform THROWS on device)",
     const w = wakeUniforms([1, 1, 1, 1], 0.3, 1, 100, 2.6, 0.3, [1, 0, 0, 1]);
     expect(wakeNames).toHaveLength(3);
     for (const name of wakeNames) expect(w).toHaveProperty(name);
+  });
+});
+
+describe("density fade (far zoom on dense Systems)", () => {
+  it("median gap of the ring radii", () => {
+    expect(typicalRingGap([100, 122, 144, 166, 400])).toBe(22);
+    expect(typicalRingGap([50])).toBe(0);
+  });
+  it("full alpha when rings are far enough apart, floored when crowded", () => {
+    expect(ringDensityFade(22, 1)).toBe(1);
+    expect(ringDensityFade(22, 0.4)).toBeCloseTo(
+      (22 * 0.4) / RING_CLUTTER_GAP_DP,
+      9,
+    );
+    expect(ringDensityFade(22, 0.05)).toBe(RING_CLUTTER_FLOOR);
+    expect(ringDensityFade(0, 1)).toBe(1);
   });
 });

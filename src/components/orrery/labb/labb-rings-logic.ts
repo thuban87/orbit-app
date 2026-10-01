@@ -56,6 +56,13 @@ export const SCALE_TICK = 2;
 export const SCALE_TICK_MAJOR = 4.5;
 export const COMPASS_GAP = 16;
 export const COMPASS_SIZE = 5;
+/**
+ * Density fade: when neighbouring rings are closer than this on screen (dp),
+ * ring alpha scales down in proportion (far zoom on a dense System reads as
+ * fine instrument grooves instead of a solid moiré), never below the floor.
+ */
+export const RING_CLUTTER_GAP_DP = 20;
+export const RING_CLUTTER_FLOOR = 0.35;
 
 export type RingStrokeStyle = OrreryRingStyle["strokeStyle"];
 
@@ -349,4 +356,23 @@ export function tetherRect(
     inner: Math.hypot(seg.x0, seg.y0),
     outer: Math.hypot(seg.x1, seg.y1),
   };
+}
+
+/** Typical world spacing between neighbouring rings (median gap; 0 if < 2). */
+export function typicalRingGap(radii: readonly number[]): number {
+  const sorted = [...new Set(radii.filter((r) => r > 0))].sort((a, b) => a - b);
+  if (sorted.length < 2) return 0;
+  const gaps = sorted.slice(1).map((r, i) => r - sorted[i]);
+  gaps.sort((a, b) => a - b);
+  return gaps[Math.floor((gaps.length - 1) / 2)];
+}
+
+/** Ring alpha multiplier for the on-screen ring spacing (see constants). */
+export function ringDensityFade(gapWorld: number, zoom: number): number {
+  "worklet";
+  if (!(gapWorld > 0) || !(zoom > 0)) return 1;
+  return Math.max(
+    RING_CLUTTER_FLOOR,
+    Math.min(1, (gapWorld * zoom) / RING_CLUTTER_GAP_DP),
+  );
 }
