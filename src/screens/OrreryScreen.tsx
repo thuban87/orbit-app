@@ -536,6 +536,18 @@ export function OrreryScreen() {
       cancelled = true;
     };
   }, [isFocused, appActive, catalogRevision]);
+  // LAB C ONLY (pre-existing main bug, owner decides on main separately): the
+  // focus restore selects a saved custom System without a name, so the store
+  // falls back to "Unavailable System". Resolve it from the loaded catalog.
+  useEffect(() => {
+    const live = useSystemStore.getState();
+    if (live.requested.ref.kind !== "custom") return;
+    const entry = systemCatalog.find((row) => row.id === live.requested.id);
+    if (entry && entry.name !== live.requested.name)
+      useSystemStore.setState({
+        requested: { ...live.requested, name: entry.name },
+      });
+  }, [systemCatalog, useSystemStore, state.requested.id]);
   useEffect(() => {
     const cached =
       catalogRevision === null

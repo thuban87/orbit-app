@@ -118,3 +118,12 @@ via adb: two-finger pan, pinch (multi-touch).
 - **Sun occupant without a photo** still renders as a flat swatch inside the bezel: the seeded self has
   no photo and (apparently) empty initials. Next step: initials/icon on a shaded plate with the star
   glowing through.
+
+## 2026-10-01 — Checkpoint C.1: "Unavailable System" fixed on the LAB BRANCH ONLY
+
+OrreryScreen now reconciles `requested.name` from the loaded Systems catalog whenever the requested
+System is `custom` (one effect after the catalog loader; `useSystemStore.setState`). The store itself is
+untouched. This is a **pre-existing main-app bug** (any user whose last System is custom sees
+"Unavailable System" after re-entering the Orrery); this branch is never merged, and the fix on `main`
+is the owner's decision. Device: selector reads "Lab C Inner" after relaunch
+(evidence/04-checkpoint-c/01-system-name-restored-lab-c-inner.png).
