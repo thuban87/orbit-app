@@ -15,9 +15,13 @@ import { THEME_PRESETS } from "@/theme/theme-presets";
 import { OrreryWorld } from "../OrreryWorld";
 import { useOrreryCamera } from "../use-orrery-camera";
 import { labInitials } from "./LabBodies";
+import { BODY_REACH, SUN_REACH } from "./labb-bodies-logic";
+import { resetLabEffectsForTest } from "./labb-effects";
 
 const lab = vi.hoisted(() => ({
   flags: {} as Record<string, boolean>,
+  /** When true the mocked Skia compiles every runtime effect (lit path). */
+  effects: false,
 }));
 
 vi.mock("@/stores/orrery-labb-fx-store", async (original) => {
@@ -107,6 +111,7 @@ vi.mock("@shopify/react-native-skia", async () => {
     Rect: "rect",
     RadialGradient: "radialGradient",
     LinearGradient: "linearGradient",
+    BlurMask: "blurMask",
     useTexture: () => ({ value: null }),
     useRSXformBuffer: () => ({ value: [] }),
     useColorBuffer: () => ({ value: [] }),
@@ -122,6 +127,9 @@ vi.mock("@shopify/react-native-skia", async () => {
     rrect: (rect: unknown) => rect,
     Skia: {
       Color: (c: string) => c,
+      RuntimeEffect: {
+        Make: (source: string) => (lab.effects ? { source } : null),
+      },
       Path: { Make: () => ({ moveTo() {}, lineTo() {}, close() {} }) },
       ParagraphBuilder: {
         Make: () => {
@@ -192,6 +200,8 @@ const switchRuntime = (
 let db: ReturnType<typeof openTestDb>;
 beforeEach(async () => {
   lab.flags = { fpsHud: false };
+  lab.effects = false;
+  resetLabEffectsForTest();
   db = openTestDb();
   let uid = 0;
   await runMigrations(nodeSqliteExecutor(db), MIGRATIONS, TARGET_VERSION, {
@@ -318,6 +328,51 @@ describe("Lab B renderer tree contract", () => {
     const hud = tree[2];
     expect(hud.children[0].type).toBe("roundRect");
     expect(hud.children.some((c) => c.type === "path")).toBe(true);
+  });
+
+  it("falls back to flat discs when every runtime effect is null", async () => {
+    const { tree } = await renderLab({ value: { ...HOME_CAMERA } });
+    const [contact, sun] = tree[1].children[3].children;
+    expect(contact.children.some((c) => c.type === "shader")).toBe(false);
+    expect(contact.children[0].type).toBe("circle");
+    expect(sun.children.some((c) => c.type === "circle")).toBe(true);
+  });
+
+  it("lit path: ONE shader circle per body at r·reach, disc uniform = world radius", async () => {
+    lab.effects = true;
+    const pose = { value: { ...HOME_CAMERA } };
+    const { tree, scene } = await renderLab(pose);
+    const [contact, sun] = tree[1].children[3].children;
+    const worldR = (kind: string) =>
+      scene.world.find((b) => b.kind === kind)?.radius ?? 0;
+    const lit = contact.children.filter(
+      (c) => c.children[0]?.type === "shader",
+    );
+    expect(lit).toHaveLength(1);
+    expect(lit[0].props.r).toBeCloseTo(worldR("contact") * BODY_REACH, 6);
+    const uniforms = lit[0].children[0].props.uniforms as {
+      value: { uR: number; uPx: number; uLight: number[] };
+    };
+    // The shader's disc is EXACTLY the world radius (the transform scales it to
+    // the frame radius), so hit/label/focus geometry is unchanged.
+    expect(uniforms.value.uR).toBe(worldR("contact"));
+    pose.value = { ...pose.value, zoom: 2 };
+    expect(uniforms.value.uPx).toBeCloseTo(0.5, 5);
+    const [lx, ly] = uniforms.value.uLight;
+    expect(Math.hypot(lx, ly)).toBeCloseTo(1, 5);
+    const sunLit = sun.children.find((c) => c.children[0]?.type === "shader");
+    expect(sunLit?.props.r).toBeCloseTo(worldR("sun") * SUN_REACH, 6);
+    for (const body of [contact, sun]) expect(body.props.layer).toBeUndefined();
+  });
+
+  it("bodyLighting off keeps the flat path even when effects compile", async () => {
+    lab.effects = true;
+    lab.flags = { fpsHud: false, bodyLighting: false };
+    const { tree } = await renderLab({ value: { ...HOME_CAMERA } });
+    const [contact] = tree[1].children[3].children;
+    expect(contact.children.some((c) => c.children[0]?.type === "shader")).toBe(
+      false,
+    );
   });
 
   it("derives real initials when Hermes returned the whole name", () => {

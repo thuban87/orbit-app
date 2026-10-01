@@ -12,10 +12,11 @@
  *
  *   L0  environment   <LabEnvironment>     baked nebula + 3-depth Atlas starfield (WP-1.1)
  *   L1  rings         <LabRings>           WP-1.3 depth fade / flow / wake / tethers
- *   L5  polaris       <Polaris> (legacy)   WP-1.2 sprite + compass tick
+ *   L5  polaris       <LabPolaris>         glow + spikes (flag polarisLab; legacy fallback)
  *   --  reorder ghost  (slot from OrreryWorld; accent contract row stays there)
  *   L2–L4 bodies      ONE contiguous Group: sun + contacts (+ moons)
  *                     WP-1.2 lit surfaces, atmospheres, corona, lit moons
+ *                     (one shader draw per body; flag bodyLighting)
  *   L6  labels        <OrreryLabel> (legacy, per-label layer: C-09)  WP-1.3 HUD tags
  *   L7  fx            empty Group          WP-2.1/2.2 switch / focus / feedback FX
  *   dbg fps HUD       <LabFpsOverlay>      (flag `fpsHud`)
@@ -72,9 +73,15 @@ import type {
   OrrerySwitchRuntime,
 } from "../use-orrery-switch-runtime";
 import { LabFpsOverlay } from "./debug/LabFpsOverlay";
-import { LabContactBody, LabMoon, LabSunBody } from "./LabBodies";
+import {
+  LabContactBody,
+  LabMoon,
+  LabSunBody,
+  type LabWorldLook,
+} from "./LabBodies";
 import { LabCanvas } from "./LabCanvas";
 import { LabEnvironment } from "./LabEnvironment";
+import { LabPolaris } from "./LabPolaris";
 import { LabRings } from "./LabRings";
 import { setLabEffectForceFallback } from "./labb-effects";
 import { indexFrame } from "./labb-frame-index";
@@ -132,6 +139,7 @@ function LabBody({
   colors,
   fontProvider,
   focused,
+  look,
 }: {
   resource: OrreryBodyResource;
   frame: SharedValue<AnimatedFrame>;
@@ -139,6 +147,7 @@ function LabBody({
   colors: ThemePalette;
   fontProvider: SkTypefaceFontProvider | null;
   focused: boolean;
+  look: LabWorldLook;
 }) {
   const { body, scene, key } = resource;
   const resolved = resolveSunOccupant({
@@ -164,6 +173,7 @@ function LabBody({
     initials: orreryInitials(name),
     fontProvider,
     focusColor: focused ? colors.accent : undefined,
+    look,
   };
   return body.kind === "sun" ? (
     <LabSunBody
@@ -171,12 +181,14 @@ function LabBody({
       photo={resolved.photo}
       glowColor={resolved.glowColor}
       glowRadius={body.radius * 1.8}
+      self={resolved.kind === "self"}
     />
   ) : (
     <LabContactBody
       {...common}
       photo={contact?.photo ?? null}
       bodyFill={orreryRingStyle(contact?.status ?? null, colors).bodyFill}
+      status={contact?.status ?? null}
     />
   );
 }
@@ -216,6 +228,17 @@ export function LabBRenderer(contract: LabRenderContract) {
   const profile = useMemo(
     () => resolveLabFxProfile(contract.themePackage, contract.themeMode),
     [contract.themePackage, contract.themeMode],
+  );
+  const sky = labColor(colors, profile.roles.sky);
+  const look = useMemo<LabWorldLook>(
+    () => ({
+      lit: flags.bodyLighting,
+      colors,
+      profile,
+      sky,
+      extent: scene.extent,
+    }),
+    [flags.bodyLighting, colors, profile, sky, scene.extent],
   );
   const warmupColor = useMemo(
     () => tokenToVec4(colors.background),
@@ -259,7 +282,16 @@ export function LabBRenderer(contract: LabRenderContract) {
         {/* L5 */}
         <Group>
           {flags.polaris ? (
-            <Polaris frame={frame} extent={scene.extent} colors={colors} />
+            flags.polarisLab ? (
+              <LabPolaris
+                frame={frame}
+                extent={scene.extent}
+                colors={colors}
+                profile={profile}
+              />
+            ) : (
+              <Polaris frame={frame} extent={scene.extent} colors={colors} />
+            )
           ) : null}
         </Group>
         {/* reorder ghost (model-owned element) */}
@@ -276,6 +308,7 @@ export function LabBRenderer(contract: LabRenderContract) {
                   colors={colors}
                   fontProvider={fontProvider}
                   focused={focusedIds.includes(resource.body.id)}
+                  look={look}
                 />
               ))
             : null}
@@ -304,6 +337,7 @@ export function LabBRenderer(contract: LabRenderContract) {
                     frameIndex={frameIndex}
                     color={colors.textSecondary}
                     focusColor={focused ? colors.accent : undefined}
+                    look={look}
                   />
                 );
               })

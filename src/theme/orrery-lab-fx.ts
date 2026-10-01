@@ -38,6 +38,8 @@ export interface LabFxProfile {
   };
   /** L0 deep environment (WP-1.1): nebula + starfield tunables. */
   env: LabEnvProfile;
+  /** L2–L5 worlds (WP-1.2): lighting, atmosphere, corona tunables. */
+  bodies: LabBodyProfile;
   /** Roles reserved for WP-1.1+ layers (environment / bodies / rings). */
   roles: {
     sky: LabColorToken;
@@ -91,6 +93,48 @@ export interface LabEnvProfile {
   starTint: number;
   /** Mid/near twinkle amplitude (± fraction of alpha). */
   twinkle: number;
+}
+
+/**
+ * L2–L5 worlds profile (WP-1.2). Token references + effect strengths (before
+ * profile and panel intensity). Dark = lit worlds with additive status
+ * atmospheres and an emissive corona; light = the same lighting with a higher
+ * readability floor, a soft anti-sun contact shadow instead of a glow, and a
+ * warm (non-additive) corona wash.
+ */
+export interface LabBodyProfile {
+  /** Lambert floor: the darkest terminator brightness (face readability). */
+  lightFloor: number;
+  /** Wrap-lighting term softening the terminator. */
+  wrap: number;
+  /** Status atmosphere glow strength. */
+  atmosphere: number;
+  /** 0 = normal (srcOver) glow, 1 = fully additive-looking glow. */
+  atmosphereAdditive: number;
+  /** Anti-sun contact shadow strength (light themes). */
+  shadow: number;
+  shadowInk: LabColorToken;
+  /** Fresnel limb rim in the status hue. */
+  fresnel: number;
+  /** Crisp inner status rim (dp) and its strength. */
+  rimPx: number;
+  rimStrength: number;
+  /** Specular glint strength. */
+  spec: number;
+  /** Max far-side haze toward the sky token. */
+  haze: number;
+  /** Near-white highlight token (specular, sun core). */
+  highlight: LabColorToken;
+  /** Sun corona strength and additivity. */
+  corona: number;
+  coronaAdditive: number;
+  /** Initials ink over a stellar (plasma) self-sun surface. */
+  sunInk: LabColorToken;
+  /** Moon base tone and its lighting floor. */
+  moonTone: LabColorToken;
+  moonFloor: number;
+  /** Procedural band contrast for initials bodies (0..1). */
+  bandContrast: number;
 }
 
 /**
@@ -158,6 +202,47 @@ const LIGHT_ENV: LabEnvProfile = {
   twinkle: 0,
 };
 
+const DARK_BODIES: LabBodyProfile = {
+  lightFloor: 0.55,
+  wrap: 0.35,
+  atmosphere: 0.85,
+  atmosphereAdditive: 0.65,
+  shadow: 0,
+  shadowInk: "background",
+  fresnel: 0.35,
+  rimPx: 1.5,
+  rimStrength: 0.9,
+  spec: 0.14,
+  haze: 0.15,
+  highlight: "avatarSwatchText",
+  corona: 1,
+  coronaAdditive: 0.7,
+  sunInk: "background",
+  moonTone: "textSecondary",
+  moonFloor: 0.22,
+  bandContrast: 0.8,
+};
+const LIGHT_BODIES: LabBodyProfile = {
+  lightFloor: 0.75,
+  wrap: 0.35,
+  atmosphere: 0.22,
+  atmosphereAdditive: 0,
+  shadow: 0.3,
+  shadowInk: "textPrimary",
+  fresnel: 0.28,
+  rimPx: 2,
+  rimStrength: 1,
+  spec: 0.08,
+  haze: 0.1,
+  highlight: "avatarSwatchText",
+  corona: 0.6,
+  coronaAdditive: 0,
+  sunInk: "textPrimary",
+  moonTone: "textSecondary",
+  moonFloor: 0.45,
+  bandContrast: 0.4,
+};
+
 const HUD: LabFxProfile["hud"] = {
   plate: "surface",
   plateOpacity: HUD_PLATE_OPACITY,
@@ -182,6 +267,7 @@ export const LAB_FX_PROFILES: Readonly<
     dark: {
       intensity: GALAXY_DARK_INTENSITY,
       env: DARK_ENV,
+      bodies: DARK_BODIES,
       blend: "additive",
       hud: HUD,
       roles: ROLES,
@@ -189,6 +275,7 @@ export const LAB_FX_PROFILES: Readonly<
     light: {
       intensity: GALAXY_LIGHT_INTENSITY,
       env: LIGHT_ENV,
+      bodies: LIGHT_BODIES,
       blend: "multiply",
       hud: HUD,
       roles: ROLES,
@@ -198,6 +285,7 @@ export const LAB_FX_PROFILES: Readonly<
     dark: {
       intensity: STANDARD_DARK_INTENSITY,
       env: DARK_ENV,
+      bodies: DARK_BODIES,
       blend: "additive",
       hud: HUD,
       roles: ROLES,
@@ -205,6 +293,7 @@ export const LAB_FX_PROFILES: Readonly<
     light: {
       intensity: STANDARD_LIGHT_INTENSITY,
       env: LIGHT_ENV,
+      bodies: LIGHT_BODIES,
       blend: "multiply",
       hud: HUD,
       roles: ROLES,

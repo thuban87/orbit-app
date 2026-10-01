@@ -110,6 +110,52 @@ export const LAB_FLAG_REGISTRY = [
     note: "WP-1.2 fills",
   },
   { id: "sunPulse", label: "L2 Sun pulse", section: "layers", default: true },
+  // L2–L5 worlds (WP-1.2).
+  {
+    id: "bodyLighting",
+    label: "L2-L4 Lit surfaces (body/sun/moon shaders)",
+    section: "effects",
+    default: true,
+    heavy: true,
+    note: "off = WP-1.0 flat discs",
+  },
+  {
+    id: "bodyAtmosphere",
+    label: "L3 Status atmosphere / light-theme shadow",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "bodyProcedural",
+    label: "L3 Procedural surface (initials bodies)",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "depthHaze",
+    label: "L3 Far-side depth haze",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "sunCorona",
+    label: "L2 Sun corona (rays + limb)",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "sunPlasma",
+    label: "L2 Self-sun stellar surface (no photo)",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "polarisLab",
+    label: "L5 Lab Polaris (glow + spikes)",
+    section: "effects",
+    default: true,
+    heavy: true,
+  },
   {
     id: "labels",
     label: "L6 Labels",

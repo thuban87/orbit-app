@@ -1,0 +1,272 @@
+/**
+ * ORRERY LAB B — L2–L4 body materials and per-frame lighting (WP-1.2), pure.
+ *
+ * - `labBodyMaterial(status)`: the static per-status material table (research
+ *   03 §1.3 L3). STATIC per status — no per-status animation (HANDOFF §7
+ *   [REJECTED] differentiated per-band animation).
+ * - `labLightDir`: the screen-space unit vector body → sun centre. Bodies are
+ *   drawn under a translate + uniform-scale transform only, so the screen
+ *   direction IS the local shader direction.
+ * - `labHaze`: far-side depth haze from the projected `depth` (negative = far).
+ * - `labBodyFrameUniforms` / `labMoonFrameUniforms` / `labSunFrameUniforms`:
+ *   the per-frame uniform blocks (worklets) merged over a static block built
+ *   React-side from theme tokens.
+ *
+ * Hermes rule: every helper is declared ABOVE its worklet callers (guarded by
+ * `orrery-worklet-order.test.ts`). No Skia import here (node-testable).
+ */
+import type { ProfileStatus } from "@/db/contact-status-read";
+import type { LabFxSnapshot } from "@/stores/orrery-labb-fx-store";
+
+// --- Tunables -----------------------------------------------------------------
+/** Drawn reach of a contact body (atmosphere / shadow) as a multiple of r. Must
+ * stay ≤ the 1.3 culling reach used by `projectAnimatedFrame`. */
+export const BODY_REACH = 1.3;
+/** Drawn reach of the sun (corona) as a multiple of r; ≤ the ×2 culling reach. */
+export const SUN_REACH = 2;
+/** Light-vector elevation out of the screen plane (the sun sits in the plane;
+ * a little z keeps the terminator from cutting faces in half). */
+export const LIGHT_Z = 0.4;
+/** Fallback light direction when a body sits on the sun (up-left). */
+const DEFAULT_LIGHT: [number, number] = [-0.6, -0.8];
+/** Sun ambient: corona ray rotation and granulation speed live in the shader;
+ * this is the frozen composition time under reduced motion (s). */
+export const SUN_STILL_T = 37;
+/** Corona breathing (± fraction of corona intensity), ~3.1 s like legacy. */
+export const SUN_BREATH = 0.06;
+const SUN_PULSE_SPEED = 0.002;
+
+export interface LabBodyMaterial {
+  /** Atmosphere strength multiplier (0 = none). */
+  atmosphere: number;
+  /** Surface desaturation (0..1). */
+  desaturate: number;
+  /** Fresnel limb-rim multiplier. */
+  fresnel: number;
+  /** Specular glint multiplier (0 = matte). */
+  spec: number;
+}
+
+/**
+ * Status → material. stable/wobble: full clear atmosphere; decay: thin & dim,
+ * 25% desaturated; rogue: no atmosphere, 45% desaturated, cold rim (the rim
+ * hue is the rogue `bodyFill` = `rogueExtinguished`); never-contacted: matte,
+ * neutral rim, no atmosphere.
+ */
+export function labBodyMaterial(status: ProfileStatus | null): LabBodyMaterial {
+  switch (status) {
+    case "stable":
+    case "wobble":
+      return { atmosphere: 1, desaturate: 0, fresnel: 1, spec: 1 };
+    case "decay":
+      return { atmosphere: 0.4, desaturate: 0.25, fresnel: 0.55, spec: 0.6 };
+    case "rogue":
+      return { atmosphere: 0, desaturate: 0.45, fresnel: 0.3, spec: 0.3 };
+    default:
+      return { atmosphere: 0, desaturate: 0.1, fresnel: 0, spec: 0 };
+  }
+}
+
+/** Unit screen-space direction from (x, y) toward the sun centre. */
+export function labLightDir(
+  x: number,
+  y: number,
+  sunX: number,
+  sunY: number,
+): [number, number] {
+  "worklet";
+  const dx = sunX - x;
+  const dy = sunY - y;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (!(len > 1e-3)) return DEFAULT_LIGHT;
+  return [dx / len, dy / len];
+}
+
+/** Far-side haze 0..max: `depth` < 0 is the far side of a tilted plane. */
+export function labHaze(depth: number, extent: number, max: number): number {
+  "worklet";
+  if (!(extent > 0) || !(max > 0)) return 0;
+  const far = Math.min(1, Math.max(0, -depth / extent));
+  return far * max;
+}
+
+/** Effect-strength scalar: profile intensity × the panel's global intensity. */
+export function labFxScale(
+  profileIntensity: number,
+  fx: LabFxSnapshot | null,
+): number {
+  "worklet";
+  return profileIntensity * (fx ? fx.intensity : 1);
+}
+
+export interface LabBodyStatic {
+  uR: number;
+  uStatus: number[];
+  uSky: number[];
+  uShadow: number[];
+  uHi: number[];
+  uBase: number[];
+  uBand: number[];
+  uSeed: number;
+  uFloor: number;
+  uWrap: number;
+  uRimPx: number;
+  uRimStr: number;
+  atmo: number;
+  atmoAdd: number;
+  shadow: number;
+  fresnel: number;
+  desat: number;
+  spec: number;
+  haze: number;
+  intensity: number;
+  extent: number;
+}
+
+/** A body's frame position subset (from `bodyAt`). */
+export interface LabBodyPose {
+  x: number;
+  y: number;
+  radius: number;
+  depth: number;
+}
+
+/** Per-frame uniforms for the lit contact-body shaders. */
+export function labBodyFrameUniforms(
+  body: LabBodyPose | undefined,
+  sunX: number,
+  sunY: number,
+  st: LabBodyStatic,
+  fx: LabFxSnapshot | null,
+) {
+  "worklet";
+  const flags = fx ? fx.flags : null;
+  const k = labFxScale(st.intensity, fx);
+  const x = body ? body.x : 0;
+  const y = body ? body.y : 0;
+  const scale = body && st.uR > 0 ? body.radius / st.uR : 1;
+  const atmosphereOn = flags ? flags.bodyAtmosphere : true;
+  return {
+    uR: st.uR,
+    uPx: scale > 1e-4 ? 1 / scale : 1,
+    uLight: labLightDir(x, y, sunX, sunY),
+    uLightZ: LIGHT_Z,
+    uLit: 1,
+    uFloor: st.uFloor,
+    uWrap: st.uWrap,
+    uStatus: st.uStatus,
+    uSky: st.uSky,
+    uShadow: st.uShadow,
+    uHi: st.uHi,
+    uAtmo: atmosphereOn ? Math.min(1.2, st.atmo * k) : 0,
+    uAtmoAdd: st.atmoAdd,
+    uAtmoReach: BODY_REACH,
+    uShadowStr: atmosphereOn ? Math.min(1, st.shadow * k) : 0,
+    uRimPx: st.uRimPx,
+    uRimStr: st.uRimStr,
+    uFresnel: st.fresnel * Math.min(1.5, k),
+    uDesat: st.desat,
+    uSpec: st.spec,
+    uHaze:
+      flags && !flags.depthHaze
+        ? 0
+        : labHaze(body ? body.depth : 0, st.extent, st.haze),
+    uBase: st.uBase,
+    uBand: st.uBand,
+    uSeed: st.uSeed,
+    uPattern: flags && !flags.bodyProcedural ? 0 : 1,
+  };
+}
+
+export interface LabMoonStatic {
+  uTone: number[];
+  uHi: number[];
+  uSky: number[];
+  floor: number;
+  haze: number;
+  extent: number;
+}
+
+/** Per-frame uniforms for a lit moon (world radius 1). */
+export function labMoonFrameUniforms(
+  body: LabBodyPose | undefined,
+  sunX: number,
+  sunY: number,
+  st: LabMoonStatic,
+  fx: LabFxSnapshot | null,
+) {
+  "worklet";
+  const flags = fx ? fx.flags : null;
+  const scale = body ? body.radius : 1;
+  return {
+    uR: 1,
+    uPx: scale > 1e-4 ? 1 / scale : 1,
+    uLight: labLightDir(body ? body.x : 0, body ? body.y : 0, sunX, sunY),
+    uTone: st.uTone,
+    uHi: st.uHi,
+    uSky: st.uSky,
+    uFloor: st.floor,
+    uHaze:
+      flags && !flags.depthHaze
+        ? 0
+        : labHaze(body ? body.depth : 0, st.extent, st.haze),
+  };
+}
+
+export interface LabSunStatic {
+  uR: number;
+  uGlow: number[];
+  uHi: number[];
+  uDeep: number[];
+  uBase: number[];
+  plasma: number;
+  corona: number;
+  coronaAdd: number;
+  intensity: number;
+}
+
+/** Per-frame sun uniforms: ambient time (frozen under reduced motion), pulse. */
+export function labSunFrameUniforms(
+  body: LabBodyPose | undefined,
+  timeMs: number,
+  reduced: boolean,
+  st: LabSunStatic,
+  fx: LabFxSnapshot | null,
+) {
+  "worklet";
+  const flags = fx ? fx.flags : null;
+  const k = labFxScale(st.intensity, fx);
+  const scale = body && st.uR > 0 ? body.radius / st.uR : 1;
+  const animate = !reduced;
+  const t = animate ? (timeMs / 1000) % 1000 : SUN_STILL_T;
+  const pulse =
+    animate && (flags ? flags.sunPulse : true)
+      ? Math.sin(timeMs * SUN_PULSE_SPEED)
+      : 0;
+  return {
+    uR: st.uR,
+    uPx: scale > 1e-4 ? 1 / scale : 1,
+    uTime: t,
+    uReach: SUN_REACH,
+    uGlow: st.uGlow,
+    uHi: st.uHi,
+    uDeep: st.uDeep,
+    uBase: st.uBase,
+    uPlasma: flags && !flags.sunPlasma ? 0 : st.plasma,
+    uCorona:
+      flags && !flags.sunCorona
+        ? 0
+        : st.corona * Math.min(1.6, k) * (1 + SUN_BREATH * pulse),
+    uCoronaAdd: st.coronaAdd,
+  };
+}
+
+/** Deterministic 0..1 seed from a body key (Hermes: no crypto). */
+export function labSeed(key: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 10007) / 10007;
+}

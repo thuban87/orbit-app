@@ -1,38 +1,64 @@
 /**
  * ORRERY LAB B — L2–L4 body slot: sun, contact bodies, moons.
  *
- * WP-1.0: parity port of `SunBody` / `OrbitBody` / `SatelliteBody` with two
- * structural changes (research 03 §2.4):
- * - NO per-body `layer` (saveLayer) and no per-frame `Skia.Paint()`; alpha is
- *   the root Group's `opacity`, and a culled / faded-out body collapses to
- *   scale 0 (`labBillboard`) so nothing of it draws.
- * - O(1) lookups through `frameIndex` instead of `frame.bodies.find`.
- * Initials use a glyph `Text` (respects paint alpha) instead of a Paragraph.
+ * WP-1.0 parity port (kept as the FALLBACK path: flag `bodyLighting` off or a
+ * null runtime effect): NO per-body `layer` (saveLayer), no per-frame
+ * `Skia.Paint()`, alpha = the root Group's `opacity`, culled / faded-out bodies
+ * collapse to scale 0 (`labBillboard`), O(1) lookups through `frameIndex`.
  *
- * Hard rule kept: every body is drawn at exactly the frame radius (world radius
- * × billboard scale), so hit radius, label anchors and focus cards are
- * unchanged. Photos keep `useOrreryPhoto` (unconditional, keyed per resource;
- * 512 px cap; owned disposal). WP-1.2 replaces the drawing with the lit-surface
- * shader, atmospheres, corona and lit moons — keep the keyed components and the
- * root-Group contract (transform length 3, zIndex = depth, no `layer`).
+ * WP-1.2 "worlds" (research 03 §1.3 L2–L4): ONE shader draw per body, a circle
+ * of radius r·reach whose runtime shader paints
+ * - inside r (exactly the frame radius — hit radius, label anchors and focus
+ *   cards are unchanged): the photo, or a procedural banded surface in the
+ *   contact's swatch, LIT from the sun (screen-space body → sun direction) with
+ *   a readability floor, a status Fresnel limb + 2-dp crisp status rim,
+ *   per-status desaturation and far-side depth haze;
+ * - outside r: the status atmosphere (dark) or an anti-sun contact shadow
+ *   (light). Materials per status live in `labb-bodies-logic.ts`.
+ * The sun is an emissive stellar surface (or the emissive photo) with a
+ * ray-structured corona to 2r; moons are tiny lit spheres.
+ *
+ * Root-Group contract kept: transform length 3, zIndex = depth, no `layer`.
+ * Photos keep `useOrreryPhoto` (unconditional, keyed per resource; 512 px cap;
+ * owned disposal) — the SkImage is only referenced by an ImageShader child.
  */
 import {
   Circle,
   Group,
+  ImageShader,
   matchFont,
   rect,
   rrect,
+  Shader,
   type SkFont,
+  type SkImage,
   Image as SkiaImage,
   type SkTypefaceFontProvider,
   Text,
 } from "@shopify/react-native-skia";
 import { useMemo } from "react";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
+import type { ProfileStatus } from "@/db/contact-status-read";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
+import { type LabFxProfile, labColor } from "@/theme/orrery-lab-fx";
+import type { ThemePalette } from "@/theme/theme-types";
 import { useOrreryPhoto } from "../use-orrery-photo";
+import {
+  BODY_REACH,
+  type LabBodyStatic,
+  type LabMoonStatic,
+  type LabSunStatic,
+  labBodyFrameUniforms,
+  labBodyMaterial,
+  labMoonFrameUniforms,
+  labSeed,
+  labSunFrameUniforms,
+  SUN_REACH,
+} from "./labb-bodies-logic";
 import { useLabRenderContext } from "./labb-context";
-import { type FrameIndex, labBillboard } from "./labb-frame-index";
+import { getLabEffect } from "./labb-effects";
+import { bodyAt, type FrameIndex, labBillboard } from "./labb-frame-index";
+import { mixVec, tokenToVec3, type Vec3 } from "./labb-uniforms";
 
 // --- Tunables -----------------------------------------------------------------
 const OUTLINE_WIDTH = 3;
@@ -137,6 +163,18 @@ function Initials({
   );
 }
 
+/** Shared look inputs for the lit (WP-1.2) path. */
+export interface LabWorldLook {
+  /** `bodyLighting` flag (React side; heavy: swaps the whole draw path). */
+  lit: boolean;
+  colors: ThemePalette;
+  profile: LabFxProfile;
+  /** Sky token value (haze target). */
+  sky: string;
+  /** Scene extent (world units) — normalises the depth haze. */
+  extent: number;
+}
+
 export interface LabBodyCommon {
   identity: string;
   frame: SharedValue<AnimatedFrame>;
@@ -148,6 +186,92 @@ export interface LabBodyCommon {
   initials: string;
   fontProvider: SkTypefaceFontProvider | null;
   focusColor?: string;
+  look?: LabWorldLook;
+}
+
+/** Local-coordinate rect of a disc of radius r (photo ImageShader placement). */
+function discRect(r: number) {
+  return rect(-r, -r, r * 2, r * 2);
+}
+
+/** The flat WP-1.0 contact disc (fallback path). */
+function FlatContactDisc({
+  radius,
+  image,
+  swatch,
+  bodyFill,
+}: {
+  radius: number;
+  image: SkImage | null;
+  swatch: string;
+  bodyFill: string;
+}) {
+  const innerR = Math.max(1, radius - OUTLINE_WIDTH / 2);
+  const clip = rrect(discRect(innerR), innerR, innerR);
+  return (
+    <>
+      <Circle cx={0} cy={0} r={radius} color={bodyFill} />
+      {image ? (
+        <Group clip={clip}>
+          <SkiaImage
+            image={image}
+            x={-innerR}
+            y={-innerR}
+            width={innerR * 2}
+            height={innerR * 2}
+            fit="cover"
+          />
+        </Group>
+      ) : (
+        <Circle cx={0} cy={0} r={innerR} color={swatch} />
+      )}
+    </>
+  );
+}
+
+function useBodyStatic(
+  look: LabWorldLook | undefined,
+  radius: number,
+  identity: string,
+  swatch: string,
+  bodyFill: string,
+  status: ProfileStatus | null,
+): LabBodyStatic | null {
+  return useMemo(() => {
+    if (!look) return null;
+    const b = look.profile.bodies;
+    const m = labBodyMaterial(status);
+    const base = tokenToVec3(swatch);
+    // Band tone: the swatch pushed toward black / the highlight token (numeric
+    // token mixes, C-03), alternating by seed so worlds differ.
+    const seed = labSeed(identity);
+    // Band tone: the swatch pushed toward black (numeric token mix, C-03);
+    // the shader adds highlight-token streaks on top.
+    const band = mixVec(base, [0, 0, 0] as Vec3, b.bandContrast * 0.55);
+    return {
+      uR: radius,
+      uStatus: tokenToVec3(bodyFill),
+      uSky: tokenToVec3(look.sky),
+      uShadow: tokenToVec3(labColor(look.colors, b.shadowInk)),
+      uHi: tokenToVec3(labColor(look.colors, b.highlight)),
+      uBase: base,
+      uBand: band,
+      uSeed: seed,
+      uFloor: b.lightFloor,
+      uWrap: b.wrap,
+      uRimPx: b.rimPx,
+      uRimStr: b.rimStrength,
+      atmo: b.atmosphere * m.atmosphere,
+      atmoAdd: b.atmosphereAdditive,
+      shadow: b.shadow,
+      fresnel: b.fresnel * m.fresnel,
+      desat: m.desaturate,
+      spec: b.spec * m.spec,
+      haze: b.haze,
+      intensity: look.profile.intensity,
+      extent: look.extent,
+    };
+  }, [look, radius, identity, swatch, bodyFill, status]);
 }
 
 export function LabContactBody({
@@ -162,7 +286,9 @@ export function LabContactBody({
   fontProvider,
   focusColor,
   bodyFill,
-}: LabBodyCommon & { bodyFill: string }) {
+  status = null,
+  look,
+}: LabBodyCommon & { bodyFill: string; status?: ProfileStatus | null }) {
   const { transform, depth, opacity } = useBillboard(
     frame,
     frameIndex,
@@ -170,13 +296,24 @@ export function LabContactBody({
     radius,
   );
   const image = useOrreryPhoto(photo);
-  const innerR = Math.max(1, radius - OUTLINE_WIDTH / 2);
   const font = useInitialsFont(fontProvider, radius);
-  const clip = rrect(
-    rect(-innerR, -innerR, innerR * 2, innerR * 2),
-    innerR,
-    innerR,
-  );
+  const ctx = useLabRenderContext();
+  const st = useBodyStatic(look, radius, identity, swatch, bodyFill, status);
+  const effect =
+    look?.lit && st
+      ? getLabEffect(image ? "bodyPhoto" : "bodyProcedural")
+      : null;
+  const uniforms = useDerivedValue(() => {
+    if (!st) return {};
+    const f = frame.value;
+    return labBodyFrameUniforms(
+      bodyAt(f, frameIndex.value, identity),
+      f.center.x,
+      f.center.y,
+      st,
+      ctx ? ctx.fxFlags.value : null,
+    );
+  });
   return (
     <Group transform={transform} zIndex={depth} opacity={opacity}>
       {focusColor ? (
@@ -189,28 +326,29 @@ export function LabContactBody({
           strokeWidth={2}
         />
       ) : null}
-      <Circle cx={0} cy={0} r={radius} color={bodyFill} />
-      {image ? (
-        <Group clip={clip}>
-          <SkiaImage
-            image={image}
-            x={-innerR}
-            y={-innerR}
-            width={innerR * 2}
-            height={innerR * 2}
-            fit="cover"
-          />
-        </Group>
+      {effect ? (
+        <Circle cx={0} cy={0} r={radius * BODY_REACH}>
+          <Shader source={effect} uniforms={uniforms}>
+            {image ? (
+              <ImageShader image={image} fit="cover" rect={discRect(radius)} />
+            ) : null}
+          </Shader>
+        </Circle>
       ) : (
-        <>
-          <Circle cx={0} cy={0} r={innerR} color={swatch} />
-          <Initials
-            font={font}
-            initials={initials}
-            radius={radius}
-            color={swatchText}
-          />
-        </>
+        <FlatContactDisc
+          radius={radius}
+          image={image}
+          swatch={swatch}
+          bodyFill={bodyFill}
+        />
+      )}
+      {image ? null : (
+        <Initials
+          font={font}
+          initials={initials}
+          radius={radius}
+          color={swatchText}
+        />
       )}
     </Group>
   );
@@ -229,7 +367,14 @@ export function LabSunBody({
   focusColor,
   glowColor,
   glowRadius,
-}: LabBodyCommon & { glowColor: string; glowRadius: number }) {
+  self = true,
+  look,
+}: LabBodyCommon & {
+  glowColor: string;
+  glowRadius: number;
+  /** Self sun (a stellar surface when photo-less) vs a contact sun. */
+  self?: boolean;
+}) {
   const { transform, depth, opacity } = useBillboard(
     frame,
     frameIndex,
@@ -238,6 +383,38 @@ export function LabSunBody({
   );
   const image = useOrreryPhoto(photo);
   const ctx = useLabRenderContext();
+  const font = useInitialsFont(fontProvider, radius);
+  const st = useMemo<LabSunStatic | null>(() => {
+    if (!look) return null;
+    const b = look.profile.bodies;
+    const glow = tokenToVec3(glowColor);
+    return {
+      uR: radius,
+      uGlow: glow,
+      uHi: tokenToVec3(labColor(look.colors, b.highlight)),
+      uDeep: mixVec(glow, tokenToVec3(look.sky), 0.45),
+      uBase: tokenToVec3(swatch),
+      plasma: self ? 1 : 0,
+      corona: b.corona,
+      coronaAdd: b.coronaAdditive,
+      intensity: look.profile.intensity,
+    };
+  }, [look, radius, glowColor, swatch, self]);
+  const effect =
+    look?.lit && st ? getLabEffect(image ? "sunPhoto" : "sunStar") : null;
+  const uniforms = useDerivedValue(() => {
+    if (!st) return {};
+    // Under reduced motion the ambient clock is NOT read, so the sun's
+    // uniforms stop depending on it (static corona).
+    const reduced = ctx ? ctx.reducedMotion.value : true;
+    return labSunFrameUniforms(
+      bodyAt(frame.value, frameIndex.value, identity),
+      reduced || !ctx ? 0 : ctx.ambient.value,
+      reduced,
+      st,
+      ctx ? ctx.fxFlags.value : null,
+    );
+  });
   const pulse = useDerivedValue(() => {
     if (!ctx || ctx.reducedMotion.value || !ctx.fxFlags.value.flags.sunPulse)
       return 0;
@@ -249,12 +426,13 @@ export function LabSunBody({
   const glowA = useDerivedValue(
     () => GLOW_OPACITY * (1 + PULSE_OPACITY_FRAC * pulse.value),
   );
-  const font = useInitialsFont(fontProvider, radius);
-  const clip = rrect(
-    rect(-radius, -radius, radius * 2, radius * 2),
-    radius,
-    radius,
-  );
+  // Initials over a stellar surface use the profile's dark-on-bright ink; over
+  // the swatch (contact sun / plasma off) the swatch text token.
+  const ink =
+    effect && self && look
+      ? labColor(look.colors, look.profile.bodies.sunInk)
+      : swatchText;
+  const clip = rrect(discRect(radius), radius, radius);
   return (
     <Group transform={transform} zIndex={depth} opacity={opacity}>
       {focusColor ? (
@@ -267,29 +445,36 @@ export function LabSunBody({
           strokeWidth={2}
         />
       ) : null}
-      <Circle cx={0} cy={0} r={glowR} color={glowColor} opacity={glowA} />
-      <Circle cx={0} cy={0} r={radius + 2} color={glowColor} />
-      {image ? (
-        <Group clip={clip}>
-          <SkiaImage
-            image={image}
-            x={-radius}
-            y={-radius}
-            width={radius * 2}
-            height={radius * 2}
-            fit="cover"
-          />
-        </Group>
+      {effect ? (
+        <Circle cx={0} cy={0} r={radius * SUN_REACH}>
+          <Shader source={effect} uniforms={uniforms}>
+            {image ? (
+              <ImageShader image={image} fit="cover" rect={discRect(radius)} />
+            ) : null}
+          </Shader>
+        </Circle>
       ) : (
         <>
-          <Circle cx={0} cy={0} r={radius} color={swatch} />
-          <Initials
-            font={font}
-            initials={initials}
-            radius={radius}
-            color={swatchText}
-          />
+          <Circle cx={0} cy={0} r={glowR} color={glowColor} opacity={glowA} />
+          <Circle cx={0} cy={0} r={radius + 2} color={glowColor} />
+          {image ? (
+            <Group clip={clip}>
+              <SkiaImage
+                image={image}
+                x={-radius}
+                y={-radius}
+                width={radius * 2}
+                height={radius * 2}
+                fit="cover"
+              />
+            </Group>
+          ) : (
+            <Circle cx={0} cy={0} r={radius} color={swatch} />
+          )}
         </>
+      )}
+      {image ? null : (
+        <Initials font={font} initials={initials} radius={radius} color={ink} />
       )}
     </Group>
   );
@@ -301,12 +486,14 @@ export function LabMoon({
   frameIndex,
   color,
   focusColor,
+  look,
 }: {
   identity: string;
   frame: SharedValue<AnimatedFrame>;
   frameIndex: SharedValue<FrameIndex>;
   color: string;
   focusColor?: string;
+  look?: LabWorldLook;
 }) {
   const { transform, depth, opacity } = useBillboard(
     frame,
@@ -314,9 +501,40 @@ export function LabMoon({
     identity,
     1,
   );
+  const ctx = useLabRenderContext();
+  const st = useMemo<LabMoonStatic | null>(() => {
+    if (!look) return null;
+    const b = look.profile.bodies;
+    return {
+      uTone: tokenToVec3(labColor(look.colors, b.moonTone)),
+      uHi: tokenToVec3(labColor(look.colors, b.highlight)),
+      uSky: tokenToVec3(look.sky),
+      floor: b.moonFloor,
+      haze: b.haze,
+      extent: look.extent,
+    };
+  }, [look]);
+  const effect = look?.lit && st ? getLabEffect("moon") : null;
+  const uniforms = useDerivedValue(() => {
+    if (!st) return {};
+    const f = frame.value;
+    return labMoonFrameUniforms(
+      bodyAt(f, frameIndex.value, identity),
+      f.center.x,
+      f.center.y,
+      st,
+      ctx ? ctx.fxFlags.value : null,
+    );
+  });
   return (
     <Group transform={transform} zIndex={depth} opacity={opacity}>
-      <Circle cx={0} cy={0} r={1} color={color} />
+      {effect ? (
+        <Circle cx={0} cy={0} r={1}>
+          <Shader source={effect} uniforms={uniforms} />
+        </Circle>
+      ) : (
+        <Circle cx={0} cy={0} r={1} color={color} />
+      )}
       {focusColor ? (
         <Circle
           cx={0}
