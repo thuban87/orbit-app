@@ -119,6 +119,8 @@ const LABEL_BODY_GAP = 4;
  * people, not rings, are the heroes of the map. Sun/satellites unchanged.
  */
 const CONTACT_HERO_SCALE = 1.9;
+/** The star scales less than contacts so it anchors without swallowing ring 0. */
+const SUN_HERO_SCALE = 1.45;
 /** Approximate OrreryFocusContext footprint (width 280; ~2 buttons + title). */
 const FOCUS_CARD_WIDTH = 290;
 const FOCUS_CARD_HEIGHT = 230;

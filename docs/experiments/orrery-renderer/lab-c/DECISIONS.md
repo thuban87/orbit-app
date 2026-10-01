@@ -77,3 +77,26 @@ via adb: two-finger pan, pinch (multi-touch).
   sit on a near body. The focus card is not a shell obstacle (it follows the body), so the 3D world
   reserves a 290×230 rect below the focused body — no label renders under the translucent card.
 - Lab badge presets now also dolly (×1, ×2.2, ×3.4 home zoom) to reach the tiers without pinch.
+
+## 2026-10-01 — Checkpoint B.3: visual pass (overview composition, star, plane)
+
+- **Overview composition.** `CameraViewport.camera` height ×0.62 ⇒ a lens shift putting the pivot (sun)
+  at ~31% of the canvas, so the receding far half reaches the top of the canvas and the near half fills
+  the bottom (screens 10 vs 04). `deriveHomePose` additionally dollies in while the far rim stays under
+  the camera-rect top and the system half-width ≤ 0.6 viewport — on the dense seed the width bound
+  already binds at the top-down fit, so the lens shift is what fixes the empty sky. (deriveHomePose was
+  moved BELOW projectWorldPoint: worklet forward-reference rule.)
+- **Star.** Sun core is an emissive sphere with limb darkening + drifting 2-octave
+  `mx_fractal_noise_float` granulation on the local normal + a hot core term; sun ×1.45 hero scale.
+  The occupant is a framed medallion (face inset to 80% of the plate, glow-token gold bezel with a bevel
+  highlight and warm vignette), plate 0.74 of the sun radius, so the person sits IN the star.
+  Compromise: the seeded self occupant has no photo and its tile renders as a plain swatch, so the
+  medallion interior is still a flat periwinkle (not a renderer limitation — a real photo fills it).
+- **Orbital plane.** One additive CircleGeometry disc (1.18 extents) under the plane: radial dust falloff
+  + 9 polar grid rings + 24 spokes, tinted by the theme `accent` token, faded at the edge.
+- **Bloom: not added.** A real bloom pass (three PostProcessing BloomNode) adds 2+ full-screen passes;
+  the frame is already JS/present-bound. The existing additive sun glow + corona stands in. Dead end
+  candidate for a GPU-thread renderer, not tried.
+- **Cost.** Renderer log on the Pixel 6 Pro: before B.3 ~47–51 fps (jsRender ~11.3 ms); after, 42 fps at
+  overview, 31–34 fps dollied in close (present 4.9→10.6 ms: fill cost of the noise star + plane at
+  close range). Overdraw is the lever (smaller plane disc, cheaper noise) if this ships.

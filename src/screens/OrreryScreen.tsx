@@ -225,7 +225,12 @@ export function OrreryScreen() {
           .map(([, rect]) => rect),
       ),
     );
-    return camera ? { ...base, camera } : base;
+    // Lens shift: pivot (sun) at ~31% of the camera rect height, so the
+    // receding far half of the tilted disc reaches the top of the canvas and
+    // the near half fills the bottom (strategy-map composition).
+    return camera
+      ? { ...base, camera: { ...camera, height: camera.height * 0.62 } }
+      : base;
   }, [canvasRect, obstacles]);
   const controlsViewport = useMemo(
     () =>

@@ -88,6 +88,10 @@ export const HOME_CAMERA: CameraPose = {
   focalDistance: 256,
 };
 export const IDENTITY_ZOOM = 2;
+/** Lab C home framing: far rim margin under the camera rect top (px) and the
+ * max half-width of the system at the pivot depth, in viewport widths. */
+export const LAB_HOME_TOP_MARGIN = 24;
+export const LAB_HOME_MAX_HALF_SPAN = 0.6;
 export const FOCUS_MS = 300;
 export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 4;
@@ -292,6 +296,21 @@ export function clampCameraPose(pose: CameraPose, extent: number): CameraPose {
 }
 export const constrainCamera = clampCameraPose;
 
+export function projectWorldPoint(
+  point: WorldPoint,
+  pose: CameraPose,
+  viewport: CameraViewport,
+): WorldPoint {
+  "worklet";
+  assertProjection(point, pose, viewport);
+  const center = projectionCenter(viewport),
+    plane = cameraPlane(point, pose),
+    scale = perspectiveScale(point, pose) * pose.zoom;
+  return {
+    x: center.x + plane.x * scale,
+    y: center.y + plane.y * Math.cos(pose.tilt ?? 0) * scale,
+  };
+}
 /** Home enforces readability instead of imposing a maximum member count. */
 export function deriveHomePose(
   world: readonly WorldBody[],
@@ -315,27 +334,37 @@ export function deriveHomePose(
     : MIN_READABLE_RADIUS;
   const floor = Math.max(MIN_ZOOM, MIN_READABLE_RADIUS / minRadius);
   const fit = Math.min(usable.width, usable.height) / (2 * extent);
-  return clampCameraPose(
+  const base = clampCameraPose(
     { ...HOME_CAMERA, zoom: Math.min(1, Math.max(floor, fit)) },
     extent,
   );
+  // Lab C: the top-down fit leaves the tilted disc floating low with empty
+  // sky above it. Dolly in until the FAR rim reaches the top of the camera
+  // rect (near rim may run off the bottom, as on a strategy map), without
+  // letting the system's width overflow the canvas by more than ~20%.
+  const rect = cameraCenterRect(viewport) ?? usable;
+  const fits = (zoom: number) => {
+    "worklet";
+    const pose = clampCameraPose({ ...HOME_CAMERA, zoom }, extent);
+    const far = projectWorldPoint({ x: 0, y: -extent }, pose, viewport);
+    const side = projectWorldPoint({ x: extent, y: 0 }, pose, viewport);
+    const cx = rect.x + rect.width / 2;
+    return (
+      far.y >= rect.y + LAB_HOME_TOP_MARGIN &&
+      side.x - cx <= viewport.width * LAB_HOME_MAX_HALF_SPAN
+    );
+  };
+  if (!fits(base.zoom)) return base;
+  let lo = base.zoom,
+    hi = MAX_ZOOM;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) lo = mid;
+    else hi = mid;
+  }
+  return clampCameraPose({ ...HOME_CAMERA, zoom: lo }, extent);
 }
 
-export function projectWorldPoint(
-  point: WorldPoint,
-  pose: CameraPose,
-  viewport: CameraViewport,
-): WorldPoint {
-  "worklet";
-  assertProjection(point, pose, viewport);
-  const center = projectionCenter(viewport),
-    plane = cameraPlane(point, pose),
-    scale = perspectiveScale(point, pose) * pose.zoom;
-  return {
-    x: center.x + plane.x * scale,
-    y: center.y + plane.y * Math.cos(pose.tilt ?? 0) * scale,
-  };
-}
 // Defined ABOVE its callers on purpose: a Reanimated worklet that references
 // another worklet defined LATER in the same module captures it as `undefined`
 // on-device (the transform breaks function hoisting), crashing with

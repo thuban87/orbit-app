@@ -40,10 +40,13 @@ import {
   instancedBufferAttribute,
   instancedDynamicBufferAttribute,
   materialColor,
+  mx_fractal_noise_float,
+  normalLocal,
   normalView,
   positionView,
   positionGeometry,
   select,
+  smoothstep,
   texture,
   uniform,
   uv,
@@ -85,7 +88,15 @@ const TWINKLE_SPEED = 0.0024;
 /** Face disc radius as a fraction of the body radius (rest = lit sphere rim). */
 const FACE_FRACTION = 0.62;
 /** The sun's occupant billboard is a small medallion in front of the lit core. */
-const SUN_FACE_FRACTION = 0.5;
+const SUN_FACE_FRACTION = 0.74;
+/** Sun medallion rim (fraction of the plate radius where the gold bezel starts). */
+const SUN_RIM_INNER = 0.8;
+/** Orbital-plane grid/dust disc, in scene extents; ring lines per extent. */
+const PLANE_DISC_EXTENTS = 1.18;
+const PLANE_GRID_RINGS = 9;
+const PLANE_GRID_SPOKES = 24;
+const PLANE_DUST_OPACITY = 0.08;
+const PLANE_LINE_OPACITY = 0.07;
 /** Wide faint corona sprite around the sun (additive), in sun radii. */
 const SUN_CORONA_SCALE = 16;
 const SUN_CORONA_OPACITY = 0.22;
@@ -242,6 +253,14 @@ export class OrreryScene3D {
   });
   private spheres: THREE.InstancedMesh;
   private sunMat = new THREE.MeshBasicNodeMaterial();
+  private sunTime = uniform(0);
+  private sunRim = uniform(new THREE.Color(1, 1, 1));
+  private planeMat = new THREE.MeshBasicNodeMaterial({
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  private plane: THREE.Mesh;
   private sun: THREE.Mesh;
   private keyLight: THREE.PointLight;
   private ambient: THREE.AmbientLight;
@@ -495,7 +514,38 @@ export class OrreryScene3D {
       const nz = float(1).sub(p.dot(p)).max(0).sqrt();
       const lambert = vec3(p.x, p.y, nz).dot(faceSunNode).max(0);
       const shade = lambert.mul(FACE_DIFFUSE).add(FACE_AMBIENT);
-      return vec4(tex.rgb.mul(shade), tex.a);
+      // Sun occupant (faceSun.z > 1.1 marks it): a framed medallion — face
+      // inset to SUN_RIM_INNER, gold bezel in the glow token with a bevel
+      // highlight, warm inner vignette so it sits INSIDE the corona.
+      const r = p.length();
+      const isSun = faceSunNode.z.greaterThan(1.1);
+      const inner = uv().sub(0.5).div(SUN_RIM_INNER).add(0.5);
+      const sunTex = texture(
+        this.atlasTex,
+        vec2(inner.x, inner.y.oneMinus()).mul(tile).add(faceUvNode),
+      );
+      const vignette = float(1).sub(
+        smoothstep(SUN_RIM_INNER * 0.55, SUN_RIM_INNER, r).mul(0.45),
+      );
+      const faceLit = sunTex.rgb
+        .mul(vignette)
+        .mul(1.05)
+        .add(
+          this.sunRim.mul(
+            smoothstep(SUN_RIM_INNER * 0.6, SUN_RIM_INNER, r).mul(0.25),
+          ),
+        );
+      const bevel = p.y
+        .mul(-0.5)
+        .add(0.75)
+        .add(
+          smoothstep(0.86, 0.9, r)
+            .mul(smoothstep(1, 0.94, r))
+            .mul(0.6),
+        );
+      const rim = this.sunRim.mul(bevel);
+      const sunRgb = select(r.greaterThan(SUN_RIM_INNER), rim, faceLit);
+      return select(isSun, vec4(sunRgb, 1), vec4(tex.rgb.mul(shade), tex.a));
     })();
     faceMat.opacityNode = Fn(() => {
       const d = uv().sub(0.5).length();
@@ -576,6 +626,47 @@ export class OrreryScene3D {
     this.stars.renderOrder = -10;
     this.scene.add(this.stars);
 
+    // Orbital plane: faint dust disc + polar grid so the plane reads as a
+    // surface in space (one draw, additive, theme-token tinted).
+    {
+      const d = uv().sub(0.5).mul(2);
+      const r = d.length();
+      const ringLine = smoothstep(
+        0.9,
+        1,
+        abs(fract(r.mul(PLANE_GRID_RINGS)).sub(0.5)).mul(2),
+      );
+      const spokeLine = smoothstep(
+        0.94,
+        1,
+        abs(
+          fract(
+            atan(d.y, d.x)
+              .div(Math.PI * 2)
+              .mul(PLANE_GRID_SPOKES),
+          ).sub(0.5),
+        ).mul(2),
+      ).mul(smoothstep(0.12, 0.3, r));
+      const edge = smoothstep(1, 0.75, r);
+      const dust = float(1).sub(r).max(0).pow(1.6).mul(PLANE_DUST_OPACITY);
+      this.planeMat.colorNode = materialColor;
+      this.planeMat.opacityNode = dust
+        .add(ringLine.mul(PLANE_LINE_OPACITY))
+        .add(spokeLine.mul(PLANE_LINE_OPACITY * 0.6))
+        .mul(edge);
+      this.planeMat.blending = THREE.AdditiveBlending;
+      this.planeMat.fog = false;
+      this.plane = new THREE.Mesh(
+        new THREE.CircleGeometry(1, 128),
+        this.planeMat,
+      );
+      this.plane.rotation.x = -Math.PI / 2;
+      this.plane.position.y = -0.5;
+      this.plane.renderOrder = -2;
+      this.plane.frustumCulled = false;
+      this.scene.add(this.plane);
+    }
+
     // Sun glow, Polaris, focus rings ------------------------------------------
     this.glowMat.fog = false;
     this.focusMat.fog = false;
@@ -593,9 +684,23 @@ export class OrreryScene3D {
     this.corona.visible = false;
     this.scene.add(this.corona);
     // Sun core: emissive sphere with a hot centre and darker limb (3D, not a disc).
-    this.sunMat.colorNode = materialColor.mul(
-      normalView.z.max(0).pow(1.4).mul(0.95).add(0.55),
-    );
+    // Lit star: limb darkening + slowly drifting fractal granulation (TSL
+    // noise on the sphere's local normal) + a hot white-ish core.
+    {
+      const limb = normalView.z.max(0);
+      const grain = mx_fractal_noise_float(
+        normalLocal.mul(5.5).add(vec3(this.sunTime.mul(0.00012), 0, 0)),
+        2,
+        2,
+        0.5,
+      );
+      const surface = materialColor
+        .mul(limb.pow(0.9).mul(0.75).add(0.35))
+        .mul(grain.mul(0.35).add(1));
+      this.sunMat.colorNode = surface.add(
+        vec3(1, 0.95, 0.85).mul(limb.pow(6).mul(0.35)),
+      );
+    }
     this.sunMat.fog = false;
     this.polarisMat.colorNode = texture(this.glowTex).mul(
       vec4(materialColor, 1),
@@ -625,6 +730,7 @@ export class OrreryScene3D {
     this.ambient.color.copy(color(colors.textPrimary));
     this.polarisMat.color.copy(color(colors.textPrimary));
     this.focusMat.color.copy(color(colors.accent));
+    this.planeMat.color.copy(color(colors.accent));
   }
 
   setFontProvider(fontProvider: SkTypefaceFontProvider | null) {
@@ -742,6 +848,8 @@ export class OrreryScene3D {
     this.fog.far = dolly + FOG_FAR_EXTENTS * Math.max(1, packet.extent);
     this.ringFadeNear.value = dolly;
     this.ringFadeFar.value = dolly + 1.2 * Math.max(1, packet.extent);
+    this.plane.scale.setScalar(PLANE_DISC_EXTENTS * Math.max(1, packet.extent));
+    this.sunTime.value = reducedMotion ? 0 : timeMs;
     const viewInverse = this.camera.matrixWorldInverse;
     // Sun position for billboard shading (pre-pass; it may sit anywhere).
     let sunX = 0;
@@ -782,6 +890,7 @@ export class OrreryScene3D {
         const glowToken =
           info?.glow ?? this.colors.starPalette[0] ?? this.colors.accent;
         this.sunMat.color.copy(color(glowToken));
+        this.sunRim.value.copy(color(glowToken));
         this.glowMat.color.copy(color(glowToken));
         const pulse = reducedMotion ? 0 : Math.sin(timeMs * SUN_PULSE_SPEED);
         this.glow.visible = opacity > 0.01;
@@ -1021,6 +1130,8 @@ export class OrreryScene3D {
 
   /** Release every GPU/CPU resource this scene created. */
   dispose() {
+    this.plane.geometry.dispose();
+    this.planeMat.dispose();
     if (this.disposed) return;
     this.disposed = true;
     for (const [id, entry] of this.labels) this.dropLabel(id, entry);
