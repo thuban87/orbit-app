@@ -265,7 +265,9 @@ function harness() {
               OrreryClusterPanel: "Panel",
               CLUSTER_OBSTACLE: "orrery-cluster-panel",
             };
-          if (id.includes("OrreryWorld")) return { OrreryWorld: "World" };
+          // Lab C: the screen renders OrreryWorld3D behind LAB_C_TRUE_3D (same props).
+          if (id.includes("OrreryWorld"))
+            return { OrreryWorld: "World", OrreryWorld3D: "World" };
           if (id.includes("/theme"))
             return { useTheme: () => ({ colors: {} }), SPACING: {} };
           return new Proxy(

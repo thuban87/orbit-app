@@ -211,6 +211,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // permission.
     const releaseOverlayPermissionPlugin =
       "./plugins/withReleaseOnlyOverlayPermissionRemoval";
+    // ORRERY LAB C: react-native-webgpu's Android C++ needs minSdk 26.
+    const labCMinSdkPlugin = "./plugins/withLabCMinSdk";
 
     return [
       ...stringPlugins.filter(
@@ -221,7 +223,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
           pluginName(p) !== bootReceiverPlugin &&
           pluginName(p) !== backupRestoreSharePlugin &&
           pluginName(p) !== contactPickerPermissionPlugin &&
-          pluginName(p) !== releaseOverlayPermissionPlugin,
+          pluginName(p) !== releaseOverlayPermissionPlugin &&
+          pluginName(p) !== labCMinSdkPlugin,
       ),
       pickerPlugin,
       shareIntentPlugin,
@@ -230,6 +233,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backupRestoreSharePlugin,
       contactPickerPermissionPlugin,
       releaseOverlayPermissionPlugin,
+      labCMinSdkPlugin,
     ];
   })(),
 });

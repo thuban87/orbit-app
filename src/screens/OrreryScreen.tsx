@@ -38,6 +38,7 @@ import { OrreryFocusContext } from "@/components/orrery/OrreryFocusContext";
 import { OrrerySystemSelector } from "@/components/orrery/OrrerySystemSelector";
 import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
 import { OrreryWorld } from "@/components/orrery/OrreryWorld";
+import { OrreryWorld3D } from "@/components/orrery/OrreryWorld3D";
 import { companionAction } from "@/components/orrery/orrery-companion-logic";
 import { systemEmptyCopy } from "@/components/orrery/orrery-controls-logic";
 import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
@@ -114,6 +115,10 @@ import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
+
+/** ORRERY LAB C: true-3D renderer (three.js WebGPU) instead of the Skia world. */
+const LAB_C_TRUE_3D = true;
+const World = LAB_C_TRUE_3D ? OrreryWorld3D : OrreryWorld;
 
 const acknowledgeReorder = () => {
   void Haptics.selectionAsync().catch(() => {});
@@ -1046,7 +1051,7 @@ export function OrreryScreen() {
         onLayout={canvasMeasurement.onLayout}
       >
         {visible && sessionReady && scene ? (
-          <OrreryWorld
+          <World
             scene={scene}
             camera={camera}
             pose={pose}
