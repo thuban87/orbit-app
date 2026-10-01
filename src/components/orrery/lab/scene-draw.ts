@@ -35,7 +35,7 @@ import type {
   SkShader,
 } from "@shopify/react-native-skia";
 import { Skia } from "@shopify/react-native-skia";
-import type { CameraPose } from "@/logic/orrery-camera-logic";
+import { type CameraPose, RING_SEGMENTS } from "@/logic/orrery-camera-logic";
 import {
   type AnimatedFrame,
   type AnimatedFrameBody,
@@ -96,7 +96,9 @@ import {
   type BodyLightMap,
   bodyDepthScale,
   bodyVisualScale,
+  mapHomography,
   moonVisualScale,
+  planeHomography,
   type SwitchFx,
 } from "./deep-field-math";
 
@@ -736,7 +738,20 @@ export function drawReorderGhost(
   const body = frame.bodies.find((b) => b.id === drag.id);
   if (!body) return;
   const path = Skia.Path.Make();
-  const points = body.ringPath;
+  let points: readonly { x: number; y: number }[] = body.ringPath;
+  if (!points.length && body.ringRadius > 0) {
+    // Lab frames carry no ring polygons (camera perf pass): project the same
+    // RING_SEGMENTS-gon from the exact homography (only while dragging).
+    const H = planeHomography(frame.pose, frame.viewport);
+    const R = body.ringRadius / (frame.pose.zoom > 0 ? frame.pose.zoom : 1);
+    const ring: { x: number; y: number }[] = [];
+    for (let i = 0; i < RING_SEGMENTS; i++) {
+      const t = (i * 2 * Math.PI) / RING_SEGMENTS;
+      const p = mapHomography(H, R * Math.sin(t), -R * Math.cos(t));
+      ring.push({ x: p.x, y: p.y });
+    }
+    points = ring;
+  }
   if (points.length) {
     path.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++)

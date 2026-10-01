@@ -116,6 +116,8 @@ it("the emitted projection closure settles after publication under the installed
     level: cell("overview"),
     viewport: { width: 400, height: 700 },
     sceneGeneration: 7,
+    // Camera perf pass: a plain boolean (Lab renderer → no ring polygons).
+    ringPaths: true,
     memberIdentities: [],
     satellites: [],
     camera: { reorder, frame: published },

@@ -565,11 +565,19 @@ function projectWithBasis(
     y: basis.center.y + planeY * basis.cosTilt * scale,
   };
 }
+/**
+ * ORRERY LAB A (camera perf pass): `ringPaths = false` leaves every
+ * `ringPath` EMPTY. The 128-point ring polygons were ~88 % of the frame
+ * worklet; the Lab renderer draws rings from world geometry under the
+ * homography and never reads them. The legacy renderer keeps the default.
+ * Positions, radii, depth and hit data are identical either way.
+ */
 export function projectFrame(
   world: readonly WorldBody[],
   pose: CameraPose,
   viewport: CameraViewport,
   generation: number,
+  ringPaths = true,
 ): ProjectedFrame {
   "worklet";
   const current = clampCameraPose(
@@ -589,7 +597,7 @@ export function projectFrame(
     bodies: world.map((body) => {
       const scale = current.zoom * perspectiveScale(body, current);
       const ringPath: WorldPoint[] = [];
-      if (body.ringRadius > 0)
+      if (ringPaths && body.ringRadius > 0)
         for (let i = 0; i < RING_SEGMENTS; i++) {
           const angle = (i * 2 * Math.PI) / RING_SEGMENTS;
           ringPath.push(

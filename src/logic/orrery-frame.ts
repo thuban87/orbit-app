@@ -163,10 +163,18 @@ export function projectAnimatedFrame(
   fraction: number,
   pose: CameraPose,
   viewport: CameraViewport,
+  /** Lab A camera perf pass: false → empty `ringPath`s (see projectFrame). */
+  ringPaths = true,
 ): AnimatedFrame {
   "worklet";
   const world = sampleWorldTransition(transition, fraction);
-  const frame = projectFrame(world, pose, viewport, transition.generation);
+  const frame = projectFrame(
+    world,
+    pose,
+    viewport,
+    transition.generation,
+    ringPaths,
+  );
   const bodies = frame.bodies.map((body, index) => {
     const opacity = world[index].opacity;
     // Halo-aware media culling only. The full frame remains the hit authority.

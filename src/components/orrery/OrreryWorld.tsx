@@ -299,6 +299,11 @@ export function OrreryWorld({
       })),
     [scene.systemSnapshot.members],
   );
+  // ORRERY LAB A: runtime A/B (experiment-only store; see lab/deep-field-mode).
+  const deepFieldOn = useDeepFieldEnabled();
+  // Camera perf pass: only the legacy renderer reads the frame's 128-point
+  // ring polygons; the Lab renderer draws rings from world geometry.
+  const ringPaths = !deepFieldOn;
   const frame = useDerivedValue(() => {
     const sampled = sampleSwitchChoreography(
       switchTransition.value,
@@ -334,6 +339,7 @@ export function OrreryWorld({
       1,
       sampledCamera,
       viewport,
+      ringPaths,
     );
   });
   // Body/moon billboards read one small per-frame map (perf pass).
@@ -349,8 +355,6 @@ export function OrreryWorld({
   // the switch runtime (separate mappers: the frame worklet's closure is
   // not widened — see orrery-frame-mapper.test).
   const deepInk = useMemo(() => resolveDeepFieldInk(colors), [colors]);
-  // ORRERY LAB A: runtime A/B (experiment-only store; see lab/deep-field-mode).
-  const deepFieldOn = useDeepFieldEnabled();
   const reducedMotion = useReducedMotionShared();
   const switchFx = useDerivedValue(() =>
     computeSwitchFx(

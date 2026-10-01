@@ -391,9 +391,11 @@ export function makePlaneShapes(): PlaneShapes | null {
  */
 export function minRadialScale(H: readonly number[], R: number): number {
   "worklet";
+  // 8 samples: within ~3.5 % of the true minimum on legal poses (pinned in
+  // world-plane-camera.test); BAND_MARGIN covers the rest.
   let low = Infinity;
-  for (let i = 0; i < 24; i++) {
-    const a = (i * TAU) / 24;
+  for (let i = 0; i < 8; i++) {
+    const a = (i * TAU) / 8;
     const dx = Math.sin(a);
     const dy = -Math.cos(a);
     const px = R * dx;
@@ -427,6 +429,44 @@ export function ringBand(
   const eps = (half / scale / R) * BAND_MARGIN;
   for (let k = 0; k < BAND_EPS.length; k++) if (BAND_EPS[k] >= eps) return k;
   return -1;
+}
+
+/** Perimeter of a closed polygon (screen px). */
+function perimeter(points: readonly SkPoint[]): number {
+  "worklet";
+  let total = 0;
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    total += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return total;
+}
+
+/**
+ * Screen perimeter of the projected ring (dash count): the frame's ringPath
+ * when it carries one, else a 32-gon projected here (the Lab frame omits
+ * ring polygons — camera perf pass; the 32-gon is within 0.2 % of the
+ * 128-gon, so the dash count only differs right at a rounding boundary).
+ */
+export function ringPerimeter(
+  H: readonly number[],
+  R: number,
+  ringPath: readonly SkPoint[],
+): number {
+  "worklet";
+  if (ringPath.length >= 3) return perimeter(ringPath);
+  let total = 0;
+  let px = 0;
+  let py = 0;
+  for (let i = 0; i <= 32; i++) {
+    const a = (i * TAU) / 32;
+    const p = mapHomography(H, R * Math.sin(a), -R * Math.cos(a));
+    if (i > 0) total += Math.hypot(p.x - px, p.y - py);
+    px = p.x;
+    py = p.y;
+  }
+  return total;
 }
 
 /** RING_WORLD_SKSL uniforms, declaration order (36 floats). */
@@ -532,18 +572,6 @@ function worldCircle(
   b.addPath(unit, circleMatrix(H, cx, cy, r) as never);
   b.setIsVolatile(true);
   return b.build();
-}
-
-/** Perimeter of a closed polygon (screen px). */
-function perimeter(points: readonly SkPoint[]): number {
-  "worklet";
-  let total = 0;
-  for (let i = 0; i < points.length; i++) {
-    const a = points[i];
-    const b = points[(i + 1) % points.length];
-    total += Math.hypot(b.x - a.x, b.y - a.y);
-  }
-  return total;
 }
 
 /** GRID_SKSL uniforms, declaration order (26 floats). */
@@ -969,7 +997,7 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
     const body = frame.bodies[bi];
     if (body.opacity <= 0) continue;
     const ringR = body.ringRadius / zoom;
-    if (!(ringR > 0) || body.ringPath.length < 3) continue;
+    if (!(ringR > 0) || (!shapes && body.ringPath.length < 3)) continue;
     const role = fx.active && bi < fx.roles.length ? fx.roles[bi] : -1;
     let drawOn = 1;
     if (role === FX_ROLE_ENTERING) {
@@ -990,10 +1018,11 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
       litMix,
     );
     const nearColor = mixInk(hairColor, ring.color, RING_NEAR_TINT);
-    const far = mapHomography(H, -nearX * ringR, -nearY * ringR);
-    const nearP = mapHomography(H, nearX * ringR, nearY * ringR);
     const dashes = dashed
-      ? Math.max(4, Math.round(perimeter(body.ringPath) / (RING_DASH * 2)))
+      ? Math.max(
+          4,
+          Math.round(ringPerimeter(H, ringR, body.ringPath) / (RING_DASH * 2)),
+        )
       : 0;
     // Ink-in reveal: clockwise from north (where interval progress starts).
     let north = 0;
@@ -1074,6 +1103,8 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
       canvas.restore();
       continue;
     }
+    const far = mapHomography(H, -nearX * ringR, -nearY * ringR);
+    const nearP = mapHomography(H, nearX * ringR, nearY * ringR);
     // The ring polygon = the frame's ringPath (same vertices), mapped natively.
     const ringPoly = shapes
       ? worldCircle(H, shapes, 0, 0, ringR, RING_SEGMENTS)
@@ -1171,7 +1202,6 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
       }
     }
   }
-
   // 5 · Moon orbit hairlines: each visible satellite's own small orbit
   // around its parent, on the plane (so it foreshortens with the tilt).
   const moonPaint = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
@@ -1212,7 +1242,7 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
     if (b.kind !== "contact" || b.opacity <= 0 || !b.visible) continue;
     if (mounted[keys[i]]) continue;
     // Its orbit as a neutral hairline (status ink arrives with the mount).
-    if (b.ringPath.length >= 3) {
+    if (shapes ? b.ringRadius > 0 : b.ringPath.length >= 3) {
       ghostRing.setColor(
         withAlpha(ink.grid, GHOST_RING_ALPHA * hairAlpha * b.opacity),
       );

@@ -80,6 +80,7 @@ import {
   minRadialScale,
   type PlaneRing,
   ringBand,
+  ringPerimeter,
   ringWorldUniforms,
 } from "./world-plane";
 
@@ -179,7 +180,7 @@ describe("world-space plane matrix (homography)", () => {
         low = Math.min(low, Math.hypot(p1.x - p0.x, p1.y - p0.y) / h);
       }
       const sampled = minRadialScale(H, R);
-      // 24 samples: within a few % of the true minimum (BAND_MARGIN covers it).
+      // 8 samples: within a few % of the true minimum (BAND_MARGIN covers it).
       expect(sampled).toBeGreaterThanOrEqual(low * 0.999);
       expect(sampled).toBeLessThan(low * 1.08);
     }
@@ -337,5 +338,59 @@ describe("world-space draw path", () => {
     expect(calls.some((c) => c.op === "drawPath" && c.paint?.style === 1)).toBe(
       false,
     );
+  });
+});
+
+describe("Lab frames without ring polygons (camera perf pass)", () => {
+  const world = [0, 1, 2].map((i) => ({
+    id: i + 1,
+    kind: "contact" as const,
+    radius: 12,
+    ringRadius: 90 + 50 * i,
+    x: (90 + 50 * i) * Math.sin(i + 0.3),
+    y: -(90 + 50 * i) * Math.cos(i + 0.3),
+    opacity: 1,
+    interactive: true,
+  }));
+  const pose = poses[1];
+
+  it("keeps every position, radius, depth and hit radius; only ringPath is empty", () => {
+    const full = projectAnimatedFrame(
+      { generation: 1, from: world, to: world },
+      1,
+      pose,
+      viewport,
+    );
+    const lab = projectAnimatedFrame(
+      { generation: 1, from: world, to: world },
+      1,
+      pose,
+      viewport,
+      false,
+    );
+    expect(lab.pose).toEqual(full.pose);
+    lab.bodies.forEach((b, i) => {
+      expect(b.ringPath).toEqual([]);
+      expect({ ...b, ringPath: [] }).toEqual({
+        ...full.bodies[i],
+        ringPath: [],
+      });
+    });
+  });
+
+  it("dash count perimeter matches the 128-gon within 0.5 %", () => {
+    const full = projectAnimatedFrame(
+      { generation: 1, from: world, to: world },
+      1,
+      pose,
+      viewport,
+    );
+    const H = planeHomography(full.pose, viewport);
+    for (const b of full.bodies) {
+      const R = b.ringRadius / full.pose.zoom;
+      const exact = ringPerimeter(H, R, b.ringPath);
+      const lab = ringPerimeter(H, R, []);
+      expect(Math.abs(lab - exact) / exact).toBeLessThan(0.005);
+    }
   });
 });
