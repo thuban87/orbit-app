@@ -67,8 +67,9 @@ import {
 import type { ThemePalette } from "@/theme/theme-types";
 import { useStreakTexture } from "./LabSwitchFx";
 import {
-  type LabRenderContextValue,
+  type LabStillContext,
   useLabRenderContext,
+  useLabStillContext,
 } from "./labb-context";
 import { getLabEffect } from "./labb-effects";
 import { VIGNETTE_FOCUS } from "./labb-focus-logic";
@@ -183,7 +184,7 @@ const FAR_STREAK_SCALE = 0.55;
  * WP-2.1 hyperspace warp for the sky, 0 at rest: the switch signal's warp when
  * the streak effect is on and the switch is live (never under reduced motion).
  */
-function skyWarp(ctx: LabRenderContextValue | null): number {
+function skyWarp(ctx: LabStillContext | null): number {
   "worklet";
   if (!ctx?.sw) return 0;
   const flags = ctx.fxFlags.value.flags;
@@ -319,8 +320,9 @@ function useNebulaUniforms(
   st: NebulaStatic,
   withTexSize: boolean,
 ) {
-  const ctx = useLabRenderContext();
-  const ambient = ctx?.ambient;
+  const full = useLabRenderContext();
+  const ctx = full?.still ?? null;
+  const ambient = full?.ambient;
   const fxFlags = ctx?.fxFlags;
   const reducedMotion = ctx?.reducedMotion;
   return useDerivedValue(() => {
@@ -553,8 +555,9 @@ function StarAtlas({
   intensity: number;
   frame: SharedValue<AnimatedFrame>;
 }) {
-  const ctx = useLabRenderContext();
-  const ambient = ctx?.ambient;
+  const full = useLabRenderContext();
+  const ctx = full?.still ?? null;
+  const ambient = full?.ambient;
   const fxFlags = ctx?.fxFlags;
   const reducedMotion = ctx?.reducedMotion;
   const count = Math.floor(field.length / STAR_STRIDE);
@@ -678,7 +681,7 @@ function StarStreakAtlas({
   additive: boolean;
   frame: SharedValue<AnimatedFrame>;
 }) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const image = useStreakTexture();
   const count = Math.floor(field.length / STAR_STRIDE);
   const places = useDerivedValue(() => {

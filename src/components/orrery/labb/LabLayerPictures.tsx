@@ -95,7 +95,7 @@ import {
   labLightDir,
   labMoonFrameUniforms,
 } from "./labb-bodies-logic";
-import { useLabRenderContext } from "./labb-context";
+import { useLabStillContext } from "./labb-context";
 import { getLabEffect, LAB_EFFECT_SOURCES } from "./labb-effects";
 import {
   focusBodyValue,
@@ -406,7 +406,7 @@ export function LabBodiesPictures({
   /** The sun component(s), drawn between the two depth halves. */
   sun: ReactNode;
 }) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const fxFlags = ctx?.fxFlags;
   const reducedMotion = ctx?.reducedMotion;
   const signal = ctx?.sw?.signal;
@@ -769,7 +769,7 @@ export function LabLabelsPicture({
     leaderDp: profile.leaderDp,
   };
   const r = RADII.sm;
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const focus = ctx?.focus ?? null;
   const fxFlags = ctx?.fxFlags;
   const picture = useDerivedValue(() => {

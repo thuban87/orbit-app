@@ -34,13 +34,21 @@ import {
   Shader,
   Skia,
   type SkPath,
+  type SkPicture,
   type SkRuntimeEffect,
 } from "@shopify/react-native-skia";
 import { useMemo } from "react";
-import { type SharedValue, useDerivedValue } from "react-native-reanimated";
+import {
+  type SharedValue,
+  useAnimatedReaction,
+  useDerivedValue,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import type { ProfileStatus } from "@/db/contact-status-read";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
 import type { SemanticLevel } from "@/logic/orrery-label-logic";
+import type { MotionRequest } from "@/logic/orrery-recovery-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
 import {
   type OrreryRingStyle,
@@ -51,7 +59,7 @@ import type { LabFlags } from "@/stores/orrery-labb-fx-store";
 import { type LabRingProfile, labColor } from "@/theme/orrery-lab-fx";
 import type { ThemePalette } from "@/theme/theme-types";
 import type { OrreryBodyResource } from "../use-orrery-switch-runtime";
-import { useLabRenderContext } from "./labb-context";
+import { useLabRenderContext, useLabStillContext } from "./labb-context";
 import { getLabEffect, LAB_EFFECT_SOURCES } from "./labb-effects";
 import { focusDimFactor } from "./labb-focus-logic";
 import { bodyAt, type FrameIndex } from "./labb-frame-index";
@@ -85,6 +93,12 @@ import {
 import { tokenToVec4 } from "./labb-uniforms";
 
 const IDENTITY_3X3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+/** R1 LOD: above this many rings the ambient energy flow is off (C-59). */
+export const FLOW_LOD_MAX_RINGS = 160;
+/** R1 LOD: above this many rings the progress wakes are off (C-60). */
+export const WAKE_LOD_MAX_RINGS = 160;
+/** R1: wakes fade back in over this long after a camera recovery settles. */
+const WAKE_RETURN_MS = 260;
 const EMPTY_KEYS: ReadonlySet<string> = new Set();
 /** Stable empty focus-key list (worklet capture must not change identity). */
 const NO_FOCUS_KEYS: string[] = [];
@@ -98,7 +112,6 @@ const WAKE_STROKE_SCALE = 1.6;
 /** Ring picture cull bounds (world units). */
 const RING_PICTURE_BOUNDS = 1e5;
 const RING_ORDER = uniformOrder(LAB_EFFECT_SOURCES.ringInstrument);
-const WAKE_ORDER = uniformOrder(LAB_EFFECT_SOURCES.ringWake);
 
 // ---------------------------------------------------------------------------
 // A/B baseline: WP-1.0 parity rings (per-frame 128-point Path per ring).
@@ -253,7 +266,7 @@ function RingCircle({
   /** WP-2.1: a trim ring owns this key during a switch (unwind / draw-on). */
   trimmed?: boolean;
 }) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const r = useDerivedValue(() => {
     const b = bodyAt(frame.value, frameIndex.value, identity);
     return b ? b.ringRadius / frame.value.pose.zoom : 0;
@@ -405,7 +418,7 @@ function TrimRingPicture({
   frame: SharedValue<AnimatedFrame>;
   profile: LabRingProfile;
 }) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   // key → [r, g, b, alpha, width dp] (React side, per publish).
   const spec = useMemo(() => {
     const out: Record<string, number[]> = {};
@@ -720,7 +733,7 @@ function RingClassesPicture({
   anyFocus: boolean;
   trimKeys: ReadonlySet<string>;
 }) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const fxFlags = ctx?.fxFlags;
   const reducedMotion = ctx?.reducedMotion;
   const signal = ctx?.sw?.signal;
@@ -829,40 +842,93 @@ function RingClassesPicture({
   return <Picture picture={picture} />;
 }
 
+/** One empty picture per UI runtime: returning the SAME object from a picture
+ * derived value is a no-op write (Reanimated skips identical values), so an
+ * idle layer does not notify the canvas (R1). */
+function emptyPicture(): SkPicture {
+  "worklet";
+  const g = globalThis as unknown as { __labbEmptyPicture?: SkPicture };
+  if (!g.__labbEmptyPicture) {
+    const recorder = Skia.PictureRecorder();
+    recorder.beginRecording(Skia.XYWHRect(0, 0, 1, 1));
+    g.__labbEmptyPicture = recorder.finishRecordingAsPicture();
+  }
+  return g.__labbEmptyPicture;
+}
+
+/** Floats per wake in the flat uniform block (uColor, uWake, uCam). */
+const WAKE_FLOATS = 12;
+
+/**
+ * Progress wakes: ONE picture, one `ringWake` shader per ring. R1 cost work
+ * (the wake picture was the top per-frame recorder at 400 rings: ~34 ms per
+ * pan frame, ~40 ms per fly-in frame on the emulator):
+ * - `cam` no longer changes on a pure pan (primitive derived values), so a pan
+ *   does not re-record;
+ * - while the camera RECOVERS (focus fly-in, recentre, north) the wakes are
+ *   hidden and the layer returns one shared empty picture; they fade back in
+ *   (Group opacity, no re-record) once it settles (C-60);
+ * - density LOD: no wakes above `WAKE_LOD_MAX_RINGS` (C-60);
+ * - static uniforms are pre-flattened per wake (React side); the worklet patches
+ *   the 4 camera floats into one scratch array instead of building an object
+ *   + 4 arrays per ring per frame.
+ */
 function WakesPicture({
   classes,
   frame,
   cam,
   profile,
   settled,
+  moving,
 }: {
   classes: readonly (readonly LabRingEntry[])[];
   frame: SharedValue<AnimatedFrame>;
   cam: SharedValue<number[]>;
   profile: LabRingProfile;
   settled: SharedValue<number>;
+  /** 1 while the camera recovers (wakes hidden), else 0. */
+  moving: SharedValue<number>;
 }) {
   const effect = getLabEffect("ringWake");
-  const wakes = useMemo(
-    () =>
-      classes
-        .filter((group) => group[0].cls.wake)
-        .flatMap((group) =>
-          group
-            .filter((e) => wakeAngle(e.x, e.y) > 1e-3)
-            .map((e) => ({
-              color: tokenToVec4(e.cls.color),
-              alpha: profile.wakeAlpha * e.cls.alpha,
-              angle: wakeAngle(e.x, e.y),
-              ringRadius: e.ringRadius,
-            })),
-        ),
-    [classes, profile.wakeAlpha],
-  );
+  const block = useMemo(() => {
+    const out: number[] = [];
+    let n = 0;
+    for (const group of classes) {
+      if (!group[0].cls.wake) continue;
+      for (const e of group) {
+        const angle = wakeAngle(e.x, e.y);
+        if (!(angle > 1e-3)) continue;
+        // Same layout as flattenUniforms(wakeUniforms(…), WAKE_ORDER).
+        const c = tokenToVec4(e.cls.color);
+        out.push(
+          c[0],
+          c[1],
+          c[2],
+          profile.wakeAlpha * e.cls.alpha,
+          angle,
+          e.ringRadius,
+          0, // half width (world) — per frame
+          profile.farAlpha,
+          0, // cam cos yaw — per frame
+          0, // cam sin yaw
+          0, // cam tilt depth
+          0,
+        );
+        n += 1;
+      }
+    }
+    return { floats: out, count: n };
+  }, [classes, profile.wakeAlpha, profile.farAlpha]);
+  const floats = block.floats;
+  const count = block.count;
   const widthDp = profile.wakeWidthDp;
-  const farAlpha = profile.farAlpha;
   const picture = useDerivedValue(() => {
     const probe = probeStart();
+    const op = settled.value;
+    if (!effect || count === 0 || !(op > 0) || moving.value > 0) {
+      probeEnd("wakes", probe);
+      return emptyPicture();
+    }
     const recorder = Skia.PictureRecorder();
     const canvas = recorder.beginRecording(
       Skia.XYWHRect(
@@ -872,36 +938,24 @@ function WakesPicture({
         RING_PICTURE_BOUNDS * 2,
       ),
     );
-    const op = settled.value;
-    if (effect && op > 0 && wakes.length > 0) {
-      const c = cam.value;
-      const paint = Skia.Paint();
-      paint.setAntiAlias(true);
-      paint.setStyle(1);
-      paint.setStrokeWidth(
-        (widthDp * WAKE_STROKE_SCALE) / frame.value.pose.zoom,
-      );
-      paint.setAlphaf(Math.min(1, op));
-      for (let i = 0; i < wakes.length; i++) {
-        const w = wakes[i];
-        paint.setShader(
-          effect.makeShader(
-            flattenUniforms(
-              wakeUniforms(
-                w.color,
-                w.alpha,
-                w.angle,
-                w.ringRadius,
-                widthDp,
-                farAlpha,
-                c,
-              ),
-              WAKE_ORDER,
-            ),
-          ),
-        );
-        canvas.drawCircle(0, 0, w.ringRadius, paint);
-      }
+    const c = cam.value;
+    const zoom = Math.max(c[3], 1e-4);
+    const half = widthDp / 2 / zoom;
+    const paint = Skia.Paint();
+    paint.setAntiAlias(true);
+    paint.setStyle(1);
+    paint.setStrokeWidth((widthDp * WAKE_STROKE_SCALE) / frame.value.pose.zoom);
+    paint.setAlphaf(Math.min(1, op));
+    const u: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    for (let i = 0; i < count; i++) {
+      const o = i * WAKE_FLOATS;
+      for (let k = 0; k < WAKE_FLOATS; k++) u[k] = floats[o + k];
+      u[6] = half;
+      u[8] = c[0];
+      u[9] = c[1];
+      u[10] = c[2];
+      paint.setShader(effect.makeShader(u));
+      canvas.drawCircle(0, 0, floats[o + 5], paint);
     }
     const wakesPicture = recorder.finishRecordingAsPicture();
     probeEnd("wakes", probe);
@@ -932,6 +986,7 @@ export function LabRings({
   reorder,
   trimKeys = EMPTY_KEYS,
   picture = false,
+  cameraActive,
 }: {
   resources: readonly OrreryBodyResource[];
   frame: SharedValue<AnimatedFrame>;
@@ -949,8 +1004,10 @@ export function LabRings({
   trimKeys?: ReadonlySet<string>;
   /** Switch-stall fix: class rings + wakes as one picture each. */
   picture?: boolean;
+  /** R1: the camera's running recovery (wakes hide while it flies). */
+  cameraActive?: SharedValue<MotionRequest | null>;
 }) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const entries = useMemo(
     () => labRingEntries(resources, colors, focusedIds),
     [resources, colors, focusedIds],
@@ -971,16 +1028,38 @@ export function LabRings({
     () =>
       planeHomography(frame.value.pose, frame.value.viewport) ?? IDENTITY_3X3,
   );
-  const cam = useDerivedValue(() => {
-    const pose = frame.value.pose;
-    const yaw = pose.yaw ?? 0;
-    return [Math.cos(yaw), Math.sin(yaw), tiltDepth(pose), pose.zoom];
-  });
+  // R1: `cam` only changes when yaw / tilt / zoom do. Primitive derived values
+  // stop the chain on a pure pan (Reanimated skips a write of an identical
+  // primitive), so the wake picture (one shader per ring) is not re-recorded
+  // on every pan frame.
+  const camYaw = useDerivedValue(() => frame.value.pose.yaw ?? 0);
+  const camTilt = useDerivedValue(() => tiltDepth(frame.value.pose));
+  const camZoom = useDerivedValue(() => frame.value.pose.zoom);
+  const cam = useDerivedValue(() => [
+    Math.cos(camYaw.value),
+    Math.sin(camYaw.value),
+    camTilt.value,
+    camZoom.value,
+  ]);
+  // The ONLY ambient-clock reader of this layer (R1: the other worklets
+  // capture the clock-free context so they do not re-run per tick).
+  const ambient = useLabRenderContext()?.ambient;
+  // R1 LOD: no energy flow on dense Systems (C-59) — the comets are clutter
+  // there and the flow alone forced a full ring-picture re-record per tick.
+  // Off, the derived value returns ONE stable array, so nothing downstream
+  // re-runs on the clock.
+  const flowLod = entries.length <= FLOW_LOD_MAX_RINGS;
+  const flowOff = useMemo(
+    () => [0, 0, profile.cometLength, profile.cometSpeed, 1, 0, 0],
+    [profile.cometLength, profile.cometSpeed],
+  );
   // [time s, flow on, comet length, comet speed, intensity]
   const flow = useDerivedValue(() => {
     const fx = ctx?.fxFlags.value;
-    const on = ctx && !ctx.reducedMotion.value && fx?.flags.ringFlow ? 1 : 0;
-    const t = on && ctx ? (ctx.ambient.value / 1000) % 1000 : 0;
+    const on =
+      flowLod && ctx && !ctx.reducedMotion.value && fx?.flags.ringFlow ? 1 : 0;
+    if (!on) return flowOff;
+    const t = on && ambient ? (ambient.value / 1000) % 1000 : 0;
     // WP-2.1 spool-up: comets ride the system spin during a switch (stateless:
     // a phase offset from the choreography's accumulated rotation).
     const signal = ctx?.sw ? ctx.sw.signal.value : null;
@@ -1011,6 +1090,21 @@ export function LabRings({
     const t = Math.max(0, Math.min(1, (p - 0.86) / 0.14));
     return t * t * (3 - 2 * t);
   });
+  // R1: wakes hide while the camera recovers (fly-in / recentre / north) and
+  // fade back in after (Group opacity: no re-record during the fade).
+  const moving = useDerivedValue<number>(() =>
+    cameraActive && cameraActive.value ? 1 : 0,
+  );
+  const wakeGate = useSharedValue(1);
+  useAnimatedReaction(
+    () => moving.value,
+    (now, before) => {
+      if (now === before) return;
+      wakeGate.value =
+        now > 0 ? 0 : withTiming(1, { duration: WAKE_RETURN_MS });
+    },
+  );
+  const wakeLod = entries.length <= WAKE_LOD_MAX_RINGS;
   const trimEntries = useMemo(
     () => entries.filter((e) => trimKeys.has(e.key)),
     [entries, trimKeys],
@@ -1071,14 +1165,17 @@ export function LabRings({
   });
   return (
     <Group matrix={matrix}>
-      {flags.ringWake && picture ? (
-        <WakesPicture
-          classes={classes}
-          frame={frame}
-          cam={cam}
-          profile={profile}
-          settled={settled}
-        />
+      {flags.ringWake && picture && wakeLod ? (
+        <Group opacity={wakeGate}>
+          <WakesPicture
+            classes={classes}
+            frame={frame}
+            cam={cam}
+            profile={profile}
+            settled={settled}
+            moving={moving}
+          />
+        </Group>
       ) : null}
       {flags.ringWake && !picture
         ? classes

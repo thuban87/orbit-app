@@ -189,9 +189,13 @@ export function LabCanvas({
       }
     },
   );
+  const still = useMemo(
+    () => ({ fxFlags, reducedMotion, warm, sw, focus }),
+    [fxFlags, reducedMotion, warm, sw, focus],
+  );
   const context = useMemo(
-    () => ({ clock, ambient, fxFlags, reducedMotion, warm, sw, focus }),
-    [clock, ambient, fxFlags, reducedMotion, warm, sw, focus],
+    () => ({ clock, ambient, still, fxFlags, reducedMotion, warm, sw, focus }),
+    [clock, ambient, still, fxFlags, reducedMotion, warm, sw, focus],
   );
   return (
     <GestureDetector gesture={gesture}>

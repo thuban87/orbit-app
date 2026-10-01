@@ -45,9 +45,28 @@ export interface LabFocusContext {
   lock: SharedValue<number>;
 }
 
+/**
+ * R1: the context WITHOUT the clocks. Reanimated subscribes a derived value to
+ * EVERY SharedValue reachable from its closure (it walks captured plain
+ * objects), so a worklet that captured the whole context re-ran on every
+ * clock tick even when it never read the clock — at idle that was the trim
+ * picture, every switch-FX state + its Atlas buffers (up to 512 sprites ×3)
+ * and the star placements, every frame. Worklets capture THIS (or single
+ * values) unless they genuinely read `ambient`.
+ */
+export interface LabStillContext {
+  fxFlags: SharedValue<LabFxSnapshot>;
+  reducedMotion: SharedValue<boolean>;
+  warm: SharedValue<boolean>;
+  sw: LabSwitchContext | null;
+  focus: LabFocusContext | null;
+}
+
 export interface LabRenderContextValue {
   clock: SharedValue<number>;
   ambient: SharedValue<number>;
+  /** The same values minus the clocks (capture this in worklets). */
+  still: LabStillContext;
   fxFlags: SharedValue<LabFxSnapshot>;
   reducedMotion: SharedValue<boolean>;
   /** True for the first WARMUP_MS after mount: every switch FX draws one
@@ -64,4 +83,9 @@ export const LabRenderContext = createContext<LabRenderContextValue | null>(
 
 export function useLabRenderContext(): LabRenderContextValue | null {
   return useContext(LabRenderContext);
+}
+
+/** The clock-free part of the context (R1; see `LabStillContext`). */
+export function useLabStillContext(): LabStillContext | null {
+  return useContext(LabRenderContext)?.still ?? null;
 }

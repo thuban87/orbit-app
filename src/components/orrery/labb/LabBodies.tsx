@@ -56,7 +56,7 @@ import {
   labSunFrameUniforms,
   SUN_REACH,
 } from "./labb-bodies-logic";
-import { useLabRenderContext } from "./labb-context";
+import { useLabRenderContext, useLabStillContext } from "./labb-context";
 import { getLabEffect } from "./labb-effects";
 import { bodyAt, type FrameIndex, labBillboard } from "./labb-frame-index";
 import {
@@ -338,7 +338,7 @@ export function LabContactBody({
   );
   const image = useOrreryPhoto(photo);
   const font = useInitialsFont(fontProvider, radius);
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const st = useBodyStatic(look, radius, identity, swatch, bodyFill, status);
   const effect =
     look?.lit && st
@@ -441,7 +441,9 @@ export function LabSunBody({
     radius,
   );
   const image = useOrreryPhoto(photo);
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
+  // The sun is an AMBIENT consumer (granulation, corona breathing, pulse).
+  const ambient = useLabRenderContext()?.ambient;
   const font = useInitialsFont(fontProvider, radius);
   const st = useMemo<LabSunStatic | null>(() => {
     if (!look) return null;
@@ -475,7 +477,7 @@ export function LabSunBody({
         : 0;
     return labSunFrameUniforms(
       bodyAt(frame.value, frameIndex.value, identity),
-      reduced || !ctx ? 0 : ctx.ambient.value,
+      reduced || !ambient ? 0 : ambient.value,
       reduced,
       st,
       fx,
@@ -483,9 +485,14 @@ export function LabSunBody({
     );
   });
   const pulse = useDerivedValue(() => {
-    if (!ctx || ctx.reducedMotion.value || !ctx.fxFlags.value.flags.sunPulse)
+    if (
+      !ctx ||
+      !ambient ||
+      ctx.reducedMotion.value ||
+      !ctx.fxFlags.value.flags.sunPulse
+    )
       return 0;
-    return Math.sin(ctx.ambient.value * PULSE_SPEED);
+    return Math.sin(ambient.value * PULSE_SPEED);
   });
   const glowR = useDerivedValue(
     () => glowRadius * (1 + PULSE_RADIUS_FRAC * pulse.value),
@@ -578,7 +585,7 @@ export function LabMoon({
     identity,
     1,
   );
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const st = useMemo<LabMoonStatic | null>(() => labMoonStatic(look), [look]);
   const shaderOn = look?.lit && look.moonShader;
   const effect = shaderOn && st ? getLabEffect("moon") : null;

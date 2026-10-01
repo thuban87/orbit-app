@@ -63,7 +63,11 @@ import { LabBRenderer, type LabTapStamp } from "./labb/LabBRenderer";
 import { probeEnd, probeStart } from "./labb/labb-perf-probe";
 import { OrbitBody } from "./OrbitBody";
 import { OrreryCanvas } from "./OrreryCanvas";
-import { OrreryLabel, prepareOrreryText } from "./OrreryLabel";
+import {
+  OrreryLabel,
+  type PreparedOrreryText,
+  prepareOrreryText,
+} from "./OrreryLabel";
 import { Polaris } from "./Polaris";
 import { ProjectedOrbitRing } from "./ProjectedOrbitRing";
 import { SatelliteBody } from "./SatelliteBody";
@@ -281,6 +285,7 @@ export function OrreryWorld({
       switchTransition.value,
       switchProgress.value,
     ).world;
+    probeEnd("f.sample", probe);
     const sampledCamera =
       switchProgress.value >= 1
         ? pose.value
@@ -302,6 +307,7 @@ export function OrreryWorld({
       semanticLevel(sampledCamera.zoom, level.value),
     );
     const completeWorld = [...world, ...moons];
+    probeEnd("f.moons", probe);
     const projected = projectAnimatedFrame(
       {
         generation: switchTransition.value.generation,
@@ -333,70 +339,104 @@ export function OrreryWorld({
     () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],
     [colors],
   );
-  const labels = useMemo(
-    () =>
-      scene.world.flatMap((body) => {
-        if (body.id === 0) return [];
-        const member = scene.systemSnapshot.members.find(
-          (c) => c.id === body.id,
-        );
-        const name =
-          member?.name ??
-          (body.kind === "sun" ? scene.sun.sunContactName : undefined);
-        if (name === undefined) return [];
-        const focused = focusedIds.length === 1 && focusedIds[0] === body.id;
-        // D-11: nonmember global sun keeps identity, but no relationship context.
-        const context = labelContext(
-          member
-            ? member.status
-            : body.kind === "sun"
-              ? scene.sun.occupant?.status
-              : undefined,
-          scene.gravity.get(body.id),
-          focused && member ? focusedRelationById[body.id] : undefined,
-        );
-        const width = Math.min(LABEL_MAX_WIDTH * fontScale, viewport.width);
-        const text = prepareOrreryText(
+  // ORRERY LAB B R1 (perf + stability, no semantic change): prepared label
+  // paragraphs are CACHED by (role, text, width) for the current font provider,
+  // colours and font scale. Every focus / cluster / scene change used to
+  // rebuild a Skia Paragraph for EVERY label (≈1 900 at 940 bodies, ~2 s of JS
+  // in debug); that churn of RN Skia host objects on the JS thread is what
+  // crashed Hermes (SIGSEGV in JsiHostObject::get → createFromHostFunction)
+  // when an 800+ System mounted or focused (research/R1-REPORT.md §crash).
+  const textCache = useRef<{
+    provider: SkTypefaceFontProvider | null;
+    colors: ThemePalette | null;
+    fontScale: number;
+    map: Map<string, PreparedOrreryText | null>;
+  }>({ provider: null, colors: null, fontScale: 0, map: new Map() });
+  const labels = useMemo(() => {
+    const cache = textCache.current;
+    if (
+      cache.provider !== fontProvider ||
+      cache.colors !== colors ||
+      cache.fontScale !== fontScale
+    )
+      textCache.current = {
+        provider: fontProvider,
+        colors,
+        fontScale,
+        map: new Map(),
+      };
+    const textMap = textCache.current.map;
+    const used = new Set<string>();
+    const prepared = (
+      text: string,
+      role: "label" | "caption",
+      width: number,
+    ): PreparedOrreryText | null => {
+      const key = `${role}|${width}|${text}`;
+      used.add(key);
+      if (textMap.has(key)) return textMap.get(key) ?? null;
+      const made = prepareOrreryText(
+        text,
+        role,
+        fontScale,
+        width,
+        fontProvider,
+        colors,
+      );
+      textMap.set(key, made);
+      return made;
+    };
+    const memberById = new Map(
+      scene.systemSnapshot.members.map((m) => [m.id, m] as const),
+    );
+    const out = scene.world.flatMap((body) => {
+      if (body.id === 0) return [];
+      const member = memberById.get(body.id);
+      const name =
+        member?.name ??
+        (body.kind === "sun" ? scene.sun.sunContactName : undefined);
+      if (name === undefined) return [];
+      const focused = focusedIds.length === 1 && focusedIds[0] === body.id;
+      // D-11: nonmember global sun keeps identity, but no relationship context.
+      const context = labelContext(
+        member
+          ? member.status
+          : body.kind === "sun"
+            ? scene.sun.occupant?.status
+            : undefined,
+        scene.gravity.get(body.id),
+        focused && member ? focusedRelationById[body.id] : undefined,
+      );
+      const width = Math.min(LABEL_MAX_WIDTH * fontScale, viewport.width);
+      const text = prepared(name, "label", width);
+      if (!text) return [];
+      return [
+        {
+          id: bodyKey(body),
           name,
-          "label",
-          fontScale,
-          width,
-          fontProvider,
-          colors,
-        );
-        if (!text) return [];
-        return [
-          {
-            id: bodyKey(body),
-            name,
-            text,
-            context: context
-              ? prepareOrreryText(
-                  context,
-                  "caption",
-                  fontScale,
-                  width,
-                  fontProvider,
-                  colors,
-                )
-              : null,
-            focused,
-            cluster: clusterIds.includes(body.id),
-            favorite: member?.favourite_rank != null,
-          },
-        ];
-      }),
-    [
-      scene,
-      colors,
-      fontProvider,
-      fontScale,
-      viewport.width,
-      focusedIds,
-      clusterIds,
-      focusedRelationById,
-    ],
-  );
+          text,
+          context: context ? prepared(context, "caption", width) : null,
+          focused,
+          cluster: clusterIds.includes(body.id),
+          favorite: member?.favourite_rank != null,
+        },
+      ];
+    });
+    // Drop paragraphs no label uses any more (left to GC, never disposed:
+    // an older render's canvas may still hold them for a frame).
+    for (const key of [...textMap.keys()])
+      if (!used.has(key)) textMap.delete(key);
+    return out;
+  }, [
+    scene,
+    colors,
+    fontProvider,
+    fontScale,
+    viewport.width,
+    focusedIds,
+    clusterIds,
+    focusedRelationById,
+  ]);
   // Share only plain measured data; native paragraph/font resources stay off worklets.
   const measured = useMemo(
     () =>
@@ -423,8 +463,18 @@ export function OrreryWorld({
   const allocations = useDerivedValue(() => {
     const probe = probeStart();
     const current = frame.value;
+    // ORRERY LAB B R1 (perf only): one key → body index per run instead of a
+    // `bodies.find(bodyKey…)` per label — O(N²) key builds (JSON for moons)
+    // per frame-change, the dominant allocation cost at 400–800 bodies.
+    // First match wins, exactly like `find`.
+    const byKey: Record<string, number> = {};
+    for (let i = 0; i < current.bodies.length; i++) {
+      const k = bodyKey(current.bodies[i]);
+      if (byKey[k] === undefined) byKey[k] = i;
+    }
     const candidates = measured.flatMap((label) => {
-      const body = current.bodies.find((b) => bodyKey(b) === label.id);
+      const at = byKey[label.id];
+      const body = at === undefined ? undefined : current.bodies[at];
       return body?.visible && body.interactive
         ? [
             {

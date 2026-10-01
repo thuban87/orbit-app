@@ -23,6 +23,10 @@ export function labAmbientNeeded(
   flags: LabFlags,
   reducedMotion: boolean,
   profile: Pick<LabFxProfile, "env" | "rings">,
+  /** Contact rings in the scene (the flow has a density LOD). */
+  ringCount = 0,
+  /** `FLOW_LOD_MAX_RINGS` (passed in: this module stays Skia-free). */
+  flowLodMaxRings = Number.POSITIVE_INFINITY,
 ): boolean {
   if (reducedMotion || flags.freezeClock) return false;
   if (flags.environment) {
@@ -34,7 +38,8 @@ export function labAmbientNeeded(
     !flags.ringsPathRebuild &&
     flags.ringShader &&
     flags.ringFlow &&
-    profile.rings.flow > 0
+    profile.rings.flow > 0 &&
+    ringCount <= flowLodMaxRings
   )
     return true;
   if (flags.bodies) {

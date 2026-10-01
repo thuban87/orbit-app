@@ -127,7 +127,7 @@ import {
   LabPhotoProbes,
 } from "./LabLayerPictures";
 import { LabPolaris } from "./LabPolaris";
-import { LabRings, LabRingsPathRebuild } from "./LabRings";
+import { FLOW_LOD_MAX_RINGS, LabRings, LabRingsPathRebuild } from "./LabRings";
 import {
   LabSwitchOver,
   LabSwitchUnder,
@@ -375,8 +375,22 @@ function LabBRendererImpl(contract: LabRenderContract) {
   // R1 idle mode: pause the ONE clock when nothing ambient animates (reduced
   // motion, or every ambient effect off). React-side inputs only.
   const reducedMotionState = useReducedMotion();
+  const ringCount = useMemo(
+    () =>
+      resources.filter(
+        (r) => r.body.kind === "contact" && r.body.ringRadius > 0,
+      ).length,
+    [resources],
+  );
   const ambientActive =
-    !flags.idleClock || labAmbientNeeded(flags, reducedMotionState, profile);
+    !flags.idleClock ||
+    labAmbientNeeded(
+      flags,
+      reducedMotionState,
+      profile,
+      ringCount,
+      FLOW_LOD_MAX_RINGS,
+    );
   const warmupColor = useMemo(
     () => tokenToVec4(colors.background),
     [colors.background],
@@ -631,6 +645,7 @@ function LabBRendererImpl(contract: LabRenderContract) {
               reorder={contract.reorder}
               trimKeys={trimKeys}
               picture={pictures}
+              cameraActive={contract.cameraActive}
             />
           )
         ) : null}

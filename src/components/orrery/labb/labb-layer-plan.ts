@@ -128,6 +128,25 @@ export interface HudTagPlacement {
  * leader direction). Hidden (opacity 0) when the label is not allocated —
  * exactly the legacy visibility rule.
  */
+export function hudTagFromAllocation(
+  item: LabelAllocation | undefined,
+  height: number,
+  bodyY: number | undefined,
+): HudTagPlacement {
+  "worklet";
+  const rect = item?.rect;
+  if (!rect) return { x: 0, y: 0, opacity: 0, edgeY: 0, toward: -1 };
+  const above = bodyY !== undefined && bodyY > rect.y + height / 2;
+  return {
+    x: rect.x,
+    y: rect.y,
+    opacity: item?.opacity ?? 0,
+    edgeY: above ? rect.y + height : rect.y,
+    toward: above ? 1 : -1,
+  };
+}
+
+/** `hudTagFromAllocation` for `identity` (linear lookup; component path). */
 export function hudTagPlacement(
   allocations: readonly LabelAllocation[],
   identity: string,
@@ -141,16 +160,7 @@ export function hudTagPlacement(
       item = allocations[i];
       break;
     }
-  const rect = item?.rect;
-  if (!rect) return { x: 0, y: 0, opacity: 0, edgeY: 0, toward: -1 };
-  const above = bodyY !== undefined && bodyY > rect.y + height / 2;
-  return {
-    x: rect.x,
-    y: rect.y,
-    opacity: item?.opacity ?? 0,
-    edgeY: above ? rect.y + height : rect.y,
-    toward: above ? 1 : -1,
-  };
+  return hudTagFromAllocation(item, height, bodyY);
 }
 
 export interface LabLabelDrawSpec {
@@ -192,8 +202,10 @@ export function planLabelDraws(
     if (!item) continue;
     let tag: HudTagPlacement | null = null;
     if (item.rect) {
+      // R1: the item is already in hand (was an O(labels × allocations)
+      // re-scan per label per frame-change).
       tag = hud
-        ? hudTagPlacement(allocations, spec.id, spec.h, bodyY(spec.id))
+        ? hudTagFromAllocation(item, spec.h, bodyY(spec.id))
         : {
             x: item.rect.x,
             y: item.rect.y,

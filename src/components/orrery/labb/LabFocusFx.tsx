@@ -56,7 +56,7 @@ import {
 } from "@/logic/orrery-recovery-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
 import type { LabTapStamp } from "./LabBRenderer";
-import { type LabFocusContext, useLabRenderContext } from "./labb-context";
+import { type LabFocusContext, useLabStillContext } from "./labb-context";
 import {
   bracketRadius,
   FOCUS_MIX_MS,
@@ -359,7 +359,7 @@ export function LabFocusPicture({
   accent: readonly number[];
   additive: boolean;
 }) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const focus = ctx?.focus ?? null;
   const fxFlags = ctx?.fxFlags;
   const reducedMotion = ctx?.reducedMotion;
@@ -447,7 +447,7 @@ export function LabFeedbackPicture({
   accent: readonly number[];
   additive: boolean;
 }) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const fxFlags = ctx?.fxFlags;
   const reducedMotion = ctx?.reducedMotion;
   const { tap, tapT, holdT, slotT } = feedback;

@@ -29,23 +29,31 @@ export function deriveSatelliteBodies(
 ) {
   "worklet";
   if (!enabled || level === "overview") return [];
-  const seen: string[] = [];
+  // ORRERY LAB B R1 (perf only, same result): lookups through one pass of
+  // maps instead of `members.some` + `world.find` + `seen.includes` per row
+  // (O(rows × bodies) per frame-change at identity zoom on dense Systems).
+  const memberKeys: Record<string, true> = {};
+  for (let i = 0; i < members.length; i++)
+    memberKeys[`${members[i].id}|${members[i].uid}`] = true;
+  const parents: Record<number, (typeof world)[number]> = {};
+  for (let i = 0; i < world.length; i++) {
+    const b = world[i];
+    if (
+      b.kind !== "satellite" &&
+      b.interactive !== false &&
+      parents[b.id] === undefined
+    )
+      parents[b.id] = b;
+  }
+  const seen: Record<string, true> = {};
   return [...rows]
     .sort(
       (a, b) =>
         a.parentId - b.parentId || (a.uid < b.uid ? -1 : a.uid > b.uid ? 1 : 0),
     )
     .flatMap((row) => {
-      if (
-        !members.some((p) => p.id === row.parentId && p.uid === row.parentUid)
-      )
-        return [];
-      const parent = world.find(
-        (b) =>
-          b.kind !== "satellite" &&
-          b.id === row.parentId &&
-          b.interactive !== false,
-      );
+      if (!memberKeys[`${row.parentId}|${row.parentUid}`]) return [];
+      const parent = parents[row.parentId];
       if (
         !parent ||
         ![parent.x, parent.y, parent.radius].every(Number.isFinite) ||
@@ -59,8 +67,8 @@ export function deriveSatelliteBodies(
         parentUid: row.parentUid,
       };
       const key = JSON.stringify([row.parentId, row.parentUid, row.uid]);
-      if (seen.includes(key)) return [];
-      seen.push(key);
+      if (seen[key]) return [];
+      seen[key] = true;
       let hash = 0;
       for (let i = 0; i < row.uid.length; i++)
         hash = (hash * 31 + row.uid.charCodeAt(i)) >>> 0;

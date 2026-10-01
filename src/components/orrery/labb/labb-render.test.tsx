@@ -611,10 +611,13 @@ describe("Lab B renderer tree contract", () => {
     ]);
     expect(labels.children.map((c) => c.type)).toEqual(["picture"]);
     // Under the homography: the class-ring picture + the trim picture (the
-    // wake picture needs its runtime effect: null here).
+    // wake picture needs its runtime effect: null here; R1 wraps it in its
+    // fade-gate Group, which is then empty).
     const orbit = rings.children[0];
     expect(orbit.props.matrix).toHaveProperty("value");
-    expect(orbit.children.slice(0, 2).map((c) => c.type)).toEqual([
+    expect(orbit.children[0].type).toBe("skGroup");
+    expect(orbit.children[0].children ?? []).toEqual([]);
+    expect(orbit.children.slice(1, 3).map((c) => c.type)).toEqual([
       "picture",
       "picture",
     ]);

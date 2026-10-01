@@ -154,3 +154,30 @@ describe("planLabelDraws", () => {
     expect(plan[0].tag).toMatchObject({ x: 5, y: 50, opacity: 0.8 });
   });
 });
+
+describe("R1: label plan uses the allocation in hand", () => {
+  it("hudTagFromAllocation equals hudTagPlacement for the same id", async () => {
+    const { hudTagFromAllocation, hudTagPlacement } = await import(
+      "./labb-layer-plan"
+    );
+    const allocations = [
+      {
+        id: "a",
+        name: "A",
+        rect: { x: 1, y: 2, width: 30, height: 10 },
+        opacity: 0.5,
+      },
+      {
+        id: "b",
+        name: "B",
+        rect: { x: 5, y: 50, width: 30, height: 10 },
+        opacity: 1,
+      },
+    ];
+    for (const bodyY of [undefined, 0, 80])
+      expect(hudTagFromAllocation(allocations[1], 10, bodyY)).toEqual(
+        hudTagPlacement(allocations, "b", 10, bodyY),
+      );
+    expect(hudTagFromAllocation(undefined, 10, 0).opacity).toBe(0);
+  });
+});

@@ -59,7 +59,7 @@ import {
   LAB_SPRITE_MASK_CLEAR,
   LAB_SPRITE_MASK_HALO,
 } from "@/theme/orrery-lab-fx";
-import { useLabRenderContext } from "./labb-context";
+import { useLabStillContext } from "./labb-context";
 import { getLabEffect } from "./labb-effects";
 import { bodyAt, type FrameIndex } from "./labb-frame-index";
 import { applyHomography, planeHomography } from "./labb-rings-logic";
@@ -260,7 +260,7 @@ function Shockwave({
   additive: boolean;
   highlight: number[];
 }) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const effect = getLabEffect("switchShock");
   const matrix = useDerivedValue(
     () =>
@@ -315,7 +315,7 @@ function Trails({
   highlight,
   additive,
 }: Omit<LabSwitchFxProps, "extent" | "flags">) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const image = useStreakTexture();
   const state = useDerivedValue(() => {
     const sw = ctx?.sw;
@@ -487,7 +487,7 @@ function Particles({
   highlight,
   additive,
 }: Omit<LabSwitchFxProps, "extent" | "flags">) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const image = useTexture(<FxSprites />, FX_ATLAS, []);
   const sprites = useMemo(
     () =>
@@ -612,7 +612,7 @@ function Flares({
   highlight,
   additive,
 }: Omit<LabSwitchFxProps, "extent" | "flags">) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   const image = useTexture(<FxSprites />, FX_ATLAS, []);
   // Even slots: soft glow; odd slots: 4-point glint.
   const sprites = useMemo(
@@ -782,7 +782,7 @@ export function useShockFilterUniforms(
   extent: number,
   pixelRatio: number,
 ) {
-  const ctx = useLabRenderContext();
+  const ctx = useLabStillContext();
   return useDerivedValue(() => {
     const f = frame.value;
     const sw = ctx?.sw;

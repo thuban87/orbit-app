@@ -39,6 +39,7 @@ import {
   type LabReducedMotionMode,
   useLabFxStore,
 } from "@/stores/orrery-labb-fx-store";
+import { useThemeStore } from "@/stores/theme-store";
 import type { ThemePalette } from "@/theme/theme-types";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -367,6 +368,8 @@ export interface LabCommand {
   focus?: string;
   /** R1: clear the focus (normal companion "Clear focus" path). */
   clear: boolean;
+  /** R1: in-memory theme switch `galaxy:dark` (never persisted). */
+  theme?: { pkg: "galaxy" | "standard"; mode: "light" | "dark" };
   replay: boolean;
   delay: number;
   panel?: boolean;
@@ -419,6 +422,13 @@ export function parseLabCommand(url: string): LabCommand | null {
     system: q.get("system") || undefined,
     focus: q.get("focus") || undefined,
     clear: q.get("clear") === "1",
+    theme: (() => {
+      const [pkg, mode] = (q.get("theme") ?? "").split(":");
+      return (pkg === "galaxy" || pkg === "standard") &&
+        (mode === "light" || mode === "dark")
+        ? { pkg, mode }
+        : undefined;
+    })(),
     replay: q.get("replay") === "1",
     delay: num("delay") ?? 0,
     panel: panel === undefined ? undefined : panel === "1",
@@ -479,6 +489,12 @@ export function LabBMarkerHost({
       const l = latest.current;
       const store = useLabFxStore.getState();
       if (cmd.reset) store.reset();
+      if (cmd.theme) {
+        // Session-only (the store is hydrated from app_settings at boot).
+        const theme = useThemeStore.getState();
+        theme.setPackage(cmd.theme.pkg);
+        useThemeStore.getState().setModeForActivePackage(cmd.theme.mode);
+      }
       if (cmd.renderer) store.setRenderer(cmd.renderer);
       if (cmd.rm) store.setReducedMotion(cmd.rm);
       if (cmd.intensity !== undefined) store.setIntensity(cmd.intensity);
