@@ -120,7 +120,12 @@ const ATLAS_UPLOAD_INTERVAL = 250;
 const LABEL_CACHE_MAX = 96;
 
 /** Per-body stride in `OrreryPacket.bodies`. */
-export const BODY_STRIDE = 6; // wx, wy, radius, ringRadius, opacity, kind
+export const BODY_STRIDE = 8; // wx, wy, radius, ringRadius, opacity, kind, lift, flare
+/** Capture flare (switch): additive halo size in body radii, ring width/alpha gain. */
+const FLARE_HALO_SCALE = 5;
+const FLARE_RING_WIDTH_GAIN = 2;
+const FLARE_RING_ALPHA_GAIN = 1.4;
+const FLARE_POOL = 24;
 export const KIND_CONTACT = 0;
 export const KIND_SUN = 1;
 export const KIND_SATELLITE = 2;
@@ -167,6 +172,8 @@ export interface SceneStats {
   triangles: number;
   /** Accumulated ms inside renderer.clear/render (three CPU + encode/submit). */
   drawMs: number;
+  /** Lit body spheres drawn in the last frame (instances). */
+  spheres: number;
 }
 
 const tmpMatrix = new THREE.Matrix4();
@@ -331,6 +338,12 @@ export class OrreryScene3D {
     depthTest: false,
   });
   private focusPool: THREE.Sprite[] = [];
+  private flareMat = new THREE.SpriteNodeMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  private flarePool: THREE.Sprite[] = [];
 
   // rings (one instanced draw) + labels
   private ringRadius = new THREE.InstancedBufferAttribute(
@@ -370,6 +383,7 @@ export class OrreryScene3D {
     dts: [],
     calls: 0,
     triangles: 0,
+    spheres: 0,
   };
 
   constructor(
@@ -716,6 +730,15 @@ export class OrreryScene3D {
       this.focusPool.push(s);
       this.scene.add(s);
     }
+    this.flareMat.fog = false;
+    this.flareMat.colorNode = texture(this.glowTex).mul(vec4(materialColor, 1));
+    for (let i = 0; i < FLARE_POOL; i++) {
+      const f = new THREE.Sprite(this.flareMat);
+      f.visible = false;
+      f.renderOrder = 1;
+      this.flarePool.push(f);
+      this.scene.add(f);
+    }
     this.applyColors(colors);
   }
 
@@ -730,6 +753,7 @@ export class OrreryScene3D {
     this.ambient.color.copy(color(colors.textPrimary));
     this.polarisMat.color.copy(color(colors.textPrimary));
     this.focusMat.color.copy(color(colors.accent));
+    this.flareMat.color.copy(color(colors.accent));
     this.planeMat.color.copy(color(colors.accent));
   }
 
@@ -868,6 +892,7 @@ export class OrreryScene3D {
     let ringCount = 0;
     let faceCount = 0;
     let focusUsed = 0;
+    let flareUsed = 0;
     let sunSeen = false;
     const tileUv = 1 / ATLAS_COLS;
     for (let i = 0; i < n; i++) {
@@ -878,6 +903,8 @@ export class OrreryScene3D {
       const ringRadius = bodies[o + 3];
       const opacity = bodies[o + 4];
       const kind = bodies[o + 5];
+      const lift = bodies[o + 6] ?? 0;
+      const flare = bodies[o + 7] ?? 0;
       const key = keys[i];
       const info = this.infos.get(key);
       const visibleRadius =
@@ -908,7 +935,7 @@ export class OrreryScene3D {
           .lerp(color(this.colors.textPrimary), 0.5);
       } else if (opacity > 0.01) {
         tmpMatrix.compose(
-          tmpVec.set(wx, 0, wz),
+          tmpVec.set(wx, lift, wz),
           tmpQuat.identity(),
           tmpScale.setScalar(visibleRadius),
         );
@@ -942,14 +969,17 @@ export class OrreryScene3D {
           c.r,
           c.g,
           c.b,
-          styleOpacity * opacity,
+          Math.min(
+            1,
+            styleOpacity * opacity * (1 + FLARE_RING_ALPHA_GAIN * flare),
+          ),
         );
         this.ringStyle.setXY(
           ringCount,
           style.strokeStyle === "dashed" || style.strokeStyle === "faintTrace"
             ? 1
             : 0,
-          Math.max(1, style.width),
+          Math.max(1, style.width) * (1 + FLARE_RING_WIDTH_GAIN * flare),
         );
         ringCount++;
       }
@@ -957,14 +987,14 @@ export class OrreryScene3D {
       const slot = this.slotByKey.get(key);
       if (slot !== undefined && kind !== KIND_SATELLITE && opacity > 0.01) {
         const dir = tmpScale
-          .set(camPos.x - wx, camPos.y, camPos.z - wz)
+          .set(camPos.x - wx, camPos.y - lift, camPos.z - wz)
           .normalize();
-        const lift = visibleRadius * 1.02;
+        const out = visibleRadius * 1.02;
         this.facePos.setXYZ(
           faceCount,
-          wx + dir.x * lift,
-          dir.y * lift,
-          wz + dir.z * lift,
+          wx + dir.x * out,
+          lift + dir.y * out,
+          wz + dir.z * out,
         );
         this.faceScale.setX(
           faceCount,
@@ -997,10 +1027,20 @@ export class OrreryScene3D {
       ) {
         const s = this.focusPool[focusUsed++];
         s.visible = true;
-        s.position.set(wx, 0, wz);
+        s.position.set(wx, lift, wz);
         s.scale.setScalar((radius + FOCUS_RING_GAP_PX / zoom) * 2.25);
       }
+      // Capture flare: a brief additive accent halo as the body locks into orbit.
+      if (flare > 0.02 && flareUsed < this.flarePool.length) {
+        const f = this.flarePool[flareUsed++];
+        f.visible = true;
+        f.position.set(wx, lift, wz);
+        f.scale.setScalar(radius * FLARE_HALO_SCALE * (0.6 + 0.4 * flare));
+      }
     }
+    for (let i = flareUsed; i < this.flarePool.length; i++)
+      this.flarePool[i].visible = false;
+    this.flareMat.opacity = 0.45;
     if (!sunSeen) {
       this.sun.visible = false;
       this.glow.visible = false;
@@ -1009,6 +1049,7 @@ export class OrreryScene3D {
     for (let i = focusUsed; i < this.focusPool.length; i++)
       this.focusPool[i].visible = false;
     this.spheres.count = sphereCount;
+    this.stats.spheres = sphereCount;
     this.spheres.instanceMatrix.needsUpdate = true;
     if (this.spheres.instanceColor)
       this.spheres.instanceColor.needsUpdate = true;
@@ -1148,6 +1189,7 @@ export class OrreryScene3D {
     this.coronaMat.dispose();
     this.polarisMat.dispose();
     this.focusMat.dispose();
+    this.flareMat.dispose();
     this.labelGeo.dispose();
     this.atlasTex.dispose();
     this.glowTex.dispose();

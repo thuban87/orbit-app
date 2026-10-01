@@ -127,3 +127,35 @@ untouched. This is a **pre-existing main-app bug** (any user whose last System i
 "Unavailable System" after re-entering the Orrery); this branch is never merged, and the fix on `main`
 is the owner's decision. Device: selector reads "Lab C Inner" after relaunch
 (evidence/04-checkpoint-c/01-system-name-restored-lab-c-inner.png).
+
+## 2026-10-01 — Checkpoint C.2: System switching reinterpreted in 3D
+
+The production choreography is untouched: `sampleSwitchChoreography` (roles retained/leaving/entering/anchor,
+phases SHED 0.18–0.58, CAPTURE 0.44–0.82, SETTLE 0.72, stagger 0.035, spin turns by intensity, 2100 ms
+driver, 180 ms Reduced Motion crossfade) still owns x/y, radius, opacity and interactivity. The 3D world
+ADDS, all computed on the UI thread inside the existing packet reaction / sampled camera (no React state):
+- **Vertical axis** (`switchDepth`, packet stride 6→8: `lift`, `flare`): leaving bodies fall below the plane
+  (`0.42·extent·shed²`) while they spiral out and fade, so they sink into the range fog; entering bodies
+  streak in from above (`0.55·extent·(1−capture)²`) and land on their orbit; retained bodies stay ON the
+  plane (they are interactive throughout, so drawn == tappable is preserved; entering bodies only become
+  interactive at 0.82, when their residual lift is ≈0).
+- **Capture flare**: in a 0.16-progress window around each entering body's capture end, its orbit ring
+  brightens (alpha ×(1+1.4f)) and widens (×(1+2f)), plus a small additive accent-token halo (pool of 24).
+- **Camera breath** in the sampled switch camera: dolly-out up to 24%, yaw +0.38 rad, tilt −0.1 rad on a
+  sin² envelope scaled by intensity — zero at p=0 and p=1, so the destination Home is landed exactly.
+  It lives in the sampled pose, so the UI-thread frame and the three camera stay one pinhole.
+- Reduced Motion: no lift, no flare, no breath (the production 180 ms crossfade only).
+- Evidence: `04-checkpoint-c/02-switch-inner-to-core-to-dense.mp4`, `03-switch-dense-to-inner.mp4`,
+  `04-switch-mid-t*.png` (frames pulled from the recording). Log line `[lab-c] switch gen=… retained/leaving/
+  entering` proves the choreography fires (Dense→Inner: retained 10, leaving 110, entering 7, intensity 0.85).
+- **Orchestrator review (a)** "Core→Dense shows no transition": the first recording simply ended while the
+  Dense snapshot was still loading (~2 s scene read for 120 contacts; the old System stays mounted until the
+  destination is ready — production behaviour). The renderer log confirms Dense renders 121 bodies.
+- **Review (b)** "destination doesn't frame the whole System": not changed. Home is the production
+  readability rule (`zoom ≥ 10/minRadius`, research §7: "large Systems overflow and you pan") plus the B.3 lab
+  composition. Fitting the full extent would shrink bodies below the readability floor — a product call,
+  flagged for the owner rather than reversed here.
+- Known issues seen in the recordings: (1) the scene read for a switch takes 1.4–2.5 s before any motion
+  (pre-existing load latency, not renderer); (2) one frame right after the selector closes shows the upper
+  canvas black (a single-frame present glitch, not chased); (3) a camera step when the selector closes,
+  before the choreography starts (not chased).

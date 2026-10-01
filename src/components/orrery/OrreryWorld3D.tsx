@@ -79,7 +79,15 @@ import {
   deriveSatelliteBodies,
   resolveSatelliteTap,
 } from "@/logic/orrery-satellite-logic";
-import { sampleSwitchChoreography } from "@/logic/orrery-switch-choreography";
+import {
+  CAPTURE_END,
+  CAPTURE_START,
+  SHED_END,
+  SHED_START,
+  type SwitchChoreography,
+  sampleSwitchChoreography,
+} from "@/logic/orrery-switch-choreography";
+import { labFocalDistance } from "@/logic/orrery-camera-logic";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
@@ -171,6 +179,75 @@ const LAB_TILT_PRESETS: readonly [number, number, number][] = [
 ];
 /** Frame-time log cadence (ms). */
 const STATS_INTERVAL = 5000;
+
+// --- 3D switch choreography (Lab C, Checkpoint C) -------------------------------
+// The planar choreography (orrery-switch-choreography: roles, phases, timings,
+// stagger) is unchanged and still owns x/y, radius, opacity and interactivity.
+// The 3D world only ADDS a vertical axis + a camera breath on top of it:
+/** Leaving bodies fall this far below the plane (in scene extents) into the fog. */
+const SWITCH_FALL_EXTENTS = 0.42;
+/** Entering bodies streak in from this far above the plane (scene extents). */
+const SWITCH_RISE_EXTENTS = 0.55;
+/** Camera breath during a switch: dolly-out fraction, yaw (rad), tilt (rad). */
+const SWITCH_PULLBACK = 0.24;
+const SWITCH_YAW = 0.38;
+const SWITCH_TILT = -0.1;
+/** Capture flare window (progress) after each entering body's capture end. */
+const SWITCH_FLARE_WINDOW = 0.16;
+
+function clamp01w(v: number): number {
+  "worklet";
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+function smooth01(v: number): number {
+  "worklet";
+  const t = clamp01w(v);
+  return t * t * (3 - 2 * t);
+}
+/** Breath envelope: 0 at both ends, 1 mid-switch (eased, continuous at 0 and 1). */
+function switchBreath(progress: number): number {
+  "worklet";
+  const p = clamp01w(progress);
+  const s = Math.sin(Math.PI * p);
+  return s * s;
+}
+/**
+ * Per-entry vertical lift (world units, + = above the plane) and capture flare
+ * (0..1). Index-aligned with `sampleSwitchChoreography(...).world`.
+ */
+function switchDepth(
+  transition: SwitchChoreography,
+  progress: number,
+  extent: number,
+): number[] {
+  "worklet";
+  const out: number[] = [];
+  const p = clamp01w(progress);
+  const still = transition.reducedMotion || p <= 0 || p >= 1;
+  const ext = Math.max(1, extent);
+  for (let i = 0; i < transition.entries.length; i++) {
+    const e = transition.entries[i];
+    let lift = 0;
+    let flare = 0;
+    if (!still && e.role === "leaving") {
+      const shed = smooth01(
+        (p - (SHED_START + e.stagger)) / (SHED_END - SHED_START),
+      );
+      lift = -SWITCH_FALL_EXTENTS * ext * shed * shed;
+    } else if (!still && e.role === "entering") {
+      const end = CAPTURE_END + e.stagger;
+      const capture = smooth01(
+        (p - (CAPTURE_START + e.stagger)) / (CAPTURE_END - CAPTURE_START),
+      );
+      const rest = 1 - capture;
+      lift = SWITCH_RISE_EXTENTS * ext * rest * rest;
+      const f = (p - (end - SWITCH_FLARE_WINDOW * 0.35)) / SWITCH_FLARE_WINDOW;
+      flare = f > 0 && f < 1 ? Math.sin(Math.PI * f) : 0;
+    }
+    out.push(lift, flare);
+  }
+  return out;
+}
 
 let mountSerial = 0;
 let renderCount = 0;
@@ -278,7 +355,7 @@ export function OrreryWorld3D({
       transition.value,
       progress.value,
     ).world;
-    const sampledCamera =
+    let sampledCamera =
       progress.value >= 1
         ? pose.value
         : sampleOrrerySwitchCamera(
@@ -286,6 +363,26 @@ export function OrreryWorld3D({
             cameraTo.value,
             progress.value,
           );
+    // 3D camera breath: ease out (dolly back), swing the yaw and lift toward
+    // top-down mid-switch, returning exactly to the destination Home at p=1.
+    // Lives in the sampled camera, so the UI-thread frame (hits/labels) and
+    // the GPU camera stay one pinhole.
+    if (
+      progress.value < 1 &&
+      !transition.value.reducedMotion &&
+      transition.value.intensity > 0
+    ) {
+      const b =
+        switchBreath(progress.value) * (0.5 + 0.5 * transition.value.intensity);
+      const zoom = sampledCamera.zoom * (1 - SWITCH_PULLBACK * b);
+      sampledCamera = {
+        ...sampledCamera,
+        zoom,
+        focalDistance: labFocalDistance(zoom),
+        yaw: (sampledCamera.yaw ?? 0) + SWITCH_YAW * b,
+        tilt: Math.max(0, (sampledCamera.tilt ?? 0) + SWITCH_TILT * b),
+      };
+    }
     const held = reorder.value;
     const world = previewReorder(
       sampled,
@@ -308,6 +405,27 @@ export function OrreryWorld3D({
       generation: transition.value.generation,
     };
   });
+  const logSwitch = useCallback((msg: string) => {
+    console.log(`[lab-c] switch ${msg}`);
+  }, []);
+  useAnimatedReaction(
+    () => transition.value.generation,
+    (gen, prev) => {
+      if (prev === null || gen === prev) return;
+      const t = transition.value;
+      let retained = 0;
+      let leaving = 0;
+      let entering = 0;
+      for (const e of t.entries) {
+        if (e.role === "retained") retained++;
+        else if (e.role === "leaving") leaving++;
+        else if (e.role === "entering") entering++;
+      }
+      runOnJS(logSwitch)(
+        `gen=${gen} retained=${retained} leaving=${leaving} entering=${entering} intensity=${t.intensity.toFixed(2)} reduced=${t.reducedMotion}`,
+      );
+    },
+  );
   const frame = useDerivedValue(() => {
     const current = sample.value;
     return projectAnimatedFrameLite(
@@ -491,6 +609,7 @@ export function OrreryWorld3D({
     () => {
       const f = frame.value;
       const w = sample.value.world;
+      const depth = switchDepth(transition.value, progress.value, worldExtent);
       const keys: string[] = [];
       const bodies: number[] = [];
       for (let i = 0; i < w.length; i++) {
@@ -503,6 +622,8 @@ export function OrreryWorld3D({
           b.ringRadius,
           f.bodies[i]?.opacity ?? 0,
           b.kind === "sun" ? 1 : b.kind === "satellite" ? 2 : 0,
+          depth[i * 2] ?? 0,
+          depth[i * 2 + 1] ?? 0,
         );
       }
       return {
@@ -746,7 +867,7 @@ export function OrreryWorld3D({
           const avg = d.reduce((a, b) => a + b, 0) / Math.max(1, d.length);
           const r = s.stats.renderMs;
           console.log(
-            `[lab-c] frames=${d.length} avgDt=${avg.toFixed(1)}ms fps=${(1000 / Math.max(1, avg)).toFixed(1)} p95Dt=${percentile(d, 0.95).toFixed(1)} maxDt=${percentile(d, 1).toFixed(1)} jsRenderAvg=${(r.reduce((a, b) => a + b, 0) / Math.max(1, r.length)).toFixed(2)}ms p95=${percentile(r, 0.95).toFixed(2)} calls=${s.stats.calls} tris=${s.stats.triangles} photos=${photoTimings.length} photoAvg=${(photoTimings.reduce((a, b) => a + b, 0) / Math.max(1, photoTimings.length)).toFixed(1)}ms packets=${packetCount} presentAvg=${(presentMs / Math.max(1, d.length)).toFixed(2)}ms drawAvg=${(s.stats.drawMs / Math.max(1, d.length)).toFixed(2)}ms`,
+            `[lab-c] frames=${d.length} avgDt=${avg.toFixed(1)}ms fps=${(1000 / Math.max(1, avg)).toFixed(1)} p95Dt=${percentile(d, 0.95).toFixed(1)} maxDt=${percentile(d, 1).toFixed(1)} jsRenderAvg=${(r.reduce((a, b) => a + b, 0) / Math.max(1, r.length)).toFixed(2)}ms p95=${percentile(r, 0.95).toFixed(2)} calls=${s.stats.calls} tris=${s.stats.triangles} photos=${photoTimings.length} photoAvg=${(photoTimings.reduce((a, b) => a + b, 0) / Math.max(1, photoTimings.length)).toFixed(1)}ms packets=${packetCount} bodies=${pendingPacket.current?.keys.length ?? 0} drawnSpheres=${s.stats.spheres} presentAvg=${(presentMs / Math.max(1, d.length)).toFixed(2)}ms drawAvg=${(s.stats.drawMs / Math.max(1, d.length)).toFixed(2)}ms`,
           );
           packetCount = 0;
           presentMs = 0;
