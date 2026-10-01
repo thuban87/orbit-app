@@ -41,6 +41,17 @@ describe("semantic labels", () => {
     expect(orreryInitials("Ada Lovelace")).toBe("AL");
     expect(orreryInitials("  ")).toBe("");
   });
+  it("still yields two initials when Intl.Segmenter is absent (Hermes)", () => {
+    const original = Intl.Segmenter;
+    try {
+      (Intl as { Segmenter?: unknown }).Segmenter = undefined;
+      expect(orreryInitials("Clara Ruiz")).toBe("CR");
+      expect(orreryInitials("Elif Kaya")).toBe("EK");
+      expect(orreryInitials("  ")).toBe("");
+    } finally {
+      (Intl as { Segmenter?: unknown }).Segmenter = original;
+    }
+  });
   it("uses both sides and exact inclusive thresholds with hysteresis", () => {
     expect(semanticLevel(IDENTITY_ENTER - 1e-6, "overview")).toBe("overview");
     expect(semanticLevel(IDENTITY_ENTER, "overview")).toBe("identity");

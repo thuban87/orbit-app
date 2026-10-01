@@ -30,14 +30,14 @@ export const LAB_MARKER_FONT = 9;
 export const NEBULA_BAKE_SIZE = 256;
 /** Peak alpha over the background, dark (glow) vs light (chart wash). */
 export const NEBULA_ALPHA_DARK = 0.32;
-export const NEBULA_ALPHA_LIGHT = 0.4;
+export const NEBULA_ALPHA_LIGHT = 0.34;
 /** Band orientation (rad, screen) and gaussian half-width (texture units). */
 export const NEBULA_BAND_ANGLE = -0.62;
 export const NEBULA_BAND_WIDTH = 0.11;
 /** Density gain before the alpha clamp (shapes how much of the band saturates). */
 export const NEBULA_GAIN = 1.8;
 /** Chart (light) mode: how far the pale wash is shaded toward the grid ink. */
-export const NEBULA_CHART_INK = 0.35;
+export const NEBULA_CHART_INK = 0.2;
 /** Dust-lane darkening inside the band (0..1). */
 export const NEBULA_DUST_STRENGTH = 0.75;
 /** Fade-in (ms) the first time a palette's nebula is baked (0 under RM). */
@@ -108,7 +108,7 @@ export const GRID_DENSITY_FLOOR = 0.3;
 export const GRID_STROKE_PX = 0.9;
 /** Sun-lit pool on the plane: alpha at the sun, radius as extent multiple. */
 export const LIT_POOL_ALPHA_DARK = 0.16;
-export const LIT_POOL_ALPHA_LIGHT = 0.26;
+export const LIT_POOL_ALPHA_LIGHT = 0.12;
 export const LIT_POOL_REACH = 0.85;
 
 // ── 3. Orbits as instruments ────────────────────────────────────────────────
@@ -170,7 +170,7 @@ export const BODY_FAR_TINT = 0.38;
 export const SHADOW_LENGTH = 2.6;
 export const SHADOW_WIDTH = 1.05;
 export const SHADOW_OFFSET = 1.1;
-export const SHADOW_ALPHA_DARK = 0.7;
+export const SHADOW_ALPHA_DARK = 0.55;
 export const SHADOW_ALPHA_LIGHT = 0.16;
 /** Contact shadows fade in with tilt: 0 at tilt 0, full at this tilt (rad). */
 export const SHADOW_TILT_FULL = 0.45;
