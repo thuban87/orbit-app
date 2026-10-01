@@ -159,3 +159,94 @@ export function focusCardPlacement(
     maxHeight: h,
   };
 }
+
+/** Narrowest card we will use to slip beside an obstacle (dp). */
+export const FOCUS_CARD_NARROW = 168;
+/** Extra height allowed for a narrowed card: its measured (wide) content
+ *  height can grow when a text line wraps at the narrower width. The card
+ *  only has a max height, so unused slack is never drawn. */
+export const FOCUS_CARD_NARROW_SLACK = 44;
+
+export interface FocusCardLayout {
+  left: number;
+  width: number;
+  top: number;
+  maxHeight: number;
+}
+
+type Rect = { x: number; y: number; width: number; height: number };
+
+/**
+ * Pass 3: the full card layout. Centred on the body at `maxWidth` first; if
+ * that cannot show the whole card (it would be capped / scroll), try a
+ * narrower card (≥ FOCUS_CARD_NARROW) beside each obstacle below the body
+ * that blocks it,
+ * and keep whichever candidate shows the most of the card. Presentation
+ * only — obstacles and the usable rect are read, never changed.
+ */
+export function focusCardLayout(
+  viewport: {
+    width: number;
+    height: number;
+    usable?: Rect;
+    obstacles?: readonly Rect[];
+  },
+  region: Rect,
+  bodyX: number,
+  bodyY: number,
+  projectedRadius: number,
+  cardHeight: number,
+  gap: number,
+  maxWidth: number,
+  label?: FocusLabelBlock,
+): FocusCardLayout {
+  "worklet";
+  const width = Math.min(maxWidth, region.width);
+  const left = Math.max(
+    region.x,
+    Math.min(region.x + region.width - width, bodyX - width / 2),
+  );
+  const wide = focusCardPlacement(
+    focusCardRoom(viewport, region, left, width, bodyY, gap),
+    bodyY,
+    projectedRadius,
+    cardHeight,
+    gap,
+    label,
+  );
+  let best: FocusCardLayout = { left, width, ...wide };
+  if (wide.maxHeight >= cardHeight) return best;
+  const obstacles = viewport.obstacles ?? [];
+  const minX = region.x + gap;
+  const maxX = region.x + region.width - gap;
+  for (let i = 0; i < obstacles.length; i++) {
+    const o = obstacles[i];
+    if (!(o.width > 0 && o.height > 0)) continue;
+    if (o.x >= left + width || o.x + o.width <= left) continue;
+    // Only obstacles BELOW the body block the preferred (below) side.
+    if (o.y < bodyY) continue;
+    const sides = [
+      { from: minX, to: o.x - gap },
+      { from: o.x + o.width + gap, to: maxX },
+    ];
+    for (let k = 0; k < sides.length; k++) {
+      const w = Math.min(width, sides[k].to - sides[k].from);
+      if (w < FOCUS_CARD_NARROW) continue;
+      const l = Math.max(
+        sides[k].from,
+        Math.min(sides[k].to - w, bodyX - w / 2),
+      );
+      const p = focusCardPlacement(
+        focusCardRoom(viewport, region, l, w, bodyY, gap),
+        bodyY,
+        projectedRadius,
+        w < width ? cardHeight + FOCUS_CARD_NARROW_SLACK : cardHeight,
+        gap,
+        label,
+      );
+      if (p.maxHeight > best.maxHeight + 0.5)
+        best = { left: l, width: w, ...p };
+    }
+  }
+  return best;
+}

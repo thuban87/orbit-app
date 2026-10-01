@@ -58,11 +58,9 @@ import {
 import { type Rgba, withAlpha } from "./deep-field-ink";
 import {
   type BodyLightMap,
-  bodyDepthScale,
-  bodyVisualScale,
   easeOutBack,
   type FocusState,
-  moonVisualScale,
+  reticleDrawnRadius,
   reticleGeometry,
 } from "./deep-field-math";
 
@@ -74,22 +72,6 @@ const STYLE_STROKE = 1;
 const CAP_BUTT = 0;
 const CAP_ROUND = 1;
 const DEG = 180 / Math.PI;
-
-/** Drawn (screen) radius of a frame body, as its root Group draws it. */
-export function reticleDrawnRadius(
-  kind: string,
-  projectedRadius: number,
-  far: number,
-): number {
-  "worklet";
-  if (!(projectedRadius > 0)) return 0;
-  if (kind === "satellite")
-    return projectedRadius * moonVisualScale(projectedRadius);
-  if (kind === "sun") return projectedRadius;
-  return (
-    projectedRadius * bodyVisualScale(projectedRadius) * bodyDepthScale(far)
-  );
-}
 
 function strokePaint(color: Rgba, alpha: number, width: number, cap: number) {
   "worklet";

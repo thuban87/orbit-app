@@ -140,6 +140,22 @@ export interface FocusState {
 
 export const FOCUS_NONE: FocusState = { keys: {}, targets: [], generation: 0 };
 
+/** Drawn (screen) radius of a frame body, as its root Group draws it. */
+export function reticleDrawnRadius(
+  kind: string,
+  projectedRadius: number,
+  far: number,
+): number {
+  "worklet";
+  if (!(projectedRadius > 0)) return 0;
+  if (kind === "satellite")
+    return projectedRadius * moonVisualScale(projectedRadius);
+  if (kind === "sun") return projectedRadius;
+  return (
+    projectedRadius * bodyVisualScale(projectedRadius) * bodyDepthScale(far)
+  );
+}
+
 /** PASS 3 reticle box (screen dp) around a drawn disc of radius `drawn`. */
 export function reticleGeometry(drawn: number): { half: number; arm: number } {
   "worklet";

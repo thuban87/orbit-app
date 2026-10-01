@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText uses typography roles.
 import { type ReactNode, useState } from "react";
-import { StyleSheet, useWindowDimensions } from "react-native";
+import { StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated, {
   type SharedValue,
   useAnimatedStyle,
@@ -19,15 +19,18 @@ import { DETAIL_EXIT } from "@/logic/orrery-label-logic";
 import { SPACING } from "@/theme/tokens/spacing";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { useDeepFieldEnabled } from "./lab/deep-field-mode";
-import {
-  focusCardPlacement,
-  focusCardRoom,
-  focusLabelBlock,
-} from "./lab/focus-card";
+import { focusCardLayout, focusLabelBlock } from "./lab/focus-card";
 
 /** ORRERY LAB A (pass 3): plate metrics mirrored from OrreryLabel (plain numbers). */
 const PLATE_LINE_HEIGHT = TYPOGRAPHY.label.lineHeight;
 const PLATE_PADDING = SPACING.xs;
+/** The card's (pre-Lab) maximum width (dp). */
+const CARD_MAX_WIDTH = 280;
+/** ORRERY LAB A (pass 3): the card's own cap (× canvas height); the layout
+ *  then caps it to the free room. Pre-Lab: half the usable rect. */
+const LAB_CARD_MAX_FRACTION = 0.55;
+/** Glass surface chrome around the card's ScrollView (dp, generous). */
+const CARD_CHROME = 24;
 
 import { OrreryNotice } from "./OrreryFeedback";
 
@@ -75,55 +78,57 @@ export function OrreryFocusContext({
         : item.kind !== "satellite" && item.id === target.id,
     );
     if (!current || !region || !body) return { opacity: 0 };
-    const width = Math.min(280, region.width);
     const limit = Math.min(height, region.height / 2);
-    const left = Math.max(
-      region.x,
-      Math.min(region.x + region.width - width, body.x - width / 2),
-    );
     // ORRERY LAB A (pass 2/3): clear the drawn body, reticle and label plate;
-    // flip above the body, or cap the card height to the free room (it
-    // scrolls), instead of clamping it up over the focused body. The room is
-    // bounded only by obstacles under the card's own x-span (pass 3).
-    // Framing/usable rect untouched.
-    const placed = deepFieldOn
-      ? focusCardPlacement(
-          focusCardRoom(
-            current.viewport,
-            region,
-            left,
-            width,
-            body.y,
-            SPACING.sm,
-          ),
-          body.y,
-          body.radius,
-          limit,
-          SPACING.sm,
-          hasLabel
-            ? focusLabelBlock(
-                fontScale,
-                PLATE_LINE_HEIGHT,
-                PLATE_PADDING,
-                (current?.pose.zoom ?? 1) >= DETAIL_EXIT,
-              )
-            : undefined,
-        )
-      : null;
+    // flip above the body, slip a narrower card beside a blocking obstacle,
+    // or cap the card height to the free room (it scrolls), instead of
+    // clamping it up over the focused body. Framing/usable rect untouched.
+    if (deepFieldOn) {
+      const layout = focusCardLayout(
+        current.viewport,
+        region,
+        body.x,
+        body.y,
+        body.radius,
+        Math.min(height, current.viewport.height * LAB_CARD_MAX_FRACTION),
+        SPACING.sm,
+        CARD_MAX_WIDTH,
+        hasLabel
+          ? focusLabelBlock(
+              fontScale,
+              PLATE_LINE_HEIGHT,
+              PLATE_PADDING,
+              current.pose.zoom >= DETAIL_EXIT,
+            )
+          : undefined,
+      );
+      return {
+        opacity: 1,
+        width: layout.width,
+        // The ScrollView carries the content cap; the root only adds the
+        // glass chrome around it (a root cap equal to the content cap
+        // clipped the last wrapped line on device).
+        maxHeight: layout.maxHeight + CARD_CHROME,
+        left: layout.left,
+        top: layout.top,
+      };
+    }
+    const width = Math.min(CARD_MAX_WIDTH, region.width);
     return {
       opacity: 1,
       width,
-      maxHeight: placed ? placed.maxHeight : region.height / 2,
-      left,
-      top: placed
-        ? placed.top
-        : Math.max(
-            region.y,
-            Math.min(
-              region.y + region.height - limit,
-              body.y + body.radius + SPACING.sm,
-            ),
-          ),
+      maxHeight: region.height / 2,
+      left: Math.max(
+        region.x,
+        Math.min(region.x + region.width - width, body.x - width / 2),
+      ),
+      top: Math.max(
+        region.y,
+        Math.min(
+          region.y + region.height - limit,
+          body.y + body.radius + SPACING.sm,
+        ),
+      ),
     };
   });
   const scrollBounds = useAnimatedStyle(() => {
@@ -143,32 +148,22 @@ export function OrreryFocusContext({
         : item.kind !== "satellite" && item.id === target.id,
     );
     if (!current || !body) return { maxHeight: region.height / 2 };
-    const limit = Math.min(height, region.height / 2);
-    const width = Math.min(280, region.width);
-    const left = Math.max(
-      region.x,
-      Math.min(region.x + region.width - width, body.x - width / 2),
-    );
     return {
-      maxHeight: focusCardPlacement(
-        focusCardRoom(
-          current.viewport,
-          region,
-          left,
-          width,
-          body.y,
-          SPACING.sm,
-        ),
+      maxHeight: focusCardLayout(
+        current.viewport,
+        region,
+        body.x,
         body.y,
         body.radius,
-        limit,
+        Math.min(height, current.viewport.height * LAB_CARD_MAX_FRACTION),
         SPACING.sm,
+        CARD_MAX_WIDTH,
         hasLabel
           ? focusLabelBlock(
               fontScale,
               PLATE_LINE_HEIGHT,
               PLATE_PADDING,
-              (current?.pose.zoom ?? 1) >= DETAIL_EXIT,
+              current.pose.zoom >= DETAIL_EXIT,
             )
           : undefined,
       ).maxHeight,
@@ -189,24 +184,32 @@ export function OrreryFocusContext({
         <Animated.ScrollView
           style={scrollBounds}
           contentContainerStyle={styles.content}
-          onContentSizeChange={(_, contentHeight) => {
-            if (deepFieldOn) setHeight(contentHeight);
-          }}
         >
-          <AppText>{name}</AppText>
-          <Button role="secondary" label="Clear focus" onPress={onClear} />
-          {target.kind !== "satellite" ? (
-            <Button
-              role="secondary"
-              label="Open Profile"
-              accessibilityLabel={`Open Profile: ${name}`}
-              onPress={onProfile}
-            />
-          ) : null}
-          {contextState === "ready" ? relationshipContext : null}
-          {contextState === "error" ? (
-            <OrreryNotice kind="satellites" onAction={onReloadContext} />
-          ) : null}
+          {/* ORRERY LAB A (pass 3): the natural height comes from this
+              wrapper's layout (onContentSizeChange did not report the
+              relationship rows / wrapped lines that arrive later). */}
+          <View
+            style={styles.stack}
+            onLayout={(event) => {
+              if (deepFieldOn)
+                setHeight(event.nativeEvent.layout.height + SPACING.sm * 2);
+            }}
+          >
+            <AppText>{name}</AppText>
+            <Button role="secondary" label="Clear focus" onPress={onClear} />
+            {target.kind !== "satellite" ? (
+              <Button
+                role="secondary"
+                label="Open Profile"
+                accessibilityLabel={`Open Profile: ${name}`}
+                onPress={onProfile}
+              />
+            ) : null}
+            {contextState === "ready" ? relationshipContext : null}
+            {contextState === "error" ? (
+              <OrreryNotice kind="satellites" onAction={onReloadContext} />
+            ) : null}
+          </View>
         </Animated.ScrollView>
       </GlassSurface>
     </Animated.View>
@@ -214,5 +217,6 @@ export function OrreryFocusContext({
 }
 const styles = StyleSheet.create({
   root: { position: "absolute", overflow: "hidden" },
-  content: { padding: SPACING.sm, gap: SPACING.sm },
+  content: { padding: SPACING.sm },
+  stack: { gap: SPACING.sm },
 });
