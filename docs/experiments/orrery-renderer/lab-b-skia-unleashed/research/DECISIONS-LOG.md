@@ -204,3 +204,87 @@ logs, evidence).
     `12-contact-sun-photo-emissive-status-corona-cheap-moons`,
     `13-perf-run-D-lit-cheap-moons-rings-off`. Some shots show the selector as "Unavailable
     System" (the pre-existing restore bug, WP-1.0 note).
+
+## 2026-10-01 — WP-1.3 instrument orbits (L1) and HUD labels (L6)
+
+Commits: `ff7ddbdd` (instrument orbits + HUD tags + compact HUD/marker), `387b20c8` (pass 2:
+focus lock keeps stroke style, density fade, tuning), dead end `eb860615` reverted by
+`41495969`.
+
+1. **One plane homography for the whole instrument layer.** `projectWorldPoint` is an exact
+   plane homography (yaw → tilted perspective plane → zoom → usable-rect centre), so
+   `planeHomography(frame.pose, frame.viewport)` returns ONE row-major 3×3 (RN Skia parses 9
+   numbers incl. perspective) and every ring, wake, tether and tick is STATIC WORLD geometry in
+   a `<Group matrix>`. Tested exact against `projectWorldPoint` (incl. pan, yaw, max tilt,
+   obstacle-shifted usable rect) and against `projectFrame`'s `ringPath[0]` in the render test.
+   Reads only `frame.value.pose`/`viewport` (the sampled camera during switches). Stroke widths
+   are `dp / zoom`, so perspective makes the near side slightly heavier — kept as a depth cue.
+2. **Rings = `<Circle cx=0 cy=0 r>`** (radius = frame `ringRadius / zoom`, so switch/reorder
+   interpolation still applies; opacity = body opacity × focus dim). Grouped by instrument class
+   (status) under one `ringInstrument` stroke shader per class: hairline, far-side **depth
+   fade** (∝ tilt, to `farAlpha` 0.32/0.40), shader **dashes** (integer count per
+   circumference → no seam at north; no CPU `DashPathEffect`), uniform **flow comets** (3 per
+   ring, same LINEAR speed for every status, clockwise; off under reduced motion; flag
+   `ringFlow`, C-04). Batching the circles further (one path per class when settled) was built
+   and removed unmeasured-needed: run F showed the circles already at the rings-OFF floor.
+3. **Semantics preserved, mapped from the legacy vocabulary** (`orreryRingStyle` → `ringVisual`
+   stays the single source; `ringInstrumentClass` only restates it):
+   | Status | Legacy | Instrument |
+   |---|---|---|
+   | stable | statusStable, solid, 2 px | statusStable, solid, 1.04 dp |
+   | wobble | statusWobble, dashed [6,6], 3 px | statusWobble, dashed 11 dp @58 %, 1.46 dp |
+   | decay | statusDecay, solid ×0.7, 4 px (heaviest) | statusDecay, solid ×0.7, 1.88 dp (heaviest) |
+   | rogue | rogue amber, dashed ×0.3, 3 px | rogue amber, dotted trace 6 dp @30 % ×0.42, 1.46 dp |
+   | never-contacted | border, solid ×0.5, 2 px | border, solid ×0.5, 1.04 dp |
+   Weight ORDER (the CVD-redundant channel) is kept and tested; base alpha 0.5 (dark) / 0.7
+   (light) × class alpha, so rings recede behind bodies. The focused ring's lock line goes
+   through the class shader so it keeps its stroke style.
+4. **Progress wake** (flag `ringWake`, C-17): per-ring stroked circle + `ringWake` shader —
+   alpha rises from north (0) to the body angle (ADR-011 convention, `wakeAngle` tested), crisp
+   end at the body, soft cross profile. Real statuses only (never-contacted: none). Built from
+   the settled world bodies (React) and hidden (`settled` = progress ≥ 1 and no active reorder)
+   while a switch or reorder moves bodies.
+5. **Drift tethers** (flag `ringTethers`, C-17): decay/rogue bodies (pushed off the rail by
+   `orrery-world-logic` drift) get a radially dashed tether from the rail point to the body
+   limb, drawn as a rect in a north-pointing frame rotated onto the body. Hidden like wakes.
+6. **Ticks** (flag `ringTicks`): a north tick on every ring at `detail`; a 30° tick scale on the
+   focused ring (any level); a compass chevron outside the outermost ring (`accent`, the WP-1.2
+   deferred compass tick).
+7. **Focus (static, M1):** non-focused rings ×0.35 (`focusDim`); focused ring = two soft glow
+   strokes beneath (flat, no blur) + full-alpha lock line. React-driven (focus is an event),
+   no animation yet (WP-2.2 adds `focusMix`).
+8. **Density fade:** ring alpha × clamp(gap·zoom / 20 dp, 0.35, 1) with gap = median world gap
+   between rings; comets × fade². Far zoom on Dense: median ring brightness −25 % measured on the
+   screenshots; zoom ≥ ~1 unaffected.
+9. **HUD-tag labels** (`LabHudLabel`, flag `labelHud`): positioned ONLY from `allocations`;
+   plate = EXACT prepared `width × height` (render test); hidden exactly when not allocated, so
+   semantic zoom and the label-visibility → tap contract (`resolveTap` reads the same
+   `allocations`) are untouched. Paint: blurred `background` scrim halo (0.55/0.5) under a
+   `surface` plate (0.9/0.94), faint `textSecondary` outline, status-hue hairline on the
+   body-facing edge and a 6 dp leader tick toward the body (direction from the body's y vs the
+   plate — the allocator's below/alternate-above choice). Context captions keep `OrreryLabel`.
+   Status hue from `orreryRingStyle` (sun label: occupant status).
+10. **Debug chrome:** FPS HUD compacted to 178×40 dp (two lines + sparkline) and moved to the
+    bottom-left above the marker; the marker is now a small dimmed "LAB B" tag bottom-left
+    (long-press still opens the panel). Previously the HUD hid a body (DG) and the marker spanned
+    the bottom centre.
+11. **Visual iteration (emulator):** pass 1 (hairlines, flow, stepped wake) → wake invisible,
+    comets too subtle in stills → pass 2: single-gradient wake 0.3, comets 48 world long at
+    full strength, tethers 0.6; focus lock kept stroke style; density fade added after the Far
+    0.4 Dense shot read as solid grooves (threshold 14 → 20 dp after a numeric check showed
+    the first value barely changed anything).
+12. **Evidence** (`evidence/04-wp1.3/`): `00-before-wp1.0-path-rings-dense`,
+    `01-pass1-overview-dense-instrument-orbits`, `02-pass1-identity-2.2-hud-tags-wake-tether`,
+    `03-detail-3.2-north-tick-depth`, `04-focus-cleo-lock-glow-tick-scale-dimmed-rings`,
+    `05-tilt-max-depth-fade-dense`, `06-inner-circle-12-overview-galaxy-dark`,
+    `07a/07b-far-0.4-dense-(before-)density-fade`, `08-pass2-overview-dense-final`,
+    `09-flow-comets-overview-dense.mp4` (720×1280 recording, aspect squashed by screenrecord),
+    `10a–10d` Galaxy Light / Standard Dark / Standard Light (Inner Circle) incl. a light focus +
+    HUD tag, `10e-hud-tags-4-themes-gd-gl-sd-sl`, `11-reduced-motion-forced-on-static-no-flow`,
+    `12-switch-inner-circle-to-dense.mp4` (rings fade out/in with their bodies; wakes and
+    tethers return on settle).
+13. **Not done / open:** perspective-matrix cost under tilt not timed; reorder ghost still
+    rebuilds a 128-point path (only while held); `ringPath` is still computed by the frame
+    worklet (R1); wake/tether during a switch simply hide (WP-2.1 ring unwind/draw-on will
+    animate rings properly); light-theme yellow wobble dashes are low-contrast on vellum (token
+    hue, same as legacy).

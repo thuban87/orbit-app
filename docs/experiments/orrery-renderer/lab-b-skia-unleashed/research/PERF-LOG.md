@@ -121,3 +121,51 @@ Findings (relative, emulator only):
 Reduced motion (forced ON, Dense overview): two screenshots 3 s apart differ only inside the
 HUD box → the sun corona/granulation are static; with motion ON the sun region differs
 between the two frames (animated corona) — verified.
+
+## 2026-10-01 — WP-1.3 instrument orbits (L1) + HUD labels (L6) (commits ff7ddbdd → 387b20c8)
+
+**EMULATOR, DEBUG build, Metro — relative A/B only, never a phone claim.** Scene: **Lab B
+Dense** (≈120 contacts) with **Relationship Satellites ON** (≈67 moons), Home pose after a
+fresh app launch (overview level), **Galaxy Dark**, renderer `lab`, compact FPS HUD on, panel
+CLOSED. Each run = registry defaults edited in code → Metro restart → app relaunch → Orrery tab →
+25 s settle → `dumpsys gfxinfo` 15 s idle after `reset` (main + RenderThread). Same session,
+same target; no tap during the window. Flags not listed are at their WP-1.3 defaults.
+
+| Run | Config | gfx frames / 15 s | gfx p50 / p90 ms | gpu p50 ms |
+|---|---|---|---|---|
+| base | HEAD 0f888524 (WP-1.2 close): WP-1.0 rings, rings ON | 40 | 250 / 300 | 14 |
+| C | `ringsPathRebuild` ON (same WP-1.0 rings, new build) | 47 | 200 / 250 | 19 |
+| B | `rings` OFF (floor) | 212 | 48 / 48 | 10 |
+| A | instrument orbits, FIRST cut (wakes = 3 stacked stroked arc paths per class, tethers = stroked segment paths) | 86 | 117 / 133 | 7 |
+| D | A with `ringShader` OFF (flat strokes) | 88 | 113 / 125 | 5 |
+| E | A with `ringFlow` OFF | 90 | 117 / 133 | 12 |
+| F | A, rings only (wake, tethers, ticks OFF) | 213 | **48** / 53 | 10 |
+| G | A, wake OFF | 164 | 61 / 65 | 2 |
+| H | A, tethers OFF | 93 | 105 / 117 | 5 |
+| I | A, ticks OFF | 86 | 117 / 133 | 12 |
+| J | wakes = per-ring circle + `ringWake` shader, tethers = rotated rects | 183 | **48** / 65 | 10 |
+| K | final WP-1.3 defaults (J + focus lock / density fade) | 196 | **48** / 65 | 10 |
+
+Findings (relative, emulator only):
+1. **The legacy ring cost was the per-frame Path + stroke, not the ring count.** 120 rings as
+   static world `Circle`s under ONE shared homography matrix cost nothing measurable over rings
+   OFF (F 48 ms = B 48 ms, 213 vs 212 frames), versus 4–5× fewer frames for the WP-1.0 rings
+   (base/C). The full instrument layer at close (K) is at the rings-OFF floor for p50 (+17 ms p90).
+2. **The ring shader is free on this target** (D flat ≈ A shader, E no-flow ≈ A): the stroke
+   shader only shades stroke pixels and one shader instance serves a whole status class.
+3. **Stroked static PATHS are the trap.** The first wake/tether cut built the geometry once
+   (React memo) and drew it under the same matrix, yet cost +56 ms (wake, G) and +12 ms
+   (tethers, H) p50: Ganesh re-tessellates stroked paths on the CPU every replay (gpu p50 stays
+   low). Circles (analytic op) and rects (rect op) under the same matrix do not. Rule for V2:
+   **instrument geometry = circles / rects / shaders, never stroked paths per frame.**
+4. Ticks (I) are free: their paths are short and the detail-level path draws at alpha 0 (Skia
+   skips) outside `detail`.
+5. Tilt (perspective matrix) was exercised visually (evidence 05) — not timed; the circles then
+   leave the analytic fast path. Measure on the phone in WP-1.4.
+6. The frame worklet still projects 128 `ringPath` points per contact whenever the frame
+   changes (pan/zoom/switch). The lab renderer no longer reads `ringPath` (only the legacy ring
+   and the reorder ghost do). Idle frames don't pay it, gestures do — R1 candidate (drop
+   `ringPath` from `projectFrame` once the ghost uses the homography too).
+
+Reduced motion (forced ON, Dense overview): two screenshots 2 s apart differ only inside the HUD
+box → flow comets off, wakes/rings static.
