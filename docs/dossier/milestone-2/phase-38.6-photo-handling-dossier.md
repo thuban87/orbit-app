@@ -315,6 +315,12 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     carry favourites in backups (Replace-all drops them); logged for later: F-3 card copy truncation, S1 double Profile
     push on Save, S6 FAB overlap, S10 picker after font/display change, S11 resume prompt over crop, S13 grid columns at
     exactly 1.4; left as is: S7, the Replace-all lost profile reference, the restore preview skip note, IN4-04 count.
+-   **[DECIDED · 2026-09-30] D-41 --- D-11 still fails after the in-memory cache fix; fix before release with an
+    on-disk Orrery derivative.** Re-measure: +23.0 % graphics / +32.5 % GL at 20 s (limit 5 %), +2.4 % / +3.3 % at 70 s.
+    The Orrery gets a small on-disk derivative of each photo so it never decodes the 1024 master; then re-measure with
+    the same fixed method. Release waits.
+-   **[DECIDED · 2026-09-30] D-42 --- Orrery framing while the assist banner shows is logged for later.** The older
+    200 dp reserved control column squeezes the system to the left while a "Did you reach ...?" question is pending.
 
 ### Engineering boundaries (recorded so planning cannot drift)
 
@@ -380,3 +386,4 @@ Owner rulings from `/gsd-discuss-phase 38.6`. D-10 onward continue the owner-req
     exist), D-35 (D-28 flag extended to the Merge-moved case).
 -   **2026-09-30** --- Device-pass rulings D-36..D-40 (looks signed off; D-11 fix before release; banner fix; cap kept +
     "too large" copy; dispositions).
+-   **2026-09-30** --- D-41 (on-disk Orrery derivative before release), D-42 (banner-time Orrery framing logged).
