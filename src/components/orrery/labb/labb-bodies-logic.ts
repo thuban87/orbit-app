@@ -234,7 +234,7 @@ export interface LabSunStatic {
  * channel value. Pure-white sun pixels (L = 1.0) under a glass overlay broke
  * the ADR-149 AA bound for Standard Dark `textSecondary` (4.42:1 at L 1.0;
  * AA needs raw L ≤ 0.913 ≈ 0.96 encoded). 0.94 keeps the bound with margin
- * and sits at the palette's brightest star (#E9ECF1 ≈ 0.945), the very pixel
+ * and sits at the palette's brightest star (Standard Dark textPrimary ≈ 0.945), the very pixel
  * ADR-149 proved against.
  */
 export const SUN_GLOW_CAP_DARK = 0.94;
