@@ -16,7 +16,7 @@ import {
 import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
 import { bodyKey } from "@/logic/orrery-frame";
 import { SPACING } from "@/theme/tokens/spacing";
-import { DEEP_FIELD_ENABLED } from "./lab/deep-field-config";
+import { useDeepFieldEnabled } from "./lab/deep-field-mode";
 import { focusCardPlacement } from "./lab/focus-card";
 import { OrreryNotice } from "./OrreryFeedback";
 
@@ -45,6 +45,7 @@ export function OrreryFocusContext({
   onReloadContext?: () => void | Promise<void>;
 }) {
   const [height, setHeight] = useState(180);
+  const deepFieldOn = useDeepFieldEnabled();
   const position = useAnimatedStyle(() => {
     const current = frame.value;
     const region = current ? usableCameraRect(current.viewport) : null;
@@ -64,7 +65,7 @@ export function OrreryFocusContext({
     // ORRERY LAB A (pass 2): clear the drawn body + reticle; flip above the
     // body, or cap the card height to the free room (it scrolls), instead of
     // clamping it up over the focused body. Framing/usable rect untouched.
-    const placed = DEEP_FIELD_ENABLED
+    const placed = deepFieldOn
       ? focusCardPlacement(region, body.y, body.radius, limit, SPACING.sm)
       : null;
     return {
@@ -90,7 +91,7 @@ export function OrreryFocusContext({
     const current = frame.value;
     const region = current ? usableCameraRect(current.viewport) : null;
     if (!region) return { maxHeight: 180 };
-    if (!DEEP_FIELD_ENABLED) return { maxHeight: region.height / 2 };
+    if (!deepFieldOn) return { maxHeight: region.height / 2 };
     // ORRERY LAB A: the same placement as the card (scroll inside the room).
     // Perf pass: the target key is built once, not once per body per frame.
     const targetKey =
@@ -122,7 +123,7 @@ export function OrreryFocusContext({
       onLayout={(event) => {
         // ORRERY LAB A: the lab caps the card to the free room, so its laid-
         // out height is not its natural height; that comes from the content.
-        if (!DEEP_FIELD_ENABLED) setHeight(event.nativeEvent.layout.height);
+        if (!deepFieldOn) setHeight(event.nativeEvent.layout.height);
       }}
     >
       <GlassSurface density="dense" treatment="orrery-overlay">
@@ -130,7 +131,7 @@ export function OrreryFocusContext({
           style={scrollBounds}
           contentContainerStyle={styles.content}
           onContentSizeChange={(_, contentHeight) => {
-            if (DEEP_FIELD_ENABLED) setHeight(contentHeight);
+            if (deepFieldOn) setHeight(contentHeight);
           }}
         >
           <AppText>{name}</AppText>

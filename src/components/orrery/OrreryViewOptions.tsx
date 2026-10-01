@@ -20,6 +20,7 @@ import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { useDeepFieldModeStore } from "./lab/deep-field-mode";
 import { OrreryNotice } from "./OrreryFeedback";
 import { OrreryObstacle } from "./OrreryObstacle";
 
@@ -37,6 +38,8 @@ export function OrreryViewOptions({
   availableHeight: number;
 }) {
   const preferences = useOrreryPreferencesStore();
+  const labRenderer = useDeepFieldModeStore((state) => state.enabled);
+  const setLabRenderer = useDeepFieldModeStore((state) => state.setEnabled);
   const { colors } = useTheme();
   const focused = useIsFocused();
   const blocked = shellTransientStore((store) =>
@@ -185,6 +188,23 @@ export function OrreryViewOptions({
                       satellitesEnabled: enabled ? 1 : 0,
                     })
                   }
+                />
+              </View>
+              {/* ORRERY LAB A — EXPERIMENT ONLY: runtime renderer A/B so one
+                  build can measure legacy vs Lab A. In-memory, never saved. */}
+              <AppText role="label">Lab A renderer (experiment)</AppText>
+              <AppText>
+                Experiment-only A/B: Lab A deep field vs the legacy flat
+                renderer. Not saved.
+              </AppText>
+              <View style={styles.toggle}>
+                <AppText>{labRenderer ? "Lab A" : "Legacy"}</AppText>
+                <Switch
+                  accessibilityLabel="Lab A renderer (experiment)"
+                  value={labRenderer}
+                  trackColor={{ false: colors.border, true: colors.accent }}
+                  thumbColor={colors.textPrimary}
+                  onValueChange={setLabRenderer}
                 />
               </View>
               {busy ? (

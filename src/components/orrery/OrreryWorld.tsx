@@ -65,13 +65,13 @@ import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import type { DeepFieldBodyContext } from "./lab/BodyOverlays";
 import { BodyStackLayer } from "./lab/BodyStackLayer";
 import { DeepFieldBackdrop } from "./lab/DeepFieldBackdrop";
-import { DEEP_FIELD_ENABLED } from "./lab/deep-field-config";
 import { resolveDeepFieldInk, tokenInk } from "./lab/deep-field-ink";
 import {
   type BodyLightMap,
   computeBodyLight,
   computeSwitchFx,
 } from "./lab/deep-field-math";
+import { useDeepFieldEnabled } from "./lab/deep-field-mode";
 import { LabHud, labMarkerVisible } from "./lab/LabHud";
 import { WorldPlaneLayer } from "./lab/WorldPlaneLayer";
 import type { PlaneRing } from "./lab/world-plane";
@@ -355,7 +355,8 @@ export function OrreryWorld({
   // the switch runtime (separate mappers: the frame worklet's closure is
   // not widened — see orrery-frame-mapper.test).
   const deepInk = useMemo(() => resolveDeepFieldInk(colors), [colors]);
-  const deepFieldOn = DEEP_FIELD_ENABLED;
+  // ORRERY LAB A: runtime A/B (experiment-only store; see lab/deep-field-mode).
+  const deepFieldOn = useDeepFieldEnabled();
   const reducedMotion = useReducedMotionShared();
   const switchFx = useDerivedValue(() =>
     computeSwitchFx(
