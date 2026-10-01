@@ -35,50 +35,15 @@ import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
 import type { PreparedOrreryText } from "../OrreryLabel";
 import { bodyAt, type FrameIndex } from "./labb-frame-index";
+import { type HudTagPlacement, hudTagPlacement } from "./labb-layer-plan";
 
 /** Same paddings as `OrreryLabel` (the prepared width already includes them). */
 const HORIZONTAL_PADDING = SPACING.sm;
 const VERTICAL_PADDING = SPACING.xs;
 
-export interface HudTagPlacement {
-  x: number;
-  y: number;
-  opacity: number;
-  /** y of the body-facing plate edge. */
-  edgeY: number;
-  /** +1 when the body is below the plate, −1 when above. */
-  toward: number;
-}
-
-/**
- * Where the tag goes, from the allocation alone (plus the body's y for the
- * leader direction). Hidden (opacity 0) when the label is not allocated —
- * exactly the legacy visibility rule.
- */
-export function hudTagPlacement(
-  allocations: readonly LabelAllocation[],
-  identity: string,
-  height: number,
-  bodyY: number | undefined,
-): HudTagPlacement {
-  "worklet";
-  let item: LabelAllocation | undefined;
-  for (let i = 0; i < allocations.length; i++)
-    if (allocations[i].id === identity) {
-      item = allocations[i];
-      break;
-    }
-  const rect = item?.rect;
-  if (!rect) return { x: 0, y: 0, opacity: 0, edgeY: 0, toward: -1 };
-  const above = bodyY !== undefined && bodyY > rect.y + height / 2;
-  return {
-    x: rect.x,
-    y: rect.y,
-    opacity: item?.opacity ?? 0,
-    edgeY: above ? rect.y + height : rect.y,
-    toward: above ? 1 : -1,
-  };
-}
+// The placement rule lives in the pure plan module (shared with the picture
+// layer, switch-stall fix); re-exported for existing importers.
+export { type HudTagPlacement, hudTagPlacement };
 
 export function LabHudLabel({
   identity,

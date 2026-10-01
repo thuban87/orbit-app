@@ -68,18 +68,18 @@ import {
 import { mixVec, tokenToVec3, type Vec3 } from "./labb-uniforms";
 
 // --- Tunables -----------------------------------------------------------------
-const OUTLINE_WIDTH = 3;
-const FOCUS_GAP = 4;
+export const OUTLINE_WIDTH = 3;
+export const FOCUS_GAP = 4;
 const SUN_FOCUS_GAP = 6;
 const GLOW_OPACITY = 0.35;
 const PULSE_RADIUS_FRAC = 0.1;
 const PULSE_OPACITY_FRAC = 0.4;
 const PULSE_SPEED = 0.002;
 /** Glyph baseline offset as a fraction of font size (visual centring). */
-const GLYPH_BASELINE = 0.36;
+export const GLYPH_BASELINE = 0.36;
 
 /** Glyph width cap as a fraction of the inner disc diameter. */
-const GLYPH_MAX_FRACTION = 0.8;
+export const GLYPH_MAX_FRACTION = 0.8;
 
 /**
  * Hermes has no `Intl.Segmenter`, so `orreryInitials` returns the WHOLE name on
@@ -241,6 +241,50 @@ function FlatContactDisc({
   );
 }
 
+/** The static (React-side) uniform block of a lit contact body. */
+export function labContactStatic(
+  look: LabWorldLook | undefined,
+  radius: number,
+  identity: string,
+  swatch: string,
+  bodyFill: string,
+  status: ProfileStatus | null,
+): LabBodyStatic | null {
+  if (!look) return null;
+  const b = look.profile.bodies;
+  const m = labBodyMaterial(status);
+  const base = tokenToVec3(swatch);
+  // Band tone: the swatch pushed toward black / the highlight token (numeric
+  // token mixes, C-03), alternating by seed so worlds differ.
+  const seed = labSeed(identity);
+  // Band tone: the swatch pushed toward black (numeric token mix, C-03);
+  // the shader adds highlight-token streaks on top.
+  const band = mixVec(base, [0, 0, 0] as Vec3, b.bandContrast * 0.55);
+  return {
+    uR: radius,
+    uStatus: tokenToVec3(bodyFill),
+    uSky: tokenToVec3(look.sky),
+    uShadow: tokenToVec3(labColor(look.colors, b.shadowInk)),
+    uHi: tokenToVec3(labColor(look.colors, b.highlight)),
+    uBase: base,
+    uBand: band,
+    uSeed: seed,
+    uFloor: b.lightFloor,
+    uWrap: b.wrap,
+    uRimPx: b.rimPx,
+    uRimStr: b.rimStrength,
+    atmo: b.atmosphere * m.atmosphere,
+    atmoAdd: b.atmosphereAdditive,
+    shadow: b.shadow,
+    fresnel: b.fresnel * m.fresnel,
+    desat: m.desaturate,
+    spec: b.spec * m.spec,
+    haze: b.haze,
+    intensity: look.profile.intensity,
+    extent: look.extent,
+  };
+}
+
 function useBodyStatic(
   look: LabWorldLook | undefined,
   radius: number,
@@ -249,41 +293,26 @@ function useBodyStatic(
   bodyFill: string,
   status: ProfileStatus | null,
 ): LabBodyStatic | null {
-  return useMemo(() => {
-    if (!look) return null;
-    const b = look.profile.bodies;
-    const m = labBodyMaterial(status);
-    const base = tokenToVec3(swatch);
-    // Band tone: the swatch pushed toward black / the highlight token (numeric
-    // token mixes, C-03), alternating by seed so worlds differ.
-    const seed = labSeed(identity);
-    // Band tone: the swatch pushed toward black (numeric token mix, C-03);
-    // the shader adds highlight-token streaks on top.
-    const band = mixVec(base, [0, 0, 0] as Vec3, b.bandContrast * 0.55);
-    return {
-      uR: radius,
-      uStatus: tokenToVec3(bodyFill),
-      uSky: tokenToVec3(look.sky),
-      uShadow: tokenToVec3(labColor(look.colors, b.shadowInk)),
-      uHi: tokenToVec3(labColor(look.colors, b.highlight)),
-      uBase: base,
-      uBand: band,
-      uSeed: seed,
-      uFloor: b.lightFloor,
-      uWrap: b.wrap,
-      uRimPx: b.rimPx,
-      uRimStr: b.rimStrength,
-      atmo: b.atmosphere * m.atmosphere,
-      atmoAdd: b.atmosphereAdditive,
-      shadow: b.shadow,
-      fresnel: b.fresnel * m.fresnel,
-      desat: m.desaturate,
-      spec: b.spec * m.spec,
-      haze: b.haze,
-      intensity: look.profile.intensity,
-      extent: look.extent,
-    };
-  }, [look, radius, identity, swatch, bodyFill, status]);
+  return useMemo(
+    () => labContactStatic(look, radius, identity, swatch, bodyFill, status),
+    [look, radius, identity, swatch, bodyFill, status],
+  );
+}
+
+/** The static uniform block of a lit moon. */
+export function labMoonStatic(
+  look: LabWorldLook | undefined,
+): LabMoonStatic | null {
+  if (!look) return null;
+  const b = look.profile.bodies;
+  return {
+    uTone: tokenToVec3(labColor(look.colors, b.moonTone)),
+    uHi: tokenToVec3(labColor(look.colors, b.highlight)),
+    uSky: tokenToVec3(look.sky),
+    floor: b.moonFloor,
+    haze: b.haze,
+    extent: look.extent,
+  };
 }
 
 export function LabContactBody({
@@ -521,12 +550,12 @@ export function LabSunBody({
 /** Cheap lit moon (default): dark disc + lit cap offset toward the sun + glint.
  * Three plain circles, no runtime shader — moons are tiny and numerous, and a
  * shader per moon cost ~14 ms gfx p50 on the emulator (PERF-LOG WP-1.2). */
-const MOON_DARK_ALPHA = 0.5;
-const MOON_CAP_R = 0.8;
-const MOON_CAP_OFFSET = 0.2;
-const MOON_GLINT_R = 0.22;
-const MOON_GLINT_OFFSET = 0.48;
-const MOON_GLINT_ALPHA = 0.8;
+export const MOON_DARK_ALPHA = 0.5;
+export const MOON_CAP_R = 0.8;
+export const MOON_CAP_OFFSET = 0.2;
+export const MOON_GLINT_R = 0.22;
+export const MOON_GLINT_OFFSET = 0.48;
+export const MOON_GLINT_ALPHA = 0.8;
 
 export function LabMoon({
   identity,
@@ -550,18 +579,7 @@ export function LabMoon({
     1,
   );
   const ctx = useLabRenderContext();
-  const st = useMemo<LabMoonStatic | null>(() => {
-    if (!look) return null;
-    const b = look.profile.bodies;
-    return {
-      uTone: tokenToVec3(labColor(look.colors, b.moonTone)),
-      uHi: tokenToVec3(labColor(look.colors, b.highlight)),
-      uSky: tokenToVec3(look.sky),
-      floor: b.moonFloor,
-      haze: b.haze,
-      extent: look.extent,
-    };
-  }, [look]);
+  const st = useMemo<LabMoonStatic | null>(() => labMoonStatic(look), [look]);
   const shaderOn = look?.lit && look.moonShader;
   const effect = shaderOn && st ? getLabEffect("moon") : null;
   // Worklets capture plain booleans only (not the effect / theme objects).

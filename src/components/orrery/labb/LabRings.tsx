@@ -52,8 +52,9 @@ import { type LabRingProfile, labColor } from "@/theme/orrery-lab-fx";
 import type { ThemePalette } from "@/theme/theme-types";
 import type { OrreryBodyResource } from "../use-orrery-switch-runtime";
 import { useLabRenderContext } from "./labb-context";
-import { getLabEffect } from "./labb-effects";
+import { getLabEffect, LAB_EFFECT_SOURCES } from "./labb-effects";
 import { bodyAt, type FrameIndex } from "./labb-frame-index";
+import { flattenUniforms, uniformOrder } from "./labb-layer-plan";
 import {
   compassChevron,
   northTick,
@@ -90,6 +91,10 @@ const MODE_RADIAL = 2;
 const FALLBACK_DASH = [5, 5];
 /** Wake stroke = visible width × this (the shader fades the cross profile). */
 const WAKE_STROKE_SCALE = 1.6;
+/** Ring picture cull bounds (world units). */
+const RING_PICTURE_BOUNDS = 1e5;
+const RING_ORDER = uniformOrder(LAB_EFFECT_SOURCES.ringInstrument);
+const WAKE_ORDER = uniformOrder(LAB_EFFECT_SOURCES.ringWake);
 
 // ---------------------------------------------------------------------------
 // A/B baseline: WP-1.0 parity rings (per-frame 128-point Path per ring).
@@ -665,6 +670,222 @@ function FocusLock({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Switch-stall fix (flag `layerPictures`): the class rings and the progress
+// wakes as ONE UI-thread picture each (one derived value) instead of one
+// component + 1–2 derived values per ring. Same uniforms, same per-ring
+// radius / opacity rule as `RingCircle` / `WakeRing`, same class order.
+
+interface RingClassSpec {
+  color: number[];
+  widthDp: number;
+  dashPeriod: number;
+  dashDuty: number;
+  /** profile.alpha × class alpha (the uniform alpha, or the flat alpha). */
+  alpha: number;
+  keys: string[];
+  dims: number[];
+  trimmed: boolean[];
+}
+
+function RingClassesPicture({
+  classes,
+  frame,
+  frameIndex,
+  cam,
+  flow,
+  profile,
+  highlight,
+  shader,
+  ringGap,
+  anyFocus,
+  trimKeys,
+}: {
+  classes: readonly (readonly LabRingEntry[])[];
+  frame: SharedValue<AnimatedFrame>;
+  frameIndex: SharedValue<FrameIndex>;
+  cam: SharedValue<number[]>;
+  flow: SharedValue<number[]>;
+  profile: LabRingProfile;
+  highlight: number[];
+  shader: boolean;
+  ringGap: number;
+  anyFocus: boolean;
+  trimKeys: ReadonlySet<string>;
+}) {
+  const ctx = useLabRenderContext();
+  const fxFlags = ctx?.fxFlags;
+  const reducedMotion = ctx?.reducedMotion;
+  const signal = ctx?.sw?.signal;
+  const roles = ctx?.sw?.roles;
+  const effect = shader ? getLabEffect("ringInstrument") : null;
+  const specs = useMemo<RingClassSpec[]>(
+    () =>
+      classes.map((group) => {
+        const cls = group[0].cls;
+        return {
+          color: tokenToVec4(cls.color),
+          widthDp: cls.widthDp,
+          dashPeriod: cls.dashPeriod,
+          dashDuty: cls.dashDuty,
+          alpha: profile.alpha * cls.alpha,
+          keys: group.map((e) => e.key),
+          dims: group.map((e) =>
+            anyFocus && !e.focused ? profile.focusDim : 1,
+          ),
+          trimmed: group.map((e) => trimKeys.has(e.key)),
+        };
+      }),
+    [classes, profile, anyFocus, trimKeys],
+  );
+  const farAlpha = profile.farAlpha;
+  const flowK = profile.flow;
+  const picture = useDerivedValue(() => {
+    const f = frame.value;
+    const index = frameIndex.value;
+    const zoom = f.pose.zoom;
+    const c = cam.value;
+    const fl = flow.value;
+    const fx = fxFlags ? fxFlags.value : null;
+    const sig = signal ? signal.value : null;
+    const live =
+      !!fx &&
+      fx.flags.fx &&
+      fx.flags.fxRingTrim &&
+      switchFxLive(sig, reducedMotion ? reducedMotion.value : false);
+    const roleMap = roles ? roles.value : null;
+    const recorder = Skia.PictureRecorder();
+    const canvas = recorder.beginRecording(
+      Skia.XYWHRect(
+        -RING_PICTURE_BOUNDS,
+        -RING_PICTURE_BOUNDS,
+        RING_PICTURE_BOUNDS * 2,
+        RING_PICTURE_BOUNDS * 2,
+      ),
+    );
+    for (let k = 0; k < specs.length; k++) {
+      const spec = specs[k];
+      const paint = Skia.Paint();
+      paint.setAntiAlias(true);
+      paint.setStyle(1);
+      paint.setStrokeWidth(spec.widthDp / zoom);
+      paint.setColor(
+        Float32Array.of(spec.color[0], spec.color[1], spec.color[2], 1),
+      );
+      let base = spec.color[3];
+      if (effect) {
+        const fade = ringDensityFade(ringGap, c[3]);
+        const u = ringUniforms(spec.color, highlight, c, fl, {
+          mode: MODE_RING,
+          alpha: spec.alpha * fade,
+          dashPeriod: spec.dashPeriod,
+          dashDuty: spec.dashDuty,
+          farAlpha,
+          flowStrength: flowK * fade * fade,
+          flowOn: true,
+        });
+        paint.setShader(effect.makeShader(flattenUniforms(u, RING_ORDER)));
+      } else {
+        base *= spec.alpha;
+        if (spec.dashPeriod > 0)
+          paint.setPathEffect(Skia.PathEffect.MakeDash(FALLBACK_DASH, 0));
+      }
+      for (let i = 0; i < spec.keys.length; i++) {
+        const b = bodyAt(f, index, spec.keys[i]);
+        if (!b) continue;
+        const r = b.ringRadius / zoom;
+        let op = b.opacity * spec.dims[i];
+        if (spec.trimmed[i] && signal)
+          op *= classRingSwitchFade(roleMap, spec.keys[i], sig, live);
+        if (!(r > 0) || !(op > 0)) continue;
+        paint.setAlphaf(Math.min(1, base * op));
+        canvas.drawCircle(0, 0, r, paint);
+      }
+    }
+    return recorder.finishRecordingAsPicture();
+  });
+  return <Picture picture={picture} />;
+}
+
+function WakesPicture({
+  classes,
+  frame,
+  cam,
+  profile,
+  settled,
+}: {
+  classes: readonly (readonly LabRingEntry[])[];
+  frame: SharedValue<AnimatedFrame>;
+  cam: SharedValue<number[]>;
+  profile: LabRingProfile;
+  settled: SharedValue<number>;
+}) {
+  const effect = getLabEffect("ringWake");
+  const wakes = useMemo(
+    () =>
+      classes
+        .filter((group) => group[0].cls.wake)
+        .flatMap((group) =>
+          group
+            .filter((e) => wakeAngle(e.x, e.y) > 1e-3)
+            .map((e) => ({
+              color: tokenToVec4(e.cls.color),
+              alpha: profile.wakeAlpha * e.cls.alpha,
+              angle: wakeAngle(e.x, e.y),
+              ringRadius: e.ringRadius,
+            })),
+        ),
+    [classes, profile.wakeAlpha],
+  );
+  const widthDp = profile.wakeWidthDp;
+  const farAlpha = profile.farAlpha;
+  const picture = useDerivedValue(() => {
+    const recorder = Skia.PictureRecorder();
+    const canvas = recorder.beginRecording(
+      Skia.XYWHRect(
+        -RING_PICTURE_BOUNDS,
+        -RING_PICTURE_BOUNDS,
+        RING_PICTURE_BOUNDS * 2,
+        RING_PICTURE_BOUNDS * 2,
+      ),
+    );
+    const op = settled.value;
+    if (effect && op > 0 && wakes.length > 0) {
+      const c = cam.value;
+      const paint = Skia.Paint();
+      paint.setAntiAlias(true);
+      paint.setStyle(1);
+      paint.setStrokeWidth(
+        (widthDp * WAKE_STROKE_SCALE) / frame.value.pose.zoom,
+      );
+      paint.setAlphaf(Math.min(1, op));
+      for (let i = 0; i < wakes.length; i++) {
+        const w = wakes[i];
+        paint.setShader(
+          effect.makeShader(
+            flattenUniforms(
+              wakeUniforms(
+                w.color,
+                w.alpha,
+                w.angle,
+                w.ringRadius,
+                widthDp,
+                farAlpha,
+                c,
+              ),
+              WAKE_ORDER,
+            ),
+          ),
+        );
+        canvas.drawCircle(0, 0, w.ringRadius, paint);
+      }
+    }
+    return recorder.finishRecordingAsPicture();
+  });
+  if (!effect) return null;
+  return <Picture picture={picture} />;
+}
+
 const CLASS_ORDER: RingInstrumentClass["id"][] = [
   "neutral",
   "stable",
@@ -685,6 +906,7 @@ export function LabRings({
   progress,
   reorder,
   trimKeys = EMPTY_KEYS,
+  picture = false,
 }: {
   resources: readonly OrreryBodyResource[];
   frame: SharedValue<AnimatedFrame>;
@@ -700,6 +922,8 @@ export function LabRings({
   /** WP-2.1: keys that may leave / enter in the running switch (React-side
    * candidates; the UI-thread role map decides what actually draws). */
   trimKeys?: ReadonlySet<string>;
+  /** Switch-stall fix: class rings + wakes as one picture each. */
+  picture?: boolean;
 }) {
   const ctx = useLabRenderContext();
   const entries = useMemo(
@@ -815,7 +1039,16 @@ export function LabRings({
   });
   return (
     <Group matrix={matrix}>
-      {flags.ringWake
+      {flags.ringWake && picture ? (
+        <WakesPicture
+          classes={classes}
+          frame={frame}
+          cam={cam}
+          profile={profile}
+          settled={settled}
+        />
+      ) : null}
+      {flags.ringWake && !picture
         ? classes
             .filter((group) => group[0].cls.wake)
             .map((group) => (
@@ -850,7 +1083,22 @@ export function LabRings({
           </Group>
         </Group>
       ))}
-      {classes.map((group) => (
+      {picture ? (
+        <RingClassesPicture
+          classes={classes}
+          frame={frame}
+          frameIndex={frameIndex}
+          cam={cam}
+          flow={flow}
+          profile={profile}
+          highlight={highlight}
+          shader={shader}
+          ringGap={ringGap}
+          anyFocus={anyFocus}
+          trimKeys={trimKeys}
+        />
+      ) : null}
+      {(picture ? [] : classes).map((group) => (
         <RingClassGroup
           key={group[0].cls.id}
           common={commonFor(group[0].cls)}

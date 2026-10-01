@@ -16,13 +16,57 @@ import { OrreryWorld } from "../OrreryWorld";
 import { useOrreryCamera } from "../use-orrery-camera";
 import { labInitials } from "./LabBodies";
 import { BODY_REACH, SUN_REACH } from "./labb-bodies-logic";
-import { resetLabEffectsForTest } from "./labb-effects";
+import { LAB_EFFECT_SOURCES, resetLabEffectsForTest } from "./labb-effects";
+import { uniformOrder } from "./labb-layer-plan";
 
 const lab = vi.hoisted(() => ({
   flags: {} as Record<string, boolean>,
   /** When true the mocked Skia compiles every runtime effect (lit path). */
   effects: false,
 }));
+
+/** Fake SkPicture recorder: canvas calls with a snapshot of the paint state. */
+const fakeSkia = vi.hoisted(() => {
+  type Op = [string, ...unknown[]];
+  const snapshot = (v: unknown) =>
+    v && typeof v === "object" && "__paint" in (v as object)
+      ? { ...(v as { __paint: Record<string, unknown> }).__paint }
+      : v;
+  const recorder = () => {
+    const ops: Op[] = [];
+    const canvas: Record<string, unknown> = new Proxy(
+      {},
+      {
+        get:
+          (_t, name: string) =>
+          (...args: unknown[]) => {
+            ops.push([name, ...args.map(snapshot)]);
+            return 0;
+          },
+      },
+    );
+    return {
+      beginRecording: () => canvas,
+      finishRecordingAsPicture: () => ({ ops }),
+    };
+  };
+  const paint = () => {
+    const state: Record<string, unknown> = { alpha: 1 };
+    return new Proxy(
+      { __paint: state },
+      {
+        get: (t, name: string) =>
+          name === "__paint"
+            ? t.__paint
+            : (...args: unknown[]) => {
+                state[name === "setAlphaf" ? "alpha" : name] =
+                  args.length === 1 ? args[0] : args;
+              },
+      },
+    );
+  };
+  return { recorder, paint };
+});
 
 vi.mock("@/stores/orrery-labb-fx-store", async (original) => {
   const real = await original<typeof import("@/stores/orrery-labb-fx-store")>();
@@ -31,7 +75,13 @@ vi.mock("@/stores/orrery-labb-fx-store", async (original) => {
     useLabFxStore: (selector: (s: unknown) => unknown) =>
       selector({
         renderer: "lab",
-        flags: { ...real.defaultLabFlags(), ...lab.flags },
+        // The per-component tree is pinned unless a test opts into the
+        // switch-stall layer pictures (`layerPictures: true`).
+        flags: {
+          ...real.defaultLabFlags(),
+          layerPictures: false,
+          ...lab.flags,
+        },
         intensity: 1,
       }),
   };
@@ -133,8 +183,32 @@ vi.mock("@shopify/react-native-skia", async () => {
     Skia: {
       Color: (c: string) => c,
       RuntimeEffect: {
-        Make: (source: string) => (lab.effects ? { source } : null),
+        Make: (source: string) =>
+          lab.effects
+            ? {
+                source,
+                makeShaderWithChildren: (
+                  uniforms: number[],
+                  children = [],
+                ) => ({
+                  uniforms,
+                  children,
+                }),
+                makeShader: (uniforms: number[]) => ({ uniforms }),
+              }
+            : null,
       },
+      PictureRecorder: fakeSkia.recorder,
+      Paint: fakeSkia.paint,
+      XYWHRect: (x: number, y: number, width: number, height: number) => ({
+        x,
+        y,
+        width,
+        height,
+      }),
+      RRectXY: (r: object, rx: number) => ({ ...r, rx }),
+      MaskFilter: { MakeBlur: (...args: unknown[]) => ({ blur: args }) },
+      PathEffect: { MakeDash: (...args: unknown[]) => ({ dash: args }) },
       Path: {
         Make: () => ({ moveTo() {}, lineTo() {}, close() {}, addArc() {} }),
       },
@@ -148,6 +222,11 @@ vi.mock("@shopify/react-native-skia", async () => {
               layout: () => {},
               getLongestLine: () => 90,
               getHeight: () => 40,
+              paint: (
+                canvas: { paragraph: (x: number, y: number) => void },
+                x: number,
+                y: number,
+              ) => canvas.paragraph(x, y),
             }),
           };
           return builder;
@@ -494,6 +573,97 @@ describe("Lab B renderer tree contract", () => {
     expect(contact.children.some((c) => c.children[0]?.type === "shader")).toBe(
       false,
     );
+  });
+
+  // --- Switch-stall fix: layer pictures (flag layerPictures) ----------------
+
+  type Op = [string, ...unknown[]];
+  const opsOf = (n: Node) =>
+    ((n.props.picture as { value: { ops: Op[] } }).value?.ops ?? []) as Op[];
+
+  it("layerPictures: bodies, labels and rings are ONE picture each; the sun stays a component between the body halves", async () => {
+    lab.flags = { fpsHud: false, layerPictures: true };
+    const { tree } = await renderLab({ value: { ...HOME_CAMERA } });
+    const [rings, , , bodies, labels] = tree[1].children;
+    expect(bodies.children.map((c) => c.type)).toEqual([
+      "picture",
+      "skGroup",
+      "picture",
+    ]);
+    expect(labels.children.map((c) => c.type)).toEqual(["picture"]);
+    // Under the homography: the class-ring picture + the trim picture (the
+    // wake picture needs its runtime effect: null here).
+    const orbit = rings.children[0];
+    expect(orbit.props.matrix).toHaveProperty("value");
+    expect(orbit.children.slice(0, 2).map((c) => c.type)).toEqual([
+      "picture",
+      "picture",
+    ]);
+    expect(orbit.children.some((c) => c.type === "circle")).toBe(false);
+  });
+
+  it("layerPictures lit body: one shader circle at r·reach, flattened uniforms (disc = world radius), billboard transform", async () => {
+    lab.effects = true;
+    lab.flags = { fpsHud: false, layerPictures: true };
+    const pose = { value: { ...HOME_CAMERA, zoom: 2 } };
+    const { tree, scene } = await renderLab(pose);
+    const [behind, , front] = tree[1].children[3].children;
+    const ops = [...opsOf(behind), ...opsOf(front)];
+    const worldR = scene.world.find((b) => b.kind === "contact")?.radius ?? 0;
+    const scale = ops.find((o) => o[0] === "scale");
+    expect(scale?.[1]).toBeCloseTo(2, 5);
+    const disc = ops.find(
+      (o) =>
+        o[0] === "drawCircle" &&
+        (o[4] as { setShader?: unknown }).setShader !== undefined,
+    );
+    expect(disc?.[3]).toBeCloseTo(worldR * BODY_REACH, 6);
+    const shader = ((disc ?? [])[4] as { setShader: { uniforms: number[] } })
+      .setShader;
+    const order = uniformOrder(LAB_EFFECT_SOURCES.bodyProcedural);
+    const uA = order.indexOf("uA") * 4;
+    expect(shader.uniforms[uA]).toBe(worldR);
+    expect(shader.uniforms[uA + 1]).toBeCloseTo(0.5, 5);
+    expect(
+      Math.hypot(shader.uniforms[uA + 2], shader.uniforms[uA + 3]),
+    ).toBeCloseTo(1, 5);
+    // Initials glyphs over the procedural world.
+    expect(ops.some((o) => o[0] === "drawText")).toBe(true);
+  });
+
+  it("layerPictures flat fallback: status disc + swatch disc + glyph, no shader", async () => {
+    lab.flags = { fpsHud: false, layerPictures: true };
+    const { tree, scene } = await renderLab({ value: { ...HOME_CAMERA } });
+    const [behind, , front] = tree[1].children[3].children;
+    const ops = [...opsOf(behind), ...opsOf(front)];
+    const circles = ops.filter((o) => o[0] === "drawCircle");
+    const worldR = scene.world.find((b) => b.kind === "contact")?.radius ?? 0;
+    expect(circles.map((o) => o[3])).toEqual([worldR, worldR - 1.5]);
+    expect(
+      circles.every(
+        (o) => (o[4] as { setShader?: unknown }).setShader === undefined,
+      ),
+    ).toBe(true);
+  });
+
+  it("layerPictures labels: hidden at overview; at zoom 2 the HUD tag plate equals the prepared size", async () => {
+    lab.flags = { fpsHud: false, layerPictures: true };
+    const pose = { value: { ...HOME_CAMERA } };
+    const { tree } = await renderLab(pose);
+    const labels = tree[1].children[4].children[0];
+    expect(opsOf(labels)).toEqual([]);
+    pose.value = { ...pose.value, zoom: 2 };
+    const ops = opsOf(labels);
+    expect(ops[0][0]).toBe("saveLayer");
+    const rrects = ops.filter((o) => o[0] === "drawRRect");
+    // [halo, plate, outline]: the plate is EXACTLY the prepared width/height.
+    expect(rrects).toHaveLength(3);
+    const plate = rrects[1][1] as { width: number; height: number };
+    expect(plate.width).toBe(90 + 2 * 8);
+    expect(plate.height).toBeGreaterThanOrEqual(40);
+    expect(ops.filter((o) => o[0] === "drawLine")).toHaveLength(2);
+    expect(ops.some((o) => o[0] === "paragraph")).toBe(true);
+    expect(ops.at(-1)?.[0]).toBe("restore");
   });
 
   it("derives real initials when Hermes returned the whole name", () => {

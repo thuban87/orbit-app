@@ -299,6 +299,14 @@ export const LAB_FLAG_REGISTRY = [
   },
   // Debug instrumentation (research 03 §4).
   {
+    id: "layerPictures",
+    label: "Bodies + labels as ONE picture per layer (switch-stall fix)",
+    section: "debug",
+    default: true,
+    heavy: true,
+    note: "off = one component per body / label (A/B baseline)",
+  },
+  {
     id: "fpsHud",
     label: "FPS / frame-time HUD",
     section: "debug",

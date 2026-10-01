@@ -39,9 +39,17 @@ import {
   Group,
   Paint,
   RuntimeShader,
+  type SkImage,
   type SkTypefaceFontProvider,
 } from "@shopify/react-native-skia";
-import { type ReactNode, useEffect, useMemo, useRef } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { PixelRatio } from "react-native";
 import type {
   ComposedGesture,
@@ -94,6 +102,12 @@ import {
 import { LabCanvas } from "./LabCanvas";
 import { LabEnvironment } from "./LabEnvironment";
 import { LabHudLabel } from "./LabLabels";
+import {
+  LabBodiesPictures,
+  type LabLabelLayerInput,
+  LabLabelsPicture,
+  LabPhotoProbes,
+} from "./LabLayerPictures";
 import { LabPolaris } from "./LabPolaris";
 import { LabRings, LabRingsPathRebuild } from "./LabRings";
 import {
@@ -283,6 +297,58 @@ export function LabBRenderer(contract: LabRenderContract) {
     [colors.background],
   );
 
+  // --- Switch-stall fix: layer pictures (flag layerPictures) ----------------
+  const pictures = flags.layerPictures;
+  // Contact photos for the bodies picture: one `useOrreryPhoto` per distinct
+  // path in `LabPhotoProbes` (outside the canvas). Arrivals are coalesced into
+  // one re-render per animation frame.
+  const photosRef = useRef(new Map<string, SkImage>());
+  const [photoVersion, setPhotoVersion] = useState(0);
+  const photoBump = useRef(false);
+  const onPhoto = useCallback((path: string, image: SkImage | null) => {
+    const map = photosRef.current;
+    if (image) {
+      if (map.get(path) === image) return;
+      map.set(path, image);
+    } else {
+      if (!map.has(path)) return;
+      map.delete(path);
+    }
+    if (photoBump.current) return;
+    photoBump.current = true;
+    requestAnimationFrame(() => {
+      photoBump.current = false;
+      setPhotoVersion((v) => v + 1);
+    });
+  }, []);
+  const photoPaths = useMemo(() => {
+    if (!pictures || !flags.bodies) return [];
+    const out = new Set<string>();
+    for (const r of resources) {
+      if (r.body.kind !== "contact") continue;
+      const photo = r.scene.contacts.find((c) => c.id === r.body.id)?.photo;
+      if (photo) out.add(photo);
+    }
+    return [...out];
+  }, [pictures, flags.bodies, resources]);
+  const labelInputs = useMemo<LabLabelLayerInput[]>(
+    () =>
+      labels.map((l) => ({
+        id: l.id,
+        paragraph: l.text.paragraph,
+        w: l.text.width,
+        h: l.text.height,
+        caption: l.context
+          ? {
+              paragraph: l.context.paragraph,
+              w: l.context.width,
+              h: l.context.height,
+            }
+          : null,
+      })),
+    [labels],
+  );
+
   // --- WP-2.1 System-switch showcase inputs ---------------------------------
   const { transition, progress } = contract.switchRuntime;
   // Pure in (transition, progress): the choreography's phase / spin signal.
@@ -438,6 +504,7 @@ export function LabBRenderer(contract: LabRenderContract) {
               progress={contract.switchRuntime.progress}
               reorder={contract.reorder}
               trimKeys={trimKeys}
+              picture={pictures}
             />
           )
         ) : null}
@@ -464,7 +531,36 @@ export function LabBRenderer(contract: LabRenderContract) {
       {ghost}
       {/* L2–L4: keep this run of body root Groups contiguous. */}
       <Group>
-        {flags.bodies
+        {flags.bodies && pictures ? (
+          <LabBodiesPictures
+            resources={resources}
+            satellites={satellites}
+            frame={frame}
+            frameIndex={frameIndex}
+            colors={colors}
+            fontProvider={fontProvider}
+            focusedIds={focusedIds}
+            focusedSatellite={focusedSatellite}
+            look={look}
+            photos={photosRef.current}
+            photoVersion={photoVersion}
+            sun={resources
+              .filter((resource) => resource.body.kind === "sun")
+              .map((resource) => (
+                <LabBody
+                  key={resource.key}
+                  resource={resource}
+                  frame={frame}
+                  frameIndex={frameIndex}
+                  colors={colors}
+                  fontProvider={fontProvider}
+                  focused={focusedIds.includes(resource.body.id)}
+                  look={look}
+                />
+              ))}
+          />
+        ) : null}
+        {flags.bodies && !pictures
           ? resources.map((resource) => (
               <LabBody
                 key={resource.key}
@@ -478,7 +574,7 @@ export function LabBRenderer(contract: LabRenderContract) {
               />
             ))
           : null}
-        {flags.bodies
+        {flags.bodies && !pictures
           ? satellites.map((row) => {
               const target = {
                 kind: "satellite" as const,
@@ -511,7 +607,7 @@ export function LabBRenderer(contract: LabRenderContract) {
       </Group>
     </>
   );
-  return (
+  const canvas = (
     <LabCanvas
       width={viewport.width}
       height={viewport.height}
@@ -544,7 +640,19 @@ export function LabBRenderer(contract: LabRenderContract) {
         )}
         {/* L6 — labels stay outside any future effect/filter layer. */}
         <Group>
-          {flags.labels
+          {flags.labels && pictures ? (
+            <LabLabelsPicture
+              labels={labelInputs}
+              allocations={allocations}
+              frame={frame}
+              frameIndex={frameIndex}
+              colors={colors}
+              profile={profile.labels}
+              statusColors={labelStatus}
+              hud={flags.labelHud}
+            />
+          ) : null}
+          {flags.labels && !pictures
             ? labels.map((label) => (
                 <Group key={label.id}>
                   {flags.labelHud ? (
@@ -592,5 +700,13 @@ export function LabBRenderer(contract: LabRenderContract) {
         />
       ) : null}
     </LabCanvas>
+  );
+  return photoPaths.length > 0 ? (
+    <>
+      <LabPhotoProbes paths={photoPaths} onImage={onPhoto} />
+      {canvas}
+    </>
+  ) : (
+    canvas
   );
 }
