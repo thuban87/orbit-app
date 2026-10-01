@@ -100,3 +100,21 @@ via adb: two-finger pan, pinch (multi-touch).
 - **Cost.** Renderer log on the Pixel 6 Pro: before B.3 ~47–51 fps (jsRender ~11.3 ms); after, 42 fps at
   overview, 31–34 fps dollied in close (present 4.9→10.6 ms: fill cost of the noise star + plane at
   close range). Overdraw is the lever (smaller plane disc, cheaper noise) if this ships.
+
+## 2026-10-01 — Checkpoint B.4/B.5: "Unavailable System", tests
+
+- **"Unavailable System" is pre-existing app behaviour, not the seed or the lab.** On screen focus,
+  OrreryScreen restores `preferences.lastSystem` via `select(system, undefined)` (no name). The store's
+  name fallback (`orrery-system-store.ts` ~104) resolves names only for built-ins and categories; for a
+  `custom` System (all three Lab C seed Systems are custom) the name falls to "Unavailable System", and
+  the post-load `currentName` again resolves categories only, so it never recovers. Files are unchanged
+  vs `main`. Would reproduce in production for any user whose last System is custom. Fix (not applied —
+  production behaviour, owner's call): pass the catalog entry's name on restore, or resolve custom names
+  from the loaded snapshot.
+- **Tests.** The 7 old-2.5D-contract cases (tilt-0 home, 60° max, throw-on-horizon, …) were NOT rewritten
+  in this checkpoint (time box); they still fail exactly as at da5433a9. New coverage:
+  `orrery-strategy-camera.test.ts` (orbit step, orbit inertia cap + Reduced Motion, two-finger pan bound).
+  `npx tsc --noEmit` clean.
+- **Sun occupant without a photo** still renders as a flat swatch inside the bezel: the seeded self has
+  no photo and (apparently) empty initials. Next step: initials/icon on a shaded plate with the star
+  glowing through.

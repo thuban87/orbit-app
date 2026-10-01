@@ -65,7 +65,7 @@ const initialSamples = (): GestureSamples => {
     panY: 0,
     scale: 1,
     rotation: 0,
-    tiltX: 0,
+
     tiltY: 0,
     tiltActive: false,
   };
