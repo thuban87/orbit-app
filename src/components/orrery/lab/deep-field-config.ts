@@ -228,6 +228,16 @@ export const FOCUS_RING_DIM = 0.55;
 export const FOCUS_RING_ALPHA = 0.85;
 export const FOCUS_RING_WIDTH = 0.6;
 export const FOCUS_BODY_DIM = 0.22;
+/** Arrival ghosts (pass 3): unmounted entering contacts draw a neutral disc
+ *  (background fill + tinted hairline) until their component mounts. */
+export const GHOST_FILL_ALPHA = 0.92;
+/** Ghost disc = background mixed this far toward grid ink; ghost orbit
+ *  hairline alpha (× the ring hairline alpha). */
+export const GHOST_BODY_TINT = 0.45;
+export const GHOST_RING_ALPHA = 0.75;
+export const GHOST_LINE_ALPHA = 0.75;
+export const GHOST_LINE_DP = 1.3;
+export const GHOST_LINE_TINT = 0.6;
 /** Bodies fade in on mount (late-mounting entering bodies; ms). */
 export const BODY_ENTER_FADE_MS = 280;
 /** Label plate alpha + hairline border alpha + status tick width (px). */

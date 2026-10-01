@@ -50,6 +50,12 @@ import {
   FOCUS_RING_ALPHA,
   FOCUS_RING_DIM,
   FOCUS_RING_WIDTH,
+  GHOST_BODY_TINT,
+  GHOST_FILL_ALPHA,
+  GHOST_LINE_ALPHA,
+  GHOST_LINE_DP,
+  GHOST_LINE_TINT,
+  GHOST_RING_ALPHA,
   GRID_ALPHA_INNER_DARK,
   GRID_ALPHA_INNER_LIGHT,
   GRID_ALPHA_OUTER_DARK,
@@ -745,6 +751,36 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
       withAlpha(ink.grid, MOON_ORBIT_ALPHA * m.opacity * parent.opacity),
     );
     canvas.drawPath(polygon(circlePoly(H, pw.x, pw.y, mr, 48)), moonPaint);
+  }
+
+  // 5b · Pass 3 arrival ghosts: a contact already in the frame (an entering
+  // body on a large switch) whose React component has not mounted yet gets a
+  // neutral "unresolved" disc at its exact drawn size and position, so the
+  // arrival is seen on time; the real body fades in over it when it mounts.
+  // Presentation only — not hittable (hit testing never reads this layer).
+  const ghostFill = makePaint(STYLE_FILL, BLEND_SRC_OVER);
+  const ghostLine = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
+  const ghostRing = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
+  ghostLine.setStrokeWidth(GHOST_LINE_DP);
+  ghostRing.setStrokeWidth(GRID_STROKE_PX * 1.4);
+  const ghostBody = mixInk(ink.background, ink.grid, GHOST_BODY_TINT);
+  const ghostInk = mixInk(ink.grid, ink.starlight, GHOST_LINE_TINT);
+  for (let i = 0; i < frame.bodies.length; i++) {
+    const b = frame.bodies[i];
+    if (b.kind !== "contact" || b.opacity <= 0 || !b.visible) continue;
+    if (mounted[keys[i]]) continue;
+    // Its orbit as a neutral hairline (status ink arrives with the mount).
+    if (b.ringPath.length >= 3) {
+      ghostRing.setColor(
+        withAlpha(ink.grid, GHOST_RING_ALPHA * hairAlpha * b.opacity),
+      );
+      canvas.drawPath(polygon(b.ringPath), ghostRing);
+    }
+    const r = b.radius * bodyVisualScale(b.radius);
+    ghostFill.setColor(withAlpha(ghostBody, GHOST_FILL_ALPHA * b.opacity));
+    canvas.drawCircle(b.x, b.y, r, ghostFill);
+    ghostLine.setColor(withAlpha(ghostInk, GHOST_LINE_ALPHA * b.opacity));
+    canvas.drawCircle(b.x, b.y, r, ghostLine);
   }
 
   // 6 · Depth haze: the far side of the plane recedes toward the background
