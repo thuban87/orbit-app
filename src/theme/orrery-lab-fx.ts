@@ -425,14 +425,14 @@ const STANDARD_DARK_ENV: LabEnvProfile = {
 const STANDARD_DARK_RINGS: LabRingProfile = { ...DARK_RINGS, flow: 0.45 };
 const STANDARD_DARK_CHART: LabChartProfile = {
   tone: "textSecondary",
-  alpha: 0.13,
+  alpha: 0.1,
   scaleAlpha: 0.3,
   spokeDeg: 30,
   rings: 6,
 };
 const STANDARD_LIGHT_CHART: LabChartProfile = {
   tone: "textSecondary",
-  alpha: 0.12,
+  alpha: 0.1,
   scaleAlpha: 0.26,
   spokeDeg: 30,
   rings: 6,

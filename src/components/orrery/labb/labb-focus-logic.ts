@@ -65,7 +65,7 @@ export const PING_ALPHA = 0.8;
 export const PING_ECHO = 0.22;
 /** Empty-space ripple: radius on the plane in screen dp at zoom 1. */
 export const RIPPLE_DP = 78;
-export const RIPPLE_ALPHA = 0.5;
+export const RIPPLE_ALPHA = 0.7;
 /** Reduced-motion static ripple / ping size (dp). */
 export const RM_RING_DP = 18;
 /** Non-focused label tags while something is focused. */
