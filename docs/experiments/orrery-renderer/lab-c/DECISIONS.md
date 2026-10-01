@@ -205,3 +205,5 @@ session; close-range targets were not met under that condition.
 - Tests: `orrery-camera-logic.test.ts` still fails the same 2 cases as at HEAD before this change (old
   readability-floor / extremes contract); the new count branch would additionally contradict the
   "no count branch" assertion once that test is rewritten.
+- **Reverted (orchestrator review of 10/11):** the whole-disc fit is disabled (`LAB_FIT_ALL_ENABLED = false`),
+  MIN_ZOOM back to 0.25; default Home is the previous framing. Recorded in DEAD-ENDS.md. Ring density fade kept.

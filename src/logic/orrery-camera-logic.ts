@@ -100,12 +100,13 @@ export const LAB_HOME_MAX_HALF_SPAN = 0.6;
  * This deliberately lets Home go below the production readability floor
  * (MIN_READABLE_RADIUS) for large Systems — lab-only, flagged for the owner.
  */
+/** DEAD END (C.5, see DEAD-ENDS.md): disabled — whole-disc fit destroys legibility at 120 contacts. */
+export const LAB_FIT_ALL_ENABLED = false;
 export const LAB_FIT_ALL_MIN_CONTACTS = 24;
 export const LAB_FIT_ALL_TILT = 0.9;
 export const LAB_FIT_ALL_MARGIN = 12;
 export const FOCUS_MS = 300;
-// Lab C: lowered from 0.25 so a large System (Dense, 120) can dolly out to a whole-disc Home.
-export const MIN_ZOOM = 0.08;
+export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 4;
 export const MAX_TILT = 1.32;
 export const MIN_READABLE_RADIUS = 10;
@@ -367,7 +368,7 @@ export function deriveHomePose(
     );
   };
   const contacts = world.filter((b) => b.kind === "contact").length;
-  if (contacts > LAB_FIT_ALL_MIN_CONTACTS) {
+  if (LAB_FIT_ALL_ENABLED && contacts > LAB_FIT_ALL_MIN_CONTACTS) {
     const wholeDisc = (zoom: number) => {
       "worklet";
       const pose = clampCameraPose(
