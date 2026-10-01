@@ -19,6 +19,11 @@ import {
 import { useMemo } from "react";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 import type { BillboardPose } from "@/logic/orrery-frame";
+import {
+  BodyLightOverlay,
+  type DeepFieldBodyContext,
+  FocusReticle,
+} from "./lab/BodyOverlays";
 import { useOrreryPhoto } from "./use-orrery-photo";
 
 export interface OrbitBodyProps {
@@ -42,6 +47,10 @@ export interface OrbitBodyProps {
   initials: string;
   /** The bundled-font provider from `useFonts`; null until the font loads. */
   fontProvider: SkTypefaceFontProvider | null;
+  /** ORRERY LAB A: this body's `bodyKey` (light lookup). */
+  lightKey?: string;
+  /** ORRERY LAB A: deep-field lighting context (absent → legacy flat body). */
+  deepField?: DeepFieldBodyContext;
 }
 
 /** Status-outline stroke width around the planet disc. */
@@ -59,6 +68,8 @@ export function OrbitBody({
   fontProvider,
   projection,
   focusColor,
+  lightKey,
+  deepField,
 }: OrbitBodyProps) {
   const transform = useDerivedValue(() =>
     projection
@@ -113,7 +124,9 @@ export function OrbitBody({
 
   return (
     <Group transform={transform} zIndex={depth} layer={layer}>
-      {focusColor ? (
+      {focusColor && deepField ? (
+        <FocusReticle radius={radius} reticleColor={focusColor} />
+      ) : focusColor ? (
         <Circle
           cx={cx}
           cy={cy}
@@ -151,6 +164,16 @@ export function OrbitBody({
           ) : null}
         </>
       )}
+      {/* ORRERY LAB A: sun-lit shading + status atmosphere (overlay only). */}
+      {deepField && lightKey ? (
+        <BodyLightOverlay
+          radius={radius}
+          lightKey={lightKey}
+          rimColor={bodyFill}
+          projection={projection}
+          context={deepField}
+        />
+      ) : null}
     </Group>
   );
 }

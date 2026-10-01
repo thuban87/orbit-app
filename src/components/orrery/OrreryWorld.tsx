@@ -58,6 +58,19 @@ import { sampleSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
+import { useReducedMotionShared } from "@/theme/use-reduced-motion";
+import type { DeepFieldBodyContext } from "./lab/BodyOverlays";
+import { DeepFieldBackdrop } from "./lab/DeepFieldBackdrop";
+import { DEEP_FIELD_ENABLED } from "./lab/deep-field-config";
+import { resolveDeepFieldInk, tokenInk } from "./lab/deep-field-ink";
+import {
+  type BodyLightMap,
+  computeBodyLight,
+  computeSwitchFx,
+} from "./lab/deep-field-math";
+import { LabHud, labMarkerVisible } from "./lab/LabHud";
+import { WorldPlaneLayer } from "./lab/WorldPlaneLayer";
+import type { PlaneRing } from "./lab/world-plane";
 import { OrbitBody } from "./OrbitBody";
 import { OrreryCanvas } from "./OrreryCanvas";
 import { OrreryLabel, prepareOrreryText } from "./OrreryLabel";
@@ -112,12 +125,18 @@ function ProjectedBody({
   colors,
   fontProvider,
   focused,
+  deepField,
+  flare,
 }: {
   resource: OrreryBodyResource;
   frame: SharedValue<AnimatedFrame>;
   colors: ThemePalette;
   fontProvider: SkTypefaceFontProvider | null;
   focused: boolean;
+  /** ORRERY LAB A: lighting context (absent → legacy flat rendering). */
+  deepField?: DeepFieldBodyContext;
+  /** ORRERY LAB A: switch-capture flare for the sun. */
+  flare?: SharedValue<number>;
 }) {
   const { body, scene, key } = resource;
   const projection = useDerivedValue(() =>
@@ -154,12 +173,16 @@ function ProjectedBody({
       photo={resolved.photo}
       glowColor={resolved.glowColor}
       glowRadius={body.radius * 1.8}
+      deepInk={deepField?.ink}
+      flare={flare}
     />
   ) : (
     <OrbitBody
       {...common}
       photo={contact?.photo ?? null}
       bodyFill={orreryRingStyle(contact?.status ?? null, colors).bodyFill}
+      lightKey={key}
+      deepField={deepField}
     />
   );
 }
@@ -263,6 +286,49 @@ export function OrreryWorld({
       camera.frame.value = value;
     },
   );
+  // ── ORRERY LAB A: read-only presentation values derived FROM the frame and
+  // the switch runtime (separate mappers: the frame worklet's closure is
+  // untouched — see orrery-frame-mapper.test).
+  const deepInk = useMemo(() => resolveDeepFieldInk(colors), [colors]);
+  const reducedMotion = useReducedMotionShared();
+  const switchTransition = switchRuntime.transition;
+  const switchProgress = switchRuntime.progress;
+  const switchFx = useDerivedValue(() =>
+    computeSwitchFx(
+      switchTransition.value,
+      switchProgress.value,
+      reducedMotion.value,
+    ),
+  );
+  const sunFlare = useDerivedValue(() => switchFx.value.flare);
+  const lightExtent = scene.extent;
+  const bodyLight = useDerivedValue<BodyLightMap>(() =>
+    computeBodyLight(frame.value, lightExtent),
+  );
+  const deepField = useMemo<DeepFieldBodyContext | undefined>(
+    () => (DEEP_FIELD_ENABLED ? { ink: deepInk, light: bodyLight } : undefined),
+    [deepInk, bodyLight],
+  );
+  const planeRings = useMemo<PlaneRing[]>(
+    () =>
+      resources
+        .filter((r) => r.body.kind === "contact")
+        .map((resource) => {
+          const status =
+            resource.scene.contacts.find((c) => c.id === resource.body.id)
+              ?.status ?? null;
+          const style = orreryRingStyle(status, colors);
+          return {
+            key: resource.key,
+            color: tokenInk(style.color),
+            width: style.width,
+            strokeStyle: style.strokeStyle,
+            opacity: style.opacity,
+            progress: status !== null,
+          };
+        }),
+    [resources, colors],
+  );
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -323,6 +389,11 @@ export function OrreryWorld({
             focused,
             cluster: clusterIds.includes(body.id),
             favorite: member?.favourite_rank != null,
+            // ORRERY LAB A: plate status tick (ring hue; neutral → secondary).
+            tick:
+              member?.status != null
+                ? orreryRingStyle(member.status, colors).color
+                : colors.textSecondary,
           },
         ];
       }),
@@ -521,25 +592,58 @@ export function OrreryWorld({
       background={colors.background}
       starColors={starColors}
       gesture={gesture}
+      backdrop={
+        DEEP_FIELD_ENABLED ? (
+          <DeepFieldBackdrop
+            width={viewport.width}
+            height={viewport.height}
+            ink={deepInk}
+            starColors={starColors}
+            frame={frame}
+            switchFx={switchFx}
+          />
+        ) : undefined
+      }
+      overlay={
+        DEEP_FIELD_ENABLED && labMarkerVisible() ? (
+          <LabHud
+            viewport={viewport}
+            fontProvider={fontProvider}
+            ink={deepInk}
+            textColor={colors.textSecondary}
+          />
+        ) : undefined
+      }
     >
       <Group
         clip={{ x: 0, y: 0, width: viewport.width, height: viewport.height }}
       >
         <Group>
-          {resources
-            .filter((r) => r.body.kind === "contact")
-            .map((resource) => (
-              <ProjectedOrbitRing
-                key={resource.key}
-                identity={resource.key}
-                frame={frame}
-                style={orreryRingStyle(
-                  resource.scene.contacts.find((c) => c.id === resource.body.id)
-                    ?.status ?? null,
-                  colors,
-                )}
-              />
-            ))}
+          {DEEP_FIELD_ENABLED ? (
+            <WorldPlaneLayer
+              frame={frame}
+              switchFx={switchFx}
+              rings={planeRings}
+              ink={deepInk}
+              extent={scene.extent}
+            />
+          ) : (
+            resources
+              .filter((r) => r.body.kind === "contact")
+              .map((resource) => (
+                <ProjectedOrbitRing
+                  key={resource.key}
+                  identity={resource.key}
+                  frame={frame}
+                  style={orreryRingStyle(
+                    resource.scene.contacts.find(
+                      (c) => c.id === resource.body.id,
+                    )?.status ?? null,
+                    colors,
+                  )}
+                />
+              ))
+          )}
         </Group>
         <Polaris frame={frame} extent={scene.extent} colors={colors} />
         <ReorderGhost
@@ -557,6 +661,8 @@ export function OrreryWorld({
               colors={colors}
               fontProvider={fontProvider}
               focused={focusedIds.includes(resource.body.id)}
+              deepField={deepField}
+              flare={sunFlare}
             />
           ))}
           {satellites.map((row) => {
@@ -595,6 +701,9 @@ export function OrreryWorld({
                 text={label.text}
                 allocations={allocations}
                 colors={colors}
+                deepInk={deepField?.ink}
+                tickColor={label.tick}
+                frame={deepField ? frame : undefined}
               />
               {label.context ? (
                 <OrreryLabel
@@ -603,6 +712,7 @@ export function OrreryWorld({
                   allocations={allocations}
                   colors={colors}
                   context
+                  deepInk={deepField?.ink}
                 />
               ) : null}
             </Group>

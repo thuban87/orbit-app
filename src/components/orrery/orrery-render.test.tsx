@@ -109,6 +109,11 @@ vi.mock("@shopify/react-native-skia", async () => {
     DashPathEffect: "dash",
     RoundedRect: "roundRect",
     Image: "image",
+    // ORRERY LAB A deep-field renderer primitives.
+    Picture: "picture",
+    Rect: "rect",
+    Shader: "shader",
+    createPicture: (draw: unknown) => ({ recorded: draw }),
     TextAlign: { Center: 2 },
     useImage: () => null,
     rect: (x: number, y: number, width: number, height: number) => ({
@@ -279,7 +284,10 @@ describe("production Orrery native tree and resource contracts", () => {
     expect(polaris.children[1].props.color).toBe(
       THEME_PRESETS.galaxy.dark.textPrimary,
     );
-    expect(rings.children.every((child) => child.type === "path")).toBe(true);
+    // ORRERY LAB A: the per-contact ring Paths became ONE world-plane picture
+    // (rings/trails/grid/shadows drawn under the camera homography). The
+    // status line-treatment contract is asserted in lab/world-plane.test.ts.
+    expect(rings.children.map((child) => child.type)).toEqual(["picture"]);
     expect(bodies.children.map((child) => child.type)).toEqual([
       "skGroup",
       "skGroup",
