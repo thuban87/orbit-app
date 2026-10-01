@@ -14,6 +14,13 @@ export const HOLD_MS = 850;
 export const HOLD_SLOP = 8;
 export const TILT_DISTANCE = 28;
 export const TILT_RADIANS_PER_POINT = 0.004;
+/**
+ * Lab C strategy-map camera: one-finger drag ORBITS the camera around the
+ * pivot. A full-width horizontal drag (~412 pt) swings ~180°; a vertical drag
+ * of ~250 pt sweeps the whole legal tilt range.
+ */
+export const ORBIT_YAW_PER_POINT = 0.0076;
+export const ORBIT_TILT_PER_POINT = 0.0052;
 export type InputOwner =
   | "idle"
   | "pending"
@@ -80,7 +87,9 @@ export type CameraStep =
   | { kind: "pan"; dx: number; dy: number }
   | { kind: "pinch"; delta: number; focal: WorldPoint }
   | { kind: "yaw"; delta: number }
-  | { kind: "tilt"; delta: number; travel: number };
+  | { kind: "tilt"; delta: number; travel: number }
+  /** Screen-space drag delta → yaw (horizontal) + tilt (vertical), bounded. */
+  | { kind: "orbit"; dx: number; dy: number };
 /** Incremental samples compose against CURRENT pose, never another recognizer's start pose. */
 export function cameraGestureStep(
   pose: CameraPose,
@@ -91,6 +100,19 @@ export function cameraGestureStep(
   "worklet";
   if (step.kind === "pan")
     return panCamera(pose, step.dx, step.dy, extent, viewport);
+  if (step.kind === "orbit") {
+    if (!Number.isFinite(step.dx) || !Number.isFinite(step.dy)) return pose;
+    // Grab-the-turntable: dragging right pulls the near side of the system
+    // right (yaw decreases); dragging up leans the camera toward the horizon.
+    return clampCameraPose(
+      {
+        ...pose,
+        yaw: (pose.yaw ?? 0) - step.dx * ORBIT_YAW_PER_POINT,
+        tilt: (pose.tilt ?? 0) - step.dy * ORBIT_TILT_PER_POINT,
+      },
+      extent,
+    );
+  }
   if (step.kind === "pinch") {
     if (
       !Number.isFinite(step.delta) ||

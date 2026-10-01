@@ -740,6 +740,7 @@ export function OrreryWorld3D({
       extent: cameraExtent(scene.extent),
       send: onIntent,
       enabled: interactive,
+      strategyCamera: true,
       stop: camera.stop,
       coast: camera.coast,
       reorder: {

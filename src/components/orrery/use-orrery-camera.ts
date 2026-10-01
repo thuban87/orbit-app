@@ -52,8 +52,10 @@ interface GestureSamples {
   panY: number;
   scale: number;
   rotation: number;
+  tiltX?: number;
   tiltY: number;
   tiltActive: boolean;
+  tiltOriginX?: number;
   tiltOriginY?: number;
 }
 const initialSamples = (): GestureSamples => {
@@ -63,6 +65,7 @@ const initialSamples = (): GestureSamples => {
     panY: 0,
     scale: 1,
     rotation: 0,
+    tiltX: 0,
     tiltY: 0,
     tiltActive: false,
   };
@@ -184,6 +187,7 @@ export function createOrreryGestures({
   panStart,
   resolveTap,
   reorder,
+  strategyCamera = false,
 }: {
   pose: CameraCell<CameraPose>;
   frame: CameraCell<ProjectedFrame>;
@@ -192,7 +196,13 @@ export function createOrreryGestures({
   stop: () => void;
   enabled?: boolean;
   camera?: OrreryCameraInput;
-  coast?: (kind: "pan" | "yaw", vx: number, vy: number) => void;
+  coast?: (kind: "pan" | "yaw" | "orbit", vx: number, vy: number) => void;
+  /**
+   * Lab C strategy-map camera: one-finger drag orbits (yaw + tilt, with
+   * inertia), two-finger drag pans the pivot, pinch dollies. Off = the
+   * production 2.5D mapping (one-finger pan, two-finger vertical tilt).
+   */
+  strategyCamera?: boolean;
   onNorth?: (x: number, y: number) => boolean;
   panStart?: CameraCell<CameraPose | null>;
   resolveTap?: (frame: ProjectedFrame, x: number, y: number) => OrreryIntent;
@@ -269,7 +279,7 @@ export function createOrreryGestures({
       pose.value = cameraGestureStep(
         pose.value,
         {
-          kind: "pan",
+          kind: strategyCamera ? "orbit" : "pan",
           dx: event.translationX - sample.panX,
           dy: event.translationY - sample.panY,
         },
@@ -285,7 +295,11 @@ export function createOrreryGestures({
         input.value.owner === "pan" &&
         event.numberOfPointers <= 1
       )
-        coast("pan", event.velocityX, event.velocityY);
+        coast(
+          strategyCamera ? "orbit" : "pan",
+          event.velocityX,
+          event.velocityY,
+        );
     })
     .onFinalize(() => {
       "worklet";
@@ -370,6 +384,10 @@ export function createOrreryGestures({
       "worklet";
       samples.value = {
         ...samples.value,
+        tiltOriginX:
+          event.allTouches.length === 2
+            ? (event.allTouches[0].x + event.allTouches[1].x) / 2
+            : undefined,
         tiltOriginY:
           event.allTouches.length === 2
             ? (event.allTouches[0].y + event.allTouches[1].y) / 2
@@ -380,15 +398,27 @@ export function createOrreryGestures({
       "worklet";
       if (!live.value || event.allTouches.length !== 2) return;
       const centroid = (event.allTouches[0].y + event.allTouches[1].y) / 2;
+      const centroidX = (event.allTouches[0].x + event.allTouches[1].x) / 2;
       const origin = samples.value.tiltOriginY;
+      const originX = samples.value.tiltOriginX ?? centroidX;
       if (origin === undefined)
-        samples.value = { ...samples.value, tiltOriginY: centroid };
-      else if (Math.abs(centroid - origin) >= TILT_DISTANCE) manager.activate();
+        samples.value = {
+          ...samples.value,
+          tiltOriginY: centroid,
+          tiltOriginX: centroidX,
+        };
+      else if (
+        (strategyCamera
+          ? Math.hypot(centroid - origin, centroidX - originX)
+          : Math.abs(centroid - origin)) >= TILT_DISTANCE
+      )
+        manager.activate();
     })
     .onTouchesUp(() => {
       "worklet";
       samples.value = {
         ...samples.value,
+        tiltOriginX: undefined,
         tiltOriginY: undefined,
         tiltActive: false,
       };
@@ -398,6 +428,7 @@ export function createOrreryGestures({
       touch(2);
       samples.value = {
         ...samples.value,
+        tiltX: event.translationX,
         tiltY: event.translationY,
         tiltActive: true,
       };
@@ -412,15 +443,26 @@ export function createOrreryGestures({
       )
         return;
       const previous = samples.value.tiltY;
-      samples.value = { ...samples.value, tiltY: event.translationY };
+      const previousX = samples.value.tiltX ?? 0;
+      samples.value = {
+        ...samples.value,
+        tiltX: event.translationX,
+        tiltY: event.translationY,
+      };
       stop();
       pose.value = cameraGestureStep(
         pose.value,
-        {
-          kind: "tilt",
-          delta: event.translationY - previous,
-          travel: TILT_DISTANCE,
-        },
+        strategyCamera
+          ? {
+              kind: "pan",
+              dx: event.translationX - previousX,
+              dy: event.translationY - previous,
+            }
+          : {
+              kind: "tilt",
+              delta: event.translationY - previous,
+              travel: TILT_DISTANCE,
+            },
         frame.value.viewport,
         extent,
       );

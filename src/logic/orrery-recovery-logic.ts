@@ -16,6 +16,15 @@ export const REDUCED_RECOVERY_MS = 100;
 export const COAST_MS = 120;
 export const PAN_COAST_POINTS = 18;
 export const YAW_COAST_RADIANS = 0.08;
+/** Lab C orbit inertia: a flick keeps swinging for ORBIT_COAST_MS on the
+ * quintic ease-out (reads as damping), capped so a hard flick can't spin
+ * the system more than ~70° or slam the tilt bound. */
+export const ORBIT_COAST_MS = 900;
+export const ORBIT_COAST_SECONDS = 0.32;
+export const ORBIT_COAST_MAX_YAW = 1.2;
+export const ORBIT_COAST_MAX_TILT = 0.35;
+const ORBIT_COAST_YAW_PER_POINT = 0.0076;
+const ORBIT_COAST_TILT_PER_POINT = 0.0052;
 export const POLARIS_RADIUS = 6;
 export const POLARIS_HIT_RADIUS = 22;
 export const cameraExtent = (extent: number): number => {
@@ -97,7 +106,7 @@ export function sampleRecovery(
 }
 export function inertiaTarget(
   pose: CameraPose,
-  kind: "pan" | "yaw",
+  kind: "pan" | "yaw" | "orbit",
   vx: number,
   vy: number,
   extent: number,
@@ -106,6 +115,26 @@ export function inertiaTarget(
 ): CameraPose {
   "worklet";
   if (reduced) return pose;
+  if (kind === "orbit") {
+    const bounded = (v: number, k: number, max: number) => {
+      "worklet";
+      return Number.isFinite(v)
+        ? Math.max(-max, Math.min(max, v * k * ORBIT_COAST_SECONDS))
+        : 0;
+    };
+    return clampCameraPose(
+      {
+        ...pose,
+        yaw:
+          (pose.yaw ?? 0) -
+          bounded(vx, ORBIT_COAST_YAW_PER_POINT, ORBIT_COAST_MAX_YAW),
+        tilt:
+          (pose.tilt ?? 0) -
+          bounded(vy, ORBIT_COAST_TILT_PER_POINT, ORBIT_COAST_MAX_TILT),
+      },
+      cameraExtent(extent),
+    );
+  }
   const cap = (v: number, max: number) => {
     "worklet";
     return Number.isFinite(v)
@@ -192,6 +221,7 @@ export function createCameraMotion({
   const recover = (
     target: CameraPose,
     kind: "recovery" | "coast" = "recovery",
+    orbitCoast = false,
   ) => {
     "worklet";
     stop();
@@ -199,6 +229,7 @@ export function createCameraMotion({
     const generation = epoch.value;
     const plan = planRecovery(pose.value, target, extent, reduced.value);
     if (kind === "coast") plan.duration = COAST_MS;
+    if (kind === "coast" && orbitCoast) plan.duration = ORBIT_COAST_MS;
     active.value = { plan, kind };
     animate(plan, (finished) => {
       "worklet";
@@ -214,12 +245,13 @@ export function createCameraMotion({
     if (pending?.kind === "recovery" && live.value)
       recover(pending.plan.target);
   };
-  const coast = (kind: "pan" | "yaw", vx: number, vy: number) => {
+  const coast = (kind: "pan" | "yaw" | "orbit", vx: number, vy: number) => {
     "worklet";
     if (!live.value || reduced.value) return;
     recover(
       inertiaTarget(pose.value, kind, vx, vy, extent, viewport, reduced.value),
       "coast",
+      kind === "orbit",
     );
   };
   return { stop, recover, coast, motionChanged };

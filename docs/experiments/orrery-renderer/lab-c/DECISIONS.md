@@ -31,3 +31,22 @@ with limb darkening + additive glow + wide corona.
 Known consequences: 7 vitest cases in camera/frame/gesture/recovery/reorder logic encode the
 old 2.5D contract (tilt 0 home, 60° max, throw-on-horizon) and now fail; to be rewritten
 for the 3D contract in a follow-up.
+
+## 2026-10-01 — Checkpoint B.1: strategy-map camera gestures
+
+`createOrreryGestures({ strategyCamera: true })` (3D world only; the Skia world and its tests keep
+the production mapping):
+- **one-finger drag orbits**: new `CameraStep` `orbit` — `yaw -= dx·0.0076` (full-width drag ≈ 180°,
+  grab-the-turntable sign), `tilt -= dy·0.0052` (drag up leans toward the horizon), clamped to
+  `[0, MAX_TILT]` by `clampCameraPose`. Every sample composes on the UI thread into `pose`.
+- **inertia**: release velocity → `inertiaTarget(kind "orbit")` (velocity × 0.32 s, capped ±1.2 rad
+  yaw / ±0.35 rad tilt) played as a 900 ms coast on the existing quintic ease-out recovery curve
+  (reads as damping). Reduced Motion disables it, as for pan/yaw coast. Any new touch `stop()`s it.
+- **two-finger drag pans** the pivot (the former 2-finger vertical-tilt recognizer, now activating
+  on centroid travel in any direction, feeding `panCamera`); pan stays bounded by
+  `clampCameraPose` (pivot within ±extent) so the system cannot be lost.
+- pinch = dolly (unchanged), two-finger twist = yaw (unchanged), tap/long-press reorder unchanged
+  (reorder's hold still fails on > HOLD_SLOP movement before the orbit claims ownership).
+- recenter = `deriveHomePose` (tilt 1.08, yaw 0, home zoom) via `camera.recover` — unchanged.
+Device-verified: adb swipe orbits (screens 01→02), tap after orbit focuses (03). Not device-testable
+via adb: two-finger pan, pinch (multi-touch).
