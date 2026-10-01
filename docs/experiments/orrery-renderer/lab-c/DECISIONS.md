@@ -207,3 +207,30 @@ session; close-range targets were not met under that condition.
   "no count branch" assertion once that test is rewritten.
 - **Reverted (orchestrator review of 10/11):** the whole-disc fit is disabled (`LAB_FIT_ALL_ENABLED = false`),
   MIN_ZOOM back to 0.25; default Home is the previous framing. Recorded in DEAD-ENDS.md. Ring density fade kept.
+
+## 2026-10-01 — Checkpoint D.1: Dense legibility (core framing + minimum body size)
+
+- **Home for Systems with > 24 contacts** frames the *populated core* (`LAB_CORE_FRACTION` of contacts,
+  `coreRadius()` in `orrery-camera-logic.ts`) at tilt `LAB_CORE_TILT = 0.85`: the largest zoom at which the
+  core disc projects inside the canvas between the System selector row (camera-rect top) and the usable
+  bottom. Smaller Systems keep the strategy-map Home unchanged.
+- **Fraction is 0.5, not the suggested 0.8.** Seed rings are linear in rank (`58 + i·34`), so the 80% core is
+  0.8× the full extent; at 411 dp it needs zoom ≈ 0.07, i.e. the whole-disc dead end again (node sweep: 0.6
+  and 0.8 both bottom out at the zoom floor). 0.5 lands at zoom ≈ 0.087.
+- **`MIN_ZOOM` 0.25 → 0.08** (required for that Home; also the user's pinch-out floor). Legibility no longer
+  comes from the readability-floor zoom but from:
+- **Minimum on-screen size** (`OrreryWorld3D`): contacts ≥ 18 px diameter, moons ≥ 10 px, star ≥ 34 px. Applied
+  to the WORLD radius in the UI-thread sample (radius = max(r, minPx/2 / pxPerWorld at that depth)), so drawn ==
+  tappable == label anchor.
+- **Canvas top inset**: contacts/moons whose centre projects above the camera-rect top (selector/View options
+  row) fade over 28 px and become non-interactive, so far bodies no longer pile up under the header.
+- **Ring density fade, harder** (orchestrator review): full strength at ≥ 20 px orbit spacing, squared ramp,
+  floor 5% (was linear, 10 px, floor 30%). At Dense Home rings are a faint texture; bodies dominate.
+- **Counts** (`visibleContacts` now in the 5 s renderer log = tappable contacts with centre on screen): before
+  ~30 of 120 (`04-checkpoint-c/07`), after **100 of 120** at Home (`05-checkpoint-d/03`), 51 at near ×2.2 (`04`).
+- **The vertical "spine" behind the star is the production layout, not a 3D bug:** never-contacted members
+  (`progress === null`) all rest at `NEUTRAL_RESTING_ANGLE = 0` (`orrery-world-logic.ts`), one per ring, so 20
+  of them form a radial line due north; at yaw 0 the camera looks straight along it. Not changed (product
+  layout rule; spreading neutrals would be an owner call). Visible in 2.5D too, but foreshortening stacks it.
+- Not done: name labels at the dense near view (label tier is still magnification-based, so dense views show
+  initials only until ≥ identity tier).

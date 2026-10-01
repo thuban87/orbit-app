@@ -132,8 +132,8 @@ const FLARE_RING_WIDTH_GAIN = 2;
 const FLARE_RING_ALPHA_GAIN = 1.4;
 const FLARE_POOL = 24;
 /** Ring density fade: full strength at ≥ this on-screen orbit spacing (px). */
-const RING_MIN_SPACING_PX = 10;
-const RING_DENSITY_FLOOR = 0.3;
+const RING_MIN_SPACING_PX = 20;
+const RING_DENSITY_FLOOR = 0.05;
 export const KIND_CONTACT = 0;
 export const KIND_SUN = 1;
 export const KIND_SATELLITE = 2;
@@ -153,6 +153,8 @@ export interface OrreryPacket {
   bodies: number[];
   labels: PacketLabel[];
   extent: number;
+  /** Diagnostics: tappable contacts whose centre is on screen. */
+  visibleContacts?: number;
 }
 
 export interface BodyInfo {
@@ -914,10 +916,10 @@ export class OrreryScene3D {
     for (let i = 0; i < n; i++)
       if (bodies[i * BODY_STRIDE + 5] === KIND_CONTACT) ringN++;
     const spacingPx = (Math.max(1, packet.extent) / Math.max(1, ringN)) * zoom;
-    const ringDensity = Math.max(
-      RING_DENSITY_FLOOR,
-      Math.min(1, spacingPx / RING_MIN_SPACING_PX),
-    );
+    // D.1: squared ramp — packed orbits (3 px apart at Dense Home) drop to a
+    // faint texture so the bodies, not the strokes, carry the overview.
+    const ringRamp = Math.min(1, spacingPx / RING_MIN_SPACING_PX);
+    const ringDensity = Math.max(RING_DENSITY_FLOOR, ringRamp * ringRamp);
     for (let i = 0; i < n; i++) {
       const o = i * BODY_STRIDE;
       const wx = bodies[o];

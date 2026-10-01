@@ -87,7 +87,10 @@ import {
   type SwitchChoreography,
   sampleSwitchChoreography,
 } from "@/logic/orrery-switch-choreography";
-import { labFocalDistance } from "@/logic/orrery-camera-logic";
+import {
+  labFocalDistance,
+  perspectiveScale,
+} from "@/logic/orrery-camera-logic";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
@@ -129,6 +132,22 @@ const LABEL_BODY_GAP = 4;
 const CONTACT_HERO_SCALE = 1.9;
 /** The star scales less than contacts so it anchors without swallowing ring 0. */
 const SUN_HERO_SCALE = 1.45;
+/**
+ * Checkpoint D.1 — minimum ON-SCREEN body size (diameter, logical px). Far /
+ * dolly-out contacts never shrink below this, so a dense System stays a field
+ * of identifiable dots-with-faces instead of specks. Applied to the world
+ * radius in the UI-thread sample, so drawn == tappable == label anchor.
+ */
+const MIN_CONTACT_PX = 18;
+const MIN_SATELLITE_PX = 10;
+/** The star stays a landmark at Dense Home (~0.09 zoom it would be ~4 px). */
+const MIN_SUN_PX = 34;
+/**
+ * Canvas top inset: contacts/moons whose centre projects above the camera rect
+ * top (the System selector / View options row) fade out over this many px and
+ * stop being tappable, so far bodies never pile up under the header controls.
+ */
+const TOP_INSET_FADE_PX = 28;
 /** Approximate OrreryFocusContext footprint (width 280; ~2 buttons + title). */
 const FOCUS_CARD_WIDTH = 290;
 const FOCUS_CARD_HEIGHT = 230;
@@ -399,8 +418,25 @@ export function OrreryWorld3D({
       true,
       level.value,
     );
+    const all = [...world, ...moons];
+    // Minimum on-screen size: inflate the WORLD radius of bodies that would
+    // project smaller than MIN_*_PX at their depth (sun excluded).
+    for (let i = 0; i < all.length; i++) {
+      const b = all[i];
+      const px = sampledCamera.zoom * perspectiveScale(b, sampledCamera);
+      if (!(px > 0)) continue;
+      const minR =
+        (b.kind === "satellite"
+          ? MIN_SATELLITE_PX
+          : b.kind === "sun"
+            ? MIN_SUN_PX
+            : MIN_CONTACT_PX) /
+        2 /
+        px;
+      if (b.radius < minR) all[i] = { ...b, radius: minR };
+    }
     return {
-      world: [...world, ...moons],
+      world: all,
       camera: sampledCamera,
       generation: transition.value.generation,
     };
@@ -428,12 +464,28 @@ export function OrreryWorld3D({
   );
   const frame = useDerivedValue(() => {
     const current = sample.value;
-    return projectAnimatedFrameLite(
+    const f = projectAnimatedFrameLite(
       current.world,
       current.camera,
       viewport,
       current.generation,
     );
+    // Canvas top inset (D.1): fade + disarm bodies under the header row.
+    const top = viewport.camera?.y ?? viewport.usable?.y ?? 0;
+    if (top > 0)
+      for (let i = 0; i < f.bodies.length; i++) {
+        const b = f.bodies[i];
+        if (b.kind === "sun" || b.y >= top + TOP_INSET_FADE_PX) continue;
+        const k = clamp01w((b.y - top) / TOP_INSET_FADE_PX);
+        const opacity = b.opacity * k;
+        f.bodies[i] = {
+          ...b,
+          opacity,
+          interactive: b.interactive && k > 0.5,
+          visible: b.visible && opacity > 0.01,
+        };
+      }
+    return f;
   });
   useAnimatedReaction(
     () => frame.value,
@@ -640,6 +692,20 @@ export function OrreryWorld3D({
           cy: a.contextRect?.y,
         })),
         extent: worldExtent,
+        visibleContacts: f.bodies.reduce(
+          (n, b) =>
+            n +
+            (b.kind === "contact" &&
+            b.visible &&
+            b.interactive &&
+            b.x >= 0 &&
+            b.x <= f.viewport.width &&
+            b.y >= 0 &&
+            b.y <= f.viewport.height
+              ? 1
+              : 0),
+          0,
+        ),
       };
     },
     (packet) => {
@@ -867,7 +933,7 @@ export function OrreryWorld3D({
           const avg = d.reduce((a, b) => a + b, 0) / Math.max(1, d.length);
           const r = s.stats.renderMs;
           console.log(
-            `[lab-c] frames=${d.length} avgDt=${avg.toFixed(1)}ms fps=${(1000 / Math.max(1, avg)).toFixed(1)} p95Dt=${percentile(d, 0.95).toFixed(1)} maxDt=${percentile(d, 1).toFixed(1)} jsRenderAvg=${(r.reduce((a, b) => a + b, 0) / Math.max(1, r.length)).toFixed(2)}ms p95=${percentile(r, 0.95).toFixed(2)} calls=${s.stats.calls} tris=${s.stats.triangles} photos=${photoTimings.length} photoAvg=${(photoTimings.reduce((a, b) => a + b, 0) / Math.max(1, photoTimings.length)).toFixed(1)}ms packets=${packetCount} bodies=${pendingPacket.current?.keys.length ?? 0} drawnSpheres=${s.stats.spheres} presentAvg=${(presentMs / Math.max(1, d.length)).toFixed(2)}ms drawAvg=${(s.stats.drawMs / Math.max(1, d.length)).toFixed(2)}ms`,
+            `[lab-c] frames=${d.length} avgDt=${avg.toFixed(1)}ms fps=${(1000 / Math.max(1, avg)).toFixed(1)} p95Dt=${percentile(d, 0.95).toFixed(1)} maxDt=${percentile(d, 1).toFixed(1)} jsRenderAvg=${(r.reduce((a, b) => a + b, 0) / Math.max(1, r.length)).toFixed(2)}ms p95=${percentile(r, 0.95).toFixed(2)} calls=${s.stats.calls} tris=${s.stats.triangles} photos=${photoTimings.length} photoAvg=${(photoTimings.reduce((a, b) => a + b, 0) / Math.max(1, photoTimings.length)).toFixed(1)}ms packets=${packetCount} bodies=${pendingPacket.current?.keys.length ?? 0} visibleContacts=${pendingPacket.current?.visibleContacts ?? 0} drawnSpheres=${s.stats.spheres} presentAvg=${(presentMs / Math.max(1, d.length)).toFixed(2)}ms drawAvg=${(s.stats.drawMs / Math.max(1, d.length)).toFixed(2)}ms`,
           );
           packetCount = 0;
           presentMs = 0;

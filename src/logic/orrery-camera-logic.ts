@@ -105,8 +105,37 @@ export const LAB_FIT_ALL_ENABLED = false;
 export const LAB_FIT_ALL_MIN_CONTACTS = 24;
 export const LAB_FIT_ALL_TILT = 0.9;
 export const LAB_FIT_ALL_MARGIN = 12;
+/**
+ * Lab C (Checkpoint D.1): dense Systems frame their POPULATED CORE — the disc
+ * holding LAB_CORE_FRACTION of the contacts — instead of the readability floor
+ * (which showed ~30 of 121) or the outer ring (whole-disc fit: dead end, see
+ * DEAD-ENDS.md). Legibility at that distance comes from the renderer's
+ * minimum on-screen body size (OrreryWorld3D MIN_BODY_PX), not from zoom.
+ */
+export const LAB_CORE_MIN_CONTACTS = 24;
+export const LAB_CORE_FRACTION = 0.5;
+export const LAB_CORE_TILT = 0.85;
+export const LAB_CORE_MARGIN = 20;
+/** Radius (world) holding `fraction` of the contacts, plus their body radius. */
+export function coreRadius(
+  world: readonly WorldBody[],
+  fraction: number,
+): number {
+  "worklet";
+  const d: number[] = [];
+  let r = 0;
+  for (const b of world)
+    if (b.kind === "contact") {
+      d.push(Math.hypot(b.x, b.y));
+      r = Math.max(r, b.radius);
+    }
+  if (!d.length) return 1;
+  d.sort((a, b) => a - b);
+  const k = Math.min(d.length - 1, Math.max(0, Math.ceil(d.length * fraction) - 1));
+  return Math.max(1, d[k] + r);
+}
 export const FOCUS_MS = 300;
-export const MIN_ZOOM = 0.25;
+export const MIN_ZOOM = 0.08;
 export const MAX_ZOOM = 4;
 export const MAX_TILT = 1.32;
 export const MIN_READABLE_RADIUS = 10;
@@ -401,6 +430,47 @@ export function deriveHomePose(
     }
     return clampCameraPose(
       { ...HOME_CAMERA, tilt: LAB_FIT_ALL_TILT, zoom: lo },
+      extent,
+    );
+  }
+  if (contacts > LAB_CORE_MIN_CONTACTS) {
+    // Dense: the populated core disc must project inside the canvas between
+    // the System selector row (camera rect top) and the usable bottom.
+    const core = coreRadius(world, LAB_CORE_FRACTION);
+    const top = rect.y + LAB_CORE_MARGIN;
+    const bottom = usable.y + usable.height - LAB_CORE_MARGIN;
+    const coreFits = (zoom: number) => {
+      "worklet";
+      const pose = clampCameraPose(
+        { ...HOME_CAMERA, tilt: LAB_CORE_TILT, zoom },
+        extent,
+      );
+      for (let k = 0; k < 32; k++) {
+        const a = (k / 32) * Math.PI * 2;
+        const p = projectWorldPoint(
+          { x: Math.cos(a) * core, y: Math.sin(a) * core },
+          pose,
+          viewport,
+        );
+        if (
+          p.x < LAB_CORE_MARGIN ||
+          p.x > viewport.width - LAB_CORE_MARGIN ||
+          p.y < top ||
+          p.y > bottom
+        )
+          return false;
+      }
+      return true;
+    };
+    let lo = MIN_ZOOM,
+      hi = MAX_ZOOM;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (coreFits(mid)) lo = mid;
+      else hi = mid;
+    }
+    return clampCameraPose(
+      { ...HOME_CAMERA, tilt: LAB_CORE_TILT, zoom: lo },
       extent,
     );
   }
