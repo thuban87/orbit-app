@@ -421,17 +421,21 @@ describe("Lab B renderer tree contract", () => {
     expect(fx.children[0].children).toEqual([]);
   });
 
-  it("WP-2.1 experiment: the displacement filter wraps L1–L5 in ONE saveLayer, labels outside", async () => {
+  it("WP-2.1 experiment: the displacement filter wraps sky + L1–L5 in ONE saveLayer, labels outside", async () => {
     lab.effects = true;
     lab.flags = { fpsHud: false, fxShockFilter: true };
-    const filtered = (await renderLab({ value: { ...HOME_CAMERA } })).tree[1];
+    const { tree } = await renderLab({ value: { ...HOME_CAMERA } });
+    // The sky moves INTO the filtered layer (no top-level L0 any more).
+    expect(tree).toHaveLength(1);
+    const filtered = tree[0];
     const [wrapped, labels, over] = filtered.children;
     // RN Skia's Group turns an element `layer` into skLayer(paint, skGroup).
     expect(wrapped.type).toBe("skLayer");
     const [paint, group] = wrapped.children;
     expect(paint.type).toBe("paint");
     expect(paint.children[0].type).toBe("runtimeShader");
-    expect(group.children).toHaveLength(4);
+    // env (L0) + rings, Polaris, ghost, bodies.
+    expect(group.children).toHaveLength(5);
     expect(labels.children.length).toBe(1);
     expect(over.children[0].children.map((c) => c.type)).toEqual([
       "atlas",

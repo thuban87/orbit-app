@@ -18,15 +18,19 @@
  *                     WP-1.2 lit surfaces, atmospheres, corona, lit moons
  *                     (one shader draw per body; flag bodyLighting)
  *   L6  labels        <LabHudLabel> HUD tags (per-label layer: C-09; flag labelHud)
- *   L7  fx            empty Group          WP-2.1/2.2 switch / focus / feedback FX
+ *   L7  fx            <LabSwitchOver>      WP-2.1 particles + capture flares (WP-2.2 focus/feedback)
+ *   (WP-2.1 also draws <LabSwitchUnder> — shockwave, comets, smears — inside L1
+ *   under the bodies, ring unwind/draw-on in LabRings, streaks in L0; the
+ *   fxShockFilter experiment wraps L0–L5 in one runtime-filter saveLayer.)
  *   dbg fps HUD       <LabFpsOverlay>      (flag `fpsHud`)
  *
  * The bodies Group must stay a CONTIGUOUS run of body root Groups: RNRecorder
  * flushes zIndex sorting at every non-Group command (legacy note).
  *
- * Per-renderer derived values owned here: `frameIndex` (O(1) key lookups) and
- * `fxFlags` (the store snapshot mirrored for worklets). WP-2.x adds
- * `switchSignal`, `switchRoles` and `focusMix` next to them.
+ * Per-renderer derived values owned here: `frameIndex` (O(1) key lookups),
+ * `fxFlags` (the store snapshot mirrored for worklets) and, WP-2.1, the switch
+ * showcase inputs (`switchSignal`, `roles`, `skyHue`) handed to every layer
+ * through `LabRenderContext.sw`. WP-2.2 adds `focusMix`.
  *
  * Heavy layers are UNMOUNTED when their flag is off, so a measured marginal
  * cost is real (research 03 §4).
@@ -396,6 +400,17 @@ export function LabBRenderer(contract: LabRenderContract) {
     scene.extent,
     PixelRatio.get(),
   );
+  const envLayer = flags.environment ? (
+    <LabEnvironment
+      width={viewport.width}
+      height={viewport.height}
+      colors={colors}
+      background={labColor(colors, profile.roles.sky)}
+      frame={frame}
+      profile={profile}
+      flags={flags}
+    />
+  ) : null;
   // L1–L5 (rings, Polaris, reorder ghost, bodies): built once, optionally
   // wrapped by the WP-2.1 displacement-filter experiment below.
   const worldLayers = (
@@ -506,22 +521,12 @@ export function LabBRenderer(contract: LabRenderContract) {
       warmupColor={warmupColor}
       sw={sw}
     >
-      {/* L0 */}
-      {flags.environment ? (
-        <LabEnvironment
-          width={viewport.width}
-          height={viewport.height}
-          colors={colors}
-          background={labColor(colors, profile.roles.sky)}
-          frame={frame}
-          profile={profile}
-          flags={flags}
-        />
-      ) : null}
+      {/* L0 (inside the filter layer instead while the experiment is on) */}
+      {shockFilter ? null : envLayer}
       <Group
         clip={{ x: 0, y: 0, width: viewport.width, height: viewport.height }}
       >
-        {/* WP-2.1 EXPERIMENT (fxShockFilter): the world layer (L1–L5, not the
+        {/* WP-2.1 EXPERIMENT (fxShockFilter): sky + world (L0–L5, not the
             labels) inside ONE saveLayer with a displacement runtime filter. */}
         {shockFilter ? (
           <Group
@@ -531,6 +536,7 @@ export function LabBRenderer(contract: LabRenderContract) {
               </Paint>
             }
           >
+            {envLayer}
             {worldLayers}
           </Group>
         ) : (

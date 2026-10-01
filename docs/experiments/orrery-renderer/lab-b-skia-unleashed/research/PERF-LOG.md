@@ -224,3 +224,48 @@ returning to foreground — the clock stops when the Orrery is inactive.
 
 Reduced motion (release, forced ON, Inner Circle): two screenshots 2.5 s apart differ in **0**
 pixels outside the HUD box; with RM off, 239 186 pixels differ.
+
+## 2026-10-01 — WP-2.1 System-switch showcase (RELEASE build, emulator)
+
+**EMULATOR, RELEASE build — relative A/B on this target only, never a phone claim.** gfx =
+`dumpsys gfxinfo` (main + RenderThread), JS thread invisible. Each run: `orbit://labb?reset=1&<flags>`
+(remount, 11 s settle) → panel quick switch Work ↔ Inner Circle (alternating; small Systems, no
+pre-existing stall) → 6 s window from the tap. "skipped" = Choreographer skipped frames in the window.
+
+| Config | frames / 6 s | p50 | p90 | p99 | gpu p50 / p90 | skipped |
+|---|---|---|---|---|---|---|
+| all switch FX ON | 187 | 17 | 46 | 113 | 6 / 8 | 0 |
+| all ON (repeat) | 136 | 18 | 48 | 133 | 6 / 22 | 0 |
+| `fx` master OFF | 164 | 17 | 34 | 48 | 8 / 20 | 0 |
+| `fx` OFF (repeat) | 171 | 17 | 34 | 34 | 9 / 25 | 0 |
+| streaks off | 193 | 17 | 34 | 117 | 8 / 14 | 0 |
+| particles off | 150 | 18 | 48 | 65 | 7 / 22 | 0 |
+| ring trim off | 178 | 17 | 34 | 85 | 5 / 16 | 0 |
+| comets/smears off | 183 | 18 | 48 | 65 | 6 / 21 | 0 |
+| flares off | 167 | 17 | 48 | 85 | 5 / 18 | 0 |
+| shockwave off | 141 | 18 | 48 | 101 | 6 / 18 | 0 |
+| dissolve off | 144 | 18 | 40 | 97 | 6 / 22 | 0 |
+| **filter experiment ON** (+ all) | 141 | 18 | 48 | 117 | 6 / 21 | 0 |
+
+Idle 15 s on Inner Circle (switch FX mounted but at rest vs `fx` off): 348 / 324 frames vs 329 /
+328, p50 17 / p90 34 in all four — **no measurable idle cost** (collapsed sprites, empty trim
+picture).
+
+Findings (relative): all FX cost about +12–14 ms at p90 and +65–85 ms at p99 during a switch;
+the frame count is noise-dominated (136–187 for the same config). No single effect stands out
+beyond noise; streaks / ring trim / dissolve are the cheapest to keep, particles + comets the
+likeliest p99 contributors (per-frame worklet loops + Atlas buffer conversion). The displacement
+filter (one full-layer saveLayer + runtime filter, every frame while mounted) did not separate
+from all-ON here; the emulator GPU (Arc B580) hides fill cost — **the phone must judge it**.
+
+**First switch after a cold launch** (force-stop → launch → Orrery → 8 s → Work → Inner, warm-up
+on): 157 frames, p50 17 / p90 40 / p99 117 ms, 0 skipped, recording max gap 0.37 s (at the publish
+render, same as warm switches). Evidence `01-first-switch-after-cold-launch…mp4`.
+
+**Lab ringPath fix** (frame worklet, instrumented release): `projectAnimatedFrame` 678–801 ms per
+switch frame at 141 bodies → 6–7 ms with `ringPaths` off.
+
+**Pre-existing big-switch stall** (see DECISIONS WP-2.1 §9): Inner ↔ Dense / All: 160–430 skipped
+frames per switch; M1 build 159–349; legacy renderer 212/413; bodies+labels+rings OFF 222/339;
+fx off/on identical (243/241 All, 426/426 Inner). Main-thread stack in RN Skia
+`JsiRecorder::applyUpdates` (`07-stall-main-thread-stack.txt`).

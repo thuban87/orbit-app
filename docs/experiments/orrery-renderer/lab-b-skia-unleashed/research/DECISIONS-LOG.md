@@ -328,3 +328,89 @@ Commits: `80a9650b` (seed portraits) + the WP-1.4 docs/evidence commit.
    canvas here). No decay-status *portrait* at detail. Tilt (perspective) is not timed.
 6. **Debug blank-canvas incident.** This was seen once, on the debug build during droid build
    load (RUNBOOK §10). The release build was unaffected.
+
+## 2026-10-01 — WP-2.1 System-switch showcase
+
+Commits: `30026fda` (pass 1), WP-2.1 pass-2 commit (tuning, docs, evidence). Evidence:
+`evidence/06-wp2.1-switch/`. All device work: emulator, RELEASE build (see 11).
+
+1. **One signal, pure effects.** `sampleSwitchSignal(transition, progress)` (phase, rotation,
+   angular velocity, `velocity` 0..1 normalised to the spin plateau, intensity, reduced flag) and
+   `sampleSwitchEntry(transition, entry, progress)` (one entry, byte-identical to the full sample,
+   via a shared `sampleEntryAt`) are exported from `orrery-switch-choreography.ts`; `entryWindow`
+   too. Choreography constants are unchanged. Every effect is a pure function of (signal, the
+   per-key role map, the animated frame), so pause / remount / retarget stay correct.
+   `labb-switch-logic.ts` holds the maths (tested: determinism, windows, intensity gates).
+2. **Phase map as built.**
+   - accelerate: hyperspace streaks — mid/near stars become streak sprites (32-band streak
+     texture, band picked per frame through a rect buffer, RSXform head-anchored), tail toward
+     the viewport centre (camera vanishing point), twisted with the spin; far stars smear in the
+     nebula shader (cells walked back along the radial ray, segment distance — continuous, not
+     dotted); sky push (zoom ×(1 + 0.14·warp·depth)); corona flare +40 %; ring-flow comets spool
+     with the accumulated rotation; retained bodies get a motion smear (their own spiral sampled
+     0.025 earlier).
+   - shed: leaving bodies dissolve in the body shader (`uK.x`, noise threshold + glowing status
+     edge, atmosphere thins; glyph initials fade with it) and burst into stateless particles
+     (Atlas, capacity 640, budgeted over ON-SCREEN leaving bodies, status hue, hot sparks toward
+     the highlight token); their rings UNWIND (visible arc trails the body, 1 → 0).
+   - capture: entering bodies arrive behind comet streaks (tail = their inbound spiral sampled
+     0.07 earlier, projected by the plane homography); rings DRAW ON (0 → 1) then crossfade
+     back to their class style over the settle; capture flare = body-shader limb flash +
+     glow/glint sprites (alpha shared across simultaneous arrivals, 1/√(n/8)).
+   - settle: streaks relax with the spin; one system-lock shockwave (world-space circle under the
+     homography = projected ellipse; crisp instrument front + soft trailing glow, in the
+     destination sky hue; none below intensity 0.25); sky hue crossfades.
+   - reduced motion: none of the above; the existing 180 ms crossfade + the sky-hue crossfade.
+3. **Per-System sky hue (C-05, flag `fxSkyHue`, owner glance).** Nebula lobe B takes a
+   starPalette hue hashed from the System identity (All Contacts keeps the default violet). The
+   UI thread crossfades from whatever is displayed (`displayedSkyHue` is robust to whether the
+   new transition or the new scene's hue arrives first, by generation order).
+4. **Ring trims are ONE picture per frame**, not components: a UI-thread `PictureRecorder` draws
+   each leaving/entering ring as a stroked circle with a sweep-gradient mask (world coords under
+   the homography). A per-ring component version froze the debug UI thread for seconds at switch
+   start (DEAD-ENDS). Class rings owned by a trim fade out/in via `classRingSwitchFade`.
+5. **Warm-up.** `WARMUP_FILTERS` (shockFilter, zero-filled uniforms via `zeroUniforms`) compile in
+   a tiny saveLayer at mount; every switch FX layer draws one ~1 %-alpha probe instance while
+   `ctx.warm` is on (a one-shot SharedValue, not clock-derived, so FX mappers never run per frame
+   at rest). Cold-launch first switch (Work → Inner, release): p50 17 / p90 40 / p99 117 ms, 0
+   Choreographer skips, recording max gap 0.37 s at the publish render — the same as warm
+   switches (p99 113–133 ms). No first-switch hitch attributable to compiles.
+6. **Displacement filter experiment** (`fxShockFilter`, default OFF): a runtime image filter on
+   ONE saveLayer around sky + L1–L5 (labels outside), following the shockwave front; dp → layer px
+   via `PixelRatio`. It visibly lenses the nebula and rings with a chroma-split band. Verdict:
+   "beautiful but costly" candidate — see PERF-LOG; keep as a toggle, not default.
+7. **Lab perf fix in the model half (perf only, no semantics):** `projectFrame` /
+   `projectAnimatedFrame` take `ringPaths` (true = all, false = none, id = that body). Under the lab
+   renderer (and not the path-rebuild A/B) `OrreryWorld` projects ringPaths only for a held reorder
+   body (the ghost). On the emulator UI runtime the 128-point loop cost ~700 ms per frame at 141
+   bodies (instrumented: project=678–801 ms → 6–7 ms). New frame-worklet capture `ringPathMode`
+   added to `orrery-frame-mapper.test.ts`'s map with a reason (research 03 §2.7 allowance).
+8. **Debug tooling.** `orbit://labb?flags=…&system=…&slowmo=…&rm=…&reset=1` deep links
+   (`parseLabCommand`, lab build only) drive the store/select paths; quick switch moved to the
+   top of the panel with "close on switch" (panel closes, switch fires 0.7 s later); a switch
+   slow-motion multiplier (`switchTimeScale`, optional 3rd arg of `useOrrerySwitchRuntime`, absent
+   = production timing). Needed because (9) hides the first half of every big switch.
+9. **Pre-existing main-thread stall at switch start (NOT WP-2.1).** Switching between large
+   Systems skips 160–430 frames (≈3–7 s) on the emulator release build — on the M1 build too
+   (7c464176: 159/349/345 skipped), with the legacy renderer (212/413), and with bodies + labels +
+   rings off (222/339). Main-thread stack: `RNSkia::JsiRecorder::applyUpdates` inside a worklet
+   `runSync` (evidence `07-stall-main-thread-stack.txt`). `withTiming` is wall-clock, so the
+   switch is ~over when frames resume: at normal speed a big switch shows only its settle.
+   Small↔small switches (Work ↔ Inner) do not stall and play the full showcase at normal speed
+   (`01`, `03`). Not fixed here (renderer-architecture scope: RN Skia per-frame applyUpdates over
+   every bound SharedValue); flagged for R1 with the phone.
+10. **Visual iteration.** Pass 1 (`29-pass1-sheet…`): shockwave read as a soap bubble (band 0.16
+    → 0.07 extent, glow 0.5 → 0.3, strength 0.35 + 0.4·intensity); particles invisible (3 per body
+    on a 130-body shed → on-screen budget, bigger); capture glints sprite-span bug (×6 too big)
+    and too bright; comets too thick (0.7 r → 0.38 r); initials glyphs survived the dissolve
+    (now fade). Pass 2 matrix (`10`–`15`, `27`, `28`): dense→small, small→dense, high continuity
+    (Dense → All: few streaks, no lock shockwave drama), All → System, near-total change
+    (Work → Inner), panned-camera switch, reduced motion, Galaxy Light.
+11. **Debug vs release iteration.** Debug JS on this emulator loads a System in > 7 s and the
+    deep-link remount makes debug recordings unusable; iteration moved to RELEASE builds after
+    the first debug pass (incremental `assembleRelease` ≈ 1 min on droid, busy-checked). The debug
+    pass found the two Hermes-only bugs below.
+12. **Hermes worklet trap #2:** a worklet DEFAULT PARAMETER referencing a module constant
+    (`switchFx = NO_SWITCH_FX`) is not captured → `ReferenceError` on device, invisible to vitest.
+    Use `undefined` + an in-body check. `MakeSweepGradient(..., null, ...)` throws "Value is null,
+    expected an Object" — pass `undefined` for the local matrix.

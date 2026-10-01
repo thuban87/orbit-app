@@ -141,11 +141,14 @@ function Initials({
   initials,
   radius,
   color,
+  opacity,
 }: {
   font: SkFont | null;
   initials: string;
   radius: number;
   color: string;
+  /** WP-2.1: glyphs fade with the departing-body dissolve. */
+  opacity?: SharedValue<number>;
 }) {
   const glyphs = labInitials(initials);
   if (!font || glyphs.length === 0) return null;
@@ -158,7 +161,7 @@ function Initials({
   const max = radius * 2 * GLYPH_MAX_FRACTION;
   const fit = width > max ? max / width : 1;
   return (
-    <Group transform={[{ scale: fit }]}>
+    <Group transform={[{ scale: fit }]} opacity={opacity}>
       <Text
         font={font}
         text={glyphs}
@@ -334,6 +337,12 @@ export function LabContactBody({
       sfx,
     );
   });
+  // Glyph initials are drawn over the shader disc; fade them as it dissolves.
+  const glyphOpacity = useDerivedValue(() => {
+    const k = (uniforms.value as { uK?: number[] }).uK;
+    const d = k ? k[0] : 0;
+    return d > 0 ? Math.max(0, 1 - Math.sqrt(d) * 1.3) : 1;
+  });
   return (
     <Group transform={transform} zIndex={depth} opacity={opacity}>
       {focusColor ? (
@@ -368,6 +377,7 @@ export function LabContactBody({
           initials={initials}
           radius={radius}
           color={swatchText}
+          opacity={glyphOpacity}
         />
       )}
     </Group>

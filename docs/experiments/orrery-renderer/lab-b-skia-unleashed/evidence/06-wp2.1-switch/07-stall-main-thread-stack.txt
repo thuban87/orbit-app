@@ -1,0 +1,35 @@
+WP-2.1 main-thread stall at switch start (pre-existing; reproduced on the M1 build 7c464176).
+Captured on the DEBUG build via run-as kill -3 during an All->Inner switch; trace from adb bugreport FS/data/anr/trace_00.
+Main thread frames #00-#10 (RN Skia):
+"main" prio=5 tid=1 Native
+  | group="main" sCount=1 ucsCount=0 flags=1 obj=0x72dcc000 self=0x78b7fb21b7b0
+  | sysTid=20116 nice=-10 cgrp=top-app sched=0/0 handle=0x78b9c41f5038
+  | state=R schedstat=( 28650014983 1115051879 10256 ) utm=2332 stm=532 core=0 HZ=100
+  | stack=0x7ff9b1f90000-0x7ff9b1f92000 stackSize=8176KB
+  | held mutexes=
+  native: #00 pc 006dc834  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 4ecc000) (???) (BuildId: 68b97f5e5774a82a289cf5559fe6b68c25929af7)
+  native: #01 pc 006dc4b2  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 4ecc000) (???) (BuildId: 68b97f5e5774a82a289cf5559fe6b68c25929af7)
+  native: #02 pc 0070d339  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 4ecc000) (???) (BuildId: 68b97f5e5774a82a289cf5559fe6b68c25929af7)
+  native: #03 pc 0070d27d  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 4ecc000) (???) (BuildId: 68b97f5e5774a82a289cf5559fe6b68c25929af7)
+  native: #04 pc 0089c354  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 4ecc000) (???) (BuildId: 68b97f5e5774a82a289cf5559fe6b68c25929af7)
+  native: #05 pc 0094f1e4  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 4ecc000) (std::__ndk1::__tree_iterator<std::__ndk1::__value_type<std::__
+  native: #06 pc 0094f082  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 4ecc000) (std::__ndk1::__tree_iterator<std::__ndk1::__value_type<std::__
+  native: #07 pc 0094ee29  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 4ecc000) (???) (BuildId: 68b97f5e5774a82a289cf5559fe6b68c25929af7)
+  native: #08 pc 0089acb1  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 4ecc000) (RNSkia::JsiRecorder::applyUpdates+401) (BuildId: 68b97f5e5774a
+  native: #09 pc 0070f261  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 4ecc000) (???) (BuildId: 68b97f5e5774a82a289cf5559fe6b68c25929af7)
+  native: #10 pc 0070f174  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 4ecc000) (???) (BuildId: 68b97f5e5774a82a289cf5559fe6b68c25929af7)
+...
+  native: #41 pc 00377767  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (facebook::jsi::RuntimeDecorator<facebook::jsi::Runtime, facebo
+  native: #42 pc 00373059  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (facebook::jsi::WithRuntimeDecorator<worklets::WorkletsReentran
+  native: #43 pc 00377767  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (facebook::jsi::RuntimeDecorator<facebook::jsi::Runtime, facebo
+  native: #44 pc 0038c879  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (facebook::jsi::WithRuntimeDecorator<worklets::AroundLock, face
+  native: #45 pc 001e6517  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (facebook::jsi::Function::call const+119) (BuildId: 65b9e92dcc6
+  native: #46 pc 001e6415  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (facebook::jsi::Function::call const+117) (BuildId: 65b9e92dcc6
+  native: #47 pc 001e61e3  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (facebook::jsi::Value facebook::jsi::Function::call<double&> co
+  native: #48 pc 001e5f7d  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (facebook::jsi::Value worklets::WorkletRuntime::callGuarded<dou
+  native: #49 pc 001e5b1b  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (facebook::jsi::Value worklets::WorkletRuntime::runSync<double&
+  native: #50 pc 001e57c4  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (???) (BuildId: 65b9e92dcc6ec1a1b4e6a9245fe85b77c842646b)
+  native: #51 pc 001e568d  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (???) (BuildId: 65b9e92dcc6ec1a1b4e6a9245fe85b77c842646b)
+  native: #52 pc 001e55e9  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (???) (BuildId: 65b9e92dcc6ec1a1b4e6a9245fe85b77c842646b)
+  native: #53 pc 001e5591  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (???) (BuildId: 65b9e92dcc6ec1a1b4e6a9245fe85b77c842646b)
+  native: #54 pc 001e3b5d  /data/app/~~sTkyoL8y2a_8aGj1ndUdbg==/com.bwales.orbit.labb-lJgQ1wYAEBqSIMq4je4DGQ==/base.apk (offset 6158000) (???) (BuildId: 65b9e92dcc6ec1a1b4e6a9245fe85b77c842646b)

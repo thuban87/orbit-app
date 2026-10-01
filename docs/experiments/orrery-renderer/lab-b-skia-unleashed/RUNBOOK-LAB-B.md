@@ -299,3 +299,23 @@ near zoom + labels), `07-dense-after-clear-focus`.
 
 Rough emulator gfxinfo over that whole session (launch + seeding + switching, NOT a perf claim):
 643 frames, 50% janky, p50 24 ms / p90 250 ms. Reset gfxinfo before any measured run.
+
+## 11. WP-2.1 switch tooling (lab build only)
+
+- **Deep links** (`parseLabCommand` in `LabFxPanel.tsx`):
+  `$ADB shell "am start -a android.intent.action.VIEW -d 'orbit://labb?flags=fx:0,fxStreaks:1&slowmo=6&rm=on&intensity=0.75&reset=1&renderer=legacy&system=Lab%20B%20Dense&delay=0&panel=0' com.bwales.orbit.labb"`.
+  Each VIEW intent pauses/resumes the activity → the Orrery REMOUNTS (wait ~10 s on release).
+  Use links for flags / slow-mo / reduced motion, then switch with the panel.
+- **Panel quick switch** is now the first section; with "Close on switch: ON" the panel closes
+  and the switch fires 0.7 s later. Unscrolled chip centres (1280×2856): All Contacts 210,1396 ·
+  Lab B Dense 888,1600 · Work 354,1600 · Lab B Inner Circle 264,1702 · Lab B Work 618,1702 ·
+  Replay 976,1702. Long-press the "LAB B" marker (96,2584) ~800 ms to open.
+- **Slow motion**: `slowmo=N` multiplies the switch duration (store `switchTimeScale`). Needed to
+  see the first half of BIG switches (pre-existing 3–7 s main-thread stall, DECISIONS WP-2.1 §9).
+- **screenrecord quirk**: running another `adb shell input` concurrently with screenrecord ended
+  the recording's frame stream early. Fire the input first in the SAME shell:
+  `$ADB shell "input tap X Y; screenrecord --time-limit 15 --bit-rate 4000000 --size 720x1606 /sdcard/r.mp4"`.
+- **Main-thread stack of a stall**: debug build only — `$ADB shell run-as $PKG kill -3 <pid>`, then
+  `$ADB bugreport` and read `FS/data/anr/trace_00` (the user-build emulator denies /data/anr).
+- Iterate on RELEASE (`assembleRelease` ≈ 1 min incremental after the busy check; install -r keeps
+  data). Debug JS takes > 7 s to load a System on this emulator.

@@ -88,7 +88,6 @@ const FX_CELL = 32;
 const FX_ATLAS = { width: FX_CELL * 2, height: FX_CELL };
 /** Core diameter (texels) of the soft cell (sizes sprites to a dp diameter). */
 const FX_SOFT_CORE = 11;
-const FX_GLINT_CORE = 9;
 /** Streak atlas: STREAK_BANDS rows. */
 const STREAK_TEX = {
   width: 256,
@@ -101,14 +100,16 @@ const SHOCK_REACH = 1.3;
 const SHOCK_BAND = 0.07;
 const SHOCK_LINE_DP = 1.4;
 /** Comet / smear look. */
-const COMET_ALPHA = 0.95;
+const COMET_ALPHA = 0.8;
 const COMET_STRETCH = 2.1;
 const COMET_MAX_DP = 280;
 const SMEAR_ALPHA = 0.34;
 const SMEAR_STRETCH = 1.15;
-/** Capture flare look. */
-const FLARE_GLOW_SCALE = 3.2;
-const FLARE_GLINT_SCALE = 5.5;
+/** Capture flare look: sprite SPAN in body radii (glow disc, glint cross). */
+const FLARE_GLOW_SPAN = 4.2;
+const FLARE_GLINT_SPAN = 4.5;
+/** Many simultaneous arrivals share the flare budget (alpha ∝ 1/√(n/N)). */
+const FLARE_CROWD = 8;
 
 /** Floats per sprite in the flat per-frame state arrays. */
 const TRAIL_STRIDE = 10; // scos, ssin, tx, ty, band, w, r, g, b, a
@@ -368,7 +369,7 @@ function Trails({
         COMET_MAX_DP,
         chord * COMET_STRETCH * (1 - u) ** 0.4,
       );
-      const thick = Math.max(2, head.radius * 0.7);
+      const thick = Math.max(1.6, head.radius * 0.38);
       const x = streakXform(head.x, head.y, dx, dy, thick, len + thick);
       const c = keyColors[entry.key] ?? highlight;
       const hot = 0.35;
@@ -657,7 +658,11 @@ function Flares({
     if (roles.generation !== signal.generation) return EMPTY;
     const transition = sw.transition.value;
     const index = frameIndex.value;
-    const k = fx.intensity;
+    const crowd = Math.min(
+      1,
+      Math.sqrt(FLARE_CROWD / Math.max(1, roles.entering.length)),
+    );
+    const k = fx.intensity * crowd;
     const out: number[] = [];
     for (let n = 0; n < roles.entering.length; n++) {
       if (out.length >= FLARE_CAPACITY * FLARE_STRIDE) break;
@@ -668,9 +673,8 @@ function Flares({
       const b = bodyAt(f, index, entry.key);
       if (!b?.visible) continue;
       const c = keyColors[entry.key] ?? highlight;
-      const glow =
-        (b.radius * FLARE_GLOW_SCALE * (0.7 + 0.5 * e)) / FX_SOFT_CORE;
-      const glint = (b.radius * FLARE_GLINT_SCALE * e) / FX_GLINT_CORE;
+      const glow = (b.radius * FLARE_GLOW_SPAN * (0.7 + 0.4 * e)) / FX_CELL;
+      const glint = (b.radius * FLARE_GLINT_SPAN * (0.4 + 0.6 * e)) / FX_CELL;
       const rot = signal.accumulatedRotation * 0.15 + entry.stagger * 40;
       const gc = Math.cos(rot) * glint;
       const gs = Math.sin(rot) * glint;
@@ -683,7 +687,7 @@ function Flares({
         c[0] + (highlight[0] - c[0]) * 0.3,
         c[1] + (highlight[1] - c[1]) * 0.3,
         c[2] + (highlight[2] - c[2]) * 0.3,
-        Math.min(1, 0.55 * e * k),
+        Math.min(1, 0.3 * e * k),
         gc,
         gs,
         b.x - (gc * h - gs * h),
@@ -691,7 +695,7 @@ function Flares({
         highlight[0],
         highlight[1],
         highlight[2],
-        Math.min(1, 0.9 * e * k),
+        Math.min(1, 0.5 * e * k),
       );
     }
     return out;
@@ -761,7 +765,7 @@ export function LabSwitchOver(props: LabSwitchFxProps) {
 // --- EXPERIMENT: displacement shockwave image filter (flag fxShockFilter) ------
 
 /** Filter look (dp; scaled to layer pixels by the device pixel ratio). */
-const FILTER_AMP_DP = 16;
+const FILTER_AMP_DP = 28;
 const FILTER_BAND_DP = 34;
 const FILTER_CHROMA = 0.18;
 const FILTER_BRIGHT = 0.22;
