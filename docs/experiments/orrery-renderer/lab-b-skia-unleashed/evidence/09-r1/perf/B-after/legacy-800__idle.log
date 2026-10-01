@@ -1,0 +1,7 @@
+10-01 11:54:13.691 30607 30607 I Choreographer: Skipped 186 frames!  The application may be doing too much work on its main thread.
+10-01 11:54:13.834 30607 30632 I ReactNativeJS: [labb-probe] win=20252ms alloc=1/1/1/1 f.moons=1/0.3/0.3/0.3 f.sample=1/0.2/0.2/0.2 frame=1/2064.6/2064.6/2064.6
+10-01 11:54:14.497 30607 30607 I Choreographer: Skipped 47 frames!  The application may be doing too much work on its main thread.
+10-01 11:54:15.254 30607 30607 I Choreographer: Skipped 45 frames!  The application may be doing too much work on its main thread.
+10-01 11:54:16.016 30607 30607 I Choreographer: Skipped 44 frames!  The application may be doing too much work on its main thread.
+10-01 11:54:16.811 30607 30607 I Choreographer: Skipped 47 frames!  The application may be doing too much work on its main thread.
+10-01 11:54:17.721 30607 30607 I Choreographer: Skipped 54 frames!  The application may be doing too much work on its main thread.

@@ -1,0 +1,48 @@
+label	scenario	frames	janky	p50	p90	p95	p99	gpu50	gpu90	skipped_max	probe(name:runs x mean ms/p95/max)
+laball-12	idle	194	184	34	65	73	97	9	20	0	nebula:417x0.1/p95 1.0/max 1.6 rings:418x2.4/p95 6.6/max 26.1 trim:417x0.4/p95 4.4/max 15.3
+laball-12	pan	344	278	31	48	48	85	6	20	0	alloc:90x0.1/p95 0.7/max 0.8 bodies:90x4.2/p95 15.6/max 17.7 frame:90x0.8/p95 1.9/max 2.0 labels:90x0.3/p95 1.4/max 1.4 nebula:801x0.1/p95 0.5/max 2.6 rings:801x1.5/p95 6.1/max 14.9 trim:801x0.2/p95 1.2/max 1.8 wakes:90x2.7/p95 12.9/max 22.1
+laball-12	focus	173	130	32	34	36	77	7	23	0	alloc:19x0.1/p95 0.5/max 0.5 bodies:30x1.6/p95 4.4/max 6.1 frame:19x1.0/p95 2.1/max 2.1 labels:30x0.3/p95 1.1/max 1.4 nebula:352x0.1/p95 0.3/max 1.3 rings:353x1.5/p95 3.7/max 19.1 trim:352x0.3/p95 2.3/max 4.3 wakes:19x3.6/p95 13.3/max 13.3
+laball-12	switch_out	168	138	32	44	85	117	7	23	0	alloc:58x1.5/p95 2.3/max 3.1 bodies:60x2.8/p95 8.0/max 11.2 frame:58x5.8/p95 8.3/max 8.6 labels:61x0.2/p95 1.4/max 2.7 nebula:368x0.1/p95 0.1/max 0.5 rings:368x1.4/p95 3.4/max 10.8 trim:368x1.3/p95 22.6/max 24.7 wakes:59x2.8/p95 17.1/max 20.1
+laball-12	switch_in	181	147	34	42	65	101	12	24	0	alloc:61x0.3/p95 2.4/max 2.4 bodies:63x2.4/p95 5.2/max 5.7 frame:61x6.0/p95 8.9/max 10.2 labels:63x0.2/p95 1.2/max 1.8 nebula:417x0.1/p95 0.3/max 1.3 rings:417x1.3/p95 3.9/max 6.4 trim:418x1.1/p95 16.0/max 23.9 wakes:62x3.4/p95 18.2/max 18.2
+laball-120	idle	201	152	32	34	34	46	20	24	0	nebula:429x0.1/p95 0.3/max 0.9 rings:429x1.7/p95 4.1/max 14.9 trim:428x0.2/p95 1.3/max 3.0
+laball-120	pan	310	233	17	36	65	85	6	22	0	alloc:69x1.4/p95 3.6/max 3.6 bodies:69x3.4/p95 17.3/max 17.3 frame:69x5.8/p95 9.5/max 9.5 labels:69x0.1/p95 0.7/max 0.7 nebula:698x0.1/p95 0.3/max 2.2 rings:697x1.6/p95 3.0/max 26.1 trim:698x0.2/p95 1.0/max 2.3 wakes:69x15.2/p95 105.4/max 105.4
+laball-120	focus	158	109	34	42	69	101	18	23	0	alloc:18x1.4/p95 2.3/max 2.3 bodies:29x1.1/p95 2.2/max 2.8 frame:18x5.9/p95 9.7/max 9.7 labels:29x0.2/p95 0.5/max 0.9 nebula:331x0.1/p95 0.1/max 0.7 rings:332x1.5/p95 3.1/max 5.2 trim:332x0.2/p95 1.3/max 2.1 wakes:18x12.6/p95 20.0/max 20.0
+laball-120	switch_out	187	138	19	48	65	101	7	24	0	alloc:41x0.2/p95 0.5/max 0.8 bodies:43x2.3/p95 5.2/max 7.4 frame:40x5.8/p95 7.7/max 7.8 labels:43x0.2/p95 0.8/max 1.2 nebula:336x0.1/p95 0.1/max 1.5 rings:335x1.1/p95 2.9/max 14.0 trim:335x0.8/p95 15.5/max 23.4 wakes:42x5.2/p95 13.8/max 16.6
+laball-120	switch_in	166	134	32	34	65	101	8	23	0	alloc:54x1.4/p95 2.5/max 3.2 bodies:56x2.5/p95 5.5/max 5.5 frame:54x5.7/p95 8.2/max 9.6 labels:57x0.2/p95 1.2/max 1.2 nebula:322x0.1/p95 0.2/max 0.5 rings:321x1.6/p95 6.7/max 15.2 trim:322x1.5/p95 20.2/max 25.5 wakes:55x3.0/p95 14.8/max 15.3
+laball-400	idle	175	113	34	34	34	48	17	21	0	nebula:304x0.1/p95 0.3/max 0.8 rings:303x1.5/p95 4.1/max 8.5 trim:304x0.0/p95 0.2/max 0.8
+laball-400	pan	302	230	32	36	97	150	14	19	0	alloc:36x15.8/p95 20.7/max 20.7 bodies:36x2.6/p95 4.1/max 4.1 frame:36x19.6/p95 25.5/max 25.5 labels:36x0.2/p95 0.9/max 0.9 nebula:605x0.1/p95 0.3/max 1.0 rings:606x1.5/p95 3.1/max 6.2 trim:605x0.0/p95 0.2/max 1.2 wakes:36x34.1/p95 42.2/max 42.2
+laball-400	focus	178	129	34	34	48	150	17	20	0	alloc:10x15.0/p95 17.3/max 17.3 bodies:37x1.1/p95 1.8/max 2.1 frame:9x20.5/p95 27.0/max 27.0 labels:37x0.4/p95 1.1/max 1.7 nebula:293x0.1/p95 0.2/max 2.3 rings:294x2.3/p95 5.7/max 14.0 trim:293x0.0/p95 0.6/max 5.7 wakes:10x40.2/p95 51.1/max 51.1
+laball-400	switch_out	143	105	34	69	101	150	20	24	0	alloc:43x1.5/p95 13.7/max 14.8 bodies:45x2.4/p95 3.6/max 5.2 frame:43x18.4/p95 21.0/max 24.4 labels:45x0.2/p95 0.8/max 1.1 nebula:369x0.1/p95 0.2/max 1.6 rings:369x1.4/p95 5.3/max 8.8 trim:369x0.5/p95 4.3/max 59.6 wakes:44x8.7/p95 37.9/max 41.6
+laball-400	switch_in	166	111	18	44	101	200	7	20	0	alloc:30x14.6/p95 20.5/max 20.5 bodies:33x2.8/p95 8.0/max 8.1 frame:30x18.9/p95 27.5/max 27.5 labels:33x0.3/p95 0.8/max 1.0 nebula:340x0.1/p95 0.3/max 7.8 rings:339x1.5/p95 3.3/max 6.3 trim:340x1.8/p95 56.8/max 75.2 wakes:31x7.5/p95 40.8/max 40.8
+laball-800	idle	216	214	34	48	48	65	9	17	0	nebula:513x0.1/p95 0.3/max 1.2 rings:512x2.0/p95 3.1/max 16.8 trim:513x0.0/p95 0.1/max 0.5
+laball-800	pan	222	217	34	48	53	200	7	17	0	alloc:24x61.7/p95 68.4/max 68.4 bodies:24x2.7/p95 4.2/max 4.2 frame:24x35.7/p95 39.6/max 39.6 labels:24x0.4/p95 1.3/max 1.3 nebula:604x0.1/p95 0.4/max 2.0 rings:603x2.3/p95 3.9/max 9.3 trim:604x0.5/p95 1.6/max 5.0 wakes:24x68.2/p95 90.8/max 90.8
+labmin-12	idle	247	220	17	32	34	40	13	4950	0	rings:417x0.5/p95 2.0/max 17.8
+labmin-12	pan	326	299	18	34	34	36	13	4950	0	alloc:143x0.1/p95 0.9/max 1.1 bodies:143x0.9/p95 6.7/max 12.2 frame:143x0.8/p95 2.0/max 3.5 labels:143x0.3/p95 2.4/max 2.4 rings:867x0.5/p95 1.9/max 13.7
+labmin-12	focus	256	202	17	20	34	34	12	14	0	alloc:40x0.1/p95 0.3/max 0.3 bodies:62x1.5/p95 2.6/max 3.3 frame:40x0.8/p95 1.4/max 1.7 labels:62x0.1/p95 0.3/max 0.6 rings:498x0.4/p95 1.8/max 6.1
+labmin-12	switch_out	189	153	32	34	34	36	15	4950	0	alloc:96x1.6/p95 2.4/max 5.2 bodies:98x0.8/p95 1.7/max 2.5 frame:96x5.8/p95 7.6/max 11.5 labels:98x0.3/p95 1.1/max 3.5 rings:510x0.6/p95 2.6/max 7.1
+labmin-12	switch_in	201	171	32	34	34	48	14	4950	0	alloc:123x0.4/p95 1.5/max 2.7 bodies:126x1.0/p95 2.2/max 16.4 frame:123x6.4/p95 9.1/max 21.1 labels:126x0.4/p95 1.8/max 11.2 rings:381x0.5/p95 1.3/max 13.5
+labmin-120	idle	248	215	17	34	34	34	12	4950	0	rings:536x0.6/p95 1.7/max 5.7
+labmin-120	pan	330	279	18	34	34	48	12	4950	0	alloc:107x1.5/p95 3.0/max 3.0 bodies:107x0.8/p95 2.5/max 3.5 frame:107x5.9/p95 8.5/max 8.6 labels:107x0.3/p95 2.1/max 2.1 rings:710x0.6/p95 2.3/max 18.1
+labmin-120	focus	252	206	17	34	34	46	12	14	0	alloc:38x1.5/p95 3.7/max 3.9 bodies:60x1.0/p95 2.5/max 2.5 frame:38x6.1/p95 9.3/max 9.7 labels:60x0.2/p95 1.3/max 1.7 rings:539x0.6/p95 2.0/max 17.6
+labmin-120	switch_out	208	170	32	34	34	57	18	4950	0	alloc:128x0.4/p95 1.6/max 3.1 bodies:131x0.8/p95 1.7/max 3.0 frame:128x5.8/p95 7.7/max 8.3 labels:131x0.1/p95 0.3/max 0.6 rings:366x0.5/p95 1.5/max 6.5
+labmin-120	switch_in	187	173	32	34	34	36	21	4950	0	alloc:107x1.8/p95 3.5/max 9.6 bodies:109x1.1/p95 2.4/max 10.3 frame:107x6.7/p95 13.7/max 21.6 labels:110x0.3/p95 1.3/max 7.2 rings:412x0.5/p95 1.4/max 6.2
+labmin-400	idle	234	215	17	34	34	40	12	4950	0	rings:498x1.1/p95 3.0/max 23.0
+labmin-400	pan	333	285	17	34	61	117	11	4950	0	alloc:58x17.5/p95 36.4/max 36.4 bodies:58x1.6/p95 23.8/max 23.8 frame:58x21.4/p95 40.5/max 40.5 labels:58x0.4/p95 3.4/max 3.4 rings:692x1.1/p95 2.9/max 5.7
+labmin-400	focus	195	165	17	34	57	97	11	25	0	alloc:17x16.3/p95 20.9/max 20.9 bodies:48x0.8/p95 1.5/max 1.5 frame:16x19.1/p95 26.3/max 26.3 labels:48x0.1/p95 0.4/max 0.8 rings:420x1.1/p95 2.8/max 9.3
+labmin-400	switch_out	226	201	17	48	65	65	12	4950	0	alloc:78x1.3/p95 17.1/max 17.1 bodies:81x1.2/p95 2.6/max 4.2 frame:78x19.2/p95 24.6/max 24.6 labels:81x0.1/p95 0.5/max 1.0 rings:518x0.5/p95 2.3/max 5.9
+labmin-400	switch_in	189	176	18	53	81	117	12	4950	0	alloc:51x15.5/p95 19.6/max 20.5 bodies:53x1.2/p95 2.7/max 5.5 frame:51x18.5/p95 26.3/max 26.3 labels:54x0.2/p95 0.8/max 0.9 rings:421x0.7/p95 2.3/max 8.9
+legacy-12	idle	197	90	12	34	36	73	3	4950	0	
+legacy-12	pan	305	156	17	34	81	150	4	22	0	alloc:37x0.1/p95 1.1/max 1.1 frame:37x64.7/p95 72.7/max 72.7
+legacy-12	focus	169	122	32	34	61	200	13	22	0	alloc:2x0.1/p95 0.1/max 0.1 frame:2x67.0/p95 69.6/max 69.6
+legacy-12	switch_out	79	57	17	200	250	1450	6	18	0	alloc:6x0.5/p95 1.5/max 1.5 frame:6x345.1/p95 629.1/max 629.1
+legacy-12	switch_in	61	39	19	200	650	1550	7	25	50	alloc:3x1.7/p95 2.4/max 2.4 frame:3x618.7/p95 637.2/max 637.2
+legacy-120	idle	33	33	200	200	250	450	12	15	0	alloc:1x1.9/p95 1.9/max 1.9 frame:1x608.6/p95 608.6/max 608.6
+legacy-120	pan	40	40	200	950	1050	1500	12	20	58	alloc:14x1.8/p95 3.3/max 3.3 frame:14x628.5/p95 729.4/max 729.4
+legacy-120	focus	23	23	200	850	1500	1600	11	17	48	alloc:2x4.2/p95 7.0/max 7.0 frame:2x646.7/p95 663.2/max 663.2
+legacy-120	switch_out	29	29	200	300	850	850	12	16	44	alloc:3x1.2/p95 1.3/max 1.3 frame:3x614.6/p95 623.1/max 623.1
+legacy-120	switch_in	18	18	250	1550	1700	1700	12	19	53	alloc:1x0.2/p95 0.2/max 0.2 frame:1x621.2/p95 621.2/max 621.2
+legacy-400	idle	5	5	3100	4950	4950	4950	20	4950	139	alloc:1x16.0/p95 16.0/max 16.0 frame:1x2114.3/p95 2114.3/max 2114.3
+legacy-400	pan	10	10	1550	1700	1700	1700	4950	4950	55	
+legacy-400	focus	4	4	1550	1600	1600	1600	4950	4950	54	
+legacy-400	switch_out	4	4	1750	3150	3150	3150	4950	4950	144	alloc:2x20.6/p95 25.8/max 25.8
+legacy-400	switch_in	162	91	18	34	34	89	9	25	0	alloc:3x0.1/p95 0.1/max 0.1 frame:3x66.0/p95 74.6/max 74.6

@@ -1,0 +1,4 @@
+10-01 11:10:50.091 26950 26983 I ReactNativeJS: [labb-probe] win=3033ms rings=91/0.6/1.4/1.7
+10-01 11:10:53.109 26950 26983 I ReactNativeJS: [labb-probe] win=3019ms rings=95/0.6/1.7/2
+10-01 11:10:56.123 26950 26983 I ReactNativeJS: [labb-probe] win=3013ms rings=181/0.6/1.5/2.3
+10-01 11:10:59.140 26950 26983 I ReactNativeJS: [labb-probe] win=3017ms rings=169/0.6/1.7/5.7

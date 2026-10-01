@@ -511,13 +511,39 @@ export function projectFrame(
         ((1 + Math.SQRT2) * Math.sin(MAX_TILT)),
     ),
   );
+  // ORRERY LAB B R1 (perf only, bit-identical): the per-frame constants of
+  // `projectWorldPoint` / `perspectiveScale` / `cameraPlane` are computed ONCE
+  // per frame instead of per body. `projectionCenter` ran `usableCameraRect`
+  // (obstacle region splitting + sort) for every body, and each body built
+  // `cameraPlane` four times — ~44 µs per body on the emulator UI thread, the
+  // top per-frame cost at 400–800 bodies (research/R1-REPORT.md). Same float
+  // operations in the same order; pinned by orrery-camera-logic tests.
+  assertProjection({ x: 0, y: 0 }, current, viewport);
+  const center = projectionCenter(viewport);
+  const yaw = current.yaw ?? 0;
+  const cy = Math.cos(yaw);
+  const sy = Math.sin(yaw);
+  const sinT = Math.sin(current.tilt ?? 0);
+  const cosT = Math.cos(current.tilt ?? 0);
+  const focal = current.focalDistance ?? MIN_FOCAL_DISTANCE;
   return {
     generation,
     pose: current,
     viewport,
     center: projectWorldPoint({ x: 0, y: 0 }, current, viewport),
     bodies: world.map((body) => {
-      const scale = current.zoom * perspectiveScale(body, current);
+      if (!Number.isFinite(body.x) || !Number.isFinite(body.y))
+        throw new Error("Invalid Orrery projection input");
+      const dx = body.x - current.x,
+        dy = body.y - current.y;
+      const planeX = dx * cy - dy * sy,
+        planeY = dx * sy + dy * cy;
+      const denominator = focal - planeY * sinT;
+      if (!Number.isFinite(denominator) || denominator <= 0)
+        throw new Error("Point outside finite Orrery camera plane");
+      const perspective = focal / denominator;
+      const scale = current.zoom * perspective;
+      const pointScale = perspective * current.zoom;
       const ringPath: WorldPoint[] = [];
       if (body.ringRadius > 0 && (ringPaths === true || ringPaths === body.id))
         for (let i = 0; i < RING_SEGMENTS; i++) {
@@ -535,12 +561,13 @@ export function projectFrame(
         }
       return {
         ...body,
-        ...projectWorldPoint(body, current, viewport),
+        x: center.x + planeX * pointScale,
+        y: center.y + planeY * cosT * pointScale,
         radius: body.radius * scale,
         ringRadius: body.ringRadius * current.zoom,
         hitRadius: Math.max(MIN_HIT_RADIUS, body.radius * scale),
         ringPath,
-        depth: cameraPlane(body, current).y * Math.sin(current.tilt ?? 0),
+        depth: planeY * sinT,
       };
     }),
   };

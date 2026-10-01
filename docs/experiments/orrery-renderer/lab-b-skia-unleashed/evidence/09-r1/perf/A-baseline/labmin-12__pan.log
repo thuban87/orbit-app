@@ -1,0 +1,6 @@
+10-01 11:08:40.476 26950 26983 I ReactNativeJS: [labb-probe] win=3021ms rings=116/0.4/1.6/2.5
+10-01 11:08:43.492 26950 26983 I ReactNativeJS: [labb-probe] win=3016ms alloc=29/0.2/0.9/1.1 bodies=29/0.7/2/2.7 frame=30/0.7/1.1/1.1 labels=29/0.3/1.5/2.2 rings=147/0.5/1.6/4.3
+10-01 11:08:46.493 26950 26983 I ReactNativeJS: [labb-probe] win=3000ms alloc=20/0.1/0.9/0.9 bodies=20/0.7/2/2 frame=19/0.8/2/2 labels=19/0.2/1.5/1.5 rings=130/0.5/1.5/3.2
+10-01 11:08:49.522 26950 26983 I ReactNativeJS: [labb-probe] win=3030ms alloc=46/0.1/0.6/0.6 bodies=46/1.4/6.7/12.2 frame=46/0.8/1.5/3.5 labels=47/0.2/1/1.6 rings=200/0.6/1.8/13.7
+10-01 11:08:52.528 26950 26983 I ReactNativeJS: [labb-probe] win=3005ms alloc=39/0.1/0.3/0.6 bodies=39/0.8/2.4/2.6 frame=40/0.9/1.6/2.2 labels=39/0.2/1.4/1.4 rings=158/0.5/1.9/5.4
+10-01 11:08:55.556 26950 26983 I ReactNativeJS: [labb-probe] win=3028ms alloc=9/0.1/0.2/0.2 bodies=9/0.4/1.2/1.2 frame=8/0.8/1/1 labels=9/1.4/2.4/2.4 rings=116/0.4/1.5/2.3

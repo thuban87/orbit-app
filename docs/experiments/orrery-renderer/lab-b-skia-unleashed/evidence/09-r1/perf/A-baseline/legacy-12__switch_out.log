@@ -1,0 +1,2 @@
+10-01 11:16:53.425 26950 26983 I ReactNativeJS: [labb-probe] win=11777ms alloc=2/0.2/0.2/0.2 frame=2/71.7/78/78
+10-01 11:16:58.240 26950 26983 I ReactNativeJS: [labb-probe] win=3274ms alloc=4/0.7/1.5/1.5 frame=4/481.8/629.1/629.1

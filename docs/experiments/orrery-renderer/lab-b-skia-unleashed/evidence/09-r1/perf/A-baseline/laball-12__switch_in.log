@@ -1,0 +1,4 @@
+10-01 10:28:44.650 14868 14911 I ReactNativeJS: [labb-probe] win=3008ms alloc=19/0.5/2.4/2.4 bodies=19/2.9/5.2/5.2 frame=19/6.1/8.9/8.9 labels=18/0.2/0.8/0.8 nebula=83/0.1/0.1/1.3 rings=83/1.8/3.9/6.3 trim=84/2.6/16/23.9 wakes=19/1/18.2/18.2
+10-01 10:28:47.659 14868 14911 I ReactNativeJS: [labb-probe] win=3009ms alloc=42/0.2/0.5/1.9 bodies=44/2.2/4.7/5.7 frame=42/5.9/7.4/10.2 labels=45/0.2/1.2/1.8 nebula=137/0.1/0.2/0.8 rings=136/1.2/2.1/6.4 trim=136/1.5/13.7/21.6 wakes=43/4.5/13.9/16.9
+10-01 10:28:50.690 14868 14911 I ReactNativeJS: [labb-probe] win=3030ms nebula=107/0.1/0.3/0.7 rings=107/1.3/2.7/3.9 trim=107/0.1/0.3/1
+10-01 10:28:53.690 14868 14911 I ReactNativeJS: [labb-probe] win=3001ms nebula=90/0.1/0.1/0.3 rings=91/1/1.8/2.7 trim=91/0.4/1.2/2

@@ -257,3 +257,46 @@ describe("projectFrame ringPaths (ORRERY LAB B WP-2.1 perf)", () => {
     expect(strip(none)).toEqual(strip(all));
   });
 });
+
+describe("projectFrame hoisted constants (ORRERY LAB B R1 perf)", () => {
+  it("is bit-identical to per-body projectWorldPoint / perspectiveScale", () => {
+    let seed = 7;
+    const rand = () => {
+      seed = (seed * 16807) % 2147483647;
+      return seed / 2147483647;
+    };
+    const vp = {
+      width: 412,
+      height: 860,
+      usable: { x: 0, y: 40, width: 412, height: 760 },
+      obstacles: [{ x: 300, y: 600, width: 112, height: 200 }],
+    };
+    for (let run = 0; run < 25; run++) {
+      const world = Array.from({ length: 40 }, (_, i) => ({
+        id: i,
+        kind: i === 0 ? ("sun" as const) : ("contact" as const),
+        x: (rand() - 0.5) * 600,
+        y: (rand() - 0.5) * 600,
+        radius: 4 + rand() * 20,
+        ringRadius: rand() * 300,
+      }));
+      const pose = {
+        ...HOME_CAMERA,
+        x: (rand() - 0.5) * 100,
+        y: (rand() - 0.5) * 100,
+        zoom: 0.3 + rand() * 3,
+        tilt: rand() * 0.9,
+        yaw: rand() * 6.28,
+      };
+      const frame = projectFrame(world, pose, vp, 1, false);
+      const current = frame.pose;
+      frame.bodies.forEach((b, i) => {
+        const p = projectWorldPoint(world[i], current, vp);
+        const scale = current.zoom * perspectiveScale(world[i], current);
+        expect(b.x).toBe(p.x);
+        expect(b.y).toBe(p.y);
+        expect(b.radius).toBe(world[i].radius * scale);
+      });
+    }
+  });
+});

@@ -382,6 +382,34 @@ function RingClassGroup({
 }
 
 // ---------------------------------------------------------------------------
+// R1: screen culling of whole rings (circle around the projected sun centre).
+
+/** Generous margin for perspective / tilt (the ring is an ellipse). */
+const RING_CULL_MARGIN = 1.35;
+
+/**
+ * False when a ring of screen radius `rs` around (cx, cy) cannot touch the
+ * viewport: entirely outside its farthest corner or entirely inside its nearest
+ * edge distance. At 800 bodies most rings lie far outside the screen.
+ */
+export function ringOnScreen(
+  rs: number,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+): boolean {
+  "worklet";
+  const dx = Math.max(cx, w - cx);
+  const dy = Math.max(cy, h - cy);
+  const far = Math.sqrt(dx * dx + dy * dy);
+  const nx = cx < 0 ? -cx : cx > w ? cx - w : 0;
+  const ny = cy < 0 ? -cy : cy > h ? cy - h : 0;
+  const near = Math.sqrt(nx * nx + ny * ny);
+  return rs <= far * RING_CULL_MARGIN && rs * RING_CULL_MARGIN >= near;
+}
+
+// ---------------------------------------------------------------------------
 // WP-2.1 switch: ring UNWIND (leaving) / DRAW-ON (entering).
 
 const RAD_TO_DEG = 180 / Math.PI;
@@ -445,7 +473,8 @@ function TrimRingPicture({
         TRIM_BOUNDS * 2,
       ),
     );
-    const zoom = Math.max(frame.value.pose.zoom, 1e-4);
+    const fr = frame.value;
+    const zoom = Math.max(fr.pose.zoom, 1e-4);
     const sw = ctx?.sw;
     const draw = (
       c: number[],
@@ -506,6 +535,18 @@ function TrimRingPicture({
             const [len, a] = trimRingState(roles, e.key, signal, true);
             if (len <= 0.001 || a <= 0) continue;
             const world = sampleSwitchEntry(transition, e, signal.progress);
+            // R1: a switch into an 800-body System trimmed ~800 rings with a
+            // sweep gradient each (p95 105–150 ms per frame); most are off-screen.
+            if (
+              !ringOnScreen(
+                world.ringRadius * zoom,
+                fr.center.x,
+                fr.center.y,
+                fr.viewport.width,
+                fr.viewport.height,
+              )
+            )
+              continue;
             draw(
               c,
               c[3] * a * (0.55 + 0.45 * len),
@@ -823,6 +864,16 @@ function RingClassesPicture({
         const b = bodyAt(f, index, spec.keys[i]);
         if (!b) continue;
         const r = b.ringRadius / zoom;
+        if (
+          !ringOnScreen(
+            b.ringRadius,
+            f.center.x,
+            f.center.y,
+            f.viewport.width,
+            f.viewport.height,
+          )
+        )
+          continue;
         let op =
           b.opacity *
           (fon
@@ -1092,9 +1143,7 @@ export function LabRings({
   });
   // R1: wakes hide while the camera recovers (fly-in / recentre / north) and
   // fade back in after (Group opacity: no re-record during the fade).
-  const moving = useDerivedValue<number>(() =>
-    cameraActive?.value ? 1 : 0,
-  );
+  const moving = useDerivedValue<number>(() => (cameraActive?.value ? 1 : 0));
   const wakeGate = useSharedValue(1);
   useAnimatedReaction(
     () => moving.value,

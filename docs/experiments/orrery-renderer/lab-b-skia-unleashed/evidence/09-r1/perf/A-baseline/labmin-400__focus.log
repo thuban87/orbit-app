@@ -1,0 +1,3 @@
+10-01 11:13:55.179 26950 26983 I ReactNativeJS: [labb-probe] win=3004ms alloc=7/17.4/20.9/20.9 bodies=6/0.9/1.3/1.3 frame=7/17.6/19/19 labels=6/0.1/0.1/0.1 rings=86/1/2.1/4.2
+10-01 11:13:57.073 26950 26983 I ReactNativeJS: [labb-probe] win=3012ms alloc=10/15.5/20.6/20.6 bodies=42/0.8/1.5/1.5 frame=9/20.3/26.3/26.3 labels=42/0.1/0.4/0.8 rings=155/1.2/2.4/9.3
+10-01 11:14:00.073 26950 26983 I ReactNativeJS: [labb-probe] win=3000ms rings=179/1.1/2.8/3.9
