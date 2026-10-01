@@ -146,35 +146,26 @@ export function labBodyFrameUniforms(
   const y = body ? body.y : 0;
   const scale = body && st.uR > 0 ? body.radius / st.uR : 1;
   const atmosphereOn = flags ? flags.bodyAtmosphere : true;
+  const light = labLightDir(x, y, sunX, sunY);
+  const haze =
+    flags && !flags.depthHaze
+      ? 0
+      : labHaze(body ? body.depth : 0, st.extent, st.haze);
+  const atmo = atmosphereOn ? Math.min(1.2, st.atmo * k) : 0;
+  const shadow = atmosphereOn ? Math.min(1, st.shadow * k) : 0;
+  const pattern = flags && !flags.bodyProcedural ? 0 : 1;
+  // Packed float4s (see BODY_LIT in labb-effects.ts).
   return {
-    uR: st.uR,
-    uPx: scale > 1e-4 ? 1 / scale : 1,
-    uLight: labLightDir(x, y, sunX, sunY),
-    uLightZ: LIGHT_Z,
-    uLit: 1,
-    uFloor: st.uFloor,
-    uWrap: st.uWrap,
-    uStatus: st.uStatus,
-    uSky: st.uSky,
-    uShadow: st.uShadow,
-    uHi: st.uHi,
-    uAtmo: atmosphereOn ? Math.min(1.2, st.atmo * k) : 0,
-    uAtmoAdd: st.atmoAdd,
-    uAtmoReach: BODY_REACH,
-    uShadowStr: atmosphereOn ? Math.min(1, st.shadow * k) : 0,
-    uRimPx: st.uRimPx,
-    uRimStr: st.uRimStr,
-    uFresnel: st.fresnel * Math.min(1.5, k),
-    uDesat: st.desat,
-    uSpec: st.spec,
-    uHaze:
-      flags && !flags.depthHaze
-        ? 0
-        : labHaze(body ? body.depth : 0, st.extent, st.haze),
-    uBase: st.uBase,
-    uBand: st.uBand,
-    uSeed: st.uSeed,
-    uPattern: flags && !flags.bodyProcedural ? 0 : 1,
+    uA: [st.uR, scale > 1e-4 ? 1 / scale : 1, light[0], light[1]],
+    uB: [LIGHT_Z, 1, st.uFloor, st.uWrap],
+    uC: [st.uStatus[0], st.uStatus[1], st.uStatus[2], atmo],
+    uD: [st.uSky[0], st.uSky[1], st.uSky[2], haze],
+    uE: [st.uShadow[0], st.uShadow[1], st.uShadow[2], shadow],
+    uF: [st.uHi[0], st.uHi[1], st.uHi[2], st.spec],
+    uG: [st.atmoAdd, BODY_REACH, st.uRimPx, st.uRimStr],
+    uH: [st.fresnel * Math.min(1.5, k), st.desat, pattern, st.uSeed],
+    uI: [st.uBase[0], st.uBase[1], st.uBase[2], 0],
+    uJ: [st.uBand[0], st.uBand[1], st.uBand[2], 0],
   };
 }
 
@@ -198,18 +189,16 @@ export function labMoonFrameUniforms(
   "worklet";
   const flags = fx ? fx.flags : null;
   const scale = body ? body.radius : 1;
+  const light = labLightDir(body ? body.x : 0, body ? body.y : 0, sunX, sunY);
+  const haze =
+    flags && !flags.depthHaze
+      ? 0
+      : labHaze(body ? body.depth : 0, st.extent, st.haze);
   return {
-    uR: 1,
-    uPx: scale > 1e-4 ? 1 / scale : 1,
-    uLight: labLightDir(body ? body.x : 0, body ? body.y : 0, sunX, sunY),
-    uTone: st.uTone,
-    uHi: st.uHi,
-    uSky: st.uSky,
-    uFloor: st.floor,
-    uHaze:
-      flags && !flags.depthHaze
-        ? 0
-        : labHaze(body ? body.depth : 0, st.extent, st.haze),
+    uM0: [1, scale > 1e-4 ? 1 / scale : 1, light[0], light[1]],
+    uM1: [st.uTone[0], st.uTone[1], st.uTone[2], st.floor],
+    uM2: [st.uHi[0], st.uHi[1], st.uHi[2], haze],
+    uM3: [st.uSky[0], st.uSky[1], st.uSky[2], 0],
   };
 }
 
@@ -243,21 +232,18 @@ export function labSunFrameUniforms(
     animate && (flags ? flags.sunPulse : true)
       ? Math.sin(timeMs * SUN_PULSE_SPEED)
       : 0;
+  const plasma = flags && !flags.sunPlasma ? 0 : st.plasma;
+  const corona =
+    flags && !flags.sunCorona
+      ? 0
+      : st.corona * Math.min(1.6, k) * (1 + SUN_BREATH * pulse);
+  // Packed float4s (see SUN_CORONA in labb-effects.ts).
   return {
-    uR: st.uR,
-    uPx: scale > 1e-4 ? 1 / scale : 1,
-    uTime: t,
-    uReach: SUN_REACH,
-    uGlow: st.uGlow,
-    uHi: st.uHi,
-    uDeep: st.uDeep,
-    uBase: st.uBase,
-    uPlasma: flags && !flags.sunPlasma ? 0 : st.plasma,
-    uCorona:
-      flags && !flags.sunCorona
-        ? 0
-        : st.corona * Math.min(1.6, k) * (1 + SUN_BREATH * pulse),
-    uCoronaAdd: st.coronaAdd,
+    uS0: [st.uR, scale > 1e-4 ? 1 / scale : 1, t, SUN_REACH],
+    uS1: [st.uGlow[0], st.uGlow[1], st.uGlow[2], plasma],
+    uS2: [st.uHi[0], st.uHi[1], st.uHi[2], corona],
+    uS3: [st.uDeep[0], st.uDeep[1], st.uDeep[2], st.coronaAdd],
+    uS4: [st.uBase[0], st.uBase[1], st.uBase[2], 0],
   };
 }
 

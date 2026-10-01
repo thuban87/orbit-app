@@ -161,29 +161,45 @@ float2 lbSky(float2 xy) {
 // hit/label/focus contracts unchanged) and the atmosphere / contact shadow
 // OUTSIDE it.
 
+// Uniforms are PACKED into float4s: RN Skia resolves every uniform by name
+// (one JSI call each) and rebuilds every runtime shader on every canvas replay,
+// so 25 scalar uniforms × ~190 bodies was measurable (PERF-LOG WP-1.2).
+//   uA = (r, px, lightX, lightY)      uB = (lightZ, lit, floor, wrap)
+//   uC = (status.rgb, atmo)           uD = (sky.rgb, haze)
+//   uE = (shadow.rgb, shadowStr)      uF = (hi.rgb, spec)
+//   uG = (atmoAdd, atmoReach, rimPx, rimStr)
+//   uH = (fresnel, desat, pattern, seed)
 const BODY_LIT = `
-uniform float uR;
-uniform float uPx;
-uniform float2 uLight;
-uniform float uLightZ;
-uniform float uLit;
-uniform float uFloor;
-uniform float uWrap;
-uniform float3 uStatus;
-uniform float3 uSky;
-uniform float3 uShadow;
-uniform float3 uHi;
-uniform float uAtmo;
-uniform float uAtmoAdd;
-uniform float uAtmoReach;
-uniform float uShadowStr;
-uniform float uRimPx;
-uniform float uRimStr;
-uniform float uFresnel;
-uniform float uDesat;
-uniform float uSpec;
-uniform float uHaze;
+uniform float4 uA;
+uniform float4 uB;
+uniform float4 uC;
+uniform float4 uD;
+uniform float4 uE;
+uniform float4 uF;
+uniform float4 uG;
+uniform float4 uH;
 half4 lbBody(float2 xy, float3 surf) {
+  float uR = uA.x;
+  float uPx = uA.y;
+  float2 uLight = uA.zw;
+  float uLightZ = uB.x;
+  float uLit = uB.y;
+  float uFloor = uB.z;
+  float uWrap = uB.w;
+  float3 uStatus = uC.rgb;
+  float uAtmo = uC.a;
+  float3 uSky = uD.rgb;
+  float uHaze = uD.a;
+  float3 uShadow = uE.rgb;
+  float uShadowStr = uE.a;
+  float3 uHi = uF.rgb;
+  float uSpec = uF.a;
+  float uAtmoAdd = uG.x;
+  float uAtmoReach = uG.y;
+  float uRimPx = uG.z;
+  float uRimStr = uG.w;
+  float uFresnel = uH.x;
+  float uDesat = uH.y;
   float2 d = xy / uR;
   float l = length(d);
   float aa = uPx / uR;
@@ -220,38 +236,32 @@ half4 lbBody(float2 xy, float3 surf) {
 `;
 
 const SUN_CORONA = `
-uniform float uR;
-uniform float uPx;
-uniform float uTime;
-uniform float uReach;
-uniform float3 uGlow;
-uniform float3 uHi;
-uniform float3 uDeep;
-uniform float3 uBase;
-uniform float uPlasma;
-uniform float uCorona;
-uniform float uCoronaAdd;
+uniform float4 uS0;
+uniform float4 uS1;
+uniform float4 uS2;
+uniform float4 uS3;
+uniform float4 uS4;
 half4 lbSun(float2 xy, float3 surf) {
-  float2 d = xy / uR;
+  float2 d = xy / uS0.x;
   float l = length(d);
-  float aa = uPx / uR;
+  float aa = uS0.y / uS0.x;
   float inside = clamp((1.0 - l) / aa + 0.5, 0.0, 1.0);
   float a01 = atan(d.y, d.x) / 6.2831853 + 0.5;
-  float rot = uTime * 0.004;
+  float rot = uS0.z * 0.004;
   float o = max(0.0, l - 1.0);
   // Rays: two angular noise bands (periodic in angle) that also drift outward
   // with radius, so streamers look like they flow off the limb.
-  float r1 = lbNoise(float2((a01 + rot) * 18.0, o * 1.6 - uTime * 0.06), 18.0);
-  float r2 = lbNoise(float2((a01 - rot * 0.7) * 41.0, o * 3.0 - uTime * 0.1 + 7.0), 41.0);
+  float r1 = lbNoise(float2((a01 + rot) * 18.0, o * 1.6 - uS0.z * 0.06), 18.0);
+  float r2 = lbNoise(float2((a01 - rot * 0.7) * 41.0, o * 3.0 - uS0.z * 0.1 + 7.0), 41.0);
   float rays = pow(0.62 * r1 + 0.38 * r2, 2.2) * 2.1;
-  float edge = 1.0 - smoothstep(uReach * 0.62, uReach, l);
+  float edge = 1.0 - smoothstep(uS0.w * 0.62, uS0.w, l);
   float inner = exp(-o * 7.5);
   float halo = exp(-o * 2.4) * 0.55;
   float streamers = exp(-o * 2.0) * rays * 0.75;
   float limb = exp(-(o * o) / 0.0016) * 0.7;
-  float g = (inner * 0.9 + halo + streamers + limb) * edge * uCorona;
-  float3 gc = mix(uGlow, uHi, clamp(inner * 0.55 + limb * 0.6, 0.0, 1.0));
-  float ga = clamp(g, 0.0, 1.0) * (1.0 - 0.7 * uCoronaAdd);
+  float g = (inner * 0.9 + halo + streamers + limb) * edge * uS2.a;
+  float3 gc = mix(uS1.rgb, uS2.rgb, clamp(inner * 0.55 + limb * 0.6, 0.0, 1.0) * (0.25 + 0.75 * uS3.a));
+  float ga = clamp(g, 0.0, 1.0) * (1.0 - 0.7 * uS3.a);
   float3 oc = gc * clamp(g, 0.0, 1.4);
   return half4(half3(surf * inside + oc * (1.0 - inside)), half(inside + ga * (1.0 - inside)));
 }
@@ -328,12 +338,15 @@ half4 main(float2 xy) {
    * lit exactly like a photo body. Initials glyphs are drawn on top.
    */
   bodyProcedural: `${NEBULA_NOISE}${BODY_LIT}
-uniform float3 uBase;
-uniform float3 uBand;
-uniform float uSeed;
-uniform float uPattern;
+uniform float4 uI;
+uniform float4 uJ;
 half4 main(float2 xy) {
-  float2 d = xy / uR;
+  float3 uBase = uI.rgb;
+  float3 uBand = uJ.rgb;
+  float3 uHi = uF.rgb;
+  float uPattern = uH.z;
+  float uSeed = uH.w;
+  float2 d = xy / uA.x;
   float nz = sqrt(max(0.0, 1.0 - dot(d, d)));
   float lon = d.x / max(nz, 0.25);
   float lat = d.y;
@@ -354,22 +367,22 @@ half4 main(float2 xy) {
    */
   sunStar: `${NEBULA_NOISE}${SUN_CORONA}
 half4 main(float2 xy) {
-  float2 d = xy / uR;
+  float2 d = xy / uS0.x;
   float nz = sqrt(max(0.0, 1.0 - dot(d, d)));
   // Granulation: domain-warped value noise on a rotated lattice (an
   // axis-aligned lattice reads as blocky squares at sun size).
-  float2 q = float2(0.8 * d.x - 0.6 * d.y, 0.6 * d.x + 0.8 * d.y) * 6.0;
-  float2 w = float2(lbNoise(q * 0.7 + float2(uTime * 0.03, 1.7), 64.0),
-                    lbNoise(q * 0.7 + float2(4.1, -uTime * 0.025), 64.0));
-  float g1 = lbNoise(q + 2.2 * w + float2(uTime * 0.05, 0.0), 64.0);
-  float g2 = lbNoise(q * 2.3 - 1.5 * w + float2(0.0, uTime * 0.07), 64.0);
+  float2 q = float2(0.8 * d.x - 0.6 * d.y, 0.6 * d.x + 0.8 * d.y) * 8.0;
+  float2 w = float2(lbNoise(q * 0.7 + float2(uS0.z * 0.03, 1.7), 64.0),
+                    lbNoise(q * 0.7 + float2(4.1, -uS0.z * 0.025), 64.0));
+  float g1 = lbNoise(q + 2.2 * w + float2(uS0.z * 0.05, 0.0), 64.0);
+  float g2 = lbNoise(q * 2.3 - 1.5 * w + float2(0.0, uS0.z * 0.07), 64.0);
   float gran = smoothstep(0.15, 0.85, 0.65 * g1 + 0.35 * g2);
   float limb = pow(nz, 0.75);
-  float3 star = mix(uDeep, uGlow, 0.25 + 0.75 * limb);
-  star *= 0.88 + 0.22 * gran;
-  star = mix(star, uHi, pow(nz, 2.5) * 0.5);
-  float3 sw = uBase * (0.85 + 0.15 * limb);
-  return lbSun(xy, mix(sw, star, uPlasma));
+  float3 star = mix(uS3.rgb, uS1.rgb, 0.25 + 0.75 * limb);
+  star *= 0.9 + 0.15 * gran;
+  star = mix(star, uS2.rgb, pow(nz, 2.5) * 0.5);
+  float3 sw = uS4.rgb * (0.85 + 0.15 * limb);
+  return lbSun(xy, mix(sw, star, uS1.a));
 }
 `,
   /**
@@ -379,7 +392,7 @@ half4 main(float2 xy) {
   sunPhoto: `${NEBULA_NOISE}${SUN_CORONA}
 uniform shader uImage;
 half4 main(float2 xy) {
-  float2 d = xy / uR;
+  float2 d = xy / uS0.x;
   float nz = sqrt(max(0.0, 1.0 - dot(d, d)));
   float3 s = float3(uImage.eval(xy).rgb) * (0.9 + 0.1 * pow(nz, 0.5));
   return lbSun(xy, s);
@@ -387,26 +400,22 @@ half4 main(float2 xy) {
 `,
   /** WP-1.2 moon: a tiny lit sphere (token tone) with a specular glint. */
   moon: `
-uniform float uR;
-uniform float uPx;
-uniform float2 uLight;
-uniform float3 uTone;
-uniform float3 uHi;
-uniform float3 uSky;
-uniform float uFloor;
-uniform float uHaze;
+uniform float4 uM0;
+uniform float4 uM1;
+uniform float4 uM2;
+uniform float4 uM3;
 half4 main(float2 xy) {
-  float2 d = xy / uR;
+  float2 d = xy / uM0.x;
   float l = length(d);
-  float inside = clamp((1.0 - l) / (uPx / uR) + 0.5, 0.0, 1.0);
+  float inside = clamp((1.0 - l) / (uM0.y / uM0.x) + 0.5, 0.0, 1.0);
   float nz = sqrt(max(0.0, 1.0 - l * l));
   float3 N = float3(d, nz);
-  float3 L = normalize(float3(uLight, 0.45));
+  float3 L = normalize(float3(uM0.zw, 0.45));
   float lam = clamp(dot(N, L), 0.0, 1.0);
-  float3 c = uTone * (uFloor + (1.0 - uFloor) * lam);
+  float3 c = uM1.rgb * (uM1.a + (1.0 - uM1.a) * lam);
   float3 H = normalize(L + float3(0.0, 0.0, 1.0));
-  c += uHi * pow(max(dot(N, H), 0.0), 20.0) * 0.6;
-  c = mix(c, uSky, uHaze);
+  c += uM2.rgb * pow(max(dot(N, H), 0.0), 20.0) * 0.6;
+  c = mix(c, uM3.rgb, uM2.a);
   return half4(half3(c * inside), half(inside));
 }
 `,

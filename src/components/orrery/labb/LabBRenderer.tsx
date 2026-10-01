@@ -337,7 +337,7 @@ export function LabBRenderer(contract: LabRenderContract) {
                     frameIndex={frameIndex}
                     color={colors.textSecondary}
                     focusColor={focused ? colors.accent : undefined}
-                    look={look}
+                    look={flags.moonShader ? look : undefined}
                   />
                 );
               })

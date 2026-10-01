@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("@shopify/react-native-skia", () => ({ Skia: {} }));
 import { defaultLabFlags, labFxSnapshot } from "@/stores/orrery-labb-fx-store";
 import { LAB_FX_PROFILES } from "@/theme/orrery-lab-fx";
 import {
@@ -9,6 +11,7 @@ import {
   labBodyMaterial,
   labHaze,
   labLightDir,
+  labMoonFrameUniforms,
   labSeed,
   labSunFrameUniforms,
   SUN_REACH,
@@ -97,11 +100,11 @@ describe("lab body lighting helpers", () => {
   it("builds finite body uniforms that follow the frame radius and flags", () => {
     const body = { x: 100, y: 50, radius: 20, depth: -100 };
     const u = labBodyFrameUniforms(body, 0, 50, bodyStatic, fx());
-    expect(u.uR).toBe(10);
-    expect(u.uPx).toBeCloseTo(0.5);
-    expect(u.uLight).toEqual([-1, 0]);
-    expect(u.uHaze).toBeCloseTo(0.075);
-    expect(u.uAtmo).toBeCloseTo(0.6);
+    expect(u.uA[0]).toBe(10);
+    expect(u.uA[1]).toBeCloseTo(0.5);
+    expect(u.uA.slice(2)).toEqual([-1, 0]);
+    expect(u.uD[3]).toBeCloseTo(0.075);
+    expect(u.uC[3]).toBeCloseTo(0.6);
     const off = labBodyFrameUniforms(
       body,
       0,
@@ -109,9 +112,9 @@ describe("lab body lighting helpers", () => {
       bodyStatic,
       fx({ bodyAtmosphere: false, depthHaze: false, bodyProcedural: false }),
     );
-    expect(off.uAtmo).toBe(0);
-    expect(off.uHaze).toBe(0);
-    expect(off.uPattern).toBe(0);
+    expect(off.uC[3]).toBe(0);
+    expect(off.uD[3]).toBe(0);
+    expect(off.uH[2]).toBe(0);
     for (const v of Object.values(u).flat())
       expect(Number.isFinite(v as number)).toBe(true);
   });
@@ -132,13 +135,13 @@ describe("lab body lighting helpers", () => {
     const a = labSunFrameUniforms(body, 1234, true, st, fx());
     const b = labSunFrameUniforms(body, 98765, true, st, fx());
     expect(a).toEqual(b);
-    expect(a.uTime).toBe(SUN_STILL_T);
-    expect(a.uCorona).toBe(1);
+    expect(a.uS0[2]).toBe(SUN_STILL_T);
+    expect(a.uS2[3]).toBe(1);
     expect(
-      labSunFrameUniforms(body, 0, false, st, fx({ sunCorona: false })).uCorona,
+      labSunFrameUniforms(body, 0, false, st, fx({ sunCorona: false })).uS2[3],
     ).toBe(0);
     expect(
-      labSunFrameUniforms(body, 0, false, st, fx({ sunPlasma: false })).uPlasma,
+      labSunFrameUniforms(body, 0, false, st, fx({ sunPlasma: false })).uS1[3],
     ).toBe(0);
   });
 
@@ -147,5 +150,59 @@ describe("lab body lighting helpers", () => {
     expect(labSeed("contact:1")).not.toBe(labSeed("contact:2"));
     expect(labSeed("x")).toBeGreaterThanOrEqual(0);
     expect(labSeed("x")).toBeLessThan(1);
+  });
+});
+
+describe("uniform contract (a missing uniform THROWS on device)", () => {
+  const declared = (src: string) =>
+    Array.from(
+      src.matchAll(/uniform\s+(?:float|float2|float3|float4|half4)\s+(\w+);/g),
+      (m) => m[1],
+    );
+  const sunStatic: LabSunStatic = {
+    uR: 30,
+    uGlow: [1, 1, 1],
+    uHi: [1, 1, 1],
+    uDeep: [1, 1, 1],
+    uBase: [1, 1, 1],
+    plasma: 1,
+    corona: 1,
+    coronaAdd: 1,
+    intensity: 1,
+  };
+  const body = { x: 1, y: 2, radius: 3, depth: 0 };
+  it("supplies every declared uniform of every WP-1.2 effect", async () => {
+    const { LAB_EFFECT_SOURCES } = await import("./labb-effects");
+    const bodyU = labBodyFrameUniforms(body, 0, 0, bodyStatic, fx());
+    const sunU = labSunFrameUniforms(body, 0, false, sunStatic, fx());
+    const moonU = labMoonFrameUniforms(
+      body,
+      0,
+      0,
+      {
+        uTone: [1, 1, 1],
+        uHi: [1, 1, 1],
+        uSky: [0, 0, 0],
+        floor: 0.2,
+        haze: 0.1,
+        extent: 10,
+      },
+      fx(),
+    );
+    const cases: [string, Record<string, unknown>][] = [
+      [LAB_EFFECT_SOURCES.bodyPhoto, bodyU],
+      [LAB_EFFECT_SOURCES.bodyProcedural, bodyU],
+      [LAB_EFFECT_SOURCES.sunStar, sunU],
+      [LAB_EFFECT_SOURCES.sunPhoto, sunU],
+      [LAB_EFFECT_SOURCES.moon, moonU],
+    ];
+    for (const [src, uniforms] of cases) {
+      const names = declared(src);
+      expect(names.length).toBeGreaterThan(0);
+      for (const name of names) expect(uniforms).toHaveProperty(name);
+      for (const value of Object.values(uniforms))
+        for (const n of [value].flat() as number[])
+          expect(Number.isFinite(n)).toBe(true);
+    }
   });
 });

@@ -351,14 +351,14 @@ describe("Lab B renderer tree contract", () => {
     expect(lit).toHaveLength(1);
     expect(lit[0].props.r).toBeCloseTo(worldR("contact") * BODY_REACH, 6);
     const uniforms = lit[0].children[0].props.uniforms as {
-      value: { uR: number; uPx: number; uLight: number[] };
+      value: { uA: number[] };
     };
     // The shader's disc is EXACTLY the world radius (the transform scales it to
     // the frame radius), so hit/label/focus geometry is unchanged.
-    expect(uniforms.value.uR).toBe(worldR("contact"));
+    expect(uniforms.value.uA[0]).toBe(worldR("contact"));
     pose.value = { ...pose.value, zoom: 2 };
-    expect(uniforms.value.uPx).toBeCloseTo(0.5, 5);
-    const [lx, ly] = uniforms.value.uLight;
+    expect(uniforms.value.uA[1]).toBeCloseTo(0.5, 5);
+    const [, , lx, ly] = uniforms.value.uA;
     expect(Math.hypot(lx, ly)).toBeCloseTo(1, 5);
     const sunLit = sun.children.find((c) => c.children[0]?.type === "shader");
     expect(sunLit?.props.r).toBeCloseTo(worldR("sun") * SUN_REACH, 6);

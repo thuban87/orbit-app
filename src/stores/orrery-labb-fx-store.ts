@@ -150,6 +150,13 @@ export const LAB_FLAG_REGISTRY = [
     default: true,
   },
   {
+    id: "moonShader",
+    label: "L4 Lit moon shader (off = flat moons)",
+    section: "effects",
+    default: true,
+    heavy: true,
+  },
+  {
     id: "polarisLab",
     label: "L5 Lab Polaris (glow + spikes)",
     section: "effects",
