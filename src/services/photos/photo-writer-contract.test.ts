@@ -642,7 +642,11 @@ describe("display resolver matcher (WR-07)", () => {
 // The contract over the real tree
 // ---------------------------------------------------------------------------
 
-describe("photo writer contract (src/, tests excluded)", () => {
+// Each scan parses all of src/ with the TypeScript parser; under full-suite load a
+// single scan can exceed the 5 s default, so the source scans get a wider budget.
+describe("photo writer contract (src/, tests excluded)", {
+  timeout: 30_000,
+}, () => {
   it("scans a real tree", () => {
     expect(TREE.length).toBeGreaterThan(100);
     expect(TREE.some(({ file }) => file.endsWith("owned-master.ts"))).toBe(
