@@ -1,0 +1,18 @@
+10-01 04:21:38.711 I/Choreographer(19346): Skipped 181 frames!  The application may be doing too much work on its main thread.
+10-01 04:21:38.996 I/ReactNativeJS(19346): [probe] frame worklet runs 1 in 11400ms, work 280ms
+10-01 04:21:39.076 I/HWUI    (19346): Davey! duration=1862ms
+10-01 04:21:39.088 I/Choreographer(19346): Skipped 43 frames!  The application may be doing too much work on its main thread.
+10-01 04:21:43.010 I/ReactNativeJS(19346): [probe] 3010 #8 store ready->loading gen 4
+10-01 04:21:43.669 I/ReactNativeJS(19346): [probe] mutex #8 waited 275ms held 384ms  at inReadSnapshot (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-
+10-01 04:21:43.669 I/ReactNativeJS(19346): [probe] load read 659ms
+10-01 04:21:43.680 I/ReactNativeJS(19346): [probe] load total 670ms
+10-01 04:21:43.681 I/ReactNativeJS(19346): [probe] 3681 #9 store loading->ready gen 4
+10-01 04:21:43.681 I/ReactNativeJS(19346): [probe] 3681 #10 publish gen 4 isSwitch false
+10-01 04:21:43.681 I/ReactNativeJS(19346): [probe] 3681 #11 store ready->ready gen 4
+10-01 04:21:43.890 I/ReactNativeJS(19346): [probe] mutex #9 waited 55ms held 154ms  at inReadSnapshot (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-
+10-01 04:21:44.128 I/ReactNativeJS(19346): [probe] mutex #10 waited 201ms held 238ms  at inWriteTransaction (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=
+10-01 04:21:44.178 I/ReactNativeJS(19346): [probe] 4178 #12 store ready->ready gen 4
+10-01 04:21:45.638 I/Choreographer(19346): Skipped 280 frames!  The application may be doing too much work on its main thread.
+10-01 04:21:46.026 I/ReactNativeJS(19346): [probe] frame worklet runs 1 in 7030ms, work 381ms
+10-01 04:21:46.117 I/HWUI    (19346): Davey! duration=2796ms
+10-01 04:21:46.174 I/Choreographer(19346): Skipped 63 frames!  The application may be doing too much work on its main thread.

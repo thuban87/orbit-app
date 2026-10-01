@@ -1,0 +1,1255 @@
+diff --git a/src/components/orrery/OrreryCanvas.tsx b/src/components/orrery/OrreryCanvas.tsx
+index 79dc1b9c..8721e25d 100644
+--- a/src/components/orrery/OrreryCanvas.tsx
++++ b/src/components/orrery/OrreryCanvas.tsx
+@@ -35,6 +35,7 @@ import {
+ } from "react-native-gesture-handler";
+ import { useDerivedValue } from "react-native-reanimated";
+ import { useReducedMotionShared } from "@/theme/use-reduced-motion";
++import { probeLog } from "./lab/perf-probe";
+ import { OrreryClockContext } from "./orrery-clock-context";
+ 
+ export interface OrreryCanvasProps {
+@@ -151,9 +152,16 @@ export function OrreryCanvas({
+     return out;
+   }, [legacyStars, width, height, starColors]);
+ 
+-  return (
+-    <GestureDetector gesture={gesture}>
+-      <Canvas testID="orrery-canvas" style={{ width, height }}>
++  // Perf pass: RN-Skia re-records the WHOLE scene whenever the Canvas
++  // `children` identity changes (twice: commit + explicit redraw), reading every
++  // animated prop synchronously from the UI runtime on the JS thread. A fresh
++  // children array per render (e.g. only `gesture` changed) therefore cost
++  // seconds of JS on large Systems. Memoised on the drawn inputs only.
++  const content = useMemo(
++    () => {
++      probeLog("canvas content rebuilt");
++      return (
++      <>
+         <Fill color={background} />
+         {/* Layer 2: ambient starfield (twinkles via the shared clock). */}
+         <Group opacity={twinkle}>
+@@ -175,6 +183,15 @@ export function OrreryCanvas({
+           {children}
+           {overlay ?? null}
+         </OrreryClockContext.Provider>
++      </>
++    );},
++    [background, twinkle, stars, clock, backdrop, children, overlay],
++  );
++
++  return (
++    <GestureDetector gesture={gesture}>
++      <Canvas testID="orrery-canvas" style={{ width, height }}>
++        {content}
+       </Canvas>
+     </GestureDetector>
+   );
+diff --git a/src/components/orrery/OrreryFocusContext.tsx b/src/components/orrery/OrreryFocusContext.tsx
+index 33f97757..c015434a 100644
+--- a/src/components/orrery/OrreryFocusContext.tsx
++++ b/src/components/orrery/OrreryFocusContext.tsx
+@@ -16,7 +16,7 @@ import {
+ import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
+ import { bodyKey } from "@/logic/orrery-frame";
+ import { SPACING } from "@/theme/tokens/spacing";
+-import { DEEP_FIELD_ENABLED } from "./lab/deep-field-config";
++import { useDeepFieldEnabled } from "./lab/deep-field-mode";
+ import { focusCardPlacement } from "./lab/focus-card";
+ import { OrreryNotice } from "./OrreryFeedback";
+ 
+@@ -45,13 +45,18 @@ export function OrreryFocusContext({
+   onReloadContext?: () => void | Promise<void>;
+ }) {
+   const [height, setHeight] = useState(180);
++  const deepFieldOn = useDeepFieldEnabled();
+   const position = useAnimatedStyle(() => {
+     const current = frame.value;
+     const region = current ? usableCameraRect(current.viewport) : null;
++    // Perf pass: the target key is built once, not once per body per frame.
++    const targetKey =
++      target.kind === "satellite"
++        ? bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
++        : "";
+     const body = current?.bodies.find((item) =>
+       target.kind === "satellite"
+-        ? bodyKey(item) ===
+-          bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
++        ? bodyKey(item) === targetKey
+         : item.kind !== "satellite" && item.id === target.id,
+     );
+     if (!region || !body) return { opacity: 0 };
+@@ -60,7 +65,7 @@ export function OrreryFocusContext({
+     // ORRERY LAB A (pass 2): clear the drawn body + reticle; flip above the
+     // body, or cap the card height to the free room (it scrolls), instead of
+     // clamping it up over the focused body. Framing/usable rect untouched.
+-    const placed = DEEP_FIELD_ENABLED
++    const placed = deepFieldOn
+       ? focusCardPlacement(region, body.y, body.radius, limit, SPACING.sm)
+       : null;
+     return {
+@@ -86,12 +91,16 @@ export function OrreryFocusContext({
+     const current = frame.value;
+     const region = current ? usableCameraRect(current.viewport) : null;
+     if (!region) return { maxHeight: 180 };
+-    if (!DEEP_FIELD_ENABLED) return { maxHeight: region.height / 2 };
++    if (!deepFieldOn) return { maxHeight: region.height / 2 };
+     // ORRERY LAB A: the same placement as the card (scroll inside the room).
++    // Perf pass: the target key is built once, not once per body per frame.
++    const targetKey =
++      target.kind === "satellite"
++        ? bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
++        : "";
+     const body = current?.bodies.find((item) =>
+       target.kind === "satellite"
+-        ? bodyKey(item) ===
+-          bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
++        ? bodyKey(item) === targetKey
+         : item.kind !== "satellite" && item.id === target.id,
+     );
+     if (!body) return { maxHeight: region.height / 2 };
+@@ -114,7 +123,7 @@ export function OrreryFocusContext({
+       onLayout={(event) => {
+         // ORRERY LAB A: the lab caps the card to the free room, so its laid-
+         // out height is not its natural height; that comes from the content.
+-        if (!DEEP_FIELD_ENABLED) setHeight(event.nativeEvent.layout.height);
++        if (!deepFieldOn) setHeight(event.nativeEvent.layout.height);
+       }}
+     >
+       <GlassSurface density="dense" treatment="orrery-overlay">
+@@ -122,7 +131,7 @@ export function OrreryFocusContext({
+           style={scrollBounds}
+           contentContainerStyle={styles.content}
+           onContentSizeChange={(_, contentHeight) => {
+-            if (DEEP_FIELD_ENABLED) setHeight(contentHeight);
++            if (deepFieldOn) setHeight(contentHeight);
+           }}
+         >
+           <AppText>{name}</AppText>
+diff --git a/src/components/orrery/OrreryLabel.tsx b/src/components/orrery/OrreryLabel.tsx
+index cf20ff5e..8f22870d 100644
+--- a/src/components/orrery/OrreryLabel.tsx
++++ b/src/components/orrery/OrreryLabel.tsx
+@@ -12,7 +12,7 @@ import {
+   TextAlign,
+ } from "@shopify/react-native-skia";
+ import { type SharedValue, useDerivedValue } from "react-native-reanimated";
+-import { type AnimatedFrame, bodyKey } from "@/logic/orrery-frame";
++import { type AnimatedFrame, frameBody } from "@/logic/orrery-frame";
+ import type { LabelAllocation } from "@/logic/orrery-label-logic";
+ import type { ThemePalette } from "@/theme/theme-types";
+ import { RADII } from "@/theme/tokens/radii";
+@@ -130,7 +130,7 @@ export function OrreryLabel({
+   const leader = useDerivedValue(() => {
+     const path = Skia.Path.Make();
+     if (!frame || context || placement.value.opacity <= 0) return path;
+-    const body = frame.value.bodies.find((b) => bodyKey(b) === identity);
++    const body = frameBody(frame.value, identity);
+     if (!body) return path;
+     const px = placement.value.x + plateW / 2;
+     const below = placement.value.y >= body.y;
+diff --git a/src/components/orrery/OrreryViewOptions.tsx b/src/components/orrery/OrreryViewOptions.tsx
+index d7648a59..5c2fe46e 100644
+--- a/src/components/orrery/OrreryViewOptions.tsx
++++ b/src/components/orrery/OrreryViewOptions.tsx
+@@ -21,6 +21,7 @@ import { shellTransientStore } from "@/stores/shell-transient-store";
+ import { useTheme } from "@/theme";
+ import { SPACING } from "@/theme/tokens/spacing";
+ import { OrreryNotice } from "./OrreryFeedback";
++import { useDeepFieldModeStore } from "./lab/deep-field-mode";
+ import { OrreryObstacle } from "./OrreryObstacle";
+ 
+ const LABELS = {
+@@ -37,6 +38,8 @@ export function OrreryViewOptions({
+   availableHeight: number;
+ }) {
+   const preferences = useOrreryPreferencesStore();
++  const labRenderer = useDeepFieldModeStore((state) => state.enabled);
++  const setLabRenderer = useDeepFieldModeStore((state) => state.setEnabled);
+   const { colors } = useTheme();
+   const focused = useIsFocused();
+   const blocked = shellTransientStore((store) =>
+@@ -187,6 +190,23 @@ export function OrreryViewOptions({
+                   }
+                 />
+               </View>
++              {/* ORRERY LAB A — EXPERIMENT ONLY: runtime renderer A/B so one
++                  build can measure legacy vs Lab A. In-memory, never saved. */}
++              <AppText role="label">Lab A renderer (experiment)</AppText>
++              <AppText>
++                Experiment-only A/B: Lab A deep field vs the legacy flat
++                renderer. Not saved.
++              </AppText>
++              <View style={styles.toggle}>
++                <AppText>{labRenderer ? "Lab A" : "Legacy"}</AppText>
++                <Switch
++                  accessibilityLabel="Lab A renderer (experiment)"
++                  value={labRenderer}
++                  trackColor={{ false: colors.border, true: colors.accent }}
++                  thumbColor={colors.textPrimary}
++                  onValueChange={setLabRenderer}
++                />
++              </View>
+               {busy ? (
+                 <AppText accessibilityLiveRegion="polite">
+                   {preferences.saving
+diff --git a/src/components/orrery/OrreryWorld.tsx b/src/components/orrery/OrreryWorld.tsx
+index f2a7674f..cc37d82d 100644
+--- a/src/components/orrery/OrreryWorld.tsx
++++ b/src/components/orrery/OrreryWorld.tsx
+@@ -30,6 +30,7 @@ import {
+   type AnimatedFrame,
+   billboardPose,
+   bodyKey,
++  frameBody,
+   projectAnimatedFrame,
+ } from "@/logic/orrery-frame";
+ import {
+@@ -62,7 +63,7 @@ import { useReducedMotionShared } from "@/theme/use-reduced-motion";
+ import type { DeepFieldBodyContext } from "./lab/BodyOverlays";
+ import { BodyStackLayer } from "./lab/BodyStackLayer";
+ import { DeepFieldBackdrop } from "./lab/DeepFieldBackdrop";
+-import { DEEP_FIELD_ENABLED } from "./lab/deep-field-config";
++import { useDeepFieldEnabled } from "./lab/deep-field-mode";
+ import { resolveDeepFieldInk, tokenInk } from "./lab/deep-field-ink";
+ import {
+   type BodyLightMap,
+@@ -70,6 +71,7 @@ import {
+   computeSwitchFx,
+ } from "./lab/deep-field-math";
+ import { LabHud, labMarkerVisible } from "./lab/LabHud";
++import { probeFrame, probeLog } from "./lab/perf-probe";
+ import { WorldPlaneLayer } from "./lab/WorldPlaneLayer";
+ import type { PlaneRing } from "./lab/world-plane";
+ import { OrbitBody } from "./OrbitBody";
+@@ -93,6 +95,10 @@ import {
+ } from "./use-orrery-camera";
+ 
+ const LABEL_MAX_WIDTH = 200;
++/** Stable default: a fresh `[]` per render would restart every mapper that captures it. */
++const NO_SATELLITES: readonly OrrerySatellite[] = [];
++const NO_IDS: number[] = [];
++const NO_RELATIONS: Readonly<Record<number, string>> = {};
+ const LABEL_BODY_GAP = 8;
+ 
+ function ReorderGhost({
+@@ -203,14 +209,14 @@ export function OrreryWorld({
+   fontProvider,
+   onIntent,
+   focusedIds,
+-  clusterIds = focusedIds.length > 1 ? focusedIds : [],
+-  focusedRelationById = {},
++  clusterIds: clusterIdsProp = focusedIds.length > 1 ? focusedIds : NO_IDS,
++  focusedRelationById: focusedRelationProp = NO_RELATIONS,
+   interactive = true,
+   camera,
+   onFocusLost,
+   onReorder,
+   onReorderActivated,
+-  satellites = [],
++  satellites: satelliteRows = NO_SATELLITES,
+   focusedSatellite,
+   switchRuntime,
+ }: {
+@@ -235,6 +241,23 @@ export function OrreryWorld({
+   switchRuntime: OrrerySwitchRuntime;
+ }) {
+   const { fontScale } = useWindowDimensions();
++  // An empty row list is the same as none: keep one identity so the satellite
++  // flip during a System load does not re-record the Skia scene.
++  const satellites = satelliteRows.length > 0 ? satelliteRows : NO_SATELLITES;
++  // Same for the label inputs: callers pass fresh `[]`/`{}` per render, which
++  // rebuilt every label paragraph and re-recorded the Skia scene each render.
++  const clusterIds = clusterIdsProp.length > 0 ? clusterIdsProp : NO_IDS;
++  const focusedRelationById =
++    Object.keys(focusedRelationProp).length > 0
++      ? focusedRelationProp
++      : NO_RELATIONS;
++  const probePrev = useRef<unknown[]>([]);
++  {
++    const cur = [switchRuntime, scene, satellites, viewport];
++    const changed = ["switchRuntime", "scene", "satellites", "viewport"].filter((_, i) => probePrev.current[i] !== cur[i]);
++    probePrev.current = cur;
++    probeLog(`OrreryWorld render; changed: ${changed.join(",")} resources ${switchRuntime.resources.length}`);
++  }
+   const resources = switchRuntime.resources;
+   const mounted = useRef(true);
+   const focusKey = JSON.stringify([
+@@ -250,35 +273,54 @@ export function OrreryWorld({
+   const level = useSharedValue<SemanticLevel>("overview");
+   // Capture only the producer's input; the controller also contains its published output.
+   const reorder = camera.reorder;
++  // Perf pass: the frame worklet captures ONLY shared values and small plain
++  // data. Capturing `switchRuntime`/`scene` shipped every keyed resource (each
++  // holding a whole scene snapshot) to the UI runtime on every mapper (re)start
++  // (~240k materialised nodes per restart on 40 bodies, restarted on every
++  // screen render) — see lab-a _notes/PERF-PASS.md and orrery-frame-mapper.test.
++  const switchTransition = switchRuntime.transition;
++  const switchProgress = switchRuntime.progress;
++  const switchCameraFrom = switchRuntime.cameraFrom;
++  const switchCameraTo = switchRuntime.cameraTo;
++  const sceneGeneration = scene.generation;
++  const memberIdentities = useMemo(
++    () =>
++      scene.systemSnapshot.members.map((member) => ({
++        id: member.id,
++        uid: member.uid,
++      })),
++    [scene.systemSnapshot.members],
++  );
+   const frame = useDerivedValue(() => {
++    const probeT0 = Date.now();
+     const sampled = sampleSwitchChoreography(
+-      switchRuntime.transition.value,
+-      switchRuntime.progress.value,
++      switchTransition.value,
++      switchProgress.value,
+     ).world;
+     const sampledCamera =
+-      switchRuntime.progress.value >= 1
++      switchProgress.value >= 1
+         ? pose.value
+         : sampleOrrerySwitchCamera(
+-            switchRuntime.cameraFrom.value,
+-            switchRuntime.cameraTo.value,
+-            switchRuntime.progress.value,
++            switchCameraFrom.value,
++            switchCameraTo.value,
++            switchProgress.value,
+           );
+     const held = reorder.value;
+     const world = previewReorder(
+       sampled,
+-      held?.generation === scene.generation ? held : null,
++      held?.generation === sceneGeneration ? held : null,
+     );
+     const moons = deriveSatelliteBodies(
+       world,
+       satellites,
+-      scene.systemSnapshot.members,
++      memberIdentities,
+       true,
+       semanticLevel(sampledCamera.zoom, level.value),
+     );
+     const completeWorld = [...world, ...moons];
+-    return projectAnimatedFrame(
++    const probeOut = projectAnimatedFrame(
+       {
+-        generation: switchRuntime.transition.value.generation,
++        generation: switchTransition.value.generation,
+         from: completeWorld,
+         to: completeWorld,
+       },
+@@ -286,6 +328,8 @@ export function OrreryWorld({
+       sampledCamera,
+       viewport,
+     );
++    probeFrame(probeT0, Date.now(), switchProgress.value, probeOut.bodies.length);
++    return probeOut;
+   });
+   // Conventional focus positioning consumes this same interpolated frame.
+   useAnimatedReaction(
+@@ -298,9 +342,9 @@ export function OrreryWorld({
+   // the switch runtime (separate mappers: the frame worklet's closure is
+   // untouched — see orrery-frame-mapper.test).
+   const deepInk = useMemo(() => resolveDeepFieldInk(colors), [colors]);
++  // ORRERY LAB A: runtime A/B (experiment-only store; see lab/deep-field-mode).
++  const deepFieldOn = useDeepFieldEnabled();
+   const reducedMotion = useReducedMotionShared();
+-  const switchTransition = switchRuntime.transition;
+-  const switchProgress = switchRuntime.progress;
+   const switchFx = useDerivedValue(() =>
+     computeSwitchFx(
+       switchTransition.value,
+@@ -314,8 +358,8 @@ export function OrreryWorld({
+     computeBodyLight(frame.value, lightExtent),
+   );
+   const deepField = useMemo<DeepFieldBodyContext | undefined>(
+-    () => (DEEP_FIELD_ENABLED ? { ink: deepInk, light: bodyLight } : undefined),
+-    [deepInk, bodyLight],
++    () => (deepFieldOn ? { ink: deepInk, light: bodyLight } : undefined),
++    [deepFieldOn, deepInk, bodyLight],
+   );
+   const planeRings = useMemo<PlaneRing[]>(
+     () =>
+@@ -448,7 +492,7 @@ export function OrreryWorld({
+   const allocations = useDerivedValue(() => {
+     const current = frame.value;
+     const candidates = measured.flatMap((label) => {
+-      const body = current.bodies.find((b) => bodyKey(b) === label.id);
++      const body = frameBody(current, label.id);
+       return body?.visible && body.interactive
+         ? [
+             {
+@@ -494,7 +538,8 @@ export function OrreryWorld({
+     ],
+     [scene],
+   );
+-  const members = scene.systemSnapshot.members;
++  const members = memberIdentities;
++  const sceneExtent = scene.extent;
+   const reorderExpectation = useMemo(
+     () => ({
+       system: scene.system,
+@@ -512,7 +557,7 @@ export function OrreryWorld({
+         pose,
+         frame,
+         camera,
+-        extent: cameraExtent(scene.extent),
++        extent: cameraExtent(sceneExtent),
+         send: onIntent,
+         enabled: interactive,
+         stop: camera.stop,
+@@ -537,7 +582,7 @@ export function OrreryWorld({
+         },
+         onNorth: (x, y) => {
+           "worklet";
+-          if (!hitPolaris(frame.value, scene.extent, x, y)) return false;
++          if (!hitPolaris(frame.value, sceneExtent, x, y)) return false;
+           camera.recover(northTarget(pose.value));
+           return true;
+         },
+@@ -546,7 +591,7 @@ export function OrreryWorld({
+       pose,
+       frame,
+       camera,
+-      scene.extent,
++      sceneExtent,
+       onIntent,
+       interactive,
+       identities,
+@@ -577,9 +622,12 @@ export function OrreryWorld({
+         satelliteTarget: focusedSatellite,
+       });
+       const current = frame.value;
+-      const body = current.bodies.find(
+-        (b) => bodyKey(b) === key && b.interactive,
+-      );
++      // First body with the key, and only if interactive (as the former
++      // `find(key && interactive)`: keys are unique per frame).
++      const keyed = frameBody(current, key);
++      const body = keyed?.interactive
++        ? keyed
++        : current.bodies.find((b) => bodyKey(b) === key && b.interactive);
+       if (!body) return true;
+       const reach = body.hitRadius + 44;
+       const rect = current.viewport.usable ?? {
+@@ -599,58 +647,69 @@ export function OrreryWorld({
+       if (lost && previous !== true && onFocusLost) runOnJS(reportFocusLost)();
+     },
+   );
+-  return (
+-    <OrreryCanvas
+-      width={viewport.width}
+-      height={viewport.height}
+-      background={colors.background}
+-      starColors={starColors}
+-      gesture={gesture}
+-      backdrop={
+-        DEEP_FIELD_ENABLED ? (
+-          <DeepFieldBackdrop
+-            width={viewport.width}
+-            height={viewport.height}
+-            ink={deepInk}
+-            starColors={starColors}
++  // Perf pass: every Skia layer element is memoised on what it draws, so a
++  // render that only changes the gesture/interactivity (or nothing drawn)
++  // never makes RN-Skia re-record the scene (see OrreryCanvas).
++  const backdrop = useMemo(
++    () =>
++      deepFieldOn ? (
++        <DeepFieldBackdrop
++          width={viewport.width}
++          height={viewport.height}
++          ink={deepInk}
++          starColors={starColors}
++          frame={frame}
++          switchFx={switchFx}
++        />
++      ) : undefined,
++    [deepFieldOn, viewport.width, viewport.height, deepInk, starColors, frame, switchFx],
++  );
++  const hudViewport = useMemo(
++    () => ({ width: viewport.width, height: viewport.height }),
++    [viewport.width, viewport.height],
++  );
++  const overlay = useMemo(
++    () =>
++      deepFieldOn ? (
++        <Group>
++          <BodyStackLayer
+             frame={frame}
++            light={bodyLight}
+             switchFx={switchFx}
++            colors={ringInks}
++            ink={deepInk}
+           />
+-        ) : undefined
+-      }
+-      overlay={
+-        DEEP_FIELD_ENABLED ? (
+-          <Group>
+-            <BodyStackLayer
+-              frame={frame}
+-              light={bodyLight}
+-              switchFx={switchFx}
+-              colors={ringInks}
++          {labMarkerVisible() ? (
++            <LabHud
++              viewport={viewport}
++              fontProvider={fontProvider}
+               ink={deepInk}
++              textColor={colors.textSecondary}
+             />
+-            {labMarkerVisible() ? (
+-              <LabHud
+-                viewport={viewport}
+-                fontProvider={fontProvider}
+-                ink={deepInk}
+-                textColor={colors.textSecondary}
+-              />
+-            ) : null}
+-          </Group>
+-        ) : undefined
+-      }
+-    >
++          ) : null}
++        </Group>
++      ) : undefined,
++    [deepFieldOn, frame, bodyLight, switchFx, ringInks, deepInk, hudViewport, fontProvider, colors],
++  );
++  const reorderDrag = camera.reorder;
++  const probeDeps = [viewport.width, viewport.height, deepFieldOn, frame, switchFx, planeRings, deepInk, sceneExtent, resources, colors, camera.reorder, fontProvider, focusedIds, deepField, sunFlare, satellites, focusedSatellite, labels, allocations];
++  const probeDepNames = "vw,vh,deepFieldOn,frame,switchFx,planeRings,deepInk,sceneExtent,resources,colors,reorderDrag,fontProvider,focusedIds,deepField,sunFlare,satellites,focusedSatellite,labels,allocations".split(",");
++  const probeDepsPrev = useRef<unknown[]>([]);
++  probeLog(`world deps changed: ${probeDepNames.filter((_, i) => probeDepsPrev.current[i] !== probeDeps[i]).join(",")}`);
++  probeDepsPrev.current = probeDeps;
++  const world = useMemo(
++    () => (
+       <Group
+         clip={{ x: 0, y: 0, width: viewport.width, height: viewport.height }}
+       >
+         <Group>
+-          {DEEP_FIELD_ENABLED ? (
++          {deepFieldOn ? (
+             <WorldPlaneLayer
+               frame={frame}
+               switchFx={switchFx}
+               rings={planeRings}
+               ink={deepInk}
+-              extent={scene.extent}
++              extent={sceneExtent}
+             />
+           ) : (
+             resources
+@@ -670,12 +729,8 @@ export function OrreryWorld({
+               ))
+           )}
+         </Group>
+-        <Polaris frame={frame} extent={scene.extent} colors={colors} />
+-        <ReorderGhost
+-          frame={frame}
+-          drag={camera.reorder}
+-          color={colors.accent}
+-        />
++        <Polaris frame={frame} extent={sceneExtent} colors={colors} />
++        <ReorderGhost frame={frame} drag={reorderDrag} color={colors.accent} />
+         {/* RNRecorder flushes sorting at every non-Group command. Keep this run contiguous. */}
+         <Group>
+           {resources.map((resource) => (
+@@ -745,6 +800,40 @@ export function OrreryWorld({
+           ))}
+         </Group>
+       </Group>
++    ),
++    [
++      viewport.width,
++      viewport.height,
++      deepFieldOn,
++      frame,
++      switchFx,
++      planeRings,
++      deepInk,
++      sceneExtent,
++      resources,
++      colors,
++      reorderDrag,
++      fontProvider,
++      focusedIds,
++      deepField,
++      sunFlare,
++      satellites,
++      focusedSatellite,
++      labels,
++      allocations,
++    ],
++  );
++  return (
++    <OrreryCanvas
++      width={viewport.width}
++      height={viewport.height}
++      background={colors.background}
++      starColors={starColors}
++      gesture={gesture}
++      backdrop={backdrop}
++      overlay={overlay}
++    >
++      {world}
+     </OrreryCanvas>
+   );
+ }
+diff --git a/src/components/orrery/ProjectedOrbitRing.tsx b/src/components/orrery/ProjectedOrbitRing.tsx
+index 88b6b835..06240db0 100644
+--- a/src/components/orrery/ProjectedOrbitRing.tsx
++++ b/src/components/orrery/ProjectedOrbitRing.tsx
+@@ -1,7 +1,7 @@
+ /** Rails are a separate layer behind the consecutive native body Group batch. */
+ import { DashPathEffect, Path, Skia } from "@shopify/react-native-skia";
+ import { type SharedValue, useDerivedValue } from "react-native-reanimated";
+-import { type AnimatedFrame, bodyKey } from "@/logic/orrery-frame";
++import { type AnimatedFrame, frameBody } from "@/logic/orrery-frame";
+ import type { OrreryRingStyle } from "@/logic/orrery-ring-logic";
+ 
+ export function ProjectedOrbitRing({
+@@ -15,7 +15,7 @@ export function ProjectedOrbitRing({
+ }) {
+   const path = useDerivedValue(() => {
+     const points =
+-      frame.value.bodies.find((b) => bodyKey(b) === identity)?.ringPath ?? [];
++      frameBody(frame.value, identity)?.ringPath ?? [];
+     const result = Skia.Path.Make();
+     if (points.length) {
+       result.moveTo(points[0].x, points[0].y);
+@@ -27,7 +27,7 @@ export function ProjectedOrbitRing({
+   });
+   const opacity = useDerivedValue(
+     () =>
+-      (frame.value.bodies.find((b) => bodyKey(b) === identity)?.opacity ?? 0) *
++      (frameBody(frame.value, identity)?.opacity ?? 0) *
+       (style.strokeStyle === "faded"
+         ? 0.7
+         : style.strokeStyle === "faintTrace"
+diff --git a/src/components/orrery/orrery-frame-mapper.test.ts b/src/components/orrery/orrery-frame-mapper.test.ts
+index b2960bfb..6ef09ab0 100644
+--- a/src/components/orrery/orrery-frame-mapper.test.ts
++++ b/src/components/orrery/orrery-frame-mapper.test.ts
+@@ -100,19 +100,23 @@ it("the emitted projection closure settles after publication under the installed
+   const cameraFrom = cell({ ...HOME_CAMERA, x: 12, zoom: 1.4 });
+   const cameraTo = cell({ ...HOME_CAMERA });
+   const pose = cell({ ...HOME_CAMERA });
++  // Perf pass: the frame worklet may capture only shared values, worklet
++  // helpers and SMALL plain data. `switchRuntime` (keyed resources, each with a
++  // whole scene snapshot) and `scene` are deliberately absent: capturing either
++  // again fails here as an unhandled capture, because the UI runtime
++  // re-materialises every captured object per reference on each mapper start.
+   const available: Record<string, unknown> = {
+-    switchRuntime: {
+-      transition,
+-      progress,
+-      cameraFrom,
+-      cameraTo,
+-    },
++    switchTransition: transition,
++    switchProgress: progress,
++    switchCameraFrom: cameraFrom,
++    switchCameraTo: cameraTo,
+     sampleSwitchChoreography,
+     sampleOrrerySwitchCamera,
+     pose,
+     level: cell("overview"),
+     viewport: { width: 400, height: 700 },
+-    scene: { generation: 7, systemSnapshot: { members: [] } },
++    sceneGeneration: 7,
++    memberIdentities: [],
+     satellites: [],
+     camera: { reorder, frame: published },
+     reorder,
+@@ -198,6 +202,8 @@ it("the emitted projection closure settles after publication under the installed
+   expect(publish).toHaveBeenCalledTimes(1);
+   expect(published.value).toBe(projected.value);
+   expect(names).not.toContain("camera");
++  for (const heavy of ["switchRuntime", "scene", "resources"])
++    expect(names).not.toContain(heavy);
+   for (const phaseProgress of [0.1, 0.3, 0.55, 0.85, 1]) {
+     progress.value = phaseProgress;
+     for (let i = 0; i < 5; i++) tick();
+diff --git a/src/components/orrery/orrery-switch-runtime.test.ts b/src/components/orrery/orrery-switch-runtime.test.ts
+index af529807..3286e6d8 100644
+--- a/src/components/orrery/orrery-switch-runtime.test.ts
++++ b/src/components/orrery/orrery-switch-runtime.test.ts
+@@ -18,6 +18,7 @@ const harness = vi.hoisted(() => ({
+ vi.mock("react", () => ({
+   useCallback: (fn: unknown) => fn,
+   useEffect: () => {},
++  useMemo: (factory: () => unknown) => factory(),
+   useRef: (current: unknown) => ({ current }),
+   useState: (initial: unknown) => {
+     harness.state.value = initial;
+@@ -300,6 +301,66 @@ describe("settled Orrery geometry retirement (RG-027, performance/AUD-PERF-001)"
+   });
+ });
+ 
++describe("switch start camera is the displayed camera (pass-2 stale-camera bug)", () => {
++  it("after a settled switch plus a user pan/zoom, the next switch starts from the live pose", () => {
++    const mounted = mountRuntime();
++    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
++    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
++    mounted.complete();
++    expect(mounted.runtime.progress.value).toBe(1);
++    // The settled frame draws `pose`; the user pans/zooms/recenters it.
++    const panned: CameraPose = { ...homeCamera, x: 47, y: -19, zoom: 2.3 };
++    mounted.pose.value = panned;
++    mounted.runtime.publish(sceneOf(3, cWorldOf()), true, 1, sourceCamera);
++    // First switch frame (progress 0) == what was on screen, not homeCamera.
++    expect(mounted.runtime.cameraFrom.value).toEqual(panned);
++    expect(
++      sampleOrrerySwitchRuntime({
++        transition: mounted.runtime.transition.value,
++        progress: 0,
++        cameraFrom: mounted.runtime.cameraFrom.value,
++        cameraTo: mounted.runtime.cameraTo.value,
++        status: "running",
++        remainingFraction: 1,
++      }).camera,
++    ).toEqual(panned);
++    expect(mounted.runtime.cameraTo.value).toEqual(sourceCamera);
++  });
++
++  it("a cold-start Home applied outside the runtime is the first switch's origin", () => {
++    const mounted = mountRuntime();
++    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
++    const coldHome: CameraPose = { ...homeCamera, tilt: 0.78, zoom: 0.61 };
++    mounted.pose.value = coldHome;
++    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
++    expect(mounted.runtime.cameraFrom.value).toEqual(coldHome);
++  });
++
++  it("a retarget while running still starts from the interpolated switch camera", () => {
++    const mounted = mountRuntime();
++    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
++    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
++    const from = { ...mounted.runtime.cameraFrom.value };
++    mounted.runtime.progress.value = 0.5;
++    // pose is not what is displayed while running; it must be ignored.
++    mounted.pose.value = { ...homeCamera, x: 999 };
++    mounted.runtime.publish(sceneOf(3, cWorldOf()), true, 1, sourceCamera);
++    expect(mounted.runtime.cameraFrom.value).toEqual(
++      sampleOrrerySwitchRuntime(
++        {
++          transition: mounted.runtime.transition.value,
++          progress: 0.5,
++          cameraFrom: from,
++          cameraTo: homeCamera,
++          status: "running",
++          remainingFraction: 0.5,
++        },
++        0.5,
++      ).camera,
++    );
++  });
++});
++
+ const cWorldOf = (): WorldBody[] => [
+   { id: 0, kind: "sun", x: 0, y: 0, radius: 18, ringRadius: 0 },
+   { id: 3, kind: "contact", x: 0, y: -60, radius: 12, ringRadius: 60 },
+diff --git a/src/components/orrery/use-orrery-switch-runtime.ts b/src/components/orrery/use-orrery-switch-runtime.ts
+index 9d9d25b7..d6ac541b 100644
+--- a/src/components/orrery/use-orrery-switch-runtime.ts
++++ b/src/components/orrery/use-orrery-switch-runtime.ts
+@@ -1,4 +1,4 @@
+-import { useCallback, useEffect, useRef, useState } from "react";
++import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+ import {
+   cancelAnimation,
+   ReduceMotion,
+@@ -21,6 +21,7 @@ import {
+   settleSwitchChoreography,
+ } from "@/logic/orrery-switch-choreography";
+ import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
++import { probeLog } from "./lab/perf-probe";
+ 
+ export const NORMAL_SWITCH_DURATION_MS = 2100;
+ export const REDUCED_SWITCH_DURATION_MS = 180;
+@@ -85,6 +86,23 @@ function interpolateCamera(
+   };
+ }
+ 
++/**
++ * The camera actually on screen when a switch starts or retargets. While a
++ * switch runs the frame draws the interpolated switch camera; once settled the
++ * frame draws the live `pose` (user pan/zoom/recenter, cold-start Home applied
++ * outside the runtime). Interpolating a settled runtime would return the
++ * PREVIOUS switch's target and snap the first frame (pass-2 headline 3).
++ */
++export function displayedSwitchCamera(
++  from: CameraPose,
++  to: CameraPose,
++  progress: number,
++  live: CameraPose,
++): CameraPose {
++  "worklet";
++  return progress >= 1 ? { ...live } : interpolateCamera(from, to, progress);
++}
++
+ export function createSettledOrrerySwitchRuntime(
+   world: readonly WorldBody[],
+   generation: number,
+@@ -287,17 +305,23 @@ export function useOrrerySwitchRuntime(
+       intensity: number,
+       destinationHome: CameraPose,
+     ) => {
++      probeLog(`publish gen ${scene.generation} isSwitch ${isSwitch}`);
+       latestScene.current = scene;
+       setResources((current) => nextOrreryResources(current, scene, isSwitch));
++      // Perf pass: ship only the geometry the UI needs. Capturing `scene` sent
++      // the whole snapshot (contacts, System snapshot, gravity map) to the UI
++      // runtime on every publication.
++      const world = scene.world;
++      const generation = scene.generation;
+       runOnUI(() => {
+         "worklet";
+         cancelAnimation(progress);
+         const reduced = reducedMotion.value;
+         if (!isSwitch || transition.value.generation === 0) {
+           transition.value = beginSwitchChoreography(
+-            scene.world,
+-            scene.world,
+-            scene.generation,
++            world,
++            world,
++            generation,
+             { intensity: 0, reducedMotion: reduced },
+           );
+           cameraFrom.value = { ...destinationHome };
+@@ -310,26 +334,28 @@ export function useOrrerySwitchRuntime(
+           transition.value,
+           progress.value,
+         ).world;
+-        const displayedCamera = interpolateCamera(
++        const displayedCamera = displayedSwitchCamera(
+           cameraFrom.value,
+           cameraTo.value,
+           progress.value,
++          pose.value,
+         );
+         transition.value = beginSwitchChoreography(
+           displayed,
+-          scene.world,
+-          scene.generation,
++          world,
++          generation,
+           { intensity, reducedMotion: reduced },
+         );
+         cameraFrom.value = displayedCamera;
+         cameraTo.value = { ...destinationHome };
+         progress.value = 0;
+-        startDriver(1, reduced, scene.generation);
++        startDriver(1, reduced, generation);
+       })();
+     },
+     [
+       cameraFrom,
+       cameraTo,
++      pose,
+       progress,
+       reducedMotion,
+       running,
+@@ -398,17 +424,32 @@ export function useOrrerySwitchRuntime(
+     [progress],
+   );
+ 
+-  return {
+-    transition,
+-    progress,
+-    cameraFrom,
+-    cameraTo,
+-    running,
+-    resources,
+-    publish,
+-    pause,
+-    resume,
+-  };
++  // Perf pass: a stable identity, so consumers that depend on the runtime do
++  // not rebuild (and re-serialise) on every unrelated screen render.
++  return useMemo(
++    () => ({
++      transition,
++      progress,
++      cameraFrom,
++      cameraTo,
++      running,
++      resources,
++      publish,
++      pause,
++      resume,
++    }),
++    [
++      transition,
++      progress,
++      cameraFrom,
++      cameraTo,
++      running,
++      resources,
++      publish,
++      pause,
++      resume,
++    ],
++  );
+ }
+ 
+ export function sampleOrrerySwitchCamera(
+diff --git a/src/db/mutex.ts b/src/db/mutex.ts
+index 1933fa96..920b3916 100644
+--- a/src/db/mutex.ts
++++ b/src/db/mutex.ts
+@@ -29,8 +29,22 @@ let chain: Promise<unknown> = Promise.resolve();
+  * (`chain = run.catch(() => {})`), while the rejection still propagates to THIS
+  * caller via the returned `run`.
+  */
++let probeSeq = 0;
+ export function withMutex<T>(fn: () => Promise<T>): Promise<T> {
+-  const run = chain.then(fn, fn) as Promise<T>;
++  const id = ++probeSeq;
++  const queued = Date.now();
++  const site = (new Error().stack ?? "").split("\n").slice(2, 5).join(" | ").replace(/\s+/g, " ").slice(0, 220);
++  const timed = async () => {
++    const start = Date.now();
++    try {
++      return await fn();
++    } finally {
++      const held = Date.now() - start;
++      if (held > 150 || start - queued > 150)
++        console.log(`[probe] mutex #${id} waited ${start - queued}ms held ${held}ms ${site}`);
++    }
++  };
++  const run = chain.then(timed, timed) as Promise<T>;
+   chain = run.catch(() => {});
+   return run;
+ }
+diff --git a/src/logic/orrery-camera-logic.test.ts b/src/logic/orrery-camera-logic.test.ts
+index 6026855b..c7ec7a44 100644
+--- a/src/logic/orrery-camera-logic.test.ts
++++ b/src/logic/orrery-camera-logic.test.ts
+@@ -232,3 +232,72 @@ describe("bounded invertible inspection camera", () => {
+     }
+   });
+ });
++
++describe("projectFrame hoisted projection basis (perf pass)", () => {
++  it("projectFrame matches projectWorldPoint bit-for-bit (bodies, centre, ring paths)", () => {
++    const obstructed = {
++      width: 411,
++      height: 760,
++      obstacles: [
++        { x: 16, y: 16, width: 143, height: 47 },
++        { x: 266, y: 16, width: 130, height: 47 },
++        { x: 341, y: 472, width: 54, height: 175 },
++        { x: 0, y: 725, width: 411, height: 35 },
++      ],
++    };
++    const world: WorldBody[] = [
++      { id: 0, kind: "sun", x: 0, y: 0, radius: 30, ringRadius: 0 },
++      ...Array.from({ length: 12 }, (_, i) => {
++        const ring = 58 + 34 * i;
++        const angle = i * 1.37;
++        return {
++          id: i + 1,
++          kind: "contact" as const,
++          radius: 14 + (i % 3),
++          ringRadius: ring,
++          x: (ring + (i % 4) * 9) * Math.sin(angle),
++          y: -(ring + (i % 4) * 9) * Math.cos(angle),
++        };
++      }),
++    ];
++    for (const pose of [
++      HOME_CAMERA,
++      { x: 31.7, y: -12.3, zoom: 1.37, tilt: 0.61, yaw: 2.2, focalDistance: 900 },
++      { x: -80, y: 140, zoom: 0.41, tilt: LAB_HOME_TILT, yaw: 5.9 },
++    ]) {
++      const frame = projectFrame(world, pose, obstructed, 3);
++      expect(frame.center).toEqual(
++        projectWorldPoint({ x: 0, y: 0 }, frame.pose, obstructed),
++      );
++      frame.bodies.forEach((projected, index) => {
++        const source = world[index];
++        const point = projectWorldPoint(source, frame.pose, obstructed);
++        expect(projected.x).toBe(point.x);
++        expect(projected.y).toBe(point.y);
++        expect(projected.ringPath.length).toBe(source.ringRadius > 0 ? 128 : 0);
++        projected.ringPath.forEach((ringPoint, i) => {
++          const angle = (i * 2 * Math.PI) / 128;
++          expect(ringPoint).toEqual(
++            projectWorldPoint(
++              {
++                x: source.ringRadius * Math.sin(angle),
++                y: -source.ringRadius * Math.cos(angle),
++              },
++              frame.pose,
++              obstructed,
++            ),
++          );
++        });
++      });
++    }
++  });
++
++  it("still rejects invalid inputs like projectWorldPoint", () => {
++    expect(() =>
++      projectFrame([body(Number.NaN, 4)], HOME_CAMERA, viewport, 1),
++    ).toThrow();
++    expect(() =>
++      projectFrame([body(1, 4)], HOME_CAMERA, { width: 0, height: 600 }, 1),
++    ).toThrow();
++  });
++});
+diff --git a/src/logic/orrery-camera-logic.ts b/src/logic/orrery-camera-logic.ts
+index e22c548c..7c882997 100644
+--- a/src/logic/orrery-camera-logic.ts
++++ b/src/logic/orrery-camera-logic.ts
+@@ -507,6 +507,63 @@ export function tryUnprojectToWorldPlane(
+   const result = unprojectToWorldPlane(point, pose, viewport);
+   return Number.isFinite(result.x) && Number.isFinite(result.y) ? result : null;
+ }
++/**
++ * Per-frame projection constants (perf pass). `projectWorldPoint` re-derives
++ * the usable rect (obstacle subdivision + sort) and the pose trig for EVERY
++ * point; a frame projects ~128 ring points per body, so that was N×128 rect
++ * derivations per frame (≈390 ms per frame worklet on the Pixel, debug native).
++ * These hoist exactly the values projectWorldPoint computes, so
++ * `projectWithBasis` is arithmetically identical (same operations, same order)
++ * — pinned by orrery-camera-logic.test "projectFrame matches projectWorldPoint".
++ */
++interface ProjectionBasis {
++  pose: CameraPose;
++  center: WorldPoint;
++  cos: number;
++  sin: number;
++  focal: number;
++  sinTilt: number;
++  cosTilt: number;
++}
++function projectionBasis(
++  pose: CameraPose,
++  viewport: CameraViewport,
++): ProjectionBasis {
++  "worklet";
++  assertProjection({ x: 0, y: 0 }, pose, viewport);
++  const yaw = pose.yaw ?? 0;
++  return {
++    pose,
++    center: projectionCenter(viewport),
++    cos: Math.cos(yaw),
++    sin: Math.sin(yaw),
++    focal: pose.focalDistance ?? MIN_FOCAL_DISTANCE,
++    sinTilt: Math.sin(pose.tilt ?? 0),
++    cosTilt: Math.cos(pose.tilt ?? 0),
++  };
++}
++function projectWithBasis(
++  px: number,
++  py: number,
++  basis: ProjectionBasis,
++): WorldPoint {
++  "worklet";
++  if (!Number.isFinite(px) || !Number.isFinite(py))
++    throw new Error("Invalid Orrery projection input");
++  const pose = basis.pose;
++  const x = px - pose.x,
++    y = py - pose.y;
++  const planeX = x * basis.cos - y * basis.sin,
++    planeY = x * basis.sin + y * basis.cos;
++  const denominator = basis.focal - planeY * basis.sinTilt;
++  if (!Number.isFinite(denominator) || denominator <= 0)
++    throw new Error("Point outside finite Orrery camera plane");
++  const scale = (basis.focal / denominator) * pose.zoom;
++  return {
++    x: basis.center.x + planeX * scale,
++    y: basis.center.y + planeY * basis.cosTilt * scale,
++  };
++}
+ export function projectFrame(
+   world: readonly WorldBody[],
+   pose: CameraPose,
+@@ -522,11 +579,12 @@ export function projectFrame(
+         ((1 + Math.SQRT2) * Math.sin(MAX_TILT)),
+     ),
+   );
++  const basis = projectionBasis(current, viewport);
+   return {
+     generation,
+     pose: current,
+     viewport,
+-    center: projectWorldPoint({ x: 0, y: 0 }, current, viewport),
++    center: projectWithBasis(0, 0, basis),
+     bodies: world.map((body) => {
+       const scale = current.zoom * perspectiveScale(body, current);
+       const ringPath: WorldPoint[] = [];
+@@ -534,19 +592,16 @@ export function projectFrame(
+         for (let i = 0; i < RING_SEGMENTS; i++) {
+           const angle = (i * 2 * Math.PI) / RING_SEGMENTS;
+           ringPath.push(
+-            projectWorldPoint(
+-              {
+-                x: body.ringRadius * Math.sin(angle),
+-                y: -body.ringRadius * Math.cos(angle),
+-              },
+-              current,
+-              viewport,
++            projectWithBasis(
++              body.ringRadius * Math.sin(angle),
++              -body.ringRadius * Math.cos(angle),
++              basis,
+             ),
+           );
+         }
+       return {
+         ...body,
+-        ...projectWorldPoint(body, current, viewport),
++        ...projectWithBasis(body.x, body.y, basis),
+         radius: body.radius * scale,
+         ringRadius: body.ringRadius * current.zoom,
+         hitRadius: Math.max(MIN_HIT_RADIUS, body.radius * scale),
+diff --git a/src/logic/orrery-frame.ts b/src/logic/orrery-frame.ts
+index adb4da35..e3ca5bdf 100644
+--- a/src/logic/orrery-frame.ts
++++ b/src/logic/orrery-frame.ts
+@@ -21,12 +21,20 @@ export interface WorldTransition {
+   from: AnimatedWorldBody[];
+   to: AnimatedWorldBody[];
+ }
++export type AnimatedFrameBody = ProjectedFrame["bodies"][number] & {
++  opacity: number;
++  interactive: boolean;
++  visible: boolean;
++};
+ export type AnimatedFrame = Omit<ProjectedFrame, "bodies"> & {
+-  bodies: (ProjectedFrame["bodies"][number] & {
+-    opacity: number;
+-    interactive: boolean;
+-    visible: boolean;
+-  })[];
++  bodies: AnimatedFrameBody[];
++  /**
++   * Perf pass: bodyKey → first index into `bodies`, built once per frame so
++   * per-body consumers stop scanning N bodies (and building N key strings)
++   * each. A hit is verified against the body's own key, so a derived frame
++   * (`{...frame, bodies: filtered}`) can never return the wrong body.
++   */
++  keyIndex?: Record<string, number>;
+ };
+ export function bodyKey(
+   body: Pick<WorldBody, "id" | "kind" | "satelliteTarget">,
+@@ -38,6 +46,30 @@ export function bodyKey(
+   }
+   return `${body.kind}:${body.id}`;
+ }
++/** First body with `key`, as `bodies.find(b => bodyKey(b) === key)` — O(1) when indexed. */
++export function frameBody(
++  frame: AnimatedFrame,
++  key: string,
++): AnimatedFrameBody | undefined {
++  "worklet";
++  const index = frame.keyIndex?.[key];
++  if (index !== undefined) {
++    const body = frame.bodies[index];
++    if (body && bodyKey(body) === key) return body;
++  }
++  return frame.bodies.find((body) => bodyKey(body) === key);
++}
++function indexFrameKeys(
++  bodies: readonly AnimatedFrameBody[],
++): Record<string, number> {
++  "worklet";
++  const index: Record<string, number> = {};
++  for (let i = 0; i < bodies.length; i++) {
++    const key = bodyKey(bodies[i]);
++    if (index[key] === undefined) index[key] = i;
++  }
++  return index;
++}
+ /** Retained keys keep their source order (native stable equal-depth ties).
+  * Departures remain decorative; new entries begin at their resolved position.
+  */
+@@ -135,9 +167,7 @@ export function projectAnimatedFrame(
+   "worklet";
+   const world = sampleWorldTransition(transition, fraction);
+   const frame = projectFrame(world, pose, viewport, transition.generation);
+-  return {
+-    ...frame,
+-    bodies: frame.bodies.map((body, index) => {
++  const bodies = frame.bodies.map((body, index) => {
+       const opacity = world[index].opacity;
+       // Halo-aware media culling only. The full frame remains the hit authority.
+       const reach = body.radius * (body.kind === "sun" ? 2 : 1.3);
+@@ -152,8 +182,8 @@ export function projectAnimatedFrame(
+           body.x - reach <= viewport.width &&
+           body.y - reach <= viewport.height,
+       };
+-    }),
+-  };
++    });
++  return { ...frame, bodies, keyIndex: indexFrameKeys(bodies) };
+ }
+ 
+ /** One choreography sample is the sole world for projection, rings and hits. */
+@@ -206,7 +236,7 @@ export function billboardPose(
+   radius: number,
+ ): BillboardPose {
+   "worklet";
+-  const b = frame.bodies.find((body) => bodyKey(body) === key);
++  const b = frameBody(frame, key);
+   return b
+     ? {
+         x: b.x,
+diff --git a/src/screens/OrreryScreen.tsx b/src/screens/OrreryScreen.tsx
+index 28502e8e..3b886dc3 100644
+--- a/src/screens/OrreryScreen.tsx
++++ b/src/screens/OrreryScreen.tsx
+@@ -38,6 +38,7 @@ import { OrreryFocusContext } from "@/components/orrery/OrreryFocusContext";
+ import { OrrerySystemSelector } from "@/components/orrery/OrrerySystemSelector";
+ import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
+ import { OrreryWorld } from "@/components/orrery/OrreryWorld";
++import { probeLog } from "@/components/orrery/lab/perf-probe";
+ import { companionAction } from "@/components/orrery/orrery-companion-logic";
+ import { systemEmptyCopy } from "@/components/orrery/orrery-controls-logic";
+ import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
+@@ -304,6 +305,7 @@ export function OrreryScreen() {
+   const switchHomeGeneration = useRef<number | null>(null);
+   useEffect(() => {
+     const unsubscribe = useSystemStore.subscribe((next, previous) => {
++      probeLog(`store ${previous.status}->${next.status} gen ${next.generation}`);
+       if (!shouldPublishSwitchScene(next, previous)) return;
+       if (
+         next.status === "loading" &&
+@@ -694,6 +696,7 @@ export function OrreryScreen() {
+   }, [useSystemStore]);
+   const focus = useCallback(
+     (targets: OrreryContactTarget[], waitForPanel = false) => {
++      probeLog(`focus ${targets.length}`);
+       const ids = targets.map((target) => target.id);
+       const scene = useSystemStore.getState().current();
+       if (!scene) return;
+diff --git a/src/services/orrery-scene.ts b/src/services/orrery-scene.ts
+index 164c1049..e58aa49c 100644
+--- a/src/services/orrery-scene.ts
++++ b/src/services/orrery-scene.ts
+@@ -212,7 +212,9 @@ export async function loadOrreryScene(
+   generation = 0,
+   system: OrrerySystemRef = ALL_CONTACTS_SYSTEM,
+ ): Promise<OrrerySceneSnapshot> {
++  const probeT = Date.now();
+   const snapshot = await readOrrerySystemSnapshot(exec, system);
++  console.log(`[probe] load read ${Date.now() - probeT}ms`);
+   if (snapshot.status === "missing-category")
+     throw new MissingOrreryCategoryError(snapshot);
+   if (snapshot.status === "missing-custom")
+@@ -231,6 +233,7 @@ export async function loadOrreryScene(
+     self,
+     now: sceneNow(),
+   });
++  console.log(`[probe] load total ${Date.now() - probeT}ms`);
+   return {
+     preferences: {
+       density: settings.orreryDensity,

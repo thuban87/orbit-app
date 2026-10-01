@@ -258,3 +258,13 @@ Recording helpers used in pass 2 (scratchpad, not committed): `pick.py`
 `sw.sh "<System>" "<group header>" out.mp4 [secs]` (screenrecord + tap),
 `vidan.py` (frame diff + contact sheet), `idle.sh` (relaunch + 5 s idle
 gfxinfo).
+
+## (j) Perf pass additions
+
+- **Renderer A/B at runtime:** View options → "Lab A renderer (experiment)" switch flips Lab A ↔ legacy
+  live (in-memory, resets on app start). Use it to measure both renderers in ONE build (incl. release).
+- **Switch latency method:** `evidence/perf/logs/scenario.sh` + `lat2.py` with the probe patch
+  `evidence/perf/probe-instrumentation.patch.txt` (not committed to src). Take UI-side timestamps
+  (`Date.now()` inside worklets); logcat arrival time of a UI `console.log` is NOT a timestamp — UI logs
+  are forwarded through the JS thread and arrive seconds late while JS is busy.
+- See `_notes/PERF-PASS.md` for root cause, numbers and residuals.

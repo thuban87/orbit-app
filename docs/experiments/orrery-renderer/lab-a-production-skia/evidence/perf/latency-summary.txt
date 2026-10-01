@@ -1,0 +1,31 @@
+# UI-timestamped switch latency (Pixel 6 Pro, DEBUG native APK + production-mode JS, Lab A package)
+# tap = JS 'store ready->loading'; publish = JS; first frame = UI-thread Date.now() in the frame worklet; settled = first + wall
+## BEFORE (HEAD 15ec425a + probes)
+s1-all-dense incomplete True False False False
+s2-dense-all incomplete True True False False
+s3-focus incomplete False False False False
+s4-all-dense: tap->publish 989ms | publish->first switch frame 3417ms | switch 1029ms, 2 frame-worklet runs (work p50 475 max 475ms) | tap->settled 5435ms | maxDavey 4609ms, max skipped 486
+s5-dense-inner: tap->publish 814ms | publish->first switch frame 2925ms | switch 533ms, 2 frame-worklet runs (work p50 412 max 412ms) | tap->settled 4272ms | maxDavey 3881ms, max skipped 412
+s6-inner-dense: tap->publish 287ms | publish->first switch frame 382ms | switch 2484ms, 7 frame-worklet runs (work p50 338 max 353ms) | tap->settled 3153ms | maxDavey 1695ms, max skipped 146
+## AFTER, Lab A renderer
+s1-all-dense incomplete True False False False
+s2-dense-all: tap->publish 227ms | publish->first switch frame 166ms | switch 2136ms, 19 frame-worklet runs (work p50 6 max 8ms) | tap->settled 2529ms | maxDavey 0ms, max skipped 0
+s3-focus incomplete False False False False
+s4-all-dense: tap->publish 267ms | publish->first switch frame 165ms | switch 2233ms, 20 frame-worklet runs (work p50 6 max 7ms) | tap->settled 2665ms | maxDavey 0ms, max skipped 0
+s5-dense-inner: tap->publish 176ms | publish->first switch frame 124ms | switch 2116ms, 28 frame-worklet runs (work p50 5 max 6ms) | tap->settled 2416ms | maxDavey 0ms, max skipped 0
+s6-inner-dense: tap->publish 152ms | publish->first switch frame 89ms | switch 2127ms, 62 frame-worklet runs (work p50 4 max 6ms) | tap->settled 2368ms | maxDavey 0ms, max skipped 0
+## AFTER, legacy renderer (runtime toggle)
+s1-all-dense incomplete True False False False
+s2-dense-all: tap->publish 239ms | publish->first switch frame 371ms | switch 2148ms, 33 frame-worklet runs (work p50 5 max 9ms) | tap->settled 2758ms | maxDavey 0ms, max skipped 0
+s3-focus incomplete False False False False
+s4-all-dense: tap->publish 251ms | publish->first switch frame 162ms | switch 2145ms, 33 frame-worklet runs (work p50 5 max 9ms) | tap->settled 2558ms | maxDavey 0ms, max skipped 0
+s5-dense-inner: tap->publish 168ms | publish->first switch frame 280ms | switch 2108ms, 39 frame-worklet runs (work p50 5 max 9ms) | tap->settled 2556ms | maxDavey 0ms, max skipped 0
+s6-inner-dense: tap->publish 193ms | publish->first switch frame 86ms | switch 2174ms, 95 frame-worklet runs (work p50 4 max 35ms) | tap->settled 2453ms | maxDavey 0ms, max skipped 0
+
+# Notes
+# - "incomplete" s1: the first switch after a cold start publishes isSwitch=false (a settled publication, no
+#   choreography) in both builds; s3 is the focus step (no switch). BEFORE s2: publish, then ONE 4984 ms Davey
+#   and zero intermediate switch frames (the frame worklet never ran with 0<progress<1) - see logs/scenario.
+# - "frame-worklet runs" = UI-thread executions of OrreryWorld's frame mapper during the switch, i.e. an upper
+#   bound on distinct switch frames; the screen shows fewer (RN-Skia draws at ~4-10 fps here, debug native).
+# - Debug native + production-mode JS only. NOT a release build. Thermal status 1 (light) throughout.

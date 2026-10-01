@@ -1,0 +1,13 @@
+10-01 06:01:56.596 I/ReactNativeJS(18183): [probe] frame worklet runs 2 in 28630ms, work 8ms
+10-01 06:02:01.338 I/ReactNativeJS(18183): [probe] frame worklet runs 1 in 4742ms, work 5ms
+10-01 06:02:06.592 I/ReactNativeJS(18183): [probe] 26592 #13 store ready->loading gen 5
+10-01 06:02:06.728 I/ReactNativeJS(18183): [probe] frame worklet runs 1 in 5390ms, work 4ms
+10-01 06:02:06.824 I/ReactNativeJS(18183): [probe] 26824 #14 store loading->ready gen 5
+10-01 06:02:06.831 I/ReactNativeJS(18183): [probe] 26831 #15 publish gen 5 isSwitch true
+10-01 06:02:06.831 I/ReactNativeJS(18183): [probe] 26831 #16 store ready->ready gen 5
+10-01 06:02:12.424 I/ReactNativeJS(18183): [probe] UI switch start executed at 27186
+10-01 06:02:12.424 I/ReactNativeJS(18183): [probe] first switch frame at 27202
+10-01 06:02:12.425 I/ReactNativeJS(18183): [probe] frame worklet runs 22 in 2010ms, work 127ms
+10-01 06:02:12.428 I/ReactNativeJS(18183): [probe] switch done: wall 2148ms frames 33 maxGap 109ms sumGaps>100 213ms work p50 5ms max 9ms bodies 41
+10-01 06:02:24.132 I/ReactNativeJS(18183): [probe] frame worklet runs 12 in 9968ms, work 71ms
+10-01 06:02:24.226 I/ReactNativeJS(18183): [probe] 44226 #17 store ready->ready gen 5

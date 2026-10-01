@@ -1,0 +1,5 @@
+10-01 04:11:27.539 I/ReactNativeJS(16907): [probe] frame worklet runs 1 in 4922ms, work 5ms
+10-01 04:11:27.921 I/ReactNativeJS(16907): [probe] 87921 #5 focus 1
+10-01 04:11:27.938 I/ReactNativeJS(16907): [probe] 87938 #6 OrreryWorld render
+10-01 04:11:28.431 I/Choreographer(16907): Skipped 30 frames!  The application may be doing too much work on its main thread.
+10-01 04:11:28.751 I/Choreographer(16907): Skipped 37 frames!  The application may be doing too much work on its main thread.

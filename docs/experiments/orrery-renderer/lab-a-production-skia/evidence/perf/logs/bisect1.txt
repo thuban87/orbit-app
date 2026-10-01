@@ -1,0 +1,15 @@
+10-01 04:25:48.815 I/Choreographer(20351): Skipped 200 frames!  The application may be doing too much work on its main thread.
+10-01 04:25:48.852 I/ReactNativeJS(20351): [probe] frame worklet runs 1 in 6357ms, work 6ms
+10-01 04:25:48.948 I/HWUI    (20351): Davey! duration=1788ms
+10-01 04:25:53.440 I/ReactNativeJS(20351): [probe] 53440 #8 store ready->loading gen 4
+10-01 04:25:54.087 I/ReactNativeJS(20351): [probe] mutex #8 waited 221ms held 426ms  at inReadSnapshot (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-
+10-01 04:25:54.087 I/ReactNativeJS(20351): [probe] load read 647ms
+10-01 04:25:54.110 I/ReactNativeJS(20351): [probe] load total 670ms
+10-01 04:25:54.111 I/ReactNativeJS(20351): [probe] 54111 #9 store loading->ready gen 4
+10-01 04:25:54.111 I/ReactNativeJS(20351): [probe] 54111 #10 publish gen 4 isSwitch false
+10-01 04:25:54.111 I/ReactNativeJS(20351): [probe] 54111 #11 store ready->ready gen 4
+10-01 04:25:54.330 I/ReactNativeJS(20351): [probe] mutex #9 waited 65ms held 154ms  at inReadSnapshot (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-
+10-01 04:25:54.579 I/ReactNativeJS(20351): [probe] mutex #10 waited 205ms held 249ms  at inWriteTransaction (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=
+10-01 04:25:54.627 I/ReactNativeJS(20351): [probe] 54627 #12 store ready->ready gen 4
+10-01 04:25:56.046 I/Choreographer(20351): Skipped 280 frames!  The application may be doing too much work on its main thread.
+10-01 04:25:56.058 I/ReactNativeJS(20351): [probe] frame worklet runs 1 in 7202ms, work 5ms

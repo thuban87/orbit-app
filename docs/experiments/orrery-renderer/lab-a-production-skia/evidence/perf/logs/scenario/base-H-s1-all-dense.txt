@@ -1,0 +1,13 @@
+10-01 05:56:18.918 I/Choreographer(16972): Skipped 205 frames!  The application may be doing too much work on its main thread.
+10-01 05:56:19.272 I/ReactNativeJS(16972): [probe] frame worklet runs 1 in 9867ms, work 315ms
+10-01 05:56:19.363 I/HWUI    (16972): Davey! duration=2142ms
+10-01 05:56:19.375 I/Choreographer(16972): Skipped 53 frames!  The application may be doing too much work on its main thread.
+10-01 05:56:23.751 I/ReactNativeJS(16972): [probe] 83751 #8 store ready->loading gen 4
+10-01 05:56:24.396 I/ReactNativeJS(16972): [probe] 84396 #9 store loading->ready gen 4
+10-01 05:56:24.396 I/ReactNativeJS(16972): [probe] 84396 #10 publish gen 4 isSwitch false
+10-01 05:56:24.396 I/ReactNativeJS(16972): [probe] 84396 #11 store ready->ready gen 4
+10-01 05:56:24.904 I/ReactNativeJS(16972): [probe] 84904 #12 store ready->ready gen 4
+10-01 05:56:26.375 I/Choreographer(16972): Skipped 280 frames!  The application may be doing too much work on its main thread.
+10-01 05:56:26.761 I/ReactNativeJS(16972): [probe] frame worklet runs 1 in 7489ms, work 378ms
+10-01 05:56:26.854 I/HWUI    (16972): Davey! duration=2796ms
+10-01 05:56:26.912 I/Choreographer(16972): Skipped 63 frames!  The application may be doing too much work on its main thread.

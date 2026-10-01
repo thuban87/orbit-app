@@ -1,0 +1,148 @@
+// TEMPORARY perf bench (not committed): quantifies JS<->UI closure sizes and
+// per-frame worklet cost on the real seeded device DB.
+import { DatabaseSync } from "node:sqlite";
+import { it, vi } from "vitest";
+
+vi.mock("expo-sqlite", () => ({}));
+vi.mock("react-native", () => ({}));
+vi.mock("@shopify/react-native-skia", () => ({}));
+vi.mock("react-native-reanimated", () => ({
+  cancelAnimation: vi.fn(),
+  ReduceMotion: { Never: "never" },
+  runOnJS: (fn: unknown) => fn,
+  runOnUI: (fn: unknown) => fn,
+  useAnimatedReaction: vi.fn(),
+  useSharedValue: (value: unknown) => ({ value }),
+  withTiming: (value: unknown) => value,
+}));
+
+import { nodeSqliteExecutor } from "@/db/__testkit__/node-sqlite";
+import { deriveHomePose } from "@/logic/orrery-camera-logic";
+import { billboardPose, bodyKey, projectAnimatedFrame } from "@/logic/orrery-frame";
+import {
+  beginSwitchChoreography,
+  sampleSwitchChoreography,
+} from "@/logic/orrery-switch-choreography";
+import { loadOrreryScene } from "@/services/orrery-scene";
+import { nextOrreryResources } from "./use-orrery-switch-runtime";
+
+const DB = process.env.BENCH_DB as string;
+
+function sv<T>(value: T) {
+  return { _isReanimatedSharedValue: true, value };
+}
+/** Node count the UI runtime materialises (toJSValue has no dedupe). */
+function nodes(value: unknown): number {
+  if (value === null || typeof value !== "object") return 1;
+  if ((value as { _isReanimatedSharedValue?: boolean })._isReanimatedSharedValue)
+    return 1;
+  if (value instanceof Map) {
+    let n = 1;
+    for (const [k, v] of value) n += nodes(k) + nodes(v);
+    return n;
+  }
+  let n = 1;
+  for (const v of Object.values(value as object)) n += nodes(v);
+  return n;
+}
+
+it.runIf(!!DB)("bench", async () => {
+  const exec = nodeSqliteExecutor(new DatabaseSync(DB));
+  const all = await loadOrreryScene(exec, 1, { kind: "builtin", id: "all-contacts" });
+  const dense = await loadOrreryScene(exec, 2, {
+    kind: "category",
+    uid: "4b71e31c-de43-45ec-8ae3-59da32f61f7b",
+  });
+  const viewport = {
+    width: 411,
+    height: 760,
+    usable: { x: 0, y: 0, width: 411, height: 760 },
+    obstacles: [
+      { x: 16, y: 16, width: 143, height: 47 },
+      { x: 266, y: 16, width: 130, height: 47 },
+      { x: 341, y: 472, width: 54, height: 175 },
+      { x: 337, y: 655, width: 58, height: 58 },
+      { x: 0, y: 725, width: 411, height: 35 },
+      { x: 400, y: 30, width: 11, height: 30 },
+    ],
+  };
+  let resources = nextOrreryResources([], all, false);
+  console.log("scene nodes all", nodes(all), "dense", nodes(dense));
+  resources = nextOrreryResources(resources, dense, true);
+  console.log("resources during switch", resources.length);
+  const transition = beginSwitchChoreography(all.world, dense.world, 2, {
+    intensity: 0.9,
+    reducedMotion: false,
+  });
+  const runtime = {
+    transition: sv(transition),
+    progress: sv(0),
+    cameraFrom: sv({}),
+    cameraTo: sv({}),
+    running: sv(true),
+    resources,
+    publish() {},
+    pause() {},
+    resume() {},
+  };
+  const closure = {
+    switchRuntime: runtime,
+    scene: dense,
+    satellites: [],
+    viewport,
+    pose: sv(0),
+    reorder: sv(0),
+    level: sv(0),
+  };
+  const narrow = {
+    transition: sv(0),
+    progress: sv(0),
+    cameraFrom: sv(0),
+    cameraTo: sv(0),
+    sceneGeneration: 2,
+    satelliteMembers: dense.systemSnapshot.members.map((m) => ({ id: m.id, uid: m.uid })),
+    satellites: [],
+    viewport,
+    pose: sv(0),
+    reorder: sv(0),
+    level: sv(0),
+  };
+  // startMapper ships {worklet closure} + {inputs = same values} → ×2.
+  console.log(
+    "frame mapper start materialised nodes: current",
+    2 * nodes(closure),
+    "narrow",
+    2 * nodes(narrow),
+    "publish runOnUI scene capture",
+    nodes(dense),
+    "world only",
+    nodes(dense.world),
+  );
+  const pose = deriveHomePose(dense.world, viewport);
+  if (!pose) throw new Error("no pose");
+  const frameAt = (p: number) => {
+    const world = sampleSwitchChoreography(transition, p).world;
+    return projectAnimatedFrame(
+      { generation: 2, from: world, to: world },
+      1,
+      pose,
+      viewport,
+    );
+  };
+  const keys = transition.entries.map((e) => e.key);
+  for (let i = 0; i < 5; i++) frameAt(0.5);
+  const N = 40;
+  let t = performance.now();
+  let f = frameAt(0.5);
+  for (let i = 0; i < N; i++) f = frameAt(0.5);
+  const frameMs = (performance.now() - t) / N;
+  t = performance.now();
+  for (let i = 0; i < N; i++) for (const k of keys) billboardPose(f, k, 16);
+  const billMs = (performance.now() - t) / N;
+  let ringPts = 0;
+  for (const b of f.bodies) ringPts += b.ringPath.length;
+  console.log(
+    `bodies ${f.bodies.length} ringPts ${ringPts} nodes(frame) ${nodes(f)} | node per-frame: projectFrame ${frameMs.toFixed(2)} ms, ${keys.length}x billboard find ${billMs.toFixed(2)} ms`,
+  );
+  void bodyKey;
+}, 60000);

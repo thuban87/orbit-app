@@ -1,0 +1,14 @@
+Cmdline: /system/bin/simpleperf record --app com.bwales.orbit.laba --add-meta-info app_type=debuggable --in-app --tracepoint-events /data/local/tmp/tracepoint_events --out-fd 3 --stop-signal-fd 4 -g --duration 4
+Arch: arm64
+Event: cpu-cycles (type 0, config 0x0, config1 0x0, config2: 0x0)
+Samples: 22789
+Event count: 9701904431
+
+Overhead  Sample  Command
+76.47%    15622   com.bwales.orbit.laba
+16.60%    3702    mqt_v_js
+3.65%     1616    mali-cmar-backe
+1.23%     277     RenderThread
+1.13%     388     hades
+0.36%     302     mali-mem-purge
+0.13%     144     DefaultDispatch

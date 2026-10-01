@@ -1,0 +1,7 @@
+10-01 06:01:22.766 I/ReactNativeJS(18183): [probe] frame worklet runs 1 in 5716ms, work 4ms
+10-01 06:01:27.865 I/ReactNativeJS(18183): [probe] 87865 #8 store ready->loading gen 4
+10-01 06:01:27.966 I/ReactNativeJS(18183): [probe] frame worklet runs 1 in 5201ms, work 5ms
+10-01 06:01:28.037 I/ReactNativeJS(18183): [probe] 88037 #9 store loading->ready gen 4
+10-01 06:01:28.037 I/ReactNativeJS(18183): [probe] 88037 #10 publish gen 4 isSwitch false
+10-01 06:01:28.037 I/ReactNativeJS(18183): [probe] 88037 #11 store ready->ready gen 4
+10-01 06:01:31.510 I/ReactNativeJS(18183): [probe] 91510 #12 store ready->ready gen 4

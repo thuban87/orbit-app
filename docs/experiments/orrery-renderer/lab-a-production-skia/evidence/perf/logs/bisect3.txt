@@ -1,0 +1,21 @@
+10-01 04:29:00.812 I/ReactNativeJS(21257): [probe] 40812 #11 OrreryWorld render
+10-01 04:29:00.953 I/ReactNativeJS(21257): [probe] 40953 #12 OrreryWorld render
+10-01 04:29:01.031 I/ReactNativeJS(21257): [probe] 41031 #13 OrreryWorld render
+10-01 04:29:05.462 I/ReactNativeJS(21257): [probe] frame worklet runs 1 in 8983ms, work 4ms
+10-01 04:29:05.495 I/ReactNativeJS(21257): [probe] 45495 #14 OrreryWorld render
+10-01 04:29:06.886 I/ReactNativeJS(21257): [probe] 46886 #15 OrreryWorld render
+10-01 04:29:06.938 I/ReactNativeJS(21257): [probe] 46938 #16 store ready->loading gen 4
+10-01 04:29:06.943 I/ReactNativeJS(21257): [probe] 46943 #17 OrreryWorld render
+10-01 04:29:07.005 I/ReactNativeJS(21257): [probe] 47005 #18 OrreryWorld render
+10-01 04:29:07.095 I/ReactNativeJS(21257): [probe] 47095 #19 OrreryWorld render
+10-01 04:29:13.730 I/ReactNativeJS(21257): [probe] frame worklet runs 1 in 6085ms, work 4ms
+10-01 04:29:13.825 I/ReactNativeJS(21257): [probe] mutex #8 waited 207ms held 6680ms  at inReadSnapshot (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-
+10-01 04:29:13.825 I/ReactNativeJS(21257): [probe] load read 6887ms
+10-01 04:29:13.845 I/ReactNativeJS(21257): [probe] load total 6907ms
+10-01 04:29:13.845 I/ReactNativeJS(21257): [probe] 53845 #20 store loading->ready gen 4
+10-01 04:29:13.846 I/ReactNativeJS(21257): [probe] 53846 #21 publish gen 4 isSwitch false
+10-01 04:29:13.846 I/ReactNativeJS(21257): [probe] 53846 #22 store ready->ready gen 4
+10-01 04:29:13.864 I/ReactNativeJS(21257): [probe] 53864 #23 OrreryWorld render
+10-01 04:29:15.811 I/ReactNativeJS(21257): [probe] frame worklet runs 1 in 6732ms, work 4ms
+10-01 04:29:15.833 I/ReactNativeJS(21257): [probe] mutex #9 waited 64ms held 1924ms  at inReadSnapshot (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-
+10-01 04:29:15.897 I/ReactNativeJS(21257): [probe] 55897 #24 OrreryWorld render

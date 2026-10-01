@@ -1,0 +1,13 @@
+10-01 04:02:20.377 I/ReactNativeJS(15824): [probe] frame worklet runs 1 in 16282ms, work 396ms
+10-01 04:02:20.533 I/Choreographer(15824): Skipped 78 frames!  The application may be doing too much work on its main thread.
+10-01 04:02:21.177 I/Choreographer(15824): Skipped 76 frames!  The application may be doing too much work on its main thread.
+10-01 04:02:21.244 I/ReactNativeJS(15824): [probe] 41244 #5 focus 1
+10-01 04:02:21.262 I/HWUI    (15824): Davey! duration=707ms
+10-01 04:02:21.267 I/ReactNativeJS(15824): [probe] 41267 #6 OrreryWorld render
+10-01 04:02:21.763 I/Choreographer(15824): Skipped 55 frames!  The application may be doing too much work on its main thread.
+10-01 04:02:22.369 I/Choreographer(15824): Skipped 72 frames!  The application may be doing too much work on its main thread.
+10-01 04:02:22.903 I/HWUI    (15824): Davey! duration=1124ms
+10-01 04:02:23.070 I/ReactNativeJS(15824): [probe] frame worklet runs 4 in 2396ms, work 1576ms
+10-01 04:02:23.345 I/Choreographer(15824): Skipped 115 frames!  The application may be doing too much work on its main thread.
+10-01 04:02:23.826 I/HWUI    (15824): Davey! duration=1424ms
+10-01 04:02:23.828 I/Choreographer(15824): Skipped 57 frames!  The application may be doing too much work on its main thread.

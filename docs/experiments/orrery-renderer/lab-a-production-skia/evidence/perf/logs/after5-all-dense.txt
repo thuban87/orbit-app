@@ -1,0 +1,20 @@
+10-01 04:23:29.680 I/ReactNativeJS(19884): [probe] 9680 #11 OrreryWorld render
+10-01 04:23:29.870 I/ReactNativeJS(19884): [probe] 9870 #12 OrreryWorld render
+10-01 04:23:29.960 I/ReactNativeJS(19884): [probe] 9960 #13 OrreryWorld render
+10-01 04:23:34.999 I/ReactNativeJS(19884): [probe] frame worklet runs 1 in 10704ms, work 4ms
+10-01 04:23:35.017 I/ReactNativeJS(19884): [probe] 15017 #14 OrreryWorld render
+10-01 04:23:36.125 I/ReactNativeJS(19884): [probe] 16125 #15 store ready->loading gen 4
+10-01 04:23:36.130 I/ReactNativeJS(19884): [probe] 16130 #16 OrreryWorld render
+10-01 04:23:36.191 I/ReactNativeJS(19884): [probe] 16191 #17 OrreryWorld render
+10-01 04:23:36.239 I/ReactNativeJS(19884): [probe] 16239 #18 OrreryWorld render
+10-01 04:23:43.140 I/ReactNativeJS(19884): [probe] frame worklet runs 1 in 6250ms, work 7ms
+10-01 04:23:43.248 I/ReactNativeJS(19884): [probe] mutex #8 waited 186ms held 6937ms  at inReadSnapshot (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-
+10-01 04:23:43.248 I/ReactNativeJS(19884): [probe] load read 7123ms
+10-01 04:23:43.269 I/ReactNativeJS(19884): [probe] load total 7144ms
+10-01 04:23:43.270 I/ReactNativeJS(19884): [probe] 23270 #19 store loading->ready gen 4
+10-01 04:23:43.270 I/ReactNativeJS(19884): [probe] 23270 #20 publish gen 4 isSwitch false
+10-01 04:23:43.270 I/ReactNativeJS(19884): [probe] 23270 #21 store ready->ready gen 4
+10-01 04:23:43.286 I/ReactNativeJS(19884): [probe] 23286 #22 OrreryWorld render
+10-01 04:23:44.968 I/ReactNativeJS(19884): [probe] frame worklet runs 1 in 7008ms, work 4ms
+10-01 04:23:44.990 I/ReactNativeJS(19884): [probe] mutex #9 waited 63ms held 1657ms  at inReadSnapshot (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-
+10-01 04:23:45.009 I/ReactNativeJS(19884): [probe] 25009 #23 OrreryWorld render

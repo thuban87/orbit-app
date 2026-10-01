@@ -1,0 +1,10 @@
+10-01 05:57:30.225 I/ReactNativeJS(16972): [probe] frame worklet runs 2 in 21764ms, work 923ms
+10-01 05:57:30.381 I/Choreographer(16972): Skipped 38 frames!  The application may be doing too much work on its main thread.
+10-01 05:57:31.020 I/Choreographer(16972): Skipped 75 frames!  The application may be doing too much work on its main thread.
+10-01 05:57:31.757 I/Choreographer(16972): Skipped 71 frames!  The application may be doing too much work on its main thread.
+10-01 05:57:32.439 I/Choreographer(16972): Skipped 81 frames!  The application may be doing too much work on its main thread.
+10-01 05:57:32.999 I/HWUI    (16972): Davey! duration=1226ms
+10-01 05:57:33.149 I/ReactNativeJS(16972): [probe] frame worklet runs 3 in 2119ms, work 1280ms
+10-01 05:57:33.496 I/Choreographer(16972): Skipped 124 frames!  The application may be doing too much work on its main thread.
+10-01 05:57:34.028 I/Choreographer(16972): Skipped 63 frames!  The application may be doing too much work on its main thread.
+10-01 05:57:34.048 I/HWUI    (16972): Davey! duration=1580ms

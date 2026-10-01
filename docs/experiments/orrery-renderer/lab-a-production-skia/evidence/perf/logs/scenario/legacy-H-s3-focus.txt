@@ -1,0 +1,2 @@
+10-01 06:02:33.288 I/ReactNativeJS(18183): [probe] frame worklet runs 1 in 14582ms, work 5ms
+10-01 06:02:34.053 I/Choreographer(18183): Skipped 32 frames!  The application may be doing too much work on its main thread.

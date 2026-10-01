@@ -1,0 +1,28 @@
+10-01 03:59:47.152 I/ReactNativeJS(14930): [probe] 87152 #5 OrreryWorld render
+10-01 03:59:47.344 I/ReactNativeJS(14930): [probe] 87344 #6 OrreryWorld render
+10-01 03:59:47.441 I/ReactNativeJS(14930): [probe] 87441 #7 OrreryWorld render
+10-01 03:59:47.769 I/ReactNativeJS(14930): [probe] 87769 #8 OrreryWorld render
+10-01 03:59:48.004 I/ReactNativeJS(14930): [probe] 88004 #9 OrreryWorld render
+10-01 03:59:49.251 I/Choreographer(14930): Skipped 207 frames!  The application may be doing too much work on its main thread.
+10-01 03:59:49.669 I/HWUI    (14930): Davey! duration=2134ms
+10-01 03:59:49.713 I/Choreographer(14930): Skipped 54 frames!  The application may be doing too much work on its main thread.
+10-01 04:00:05.687 I/ReactNativeJS(14930): [probe] 5687 #10 OrreryWorld render
+10-01 04:00:05.801 I/ReactNativeJS(14930): [probe] 5801 #11 OrreryWorld render
+10-01 04:00:05.873 I/ReactNativeJS(14930): [probe] 5873 #12 OrreryWorld render
+10-01 04:00:05.968 I/ReactNativeJS(14930): [probe] 5968 #13 OrreryWorld render
+10-01 04:00:06.399 I/ReactNativeJS(14930): [probe] 6399 #14 publish gen 4 isSwitch true
+10-01 04:00:06.407 I/ReactNativeJS(14930): [probe] 6407 #15 OrreryWorld render
+10-01 04:00:06.645 I/ReactNativeJS(14930): [probe] 6645 #16 OrreryWorld render
+10-01 04:00:06.800 I/ReactNativeJS(14930): [probe] 6800 #17 OrreryWorld render
+10-01 04:00:06.840 I/ReactNativeJS(14930): [probe] 6840 #18 OrreryWorld render
+10-01 04:00:08.635 I/Choreographer(14930): Skipped 319 frames!  The application may be doing too much work on its main thread.
+10-01 04:00:09.058 I/HWUI    (14930): Davey! duration=3073ms
+10-01 04:00:09.084 I/Choreographer(14930): Skipped 52 frames!  The application may be doing too much work on its main thread.
+10-01 04:00:09.577 I/Choreographer(14930): Skipped 58 frames!  The application may be doing too much work on its main thread.
+10-01 04:00:09.606 I/HWUI    (14930): Davey! duration=941ms
+10-01 04:00:09.955 I/Choreographer(14930): Skipped 44 frames!  The application may be doing too much work on its main thread.
+10-01 04:00:09.956 I/ReactNativeJS(14930): [probe] 9956 #19 OrreryWorld render
+10-01 04:00:09.981 I/HWUI    (14930): Davey! duration=877ms
+10-01 04:00:09.996 I/ReactNativeJS(14930): [probe] switch done: wall 1211ms frames 3 maxGap 135ms sumGaps>100 135ms work p50 345ms max 360ms bodies 33
+10-01 04:00:10.411 I/Choreographer(14930): Skipped 47 frames!  The application may be doing too much work on its main thread.
+10-01 04:00:10.791 I/Choreographer(14930): Skipped 44 frames!  The application may be doing too much work on its main thread.

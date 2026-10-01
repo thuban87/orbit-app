@@ -1,0 +1,131 @@
+10-01 04:42:03.758 I/ReactNativeJS(25166): [probe] 23758 #11 OrreryWorld render
+10-01 04:42:03.881 I/ReactNativeJS(25166): [probe] 23881 #12 OrreryWorld render
+10-01 04:42:03.938 I/ReactNativeJS(25166): [probe] 23938 #13 OrreryWorld render
+10-01 04:42:04.094 I/ReactNativeJS(25166): [probe] JS sync SV reads 8 in 15952ms, blocked 22ms, max 19ms
+10-01 04:42:04.094 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.128 I/ReactNativeJS(25166): [probe] SV read stack at get < at savePaint < at savePaint < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.130 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.131 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.132 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.133 I/ReactNativeJS(25166): [probe] SV read stack at get < at savePaint < at savePaint < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.134 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.136 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.137 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.139 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.140 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.142 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.143 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:04.145 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:04.146 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:04.147 I/ReactNativeJS(25166): [probe] SV read stack at get < at savePaint < at savePaint < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.148 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.152 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.153 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.155 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.156 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.158 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.159 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:04.161 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:04.162 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:04.163 I/ReactNativeJS(25166): [probe] SV read stack at get < at savePaint < at savePaint < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.164 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.166 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.167 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.169 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.170 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.172 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.173 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:04.174 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:04.176 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:04.177 I/ReactNativeJS(25166): [probe] SV read stack at get < at savePaint < at savePaint < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.178 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.180 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.181 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.182 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.184 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.185 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:04.188 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.190 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.193 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.196 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.199 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.202 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.204 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.207 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.210 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.219 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.222 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPicture < at drawPicture < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:04.356 I/ReactNativeJS(25166): [probe] 24356 #14 OrreryWorld render
+10-01 04:42:04.548 I/ReactNativeJS(25166): [probe] 24548 #15 OrreryWorld render
+10-01 04:42:04.797 I/Choreographer(25166): Skipped 86 frames!  The application may be doing too much work on its main thread.
+10-01 04:42:04.807 I/ReactNativeJS(25166): [probe] frame worklet runs 1 in 15512ms, work 4ms
+10-01 04:42:04.890 I/HWUI    (25166): Davey! duration=792ms
+10-01 04:42:09.723 I/ReactNativeJS(25166): [probe] 29723 #16 store ready->loading gen 4
+10-01 04:42:09.756 I/ReactNativeJS(25166): [probe] JS sync SV reads 159 in 5662ms, blocked 108ms, max 33ms
+10-01 04:42:09.759 I/ReactNativeJS(25166): [probe] 29759 #17 OrreryWorld render
+10-01 04:42:09.845 I/ReactNativeJS(25166): [probe] 29845 #18 OrreryWorld render
+10-01 04:42:09.894 I/ReactNativeJS(25166): [probe] 29894 #19 OrreryWorld render
+10-01 04:42:10.025 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.027 I/ReactNativeJS(25166): [probe] SV read stack at get < at savePaint < at savePaint < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.028 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.029 I/ReactNativeJS(25166): [probe] SV read stack at get < at saveCTM < at saveCTM < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.031 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.032 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.034 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.036 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.037 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.039 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.041 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.042 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.044 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.045 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.047 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.049 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.050 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.052 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.053 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.055 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.057 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.058 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.060 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.061 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.063 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.065 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.066 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.068 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.069 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.071 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.073 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.074 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.076 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.077 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.079 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.081 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.082 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.083 I/ReactNativeJS(25166): [probe] SV read stack at get < at pushShader < at pushShader < at anonymous < at forEach < at pushShaders < at visitNode < at anonymous
+10-01 04:42:10.086 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.089 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.092 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.095 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.098 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.101 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.104 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.107 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.111 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.114 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.120 I/ReactNativeJS(25166): [probe] SV read stack at get < at drawPath < at drawPath < at visitNode < at anonymous < at forEach < at visitNode < at anonymous
+10-01 04:42:10.351 I/ReactNativeJS(25166): [probe] mutex #8 waited 215ms held 413ms  at inReadSnapshot (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-
+10-01 04:42:10.351 I/ReactNativeJS(25166): [probe] load read 628ms
+10-01 04:42:10.363 I/ReactNativeJS(25166): [probe] load total 640ms
+10-01 04:42:10.363 I/ReactNativeJS(25166): [probe] 30363 #20 store loading->ready gen 4
+10-01 04:42:10.363 I/ReactNativeJS(25166): [probe] 30363 #21 publish gen 4 isSwitch false
+10-01 04:42:10.364 I/ReactNativeJS(25166): [probe] 30364 #22 store ready->ready gen 4
+10-01 04:42:10.377 I/ReactNativeJS(25166): [probe] 30377 #23 OrreryWorld render
+10-01 04:42:10.580 I/ReactNativeJS(25166): [probe] mutex #9 waited 61ms held 155ms  at inReadSnapshot (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=url-
+10-01 04:42:10.582 I/ReactNativeJS(25166): [probe] 30582 #24 OrreryWorld render
+10-01 04:42:10.767 I/ReactNativeJS(25166): [probe] mutex #10 waited 205ms held 187ms  at inWriteTransaction (http://localhost:8081/.expo/.virtual-metro-entry.bundle?platform=android&dev=false&lazy=false&minify=true&app=com.bwales.orbit.laba&modulesOnly=false&runModule=true&excludeSource=true&sourcePaths=
+10-01 04:42:10.769 I/ReactNativeJS(25166): [probe] 30769 #25 OrreryWorld render
+10-01 04:42:10.818 I/ReactNativeJS(25166): [probe] 30818 #26 store ready->ready gen 4
+10-01 04:42:10.820 I/ReactNativeJS(25166): [probe] 30820 #27 OrreryWorld render
+10-01 04:42:11.683 I/Choreographer(25166): Skipped 206 frames!  The application may be doing too much work on its main thread.
+10-01 04:42:11.693 I/ReactNativeJS(25166): [probe] frame worklet runs 1 in 6886ms, work 7ms
