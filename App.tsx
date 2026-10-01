@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
+  LogBox,
   StyleSheet,
   Text,
   View,
@@ -233,6 +234,12 @@ function AppShell() {
       const { seedLabCFixtureIfAbsent } =
         require("@/__dev__/lab-c-seed") as typeof import("@/__dev__/lab-c-seed");
       void seedLabCFixtureIfAbsent();
+      // ORRERY LAB C: the pre-existing Reanimated strict-mode render-read
+      // warning raises a LogBox toast that eats tab-bar taps during device
+      // runs. Dev-only, lab-only noise suppression.
+      LogBox.ignoreLogs([
+        "[Reanimated] Reading from `value` during component render",
+      ]);
     }
     // The confirmation queue has its own per-return subscription: unlike the
     // launch sweep, it refreshes for every real background-to-active return.

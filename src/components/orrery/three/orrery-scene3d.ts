@@ -33,6 +33,7 @@ import {
   If,
   instancedBufferAttribute,
   instancedDynamicBufferAttribute,
+  materialColor,
   positionGeometry,
   select,
   texture,
@@ -404,9 +405,8 @@ export class OrreryScene3D {
     }
 
     // Faces --------------------------------------------------------------------
-    const atlasData = new Uint8Array(ATLAS_SIZE * ATLAS_SIZE * 4);
     this.atlasTex = dataTexture({
-      data: atlasData,
+      data: this.atlas.pixels,
       width: ATLAS_SIZE,
       height: ATLAS_SIZE,
     });
@@ -519,16 +519,18 @@ export class OrreryScene3D {
     this.scene.add(this.stars);
 
     // Sun glow, Polaris, focus rings ------------------------------------------
-    this.glowMat.colorNode = texture(this.glowTex);
+    this.glowMat.colorNode = texture(this.glowTex).mul(vec4(materialColor, 1));
     this.glow = new THREE.Sprite(this.glowMat);
     this.glow.renderOrder = 1;
     this.glow.visible = false;
     this.scene.add(this.glow);
-    this.polarisMat.colorNode = texture(this.glowTex);
+    this.polarisMat.colorNode = texture(this.glowTex).mul(
+      vec4(materialColor, 1),
+    );
     this.polaris = new THREE.Sprite(this.polarisMat);
     this.polaris.scale.setScalar(POLARIS_WORLD);
     this.scene.add(this.polaris);
-    this.focusMat.colorNode = texture(this.ringTex);
+    this.focusMat.colorNode = texture(this.ringTex).mul(vec4(materialColor, 1));
     for (let i = 0; i < 8; i++) {
       const s = new THREE.Sprite(this.focusMat);
       s.visible = false;
@@ -814,11 +816,7 @@ export class OrreryScene3D {
       this.atlasDirty &&
       timeMs - this.atlasUploadedAt >= ATLAS_UPLOAD_INTERVAL
     ) {
-      const data = this.atlas.read();
-      if (data) {
-        (this.atlasTex.image as { data: Uint8Array }).data = data;
-        this.atlasTex.needsUpdate = true;
-      }
+      if (this.atlas.flush()) this.atlasTex.needsUpdate = true;
       this.atlasDirty = false;
       this.atlasUploadedAt = timeMs;
     }

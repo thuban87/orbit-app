@@ -52,9 +52,43 @@ function readSurfacePixels(surface: SkSurface, width: number, height: number) {
 /** A Skia raster surface that holds the whole body atlas. */
 export class BodyAtlas {
   private surface: SkSurface | null;
+  /** The persistent RGBA buffer the GPU texture wraps (never reallocated). */
+  readonly pixels = new Uint8Array(ATLAS_SIZE * ATLAS_SIZE * 4);
+  private dirty = new Set<number>();
   constructor() {
     this.surface = Skia.Surface.Make(ATLAS_SIZE, ATLAS_SIZE);
     this.surface?.getCanvas().clear(Float32Array.of(0, 0, 0, 0));
+  }
+
+  /**
+   * Copy only the dirty tiles from the Skia surface into `pixels`. Reading the
+   * whole 2560² atlas per photo batch allocated ~26 MB per upload and the
+   * native heap ballooned until Hermes crashed on the 3rd remount (M1 notes).
+   */
+  flush(): boolean {
+    if (!this.surface || this.dirty.size === 0) return false;
+    this.surface.flush();
+    const image = this.surface.makeImageSnapshot();
+    const rowBytes = ATLAS_SIZE * 4;
+    const tileRow = ATLAS_TILE * 4;
+    for (const slot of this.dirty) {
+      const { x, y } = tileOrigin(slot);
+      const tile = image.readPixels(x, y, {
+        width: ATLAS_TILE,
+        height: ATLAS_TILE,
+        colorType: ColorType.RGBA_8888,
+        alphaType: AlphaType.Unpremul,
+      });
+      if (!(tile instanceof Uint8Array)) continue;
+      for (let r = 0; r < ATLAS_TILE; r++)
+        this.pixels.set(
+          tile.subarray(r * tileRow, (r + 1) * tileRow),
+          (y + r) * rowBytes + x * 4,
+        );
+    }
+    image.dispose();
+    this.dirty.clear();
+    return true;
   }
 
   get ok() {
@@ -72,6 +106,7 @@ export class BodyAtlas {
     const canvas = this.surface?.getCanvas();
     if (!canvas) return;
     const { x, y } = tileOrigin(slot);
+    this.dirty.add(slot);
     canvas.save();
     canvas.clipRect(Skia.XYWHRect(x, y, ATLAS_TILE, ATLAS_TILE), 1, true);
     canvas.clear(Float32Array.of(0, 0, 0, 0));
@@ -110,6 +145,7 @@ export class BodyAtlas {
     const canvas = this.surface?.getCanvas();
     if (!canvas) return;
     const { x, y } = tileOrigin(slot);
+    this.dirty.add(slot);
     const w = image.width();
     const h = image.height();
     const side = Math.min(w, h);
@@ -122,12 +158,6 @@ export class BodyAtlas {
     paint.setAntiAlias(true);
     canvas.drawImageRect(image, src, dst, paint, true);
     canvas.restore();
-  }
-
-  read(): Uint8Array | null {
-    return this.surface
-      ? readSurfacePixels(this.surface, ATLAS_SIZE, ATLAS_SIZE)
-      : null;
   }
 
   dispose() {

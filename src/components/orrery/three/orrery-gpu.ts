@@ -1,22 +1,25 @@
 /**
  * ORRERY LAB C — WebGPU adapter/device ownership + one-off spike probes.
  *
- * One GPUDevice per app process, created lazily on the first Orrery mount and
- * reused across remounts (each mount still creates/disposes its own renderer
- * and canvas context). Keeping the device off the remount path avoids
- * re-requesting Dawn adapters on every tab visit; whether the Vulkan surface
- * re-bind survives 10× remounts is spike check 2 (react-native-webgpu issue 407).
+ * Device lifecycle (learned on the Pixel 6 Pro, see _notes/M1-BUILD.md):
+ *  - requestDevice() issued while the Orrery's SurfaceView is being created
+ *    blocked the JS AND main threads for ~32 s, so a device is always
+ *    requested while NO WebGPU surface is being created: a "spare" device is
+ *    prewarmed at module load and re-prewarmed right after each unmount; the
+ *    world only mounts its <Canvas> once it holds a device.
+ *  - ONE device per mount, destroyed on unmount. A process-wide shared device
+ *    leaked every renderer (three's backend hangs a `device.lost.then(...)`
+ *    reaction per renderer on the shared device, rooting the whole graph):
+ *    Hermes external memory grew ~200 MB per remount and the JS thread
+ *    SIGSEGV'd on the 3rd–4th remount at 200 bodies.
  */
 import { File } from "expo-file-system";
 import * as THREE from "three/webgpu";
 import { defaultOrreryImageDeps } from "../use-orrery-photo";
 import type { BodyInfo } from "./orrery-scene3d";
 
-interface OrreryGpu {
-  adapter: GPUAdapter;
-  device: GPUDevice;
-}
-let gpu: Promise<OrreryGpu> | null = null;
+let adapterLogged = false;
+let spare: Promise<GPUDevice> | null = null;
 
 function installTextDecoderIfMissing() {
   if (typeof TextDecoder !== "undefined") return;
@@ -40,63 +43,73 @@ function installTextDecoderIfMissing() {
   );
 }
 
-export function getOrreryGpu(): Promise<OrreryGpu> {
-  if (!gpu) {
-    gpu = (async () => {
-      installTextDecoderIfMissing();
-      const t0 = performance.now();
-      console.log(
-        `[lab-c] stage requestAdapter navigator.gpu=${typeof navigator !== "undefined" && !!navigator.gpu}`,
-      );
-      const adapter = await navigator.gpu.requestAdapter({
-        powerPreference: "high-performance",
-      });
-      if (!adapter) throw new Error("No GPUAdapter");
-      const info = adapter.info as GPUAdapterInfo & {
-        isFallbackAdapter?: boolean;
-      };
-      console.log(
-        `[lab-c] adapter vendor=${info.vendor} arch=${info.architecture} device=${info.device} desc=${info.description} fallback=${info.isFallbackAdapter ?? "n/a"} features=${[...adapter.features].join(",")} in ${Math.round(performance.now() - t0)}ms`,
-      );
-      const withTimeout = <T>(p: Promise<T>, ms: number) =>
-        Promise.race([
-          p,
-          new Promise<null>((resolve) => setTimeout(() => resolve(null), ms)),
-        ]);
-      const tDev = performance.now();
-      let device = await withTimeout(adapter.requestDevice(), 5000);
-      console.log(
-        `[lab-c] stage requestDevice ${device ? "ok" : "TIMEOUT"} ${Math.round(performance.now() - tDev)}ms`,
-      );
-      if (!device) {
-        const retry = await navigator.gpu.requestAdapter();
-        device = retry
-          ? await withTimeout(
-              retry.requestDevice({
-                implicitDeviceSynchronization: false,
-              } as GPUDeviceDescriptor),
-              5000,
-            )
-          : null;
-        console.log(
-          `[lab-c] stage requestDevice(noImplicitSync) ${device ? "ok" : "TIMEOUT"}`,
-        );
-      }
-      if (!device) throw new Error("requestDevice timed out");
-      device.lost.then((lost) => {
-        console.warn(`[lab-c] GPU device LOST: ${lost.reason} ${lost.message}`);
-        gpu = null;
-      });
-      console.log(
-        `[lab-c] device ready in ${Math.round(performance.now() - t0)}ms`,
-      );
-      return { adapter, device };
-    })();
-    gpu.catch(() => {
-      gpu = null;
-    });
+/** A fresh adapter per device: a WebGPU adapter is "consumed" by one device. */
+async function requestAdapter(): Promise<GPUAdapter> {
+  installTextDecoderIfMissing();
+  const t0 = performance.now();
+  const adapter = await navigator.gpu.requestAdapter({
+    powerPreference: "high-performance",
+  });
+  if (!adapter) throw new Error("No GPUAdapter");
+  if (!adapterLogged) {
+    adapterLogged = true;
+    const info = adapter.info as GPUAdapterInfo & {
+      isFallbackAdapter?: boolean;
+    };
+    console.log(
+      `[lab-c] adapter vendor=${info.vendor} arch=${info.architecture} device=${info.device} desc=${info.description} fallback=${info.isFallbackAdapter ?? "n/a"} in ${Math.round(performance.now() - t0)}ms`,
+    );
   }
-  return gpu;
+  return adapter;
+}
+
+async function createDevice(): Promise<GPUDevice> {
+  const adapter = await requestAdapter();
+  const t0 = performance.now();
+  const device = await adapter.requestDevice();
+  // react-native-webgpu 0.10.4: every `device.queue` read builds a NEW native
+  // GPUQueue + JS wrapper (GPUDevice::getQueue → make_shared) and three reads
+  // it on every write/submit. Pin one wrapper as an own property shadowing the
+  // prototype getter (the device stays the real host object, so
+  // context.configure({ device }) still unwraps it).
+  const queue = device.queue;
+  Object.defineProperty(device, "queue", {
+    value: queue,
+    writable: false,
+    configurable: true,
+    enumerable: true,
+  });
+  device.lost.then((lost) => {
+    if (lost.reason !== "destroyed")
+      console.warn(`[lab-c] GPU device LOST: ${lost.reason} ${lost.message}`);
+  });
+  console.log(
+    `[lab-c] device created in ${Math.round(performance.now() - t0)}ms`,
+  );
+  return device;
+}
+
+/** Create a spare device now, while no WebGPU surface is being created. */
+export function prewarmOrreryDevice(): void {
+  if (spare) return;
+  spare = createDevice();
+  spare.catch((error) => {
+    console.warn("[lab-c] device prewarm failed", error);
+    spare = null;
+  });
+}
+
+/** Take the spare (or create one). The caller owns and must release it. */
+export function acquireOrreryDevice(): Promise<GPUDevice> {
+  const taken = spare ?? createDevice();
+  spare = null;
+  return taken;
+}
+
+/** Destroy a mount's device and prewarm the next one off the surface path. */
+export function releaseOrreryDevice(device: GPUDevice): void {
+  device.destroy();
+  setTimeout(prewarmOrreryDevice, 0);
 }
 
 let bitmapProbed = false;

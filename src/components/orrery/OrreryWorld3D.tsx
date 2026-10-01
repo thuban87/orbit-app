@@ -24,7 +24,7 @@
  * drawn yet, ring stroke width fixed in world units.
  */
 import type { SkTypefaceFontProvider } from "@shopify/react-native-skia";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PixelRatio,
   Pressable,
@@ -85,7 +85,12 @@ import type { ThemePalette } from "@/theme/theme-types";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
 import { prepareOrreryText } from "./OrreryLabel";
 import { projectAnimatedFrameLite } from "./orrery-frame-lite";
-import { getOrreryGpu, runBitmapProbe } from "./three/orrery-gpu";
+import {
+  acquireOrreryDevice,
+  prewarmOrreryDevice,
+  releaseOrreryDevice,
+  runBitmapProbe,
+} from "./three/orrery-gpu";
 import {
   type BodyInfo,
   KIND_CONTACT,
@@ -110,6 +115,8 @@ const LABEL_BODY_GAP = 8;
 /** GPU fill tunables (Pixel 6 Pro native dpr is 3.5 → 1439×2538 buffer). */
 const RENDER_MAX_PIXEL_RATIO = 2.5;
 const RENDER_ANTIALIAS = true;
+/** Leak bisect: "full" | "init" (renderer only, no scene). */
+const LAB_STAGE: string = "context";
 /** Lab-only badge tap: [tilt, yaw] presets (tilt is clamped to 60° anyway). */
 const LAB_TILT_PRESETS: readonly [number, number][] = [
   [0, 0],
@@ -129,12 +136,12 @@ let presentMs = 0;
 // Spike: create the GPUDevice at module load (app start), long before any
 // WebGPU surface exists. On the Pixel 6 Pro, requestDevice issued while the
 // Orrery's SurfaceView was being created blocked JS + main for ~32 s.
-console.log("[lab-c] prewarm GPU device at module load");
-void getOrreryGpu().catch((error) =>
-  console.warn("[lab-c] prewarm failed", error),
-);
+prewarmOrreryDevice();
 
 function disposeRenderer(renderer: THREE.WebGPURenderer) {
+  // The mount's device is destroyed right after; three's device.lost reaction
+  // would otherwise console.error a "device lost" for an intentional destroy.
+  (renderer as unknown as { onDeviceLost: () => void }).onDeviceLost = () => {};
   renderer.setAnimationLoop(null);
   renderer.dispose();
   // three r184+ QuadMesh listener leak across remounts (react-native-webgpu issue 445).
@@ -556,15 +563,52 @@ export function OrreryWorld3D({
   reducedRef.current = reducedMotion;
 
   // --- GPU lifecycle + render loop (owned here; stops on unmount) ---------------
-  const canvasRef = useRef<CanvasRef>(null);
+  // 1. Acquire this mount's device BEFORE the <Canvas> exists (see orrery-gpu).
+  //    One setState per mount (not per frame).
+  const [device, setDevice] = useState<GPUDevice | null>(null);
   useEffect(() => {
+    let cancelled = false;
+    let owned: GPUDevice | null = null;
+    acquireOrreryDevice().then(
+      (d) => {
+        if (cancelled) releaseOrreryDevice(d);
+        else {
+          owned = d;
+          setDevice(d);
+        }
+      },
+      (error) => console.warn("[lab-c] device acquire failed", error),
+    );
+    return () => {
+      cancelled = true;
+      // React runs this cleanup BEFORE the renderer effect's cleanup (same
+      // declaration order), so defer one tick: destroy only after disposal.
+      if (owned) {
+        const d = owned;
+        setTimeout(() => releaseOrreryDevice(d), 0);
+      }
+    };
+  }, []);
+  const canvasRef = useRef<CanvasRef>(null);
+  // 2. Renderer + loop, once the device and the Canvas exist.
+  useEffect(() => {
+    if (!device) return;
     const serial = ++mountSerial;
     let cancelled = false;
     let raf = 0;
     let renderer: THREE.WebGPURenderer | null = null;
     let s: OrreryScene3D | null = null;
     const tMount = performance.now();
-    console.log(`[lab-c] mount #${serial}`);
+    const hs = (
+      globalThis as {
+        HermesInternal?: {
+          getInstrumentedStats?: () => Record<string, number>;
+        };
+      }
+    ).HermesInternal?.getInstrumentedStats?.();
+    console.log(
+      `[lab-c] mount #${serial} hermes heap=${Math.round((hs?.js_heapSize ?? 0) / 1e6)}MB allocated=${Math.round((hs?.js_allocatedBytes ?? 0) / 1e6)}MB external=${Math.round((hs?.js_externalBytes ?? 0) / 1e6)}MB gcs=${hs?.js_numGCs ?? "?"}`,
+    );
     const start = async () => {
       let context = canvasRef.current?.getContext("webgpu") ?? null;
       for (let tries = 0; !context && tries < 30 && !cancelled; tries++) {
@@ -587,9 +631,7 @@ export function OrreryWorld3D({
       console.log(
         `[lab-c] stage canvas ${nativeCanvas.clientWidth}x${nativeCanvas.clientHeight} -> ${nativeCanvas.width}x${nativeCanvas.height}`,
       );
-      const { device } = await getOrreryGpu();
-      console.log("[lab-c] stage device ok");
-      if (cancelled) return;
+      if (cancelled || LAB_STAGE === "context") return;
       renderer = new THREE.WebGPURenderer({
         antialias: RENDER_ANTIALIAS,
         canvas: context.canvas as unknown as HTMLCanvasElement,
@@ -602,6 +644,7 @@ export function OrreryWorld3D({
         disposeRenderer(renderer);
         return;
       }
+      if (LAB_STAGE === "init") return;
       const inputs = latestInputs.current;
       s = new OrreryScene3D(renderer, inputs.colors, inputs.fontProvider, dpr);
       sceneRef.current = s;
@@ -656,7 +699,7 @@ export function OrreryWorld3D({
         `[lab-c] unmount #${serial}: loop stopped, GPU resources disposed`,
       );
     };
-  }, [loadPhoto]);
+  }, [loadPhoto, device]);
 
   // --- Gestures / hits (identical wiring to OrreryWorld) ------------------------
   const identities = useMemo<OrreryContactTarget[]>(
@@ -804,7 +847,9 @@ export function OrreryWorld3D({
           collapsable={false}
           style={StyleSheet.absoluteFill}
         >
-          <Canvas ref={canvasRef} style={StyleSheet.absoluteFill} />
+          {device ? (
+            <Canvas ref={canvasRef} style={StyleSheet.absoluteFill} />
+          ) : null}
         </View>
       </GestureDetector>
       {/* Lab-only: tap the badge to cycle camera tilt presets through the real

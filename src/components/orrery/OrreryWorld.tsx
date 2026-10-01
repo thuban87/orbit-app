@@ -264,6 +264,8 @@ export function OrreryWorld({
     },
   );
   useEffect(() => {
+    const hs = (globalThis as any).HermesInternal?.getInstrumentedStats?.();
+    console.log(`[lab-c] TEMP skia mount external=${Math.round((hs?.js_externalBytes ?? 0) / 1e6)}MB heap=${Math.round((hs?.js_heapSize ?? 0) / 1e6)}MB`);
     mounted.current = true;
     return () => {
       mounted.current = false;
