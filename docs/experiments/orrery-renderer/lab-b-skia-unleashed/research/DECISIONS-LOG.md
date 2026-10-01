@@ -414,3 +414,26 @@ Commits: `30026fda` (pass 1), `413d6999` (pass 2: tuning, docs, evidence). Evide
     (`switchFx = NO_SWITCH_FX`) is not captured → `ReferenceError` on device, invisible to vitest.
     Use `undefined` + an in-body check. `MakeSweepGradient(..., null, ...)` throws "Value is null,
     expected an Object" — pass `undefined` for the local matrix.
+
+## 2026-10-01 — Switch-stall fix (pre-existing big-switch stall, WP-2.1 §9 / C-49)
+
+Commits: `ea137306` (fix 1), `038a8d97` (fix 2), `3c0f691b` (fix 3). Write-up:
+`research/SWITCH-STALL-INVESTIGATION.md`; evidence `evidence/07-switch-stall/`.
+
+1. **Root cause** (measured with temporary instrumentation): the shared model-half `frame`
+   derived value captured `switchRuntime` (new object per render, `resources` → scene per entry)
+   and `scene`; every OrreryScreen render restarted it and the UI thread spent ~0.6–0.8 s per
+   restart deserialising/walking the closure. Not Skia `applyUpdates` (≤ 8 ms).
+2. **Fix 1 (model half, both renderers):** worklets capture shared values and small stable data
+   only; stable empty defaults; content-keyed `clusterIds`. Perf only — same semantics.
+3. **Fix 2 (`layerPictures`, default ON, debug section):** bodies + moons, labels, class rings +
+   wakes = one UI-thread picture per layer from one derived value; pure plans in
+   `labb-layer-plan.ts`; photos via RN probes outside the canvas + image shaders (C-50, C-51).
+   The per-component path stays as the A/B baseline (tests pin both).
+4. **Fix 3:** `memo(LabBRenderer)` with a part-wise contract comparator — fewer canvas commits
+   (each one re-records twice and sync-reads every bound value in RN Skia 2.6.2).
+5. **Result (emulator release):** 0 skipped frames on every big switch (was 216–371); the full
+   showcase plays at normal speed. Legacy 216–427 → 33–120 (fix 1 only).
+6. **V2 consequence:** per-entity declarative Skia components with animated props are not viable
+   at 100+ bodies; per-layer imperative pictures (or Atlases) are. Closure-capture discipline and
+   canvas memo boundaries are renderer requirements, not polish.

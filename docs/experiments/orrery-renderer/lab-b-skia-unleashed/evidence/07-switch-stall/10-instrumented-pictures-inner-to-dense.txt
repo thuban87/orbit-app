@@ -1,0 +1,48 @@
+# AFTER FIX 2+3 (layer pictures + memo, 47 bound values, 85 mappers)
+# Emulator RELEASE build with TEMPORARY instrumentation (see 12-instrumentation.patch). Relative evidence only.
+
+08:53:44.615STALL] JS store ready->loading gen=5 t=29500237
+08:53:44.616STALL] JS OrreryWorld render t=29500238
+08:53:44.616STALL] JS LabBRenderer render changed=switchRuntime,satellites,gesture,ghost t=29500238
+08:53:44.699STALL] redraw#24 id=1000 visit=73.1ms svs=45 roots=3
+08:53:44.711STALL] redraw#25 id=1000 visit=11.0ms svs=45 roots=3
+08:53:44.713STALL] JS OrreryWorld render t=29500335
+08:53:44.713STALL] JS LabBRenderer render changed=switchRuntime,viewport,gesture,ghost t=29500335
+08:53:44.769STALL] redraw#26 id=1000 visit=47.8ms svs=45 roots=3
+08:53:44.792STALL] redraw#27 id=1000 visit=21.9ms svs=45 roots=3
+08:53:44.844STALL] JS store loading->ready gen=5 t=29500466
+08:53:44.844STALL] JS publish isSwitch=true bodies=121 t=29500466
+08:53:44.844STALL] JS publish runOnUI dispatched in 0.1ms
+08:53:44.844STALL] JS store ready->ready gen=5 t=29500466
+08:53:44.847STALL] JS OrreryWorld render t=29500469
+08:53:44.985STALL] JS LabBRenderer render changed=switchRuntime,scene,resources,labels,focusedIds,satellites,gesture,ghost t=29500608
+08:53:45.106STALL] JS gap=282ms at=29500729
+08:53:45.118STALL] UI publish worklet start t=29500730
+08:53:45.118STALL] UI publish worklet end t=29500734
+08:53:45.120STALL] JS OrreryWorld render t=29500742
+08:53:45.388STALL] redraw#28 id=1000 visit=260.4ms svs=47 roots=3
+08:53:45.428STALL] redraw#29 id=1000 visit=39.0ms svs=47 roots=3
+08:53:45.429STALL] JS gap=313ms at=29501051
+08:53:45.431STALL] JS OrreryWorld render t=29501054
+08:53:45.468STALL] JS OrreryWorld render t=29501090
+08:53:45.468STALL] JS LabBRenderer render changed=switchRuntime,satellites,ghost t=29501090
+08:53:45.721STALL] redraw#30 id=1000 visit=229.3ms svs=47 roots=3
+08:53:45.761STALL] redraw#31 id=1000 visit=37.6ms svs=47 roots=3
+08:53:45.762STALL] JS gap=287ms at=29501384
+08:53:45.763STALL] JS LabBRenderer render changed= t=29501385
+08:53:45.814STALL] redraw#32 id=1000 visit=30.9ms svs=47 roots=3
+08:53:45.819STALL] redraw#33 id=1000 visit=3.9ms svs=47 roots=3
+08:53:45.820STALL] JS OrreryWorld render t=29501442
+08:53:45.822STALL] JS store ready->ready gen=5 t=29501445
+08:53:45.823STALL] JS OrreryWorld render t=29501445
+08:53:46.206STALL] UI parts 
+08:53:46.250STALL] UI parts 
+08:53:46.297STALL] UI parts 
+08:53:46.346STALL] UI parts 
+08:53:46.475STALL] UI parts 
+08:53:46.520STALL] UI parts 
+08:53:46.563STALL] UI parts 
+08:53:46.610STALL] UI parts 
+08:53:46.659STALL] UI parts 
+08:53:46.858STALL] UI parts 
+08:53:46.858STALL] UI mapperRun total=155ms order=0ms mappers=85 ran=65 slow=id10349/in8/8ms id10380/in6/3ms id10338/in3/15ms id10340/in10/80ms id10379/in47/26ms

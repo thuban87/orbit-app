@@ -310,8 +310,15 @@ Rough emulator gfxinfo over that whole session (launch + seeding + switching, NO
   and the switch fires 0.7 s later. Unscrolled chip centres (1280×2856): All Contacts 210,1396 ·
   Lab B Dense 888,1600 · Work 354,1600 · Lab B Inner Circle 264,1702 · Lab B Work 618,1702 ·
   Replay 976,1702. Long-press the "LAB B" marker (96,2584) ~800 ms to open.
-- **Slow motion**: `slowmo=N` multiplies the switch duration (store `switchTimeScale`). Needed to
-  see the first half of BIG switches (pre-existing 3–7 s main-thread stall, DECISIONS WP-2.1 §9).
+- **Slow motion**: `slowmo=N` multiplies the switch duration (store `switchTimeScale`). It was
+  needed to see the first half of BIG switches until the switch-stall fix (`ea137306`…`3c0f691b`,
+  research/SWITCH-STALL-INVESTIGATION.md); big switches now play at normal speed.
+- **Layer pictures A/B**: `flags=layerPictures:0` restores the per-component bodies / labels /
+  rings (the pre-fix-2 tree) on the same build.
+- **Temporary perf instrumentation** (never commit): `evidence/07-switch-stall/12-instrumentation.patch`
+  patches RN Skia / Reanimated / Worklets copies in `node_modules` (Metro bundles their `src/`)
+  — sync them to droid too, and change any app source line so Gradle re-bundles. Restore the
+  originals locally AND on droid afterwards (compare MD5s).
 - **screenrecord quirk**: running another `adb shell input` concurrently with screenrecord ended
   the recording's frame stream early. Fire the input first in the SAME shell:
   `$ADB shell "input tap X Y; screenrecord --time-limit 15 --bit-rate 4000000 --size 720x1606 /sdcard/r.mp4"`.

@@ -1,0 +1,23 @@
+# Per-worklet UI time per switch frame after fix 2 (ms; mapperRun > 40 ms frames only). trimPic = WP-2.1 ring trim picture, wakesPic at settle.
+# Emulator RELEASE build with TEMPORARY instrumentation (see 12-instrumentation.patch). Relative evidence only.
+
+STALL] UI parts frame=5.0 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=1.4 fx786=0.0 alloc=1.8 wakesPic=0.0 ringsPic=1.8 trimPic=15.7 fx320=0.2 fx499=0.0 fx625=0.0 labelsPic=0.1
+STALL] UI parts frame=5.5 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=2.0 fx786=0.1 alloc=1.6 wakesPic=0.0 ringsPic=2.2 trimPic=19.4 fx320=0.2 fx499=0.0 fx625=0.0 labelsPic=0.1
+STALL] UI parts frame=5.1 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=7.5 fx786=0.1 alloc=1.1 wakesPic=0.0 ringsPic=0.8 trimPic=15.9 fx320=0.2 fx499=0.0 fx625=0.0 labelsPic=0.1
+STALL] UI parts frame=5.0 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=2.6 fx786=0.1 alloc=1.5 wakesPic=0.0 ringsPic=1.0 trimPic=16.8 fx320=0.2 fx499=0.0 fx625=0.0 labelsPic=0.1
+STALL] UI parts frame=6.9 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=1.9 fx786=0.1 alloc=1.4 wakesPic=0.0 ringsPic=1.9 trimPic=15.3 fx320=0.2 fx499=0.0 fx625=0.0 labelsPic=0.1
+STALL] UI parts frame=5.7 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=4.4 fx786=0.1 alloc=1.7 wakesPic=0.0 ringsPic=1.5 trimPic=18.2 fx320=0.3 fx499=0.0 fx625=0.0 labelsPic=0.1
+STALL] UI parts frame=8.1 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=5.9 fx786=0.1 alloc=2.4 wakesPic=0.0 ringsPic=2.2 trimPic=15.5 fx320=0.2 fx499=0.0 fx625=0.0 labelsPic=0.1
+STALL] UI parts frame=6.3 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=7.1 fx786=0.1 alloc=1.4 wakesPic=0.0 ringsPic=0.9 trimPic=11.5 fx320=0.3 fx499=0.0 fx625=0.1 labelsPic=0.0
+STALL] UI parts frame=7.0 fidx=0.2 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=2.6 fx786=0.1 alloc=2.2 wakesPic=0.0 ringsPic=0.9 trimPic=15.9 fx320=0.2 fx499=0.0 fx625=0.1 labelsPic=0.1
+STALL] UI parts frame=5.3 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=2.6 fx786=0.1 alloc=1.6 wakesPic=0.0 ringsPic=1.8 trimPic=16.8 fx320=0.1 fx499=0.0 fx625=0.1 labelsPic=0.1
+STALL] UI parts frame=5.5 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=2.8 fx786=0.1 alloc=2.2 wakesPic=14.1 ringsPic=1.9 trimPic=16.3 fx320=0.3 fx499=0.0 fx625=0.1 labelsPic=0.9
+STALL] UI parts frame=5.0 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=2.6 fx786=0.1 alloc=1.3 wakesPic=11.2 ringsPic=0.8 trimPic=17.1 fx320=0.1 fx499=0.0 fx625=0.1 labelsPic=0.1
+STALL] UI parts frame=6.3 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=3.1 fx786=0.1 alloc=1.5 wakesPic=10.9 ringsPic=1.5 trimPic=15.1 fx320=0.1 fx499=0.0 fx625=0.1 labelsPic=0.6
+STALL] UI parts frame=5.5 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=2.8 fx786=0.1 alloc=1.1 wakesPic=11.5 ringsPic=1.4 trimPic=19.8 fx320=0.1 fx499=0.0 fx625=0.0 labelsPic=0.1
+STALL] UI parts frame=6.2 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=6.6 fx786=0.1 alloc=1.5 wakesPic=12.4 ringsPic=2.2 trimPic=13.3 fx320=0.1 fx499=0.0 fx625=0.0 labelsPic=0.6
+STALL] UI parts frame=4.8 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=2.2 fx786=0.2 alloc=2.1 wakesPic=13.4 ringsPic=1.3 trimPic=15.6 fx320=0.1 fx499=0.0 fx625=0.0 labelsPic=0.1
+STALL] UI parts frame=5.9 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=6.3 fx786=0.1 alloc=1.4 wakesPic=10.6 ringsPic=1.5 trimPic=15.7 fx320=0.1 fx499=0.0 fx625=0.0 labelsPic=0.1
+STALL] UI parts frame=5.6 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=1.6 fx786=0.1 alloc=1.5 wakesPic=13.1 ringsPic=0.9 trimPic=17.9 fx320=0.1 fx499=0.0 fx625=0.0 labelsPic=0.9
+STALL] UI parts frame=5.1 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=2.3 fx786=0.1 alloc=2.8 wakesPic=14.1 ringsPic=1.8 trimPic=23.8 fx320=0.1 fx499=0.0 fx625=0.0 labelsPic=0.7
+STALL] UI parts frame=5.3 fidx=0.1 signal=0.0 env324=0.0 env668=0.0 env559=0.0 fx271=0.0 bodiesPic=5.6 fx786=0.1 alloc=1.4 wakesPic=12.0 ringsPic=0.6 trimPic=17.2 fx320=0.1 fx499=0.0 fx625=0.2 labelsPic=0.1

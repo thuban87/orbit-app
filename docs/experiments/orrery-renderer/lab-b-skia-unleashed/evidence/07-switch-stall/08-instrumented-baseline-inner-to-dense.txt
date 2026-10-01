@@ -1,0 +1,48 @@
+# BASELINE (HEAD 6e6fd2a3 + instrumentation): Inner -> Lab B Dense. One 7-job UI batch per OrreryScreen render; the frame mapper restart (svInputs=9 = OrreryWorld frame worklet) costs ~0.45-0.65 s closure deserialisation (GAP-before) + ~0.15 s extractInputs walk.
+# Emulator RELEASE build with TEMPORARY instrumentation (see 12-instrumentation.patch). Relative evidence only.
+
+08:05:31.298STALL] JS store ready->loading gen=5 t=26606920
+08:05:31.365STALL] redraw#23 id=1000 visit=30.7ms svs=328 roots=3
+08:05:31.486STALL] redraw#24 id=1000 visit=118.9ms svs=328 roots=3
+08:05:31.488STALL] JS gap=159ms at=26607110
+08:05:31.515STALL] UI startMapper#14356 extract=7ms svInputs=9 keys=
+08:05:31.540STALL] redraw#25 id=1000 visit=19.1ms svs=328 roots=3
+08:05:31.550STALL] redraw#26 id=1000 visit=8.4ms svs=328 roots=3
+08:05:31.551STALL] UI startMapper#14372 extract=8ms svInputs=9 keys=
+08:05:31.591STALL] JS store loading->ready gen=5 t=26607213
+08:05:31.591STALL] JS publish isSwitch=true bodies=121 t=26607213
+08:05:31.591STALL] JS publish runOnUI dispatched in 0.0ms
+08:05:31.591STALL] JS store ready->ready gen=5 t=26607213
+08:05:31.926STALL] JS gap=375ms at=26607548
+08:05:32.099STALL] JS gap=173ms at=26607722
+08:05:32.099STALL] UI publish worklet start t=26607557
+08:05:32.099STALL] UI publish worklet end t=26607563
+08:05:32.324STALL] redraw#27 id=1000 visit=59.1ms svs=2919 roots=3
+08:05:32.366STALL] redraw#28 id=1000 visit=37.0ms svs=2919 roots=3
+08:05:32.403STALL] redraw#29 id=1000 visit=37.6ms svs=2919 roots=3
+08:05:32.680STALL] UI startMapper#14392 extract=159ms svInputs=9 keys=
+08:05:32.680STALL] UI batch jobs=22 wall=729ms inJobs=165ms slow=GAP-before bound reactNativeReanimated_mappersTs2{}:563ms RUN bound reactNativeReanimated_mappersTs2{}:159ms
+08:05:32.718STALL] redraw#30 id=1000 visit=35.2ms svs=2865 roots=3
+08:05:33.055STALL] redraw#31 id=1000 visit=43.8ms svs=3200 roots=3
+08:05:33.110STALL] redraw#32 id=1000 visit=49.4ms svs=3200 roots=3
+08:05:33.345STALL] JS store ready->ready gen=5 t=26608967
+08:05:33.539STALL] UI startMapper#14413 extract=162ms svInputs=9 keys=
+08:05:33.539STALL] UI batch jobs=7 wall=740ms inJobs=162ms slow=GAP-before bound reactNativeReanimated_mappersTs2{}:577ms RUN bound reactNativeReanimated_mappersTs2{}:162ms
+08:05:33.623STALL] redraw#33 id=1000 visit=45.3ms svs=3200 roots=3
+08:05:33.671STALL] redraw#34 id=1000 visit=43.2ms svs=3200 roots=3
+08:05:33.715STALL] redraw#35 id=1000 visit=43.5ms svs=3200 roots=3
+08:05:33.721STALL] UI batch jobs=3028 wall=221ms inJobs=96ms slow=
+08:05:34.294STALL] UI startMapper#17381 extract=149ms svInputs=9 keys=
+08:05:34.295STALL] UI batch jobs=7 wall=594ms inJobs=150ms slow=GAP-before bound reactNativeReanimated_mappersTs2{}:442ms RUN bound reactNativeReanimated_mappersTs2{}:150ms
+08:05:34.943STALL] UI startMapper#17866 extract=151ms svInputs=9 keys=
+08:05:34.944STALL] UI batch jobs=7 wall=592ms inJobs=152ms slow=GAP-before bound reactNativeReanimated_mappersTs2{}:440ms RUN bound reactNativeReanimated_mappersTs2{}:152ms
+08:05:35.533STALL] UI startMapper#17868 extract=150ms svInputs=9 keys=
+08:05:35.533STALL] UI batch jobs=7 wall=589ms inJobs=151ms slow=GAP-before bound reactNativeReanimated_mappersTs2{}:438ms RUN bound reactNativeReanimated_mappersTs2{}:150ms
+08:05:35.556kipped 217 frames!  The application may be doing too much work on its main thread.
+08:05:35.565STALL] UI gap since last mapperRun=3633ms at=26611187 starts=3494 stops=111
+08:05:35.918STALL] JS gap=3818ms at=26611540
+08:05:36.111STALL] redraw#36 id=1000 visit=148.2ms svs=3193 roots=3
+08:05:36.159STALL] redraw#37 id=1000 visit=43.6ms svs=3193 roots=3
+08:05:36.163STALL] JS gap=244ms at=26611785
+08:05:36.708STALL] UI startMapper#17885 extract=154ms svInputs=9 keys=
+08:05:36.709STALL] UI batch jobs=7 wall=731ms inJobs=155ms slow=GAP-before bound reactNativeReanimated_mappersTs2{}:575ms RUN bound reactNativeReanimated_mappersTs2{}:155ms

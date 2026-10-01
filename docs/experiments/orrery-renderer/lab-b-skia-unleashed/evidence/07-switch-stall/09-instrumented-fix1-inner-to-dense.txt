@@ -1,0 +1,36 @@
+# AFTER FIX 1 (ea137306, frame worklet captures): no main-thread stall (no UI gap > 0.3 s, 0 skipped) but the JS thread blocks for seconds inside RN Skia redraws (sync SharedValue reads, 3 193 bound values)
+# Emulator RELEASE build with TEMPORARY instrumentation (see 12-instrumentation.patch). Relative evidence only.
+
+08:10:41.749STALL] JS store ready->loading gen=5 t=26917371
+08:10:41.838STALL] redraw#24 id=1000 visit=78.7ms svs=328 roots=3
+08:10:41.924STALL] redraw#25 id=1000 visit=83.6ms svs=328 roots=3
+08:10:41.929STALL] JS gap=180ms at=26917552
+08:10:42.031STALL] redraw#26 id=1000 visit=94.9ms svs=328 roots=3
+08:10:42.122STALL] redraw#27 id=1000 visit=88.9ms svs=328 roots=3
+08:10:42.123STALL] JS gap=193ms at=26917745
+08:10:42.167STALL] JS store loading->ready gen=5 t=26917789
+08:10:42.167STALL] JS publish isSwitch=true bodies=121 t=26917789
+08:10:42.167STALL] JS publish runOnUI dispatched in 0.1ms
+08:10:42.167STALL] JS store ready->ready gen=5 t=26917789
+08:10:42.515STALL] JS gap=363ms at=26918138
+08:10:42.530STALL] UI publish worklet start t=26918143
+08:10:42.532STALL] UI publish worklet end t=26918151
+08:10:45.002STALL] redraw#28 id=1000 visit=136.4ms svs=2919 roots=3
+08:10:45.073STALL] redraw#29 id=1000 visit=63.3ms svs=2919 roots=3
+08:10:45.384STALL] redraw#30 id=1000 visit=310.4ms svs=2919 roots=3
+08:10:45.393STALL] JS gap=2876ms at=26921015
+08:10:45.395STALL] UI batch jobs=15 wall=46ms inJobs=8ms slow=GAP-before bound reactNativeReanimated_mappersTs2{}:31ms
+08:10:45.711STALL] JS gap=302ms at=26921333
+08:10:45.829STALL] redraw#31 id=1000 visit=70.2ms svs=2858 roots=3
+08:10:45.869STALL] redraw#32 id=1000 visit=35.7ms svs=2858 roots=3
+08:10:46.002STALL] redraw#33 id=1000 visit=45.6ms svs=3193 roots=3
+08:10:46.829STALL] redraw#34 id=1000 visit=821.1ms svs=3193 roots=3
+08:10:46.844STALL] UI batch jobs=3028 wall=236ms inJobs=101ms slow=
+08:10:46.845STALL] UI gap since last mapperRun=304ms at=26921653 starts=3106 stops=201
+08:10:46.845STALL] JS gap=1127ms at=26922467
+08:10:46.911STALL] JS store ready->ready gen=5 t=26922534
+08:10:51.410STALL] redraw#35 id=1000 visit=4460.7ms svs=3193 roots=3
+08:10:52.775STALL] redraw#36 id=1000 visit=1359.4ms svs=3193 roots=3
+08:10:54.239STALL] redraw#37 id=1000 visit=1463.4ms svs=3193 roots=3
+08:10:54.246STALL] JS gap=7344ms at=26929868
+08:10:54.246STALL] UI batch jobs=481 wall=70ms inJobs=23ms slow=

@@ -269,3 +269,36 @@ switch frame at 141 bodies → 6–7 ms with `ringPaths` off.
 frames per switch; M1 build 159–349; legacy renderer 212/413; bodies+labels+rings OFF 222/339;
 fx off/on identical (243/241 All, 426/426 Inner). Main-thread stack in RN Skia
 `JsiRecorder::applyUpdates` (`07-stall-main-thread-stack.txt`).
+
+## 2026-10-01 — Switch-stall investigation and fix (RELEASE build, emulator; commits ea137306 → 3c0f691b)
+
+**EMULATOR, RELEASE, uninstrumented builds — relative A/B on this target only, never a phone
+claim.** Full write-up: `research/SWITCH-STALL-INVESTIGATION.md`. Per run: the panel quick switch
+→ 10 s window → `dumpsys gfxinfo` (reset at the tap) + Choreographer "Skipped N frames". A =
+6e6fd2a3 (before), B = 3c0f691b (after). Raw: `evidence/07-switch-stall/15-gfxinfo-summary.txt`.
+
+| Build / renderer | runs (big switches) | gfx frames / 10 s | p50 | p99 | skipped max per switch |
+|---|---|---|---|---|---|
+| A lab | 8 (I↔D ×2, I↔A, A↔D) | 67–163 | 17–34 ms | 65–4950 ms | **216–371** |
+| A legacy | 6 | 12–102 | 13–250 ms | 900–4950 ms | **216–427** |
+| B lab (`layerPictures` ON, default) | 8 | **196–260** | 17–34 ms | 81–117 ms | **0** |
+| B lab `layerPictures:0` (fixes 1+3 only) | 6 | 176–255 | 32–34 ms | 81–133 ms | 0 |
+| B legacy (fix 1 applies) | 6 | 25–109 | 17–250 ms | 300–1600 ms | 33–120 |
+
+Normal-speed recordings (`01`–`04`), longest interval with no new frame: before 3.8 s / 4.9 s,
+after 0.18 s / 0.17 s. Instrumented (temporary, `12-instrumentation.patch`): bound
+SharedValues on Dense 3 193 → 47, mappers 3 786 → 85, UI mapper time per animated switch frame
+80–126 → 50–60 ms; JS-thread blocks per big switch up to 7.3 s (after fix 1 alone) → ≤ ~1 s.
+Remaining per-switch-frame UI cost: WP-2.1 trim picture 15–24 ms, wake picture 11–14 ms at
+settle, frame projection 5–8, bodies picture 2–7, allocation 1.5–3, rings 1–2.
+
+Findings (relative, emulator only):
+1. The 3–7 s main-thread stall was the model-half frame mapper being re-created on every
+   OrreryScreen render with a closure carrying the switch runtime's `resources` (scene per
+   entry) — ~0.6–0.8 s of UI-thread closure deserialisation + `extractInputs` walk per restart.
+   Fixed in the shared model half → both renderers.
+2. Declarative per-body Skia components (thousands of bound SharedValues) block the JS thread
+   for seconds per canvas commit (synchronous UI reads, recorded twice per commit) and cost
+   ~80 ms of mappers per frame on this target. One UI-thread picture per layer removes both.
+3. Legacy after fix 1 still drops 33–120 frames per switch: its own ~200 ms ring-Path frames
+   (WP-1.3/1.4), now visible because the switch actually plays.

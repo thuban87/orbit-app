@@ -1,0 +1,201 @@
+# TEMPORARY instrumentation used for the switch-stall investigation (never committed).
+# Apply to node_modules copies + app files; Metro bundles RN Skia / Reanimated / Worklets from src/.
+# A stamp const in OrreryScreen.tsx forces Gradle to re-bundle when only node_modules changed.
+--- a/mappers.ts (original)
++++ b/mappers.ts (instrumented)
+@@ -99,18 +99,35 @@
+     }
+     try {
+       processingMappers = true;
++      const __a = performance.now();
++      const __g = globalThis as any;
++      if (__g.__lastMR && __a - __g.__lastMR > 100) console.log(`[STALL] UI gap since last mapperRun=${(__a - __g.__lastMR).toFixed(0)}ms at=${__a.toFixed(0)} starts=${__g.__mStart ?? 0} stops=${__g.__mStop ?? 0}`);
++      __g.__mStart = 0; __g.__mStop = 0;
++      let __order = 0;
+       if (mappers.size !== sortedMappers.length) {
+         updateMappersOrder();
++        __order = performance.now() - __a;
+       }
++      let __ran = 0;
++      const __slow: string[] = [];
+       if (isAnyMapperDirty) {
+         isAnyMapperDirty = false;
+         for (const mapper of sortedMappers) {
+           if (mapper.dirty) {
+             mapper.dirty = false;
++            const __m = performance.now();
+             mapper.worklet();
++            const __d = performance.now() - __m;
++            __ran++;
++            if (__d > 3) __slow.push(`id${mapper.id}/in${mapper.inputs.length}/${__d.toFixed(0)}ms`);
+           }
+         }
+       }
++      const __tot = performance.now() - __a;
++      __g.__lastMR = performance.now();
++      const __st = __g.__st; __g.__st = {};
++      if (__tot > 40 && __st) console.log(`[STALL] UI parts ${Object.keys(__st).map((k) => k + '=' + __st[k].toFixed(1)).join(' ')}`);
++      if (__tot > 50) console.log(`[STALL] UI mapperRun total=${__tot.toFixed(0)}ms order=${__order.toFixed(0)}ms mappers=${mappers.size} ran=${__ran} slow=${__slow.slice(0, 14).join(' ')}`);
+     } finally {
+       processingMappers = false;
+       const finalizers = mapperRunFinalizers;
+@@ -202,6 +219,8 @@
+       inputs: MapperRawInputs,
+       outputs?: MapperOutputs
+     ) => {
++      const __gs = globalThis as any; __gs.__mStart = (__gs.__mStart ?? 0) + 1;
++      const __x0 = performance.now();
+       const mapper: Mapper = {
+         id: mapperID,
+         dirty: true,
+@@ -209,6 +228,12 @@
+         inputs: extractInputs(inputs, []),
+         outputs,
+       };
++      const __xd = performance.now() - __x0;
++      if (__xd > 5) {
++        const wc = (worklet as any).__closure ?? {};
++        const inner = (wc.updater ?? wc.prepare ?? {}).__closure ?? wc;
++        console.log(`[STALL] UI startMapper#${mapperID} extract=${__xd.toFixed(0)}ms svInputs=${mapper.inputs.length} keys=${Object.keys(inner).slice(0, 16).join(',')}`);
++      }
+       mappers.set(mapper.id, mapper);
+       sortedMappers = [];
+       isAnyMapperDirty = true;
+@@ -226,6 +251,7 @@
+       }
+     },
+     stop: (mapperID: number) => {
++      const __gs = globalThis as any; __gs.__mStop = (__gs.__mStop ?? 0) + 1;
+       const mapper = mappers.get(mapperID);
+       if (mapper) {
+         mappers.delete(mapper.id);
+--- a/Container.native.ts (original)
++++ b/Container.native.ts (instrumented)
+@@ -46,22 +46,34 @@
+     if (this.unmounted) {
+       return;
+     }
++    const __t0 = performance.now();
+     const recorder = new ReanimatedRecorder(this.Skia);
+     const { nativeId, picture } = this;
+     visit(recorder, this.root);
+     const sharedValues = recorder.getSharedValues();
+     const sharedRecorder = recorder.getRecorder();
++    const __t1 = performance.now();
++    const __n = (globalThis.__skRedrawN = (globalThis.__skRedrawN ?? 0) + 1);
++    console.log(`[STALL] redraw#${__n} id=${nativeId} visit=${(__t1 - __t0).toFixed(1)}ms svs=${sharedValues.length} roots=${this.root.length}`);
+     // Draw first frame
+     Rea.runOnUI(() => {
+       "worklet";
++      const a = performance.now();
+       nativeDrawOnscreen(nativeId, sharedRecorder, picture);
++      const b = performance.now();
++      if (b - a > 8) console.log(`[STALL] UI firstDraw#${__n} play=${(b - a).toFixed(1)}ms`);
+     })();
+     // Animate
+     if (sharedValues.length > 0) {
+       this.mapperId = Rea.startMapper(() => {
+         "worklet";
++        const a = performance.now();
+         sharedRecorder.applyUpdates(sharedValues);
++        const b = performance.now();
+         nativeDrawOnscreen(nativeId, sharedRecorder, picture);
++        const c = performance.now();
++        const g = globalThis as any; g.__skRuns = g.__skRuns ?? {}; const r = (g.__skRuns[__n] = (g.__skRuns[__n] ?? 0) + 1);
++        if (c - a > 30 || r <= 1) console.log(`[STALL] UI skMapper#${__n} run${r} apply=${(b - a).toFixed(1)}ms play=${(c - b).toFixed(1)}ms svs=${sharedValues.length}`);
+       }, sharedValues);
+     }
+   }
+--- a/threads.native.ts (original)
++++ b/threads.native.ts (instrumented)
+@@ -364,8 +364,17 @@
+       ([workletFunction, workletArgs, resolve, reject]) =>
+         createSerializable(() => {
+           'worklet';
++          const __g = globalThis as any;
++          const __s = performance.now();
++          if (!__g.__qb) __g.__qb = { start: __s, n: 0, sum: 0, slow: [] as string[], lastEnd: __s };
++          const __gap = __s - __g.__qb.lastEnd;
++          const __id = () => { const wf = workletFunction as any; const c = wf.__closure; return `${wf.name || '?'}{${c ? Object.keys(c).slice(0, 6).join(',') : ''}}`; };
++          if (__gap > 10 && __g.__qb.slow.length < 14) __g.__qb.slow.push(`GAP-before ${__id()}:${__gap.toFixed(0)}ms`);
+           try {
+             const result = workletFunction(...workletArgs);
++            const __d = performance.now() - __s;
++            __g.__qb.n++; __g.__qb.sum += __d; __g.__qb.lastEnd = performance.now();
++            if (__d > 10 && __g.__qb.slow.length < 14) __g.__qb.slow.push(`RUN ${__id()}:${__d.toFixed(0)}ms`);
+             if (resolve) {
+               const serializedResult = globalThis.__serializer(result);
+               globalThis.__workletsModuleProxy.handlePromise(
+@@ -389,6 +398,19 @@
+     const scheduleStacks = SHOULD_CAPTURE_SCHEDULE_STACK
+       ? (queue.map(([, , , , scheduleStack]) => scheduleStack) as string[])
+       : undefined;
++    const __count = jobWorklets.length;
++    jobWorklets.push(
++      createSerializable(() => {
++        'worklet';
++        const __g = globalThis as any;
++        const q = __g.__qb;
++        __g.__qb = null;
++        if (q) {
++          const wall = performance.now() - q.start;
++          if (wall > 40) console.log(`[STALL] UI batch jobs=${__count} wall=${wall.toFixed(0)}ms inJobs=${q.sum.toFixed(0)}ms slow=${q.slow.join(' ')}`);
++        }
++      })
++    );
+     WorkletsModule.scheduleOnUI(
+       WorkletsModule.createSerializableArray(jobWorklets),
+       scheduleStacks
+--- a/src/screens/OrreryScreen.tsx
++++ b/src/screens/OrreryScreen.tsx (instrumented)
+@@ -146,6 +146,17 @@
+   };
+ }
+ 
++const __STALL_BUILD = 9;
++let __jsLag: ReturnType<typeof setInterval> | null = null;
++console.log(`[STALL] build ${__STALL_BUILD}`);
++if (!__jsLag) {
++  let last = performance.now();
++  __jsLag = setInterval(() => {
++    const now = performance.now();
++    if (now - last > 150) console.log(`[STALL] JS gap=${(now - last).toFixed(0)}ms at=${now.toFixed(0)}`);
++    last = now;
++  }, 30);
++}
+ export function OrreryScreen() {
+   const { colors, mode: themeMode, package: themePackage } = useTheme();
+   const [contactsOpen, setContactsOpen] = useState(false);
+@@ -316,6 +327,7 @@
+   const switchHomeGeneration = useRef<number | null>(null);
+   useEffect(() => {
+     const unsubscribe = useSystemStore.subscribe((next, previous) => {
++      console.log(`[STALL] JS store ${previous.status}->${next.status} gen=${next.generation} t=${performance.now().toFixed(0)}`);
+       if (!shouldPublishSwitchScene(next, previous)) return;
+       if (
+         next.status === "loading" &&
+--- a/src/components/orrery/use-orrery-switch-runtime.ts
++++ b/src/components/orrery/use-orrery-switch-runtime.ts (instrumented)
+@@ -296,9 +296,12 @@
+       destinationHome: CameraPose,
+     ) => {
+       latestScene.current = scene;
++      const __p0 = performance.now();
+       setResources((current) => nextOrreryResources(current, scene, isSwitch));
++      console.log(`[STALL] JS publish isSwitch=${isSwitch} bodies=${scene.world.length} t=${__p0.toFixed(0)}`);
+       runOnUI(() => {
+         "worklet";
++        console.log(`[STALL] UI publish worklet start t=${performance.now().toFixed(0)}`);
+         cancelAnimation(progress);
+         const reduced = reducedMotion.value;
+         if (!isSwitch || transition.value.generation === 0) {
+@@ -333,7 +336,9 @@
+         cameraTo.value = { ...destinationHome };
+         progress.value = 0;
+         startDriver(1, reduced, scene.generation);
++        console.log(`[STALL] UI publish worklet end t=${performance.now().toFixed(0)}`);
+       })();
++      console.log(`[STALL] JS publish runOnUI dispatched in ${(performance.now() - __p0).toFixed(1)}ms`);
+     },
+     [
+       cameraFrom,
