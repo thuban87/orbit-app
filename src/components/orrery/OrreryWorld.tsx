@@ -81,6 +81,14 @@ import {
 } from "./use-orrery-camera";
 
 const LABEL_MAX_WIDTH = 200;
+/**
+ * ORRERY LAB B (switch-stall fix): stable empty defaults. A fresh `[]` / `{}`
+ * default changes identity on every render, which re-created every worklet
+ * that captures it (a Reanimated mapper restart on the UI thread per render).
+ */
+const NO_IDS: number[] = [];
+const NO_RELATIONS: Readonly<Record<number, string>> = {};
+const NO_SATELLITES: readonly OrrerySatellite[] = [];
 const LABEL_BODY_GAP = 8;
 
 function ReorderGhost({
@@ -174,14 +182,14 @@ export function OrreryWorld({
   fontProvider,
   onIntent,
   focusedIds,
-  clusterIds = focusedIds.length > 1 ? focusedIds : [],
-  focusedRelationById = {},
+  clusterIds: clusterIdsProp,
+  focusedRelationById = NO_RELATIONS,
   interactive = true,
   camera,
   onFocusLost,
   onReorder,
   onReorderActivated,
-  satellites = [],
+  satellites = NO_SATELLITES,
   focusedSatellite,
   switchRuntime,
   themePackage,
@@ -211,6 +219,14 @@ export function OrreryWorld({
   themeMode?: string;
 }) {
   const { fontScale } = useWindowDimensions();
+  // ORRERY LAB B (switch-stall fix): callers pass a fresh `[]` per render; key
+  // the cluster list by content so label preparation and the worklets that
+  // capture it are not rebuilt on every parent render.
+  const clusterSource =
+    clusterIdsProp ?? (focusedIds.length > 1 ? focusedIds : NO_IDS);
+  const clusterKey = clusterSource.join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: content-keyed by clusterKey
+  const clusterIds = useMemo(() => clusterSource, [clusterKey]);
   const resources = switchRuntime.resources;
   const mounted = useRef(true);
   const focusKey = JSON.stringify([
@@ -240,35 +256,53 @@ export function OrreryWorld({
   }, [ringPathMode, labRenderer, ringPathsRebuild]);
   // Capture only the producer's input; the controller also contains its published output.
   const reorder = camera.reorder;
+  // ORRERY LAB B (switch-stall fix, docs/…/research/SWITCH-STALL-INVESTIGATION.md):
+  // the frame worklet captures ONLY shared values and small, identity-stable
+  // data. It used to capture `switchRuntime` (a new object on every
+  // OrreryScreen render, carrying `resources` → N × the whole scene) and
+  // `scene`: every parent render restarted this mapper, and each restart
+  // deserialised that graph on the UI thread and walked it for shared values
+  // (≈0.6–0.75 s of main thread per restart on the emulator, ×5–6 per switch).
+  const switchTransition = switchRuntime.transition;
+  const switchProgress = switchRuntime.progress;
+  const switchCameraFrom = switchRuntime.cameraFrom;
+  const switchCameraTo = switchRuntime.cameraTo;
+  const sceneGeneration = scene.generation;
+  const sceneExtent = scene.extent;
+  const sceneMembers = scene.systemSnapshot.members;
+  const memberIdentities = useMemo(
+    () => sceneMembers.map((m) => ({ id: m.id, uid: m.uid })),
+    [sceneMembers],
+  );
   const frame = useDerivedValue(() => {
     const sampled = sampleSwitchChoreography(
-      switchRuntime.transition.value,
-      switchRuntime.progress.value,
+      switchTransition.value,
+      switchProgress.value,
     ).world;
     const sampledCamera =
-      switchRuntime.progress.value >= 1
+      switchProgress.value >= 1
         ? pose.value
         : sampleOrrerySwitchCamera(
-            switchRuntime.cameraFrom.value,
-            switchRuntime.cameraTo.value,
-            switchRuntime.progress.value,
+            switchCameraFrom.value,
+            switchCameraTo.value,
+            switchProgress.value,
           );
     const held = reorder.value;
     const world = previewReorder(
       sampled,
-      held?.generation === scene.generation ? held : null,
+      held?.generation === sceneGeneration ? held : null,
     );
     const moons = deriveSatelliteBodies(
       world,
       satellites,
-      scene.systemSnapshot.members,
+      memberIdentities,
       true,
       semanticLevel(sampledCamera.zoom, level.value),
     );
     const completeWorld = [...world, ...moons];
     return projectAnimatedFrame(
       {
-        generation: switchRuntime.transition.value.generation,
+        generation: switchTransition.value.generation,
         from: completeWorld,
         to: completeWorld,
       },
@@ -431,7 +465,7 @@ export function OrreryWorld({
     ],
     [scene],
   );
-  const members = scene.systemSnapshot.members;
+  const members = memberIdentities;
   const reorderExpectation = useMemo(
     () => ({
       system: scene.system,
@@ -482,7 +516,7 @@ export function OrreryWorld({
         },
         onNorth: (x, y) => {
           "worklet";
-          if (!hitPolaris(frame.value, scene.extent, x, y)) return false;
+          if (!hitPolaris(frame.value, sceneExtent, x, y)) return false;
           camera.recover(northTarget(pose.value));
           return true;
         },
@@ -492,6 +526,7 @@ export function OrreryWorld({
       frame,
       camera,
       scene.extent,
+      sceneExtent,
       onIntent,
       interactive,
       identities,

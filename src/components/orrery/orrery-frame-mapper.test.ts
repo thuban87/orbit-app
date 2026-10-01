@@ -120,6 +120,14 @@ it("the emitted projection closure settles after publication under the installed
     deriveSatelliteBodies,
     semanticLevel,
     projectAnimatedFrame: projection,
+    // ORRERY LAB B switch-stall fix: the worklet now captures the switch
+    // runtime's shared values and scene scalars individually (no object graph).
+    switchTransition: transition,
+    switchProgress: progress,
+    switchCameraFrom: cameraFrom,
+    switchCameraTo: cameraTo,
+    sceneGeneration: 7,
+    memberIdentities: [],
     // ORRERY LAB B WP-2.1: ringPath projection mode (-1 = every body; the lab
     // renderer sets 0 = only a held reorder body). Perf only, no semantics.
     ringPathMode: cell(-1),
