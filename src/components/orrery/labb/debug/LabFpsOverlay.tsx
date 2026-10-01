@@ -8,6 +8,9 @@
  * fps, p50/p95/max, frames over 16.7 / 33.3 ms) drawn as Skia glyph text plus a
  * sparkline.
  *
+ * Compact (WP-1.3: bottom-left, 178×40 dp, so it hides as little of the
+ * scene as possible).
+ *
  * HONEST LABEL: this is the UI-thread frame CADENCE (clock deltas). It cannot
  * see GPU or RenderThread time; pair it with
  * `adb shell dumpsys gfxinfo com.bwales.orbit.labb framestats`. Emulator numbers
@@ -40,15 +43,15 @@ import { useLabRenderContext } from "../labb-context";
 // --- Tunables -----------------------------------------------------------------
 const SLOTS = 120;
 const SUMMARY_EVERY = 8;
-const HUD_W = 236;
-const HUD_H = 78;
-const PAD = 6;
-const GRAPH_H = 28;
+export const HUD_W = 178;
+export const HUD_H = 40;
+const PAD = 4;
+const GRAPH_H = 10;
 /** Graph y-axis ceiling (ms). */
 const GRAPH_MAX_MS = 50;
 const BUDGET_60 = 1000 / 60;
 const BUDGET_30 = 1000 / 30;
-const FONT_SIZE = 10;
+const FONT_SIZE = 9;
 /** Ignore pauses longer than this (clock gaps, e.g. a GC or debugger stop). */
 const MAX_SAMPLE_MS = 1000;
 
@@ -90,8 +93,8 @@ export function summarizeFrameDeltas(stats: HudStats): HudSummary {
   const p95 = sorted[Math.floor((n - 1) * 0.95)];
   const max = sorted[n - 1];
   return {
-    line1: `${(1000 / mean).toFixed(1)} fps  p50 ${p50.toFixed(1)}  p95 ${p95.toFixed(1)}  max ${max.toFixed(0)} ms`,
-    line2: `>16.7ms ${over60}  >33ms ${over30}  of ${n}  (UI-thread clock Δ)`,
+    line1: `${(1000 / mean).toFixed(1)}fps p50 ${p50.toFixed(1)} p95 ${p95.toFixed(1)} max ${max.toFixed(0)}`,
+    line2: `>16.7 ${over60} >33 ${over30} /${n} · UI clock Δ ms`,
     graph: ordered,
   };
 }
@@ -196,20 +199,13 @@ export function LabFpsOverlay({
             font={font}
             x={x + PAD}
             y={y + PAD + FONT_SIZE}
-            text="LAB B · UI-thread frame cadence"
-            color={text}
-          />
-          <Text
-            font={font}
-            x={x + PAD}
-            y={y + PAD + FONT_SIZE * 2.3}
             text={line1}
             color={text}
           />
           <Text
             font={font}
             x={x + PAD}
-            y={y + PAD + FONT_SIZE * 3.6}
+            y={y + PAD + FONT_SIZE * 2.2}
             text={line2}
             color={text}
           />

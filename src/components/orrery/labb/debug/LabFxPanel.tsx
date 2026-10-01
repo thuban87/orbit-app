@@ -324,6 +324,10 @@ export function LabFxPanel({
   );
 }
 
+/** WP-1.3: the marker is a small, dimmed "LAB B" tag in the bottom-left
+ * corner (it used to span the bottom centre over the scene). */
+const MARKER_OPACITY = 0.75;
+
 /** The marker (long-press opens the panel) + the panel itself. */
 export function LabBMarkerHost({
   colors,
@@ -356,8 +360,11 @@ export function LabBMarkerHost({
         }
         style={styles.marker}
       >
-        <AppText role="caption" style={{ color: colors.accentText }}>
-          ORRERY LAB B — SKIA UNLEASHED
+        <AppText
+          role="caption"
+          style={{ color: colors.accentText, opacity: MARKER_OPACITY }}
+        >
+          LAB B
         </AppText>
       </Pressable>
       {open && lab ? (
@@ -379,8 +386,9 @@ const styles = StyleSheet.create({
   marker: {
     position: "absolute",
     bottom: SPACING.xs,
-    alignSelf: "center",
-    paddingHorizontal: SPACING.sm,
+    left: SPACING.sm,
+    paddingHorizontal: SPACING.xs,
+    paddingVertical: SPACING.xs,
   },
   panel: {
     position: "absolute",

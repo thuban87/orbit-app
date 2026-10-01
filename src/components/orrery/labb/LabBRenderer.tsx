@@ -11,13 +11,13 @@
  * component; later work packages replace the slot's body, not this order:
  *
  *   L0  environment   <LabEnvironment>     baked nebula + 3-depth Atlas starfield (WP-1.1)
- *   L1  rings         <LabRings>           WP-1.3 depth fade / flow / wake / tethers
+ *   L1  rings         <LabRings>           WP-1.3 instrument orbits under one plane homography
  *   L5  polaris       <LabPolaris>         glow + spikes (flag polarisLab; legacy fallback)
  *   --  reorder ghost  (slot from OrreryWorld; accent contract row stays there)
  *   L2–L4 bodies      ONE contiguous Group: sun + contacts (+ moons)
  *                     WP-1.2 lit surfaces, atmospheres, corona, lit moons
  *                     (one shader draw per body; flag bodyLighting)
- *   L6  labels        <OrreryLabel> (legacy, per-label layer: C-09)  WP-1.3 HUD tags
+ *   L6  labels        <LabHudLabel> HUD tags (per-label layer: C-09; flag labelHud)
  *   L7  fx            empty Group          WP-2.1/2.2 switch / focus / feedback FX
  *   dbg fps HUD       <LabFpsOverlay>      (flag `fpsHud`)
  *
@@ -72,7 +72,7 @@ import type {
   OrreryBodyResource,
   OrrerySwitchRuntime,
 } from "../use-orrery-switch-runtime";
-import { LabFpsOverlay } from "./debug/LabFpsOverlay";
+import { HUD_H, LabFpsOverlay } from "./debug/LabFpsOverlay";
 import {
   LabContactBody,
   LabMoon,
@@ -81,15 +81,16 @@ import {
 } from "./LabBodies";
 import { LabCanvas } from "./LabCanvas";
 import { LabEnvironment } from "./LabEnvironment";
+import { LabHudLabel } from "./LabLabels";
 import { LabPolaris } from "./LabPolaris";
-import { LabRings } from "./LabRings";
+import { LabRings, LabRingsPathRebuild } from "./LabRings";
 import { setLabEffectForceFallback } from "./labb-effects";
 import { indexFrame } from "./labb-frame-index";
 import { tokenToVec4 } from "./labb-uniforms";
 
-/** HUD placement inside the canvas (below the System selector chip). */
+/** HUD placement: bottom-left corner of the canvas, above the lab marker. */
 const HUD_X = 8;
-const HUD_Y = 68;
+const HUD_BOTTOM_GAP = 34;
 
 export interface LabPreparedLabel {
   id: string;
@@ -241,6 +242,18 @@ export function LabBRenderer(contract: LabRenderContract) {
     }),
     [flags.bodyLighting, flags.moonShader, colors, profile, sky, scene.extent],
   );
+  // Label id (bodyKey) → status hue for the HUD tag hairline / leader.
+  const labelStatus = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const r of resources) {
+      const status =
+        r.body.kind === "sun"
+          ? (scene.sun.occupant?.status ?? null)
+          : (scene.contacts.find((c) => c.id === r.body.id)?.status ?? null);
+      out[r.key] = orreryRingStyle(status, colors).color;
+    }
+    return out;
+  }, [resources, scene, colors]);
   const warmupColor = useMemo(
     () => tokenToVec4(colors.background),
     [colors.background],
@@ -272,12 +285,27 @@ export function LabBRenderer(contract: LabRenderContract) {
         {/* L1 */}
         <Group>
           {flags.rings ? (
-            <LabRings
-              resources={resources}
-              frame={frame}
-              frameIndex={frameIndex}
-              colors={colors}
-            />
+            flags.ringsPathRebuild ? (
+              <LabRingsPathRebuild
+                resources={resources}
+                frame={frame}
+                frameIndex={frameIndex}
+                colors={colors}
+              />
+            ) : (
+              <LabRings
+                resources={resources}
+                frame={frame}
+                frameIndex={frameIndex}
+                colors={colors}
+                profile={profile.rings}
+                flags={flags}
+                focusedIds={focusedIds}
+                level={contract.level}
+                progress={contract.switchRuntime.progress}
+                reorder={contract.reorder}
+              />
+            )
           ) : null}
         </Group>
         {/* L5 */}
@@ -349,12 +377,25 @@ export function LabBRenderer(contract: LabRenderContract) {
           {flags.labels
             ? labels.map((label) => (
                 <Group key={label.id}>
-                  <OrreryLabel
-                    identity={label.id}
-                    text={label.text}
-                    allocations={allocations}
-                    colors={colors}
-                  />
+                  {flags.labelHud ? (
+                    <LabHudLabel
+                      identity={label.id}
+                      text={label.text}
+                      allocations={allocations}
+                      frame={frame}
+                      frameIndex={frameIndex}
+                      colors={colors}
+                      profile={profile.labels}
+                      statusColor={labelStatus[label.id] ?? colors.border}
+                    />
+                  ) : (
+                    <OrreryLabel
+                      identity={label.id}
+                      text={label.text}
+                      allocations={allocations}
+                      colors={colors}
+                    />
+                  )}
                   {label.context ? (
                     <OrreryLabel
                       identity={label.id}
@@ -374,7 +415,7 @@ export function LabBRenderer(contract: LabRenderContract) {
       {flags.fpsHud ? (
         <LabFpsOverlay
           x={HUD_X}
-          y={HUD_Y}
+          y={viewport.height - HUD_H - HUD_BOTTOM_GAP}
           colors={colors}
           profile={profile}
           fontProvider={fontProvider}

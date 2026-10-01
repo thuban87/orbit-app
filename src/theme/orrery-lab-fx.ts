@@ -40,6 +40,10 @@ export interface LabFxProfile {
   env: LabEnvProfile;
   /** L2–L5 worlds (WP-1.2): lighting, atmosphere, corona tunables. */
   bodies: LabBodyProfile;
+  /** L1 instrument orbits (WP-1.3). */
+  rings: LabRingProfile;
+  /** L6 HUD-tag labels (WP-1.3). */
+  labels: LabLabelProfile;
   /** Roles reserved for WP-1.1+ layers (environment / bodies / rings). */
   roles: {
     sky: LabColorToken;
@@ -135,6 +139,69 @@ export interface LabBodyProfile {
   moonFloor: number;
   /** Procedural band contrast for initials bodies (0..1). */
   bandContrast: number;
+}
+
+/**
+ * L1 instrument-orbit profile (WP-1.3). Hairline rings in the status hue (the
+ * class colour/weight/style comes from `orreryRingStyle`), faded on the far
+ * side of a tilted plane, with optional uniform energy flow (C-04), a progress
+ * wake and drift tethers (C-17). Strengths before profile/panel intensity
+ * where noted.
+ */
+export interface LabRingProfile {
+  /** Base ring alpha (× the class alpha: faded 0.7, trace 0.42, neutral 0.5). */
+  alpha: number;
+  /** Alpha multiplier on the far side at maximum tilt. */
+  farAlpha: number;
+  /** Flow comet strength (scaled by intensity) and highlight token. */
+  flow: number;
+  flowHighlight: LabColorToken;
+  /** Comet tail length and linear speed, world units (/s). */
+  cometLength: number;
+  cometSpeed: number;
+  /** Progress wake: peak alpha at the body (fades toward north). */
+  wakeAlpha: number;
+  wakeWidthDp: number;
+  /** Drift tether alpha, width and radial dash period (dp). */
+  tetherAlpha: number;
+  tetherWidthDp: number;
+  tetherDash: number;
+  /** Non-focused rings while something is focused. */
+  focusDim: number;
+  /** Focused ring: soft glow strokes beneath (wide/narrow alpha, widths dp). */
+  glowWide: number;
+  glowNarrow: number;
+  glowWideDp: number;
+  glowNarrowDp: number;
+  /** Instrument ticks (north ticks at detail, focus tick scale). */
+  tick: LabColorToken;
+  tickAlpha: number;
+  /** Compass chevron on the world rim (deferred from WP-1.2 Polaris). */
+  compass: LabColorToken;
+  compassAlpha: number;
+}
+
+/**
+ * L6 HUD-tag label profile (WP-1.3). The plate keeps EXACTLY the prepared
+ * text's width/height (allocation geometry); the tag adds a scrim halo under
+ * it, a status-hue hairline on the body-facing edge and a leader tick toward
+ * the body.
+ */
+export interface LabLabelProfile {
+  /** Plate fill token + opacity (legacy: `surface` at 1). */
+  plate: LabColorToken;
+  plateOpacity: number;
+  /** Plate outline (instrument hairline). */
+  outline: LabColorToken;
+  outlineAlpha: number;
+  /** Scrim halo under the plate (contrast over the brightest nebula). */
+  halo: LabColorToken;
+  haloAlpha: number;
+  haloSpread: number;
+  haloBlur: number;
+  /** Status hairline + leader tick. */
+  hairlineDp: number;
+  leaderDp: number;
 }
 
 /**
@@ -243,6 +310,75 @@ const LIGHT_BODIES: LabBodyProfile = {
   bandContrast: 0.4,
 };
 
+const DARK_RINGS: LabRingProfile = {
+  alpha: 0.5,
+  farAlpha: 0.32,
+  flow: 1,
+  flowHighlight: "textPrimary",
+  cometLength: 48,
+  cometSpeed: 36,
+  wakeAlpha: 0.3,
+  wakeWidthDp: 2.6,
+  tetherAlpha: 0.6,
+  tetherWidthDp: 1,
+  tetherDash: 4,
+  focusDim: 0.35,
+  glowWide: 0.1,
+  glowNarrow: 0.22,
+  glowWideDp: 7,
+  glowNarrowDp: 3.2,
+  tick: "textSecondary",
+  tickAlpha: 0.7,
+  compass: "accent",
+  compassAlpha: 0.6,
+};
+const LIGHT_RINGS: LabRingProfile = {
+  alpha: 0.7,
+  farAlpha: 0.4,
+  flow: 0.5,
+  flowHighlight: "textPrimary",
+  cometLength: 48,
+  cometSpeed: 36,
+  wakeAlpha: 0.28,
+  wakeWidthDp: 2.6,
+  tetherAlpha: 0.7,
+  tetherWidthDp: 1,
+  tetherDash: 4,
+  focusDim: 0.4,
+  glowWide: 0.08,
+  glowNarrow: 0.18,
+  glowWideDp: 7,
+  glowNarrowDp: 3.2,
+  tick: "textSecondary",
+  tickAlpha: 0.75,
+  compass: "accent",
+  compassAlpha: 0.7,
+};
+const DARK_LABELS: LabLabelProfile = {
+  plate: "surface",
+  plateOpacity: 0.9,
+  outline: "textSecondary",
+  outlineAlpha: 0.22,
+  halo: "background",
+  haloAlpha: 0.55,
+  haloSpread: 3,
+  haloBlur: 5,
+  hairlineDp: 1.25,
+  leaderDp: 6,
+};
+const LIGHT_LABELS: LabLabelProfile = {
+  plate: "surface",
+  plateOpacity: 0.94,
+  outline: "textSecondary",
+  outlineAlpha: 0.25,
+  halo: "background",
+  haloAlpha: 0.5,
+  haloSpread: 3,
+  haloBlur: 5,
+  hairlineDp: 1.5,
+  leaderDp: 6,
+};
+
 const HUD: LabFxProfile["hud"] = {
   plate: "surface",
   plateOpacity: HUD_PLATE_OPACITY,
@@ -268,6 +404,8 @@ export const LAB_FX_PROFILES: Readonly<
       intensity: GALAXY_DARK_INTENSITY,
       env: DARK_ENV,
       bodies: DARK_BODIES,
+      rings: DARK_RINGS,
+      labels: DARK_LABELS,
       blend: "additive",
       hud: HUD,
       roles: ROLES,
@@ -276,6 +414,8 @@ export const LAB_FX_PROFILES: Readonly<
       intensity: GALAXY_LIGHT_INTENSITY,
       env: LIGHT_ENV,
       bodies: LIGHT_BODIES,
+      rings: LIGHT_RINGS,
+      labels: LIGHT_LABELS,
       blend: "multiply",
       hud: HUD,
       roles: ROLES,
@@ -286,6 +426,8 @@ export const LAB_FX_PROFILES: Readonly<
       intensity: STANDARD_DARK_INTENSITY,
       env: DARK_ENV,
       bodies: DARK_BODIES,
+      rings: DARK_RINGS,
+      labels: DARK_LABELS,
       blend: "additive",
       hud: HUD,
       roles: ROLES,
@@ -294,6 +436,8 @@ export const LAB_FX_PROFILES: Readonly<
       intensity: STANDARD_LIGHT_INTENSITY,
       env: LIGHT_ENV,
       bodies: LIGHT_BODIES,
+      rings: LIGHT_RINGS,
+      labels: LIGHT_LABELS,
       blend: "multiply",
       hud: HUD,
       roles: ROLES,

@@ -130,7 +130,9 @@ vi.mock("@shopify/react-native-skia", async () => {
       RuntimeEffect: {
         Make: (source: string) => (lab.effects ? { source } : null),
       },
-      Path: { Make: () => ({ moveTo() {}, lineTo() {}, close() {} }) },
+      Path: {
+        Make: () => ({ moveTo() {}, lineTo() {}, close() {}, addArc() {} }),
+      },
       ParagraphBuilder: {
         Make: () => {
           const builder = {
@@ -256,10 +258,12 @@ describe("Lab B renderer tree contract", () => {
       "atlas",
     ]);
     const [rings, polaris, ghost, bodies, labels, fx] = world.children;
-    expect(rings.children[0].children.length).toBe(1);
-    expect(rings.children[0].children.every((c) => c.type === "path")).toBe(
-      true,
-    );
+    // L1 (WP-1.3): ONE homography Group; rings are static world circles
+    // grouped by instrument class — no per-ring path rebuilt per frame.
+    const orbit = rings.children[0];
+    expect(orbit.props.matrix).toHaveProperty("value");
+    const [classGroup] = orbit.children;
+    expect(classGroup.children.map((c) => c.type)).toEqual(["circle"]);
     expect(polaris.children[0].type).toBe("skGroup");
     expect(ghost.type).toBe("path");
     expect(ghost.props.color).toBe(THEME_PRESETS.galaxy.dark.accent);
@@ -302,6 +306,64 @@ describe("Lab B renderer tree contract", () => {
     expect(alpha.value).toBe(0);
     pose.value = { ...pose.value, zoom: 2 };
     expect(alpha.value).toBe(1);
+  });
+
+  it("rings: the homography maps the world ring circle onto the frame's projected ring", async () => {
+    const pose = { value: { ...HOME_CAMERA, zoom: 1.7, tilt: 0.4, yaw: 0.6 } };
+    const { tree, scene } = await renderLab(pose);
+    const orbit = tree[1].children[0].children[0];
+    const m = (orbit.props.matrix as { value: number[] }).value;
+    expect(m).toHaveLength(9);
+    const circle = orbit.children[0].children[0];
+    const r = (circle.props.r as { value: number }).value;
+    const world = scene.world.find((b) => b.kind === "contact");
+    expect(r).toBeCloseTo(world?.ringRadius ?? -1, 6);
+    expect(circle.props.cx).toBe(0);
+    expect(circle.props.cy).toBe(0);
+    // The ring's north point lands where projectFrame put ringPath[0]
+    // (exactness of the matrix itself is pinned in labb-rings-logic.test).
+    const { applyHomography } = await import("./labb-rings-logic");
+    const { projectFrame } = await import("@/logic/orrery-camera-logic");
+    const projected = projectFrame(
+      scene.world,
+      pose.value,
+      { width: 500, height: 700 },
+      0,
+    ).bodies.find((b) => b.kind === "contact");
+    const north = applyHomography(m, 0, -r);
+    expect(north.x).toBeCloseTo(projected?.ringPath[0].x ?? Number.NaN, 4);
+    expect(north.y).toBeCloseTo(projected?.ringPath[0].y ?? Number.NaN, 4);
+  });
+
+  it("HUD tag: plate geometry equals the prepared text measurement", async () => {
+    const pose = { value: { ...HOME_CAMERA, zoom: 2 } };
+    const { tree } = await renderLab(pose);
+    const tag = tree[1].children[4].children[0].children[0].children[1];
+    const plates = tag.children.filter(
+      (c) => c.type === "roundRect" && c.props.style === undefined,
+    );
+    // [halo, plate]: the plate is EXACTLY the prepared width/height.
+    const plate = plates[1];
+    // prepareOrreryText (mocked paragraph): longest line 90 + 2×sm padding.
+    expect(plate.props.width).toBe(90 + 2 * 8);
+    expect(plate.props.height).toBeGreaterThanOrEqual(40);
+    expect((plate.props.x as { value: number }).value).toBeTypeOf("number");
+    expect(tag.children.some((c) => c.type === "paragraph")).toBe(true);
+    expect(tag.children.filter((c) => c.type === "line")).toHaveLength(2);
+  });
+
+  it("labelHud off keeps the legacy plate", async () => {
+    lab.flags = { fpsHud: false, labelHud: false };
+    const { tree } = await renderLab({ value: { ...HOME_CAMERA, zoom: 2 } });
+    const tag = tree[1].children[4].children[0].children[0].children[1];
+    expect(tag.children.some((c) => c.type === "line")).toBe(false);
+  });
+
+  it("ringsPathRebuild flag restores the WP-1.0 per-ring Path baseline", async () => {
+    lab.flags = { fpsHud: false, ringsPathRebuild: true };
+    const { tree } = await renderLab({ value: { ...HOME_CAMERA } });
+    const rings = tree[1].children[0].children[0];
+    expect(rings.children.map((c) => c.type)).toEqual(["path"]);
   });
 
   it("unmounts heavy layers whose flag is off", async () => {

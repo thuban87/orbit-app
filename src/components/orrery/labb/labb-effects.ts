@@ -419,6 +419,94 @@ half4 main(float2 xy) {
   return half4(half3(c * inside), half(inside));
 }
 `,
+  /**
+   * WP-1.3 instrument stroke shader for orbits, wakes, tethers and ticks. It
+   * paints a STROKE drawn in WORLD coordinates under the plane homography, so
+   * `xy` is the world point on the plane (sun = origin, north = −y).
+   *   uColor = status rgb, base alpha
+   *   uHi    = flow highlight rgb, flow strength
+   *   uCam   = cos yaw, sin yaw, tilt depth 0..1, zoom
+   *   uStyle = mode (0 arc-dashed ring, 1 plain, 2 radial-dashed),
+   *            dash period dp (0 = solid), dash duty, far-side alpha
+   *   uFlow  = time s, flow on, comet length (world), comet speed (world/s)
+   * Depth fade: the side of the plane away from the camera fades toward
+   * `uStyle.w` in proportion to tilt. Dashes are integer per circumference so
+   * there is no seam at north. Flow = 3 comets per ring, same LINEAR speed for
+   * every status (never encodes status, C-04), clockwise.
+   */
+  ringInstrument: `
+uniform float4 uColor;
+uniform float4 uHi;
+uniform float4 uCam;
+uniform float4 uStyle;
+uniform float4 uFlow;
+half4 main(float2 p) {
+  float tau = 6.2831853;
+  float r = max(length(p), 0.0001);
+  float v = (uCam.y * p.x + uCam.x * p.y) / r;
+  float depth = mix(1.0, uStyle.w, uCam.z * (0.5 - 0.5 * v));
+  float a = uColor.a * depth;
+  float3 col = uColor.rgb;
+  float ang = atan(p.x, -p.y);
+  if (ang < 0.0) { ang += tau; }
+  float zoom = max(uCam.w, 0.0001);
+  float mask = 1.0;
+  if (uStyle.y > 0.0) {
+    float d = 0.0;
+    float per = uStyle.y;
+    if (uStyle.x < 0.5) {
+      float circ = tau * r * zoom;
+      float n = max(4.0, floor(circ / uStyle.y));
+      per = circ / n;
+      d = mod(ang * r * zoom, per);
+    } else {
+      d = mod(r * zoom, per);
+    }
+    float on = per * uStyle.z;
+    mask = smoothstep(0.0, 0.7, d) * (1.0 - smoothstep(on - 0.7, on, d));
+    a *= mask;
+  }
+  if (uStyle.x < 0.5 && uFlow.y > 0.5) {
+    float seg = tau * r / 3.0;
+    float u = fract((ang * r - uFlow.x * uFlow.w) / seg + fract(r * 0.618034));
+    float k = seg / max(uFlow.z, 1.0);
+    float head = 1.0 - smoothstep(1.0 - 1.2 / (zoom * seg), 1.0, u);
+    float comet = exp(-(1.0 - u) * k) * head * uHi.a * depth * mask;
+    col = mix(col, uHi.rgb, clamp(comet * 1.4, 0.0, 1.0));
+    a = clamp(a + comet, 0.0, 1.0);
+  }
+  return half4(half3(col * a), half(a));
+}
+`,
+  /**
+   * WP-1.3 progress WAKE for one ring, painted on a stroked world circle (the
+   * stroke is wider than the visible wake; the cross profile is soft).
+   *   uColor = status rgb, peak alpha
+   *   uWake  = body angle (0 = north, clockwise), ring radius, half width
+   *            (world), far-side alpha
+   *   uCam   = cos yaw, sin yaw, tilt depth, unused
+   * Alpha rises from north to the body (a comet tail drawn backward along the
+   * rail), ends crisply at the body, zero past it.
+   */
+  ringWake: `
+uniform float4 uColor;
+uniform float4 uWake;
+uniform float4 uCam;
+half4 main(float2 p) {
+  float tau = 6.2831853;
+  float r = max(length(p), 0.0001);
+  float ang = atan(p.x, -p.y);
+  if (ang < 0.0) { ang += tau; }
+  float th = max(uWake.x, 0.0001);
+  float t = clamp(ang / th, 0.0, 1.0);
+  float inside = 1.0 - smoothstep(th - 0.004, th, ang);
+  float across = 1.0 - smoothstep(0.0, max(uWake.z, 0.0001), abs(r - uWake.y));
+  float v = (uCam.y * p.x + uCam.x * p.y) / r;
+  float depth = mix(1.0, uWake.w, uCam.z * (0.5 - 0.5 * v));
+  float a = uColor.a * (0.12 + 0.88 * t * t) * inside * across * depth;
+  return half4(half3(uColor.rgb * a), half(a));
+}
+`,
 } as const;
 
 export type LabEffectName = keyof typeof LAB_EFFECT_SOURCES;
