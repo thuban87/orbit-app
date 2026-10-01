@@ -301,6 +301,66 @@ describe("settled Orrery geometry retirement (RG-027, performance/AUD-PERF-001)"
   });
 });
 
+describe("switch start camera is the displayed camera (pass-2 stale-camera bug)", () => {
+  it("after a settled switch plus a user pan/zoom, the next switch starts from the live pose", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    mounted.complete();
+    expect(mounted.runtime.progress.value).toBe(1);
+    // The settled frame draws `pose`; the user pans/zooms/recenters it.
+    const panned: CameraPose = { ...homeCamera, x: 47, y: -19, zoom: 2.3 };
+    mounted.pose.value = panned;
+    mounted.runtime.publish(sceneOf(3, cWorldOf()), true, 1, sourceCamera);
+    // First switch frame (progress 0) == what was on screen, not homeCamera.
+    expect(mounted.runtime.cameraFrom.value).toEqual(panned);
+    expect(
+      sampleOrrerySwitchRuntime({
+        transition: mounted.runtime.transition.value,
+        progress: 0,
+        cameraFrom: mounted.runtime.cameraFrom.value,
+        cameraTo: mounted.runtime.cameraTo.value,
+        status: "running",
+        remainingFraction: 1,
+      }).camera,
+    ).toEqual(panned);
+    expect(mounted.runtime.cameraTo.value).toEqual(sourceCamera);
+  });
+
+  it("a cold-start Home applied outside the runtime is the first switch's origin", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    const coldHome: CameraPose = { ...homeCamera, tilt: 0.78, zoom: 0.61 };
+    mounted.pose.value = coldHome;
+    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    expect(mounted.runtime.cameraFrom.value).toEqual(coldHome);
+  });
+
+  it("a retarget while running still starts from the interpolated switch camera", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    const from = { ...mounted.runtime.cameraFrom.value };
+    mounted.runtime.progress.value = 0.5;
+    // pose is not what is displayed while running; it must be ignored.
+    mounted.pose.value = { ...homeCamera, x: 999 };
+    mounted.runtime.publish(sceneOf(3, cWorldOf()), true, 1, sourceCamera);
+    expect(mounted.runtime.cameraFrom.value).toEqual(
+      sampleOrrerySwitchRuntime(
+        {
+          transition: mounted.runtime.transition.value,
+          progress: 0.5,
+          cameraFrom: from,
+          cameraTo: homeCamera,
+          status: "running",
+          remainingFraction: 0.5,
+        },
+        0.5,
+      ).camera,
+    );
+  });
+});
+
 const cWorldOf = (): WorldBody[] => [
   { id: 0, kind: "sun", x: 0, y: 0, radius: 18, ringRadius: 0 },
   { id: 3, kind: "contact", x: 0, y: -60, radius: 12, ringRadius: 60 },

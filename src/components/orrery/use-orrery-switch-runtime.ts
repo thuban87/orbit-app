@@ -85,6 +85,23 @@ function interpolateCamera(
   };
 }
 
+/**
+ * The camera actually on screen when a switch starts or retargets. While a
+ * switch runs the frame draws the interpolated switch camera; once settled the
+ * frame draws the live `pose` (user pan/zoom/recenter, cold-start Home applied
+ * outside the runtime). Interpolating a settled runtime would return the
+ * PREVIOUS switch's target and snap the first frame (pass-2 headline 3).
+ */
+export function displayedSwitchCamera(
+  from: CameraPose,
+  to: CameraPose,
+  progress: number,
+  live: CameraPose,
+): CameraPose {
+  "worklet";
+  return progress >= 1 ? { ...live } : interpolateCamera(from, to, progress);
+}
+
 export function createSettledOrrerySwitchRuntime(
   world: readonly WorldBody[],
   generation: number,
@@ -313,10 +330,11 @@ export function useOrrerySwitchRuntime(
           transition.value,
           progress.value,
         ).world;
-        const displayedCamera = interpolateCamera(
+        const displayedCamera = displayedSwitchCamera(
           cameraFrom.value,
           cameraTo.value,
           progress.value,
+          pose.value,
         );
         transition.value = beginSwitchChoreography(
           displayed,
@@ -333,6 +351,7 @@ export function useOrrerySwitchRuntime(
     [
       cameraFrom,
       cameraTo,
+      pose,
       progress,
       reducedMotion,
       running,
