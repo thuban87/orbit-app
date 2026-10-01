@@ -82,7 +82,8 @@ export const MIN_READABLE_RADIUS = 10;
 export const MIN_HIT_RADIUS = 22;
 const MIN_FOCAL_DISTANCE = 256;
 const MAX_DEPTH_FRACTION = 0.45;
-const RING_SEGMENTS = 128;
+/** Vertices of a projected ring polygon (`ProjectedBody.ringPath`). */
+export const RING_SEGMENTS = 128;
 
 function clamp(
   value: number,

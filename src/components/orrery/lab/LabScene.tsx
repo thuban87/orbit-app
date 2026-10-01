@@ -103,7 +103,12 @@ import {
   orderBodies,
 } from "./scene-draw";
 import { recordStars, SKY_MARGIN, scatter } from "./sky-resources";
-import { drawWorldPlane, type PlaneRing, type TrailState } from "./world-plane";
+import {
+  drawWorldPlane,
+  makePlaneShapes,
+  type PlaneRing,
+  type TrailState,
+} from "./world-plane";
 
 /** Polaris' four-point star (Polaris.tsx), local coordinates. */
 const POLARIS_STAR =
@@ -116,6 +121,8 @@ const MIPMAP_NONE = 0;
 const CLEAR_INK = Float32Array.of(0, 0, 0, 0);
 /** Rasterise the base layer into a cached texture (see baseCache). */
 const BASE_TEXTURE = true;
+/** Ambient time the base must stay unchanged before it is baked (2 ticks). */
+const BAKE_SETTLE_MS = AMBIENT_STEP_MS * 2 - 1;
 
 export interface LabSceneProps {
   width: number;
@@ -186,6 +193,10 @@ export function LabScene({
     [],
   );
   const empty = useMemo<SkPicture>(() => createPicture(() => {}), []);
+  // World-space unit polygons for the plane (camera perf pass), built once.
+  const planeShapes = useMemo(() => makePlaneShapes(), []);
+  const ringWorldEffect = useMemo(() => labEffect("ringWorld"), []);
+  const gridEffect = useMemo(() => labEffect("grid"), []);
 
   // ── Sky resources: recorded ONCE per size/palette (as DeepFieldBackdrop). ──
   const firstBake = useMemo(() => !nebulaCached(ink), [ink]);
@@ -263,10 +274,10 @@ export function LabScene({
   // ── Base-layer texture cache. The "below" picture (sky, world plane,
   // rear bodies) is the expensive one to rasterise — the plane's many
   // stroked polygons are re-tessellated by Ganesh on every flush (measured:
-  // ~70 % of the remaining idle main-thread time). It is rasterised ONCE per
-  // change into a device-pixel offscreen texture on the UI thread (same GL
-  // context as the view), so ambient-only redraws (the sun, the reticle
-  // scan) just blit it. Mutable UI scratch: never reassigned → never an input
+  // ~70 % of the remaining idle main-thread time). It is rasterised into a
+  // device-pixel offscreen texture on the UI thread (same GL context as the
+  // view) once the scene is STATIC (camera perf pass: see `below`), so
+  // ambient-only redraws (the sun, the reticle scan) just blit it. Mutable UI scratch: never reassigned → never an input
   // change. Released on unmount.
   const density = useWindowDimensions().scale || 1;
   const baseCache = useSharedValue<{
@@ -345,6 +356,10 @@ export function LabScene({
         now,
         ringEffect: effects.ring,
         focus: mix > 0 ? { keys: state.keys, mix } : undefined,
+        shapes: planeShapes,
+        ringWorldEffect,
+        gridEffect,
+        pixelRatio: density,
       });
       const polaris = polarisProjection(current, sceneExtent);
       drawPolaris(
@@ -361,45 +376,69 @@ export function LabScene({
     const above = createPicture((canvas) => {
       drawRange(canvas, sunAt, order.length);
     }, viewportRect);
-    // Rasterise the base once (see baseCache); fall back to the picture.
-    if (BASE_TEXTURE) {
-      const pw = Math.ceil(viewportRect.width * density);
-      const ph = Math.ceil(viewportRect.height * density);
-      const cache = baseCache.value;
-      if (!cache.surface || cache.width !== pw || cache.height !== ph) {
-        cache.surface?.dispose();
-        cache.surface =
-          pw > 0 && ph > 0 ? Skia.Surface.MakeOffscreen(pw, ph) : null;
-        cache.width = pw;
-        cache.height = ph;
-      }
-      const surface = cache.surface;
-      if (surface) {
-        const target = surface.getCanvas();
-        target.clear(CLEAR_INK);
-        target.save();
-        target.scale(density, density);
-        target.drawPicture(below);
-        target.restore();
-        surface.flush();
-        const image = surface.makeImageSnapshot();
-        const blit = createPicture((canvas) => {
-          canvas.drawImageRectOptions(
-            image,
-            Skia.XYWHRect(0, 0, pw, ph),
-            Skia.XYWHRect(0, 0, pw / density, ph / density),
-            FILTER_LINEAR,
-            MIPMAP_NONE,
-            null,
-          );
-        }, viewportRect);
-        return { below: blit, above };
-      }
-    }
     return { below, above };
   });
-  const below = useDerivedValue(() => scene.value.below);
   const above = useDerivedValue(() => scene.value.above);
+
+  // ── Base texture, only while STATIC (camera perf pass). While anything the
+  // base draws keeps changing (a pan, pinch, focus flight, switch, fade), the
+  // fresh `below` picture is drawn directly: rasterising it into the cache
+  // every frame would add an offscreen pass + an 18 MB snapshot copy per
+  // frame. Once the scene has been unchanged for BAKE_SETTLE_MS of ambient
+  // time, it is rasterised ONCE and ambient-only redraws (sun at AMBIENT_HZ)
+  // blit that texture. Under live reduced motion there is no ambient time:
+  // nothing redraws at idle, so the direct picture is kept (no bake needed).
+  const bake = useSharedValue<{
+    scene: unknown;
+    since: number;
+    blit: SkPicture | null;
+  }>({ scene: null, since: 0, blit: null });
+  const below = useDerivedValue(() => {
+    const current = scene.value;
+    const t = ambient.value;
+    const state = bake.value;
+    if (state.scene !== current) {
+      state.scene = current;
+      state.since = t;
+      state.blit = null;
+      return current.below;
+    }
+    if (state.blit) return state.blit;
+    if (!BASE_TEXTURE || t < 0 || t - state.since < BAKE_SETTLE_MS)
+      return current.below;
+    const viewportRect = { width, height };
+    const pw = Math.ceil(width * density);
+    const ph = Math.ceil(height * density);
+    const cache = baseCache.value;
+    if (!cache.surface || cache.width !== pw || cache.height !== ph) {
+      cache.surface?.dispose();
+      cache.surface =
+        pw > 0 && ph > 0 ? Skia.Surface.MakeOffscreen(pw, ph) : null;
+      cache.width = pw;
+      cache.height = ph;
+    }
+    const surface = cache.surface;
+    if (!surface) return current.below;
+    const target = surface.getCanvas();
+    target.clear(CLEAR_INK);
+    target.save();
+    target.scale(density, density);
+    target.drawPicture(current.below);
+    target.restore();
+    surface.flush();
+    const image = surface.makeImageSnapshot();
+    state.blit = createPicture((canvas) => {
+      canvas.drawImageRectOptions(
+        image,
+        Skia.XYWHRect(0, 0, pw, ph),
+        Skia.XYWHRect(0, 0, pw / density, ph / density),
+        FILTER_LINEAR,
+        MIPMAP_NONE,
+        null,
+      );
+    }, viewportRect);
+    return state.blit;
+  });
 
   // ── The sun: the only ambient-driven body. ───────────────────────────────
   const sun = useDerivedValue(() => {

@@ -22,6 +22,20 @@
  *     the ring polygon — no extra projection for rings.
  *   - Widths are screen px (the canonical 2/3/4 width channel × scale).
  *
+ * CAMERA PERF PASS (supersedes the CPU projection above where the world
+ * resources exist — `PlaneShapes` + RING_WORLD_SKSL/GRID_SKSL): the plane's
+ * static geometry is cached ONCE in world/unit coordinates and drawn under
+ * the exact homography (canvas.concat(H·T·S)); a camera move costs a matrix
+ * per element instead of re-projecting polygons in JS and re-tessellating
+ * strokes in Ganesh every frame. Pass 1's dead end (strokes under a
+ * perspective CTM fall to CPU path masks) is avoided because nothing is
+ * STROKED in world space: rings are cached unit annulus strips and the grid
+ * is one unit disc (`drawVertices` → plain GPU triangles under perspective),
+ * and the stroke itself is analytic in the shader — screen-dp width from the
+ * Jacobian of H, 1-device-px AA. Pool and haze are gradients on the same
+ * disc. The screen-space path below remains the fallback (no Skia vertices /
+ * shader compile failure) and is what the unit tests' mocks exercise.
+ *
  * Draw order (bottom → top): sun-lit pool · reference grid + bezel · contact
  * shadows (tilt-gated) · ring hairlines + status segments · moon orbit
  * hairlines · depth haze · switch FX (motion trails, ink-in glints, capture
@@ -38,11 +52,13 @@
 import type {
   SkCanvas,
   SkPaint,
+  SkPath,
   SkPoint,
   SkRuntimeEffect,
+  SkVertices,
 } from "@shopify/react-native-skia";
 import { Skia } from "@shopify/react-native-skia";
-import { MAX_TILT } from "@/logic/orrery-camera-logic";
+import { MAX_TILT, RING_SEGMENTS } from "@/logic/orrery-camera-logic";
 import { type AnimatedFrame, bodyKey } from "@/logic/orrery-frame";
 import type { StrokeStyle } from "@/logic/orrery-ring-logic";
 import {
@@ -136,6 +152,10 @@ const TILE_CLAMP = 0;
 const BLEND_SRC_OVER = 3;
 const BLEND_PLUS = 12;
 const BLEND_MULTIPLY = 24;
+/** drawVertices blend (ignored: the bands carry no per-vertex colours). */
+const BLEND_DST = 2;
+const MODE_TRIANGLE_STRIP = 1;
+const MODE_TRIANGLE_FAN = 2;
 const TAU = Math.PI * 2;
 const DEG = 180 / Math.PI;
 
@@ -156,6 +176,22 @@ export interface TrailState {
   pts: Record<string, number[]>;
 }
 
+/**
+ * CAMERA PERF PASS — world-space unit polygons, built ONCE on the JS thread
+ * (`makePlaneShapes`). Vertex i of the n-gon is (sin a, −cos a), a = i·τ/n —
+ * exactly the vertex set `circlePoly` / the frame's `ringPath` project — so a
+ * circle (cx, cy, r) on the plane is `unit(n)` under H·T(cx,cy)·S(r), mapped
+ * NATIVELY by `PathBuilder.addPath(unit, M)` (one call) instead of n JS
+ * projections + an n-object JSI array conversion per circle per frame.
+ */
+export interface PlaneShapes {
+  circles: Readonly<Record<number, SkPath>>;
+  /** Unit annulus strips 1 ± BAND_EPS[k] (ring geometry, see ringBand). */
+  bands: readonly SkVertices[] | null;
+  /** Unit disc fan (rim pushed out to contain the true circle). */
+  disc: SkVertices | null;
+}
+
 export interface PlaneInput {
   frame: AnimatedFrame;
   rings: readonly PlaneRing[];
@@ -171,6 +207,14 @@ export interface PlaneInput {
   /** Pass 3: focused body keys + 0..1 emphasis (focused ring lit along its
    *  whole length, other rings dim). Absent → no emphasis. */
   focus?: PlaneFocus;
+  /** Camera perf pass: cached world unit polygons (absent → JS projection). */
+  shapes?: PlaneShapes | null;
+  /** Camera perf pass: compiled RING_WORLD_SKSL (null → screen-space rings). */
+  ringWorldEffect?: SkRuntimeEffect | null;
+  /** Camera perf pass: compiled GRID_SKSL (null → screen-space grid). */
+  gridEffect?: SkRuntimeEffect | null;
+  /** Device pixels per dp (the AA feather of the analytic strokes). */
+  pixelRatio?: number;
 }
 
 export interface PlaneFocus {
@@ -272,6 +316,224 @@ function polygon(points: readonly SkPoint[]) {
   return b.build();
 }
 
+/** Ring band strips: segments, and the geometric ladder of half-widths
+ *  (fraction of R; ×1.25 per step → ≤ 25 % fragment waste per ring). */
+const BAND_SEGMENTS = 128;
+export const BAND_EPS: readonly number[] = Array.from(
+  { length: 30 },
+  (_, k) => 0.001 * 1.25 ** k,
+);
+const BAND_MARGIN = 1.1;
+
+/** Segment counts of the cached unit polygons (see PlaneShapes). */
+export const PLANE_SHAPE_SEGMENTS = [
+  40,
+  48,
+  64,
+  PLANE_CIRCLE_SEGMENTS,
+  RING_SEGMENTS,
+  PLANE_CIRCLE_SEGMENTS * 2,
+] as const;
+
+/** JS thread, once: the unit polygons (null when Skia is unavailable). */
+export function makePlaneShapes(): PlaneShapes | null {
+  const make = Skia?.PathBuilder?.Make;
+  if (typeof make !== "function") return null;
+  const circles: Record<number, SkPath> = {};
+  for (const n of PLANE_SHAPE_SEGMENTS) {
+    const points: SkPoint[] = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i * TAU) / n;
+      points.push({ x: Math.sin(a), y: -Math.cos(a) });
+    }
+    circles[n] = make().addPoly(points, true).build();
+  }
+  let bands: SkVertices[] | null = null;
+  if (typeof Skia.MakeVertices === "function") {
+    // Outer edge pushed out by 1/cos(π/n) so the polygonal strip CONTAINS
+    // the true circle band (the shader computes exact circle distance).
+    const n = BAND_SEGMENTS;
+    const grow = 1 / Math.cos(Math.PI / n);
+    bands = BAND_EPS.map((eps) => {
+      const strip: SkPoint[] = [];
+      for (let i = 0; i <= n; i++) {
+        const a = (i * TAU) / n;
+        const s = Math.sin(a);
+        const c = -Math.cos(a);
+        const inner = Math.max(0, 1 - eps);
+        const outer = (1 + eps) * grow;
+        strip.push(
+          { x: s * inner, y: c * inner },
+          { x: s * outer, y: c * outer },
+        );
+      }
+      return Skia.MakeVertices(MODE_TRIANGLE_STRIP, strip);
+    });
+  }
+  let disc: SkVertices | null = null;
+  if (typeof Skia.MakeVertices === "function") {
+    const n = BAND_SEGMENTS;
+    const grow = 1 / Math.cos(Math.PI / n);
+    const fan: SkPoint[] = [{ x: 0, y: 0 }];
+    for (let i = 0; i <= n; i++) {
+      const a = (i * TAU) / n;
+      fan.push({ x: Math.sin(a) * grow, y: -Math.cos(a) * grow });
+    }
+    disc = Skia.MakeVertices(MODE_TRIANGLE_FAN, fan);
+  }
+  return { circles, bands, disc };
+}
+
+/**
+ * Smallest screen-dp-per-world-unit RADIAL scale of the projection around
+ * the ring of radius R (sampled; the strip's half-width must cover the
+ * widest stroke + AA where the plane is most compressed).
+ */
+export function minRadialScale(H: readonly number[], R: number): number {
+  "worklet";
+  let low = Infinity;
+  for (let i = 0; i < 24; i++) {
+    const a = (i * TAU) / 24;
+    const dx = Math.sin(a);
+    const dy = -Math.cos(a);
+    const px = R * dx;
+    const py = R * dy;
+    const w = H[6] * px + H[7] * py + H[8];
+    const sx = (H[0] * px + H[1] * py + H[2]) / w;
+    const sy = (H[3] * px + H[4] * py + H[5]) / w;
+    const hd = H[6] * dx + H[7] * dy;
+    const jx = (H[0] * dx + H[1] * dy - sx * hd) / w;
+    const jy = (H[3] * dx + H[4] * dy - sy * hd) / w;
+    low = Math.min(low, Math.hypot(jx, jy));
+  }
+  return low;
+}
+
+/** Index of the narrowest cached band containing the ring's strokes + AA
+ *  (−1 → none wide enough: use the screen-space fallback). */
+export function ringBand(
+  shapes: PlaneShapes | null | undefined,
+  H: readonly number[],
+  R: number,
+  hairWidth: number,
+  statusWidth: number,
+): number {
+  "worklet";
+  if (!shapes?.bands || !(R > 0)) return -1;
+  const scale = minRadialScale(H, R);
+  if (!(scale > 0)) return -1;
+  // Widest stroke (focused hairline or segment) + AA, with sampling margin.
+  const half = Math.max(hairWidth, statusWidth * SEGMENT_SCALE) / 2 + 2;
+  const eps = (half / scale / R) * BAND_MARGIN;
+  for (let k = 0; k < BAND_EPS.length; k++) if (BAND_EPS[k] >= eps) return k;
+  return -1;
+}
+
+/** RING_WORLD_SKSL uniforms, declaration order (36 floats). */
+export function ringWorldUniforms(
+  H: readonly number[],
+  R: number,
+  aa: number,
+  dashes: number,
+  reveal: number,
+  nearX: number,
+  nearY: number,
+  farA: number,
+  hairHalf: number,
+  hairA: number,
+  inkFar: Rgba,
+  inkNear: Rgba,
+  segHalf: number,
+  segA: number,
+  start: number,
+  body: number,
+  span: number,
+  directional: boolean,
+  segInk: Rgba,
+): number[] {
+  "worklet";
+  return [
+    H[0],
+    H[1],
+    H[2],
+    H[3],
+    H[4],
+    H[5],
+    H[6],
+    H[7],
+    H[8],
+    R,
+    aa,
+    dashes,
+    reveal,
+    nearX,
+    nearY,
+    farA,
+    hairHalf,
+    hairA,
+    inkFar[0],
+    inkFar[1],
+    inkFar[2],
+    1,
+    inkNear[0],
+    inkNear[1],
+    inkNear[2],
+    1,
+    segHalf,
+    segA,
+    start,
+    body,
+    span,
+    directional ? 1 : 0,
+    segInk[0],
+    segInk[1],
+    segInk[2],
+    1,
+  ];
+}
+
+/** H · T(cx, cy) · S(r): the unit polygon → the projected world circle. */
+export function circleMatrix(
+  H: readonly number[],
+  cx: number,
+  cy: number,
+  r: number,
+): number[] {
+  "worklet";
+  return [
+    H[0] * r,
+    H[1] * r,
+    H[0] * cx + H[1] * cy + H[2],
+    H[3] * r,
+    H[4] * r,
+    H[3] * cx + H[4] * cy + H[5],
+    H[6] * r,
+    H[7] * r,
+    H[6] * cx + H[7] * cy + H[8],
+  ];
+}
+
+/**
+ * The projected world circle as a closed convex screen polygon: natively
+ * mapped from the cached unit n-gon when available, else projected in JS.
+ */
+function worldCircle(
+  H: readonly number[],
+  shapes: PlaneShapes | null | undefined,
+  cx: number,
+  cy: number,
+  r: number,
+  segments: number,
+) {
+  "worklet";
+  const unit = shapes?.circles[segments];
+  if (!unit) return polygon(circlePoly(H, cx, cy, r, segments));
+  const b = Skia.PathBuilder.Make();
+  b.addPath(unit, circleMatrix(H, cx, cy, r) as never);
+  b.setIsVolatile(true);
+  return b.build();
+}
+
 /** Perimeter of a closed polygon (screen px). */
 function perimeter(points: readonly SkPoint[]): number {
   "worklet";
@@ -284,13 +546,76 @@ function perimeter(points: readonly SkPoint[]): number {
   return total;
 }
 
+/** GRID_SKSL uniforms, declaration order (26 floats). */
+export function gridUniforms(
+  H: readonly number[],
+  S: number,
+  aa: number,
+  reach: number,
+  inner: number,
+  outer: number,
+  bezel: number,
+  spin: number,
+  ink: Rgba,
+): number[] {
+  "worklet";
+  return [
+    H[0],
+    H[1],
+    H[2],
+    H[3],
+    H[4],
+    H[5],
+    H[6],
+    H[7],
+    H[8],
+    S,
+    aa,
+    GRID_STROKE_PX / 2,
+    reach,
+    GRID_RING_STEP,
+    inner,
+    outer,
+    bezel,
+    GRID_SPOKE_DEGREES / DEG,
+    GRID_TICK_DEGREES / DEG,
+    spin,
+    GRID_TICK_MINOR,
+    GRID_TICK_MAJOR,
+    ink[0],
+    ink[1],
+    ink[2],
+    1,
+  ];
+}
+
+/** Draws the unit disc fan under H·T(cx,cy)·S(r) with `paint`. */
+function drawWorldDisc(
+  canvas: SkCanvas,
+  disc: SkVertices,
+  H: readonly number[],
+  cx: number,
+  cy: number,
+  r: number,
+  paint: SkPaint,
+): void {
+  "worklet";
+  canvas.save();
+  canvas.concat(circleMatrix(H, cx, cy, r) as never);
+  canvas.drawVertices(disc, BLEND_DST, paint);
+  canvas.restore();
+}
+
 function drawGrid(
   canvas: SkCanvas,
   H: readonly number[],
+  shapes: PlaneShapes | null | undefined,
   ink: DeepFieldInk,
   reach: number,
   density: number,
   bezelSpin: number,
+  gridEffect: SkRuntimeEffect | null,
+  aa: number,
 ): void {
   "worklet";
   const chart = ink.chart;
@@ -298,6 +623,30 @@ function drawGrid(
     (chart ? GRID_ALPHA_INNER_LIGHT : GRID_ALPHA_INNER_DARK) * density;
   const outer =
     (chart ? GRID_ALPHA_OUTER_LIGHT : GRID_ALPHA_OUTER_DARK) * density;
+  // CAMERA PERF PASS: one analytic world-space draw (no CPU geometry).
+  if (gridEffect && shapes?.disc) {
+    const rim = reach + GRID_TICK_MAJOR * 1.1;
+    const scale = minRadialScale(H, rim);
+    const S = rim + (scale > 0 ? ((GRID_STROKE_PX / 2 + 2) / scale) * 1.1 : 0);
+    const paint = makePaint(STYLE_FILL, BLEND_SRC_OVER);
+    paint.setShader(
+      gridEffect.makeShader(
+        gridUniforms(
+          H,
+          S,
+          aa,
+          reach,
+          inner,
+          outer,
+          chart ? GRID_BEZEL_ALPHA_LIGHT : GRID_BEZEL_ALPHA_DARK,
+          bezelSpin,
+          ink.grid,
+        ),
+      ),
+    );
+    drawWorldDisc(canvas, shapes.disc, H, 0, 0, S, paint);
+    return;
+  }
   const paint = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
   paint.setStrokeWidth(GRID_STROKE_PX);
   // Reference circles: alpha fades outward (per circle).
@@ -307,7 +656,7 @@ function drawGrid(
       withAlpha(ink.grid, Math.min(1, inner + (outer - inner) * k)),
     );
     canvas.drawPath(
-      polygon(circlePoly(H, 0, 0, r, PLANE_CIRCLE_SEGMENTS)),
+      worldCircle(H, shapes, 0, 0, r, PLANE_CIRCLE_SEGMENTS),
       paint,
     );
   }
@@ -348,18 +697,17 @@ function drawGrid(
     withAlpha(ink.grid, chart ? GRID_BEZEL_ALPHA_LIGHT : GRID_BEZEL_ALPHA_DARK),
   );
   canvas.drawPath(
-    polygon(circlePoly(H, 0, 0, reach, PLANE_CIRCLE_SEGMENTS * 2)),
+    worldCircle(H, shapes, 0, 0, reach, PLANE_CIRCLE_SEGMENTS * 2),
     bezel,
   );
   canvas.drawPath(
-    polygon(
-      circlePoly(
-        H,
-        0,
-        0,
-        reach + GRID_TICK_MAJOR * 1.1,
-        PLANE_CIRCLE_SEGMENTS * 2,
-      ),
+    worldCircle(
+      H,
+      shapes,
+      0,
+      0,
+      reach + GRID_TICK_MAJOR * 1.1,
+      PLANE_CIRCLE_SEGMENTS * 2,
     ),
     bezel,
   );
@@ -429,8 +777,10 @@ function ringUniforms(
  */
 export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
   "worklet";
-  const { frame, rings, fx, ink, extent, trails } = input;
+  const { frame, rings, fx, ink, extent, trails, shapes } = input;
   const effect = input.ringEffect ?? null;
+  const worldEffect = input.ringWorldEffect ?? null;
+  const pixel = 1 / Math.max(1, input.pixelRatio ?? 1);
   const now = input.now ?? 0;
   const pose = frame.pose;
   const zoom = pose.zoom > 0 ? pose.zoom : 1;
@@ -475,26 +825,44 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
   // exact projected circle, gradient in the local affine frame at the sun.
   const pool = makePaint(STYLE_FILL, chart ? BLEND_MULTIPLY : BLEND_PLUS);
   const poolR = Math.max(GRID_RING_STEP, extent * LIT_POOL_REACH);
-  pool.setShader(
-    Skia.Shader.MakeRadialGradient(
-      { x: sunX, y: sunY },
-      poolR,
-      chart
-        ? [
-            withAlpha(ink.starlight, LIT_POOL_ALPHA_LIGHT),
-            withAlpha(ink.background, 0),
-          ]
-        : [
-            withAlpha(ink.starlight, LIT_POOL_ALPHA_DARK),
-            withAlpha(ink.starlight, LIT_POOL_ALPHA_DARK * 0.3),
-            withAlpha(ink.starlight, 0),
-          ],
-      chart ? [0, 1] : [0, 0.35, 1],
-      TILE_CLAMP,
-      Skia.Matrix(affineAt(H, sunX, sunY)),
-    ),
-  );
-  canvas.drawPath(polygon(circlePoly(H, sunX, sunY, poolR, 64)), pool);
+  const poolColors = chart
+    ? [
+        withAlpha(ink.starlight, LIT_POOL_ALPHA_LIGHT),
+        withAlpha(ink.background, 0),
+      ]
+    : [
+        withAlpha(ink.starlight, LIT_POOL_ALPHA_DARK),
+        withAlpha(ink.starlight, LIT_POOL_ALPHA_DARK * 0.3),
+        withAlpha(ink.starlight, 0),
+      ];
+  const poolStops = chart ? [0, 1] : [0, 0.35, 1];
+  if (shapes?.disc) {
+    // Camera perf pass: the exact world-space radial pool (unit disc under
+    // H·T(sun)·S(poolR); the gradient is in unit coordinates → exact under
+    // perspective, no per-frame polygon).
+    pool.setShader(
+      Skia.Shader.MakeRadialGradient(
+        { x: 0, y: 0 },
+        1,
+        poolColors,
+        poolStops,
+        TILE_CLAMP,
+      ),
+    );
+    drawWorldDisc(canvas, shapes.disc, H, sunX, sunY, poolR, pool);
+  } else {
+    pool.setShader(
+      Skia.Shader.MakeRadialGradient(
+        { x: sunX, y: sunY },
+        poolR,
+        poolColors,
+        poolStops,
+        TILE_CLAMP,
+        Skia.Matrix(affineAt(H, sunX, sunY)),
+      ),
+    );
+    canvas.drawPath(worldCircle(H, shapes, sunX, sunY, poolR, 64), pool);
+  }
 
   // 2 · Reference grid + bezel. The inner rings/spokes fade as the orbit
   // count rises; the bezel stays. Pass 2: brightens with spin velocity.
@@ -504,7 +872,17 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
       Math.min(1, GRID_DENSITY_REF / Math.max(1, rings.length)),
     ) *
     (1 + GRID_FX_GAIN * velocity);
-  drawGrid(canvas, H, ink, reach, density, BEZEL_SPIN * velocity);
+  drawGrid(
+    canvas,
+    H,
+    shapes,
+    ink,
+    reach,
+    density,
+    BEZEL_SPIN * velocity,
+    input.gridEffect ?? null,
+    pixel,
+  );
 
   // 3 · Contact shadows: cast outward along the plane, away from the sun,
   // drawn in the local affine frame at each shadow (GPU oval fill).
@@ -565,6 +943,7 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
   const nearY = Math.cos(yaw);
   const hair = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
   const segment = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
+  const bandPaint = makePaint(STYLE_FILL, BLEND_SRC_OVER);
   const tint = chart ? RING_TINT_LIGHT : RING_TINT_DARK;
   // Few orbits → bolder hairlines (they are the only structure).
   const sparse = clamp01(
@@ -613,7 +992,6 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
     const nearColor = mixInk(hairColor, ring.color, RING_NEAR_TINT);
     const far = mapHomography(H, -nearX * ringR, -nearY * ringR);
     const nearP = mapHomography(H, nearX * ringR, nearY * ringR);
-    const ringPoly = polygon(body.ringPath);
     const dashes = dashed
       ? Math.max(4, Math.round(perimeter(body.ringPath) / (RING_DASH * 2)))
       : 0;
@@ -628,6 +1006,78 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
       reveal = normalAngle(screenAngle(origin.x, origin.y, hp.x, hp.y) - north);
       glints.push(hp.x, hp.y, alpha * (1 - drawOn * drawOn), r);
     }
+    const hairW =
+      ring.width *
+      (RING_HAIR_SCALE + (FOCUS_RING_WIDTH - RING_HAIR_SCALE) * litMix);
+    const hairA = Math.min(
+      1,
+      alpha * (hairAlpha + (FOCUS_RING_ALPHA - hairAlpha) * litMix) * dim,
+    );
+    // CAMERA PERF PASS: the world-space path (cached unit band under H·S(R),
+    // analytic stroke) — no per-frame polygon, no CPU stroke tessellation.
+    const band = worldEffect
+      ? ringBand(shapes, H, ringR, hairW, ring.width)
+      : -1;
+    if (worldEffect && shapes?.bands && band >= 0) {
+      let segW = 0;
+      let segA = 0;
+      let start = 0;
+      let bodyRel = 0;
+      let span = 0;
+      if (drawOn >= 1 && body.kind === "contact") {
+        const w = mapHomography(Hi, body.x, body.y);
+        const theta = normalAngle(Math.atan2(w.x, -w.y));
+        const trail = ring.progress
+          ? Math.min(SEGMENT_TRAIL, theta)
+          : SEGMENT_LEAD * 1.5;
+        const lead = ring.progress ? SEGMENT_LEAD : SEGMENT_LEAD * 1.5;
+        if (trail + lead > 0.02) {
+          const bx = Math.sin(theta);
+          const by = -Math.cos(theta);
+          const near = (bx * nearX + by * nearY + 1) / 2;
+          const depthA = farAlpha + (1 - farAlpha) * near;
+          segW = (ring.width * SEGMENT_SCALE) / 2;
+          segA = alpha * segAlpha * depthA * (1 - (1 - dim) * 0.6);
+          start = normalAngle(theta - trail);
+          bodyRel = trail;
+          span = trail + lead;
+        }
+      }
+      bandPaint.setShader(
+        worldEffect.makeShader(
+          ringWorldUniforms(
+            H,
+            ringR,
+            pixel,
+            dashes,
+            drawOn < 1 ? drawOn * TAU : TAU + 1,
+            nearX,
+            nearY,
+            farAlpha,
+            hairW / 2,
+            hairA,
+            hairColor,
+            nearColor,
+            segW,
+            segA,
+            start,
+            bodyRel,
+            span,
+            ring.progress,
+            ring.color,
+          ),
+        ),
+      );
+      canvas.save();
+      canvas.concat(circleMatrix(H, 0, 0, ringR) as never);
+      canvas.drawVertices(shapes.bands[band], BLEND_DST, bandPaint);
+      canvas.restore();
+      continue;
+    }
+    // The ring polygon = the frame's ringPath (same vertices), mapped natively.
+    const ringPoly = shapes
+      ? worldCircle(H, shapes, 0, 0, ringR, RING_SEGMENTS)
+      : polygon(body.ringPath);
     if (effect) {
       hair.setShader(
         effect.makeShader(
@@ -652,16 +1102,8 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
       );
     } else hair.setColor(withAlpha(hairColor, 1));
     // Width channel kept proportional (2/3/4 → 1 : 1.5 : 2), screen px.
-    hair.setStrokeWidth(
-      ring.width *
-        (RING_HAIR_SCALE + (FOCUS_RING_WIDTH - RING_HAIR_SCALE) * litMix),
-    );
-    hair.setAlphaf(
-      Math.min(
-        1,
-        alpha * (hairAlpha + (FOCUS_RING_ALPHA - hairAlpha) * litMix) * dim,
-      ),
-    );
+    hair.setStrokeWidth(hairW);
+    hair.setAlphaf(hairA);
     canvas.drawPath(ringPoly, hair);
 
     // Body world position → its angle (0 = north, clockwise).
@@ -750,7 +1192,7 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
     moonPaint.setColor(
       withAlpha(ink.grid, MOON_ORBIT_ALPHA * m.opacity * parent.opacity),
     );
-    canvas.drawPath(polygon(circlePoly(H, pw.x, pw.y, mr, 48)), moonPaint);
+    canvas.drawPath(worldCircle(H, shapes, pw.x, pw.y, mr, 48), moonPaint);
   }
 
   // 5b · Pass 3 arrival ghosts: a contact already in the frame (an entering
@@ -774,7 +1216,12 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
       ghostRing.setColor(
         withAlpha(ink.grid, GHOST_RING_ALPHA * hairAlpha * b.opacity),
       );
-      canvas.drawPath(polygon(b.ringPath), ghostRing);
+      canvas.drawPath(
+        shapes && b.ringRadius > 0
+          ? worldCircle(H, shapes, 0, 0, b.ringRadius / zoom, RING_SEGMENTS)
+          : polygon(b.ringPath),
+        ghostRing,
+      );
     }
     const r = b.radius * bodyVisualScale(b.radius);
     ghostFill.setColor(withAlpha(ghostBody, GHOST_FILL_ALPHA * b.opacity));
@@ -786,34 +1233,45 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
   // 6 · Depth haze: the far side of the plane recedes toward the background
   // (aerial perspective). Confined to the plane's own footprint.
   if (tiltGate > 0.01) {
-    const farEdge = mapHomography(H, -nearX * reach, -nearY * reach);
     const haze = makePaint(STYLE_FILL, BLEND_SRC_OVER);
     const hA = (chart ? HAZE_ALPHA_LIGHT : HAZE_ALPHA_DARK) * shadowGate;
-    haze.setShader(
-      Skia.Shader.MakeLinearGradient(
-        { x: farEdge.x, y: farEdge.y },
-        { x: origin.x, y: origin.y },
-        [
-          withAlpha(ink.background, hA),
-          withAlpha(ink.background, hA * 0.35),
-          withAlpha(ink.background, 0),
-        ],
-        [0, 0.45, 1],
-        TILE_CLAMP,
-      ),
-    );
-    canvas.drawPath(
-      polygon(
-        circlePoly(
-          H,
-          0,
-          0,
-          reach + GRID_TICK_MAJOR * 1.6,
-          PLANE_CIRCLE_SEGMENTS,
+    const hazeColors = [
+      withAlpha(ink.background, hA),
+      withAlpha(ink.background, hA * 0.35),
+      withAlpha(ink.background, 0),
+    ];
+    const hazeR = reach + GRID_TICK_MAJOR * 1.6;
+    if (shapes?.disc) {
+      // Camera perf pass: world-space linear ramp (far rim → sun) on the unit
+      // disc (world-linear instead of screen-linear: a documented, visually
+      // negligible difference under perspective).
+      const k = reach / hazeR;
+      haze.setShader(
+        Skia.Shader.MakeLinearGradient(
+          { x: -nearX * k, y: -nearY * k },
+          { x: 0, y: 0 },
+          hazeColors,
+          [0, 0.45, 1],
+          TILE_CLAMP,
         ),
-      ),
-      haze,
-    );
+      );
+      drawWorldDisc(canvas, shapes.disc, H, 0, 0, hazeR, haze);
+    } else {
+      const farEdge = mapHomography(H, -nearX * reach, -nearY * reach);
+      haze.setShader(
+        Skia.Shader.MakeLinearGradient(
+          { x: farEdge.x, y: farEdge.y },
+          { x: origin.x, y: origin.y },
+          hazeColors,
+          [0, 0.45, 1],
+          TILE_CLAMP,
+        ),
+      );
+      canvas.drawPath(
+        worldCircle(H, shapes, 0, 0, hazeR, PLANE_CIRCLE_SEGMENTS),
+        haze,
+      );
+    }
   }
 
   // 7 · Switch FX (all absent under reduced motion: `fx` is idle then).
@@ -968,7 +1426,7 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
     const fade = (1 - t) * (1 - t);
     ripple.setColor(withAlpha(ring.color, PULSE_ALPHA * fade * body.opacity));
     canvas.drawPath(
-      polygon(circlePoly(H, w.x, w.y, worldR * (1.15 + PULSE_REACH * t), 40)),
+      worldCircle(H, shapes, w.x, w.y, worldR * (1.15 + PULSE_REACH * t), 40),
       ripple,
     );
   }

@@ -274,11 +274,177 @@ half4 main(float2 p) {
 }
 `;
 
+/**
+ * CAMERA PERF PASS — one orbit ring (hairline + status segment) drawn in
+ * WORLD space under the camera homography: the geometry is a cached UNIT
+ * annulus strip (`SkVertices`, built once) drawn under H·S(uR), so local
+ * coordinates are unit-ring coordinates and p = u·uR is the world point.
+ * Nothing is tessellated on the CPU (no stroke → no Ganesh path renderer);
+ * the stroke is analytic:
+ *   - the screen-dp distance to the ring is |r − uR| × the radial derivative
+ *     of the projection at p (the Jacobian of H, exact per pixel), so widths
+ *     stay CONSTANT SCREEN dp (the 2/3/4 width channel) with a 1-device-px
+ *     AA feather (uAA = dp per device pixel), at any tilt/zoom;
+ *   - angles are WORLD angles about the sun (0 = north, clockwise), so the
+ *     status segment, dashes and ink-in reveal are exact on the plane;
+ *   - far→near ink/alpha ramp along the world near direction (uNearDir).
+ * Hairline + segment are one draw: segment composited over hairline (the
+ * previous two src-over draws, in the same order).
+ * Uniform block order is mirrored by `ringWorldUniforms` (world-plane.ts).
+ */
+export const RING_WORLD_SKSL = `
+uniform float3 uH0;
+uniform float3 uH1;
+uniform float3 uH2;
+uniform float uR;
+uniform float uAA;
+uniform float uN;
+uniform float uReveal;
+uniform float2 uNearDir;
+uniform float uFarA;
+uniform float uHairW;
+uniform float uHairA;
+uniform half4 uInkFar;
+uniform half4 uInkNear;
+uniform float uSegW;
+uniform float uSegA;
+uniform float uStart;
+uniform float uBody;
+uniform float uSpan;
+uniform float uDir;
+uniform half4 uSegInk;
+
+half4 main(float2 u) {
+  const float TAU = 6.2831853;
+  float2 p = u * uR;
+  float r = length(p);
+  if (r < 0.0001) return half4(0.0);
+  float an = mod(atan(p.x, -p.y) + TAU, TAU);
+  if (uN > 0.5 && fract(an / TAU * uN) >= 0.5) return half4(0.0);
+  if (uReveal < TAU && an > uReveal) return half4(0.0);
+  float3 q = float3(p, 1.0);
+  float w = dot(uH2, q);
+  float sx = dot(uH0, q) / w;
+  float sy = dot(uH1, q) / w;
+  float2 d = p / r;
+  float2 j = float2(dot(uH0.xy, d) - sx * dot(uH2.xy, d),
+                    dot(uH1.xy, d) - sy * dot(uH2.xy, d)) / w;
+  float dist = abs(r - uR) * length(j);
+  float hc = clamp((uHairW - dist) / uAA + 0.5, 0.0, 1.0);
+  float t = clamp((dot(p, uNearDir) / uR + 1.0) * 0.5, 0.0, 1.0);
+  half4 hair = mix(uInkFar, uInkNear, half(t)) * half(mix(uFarA, 1.0, t) * uHairA * hc);
+  if (uSegW <= 0.0) return hair;
+  float rel = mod(an - uStart + TAU, TAU);
+  if (rel > uSpan) return hair;
+  float lo = uDir > 0.5 ? 0.18 : 0.5;
+  float k;
+  if (rel < uBody) {
+    float tt = rel / max(uBody, 0.0001);
+    k = tt < 0.5 ? lo * tt * 2.0 : mix(lo, 1.0, (tt - 0.5) * 2.0);
+  } else {
+    k = 1.0 - (rel - uBody) / max(uSpan - uBody, 0.0001);
+  }
+  float sc = clamp((uSegW - dist) / uAA + 0.5, 0.0, 1.0);
+  half4 seg = uSegInk * half(clamp(k, 0.0, 1.0) * uSegA * sc);
+  return seg + hair * (1.0 - seg.a);
+}
+`;
+
+/**
+ * CAMERA PERF PASS — the whole reference grid (fading reference circles,
+ * spokes, double bezel, graduated tick dial) as ONE analytic draw in WORLD
+ * space under the camera homography (a cached unit disc fan under
+ * H·S(uS); p = u·uS is the world point). Same Jacobian-based screen-dp
+ * strokes + 1-device-px AA as RING_WORLD_SKSL, so line widths stay constant
+ * screen dp at any tilt/zoom; elements are composited src-over in the
+ * previous draw order (circles → spokes → bezel → ticks). Ink: uInk (token).
+ * Uniform order is mirrored by `gridUniforms` (world-plane.ts).
+ */
+export const GRID_SKSL = `
+uniform float3 uH0;
+uniform float3 uH1;
+uniform float3 uH2;
+uniform float uS;
+uniform float uAA;
+uniform float uHalf;
+uniform float uReach;
+uniform float uStep;
+uniform float uInner;
+uniform float uOuter;
+uniform float uBezelA;
+uniform float uSpokeStep;
+uniform float uTickStep;
+uniform float uSpin;
+uniform float uMinor;
+uniform float uMajor;
+uniform half4 uInk;
+
+half4 over(half4 dst, float a) {
+  half4 src = uInk * half(a);
+  return src + dst * (1.0 - src.a);
+}
+
+half4 main(float2 u) {
+  const float TAU = 6.2831853;
+  float2 p = u * uS;
+  float r = length(p);
+  if (r < 0.0001) return half4(0.0);
+  float3 q = float3(p, 1.0);
+  float w = dot(uH2, q);
+  float sx = dot(uH0, q) / w;
+  float sy = dot(uH1, q) / w;
+  float2 jx = (uH0.xy - sx * uH2.xy) / w;
+  float2 jy = (uH1.xy - sy * uH2.xy) / w;
+  float2 rd = p / r;
+  float2 td = float2(-rd.y, rd.x);
+  float sr = length(float2(dot(jx, rd), dot(jy, rd)));
+  float st = length(float2(dot(jx, td), dot(jy, td)));
+  float an = mod(atan(p.x, -p.y) + TAU, TAU);
+  half4 o = half4(0.0);
+  // Reference circles (alpha fades outward per circle).
+  float k = floor(r / uStep + 0.5);
+  float cr = k * uStep;
+  if (k >= 1.0 && cr < uReach) {
+    float c = clamp((uHalf - abs(r - cr) * sr) / uAA + 0.5, 0.0, 1.0);
+    float f = clamp((cr / uReach - 0.1) / 0.9, 0.0, 1.0);
+    o = over(o, min(1.0, uInner + (uOuter - uInner) * f) * c);
+  }
+  // Spokes: inner → outer ramp, butt ends.
+  float r0 = uStep * 0.6;
+  if (r > r0 - uStep && r < uReach + uStep) {
+    float m = floor(an / uSpokeStep + 0.5) * uSpokeStep;
+    float c = clamp((uHalf - r * abs(sin(an - m)) * st) / uAA + 0.5, 0.0, 1.0);
+    float ends = clamp((r - r0) * sr / uAA + 0.5, 0.0, 1.0)
+        * clamp((uReach - r) * sr / uAA + 0.5, 0.0, 1.0);
+    float t = clamp((r - r0) / (uReach - r0), 0.0, 1.0);
+    o = over(o, min(1.0, mix(uInner, uOuter, t)) * c * ends);
+  }
+  // Bezel: double ring.
+  float b2 = uReach + uMajor * 1.1;
+  float cb = max(clamp((uHalf - abs(r - uReach) * sr) / uAA + 0.5, 0.0, 1.0),
+                 clamp((uHalf - abs(r - b2) * sr) / uAA + 0.5, 0.0, 1.0));
+  o = over(o, uBezelA * cb);
+  // Graduated ticks (every 5th major), swinging with the switch spin.
+  if (r > uReach - uStep && r < uReach + uMajor + uStep) {
+    float idx = floor((an - uSpin) / uTickStep + 0.5);
+    float m = idx * uTickStep + uSpin;
+    float len = mod(mod(idx, 120.0) + 120.0, 5.0) < 0.5 ? uMajor : uMinor;
+    float c = clamp((uHalf - r * abs(sin(an - m)) * st) / uAA + 0.5, 0.0, 1.0);
+    float ends = clamp((r - uReach) * sr / uAA + 0.5, 0.0, 1.0)
+        * clamp((uReach + len - r) * sr / uAA + 0.5, 0.0, 1.0);
+    o = over(o, uBezelA * c * ends);
+  }
+  return o;
+}
+`;
+
 const SOURCES = {
   corona: CORONA_SKSL,
   sunDisc: SUN_DISC_SKSL,
   body: BODY_SKSL,
   ring: RING_SKSL,
+  ringWorld: RING_WORLD_SKSL,
+  grid: GRID_SKSL,
 } as const;
 export type LabEffectName = keyof typeof SOURCES;
 
