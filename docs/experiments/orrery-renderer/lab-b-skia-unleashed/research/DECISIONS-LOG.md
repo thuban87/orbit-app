@@ -437,3 +437,84 @@ Commits: `ea137306` (fix 1), `038a8d97` (fix 2), `3c0f691b` (fix 3). Write-up:
 6. **V2 consequence:** per-entity declarative Skia components with animated props are not viable
    at 100+ bodies; per-layer imperative pictures (or Atlases) are. Closure-capture discipline and
    canvas memo boundaries are renderer requirements, not polish.
+
+## 2026-10-01 — WP-2.2 focus state and interaction feedback (L7)
+
+Commits: `11c21745` (pass 1), `0acdc848` (pass 2 tuning), plus the WP-2.2 docs/evidence commit.
+Evidence: `evidence/08-wp2.2-focus/`. Device: emulator only (debug while iterating, release
+for the final captures and perf).
+
+1. **Architecture follows the switch-stall rules.** No per-body components or SharedValues:
+   the reticles are ONE picture (`LabFocusPicture`, between bodies and labels) and all feedback
+   is ONE picture (`LabFeedbackPicture`, L7), each from one derived value. Worklets capture
+   only shared values and small stable data (accent vec4, scalars, stable `NO_KEYS`). Nothing
+   reads the ambient clock: every animation is a `withTiming` SharedValue, so these layers do
+   not re-record at rest. Pure maths in `labb-focus-logic.ts` (tested).
+2. **Focus state** (`useLabFocusState` in `LabFocusFx.tsx`, exposed as
+   `LabRenderContext.focus`): `mix` and `keys` are written ONLY in a `useEffect` keyed on the
+   focus identity (joined body keys). `keys` is retained after a clear so the release fades
+   out with `mix` (340 ms in / 260 ms out). `lock` follows `camera.active` (new contract field
+   `cameraActive`): a new focus "seeks" while the recovery flies in, then locks over 380 ms
+   once the camera settles (a 160 ms grace if no fly-in starts).
+3. **Target-lock reticle replaces the accent focus ring** (flag `fxFocus`): four corner
+   L-brackets, cardinal inner ticks, a soft additive under-glow (dark themes), a faint dashed
+   range circle once locked, and a one-shot lock flash ring. While seeking, spread and spin are
+   a pure function of the body's remaining on-screen distance to the usable-rect centre, so the
+   reticle converges WITH the camera. This is the "weight" cue; camera semantics are unchanged.
+   Cluster focus: a reticle per member plus a dashed hull ring. Satellite focus: a 0.8× reticle.
+   The legacy accent ring (bodies picture, moon ring, sun `focusColor`) is suppressed while
+   the flag is on.
+4. **World response** (flag `fxFocusDim`): body shader `uK.w` = +mix on the focused world
+   (atmosphere ×1.8 plus a soft halo even on atmosphere-less statuses, a slightly brighter
+   status limb) and −mix on every other world (30 % desaturation, 22 % toward the sky, ×0.68
+   luminance; atmosphere ×0.45). There is no new uniform, because the spare `uK.w` slot is
+   used. Flat fallbacks and moons dim alpha ×0.6. Rings dim from the animated mix (replacing
+   the static React dims); the focused ring's glow and lock line fade in with the mix.
+   Non-focused label tags ×0.62. The vignette deepens up to +16 %. The sun is never dimmed,
+   because it is the light source.
+5. **Feedback** (flag `fxFeedback`): `resolveTap`'s stamp (C-20) now also fires from `onNorth`
+   (kind `north`; the recovery is unchanged). On a body tap, a sonar ping (two rings, the
+   second an echo) follows the body. On empty space, a ripple on the world plane (circle at
+   the unprojected tap point under the plane homography, i.e. a projected ellipse). On the
+   north tap, a Polaris flare (cross spikes plus a ring). 620 ms each.
+6. **Reorder hold language** (flag `fxReorder`, replaces the accent ghost path): a hold-charge
+   arc fills around the body over `HOLD_MS` from touch-down; once active, the held body's ring
+   glows on the plane (its radius is the candidate slot), flashes on every slot change, and a
+   locked reticle rides the body. The haptic is unchanged. Verified on device that the
+   motion-event drag reordered and committed (EN moved slots after reload, `12`/`16`).
+7. **Focus card anchoring** (flag `focusCardAnchor`, `orrery-focus-placement.ts`, tested):
+   a keep-out box covers the body plus a label reserve on both sides (58 dp × fontScale; the
+   allocator may flip the tag above). The card tries below, above, right, left; if nothing
+   fits whole, it takes the roomier vertical side with a height cap (the card scrolls),
+   else it docks. Natural height comes from `onContentSizeChange`, so a capped card can grow
+   back. Content and actions are unchanged. With `hudChrome`, the two actions share one
+   wrapping row (pass 1 found "Open Profile" clipped under the cap).
+8. **HUD chrome** (flag `hudChrome`, Orrery components only): `OrreryHudCorners` adds accent
+   hairline corner brackets (the reticle's language) and an instrument radius (`RADII.sm`)
+   on the selector, View options, the three controls and the focus card. "View options" is
+   in tracked caps. The System name stays in its own case (user content; pass 1 uppercased
+   it and the extra width truncated it). Glass tint and opacity are untouched (ADR-149 / C-02).
+   The shell "+" FAB and the app header are shared across screens and are NOT restyled.
+9. **Standard Dark identity** (flag `stdChart`, `LabChart.tsx`, profile `chart`): the
+   Standard package gets a quiet graphite sky (`STANDARD_DARK_ENV`: nebula ≈⅓ strength, no
+   ember, crisp sparse stars, almost no twinkle, softer vignette, half-strength ring flow)
+   plus a navigational chart graticule on the world plane. The graticule has range rings at
+   a nice step, 30° bearing spokes and a 10°/30° degree scale, in `textSecondary` hairlines at
+   alpha 0.10, as one picture under the homography. Standard Light also gets the chart. Galaxy
+   is unchanged. `stdChart` off restores the pre-WP-2.2 Standard profiles.
+10. **Reduced motion:** the reticle is locked immediately (no seek, spin or flash) and the
+    world response is instant. Pings and ripples become a fixed ring that fades over 150 ms.
+    On device, 0 changed pixels outside the HUD between 3 s and 5 s while focused (`08`).
+11. **Visual iteration.** Debug pass 1: reticle, dims, ripple, ping, card below the label;
+    the card was clipped by the height cap, which led to the one-row actions; the System name
+    was truncated by uppercase, which led to keeping its case. Pass 2: chart alpha 0.13 →
+    0.10 (spokes too present at identity zoom); ripple alpha 0.5 → 0.7 (faint in pass-1
+    frames). Release: final captures plus perf.
+12. **Matrix covered:** photo (Wren Ellis, Dev Holm) and initials (Rosa Brook, Eli Novak, Cleo
+    Okafor) focus; Dense 120; identity/near zoom via fly-in (overview at Home); all four
+    themes; reduced motion; reorder hold and drag; a System switch while focused (the focused
+    contact was not a destination member, so focus cleared and no stale reticle remained);
+    background → foreground while focused (focus restored, reticle re-locks); satellite focus
+    (release `15`). **Not covered:** a far zoom preset while focused, a cluster (group) tap,
+    and the Polaris north tap on device. The flare is built and unit-tested but was not
+    captured.

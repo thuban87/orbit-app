@@ -302,3 +302,26 @@ Findings (relative, emulator only):
    ~80 ms of mappers per frame on this target. One UI-thread picture per layer removes both.
 3. Legacy after fix 1 still drops 33–120 frames per switch: its own ~200 ms ring-Path frames
    (WP-1.3/1.4), now visible because the switch actually plays.
+
+## 2026-10-01 — WP-2.2 focus / feedback (RELEASE build, emulator; commit 0acdc848)
+
+**EMULATOR, RELEASE — relative A/B only, never a phone claim.** Scenario (scratch `perf.sh`, raw
+`evidence/08-wp2.2-focus/18-perf-gfxinfo-raw.txt`): Lab B Inner Circle, Galaxy Dark; ×3: recentre →
+reset → tap a photo body → 6 s (fly-in + lock) → reset → 8 s idle focused → reset → tap empty
+space (clear + ripple) → 3 s. A/B on the SAME build: WP-2.2 flags all on vs all off (`fxFocus,
+fxFocusDim, fxFeedback, fxReorder, hudChrome, focusCardAnchor` via deep link).
+
+| Window | flags ON frames / p50 / p90 / p99 | flags OFF frames / p50 / p90 / p99 |
+|---|---|---|
+| fly-in 6 s | 184–210 / 17–18 / 34–48 / 48–77 | 195–207 / 17–18 / 34–36 / 53–65 |
+| idle focused 8 s | 138–157 / 14–32 / 34 / 48–77 | 139–159 / 18–32 / 34 / 65–69 |
+| clear + ripple 3 s | 102 / 13–17 / 18–34 / 34 | 100–110 / 17–18 / 19–32 / 34–48 |
+
+Cross-build reference (pre-WP-2.2 release, dba6430b-era code, different body/layout, so only
+indicative): fly-in 194–198 / 18 / 34 / 48–65, idle 166–169 / 17–18 / 34 / 36–53.
+
+Findings: no separable cost within emulator noise. The fly-in p90/p99 upper end is slightly
+higher with the flags on (one run 48/77 ms), consistent with the bodies picture re-recording
+while `mix` animates (340 ms) plus the reticle picture recording per frame during the
+lock. At rest the focus/feedback pictures do not re-record (no clock reads). Phone + Perfetto
+needed for a real answer (R1).
