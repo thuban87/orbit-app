@@ -20,8 +20,9 @@ import { Skia, type SkRuntimeEffect } from "@shopify/react-native-skia";
  * The sun as a star: white-hot core → occupant glow hue corona whose edge is
  * shaped by cheap animated angular harmonics (no loops), plus a soft bloom.
  * Local coordinates (origin = sun centre, units = sun world radius space).
- * `uTime` is 0 under reduced motion (static corona); `uFlare` is the switch
- * capture flare (0 under reduced motion). Chart mode: engraved rays + rings.
+ * `uTime` is held at a fixed phase (1.7, scene-draw `drawSunBody`) under reduced
+ * motion (static corona); `uFlare` is the switch capture flare (0 under
+ * reduced motion). Chart mode: engraved rays + rings.
  */
 export const CORONA_SKSL = `
 uniform float uR;
@@ -70,7 +71,7 @@ half4 main(float2 p) {
  * so the trig granulation is precision-safe on mediump GPUs too.
  *   uPhoto = 0 → opaque stellar surface: white-hot core (uCore) grading to the
  *               occupant glow hue (uGlow) at the limb, limb darkening, slow
- *               granulation (uTime is fixed under reduced motion).
+ *               granulation (uTime is fixed at 2.3 under reduced motion).
  *   uPhoto = 1 → the occupant photo stays the identity: only a glowing limb
  *               band frames it (transparent centre).
  * Chart mode passes a paper core so the star reads as an engraved disc.

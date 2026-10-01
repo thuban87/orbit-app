@@ -272,13 +272,16 @@ export function LabScene({
   const trails = useSharedValue<TrailState>({ pts: {} });
 
   // ── Base-layer texture cache. The "below" picture (sky, world plane,
-  // rear bodies) is the expensive one to rasterise — the plane's many
-  // stroked polygons are re-tessellated by Ganesh on every flush (measured:
-  // ~70 % of the remaining idle main-thread time). It is rasterised into a
-  // device-pixel offscreen texture on the UI thread (same GL context as the
-  // view) once the scene is STATIC (camera perf pass: see `below`), so
-  // ambient-only redraws (the sun, the reticle scan) just blit it. Mutable UI scratch: never reassigned → never an input
-  // change. Released on unmount.
+  // rear bodies) is the most expensive one to replay. Originally (arch perf
+  // pass) the plane's CPU-projected stroked polygons were re-tessellated by
+  // Ganesh on every flush; the camera perf pass replaced those with
+  // world-space vertices + analytic shaders, but replaying the whole base
+  // (sky layers, plane shaders, rear bodies) is still far dearer than one
+  // image blit. So it is rasterised into a device-pixel offscreen texture on
+  // the UI thread (same GL context as the view) once the scene is STATIC
+  // (see `below`), and ambient-only redraws (the sun, the reticle scan) just
+  // blit it. Mutable UI scratch: never reassigned → never an input change.
+  // Released on unmount.
   const density = useWindowDimensions().scale || 1;
   const baseCache = useSharedValue<{
     surface: SkSurface | null;

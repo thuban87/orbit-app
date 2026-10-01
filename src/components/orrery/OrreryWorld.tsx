@@ -192,7 +192,6 @@ function ProjectedBody({
       {...common}
       photo={contact?.photo ?? null}
       bodyFill={orreryRingStyle(contact?.status ?? null, colors).bodyFill}
-      lightKey={key}
     />
   );
 }

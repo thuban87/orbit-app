@@ -115,7 +115,8 @@ export const LABEL_PAD_X = 8;
 export const LABEL_PAD_Y = 4;
 /** Label plate corner radius — mirrors OrreryLabel (RADII.sm). */
 export const LABEL_RADIUS = 8;
-/** Up-left key light when a body has no light entry (as BodyLightOverlay). */
+/** Up-left key light when a body has no light entry (as the removed
+ *  declarative `BodyLightOverlay` did). */
 const DEFAULT_LIGHT = [-0.6, -0.8, 0] as const;
 /** Local-space AA band ≈ this many dp, divided by the projected scale. */
 const AA_DP = 0.6;
@@ -403,7 +404,8 @@ export function fadeIn(at: number, now: number, ms: number, still: boolean) {
   return clamp01((now - at) / ms);
 }
 
-/** A contact planet (OrbitBody + BodyLightOverlay, Lab A treatment). */
+/** A contact planet (Lab A treatment; ported from the removed declarative
+ *  OrbitBody Lab branch + `BodyLightOverlay`). */
 export function drawContactBody(
   canvas: SkCanvas,
   spec: LabBodySpec,
@@ -469,7 +471,8 @@ export function drawContactBody(
   canvas.restore();
 }
 
-/** A relationship moon (SatelliteBody, Lab A treatment). */
+/** A relationship moon (Lab A treatment; ported from the removed declarative
+ *  SatelliteBody Lab branch). */
 export function drawMoonBody(
   canvas: SkCanvas,
   spec: LabBodySpec,
@@ -512,7 +515,8 @@ export function drawMoonBody(
   canvas.restore();
 }
 
-/** The sun (SunBody + SunCorona + SunDisc, Lab A treatment). */
+/** The sun (Lab A treatment; ported from the removed declarative SunBody Lab
+ *  branch + `SunCorona` / `SunDisc`). */
 export function drawSunBody(
   canvas: SkCanvas,
   spec: LabBodySpec,
@@ -560,7 +564,8 @@ export function drawSunBody(
     if (effects.sunDisc) {
       const limb = Skia.Paint();
       limb.setAntiAlias(true);
-      // The photo limb never carried the flare (SunBody passed none).
+      // The photo limb never carried the flare (the removed declarative
+      // SunBody Lab branch passed none); kept for parity.
       limb.setShader(
         effects.sunDisc.makeShader(
           sunDiscUniforms(r, time, true, scale, 0, spec.fill, ink),
@@ -616,7 +621,12 @@ function skyTransform(
  * note: in the declarative layer the twinkle/warp `Group opacity` never
  * reached `<Picture>` (RN-Skia's drawPicture takes no paint), so the near
  * stars always rendered at full alpha, overdrawn by the 5 warp copies of
- * group A. That on-screen result is reproduced exactly here.
+ * group A. That on-screen result is reproduced exactly here, deliberately:
+ * at rest (velocity 0) every warp level shares one transform, so `nearA` is
+ * replayed WARP_COPIES + 1 times on the same spot (compounding its alpha)
+ * while `nearB` draws once. That replay IS the current look; the per-group
+ * twinkle and a warp-copy alpha never took effect (their tunables were
+ * removed as unused). Changing it is a visual decision, not a cleanup.
  */
 export function drawSky(
   canvas: SkCanvas,
@@ -762,7 +772,8 @@ export function drawReorderGhost(
   canvas.drawPath(path, strokePaint(inks.accent, inks.accent[3], 2));
 }
 
-/** One allocated label plate (OrreryLabel, Lab A instrument plate). */
+/** One allocated label plate (Lab A instrument plate in OrreryLabel's exact
+ *  rect; ported from its removed declarative Lab branch). */
 function drawPlate(
   canvas: SkCanvas,
   x: number,

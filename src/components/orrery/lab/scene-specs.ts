@@ -156,7 +156,8 @@ export function buildBodySpecs(input: {
         imageWidth,
         imageHeight,
         photoAt: photo.at,
-        // SunBody had no mount fade.
+        // No mount fade for the sun (parity with the removed declarative
+        // Lab path, where only OrbitBody faded in).
         enterAt: 0,
       });
       continue;
@@ -213,7 +214,8 @@ export function buildBodySpecs(input: {
       imageWidth: 0,
       imageHeight: 0,
       photoAt: 0,
-      // SatelliteBody had no mount fade.
+      // No mount fade for moons (parity with the removed declarative Lab
+      // path, where only OrbitBody faded in).
       enterAt: 0,
     });
   }

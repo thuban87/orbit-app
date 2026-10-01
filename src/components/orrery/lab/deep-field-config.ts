@@ -69,11 +69,6 @@ export const STARS_HERO_COUNT = 7;
 /** Hero glow radius multiple of the star radius; spike length (px). */
 export const STARS_HERO_GLOW = 5;
 export const STARS_HERO_SPIKE = 9;
-/** Twinkle: two near-star groups oscillate in opposite phase in this band. */
-export const TWINKLE_MIN = 0.45;
-export const TWINKLE_MAX = 1;
-/** rad/ms → ~3.5 s period. */
-export const TWINKLE_SPEED = 0.0018;
 /** Vignette: edge alpha of `orreryVoid`, and where the falloff starts (0..1). */
 export const VIGNETTE_ALPHA_DARK = 0.78;
 export const VIGNETTE_ALPHA_LIGHT = 0.32;
@@ -248,27 +243,20 @@ export const PLATE_TICK_WIDTH = 2.5;
 export const LEADER_ALPHA = 0.7;
 
 // ── 7. System switch as a jump ──────────────────────────────────────────────
-/** Streak arc length (rad) at full angular velocity; leaving bodies × boost. */
-export const STREAK_ARC = 0.55;
-export const STREAK_LEAVING_BOOST = 1.5;
-/** Streak stroke width as a multiple of the body world radius. */
-export const STREAK_WIDTH = 0.95;
-export const STREAK_ALPHA_DARK = 0.7;
-export const STREAK_ALPHA_LIGHT = 0.35;
 /** Sun flare peak (corona gain) at capture. */
 export const FLARE_GAIN = 1.25;
 
 // ── PASS 2 ──────────────────────────────────────────────────────────────────
 /**
- * Plane geometry is projected to SCREEN space on the CPU (the frame's own
- * homography) and stroked without a perspective canvas matrix. Pass 1 drew it
+ * Pass 2 projected plane geometry to SCREEN space on the CPU (the frame's own
+ * homography) and stroked it without a perspective canvas matrix. Pass 1 drew it
  * under `concat(H)`: Ganesh cannot stroke/dash under perspective on the GPU,
  * so every idle frame re-rasterised ~40 rings + grid as CPU masks (device:
- * ~5 fps idle on the Pixel). Segments per projected circle:
+ * ~5 fps idle on the Pixel). (The camera perf pass later moved the plane to
+ * cached world-space unit polygons drawn under the homography — see
+ * world-plane.ts `PLANE_SHAPE_SEGMENTS` / `worldCircle`.) Segments per circle:
  */
 export const PLANE_CIRCLE_SEGMENTS = 96;
-/** Arc sampling step for status segments / ripples (rad). */
-export const PLANE_ARC_STEP = (3 * Math.PI) / 180;
 /** Near side of each ring is pulled this far toward its full status hue. */
 export const RING_NEAR_TINT = 0.35;
 /**
@@ -277,8 +265,6 @@ export const RING_NEAR_TINT = 0.35;
  */
 export const HAZE_ALPHA_DARK = 0.5;
 export const HAZE_ALPHA_LIGHT = 0.55;
-/** Cool horizon glow (nebulaB) just beyond the far bezel (dark only). */
-export const HAZE_GLOW_ALPHA = 0.12;
 /** Separation keyline just outside each body disc (dp) and its alpha. */
 export const BODY_KEYLINE_DP = 1.6;
 export const BODY_KEYLINE_ALPHA_DARK = 0.9;
@@ -331,7 +317,6 @@ export const GRID_FX_GAIN = 0.9;
 /** Starfield warp: ghost copies of the near stars scaled out from centre. */
 export const WARP_COPIES = 5;
 export const WARP_STEP = 0.014;
-export const WARP_ALPHA = 0.55;
 
 // ── ARCH PERF PASS: imperative scene renderer (lab/scene-draw.ts) ─────────
 /** Photo cross-fade over the initials when it resolves (ms). */
@@ -340,7 +325,8 @@ export const PHOTO_FADE_MS = 260;
  * Ambient (corona, granulation, reticle scan) redraw rate. The single clock
  * ticks at the display rate (120 Hz on the Pixel); the ambient time is
  * quantised to this rate so idle frames that would draw an identical-looking
- * corona never re-record or redraw anything. 0 under live reduced motion.
+ * corona never re-record or redraw anything. Under live reduced motion the
+ * ambient time is −1 ("still"; see LabScene `ambient`), not a rate.
  */
 export const AMBIENT_HZ = 30;
 /** Fade bookkeeping window: how long re-records keep ticking after a spec

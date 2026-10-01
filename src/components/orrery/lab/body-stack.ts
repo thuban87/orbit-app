@@ -30,7 +30,7 @@ function findRoot(parent: number[], i: number): number {
   return r;
 }
 
-/** Drawn (visual) radius of a frame body, matching OrbitBody's transform. */
+/** Drawn (visual) radius of a frame body, matching `drawContactBody`'s scale. */
 export function drawnRadius(radius: number, far: number): number {
   "worklet";
   return radius * bodyVisualScale(radius) * bodyDepthScale(far);
