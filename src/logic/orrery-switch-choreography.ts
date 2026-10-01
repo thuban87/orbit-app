@@ -430,6 +430,55 @@ export function settleSwitchChoreography(
   );
 }
 
+/**
+ * One entry's displayed geometry at `progress`, given the transition's derived
+ * rotation terms. Shared by `sampleSwitchChoreography` (every entry) and
+ * `sampleSwitchEntry` (one entry, e.g. a renderer's comet tail), so both are
+ * byte-identical. Defined ABOVE both callers (Hermes worklet forward-ref hazard).
+ */
+function sampleEntryAt(
+  transition: SwitchChoreography,
+  entry: SwitchChoreographyEntry,
+  progress: number,
+  rotationProgress: number,
+  accumulatedRotation: number,
+): ChoreographyWorldBody {
+  "worklet";
+  if (progress <= 0 && entry.source)
+    return {
+      ...entry.source,
+      interactive: entry.role === "leaving" ? false : entry.source.interactive,
+    };
+  if (progress >= 1 && entry.destination)
+    return { ...entry.destination, opacity: 1, interactive: true };
+  if (progress >= 1 && entry.source)
+    return { ...entry.source, opacity: 0, interactive: false };
+  if (transition.reducedMotion) return sampleReduced(entry, progress);
+  if (entry.role === "retained")
+    return sampleRetained(
+      entry,
+      progress,
+      rotationProgress,
+      transition.spinTurns,
+    );
+  if (entry.role === "leaving")
+    return sampleLeaving(
+      entry,
+      progress,
+      accumulatedRotation,
+      transition.radialDisplacement,
+    );
+  if (entry.role === "entering")
+    return sampleEntering(
+      entry,
+      progress,
+      rotationProgress,
+      transition.spinTurns,
+      transition.radialDisplacement,
+    );
+  return sampleAnchor(entry, progress);
+}
+
 export function sampleSwitchChoreography(
   transition: SwitchChoreography,
   fraction: number,
@@ -451,42 +500,102 @@ export function sampleSwitchChoreography(
     angularVelocity,
     world: transition.entries.map((entry) => {
       "worklet";
-      if (progress <= 0 && entry.source)
-        return {
-          ...entry.source,
-          interactive:
-            entry.role === "leaving" ? false : entry.source.interactive,
-        };
-      if (progress >= 1 && entry.destination)
-        return { ...entry.destination, opacity: 1, interactive: true };
-      if (progress >= 1 && entry.source)
-        return { ...entry.source, opacity: 0, interactive: false };
-      if (transition.reducedMotion) return sampleReduced(entry, progress);
-      if (entry.role === "retained")
-        return sampleRetained(
-          entry,
-          progress,
-          rotationProgress,
-          transition.spinTurns,
-        );
-      if (entry.role === "leaving")
-        return sampleLeaving(
-          entry,
-          progress,
-          accumulatedRotation,
-          transition.radialDisplacement,
-        );
-      if (entry.role === "entering")
-        return sampleEntering(
-          entry,
-          progress,
-          rotationProgress,
-          transition.spinTurns,
-          transition.radialDisplacement,
-        );
-      return sampleAnchor(entry, progress);
+      return sampleEntryAt(
+        transition,
+        entry,
+        progress,
+        rotationProgress,
+        accumulatedRotation,
+      );
     }),
   };
+}
+
+/**
+ * ORRERY LAB B (WP-2.1): ONE entry sampled exactly as
+ * `sampleSwitchChoreography` would (same geometry, no world allocation), for
+ * renderer effects that need an entry's position at another progress (comet
+ * tails, motion smears).
+ */
+export function sampleSwitchEntry(
+  transition: SwitchChoreography,
+  entry: SwitchChoreographyEntry,
+  fraction: number,
+): ChoreographyWorldBody {
+  "worklet";
+  const progress = clamp01(fraction);
+  const rotationProgress = transition.reducedMotion
+    ? 0
+    : normalizedRotation(progress);
+  return sampleEntryAt(
+    transition,
+    entry,
+    progress,
+    rotationProgress,
+    transition.maximumRotation * rotationProgress,
+  );
+}
+
+/** The choreography's per-progress signal without building the world. */
+export interface SwitchSignal {
+  generation: number;
+  progress: number;
+  phase: SwitchChoreographyPhase;
+  /** True while the switch is in flight (progress < 1). */
+  running: boolean;
+  reducedMotion: boolean;
+  /** Membership-change intensity of the switch (0..1). */
+  intensity: number;
+  /** Spin turns (0 = no spin: reduced motion or zero intensity). */
+  spinTurns: number;
+  accumulatedRotation: number;
+  /** Same value as `sampleSwitchChoreography(...).angularVelocity`. */
+  angularVelocity: number;
+  /** Angular velocity normalised to its plateau: 0 at rest, 1 at full spin. */
+  velocity: number;
+}
+
+/**
+ * ORRERY LAB B (WP-2.1): phase, rotation and angular velocity for `progress`,
+ * pure in (transition, progress) — renderer effects are functions of this, so
+ * pause / remount / resume / retarget stay byte-consistent (research 03 §2.3).
+ */
+export function sampleSwitchSignal(
+  transition: SwitchChoreography,
+  fraction: number,
+): SwitchSignal {
+  "worklet";
+  const progress = clamp01(fraction);
+  const reduced = transition.reducedMotion;
+  const rotationProgress = reduced ? 0 : normalizedRotation(progress);
+  const plateau = 1 / rotationIntegralTotal();
+  const normalized = reduced ? 0 : normalizedAngularVelocity(progress);
+  return {
+    generation: transition.generation,
+    progress,
+    phase: phaseAt(progress),
+    running: progress < 1,
+    reducedMotion: reduced,
+    intensity: transition.intensity,
+    spinTurns: transition.spinTurns,
+    accumulatedRotation: transition.maximumRotation * rotationProgress,
+    angularVelocity: transition.maximumRotation * normalized,
+    velocity: transition.spinTurns > 0 ? Math.min(1, normalized / plateau) : 0,
+  };
+}
+
+/**
+ * ORRERY LAB B (WP-2.1): an entry's local 0..1 progress through a phase window
+ * shifted by its stagger (the same window maths the choreography uses).
+ */
+export function entryWindow(
+  progress: number,
+  start: number,
+  end: number,
+  stagger: number,
+): number {
+  "worklet";
+  return intervalProgress(progress, start + stagger, end + stagger);
 }
 
 /** A rapid A→B→C switch rebases on B's currently displayed geometry. */

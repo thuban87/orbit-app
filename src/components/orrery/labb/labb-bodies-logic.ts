@@ -131,13 +131,17 @@ export interface LabBodyPose {
   depth: number;
 }
 
-/** Per-frame uniforms for the lit contact-body shaders. */
+/**
+ * Per-frame uniforms for the lit contact-body shaders. `switchFx` (WP-2.1) =
+ * [dissolve 0..1, capture flare 0..1] from `bodySwitchFx` (zeros at rest).
+ */
 export function labBodyFrameUniforms(
   body: LabBodyPose | undefined,
   sunX: number,
   sunY: number,
   st: LabBodyStatic,
   fx: LabFxSnapshot | null,
+  switchFx?: readonly number[],
 ) {
   "worklet";
   const flags = fx ? fx.flags : null;
@@ -166,6 +170,7 @@ export function labBodyFrameUniforms(
     uH: [st.fresnel * Math.min(1.5, k), st.desat, pattern, st.uSeed],
     uI: [st.uBase[0], st.uBase[1], st.uBase[2], 0],
     uJ: [st.uBand[0], st.uBand[1], st.uBand[2], 0],
+    uK: [switchFx ? switchFx[0] : 0, switchFx ? switchFx[1] : 0, st.uSeed, 0],
   };
 }
 
@@ -221,6 +226,8 @@ export function labSunFrameUniforms(
   reduced: boolean,
   st: LabSunStatic,
   fx: LabFxSnapshot | null,
+  /** WP-2.1 corona flare multiplier boost (0 at rest; +0.4 at full warp). */
+  flare = 0,
 ) {
   "worklet";
   const flags = fx ? fx.flags : null;
@@ -236,7 +243,7 @@ export function labSunFrameUniforms(
   const corona =
     flags && !flags.sunCorona
       ? 0
-      : st.corona * Math.min(1.6, k) * (1 + SUN_BREATH * pulse);
+      : st.corona * Math.min(1.6, k) * (1 + SUN_BREATH * pulse) * (1 + flare);
   // Packed float4s (see SUN_CORONA in labb-effects.ts).
   return {
     uS0: [st.uR, scale > 1e-4 ? 1 / scale : 1, t, SUN_REACH],

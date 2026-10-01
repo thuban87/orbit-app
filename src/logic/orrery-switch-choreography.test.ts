@@ -5,11 +5,14 @@ import {
   beginSwitchChoreography,
   CAPTURE_END,
   CAPTURE_START,
+  entryWindow,
   retargetSwitchChoreography,
   SETTLE_START,
   SHED_END,
   SHED_START,
   sampleSwitchChoreography,
+  sampleSwitchEntry,
+  sampleSwitchSignal,
   settleSwitchChoreography,
 } from "./orrery-switch-choreography";
 
@@ -382,5 +385,68 @@ describe("settleSwitchChoreography", () => {
     });
     settleSwitchChoreography(transition);
     expect(keysOf(transition)).toHaveLength(4);
+  });
+});
+
+describe("Lab B switch signal (WP-2.1)", () => {
+  const source = [contact(1, 80), contact(2, 120, 1)];
+  const destination = [contact(2, 140, 1.4), contact(3, 200, 2)];
+  const transition = beginSwitchChoreography(source, destination, 7, {
+    intensity: 0.6,
+    reducedMotion: false,
+  });
+
+  it("agrees with the full sample's phase, rotation and angular velocity", () => {
+    for (const p of [0, 0.05, 0.19, 0.2, 0.3, 0.5, 0.72, 0.8, 0.95, 1]) {
+      const full = sampleSwitchChoreography(transition, p);
+      const signal = sampleSwitchSignal(transition, p);
+      expect(signal.phase).toBe(full.phase);
+      expect(signal.angularVelocity).toBeCloseTo(full.angularVelocity, 12);
+      expect(signal.accumulatedRotation).toBeCloseTo(
+        full.accumulatedRotation,
+        12,
+      );
+      expect(signal.generation).toBe(7);
+      expect(signal.running).toBe(p < 1);
+      expect(signal.velocity).toBeGreaterThanOrEqual(0);
+      expect(signal.velocity).toBeLessThanOrEqual(1);
+    }
+    expect(sampleSwitchSignal(transition, 0.4).velocity).toBeCloseTo(1, 12);
+    expect(sampleSwitchSignal(transition, 0).velocity).toBe(0);
+    expect(sampleSwitchSignal(transition, 1).velocity).toBe(0);
+  });
+
+  it("is pure in (transition, progress) and zero-velocity under reduced motion", () => {
+    expect(sampleSwitchSignal(transition, 0.37)).toEqual(
+      sampleSwitchSignal(transition, 0.37),
+    );
+    const reduced = beginSwitchChoreography(source, destination, 8, {
+      intensity: 1,
+      reducedMotion: true,
+    });
+    const signal = sampleSwitchSignal(reduced, 0.5);
+    expect(signal.reducedMotion).toBe(true);
+    expect(signal.velocity).toBe(0);
+    expect(signal.angularVelocity).toBe(0);
+    expect(signal.spinTurns).toBe(0);
+  });
+
+  it("samples one entry exactly as the whole world sample does", () => {
+    for (const p of [0, 0.1, 0.33, 0.5, 0.66, 0.9, 1]) {
+      const world = sampleSwitchChoreography(transition, p).world;
+      transition.entries.forEach((entry, i) => {
+        expect(sampleSwitchEntry(transition, entry, p)).toEqual(world[i]);
+      });
+    }
+  });
+
+  it("windows an entry's phase by its stagger", () => {
+    expect(entryWindow(SHED_START, SHED_START, SHED_END, 0)).toBe(0);
+    expect(entryWindow(SHED_END, SHED_START, SHED_END, 0)).toBe(1);
+    expect(entryWindow(SHED_END, SHED_START, SHED_END, 0.02)).toBeLessThan(1);
+    expect(entryWindow(0.5, CAPTURE_START, CAPTURE_END, 0)).toBeCloseTo(
+      (0.5 - CAPTURE_START) / (CAPTURE_END - CAPTURE_START),
+      12,
+    );
   });
 });

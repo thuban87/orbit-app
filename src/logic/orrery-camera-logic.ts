@@ -487,11 +487,20 @@ export function tryUnprojectToWorldPlane(
   const result = unprojectToWorldPlane(point, pose, viewport);
   return Number.isFinite(result.x) && Number.isFinite(result.y) ? result : null;
 }
+/**
+ * `ringPaths` (ORRERY LAB B, WP-2.1 perf): `true` (default, unchanged
+ * behaviour) projects every body's 128-point `ringPath`; `false` skips them;
+ * a number projects only that body id's ring (the reorder ghost). The lab
+ * renderer draws rings from the plane homography and never reads `ringPath`,
+ * and on the emulator's UI runtime this loop cost ~700 ms per frame at 141
+ * bodies — every switch / pan frame (PERF-LOG WP-2.1).
+ */
 export function projectFrame(
   world: readonly WorldBody[],
   pose: CameraPose,
   viewport: CameraViewport,
   generation: number,
+  ringPaths: boolean | number = true,
 ): ProjectedFrame {
   "worklet";
   const current = clampCameraPose(
@@ -510,7 +519,7 @@ export function projectFrame(
     bodies: world.map((body) => {
       const scale = current.zoom * perspectiveScale(body, current);
       const ringPath: WorldPoint[] = [];
-      if (body.ringRadius > 0)
+      if (body.ringRadius > 0 && (ringPaths === true || ringPaths === body.id))
         for (let i = 0; i < RING_SEGMENTS; i++) {
           const angle = (i * 2 * Math.PI) / RING_SEGMENTS;
           ringPath.push(

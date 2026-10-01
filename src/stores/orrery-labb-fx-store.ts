@@ -227,7 +227,75 @@ export const LAB_FLAG_REGISTRY = [
     section: "layers",
     default: true,
     heavy: true,
-    note: "WP-2.x fills",
+    note: "WP-2.1 switch FX master (WP-2.2 focus/feedback)",
+  },
+  // WP-2.1 System-switch showcase (L0/L1/L2/L7; master = `fx`).
+  {
+    id: "fxStreaks",
+    label: "SW Hyperspace star streaks + sky push",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "fxParticles",
+    label: "SW Departing particle bursts (Atlas)",
+    section: "effects",
+    default: true,
+    heavy: true,
+  },
+  {
+    id: "fxDissolve",
+    label: "SW Departing body dissolve (body shader)",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "fxRingTrim",
+    label: "SW Ring unwind / draw-on",
+    section: "effects",
+    default: true,
+    heavy: true,
+  },
+  {
+    id: "fxComets",
+    label: "SW Arrival comets + retained motion smears",
+    section: "effects",
+    default: true,
+    heavy: true,
+  },
+  {
+    id: "fxFlares",
+    label: "SW Capture flares",
+    section: "effects",
+    default: true,
+    heavy: true,
+  },
+  {
+    id: "fxShockwave",
+    label: "SW System-lock shockwave (projected ring)",
+    section: "effects",
+    default: true,
+    heavy: true,
+  },
+  {
+    id: "fxSpool",
+    label: "SW Corona flare + ring-flow spool-up",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "fxSkyHue",
+    label: "SW Per-System sky hue (owner glance C-05)",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "fxShockFilter",
+    label: "SW EXPERIMENT displacement shockwave image filter",
+    section: "effects",
+    default: false,
+    heavy: true,
+    note: "wraps the world layer in a saveLayer + runtime filter",
   },
   // Debug instrumentation (research 03 §4).
   {
@@ -275,6 +343,9 @@ export interface LabFxSnapshot {
 
 interface LabFxState extends LabFxSnapshot {
   reducedMotion: LabReducedMotionMode;
+  /** WP-2.1 debug: System-switch duration multiplier (1 = production). */
+  switchTimeScale: number;
+  setSwitchTimeScale: (value: number) => void;
   setRenderer: (renderer: LabRenderer) => void;
   toggleFlag: (id: LabFlagId) => void;
   setFlag: (id: LabFlagId, value: boolean) => void;
@@ -293,6 +364,9 @@ export const useLabFxStore = create<LabFxState>((set) => ({
   flags: defaultLabFlags(),
   intensity: 1,
   reducedMotion: "os",
+  switchTimeScale: 1,
+  setSwitchTimeScale: (value) =>
+    set({ switchTimeScale: Math.min(20, Math.max(0.25, value)) }),
   setRenderer: (renderer) => set({ renderer }),
   toggleFlag: (id) =>
     set((state) => ({ flags: { ...state.flags, [id]: !state.flags[id] } })),
@@ -316,6 +390,7 @@ export const useLabFxStore = create<LabFxState>((set) => ({
       flags: defaultLabFlags(),
       intensity: 1,
       reducedMotion: "os",
+      switchTimeScale: 1,
     });
   },
 }));

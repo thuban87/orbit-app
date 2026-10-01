@@ -83,20 +83,60 @@ uniform float uStarDensity;
 uniform float3 uStarA;
 uniform float3 uStarB;
 uniform float3 uStarC;
+uniform float4 uWarpS;
 float3 lbFarStars(float2 xy, float3 col) {
-  float2 d = xy - uVC - uFarOff;
   float c = cos(uRot);
   float s = sin(uRot);
+  float2 d = xy - uVC - uFarOff;
   float2 p = float2(c * d.x + s * d.y, -s * d.x + c * d.y) / uFarScale;
-  float2 cell = floor(p / 22.0);
-  if (lbHash(cell + 17.0) > uStarDensity) return col;
-  float2 sp = (cell + 0.2 + 0.6 * float2(lbHash(cell + 41.3), lbHash(cell + 7.9))) * 22.0;
-  float dist = length(p - sp) * uFarScale;
-  float rad = 0.42 + 0.75 * pow(lbHash(cell + 3.1), 3.0);
-  float a = min(1.0, exp(-(dist * dist) / (rad * rad)) * (0.45 + 0.85 * lbHash(cell + 9.7)) * uStarAlpha);
-  float t = lbHash(cell + 5.5);
-  float3 sc = t < 0.72 ? uStarA : (t < 0.86 ? uStarB : uStarC);
-  return mix(mix(col, sc, a), col + sc * a, uStarAdd);
+  if (uWarpS.x < 0.05) {
+    float2 cell = floor(p / 22.0);
+    if (lbHash(cell + 17.0) > uStarDensity) return col;
+    float2 sp = (cell + 0.2 + 0.6 * float2(lbHash(cell + 41.3), lbHash(cell + 7.9))) * 22.0;
+    float dist = length(p - sp) * uFarScale;
+    float rad = 0.42 + 0.75 * pow(lbHash(cell + 3.1), 3.0);
+    float a = min(1.0, exp(-(dist * dist) / (rad * rad)) * (0.45 + 0.85 * lbHash(cell + 9.7)) * uStarAlpha);
+    float t = lbHash(cell + 5.5);
+    float3 sc = t < 0.72 ? uStarA : (t < 0.86 ? uStarB : uStarC);
+    return mix(mix(col, sc, a), col + sc * a, uStarAdd);
+  }
+  // WP-2.1 hyperspace: every far star becomes a segment from its position back
+  // toward the vanishing point (uWarpS.yz), length uWarpS.x dp at the screen
+  // edge. The pixel checks the cells along the ray toward the centre.
+  float2 toC = xy - uWarpS.yz;
+  float rl = max(length(toC), 1.0);
+  float2 dirS = toC / rl;
+  float2 dirP = float2(c * dirS.x + s * dirS.y, -s * dirS.x + c * dirS.y);
+  float len = uWarpS.x * clamp(rl / 420.0, 0.08, 1.6);
+  float best = 0.0;
+  float3 bestC = uStarA;
+  for (int k = 0; k < 5; k++) {
+    float back = float(k) * 15.0;
+    if (back > len / uFarScale + 22.0) break;
+    float2 cell = floor((p - dirP * back) / 22.0);
+    if (lbHash(cell + 17.0) > uStarDensity) continue;
+    float2 sp = (cell + 0.2 + 0.6 * float2(lbHash(cell + 41.3), lbHash(cell + 7.9))) * 22.0;
+    float2 q = sp * uFarScale;
+    float2 ss = float2(c * q.x - s * q.y, s * q.x + c * q.y) + uVC + uFarOff;
+    float2 sd = ss - uWarpS.yz;
+    float sl = max(length(sd), 1.0);
+    float2 sdir = sd / sl;
+    float ang = uWarpS.w;
+    sdir = float2(cos(ang) * sdir.x - sin(ang) * sdir.y, sin(ang) * sdir.x + cos(ang) * sdir.y);
+    float slen = uWarpS.x * clamp(sl / 420.0, 0.08, 1.6);
+    float2 pa = xy - ss;
+    float tt = clamp(dot(pa, -sdir) / max(slen, 0.001), 0.0, 1.0);
+    float dist = length(pa + sdir * slen * tt);
+    float rad = 0.5 + 0.75 * pow(lbHash(cell + 3.1), 3.0);
+    float a = exp(-(dist * dist) / (rad * rad)) * (0.45 + 0.85 * lbHash(cell + 9.7)) * pow(1.0 - tt, 1.4);
+    if (a > best) {
+      best = a;
+      float t = lbHash(cell + 5.5);
+      bestC = t < 0.72 ? uStarA : (t < 0.86 ? uStarB : uStarC);
+    }
+  }
+  float a = min(1.0, best * uStarAlpha);
+  return mix(mix(col, bestC, a), col + bestC * a, uStarAdd);
 }
 `;
 
@@ -178,6 +218,7 @@ uniform float4 uE;
 uniform float4 uF;
 uniform float4 uG;
 uniform float4 uH;
+uniform float4 uK;
 half4 lbBody(float2 xy, float3 surf) {
   float uR = uA.x;
   float uPx = uA.y;
@@ -223,10 +264,23 @@ half4 lbBody(float2 xy, float3 surf) {
     float rim = smoothstep(1.0 - rimW - aa, 1.0 - rimW, l) * uRimStr;
     c = mix(c, uStatus, rim);
     c = mix(c, uSky, uHaze);
+    // WP-2.1 capture flare: a brief bright limb as an arriving world locks on.
+    c = mix(c, mix(uStatus, uHi, 0.55), uK.y * (0.2 + 0.8 * l * l * l) * 0.75);
+  }
+  // WP-2.1 dissolve (departing worlds): a noise threshold eats the disc with a
+  // glowing status-hue edge; the atmosphere thins with it.
+  if (uK.x > 0.0) {
+    float n = lbNoise(d * 3.3 + uK.z * 37.0, 64.0) * 0.62 + lbNoise(d * 8.5 + uK.z * 11.0, 64.0) * 0.38;
+    float th = uK.x * 1.12 - 0.06;
+    float keep = smoothstep(th - 0.015, th + 0.015, n);
+    float edge = (1.0 - smoothstep(0.0, 0.07, abs(n - th))) * min(1.0, uK.x * 6.0);
+    c = mix(c, uStatus * 1.5 + uHi * 0.35, edge * 0.9);
+    inside *= clamp(keep + edge, 0.0, 1.0);
   }
   float t = clamp((l - 1.0) / (uAtmoReach - 1.0), 0.0, 1.0);
   float g = 1.0 - t;
   g = g * g * g * uAtmo * mix(1.0, 0.4 + 0.6 * max(0.0, facing), uLit) * (1.0 - uHaze);
+  g = g * (1.0 - uK.x) + (1.0 - t) * (1.0 - t) * uK.y * 0.9;
   float sh = (1.0 - smoothstep(0.9, 1.26, length(d + uLight * 0.14))) * uShadowStr;
   float ga = g * (1.0 - 0.75 * uAtmoAdd);
   float oa = ga + sh * (1.0 - ga);
@@ -325,7 +379,7 @@ half4 main(float2 xy) {
    * crisp inner rim, desaturation per status, far-side haze, atmosphere or
    * light-theme contact shadow outside the disc.
    */
-  bodyPhoto: `${BODY_LIT}
+  bodyPhoto: `${NEBULA_NOISE}${BODY_LIT}
 uniform shader uImage;
 half4 main(float2 xy) {
   float3 s = float3(uImage.eval(xy).rgb);
@@ -440,6 +494,7 @@ uniform float4 uHi;
 uniform float4 uCam;
 uniform float4 uStyle;
 uniform float4 uFlow;
+uniform float4 uSpin;
 half4 main(float2 p) {
   float tau = 6.2831853;
   float r = max(length(p), 0.0001);
@@ -468,10 +523,10 @@ half4 main(float2 p) {
   }
   if (uStyle.x < 0.5 && uFlow.y > 0.5) {
     float seg = tau * r / 3.0;
-    float u = fract((ang * r - uFlow.x * uFlow.w) / seg + fract(r * 0.618034));
+    float u = fract((ang * r - uFlow.x * uFlow.w - uSpin.x * r) / seg + fract(r * 0.618034));
     float k = seg / max(uFlow.z, 1.0);
     float head = 1.0 - smoothstep(1.0 - 1.2 / (zoom * seg), 1.0, u);
-    float comet = exp(-(1.0 - u) * k) * head * uHi.a * depth * mask;
+    float comet = exp(-(1.0 - u) * k) * head * uHi.a * depth * mask * (1.0 + uSpin.y);
     col = mix(col, uHi.rgb, clamp(comet * 1.4, 0.0, 1.0));
     a = clamp(a + comet, 0.0, 1.0);
   }
@@ -507,12 +562,98 @@ half4 main(float2 p) {
   return half4(half3(uColor.rgb * a), half(a));
 }
 `,
+  /**
+   * WP-2.1 system-lock SHOCKWAVE on the world plane: painted on a world-space
+   * circle under the plane homography (a projected ellipse in tilt). A crisp
+   * instrument front line plus a soft glow trailing INSIDE the front.
+   *   uShk  = front radius (world), glow band (world), strength, line width (world)
+   *   uShkC = hue rgb, additive (1 dark) / ink (0 light)
+   *   uShkH = highlight rgb, unused
+   */
+  switchShock: `
+uniform float4 uShk;
+uniform float4 uShkC;
+uniform float4 uShkH;
+half4 main(float2 p) {
+  float r = length(p);
+  float inside = (uShk.x - r) / max(uShk.y, 0.001);
+  float glow = inside >= 0.0 ? exp(-inside * 2.4) * (1.0 - smoothstep(0.6, 1.0, inside)) : 0.0;
+  float dl = (uShk.x - r) / max(uShk.w, 0.0001);
+  float line = exp(-dl * dl);
+  float3 col = uShkC.rgb * glow * 0.45 + mix(uShkC.rgb, uShkH.rgb, 0.55 * uShkC.a) * line;
+  float a = clamp((glow * 0.3 + line) * uShk.z, 0.0, 1.0);
+  return half4(half3(col * uShk.z), half(a));
+}
+`,
+  /**
+   * WP-2.1 EXPERIMENT (flag `fxShockFilter`, default off): a displacement
+   * shockwave as a runtime IMAGE FILTER over the world layer (rings, Polaris,
+   * bodies; labels stay outside). A radial lens ring pushes pixels outward ahead
+   * of the front and pulls them behind it, with an optional chroma split and a
+   * brightening band. Coordinates are LAYER pixels (the caller scales dp → px).
+   *   uShock  = centre x, centre y, front radius, amplitude (px; 0 = identity)
+   *   uShock2 = band half-width (px), chroma split, band brightening, unused
+   */
+  shockFilter: `
+uniform shader image;
+uniform float4 uShock;
+uniform float4 uShock2;
+half4 main(float2 xy) {
+  if (uShock.w <= 0.0) {
+    return image.eval(xy);
+  }
+  float2 d = xy - uShock.xy;
+  float dist = length(d);
+  float x = (dist - uShock.z) / max(uShock2.x, 1.0);
+  float prof = x * exp(-x * x);
+  float2 dir = d / max(dist, 0.001);
+  float2 off = dir * prof * uShock.w;
+  half4 c = image.eval(xy - off);
+  if (uShock2.y > 0.0) {
+    half4 r = image.eval(xy - off * (1.0 + uShock2.y));
+    half4 b = image.eval(xy - off * (1.0 - uShock2.y));
+    c = half4(r.r, c.g, b.b, c.a);
+  }
+  float ring = exp(-x * x * 2.0) * uShock2.z;
+  return half4(c.rgb * half(1.0 + ring), c.a);
+}
+`,
 } as const;
 
 export type LabEffectName = keyof typeof LAB_EFFECT_SOURCES;
 
-/** Effects drawn invisibly at mount so the GL program compile happens early. */
+/** Effects drawn invisibly at mount so the GL program compile happens early.
+ * Shader effects (drawn as a Fill paint shader) here; image-filter effects in
+ * `WARMUP_FILTERS`. Uniforms come from `zeroUniforms` (every declared uniform,
+ * zero-filled — a missing uniform throws on device). */
 export const WARMUP_EFFECTS: readonly LabEffectName[] = ["probe"];
+/** Transition-only IMAGE FILTER effects, warmed inside a tiny saveLayer. */
+export const WARMUP_FILTERS: readonly LabEffectName[] = ["shockFilter"];
+
+const UNIFORM_SIZES: Record<string, number> = {
+  float: 1,
+  half: 1,
+  float2: 2,
+  half2: 2,
+  float3: 3,
+  half3: 3,
+  float4: 4,
+  half4: 4,
+};
+
+/** Every declared (non-shader) uniform of an SkSL source, zero-filled. */
+export function zeroUniforms(
+  source: string,
+): Record<string, number | number[]> {
+  const out: Record<string, number | number[]> = {};
+  for (const m of source.matchAll(
+    /uniform\s+(float4|float3|float2|float|half4|half3|half2|half)\s+(\w+)\s*;/g,
+  )) {
+    const n = UNIFORM_SIZES[m[1]] ?? 1;
+    out[m[2]] = n === 1 ? 0 : new Array(n).fill(0);
+  }
+  return out;
+}
 
 export type LabEffectStatus = "ok" | "null" | "error" | "pending";
 

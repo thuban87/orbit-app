@@ -222,3 +222,38 @@ describe("bounded invertible inspection camera", () => {
     }
   });
 });
+
+describe("projectFrame ringPaths (ORRERY LAB B WP-2.1 perf)", () => {
+  const world = [
+    { id: 0, kind: "sun" as const, x: 0, y: 0, radius: 30, ringRadius: 0 },
+    {
+      id: 1,
+      kind: "contact" as const,
+      x: 0,
+      y: -80,
+      radius: 16,
+      ringRadius: 80,
+    },
+    {
+      id: 2,
+      kind: "contact" as const,
+      x: 120,
+      y: 0,
+      radius: 16,
+      ringRadius: 120,
+    },
+  ];
+  const vp = { width: 400, height: 700 };
+  it("projects every ring by default and none / one on request, nothing else changes", () => {
+    const all = projectFrame(world, HOME_CAMERA, vp, 1);
+    const none = projectFrame(world, HOME_CAMERA, vp, 1, false);
+    const one = projectFrame(world, HOME_CAMERA, vp, 1, 2);
+    expect(all.bodies[1].ringPath).toHaveLength(128);
+    expect(none.bodies.every((b) => b.ringPath.length === 0)).toBe(true);
+    expect(one.bodies[1].ringPath).toHaveLength(0);
+    expect(one.bodies[2].ringPath).toEqual(all.bodies[2].ringPath);
+    const strip = (f: typeof all) =>
+      f.bodies.map(({ ringPath: _r, ...rest }) => rest);
+    expect(strip(none)).toEqual(strip(all));
+  });
+});

@@ -227,6 +227,17 @@ export function OrreryWorld({
   // ORRERY LAB B (C-20): resolveTap stamps the tap for the lab feedback layer.
   const fxTap = useSharedValue<LabTapStamp | null>(null);
   const labRenderer = useLabFxStore((s) => s.renderer);
+  // ORRERY LAB B (WP-2.1 perf): the lab renderer draws rings from the plane
+  // homography and never reads `ringPath`, so the frame worklet projects it
+  // only for the legacy renderer / the path-rebuild A/B, and otherwise only for
+  // a held reorder body (the ghost). -1 = every body, 0 = only the held body.
+  const ringPathsRebuild = useLabFxStore(
+    (s) => s.flags?.ringsPathRebuild ?? false,
+  );
+  const ringPathMode = useSharedValue(-1);
+  useEffect(() => {
+    ringPathMode.value = labRenderer === "lab" && !ringPathsRebuild ? 0 : -1;
+  }, [ringPathMode, labRenderer, ringPathsRebuild]);
   // Capture only the producer's input; the controller also contains its published output.
   const reorder = camera.reorder;
   const frame = useDerivedValue(() => {
@@ -264,6 +275,7 @@ export function OrreryWorld({
       1,
       sampledCamera,
       viewport,
+      ringPathMode.value < 0 ? true : held?.active ? held.id : false,
     );
   });
   // Conventional focus positioning consumes this same interpolated frame.

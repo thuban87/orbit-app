@@ -31,14 +31,21 @@
  * Heavy layers are UNMOUNTED when their flag is off, so a measured marginal
  * cost is real (research 03 §4).
  */
-import { Group, type SkTypefaceFontProvider } from "@shopify/react-native-skia";
-import { type ReactNode, useEffect, useMemo } from "react";
+import {
+  Group,
+  Paint,
+  RuntimeShader,
+  type SkTypefaceFontProvider,
+} from "@shopify/react-native-skia";
+import { type ReactNode, useEffect, useMemo, useRef } from "react";
+import { PixelRatio } from "react-native";
 import type {
   ComposedGesture,
   GestureType,
 } from "react-native-gesture-handler";
 import {
   type SharedValue,
+  useAnimatedReaction,
   useDerivedValue,
   useSharedValue,
 } from "react-native-reanimated";
@@ -57,6 +64,7 @@ import {
 } from "@/logic/orrery-label-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
+import { sampleSwitchSignal } from "@/logic/orrery-switch-choreography";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import {
@@ -84,9 +92,21 @@ import { LabEnvironment } from "./LabEnvironment";
 import { LabHudLabel } from "./LabLabels";
 import { LabPolaris } from "./LabPolaris";
 import { LabRings, LabRingsPathRebuild } from "./LabRings";
-import { setLabEffectForceFallback } from "./labb-effects";
+import {
+  LabSwitchOver,
+  LabSwitchUnder,
+  useShockFilterUniforms,
+} from "./LabSwitchFx";
+import type { LabSwitchContext } from "./labb-context";
+import { getLabEffect, setLabEffectForceFallback } from "./labb-effects";
 import { indexFrame } from "./labb-frame-index";
-import { tokenToVec4 } from "./labb-uniforms";
+import {
+  displayedSkyHue,
+  type LabSkyHueState,
+  switchRoles,
+  systemSkyIndex,
+} from "./labb-switch-logic";
+import { tokenToVec3, tokenToVec4 } from "./labb-uniforms";
 
 /** HUD placement: bottom-left corner of the canvas, above the lab marker. */
 const HUD_X = 8;
@@ -258,6 +278,224 @@ export function LabBRenderer(contract: LabRenderContract) {
     () => tokenToVec4(colors.background),
     [colors.background],
   );
+
+  // --- WP-2.1 System-switch showcase inputs ---------------------------------
+  const { transition, progress } = contract.switchRuntime;
+  // Pure in (transition, progress): the choreography's phase / spin signal.
+  const switchSignal = useDerivedValue(() =>
+    sampleSwitchSignal(transition.value, progress.value),
+  );
+  // key → role / stagger: recomputed only when a switch is (re)published.
+  const roles = useDerivedValue(() => switchRoles(transition.value));
+  // Per-System sky hue (owner glance C-05): React resolves the destination's
+  // hue; the UI thread crossfades from whatever is displayed (see
+  // `displayedSkyHue` — robust to transition vs scene arrival order).
+  const hueIndex = systemSkyIndex(
+    scene.system,
+    colors.starPalette.length,
+    profile.env.lobeBStar,
+  );
+  const hueToken = colors.starPalette[hueIndex] ?? colors.accent;
+  const hue = useMemo(() => tokenToVec3(hueToken), [hueToken]);
+  const skyTarget = useSharedValue({ gen: scene.generation, hue });
+  const skyState = useSharedValue<LabSkyHueState>({
+    from: hue,
+    to: hue,
+    gen: scene.generation,
+  });
+  useEffect(() => {
+    skyTarget.value = { gen: scene.generation, hue };
+  }, [skyTarget, scene.generation, hue]);
+  useAnimatedReaction(
+    () => skyTarget.value,
+    (target) => {
+      const state = skyState.value;
+      if (
+        target.gen === state.gen &&
+        target.hue[0] === state.to[0] &&
+        target.hue[1] === state.to[1] &&
+        target.hue[2] === state.to[2]
+      )
+        return;
+      skyState.value = {
+        from: displayedSkyHue(state, switchSignal.value),
+        to: target.hue,
+        gen: target.gen,
+      };
+    },
+  );
+  const skyHue = useDerivedValue(() =>
+    displayedSkyHue(skyState.value, switchSignal.value),
+  );
+  const sw = useMemo<LabSwitchContext>(
+    () => ({ signal: switchSignal, roles, skyHue, transition }),
+    [switchSignal, roles, skyHue, transition],
+  );
+  // Trim-ring candidates (React side): keys not in the destination (leaving)
+  // or new since the previous scene (entering). The UI-thread role map still
+  // decides what draws, so a stale candidate only costs a hidden circle.
+  const sceneKeys = useRef<{
+    gen: number;
+    keys: Set<string>;
+    prev: Set<string>;
+  }>({ gen: -1, keys: new Set(), prev: new Set() });
+  if (sceneKeys.current.gen !== scene.generation) {
+    const keys = new Set(
+      scene.world.map((b) =>
+        bodyKey({ kind: b.kind, id: b.id, satelliteTarget: b.satelliteTarget }),
+      ),
+    );
+    sceneKeys.current = {
+      gen: scene.generation,
+      keys,
+      prev: sceneKeys.current.gen < 0 ? keys : sceneKeys.current.keys,
+    };
+  }
+  const trimKeys = useMemo(() => {
+    const { keys, prev } = sceneKeys.current;
+    const out = new Set<string>();
+    for (const r of resources) {
+      if (r.body.kind !== "contact") continue;
+      if (!keys.has(r.key) || !prev.has(r.key)) out.add(r.key);
+    }
+    return out;
+    // sceneKeys is a ref updated above for this generation.
+  }, [resources]);
+  const keyColors = useMemo(() => {
+    const out: Record<string, number[]> = {};
+    for (const r of resources) {
+      if (r.body.kind !== "contact") continue;
+      const status =
+        r.scene.contacts.find((c) => c.id === r.body.id)?.status ?? null;
+      out[r.key] = tokenToVec3(orreryRingStyle(status, colors).color);
+    }
+    return out;
+  }, [resources, colors]);
+  const highlight = useMemo(
+    () => tokenToVec3(labColor(colors, profile.bodies.highlight)),
+    [colors, profile.bodies.highlight],
+  );
+  const switchFxProps = {
+    frame,
+    frameIndex,
+    keyColors,
+    highlight,
+    additive: profile.blend === "additive",
+    extent: scene.extent,
+    flags: {
+      particles: flags.fxParticles,
+      comets: flags.fxComets,
+      flares: flags.fxFlares,
+      shockwave: flags.fxShockwave,
+    },
+  };
+  const shockFilter =
+    flags.fx && flags.fxShockFilter ? getLabEffect("shockFilter") : null;
+  const shockUniforms = useShockFilterUniforms(
+    frame,
+    scene.extent,
+    PixelRatio.get(),
+  );
+  // L1–L5 (rings, Polaris, reorder ghost, bodies): built once, optionally
+  // wrapped by the WP-2.1 displacement-filter experiment below.
+  const worldLayers = (
+    <>
+      {/* L1 */}
+      <Group>
+        {flags.rings ? (
+          flags.ringsPathRebuild ? (
+            <LabRingsPathRebuild
+              resources={resources}
+              frame={frame}
+              frameIndex={frameIndex}
+              colors={colors}
+            />
+          ) : (
+            <LabRings
+              resources={resources}
+              frame={frame}
+              frameIndex={frameIndex}
+              colors={colors}
+              profile={profile.rings}
+              flags={flags}
+              focusedIds={focusedIds}
+              level={contract.level}
+              progress={contract.switchRuntime.progress}
+              reorder={contract.reorder}
+              trimKeys={trimKeys}
+            />
+          )
+        ) : null}
+        {/* WP-2.1 on the world plane, under the bodies: shockwave, comets,
+              retained motion smears. */}
+        {flags.fx ? <LabSwitchUnder {...switchFxProps} /> : null}
+      </Group>
+      {/* L5 */}
+      <Group>
+        {flags.polaris ? (
+          flags.polarisLab ? (
+            <LabPolaris
+              frame={frame}
+              extent={scene.extent}
+              colors={colors}
+              profile={profile}
+            />
+          ) : (
+            <Polaris frame={frame} extent={scene.extent} colors={colors} />
+          )
+        ) : null}
+      </Group>
+      {/* reorder ghost (model-owned element) */}
+      {ghost}
+      {/* L2–L4: keep this run of body root Groups contiguous. */}
+      <Group>
+        {flags.bodies
+          ? resources.map((resource) => (
+              <LabBody
+                key={resource.key}
+                resource={resource}
+                frame={frame}
+                frameIndex={frameIndex}
+                colors={colors}
+                fontProvider={fontProvider}
+                focused={focusedIds.includes(resource.body.id)}
+                look={look}
+              />
+            ))
+          : null}
+        {flags.bodies
+          ? satellites.map((row) => {
+              const target = {
+                kind: "satellite" as const,
+                uid: row.uid,
+                parentId: row.parentId,
+                parentUid: row.parentUid,
+              };
+              const identity = bodyKey({
+                kind: "satellite",
+                id: -1,
+                satelliteTarget: target,
+              });
+              const focused =
+                focusedSatellite?.uid === row.uid &&
+                focusedSatellite.parentId === row.parentId &&
+                focusedSatellite.parentUid === row.parentUid;
+              return (
+                <LabMoon
+                  key={identity}
+                  identity={identity}
+                  frame={frame}
+                  frameIndex={frameIndex}
+                  color={colors.textSecondary}
+                  focusColor={focused ? colors.accent : undefined}
+                  look={look}
+                />
+              );
+            })
+          : null}
+      </Group>
+    </>
+  );
   return (
     <LabCanvas
       width={viewport.width}
@@ -266,6 +504,7 @@ export function LabBRenderer(contract: LabRenderContract) {
       fxFlags={fxFlags}
       warmup={flags.warmup}
       warmupColor={warmupColor}
+      sw={sw}
     >
       {/* L0 */}
       {flags.environment ? (
@@ -282,96 +521,21 @@ export function LabBRenderer(contract: LabRenderContract) {
       <Group
         clip={{ x: 0, y: 0, width: viewport.width, height: viewport.height }}
       >
-        {/* L1 */}
-        <Group>
-          {flags.rings ? (
-            flags.ringsPathRebuild ? (
-              <LabRingsPathRebuild
-                resources={resources}
-                frame={frame}
-                frameIndex={frameIndex}
-                colors={colors}
-              />
-            ) : (
-              <LabRings
-                resources={resources}
-                frame={frame}
-                frameIndex={frameIndex}
-                colors={colors}
-                profile={profile.rings}
-                flags={flags}
-                focusedIds={focusedIds}
-                level={contract.level}
-                progress={contract.switchRuntime.progress}
-                reorder={contract.reorder}
-              />
-            )
-          ) : null}
-        </Group>
-        {/* L5 */}
-        <Group>
-          {flags.polaris ? (
-            flags.polarisLab ? (
-              <LabPolaris
-                frame={frame}
-                extent={scene.extent}
-                colors={colors}
-                profile={profile}
-              />
-            ) : (
-              <Polaris frame={frame} extent={scene.extent} colors={colors} />
-            )
-          ) : null}
-        </Group>
-        {/* reorder ghost (model-owned element) */}
-        {ghost}
-        {/* L2–L4: keep this run of body root Groups contiguous. */}
-        <Group>
-          {flags.bodies
-            ? resources.map((resource) => (
-                <LabBody
-                  key={resource.key}
-                  resource={resource}
-                  frame={frame}
-                  frameIndex={frameIndex}
-                  colors={colors}
-                  fontProvider={fontProvider}
-                  focused={focusedIds.includes(resource.body.id)}
-                  look={look}
-                />
-              ))
-            : null}
-          {flags.bodies
-            ? satellites.map((row) => {
-                const target = {
-                  kind: "satellite" as const,
-                  uid: row.uid,
-                  parentId: row.parentId,
-                  parentUid: row.parentUid,
-                };
-                const identity = bodyKey({
-                  kind: "satellite",
-                  id: -1,
-                  satelliteTarget: target,
-                });
-                const focused =
-                  focusedSatellite?.uid === row.uid &&
-                  focusedSatellite.parentId === row.parentId &&
-                  focusedSatellite.parentUid === row.parentUid;
-                return (
-                  <LabMoon
-                    key={identity}
-                    identity={identity}
-                    frame={frame}
-                    frameIndex={frameIndex}
-                    color={colors.textSecondary}
-                    focusColor={focused ? colors.accent : undefined}
-                    look={look}
-                  />
-                );
-              })
-            : null}
-        </Group>
+        {/* WP-2.1 EXPERIMENT (fxShockFilter): the world layer (L1–L5, not the
+            labels) inside ONE saveLayer with a displacement runtime filter. */}
+        {shockFilter ? (
+          <Group
+            layer={
+              <Paint>
+                <RuntimeShader source={shockFilter} uniforms={shockUniforms} />
+              </Paint>
+            }
+          >
+            {worldLayers}
+          </Group>
+        ) : (
+          worldLayers
+        )}
         {/* L6 — labels stay outside any future effect/filter layer. */}
         <Group>
           {flags.labels
@@ -409,8 +573,8 @@ export function LabBRenderer(contract: LabRenderContract) {
               ))
             : null}
         </Group>
-        {/* L7 — focus / feedback / switch FX slot (WP-2.x). */}
-        <Group />
+        {/* L7 — switch FX over the bodies (WP-2.1); focus / feedback WP-2.2. */}
+        <Group>{flags.fx ? <LabSwitchOver {...switchFxProps} /> : null}</Group>
       </Group>
       {flags.fpsHud ? (
         <LabFpsOverlay

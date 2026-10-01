@@ -120,6 +120,9 @@ it("the emitted projection closure settles after publication under the installed
     deriveSatelliteBodies,
     semanticLevel,
     projectAnimatedFrame: projection,
+    // ORRERY LAB B WP-2.1: ringPath projection mode (-1 = every body; the lab
+    // renderer sets 0 = only a held reorder body). Perf only, no semantics.
+    ringPathMode: cell(-1),
   };
   const closure = Object.fromEntries(
     names.map((name) => {

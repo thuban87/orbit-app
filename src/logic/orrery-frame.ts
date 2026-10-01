@@ -131,10 +131,18 @@ export function projectAnimatedFrame(
   fraction: number,
   pose: CameraPose,
   viewport: CameraViewport,
+  /** See `projectFrame` (ORRERY LAB B): which bodies get a `ringPath`. */
+  ringPaths: boolean | number = true,
 ): AnimatedFrame {
   "worklet";
   const world = sampleWorldTransition(transition, fraction);
-  const frame = projectFrame(world, pose, viewport, transition.generation);
+  const frame = projectFrame(
+    world,
+    pose,
+    viewport,
+    transition.generation,
+    ringPaths,
+  );
   return {
     ...frame,
     bodies: frame.bodies.map((body, index) => {

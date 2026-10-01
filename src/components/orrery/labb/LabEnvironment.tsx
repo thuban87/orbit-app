@@ -42,6 +42,7 @@ import {
   type SkImage,
   type SkRSXform,
   useColorBuffer,
+  useRectBuffer,
   useRSXformBuffer,
   useTexture,
   vec,
@@ -64,7 +65,11 @@ import {
   labColor,
 } from "@/theme/orrery-lab-fx";
 import type { ThemePalette } from "@/theme/theme-types";
-import { useLabRenderContext } from "./labb-context";
+import { useStreakTexture } from "./LabSwitchFx";
+import {
+  type LabRenderContextValue,
+  useLabRenderContext,
+} from "./labb-context";
 import { getLabEffect } from "./labb-effects";
 import {
   buildStarField,
@@ -87,6 +92,15 @@ import {
   skyLayerPlacement,
   starTileSize,
 } from "./labb-sky";
+import {
+  STREAK_BAND_H,
+  STREAK_MAX_DP,
+  streakXform,
+  switchFxLive,
+  WARP_PUSH,
+  WARP_SWIRL,
+  warpAmount,
+} from "./labb-switch-logic";
 import { mixVec, tokenToVec3, type Vec3 } from "./labb-uniforms";
 
 // --- Tunables -----------------------------------------------------------------
@@ -160,12 +174,30 @@ function envScale(profile: number, fx: LabFxSnapshot | null): number {
   return profile * (fx ? fx.intensity : 1);
 }
 
+/** Far-star streak length (dp at the screen edge) relative to STREAK_MAX_DP. */
+const FAR_STREAK_SCALE = 0.55;
+
+/**
+ * WP-2.1 hyperspace warp for the sky, 0 at rest: the switch signal's warp when
+ * the streak effect is on and the switch is live (never under reduced motion).
+ */
+function skyWarp(ctx: LabRenderContextValue | null): number {
+  "worklet";
+  if (!ctx?.sw) return 0;
+  const flags = ctx.fxFlags.value.flags;
+  if (!flags.fx || !flags.fxStreaks) return 0;
+  const signal = ctx.sw.signal.value;
+  if (!switchFxLive(signal, ctx.reducedMotion.value)) return 0;
+  return warpAmount(signal);
+}
+
 /** Per-frame nebula uniforms (parallax from the DISPLAYED camera). */
 function nebulaFrameUniforms(
   frame: AnimatedFrame,
   flags: LabFlags | null,
   timeMs: number,
   reduced: boolean,
+  warp = 0,
 ): {
   uVC: number[];
   uOff: number[];
@@ -176,12 +208,14 @@ function nebulaFrameUniforms(
   uTime: number;
   uFarOff: number[];
   uFarScale: number;
+  uWarpS: number[];
 } {
   "worklet";
   const sky = labSkyPose(frame);
   const parallax = flags ? flags.parallax : true;
-  const place = skyLayerPlacement(sky, NEBULA_FACTOR, parallax);
-  const far = skyLayerPlacement(sky, FAR.factor, parallax);
+  const push = WARP_PUSH * warp;
+  const place = skyLayerPlacement(sky, NEBULA_FACTOR, parallax, push);
+  const far = skyLayerPlacement(sky, FAR.factor, parallax, push);
   const animate = !reduced && (flags ? flags.nebulaDrift : true);
   const t = animate ? (timeMs / 1000) % 1000 : STILL_T;
   const tau = Math.PI * 2;
@@ -198,6 +232,12 @@ function nebulaFrameUniforms(
     uTime: t,
     uFarOff: [far.ox, far.oy],
     uFarScale: far.zs,
+    uWarpS: [
+      STREAK_MAX_DP * FAR_STREAK_SCALE * warp,
+      sky.vx,
+      sky.vy,
+      WARP_SWIRL * warp,
+    ],
   };
 }
 
@@ -290,14 +330,18 @@ function useNebulaUniforms(
       flags,
       ambient ? ambient.value : 0,
       reducedMotion ? reducedMotion.value : false,
+      skyWarp(ctx),
     );
     const vignette = flags ? flags.vignette : true;
+    // WP-2.1 per-System sky hue (owner glance C-05): lobe B follows the
+    // displayed hue (crossfades over the settle; static at rest).
+    const lobeB = flags?.fxSkyHue && ctx?.sw ? ctx.sw.skyHue.value : st.uLobeB;
     const base = {
       ...dyn,
       uRes: st.uRes,
       uSky: st.uSky,
       uLobeA: st.uLobeA,
-      uLobeB: st.uLobeB,
+      uLobeB: lobeB,
       uEmber: st.uEmber,
       uVigTone: st.uVigTone,
       uTexPerDp: st.uTexPerDp,
@@ -515,9 +559,10 @@ function StarAtlas({
   const places = useDerivedValue(() => {
     const sky = labSkyPose(frame.value);
     const parallax = fxFlags ? fxFlags.value.flags.parallax : true;
+    const push = WARP_PUSH * skyWarp(ctx);
     const out: StarLayerPlace[] = [];
     for (let l = 0; l < factors.length; l++)
-      out.push(skyLayerPlacement(sky, factors[l], parallax));
+      out.push(skyLayerPlacement(sky, factors[l], parallax, push));
     return { vx: sky.vx, vy: sky.vy, layers: out };
   });
   const transforms = useRSXformBuffer(count, (xf: SkRSXform, i: number) => {
@@ -582,6 +627,151 @@ function StarAtlas({
   );
 }
 
+/** WP-2.1 streak look: thickness (× star size), alpha (× star alpha). */
+const STREAK_THICK = 0.85;
+const STREAK_ALPHA = 0.95;
+
+/**
+ * WP-2.1 HYPERSPACE STREAKS for the mid/near stars: one streak sprite per star
+ * (head at the star, tail toward the viewport centre — the camera's vanishing
+ * point — twisted slightly with the spin), length ∝ warp × distance from the
+ * centre × layer depth. Same star field, placements and tones as the star
+ * Atlas; sprites come from the shared streak texture (band chosen per frame
+ * through a rect buffer). Every sprite collapses while warp is 0, so at rest
+ * the layer costs one empty Atlas draw (and nothing while the flag is off:
+ * unmounted).
+ */
+function StarStreakAtlas({
+  field,
+  tiles,
+  factors,
+  tones,
+  density,
+  alphaScale,
+  intensity,
+  additive,
+  frame,
+}: {
+  field: number[];
+  tiles: number[];
+  factors: number[];
+  tones: number[];
+  density: number;
+  alphaScale: number;
+  intensity: number;
+  additive: boolean;
+  frame: SharedValue<AnimatedFrame>;
+}) {
+  const ctx = useLabRenderContext();
+  const image = useStreakTexture();
+  const count = Math.floor(field.length / STAR_STRIDE);
+  const places = useDerivedValue(() => {
+    const warm = ctx ? ctx.warm.value : false;
+    const warp = warm ? 0.05 : skyWarp(ctx);
+    const sky = labSkyPose(frame.value);
+    const parallax = ctx ? ctx.fxFlags.value.flags.parallax : true;
+    const push = WARP_PUSH * warp;
+    const out: StarLayerPlace[] = [];
+    for (let l = 0; l < factors.length; l++)
+      out.push(skyLayerPlacement(sky, factors[l], parallax, push));
+    const half = Math.sqrt(sky.vx * sky.vx + sky.vy * sky.vy);
+    const swirl = WARP_SWIRL * warp;
+    return {
+      vx: sky.vx,
+      vy: sky.vy,
+      half: half > 1 ? half : 1,
+      warp,
+      warm,
+      cs: Math.cos(swirl),
+      sn: Math.sin(swirl),
+      k: ctx ? ctx.fxFlags.value.intensity : 1,
+      layers: out,
+    };
+  });
+  // [scos, ssin, tx, ty, band, w] per star, or null (hidden).
+  type Places = typeof places.value;
+  const xform = (P: Places, i: number): number[] | null => {
+    "worklet";
+    if (P.warp <= 0.001) return null;
+    if (P.warm && i > 0) return null;
+    const k = i * STAR_STRIDE;
+    if (field[k + S_RANK] >= density) return null;
+    const layer = field[k + S_LAYER];
+    const pt = placeSkyPoint(
+      field[k + S_X],
+      field[k + S_Y],
+      tiles[layer],
+      P.layers[layer],
+      P.vx,
+      P.vy,
+    );
+    let dx = pt.x - P.vx;
+    let dy = pt.y - P.vy;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 1) return null;
+    dx /= d;
+    dy /= d;
+    const rx = dx * P.cs - dy * P.sn;
+    const ry = dx * P.sn + dy * P.cs;
+    const depth = 0.45 + 2.5 * factors[layer];
+    const len =
+      STREAK_MAX_DP *
+      P.warp *
+      Math.min(1.4, Math.max(0.12, d / P.half)) *
+      depth;
+    const size = field[k + S_SIZE] * Math.sqrt(P.layers[layer].zs);
+    return streakXform(pt.x, pt.y, rx, ry, size * STREAK_THICK, len);
+  };
+  // Each modifier reads `places.value` itself so the buffer mapper subscribes
+  // to it (a captured helper's closure is not scanned for inputs).
+  const sprites = useRectBuffer(count, (r, i) => {
+    "worklet";
+    const x = xform(places.value, i);
+    if (!x) {
+      r.setXYWH(0, 0, 1, 1);
+      return;
+    }
+    r.setXYWH(0, x[4] * STREAK_BAND_H, x[5], STREAK_BAND_H);
+  });
+  const transforms = useRSXformBuffer(count, (xf: SkRSXform, i: number) => {
+    "worklet";
+    const x = xform(places.value, i);
+    if (!x) {
+      xf.set(0, 0, -64, -64);
+      return;
+    }
+    xf.set(x[0], x[1], x[2], x[3]);
+  });
+  const colors = useColorBuffer(count, (c, i: number) => {
+    "worklet";
+    const P = places.value;
+    const k = i * STAR_STRIDE;
+    const tone = field[k + S_TONE] * 3;
+    const scale = envScale(intensity, ctx ? ctx.fxFlags.value : null);
+    const a =
+      field[k + S_ALPHA] *
+      alphaScale *
+      (0.4 + 0.6 * Math.min(1.5, scale)) *
+      STREAK_ALPHA *
+      Math.min(1, P.warp * 2.5) *
+      (P.warm ? 0.01 : 1);
+    c[0] = tones[tone];
+    c[1] = tones[tone + 1];
+    c[2] = tones[tone + 2];
+    c[3] = Math.min(1, Math.max(0, a));
+  });
+  return (
+    <Atlas
+      image={image}
+      sprites={sprites}
+      transforms={transforms}
+      colors={colors}
+      colorBlendMode="modulate"
+      blendMode={additive ? "plus" : "srcOver"}
+    />
+  );
+}
+
 function Starfield({
   width,
   height,
@@ -589,6 +779,7 @@ function Starfield({
   profile,
   frame,
   farInShader,
+  streaks = false,
 }: {
   width: number;
   height: number;
@@ -597,6 +788,8 @@ function Starfield({
   frame: SharedValue<AnimatedFrame>;
   /** The FAR layer is drawn analytically by the nebula shader. */
   farInShader: boolean;
+  /** WP-2.1 hyperspace streak Atlas mounted (flags fx && fxStreaks). */
+  streaks?: boolean;
 }) {
   const env = profile.env;
   const image = useTexture(<StarSprites />, ATLAS_SIZE, []);
@@ -648,6 +841,19 @@ function Starfield({
   return (
     <Group>
       {farInShader ? null : <StarAtlas {...common} {...far} twinkleAmp={0} />}
+      {streaks ? (
+        <StarStreakAtlas
+          field={near.field}
+          tiles={near.tiles}
+          factors={near.factors}
+          tones={tones}
+          density={env.starDensity}
+          alphaScale={env.starAlpha}
+          intensity={profile.intensity}
+          additive={env.starAdditive}
+          frame={frame}
+        />
+      ) : null}
       <StarAtlas {...common} {...near} twinkleAmp={env.twinkle} />
     </Group>
   );
@@ -700,6 +906,7 @@ export function LabEnvironment({
           profile={profile}
           frame={frame}
           farInShader={farInShader}
+          streaks={flags.fx && flags.fxStreaks}
         />
       ) : null}
     </Group>

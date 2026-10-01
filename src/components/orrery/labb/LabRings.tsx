@@ -29,6 +29,7 @@ import {
   DashPathEffect,
   Group,
   Path,
+  Picture,
   Rect,
   Shader,
   Skia,
@@ -45,6 +46,7 @@ import {
   type OrreryRingStyle,
   orreryRingStyle,
 } from "@/logic/orrery-ring-logic";
+import { sampleSwitchEntry } from "@/logic/orrery-switch-choreography";
 import type { LabFlags } from "@/stores/orrery-labb-fx-store";
 import { type LabRingProfile, labColor } from "@/theme/orrery-lab-fx";
 import type { ThemePalette } from "@/theme/theme-types";
@@ -70,9 +72,17 @@ import {
   wakeAngle,
   wakeUniforms,
 } from "./labb-rings-logic";
+import {
+  classRingSwitchFade,
+  FLOW_SPOOL,
+  switchFxLive,
+  trimRingState,
+  warpAmount,
+} from "./labb-switch-logic";
 import { tokenToVec4 } from "./labb-uniforms";
 
 const IDENTITY_3X3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+const EMPTY_KEYS: ReadonlySet<string> = new Set();
 /** Shader modes (see `ringInstrument`). */
 const MODE_RING = 0;
 const MODE_RADIAL = 2;
@@ -224,20 +234,35 @@ function RingCircle({
   frameIndex,
   dim,
   strokeWidth,
+  trimmed = false,
 }: {
   identity: string;
   frame: SharedValue<AnimatedFrame>;
   frameIndex: SharedValue<FrameIndex>;
   dim: number;
   strokeWidth?: SharedValue<number>;
+  /** WP-2.1: a trim ring owns this key during a switch (unwind / draw-on). */
+  trimmed?: boolean;
 }) {
+  const ctx = useLabRenderContext();
   const r = useDerivedValue(() => {
     const b = bodyAt(frame.value, frameIndex.value, identity);
     return b ? b.ringRadius / frame.value.pose.zoom : 0;
   });
-  const opacity = useDerivedValue(
-    () => (bodyAt(frame.value, frameIndex.value, identity)?.opacity ?? 0) * dim,
-  );
+  const opacity = useDerivedValue(() => {
+    const base =
+      (bodyAt(frame.value, frameIndex.value, identity)?.opacity ?? 0) * dim;
+    if (!trimmed || !ctx?.sw) return base;
+    const fx = ctx.fxFlags.value;
+    const signal = ctx.sw.signal.value;
+    const live =
+      fx.flags.fx &&
+      fx.flags.fxRingTrim &&
+      switchFxLive(signal, ctx.reducedMotion.value);
+    return (
+      base * classRingSwitchFade(ctx.sw.roles.value, identity, signal, live)
+    );
+  });
   return (
     <Circle cx={0} cy={0} r={r} opacity={opacity} strokeWidth={strokeWidth} />
   );
@@ -286,11 +311,13 @@ function RingClassGroup({
   entries,
   frameIndex,
   dims,
+  trimKeys,
 }: {
   common: ClassCommon;
   entries: readonly LabRingEntry[];
   frameIndex: SharedValue<FrameIndex>;
   dims: readonly number[];
+  trimKeys: ReadonlySet<string>;
 }) {
   const { cls, frame, profile, shader } = common;
   const effect = shader ? getLabEffect("ringInstrument") : null;
@@ -325,10 +352,151 @@ function RingClassGroup({
           frame={frame}
           frameIndex={frameIndex}
           dim={dims[i]}
+          trimmed={trimKeys.has(e.key)}
         />
       ))}
     </Group>
   );
+}
+
+// ---------------------------------------------------------------------------
+// WP-2.1 switch: ring UNWIND (leaving) / DRAW-ON (entering).
+
+const RAD_TO_DEG = 180 / Math.PI;
+/** Trim rings are slightly heavier than the class hairline (they carry motion). */
+const TRIM_WIDTH_SCALE = 1.35;
+/** Tail alpha of a trim ring relative to its head (at the body). */
+const TRIM_TAIL = 0.3;
+/** Picture bounds (world units) — larger than any ring. */
+const TRIM_BOUNDS = 1e5;
+const PAINT_STROKE = 1;
+const TILE_CLAMP = 0;
+
+/**
+ * Every leaving / entering ring of a switch, recorded into ONE picture per
+ * frame on the UI thread (under the plane homography, world coordinates):
+ * per ring, a stroked circle whose shader is a SWEEP GRADIENT mask — the
+ * visible arc trails the body (clear → tail → head at the body), its length
+ * from `trimRingState`; the body's WORLD angle and ring radius come from the
+ * choreography (`sampleSwitchEntry`), so the trim stays exact through pause /
+ * remount / retarget. Analytic circles + native gradients: no path
+ * tessellation (WP-1.3 PERF finding).
+ *
+ * First cut was one React component per ring (7 derived values + a
+ * SweepGradient element each): mounting ~130 of them at a switch start froze
+ * the debug UI thread for seconds (DEAD-ENDS WP-2.1). The picture costs
+ * nothing to mount and nothing at rest (an empty recording).
+ */
+function TrimRingPicture({
+  entries,
+  frame,
+  profile,
+}: {
+  entries: readonly LabRingEntry[];
+  frame: SharedValue<AnimatedFrame>;
+  profile: LabRingProfile;
+}) {
+  const ctx = useLabRenderContext();
+  // key → [r, g, b, alpha, width dp] (React side, per publish).
+  const spec = useMemo(() => {
+    const out: Record<string, number[]> = {};
+    for (const e of entries) {
+      const c = tokenToVec4(e.cls.color);
+      out[e.key] = [
+        c[0],
+        c[1],
+        c[2],
+        Math.min(1, profile.alpha * e.cls.alpha * 1.6),
+        e.cls.widthDp * TRIM_WIDTH_SCALE,
+      ];
+    }
+    return out;
+  }, [entries, profile.alpha]);
+  const picture = useDerivedValue(() => {
+    const recorder = Skia.PictureRecorder();
+    const canvas = recorder.beginRecording(
+      Skia.XYWHRect(
+        -TRIM_BOUNDS,
+        -TRIM_BOUNDS,
+        TRIM_BOUNDS * 2,
+        TRIM_BOUNDS * 2,
+      ),
+    );
+    const zoom = Math.max(frame.value.pose.zoom, 1e-4);
+    const sw = ctx?.sw;
+    const draw = (
+      c: number[],
+      alpha: number,
+      len: number,
+      angle: number,
+      r: number,
+    ) => {
+      "worklet";
+      const deg = angle * RAD_TO_DEG - 90;
+      const start = ((deg % 360) + 360) % 360;
+      const cut = Math.max(0, Math.min(0.998, 1 - len));
+      const paint = Skia.Paint();
+      paint.setStyle(PAINT_STROKE);
+      paint.setStrokeWidth(c[4] / zoom);
+      paint.setAntiAlias(true);
+      paint.setShader(
+        Skia.Shader.MakeSweepGradient(
+          0,
+          0,
+          [
+            Float32Array.of(c[0], c[1], c[2], 0),
+            Float32Array.of(c[0], c[1], c[2], 0),
+            Float32Array.of(c[0], c[1], c[2], TRIM_TAIL),
+            Float32Array.of(c[0], c[1], c[2], 1),
+          ],
+          [0, cut, cut + 0.002, 1],
+          TILE_CLAMP,
+          undefined,
+          0,
+          start,
+          start + 360,
+        ),
+      );
+      paint.setAlphaf(Math.min(1, alpha));
+      canvas.drawCircle(0, 0, r, paint);
+    };
+    if (ctx?.warm.value) {
+      draw([1, 1, 1, 1, 1], 0.01, 0.5, 0, 40);
+    } else if (ctx && sw) {
+      const fx = ctx.fxFlags.value;
+      const signal = sw.signal.value;
+      const live =
+        fx.flags.fx &&
+        fx.flags.fxRingTrim &&
+        switchFxLive(signal, ctx.reducedMotion.value);
+      const roles = sw.roles.value;
+      if (live && roles.generation === signal.generation) {
+        const transition = sw.transition.value;
+        const lists = [roles.leaving, roles.entering];
+        for (let l = 0; l < 2; l++) {
+          const list = lists[l];
+          for (let n = 0; n < list.length; n++) {
+            const e = transition.entries[list[n]];
+            if (!e) continue;
+            const c = spec[e.key];
+            if (!c) continue;
+            const [len, a] = trimRingState(roles, e.key, signal, true);
+            if (len <= 0.001 || a <= 0) continue;
+            const world = sampleSwitchEntry(transition, e, signal.progress);
+            draw(
+              c,
+              c[3] * a * (0.55 + 0.45 * len),
+              len,
+              Math.atan2(world.x, -world.y),
+              world.ringRadius,
+            );
+          }
+        }
+      }
+    }
+    return recorder.finishRecordingAsPicture();
+  });
+  return <Picture picture={picture} />;
 }
 
 /** One ring's progress wake: a stroked world circle + the wake shader. */
@@ -516,6 +684,7 @@ export function LabRings({
   level,
   progress,
   reorder,
+  trimKeys = EMPTY_KEYS,
 }: {
   resources: readonly OrreryBodyResource[];
   frame: SharedValue<AnimatedFrame>;
@@ -528,6 +697,9 @@ export function LabRings({
   /** Switch progress (1 = settled). */
   progress: SharedValue<number>;
   reorder: SharedValue<ReorderDrag | null>;
+  /** WP-2.1: keys that may leave / enter in the running switch (React-side
+   * candidates; the UI-thread role map decides what actually draws). */
+  trimKeys?: ReadonlySet<string>;
 }) {
   const ctx = useLabRenderContext();
   const entries = useMemo(
@@ -560,16 +732,39 @@ export function LabRings({
     const fx = ctx?.fxFlags.value;
     const on = ctx && !ctx.reducedMotion.value && fx?.flags.ringFlow ? 1 : 0;
     const t = on && ctx ? (ctx.ambient.value / 1000) % 1000 : 0;
+    // WP-2.1 spool-up: comets ride the system spin during a switch (stateless:
+    // a phase offset from the choreography's accumulated rotation).
+    const signal = ctx?.sw ? ctx.sw.signal.value : null;
+    const spool =
+      on && fx?.flags.fx && fx.flags.fxSpool && signal?.running
+        ? signal.accumulatedRotation * FLOW_SPOOL
+        : 0;
+    const boost =
+      on && fx?.flags.fx && fx.flags.fxSpool ? warpAmount(signal) * 1.4 : 0;
     return [
       t,
       on,
       profile.cometLength,
       profile.cometSpeed,
       fx ? fx.intensity : 1,
+      spool,
+      boost,
     ];
   });
-  const settled = useDerivedValue<number>(() =>
-    progress.value >= 1 && !reorder.value?.active ? 1 : 0,
+  // Wakes / tethers are built from the settled world; while a switch runs they
+  // fade back in over its last moments instead of popping at progress 1.
+  const settled = useDerivedValue<number>(() => {
+    if (reorder.value?.active) return 0;
+    const p = progress.value;
+    if (p >= 1) return 1;
+    const reduced = ctx ? ctx.reducedMotion.value : false;
+    if (reduced) return 0;
+    const t = Math.max(0, Math.min(1, (p - 0.86) / 0.14));
+    return t * t * (3 - 2 * t);
+  });
+  const trimEntries = useMemo(
+    () => entries.filter((e) => trimKeys.has(e.key)),
+    [entries, trimKeys],
   );
   const highlight = tokenToVec4(labColor(colors, profile.flowHighlight));
   const shader = flags.ringShader;
@@ -664,8 +859,16 @@ export function LabRings({
           dims={group.map((e) =>
             anyFocus && !e.focused ? profile.focusDim : 1,
           )}
+          trimKeys={trimKeys}
         />
       ))}
+      {flags.fx && flags.fxRingTrim ? (
+        <TrimRingPicture
+          entries={trimEntries}
+          frame={frame}
+          profile={profile}
+        />
+      ) : null}
       {/* Focused ring at full opacity (instrument lock), above its class. */}
       {focused.map((e) => (
         <FocusLock

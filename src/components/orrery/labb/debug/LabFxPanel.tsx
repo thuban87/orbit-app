@@ -12,14 +12,16 @@
  * - camera presets (adb cannot pinch): zoom far / overview / identity / detail
  *   / near, tilt and yaw — applied through the camera's normal `recover` path;
  * - quick System switching through the screen's normal store `select`, plus
- *   "replay last switch" (re-selects the previous System).
+ *   "replay last switch" (re-selects the previous System). WP-2.1: with
+ *   "close on switch" (default ON) the panel closes and the switch fires
+ *   ~0.7 s later, so recordings see the whole switch.
  *
  * Gated on the Lab B applicationId (not `__DEV__`) so release-build profiling
  * works (C-08). In any other build only the plain marker renders.
  */
 import Constants from "expo-constants";
-import { useCallback, useRef, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Linking, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { runOnUI, type SharedValue } from "react-native-reanimated";
 import { AppText } from "@/components/ui/AppText";
 import type { SystemCatalogEntry } from "@/db/systems-catalog-read";
@@ -32,6 +34,7 @@ import {
 import type { OrrerySystemRef } from "@/logic/orrery-system-logic";
 import {
   LAB_FLAG_REGISTRY,
+  type LabFlagId,
   type LabFlagSpec,
   type LabReducedMotionMode,
   useLabFxStore,
@@ -67,6 +70,9 @@ const YAW_PRESETS: readonly { id: string; label: string; yaw: number }[] = [
 ];
 
 type Recover = (target: CameraPose) => void;
+
+/** Delay between closing the panel and firing a quick switch (ms). */
+const SWITCH_AFTER_CLOSE_MS = 700;
 
 function Chip({
   label,
@@ -133,6 +139,9 @@ export function LabFxPanel({
   currentSystemId,
   onSelectSystem,
   onClose,
+  previousSystem,
+  closeOnSwitch,
+  setCloseOnSwitch,
 }: {
   colors: ThemePalette;
   pose: SharedValue<CameraPose>;
@@ -141,15 +150,16 @@ export function LabFxPanel({
   currentSystemId: string | null;
   onSelectSystem: (ref: OrrerySystemRef, name: string) => void;
   onClose: () => void;
+  /** Owned by the host so "replay" survives the panel closing (WP-2.1). */
+  previousSystem: { current: { ref: OrrerySystemRef; name: string } | null };
+  closeOnSwitch: boolean;
+  setCloseOnSwitch: (value: boolean) => void;
 }) {
   const renderer = useLabFxStore((s) => s.renderer);
   const flags = useLabFxStore((s) => s.flags);
   const intensity = useLabFxStore((s) => s.intensity);
   const reducedMotion = useLabFxStore((s) => s.reducedMotion);
   const store = useLabFxStore.getState;
-  const previousSystem = useRef<{ ref: OrrerySystemRef; name: string } | null>(
-    null,
-  );
   const applyPose = useCallback(
     (patch: Partial<CameraPose>) => {
       runOnUI((p: Partial<CameraPose>) => {
@@ -159,11 +169,21 @@ export function LabFxPanel({
     },
     [pose, recover],
   );
+  // WP-2.1: with "close on switch" the panel closes FIRST and the switch fires
+  // after a short delay, so a recording sees the whole switch unobstructed.
+  const fire = (ref: OrrerySystemRef, name: string) => {
+    if (!closeOnSwitch) {
+      onSelectSystem(ref, name);
+      return;
+    }
+    onClose();
+    setTimeout(() => onSelectSystem(ref, name), SWITCH_AFTER_CLOSE_MS);
+  };
   const select = (entry: SystemCatalogEntry) => {
     const current = catalog.find((e) => e.id === currentSystemId);
     if (current && current.id !== entry.id)
       previousSystem.current = { ref: current.ref, name: current.name };
-    onSelectSystem(entry.ref, entry.name);
+    fire(entry.ref, entry.name);
   };
   const replay = () => {
     const prev = previousSystem.current;
@@ -172,7 +192,7 @@ export function LabFxPanel({
     previousSystem.current = current
       ? { ref: current.ref, name: current.name }
       : null;
-    onSelectSystem(prev.ref, prev.name);
+    fire(prev.ref, prev.name);
   };
   const statuses = labEffectStatuses();
   const sections: { key: LabFlagSpec["section"]; title: string }[] = [
@@ -203,6 +223,28 @@ export function LabFxPanel({
         </View>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
+        <Section title="Systems (quick switch)" colors={colors}>
+          {catalog
+            .filter((entry) => !entry.hidden)
+            .map((entry) => (
+              <Chip
+                key={entry.id}
+                label={entry.name}
+                active={entry.id === currentSystemId}
+                colors={colors}
+                onPress={() => select(entry)}
+              />
+            ))}
+          <Chip label="Replay last switch" colors={colors} onPress={replay} />
+          <Chip
+            label={
+              closeOnSwitch ? "Close on switch: ON" : "Close on switch: off"
+            }
+            active={closeOnSwitch}
+            colors={colors}
+            onPress={() => setCloseOnSwitch(!closeOnSwitch)}
+          />
+        </Section>
         <Section title="Renderer (A/B)" colors={colors}>
           <Chip
             label="Lab"
@@ -261,20 +303,6 @@ export function LabFxPanel({
             />
           ))}
         </Section>
-        <Section title="Systems (quick switch)" colors={colors}>
-          {catalog
-            .filter((entry) => !entry.hidden)
-            .map((entry) => (
-              <Chip
-                key={entry.id}
-                label={entry.name}
-                active={entry.id === currentSystemId}
-                colors={colors}
-                onPress={() => select(entry)}
-              />
-            ))}
-          <Chip label="Replay last switch" colors={colors} onPress={replay} />
-        </Section>
         <Section title={`Intensity ${intensity.toFixed(2)}`} colors={colors}>
           <Chip
             label="−0.25"
@@ -324,6 +352,73 @@ export function LabFxPanel({
   );
 }
 
+/** A parsed `orbit://labb?...` command (lab build only; see LabBMarkerHost). */
+export interface LabCommand {
+  reset: boolean;
+  renderer?: "lab" | "legacy";
+  rm?: LabReducedMotionMode;
+  intensity?: number;
+  /** Switch duration multiplier (debug slow-motion). */
+  slowmo?: number;
+  flags: [string, boolean][];
+  pose?: Partial<CameraPose>;
+  system?: string;
+  replay: boolean;
+  delay: number;
+  panel?: boolean;
+}
+
+/**
+ * Parse `orbit://labb?flags=fx:0,fxStreaks:1&system=Lab%20B%20Dense&rm=on
+ * &intensity=0.75&zoom=2.2&tilt=0.5&yaw=1.57&renderer=legacy&replay=1
+ * &delay=0&panel=0&reset=1`. Null for any other URL. Unknown flag ids are
+ * dropped (only registry ids reach the store).
+ */
+export function parseLabCommand(url: string): LabCommand | null {
+  const m = /^orbit:\/\/labb\/?\?(.*)$/.exec(url);
+  if (!m) return null;
+  const q = new Map<string, string>();
+  for (const part of m[1].split("&")) {
+    const [k, v = ""] = part.split("=");
+    if (k)
+      q.set(decodeURIComponent(k), decodeURIComponent(v.replace(/\+/g, " ")));
+  }
+  const ids = new Set(LAB_FLAG_REGISTRY.map((f) => f.id as string));
+  const flags: [string, boolean][] = (q.get("flags") ?? "")
+    .split(",")
+    .filter(Boolean)
+    .map((pair) => pair.split(":"))
+    .filter(([id]) => ids.has(id))
+    .map(([id, v]) => [id, v === "1" || v === "on" || v === "true"]);
+  const num = (key: string) => {
+    const v = q.get(key);
+    const n = v === undefined ? Number.NaN : Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const pose: Partial<CameraPose> = {};
+  for (const key of ["zoom", "tilt", "yaw", "x", "y"] as const) {
+    const n = num(key);
+    if (n !== undefined) pose[key] = n;
+  }
+  const rm = q.get("rm");
+  const renderer = q.get("renderer");
+  const panel = q.get("panel");
+  return {
+    reset: q.get("reset") === "1",
+    renderer:
+      renderer === "lab" || renderer === "legacy" ? renderer : undefined,
+    rm: rm === "on" || rm === "off" || rm === "os" ? rm : undefined,
+    intensity: num("intensity"),
+    slowmo: num("slowmo"),
+    flags,
+    pose: Object.keys(pose).length ? pose : undefined,
+    system: q.get("system") || undefined,
+    replay: q.get("replay") === "1",
+    delay: num("delay") ?? 0,
+    panel: panel === undefined ? undefined : panel === "1",
+  };
+}
+
 /** WP-1.3: the marker is a small, dimmed "LAB B" tag in the bottom-left
  * corner (it used to span the bottom centre over the scene). */
 const MARKER_OPACITY = 0.75;
@@ -345,7 +440,54 @@ export function LabBMarkerHost({
   onSelectSystem: (ref: OrrerySystemRef, name: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [closeOnSwitch, setCloseOnSwitch] = useState(true);
+  const previousSystem = useRef<{ ref: OrrerySystemRef; name: string } | null>(
+    null,
+  );
   const lab = isLabBBuild();
+  // WP-2.1 adb remote control (lab build only): `orbit://labb?...` VIEW
+  // intents drive the same store / select / camera paths as the panel, so a
+  // recording never has the panel in frame and A/B runs are repeatable.
+  const latest = useRef({ catalog, currentSystemId, onSelectSystem, recover });
+  latest.current = { catalog, currentSystemId, onSelectSystem, recover };
+  useEffect(() => {
+    if (!lab) return;
+    const sub = Linking.addEventListener("url", ({ url }) => {
+      const cmd = parseLabCommand(url);
+      if (!cmd) return;
+      const l = latest.current;
+      const store = useLabFxStore.getState();
+      if (cmd.reset) store.reset();
+      if (cmd.renderer) store.setRenderer(cmd.renderer);
+      if (cmd.rm) store.setReducedMotion(cmd.rm);
+      if (cmd.intensity !== undefined) store.setIntensity(cmd.intensity);
+      if (cmd.slowmo !== undefined) store.setSwitchTimeScale(cmd.slowmo);
+      for (const [id, on] of cmd.flags) store.setFlag(id as LabFlagId, on);
+      if (cmd.pose) {
+        const patch = cmd.pose;
+        const rec = l.recover;
+        runOnUI((p: Partial<CameraPose>) => {
+          "worklet";
+          rec({ ...pose.value, ...p });
+        })(patch);
+      }
+      const go = (ref: OrrerySystemRef, name: string) => {
+        const current = l.catalog.find((e) => e.id === l.currentSystemId);
+        if (current && current.name !== name)
+          previousSystem.current = { ref: current.ref, name: current.name };
+        setTimeout(() => l.onSelectSystem(ref, name), cmd.delay);
+      };
+      if (cmd.system) {
+        const entry = l.catalog.find((e) => e.name === cmd.system);
+        if (entry) go(entry.ref, entry.name);
+      } else if (cmd.replay && previousSystem.current) {
+        const prev = previousSystem.current;
+        go(prev.ref, prev.name);
+      }
+      if (cmd.panel !== undefined) setOpen(cmd.panel);
+    });
+    return () => sub.remove();
+  }, [lab, pose]);
   return (
     <>
       <Pressable
@@ -376,6 +518,9 @@ export function LabBMarkerHost({
           currentSystemId={currentSystemId}
           onSelectSystem={onSelectSystem}
           onClose={() => setOpen(false)}
+          previousSystem={previousSystem}
+          closeOnSwitch={closeOnSwitch}
+          setCloseOnSwitch={setCloseOnSwitch}
         />
       ) : null}
     </>

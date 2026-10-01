@@ -103,6 +103,7 @@ import {
   loadOrreryScene,
   type OrrerySatelliteState,
 } from "@/services/orrery-scene";
+import { useLabFxStore } from "@/stores/orrery-labb-fx-store";
 import { useOrreryPreferencesStore } from "@/stores/orrery-preferences-store";
 import { useOrrerySessionStore } from "@/stores/orrery-session-store";
 import { createOrrerySystemStore } from "@/stores/orrery-system-store";
@@ -283,7 +284,17 @@ export function OrreryScreen() {
     [],
   );
   const state = useSystemStore();
-  const switchRuntime = useOrrerySwitchRuntime(pose, reducedMotion);
+  // ORRERY LAB B (WP-2.1): debug slow-motion for the switch showcase.
+  const labSwitchTimeScale = useLabFxStore((s) => s.switchTimeScale);
+  const labTimeScale = useSharedValue(1);
+  useEffect(() => {
+    labTimeScale.value = labSwitchTimeScale;
+  }, [labTimeScale, labSwitchTimeScale]);
+  const switchRuntime = useOrrerySwitchRuntime(
+    pose,
+    reducedMotion,
+    labTimeScale,
+  );
   const publishSwitch = switchRuntime.publish;
   const pauseSwitch = switchRuntime.pause;
   const resumeSwitch = switchRuntime.resume;

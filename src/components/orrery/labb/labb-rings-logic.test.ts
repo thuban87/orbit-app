@@ -189,12 +189,13 @@ describe("ringInstrument uniform contract (a missing uniform THROWS on device)",
       ),
       (m) => m[1],
     );
-    expect(names.length).toBe(5);
+    // WP-2.1 added uSpin (switch spool-up).
+    expect(names.length).toBe(6);
     const u = ringUniforms(
       [1, 0, 0, 1],
       [1, 1, 1, 1],
       [1, 0, 0.5, 2],
-      [3, 1, 70, 36, 1],
+      [3, 1, 70, 36, 1, 2.5, 0.8],
       {
         mode: 0,
         alpha: 0.5,
@@ -226,6 +227,9 @@ describe("ringInstrument uniform contract (a missing uniform THROWS on device)",
       },
     );
     expect(off.uFlow[1]).toBe(0);
+    // Spool defaults to 0 when the flow array has no switch terms.
+    expect(off.uSpin).toEqual([0, 0, 0, 0]);
+    expect(u.uSpin).toEqual([2.5, 0.8, 0, 0]);
     const wakeNames = Array.from(
       LAB_EFFECT_SOURCES.ringWake.matchAll(
         /uniform\s+(?:float|float2|float3|float4|half4)\s+(\w+);/g,

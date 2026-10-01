@@ -273,11 +273,13 @@ export type RingUniforms = {
   uCam: number[];
   uStyle: number[];
   uFlow: number[];
+  uSpin: number[];
 };
 
 /**
  * Build the `ringInstrument` uniforms. `cam` = [cos yaw, sin yaw, tilt depth,
- * zoom]; `flow` = [time s, on, comet length, comet speed, panel intensity].
+ * zoom]; `flow` = [time s, on, comet length, comet speed, panel intensity,
+ * (WP-2.1) spool angle rad, spool brightness boost] — the last two default 0.
  */
 export function ringUniforms(
   color: readonly number[],
@@ -306,6 +308,7 @@ export function ringUniforms(
     uCam: [cam[0], cam[1], cam[2], cam[3]],
     uStyle: [style.mode, style.dashPeriod, style.dashDuty, style.farAlpha],
     uFlow: [flow[0], style.flowOn ? flow[1] : 0, flow[2], flow[3]],
+    uSpin: [flow[5] ?? 0, flow[6] ?? 0, 0, 0],
   };
 }
 

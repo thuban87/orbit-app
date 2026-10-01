@@ -228,6 +228,12 @@ export interface OrrerySwitchRuntime {
 export function useOrrerySwitchRuntime(
   pose: SharedValue<CameraPose>,
   reducedMotion: SharedValue<boolean>,
+  /**
+   * ORRERY LAB B (WP-2.1, debug only): switch duration multiplier ("slow-mo")
+   * so the showcase can be recorded / inspected frame by frame. Absent = 1
+   * (production timing unchanged).
+   */
+  timeScale?: SharedValue<number>,
 ): OrrerySwitchRuntime {
   const empty = useRef(
     createSettledOrrerySwitchRuntime([], 0, pose.value),
@@ -265,9 +271,11 @@ export function useOrrerySwitchRuntime(
   const startDriver = useCallback(
     (remaining: number, reduced: boolean, generation: number) => {
       "worklet";
+      const scale = timeScale && timeScale.value > 0 ? timeScale.value : 1;
       const duration =
         (reduced ? REDUCED_SWITCH_DURATION_MS : NORMAL_SWITCH_DURATION_MS) *
-        remaining;
+        remaining *
+        scale;
       running.value = true;
       progress.value = withTiming(
         1,
@@ -277,7 +285,7 @@ export function useOrrerySwitchRuntime(
         },
       );
     },
-    [finish, progress, running],
+    [finish, progress, running, timeScale],
   );
 
   const publish = useCallback(

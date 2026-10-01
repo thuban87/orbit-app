@@ -72,20 +72,33 @@ export interface LabSkyPlacement {
 
 const STILL: LabSkyPlacement = { ox: 0, oy: 0, zs: 1, c: 1, s: 0 };
 
-/** Placement of one depth layer for the displayed camera (identity when parallax is off). */
+/** WP-2.1 warp push: extra zoom per unit push, base + per depth factor. */
+export const SKY_PUSH_BASE = 0.6;
+export const SKY_PUSH_DEPTH = 2.5;
+
+/**
+ * Placement of one depth layer for the displayed camera (identity when
+ * parallax is off). `push` (WP-2.1, 0 at rest) zooms the layer about the
+ * viewport centre during a System switch — nearer layers more ("flying into
+ * the cloud"); it is a pure function of the switch signal, so it relaxes to 0
+ * as the destination settles.
+ */
 export function skyLayerPlacement(
   sky: LabSkyPose,
   factor: number,
   parallax: boolean,
+  push = 0,
 ): LabSkyPlacement {
   "worklet";
-  if (!parallax) return STILL;
+  const pushScale = 1 + push * (SKY_PUSH_BASE + SKY_PUSH_DEPTH * factor);
+  if (!parallax)
+    return push > 0 ? { ox: 0, oy: 0, zs: pushScale, c: 1, s: 0 } : STILL;
   return {
     ox: (sky.cx - sky.vx) * factor,
     oy:
       (sky.cy - sky.vy) * factor +
       Math.sin(sky.tilt) * SKY_TILT_SHIFT * (SKY_TILT_BASE + factor),
-    zs: Math.exp(Math.log(sky.zoom) * factor * SKY_ZOOM_DEPTH),
+    zs: Math.exp(Math.log(sky.zoom) * factor * SKY_ZOOM_DEPTH) * pushScale,
     c: Math.cos(sky.yaw),
     s: Math.sin(sky.yaw),
   };

@@ -59,6 +59,12 @@ import {
 import { useLabRenderContext } from "./labb-context";
 import { getLabEffect } from "./labb-effects";
 import { bodyAt, type FrameIndex, labBillboard } from "./labb-frame-index";
+import {
+  bodySwitchFx,
+  CORONA_FLARE,
+  switchFxLive,
+  warpAmount,
+} from "./labb-switch-logic";
 import { mixVec, tokenToVec3, type Vec3 } from "./labb-uniforms";
 
 // --- Tunables -----------------------------------------------------------------
@@ -309,12 +315,23 @@ export function LabContactBody({
   const uniforms = useDerivedValue(() => {
     if (!st) return {};
     const f = frame.value;
+    const fx = ctx ? ctx.fxFlags.value : null;
+    // WP-2.1: dissolve (leaving) / capture flare (entering), pure in progress.
+    let sfx: number[] | undefined;
+    if (ctx?.sw && fx?.flags.fx) {
+      const signal = ctx.sw.signal.value;
+      if (switchFxLive(signal, ctx.reducedMotion.value)) {
+        const v = bodySwitchFx(ctx.sw.roles.value, identity, signal, true);
+        sfx = [fx.flags.fxDissolve ? v[0] : 0, fx.flags.fxFlares ? v[1] : 0];
+      }
+    }
     return labBodyFrameUniforms(
       bodyAt(f, frameIndex.value, identity),
       f.center.x,
       f.center.y,
       st,
-      ctx ? ctx.fxFlags.value : null,
+      fx,
+      sfx,
     );
   });
   return (
@@ -410,12 +427,20 @@ export function LabSunBody({
     // Under reduced motion the ambient clock is NOT read, so the sun's
     // uniforms stop depending on it (static corona).
     const reduced = ctx ? ctx.reducedMotion.value : true;
+    const fx = ctx ? ctx.fxFlags.value : null;
+    // WP-2.1 corona flare with the switch spin (zero at rest / reduced).
+    const signal = ctx?.sw ? ctx.sw.signal.value : null;
+    const flare =
+      fx?.flags.fx && fx.flags.fxSpool && switchFxLive(signal, reduced)
+        ? CORONA_FLARE * warpAmount(signal)
+        : 0;
     return labSunFrameUniforms(
       bodyAt(frame.value, frameIndex.value, identity),
       reduced || !ctx ? 0 : ctx.ambient.value,
       reduced,
       st,
-      ctx ? ctx.fxFlags.value : null,
+      fx,
+      flare,
     );
   });
   const pulse = useDerivedValue(() => {

@@ -51,6 +51,7 @@ vi.mock("react", async (original) => ({
 }));
 vi.mock("react-native", () => ({
   useWindowDimensions: () => ({ fontScale: 1 }),
+  PixelRatio: { get: () => 3 },
 }));
 vi.mock("@/services/photos/photo-storage", () => ({
   resolvePhotoUri: (path: string) => path,
@@ -111,9 +112,13 @@ vi.mock("@shopify/react-native-skia", async () => {
     Rect: "rect",
     RadialGradient: "radialGradient",
     LinearGradient: "linearGradient",
+    SweepGradient: "sweepGradient",
+    Picture: "picture",
     BlurMask: "blurMask",
+    RuntimeShader: "runtimeShader",
     useTexture: () => ({ value: null }),
     useRSXformBuffer: () => ({ value: [] }),
+    useRectBuffer: () => ({ value: [] }),
     useColorBuffer: () => ({ value: [] }),
     vec: (x: number, y: number) => ({ x, y }),
     matchFont: () => ({ measureText: () => ({ width: 10 }) }),
@@ -251,9 +256,11 @@ describe("Lab B renderer tree contract", () => {
     const { tree } = await renderLab(pose);
     const [environment, world] = tree;
     // L0: sky/nebula fill (the baked sample falls back to a token Fill until
-    // the bake texture exists) + far and mid/near star Atlases.
+    // the bake texture exists) + far, WP-2.1 hyperspace-streak and mid/near
+    // star Atlases.
     expect(environment.children[0].type).toBe("fill");
     expect(environment.children[1].children.map((c) => c.type)).toEqual([
+      "atlas",
       "atlas",
       "atlas",
     ]);
@@ -269,7 +276,15 @@ describe("Lab B renderer tree contract", () => {
     expect(ghost.props.color).toBe(THEME_PRESETS.galaxy.dark.accent);
     expect(bodies.children.map((c) => c.type)).toEqual(["skGroup", "skGroup"]);
     expect(labels.children.length).toBe(1);
-    expect(fx.children).toEqual([]);
+    // WP-2.1 switch FX: under the bodies (on the world plane, inside L1) the
+    // comet / smear Atlas (the shockwave needs its runtime effect: null here);
+    // over the bodies (L7) the particle and capture-flare Atlases.
+    const under = rings.children[1];
+    expect(under.children.map((c) => c.type)).toEqual(["atlas"]);
+    expect(fx.children[0].children.map((c) => c.type)).toEqual([
+      "atlas",
+      "atlas",
+    ]);
     // No per-body saveLayer: alpha is Group opacity.
     for (const body of bodies.children) {
       expect(body.props.layer).toBeUndefined();
@@ -374,14 +389,54 @@ describe("Lab B renderer tree contract", () => {
       bodies: false,
       labels: false,
       polaris: false,
+      fx: false,
     };
     const { tree } = await renderLab({ value: { ...HOME_CAMERA } });
     expect(tree).toHaveLength(1);
-    const [rings, polaris, , bodies, labels] = tree[0].children;
+    const [rings, polaris, , bodies, labels, fx] = tree[0].children;
     expect(rings.children).toEqual([]);
     expect(polaris.children).toEqual([]);
     expect(bodies.children).toEqual([]);
     expect(labels.children).toEqual([]);
+    expect(fx.children).toEqual([]);
+  });
+
+  it("WP-2.1: each switch effect unmounts with its flag", async () => {
+    lab.flags = {
+      fpsHud: false,
+      fxComets: false,
+      fxShockwave: false,
+      fxParticles: false,
+      fxFlares: false,
+      fxStreaks: false,
+    };
+    const { tree } = await renderLab({ value: { ...HOME_CAMERA } });
+    const [environment, world] = tree;
+    expect(environment.children[1].children.map((c) => c.type)).toEqual([
+      "atlas",
+      "atlas",
+    ]);
+    const [rings, , , , , fx] = world.children;
+    expect(rings.children[1].children).toEqual([]);
+    expect(fx.children[0].children).toEqual([]);
+  });
+
+  it("WP-2.1 experiment: the displacement filter wraps L1–L5 in ONE saveLayer, labels outside", async () => {
+    lab.effects = true;
+    lab.flags = { fpsHud: false, fxShockFilter: true };
+    const filtered = (await renderLab({ value: { ...HOME_CAMERA } })).tree[1];
+    const [wrapped, labels, over] = filtered.children;
+    // RN Skia's Group turns an element `layer` into skLayer(paint, skGroup).
+    expect(wrapped.type).toBe("skLayer");
+    const [paint, group] = wrapped.children;
+    expect(paint.type).toBe("paint");
+    expect(paint.children[0].type).toBe("runtimeShader");
+    expect(group.children).toHaveLength(4);
+    expect(labels.children.length).toBe(1);
+    expect(over.children[0].children.map((c) => c.type)).toEqual([
+      "atlas",
+      "atlas",
+    ]);
   });
 
   it("mounts the FPS HUD only while its flag is on", async () => {
