@@ -57,7 +57,9 @@ import {
 import { sampleSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
+import { useLabFxStore } from "@/stores/orrery-labb-fx-store";
 import type { ThemePalette } from "@/theme/theme-types";
+import { LabBRenderer, type LabTapStamp } from "./labb/LabBRenderer";
 import { OrbitBody } from "./OrbitBody";
 import { OrreryCanvas } from "./OrreryCanvas";
 import { OrreryLabel, prepareOrreryText } from "./OrreryLabel";
@@ -182,6 +184,8 @@ export function OrreryWorld({
   satellites = [],
   focusedSatellite,
   switchRuntime,
+  themePackage,
+  themeMode,
 }: {
   scene: OrrerySceneSnapshot;
   camera: OrreryCameraController;
@@ -202,6 +206,9 @@ export function OrreryWorld({
   focusedSatellite?: OrrerySatelliteTarget | null;
   /** Screen-owned runtime survives this canvas consumer being unmounted. */
   switchRuntime: OrrerySwitchRuntime;
+  /** ORRERY LAB B: theme package × mode, for the lab effect profile. */
+  themePackage?: string;
+  themeMode?: string;
 }) {
   const { fontScale } = useWindowDimensions();
   const resources = switchRuntime.resources;
@@ -217,6 +224,9 @@ export function OrreryWorld({
     if (mounted.current && latestFocus.current === focusKey) onFocusLost?.();
   }, [focusKey, onFocusLost]);
   const level = useSharedValue<SemanticLevel>("overview");
+  // ORRERY LAB B (C-20): resolveTap stamps the tap for the lab feedback layer.
+  const fxTap = useSharedValue<LabTapStamp | null>(null);
+  const labRenderer = useLabFxStore((s) => s.renderer);
   // Capture only the producer's input; the controller also contains its published output.
   const reorder = camera.reorder;
   const frame = useDerivedValue(() => {
@@ -441,7 +451,7 @@ export function OrreryWorld({
         },
         resolveTap: (current, x, y) => {
           "worklet";
-          return resolveSatelliteTap(
+          const intent = resolveSatelliteTap(
             current,
             x,
             y,
@@ -449,6 +459,14 @@ export function OrreryWorld({
             allocations.value.map((label) => label.id),
             members,
           );
+          // ORRERY LAB B (C-20): side-stamp only; the intent is unchanged.
+          fxTap.value = {
+            x,
+            y,
+            seq: (fxTap.value?.seq ?? 0) + 1,
+            kind: intent.kind,
+          };
+          return intent;
         },
         onNorth: (x, y) => {
           "worklet";
@@ -471,6 +489,7 @@ export function OrreryWorld({
       onReorder,
       onReorderActivated,
       scene.generation,
+      fxTap,
     ],
   );
   const singleFocus = focusedIds.length === 1 ? focusedIds[0] : null;
@@ -514,6 +533,37 @@ export function OrreryWorld({
       if (lost && previous !== true && onFocusLost) runOnJS(reportFocusLost)();
     },
   );
+  const ghost = (
+    <ReorderGhost frame={frame} drag={camera.reorder} color={colors.accent} />
+  );
+  // ORRERY LAB B: renderer A/B switch. The model half above is shared; only one
+  // renderer (one canvas, one clock) is ever mounted.
+  if (labRenderer === "lab") {
+    return (
+      <LabBRenderer
+        frame={frame}
+        allocations={allocations}
+        level={level}
+        reorder={camera.reorder}
+        pose={pose}
+        switchRuntime={switchRuntime}
+        fxTap={fxTap}
+        scene={scene}
+        resources={resources}
+        colors={colors}
+        themePackage={themePackage}
+        themeMode={themeMode}
+        fontProvider={fontProvider}
+        labels={labels}
+        focusedIds={focusedIds}
+        focusedSatellite={focusedSatellite}
+        satellites={satellites}
+        viewport={viewport}
+        gesture={gesture}
+        ghost={ghost}
+      />
+    );
+  }
   return (
     <OrreryCanvas
       width={viewport.width}
@@ -542,11 +592,7 @@ export function OrreryWorld({
             ))}
         </Group>
         <Polaris frame={frame} extent={scene.extent} colors={colors} />
-        <ReorderGhost
-          frame={frame}
-          drag={camera.reorder}
-          color={colors.accent}
-        />
+        {ghost}
         {/* RNRecorder flushes sorting at every non-Group command. Keep this run contiguous. */}
         <Group>
           {resources.map((resource) => (

@@ -59,6 +59,12 @@ vi.mock("react-native", () => ({
 vi.mock("@/services/photos/photo-storage", () => ({
   resolvePhotoUri: (path: string) => path,
 }));
+// ORRERY LAB B: these assertions pin the LEGACY renderer, which the lab keeps
+// mounted-switchable as the A/B baseline; `labb-render.test.tsx` pins the lab.
+vi.mock("@/stores/orrery-labb-fx-store", () => ({
+  useLabFxStore: (selector: (s: { renderer: string }) => unknown) =>
+    selector({ renderer: "legacy" }),
+}));
 vi.mock("./orrery-clock-context", () => ({ useOrreryClock: () => null }));
 // The bodies' photo hook (38.6-04 D-11) — a photo-less render, as `useImage: () => null` was.
 vi.mock("./use-orrery-photo", () => ({ useOrreryPhoto: () => null }));

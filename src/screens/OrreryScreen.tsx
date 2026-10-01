@@ -21,6 +21,7 @@ import {
   runOnUI,
   useSharedValue,
 } from "react-native-reanimated";
+import { LabBMarkerHost } from "@/components/orrery/labb/debug/LabFxPanel";
 import {
   CLUSTER_OBSTACLE,
   OrreryClusterPanel,
@@ -145,7 +146,7 @@ export function systemAttentionFeedback(
 }
 
 export function OrreryScreen() {
-  const { colors } = useTheme();
+  const { colors, mode: themeMode, package: themePackage } = useTheme();
   const [contactsOpen, setContactsOpen] = useState(false);
   const [clusterOpen, setClusterOpen] = useState(false);
   const [reorderError, setReorderError] = useState(false);
@@ -1060,6 +1061,8 @@ export function OrreryScreen() {
             satellites={satellites?.rows}
             focusedSatellite={focusedSatellite}
             switchRuntime={switchRuntime}
+            themePackage={themePackage}
+            themeMode={themeMode}
             clusterIds={clusterOpen ? focusedIds : []}
             onFocusLost={clusterOpen ? undefined : clearFocus}
             interactive={!overlaysOpen && state.status === "ready"}
@@ -1307,16 +1310,15 @@ export function OrreryScreen() {
           </OrreryFeedback>
         ) : null}
       </View>
-      {/* ORRERY LAB B marker — experiment-only, non-interactive. */}
-      <View pointerEvents="none" style={styles.labMarker}>
-        <AppText
-          role="caption"
-          style={{ color: colors.accentText }}
-          accessibilityLabel="Orrery Lab B experiment build"
-        >
-          ORRERY LAB B — SKIA UNLEASHED
-        </AppText>
-      </View>
+      {/* ORRERY LAB B marker — long-press opens the lab panel (lab build only). */}
+      <LabBMarkerHost
+        colors={colors}
+        pose={pose}
+        recover={camera.recover}
+        catalog={systemCatalog}
+        currentSystemId={state.requested.id}
+        onSelectSystem={(ref, name) => void state.select(ref, name, true)}
+      />
       <OrreryContactsSheet
         satellites={satellites}
         onReloadSatellites={reloadSatellites}
@@ -1337,13 +1339,6 @@ export function OrreryScreen() {
 }
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  labMarker: {
-    position: "absolute",
-    bottom: SPACING.xs,
-    left: 0,
-    right: 0,
-    alignItems: "center",
-  },
   canvasArea: { flex: 1, alignItems: "center", justifyContent: "center" },
   feedback: {
     position: "absolute",

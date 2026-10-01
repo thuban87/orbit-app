@@ -26,6 +26,10 @@
 import { useEffect, useState } from "react";
 import { AccessibilityInfo } from "react-native";
 import { type SharedValue, useSharedValue } from "react-native-reanimated";
+import {
+  resolveReducedMotion,
+  subscribeReducedMotionOverride,
+} from "./reduced-motion-override";
 
 /**
  * The minimal AccessibilityInfo-shaped dependency the controller needs. The
@@ -106,13 +110,25 @@ export function createReducedMotionController(
 export function useReducedMotionShared(): SharedValue<boolean> {
   const reduced = useSharedValue(false);
   useEffect(() => {
+    // ORRERY LAB B: the OS value is combined with the lab panel override
+    // (`reduced-motion-override.ts`; null = follow the OS, as in production).
+    let os = false;
+    const apply = () => {
+      reduced.value = resolveReducedMotion(os); // writing .value ≠ setState
+    };
     const controller = createReducedMotionController(
       AccessibilityInfo,
       (value) => {
-        reduced.value = value; // writing .value ≠ setState → no re-render
+        os = value;
+        apply();
       },
     );
-    return () => controller.dispose();
+    const unsubscribe = subscribeReducedMotionOverride(apply);
+    apply();
+    return () => {
+      controller.dispose();
+      unsubscribe();
+    };
   }, [reduced]);
   return reduced;
 }
@@ -125,11 +141,21 @@ export function useReducedMotionShared(): SharedValue<boolean> {
 export function useReducedMotion(): boolean {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
+    let os = false;
+    const apply = () => setReduced(resolveReducedMotion(os));
     const controller = createReducedMotionController(
       AccessibilityInfo,
-      setReduced,
+      (value) => {
+        os = value;
+        apply();
+      },
     );
-    return () => controller.dispose();
+    const unsubscribe = subscribeReducedMotionOverride(apply);
+    apply();
+    return () => {
+      controller.dispose();
+      unsubscribe();
+    };
   }, []);
   return reduced;
 }

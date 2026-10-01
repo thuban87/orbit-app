@@ -211,13 +211,19 @@ describe("same-file worklet forward references (Hermes hazard)", () => {
         (name) => /^orrery-.*\.ts$/.test(name) && !name.includes(".test."),
       )
       .map((name) => join("src/logic", name));
-    const components = readdirSync("src/components/orrery")
+    // Recursive: the Lab B renderer lives in `labb/` and `labb/debug/`
+    // (research 03 §0.1 — the old top-level-only scan could not see them).
+    const components = (
+      readdirSync("src/components/orrery", { recursive: true }) as string[]
+    )
       .filter((name) => /\.tsx?$/.test(name) && !name.includes(".test."))
       .map((name) => join("src/components/orrery", name));
     const others = [...logic, ...components].filter(
       (path) => !TARGETS.includes(path),
     );
     expect(others.length).toBeGreaterThan(0);
+    expect(others.some((path) => path.includes("/labb/"))).toBe(true);
+    expect(others.some((path) => path.includes("/labb/debug/"))).toBe(true);
     expect(
       others.flatMap((path) =>
         scanWorkletForwardReferences(load([path])).map(

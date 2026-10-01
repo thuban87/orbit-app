@@ -25,6 +25,9 @@ vi.mock("@shopify/react-native-skia", () => ({}));
 vi.mock("@/components/orrery/OrbitBody", () => ({}));
 vi.mock("@/components/orrery/SunBody", () => ({}));
 vi.mock("@/components/orrery/OrreryCanvas", () => ({}));
+// ORRERY LAB B: the lab body slot imports the photo loader (expo-file-system)
+// for the same reason OrbitBody/SunBody are mocked above; never exercised here.
+vi.mock("@/components/orrery/use-orrery-photo", () => ({}));
 vi.mock("@/theme/use-reduced-motion", () => ({}));
 vi.mock("react-native-reanimated", () => ({
   runOnJS: (fn: unknown) => fn,
