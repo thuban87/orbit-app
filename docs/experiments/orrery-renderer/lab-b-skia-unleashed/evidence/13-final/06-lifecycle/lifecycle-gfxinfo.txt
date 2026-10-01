@@ -1,0 +1,7 @@
+# lifecycle gfxinfo windows (6 s each), release build, preset best + opaqueCanvas:0 (so gfxinfo sees canvas frames) + perfProbe:1
+Thu Oct  1 03:50:22 PM CDT 2026
+A Orrery foreground (idle, animating) | Total frames rendered: 118 | probe lines: 3
+B Digest tab (Orrery inactive / unfocused) | Total frames rendered: 0 | probe lines: 0
+C back on Orrery tab (refocus) | Total frames rendered: 122 | probe lines: 2
+D app backgrounded (HOME) | Total frames rendered: 0 | probe lines: 0
+E foregrounded again (Orrery) | Total frames rendered: 115 | probe lines: 2
