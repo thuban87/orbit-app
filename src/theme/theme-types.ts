@@ -257,6 +257,26 @@ export interface ThemePalette {
    * Seeded per-palette in `theme-presets`.
    */
   markerLifecycle: string;
+  /**
+   * ORRERY LAB A (experiment) — deep-field star-chart tokens. Every hue the
+   * Skia renderer's shaders use arrives as one of these (passed as uniforms);
+   * no colour literal lives in SkSL. Dark palettes author a luminous deep field;
+   * light palettes author a "chart paper" ink set (no additive glow).
+   *
+   * `orreryVoid` — the deepest space tone (vignette edge, far-depth tint). On
+   * light palettes it is the paper-edge burn tone.
+   */
+  orreryVoid: string;
+  /** Primary nebula/dust hue (dark: emissive gas; light: pale wash). */
+  orreryNebulaA: string;
+  /** Secondary nebula hue (dark: cool gas core; light: warm paper wash). */
+  orreryNebulaB: string;
+  /** World-plane astrolabe grid ink (reference rings, spokes, bezel ticks). */
+  orreryGrid: string;
+  /** Sun light / corona core (dark: white-hot; light: amber engraving ink). */
+  orreryStarlight: string;
+  /** Contact-shadow / terminator ink cast on and by bodies. */
+  orreryShadow: string;
 }
 
 /**

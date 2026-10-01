@@ -246,6 +246,13 @@ describe("four authored palettes — light required, all distinct + complete (Pl
     "mutedWobble",
     "mutedDecay",
     "rogueExtinguished",
+    // ORRERY LAB A deep-field tokens.
+    "orreryVoid",
+    "orreryNebulaA",
+    "orreryNebulaB",
+    "orreryGrid",
+    "orreryStarlight",
+    "orreryShadow",
   ] as const;
   const ARRAY_TOKENS = [
     "avatarSwatches",

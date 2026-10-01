@@ -130,6 +130,13 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       // ring stroke for lifecycle-only dates (silhouette is the primary cue).
       markerInteraction: "#8FA6FF",
       markerLifecycle: "#8B93B0",
+      // ORRERY LAB A deep-field tokens (experiment; owner sign-off needed for prod).
+      orreryVoid: "#04050B",
+      orreryNebulaA: "#4A33A3",
+      orreryNebulaB: "#16708F",
+      orreryGrid: "#6F86C8",
+      orreryStarlight: "#FFE7B8",
+      orreryShadow: "#010207",
     },
     // GALAXY LIGHT (authored Plan 03) — a light deep-space treatment: cool
     // off-white surfaces, deep-navy text, deeper accent/status hues retuned so
@@ -196,6 +203,13 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       heatmapCellEmpty: "#00000000",
       markerInteraction: "#2A46C7",
       markerLifecycle: "#515A78",
+      // ORRERY LAB A deep-field tokens (experiment; owner sign-off needed for prod).
+      orreryVoid: "#C9D0E6",
+      orreryNebulaA: "#C7CDEB",
+      orreryNebulaB: "#E6D5C8",
+      orreryGrid: "#3E4F86",
+      orreryStarlight: "#C98A2E",
+      orreryShadow: "#1A1F33",
     },
   },
   // The SECOND package — a calmer, FLATTER treatment vs galaxy's deep-space
@@ -262,6 +276,13 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       heatmapCellEmpty: "#00000000",
       markerInteraction: "#9AA8E0",
       markerLifecycle: "#9AA1AD",
+      // ORRERY LAB A deep-field tokens (experiment; owner sign-off needed for prod).
+      orreryVoid: "#060709",
+      orreryNebulaA: "#252B3D",
+      orreryNebulaB: "#1E3438",
+      orreryGrid: "#7A8494",
+      orreryStarlight: "#F3E6CC",
+      orreryShadow: "#020203",
     },
     // STANDARD LIGHT (authored Plan 03) — a flat, calm light palette: neutral
     // off-white surfaces, near-black text, deeper accent/status hues retuned for
@@ -320,6 +341,13 @@ export const THEME_PRESETS: Record<ThemePackage, ThemePreset> = {
       heatmapCellEmpty: "#00000000",
       markerInteraction: "#3C4AA0",
       markerLifecycle: "#565D6B",
+      // ORRERY LAB A deep-field tokens (experiment; owner sign-off needed for prod).
+      orreryVoid: "#D5D8E0",
+      orreryNebulaA: "#DADDE6",
+      orreryNebulaB: "#E5DFD6",
+      orreryGrid: "#4A5263",
+      orreryStarlight: "#B07A2A",
+      orreryShadow: "#1B1E26",
     },
   },
 };
