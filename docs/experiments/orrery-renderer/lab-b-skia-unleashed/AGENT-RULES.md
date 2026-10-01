@@ -31,3 +31,7 @@ Worktree: `/home/bwales/projects/orbit-orrery-lab-b`, branch `experiment/orrery-
 
 ## Reporting
 - Return a SHORT summary (<300 words): what changed, commit SHAs, gates results, evidence paths, open problems. Put detail in files, not in the return.
+
+## Evidence size (added after M1 — evidence hit 179 MB)
+- Save new screenshots as JPEG (quality ~85, full resolution is fine) — convert with python PIL. Keep PNG only when an exact pixel diff is the point (e.g. reduced-motion static proof).
+- Screen recordings: `screenrecord --bit-rate 4000000`, keep clips short (≤ 15 s) and trimmed.
