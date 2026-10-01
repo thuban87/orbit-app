@@ -419,6 +419,12 @@ export interface OrreryImageSlot {
   retire(image: SkImage | null): void;
   /** An error-path result: dispose it; never publish. */
   discard(image: SkImage | null): void;
+  /**
+   * Custody transfer: the same bookkeeping as `retire` WITHOUT disposing.
+   * Returns true when the caller now owns `image` (false: already disposed
+   * or released). Idempotent.
+   */
+  release(image: SkImage): boolean;
 }
 
 export function createOrreryImageSlot(): OrreryImageSlot {
@@ -453,6 +459,13 @@ export function createOrreryImageSlot(): OrreryImageSlot {
     discard(image) {
       disposeOnce(image);
     },
+    release(image) {
+      if (image === published) published = null;
+      if (disposed.has(image)) return false;
+      // Never disposed by this slot from now on.
+      disposed.add(image);
+      return true;
+    },
   };
 }
 
@@ -461,8 +474,18 @@ export function createOrreryImageSlot(): OrreryImageSlot {
 /**
  * The orrery body's photo (C2-1: call unconditionally; a null path → null → the
  * initials swatch). Re-loads when the path or its display revision changes.
+ *
+ * `handOff` (ORRERY LAB A arch perf pass — custody transfer): when given, a
+ * retired image is NOT disposed here; it is handed to the caller, which then
+ * owns its disposal. The imperative scene renderer draws photos from a
+ * UI-thread copy of its specs, so it may only dispose an image after its UI
+ * thread has received specs that no longer reference it (`use-lab-photos`).
+ * Rules 1, 2 and 4 above are unchanged; rule 3 moves to the custodian.
  */
-export function useOrreryPhoto(relative: string | null): SkImage | null {
+export function useOrreryPhoto(
+  relative: string | null,
+  handOff?: (image: SkImage) => void,
+): SkImage | null {
   const revision = usePhotoCacheBust(relative);
   const slotRef = useRef<OrreryImageSlot | null>(null);
   if (slotRef.current === null) slotRef.current = createOrreryImageSlot();
@@ -496,7 +519,16 @@ export function useOrreryPhoto(relative: string | null): SkImage | null {
 
   // Runs after the commit that replaced `image` (or on unmount): only then is it
   // safe to dispose, because no re-record can still read it.
-  useEffect(() => () => slot.retire(image), [image, slot]);
+  const handOffRef = useRef(handOff);
+  handOffRef.current = handOff;
+  useEffect(
+    () => () => {
+      const custodian = handOffRef.current;
+      if (custodian && image && slot.release(image)) custodian(image);
+      else slot.retire(image);
+    },
+    [image, slot],
+  );
 
   return image;
 }

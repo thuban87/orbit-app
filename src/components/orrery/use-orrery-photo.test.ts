@@ -699,6 +699,20 @@ describe("createOrreryImageSlot — the hook's SkImage lifecycle", () => {
     expect(one.disposeCount).toBe(1);
   });
 
+  it("release hands custody over exactly once and never disposes (Lab A renderer)", () => {
+    const slot = createOrreryImageSlot();
+    const one = fakeImage("1", 512);
+    slot.settle(asSk(one), false);
+    expect(slot.release(asSk(one))).toBe(true);
+    expect(slot.published).toBeNull();
+    expect(one.disposeCount).toBe(0);
+    // The custodian owns it now: no second hand-off, no slot dispose.
+    expect(slot.release(asSk(one))).toBe(false);
+    slot.retire(asSk(one));
+    slot.discard(asSk(one));
+    expect(one.disposeCount).toBe(0);
+  });
+
   it("20 revision changes leave only the published image undisposed", () => {
     const slot = createOrreryImageSlot();
     let committed: FakeImage | null = null;

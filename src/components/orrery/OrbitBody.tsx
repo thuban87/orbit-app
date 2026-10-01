@@ -29,7 +29,11 @@ import {
   BodyLightOverlay,
   type DeepFieldBodyContext,
 } from "./lab/BodyOverlays";
-import { BODY_ENTER_FADE_MS, FOCUS_BODY_DIM } from "./lab/deep-field-config";
+import {
+  BODY_ENTER_FADE_MS,
+  FOCUS_BODY_DIM,
+  PHOTO_FADE_MS,
+} from "./lab/deep-field-config";
 import { bodyDepthScale, bodyVisualScale } from "./lab/deep-field-math";
 import { useOrreryPhoto } from "./use-orrery-photo";
 
@@ -62,8 +66,6 @@ export interface OrbitBodyProps {
 
 /** Status-outline stroke width around the planet disc. */
 const OUTLINE_WIDTH = 3;
-/** ORRERY LAB A: photo fade-in on resolve (ms). */
-const PHOTO_FADE_MS = 260;
 
 export function OrbitBody({
   cx,

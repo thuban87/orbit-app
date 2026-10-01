@@ -25,6 +25,8 @@ vi.mock("@shopify/react-native-skia", () => ({}));
 vi.mock("@/components/orrery/OrbitBody", () => ({}));
 vi.mock("@/components/orrery/SunBody", () => ({}));
 vi.mock("@/components/orrery/OrreryCanvas", () => ({}));
+// Lab A scene renderer photo custody (pulls in the native photo loader).
+vi.mock("@/components/orrery/lab/use-lab-photos", () => ({}));
 vi.mock("@/theme/use-reduced-motion", () => ({}));
 vi.mock("react-native-reanimated", () => ({
   runOnJS: (fn: unknown) => fn,

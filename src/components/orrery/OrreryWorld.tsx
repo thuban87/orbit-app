@@ -2,12 +2,14 @@
 import {
   Group,
   Path,
+  type SkImage,
   Skia,
   type SkTypefaceFontProvider,
 } from "@shopify/react-native-skia";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useWindowDimensions } from "react-native";
 import {
+  ReduceMotion,
   runOnJS,
   type SharedValue,
   useAnimatedReaction,
@@ -63,10 +65,7 @@ import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
-import type { DeepFieldBodyContext } from "./lab/BodyOverlays";
-import { BodyStackLayer } from "./lab/BodyStackLayer";
-import { DeepFieldBackdrop } from "./lab/DeepFieldBackdrop";
-import { FOCUS_FADE_MS } from "./lab/deep-field-config";
+import { FOCUS_FADE_MS, SPEC_FADE_WINDOW_MS } from "./lab/deep-field-config";
 import { resolveDeepFieldInk, tokenInk } from "./lab/deep-field-ink";
 import {
   type BodyLightMap,
@@ -76,9 +75,14 @@ import {
   type FocusState,
 } from "./lab/deep-field-math";
 import { useDeepFieldEnabled } from "./lab/deep-field-mode";
-import { FocusReticleLayer } from "./lab/FocusReticleLayer";
-import { LabHud, labMarkerVisible } from "./lab/LabHud";
-import { WorldPlaneLayer } from "./lab/WorldPlaneLayer";
+import { LabScene } from "./lab/LabScene";
+import type { LabBodySpec, LabLabelSpec, LabSceneInks } from "./lab/scene-draw";
+import {
+  buildBodySpecs,
+  type ParagraphCache,
+  resourcePhotoPath,
+} from "./lab/scene-specs";
+import { LabPhotoSlot, useLabPhotoCustody } from "./lab/use-lab-photos";
 import type { PlaneRing } from "./lab/world-plane";
 import { OrbitBody } from "./OrbitBody";
 import { OrreryCanvas } from "./OrreryCanvas";
@@ -138,8 +142,6 @@ function ProjectedBody({
   colors,
   fontProvider,
   focused,
-  deepField,
-  flare,
 }: {
   resource: OrreryBodyResource;
   /** Per-frame billboard map (perf pass), not the whole frame. */
@@ -147,10 +149,6 @@ function ProjectedBody({
   colors: ThemePalette;
   fontProvider: SkTypefaceFontProvider | null;
   focused: boolean;
-  /** ORRERY LAB A: lighting context (absent → legacy flat rendering). */
-  deepField?: DeepFieldBodyContext;
-  /** ORRERY LAB A: switch-capture flare for the sun. */
-  flare?: SharedValue<number>;
 }) {
   const { body, scene, key } = resource;
   const projection = useDerivedValue(() =>
@@ -180,22 +178,14 @@ function ProjectedBody({
     fontProvider,
     focusColor: focused ? colors.accent : undefined,
   };
-  // Each branch returns exactly ONE actual body root Group; no parent wrapper.
+  // Legacy (non-Lab) renderer only: Lab A draws bodies imperatively
+  // (lab/LabScene). Each branch returns exactly ONE actual body root Group.
   return body.kind === "sun" ? (
     <SunBody
       {...common}
       photo={resolved.photo}
       glowColor={resolved.glowColor}
       glowRadius={body.radius * 1.8}
-      deepInk={deepField?.ink}
-      flare={flare}
-      starText={
-        deepField
-          ? deepField.ink.chart
-            ? colors.textPrimary
-            : colors.background
-          : undefined
-      }
     />
   ) : (
     <OrbitBody
@@ -203,7 +193,6 @@ function ProjectedBody({
       photo={contact?.photo ?? null}
       bodyFill={orreryRingStyle(contact?.status ?? null, colors).bodyFill}
       lightKey={key}
-      deepField={deepField}
     />
   );
 }
@@ -370,7 +359,6 @@ export function OrreryWorld({
       reducedMotion.value,
     ),
   );
-  const sunFlare = useDerivedValue(() => switchFx.value.flare);
   const lightExtent = scene.extent;
   const bodyLight = useDerivedValue<BodyLightMap>(() =>
     computeBodyLight(frame.value, lightExtent),
@@ -418,13 +406,15 @@ export function OrreryWorld({
           : withTiming(target, { duration: FOCUS_FADE_MS });
     },
   );
-  const accentInk = useMemo(() => tokenInk(colors.accent), [colors.accent]);
-  const deepField = useMemo<DeepFieldBodyContext | undefined>(
-    () =>
-      deepFieldOn
-        ? { ink: deepInk, light: bodyLight, focusMix, focus: focusState }
-        : undefined,
-    [deepFieldOn, deepInk, bodyLight, focusMix, focusState],
+  const labInks = useMemo<LabSceneInks>(
+    () => ({
+      surface: tokenInk(colors.surface),
+      textPrimary: tokenInk(colors.textPrimary),
+      textSecondary: tokenInk(colors.textSecondary),
+      accent: tokenInk(colors.accent),
+      polarisHalo: tokenInk(colors.starPalette[0] ?? colors.textPrimary),
+    }),
+    [colors],
   );
   const planeRings = useMemo<PlaneRing[]>(
     () =>
@@ -446,12 +436,6 @@ export function OrreryWorld({
         }),
     [resources, colors],
   );
-  // ORRERY LAB A (pass 2): key → status ink for the stack pips.
-  const ringInks = useMemo(() => {
-    const out: Record<string, PlaneRing["color"]> = {};
-    for (const ring of planeRings) out[ring.key] = ring.color;
-    return out;
-  }, [planeRings]);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -712,19 +696,143 @@ export function OrreryWorld({
       if (lost && previous !== true && onFocusLost) runOnJS(reportFocusLost)();
     },
   );
-  // Perf pass: every Skia layer element is memoised on what it draws, so a
-  // render that only changes the gesture/interactivity (or nothing drawn)
-  // never makes RN-Skia re-record the scene (see OrreryCanvas).
-  const backdrop = useMemo(
+  // ── ORRERY LAB A (arch perf pass): the imperative scene renderer. ───────
+  // Everything the Lab A canvas draws reaches the UI thread as shared
+  // values written HERE (an async hand-off, never a sync read), so the Canvas
+  // tree (lab/LabScene) never changes and RN-Skia never re-records it.
+  const custody = useLabPhotoCustody();
+  const enterAt = useRef(new Map<string, number>());
+  const paragraphCache = useRef<{
+    provider: SkTypefaceFontProvider | null;
+    cache: ParagraphCache;
+  }>({ provider: fontProvider, cache: new Map() });
+  if (paragraphCache.current.provider !== fontProvider)
+    paragraphCache.current = { provider: fontProvider, cache: new Map() };
+  const bodySpecs = useMemo<LabBodySpec[]>(() => {
+    if (!deepFieldOn) return [];
+    const now = Date.now();
+    const specs = buildBodySpecs({
+      resources,
+      satellites: drawnSatellites,
+      colors,
+      ink: deepInk,
+      fontProvider,
+      photos: custody.photos,
+      enterAt: enterAt.current,
+      paragraphs: paragraphCache.current.cache,
+      now,
+    });
+    // A key that left and comes back fades in again (as a remounted body).
+    const live = new Set(resources.map((r) => r.key));
+    for (const key of [...enterAt.current.keys()])
+      if (!live.has(key)) enterAt.current.delete(key);
+    return specs;
+  }, [
+    deepFieldOn,
+    resources,
+    drawnSatellites,
+    colors,
+    deepInk,
+    fontProvider,
+    custody.photos,
+  ]);
+  const labelSpecs = useMemo<LabLabelSpec[]>(
+    () =>
+      deepFieldOn
+        ? labels.map((label) => ({
+            id: label.id,
+            text: {
+              paragraph: label.text.paragraph,
+              width: label.text.width,
+              height: label.text.height,
+            },
+            context: label.context
+              ? {
+                  paragraph: label.context.paragraph,
+                  width: label.context.width,
+                  height: label.context.height,
+                }
+              : null,
+            tick: tokenInk(label.tick),
+          }))
+        : [],
+    [deepFieldOn, labels],
+  );
+  const bodySpecsValue = useSharedValue<LabBodySpec[]>([]);
+  const labelSpecsValue = useSharedValue<LabLabelSpec[]>([]);
+  const ringSpecsValue = useSharedValue<PlaneRing[]>([]);
+  const extentValue = useSharedValue(scene.extent);
+  const fadeTick = useSharedValue(0);
+  const written = useRef<{
+    bodies: LabBodySpec[] | null;
+    labels: LabLabelSpec[] | null;
+    rings: PlaneRing[] | null;
+    extent: number;
+    fade: number;
+  }>({
+    bodies: null,
+    labels: null,
+    rings: null,
+    extent: scene.extent,
+    fade: 0,
+  });
+  if (deepFieldOn) {
+    const w = written.current;
+    if (w.bodies !== bodySpecs) {
+      w.bodies = bodySpecs;
+      bodySpecsValue.value = bodySpecs;
+      // Keep re-recording through the mount / photo fades just written.
+      w.fade += 1;
+      fadeTick.value = withTiming(w.fade, {
+        duration: SPEC_FADE_WINDOW_MS,
+        reduceMotion: ReduceMotion.Never,
+      });
+    }
+    if (w.labels !== labelSpecs) {
+      w.labels = labelSpecs;
+      labelSpecsValue.value = labelSpecs;
+    }
+    if (w.rings !== planeRings) {
+      w.rings = planeRings;
+      ringSpecsValue.value = planeRings;
+    }
+    if (w.extent !== scene.extent) {
+      w.extent = scene.extent;
+      extentValue.value = scene.extent;
+    }
+  }
+  // Photo custody (lab/use-lab-photos): images retired by their slots are
+  // disposed on the UI runtime only after the spec write above stopped
+  // referencing them (runs after every commit, after the slots' cleanups).
+  useEffect(() => {
+    const inUse = new Set<SkImage>();
+    for (const spec of written.current.bodies ?? [])
+      if (spec.image) inUse.add(spec.image);
+    custody.settle(inUse);
+  });
+  const labScene = useMemo(
     () =>
       deepFieldOn ? (
-        <DeepFieldBackdrop
+        <LabScene
           width={viewport.width}
           height={viewport.height}
           ink={deepInk}
+          inks={labInks}
           starColors={starColors}
+          fontProvider={fontProvider}
+          hudText={colors.textSecondary}
           frame={frame}
           switchFx={switchFx}
+          light={bodyLight}
+          focus={focusState}
+          focusMix={focusMix}
+          allocations={allocations}
+          drag={camera.reorder}
+          bodies={bodySpecsValue}
+          labels={labelSpecsValue}
+          rings={ringSpecsValue}
+          extent={extentValue}
+          fadeTick={fadeTick}
         />
       ) : undefined,
     [
@@ -732,67 +840,46 @@ export function OrreryWorld({
       viewport.width,
       viewport.height,
       deepInk,
+      labInks,
       starColors,
-      frame,
-      switchFx,
-    ],
-  );
-  const hudViewport = useMemo(
-    () => ({ width: viewport.width, height: viewport.height }),
-    [viewport.width, viewport.height],
-  );
-  const overlay = useMemo(
-    () =>
-      deepFieldOn ? (
-        <Group>
-          <BodyStackLayer
-            frame={frame}
-            light={bodyLight}
-            switchFx={switchFx}
-            colors={ringInks}
-            ink={deepInk}
-          />
-          {labMarkerVisible() ? (
-            <LabHud
-              viewport={hudViewport}
-              fontProvider={fontProvider}
-              ink={deepInk}
-              textColor={colors.textSecondary}
-            />
-          ) : null}
-        </Group>
-      ) : undefined,
-    [
-      deepFieldOn,
-      frame,
-      bodyLight,
-      switchFx,
-      ringInks,
-      deepInk,
-      hudViewport,
       fontProvider,
-      colors,
+      colors.textSecondary,
+      frame,
+      switchFx,
+      bodyLight,
+      focusState,
+      focusMix,
+      allocations,
+      camera.reorder,
+      bodySpecsValue,
+      labelSpecsValue,
+      ringSpecsValue,
+      extentValue,
+      fadeTick,
     ],
   );
+  const photoSlots = deepFieldOn
+    ? resources.map((resource) => (
+        <LabPhotoSlot
+          key={resource.key}
+          bodyKey={resource.key}
+          path={resourcePhotoPath(resource, colors)}
+          report={custody.report}
+          retire={custody.retire}
+        />
+      ))
+    : null;
+  // Legacy (non-Lab) renderer: the declarative tree, every layer memoised on
+  // what it draws so a render that changes nothing drawn never re-records.
   const reorderDrag = camera.reorder;
   const world = useMemo(
-    () => (
-      <Group
-        clip={{ x: 0, y: 0, width: viewport.width, height: viewport.height }}
-      >
-        <Group>
-          {deepFieldOn ? (
-            <WorldPlaneLayer
-              frame={frame}
-              switchFx={switchFx}
-              rings={planeRings}
-              ink={deepInk}
-              extent={sceneExtent}
-              focus={focusState}
-              focusMix={focusMix}
-            />
-          ) : (
-            resources
+    () =>
+      deepFieldOn ? null : (
+        <Group
+          clip={{ x: 0, y: 0, width: viewport.width, height: viewport.height }}
+        >
+          <Group>
+            {resources
               .filter((r) => r.body.kind === "contact")
               .map((resource) => (
                 <ProjectedOrbitRing
@@ -806,128 +893,108 @@ export function OrreryWorld({
                     colors,
                   )}
                 />
-              ))
-          )}
-        </Group>
-        <Polaris frame={frame} extent={sceneExtent} colors={colors} />
-        <ReorderGhost frame={frame} drag={reorderDrag} color={colors.accent} />
-        {/* RNRecorder flushes sorting at every non-Group command. Keep this run contiguous. */}
-        <Group>
-          {resources.map((resource) => (
-            <ProjectedBody
-              key={resource.key}
-              resource={resource}
-              billboards={billboards}
-              colors={colors}
-              fontProvider={fontProvider}
-              focused={focusedIds.includes(resource.body.id)}
-              deepField={deepField}
-              flare={sunFlare}
-            />
-          ))}
-          {drawnSatellites.map((row) => {
-            const target = {
-              kind: "satellite" as const,
-              uid: row.uid,
-              parentId: row.parentId,
-              parentUid: row.parentUid,
-            };
-            const identity = bodyKey({
-              kind: "satellite",
-              id: -1,
-              satelliteTarget: target,
-            });
-            return (
-              <SatelliteBody
-                key={identity}
-                identity={identity}
+              ))}
+          </Group>
+          <Polaris frame={frame} extent={sceneExtent} colors={colors} />
+          <ReorderGhost
+            frame={frame}
+            drag={reorderDrag}
+            color={colors.accent}
+          />
+          {/* RNRecorder flushes sorting at every non-Group command. Keep this run contiguous. */}
+          <Group>
+            {resources.map((resource) => (
+              <ProjectedBody
+                key={resource.key}
+                resource={resource}
                 billboards={billboards}
                 colors={colors}
-                deepField={deepField}
-                focused={
-                  focusedSatellite?.uid === row.uid &&
-                  focusedSatellite.parentId === row.parentId &&
-                  focusedSatellite.parentUid === row.parentUid
-                }
+                fontProvider={fontProvider}
+                focused={focusedIds.includes(resource.body.id)}
               />
-            );
-          })}
-        </Group>
-        {/* ORRERY LAB A (pass 3): always-mounted focus reticle HUD. */}
-        {deepFieldOn ? (
-          <FocusReticleLayer
-            frame={frame}
-            light={bodyLight}
-            focus={focusState}
-            accent={accentInk}
-          />
-        ) : null}
-        {/* Labels/backplates are screen-space and never interrupt the body batch. */}
-        <Group>
-          {labels.map((label) => (
-            <Group key={label.id}>
-              <OrreryLabel
-                identity={label.id}
-                text={label.text}
-                allocations={allocations}
-                colors={colors}
-                deepInk={deepField?.ink}
-                tickColor={label.tick}
-                frame={deepField ? frame : undefined}
-              />
-              {label.context ? (
+            ))}
+            {drawnSatellites.map((row) => {
+              const target = {
+                kind: "satellite" as const,
+                uid: row.uid,
+                parentId: row.parentId,
+                parentUid: row.parentUid,
+              };
+              const identity = bodyKey({
+                kind: "satellite",
+                id: -1,
+                satelliteTarget: target,
+              });
+              return (
+                <SatelliteBody
+                  key={identity}
+                  identity={identity}
+                  billboards={billboards}
+                  colors={colors}
+                  focused={
+                    focusedSatellite?.uid === row.uid &&
+                    focusedSatellite.parentId === row.parentId &&
+                    focusedSatellite.parentUid === row.parentUid
+                  }
+                />
+              );
+            })}
+          </Group>
+          {/* Labels/backplates are screen-space and never interrupt the body batch. */}
+          <Group>
+            {labels.map((label) => (
+              <Group key={label.id}>
                 <OrreryLabel
                   identity={label.id}
-                  text={label.context}
+                  text={label.text}
                   allocations={allocations}
                   colors={colors}
-                  context
-                  deepInk={deepField?.ink}
                 />
-              ) : null}
-            </Group>
-          ))}
+                {label.context ? (
+                  <OrreryLabel
+                    identity={label.id}
+                    text={label.context}
+                    allocations={allocations}
+                    colors={colors}
+                    context
+                  />
+                ) : null}
+              </Group>
+            ))}
+          </Group>
         </Group>
-      </Group>
-    ),
+      ),
     [
       viewport.width,
       viewport.height,
       deepFieldOn,
       frame,
       billboards,
-      switchFx,
-      planeRings,
-      deepInk,
       sceneExtent,
       resources,
       colors,
       reorderDrag,
       fontProvider,
       focusedIds,
-      deepField,
-      sunFlare,
-      focusState,
-      focusMix,
-      accentInk,
       drawnSatellites,
       focusedSatellite,
       labels,
       allocations,
-      bodyLight,
     ],
   );
   return (
-    <OrreryCanvas
-      width={viewport.width}
-      height={viewport.height}
-      background={colors.background}
-      starColors={starColors}
-      gesture={gesture}
-      backdrop={backdrop}
-      overlay={overlay}
-    >
-      {world}
-    </OrreryCanvas>
+    <>
+      {photoSlots}
+      <OrreryCanvas
+        width={viewport.width}
+        height={viewport.height}
+        background={colors.background}
+        starColors={starColors}
+        gesture={gesture}
+        backdrop={labScene}
+      >
+        {world}
+      </OrreryCanvas>
+    </>
   );
 }

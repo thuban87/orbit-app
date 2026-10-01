@@ -332,3 +332,17 @@ export const GRID_FX_GAIN = 0.9;
 export const WARP_COPIES = 5;
 export const WARP_STEP = 0.014;
 export const WARP_ALPHA = 0.55;
+
+// ── ARCH PERF PASS: imperative scene renderer (lab/scene-draw.ts) ─────────
+/** Photo cross-fade over the initials when it resolves (ms). */
+export const PHOTO_FADE_MS = 260;
+/**
+ * Ambient (corona, granulation, reticle scan) redraw rate. The single clock
+ * ticks at the display rate (120 Hz on the Pixel); the ambient time is
+ * quantised to this rate so idle frames that would draw an identical-looking
+ * corona never re-record or redraw anything. 0 under live reduced motion.
+ */
+export const AMBIENT_HZ = 30;
+/** Fade bookkeeping window: how long re-records keep ticking after a spec
+ *  change (≥ the longest fade above, plus slack for the JS→UI hand-off). */
+export const SPEC_FADE_WINDOW_MS = 360;

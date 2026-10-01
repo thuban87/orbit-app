@@ -9,6 +9,7 @@ import { HOME_CAMERA } from "@/logic/orrery-camera-logic";
 import { beginSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import { loadOrreryScene } from "@/services/orrery-scene";
 import { THEME_PRESETS } from "@/theme/theme-presets";
+import { useDeepFieldModeStore } from "./lab/deep-field-mode";
 import { prepareOrreryText } from "./OrreryLabel";
 import { OrreryWorld } from "./OrreryWorld";
 import { useOrreryCamera } from "./use-orrery-camera";
@@ -180,6 +181,9 @@ function resolve(node: ReactNode): Node[] {
 let db: ReturnType<typeof openTestDb>;
 beforeEach(async () => {
   native.paragraphs = [];
+  // These are the LEGACY declarative tree contracts. Lab A's imperative
+  // scene renderer has its own contract (lab/lab-scene-render.test.tsx).
+  useDeepFieldModeStore.setState({ enabled: false });
   db = openTestDb();
   let uid = 0;
   await runMigrations(nodeSqliteExecutor(db), MIGRATIONS, TARGET_VERSION, {
@@ -188,7 +192,10 @@ beforeEach(async () => {
     defaultPhoneRegion: "US",
   });
 });
-afterEach(() => db.close());
+afterEach(() => {
+  db.close();
+  useDeepFieldModeStore.setState({ enabled: true });
+});
 
 describe("production Orrery native tree and resource contracts", () => {
   it("renders tokenized moons in the same actual native depth batch and hides them at overview", async () => {
@@ -274,10 +281,7 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    // ORRERY LAB A (pass 3): an always-mounted focus-reticle picture sits
-    // between the body batch and the labels (outside the body batch).
-    const [rings, polaris, ghost, bodies, reticle, labels] = tree[0].children;
-    expect(reticle.type).toBe("picture");
+    const [rings, polaris, ghost, bodies, labels] = tree[0].children;
     expect(ghost.props.color).toBe(THEME_PRESETS.galaxy.dark.accent);
     expect(polaris.children.map((child) => child.type)).toEqual([
       "circle",
@@ -287,10 +291,8 @@ describe("production Orrery native tree and resource contracts", () => {
     expect(polaris.children[1].props.color).toBe(
       THEME_PRESETS.galaxy.dark.textPrimary,
     );
-    // ORRERY LAB A: the per-contact ring Paths became ONE world-plane picture
-    // (rings/trails/grid/shadows drawn under the camera homography). The
-    // status line-treatment contract is asserted in lab/world-plane.test.ts.
-    expect(rings.children.map((child) => child.type)).toEqual(["picture"]);
+    // Legacy: one ring Path per contact (Lab A: lab/world-plane.test.ts).
+    expect(rings.children.map((child) => child.type)).toEqual(["path"]);
     expect(bodies.children.map((child) => child.type)).toEqual([
       "skGroup",
       "skGroup",
