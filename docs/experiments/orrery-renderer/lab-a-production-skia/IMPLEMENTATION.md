@@ -1,16 +1,16 @@
-# Lab A: Implementation map (HEAD `978643c9`)
+# Lab A: Implementation map (HEAD `978643c9`, line numbers refreshed after `75cea9b6`)
 
-This is a file- and function-level map, detailed enough to rebuild the good ideas in a clean V2. Line numbers are HEAD's. "First" is the commit that introduced the item; "final" is the last one that reshaped it. Paths are under `src/components/orrery/` unless they start with `src/`. For the design view, read [ARCHITECTURE.md](ARCHITECTURE.md) first.
+This is a file- and function-level map, detailed enough to rebuild the good ideas in a clean V2. Line numbers are those after the behaviour-preserving cleanup `75cea9b6` (dead Lab branches, unused tunables and stale comments removed). "First" is the commit that introduced the item; "final" is the last one that reshaped it. Paths are under `src/components/orrery/` unless they start with `src/`. For the design view, read [ARCHITECTURE.md](ARCHITECTURE.md) first.
 
 ## 1. New files (`lab/`)
 
 | File | Role | Key functions (line) | First → final |
 |---|---|---|---|
-| `LabScene.tsx` | The only Lab node in `<Canvas>`. It builds the sky resources, ambient time, the `scene`/`below`/`sun`/`reticle`/`top` mappers, the base-texture bake and the reticle lock timeline. | `LabScene` (152). Inside it: `ambient` (177), `sky` memo (210), `baseCache` and dispose (283–298), `scene` (301), `below` bake (396), `sun` (444), lock reaction (463), `reticle` (478), `top` (518) | `fd7f09c` → `5fb0f0d` |
-| `scene-draw.ts` | UI-thread draw worklets: bodies, sky, Polaris, reorder ghost, labels, pips, uniform builders, ordering | `boundedLayer` 215, `drawDiscPhoto` 241, `bodyUniforms` 273, `coronaUniforms` 323, `sunDiscUniforms` 350, `orderBodies` 380, `fadeIn` 400, `drawContactBody` 407, `drawMoonBody` 473, `drawSunBody` 516, `drawSky` 621, `drawPolaris` 707, `drawReorderGhost` 730, `drawPlate` 766, `drawLabels` 814, `drawStackPips` 869, `focusDim` 906 | `fd7f09c` → `5fb0f0d` |
+| `LabScene.tsx` | The only Lab node in `<Canvas>`. It builds the sky resources, ambient time, the `scene`/`below`/`sun`/`reticle`/`top` mappers, the base-texture bake and the reticle lock timeline. | `LabScene` (152). Inside it: `ambient` (177), `sky` memo (210), `baseCache` and dispose (286–301), `scene` (304), `below` bake (399), `sun` (447), lock reaction (466), `reticle` (481), `top` (521) | `fd7f09c` → `5fb0f0d` |
+| `scene-draw.ts` | UI-thread draw worklets: bodies, sky, Polaris, reorder ghost, labels, pips, uniform builders, ordering | `boundedLayer` 216, `drawDiscPhoto` 242, `bodyUniforms` 274, `coronaUniforms` 324, `sunDiscUniforms` 351, `orderBodies` 381, `fadeIn` 401, `drawContactBody` 409, `drawMoonBody` 476, `drawSunBody` 520, `drawSky` 631, `drawPolaris` 717, `drawReorderGhost` 740, `drawPlate` 777, `drawLabels` 825, `drawStackPips` 880, `focusDim` 917 | `fd7f09c` → `5fb0f0d` |
 | `scene-specs.ts` | JS-thread spec builders: token RGBA, cached initials paragraphs, image size, fade stamps | `initialsParagraph` 41, `resourcePhotoPath` 82, `buildBodySpecs` 101 | `fd7f09c` |
 | `world-plane.ts` | The whole plane: pool, grid, shadows, rings, moon orbits, ghosts, haze, switch FX. It holds the world-space path and the screen-space fallback. | `makePlaneShapes` 339, `minRadialScale` 392, `ringBand` 416, `ringPerimeter` 452, `ringWorldUniforms` 473, `circleMatrix` 536, `worldCircle` 560, `gridUniforms` 578, `drawWorldDisc` 621, `drawGrid` 637, `ringUniforms` 756 (fallback), `drawWorldPlane` 806, `affineAt` 275 | `0a73a54` → `5fb0f0d` |
-| `deep-field-shaders.ts` | Six SkSL sources plus the lazy, memoised `labEffect` (457) | see §2 | `0a73a54` → `dc7f866` |
+| `deep-field-shaders.ts` | Six SkSL sources plus the lazy, memoised `labEffect` (458) | see §2 | `0a73a54` → `dc7f866` |
 | `deep-field-math.ts` | Read-only math: homography, switch FX, body light, visual scales, reticle geometry | `bodyVisualScale` 78, `bodyDepthScale` 92, `moonVisualScale` 118, `reticleDrawnRadius` 144, `reticleGeometry` 160, `easeOutBack` 172, `computeSwitchFx` 208, `planeHomography` 267, `invertHomography` 300, `mapHomography` 324, `computeBodyLight` 347 | `0a73a54` → `0c0b18b` |
 | `deep-field-config.ts` | Every Lab tunable (§4) | | `0a73a54` → `fd7f09c` |
 | `deep-field-ink.ts` | Token → RGBA (`tokenInk` 32); `resolveDeepFieldInk` 47 (`chart` = background luminance > 0.5); `withAlpha` 64 (worklet) | | `0a73a54` |
@@ -22,7 +22,7 @@ This is a file- and function-level map, detailed enough to rebuild the good idea
 | `use-lab-photos.tsx` | Photo custody: `useLabPhotoCustody` 54, `LabPhotoSlot` 98, `disposeOnUI` 32 | | `fd7f09c` |
 | `deep-field-mode.ts` | Experiment-only A/B store and `useDeepFieldEnabled` 27 | | `b1cfde3` |
 | `LabHud.tsx` | DEV marker (`labMarkerVisible` 29: `__DEV__ && LAB_MARKER_ENABLED`). It is the only declarative Lab node left. | | `b450f47` → `c862c30` |
-| `BodyOverlays.tsx` | **Dead at HEAD.** Declarative `BodyLightOverlay`/`SunCorona`/`SunDisc`, reachable only through props that `OrreryWorld` no longer passes. Delete in V2. | | `b450f47` → `3cd7695` |
+| ~~`BodyOverlays.tsx`~~ | **Removed in `75cea9b6`** (was dead since `fd7f09c`). Declarative `BodyLightOverlay`/`SunCorona`/`SunDisc`, reachable only through props `OrreryWorld` no longer passed; their look lives on in `scene-draw.ts` (`drawContactBody`/`drawMoonBody`/`drawSunBody`). Recover with `git show 75cea9b6^:src/components/orrery/lab/BodyOverlays.tsx`. | | `b450f47` → `3cd7695` |
 
 Deleted in `fd7f09c`: `DeepFieldBackdrop.tsx`, `WorldPlaneLayer.tsx`, `BodyStackLayer.tsx`, `FocusReticleLayer.tsx`. To recover them, use `git show fd7f09c^:src/components/orrery/lab/<file>`.
 
@@ -39,7 +39,7 @@ Deleted in `fd7f09c`: `DeepFieldBackdrop.tsx`, `WorldPlaneLayer.tsx`, `BodyStack
 | `OrreryCanvas.tsx` | `backdrop`/`overlay` slots; memoised Canvas content (main re-recorded on every render); `opaque={!!backdrop}` → SurfaceView | `0a73a54`, `842f1f3`, `dc7f866` | memo = main-line fix; opaque = Lab |
 | `OrreryFocusContext.tsx` | Lab layout through `focusCardLayout`; natural height from a wrapper `View` `onLayout` (the old `onContentSizeChange`/root-layout height stayed at 180 and clipped later rows); Lab cap 0.55 × canvas height; target key hoisted out of the per-body `find` | `527bd5b`, `3cd7695`, `0c0b18b` | measurement bug = main-line |
 | `OrreryViewOptions.tsx` | "Lab A renderer (experiment)" switch | `b1cfde3` | experiment-only |
-| `OrbitBody.tsx`, `SunBody.tsx`, `SatelliteBody.tsx`, `OrreryLabel.tsx` | Lab props/branches (dead at HEAD). `SatelliteBody` reads `billboardMap` (live, perf). **Legacy `SunBody` draw order changed:** the pulse halo is now drawn *before* the focus ring, so in legacy the ring sits on top of the halo; main drew the ring first. | `b450f47` … `fd7f09c` | strip in V2; check the SunBody order |
+| `OrbitBody.tsx`, `SunBody.tsx`, `SatelliteBody.tsx`, `OrreryLabel.tsx` | The dead Lab props/branches (`deepField`, `lightKey`, `deepInk`, `flare`, `starText`, `tickColor`, `frame`) were **removed in `75cea9b6`**: `OrbitBody`, `SunBody` and `OrreryLabel` are byte-identical to `3492092` again. `SatelliteBody` keeps only its `billboardMap` input (live, perf). The legacy `SunBody` halo/focus-ring order, which the Lab branch had swapped (halo before ring, no recorded rationale), is back to main's (ring first). | `b450f47` … `fd7f09c`; cleanup `75cea9b6` | `SatelliteBody` billboard input = main-line perf fix |
 | `ProjectedOrbitRing.tsx` | `frameBody` lookups | `842f1f3` | main-line fix |
 | `src/theme/theme-types.ts`, `theme-presets.ts` | Six tokens × four presets: `orreryVoid`, `orreryNebulaA`, `orreryNebulaB`, `orreryGrid`, `orreryStarlight`, `orreryShadow` | `202b0d6` | needs owner sign-off for production |
 | `app.config.ts` | `com.bwales.orbit.laba`, "Orbit Lab A" | `6514a80` | experiment-only; revert |
@@ -187,7 +187,7 @@ See ARCHITECTURE §8. The key invariant: an `SkImage` is disposed only on the UI
 | `STACK_*` | 0.8, r 3.2, max 4, step 0.42, angle −0.75 | Pips |
 | `FOCUS_CARD_MIN_HEIGHT/NARROW/NARROW_SLACK` (`focus-card.ts`); `LAB_CARD_MAX_FRACTION`, `CARD_CHROME` (`OrreryFocusContext.tsx`) | 112, 168, 44; 0.55, 24 | Focus card |
 
-**Unused leftovers at HEAD:** `STREAK_*` (5), `TWINKLE_MIN/MAX/SPEED` (the Lab copies; `OrreryCanvas` has its own), `WARP_ALPHA`, `HAZE_GLOW_ALPHA` and `PLANE_ARC_STEP`. Comment drift: `AMBIENT_HZ` says "0 under live reduced motion" (the code uses −1); `CORONA_SKSL` says "uTime is 0 under reduced motion" (the code uses 1.7); the base-texture comment in `LabScene` still cites stroked-polygon tessellation, which the camera pass removed.
+**Removed in `75cea9b6` (unreferenced):** `STREAK_*` (5), the Lab copies of `TWINKLE_MIN/MAX/SPEED` (`OrreryCanvas` keeps its own), `WARP_ALPHA`, `HAZE_GLOW_ALPHA` and `PLANE_ARC_STEP`. The same commit corrected comment drift: `AMBIENT_HZ` (reduced motion gives ambient −1, not 0), `CORONA_SKSL` (`uTime` held at 1.7 under reduced motion) and `SUN_DISC_SKSL` (2.3), and the `LabScene` base-texture rationale (no longer cites stroked-polygon tessellation, which the camera pass removed). `drawSky` now documents that the six-fold `nearA` replay at rest is deliberate (it is the current look).
 
 ## 5. Experiment-only infrastructure
 `app.config.ts` package/name; `deep-field-mode.ts` and the View options row; `LabHud` (DEV only); `tools/seed-lab-a.py`, `tools/ui.py` and `tools/shot.sh`; probe patches kept as evidence text, not in `src`.

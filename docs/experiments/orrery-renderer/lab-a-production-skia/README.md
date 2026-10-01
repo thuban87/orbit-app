@@ -8,9 +8,9 @@
 |---|---|
 | Branch | `experiment/orrery-skia-production` (local only, never pushed) |
 | Base | `main` @ `3492092` |
-| HEAD at writing | `978643c9` (31 lab commits, plus this research package) |
+| HEAD at writing | `978643c9` (31 lab commits, plus this research package), then the cleanup `75cea9b6` |
 | Package | `com.bwales.orbit.laba`, launcher "Orbit Lab A". It installs side by side with `com.bwales.orbit` (`app.config.ts`, commit `6514a80`). |
-| Device | Pixel 6 Pro (`raven`, 1440×3120, 120 Hz). A release build of `5fb0f0d7` is installed. |
+| Device | Pixel 6 Pro (`raven`, 1440×3120, 120 Hz). The installed build is a **release build of `5fb0f0d7`**. The later cleanup commit `75cea9b6` (dead Lab branches, `lab/BodyOverlays.tsx`, unused tunables and stale comments removed) is behaviour-preserving and was **not** device-rebuilt; it was verified by `tsc`, `check:colors`, Biome and vitest only. |
 | Dependencies | **None added.** `package.json`, the lockfile and `patches/` are unchanged from base. The lab uses RN-Skia 2.6.2, Reanimated 4.5.1 and worklets 0.10.4, which were already present. |
 
 ## What was built (one paragraph)

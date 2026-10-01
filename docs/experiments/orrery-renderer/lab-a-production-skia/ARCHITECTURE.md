@@ -159,13 +159,13 @@ There is no network access and no game engine.
 `OrreryWorld` renders exactly one renderer at a time:
 - **Lab on:** `labScene` goes in the canvas `backdrop` slot; `world` is `null`; photo slots are mounted; frames have no ring polygons; the canvas is opaque. The focus card uses the Lab placement (`OrreryFocusContext`, gated on `useDeepFieldEnabled()`).
 - **Lab off:** the declarative tree (`ProjectedOrbitRing`, `Polaris`, `ReorderGhost`, `ProjectedBody` → `OrbitBody`/`SunBody`, `SatelliteBody`, `OrreryLabel`), memoised per layer, with a TextureView.
-- **Dead code, still compiled:** the declarative Lab branches in `OrbitBody`, `SunBody`, `SatelliteBody` and `OrreryLabel` (props `deepField`, `deepInk`, `flare`, `starText`, `tickColor`, `frame`), and `lab/BodyOverlays.tsx` (`BodyLightOverlay`, `SunCorona`, `SunDisc`). `OrreryWorld` no longer passes any of these props, so the branches never run. They should be deleted in any clean V2.
+- **Dead code: removed in `75cea9b6`.** The declarative Lab branches in `OrbitBody`, `SunBody`, `SatelliteBody` and `OrreryLabel` (props `deepField`, `lightKey`, `deepInk`, `flare`, `starText`, `tickColor`, `frame`) and `lab/BodyOverlays.tsx` (`BodyLightOverlay`, `SunCorona`, `SunDisc`) had been unreachable since `fd7f09c`. The cleanup deleted them (behaviour-preserving): the legacy components are back to `main`'s versions, apart from `SatelliteBody`'s `billboardMap` input.
 
 ## 11. Superseded designs (history only)
 
 | Design | Commits | Replaced by | Why |
 |---|---|---|---|
-| Declarative deep field: `DeepFieldBackdrop`, `WorldPlaneLayer`, `BodyStackLayer`, `FocusReticleLayer`, plus per-body `BodyOverlays` in the React tree | `0a73a54` … `0c0b18b` | imperative five-picture `LabScene` (`fd7f09c`) | RN-Skia's declarative redraw re-converted about 550 animated props, replayed the whole command list and opened about 120 full-canvas layers per frame. Release measured ≈12 fps idle at ≈92 % main thread. |
+| Declarative deep field: `DeepFieldBackdrop`, `WorldPlaneLayer`, `BodyStackLayer`, `FocusReticleLayer`, plus per-body `BodyOverlays` in the React tree (file deleted in `75cea9b6`) | `0a73a54` … `0c0b18b` | imperative five-picture `LabScene` (`fd7f09c`) | RN-Skia's declarative redraw re-converted about 550 animated props, replayed the whole command list and opened about 120 full-canvas layers per frame. Release measured ≈12 fps idle at ≈92 % main thread. |
 | GPU fbm nebula (`NEBULA_SKSL`) + `usePictureAsTexture` | `0a73a54` | CPU bake + module cache (`c862c30`) | Facets and a seam on Mali; a re-raster pop on every remount. |
 | Plane recorded under `concat(H)` with strokes and dashes | `0a73a54` | CPU-projected convex polygons + `RING_SKSL` (`527bd5b`) | CPU path masks, `drawOval` bounding quads, round joins. |
 | CPU-projected 128-point polygons per ring per frame; base texture re-rasterised every change | `527bd5b`, `fd7f09c` | world-space `SkVertices` + analytic shaders; bake only when static (`033e751`) | ≈32 ms per camera frame of JS recording plus 9 ms of Ganesh tessellation (debug). |
