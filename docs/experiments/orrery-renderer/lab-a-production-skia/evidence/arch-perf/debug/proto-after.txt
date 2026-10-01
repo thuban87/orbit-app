@@ -1,0 +1,15 @@
+Current System: All Contacts
+after-idle-1 frames 223 p50 7 p90 13
+after-idle-2 frames 224 p50 6 p90 13
+idle cpu win=12.6s ales.orbit.laba:21% RenderThread:8% mali-cmar-backe:2% mali-cmar-backe:1% hades:1% binder:27363_4:1%
+after-pan frames 110 p50 12 p90 77
+after-rm-1 frames 0 p50 4950
+after-rm-2 frames 0 p50 4950
+rm cpu win=13.0s ales.orbit.laba:26% mqt_v_js:0% OkHttp_TaskRunn:0% OkHttp_TaskRunn:0% alhost:8081/...:0% HeapTaskDaemon:0%
+{"name": "after-sw-ad-1", "tap_pts": 1.171, "tap_cmd_ms": 65, "first_change_s": 0.235, "last_change_s": 2.448, "n_changes": 14, "changes_per_s_first_to_last": 6.3, "timeline": [[0.235, 12.1], [0.243, 14.1], [0.26, 0.6], [0.493, 1.9], [0.676, 1.7], [0.859, 7.8], [1.05, 9.1], [1.292, 11.7], [1.533, 12.5], [1.716, 11.7], [1.916, 11.4], [2.099, 8.9], [2.281, 4.3], [2.448, 0.4]]}
+{"name": "after-sw-da-1", "tap_pts": 1.173, "tap_cmd_ms": 66, "first_change_s": 0.145, "last_change_s": 7.184, "n_changes": 13, "changes_per_s_first_to_last": 1.8, "timeline": [[0.145, 12.3], [0.22, 14.1], [0.413, 2.1], [0.587, 1.6], [0.769, 7.0], [0.952, 8.8], [1.136, 8.7], [1.36, 11.0], [1.593, 11.2], [1.835, 11.2], [2.05, 8.4], [2.267, 3.4], [7.184, 0.4]]}
+{"name": "after-sw-ad-2", "tap_pts": 1.19, "tap_cmd_ms": 67, "first_change_s": 0.195, "last_change_s": 2.218, "n_changes": 13, "changes_per_s_first_to_last": 6.4, "timeline": [[0.195, 12.1], [0.205, 14.1], [0.295, 2.0], [0.471, 0.4], [0.645, 3.1], [0.829, 8.2], [1.019, 8.9], [1.261, 11.1], [1.468, 12.5], [1.668, 12.4], [1.851, 11.1], [2.042, 8.1], [2.218, 3.8]]}
+{"name": "after-sw-da-2", "tap_pts": 1.16, "tap_cmd_ms": 53, "first_change_s": 0.147, "last_change_s": 7.119, "n_changes": 13, "changes_per_s_first_to_last": 1.9, "timeline": [[0.147, 12.3], [0.223, 14.1], [0.455, 2.1], [0.63, 1.5], [0.805, 6.9], [0.972, 8.8], [1.155, 7.1], [1.371, 11.1], [1.603, 11.0], [1.845, 10.9], [2.068, 9.1], [2.26, 3.7], [7.119, 0.4]]}
+{"name": "after-fo-1", "tap_pts": 1.56, "tap_cmd_ms": 250, "first_change_s": 0.337, "last_change_s": 3.269, "n_changes": 6, "changes_per_s_first_to_last": 2.0, "timeline": [[0.337, 19.5], [0.396, 9.9], [0.513, 13.2], [0.587, 15.9], [0.762, 1.9], [3.269, 0.3]]}
+{"name": "after-fo-2", "tap_pts": 1.461, "tap_cmd_ms": 215, "first_change_s": 0.18, "last_change_s": 3.163, "n_changes": 6, "changes_per_s_first_to_last": 2.0, "timeline": [[0.18, 18.8], [0.453, 10.0], [0.528, 21.4], [0.702, 1.8], [0.868, 0.5], [3.163, 0.3]]}
+{"name": "after-fo-3", "tap_pts": 1.436, "tap_cmd_ms": 241, "first_change_s": 0.179, "last_change_s": 3.501, "n_changes": 8, "changes_per_s_first_to_last": 2.4, "timeline": [[0.179, 18.5], [0.479, 15.5], [0.57, 3.3], [0.636, 2.7], [0.694, 5.5], [0.86, 0.8], [0.96, 0.3], [3.501, 0.3]]}

@@ -1,0 +1,15 @@
+Current System: All Contacts
+before-idle-1 frames 79 p50 77 p90 150
+before-idle-2 frames 74 p50 85 p90 150
+idle cpu win=11.7s ales.orbit.laba:93% mali-cmar-backe:9% mali-mem-purge:2% hades:2% RenderThread:1% mali-cmar-backe:0%
+before-pan frames 29 p50 200 p90 250
+before-rm-1 frames 92 p50 77
+before-rm-2 frames 80 p50 81
+rm cpu win=11.4s ales.orbit.laba:94% mali-cmar-backe:10% hades:2% RenderThread:1% mali-mem-purge:1% mali-cmar-backe:0%
+{"name": "before-sw-ad-1", "tap_pts": 1.186, "tap_cmd_ms": 88, "first_change_s": 0.202, "last_change_s": 2.782, "n_changes": 7, "changes_per_s_first_to_last": 2.7, "timeline": [[0.202, 12.4], [0.369, 14.3], [1.009, 4.1], [1.5, 11.6], [1.974, 12.5], [2.408, 8.6], [2.782, 1.0]]}
+{"name": "before-sw-da-1", "tap_pts": 1.186, "tap_cmd_ms": 87, "first_change_s": 0.277, "last_change_s": 2.556, "n_changes": 8, "changes_per_s_first_to_last": 3.5, "timeline": [[0.277, 12.5], [0.352, 14.2], [0.876, 5.1], [1.184, 7.3], [1.633, 7.6], [1.941, 8.8], [2.257, 9.1], [2.556, 2.1]]}
+{"name": "before-sw-ad-2", "tap_pts": 1.231, "tap_cmd_ms": 118, "first_change_s": 0.183, "last_change_s": 2.82, "n_changes": 7, "changes_per_s_first_to_last": 2.7, "timeline": [[0.183, 12.4], [0.432, 14.3], [0.89, 1.5], [1.398, 9.4], [1.896, 11.8], [2.387, 12.9], [2.82, 2.7]]}
+{"name": "before-sw-da-2", "tap_pts": 1.158, "tap_cmd_ms": 84, "first_change_s": 0.32, "last_change_s": 2.491, "n_changes": 7, "changes_per_s_first_to_last": 3.2, "timeline": [[0.32, 19.4], [0.853, 3.1], [1.16, 9.2], [1.551, 9.3], [1.892, 10.8], [2.216, 9.6], [2.491, 5.5]]}
+{"name": "before-fo-1", "tap_pts": 1.694, "tap_cmd_ms": 465, "first_change_s": null, "last_change_s": null, "n_changes": 0, "changes_per_s_first_to_last": null, "timeline": []}
+{"name": "before-fo-2", "tap_pts": 1.716, "tap_cmd_ms": 489, "first_change_s": null, "last_change_s": null, "n_changes": 0, "changes_per_s_first_to_last": null, "timeline": []}
+{"name": "before-fo-3", "tap_pts": 1.727, "tap_cmd_ms": 499, "first_change_s": null, "last_change_s": null, "n_changes": 0, "changes_per_s_first_to_last": null, "timeline": []}

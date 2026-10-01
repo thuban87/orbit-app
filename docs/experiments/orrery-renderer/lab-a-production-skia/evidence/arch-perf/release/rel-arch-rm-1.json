@@ -1,0 +1,1 @@
+{"frames": 0, "janky_pct": 0.0, "janky_legacy_pct": 0.0, "p50": 4950, "p90": 4950, "p95": 4950, "p99": 4950, "gpu_p50": 4950, "gpu_p90": 4950, "gpu_p95": 4950, "gpu_p99": 4950, "missed_vsync": 0, "high_input_lat": 0, "slow_ui": 0, "slow_bitmap": 0, "slow_draw": 0, "frame_deadline_missed": 0}

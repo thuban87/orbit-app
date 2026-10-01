@@ -1,0 +1,77 @@
+Applications Memory Usage (in Kilobytes):
+Uptime: 384206966 Realtime: 617194980
+
+** MEMINFO in pid 21254 [com.bwales.orbit.laba] **
+                   Pss  Private  Private  SwapPss      Rss     Heap     Heap     Heap
+                 Total    Dirty    Clean    Dirty    Total     Size    Alloc     Free
+                ------   ------   ------   ------   ------   ------   ------   ------
+  Native Heap   150848   150844        0        5   153704   172920   147664    20080
+  Dalvik Heap     9042     8956       48        7    15824   262144     6114   256030
+ Dalvik Other     1540     1104        4        0     2668                           
+        Stack     1616     1616        0        0     1624                           
+       Ashmem       10        0        0        0     1308                           
+    Other dev      140        0      140        0      420                           
+     .so mmap     6453      176     3348        2    63552                           
+    .jar mmap      595        0        8        0    40968                           
+    .apk mmap    38810     1560    36636        0    41440                           
+    .ttf mmap     2105        0     1124        0     4928                           
+    .dex mmap    23191        0    23188        0    23956                           
+    .oat mmap      165        0        0        0    12580                           
+    .art mmap     5758     5288      332        0    27504                           
+   Other mmap     2347        4     1224        0     5228                           
+   EGL mtrack   132748   132748        0        0   132748                           
+    GL mtrack   153492   153492        0        0   153492                           
+      Unknown    30076    29884      192        2    31300                           
+        TOTAL   558952   485672    66244       16   713244   435064   153778   276110
+ 
+ App Summary
+                       Pss(KB)                        Rss(KB)
+                        ------                         ------
+           Java Heap:    14576                          43328
+         Native Heap:   150844                         153704
+                Code:    66040                         188288
+               Stack:     1616                           1624
+            Graphics:   286240                         286240
+       Private Other:    32600
+              System:     7036
+             Unknown:                                   40060
+ 
+           TOTAL PSS:   558952            TOTAL RSS:   713244       TOTAL SWAP PSS:       16
+ 
+ Objects
+               Views:      206         ViewRootImpl:        1
+         AppContexts:        5           Activities:        1
+              Assets:       30        AssetManagers:        0
+       Local Binders:       30        Proxy Binders:       62
+       Parcel memory:       10         Parcel count:       43
+    Death Recipients:        1             WebViews:        0
+ 
+ Native Allocations
+                         Count                       Total(kB)
+                        ------                         ------
+    Other (malloced):     2099                            199
+ Other (nonmalloced):      101                             72
+   Bitmap (malloced):        4                           6238
+ 
+ Mapped Bitmaps
+                         Count                       Size(KB)
+                        ------                         ------
+              Mapped:        0                              0
+              Unique:        0                              0
+ 
+ SQL
+         MEMORY_USED:      343
+  PAGECACHE_OVERFLOW:       92          MALLOC_SIZE:       46
+ 
+ DATABASES
+      pgsz     dbsz   Lookaside(b) cache hits cache misses cache size  Dbname
+PER CONNECTION STATS
+         4      100            123     8    45    10  /data/user/0/com.bwales.orbit.laba/no_backup/androidx.work.workdb
+         4        8                    0     0     0    (attached) temp
+         4      100             32     4    18     3  /data/user/0/com.bwales.orbit.laba/no_backup/androidx.work.workdb (2)
+         4       20             27     3    23     2  /data/user/0/com.bwales.orbit.laba/databases/RKStorage
+POOL STATS
+     cache hits  cache misses    cache size  Dbname
+             12            67            13  /data/user/0/com.bwales.orbit.laba/no_backup/androidx.work.workdb
+              3            24             2  /data/user/0/com.bwales.orbit.laba/databases/RKStorage
+ 

@@ -1,0 +1,156 @@
+Cmdline: /system/bin/simpleperf record -t 18761 -f 4000 --duration 6 -g -o /data/data/com.bwales.orbit.laba/perf.data
+Arch: arm64
+Event: cpu-cycles (type 0, config 0)
+Samples: 13922
+Event count: 5858995180
+
+Overhead  Sample  Shared Object
+55.09%    7597    /lib/arm64-v8a/librnskia.so
+25.78%    3559    /apex/com.android.runtime/lib64/bionic/libc.so
+4.94%     668     /vendor/lib64/egl/libGLES_mali.so
+4.24%     628     /lib/arm64-v8a/libhermesvm.so
+3.96%     587     /apex/com.android.art/lib64/libart.so
+2.08%     308     [JIT app cache]
+1.98%     294     /lib/arm64-v8a/libworklets.so
+0.35%     49      /system/lib64/libgui.so
+0.30%     45      /lib/arm64-v8a/libreactnative.so
+0.16%     25      /system/lib64/libhwui.so
+0.13%     19      /lib/arm64-v8a/libc++_shared.so
+0.12%     18      /system/lib64/libbinder.so
+0.11%     15      /lib/arm64-v8a/libfbjni.so
+
+Cmdline: /system/bin/simpleperf record -t 18761 -f 4000 --duration 6 -g -o /data/data/com.bwales.orbit.laba/perf.data
+Arch: arm64
+Event: cpu-cycles (type 0, config 0)
+Samples: 13922
+Event count: 5858995180
+
+Children  Self    Sample  Symbol
+100.00%   0.50%   74      bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)
+100.00%   0.30%   45      artQuickToInterpreterBridge
+100.00%   0.24%   37      void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)
+100.00%   0.02%   4       art_quick_generic_jni_trampoline
+100.00%   0.01%   2       art_quick_to_interpreter_bridge
+100.00%   0.01%   1       art_quick_invoke_stub
+100.00%   0.00%   0       ExecuteSwitchImplAsm
+100.00%   0.00%   0       _JNIEnv::CallStaticVoidMethod(_jclass*, _jmethodID*, ...)
+100.00%   0.00%   0       __libc_init
+100.00%   0.00%   0       _jobject* art::InvokeMethod<(art::PointerSize)8>(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jobject*, _jobject*, unsigned long)
+100.00%   0.00%   0       android.app.ActivityThread.main
+100.00%   0.00%   0       android.os.Looper.loop
+100.00%   0.00%   0       android::AndroidRuntime::start(char const*, android::Vector<android::String8> const&, bool)
+100.00%   0.00%   0       art::JNI<true>::CallStaticVoidMethodV(_JNIEnv*, _jclass*, _jmethodID*, std::__va_list)
+100.00%   0.00%   0       art::JValue art::InvokeWithVarArgs<_jmethodID*>(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jmethodID*, std::__va_list)
+100.00%   0.00%   0       art::Method_invoke(_JNIEnv*, _jobject*, _jobject*, _jobjectArray*) (.__uniq.165753521025965369065708152063621506277)
+100.00%   0.00%   0       art_quick_invoke_static_stub
+100.00%   0.00%   0       com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run
+100.00%   0.00%   0       com.android.internal.os.ZygoteInit.main
+100.00%   0.00%   0       main
+99.96%    0.02%   3       android.os.Looper.loopOnce
+98.45%    0.00%   0       android.os.Handler.dispatchMessage
+98.45%    0.00%   0       android.os.Handler.dispatchMessageImpl
+98.22%    0.01%   2       android.os.Handler.handleCallback
+98.10%    0.01%   1       android.view.Choreographer$FrameDisplayEventReceiver.run
+98.09%    0.03%   4       android.view.Choreographer.doFrame
+97.96%    0.03%   4       android.view.Choreographer.doCallbacks
+97.88%    0.03%   4       android.view.Choreographer$CallbackRecord.run
+96.57%    0.00%   0       com.facebook.react.modules.core.ReactChoreographer$$ExternalSyntheticLambda0.doFrame
+96.52%    0.04%   6       com.facebook.react.modules.core.ReactChoreographer.frameCallback$lambda$1
+96.52%    0.00%   0       com.facebook.react.modules.core.ReactChoreographer.$r8$lambda$nSkFhrr5T7rop_XKwzlLov4NLLw
+95.86%    0.02%   3       com.facebook.react.uimanager.GuardedFrameCallback.doFrame
+94.24%    0.01%   1       com.swmansion.worklets.runloop.AnimationFrameQueue$mChoreographerCallback$1.doFrameGuarded
+94.23%    0.01%   1       com.swmansion.worklets.runloop.AnimationFrameQueue.access$executeQueue
+94.23%    0.03%   5       com.swmansion.worklets.runloop.AnimationFrameQueue.executeQueue
+93.96%    0.01%   1       facebook::jni::detail::MethodWrapper<void (worklets::AnimationFrameCallback::*)(double), &(worklets::AnimationFrameCallback::onAnimationFrame(double)), worklets::AnimationFra
+93.95%    0.00%   0       facebook::jni::detail::FunctionWrapper<void (*)(facebook::jni::alias_ref<facebook::jni::detail::JTypeFor<facebook::jni::HybridClass<worklets::AnimationFrameCallback, facebook
+93.94%    0.00%   0       facebook::jni::detail::CallWithJniConversions<void (*)(facebook::jni::alias_ref<facebook::jni::detail::JTypeFor<facebook::jni::HybridClass<worklets::AnimationFrameCallback, f
+93.90%    0.00%   0       facebook::jni::detail::MethodWrapper<void (worklets::AnimationFrameCallback::*)(double), &(worklets::AnimationFrameCallback::onAnimationFrame(double)), worklets::AnimationFra
+93.79%    0.00%   0       worklets::AnimationFrameCallback::onAnimationFrame(double)
+93.68%    0.00%   0       facebook::jsi::Value worklets::WorkletRuntime::runSync<double&>(facebook::jsi::Function const&, double&) const
+93.67%    0.00%   0       facebook::jsi::Value worklets::WorkletRuntime::callGuarded<double&>(facebook::jsi::Function const&, std::__ndk1::optional<std::__ndk1::basic_string<char, std::__ndk1::char_tr
+93.65%    0.00%   0       facebook::jsi::Function::call(facebook::jsi::IRuntime&, std::initializer_list<facebook::jsi::Value>) const
+93.65%    0.00%   0       facebook::jsi::Value facebook::jsi::Function::call<double&>(facebook::jsi::IRuntime&, double&) const
+93.64%    0.01%   2       facebook::jsi::Function::call(facebook::jsi::IRuntime&, facebook::jsi::Value const*, unsigned long) const
+93.62%    0.01%   1       facebook::jsi::WithRuntimeDecorator<worklets::AroundLock, facebook::jsi::Runtime, facebook::jsi::Runtime>::call(facebook::jsi::Function const&, facebook::jsi::Value const&, f
+93.60%    0.01%   1       facebook::jsi::WithRuntimeDecorator<worklets::WorkletsReentrancyCheck, facebook::jsi::Runtime, facebook::jsi::Runtime>::call(facebook::jsi::Function const&, facebook::jsi::Va
+93.60%    0.00%   0       facebook::jsi::RuntimeDecorator<facebook::jsi::Runtime, facebook::jsi::Runtime>::call(facebook::jsi::Function const&, facebook::jsi::Value const&, facebook::jsi::Value const*
+87.02%    0.01%   1       facebook::jsi::Value std::__ndk1::__invoke_void_return_wrapper<facebook::jsi::Value, false>::__call[abi:ne180000]<facebook::jsi::DecoratedHostFunction&, facebook::jsi::Runtim
+87.01%    0.01%   1       facebook::jsi::DecoratedHostFunction::operator()(facebook::jsi::Runtime&, facebook::jsi::Value const&, facebook::jsi::Value const*, unsigned long)
+85.14%    0.00%   0       facebook::jsi::Value std::__ndk1::__invoke_void_return_wrapper<facebook::jsi::Value, false>::__call[abi:ne180000]<std::__ndk1::__bind<facebook::jsi::Value (RNJsi::JsiHostObje
+85.14%    0.00%   0       std::__ndk1::__bind_return<facebook::jsi::Value (RNJsi::JsiHostObject::*)(facebook::jsi::Runtime&, facebook::jsi::Value const&, facebook::jsi::Value const*, unsigned long), s
+83.52%    0.04%   5       art::(anonymous namespace)::CheckJNI::CallMethodV(char const*, _JNIEnv*, _jobject*, _jclass*, _jmethodID*, std::__va_list, art::Primitive::Type, art::InvokeType) (.__uniq.990
+83.36%    0.00%   0       art::(anonymous namespace)::CheckJNI::CallVoidMethodV(_JNIEnv*, _jobject*, _jmethodID*, std::__va_list) (.__uniq.99033978352804627313491551960229047428.llvm.27670558719509999
+83.33%    0.01%   2       _JNIEnv::CallVoidMethod(_jobject*, _jmethodID*, ...)
+83.30%    0.04%   6       art::JValue art::InvokeVirtualOrInterfaceWithVarArgs<_jmethodID*>(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jmethodID*, std::__va_list)
+83.20%    0.01%   1       art::JNI<true>::CallVoidMethodV(_JNIEnv*, _jobject*, _jmethodID*, std::__va_list)
+83.14%    0.01%   1       RNSkia::RNSkJsiViewApi::setJsiProperty(facebook::jsi::Runtime&, facebook::jsi::Value const&, facebook::jsi::Value const*, unsigned long)
+83.13%    0.00%   0       decltype(fp0((std::__ndk1::shared_ptr<RNSkia::RNSkViewInfo>)())) RNSkia::ViewRegistry::withViewInfo<RNSkia::RNSkJsiViewApi::setJsiProperty(facebook::jsi::Runtime&, facebook::
+83.07%    0.01%   1       RNSkia::RNSkJsiViewApi::setJsiProperty(facebook::jsi::Runtime&, facebook::jsi::Value const&, facebook::jsi::Value const*, unsigned long)::'lambda'(std::__ndk1::shared_ptr<RNS
+82.96%    0.00%   0       RNSkia::RNSkPictureView::setJsiProperties(std::__ndk1::unordered_map<std::__ndk1::basic_string<char, std::__ndk1::char_traits<char>, std::__ndk1::allocator<char> >, RNJsi::Vi
+82.94%    0.00%   0       RNSkia::RNSkPictureRenderer::setPicture(sk_sp<SkPicture>)
+82.88%    0.03%   4       RNSkia::RNSkAndroidPlatformContext::runOnMainThread(std::__ndk1::function<void ()>)
+82.88%    0.00%   0       RNSkia::RNSkView::requestRedraw()
+82.88%    0.00%   0       std::__ndk1::__bind_return<void (RNSkia::RNSkView::*)(), std::__ndk1::tuple<RNSkia::RNSkPictureView*>, std::__ndk1::tuple<>, __is_valid_bind_return<void (RNSkia::RNSkView::*)
+82.88%    0.00%   0       void std::__ndk1::__invoke_void_return_wrapper<void, true>::__call[abi:ne180000]<std::__ndk1::__bind<void (RNSkia::RNSkView::*)(), RNSkia::RNSkPictureView*>&>(std::__ndk1::__
+82.86%    0.00%   0       RNSkia::JniPlatformContext::runTaskOnMainThread(std::__ndk1::function<void ()>)
+82.83%    0.00%   0       RNSkia::JniPlatformContext::notifyTaskReadyExternal()
+82.76%    0.00%   0       facebook::jni::JMethod<void ()>::operator()(facebook::jni::alias_ref<_jobject*>) const
+82.68%    0.00%   0       com.shopify.reactnative.skia.PlatformContext.notifyTaskReady
+82.53%    0.01%   1       facebook::jni::detail::FunctionWrapper<void (*)(facebook::jni::alias_ref<facebook::jni::detail::JTypeFor<facebook::jni::HybridClass<RNSkia::JniPlatformContext, facebook::jni:
+82.53%    0.00%   0       facebook::jni::detail::MethodWrapper<void (RNSkia::JniPlatformContext::*)(), &(RNSkia::JniPlatformContext::notifyTaskReadyNative()), RNSkia::JniPlatformContext, void>::call(_
+82.50%    0.00%   0       facebook::jni::detail::CallWithJniConversions<void (*)(facebook::jni::alias_ref<facebook::jni::detail::JTypeFor<facebook::jni::HybridClass<RNSkia::JniPlatformContext, faceboo
+82.45%    0.01%   1       facebook::jni::detail::MethodWrapper<void (RNSkia::JniPlatformContext::*)(), &(RNSkia::JniPlatformContext::notifyTaskReadyNative()), RNSkia::JniPlatformContext, void>::dispat
+82.35%    0.00%   0       RNSkia::JniPlatformContext::notifyTaskReadyNative()
+82.27%    0.00%   0       RNSkia::RNSkView::requestRedraw()::'lambda'()::operator()() const
+82.27%    0.00%   0       void std::__ndk1::__invoke_void_return_wrapper<void, true>::__call[abi:ne180000]<RNSkia::RNSkView::requestRedraw()::'lambda'()&>(RNSkia::RNSkView::requestRedraw()::'lambda'()
+82.24%    0.00%   0       RNSkia::RNSkPictureRenderer::renderImmediate(std::__ndk1::shared_ptr<RNSkia::RNSkCanvasProvider>)
+82.23%    0.00%   0       RNSkia::RNSkPictureRenderer::performDraw(std::__ndk1::shared_ptr<RNSkia::RNSkCanvasProvider>)
+82.19%    0.00%   0       RNSkia::RNSkOpenGLCanvasProvider::renderToCanvas(std::__ndk1::function<void (SkCanvas*)> const&)
+74.31%    0.00%   0       RNSkia::OpenGLWindowContext::present()
+70.12%    0.01%   1       GrDirectContext::flushAndSubmit(GrSyncCpu)
+10.52%    10.52%  1430    __memcpy_aarch64_simd
+6.75%     0.01%   1       RNSkia::RNSkPictureRenderer::performDraw(std::__ndk1::shared_ptr<RNSkia::RNSkCanvasProvider>)::'lambda'(SkCanvas*)::operator()(SkCanvas*) const
+6.75%     0.00%   0       void std::__ndk1::__invoke_void_return_wrapper<void, true>::__call[abi:ne180000]<RNSkia::RNSkPictureRenderer::performDraw(std::__ndk1::shared_ptr<RNSkia::RNSkCanvasProvider>)
+6.47%     0.01%   1       SkCanvas::drawPicture(sk_sp<SkPicture> const&)
+6.46%     0.00%   0       SkCanvas::drawPicture(SkPicture const*)
+5.73%     0.23%   30      gles_drawp_draw_common
+5.44%     0.01%   1       gles2_draw_draw_range_elements
+5.05%     0.16%   21      realloc
+4.89%     0.02%   3       scudo_realloc
+4.79%     0.76%   106     scudo::Allocator<scudo::AndroidNormalConfig, &(scudo_malloc_postinit)>::quarantineOrDeallocateChunk(scudo::Options const&, void*, scudo::Chunk::UnpackedHeader*, unsigned long
+4.21%     0.35%   48      scudo::Allocator<scudo::AndroidNormalConfig, &(scudo_malloc_postinit)>::reallocate(void*, unsigned long, unsigned long)
+4.16%     0.01%   1       eglSwapBuffers
+4.16%     0.00%   0       gl::Surface::present()
+4.15%     0.01%   1       android::eglSwapBuffersWithDamageKHRImpl(void*, void*, int const*, int)
+4.09%     0.00%   0       eglp_swap_buffers
+4.04%     0.32%   45      scudo::Allocator<scudo::AndroidNormalConfig, &(scudo_malloc_postinit)>::deallocate(void*, unsigned char, unsigned long, unsigned long)
+4.02%     2.06%   280     scudo::Allocator<scudo::AndroidNormalConfig, &(scudo_malloc_postinit)>::allocate(unsigned long, scudo::Chunk::Origin, unsigned long, bool)
+4.02%     0.02%   3       facebook::jsi::DecoratedHostObject::get(facebook::jsi::Runtime&, facebook::jsi::PropNameID const&)
+3.98%     0.05%   7       RNJsi::JsiHostObject::get(facebook::jsi::Runtime&, facebook::jsi::PropNameID const&)
+3.97%     0.01%   1       eglp_gles_flush_operation
+3.66%     0.02%   2       gles_vertex_prepare_nx
+3.27%     0.01%   1       ioctl
+3.26%     3.26%   453     __ioctl
+3.26%     0.04%   6       art_jni_trampoline
+3.19%     0.00%   0       gles_context_flush_surface
+3.18%     0.01%   1       gles_fb_object_flush_graphics_nx
+3.17%     0.01%   1       glescore_context::submit_graphics(glescore_framebuffer*, glescore_fb_state*, bool const*, hal::tile_enable_map const**, hal::tile_render_order, void (*)(void*), void*, bool, 
+3.02%     0.03%   4       cmarp_handle_cmar_signals_in_app_thread
+3.01%     0.00%   0       cmarp_flush
+2.87%     0.02%   3       cmar_gl_executor
+2.83%     0.00%   0       cmarp_submit_atoms_to_base
+2.79%     0.00%   0       base_jd_submit_nofail
+2.79%     0.00%   0       basep_ioctl_job_submit
+2.76%     0.02%   2       glescore_context::submit_generic(glescore_submission*, primary_cmd_type, void (*)(void*), void*, bool, bool)
+2.58%     0.01%   1       hal::halp::queue_internal::enqueue_post_exec_cb(mali_error (*)(void*), void*, hal::pipeline_stage_mask)
+2.39%     0.02%   2       gles_vertexp_copy_client_buffers
+2.33%     0.00%   0       facebook::jsi::Function::createFromHostFunction(facebook::jsi::IRuntime&, facebook::jsi::PropNameID const&, unsigned int, std::__ndk1::function<facebook::jsi::Value (facebook
+2.30%     0.00%   0       facebook::jsi::WithRuntimeDecorator<worklets::AroundLock, facebook::jsi::Runtime, facebook::jsi::Runtime>::createFunctionFromHostFunction(facebook::jsi::PropNameID const&, un
+2.27%     0.01%   1       facebook::jsi::RuntimeDecorator<facebook::jsi::Runtime, facebook::jsi::Runtime>::createFunctionFromHostFunction(facebook::jsi::PropNameID const&, unsigned int, std::__ndk1::f
+2.20%     0.05%   8       malloc
+2.15%     0.00%   0       scudo_malloc
+2.12%     0.02%   3       scudo::SizeClassAllocator64<scudo::PrimaryConfig<scudo::AndroidNormalConfig> >::releaseToOSMaybe(scudo::SizeClassAllocator64<scudo::PrimaryConfig<scudo::AndroidNormalConfig> 
+2.10%     0.01%   1       facebook::jsi::WithRuntimeDecorator<worklets::WorkletsReentrancyCheck, facebook::jsi::Runtime, facebook::jsi::Runtime>::createFunctionFromHostFunction(facebook::jsi::PropName
+2.02%     0.00%   0       scudo::MemMapLinux::releaseAndZeroPagesToOSImpl(unsigned long, unsigned long)
+2.01%     0.04%   5       operator new(unsigned long)
+2.01%     2.01%   271     madvise

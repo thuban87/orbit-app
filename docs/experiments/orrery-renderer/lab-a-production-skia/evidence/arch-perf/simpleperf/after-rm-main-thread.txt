@@ -1,0 +1,151 @@
+Cmdline: /system/bin/simpleperf record -t 8837 -f 4000 --duration 5 -g -o /data/data/com.bwales.orbit.laba/perf.data
+Arch: arm64
+Event: cpu-cycles (type 0, config 0)
+Samples: 5152
+Event count: 546984714
+
+Overhead  Sample  Shared Object
+38.71%    1982    /apex/com.android.art/lib64/libart.so
+14.92%    753     [JIT app cache]
+14.13%    781     /apex/com.android.runtime/lib64/bionic/libc.so
+11.58%    580     /lib/arm64-v8a/libworklets.so
+11.03%    574     /lib/arm64-v8a/libhermesvm.so
+3.50%     166     /lib/arm64-v8a/libreactnative.so
+1.10%     54      /lib/arm64-v8a/libfbjni.so
+0.95%     50      /system/lib64/libbinder.so
+0.94%     54      /system/lib64/libutils.so
+0.53%     23      /lib/arm64-v8a/libc++_shared.so
+0.51%     23      /system/lib64/libgui.so
+0.47%     25      /system/lib64/libandroid_runtime.so
+0.39%     22      /system/lib64/libtracing_perfetto.so
+
+Cmdline: /system/bin/simpleperf record -t 8837 -f 4000 --duration 5 -g -o /data/data/com.bwales.orbit.laba/perf.data
+Arch: arm64
+Event: cpu-cycles (type 0, config 0)
+Samples: 5152
+Event count: 546984714
+
+Children  Self   Sample  Symbol
+99.94%    0.10%  4       ExecuteSwitchImplAsm
+99.94%    4.62%  242     artQuickToInterpreterBridge
+99.92%    0.24%  12      art_quick_generic_jni_trampoline
+99.90%    3.46%  180     bool art::interpreter::DoCall<false>(art::ArtMethod*, art::Thread*, art::ShadowFrame&, art::Instruction const*, unsigned short, bool, art::JValue*)
+99.90%    3.16%  166     void art::interpreter::ExecuteSwitchImplCpp<false>(art::interpreter::SwitchImplContext*)
+99.90%    0.44%  19      art_quick_to_interpreter_bridge
+99.90%    0.30%  15      art_quick_invoke_stub
+99.90%    0.13%  6       art_quick_invoke_static_stub
+99.90%    0.12%  5       art::JValue art::InvokeWithVarArgs<_jmethodID*>(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jmethodID*, std::__va_list)
+99.90%    0.00%  0       _JNIEnv::CallStaticVoidMethod(_jclass*, _jmethodID*, ...)
+99.90%    0.00%  0       __libc_init
+99.90%    0.00%  0       _jobject* art::InvokeMethod<(art::PointerSize)8>(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jobject*, _jobject*, unsigned long)
+99.90%    0.00%  0       android.app.ActivityThread.main
+99.90%    0.00%  0       android.os.Looper.loop
+99.90%    0.00%  0       android::AndroidRuntime::start(char const*, android::Vector<android::String8> const&, bool)
+99.90%    0.00%  0       art::JNI<true>::CallStaticVoidMethodV(_JNIEnv*, _jclass*, _jmethodID*, std::__va_list)
+99.90%    0.00%  0       art::Method_invoke(_JNIEnv*, _jobject*, _jobject*, _jobjectArray*) (.__uniq.165753521025965369065708152063621506277)
+99.90%    0.00%  0       com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run
+99.90%    0.00%  0       com.android.internal.os.ZygoteInit.main
+99.90%    0.00%  0       main
+99.49%    0.50%  25      android.os.Looper.loopOnce
+75.88%    0.04%  2       android.os.Handler.dispatchMessage
+75.84%    0.07%  3       android.os.Handler.dispatchMessageImpl
+75.77%    0.12%  7       android.os.Handler.handleCallback
+74.23%    0.11%  7       android.view.Choreographer$FrameDisplayEventReceiver.run
+74.12%    0.49%  23      android.view.Choreographer.doFrame
+71.88%    0.37%  19      android.view.Choreographer.doCallbacks
+70.71%    0.24%  13      android.view.Choreographer$CallbackRecord.run
+69.91%    0.00%  0       com.facebook.react.modules.core.ReactChoreographer$$ExternalSyntheticLambda0.doFrame
+69.61%    0.00%  0       com.facebook.react.modules.core.ReactChoreographer.$r8$lambda$nSkFhrr5T7rop_XKwzlLov4NLLw
+69.52%    0.50%  27      com.facebook.react.modules.core.ReactChoreographer.frameCallback$lambda$1
+59.19%    0.07%  4       com.facebook.react.uimanager.GuardedFrameCallback.doFrame
+36.12%    0.00%  0       com.swmansion.worklets.runloop.AnimationFrameQueue$mChoreographerCallback$1.doFrameGuarded
+35.91%    0.02%  1       com.swmansion.worklets.runloop.AnimationFrameQueue.access$executeQueue
+35.82%    0.11%  6       com.swmansion.worklets.runloop.AnimationFrameQueue.executeQueue
+33.12%    0.08%  4       facebook::jni::detail::MethodWrapper<void (worklets::AnimationFrameCallback::*)(double), &(worklets::AnimationFrameCallback::onAnimationFrame(double)), worklets::AnimationFram
+32.96%    0.00%  0       facebook::jni::detail::FunctionWrapper<void (*)(facebook::jni::alias_ref<facebook::jni::detail::JTypeFor<facebook::jni::HybridClass<worklets::AnimationFrameCallback, facebook:
+32.85%    0.02%  1       facebook::jni::detail::CallWithJniConversions<void (*)(facebook::jni::alias_ref<facebook::jni::detail::JTypeFor<facebook::jni::HybridClass<worklets::AnimationFrameCallback, fa
+32.34%    0.04%  2       facebook::jni::detail::MethodWrapper<void (worklets::AnimationFrameCallback::*)(double), &(worklets::AnimationFrameCallback::onAnimationFrame(double)), worklets::AnimationFram
+29.83%    0.00%  0       worklets::AnimationFrameCallback::onAnimationFrame(double)
+29.38%    0.68%  34      art_jni_trampoline
+28.82%    0.01%  1       facebook::jsi::Value worklets::WorkletRuntime::runSync<double&>(facebook::jsi::Function const&, double&) const
+28.64%    0.00%  0       facebook::jsi::Value worklets::WorkletRuntime::callGuarded<double&>(facebook::jsi::Function const&, std::__ndk1::optional<std::__ndk1::basic_string<char, std::__ndk1::char_tra
+28.62%    0.02%  1       facebook::jsi::Value facebook::jsi::Function::call<double&>(facebook::jsi::IRuntime&, double&) const
+28.53%    0.00%  0       facebook::jsi::Function::call(facebook::jsi::IRuntime&, std::initializer_list<facebook::jsi::Value>) const
+28.51%    0.06%  3       facebook::jsi::Function::call(facebook::jsi::IRuntime&, facebook::jsi::Value const*, unsigned long) const
+28.42%    0.04%  2       facebook::jsi::WithRuntimeDecorator<worklets::AroundLock, facebook::jsi::Runtime, facebook::jsi::Runtime>::call(facebook::jsi::Function const&, facebook::jsi::Value const&, fa
+28.15%    0.28%  8       facebook::jsi::RuntimeDecorator<facebook::jsi::Runtime, facebook::jsi::Runtime>::call(facebook::jsi::Function const&, facebook::jsi::Value const&, facebook::jsi::Value const*,
+28.15%    0.07%  3       facebook::jsi::WithRuntimeDecorator<worklets::WorkletsReentrancyCheck, facebook::jsi::Runtime, facebook::jsi::Runtime>::call(facebook::jsi::Function const&, facebook::jsi::Val
+21.30%    0.26%  13      com.facebook.react.fabric.FabricUIManager$DispatchUIFrameCallback.doFrameGuarded
+19.66%    0.04%  2       android.os.MessageQueue.next
+19.63%    0.22%  12      android.os.MessageQueue.nextLegacy
+18.41%    0.01%  1       android::android_os_MessageQueue_nativePollOnce(_JNIEnv*, _jobject*, long, int) (.__uniq.190462215528616872930035678816392364378)
+18.40%    0.42%  26      android::Looper::pollOnce(int, int*, int*, void**)
+16.28%    0.02%  1       facebook::jsi::DecoratedHostFunction::operator()(facebook::jsi::Runtime&, facebook::jsi::Value const&, facebook::jsi::Value const*, unsigned long)
+16.28%    0.00%  0       facebook::jsi::Value std::__ndk1::__invoke_void_return_wrapper<facebook::jsi::Value, false>::__call[abi:ne180000]<facebook::jsi::DecoratedHostFunction&, facebook::jsi::Runtime
+16.11%    0.02%  1       std::__ndk1::function<facebook::jsi::Value (facebook::jsi::Runtime&, facebook::jsi::Value const&, facebook::jsi::Value const*, unsigned long)> worklets::jsi_utils::createHostF
+16.11%    0.00%  0       facebook::jsi::Value std::__ndk1::__invoke_void_return_wrapper<facebook::jsi::Value, false>::__call[abi:ne180000]<std::__ndk1::function<facebook::jsi::Value (facebook::jsi::Ru
+15.27%    0.00%  0       facebook::jsi::Value worklets::jsi_utils::apply<facebook::jsi::Runtime&, facebook::jsi::Value const&>(std::__ndk1::function<void (facebook::jsi::Runtime&, facebook::jsi::Value
+14.04%    0.21%  6       android::DisplayEventDispatcher::handleEvent(int, int, void*)
+13.99%    0.02%  1       worklets::AnimationFrameBatchinator::addToBatch(facebook::jsi::Function&&)
+12.59%    0.00%  0       worklets::AnimationFrameBatchinator::flush()
+12.14%    0.19%  10      com.facebook.react.modules.core.ReactChoreographer.postFrameCallback
+12.09%    0.11%  6       android::NativeDisplayEventReceiver::dispatchVsync(long, android::PhysicalDisplayId, unsigned int, android::gui::VsyncEventData)
+11.20%    0.21%  11      art::(anonymous namespace)::CheckJNI::CallMethodV(char const*, _JNIEnv*, _jobject*, _jclass*, _jmethodID*, std::__va_list, art::Primitive::Type, art::InvokeType) (.__uniq.9903
+11.11%    0.10%  4       com.facebook.react.fabric.FabricUIManager$DispatchUIFrameCallback.schedule
+10.59%    0.00%  0       com.facebook.react.modules.core.ReactChoreographer.postFrameCallbackOnChoreographer
+10.02%    0.01%  1       com.facebook.react.internal.AndroidChoreographerProvider$AndroidChoreographer.postFrameCallback
+9.98%     0.03%  1       android.view.Choreographer.postFrameCallback
+9.96%     0.10%  5       android.view.Choreographer.postFrameCallbackDelayed
+9.86%     0.06%  3       android.view.Choreographer.postCallbackDelayedInternal
+9.56%     0.24%  14      art::JValue art::InvokeVirtualOrInterfaceWithVarArgs<_jmethodID*>(art::ScopedObjectAccessAlreadyRunnable const&, _jobject*, _jmethodID*, std::__va_list)
+9.51%     0.01%  1       android.view.Choreographer.scheduleFrameLocked
+9.01%     0.02%  1       facebook::jni::basic_strong_ref<facebook::jni::HybridClass<worklets::AnimationFrameCallback, facebook::jni::detail::BaseHybridClass>::JavaPart, facebook::jni::LocalReferenceAl
+8.88%     0.00%  0       android.view.Choreographer.scheduleVsyncLocked
+8.47%     0.01%  1       android.view.DisplayEventReceiver.scheduleVsync
+8.45%     0.00%  0       art::(anonymous namespace)::CheckJNI::CallVoidMethodV(_JNIEnv*, _jobject*, _jmethodID*, std::__va_list) (.__uniq.99033978352804627313491551960229047428.llvm.276705587195099995
+8.39%     0.02%  1       android::nativeScheduleVsync(_JNIEnv*, _jclass*, long) (.__uniq.90440561212854663225003719316179048247)
+8.31%     0.05%  3       android::DisplayEventDispatcher::scheduleVsync()
+7.89%     0.08%  4       art::JNI<true>::CallVoidMethodV(_JNIEnv*, _jobject*, _jmethodID*, std::__va_list)
+7.86%     0.06%  3       _JNIEnv::CallVoidMethod(_jobject*, _jmethodID*, ...)
+7.41%     0.10%  5       android::gui::BpDisplayEventConnection::requestNextVsync()
+6.65%     0.27%  13      com.facebook.react.uimanager.events.FabricEventDispatcher$ScheduleDispatchFrameCallback.doFrame
+6.42%     0.08%  4       android::BpBinder::transact(unsigned int, android::Parcel const&, android::Parcel*, unsigned int)
+6.33%     0.24%  11      android::IPCThreadState::transact(int, unsigned int, android::Parcel const&, android::Parcel*, unsigned int)
+6.03%     0.04%  2       ioctl
+5.99%     5.99%  308     __ioctl
+5.41%     0.02%  1       facebook::jni::HybridClass<worklets::AnimationFrameCallback, facebook::jni::detail::BaseHybridClass>::makeHybridData(std::__ndk1::unique_ptr<worklets::AnimationFrameCallback, 
+5.26%     0.06%  4       facebook::jni::getHybridDataFromField(facebook::jni::JObject const*, facebook::jni::JField<facebook::jni::detail::JTypeFor<facebook::jni::detail::HybridData, facebook::jni::JO
+4.65%     2.58%  130     art::(anonymous namespace)::ScopedCheck::Check(art::ScopedObjectAccess&, bool, char const*, art::(anonymous namespace)::JniValueType*) (.__uniq.9903397835280462731349155196022
+4.55%     0.02%  1       android.view.DisplayEventReceiver.dispatchVsync
+4.52%     0.16%  8       android.view.Choreographer$FrameDisplayEventReceiver.onVsync
+4.32%     4.32%  221     @plt
+3.66%     0.20%  11      art::(anonymous namespace)::CheckJNI::GetField(char const*, _JNIEnv*, _jobject*, _jfieldID*, bool, art::Primitive::Type) (.__uniq.99033978352804627313491551960229047428)
+3.61%     0.10%  6       facebook::jni::detail::MethodWrapper<void (facebook::react::FabricUIManagerBinding::*)(), &(facebook::react::FabricUIManagerBinding::drainPreallocateViewsQueue()), facebook::r
+3.55%     1.69%  87      art::(anonymous namespace)::ScopedCheck::CheckFieldAccess(art::ScopedObjectAccess&, _jobject*, _jfieldID*, bool, art::Primitive::Type) (.__uniq.9903397835280462731349155196022
+3.48%     0.05%  2       facebook::jni::detail::FunctionWrapper<void (*)(facebook::jni::alias_ref<facebook::jni::detail::JTypeFor<facebook::jni::HybridClass<facebook::react::FabricUIManagerBinding, fa
+3.28%     0.00%  0       facebook::jni::detail::CallWithJniConversions<void (*)(facebook::jni::alias_ref<facebook::jni::detail::JTypeFor<facebook::jni::HybridClass<facebook::react::FabricUIManagerBind
+3.06%     0.06%  3       _JNIEnv::NewObject(_jclass*, _jmethodID*, ...)
+3.00%     0.14%  5       art::(anonymous namespace)::CheckJNI::NewObjectV(_JNIEnv*, _jclass*, _jmethodID*, std::__va_list) (.__uniq.99033978352804627313491551960229047428.llvm.2767055871950999953)
+2.98%     0.06%  3       android.os.Handler.sendMessageAtTime
+2.97%     0.62%  27      art::JniDecodeReferenceResult(_jobject*, art::Thread*)
+2.92%     0.03%  2       android.os.Handler.enqueueMessage
+2.88%     0.30%  15      art::(anonymous namespace)::CheckJNI::SetField(char const*, _JNIEnv*, _jobject*, _jfieldID*, bool, art::Primitive::Type, art::(anonymous namespace)::JniValueType) (.__uniq.990
+2.78%     0.00%  0       facebook::jni::detail::BaseHybridClass* facebook::jni::detail::getNativePointer<facebook::jni::JObject>(facebook::jni::JObject const*)
+2.75%     0.00%  0       facebook::jni::basic_strong_ref<facebook::jni::detail::HybridData, facebook::jni::LocalReferenceAllocator> facebook::jni::JavaClass<facebook::jni::detail::HybridData, facebook
+2.74%     0.26%  13      java.lang.ThreadLocal.get
+2.74%     0.11%  5       com.facebook.react.fabric.mounting.MountItemDispatcher.tryDispatchMountItems
+2.64%     0.06%  3       art::(anonymous namespace)::CheckJNI::CallObjectMethodV(_JNIEnv*, _jobject*, _jmethodID*, std::__va_list) (.__uniq.99033978352804627313491551960229047428.llvm.2767055871950999
+2.64%     0.00%  0       _JNIEnv::CallObjectMethod(_jobject*, _jmethodID*, ...)
+2.62%     1.78%  91      void art::StackVisitor::WalkStack<(art::StackVisitor::CountTransitions)0, false>(bool)
+2.58%     0.00%  0       facebook::jni::detail::MethodWrapper<void (facebook::react::FabricUIManagerBinding::*)(), &(facebook::react::FabricUIManagerBinding::drainPreallocateViewsQueue()), facebook::r
+2.54%     0.00%  0       com.facebook.react.fabric.events.EventBeatManager.onBatchEventDispatched
+2.47%     0.04%  2       facebook::jni::HybridClass<worklets::AnimationFrameCallback, facebook::jni::detail::BaseHybridClass>::JavaPart::cthis() const
+2.37%     0.12%  6       facebook::jni::detail::MethodWrapper<void (facebook::react::EventBeatManager::*)(), &(facebook::react::EventBeatManager::tick()), facebook::react::EventBeatManager, void>::cal
+2.37%     0.15%  8       facebook::jni::isObjectRefType(_jobject*, jobjectRefType)
+2.34%     0.38%  16      com.facebook.react.modules.core.JavaTimerManager$TimerFrameCallback.doFrame
+2.20%     0.02%  1       art::JNI<true>::NewObjectV(_JNIEnv*, _jclass*, _jmethodID*, std::__va_list)
+2.20%     0.00%  0       facebook::jni::detail::FunctionWrapper<void (*)(facebook::jni::alias_ref<facebook::jni::detail::JTypeFor<facebook::jni::HybridClass<facebook::react::EventBeatManager, facebook
+2.15%     0.00%  0       facebook::jni::JMethod<void (facebook::jni::detail::JTypeFor<facebook::jni::HybridClass<worklets::AnimationFrameCallback, facebook::jni::detail::BaseHybridClass>::JavaPart, fa
+2.14%     0.00%  0       facebook::jni::detail::CallWithJniConversions<void (*)(facebook::jni::alias_ref<facebook::jni::detail::JTypeFor<facebook::jni::HybridClass<facebook::react::EventBeatManager, f
+2.05%     0.02%  1       art::JNI<true>::CallNonvirtualVoidMethodV(_JNIEnv*, _jobject*, _jclass*, _jmethodID*, std::__va_list)
+2.02%     0.00%  0       facebook::jni::basic_strong_ref<facebook::jni::HybridClass<worklets::AnimationFrameCallback, facebook::jni::detail::BaseHybridClass>::JavaPart, facebook::jni::LocalReferenceAl
