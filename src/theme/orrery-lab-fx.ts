@@ -145,7 +145,7 @@ const LIGHT_ENV: LabEnvProfile = {
   glow: 0,
   ember: 0.08,
   dust: 0.05,
-  vignette: 0.18,
+  vignette: 0.13,
   vignetteTone: "textSecondary",
   vignetteShade: 0,
   starTone: "textSecondary",

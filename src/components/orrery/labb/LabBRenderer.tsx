@@ -205,9 +205,12 @@ export function LabBRenderer(contract: LabRenderContract) {
   const fxFlags = useSharedValue<LabFxSnapshot>(
     labFxSnapshot({ renderer, flags, intensity }),
   );
+  // Applied DURING render (an idempotent module flag), not in the effect:
+  // children call `getLabEffect` while rendering, so setting it after commit
+  // left the first post-toggle render on the stale value (found in WP-1.1).
+  setLabEffectForceFallback(flags.forceFallback);
   useEffect(() => {
     fxFlags.value = labFxSnapshot({ renderer, flags, intensity });
-    setLabEffectForceFallback(flags.forceFallback);
   }, [fxFlags, renderer, flags, intensity]);
   const frameIndex = useDerivedValue(() => indexFrame(frame.value));
   const profile = useMemo(
