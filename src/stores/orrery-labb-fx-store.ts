@@ -34,13 +34,58 @@ export const LAB_FLAG_REGISTRY = [
   // L0..L7 layer slots of the lab renderer (research 03 §1.3 / §2.2).
   {
     id: "environment",
-    label: "L0 Environment (fill + stars)",
+    label: "L0 Environment (sky, nebula, stars)",
     section: "layers",
     default: true,
     heavy: true,
-    note: "WP-1.1 fills",
   },
-  { id: "twinkle", label: "L0 Star twinkle", section: "layers", default: true },
+  // L0 environment effects (WP-1.1).
+  {
+    id: "nebula",
+    label: "L0 Nebula (baked fbm, warp-sampled)",
+    section: "effects",
+    default: true,
+    heavy: true,
+  },
+  {
+    id: "nebulaLive",
+    label: "L0 Nebula LIVE full-res fbm (A/B cost)",
+    section: "effects",
+    default: false,
+    heavy: true,
+    note: "replaces the baked sample while on",
+  },
+  {
+    id: "nebulaDrift",
+    label: "L0 Nebula drift + breathing",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "vignette",
+    label: "L0 Vignette",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "stars",
+    label: "L0 Starfield (3-depth Atlas)",
+    section: "effects",
+    default: true,
+    heavy: true,
+  },
+  {
+    id: "twinkle",
+    label: "L0 Star twinkle",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "parallax",
+    label: "L0 Sky parallax (frame.value.pose)",
+    section: "effects",
+    default: true,
+  },
   {
     id: "rings",
     label: "L1 Orbit rings",

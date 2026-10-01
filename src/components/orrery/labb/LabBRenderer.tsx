@@ -10,7 +10,7 @@
  * LAYER SLOTS (fixed back-to-front order; research 03 §1.3). Each slot is one
  * component; later work packages replace the slot's body, not this order:
  *
- *   L0  environment   <LabEnvironment>     WP-1.1 nebula + Atlas starfield
+ *   L0  environment   <LabEnvironment>     baked nebula + 3-depth Atlas starfield (WP-1.1)
  *   L1  rings         <LabRings>           WP-1.3 depth fade / flow / wake / tethers
  *   L5  polaris       <Polaris> (legacy)   WP-1.2 sprite + compass tick
  *   --  reorder ghost  (slot from OrreryWorld; accent contract row stays there)
@@ -235,6 +235,8 @@ export function LabBRenderer(contract: LabRenderContract) {
           colors={colors}
           background={labColor(colors, profile.roles.sky)}
           frame={frame}
+          profile={profile}
+          flags={flags}
         />
       ) : null}
       <Group

@@ -102,6 +102,14 @@ vi.mock("@shopify/react-native-skia", async () => {
     Text: "text",
     Line: "line",
     Shader: "shader",
+    ImageShader: "imageShader",
+    Atlas: "atlas",
+    Rect: "rect",
+    RadialGradient: "radialGradient",
+    LinearGradient: "linearGradient",
+    useTexture: () => ({ value: null }),
+    useRSXformBuffer: () => ({ value: [] }),
+    useColorBuffer: () => ({ value: [] }),
     vec: (x: number, y: number) => ({ x, y }),
     matchFont: () => ({ measureText: () => ({ width: 10 }) }),
     TextAlign: { Center: 2 },
@@ -230,7 +238,13 @@ describe("Lab B renderer tree contract", () => {
     const pose = { value: { ...HOME_CAMERA, tilt: 0.5 } };
     const { tree } = await renderLab(pose);
     const [environment, world] = tree;
+    // L0: sky/nebula fill (the baked sample falls back to a token Fill until
+    // the bake texture exists) + far and mid/near star Atlases.
     expect(environment.children[0].type).toBe("fill");
+    expect(environment.children[1].children.map((c) => c.type)).toEqual([
+      "atlas",
+      "atlas",
+    ]);
     const [rings, polaris, ghost, bodies, labels, fx] = world.children;
     expect(rings.children[0].children.length).toBe(1);
     expect(rings.children[0].children.every((c) => c.type === "path")).toBe(
