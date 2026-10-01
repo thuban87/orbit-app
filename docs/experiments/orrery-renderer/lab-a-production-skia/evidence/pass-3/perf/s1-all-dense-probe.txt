@@ -1,0 +1,5 @@
+10-01 07:20:28.293 I/ReactNativeJS( 2088): [probe] 28293 #5 store ready->loading gen 4
+10-01 07:20:28.548 I/ReactNativeJS( 2088): [probe] 28548 #6 store loading->ready gen 4
+10-01 07:20:28.551 I/ReactNativeJS( 2088): [probe] 28551 #7 publish gen 4 isSwitch true
+10-01 07:20:39.743 I/ReactNativeJS( 2088): [probe] first switch frame at 28785
+10-01 07:20:39.751 I/ReactNativeJS( 2088): [probe] switch done: wall 2046ms frames 14 work p50 6ms max 7ms

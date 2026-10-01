@@ -1,0 +1,4 @@
+s1-all-dense: tap->publish 258ms | publish->first switch frame 234ms | switch 2046ms, 14 frame-worklet runs (work p50 6 max 7ms) | tap->settled 2538ms | maxDavey 0ms, max skipped 0
+s2-dense-all: tap->publish 240ms | publish->first switch frame 132ms | switch 2048ms, 20 frame-worklet runs (work p50 5 max 7ms) | tap->settled 2420ms | maxDavey 0ms, max skipped 0
+s3-all-dense: tap->publish 190ms | publish->first switch frame 191ms | switch 1982ms, 13 frame-worklet runs (work p50 5 max 7ms) | tap->settled 2363ms | maxDavey 0ms, max skipped 0
+s4-dense-all: tap->publish 201ms | publish->first switch frame 154ms | switch 2067ms, 19 frame-worklet runs (work p50 7 max 8ms) | tap->settled 2422ms | maxDavey 0ms, max skipped 0
