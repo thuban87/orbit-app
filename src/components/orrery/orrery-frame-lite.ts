@@ -72,12 +72,21 @@ export function projectAnimatedFrameLite(
     const dy = body.y - current.y;
     const px = dx * c - dy * s;
     const py = dx * s + dy * c;
-    const scale = zoom * perspectiveScale(body, current);
+    // Checkpoint D.2: optional height above the plane (moons on a tilted local
+    // orbit). Same pinhole as orrery-camera-rig with h ≠ 0:
+    //   x = F·px / (f − py·sinT − h·cosT),  y = F·(py·cosT − h·sinT) / (…)
+    // h = 0 reduces exactly to the planar projection below.
+    const h = (body as { lift?: number }).lift ?? 0;
+    const scale =
+      h === 0
+        ? zoom * perspectiveScale(body, current)
+        : (zoom * focal) /
+          Math.max(focal - py * sinT - h * cosT, focal * 0.02);
     // Lab C true-3D: bodies at/behind the near plane are culled (not tappable).
     const inFront =
-      focal - py * sinT > focal * NEAR_CULL_FRACTION + body.radius;
+      focal - py * sinT - h * cosT > focal * NEAR_CULL_FRACTION + body.radius;
     const x = cx + px * scale;
-    const y = cy + py * cosT * scale;
+    const y = cy + (py * cosT - h * sinT) * scale;
     const radius = body.radius * scale;
     const reach = radius * (body.kind === "sun" ? 2 : 1.3);
     const opacity = inFront ? body.opacity : 0;

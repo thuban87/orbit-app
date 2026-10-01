@@ -41,6 +41,7 @@ import {
   type SharedValue,
   useAnimatedReaction,
   useDerivedValue,
+  useFrameCallback,
   useSharedValue,
 } from "react-native-reanimated";
 import { Canvas, type CanvasRef } from "react-native-webgpu";
@@ -148,6 +149,18 @@ const MIN_SUN_PX = 34;
  * stop being tappable, so far bodies never pile up under the header controls.
  */
 const TOP_INSET_FADE_PX = 28;
+/**
+ * Checkpoint D.2 — moons ride a TILTED local orbit around their parent
+ * (inclination vs the orbital plane), so they read as 3D satellites; the
+ * focused parent's moons revolve slowly (frozen under Reduced Motion). The
+ * height feeds the UI-thread projection too (frame-lite `lift`): drawn ==
+ * tappable while they move.
+ */
+const MOON_INCLINATION = 0.5;
+/** Revolution speed of the focused parent's moons (rad/ms ≈ one turn / 21 s). */
+const MOON_SPEED = 0.0003;
+/** Moons read as bodies next to a hero-scaled parent (world radius ×, hits follow). */
+const MOON_HERO_SCALE = 1.7;
 /** Approximate OrreryFocusContext footprint (width 280; ~2 buttons + title). */
 const FOCUS_CARD_WIDTH = 290;
 const FOCUS_CARD_HEIGHT = 230;
@@ -369,6 +382,12 @@ export function OrreryWorld3D({
   const sceneGeneration = scene.generation;
   const sceneMembers = scene.systemSnapshot.members;
   const sceneExtent = scene.extent;
+  // Moon clock: runs only while a single focused parent has moons on screen.
+  const moonClock = useSharedValue(0);
+  const orbitParent = useSharedValue<number | null>(null);
+  const moonFrame = useFrameCallback((info) => {
+    moonClock.value += info.timeSincePreviousFrame ?? 0;
+  }, false);
   const sample = useDerivedValue(() => {
     const sampled = sampleSwitchChoreography(
       transition.value,
@@ -418,7 +437,34 @@ export function OrreryWorld3D({
       true,
       level.value,
     );
-    const all = [...world, ...moons];
+    const all: (typeof world[number] & { lift?: number })[] = [...world];
+    for (let i = 0; i < moons.length; i++) {
+      const m = moons[i];
+      const parentId = m.satelliteTarget?.parentId;
+      let parent: (typeof world)[number] | undefined;
+      for (let j = 0; j < world.length; j++)
+        if (world[j].kind !== "satellite" && world[j].id === parentId) {
+          parent = world[j];
+          break;
+        }
+      if (!parent) {
+        all.push(m);
+        continue;
+      }
+      const dx = m.x - parent.x;
+      const dy = m.y - parent.y;
+      const off = Math.hypot(dx, dy);
+      const a =
+        Math.atan2(dy, dx) +
+        (parentId === orbitParent.value ? moonClock.value * MOON_SPEED : 0);
+      all.push({
+        ...m,
+        radius: m.radius * MOON_HERO_SCALE,
+        x: parent.x + Math.cos(a) * off,
+        y: parent.y + Math.sin(a) * off * Math.cos(MOON_INCLINATION),
+        lift: Math.sin(a) * off * Math.sin(MOON_INCLINATION),
+      });
+    }
     // Minimum on-screen size: inflate the WORLD radius of bodies that would
     // project smaller than MIN_*_PX at their depth (sun excluded).
     for (let i = 0; i < all.length; i++) {
@@ -674,7 +720,7 @@ export function OrreryWorld3D({
           b.ringRadius,
           f.bodies[i]?.opacity ?? 0,
           b.kind === "sun" ? 1 : b.kind === "satellite" ? 2 : 0,
-          depth[i * 2] ?? 0,
+          (depth[i * 2] ?? 0) + ((b as { lift?: number }).lift ?? 0),
           depth[i * 2 + 1] ?? 0,
         );
       }
@@ -822,6 +868,16 @@ export function OrreryWorld3D({
   const reducedMotion = useReducedMotion();
   const reducedRef = useRef(reducedMotion);
   reducedRef.current = reducedMotion;
+  const orbitingId =
+    focusedIds.length === 1 &&
+    satellites.some((row) => row.parentId === focusedIds[0])
+      ? focusedIds[0]
+      : null;
+  useEffect(() => {
+    orbitParent.value = orbitingId;
+    moonFrame.setActive(orbitingId !== null && !reducedMotion);
+    return () => moonFrame.setActive(false);
+  }, [orbitingId, reducedMotion, orbitParent, moonFrame]);
 
   // --- GPU lifecycle + render loop (owned here; stops on unmount) ---------------
   // 1. Acquire this mount's device BEFORE the <Canvas> exists (see orrery-gpu).

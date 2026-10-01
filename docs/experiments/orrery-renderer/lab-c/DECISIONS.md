@@ -234,3 +234,23 @@ session; close-range targets were not met under that condition.
   layout rule; spreading neutrals would be an owner call). Visible in 2.5D too, but foreshortening stacks it.
 - Not done: name labels at the dense near view (label tier is still magnification-based, so dense views show
   initials only until ≥ identity tier).
+
+## 2026-10-01 — Checkpoint D.2: satellites as 3D moons
+
+- Before: moons were planar spheres at a fixed hash angle around the parent (no height, no motion) and tiny
+  (`min(MOON_RADIUS, 0.2·parent)` next to a 1.9× hero parent) — `05-satellite-focused-parent-moon-before-scale.png`.
+- Now (`OrreryWorld3D` sample): each moon rides a **tilted local orbit** (inclination 0.5 rad: x = cos a·r,
+  y = sin a·r·cos i, height = sin a·r·sin i). The **focused parent's moons revolve** (≈ one turn / 21 s) on a
+  Reanimated `useFrameCallback` that is active only while exactly one focused contact has moons and Reduced
+  Motion is off; other moons sit still at their hash angle. Moon world radius ×1.7 (`MOON_HERO_SCALE`), min 10 px.
+- **Drawn == tappable kept:** `projectAnimatedFrameLite` now projects an optional `lift` with the same pinhole
+  as the three camera (h = 0 is exactly the old path); parity test added in `orrery-camera-rig.test.ts`
+  (12 lifted cases). The packet carries the lift so the renderer draws the moon at the same 3D point.
+- Labels: unchanged production rule — moons have no on-canvas label; the relationship ("Cy · Parent of …")
+  appears in the focus card rows (`06-satellite-moon-tilted-orbit-focused.png`).
+- **Not verified on device:** tapping a moon (`resolveSatelliteTap`) — the moon is a moving 10–20 px target that
+  spends much of its orbit behind the parent/focus card, and adb tap timing could not be made reliable in the
+  time box. The hit path consumes the same published frame as the drawing (unit-tested parity). No focus ring
+  is drawn on a focused moon yet (the 3D focus ring pool keys by contact id only).
+- Seen while testing: at Dense, focus framing (`IDENTITY_ZOOM` cap) dollies very close — the focused body is
+  ~170 px and its lower half sits under the focus card. Pre-existing focus framing, not changed here.

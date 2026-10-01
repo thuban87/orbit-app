@@ -6,6 +6,7 @@ import {
   clampCameraPose,
   projectWorldPoint,
 } from "@/logic/orrery-camera-logic";
+import { projectAnimatedFrameLite } from "../orrery-frame-lite";
 import { orreryCameraRig } from "./orrery-camera-rig";
 
 /** Project an orrery world point with a three camera built from the rig. */
@@ -13,6 +14,7 @@ function threeProject(
   point: { x: number; y: number },
   pose: CameraPose,
   viewport: CameraViewport,
+  height = 0,
 ) {
   const rig = orreryCameraRig(pose, viewport);
   const camera = new PerspectiveCamera(
@@ -25,7 +27,7 @@ function threeProject(
   camera.matrixAutoUpdate = false;
   camera.matrix.copy(new Matrix4().fromArray(rig.world));
   camera.updateMatrixWorld(true);
-  const ndc = new Vector3(point.x, 0, point.y).project(camera);
+  const ndc = new Vector3(point.x, height, point.y).project(camera);
   return {
     x: ((ndc.x + 1) / 2) * viewport.width,
     y: ((1 - ndc.y) / 2) * viewport.height,
@@ -63,4 +65,33 @@ describe("orrery camera rig matches the pinhole projection (drawn == published)"
           expect(actual.x).toBeCloseTo(expected.x, 3);
           expect(actual.y).toBeCloseTo(expected.y, 3);
         });
+});
+
+describe("lifted bodies (moons on a tilted orbit): frame-lite == three camera", () => {
+  const viewport: CameraViewport = { width: 412, height: 780 };
+  const poses: CameraPose[] = [
+    { x: 0, y: 0, zoom: 1, tilt: 1.08, yaw: 0 },
+    { x: 40, y: -25, zoom: 2.3, tilt: 0.6, yaw: 1.1 },
+    { x: -120, y: 80, zoom: 0.4, tilt: 0.85, yaw: 4.2 },
+  ];
+  for (const raw of poses)
+    for (const lift of [-18, 0, 12, 30])
+      it(`pose ${JSON.stringify(raw)} lift ${lift}`, () => {
+        const pose = clampCameraPose(raw, 400);
+        const body = {
+          id: -1,
+          kind: "satellite" as const,
+          x: 70,
+          y: -45,
+          radius: 4,
+          ringRadius: 0,
+          opacity: 1,
+          interactive: true,
+          lift,
+        };
+        const frame = projectAnimatedFrameLite([body], pose, viewport, 1);
+        const actual = threeProject(body, frame.pose, viewport, lift);
+        expect(frame.bodies[0].x).toBeCloseTo(actual.x, 3);
+        expect(frame.bodies[0].y).toBeCloseTo(actual.y, 3);
+      });
 });
