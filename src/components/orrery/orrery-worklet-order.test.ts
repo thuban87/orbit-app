@@ -214,7 +214,11 @@ describe("same-file worklet forward references (Hermes hazard)", () => {
     const components = readdirSync("src/components/orrery")
       .filter((name) => /\.tsx?$/.test(name) && !name.includes(".test."))
       .map((name) => join("src/components/orrery", name));
-    const others = [...logic, ...components].filter(
+    // ORRERY LAB A: the deep-field renderer's worklet helpers live in lab/.
+    const lab = readdirSync("src/components/orrery/lab")
+      .filter((name) => /\.tsx?$/.test(name) && !name.includes(".test."))
+      .map((name) => join("src/components/orrery/lab", name));
+    const others = [...logic, ...components, ...lab].filter(
       (path) => !TARGETS.includes(path),
     );
     expect(others.length).toBeGreaterThan(0);

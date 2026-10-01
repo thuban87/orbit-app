@@ -50,6 +50,14 @@ export interface OrreryCanvasProps {
   gesture: ComposedGesture | GestureType;
   /** The pre-built Skia subtree: rings, `<OrbitBody/>` planets, `<SunBody/>`. */
   children: ReactNode;
+  /**
+   * ORRERY LAB A: the deep-field environment (nebula, parallax stars,
+   * vignette). Rendered inside the clock Provider, below `children`; when
+   * present it REPLACES the legacy screen-space starfield.
+   */
+  backdrop?: ReactNode;
+  /** ORRERY LAB A: screen-space HUD drawn above everything (DEV marker). */
+  overlay?: ReactNode;
 }
 
 /** How many ambient star dots to scatter (subtle — device-UAT tunable, 13-08). */
@@ -96,6 +104,8 @@ export function OrreryCanvas({
   starColors,
   gesture,
   children,
+  backdrop,
+  overlay,
 }: OrreryCanvasProps) {
   // M5: the ONE ambient clock (inside this unmountable subtree).
   const clock = useClock();
@@ -104,11 +114,14 @@ export function OrreryCanvas({
   // the Skia loop gates on it inside `useDerivedValue` — never a React boolean, no
   // per-frame setState (D-07). A live toggle updates without an app restart.
   const reducedMotion = useReducedMotionShared();
+  // Plain boolean (never capture the ReactNode itself into a worklet).
+  const legacyStars = !backdrop;
 
   // The subtle starfield twinkle — a SINGLE Group-opacity oscillation (cheap; one
   // worklet for the whole field). Per-star `base` opacity keeps the field varied.
   // Under reduced motion it collapses to a constant (holds, no oscillation).
   const twinkle = useDerivedValue(() => {
+    if (!legacyStars) return 0;
     if (reducedMotion.value) {
       return TWINKLE_STATIC;
     }
@@ -118,7 +131,7 @@ export function OrreryCanvas({
 
   // Deterministic star placement — stable for the measured canvas + palette.
   const stars = useMemo<Star[]>(() => {
-    if (width <= 0 || height <= 0 || starColors.length === 0) {
+    if (!legacyStars || width <= 0 || height <= 0 || starColors.length === 0) {
       return [];
     }
     const out: Star[] = [];
@@ -136,7 +149,7 @@ export function OrreryCanvas({
       });
     }
     return out;
-  }, [width, height, starColors]);
+  }, [legacyStars, width, height, starColors]);
 
   return (
     <GestureDetector gesture={gesture}>
@@ -158,7 +171,9 @@ export function OrreryCanvas({
         </Group>
         {/* Layers 3-5: rings, planets, sun — SunBody reads the clock via context. */}
         <OrreryClockContext.Provider value={clock}>
+          {backdrop ?? null}
           {children}
+          {overlay ?? null}
         </OrreryClockContext.Provider>
       </Canvas>
     </GestureDetector>
