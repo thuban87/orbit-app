@@ -1,0 +1,10 @@
+1790860177.369745324 Time limit set to 12 seconds
+1790860177.378939416 Display is 1440x3120 @60.00fps (orientation=ROTATION_0), layerStack=0
+1790860177.388333011 Configuring recorder for 720x1560 video/avc at 12.00Mbps
+1790860177.424270023 Content area is 720x1560 at offset x=0 y=0
+1790860189.527571746 Time limit reached
+1790860189.542238656 Encoder stopping; recorded 127 frames in 12 seconds
+1790860189.557987843 Stopping encoder and muxer
+1790860189.568989226 Executing: /system/bin/am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/m.mp4
+1790860189.579543507 Broadcasting: Intent { act=android.intent.action.MEDIA_SCANNER_SCAN_FILE dat=file:///... flg=0x400000 }
+1790860189.601368661 Broadcast completed: result=0

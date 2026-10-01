@@ -1,0 +1,2 @@
+         1790861799.862 31556 31556 I Choreographer: Skipped 678 frames!  The application may be doing too much work on its main thread.
+         1790861799.912 30916 30916 I Choreographer: Skipped 676 frames!  The application may be doing too much work on its main thread.
