@@ -507,6 +507,63 @@ export function tryUnprojectToWorldPlane(
   const result = unprojectToWorldPlane(point, pose, viewport);
   return Number.isFinite(result.x) && Number.isFinite(result.y) ? result : null;
 }
+/**
+ * Per-frame projection constants (perf pass). `projectWorldPoint` re-derives
+ * the usable rect (obstacle subdivision + sort) and the pose trig for EVERY
+ * point; a frame projects ~128 ring points per body, so that was N×128 rect
+ * derivations per frame (≈390 ms per frame worklet on the Pixel, debug native).
+ * These hoist exactly the values projectWorldPoint computes, so
+ * `projectWithBasis` is arithmetically identical (same operations, same order)
+ * — pinned by orrery-camera-logic.test "projectFrame matches projectWorldPoint".
+ */
+interface ProjectionBasis {
+  pose: CameraPose;
+  center: WorldPoint;
+  cos: number;
+  sin: number;
+  focal: number;
+  sinTilt: number;
+  cosTilt: number;
+}
+function projectionBasis(
+  pose: CameraPose,
+  viewport: CameraViewport,
+): ProjectionBasis {
+  "worklet";
+  assertProjection({ x: 0, y: 0 }, pose, viewport);
+  const yaw = pose.yaw ?? 0;
+  return {
+    pose,
+    center: projectionCenter(viewport),
+    cos: Math.cos(yaw),
+    sin: Math.sin(yaw),
+    focal: pose.focalDistance ?? MIN_FOCAL_DISTANCE,
+    sinTilt: Math.sin(pose.tilt ?? 0),
+    cosTilt: Math.cos(pose.tilt ?? 0),
+  };
+}
+function projectWithBasis(
+  px: number,
+  py: number,
+  basis: ProjectionBasis,
+): WorldPoint {
+  "worklet";
+  if (!Number.isFinite(px) || !Number.isFinite(py))
+    throw new Error("Invalid Orrery projection input");
+  const pose = basis.pose;
+  const x = px - pose.x,
+    y = py - pose.y;
+  const planeX = x * basis.cos - y * basis.sin,
+    planeY = x * basis.sin + y * basis.cos;
+  const denominator = basis.focal - planeY * basis.sinTilt;
+  if (!Number.isFinite(denominator) || denominator <= 0)
+    throw new Error("Point outside finite Orrery camera plane");
+  const scale = (basis.focal / denominator) * pose.zoom;
+  return {
+    x: basis.center.x + planeX * scale,
+    y: basis.center.y + planeY * basis.cosTilt * scale,
+  };
+}
 export function projectFrame(
   world: readonly WorldBody[],
   pose: CameraPose,
@@ -522,11 +579,12 @@ export function projectFrame(
         ((1 + Math.SQRT2) * Math.sin(MAX_TILT)),
     ),
   );
+  const basis = projectionBasis(current, viewport);
   return {
     generation,
     pose: current,
     viewport,
-    center: projectWorldPoint({ x: 0, y: 0 }, current, viewport),
+    center: projectWithBasis(0, 0, basis),
     bodies: world.map((body) => {
       const scale = current.zoom * perspectiveScale(body, current);
       const ringPath: WorldPoint[] = [];
@@ -534,19 +592,16 @@ export function projectFrame(
         for (let i = 0; i < RING_SEGMENTS; i++) {
           const angle = (i * 2 * Math.PI) / RING_SEGMENTS;
           ringPath.push(
-            projectWorldPoint(
-              {
-                x: body.ringRadius * Math.sin(angle),
-                y: -body.ringRadius * Math.cos(angle),
-              },
-              current,
-              viewport,
+            projectWithBasis(
+              body.ringRadius * Math.sin(angle),
+              -body.ringRadius * Math.cos(angle),
+              basis,
             ),
           );
         }
       return {
         ...body,
-        ...projectWorldPoint(body, current, viewport),
+        ...projectWithBasis(body.x, body.y, basis),
         radius: body.radius * scale,
         ringRadius: body.ringRadius * current.zoom,
         hitRadius: Math.max(MIN_HIT_RADIUS, body.radius * scale),

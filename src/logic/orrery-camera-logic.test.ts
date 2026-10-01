@@ -232,3 +232,79 @@ describe("bounded invertible inspection camera", () => {
     }
   });
 });
+
+describe("projectFrame hoisted projection basis (perf pass)", () => {
+  it("projectFrame matches projectWorldPoint bit-for-bit (bodies, centre, ring paths)", () => {
+    const obstructed = {
+      width: 411,
+      height: 760,
+      obstacles: [
+        { x: 16, y: 16, width: 143, height: 47 },
+        { x: 266, y: 16, width: 130, height: 47 },
+        { x: 341, y: 472, width: 54, height: 175 },
+        { x: 0, y: 725, width: 411, height: 35 },
+      ],
+    };
+    const world: WorldBody[] = [
+      { id: 0, kind: "sun", x: 0, y: 0, radius: 30, ringRadius: 0 },
+      ...Array.from({ length: 12 }, (_, i) => {
+        const ring = 58 + 34 * i;
+        const angle = i * 1.37;
+        return {
+          id: i + 1,
+          kind: "contact" as const,
+          radius: 14 + (i % 3),
+          ringRadius: ring,
+          x: (ring + (i % 4) * 9) * Math.sin(angle),
+          y: -(ring + (i % 4) * 9) * Math.cos(angle),
+        };
+      }),
+    ];
+    for (const pose of [
+      HOME_CAMERA,
+      {
+        x: 31.7,
+        y: -12.3,
+        zoom: 1.37,
+        tilt: 0.61,
+        yaw: 2.2,
+        focalDistance: 900,
+      },
+      { x: -80, y: 140, zoom: 0.41, tilt: LAB_HOME_TILT, yaw: 5.9 },
+    ]) {
+      const frame = projectFrame(world, pose, obstructed, 3);
+      expect(frame.center).toEqual(
+        projectWorldPoint({ x: 0, y: 0 }, frame.pose, obstructed),
+      );
+      frame.bodies.forEach((projected, index) => {
+        const source = world[index];
+        const point = projectWorldPoint(source, frame.pose, obstructed);
+        expect(projected.x).toBe(point.x);
+        expect(projected.y).toBe(point.y);
+        expect(projected.ringPath.length).toBe(source.ringRadius > 0 ? 128 : 0);
+        projected.ringPath.forEach((ringPoint, i) => {
+          const angle = (i * 2 * Math.PI) / 128;
+          expect(ringPoint).toEqual(
+            projectWorldPoint(
+              {
+                x: source.ringRadius * Math.sin(angle),
+                y: -source.ringRadius * Math.cos(angle),
+              },
+              frame.pose,
+              obstructed,
+            ),
+          );
+        });
+      });
+    }
+  });
+
+  it("still rejects invalid inputs like projectWorldPoint", () => {
+    expect(() =>
+      projectFrame([body(Number.NaN, 4)], HOME_CAMERA, viewport, 1),
+    ).toThrow();
+    expect(() =>
+      projectFrame([body(1, 4)], HOME_CAMERA, { width: 0, height: 600 }, 1),
+    ).toThrow();
+  });
+});
