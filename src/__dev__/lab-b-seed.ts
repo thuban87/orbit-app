@@ -10,6 +10,17 @@
  *     tiers thin..deep, mixed overdue/healthy recency);
  *   - procedural "photo" avatars for ~40% of them (Skia CPU raster -> JPEG,
  *     stored under the normal `avatars/contact-<id>.jpg` contract);
+ *   - WP-1.4: 30 contacts instead get one of the 16 fictional, AI-generated
+ *     TEST PORTRAITS (`docs/experiments/orrery-renderer/lab-b-skia-unleashed/
+ *     assets/test-portraits/`, see its PROVENANCE.md) through the same photo
+ *     contract, so face readability under the lit-sphere shaders can be judged.
+ *     The portraits are fixtures: they are `require`d ONLY from this module,
+ *     which App.tsx loads ONLY inside `if (__DEV__)`. Metro constant-folds that
+ *     branch away in a non-dev bundle before collecting dependencies, so this
+ *     module and the JPEGs never enter a release/production bundle (verified by
+ *     inspecting the Lab B release APK in WP-1.4, RUNBOOK-LAB-B.md §10). In dev
+ *     the bytes come from the Metro asset server (the dev host), not the
+ *     internet;
  *   - unlinked relationships on ~30 contacts (Orrery satellites);
  *   - custom Systems: "Lab B Dense" (~120 members), "Lab B Inner Circle" (12),
  *     "Lab B Work" (30).
@@ -22,6 +33,7 @@
 import { ImageFormat, Skia, TileMode } from "@shopify/react-native-skia";
 import Constants from "expo-constants";
 import { Directory, File, Paths } from "expo-file-system";
+import { Image } from "react-native";
 import { createContactFull, setContactPhoto } from "@/db/contacts-dao";
 import { getExecutor, localDateTime } from "@/db/database";
 import { recordTouchpoint } from "@/db/recency-dao";
@@ -41,6 +53,90 @@ const PHOTO_EVERY_NTH = 5; // 2 of every 5 get a photo (see hasPhoto)
 const SATELLITE_PARENTS = 30;
 const PHOTO_PX = 256;
 const DENSE_NAME = "Lab B Dense";
+
+// --- WP-1.4 test portraits (fictional fixtures, never shipped) -----------------
+// Static requires so Metro can see them (dev bundle only, see header).
+const PORTRAITS: readonly number[] = [
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/01-older-woman-black-mustard.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/02-young-man-east-asian-bright-cyan.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/03-teen-girl-south-asian-dark.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/04-older-man-white-busy-street.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/05-woman-latina-backlit-golden.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/06-man-black-glasses-office.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/07-child-red-hair-green.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/08-woman-middle-eastern-hijab-pastel.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/09-man-indigenous-long-hair-dusk.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/10-woman-blonde-flash-selfie.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/11-man-southeast-asian-profile.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/12-low-contrast-foggy.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/13-pet-dog.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/14-logo-graphic.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/15-landscape-mountains.jpg"),
+  require("../../docs/experiments/orrery-renderer/lab-b-skia-unleashed/assets/test-portraits/16-man-curly-afro-neon.jpg"),
+];
+/**
+ * contact index -> portrait index (0-based into PORTRAITS). Inner Circle =
+ * indices 0, 11, 22, … (i % 11 === 0); Dense = 0..119; Work = 110..139. The
+ * low-contrast (11), dog (12), logo (13) and landscape (14) fixtures sit in the
+ * Inner Circle AND recur in Dense; every portrait is used about twice.
+ */
+const PORTRAIT_BY_CONTACT: ReadonlyMap<number, number> = new Map([
+  // Inner Circle (7 of 12; the rest stay procedural / initials).
+  [0, 0],
+  [11, 11],
+  [22, 12],
+  [33, 4],
+  [44, 13],
+  [55, 9],
+  [66, 15],
+  // Dense (and the first round of the remaining portraits).
+  [3, 1],
+  [8, 2],
+  [14, 3],
+  [19, 5],
+  [26, 6],
+  [30, 7],
+  [37, 8],
+  [41, 10],
+  [48, 14],
+  [52, 11],
+  [60, 12],
+  // Second round, spread over Dense and Work.
+  [70, 0],
+  [75, 1],
+  [83, 2],
+  [90, 3],
+  [95, 5],
+  [104, 6],
+  [113, 7],
+  [118, 8],
+  [125, 10],
+  [131, 14],
+  [137, 4],
+  [100, 13],
+]);
+
+/**
+ * Write a portrait fixture to the contact's normal `avatars/` file. The asset
+ * URI is the Metro dev server (dev bundle only). Returns false on failure so
+ * the caller can fall back to the procedural avatar.
+ */
+async function writePortrait(
+  index: number,
+  relative: string,
+): Promise<boolean> {
+  try {
+    const source = Image.resolveAssetSource(PORTRAITS[index]);
+    if (!source?.uri) return false;
+    const file = new File(Paths.document, relative);
+    if (file.exists) file.delete();
+    await File.downloadFileAsync(source.uri, file);
+    return file.exists;
+  } catch (error) {
+    console.warn("[lab-b-seed] portrait failed", index, error);
+    return false;
+  }
+}
 
 const FIRST = [
   "Ada",
@@ -192,6 +288,7 @@ export async function seedLabBFixtureIfAbsent(): Promise<void> {
     const now = localDateTime(nowDate);
     const ids: number[] = [];
     let photos = 0;
+    let portraits = 0;
     let touchpoints = 0;
     for (let i = 0; i < CONTACT_COUNT; i += 1) {
       const name = `${FIRST[i % FIRST.length]} ${LAST[(i * 7 + Math.floor(i / FIRST.length)) % LAST.length]}`;
@@ -236,17 +333,29 @@ export async function seedLabBFixtureIfAbsent(): Promise<void> {
           touchpoints += 1;
         }
       }
-      if (i % PHOTO_EVERY_NTH < 2) {
-        const bytes = renderAvatarJpeg(rand);
-        if (bytes) {
-          const relative = `avatars/contact-${contactId}.jpg`;
-          new Directory(Paths.document, "avatars").create({
-            intermediates: true,
-            idempotent: true,
-          });
+      const portrait = PORTRAIT_BY_CONTACT.get(i);
+      const procedural = i % PHOTO_EVERY_NTH < 2;
+      if (procedural || portrait !== undefined) {
+        // Always consume the procedural draw for the original photo slots so the
+        // PRNG sequence (and so every contact's cadence/history) is unchanged.
+        const bytes = procedural ? renderAvatarJpeg(rand) : null;
+        const relative = `avatars/contact-${contactId}.jpg`;
+        new Directory(Paths.document, "avatars").create({
+          intermediates: true,
+          idempotent: true,
+        });
+        let wrote = false;
+        if (portrait !== undefined) {
+          wrote = await writePortrait(portrait, relative);
+          if (wrote) portraits += 1;
+        }
+        if (!wrote && bytes) {
           const file = new File(Paths.document, relative);
           if (file.exists) file.delete();
           file.write(bytes);
+          wrote = true;
+        }
+        if (wrote) {
           await setContactPhoto(exec, contactId, relative, now);
           photos += 1;
         }
@@ -289,7 +398,7 @@ export async function seedLabBFixtureIfAbsent(): Promise<void> {
     await system("Lab B Work", ids.slice(CONTACT_COUNT - WORK_SYSTEM_SIZE));
     bumpShellRefresh();
     console.log(
-      `[lab-b-seed] seeded contacts=${ids.length} touchpoints=${touchpoints} photos=${photos} satellites=${sats} in ${Date.now() - t0}ms`,
+      `[lab-b-seed] seeded contacts=${ids.length} touchpoints=${touchpoints} photos=${photos} portraits=${portraits} satellites=${sats} in ${Date.now() - t0}ms`,
     );
   } catch (error) {
     console.error("[lab-b-seed] failed", error);
