@@ -6,6 +6,7 @@ import {
   deriveHomePose,
   frameBodies,
   HOME_CAMERA,
+  LAB_HOME_TILT,
   MAX_TILT,
   MAX_ZOOM,
   MIN_READABLE_RADIUS,
@@ -133,29 +134,38 @@ describe("bounded invertible inspection camera", () => {
     expect(deriveFocalDistance(5000)).toBeGreaterThan(deriveFocalDistance(300));
   });
   it("Home fits complete rings until exact readability floor, with zero/one/many finite and no count branch", () => {
+    // ORRERY LAB A: Home carries the experiment tilt (LAB_HOME_TILT; 0 restores
+    // the recorded top-down Home). The fit divides by the near-side
+    // perspective scale and cos(tilt); at tilt 0 both factors are exactly 1.
+    const tilt = LAB_HOME_TILT;
     expect(deriveHomePose([], viewport)).toMatchObject({
       x: 0,
       y: 0,
       zoom: 1,
-      tilt: 0,
       yaw: 0,
     });
+    expect(deriveHomePose([], viewport)?.tilt).toBeCloseTo(tilt, 12);
     for (const count of [1, 6, 10, 100]) {
       const world = Array.from({ length: count }, (_, i) =>
         body(0, -58 - i * 34, 16, i + 1),
       );
       const pose = deriveHomePose(world, viewport)!;
       expect(pose.zoom * 16).toBeGreaterThanOrEqual(MIN_READABLE_RADIUS);
-      expect(pose).toMatchObject({ x: 0, y: 0, tilt: 0, yaw: 0 });
+      expect(pose).toMatchObject({ x: 0, y: 0, yaw: 0 });
+      expect(pose.tilt).toBeCloseTo(tilt, 12);
     }
     const floor = MIN_READABLE_RADIUS / 16;
     const radius = 200 / floor - 16;
     for (const delta of [-1e-6, 0, 1e-6]) {
-      const pose = deriveHomePose([body(0, -radius - delta)], viewport)!;
-      expect(pose.zoom).toBeCloseTo(
-        Math.max(floor, 200 / (radius + delta + 16)),
-        10,
+      const extent = radius + delta + 16;
+      const f = deriveFocalDistance(extent);
+      const near = tilt > 0 ? f / (f - extent * Math.sin(tilt)) : 1;
+      const fit = Math.min(
+        viewport.width / (2 * extent * near),
+        viewport.height / (2 * extent * near * Math.cos(tilt)),
       );
+      const pose = deriveHomePose([body(0, -radius - delta)], viewport)!;
+      expect(pose.zoom).toBeCloseTo(Math.min(1, Math.max(floor, fit)), 10);
     }
   });
   it("frames unequal arbitrary body bounds and touch targets in a measured obstacle-free region", () => {

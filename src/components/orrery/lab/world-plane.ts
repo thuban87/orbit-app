@@ -11,8 +11,8 @@
  *     untouched for the ReorderGhost and any other consumer).
  *
  * Draw order (bottom → top): sun-lit pool · reference grid + bezel · contact
- * shadows · rings (glow underlay + status core) · progress trails · switch
- * streaks. Bodies, labels and HUD draw above this layer elsewhere.
+ * shadows (tilt-gated) · ring hairlines · status segments near each body ·
+ * switch streaks. Bodies, labels and HUD draw above this layer elsewhere.
  *
  * Status language preserved exactly from `orreryRingStyle`: colour, the
  * 2/3/4 px width channel, solid/dashed/faded/faint-trace, and the
@@ -32,6 +32,8 @@ import {
   GRID_ALPHA_OUTER_LIGHT,
   GRID_BEZEL_ALPHA_DARK,
   GRID_BEZEL_ALPHA_LIGHT,
+  GRID_DENSITY_FLOOR,
+  GRID_DENSITY_REF,
   GRID_REACH,
   GRID_RING_STEP,
   GRID_SPOKE_DEGREES,
@@ -42,26 +44,31 @@ import {
   LIT_POOL_ALPHA_DARK,
   LIT_POOL_ALPHA_LIGHT,
   LIT_POOL_REACH,
-  RING_CORE_SCALE,
   RING_DASH,
   RING_FAR_ALPHA,
-  RING_GLOW_ALPHA,
-  RING_GLOW_WIDTH,
-  RING_TICK_HALF,
+  RING_HAIR_ALPHA_DARK,
+  RING_HAIR_ALPHA_LIGHT,
+  RING_HAIR_SCALE,
+  RING_SPARSE_BOOST,
+  RING_SPARSE_COUNT,
+  RING_TINT_DARK,
+  RING_TINT_LIGHT,
+  SEGMENT_ALPHA_DARK,
+  SEGMENT_ALPHA_LIGHT,
+  SEGMENT_LEAD,
+  SEGMENT_SCALE,
+  SEGMENT_TRAIL,
   SHADOW_ALPHA_DARK,
   SHADOW_ALPHA_LIGHT,
   SHADOW_LENGTH,
   SHADOW_OFFSET,
+  SHADOW_TILT_FULL,
   SHADOW_WIDTH,
   STREAK_ALPHA_DARK,
   STREAK_ALPHA_LIGHT,
   STREAK_ARC,
   STREAK_LEAVING_BOOST,
   STREAK_WIDTH,
-  TRAIL_ALPHA_DARK,
-  TRAIL_ALPHA_LIGHT,
-  TRAIL_CORE_WIDTH_PX,
-  TRAIL_WIDTH_PX,
 } from "./deep-field-config";
 import { type DeepFieldInk, type Rgba, withAlpha } from "./deep-field-ink";
 import {
@@ -78,7 +85,6 @@ import {
 const STYLE_FILL = 0;
 const STYLE_STROKE = 1;
 const CAP_BUTT = 0;
-const CAP_ROUND = 1;
 const TILE_CLAMP = 0;
 const BLEND_SRC_OVER = 3;
 const BLEND_PLUS = 12;
@@ -155,16 +161,59 @@ function sweepRamp(color: Rgba, alpha: number, start: number, span: number) {
   );
 }
 
+/** Linear mix of two token inks (a → b by t), alpha from `a`. */
+function mixInk(a: Rgba, b: Rgba, t: number): Rgba {
+  "worklet";
+  return [
+    a[0] + (b[0] - a[0]) * t,
+    a[1] + (b[1] - a[1]) * t,
+    a[2] + (b[2] - a[2]) * t,
+    1,
+  ];
+}
+
+/** Status segment ramp over [start, start+trail+lead] (world angles):
+ *  tapered 0 → full at the body (start+trail) → 0 at the lead's end. */
+function segmentRamp(
+  color: Rgba,
+  start: number,
+  trail: number,
+  lead: number,
+  directional: boolean,
+) {
+  "worklet";
+  const local = Skia.Matrix();
+  local.rotate(start - Math.PI / 2);
+  const t = trail / TAU;
+  const end = Math.min(1, (trail + lead) / TAU);
+  return Skia.Shader.MakeSweepGradient(
+    0,
+    0,
+    [
+      withAlpha(color, 0),
+      withAlpha(color, directional ? 0.18 : 0.5),
+      withAlpha(color, 1),
+      withAlpha(color, 0),
+    ],
+    [0, t * 0.5, t, end],
+    TILE_CLAMP,
+    local,
+  );
+}
+
 function drawGrid(
   canvas: SkCanvas,
   ink: DeepFieldInk,
   reach: number,
   unit: number,
+  density: number,
 ): void {
   "worklet";
   const chart = ink.chart;
-  const inner = chart ? GRID_ALPHA_INNER_LIGHT : GRID_ALPHA_INNER_DARK;
-  const outer = chart ? GRID_ALPHA_OUTER_LIGHT : GRID_ALPHA_OUTER_DARK;
+  const inner =
+    (chart ? GRID_ALPHA_INNER_LIGHT : GRID_ALPHA_INNER_DARK) * density;
+  const outer =
+    (chart ? GRID_ALPHA_OUTER_LIGHT : GRID_ALPHA_OUTER_DARK) * density;
   const paint = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
   paint.setStrokeWidth(GRID_STROKE_PX * unit);
   paint.setShader(
@@ -266,8 +315,13 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
   );
   canvas.drawCircle(sunX, sunY, poolR, pool);
 
-  // 2 · Reference grid + bezel.
-  drawGrid(canvas, ink, reach, unit);
+  // 2 · Reference grid + bezel. PASS 1: the inner rings/spokes fade as the
+  // orbit count rises (they were noise under ~20 rings); the bezel stays.
+  const density = Math.max(
+    GRID_DENSITY_FLOOR,
+    Math.min(1, GRID_DENSITY_REF / Math.max(1, rings.length)),
+  );
+  drawGrid(canvas, ink, reach, unit, density);
 
   // 3 · Contact shadows: cast outward along the plane, away from the sun.
   const shadow = makePaint(STYLE_FILL, chart ? BLEND_MULTIPLY : BLEND_SRC_OVER);
@@ -284,8 +338,13 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
       TILE_CLAMP,
     ),
   );
-  const shadowAlpha = chart ? SHADOW_ALPHA_LIGHT : SHADOW_ALPHA_DARK;
-  for (let i = 0; i < frame.bodies.length; i++) {
+  // PASS 1: a cast shadow only reads as one once the plane is tilted; at
+  // tilt 0 it was a smudge beside the body. Fade in with tilt.
+  const tiltGate = Math.max(0, Math.min(1, tilt / SHADOW_TILT_FULL));
+  const shadowGate = tiltGate * tiltGate * (3 - 2 * tiltGate);
+  const shadowAlpha =
+    (chart ? SHADOW_ALPHA_LIGHT : SHADOW_ALPHA_DARK) * shadowGate;
+  for (let i = 0; shadowAlpha > 0.004 && i < frame.bodies.length; i++) {
     const b = frame.bodies[i];
     if (b.kind !== "contact" || b.opacity <= 0) continue;
     const w = mapHomography(Hi, b.x, b.y);
@@ -309,7 +368,13 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
     canvas.restore();
   }
 
-  // 4 · Rings, 5 · trails, 6 · streaks.
+  // 4 · Rings (instrument hairlines) + 5 · status segments, 6 · streaks.
+  // PASS 1 hierarchy inversion: the full ring is a thin, low-alpha hairline
+  // mostly in neutral grid ink with a status TINT (colour-on-ring stays
+  // perceivable all the way round); full status colour is concentrated in a
+  // tapered segment around the body (its last ~75° of progress plus a short
+  // lead). No additive underglow. Line language (width channel 2/3/4, solid
+  // vs dashed, faded / faint-trace alpha) is applied to BOTH parts.
   const sinTilt = Math.sin(tilt) / Math.sin(MAX_TILT);
   const farAlpha = 1 - (1 - RING_FAR_ALPHA) * Math.max(0, Math.min(1, sinTilt));
   // Unit vector (world) toward the viewer = gradient of camera-plane depth.
@@ -319,19 +384,28 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
     [RING_DASH * unit, RING_DASH * unit],
     0,
   );
-  const core = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
-  const coreDash = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
-  coreDash.setPathEffect(dash);
-  const glow = makePaint(STYLE_STROKE, BLEND_PLUS);
-  const glowDash = makePaint(STYLE_STROKE, BLEND_PLUS);
-  glowDash.setPathEffect(dash);
-  const trail = makePaint(STYLE_STROKE, chart ? BLEND_SRC_OVER : BLEND_PLUS);
-  trail.setStrokeCap(CAP_BUTT);
-  const tick = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
-  tick.setStrokeCap(CAP_ROUND);
+  const hair = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
+  const hairDash = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
+  hairDash.setPathEffect(dash);
+  const segment = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
+  segment.setStrokeCap(CAP_BUTT);
+  const segmentDash = makePaint(STYLE_STROKE, BLEND_SRC_OVER);
+  segmentDash.setStrokeCap(CAP_BUTT);
+  segmentDash.setPathEffect(dash);
   const streak = makePaint(STYLE_STROKE, chart ? BLEND_SRC_OVER : BLEND_PLUS);
   // Butt caps: a round cap would sample the sweep ramp's wrapped (bright) end.
   streak.setStrokeCap(CAP_BUTT);
+  const tint = chart ? RING_TINT_LIGHT : RING_TINT_DARK;
+  // Few orbits → the hairlines may be bolder (they are the only structure);
+  // many orbits → back off so ~20 concentric lines never dominate bodies.
+  const sparse = Math.max(
+    0,
+    Math.min(1, (RING_SPARSE_COUNT - rings.length) / (RING_SPARSE_COUNT - 2)),
+  );
+  const hairAlpha =
+    (chart ? RING_HAIR_ALPHA_LIGHT : RING_HAIR_ALPHA_DARK) *
+    (1 + (RING_SPARSE_BOOST - 1) * sparse);
+  const segAlpha = chart ? SEGMENT_ALPHA_LIGHT : SEGMENT_ALPHA_DARK;
 
   for (let r = 0; r < rings.length; r++) {
     const ring = rings[r];
@@ -346,66 +420,55 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
       role === FX_ROLE_ENTERING ? Math.max(0, Math.min(1, fx.stages[bi])) : 1;
     const alpha = body.opacity * ringStatusAlpha(ring);
     const dashed = ringIsDashed(ring);
+    const hairColor = mixInk(ink.grid, ring.color, tint);
     const depthShader = Skia.Shader.MakeLinearGradient(
       { x: -nearX * ringR, y: -nearY * ringR },
       { x: nearX * ringR, y: nearY * ringR },
-      [withAlpha(ring.color, farAlpha), withAlpha(ring.color, 1)],
+      [withAlpha(hairColor, farAlpha), withAlpha(hairColor, 1)],
       null,
       TILE_CLAMP,
     );
     const oval = Skia.XYWHRect(-ringR, -ringR, ringR * 2, ringR * 2);
-    const coreW = ring.width * RING_CORE_SCALE * unit;
-    const strokeRing = (paint: SkPaint) => {
-      "worklet";
-      if (drawOn >= 1) canvas.drawCircle(0, 0, ringR, paint);
-      else if (drawOn > 0)
-        canvas.drawArc(oval, -90, 360 * drawOn, false, paint);
-    };
-    if (!chart) {
-      const g = dashed ? glowDash : glow;
-      g.setShader(depthShader);
-      g.setStrokeWidth(coreW * RING_GLOW_WIDTH);
-      g.setAlphaf(alpha * RING_GLOW_ALPHA);
-      strokeRing(g);
-    }
-    const c = dashed ? coreDash : core;
-    c.setShader(depthShader);
-    c.setStrokeWidth(coreW);
-    c.setAlphaf(alpha);
-    strokeRing(c);
+    // Width channel kept proportional (2/3/4 → 1 : 1.5 : 2).
+    const hairW = ring.width * RING_HAIR_SCALE * unit;
+    const h = dashed ? hairDash : hair;
+    h.setShader(depthShader);
+    h.setStrokeWidth(hairW);
+    h.setAlphaf(alpha * hairAlpha);
+    if (drawOn >= 1) canvas.drawCircle(0, 0, ringR, h);
+    else if (drawOn > 0) canvas.drawArc(oval, -90, 360 * drawOn, false, h);
 
     // Body world position → its angle (0 = north, clockwise).
     const w = mapHomography(Hi, body.x, body.y);
     const theta = normalAngle(Math.atan2(w.x, -w.y));
-    if (
-      ring.progress &&
-      drawOn >= 1 &&
-      theta > 0.03 &&
-      body.kind === "contact"
-    ) {
-      const headAlpha = (chart ? TRAIL_ALPHA_LIGHT : TRAIL_ALPHA_DARK) * alpha;
-      trail.setShader(sweepRamp(ring.color, 1, 0, theta));
-      trail.setStrokeWidth(TRAIL_WIDTH_PX * unit);
-      trail.setAlphaf(headAlpha * (chart ? 0.55 : 0.5));
-      canvas.drawArc(oval, -90, theta * DEG, false, trail);
-      trail.setStrokeWidth(TRAIL_CORE_WIDTH_PX * unit);
-      trail.setAlphaf(headAlpha);
-      canvas.drawArc(oval, -90, theta * DEG, false, trail);
-    }
-    // Progress tick: where the body's angle crosses its ring (reads drift).
-    if (drawOn >= 1 && ring.progress) {
-      const s = Math.sin(theta);
-      const k = -Math.cos(theta);
-      const half = RING_TICK_HALF * unit;
-      tick.setColor(withAlpha(ring.color, alpha));
-      tick.setStrokeWidth(coreW * 1.1);
-      canvas.drawLine(
-        s * (ringR - half),
-        k * (ringR - half),
-        s * (ringR + half),
-        k * (ringR + half),
-        tick,
-      );
+    if (drawOn >= 1 && body.kind === "contact") {
+      // Contacted: trail = the last SEGMENT_TRAIL of progress (never past
+      // north, where interval progress starts). Never contacted: a short
+      // symmetric segment (no progress direction is implied).
+      const trail = ring.progress
+        ? Math.min(SEGMENT_TRAIL, theta)
+        : SEGMENT_LEAD * 1.5;
+      const lead = ring.progress ? SEGMENT_LEAD : SEGMENT_LEAD * 1.5;
+      if (trail + lead > 0.02) {
+        // Depth cue for the segment from the body's side of the ring.
+        const bx = Math.sin(theta);
+        const by = -Math.cos(theta);
+        const near = (bx * nearX + by * nearY + 1) / 2;
+        const depthA = farAlpha + (1 - farAlpha) * near;
+        const sg = dashed ? segmentDash : segment;
+        sg.setShader(
+          segmentRamp(ring.color, theta - trail, trail, lead, ring.progress),
+        );
+        sg.setStrokeWidth(ring.width * SEGMENT_SCALE * unit);
+        sg.setAlphaf(alpha * segAlpha * depthA);
+        canvas.drawArc(
+          oval,
+          (theta - trail) * DEG - 90,
+          (trail + lead) * DEG,
+          false,
+          sg,
+        );
+      }
     }
     // Switch streak: a world-space arc trailing the body along its spin.
     if (fx.active && fx.velocity > 0.02 && role !== FX_ROLE_ANCHOR) {

@@ -18,12 +18,16 @@ import {
   ACCELERATE_END,
   CAPTURE_END,
   CAPTURE_START,
-  SHED_END,
   SETTLE_START,
+  SHED_END,
   SHED_START,
   type SwitchChoreography,
 } from "@/logic/orrery-switch-choreography";
-import { BODY_FAR_TINT } from "./deep-field-config";
+import {
+  BODY_FAR_TINT,
+  BODY_VISUAL_MAX,
+  BODY_VISUAL_MIN_RADIUS,
+} from "./deep-field-config";
 
 /** Role codes in `SwitchFx.roles` (index-aligned with `frame.bodies`). */
 export const FX_ROLE_RETAINED = 0;
@@ -56,6 +60,21 @@ export const SWITCH_FX_IDLE: SwitchFx = {
   roles: [],
   stages: [],
 };
+
+/**
+ * PASS 1: presentation-only body scale for a projected radius (dp). Grows a
+ * small body toward BODY_VISUAL_MIN_RADIUS (just under the 22 dp minimum tap
+ * radius) capped at BODY_VISUAL_MAX; 1 once the body is already that big, so
+ * the drawn disc never exceeds the tap target and labels never collide.
+ */
+export function bodyVisualScale(projectedRadius: number): number {
+  "worklet";
+  if (!(projectedRadius > 0)) return 1;
+  return Math.max(
+    1,
+    Math.min(BODY_VISUAL_MAX, BODY_VISUAL_MIN_RADIUS / projectedRadius),
+  );
+}
 
 function clampUnit(value: number): number {
   "worklet";

@@ -3,8 +3,8 @@ import {
   clampCameraPose,
   projectWorldPoint,
 } from "@/logic/orrery-camera-logic";
-import { beginSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import { projectAnimatedFrame } from "@/logic/orrery-frame";
+import { beginSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import {
   computeBodyLight,
   computeSwitchFx,

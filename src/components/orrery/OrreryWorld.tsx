@@ -175,6 +175,13 @@ function ProjectedBody({
       glowRadius={body.radius * 1.8}
       deepInk={deepField?.ink}
       flare={flare}
+      starText={
+        deepField
+          ? deepField.ink.chart
+            ? colors.textPrimary
+            : colors.background
+          : undefined
+      }
     />
   ) : (
     <OrbitBody

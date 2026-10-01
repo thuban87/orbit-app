@@ -65,6 +65,14 @@ export const HOME_CAMERA: CameraPose = {
   yaw: 0,
   focalDistance: 256,
 };
+/**
+ * ORRERY LAB A — EXPERIMENT ONLY. Home/Recenter tilt in radians. Production
+ * Home is top-down by a recorded decision (Phase 8 dossier §C/§P [DECIDED],
+ * 29-UI-SPEC ORRC-04/05); a non-zero value here REVERSES that decision and is
+ * an owner call before it could ship. See lab-a _notes/PASS-1.md.
+ */
+export const LAB_HOME_TILT_DEG = 45;
+export const LAB_HOME_TILT = (LAB_HOME_TILT_DEG * Math.PI) / 180;
 export const IDENTITY_ZOOM = 2;
 export const FOCUS_MS = 300;
 export const MIN_ZOOM = 0.25;
@@ -272,9 +280,21 @@ export function deriveHomePose(
     ? Math.min(...world.map((b) => b.radius))
     : MIN_READABLE_RADIUS;
   const floor = Math.max(MIN_ZOOM, MIN_READABLE_RADIUS / minRadius);
-  const fit = Math.min(usable.width, usable.height) / (2 * extent);
+  // ORRERY LAB A (experiment): an optional tilted Home. The fit accounts for
+  // the near side's perspective enlargement and the vertical foreshortening so
+  // the same "fit until readability fails" rule holds. tilt 0 → unchanged.
+  const tilt = Math.max(0, Math.min(MAX_TILT, LAB_HOME_TILT));
+  const near =
+    tilt > 0
+      ? deriveFocalDistance(extent) /
+        (deriveFocalDistance(extent) - extent * Math.sin(tilt))
+      : 1;
+  const fit = Math.min(
+    usable.width / (2 * extent * near),
+    usable.height / (2 * extent * near * Math.cos(tilt)),
+  );
   return clampCameraPose(
-    { ...HOME_CAMERA, zoom: Math.min(1, Math.max(floor, fit)) },
+    { ...HOME_CAMERA, tilt, zoom: Math.min(1, Math.max(floor, fit)) },
     extent,
   );
 }

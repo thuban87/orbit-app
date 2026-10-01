@@ -31,8 +31,8 @@ import { useMemo } from "react";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 import type { BillboardPose } from "@/logic/orrery-frame";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
+import { FocusReticle, SunCorona, SunDisc } from "./lab/BodyOverlays";
 import type { DeepFieldInk } from "./lab/deep-field-ink";
-import { FocusReticle, SunCorona } from "./lab/BodyOverlays";
 import { useOrreryClock } from "./orrery-clock-context";
 import { useOrreryPhoto } from "./use-orrery-photo";
 
@@ -63,6 +63,8 @@ export interface SunBodyProps {
   deepInk?: DeepFieldInk;
   /** ORRERY LAB A: switch-capture flare 0..1 (0 under reduced motion). */
   flare?: SharedValue<number>;
+  /** ORRERY LAB A: initials colour on the stellar disc (dark-on-hot). */
+  starText?: string;
 }
 
 /** Soft-glow halo opacity mid-point (device-UAT tunable, 13-08). */
@@ -89,6 +91,7 @@ export function SunBody({
   focusColor,
   deepInk,
   flare,
+  starText,
 }: SunBodyProps) {
   const transform = useDerivedValue(() =>
     projection
@@ -154,16 +157,17 @@ export function SunBody({
       fontProvider,
     )
       .pushStyle({
-        color: Skia.Color(swatchText),
+        color: Skia.Color(starText ?? swatchText),
         fontFamilies: ["Inter"],
         fontSize,
+        ...(starText ? { fontStyle: { weight: 600 } } : {}),
       })
       .addText(initials)
       .pop()
       .build();
     p.layout(radius * 2);
     return p;
-  }, [fontProvider, initials, swatchText, fontSize, radius]);
+  }, [fontProvider, initials, swatchText, starText, fontSize, radius]);
 
   const circleClip = rrect(
     rect(cx - radius, cy - radius, radius * 2, radius * 2),
@@ -202,8 +206,13 @@ export function SunBody({
           strokeWidth={2}
         />
       ) : null}
-      {/* Glow rim just outside the disc. */}
-      <Circle cx={cx} cy={cy} r={radius + 2} color={glowColor} />
+      {/* Glow rim just outside the disc (Lab A: a finer limb line). */}
+      <Circle
+        cx={cx}
+        cy={cy}
+        r={radius + (deepInk ? 1 : 2)}
+        color={glowColor}
+      />
       {image ? (
         <Group clip={circleClip}>
           <SkiaImage
@@ -217,7 +226,18 @@ export function SunBody({
         </Group>
       ) : (
         <>
-          <Circle cx={cx} cy={cy} r={radius} color={swatch} />
+          {deepInk ? (
+            /* ORRERY LAB A: the star surface replaces the flat swatch. */
+            <SunDisc
+              radius={radius}
+              glowColor={glowColor}
+              ink={deepInk}
+              photo={false}
+              projection={projection}
+            />
+          ) : (
+            <Circle cx={cx} cy={cy} r={radius} color={swatch} />
+          )}
           {paragraph ? (
             <Paragraph
               paragraph={paragraph}
@@ -228,6 +248,16 @@ export function SunBody({
           ) : null}
         </>
       )}
+      {/* ORRERY LAB A: a photo sun keeps its photo; a glowing limb frames it. */}
+      {deepInk && image ? (
+        <SunDisc
+          radius={radius}
+          glowColor={glowColor}
+          ink={deepInk}
+          photo
+          projection={projection}
+        />
+      ) : null}
     </Group>
   );
 }

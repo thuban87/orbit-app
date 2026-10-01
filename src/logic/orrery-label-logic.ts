@@ -19,12 +19,20 @@ const CONTEXT_GAP = 4;
  * Segmenter hand the whole identity to the native one-line avatar paragraph.
  */
 export function orreryInitials(name: string): string {
-  if (typeof Intl.Segmenter !== "function") return name;
-  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  // ORRERY LAB A (pass 1): Hermes has no Intl.Segmenter, so the old early
+  // `return name` drew the FULL name into an initials-sized disc ("C…",
+  // "El…" on device). Fall back to the first code point of each word.
+  const segmenter =
+    typeof Intl.Segmenter === "function"
+      ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
+      : null;
   const initials: string[] = [];
   for (const word of name.trim().split(/\s+/)) {
-    const first = segmenter.segment(word)[Symbol.iterator]().next().value;
-    if (first) initials.push(first.segment);
+    if (!word) continue;
+    const first = segmenter
+      ? segmenter.segment(word)[Symbol.iterator]().next().value?.segment
+      : Array.from(word)[0];
+    if (first) initials.push(first);
     if (initials.length === 2) break;
   }
   return initials.join("").toUpperCase();

@@ -1,8 +1,10 @@
 /**
  * ORRERY LAB A — DEV-only experiment marker (canvas corner HUD text).
- * Placed at the top-left of the obstacle-free usable rect so it never sits
- * under the System selector / controls; it is not interactive (the canvas has
- * a single GestureDetector and Skia draws do not intercept touches).
+ * PASS 1: pinned to the canvas's bottom-left corner (left of the controls
+ * column / FAB). Direction 1 anchored it to the usable rect, which JUMPS when
+ * obstacles (System sheet, panels) appear or vanish — mid-switch that read as
+ * a doubled, offset marker. A fixed corner never moves. Not interactive (the
+ * canvas has a single GestureDetector; Skia draws do not intercept touches).
  */
 import {
   Group,
@@ -13,10 +15,7 @@ import {
   TextAlign,
 } from "@shopify/react-native-skia";
 import { useMemo } from "react";
-import {
-  type CameraViewport,
-  usableCameraRect,
-} from "@/logic/orrery-camera-logic";
+import type { CameraViewport } from "@/logic/orrery-camera-logic";
 import {
   LAB_MARKER_ENABLED,
   LAB_MARKER_FONT,
@@ -63,14 +62,8 @@ export function LabHud({
     return p;
   }, [fontProvider, textColor]);
   if (!paragraph) return null;
-  const rect = usableCameraRect(viewport) ?? {
-    x: 0,
-    y: 0,
-    width: viewport.width,
-    height: viewport.height,
-  };
-  const x = rect.x + LAB_MARKER_INSET;
-  const y = rect.y + LAB_MARKER_INSET;
+  const x = LAB_MARKER_INSET + 4;
+  const y = viewport.height - LAB_MARKER_INSET - LAB_MARKER_FONT - 4;
   return (
     <Group opacity={0.8}>
       <Rect

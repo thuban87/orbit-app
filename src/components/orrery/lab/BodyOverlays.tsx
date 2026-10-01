@@ -18,6 +18,8 @@ import type { BillboardPose } from "@/logic/orrery-frame";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { useOrreryClock } from "../orrery-clock-context";
 import {
+  BODY_EDGE_LIT,
+  BODY_EDGE_NIGHT,
   BODY_HALO_ALPHA_DARK,
   BODY_HALO_ALPHA_LIGHT,
   BODY_HALO_REACH,
@@ -25,6 +27,8 @@ import {
   BODY_RIM_LIGHT,
   BODY_SHADOW_MAX_DARK,
   BODY_SHADOW_MAX_LIGHT,
+  BODY_SPEC_DARK,
+  BODY_SPEC_LIGHT,
   CORONA_ALPHA_DARK,
   CORONA_ALPHA_LIGHT,
   CORONA_EXTENT,
@@ -33,9 +37,10 @@ import {
   RETICLE_ARM,
   RETICLE_GAP,
   RETICLE_SPEED,
+  SUN_GRANULE_SPEED,
 } from "./deep-field-config";
 import { type DeepFieldInk, tokenInk } from "./deep-field-ink";
-import type { BodyLightMap } from "./deep-field-math";
+import { type BodyLightMap, bodyVisualScale } from "./deep-field-math";
 import { labEffect } from "./deep-field-shaders";
 
 /** Up-left key light when a body has no entry (e.g. unit harness). */
@@ -73,12 +78,16 @@ export function BodyLightOverlay({
       uRimGain: ink.chart ? BODY_RIM_LIGHT : BODY_RIM_DARK,
       uHaloAlpha: ink.chart ? BODY_HALO_ALPHA_LIGHT : BODY_HALO_ALPHA_DARK,
       uChart: ink.chart ? 1 : 0,
+      uSpec: ink.chart ? BODY_SPEC_LIGHT : BODY_SPEC_DARK,
+      uSpecInk: [...ink.starlight],
     }),
     [ink, rimColor],
   );
   const uniforms = useDerivedValue(() => {
     const l = light.value[lightKey] ?? DEFAULT_LIGHT;
-    const scale = projection?.value.scale ?? 1;
+    const base = projection?.value.scale ?? 1;
+    // Total local→screen scale includes the pass-1 visual body scale.
+    const scale = base * bodyVisualScale(radius * base);
     return {
       uR: radius,
       uL: [l[0], l[1]],
@@ -89,9 +98,13 @@ export function BodyLightOverlay({
       uHaloAlpha: statics.uHaloAlpha,
       uHaloReach: BODY_HALO_REACH,
       uChart: statics.uChart,
+      uEdgeLit: BODY_EDGE_LIT,
+      uEdgeNight: BODY_EDGE_NIGHT,
+      uSpec: statics.uSpec,
       uShade: statics.uShade,
       uRim: statics.uRim,
       uFarTint: statics.uFarTint,
+      uSpecInk: statics.uSpecInk,
     };
   });
   if (!effect) return null;
@@ -156,6 +169,56 @@ export function SunCorona({
     >
       <Shader source={effect} uniforms={uniforms} />
     </Rect>
+  );
+}
+
+/**
+ * PASS 1: the sun disc as a star (see SUN_DISC_SKSL). Without a photo it
+ * REPLACES the flat swatch; with a photo it only frames it with a glowing
+ * limb, so the occupant photo stays the identity. Granulation runs off the
+ * single clock and is static under live reduced motion.
+ */
+export function SunDisc({
+  radius,
+  glowColor,
+  ink,
+  photo,
+  projection,
+}: {
+  radius: number;
+  glowColor: string;
+  ink: DeepFieldInk;
+  photo: boolean;
+  projection?: SharedValue<BillboardPose>;
+}) {
+  const clock = useOrreryClock();
+  const reducedMotion = useReducedMotionShared();
+  const effect = useMemo(() => labEffect("sunDisc"), []);
+  const statics = useMemo(
+    () => ({
+      uCore: [...(ink.chart ? ink.background : ink.starlight)],
+      uGlow: [...tokenInk(glowColor)],
+      uPhoto: photo ? 1 : 0,
+    }),
+    [ink, glowColor, photo],
+  );
+  const uniforms = useDerivedValue(() => {
+    const still = !clock || reducedMotion.value;
+    const scale = projection?.value.scale ?? 1;
+    return {
+      uR: radius,
+      uTime: still ? 2.3 : (clock?.value ?? 0) * SUN_GRANULE_SPEED,
+      uPhoto: statics.uPhoto,
+      uAA: 0.7 / Math.max(0.05, scale),
+      uCore: statics.uCore,
+      uGlow: statics.uGlow,
+    };
+  });
+  if (!effect) return null;
+  return (
+    <Circle cx={0} cy={0} r={radius}>
+      <Shader source={effect} uniforms={uniforms} />
+    </Circle>
   );
 }
 

@@ -24,6 +24,7 @@ import {
   type DeepFieldBodyContext,
   FocusReticle,
 } from "./lab/BodyOverlays";
+import { bodyVisualScale } from "./lab/deep-field-math";
 import { useOrreryPhoto } from "./use-orrery-photo";
 
 export interface OrbitBodyProps {
@@ -71,12 +72,20 @@ export function OrbitBody({
   lightKey,
   deepField,
 }: OrbitBodyProps) {
+  // ORRERY LAB A (pass 1): presentation-only visual scale — small overview
+  // bodies grow toward the 22 dp tap radius (never beyond it), so what you
+  // see is what you can tap. The frame's radius/hitRadius/labels are untouched.
+  const lab = !!deepField;
   const transform = useDerivedValue(() =>
     projection
       ? [
           { translateX: projection.value.x },
           { translateY: projection.value.y },
-          { scale: projection.value.scale },
+          {
+            scale:
+              projection.value.scale *
+              (lab ? bodyVisualScale(radius * projection.value.scale) : 1),
+          },
         ]
       : [],
   );
@@ -108,13 +117,15 @@ export function OrbitBody({
         color: Skia.Color(swatchText),
         fontFamilies: ["Inter"],
         fontSize,
+        // ORRERY LAB A: semibold initials hold up at overview size.
+        ...(lab ? { fontStyle: { weight: 600 } } : {}),
       })
       .addText(initials)
       .pop()
       .build();
     p.layout(innerR * 2);
     return p;
-  }, [fontProvider, initials, swatchText, fontSize, innerR]);
+  }, [fontProvider, initials, swatchText, fontSize, innerR, lab]);
 
   const circleClip = rrect(
     rect(cx - innerR, cy - innerR, innerR * 2, innerR * 2),

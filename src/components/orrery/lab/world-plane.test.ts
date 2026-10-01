@@ -1,9 +1,10 @@
 /**
  * ORRERY LAB A — the world-plane picture keeps the canonical status line
  * language that the pre-Lab per-ring `<Path>` nodes carried (formerly pinned
- * structurally in orrery-render.test): one status-coloured core stroke per
- * contact, dashed for wobble + rogue, alpha factors faded 0.7 / faint-trace 0.3
- * / neutral 0.5, width channel 2/3/4, and no trail for never-contacted.
+ * structurally in orrery-render.test): one status-tinted hairline per contact
+ * plus one full-status segment near each body (pass 1 hierarchy inversion),
+ * dashed for wobble + rogue on BOTH, alpha factors faded 0.7 / faint-trace 0.3
+ * / neutral 0.5 kept as ratios, width channel 2/3/4, and no additive glow.
  */
 import { describe, expect, it, vi } from "vitest";
 
@@ -67,7 +68,7 @@ vi.mock("@shopify/react-native-skia", () => {
 });
 
 import { projectAnimatedFrame } from "@/logic/orrery-frame";
-import { RING_CORE_SCALE } from "./deep-field-config";
+import { RING_HAIR_SCALE, SEGMENT_SCALE } from "./deep-field-config";
 import type { DeepFieldInk } from "./deep-field-ink";
 import { SWITCH_FX_IDLE } from "./deep-field-math";
 import { drawWorldPlane, type PlaneRing } from "./world-plane";
@@ -166,29 +167,43 @@ describe("Lab A world plane keeps the canonical ring language", () => {
       ink: ink(false),
       extent: 300,
     });
-    // Core strokes = full-circle srcOver strokes with the core width.
-    const cores = calls.filter(
+    // Hairlines = full-circle srcOver strokes with the hairline width.
+    const hairs = calls.filter(
       (c) =>
         c.op === "drawCircle" && c.paint.style === 1 && c.paint.blend === 3,
     );
-    expect(cores).toHaveLength(statuses.length);
-    cores.forEach((core, i) => {
-      expect(core.paint.alpha).toBeCloseTo(expectedAlpha[i], 6);
-      expect(core.paint.dashed).toBe(i === 1 || i === 3);
-      expect(core.paint.width).toBeCloseTo(
-        (statuses[i][1] * RING_CORE_SCALE) / zoom,
+    expect(hairs).toHaveLength(statuses.length);
+    const unitAlpha = hairs[0].paint.alpha / expectedAlpha[0];
+    hairs.forEach((hair, i) => {
+      expect(hair.paint.alpha).toBeCloseTo(expectedAlpha[i] * unitAlpha, 6);
+      expect(hair.paint.dashed).toBe(i === 1 || i === 3);
+      expect(hair.paint.width).toBeCloseTo(
+        (statuses[i][1] * RING_HAIR_SCALE) / zoom,
         6,
       );
     });
-    // Dark mode adds an additive (plus) underglow per ring.
-    const glows = calls.filter(
-      (c) =>
-        c.op === "drawCircle" && c.paint.blend === 12 && c.paint.style === 1,
+    // Pass 1: no additive ring underglow (dashed glow read as beads); the
+    // only additive draw left at idle is the sun-lit pool FILL.
+    expect(calls.some((c) => c.paint.blend === 12 && c.paint.style === 1)).toBe(
+      false,
     );
-    expect(glows).toHaveLength(statuses.length);
-    // Trails: two arcs per contacted body; never-contacted has none.
+    // One status segment per contact (never-contacted: symmetric, no trail),
+    // same dash language and width channel as its ring.
     const arcs = calls.filter((c) => c.op === "drawArc");
-    expect(arcs).toHaveLength(2 * (statuses.length - 1));
+    expect(arcs).toHaveLength(statuses.length);
+    arcs.forEach((arc, i) => {
+      expect(arc.paint.dashed).toBe(i === 1 || i === 3);
+      expect(arc.paint.width).toBeCloseTo(
+        (statuses[i][1] * SEGMENT_SCALE) / zoom,
+        6,
+      );
+      // Status alpha ordering survives on the segment too.
+      expect(arc.paint.alpha).toBeLessThanOrEqual(expectedAlpha[i] + 1e-6);
+    });
+    // Trails never exceed the configured span (≤ 75° + 14° lead).
+    arcs.forEach((arc) => {
+      expect(arc.args[2] as number).toBeLessThanOrEqual(90 + 1e-6);
+    });
   });
   it("chart (light) mode draws ink only — no additive glow anywhere", () => {
     calls.length = 0;
@@ -219,7 +234,7 @@ describe("Lab A world plane keeps the canonical ring language", () => {
       extent: 300,
     });
     const arcs = calls.filter((c) => c.op === "drawArc");
-    // trails (2 × 4) + one streak per contact (5)
-    expect(arcs).toHaveLength(2 * 4 + 5);
+    // one segment per contact (5) + one streak per contact (5)
+    expect(arcs).toHaveLength(5 + 5);
   });
 });

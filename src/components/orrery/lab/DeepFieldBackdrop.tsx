@@ -1,6 +1,7 @@
 /**
  * ORRERY LAB A — hypothesis item 1: the environment, as three parallax layers
- * (bottom → top): a procedural nebula baked ONCE into a GPU texture, a far and
+ * (bottom → top): a procedural nebula baked ONCE on the CPU and cached per
+ * palette across remounts (nebula-bake.ts), a far and
  * a near star layer recorded ONCE as SkPictures, and a screen-fixed vignette.
  *
  * Per-frame work is transforms + two opacities only:
@@ -26,20 +27,21 @@ import {
   Rect,
   Skia,
   type SkPicture,
-  usePictureAsTexture,
   vec,
 } from "@shopify/react-native-skia";
-import { useMemo } from "react";
-import { type SharedValue, useDerivedValue } from "react-native-reanimated";
+import { useEffect, useMemo } from "react";
+import {
+  type SharedValue,
+  useDerivedValue,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { useOrreryClock } from "../orrery-clock-context";
 import {
-  NEBULA_ALPHA_DARK,
-  NEBULA_ALPHA_LIGHT,
-  NEBULA_FREQUENCY,
+  NEBULA_FADE_MS,
   NEBULA_PAN_PARALLAX,
-  NEBULA_TEXTURE_SCALE,
   NEBULA_TILT_SLIDE,
   NEBULA_ZOOM_SCALE,
   SKY_YAW_FACTOR,
@@ -74,7 +76,7 @@ import {
   withAlpha,
 } from "./deep-field-ink";
 import type { SwitchFx } from "./deep-field-math";
-import { labEffect } from "./deep-field-shaders";
+import { nebulaCached, nebulaImage } from "./nebula-bake";
 
 /** Margin (dp) beyond the half-diagonal so pans/tilt never expose an edge. */
 const SKY_MARGIN = 140;
@@ -203,40 +205,17 @@ export function DeepFieldBackdrop({
 
   const palette = useMemo(() => starColors.map(tokenInk), [starColors]);
 
-  // ── Nebula: one shader pass into a picture → GPU texture (UI thread). ─────
-  const texturePx = Math.max(64, Math.round(side * NEBULA_TEXTURE_SCALE));
-  const nebulaPicture = useMemo(() => {
-    const effect = labEffect("nebula");
-    if (!effect) return null;
-    const glowInk = ink.chart ? ink.grid : ink.starlight;
-    const uniforms = [
-      side,
-      side,
-      NEBULA_FREQUENCY,
-      3.7,
-      ...ink.nebulaA,
-      ...ink.nebulaB,
-      ...glowInk,
-      ink.chart ? 1 : 0,
-      ink.chart ? NEBULA_ALPHA_LIGHT : NEBULA_ALPHA_DARK,
-    ];
-    if (uniforms.length !== effect.getUniformFloatCount()) return null;
-    return createPicture(
-      (canvas) => {
-        const paint = Skia.Paint();
-        paint.setShader(effect.makeShader(uniforms));
-        canvas.scale(texturePx / side, texturePx / side);
-        canvas.drawRect(Skia.XYWHRect(0, 0, side, side), paint);
-      },
-      Skia.XYWHRect(0, 0, texturePx, texturePx),
-    );
-  }, [ink, side, texturePx]);
-  // Stable size object: usePictureAsTexture re-rasterises when it changes.
-  const textureSize = useMemo(
-    () => ({ width: texturePx, height: texturePx }),
-    [texturePx],
-  );
-  const nebula = usePictureAsTexture(nebulaPicture, textureSize);
+  // ── Nebula: CPU-baked once per palette, cached across canvas remounts. ──
+  // Fade in only on the very first bake (a cached nebula is there at once).
+  const firstBake = useMemo(() => !nebulaCached(ink), [ink]);
+  const nebula = useMemo(() => nebulaImage(ink), [ink]);
+  const nebulaOpacity = useSharedValue(firstBake ? 0 : 1);
+  useEffect(() => {
+    if (nebulaOpacity.value >= 1) return;
+    nebulaOpacity.value = reducedMotion.value
+      ? 1
+      : withTiming(1, { duration: NEBULA_FADE_MS });
+  }, [nebulaOpacity, reducedMotion]);
 
   // ── Stars: recorded once per size/palette. ───────────────────────────────
   const far = useMemo(
@@ -348,7 +327,7 @@ export function DeepFieldBackdrop({
 
   return (
     <Group>
-      <Group transform={nebulaTransform}>
+      <Group transform={nebulaTransform} opacity={nebulaOpacity}>
         <Image
           image={nebula}
           x={-radius}
