@@ -24,7 +24,7 @@ import {
   type DeepFieldBodyContext,
   FocusReticle,
 } from "./lab/BodyOverlays";
-import { bodyVisualScale } from "./lab/deep-field-math";
+import { bodyDepthScale, bodyVisualScale } from "./lab/deep-field-math";
 import { useOrreryPhoto } from "./use-orrery-photo";
 
 export interface OrbitBodyProps {
@@ -76,6 +76,8 @@ export function OrbitBody({
   // bodies grow toward the 22 dp tap radius (never beyond it), so what you
   // see is what you can tap. The frame's radius/hitRadius/labels are untouched.
   const lab = !!deepField;
+  // Pass 2: far bodies a touch smaller (depth cue; presentation only).
+  const light = deepField?.light;
   const transform = useDerivedValue(() =>
     projection
       ? [
@@ -84,7 +86,10 @@ export function OrbitBody({
           {
             scale:
               projection.value.scale *
-              (lab ? bodyVisualScale(radius * projection.value.scale) : 1),
+              (lab ? bodyVisualScale(radius * projection.value.scale) : 1) *
+              (light && lightKey
+                ? bodyDepthScale(light.value[lightKey]?.[2] ?? 0)
+                : 1),
           },
         ]
       : [],

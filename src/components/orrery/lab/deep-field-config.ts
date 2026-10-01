@@ -193,6 +193,11 @@ export const RETICLE_GAP = 7;
 export const RETICLE_ARM = 0.42;
 /** Reticle spin (rad/ms) → one turn ≈ 21 s. Static under reduced motion. */
 export const RETICLE_SPEED = 0.0003;
+/** Pass 2 lock-on: duration (ms) of converge + ping, bracket start spread
+ *  (× scale), ping reach (radius ×). Static under reduced motion. */
+export const RETICLE_LOCK_MS = 720;
+export const RETICLE_LOCK_SPREAD = 0.85;
+export const RETICLE_PING_REACH = 0.9;
 /** Label plate alpha + hairline border alpha + status tick width (px). */
 export const PLATE_ALPHA = 0.9;
 export const PLATE_BORDER_ALPHA = 0.55;
@@ -210,3 +215,74 @@ export const STREAK_ALPHA_DARK = 0.7;
 export const STREAK_ALPHA_LIGHT = 0.35;
 /** Sun flare peak (corona gain) at capture. */
 export const FLARE_GAIN = 1.25;
+
+// ── PASS 2 ──────────────────────────────────────────────────────────────────
+/**
+ * Plane geometry is projected to SCREEN space on the CPU (the frame's own
+ * homography) and stroked without a perspective canvas matrix. Pass 1 drew it
+ * under `concat(H)`: Ganesh cannot stroke/dash under perspective on the GPU,
+ * so every idle frame re-rasterised ~40 rings + grid as CPU masks (device:
+ * ~5 fps idle on the Pixel). Segments per projected circle:
+ */
+export const PLANE_CIRCLE_SEGMENTS = 96;
+/** Arc sampling step for status segments / ripples (rad). */
+export const PLANE_ARC_STEP = (3 * Math.PI) / 180;
+/** Near side of each ring is pulled this far toward its full status hue. */
+export const RING_NEAR_TINT = 0.35;
+/**
+ * Depth haze: a screen gradient over the plane from the far edge (alpha) to
+ * the plane centre (0), in background ink — far grid/rings recede. × tilt gate.
+ */
+export const HAZE_ALPHA_DARK = 0.5;
+export const HAZE_ALPHA_LIGHT = 0.55;
+/** Cool horizon glow (nebulaB) just beyond the far bezel (dark only). */
+export const HAZE_GLOW_ALPHA = 0.12;
+/** Separation keyline just outside each body disc (dp) and its alpha. */
+export const BODY_KEYLINE_DP = 1.6;
+export const BODY_KEYLINE_ALPHA_DARK = 0.9;
+export const BODY_KEYLINE_ALPHA_LIGHT = 0.95;
+/** Stack pips: bodies closer than (rA + rB) × this overlap = one stack. */
+export const STACK_OVERLAP = 0.8;
+/** Pip radius (dp), max pips shown, angular spacing (rad), anchor angle. */
+export const STACK_PIP_R = 3.2;
+export const STACK_PIP_MAX = 4;
+export const STACK_PIP_STEP = 0.42;
+export const STACK_PIP_ANGLE = -0.75;
+/** Far bodies draw up to this much smaller (presentation; × far 0..1). */
+export const BODY_FAR_SHRINK = 0.16;
+/** Orbit hairline of a moon around its parent (alpha × ring hairline ink). */
+export const MOON_ORBIT_ALPHA = 0.42;
+/** Moon visual minimum radius (dp) — presentation only (hit radius ≥ 22). */
+export const MOON_VISUAL_MIN_RADIUS = 4.5;
+export const MOON_VISUAL_MAX = 2.2;
+
+// Switch "jump" (pass 2). All of these are 0 under reduced motion (fx idle).
+/** Entering rings ink in from the sun outward: outer rings start this much
+ *  later within their capture stage (0 = all together). */
+export const INK_IN_SPREAD = 0.55;
+/** Glint at the drawing head of an inking ring (px radius, alpha). */
+export const INK_GLINT_R = 3.2;
+export const INK_GLINT_ALPHA = 0.95;
+/** Motion-blur trails from the bodies' real recent screen path (ms). */
+export const TRAIL_MS = 160;
+export const TRAIL_LEAVING_MS = 340;
+/** Trail width as a multiple of the drawn body radius; peak alpha. */
+export const TRAIL_WIDTH = 1.15;
+export const TRAIL_ALPHA_DARK = 0.42;
+export const TRAIL_ALPHA_LIGHT = 0.26;
+/** Longest trail arc about the sun (rad; < π keeps the stroke convex). */
+export const TRAIL_MAX_ARC = 2.4;
+/** Capture pulse: on-plane ripple over the last part of a body's capture. */
+export const PULSE_START = 0.62;
+export const PULSE_REACH = 2.6;
+export const PULSE_ALPHA = 0.85;
+/** Retained bodies pulse once as the system settles (progress window). */
+export const SETTLE_PULSE_START = 0.8;
+/** Bezel "dial" response: tick ring swings with the spin (rad at v = 1). */
+export const BEZEL_SPIN = 0.42;
+/** Grid brightens with spin velocity (× (1 + gain·v)). */
+export const GRID_FX_GAIN = 0.9;
+/** Starfield warp: ghost copies of the near stars scaled out from centre. */
+export const WARP_COPIES = 5;
+export const WARP_STEP = 0.014;
+export const WARP_ALPHA = 0.55;

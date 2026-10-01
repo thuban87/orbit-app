@@ -24,6 +24,7 @@ import {
   type SwitchChoreography,
 } from "@/logic/orrery-switch-choreography";
 import {
+  BODY_FAR_SHRINK,
   BODY_FAR_TINT,
   BODY_VISUAL_MAX,
   BODY_VISUAL_MIN_RADIUS,
@@ -74,6 +75,17 @@ export function bodyVisualScale(projectedRadius: number): number {
     1,
     Math.min(BODY_VISUAL_MAX, BODY_VISUAL_MIN_RADIUS / projectedRadius),
   );
+}
+
+/**
+ * PASS 2 depth cue: far bodies draw slightly smaller (presentation only —
+ * frame radius/hitRadius/labels untouched). `far` is the light map's 0..
+ * BODY_FAR_TINT far factor; 1 at the near side / at tilt 0.
+ */
+export function bodyDepthScale(far: number): number {
+  "worklet";
+  if (!(far > 0)) return 1;
+  return 1 - BODY_FAR_SHRINK * Math.min(1, far / BODY_FAR_TINT);
 }
 
 function clampUnit(value: number): number {

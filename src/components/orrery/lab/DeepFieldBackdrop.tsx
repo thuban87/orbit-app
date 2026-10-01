@@ -68,6 +68,9 @@ import {
   VIGNETTE_ALPHA_DARK,
   VIGNETTE_ALPHA_LIGHT,
   VIGNETTE_INNER,
+  WARP_ALPHA,
+  WARP_COPIES,
+  WARP_STEP,
 } from "./deep-field-config";
 import {
   type DeepFieldInk,
@@ -180,6 +183,60 @@ function recordStars(
   );
 }
 
+/** One warp ghost of the near-star layer (pass 2). */
+function WarpGhost({
+  level,
+  sky,
+  picture,
+  cx,
+  cy,
+  chart,
+}: {
+  level: number;
+  sky: SharedValue<{
+    dx: number;
+    dy: number;
+    yaw: number;
+    tilt: number;
+    lz: number;
+    stretch: number;
+    velocity: number;
+  }>;
+  picture: SkPicture;
+  cx: number;
+  cy: number;
+  chart: boolean;
+}) {
+  const transform = useDerivedValue(() => {
+    const s = sky.value;
+    return [
+      { translateX: cx + s.dx * STARS_NEAR_PAN_PARALLAX },
+      {
+        translateY:
+          cy + s.dy * STARS_NEAR_PAN_PARALLAX - s.tilt * STARS_NEAR_TILT_SLIDE,
+      },
+      { rotate: -s.yaw },
+      {
+        scale:
+          1 +
+          s.lz * STARS_NEAR_ZOOM_SCALE +
+          s.stretch +
+          level * WARP_STEP * s.velocity * s.velocity,
+      },
+    ];
+  });
+  const opacity = useDerivedValue(() => {
+    const v = sky.value.velocity;
+    const k = 1 - level / (WARP_COPIES + 1);
+    return v > 0.02 ? WARP_ALPHA * v * k * (chart ? 0.5 : 1) : 0;
+  });
+  return (
+    <Group transform={transform} opacity={opacity}>
+      <Picture picture={picture} />
+    </Group>
+  );
+}
+
 export function DeepFieldBackdrop({
   width,
   height,
@@ -264,6 +321,7 @@ export function DeepFieldBackdrop({
       tilt: f.pose.tilt ?? 0,
       lz: Math.log2(Math.max(0.25, f.pose.zoom)),
       stretch: fx.velocity * SWITCH_STAR_STRETCH,
+      velocity: fx.velocity,
     };
   });
   const nebulaTransform = useDerivedValue(() => {
@@ -315,6 +373,14 @@ export function DeepFieldBackdrop({
     return TWINKLE_MIN + (TWINKLE_MAX - TWINKLE_MIN) * t;
   });
 
+  // ── PASS 2: jump "warp" — ghost copies of the near stars scaled out from
+  // the centre by the spin velocity, so the starfield streaks radially at the
+  // height of the jump and snaps back as the system settles. `velocity` is 0
+  // under reduced motion (SwitchFx idle) → the ghosts are fully transparent.
+  const warpLevels = useMemo(
+    () => Array.from({ length: WARP_COPIES }, (_, i) => i + 1),
+    [],
+  );
   const vignette = useMemo(() => {
     const edge = ink.chart ? VIGNETTE_ALPHA_LIGHT : VIGNETTE_ALPHA_DARK;
     return [
@@ -349,6 +415,17 @@ export function DeepFieldBackdrop({
           <Picture picture={nearB} />
         </Group>
       </Group>
+      {warpLevels.map((level) => (
+        <WarpGhost
+          key={level}
+          level={level}
+          sky={sky}
+          picture={nearA}
+          cx={cx}
+          cy={cy}
+          chart={ink.chart}
+        />
+      ))}
       <Rect x={0} y={0} width={width} height={height}>
         <RadialGradient
           c={vec(cx, cy)}

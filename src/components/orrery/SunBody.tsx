@@ -234,6 +234,7 @@ export function SunBody({
               ink={deepInk}
               photo={false}
               projection={projection}
+              flare={flare}
             />
           ) : (
             <Circle cx={cx} cy={cy} r={radius} color={swatch} />

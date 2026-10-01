@@ -16,6 +16,8 @@ import {
 import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
 import { bodyKey } from "@/logic/orrery-frame";
 import { SPACING } from "@/theme/tokens/spacing";
+import { DEEP_FIELD_ENABLED } from "./lab/deep-field-config";
+import { focusCardPlacement } from "./lab/focus-card";
 import { OrreryNotice } from "./OrreryFeedback";
 
 /** Lightweight identity follows the authoritative frame on the UI thread.
@@ -55,39 +57,73 @@ export function OrreryFocusContext({
     if (!region || !body) return { opacity: 0 };
     const width = Math.min(280, region.width);
     const limit = Math.min(height, region.height / 2);
+    // ORRERY LAB A (pass 2): clear the drawn body + reticle; flip above the
+    // body, or cap the card height to the free room (it scrolls), instead of
+    // clamping it up over the focused body. Framing/usable rect untouched.
+    const placed = DEEP_FIELD_ENABLED
+      ? focusCardPlacement(region, body.y, body.radius, limit, SPACING.sm)
+      : null;
     return {
       opacity: 1,
       width,
-      maxHeight: region.height / 2,
+      maxHeight: placed ? placed.maxHeight : region.height / 2,
       left: Math.max(
         region.x,
         Math.min(region.x + region.width - width, body.x - width / 2),
       ),
-      top: Math.max(
-        region.y,
-        Math.min(
-          region.y + region.height - limit,
-          body.y + body.radius + SPACING.sm,
-        ),
-      ),
+      top: placed
+        ? placed.top
+        : Math.max(
+            region.y,
+            Math.min(
+              region.y + region.height - limit,
+              body.y + body.radius + SPACING.sm,
+            ),
+          ),
     };
   });
   const scrollBounds = useAnimatedStyle(() => {
     const current = frame.value;
     const region = current ? usableCameraRect(current.viewport) : null;
-    return { maxHeight: region ? region.height / 2 : 180 };
+    if (!region) return { maxHeight: 180 };
+    if (!DEEP_FIELD_ENABLED) return { maxHeight: region.height / 2 };
+    // ORRERY LAB A: the same placement as the card (scroll inside the room).
+    const body = current?.bodies.find((item) =>
+      target.kind === "satellite"
+        ? bodyKey(item) ===
+          bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
+        : item.kind !== "satellite" && item.id === target.id,
+    );
+    if (!body) return { maxHeight: region.height / 2 };
+    const limit = Math.min(height, region.height / 2);
+    return {
+      maxHeight: focusCardPlacement(
+        region,
+        body.y,
+        body.radius,
+        limit,
+        SPACING.sm,
+      ).maxHeight,
+    };
   });
   return (
     <Animated.View
       style={[styles.root, position]}
       pointerEvents={blocked ? "none" : "auto"}
       importantForAccessibility={blocked ? "no-hide-descendants" : "auto"}
-      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
+      onLayout={(event) => {
+        // ORRERY LAB A: the lab caps the card to the free room, so its laid-
+        // out height is not its natural height; that comes from the content.
+        if (!DEEP_FIELD_ENABLED) setHeight(event.nativeEvent.layout.height);
+      }}
     >
       <GlassSurface density="dense" treatment="orrery-overlay">
         <Animated.ScrollView
           style={scrollBounds}
           contentContainerStyle={styles.content}
+          onContentSizeChange={(_, contentHeight) => {
+            if (DEEP_FIELD_ENABLED) setHeight(contentHeight);
+          }}
         >
           <AppText>{name}</AppText>
           <Button role="secondary" label="Clear focus" onPress={onClear} />

@@ -60,6 +60,7 @@ import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import type { DeepFieldBodyContext } from "./lab/BodyOverlays";
+import { BodyStackLayer } from "./lab/BodyStackLayer";
 import { DeepFieldBackdrop } from "./lab/DeepFieldBackdrop";
 import { DEEP_FIELD_ENABLED } from "./lab/deep-field-config";
 import { resolveDeepFieldInk, tokenInk } from "./lab/deep-field-ink";
@@ -336,6 +337,12 @@ export function OrreryWorld({
         }),
     [resources, colors],
   );
+  // ORRERY LAB A (pass 2): key → status ink for the stack pips.
+  const ringInks = useMemo(() => {
+    const out: Record<string, PlaneRing["color"]> = {};
+    for (const ring of planeRings) out[ring.key] = ring.color;
+    return out;
+  }, [planeRings]);
   useEffect(() => {
     mounted.current = true;
     return () => {
@@ -612,13 +619,24 @@ export function OrreryWorld({
         ) : undefined
       }
       overlay={
-        DEEP_FIELD_ENABLED && labMarkerVisible() ? (
-          <LabHud
-            viewport={viewport}
-            fontProvider={fontProvider}
-            ink={deepInk}
-            textColor={colors.textSecondary}
-          />
+        DEEP_FIELD_ENABLED ? (
+          <Group>
+            <BodyStackLayer
+              frame={frame}
+              light={bodyLight}
+              switchFx={switchFx}
+              colors={ringInks}
+              ink={deepInk}
+            />
+            {labMarkerVisible() ? (
+              <LabHud
+                viewport={viewport}
+                fontProvider={fontProvider}
+                ink={deepInk}
+                textColor={colors.textSecondary}
+              />
+            ) : null}
+          </Group>
         ) : undefined
       }
     >
@@ -690,6 +708,7 @@ export function OrreryWorld({
                 identity={identity}
                 frame={frame}
                 colors={colors}
+                deepField={deepField}
                 focused={
                   focusedSatellite?.uid === row.uid &&
                   focusedSatellite.parentId === row.parentId &&

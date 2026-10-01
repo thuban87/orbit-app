@@ -3,16 +3,24 @@
  * ring draw-on of 7): the world plane as ONE per-frame SkPicture.
  *
  * The picture re-records only when `frame` or `switchFx` changes (camera
- * motion / switch), never on ambient clock ticks — idle frames just replay it.
+ * motion / switch), never on ambient clock ticks — idle frames just replay it
+ * (pass 2: replay is cheap — screen-space convex polygons + one analytic ring
+ * shader; see world-plane.ts header for the device findings).
  * One recorded draw list replaces N `ProjectedOrbitRing` nodes, N per-ring
  * mappers and N per-frame SkPath rebuilds from `ringPath`.
  */
 import { createPicture, Picture } from "@shopify/react-native-skia";
-import { type SharedValue, useDerivedValue } from "react-native-reanimated";
+import { useMemo } from "react";
+import {
+  type SharedValue,
+  useDerivedValue,
+  useSharedValue,
+} from "react-native-reanimated";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
 import type { DeepFieldInk } from "./deep-field-ink";
 import type { SwitchFx } from "./deep-field-math";
-import { drawWorldPlane, type PlaneRing } from "./world-plane";
+import { labEffect } from "./deep-field-shaders";
+import { drawWorldPlane, type PlaneRing, type TrailState } from "./world-plane";
 
 export function WorldPlaneLayer({
   frame,
@@ -27,12 +35,27 @@ export function WorldPlaneLayer({
   ink: DeepFieldInk;
   extent: number;
 }) {
+  // Pass 2: this layer's own motion-blur history (UI-thread scratch, mutated
+  // in place — never reassigned, so it never re-triggers this mapper).
+  const trails = useSharedValue<TrailState>({ pts: {} });
+  const ringEffect = useMemo(() => labEffect("ring"), []);
   const picture = useDerivedValue(() => {
     const current = frame.value;
     const fx = switchFx.value;
+    const history = trails.value;
+    const now = Date.now();
     return createPicture(
       (canvas) => {
-        drawWorldPlane(canvas, { frame: current, rings, fx, ink, extent });
+        drawWorldPlane(canvas, {
+          frame: current,
+          rings,
+          fx,
+          ink,
+          extent,
+          trails: history,
+          now,
+          ringEffect,
+        });
       },
       {
         width: current.viewport.width,
