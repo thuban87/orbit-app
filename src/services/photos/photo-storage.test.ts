@@ -22,6 +22,7 @@ const h = vi.hoisted(() => ({
   ops: [] as string[],
   exists: new Set<string>(),
   bytes: new Map<string, Uint8Array>(),
+  mtimes: new Map<string, number>(),
 }));
 
 vi.mock("expo-file-system", () => {
@@ -45,6 +46,14 @@ vi.mock("expo-file-system", () => {
     }
     get name(): string {
       return this.uri.split("/").at(-1) ?? "";
+    }
+    info(): { exists: boolean; size?: number; modificationTime?: number } {
+      if (!h.exists.has(this.uri)) return { exists: false };
+      return {
+        exists: true,
+        size: h.bytes.get(this.uri)?.length,
+        modificationTime: h.mtimes.get(this.uri),
+      };
     }
     async copy(dest: File): Promise<void> {
       h.ops.push(`copy ${this.uri} -> ${dest.uri}`);
@@ -112,6 +121,7 @@ import {
   persistMaster,
   photoDisplayUriFromDocumentUri,
   photoFileExists,
+  photoFileStat,
   photoSwapBackupExists,
   profilePhotoRelPath,
   reconcilePhotoDir,
@@ -134,6 +144,28 @@ beforeEach(() => {
   h.ops = [];
   h.exists = new Set();
   h.bytes = new Map();
+  h.mtimes = new Map();
+});
+
+describe("photoFileStat — read-only master signature source (38.6 D-41)", () => {
+  it("returns size + mtime for a present master, null when missing, never writes", () => {
+    h.exists.add(DEST);
+    h.bytes.set(DEST, new Uint8Array(36109));
+    h.mtimes.set(DEST, 1_700_000_000_123);
+    expect(photoFileStat("avatars/contact-42.jpg")).toEqual({
+      size: 36109,
+      modificationTime: 1_700_000_000_123,
+    });
+    expect(photoFileStat("avatars/contact-43.jpg")).toBeNull();
+    // A platform that reports no mtime gives no signature.
+    h.mtimes.delete(DEST);
+    expect(photoFileStat("avatars/contact-42.jpg")).toBeNull();
+    expect(h.ops).toEqual([]);
+  });
+
+  it("rejects an unsafe path before touching the file system", () => {
+    expect(() => photoFileStat("avatars/../secret.jpg")).toThrow();
+  });
 });
 
 describe("filename builders — contactId-derivable, validated by construction", () => {

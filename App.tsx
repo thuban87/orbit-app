@@ -63,6 +63,7 @@ import {
 } from "@/services/photos/background-reconcile-sweep";
 import { registerDerivativeCacheSweep } from "@/services/photos/derivative-cache";
 import { registerLegacyImageDiskCacheSweep } from "@/services/photos/legacy-image-disk-cache-sweep";
+import { registerOrreryDerivativeSweep } from "@/services/photos/orrery-derivative-store";
 import { registerPhotoReconcileSweep } from "@/services/photos/photo-reconcile-sweep";
 import { registerRestorePhotoFinalizeSweep } from "@/services/photos/restore-photo-finalize-sweep";
 import { registerWidgetSweep } from "@/services/widget/widget-refresh";
@@ -126,6 +127,7 @@ let backupCacheSweepRegistered = false;
 // SAME registry and under the SAME re-entrancy reasoning as the field sweep.
 let photoReconcileRegistered = false;
 let derivativeCacheSweepRegistered = false;
+let orreryDerivativeSweepRegistered = false;
 let legacyImageDiskCacheSweepRegistered = false;
 let backgroundReconcileRegistered = false;
 let restorePhotoFinalizeSweepRegistered = false;
@@ -261,6 +263,12 @@ function AppShell() {
     if (!derivativeCacheSweepRegistered) {
       registerDerivativeCacheSweep();
       derivativeCacheSweepRegistered = true;
+    }
+    // 38.6 D-41: bounded once-per-process sweep of the Orrery's cache-dir photo
+    // derivatives (masters gone, stale signatures, crash leftovers).
+    if (!orreryDerivativeSweepRegistered) {
+      registerOrreryDerivativeSweep();
+      orreryDerivativeSweepRegistered = true;
     }
     // 38.6: avatars are memory-only now, so the old memory-disk Glide entries
     // (incl. deleted contacts' photos) are never read again. Clear them once,

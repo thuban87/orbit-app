@@ -12,6 +12,7 @@ import { inWriteTransaction } from "@/db/transaction";
 import type { SqlExecutor } from "@/db/types";
 import { bumpPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import { Logger } from "@/utils/logger";
+import { discardOrreryDerivatives } from "./orrery-derivative-store";
 import {
   deletePhoto,
   deleteRestorePending,
@@ -64,6 +65,11 @@ function bump(canonical: string): void {
  */
 export function notifyPhotoBytesChanged(canonical: string): void {
   assertSafeRelative(canonical);
+  // 38.6 D-41: the Orrery's cache-dir derivative of the old bytes goes with
+  // them (a deleted contact's photo must not linger in the cache). Before the
+  // bump, so the reload it triggers can never find the old derivative. Never
+  // throws (cache cleanup only).
+  discardOrreryDerivatives(canonical);
   try {
     bumpPhotoCacheBust(canonical);
   } catch (error) {

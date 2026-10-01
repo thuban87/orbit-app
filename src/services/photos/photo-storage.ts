@@ -434,6 +434,26 @@ export function photoFileExists(relative: string): boolean {
 }
 
 /**
+ * Read-only byte size + modification time (ms) of a canonical master, or null
+ * when it is missing (38.6 D-41). The Orrery's cache-dir derivative is keyed
+ * and verified by this durable signature, which survives a restart (the
+ * in-process display revision does not). Never writes.
+ */
+export function photoFileStat(
+  relative: string,
+): { size: number; modificationTime: number } | null {
+  assertSafeRelative(relative);
+  const info = new File(Paths.document, relative).info();
+  if (
+    !info.exists ||
+    typeof info.size !== "number" ||
+    typeof info.modificationTime !== "number"
+  )
+    return null;
+  return { size: info.size, modificationTime: info.modificationTime };
+}
+
+/**
  * Whether a canonical has a `.bak` sidecar: a replace is mid-swap (the prior
  * master is moved aside, the new bytes not yet in place) or was interrupted
  * and the launch sweep will move the `.bak` back. Either way the canonical is
