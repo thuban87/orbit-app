@@ -67,7 +67,7 @@ export function underCard(
   pad: number,
 ): boolean {
   "worklet";
-  if (!card || card[4] !== 1) return false;
+  if (card?.[4] !== 1) return false;
   return (
     x1 >= card[0] - pad &&
     x0 <= card[0] + card[2] + pad &&

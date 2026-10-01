@@ -109,6 +109,23 @@ $ADB shell dumpsys batterystats $PKG | grep -E "Estimated power use|Uid u0a|cpu=
 $ADB shell dumpsys gfxinfo $PKG > $EV/gfx-10min.txt
 ```
 
+**Opaque canvas (R1 default ON) needs SurfaceFlinger, not gfxinfo.** The harness pins
+`opaqueCanvas:0` (TextureView, visible to gfxinfo) unless `OPAQUE=1`. For the SurfaceView path:
+
+```bash
+sf_rate() { $ADB shell dumpsys SurfaceFlinger --latency "'$1'" | awk 'NR>1 && $2>0 && $2<9e18 {print $2}' |
+  python3 -c "import sys;t=sorted(int(x) for x in sys.stdin if x.strip());d=sorted((b-a)/1e6 for a,b in zip(t,t[1:]));print(len(t),'frames %.1f fps p50 %.1f p90 %.1f ms'%((len(t)-1)/((t[-1]-t[0])/1e9),d[len(d)//2],d[int(len(d)*.9)]))"; }
+L=$($ADB shell dumpsys SurfaceFlinger --list | grep "SurfaceView\[$PKG.*(BLAST)" | tail -1 | sed 's/RequestedLayerState{//; s/ parentId.*//')
+sf_rate "$L"     # canvas layer, opaque ON
+L2=$($ADB shell dumpsys SurfaceFlinger --list | grep "^RequestedLayerState{VRI-$PKG" | tail -1 | sed 's/RequestedLayerState{//; s/ parentId.*//')
+sf_rate "$L2"    # app window (TextureView path), opaque OFF
+```
+
+Emulator reference (R1): Dense idle 60 fps presented opaque vs ~28 fps TextureView. Check on the
+phone: does the TextureView path also halve the rate (then it is the platform composition
+path, a V2 decision), and do the glass overlays, the focus card, tab transitions and screenshots
+look right over the SurfaceView.
+
 (The 10-minute soak can overlap with filling in §5 from the matrix output.)
 
 ## 5. Result tables (fill in)
@@ -148,6 +165,7 @@ $ADB shell dumpsys gfxinfo $PKG > $EV/gfx-10min.txt
 
 | Scene | idleClock ON frames/15 s | OFF frames/15 s | notes |
 |---|---|---|---|
+| (run `tools/r1-idle.sh $EV/idle` — emulator: RM 0 vs 190 frames / 10 s) | | | |
 | 800, all ambient on | | | (clock runs: nebula/stars/sun) |
 | 800, reduced motion | | | ON should be ≈0 |
 

@@ -178,7 +178,7 @@ function vecColor(c: readonly number[], alpha: number): Float32Array {
  * R1 legibility: the lowest alpha a DEFOCUSED label's text takes (text-only
  * dim). Model over the extreme raw backdrop (white on dark themes, black on
  * light) with the plate at full scrim: 0.66 → ≥ 4.95:1 in all four themes;
- * WP-2.2's 0.62 whole-tag dim measured 2.2–2.9:1 there.
+ * WP-2.2's 0.62 whole-tag dim modelled 2.2–2.9:1 there.
  */
 const LABEL_TEXT_DIM_MIN = 0.66;
 

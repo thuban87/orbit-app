@@ -325,3 +325,62 @@ higher with the flags on (one run 48/77 ms), consistent with the bodies picture 
 while `mix` animates (340 ms) plus the reticle picture recording per frame during the
 lock. At rest the focus/feedback pictures do not re-record (no clock reads). Phone + Perfetto
 needed for a real answer (R1).
+
+## 2026-10-01 — R1 density envelope (RELEASE builds, emulator; commits bba4cf5b → final R1)
+
+**EMULATOR, RELEASE, x86_64 — relative A/B on this one target only, never a phone claim.**
+Harness `tools/r1-matrix.sh` / `tools/r1-perf.sh` (deep-link driven; each row = a 10 s idle,
+6-swipe pan, 7 s focus fly-in, or 9 s switch window; gfx = `dumpsys gfxinfo`, main +
+RenderThread, TextureView path (`opaqueCanvas:0`); probe = the new `perfProbe` per-worklet UI-thread
+timing, mean ms). Systems: Inner 12, Dense 120, **Stress 400**, **Stress 800** (new seed; All
+Contacts = 940). Galaxy Dark, satellites on. Configs: **lab all-on** (`idleClock:0` = the M2
+clock behaviour), **lab minimal** (environment, fx, ring shader/flow/wake/tethers/ticks, lighting,
+lab Polaris, chart, HUD labels all off), **legacy**. Full tables: `tools/r1-table.py` over
+`evidence/09-r1/perf/{A-baseline,B-after,C-after2}/summary.tsv` (+ raw `.gfx` / `.log`).
+A = R1 start (bba4cf5b), B = 83c9033a (context, lookups, wakes/flow LOD, paragraph cache),
+C = 89c2f1dd (+ projectFrame fast path, ring culling).
+
+### Envelope — lab all-on
+
+| Bodies | Scene | A frames / p50 / p99 | C frames / p50 / p99 | Top UI worklets A → C (mean ms) |
+|---|---|---|---|---|
+| 120 | pan | 310 / 17 / 85 | 400 / 18 / 53 | frame 5.8 → 0.7 · wakes 15.2 (p95 105) → 6.8 · alloc 1.4 → 0.3 |
+| 120 | focus | 158 / 34 / 101 | 168 / 29 / 93 | wakes 12.6 → 1.1 (hidden in flight) |
+| 400 | pan | 302 / 32 / 150 | 375 / 17 / 48 | frame 19.6 → 1.7 · alloc 15.8 → 0.4 · wakes 34.1 → off (LOD) |
+| 400 | focus | 178 / 34 / 150 | 216 / 17 / 65 | frame 20.5 → 2.1 · wakes 40.2 → off |
+| 400 | switch in | 166 / 18 / 200 | 195 / 18 / 121 | trim p95 57 → 24 (culled) |
+| 800 | idle | 216 / 34 / 65 | 211 / 18 / 40 | — |
+| 800 | pan | 222 / 34 / 200 | 358 / 17 / 48 | frame 35.7 → 3.4 · alloc 61.7 → 0.6 · wakes 68.2 → off |
+| 800 | focus | **CRASH** (Hermes SIGSEGV) | 216 / 18 / 69 | — |
+| 800 | switch in | **CRASH** | 204 / 18 / 73 | trim p95 150 (B) → 10 (C) |
+
+Lab minimal at 800 (C): pan 290 frames p50 18 / p99 36; frame 3.1 ms. Legacy renderer (A and B):
+120 idle 33 frames / 10 s at p50 200 ms; 400 idle 5 frames (p50 3.1 s); 800 idle 5 frames
+(p50 1.55 s, 186 skipped) — **legacy is unusable from ~120 bodies on this target and crashed at
+800 before the paragraph-cache fix** (the crash was in the shared model half).
+
+### Idle clock / reduced motion / opaque canvas (C build, Dense 120, 10 s idle)
+
+| Config | gfx frames | p50 |
+|---|---|---|
+| defaults, idle clock ON vs always-on clock | 189 vs 191 | 32 / 32 (ambient effects still animate) |
+| reduced motion, idle clock ON vs always-on | **0** vs 190 | — / 32 |
+| every ambient effect off, ON vs always-on | **0** vs 230 | — / 18 |
+| Stress 800, reduced motion, idle clock ON | **0** | — |
+
+Reduced motion: two screenshots 3 s apart, 0 changed pixels (no HUD). **Opaque canvas
+(SurfaceView)**: gfxinfo cannot see SurfaceView buffers (0 frames is NOT idle there); measured
+with `dumpsys SurfaceFlinger --latency` on the canvas layer instead: Dense idle **60.0 fps
+presented (p50 16.6 ms)** vs TextureView 27.4–27.8 fps (p50 33.4 ms), twice each; Stress 800
+during pans 59.9 vs 27.8 fps. The ~21–30 fps "cadence no layer explains" since WP-1.4 is the
+TextureView composition path on this emulator. Overlays, the focus card and screenshots composite
+over the SurfaceView (`evidence/09-r1/shots/02`, `03`).
+
+Findings (relative, emulator only):
+1. Before R1 the envelope broke at **~400 bodies** (UI thread: frame projection 20 ms +
+   allocation 16 ms + wakes 34–40 ms per changed frame) and **crashed at 800+** (JS thread).
+2. After R1 the per-frame UI cost at 800 is **~10 ms** in a pan (frame 3.4, bodies 3.9, rings
+   1.6, alloc 0.6) — linear and small. The remaining fixed cost is the environment
+   (full-screen nebula sample + star Atlas + sun) and, on this target, the TextureView path.
+3. GPU p50 stays 7–24 ms in every lab row (emulator GPU noise dominates); no GPU fill wall was
+   found up to 800 bodies — the phone must confirm (PHONE-PASS-SCRIPT).

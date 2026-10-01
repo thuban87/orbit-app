@@ -326,3 +326,23 @@ Rough emulator gfxinfo over that whole session (launch + seeding + switching, NO
   `$ADB bugreport` and read `FS/data/anr/trace_00` (the user-build emulator denies /data/anr).
 - Iterate on RELEASE (`assembleRelease` ≈ 1 min incremental after the busy check; install -r keeps
   data). Debug JS takes > 7 s to load a System on this emulator.
+
+## 12. R1 tooling (density, perf, legibility)
+
+- **Stress seed**: a debug launch adds 800 contacts + "Lab B Stress 400" / "Lab B Stress 800"
+  if absent (`[lab-b-seed] stress seeded …` in logcat, ~1 min). All Contacts becomes 940.
+- **Deep links** (lab build): `focus=<member name>`, `clear=1`, `theme=galaxy:dark` (session
+  only), on top of §11's. All still remount the Orrery (pause/resume) — fire actions with
+  `delay=` after the remount settles.
+- **Probe**: `flags=perfProbe:1` → logcat `[labb-probe] win=… name=runs/mean/p95/max` (ms,
+  UI-thread JS only) every 3 s while worklets run.
+- **Harness**: `tools/r1-matrix.sh <out>` (configs × Systems × idle/pan/focus/switch; env
+  `CONFIGS`, `SYSTEMS`, `LABALL_FLAGS`, `OPAQUE`, `ORRERY_TAB`, `RECENTRE`, `SWIPE`),
+  `tools/r1-table.py <summary.tsv…>`, `tools/r1-idle.sh <out>` (idle clock / RM / opaque),
+  `tools/r1-legibility.sh <out> <palettes.json>` + `tools/r1-contrast.py` (needs numpy + PIL:
+  use a venv). Never run `pkill -f r1-perf.sh` from a shell whose own command line contains that
+  string (it kills the shell).
+- **Opaque canvas is ON by default since R1**: gfxinfo cannot see its frames; the harness pins
+  `opaqueCanvas:0`, and SurfaceFlinger `--latency` measures the opaque path (PHONE-PASS §4).
+- `uiautomator dump` now works on a static Orrery (reduced motion or all ambient off: the idle
+  clock stops the canvas).

@@ -518,3 +518,54 @@ for the final captures and perf).
     (release `15`). **Not covered:** a far zoom preset while focused, a cluster (group) tap,
     and the Polaris north tap on device. The flare is built and unit-tested but was not
     captured.
+
+## 2026-10-01 — R1 performance envelope and legibility (emulator; phone pass prepared)
+
+Commits: `bba4cf5b` (seed, probe, deep links, idle-clock/opaque flags), `83c9033a` (density
+fixes + crash fix), `2d043162` (focus-card occlusion, point LOD), `89c2f1dd` (projection fast
+path, ring culling), `80852701` + `5547b519` + `7c3ec0e6` (legibility, opaque default) — see
+`git log 3422d06c..`. Report: `research/R1-REPORT.md`. Evidence: `evidence/09-r1/`.
+
+1. **Density fixture.** `seedLabBStressIfAbsent` adds 800 synthetic contacts (unique names,
+   light histories, procedural photos on every 4th, 111 moons) and the Systems "Lab B Stress
+   400" / "Lab B Stress 800" through the real DAOs; idempotent by name, so an existing debug
+   install gains them without `pm clear` (53 s on the emulator).
+2. **Measure first.** A committed per-worklet probe (`perfProbe`, off by default) plus a
+   deep-link harness (`tools/r1-perf.sh`, `r1-matrix.sh`) replaced panel taps; `focus=`,
+   `clear=1`, `theme=` deep links were added for scripting (C-65).
+3. **The 800-body crash (both renderers).** Mounting or focusing an 800/940-body System killed
+   the app: SIGSEGV on the JS thread inside RN Skia `JsiHostObject::get` →
+   `jsi::Function::createFromHostFunction` (symbolised from the debug `librnskia.so`). Every
+   focus / scene / cluster change rebuilt a Skia Paragraph per label (~1 900). Caching prepared
+   paragraphs by (role, width, text) made it 0/5 (from 3/3 + 5/5). Root cause inside
+   RN Skia/Hermes is inferred (host-object churn), not proven (C-63).
+4. **Hidden per-tick work.** Reanimated subscribes a derived value to EVERY SharedValue
+   reachable from its closure; worklets that captured the whole lab context re-ran on every
+   clock tick (trim picture, switch-FX states, star placements). Worklets now capture
+   `LabStillContext` (no clocks) or single values.
+5. **O(N²) → O(N) in the model half** (no semantic change): label allocation body lookups,
+   `deriveSatelliteBodies`, and `projectFrame` (per-frame constants hoisted; it called
+   `usableCameraRect` — obstacle region splitting + sort — once per body). The projection is
+   bit-identical (new test). 800-body frame projection 35.7 → 3.4 ms.
+6. **LOD instead of cost.** Wakes (one shader per ring) and ring energy flow are off above 160
+   rings; wakes hide while the camera recovers and fade back (C-59, C-60). Rings and switch
+   trims skip rings that cannot touch the screen. A point LOD for sub-6 dp bodies exists behind
+   a flag but rarely triggers at today's MIN_ZOOM (C-62).
+7. **Idle mode.** The lab clock is a pausable frame callback, active only while an ambient effect
+   can animate (`labAmbientNeeded`). Reduced motion or all-ambient-off now draws 0 frames when
+   untouched (was 190 per 10 s). C-29 resolved (C-64).
+8. **Opaque canvas default ON.** SurfaceView presents 60 fps where TextureView presented
+   ~28 fps on this emulator (SurfaceFlinger latency); overlays still composite. gfxinfo cannot
+   see it, so the harness pins `opaqueCanvas:0` for gfx A/B and the phone script measures both
+   (C-07, PHONE-PASS-SCRIPT §4).
+9. **Legibility.** `tools/r1-contrast.py` computes ADR-149-style model ratios (tint/plate over
+   the raw extreme pixel under the element, raw backdrop from a labels-off twin capture) and
+   measured ratios (rendered text vs rendered backdrop). Findings and fixes: the sun reached
+   pure white (Standard Dark glass `textSecondary` 4.42:1) → a composite-aware glow cap on dark
+   themes (`SUN_GLOW_CAP_DARK` 0.94; now bounded at 4.45 by the initials glyph ink, a palette
+   token outside ADR-149's proof set — owner item, not retuned); defocused labels dimmed plate
+   and text together (model 2.2–2.9:1 over a bright/dark extreme) → text-only dim with a 0.66
+   floor (≥ 4.95:1 model, all four themes); the focus card ghosting → canvas occlusion under the
+   card (C-61) with the ADR-149 glass untouched.
+10. **Not done here (phone needed):** absolute frame times, thermal, Mali GPU fill, Perfetto
+    thread split — `research/PHONE-PASS-SCRIPT.md`.
