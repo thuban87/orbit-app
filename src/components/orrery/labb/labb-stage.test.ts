@@ -182,6 +182,10 @@ describe("R2 home tilt", () => {
     useLabFxStore.getState().setFlag("homeTilt", false);
     expect(labHomePose(home)).toBe(home);
     expect(labHomePose(null)).toBeNull();
+    // R3: the legacy renderer keeps the production Home (tilt 0).
+    useLabFxStore.getState().setFlag("homeTilt", true);
+    useLabFxStore.getState().setRenderer("legacy");
+    expect(labHomePose(home)).toBe(home);
     useLabFxStore.getState().reset();
   });
 });

@@ -26,7 +26,9 @@ export const LAB_HOME_TILT = 0.56;
 /** Home pose with the lab default tilt applied (identity when the flag is off). */
 export function labHomePose<T extends CameraPose | null>(pose: T): T {
   if (!pose) return pose;
-  const flags = useLabFxStore.getState().flags;
-  if (!flags.homeTilt) return pose;
+  const { flags, renderer } = useLabFxStore.getState();
+  // R3: lab renderer only — the Legacy renderer / "Legacy" preset keeps the
+  // production Home (tilt 0), so an A/B against it is a real baseline.
+  if (!flags.homeTilt || renderer !== "lab") return pose;
   return { ...pose, tilt: LAB_HOME_TILT };
 }
