@@ -332,9 +332,12 @@ half4 lbSun(float2 xy, float3 surf) {
   float ga = clamp(g, 0.0, 1.0) * (1.0 - 0.7 * uS3.a);
   float3 oc = gc * clamp(g, 0.0, 1.4);
   float3 outc = surf * inside + oc * (1.0 - inside);
-  // R1 glow cap (uS4.a > 0): no channel above the cap (labb-bodies-logic.ts).
-  if (uS4.a > 0.0) { outc = min(outc, float3(uS4.a)); }
-  return half4(half3(outc), half(inside + ga * (1.0 - inside)));
+  float aout = inside + ga * (1.0 - inside);
+  // R1 glow cap (uS4.a > 0): the COMPOSITE stays under the cap. The output is
+  // premultiplied-style (srcOver adds dst × (1 − a)), so the bright limb /
+  // corona leave room for up to 0.2 of sky behind them (labb-bodies-logic.ts).
+  if (uS4.a > 0.0) { outc = min(outc, float3(uS4.a - 0.2 * (1.0 - aout))); }
+  return half4(half3(outc), half(aout));
 }
 `;
 

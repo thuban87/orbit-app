@@ -1,0 +1,72 @@
+theme	element	box	raw_extreme_L	model_ratio	measured_vs_median	measured_vs_p98
+galaxy:dark	label	(492, 1268, 792, 1392)	0.963	11.02	14.43	2.03
+galaxy:dark	LABELS-WORST	-	-	11.02	14.43	2.03	AA(model)=PASS
+theme	element	token	model_ratio(tint over raw extreme)	measured_ratio	box
+galaxy:dark	glass-model	textPrimary	11.33	-	 raw extreme L=1.000 rgb=[255, 255, 255]
+galaxy:dark	glass-model	textSecondary	4.51	-	 raw extreme L=1.000 rgb=[255, 255, 255]
+galaxy:dark	glass-model	accentText	5.92	-	 raw extreme L=1.000 rgb=[255, 255, 255]
+galaxy:dark	'Lab B Dense'	textPrimary	-	13.97	(87, 399, 351, 459)
+galaxy:dark	'\uf232'	textPrimary	-	14.05	(363, 404, 411, 454)
+galaxy:dark	'VIEW OPTIONS'	textPrimary	-	14.59	(842, 399, 1193, 459)
+galaxy:dark	'Cleo Okafor'	textPrimary	-	14.25	(247, 1505, 1033, 1577)
+galaxy:dark	'Clear focus'	textPrimary	-	14.56	(321, 1640, 554, 1700)
+galaxy:dark	'Open Profile'	textPrimary	-	14.56	(717, 1640, 969, 1700)
+galaxy:dark	'\uf3bf'	textPrimary	-	14.72	(1122, 1932, 1182, 1995)
+galaxy:dark	'\uf3c2'	textPrimary	-	14.72	(1122, 2109, 1182, 2172)
+galaxy:dark	'\uf284'	textPrimary	-	14.72	(1122, 2286, 1182, 2349)
+galaxy:dark	OVERLAY-WORST	-	4.51	13.97	AA(model)=PASS
+theme	element	box	raw_extreme_L	model_ratio	measured_vs_median	measured_vs_p98
+galaxy:light	label	(180, 516, 436, 632)	0.263	14.97	5.19	5.18
+galaxy:light	label	(716, 720, 1016, 828)	0.601	15.49	4.87	4.86
+galaxy:light	label	(492, 1272, 788, 1384)	0.129	14.58	15.62	15.10
+galaxy:light	LABELS-WORST	-	-	14.58	4.87	4.86	AA(model)=PASS
+theme	element	token	model_ratio(tint over raw extreme)	measured_ratio	box
+galaxy:light	glass-model	textPrimary	13.32	-	 raw extreme L=0.014 rgb=[26, 31, 51]
+galaxy:light	glass-model	textSecondary	5.56	-	 raw extreme L=0.014 rgb=[26, 31, 51]
+galaxy:light	glass-model	accentText	6.13	-	 raw extreme L=0.014 rgb=[26, 31, 51]
+galaxy:light	'Lab B Dense'	textPrimary	-	14.30	(87, 399, 351, 459)
+galaxy:light	'\uf232'	textPrimary	-	14.54	(363, 404, 411, 454)
+galaxy:light	'VIEW OPTIONS'	textPrimary	-	15.62	(842, 399, 1193, 459)
+galaxy:light	'Cleo Okafor'	textPrimary	-	15.49	(247, 1505, 1033, 1577)
+galaxy:light	'Clear focus'	textPrimary	-	15.89	(321, 1640, 554, 1700)
+galaxy:light	'Open Profile'	textPrimary	-	15.89	(717, 1640, 969, 1700)
+galaxy:light	'\uf3bf'	textPrimary	-	15.62	(1122, 1932, 1182, 1995)
+galaxy:light	'\uf3c2'	textPrimary	-	15.62	(1122, 2109, 1182, 2172)
+galaxy:light	'\uf284'	textPrimary	-	15.62	(1122, 2286, 1182, 2349)
+galaxy:light	OVERLAY-WORST	-	5.56	14.30	AA(model)=PASS
+theme	element	box	raw_extreme_L	model_ratio	measured_vs_median	measured_vs_p98
+standard:dark	label	(492, 1268, 788, 1384)	0.697	11.41	14.56	2.25
+standard:dark	LABELS-WORST	-	-	11.41	14.56	2.25	AA(model)=PASS
+theme	element	token	model_ratio(tint over raw extreme)	measured_ratio	box
+standard:dark	glass-model	textPrimary	9.78	-	 raw extreme L=0.970 rgb=[255, 255, 202]
+standard:dark	glass-model	textSecondary	4.45	-	 raw extreme L=0.970 rgb=[255, 255, 202]
+standard:dark	glass-model	accentText	4.99	-	 raw extreme L=0.970 rgb=[255, 255, 202]
+standard:dark	'Lab B Dense'	textPrimary	-	13.09	(87, 399, 351, 459)
+standard:dark	'\uf232'	textPrimary	-	13.39	(363, 404, 411, 454)
+standard:dark	'VIEW OPTIONS'	textPrimary	-	14.42	(842, 399, 1193, 459)
+standard:dark	'Cleo Okafor'	textPrimary	-	14.22	(247, 1505, 1033, 1577)
+standard:dark	'Clear focus'	textPrimary	-	14.41	(321, 1640, 554, 1700)
+standard:dark	'Open Profile'	textPrimary	-	14.41	(717, 1640, 969, 1700)
+standard:dark	'\uf3bf'	textPrimary	-	14.69	(1122, 1932, 1182, 1995)
+standard:dark	'\uf3c2'	textPrimary	-	14.69	(1122, 2109, 1182, 2172)
+standard:dark	'\uf284'	textPrimary	-	14.69	(1122, 2286, 1182, 2349)
+standard:dark	OVERLAY-WORST	-	4.45	13.09	AA(model)=FAIL
+theme	element	box	raw_extreme_L	model_ratio	measured_vs_median	measured_vs_p98
+standard:light	label	(180, 516, 436, 632)	0.264	15.69	5.53	5.52
+standard:light	label	(716, 720, 1016, 828)	0.694	16.34	5.03	4.99
+standard:light	label	(492, 1276, 788, 1384)	0.106	15.27	16.40	15.83
+standard:light	LABELS-WORST	-	-	15.27	5.03	4.99	AA(model)=PASS
+theme	element	token	model_ratio(tint over raw extreme)	measured_ratio	box
+standard:light	glass-model	textPrimary	12.83	-	 raw extreme L=0.013 rgb=[27, 30, 38]
+standard:light	glass-model	textSecondary	5.10	-	 raw extreme L=0.013 rgb=[27, 30, 38]
+standard:light	glass-model	accentText	6.04	-	 raw extreme L=0.013 rgb=[27, 30, 38]
+standard:light	'Lab B Dense'	textPrimary	-	13.38	(87, 399, 351, 459)
+standard:light	'\uf232'	textPrimary	-	13.99	(363, 404, 411, 454)
+standard:light	'VIEW OPTIONS'	textPrimary	-	16.12	(842, 399, 1193, 459)
+standard:light	'Cleo Okafor'	textPrimary	-	16.10	(247, 1505, 1033, 1577)
+standard:light	'Clear focus'	textPrimary	-	16.66	(321, 1640, 554, 1700)
+standard:light	'Open Profile'	textPrimary	-	16.66	(717, 1640, 969, 1700)
+standard:light	'\uf3bf'	textPrimary	-	16.25	(1122, 1932, 1182, 1995)
+standard:light	'\uf3c2'	textPrimary	-	16.24	(1122, 2109, 1182, 2172)
+standard:light	'\uf284'	textPrimary	-	16.24	(1122, 2286, 1182, 2349)
+standard:light	OVERLAY-WORST	-	5.10	13.38	AA(model)=PASS

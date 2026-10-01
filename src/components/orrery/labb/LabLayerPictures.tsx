@@ -174,6 +174,14 @@ function vecColor(c: readonly number[], alpha: number): Float32Array {
   return Float32Array.of(c[0], c[1], c[2], c[3] * alpha);
 }
 
+/**
+ * R1 legibility: the lowest alpha a DEFOCUSED label's text takes (text-only
+ * dim). Model over the extreme raw backdrop (white on dark themes, black on
+ * light) with the plate at full scrim: 0.66 → ≥ 4.95:1 in all four themes;
+ * WP-2.2's 0.62 whole-tag dim measured 2.2–2.9:1 there.
+ */
+const LABEL_TEXT_DIM_MIN = 0.66;
+
 /** R1 focus-card occlusion: bodies under the card draw at this alpha. */
 const OCCLUDED_ALPHA = 0.12;
 /** Padding (dp) around the card for the occlusion test. */
@@ -926,7 +934,7 @@ export function LabLabelsPicture({
           canvas.drawRRect(Skia.RRectXY(Skia.XYWHRect(x, y, w, h), r, r), fill);
         }
         if (dim < 1 && !labelPlateDim) {
-          textPaint.setAlphaf(dim);
+          textPaint.setAlphaf(Math.max(LABEL_TEXT_DIM_MIN, dim));
           canvas.saveLayer(textPaint);
           paragraphs[item.i].paint(canvas, x + LABEL_PAD_X, y + LABEL_PAD_Y);
           canvas.restore();
