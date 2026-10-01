@@ -17,6 +17,7 @@ import {
   type SkSurface,
   type SkTypefaceFontProvider,
   TextAlign,
+  TileMode,
 } from "@shopify/react-native-skia";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
@@ -102,6 +103,8 @@ export class BodyAtlas {
     swatchText: string,
     initials: string,
     fontProvider: SkTypefaceFontProvider | null,
+    /** Sun occupant medallion: shaded plate + ink token; person glyph if no initials. */
+    plate?: { ink: string } | null,
   ) {
     const canvas = this.surface?.getCanvas();
     if (!canvas) return;
@@ -119,13 +122,71 @@ export class BodyAtlas {
       ATLAS_TILE / 2,
       paint,
     );
+    const cx = x + ATLAS_TILE / 2;
+    const cy = y + ATLAS_TILE / 2;
+    const R = ATLAS_TILE / 2;
+    if (plate) {
+      // Shaded plate: darkened rim (neutral alpha ramp over the swatch token)
+      // + a soft top-left highlight, so the medallion reads as a convex disc.
+      const shade = Skia.Paint();
+      shade.setAntiAlias(true);
+      shade.setShader(
+        Skia.Shader.MakeRadialGradient(
+          { x: cx, y: cy },
+          R,
+          [Float32Array.of(0, 0, 0, 0), Float32Array.of(0, 0, 0, 0.55)],
+          [0.45, 1],
+          TileMode.Clamp,
+        ),
+      );
+      canvas.drawCircle(cx, cy, R, shade);
+      const hi = Skia.Paint();
+      hi.setAntiAlias(true);
+      hi.setShader(
+        Skia.Shader.MakeRadialGradient(
+          { x: cx - R * 0.35, y: cy - R * 0.4 },
+          R * 0.75,
+          [Float32Array.of(1, 1, 1, 0.22), Float32Array.of(1, 1, 1, 0)],
+          [0, 1],
+          TileMode.Clamp,
+        ),
+      );
+      canvas.drawCircle(cx, cy, R, hi);
+    }
+    const ink = plate?.ink ?? swatchText;
+    if (plate && !initials) {
+      // Person glyph: head + shoulders in the ink token.
+      const glyph = Skia.Paint();
+      glyph.setAntiAlias(true);
+      glyph.setColor(Skia.Color(ink));
+      canvas.drawCircle(cx, cy - R * 0.2, R * 0.24, glyph);
+      const body = Skia.Path.Make();
+      body.addArc(
+        Skia.XYWHRect(cx - R * 0.46, cy + R * 0.12, R * 0.92, R * 0.8),
+        180,
+        180,
+      );
+      body.close();
+      canvas.save();
+      canvas.clipPath(
+        (() => {
+          const clip = Skia.Path.Make();
+          clip.addCircle(cx, cy, R * 0.86);
+          return clip;
+        })(),
+        1,
+        true,
+      );
+      canvas.drawPath(body, glyph);
+      canvas.restore();
+    }
     if (fontProvider && initials) {
       const paragraph = Skia.ParagraphBuilder.Make(
         { textAlign: TextAlign.Center, maxLines: 1, ellipsis: "…" },
         fontProvider,
       )
         .pushStyle({
-          color: Skia.Color(swatchText),
+          color: Skia.Color(ink),
           fontFamilies: ["Inter"],
           fontStyle: { weight: 600 },
           fontSize: ATLAS_TILE * 0.4,

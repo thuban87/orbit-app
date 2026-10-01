@@ -668,10 +668,10 @@ export function OrreryWorld3D({
           ring: null,
           photo: resolved.photo,
           initials: orreryInitials(name),
-          swatch:
-            colors.avatarSwatches[
-              swatchIndex(name, colors.avatarSwatches.length)
-            ],
+          // Medallion plate: the theme surface, shaded, with the star's glow
+          // token as ink — initials, or a person glyph when the self has none.
+          swatch: colors.surface,
+          plateInk: resolved.glowColor,
           glow: resolved.glowColor,
         });
         continue;

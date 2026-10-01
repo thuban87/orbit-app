@@ -91,6 +91,8 @@ const FACE_FRACTION = 0.62;
 const SUN_FACE_FRACTION = 0.74;
 /** Sun medallion rim (fraction of the plate radius where the gold bezel starts). */
 const SUN_RIM_INNER = 0.8;
+/** Medallion interior opacity (the star core glows through the rest). */
+const SUN_PLATE_OPACITY = 0.86;
 /** Orbital-plane grid/dust disc, in scene extents; ring lines per extent. */
 const PLANE_DISC_EXTENTS = 1.18;
 const PLANE_GRID_RINGS = 9;
@@ -157,6 +159,8 @@ export interface BodyInfo {
   initials: string;
   swatch: string;
   glow?: string;
+  /** Sun medallion: shaded plate with this ink token (glyph when no initials). */
+  plateInk?: string;
 }
 
 export interface LabelText {
@@ -546,7 +550,7 @@ export class OrreryScene3D {
         .mul(1.05)
         .add(
           this.sunRim.mul(
-            smoothstep(SUN_RIM_INNER * 0.6, SUN_RIM_INNER, r).mul(0.25),
+            smoothstep(SUN_RIM_INNER * 0.3, SUN_RIM_INNER, r).mul(0.42),
           ),
         );
       const bevel = p.y
@@ -566,7 +570,16 @@ export class OrreryScene3D {
       If(d.greaterThan(0.5), () => {
         Discard();
       });
-      return faceOpacityNode;
+      // Sun medallion interior is slightly translucent: the emissive star core
+      // behind it glows through the plate (bezel stays opaque).
+      const sunInner = faceSunNode.z
+        .greaterThan(1.1)
+        .and(d.mul(2).lessThan(SUN_RIM_INNER));
+      return select(
+        sunInner,
+        faceOpacityNode.mul(SUN_PLATE_OPACITY),
+        faceOpacityNode,
+      );
     })();
     this.faces = new THREE.Sprite(faceMat);
     this.faces.count = 0;
@@ -785,6 +798,7 @@ export class OrreryScene3D {
       const needsDraw =
         slot === undefined ||
         prevInfo?.swatch !== info.swatch ||
+        prevInfo?.plateInk !== info.plateInk ||
         prevInfo?.initials !== info.initials;
       if (slot === undefined) {
         slot = this.freeSlots.pop();
@@ -798,6 +812,7 @@ export class OrreryScene3D {
           this.colors.avatarSwatchText,
           info.initials,
           this.fontProvider,
+          info.plateInk ? { ink: info.plateInk } : null,
         );
         this.atlasDirty = true;
         this.photoByKey.set(info.key, info.photo);

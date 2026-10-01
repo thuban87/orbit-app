@@ -159,3 +159,15 @@ ADDS, all computed on the UI thread inside the existing packet reaction / sample
   (pre-existing load latency, not renderer); (2) one frame right after the selector closes shows the upper
   canvas black (a single-frame present glitch, not chased); (3) a camera step when the selector closes,
   before the choreography starts (not chased).
+
+## 2026-10-01 — Checkpoint C.3: sun occupant without a photo
+
+The seeded self has no photo and an empty name, so the medallion was a flat periwinkle swatch. Now the sun
+tile is drawn as a **shaded plate**: theme `surface` token disc, darkened rim (neutral alpha radial ramp),
+soft top-left highlight, and the star's glow token as ink — the occupant's initials, or a **person glyph**
+(head + shoulders) when there are none (`BodyAtlas.drawInitials(..., plate)`; `BodyInfo.plateInk`). In the
+shader the medallion interior is 86% opaque so the emissive star core glows through it, and the warm
+rim tint now starts at 30% of the plate radius (was 60%) so the glow wraps further in. A real photo still
+replaces the tile. Evidence: `05-sun-occupant-glyph-overview.png`, `06-sun-occupant-glyph-close.png`.
+Side observation: one relaunch showed "Couldn't load this System" (transient; Reload System recovered it,
+no JS error logged) — likely the force-stop/relaunch racing the DB open; not investigated.
