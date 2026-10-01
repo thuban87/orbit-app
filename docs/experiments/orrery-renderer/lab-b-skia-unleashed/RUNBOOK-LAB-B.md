@@ -346,3 +346,16 @@ Rough emulator gfxinfo over that whole session (launch + seeding + switching, NO
   `opaqueCanvas:0`, and SurfaceFlinger `--latency` measures the opaque path (PHONE-PASS §4).
 - `uiautomator dump` now works on a static Orrery (reduced motion or all ambient off: the idle
   clock stops the canvas).
+
+## 13. R2 tooling (art captures)
+
+- `tools/r2-release.sh <tag>`: busy-check → sync → `assembleRelease` x86_64 → install -r → launch
+  (lands on the last tab; tap Orrery ≈ 896,2690 after a reinstall).
+- `tools/r2-shots.sh <out> [inner dense identity detail focus switch themes]` (env `FLAGS`,
+  `THEME`): each scene = reset deep link + **Recentre tap** (a VIEW-intent remount restores the
+  previous pose, so Home — and the R2 Home tilt — only applies after Recentre). Pose deep links
+  (`zoom=`, `tilt=`) now honour `delay=`.
+- `tools/r2-snap.sh <out.jpg>` (screencap → JPEG, no PNG on disk), `tools/r2-link.sh`,
+  `tools/r2-sheet.py <out> <cols> <img…>` (contact sheets), `tools/r2-perf.sh <out>` (R2 A/B).
+- Shockwave beats need `slowmo=5` and `screenrecord` with the switch fired from the same shell
+  (`delay=7000` covers the remount).

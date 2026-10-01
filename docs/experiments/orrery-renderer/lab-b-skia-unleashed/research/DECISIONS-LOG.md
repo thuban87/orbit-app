@@ -569,3 +569,37 @@ path, ring culling), `80852701` + `5547b519` + `7c3ec0e6` (legibility, opaque de
    card (C-61) with the ADR-149 glass untouched.
 10. **Not done here (phone needed):** absolute frame times, thermal, Mali GPU fill, Perfetto
     thread split — `research/PHONE-PASS-SCRIPT.md`.
+
+## 2026-10-01 — R2 art direction and hero moments (emulator, release `r2a`…`r2d`)
+
+Commit `ff90df99` (code + tooling); report `research/R2-REPORT.md`; evidence `evidence/10-r2/`.
+
+1. **Art review first** (`00-before`, R2-REPORT §1): the R1 renderer was depth-capable (plane
+   homography, far-side fade, haze, perspective) but Home was tilt 0, so the map read as a
+   radar target; the sun lit nothing; overview bodies were pins.
+2. **Default tilt as a flag, not a product change.** Tilt is already a product gesture and
+   every model-half consumer (projection, hit test, labels, focus framing) runs through the
+   tilted projection, so a tilted Home is safe for taps/labels — but docs/systems/orrery.md
+   defines Home as tilt 0 for Recenter. `labHomePose` wraps the three OrreryScreen Home call
+   sites (switch destination, scene framing, Recenter); `deriveHomePose` is untouched. 0.56 rad
+   chosen from a 0.45 / 0.7 / 0.95 probe (`01-tilt-probe`): 0.7+ squashes the far side under
+   the selector pills. C-66.
+3. **The sun lights its plane** with ONE full-screen shader (`stagePlane`): inverse plane
+   homography per pixel → world radius → gaussian + core falloff in the sun's glow token, plus
+   the optional gravity-well grid in the same pass. Uniforms derive from `frame` only, so the
+   idle clock and reduced-motion stillness are unaffected (0 changed pixels, `06-final/09`).
+4. **Rim light lives in the existing ring shader** (`uSpin.zw` were unused zeros), not in a new
+   pass: per-pixel e^(−r/R) on the world-space stroke.
+5. **Overview size floor is visual only** (max 1.4×, below 12 dp) in the bodies picture.
+6. **Iteration log.** iter 1 (`02-iter1`): pool radius 0.55·extent tinted the whole sky brown;
+   cartesian grid drew a crosshair through the sun; deep links did not apply poses (the
+   remount re-framed) → pose deep links now honour `delay`, captures recentre after each
+   remount. iter 2 (`03-iter2`): pool 0.32·extent; bloom at threshold 0.62 flattened the sun;
+   tilt-shift failed. iter 3 (`04-iter3`): grid offset half a cell + well radius 0.3·extent,
+   flare ghosts ×1.5, bloom 0.74 / 0.7, all four themes, shock filter elliptical + doubled.
+   Final (`06-final`, release `r2d`): defaults ON for the five art flags.
+7. **Experiment verdicts** (R2-REPORT §3): bloom = beautiful but too costly; shock filter =
+   failed (invisible at speed); lens flare = simplify to the streak; tilt-shift = failed;
+   plane grid / gravity well = simplify (texture). Experiments stay committed, flag-off.
+8. **Not changed:** switch choreography constants, focus lock, labels/allocation, reorder, theme
+   tokens (all new colours are uniforms from existing tokens), reduced motion.

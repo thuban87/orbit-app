@@ -384,3 +384,22 @@ Findings (relative, emulator only):
    (full-screen nebula sample + star Atlas + sun) and, on this target, the TextureView path.
 3. GPU p50 stays 7–24 ms in every lab row (emulator GPU noise dominates); no GPU fill wall was
    found up to 800 bodies — the phone must confirm (PHONE-PASS-SCRIPT).
+
+## 2026-10-01 — R2 art direction + hero experiments (RELEASE `r2d`, emulator; commit ff90df99)
+
+Harness `tools/r2-perf.sh` (r1-perf: `opaqueCanvas:0`, `idleClock:0`, Dense 120, focus Ada
+Abbott, switch ↔ Inner Circle). Raw: `evidence/10-r2/perf/summary.tsv`, `*.gfx`, `*.log`.
+Relative only — this emulator's TextureView path presents ~28 fps whatever the scene.
+
+| Config | idle p50/p90 | pan p50/p90 | focus p50/p90 | switch-in p50/p90 | GPU p50 idle/pan |
+|---|---|---|---|---|---|
+| R1 base (R2 flags off) | 19/36 | 20/48 | 32/34 | 32/53 | 8/8 |
+| R2 defaults (tilt, pool, grid, rim light, size floor) | 24/36 | 23/42 | 23/40 | 25/40 | 9/9 |
+| + bloom | 26/34 | 25/42 | 27/36 | 25/57 | 14/11 |
+| + lens flare | 24/34 | 22/48 | 24/36 | — | 13/9 |
+| + tilt-shift | 25/34 | 23/38 | 23/48 | — | 13/9 |
+| + shock filter (switch only) | — | — | — | 25/40 | — |
+
+No config is separable from run-to-run noise (±5 ms p50); 0 skipped frames everywhere. GPU p50
+hints at +2–5 ms for bloom. UI-thread probe (bodies/rings/labels pictures) unchanged within
+noise. The full-screen stage shader and bloom are the phone-pass items.

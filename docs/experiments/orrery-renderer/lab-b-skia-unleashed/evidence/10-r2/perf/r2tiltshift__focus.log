@@ -1,0 +1,2 @@
+10-01 13:50:07.724  6326  6350 I ReactNativeJS: [labb-probe] win=3013ms alloc=23/0.2/0.9/1.4 bodies=40/1.1/4/5.6 f.moons=23/0.2/0.8/1.2 f.sample=23/0.1/0.5/0.6 frame=23/0.8/2.1/2.1 labels=40/0.5/1.9/2.3 nebula=133/0.1/0.4/0.6 rings=133/2.4/7/28.9 trim=40/0.2/1/1.1 wakes=23/1.6/16.4/19.6
+10-01 13:50:10.723  6326  6350 I ReactNativeJS: [labb-probe] win=3000ms nebula=180/0.1/0.4/1 rings=180/2/4/6.7

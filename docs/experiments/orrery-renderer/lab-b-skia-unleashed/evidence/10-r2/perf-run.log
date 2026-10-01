@@ -1,0 +1,30 @@
+== r1base 13:39:50
+r1base	idle	276	219	19	36	48	97	8	23	0
+r1base	pan	303	261	20	48	48	65	8	21	0
+r1base	focus	168	120	32	34	36	101	15	23	0
+r1base	switch_out	167	142	32	65	69	101	11	24	0
+r1base	switch_in	200	169	32	53	69	117	9	22	0
+== r2art 13:42:10
+r2art	idle	193	99	24	36	36	73	9	22	0
+r2art	pan	294	245	23	42	57	81	9	14	0
+r2art	focus	217	136	23	40	48	65	9	22	0
+r2art	switch_out	173	101	19	48	77	101	5	25	0
+r2art	switch_in	182	115	25	40	65	93	11	25	0
+== r2bloom 13:44:31
+r2bloom	idle	201	76	26	34	34	77	14	19	0
+r2bloom	pan	320	276	25	42	57	65	11	21	0
+r2bloom	focus	172	101	27	36	40	101	13	20	0
+r2bloom	switch_out	169	110	32	53	73	93	6	25	0
+r2bloom	switch_in	183	106	25	57	69	85	10	22	0
+== r2flare 13:46:52
+r2flare	idle	202	77	24	34	34	73	13	19	0
+r2flare	pan	323	288	22	48	53	73	9	14	0
+r2flare	focus	164	99	24	36	48	121	9	18	0
+== r2tiltshift 13:48:26
+r2tiltshift	idle	187	76	25	34	36	85	13	23	0
+r2tiltshift	pan	316	259	23	38	57	73	9	17	0
+r2tiltshift	focus	208	165	23	48	61	101	9	22	0
+== r2shockfilter 13:50:00
+r2shockfilter	switch_out	166	130	32	53	77	105	8	25	0
+r2shockfilter	switch_in	183	103	25	40	65	93	7	25	0
+== done 13:51:10
