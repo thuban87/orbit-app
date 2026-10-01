@@ -155,6 +155,7 @@ function world(
         ),
       );
     },
+    revision: () => undefined,
     signature: (relative) => masters[relative]?.sig ?? null,
     findDerivative: (relative, sig) => {
       const uri = derivUri(relative, sig);
@@ -370,6 +371,46 @@ describe("loadOrreryImage — on-disk derivative (38.6 D-41)", () => {
     expect(smalls()).toEqual([]);
     expect(larges()[0].disposeCount).toBe(1);
     expect(Logger.warn).not.toHaveBeenCalled();
+  });
+
+  it("hands the install the display revision read BEFORE the master signature (WR6-01 hardening)", async () => {
+    const order: string[] = [];
+    const revisions: Array<number | undefined> = [];
+    const w = world({ "avatars/contact-1.jpg": BIG });
+    const { install, signature } = w.d;
+    w.d.revision = () => {
+      order.push("revision");
+      return 7;
+    };
+    w.d.signature = (relative) => {
+      order.push("signature");
+      return signature(relative);
+    };
+    w.d.install = (temp, relative, sig, revision) => {
+      revisions.push(revision);
+      return install(temp, relative, sig, revision);
+    };
+    expect(await loadOrreryImage("avatars/contact-1.jpg", w.d)).not.toBeNull();
+    expect(order).toEqual(["revision", "signature"]);
+    expect(revisions).toEqual([7]);
+  });
+
+  it("a load after a revision bump never joins the older revision's generation (same signature)", async () => {
+    const revisions: Array<number | undefined> = [];
+    let current = 1;
+    const w = world({ "avatars/contact-1.jpg": BIG });
+    const { install } = w.d;
+    w.d.revision = () => current;
+    w.d.install = (temp, relative, sig, revision) => {
+      revisions.push(revision);
+      return install(temp, relative, sig, revision);
+    };
+    const older = loadOrreryImage("avatars/contact-1.jpg", w.d);
+    current = 2;
+    const newer = loadOrreryImage("avatars/contact-1.jpg", w.d);
+    await Promise.all([older, newer]);
+    expect(w.calls.downsamples).toHaveLength(2);
+    expect(revisions).toEqual([1, 2]);
   });
 
   it("feeds Skia and the manipulator the plain file URI (no ?v= query)", async () => {

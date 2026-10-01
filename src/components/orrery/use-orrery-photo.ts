@@ -60,7 +60,10 @@ import {
   orreryMasterSignature,
 } from "@/services/photos/orrery-derivative-store";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
-import { usePhotoCacheBust } from "@/stores/photo-cache-bust-store";
+import {
+  getPhotoCacheBust,
+  usePhotoCacheBust,
+} from "@/stores/photo-cache-bust-store";
 import { Logger } from "@/utils/logger";
 
 // --- Tunable constants (top-of-file per project convention) ------------------
@@ -94,6 +97,8 @@ export interface OrreryImageDeps {
   readData: (uri: string) => Promise<SkData>;
   /** Deferred decode: `width()`/`height()` read the header only. */
   decode: (data: SkData) => SkImage | null;
+  /** The in-process display revision (`photo-cache-bust-store`), read first. */
+  revision: (relative: string) => number | undefined;
   /** The master's durable signature (size + mtime); null when it is missing. */
   signature: (relative: string) => string | null;
   /** The derivative file for exactly this signature, or null (miss / stale). */
@@ -102,12 +107,14 @@ export interface OrreryImageDeps {
   downsample: (uri: string) => Promise<{ uri: string }>;
   /**
    * Atomically move the temp file into place as the derivative for
-   * `signature`; null when the master changed meanwhile (nothing installed).
+   * `signature`; null when the master changed meanwhile — a new signature, or
+   * a display revision past `revision` (nothing installed).
    */
   install: (
     tempUri: string,
     relative: string,
     signature: string,
+    revision: number | undefined,
   ) => Promise<string | null>;
   /** Delete an unusable (empty / undecodable) derivative file. */
   dropDerivative: (uri: string) => void;
@@ -154,12 +161,13 @@ export const defaultOrreryImageDeps: OrreryImageDeps = {
   fileUri: (relative) => resolvePhotoUri(relative),
   readData: (uri) => Skia.Data.fromURI(uri),
   decode: (data) => Skia.Image.MakeImageFromEncoded(data),
+  revision: (relative) => getPhotoCacheBust(relative),
   signature: (relative) => orreryMasterSignature(relative),
   findDerivative: (relative, signature) =>
     findOrreryDerivative(relative, signature),
   downsample: downsampleWithManipulator,
-  install: (tempUri, relative, signature) =>
-    installOrreryDerivative(tempUri, relative, signature),
+  install: (tempUri, relative, signature, revision) =>
+    installOrreryDerivative(tempUri, relative, signature, revision),
   dropDerivative: (uri) => {
     dropOrreryDerivative(uri);
   },
@@ -188,7 +196,11 @@ interface PendingDerivative {
   work: Promise<string | null>;
 }
 
-/** In-flight generation per path + signature, so two bodies derive once. */
+/**
+ * In-flight generation per path + signature + display revision, so two bodies
+ * derive once. The revision is part of the key: a load that starts after a
+ * bump never joins a generation whose install will be discarded for it.
+ */
 const pendingDerivatives = new Map<string, PendingDerivative>();
 
 // --- Generation queue (at most ORRERY_DOWNSAMPLE_CONCURRENCY in flight) ------
@@ -219,11 +231,12 @@ function everyRequesterCancelled(requesters: Set<OrreryLoadToken>): boolean {
 function generateDerivative(
   relative: string,
   signature: string,
+  revision: number | undefined,
   uri: string,
   deps: OrreryImageDeps,
   token: OrreryLoadToken,
 ): Promise<string | null> {
-  const key = `${relative}#${signature}`;
+  const key = `${relative}#${signature}#${revision ?? 0}`;
   const pending = pendingDerivatives.get(key);
   if (pending) {
     pending.requesters.add(token);
@@ -250,7 +263,7 @@ function generateDerivative(
       }
       // Installed even if every requester has since gone: the next mount
       // reads it from disk instead of generating again.
-      return await deps.install(out.uri, relative, signature);
+      return await deps.install(out.uri, relative, signature, revision);
     } finally {
       if (pendingDerivatives.get(key) === entry) pendingDerivatives.delete(key);
     }
@@ -332,6 +345,9 @@ export async function loadOrreryImage(
   if (!isStoredPhotoPath(relative)) return null;
   try {
     if (token.cancelled) return null;
+    // Read BEFORE the master: a byte change after this point bumps it, so the
+    // install can tell this load's derivative is stale (WR6-01 hardening).
+    const revision = deps.revision(relative);
     // Missing master (D-23: small surfaces keep plain initials).
     const signature = deps.signature(relative);
     if (signature === null) return null;
@@ -358,6 +374,7 @@ export async function loadOrreryImage(
       derivative = await generateDerivative(
         relative,
         signature,
+        revision,
         uri,
         deps,
         token,

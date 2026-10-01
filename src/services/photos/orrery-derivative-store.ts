@@ -31,6 +31,9 @@
  *   - `installOrreryDerivative` re-reads the master's signature AFTER the
  *     atomic rename and deletes its own file if the master changed or vanished
  *     meanwhile, so a derivation racing a delete cannot leave a copy behind.
+ *     It also compares the in-process display revision captured when the load
+ *     started: every byte change bumps it, so a replace whose new master has
+ *     the same size + mtime (one timestamp tick) is still caught.
  *   - A launch sweep (once per process) walks the WHOLE namespace in chunks,
  *     yielding between them, off the launch-sweep critical path, and deletes
  *     sub-directories whose master is gone, files whose signature no longer
@@ -46,6 +49,7 @@ import { isStoredPhotoPath } from "@/db/photo-relative-path";
 import { registerSweepHook } from "@/services/launch-sweep";
 import { discardDerivative } from "@/services/photos/derivative-cache";
 import { photoFileStat } from "@/services/photos/photo-storage";
+import { getPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import { Logger } from "@/utils/logger";
 
 // --- Tunable constants (top-of-file per project convention) ------------------
@@ -248,13 +252,16 @@ export function dropOrreryDerivative(
  * file. Older signatures of the same photo are removed first. Resolves the
  * final URI, or null when the master changed or vanished while the
  * derivative was being made (the new file is deleted again — never a stale or
- * orphaned copy). On a failed move the temp file is retired and the error
- * rethrown.
+ * orphaned copy). "Changed" is either signal: the master's signature, or the
+ * in-process display revision (`photo-cache-bust-store`) moving on from
+ * `startRevision`, the value the load read before it looked at the master.
+ * On a failed move the temp file is retired and the error rethrown.
  */
 export async function installOrreryDerivative(
   tempUri: string,
   relative: string,
   signature: string,
+  startRevision: number | undefined,
   fs: OrreryDerivativeFs = productionFs(),
 ): Promise<string | null> {
   const basename = basenameOf(relative);
@@ -264,6 +271,12 @@ export async function installOrreryDerivative(
     throw new Error("unsafe orrery derivative target");
   }
   const dir = photoDirUri(fs, basename);
+  // The bytes changed since the load began (their derivatives were already
+  // discarded): install nothing, and never touch the photo's directory.
+  if (getPhotoCacheBust(relative) !== startRevision) {
+    discardDerivative(tempUri);
+    return null;
+  }
   let expectedSize: number | null;
   try {
     expectedSize = fs.fileSize(tempUri);
@@ -287,8 +300,12 @@ export async function installOrreryDerivative(
     throw new Error("orrery derivative size mismatch after install");
   }
   // The master may have been replaced or deleted (with its derivatives
-  // discarded) while this one was being made: never leave a copy behind.
-  if (orreryMasterSignature(relative, fs) !== signature) {
+  // discarded) while this one was being made: never leave a copy behind. The
+  // revision check closes a replace within one mtime tick at the same size.
+  if (
+    getPhotoCacheBust(relative) !== startRevision ||
+    orreryMasterSignature(relative, fs) !== signature
+  ) {
     dropOrreryDerivative(finalUri, fs);
     return null;
   }

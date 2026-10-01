@@ -25,6 +25,10 @@ vi.mock("@/utils/logger", () => ({
 import { registerSweepHook } from "@/services/launch-sweep";
 import { discardDerivative } from "@/services/photos/derivative-cache";
 import {
+  bumpPhotoCacheBust,
+  getPhotoCacheBust,
+} from "@/stores/photo-cache-bust-store";
+import {
   __resetOrreryDerivativeSweepForTest,
   discardOrreryDerivatives,
   dropOrreryDerivative,
@@ -128,6 +132,8 @@ const STAT = { size: 36109, modificationTime: 1_700_000_000_123.7 };
 const SIG = "36109-1700000000123";
 const PHOTO_DIR = `${NS}/contact-12.jpg`;
 const FINAL = `${PHOTO_DIR}/${SIG}.jpg`;
+/** The display revision a load of REL would capture right now. */
+const rev = () => getPhotoCacheBust(REL);
 
 let fs: FakeFs;
 beforeEach(() => {
@@ -204,9 +210,9 @@ describe("installOrreryDerivative — atomic, never stale, never orphaned", () =
     fs.files.set(`${PHOTO_DIR}/20000-1.jpg`, 30_000);
     fs.files.set(`${PHOTO_DIR}/20000-1.jpg.partial`, 10);
     fs.files.set(TEMP, 41_000);
-    await expect(installOrreryDerivative(TEMP, REL, SIG, fs)).resolves.toBe(
-      FINAL,
-    );
+    await expect(
+      installOrreryDerivative(TEMP, REL, SIG, rev(), fs),
+    ).resolves.toBe(FINAL);
     expect([...fs.files]).toEqual([[FINAL, 41_000]]);
     expect(discardDerivative).not.toHaveBeenCalled();
   });
@@ -215,7 +221,7 @@ describe("installOrreryDerivative — atomic, never stale, never orphaned", () =
     fs.files.set(TEMP, 41_000);
     const seen: Array<number | null> = [];
     fs.duringMove = () => seen.push(fs.fileSize(FINAL));
-    await installOrreryDerivative(TEMP, REL, SIG, fs);
+    await installOrreryDerivative(TEMP, REL, SIG, rev(), fs);
     expect(seen).toEqual([null]);
     expect(fs.fileSize(FINAL)).toBe(41_000);
   });
@@ -228,7 +234,7 @@ describe("installOrreryDerivative — atomic, never stale, never orphaned", () =
         modificationTime: 1_800_000_000_000,
       });
     await expect(
-      installOrreryDerivative(TEMP, REL, SIG, fs),
+      installOrreryDerivative(TEMP, REL, SIG, rev(), fs),
     ).resolves.toBeNull();
     expect(fs.files.size).toBe(0);
   });
@@ -237,28 +243,55 @@ describe("installOrreryDerivative — atomic, never stale, never orphaned", () =
     fs.files.set(TEMP, 41_000);
     fs.duringMove = () => fs.masters.delete(REL);
     await expect(
-      installOrreryDerivative(TEMP, REL, SIG, fs),
+      installOrreryDerivative(TEMP, REL, SIG, rev(), fs),
     ).resolves.toBeNull();
     expect(fs.files.size).toBe(0);
+  });
+
+  it("leaves nothing behind when the bytes change mid-install at the SAME size + mtime (revision)", async () => {
+    fs.files.set(TEMP, 41_000);
+    const start = rev();
+    // A replace within one timestamp tick: the signature is unchanged, but the
+    // ownership layer's notify still bumps the display revision.
+    fs.duringMove = () => bumpPhotoCacheBust(REL);
+    await expect(
+      installOrreryDerivative(TEMP, REL, SIG, start, fs),
+    ).resolves.toBeNull();
+    expect(orreryMasterSignature(REL, fs)).toBe(SIG);
+    expect(fs.files.size).toBe(0);
+  });
+
+  it("installs nothing, and leaves the photo's directory alone, when the revision moved before the install began", async () => {
+    const start = rev();
+    bumpPhotoCacheBust(REL);
+    // A newer load's derivative for the same signature is already in place.
+    fs.ensureDir(PHOTO_DIR);
+    fs.files.set(FINAL, 40_000);
+    fs.files.set(TEMP, 41_000);
+    await expect(
+      installOrreryDerivative(TEMP, REL, SIG, start, fs),
+    ).resolves.toBeNull();
+    expect(discardDerivative).toHaveBeenCalledWith(TEMP);
+    expect(fs.fileSize(FINAL)).toBe(40_000);
   });
 
   it("retires the temp file and rethrows when the rename fails", async () => {
     fs.files.set(TEMP, 41_000);
     fs.failMove = true;
-    await expect(installOrreryDerivative(TEMP, REL, SIG, fs)).rejects.toThrow(
-      "rename failed",
-    );
+    await expect(
+      installOrreryDerivative(TEMP, REL, SIG, rev(), fs),
+    ).rejects.toThrow("rename failed");
     expect(discardDerivative).toHaveBeenCalledWith(TEMP);
     expect(fs.fileSize(FINAL)).toBeNull();
   });
 
   it("refuses an empty temp file or an unsafe target (temp retired)", async () => {
     fs.files.set(TEMP, 0);
-    await expect(installOrreryDerivative(TEMP, REL, SIG, fs)).rejects.toThrow(
-      "empty",
-    );
     await expect(
-      installOrreryDerivative(TEMP, "avatars/../x.jpg", SIG, fs),
+      installOrreryDerivative(TEMP, REL, SIG, rev(), fs),
+    ).rejects.toThrow("empty");
+    await expect(
+      installOrreryDerivative(TEMP, "avatars/../x.jpg", SIG, undefined, fs),
     ).rejects.toThrow("unsafe");
     expect(discardDerivative).toHaveBeenCalledTimes(2);
   });
@@ -266,9 +299,9 @@ describe("installOrreryDerivative — atomic, never stale, never orphaned", () =
   it("deletes a short file that the rename produced", async () => {
     fs.files.set(TEMP, 41_000);
     fs.truncateOnMove = true;
-    await expect(installOrreryDerivative(TEMP, REL, SIG, fs)).rejects.toThrow(
-      "size mismatch",
-    );
+    await expect(
+      installOrreryDerivative(TEMP, REL, SIG, rev(), fs),
+    ).rejects.toThrow("size mismatch");
     expect(fs.fileSize(FINAL)).toBeNull();
   });
 });

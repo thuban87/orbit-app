@@ -33,6 +33,7 @@ vi.mock("react", () => ({
 }));
 vi.mock("@/stores/photo-cache-bust-store", () => ({
   usePhotoCacheBust: () => 1,
+  getPhotoCacheBust: () => 1,
 }));
 vi.mock("@shopify/react-native-skia", () => {
   const image = (size: number) => {
