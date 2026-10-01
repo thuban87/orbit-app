@@ -71,6 +71,35 @@ float3 lbNebula(float2 p, float per, float t) {
 }
 `;
 
+// FAR star layer, analytic (hash grid, one candidate star per 22-dp sky cell).
+// Lives in the nebula pass so the 700+ far stars cost no CPU and no extra
+// full-screen pass. Needs NEBULA_SKY's uVC / uRot (concatenated before).
+const NEBULA_FAR_STARS = `
+uniform float2 uFarOff;
+uniform float uFarScale;
+uniform float uStarAlpha;
+uniform float uStarAdd;
+uniform float uStarDensity;
+uniform float3 uStarA;
+uniform float3 uStarB;
+uniform float3 uStarC;
+float3 lbFarStars(float2 xy, float3 col) {
+  float2 d = xy - uVC - uFarOff;
+  float c = cos(uRot);
+  float s = sin(uRot);
+  float2 p = float2(c * d.x + s * d.y, -s * d.x + c * d.y) / uFarScale;
+  float2 cell = floor(p / 22.0);
+  if (lbHash(cell + 17.0) > uStarDensity) return col;
+  float2 sp = (cell + 0.2 + 0.6 * float2(lbHash(cell + 41.3), lbHash(cell + 7.9))) * 22.0;
+  float dist = length(p - sp) * uFarScale;
+  float rad = 0.42 + 0.75 * pow(lbHash(cell + 3.1), 3.0);
+  float a = min(1.0, exp(-(dist * dist) / (rad * rad)) * (0.45 + 0.85 * lbHash(cell + 9.7)) * uStarAlpha);
+  float t = lbHash(cell + 5.5);
+  float3 sc = t < 0.72 ? uStarA : (t < 0.86 ? uStarB : uStarC);
+  return mix(mix(col, sc, a), col + sc * a, uStarAdd);
+}
+`;
+
 const NEBULA_SHADE = `
 uniform float2 uRes;
 uniform float3 uSky;
@@ -93,6 +122,7 @@ half4 lbShade(float3 n, float2 xy) {
   col = mix(col, uEmber, clamp(a * b * 4.0 * uEmberStr, 0.0, 1.0));
   col += uLobeA * (a * a * uGlow) + uLobeB * (b * b * uGlow);
   col *= 1.0 - n.z * clamp(0.25 + a + b, 0.0, 1.0) * uDust;
+  col = lbFarStars(xy, col);
   float2 v = (xy - 0.5 * uRes) / (0.5 * uRes);
   float vig = smoothstep(0.45, 1.4, length(v * float2(1.0, 0.85)));
   col = mix(col, uVigTone, vig * uVig);
@@ -150,9 +180,10 @@ half4 main(float2 xy) {
   /**
    * Per-frame SAMPLE of the baked densities: parallax (offset / yaw / zoom
    * scale from `frame.value.pose`), ambient drift + breathing warp, token
-   * colouring, dust, vignette and a 1/255 dither. One texture fetch per pixel.
+   * colouring, dust, the analytic FAR star layer, vignette and a 1/255
+   * dither. One texture fetch per pixel.
    */
-  nebulaSample: `${NEBULA_NOISE}${NEBULA_SHADE}${NEBULA_SKY}
+  nebulaSample: `${NEBULA_NOISE}${NEBULA_SKY}${NEBULA_FAR_STARS}${NEBULA_SHADE}
 uniform shader uNeb;
 half4 main(float2 xy) {
   float2 p = lbSky(xy);
@@ -164,7 +195,7 @@ half4 main(float2 xy) {
    * A/B only: the same nebula computed LIVE at full resolution every frame
    * (≈17 noise evaluations × 5 octaves per pixel) with slowly evolving warp.
    */
-  nebulaLive: `${NEBULA_NOISE}${NEBULA_SHADE}${NEBULA_SKY}
+  nebulaLive: `${NEBULA_NOISE}${NEBULA_SKY}${NEBULA_FAR_STARS}${NEBULA_SHADE}
 uniform float uTexSize;
 uniform float uPer;
 half4 main(float2 xy) {

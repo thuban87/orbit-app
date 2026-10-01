@@ -91,12 +91,12 @@ import { mixVec, tokenToVec3, type Vec3 } from "./labb-uniforms";
 
 // --- Tunables -----------------------------------------------------------------
 /** Baked density texture (square, seamlessly tiling). */
-const NEB_TEX = 512;
+const NEB_TEX = 768;
 const NEB_TEX_SIZE = { width: NEB_TEX, height: NEB_TEX };
 /** Noise lattice period across the texture (base cells per tile). */
 const NEB_PERIOD = 8;
-/** Texels per dp: tile = 512 / 0.3 ≈ 1700 dp, base cloud cell ≈ 213 dp. */
-const NEB_TEXELS_PER_DP = 0.3;
+/** Texels per dp: tile = 768 / 0.45 ≈ 1700 dp, base cloud cell ≈ 213 dp. */
+const NEB_TEXELS_PER_DP = 0.45;
 /** Ambient drift: a slow Lissajous (dp amplitude, s period) — bounded, never walks off. */
 const DRIFT_X = 26;
 const DRIFT_Y = 18;
@@ -144,6 +144,11 @@ const NEAR: LabStarLayerSpec = {
   twinkle: 0.7,
   spikes: 0.14,
 };
+/**
+ * FAR layer in the nebula shader: probability that a 22-dp sky cell holds a
+ * star (× profile density). ≈ 0.42 → ~350 far stars on a phone screen.
+ */
+const FAR_SHADER_DENSITY = 0.5;
 /** Twinkle speed (rad/s) per unit star speed. */
 const TWINKLE_RATE = 1.1;
 
@@ -169,11 +174,14 @@ function nebulaFrameUniforms(
   uDrift: number[];
   uWarp: number;
   uTime: number;
+  uFarOff: number[];
+  uFarScale: number;
 } {
   "worklet";
   const sky = labSkyPose(frame);
   const parallax = flags ? flags.parallax : true;
   const place = skyLayerPlacement(sky, NEBULA_FACTOR, parallax);
+  const far = skyLayerPlacement(sky, FAR.factor, parallax);
   const animate = !reduced && (flags ? flags.nebulaDrift : true);
   const t = animate ? (timeMs / 1000) % 1000 : STILL_T;
   const tau = Math.PI * 2;
@@ -188,6 +196,8 @@ function nebulaFrameUniforms(
     ],
     uWarp: WARP_DP * (0.55 + 0.45 * Math.sin((t * tau) / BREATH_S)),
     uTime: t,
+    uFarOff: [far.ox, far.oy],
+    uFarScale: far.zs,
   };
 }
 
@@ -210,6 +220,12 @@ interface NebulaStatic {
   dust: number;
   vig: number;
   intensity: number;
+  uStarA: Vec3;
+  uStarB: Vec3;
+  uStarC: Vec3;
+  uStarAdd: number;
+  uStarDensity: number;
+  starAlpha: number;
 }
 
 function nebulaStatic(
@@ -247,6 +263,12 @@ function nebulaStatic(
     dust: env.dust,
     vig: env.vignette,
     intensity: profile.intensity,
+    uStarA: tokenToVec3(labColor(colors, env.starTone)),
+    uStarB: tokenToVec3(pick(env.starTintStars[0])),
+    uStarC: tokenToVec3(pick(env.starTintStars[1])),
+    uStarAdd: env.starAdditive ? 1 : 0,
+    uStarDensity: FAR_SHADER_DENSITY * env.starDensity,
+    starAlpha: env.starAlpha,
   };
 }
 
@@ -285,6 +307,15 @@ function useNebulaUniforms(
       uEmberStr: st.ember * k,
       uDust: Math.min(1, st.dust * k),
       uVig: vignette ? Math.min(1, st.vig * Math.max(0.6, k)) : 0,
+      uStarA: st.uStarA,
+      uStarB: st.uStarB,
+      uStarC: st.uStarC,
+      uStarAdd: st.uStarAdd,
+      uStarDensity: st.uStarDensity,
+      uStarAlpha:
+        flags && !flags.stars
+          ? 0
+          : st.starAlpha * (0.4 + 0.6 * Math.min(1.5, k)),
     };
     return withTexSize
       ? { ...base, uTexSize: st.uTexSize, uPer: st.uPer }
@@ -557,12 +588,15 @@ function Starfield({
   colors,
   profile,
   frame,
+  farInShader,
 }: {
   width: number;
   height: number;
   colors: ThemePalette;
   profile: LabFxProfile;
   frame: SharedValue<AnimatedFrame>;
+  /** The FAR layer is drawn analytically by the nebula shader. */
+  farInShader: boolean;
 }) {
   const env = profile.env;
   const image = useTexture(<StarSprites />, ATLAS_SIZE, []);
@@ -613,7 +647,7 @@ function Starfield({
   };
   return (
     <Group>
-      <StarAtlas {...common} {...far} twinkleAmp={0} />
+      {farInShader ? null : <StarAtlas {...common} {...far} twinkleAmp={0} />}
       <StarAtlas {...common} {...near} twinkleAmp={env.twinkle} />
     </Group>
   );
@@ -641,6 +675,14 @@ export function LabEnvironment({
     () => nebulaStatic(width, height, colors, background, profile),
     [width, height, colors, background, profile],
   );
+  // The far star layer rides in the nebula shader when that shader exists;
+  // otherwise (nebula off / null effect) it falls back to its own Atlas.
+  const farInShader =
+    flags.nebula &&
+    (flags.nebulaLive
+      ? getLabEffect("nebulaLive") !== null
+      : getLabEffect("nebulaBake") !== null &&
+        getLabEffect("nebulaSample") !== null);
   return (
     <Group>
       {flags.nebula && flags.nebulaLive ? (
@@ -657,6 +699,7 @@ export function LabEnvironment({
           colors={colors}
           profile={profile}
           frame={frame}
+          farInShader={farInShader}
         />
       ) : null}
     </Group>

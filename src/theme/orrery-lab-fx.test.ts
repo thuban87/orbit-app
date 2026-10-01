@@ -39,6 +39,43 @@ describe("Lab B effect profiles (LAB-ONLY tokens)", () => {
     );
   });
 
+  it("gives every variant an L0 environment, with Standard Light the quietest", () => {
+    const effective = (pkg: "galaxy" | "standard", mode: "dark" | "light") => {
+      const p = resolveLabFxProfile(pkg, mode);
+      return {
+        nebula: (p.env.strengthA + p.env.strengthB) * p.intensity,
+        stars: p.env.starAlpha * p.env.starDensity * p.intensity,
+      };
+    };
+    for (const pkg of ["galaxy", "standard"] as const)
+      for (const mode of ["dark", "light"] as const) {
+        const profile = resolveLabFxProfile(pkg, mode);
+        const palette = THEME_PRESETS[pkg][mode];
+        expect(typeof labColor(palette, profile.env.lobeA)).toBe("string");
+        expect(typeof labColor(palette, profile.env.starTone)).toBe("string");
+        for (const i of [
+          profile.env.lobeBStar,
+          profile.env.emberStar,
+          ...profile.env.starTintStars,
+        ])
+          expect(palette.starPalette[i]).toBeTypeOf("string");
+        // Light themes have no emission and no additive stars.
+        if (mode === "light") {
+          expect(profile.env.glow).toBe(0);
+          expect(profile.env.starAdditive).toBe(false);
+        }
+      }
+    const sl = effective("standard", "light");
+    for (const [pkg, mode] of [
+      ["galaxy", "dark"],
+      ["galaxy", "light"],
+      ["standard", "dark"],
+    ] as const) {
+      expect(sl.nebula).toBeLessThan(effective(pkg, mode).nebula);
+      expect(sl.stars).toBeLessThan(effective(pkg, mode).stars);
+    }
+  });
+
   it("falls back to Galaxy Dark for unknown inputs", () => {
     expect(resolveLabFxProfile(undefined, undefined)).toBe(
       LAB_FX_PROFILES.galaxy.dark,

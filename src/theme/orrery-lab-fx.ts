@@ -78,6 +78,10 @@ export interface LabEnvProfile {
    */
   vignetteTone: LabColorToken | null;
   vignetteShade: number;
+  /** Neutral star tone (bright stars on dark, ink specks on light). */
+  starTone: LabColorToken;
+  /** Far-layer star tints: indices into `starPalette`. */
+  starTintStars: readonly [number, number];
   /** Starfield: global star alpha, fraction of stars kept, glow sprites, blend. */
   starAlpha: number;
   starDensity: number;
@@ -114,14 +118,16 @@ const DARK_ENV: LabEnvProfile = {
   lobeA: "accent",
   lobeBStar: 3,
   emberStar: 2,
-  strengthA: 0.34,
-  strengthB: 0.3,
-  glow: 0.22,
+  strengthA: 0.28,
+  strengthB: 0.27,
+  glow: 0.16,
   ember: 0.22,
-  dust: 0.42,
-  vignette: 0.55,
+  dust: 0.38,
+  vignette: 0.62,
   vignetteTone: null,
   vignetteShade: 0.55,
+  starTone: "textPrimary",
+  starTintStars: [4, 0],
   starAlpha: 0.9,
   starDensity: 1,
   starSoft: true,
@@ -142,6 +148,8 @@ const LIGHT_ENV: LabEnvProfile = {
   vignette: 0.18,
   vignetteTone: "textSecondary",
   vignetteShade: 0,
+  starTone: "textSecondary",
+  starTintStars: [4, 0],
   starAlpha: 0.42,
   starDensity: 0.4,
   starSoft: false,
