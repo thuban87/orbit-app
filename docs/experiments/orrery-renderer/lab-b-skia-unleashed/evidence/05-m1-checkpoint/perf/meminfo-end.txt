@@ -1,0 +1,30 @@
+Applications Memory Usage (in Kilobytes):
+Uptime: 16512283 Realtime: 16512283
+
+** MEMINFO in pid 3342 [com.bwales.orbit.labb] **
+                   Pss  Private  Private  SwapPss      Rss     Heap     Heap     Heap
+                 Total    Dirty    Clean    Dirty    Total     Size    Alloc     Free
+                ------   ------   ------   ------   ------   ------   ------   ------
+  Native Heap   399345   399336        0       16   400104   520528   295821   211989
+  Dalvik Heap    14744    14344      352       21    15884    27466    13733    13733
+ Dalvik Other     5472     4716        4        0     6292                           
+        Stack     1392     1392        0        0     1400                           
+    Other dev      157        0      156        0      316                           
+     .so mmap     4537      616     1244       12    44800                           
+    .jar mmap     1512        0       84        0    41444                           
+    .apk mmap    39866     1792    37516        0    42156                           
+    .ttf mmap     5258        0     5176        0     5612                           
+    .dex mmap      385        0      376        0      780                           
+    .oat mmap      993        0      276        0    13008                           
+    .art mmap     2819     1384     1056       57    19616                           
+   Other mmap     2391        4     2084        0     3908                           
+        Memfd        0        0        0        0        4                           
+      Unknown   619892   619888        0        9   620316                           
+        TOTAL  1098878  1043472    48324      115  1215640   547994   309554   225722
+ 
+ App Summary
+                       Pss(KB)                        Rss(KB)
+                        ------                         ------
+           Java Heap:    16784                          35500
+         Native Heap:   399336                         400104
+                Code:    47092                         149316

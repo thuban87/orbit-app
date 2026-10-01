@@ -288,3 +288,43 @@ focus lock keeps stroke style, density fade, tuning), dead end `eb860615` revert
     worklet (R1); wake/tether during a switch simply hide (WP-2.1 ring unwind/draw-on will
     animate rings properly); light-theme yellow wobble dashes are low-contrast on vellum (token
     hue, same as legacy).
+
+## 2026-10-01 — WP-1.4 Milestone 1 device checkpoint (release build, emulator)
+
+Commits: `80a9650b` (seed portraits) + the WP-1.4 docs/evidence commit.
+
+1. **Real-looking photos.** The 16 fictional test portraits are wired into the dev seed for 30
+   contacts, through the normal `avatars/contact-<id>.jpg` contract. Inner Circle gets 7,
+   including the low-contrast, dog and logo fixtures; Dense and Work reuse each portrait about
+   twice. The PRNG sequence is unchanged, so every contact keeps its cadence, history, status
+   and position from earlier WPs, and the old evidence stays comparable. Dev bundle only (C-42).
+2. **Release build.** `assembleRelease -PreactNativeArchitectures=x86_64` on droid (5 m 15 s
+   clean in Lab B's dir, after the busy check) gives an 84 MB APK. Debug and release are
+   signed by the same `debug.keystore` (apksigner SHA-256 identical), so `install -r` of the
+   release APK over the seeded debug install **keeps all data** (verified on device). No lab
+   flag or seed-in-release path was needed. The FX panel and FPS HUD work in release
+   (applicationId gate, C-08). Procedure: RUNBOOK §10.
+3. **Checkpoint matrix (release, emulator)**, all in `evidence/05-m1-checkpoint/`:
+   - overview: All Contacts, Dense 120 and Inner Circle 12;
+   - all five zoom presets on Dense;
+   - focus fly-in on a photo body (Dev Grant + moon companion) and an initials body (Cleo);
+   - detail labels with context captions;
+   - two System switches (mp4);
+   - reduced motion forced on: 0 changed pixels outside the HUD;
+   - all four themes;
+   - background → foreground and tab blur → refocus: 0 gfx frames while inactive;
+   - legacy-vs-lab A/B pairs (`28c`, `29b` vs `02`);
+   - face close-ups at detail 3.2 for stable, never-contacted and rogue portraits;
+   - perf matrix (PERF-LOG).
+4. **Findings that change the plan.** Release legacy on Dense is ~5 fps against the lab's ~21
+   gfx frames/s. In release no single heavy layer moves the lab's emulator frame count, so
+   per-layer cost needs the phone or Perfetto (R1). The companion popover hides the focused
+   body's label and covers half the face at detail zoom: a WP-2.2 target. Standard Dark is
+   indistinguishable from Galaxy Dark in the lab sky: a package environment profile is
+   needed. Faces survive the lighting and the rogue desaturation (M1-CRITIQUE).
+5. **Not done (emulator-only checkpoint).** No physical Pixel 6 Pro / 3a run: Lab A owns the
+   phone, and Lab B is restricted to the emulator. So there is no perf or thermal claim and no
+   pinch. Reorder hold was not exercised (adb cannot do the long-press drag reliably on the
+   canvas here). No decay-status *portrait* at detail. Tilt (perspective) is not timed.
+6. **Debug blank-canvas incident.** This was seen once, on the debug build during droid build
+   load (RUNBOOK §10). The release build was unaffected.

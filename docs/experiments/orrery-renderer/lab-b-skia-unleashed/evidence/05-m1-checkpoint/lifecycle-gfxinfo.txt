@@ -1,0 +1,8 @@
+WP-1.4 lifecycle check — Lab B RELEASE build (x86_64, 80a9650b), emulator-5554, Lab B Dense, Galaxy Dark.
+`dumpsys gfxinfo com.bwales.orbit.labb reset`, wait 10 s, read "Total frames rendered".
+  Contacts tab (Orrery blurred)  : 0 frames
+  Orrery tab, idle                : 200 frames
+  Home pressed (backgrounded)     : 0 frames
+  Relaunched -> Orrery foreground : 199 frames
+=> the lab clock stops when the Orrery tab is blurred and when the app is backgrounded,
+   and resumes on refocus/foreground (unmount gate in OrreryScreen preserved).

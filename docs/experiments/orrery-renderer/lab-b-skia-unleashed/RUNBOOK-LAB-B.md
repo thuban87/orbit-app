@@ -157,7 +157,9 @@ A fresh install (or `pm clear`) needs §3's prefs file before launch, otherwise 
 Automatic. `src/__dev__/lab-b-seed.ts` runs once after DB migration on any **`__DEV__` build
 whose applicationId is `com.bwales.orbit.labb`** (it no-ops in the real app and in release). It
 seeds through the real DAOs: 140 contacts with varied cadences and 0–24 interactions (all gravity
-tiers, mixed recency), ~56 procedural Skia-rendered JPEG "photos", ~75 unlinked relationships on
+tiers, mixed recency), 71 photos — 30 of them the fictional test portraits from
+`assets/test-portraits/` (WP-1.4; fetched from Metro, dev bundle only, see §10) and the rest
+procedural Skia-rendered JPEGs — ~75 unlinked relationships on
 30 contacts (satellites), and Systems **Lab B Dense** (120 members), **Lab B Inner Circle** (12),
 **Lab B Work** (30). Idempotent (skips when "Lab B Dense" exists). Logs
 `[lab-b-seed] seeded contacts=… photos=… satellites=… in …ms` to logcat (`ReactNativeJS`).
@@ -215,6 +217,63 @@ tmux kill-session -t orbit-lab-b
 pkill -f "ssh -f -N .*-L 5039:127.0.0.1:5037"       # ONLY our tunnel pattern
 # optional: $ADB uninstall $PKG ; ssh droid "rmdir /s /q \"$DEST\""
 ```
+
+## 10. Release (non-debug) build for evidence and perf (WP-1.4)
+
+Performance claims and M1 evidence come from a **release** APK: Hermes bytecode, minified,
+`__DEV__ = false`, no dev menu / LogBox / Metro. The FX panel and FPS HUD stay reachable
+because they are gated on the applicationId, not `__DEV__` (C-08): long-press "LAB B".
+
+**Seeding.** The seed (and the test portraits it pulls from Metro) only runs in a DEBUG build:
+`App.tsx` requires `@/__dev__/lab-b-seed` inside `if (__DEV__)`, and Metro constant-folds that
+branch away before collecting dependencies in a release bundle. So: seed on the debug APK, then
+install the release APK over it with `install -r`. **Verified 2026-10-01 that this keeps the
+data**: `assembleRelease` on the Expo-prebuilt project signs with the same `debug.keystore` as
+`assembleDebug` (`android/app/build.gradle` `signingConfigs.debug` for both), so the
+certificates match and `install -r` is an in-place update. No lab-only release flag was needed.
+
+```bash
+# 1. Seed on DEBUG (fresh): pm clear + §3 prefs + launch the debug APK; wait for
+#    "[lab-b-seed] seeded ... portraits=30 ..." in logcat (§7). Turn on Settings > Orrery >
+#    Relationship Satellites if the run needs moons (pm clear resets it to off).
+# 2. Busy check (§5), sync (§4), then build RELEASE, x86_64 only (~5 min clean, droid):
+ssh -o BatchMode=yes droid "cd /d \"$DEST\\android\" & gradlew.bat assembleRelease -PreactNativeArchitectures=x86_64 --console=plain"
+scp -o BatchMode=yes "droid:C:/Users/bwales/projects/orbit-lab-b/android/app/build/outputs/apk/release/app-release.apk" /tmp/orbit-lab-b-release.apk
+# 3. Same signer as the debug APK? (both print the same SHA-256)
+AS=$(ls -d ~/Android/Sdk/build-tools/*/ | tail -1)apksigner
+$AS verify --print-certs /tmp/orbit-lab-b-release.apk | grep -m1 SHA-256
+$AS verify --print-certs /tmp/orbit-lab-b-debug.apk   | grep -m1 SHA-256
+# 4. Install OVER the seeded debug app (keeps the DB + avatars/), launch:
+$ADB shell am force-stop $PKG && $ADB install -r /tmp/orbit-lab-b-release.apk
+$ADB shell dumpsys package $PKG | grep -m1 "flags=\["      # no DEBUGGABLE => release
+$ADB shell monkey -p $PKG -c android.intent.category.LAUNCHER 1
+```
+
+Release APK (x86_64): ~84 MB (debug 110 MB). It needs no Metro and no `debug_http_host`.
+
+**Fixtures never ship — how it was checked.** droid's source copy excludes `docs/` (§4), so a
+release bundle that tried to resolve the portrait `require`s would fail to build; it built.
+Then, on the APK: `unzip -l app-release.apk | grep -c jpg` under `res/drawable*` = 0, and the
+Hermes bundle (`assets/index.android.bundle`) contains no `lab-b-seed`, `Lab B Dense` or
+`registerUatProbes` strings, while it does contain `labb-fx-panel` (panel present).
+
+**Caveats.** `run-as` does not work on the release install (not debuggable), so DB peeks need the
+debug APK again (`install -r` the debug APK back; data is kept the same way). Going back to debug
+also needs the §3 prefs only after a `pm clear`. Panel state (renderer, flags, reduced-motion
+override) is session-only and resets on app restart. `uiautomator dump` still fails while the
+Orrery animates; drive the panel from screenshots (panel chip coordinates at 1280x2856, panel
+unscrolled: Lab 126,1396 · Legacy 300,1396 · Far 158,1582 · Overview 406,1582 · Identity
+692,1582 · Detail 966,1582 · Near 156,1684 · RM On 380,2158 · RM Follow OS 188,2158 · All
+Contacts 210,2346 · Lab B Dense 888,2546 · Close 1132,1198 · Reset 956,1198). Recentre =
+`input touchscreen tap 1150 2140`. Panning: `input swipe` in the canvas works but carries
+fling momentum (distance not repeatable); never start a swipe within ~150 px of the left edge
+(it triggers system Back).
+
+**Debug-build blank canvas (seen once).** Right after a reseed, while droid was running the
+release Gradle build, the DEBUG app showed an empty Orrery canvas for >1 min with
+`updateTexImage: LegacySurfaceTexture is not attached!` spam from RNSkia. The release build
+rendered normally on the same data. Not reproduced or diagnosed further (suspected host
+contention + debug JS); if it recurs, relaunch the app after the host is idle.
 
 ## Gotchas hit while bringing this up
 

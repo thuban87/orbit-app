@@ -169,3 +169,58 @@ Findings (relative, emulator only):
 
 Reduced motion (forced ON, Dense overview): two screenshots 2 s apart differ only inside the HUD
 box → flow comets off, wakes/rings static.
+
+## 2026-10-01 — WP-1.4 M1 checkpoint, RELEASE build (commit 80a9650b)
+
+**EMULATOR, RELEASE build (Hermes, minified, `__DEV__` false, no Metro), x86_64, emulator-5554 —
+relative A/B on this one target only, never a phone claim.** Scene: **Lab B Dense** (120
+contacts, 30 seeded test portraits app-wide), **Relationship Satellites ON**, **Galaxy Dark**,
+Home pose (recentre button) after a 20 s settle. Toggles changed live in the Lab B panel (panel
+closed during every window). Per run: `gfxinfo reset` → **idle 15 s**; then **pan** = 6 adb
+swipes back and forth (~10 s window); then **switch2x** = Dense → All Contacts → Dense through
+the panel (~25 s window, includes two panel open/close cycles). Raw dumps + HUD crops:
+`evidence/05-m1-checkpoint/perf/`. Main + RenderThread only; JS-thread jank is invisible.
+
+| Run | idle frames / 15 s | idle p50 / p90 | pan frames | pan p50 / p95 | switch2x frames | switch p50 / p95 | HUD fps (one snapshot) |
+|---|---|---|---|---|---|---|---|
+| **legacy** renderer | **50** | 200 / 200 ms | 28 | 200 / 1600 ms | 91 | 200 / 850 ms | n/a (HUD is lab-only) |
+| **lab, all defaults ON** | **312** | 17 / 34 | 174 | 17 / 48 | 574 | 32 / 34 | 40.2 |
+| lab, `environment` OFF | 332 | 17 / 34 | 157 | 18 / 600 | 583 | 32 / 34 | 60.0 |
+| lab, `rings` OFF | 339 | 17 / 34 | 140 | 18 / 600 | 560 | 17 / 34 | 60.0 |
+| lab, `bodies` OFF | 325 | 17 / 34 | 150 | 17 / 38 | 584 | 17 / 34 | 51.8 |
+| lab, `labels` OFF | 321 | 17 / 34 | 176 | 17 / 550 | 568 | 17 / 34 | 48.3 |
+| lab, env+rings+polaris+bodies+labels OFF | 115 | 17 / 18 | 52 | 17 / 1150 | 223 | 17 / 22 | 60.0 |
+| lab all ON, **5-min idle** | 7062 / 300 s (23.5/s) | 17 / 34 | — | — | — | — | — |
+
+Findings (relative, emulator only):
+1. **Legacy vs lab in release: ~6× more frames for the lab renderer** (312 vs 50 per 15 s idle;
+   legacy p50 200 ms = ~5 fps on Dense). This matches the WP-1.3 debug finding that the legacy
+   per-frame ring `Path` rebuild is the dominant cost; release does not rescue legacy.
+2. **In release, no single heavy layer moves the lab's idle frame count** (312–339 within
+   noise). The lab path runs at a steady ~21–23 frames/s of RenderThread output with p50 at one
+   vsync (17 ms) and p90 at two (34 ms), i.e. a cadence pinned near every-other/third vsync
+   rather than a cost that scales with any layer. With every layer off the count *drops* (115)
+   because an unchanged canvas produces fewer frames — so gfx frame count here measures
+   "changed frames", not headroom. The bottleneck is not identifiable from gfxinfo on this
+   target; the debug-build layer costs (WP-1.2/1.3 tables) remain the best per-layer evidence.
+   R1: repeat this exact matrix on the Pixel 6 Pro with Perfetto (UI + JS threads).
+3. **gpu p50 stays 3–7 ms** with everything on (the sky, rings and lit bodies are cheap on the
+   GPU); the switch window rises to 15–16 ms GPU while bodies/rings animate.
+4. **Pan p95 spikes (550–1150 ms)** appear in some lab runs and in the all-off run but not
+   in lab-all — single long frames at gesture start/end, not sustained; treat as noise until
+   reproduced on a phone.
+5. **HUD fps** (UI-thread clock cadence, one screenshot per run) disagrees with gfx again
+   (40–60 fps HUD vs ~21 frames/s gfx). Same caveat as WP-1.2: HUD is a lab convenience, not a
+   measurement.
+6. **5-minute idle** holds 23.5 frames/s with the same p50/p90 as the 15 s window — no drift.
+   Thermal on the emulator is synthetic (battery/skin constant 30 °C, status 0): **no thermal
+   claim possible**. Memory: TOTAL PSS ~1.11 GB at start, ~1.10 GB after 5 min (Native Heap
+   ~400 MB) — stable, no growth; the absolute figure includes the emulator's GL translation
+   allocations and is not comparable to a phone.
+
+Lifecycle (release, `evidence/05-m1-checkpoint/lifecycle-gfxinfo.txt`): 0 frames in 10 s on
+the Contacts tab and while backgrounded; ~200 frames in 10 s on the Orrery tab and again after
+returning to foreground — the clock stops when the Orrery is inactive.
+
+Reduced motion (release, forced ON, Inner Circle): two screenshots 2.5 s apart differ in **0**
+pixels outside the HUD box; with RM off, 239 186 pixels differ.

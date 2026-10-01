@@ -1,0 +1,85 @@
+Applications Graphics Acceleration Info:
+Uptime: 15815555 Realtime: 15815555
+
+** Graphics info for pid 3342 [com.bwales.orbit.labb] **
+
+Stats since: 15800125367968ns
+Total frames rendered: 325
+Janky frames: 202 (62.15%)
+Janky frames (legacy): 2 (0.62%)
+50th percentile: 17ms
+90th percentile: 34ms
+95th percentile: 34ms
+99th percentile: 34ms
+Number Missed Vsync: 0
+Number High input latency: 0
+Number Slow UI thread: 107
+Number Slow bitmap uploads: 0
+Number Slow issue draw commands: 39
+Number Frame deadline missed: 202
+Number Frame deadline missed (legacy): 2
+HISTOGRAM: 5ms=0 6ms=0 7ms=0 8ms=0 9ms=10 10ms=63 11ms=29 12ms=18 13ms=2 14ms=0 15ms=1 16ms=29 17ms=68 18ms=21 19ms=0 20ms=0 21ms=0 22ms=1 23ms=0 24ms=0 25ms=0 26ms=0 27ms=0 28ms=0 29ms=1 30ms=0 31ms=0 32ms=26 34ms=56 36ms=0 38ms=0 40ms=0 42ms=0 44ms=0 46ms=0 48ms=0 53ms=0 57ms=0 61ms=0 65ms=0 69ms=0 73ms=0 77ms=0 81ms=0 85ms=0 89ms=0 93ms=0 97ms=0 101ms=0 105ms=0 109ms=0 113ms=0 117ms=0 121ms=0 125ms=0 129ms=0 133ms=0 150ms=0 200ms=0 250ms=0 300ms=0 350ms=0 400ms=0 450ms=0 500ms=0 550ms=0 600ms=0 650ms=0 700ms=0 750ms=0 800ms=0 850ms=0 900ms=0 950ms=0 1000ms=0 1050ms=0 1100ms=0 1150ms=0 1200ms=0 1250ms=0 1300ms=0 1350ms=0 1400ms=0 1450ms=0 1500ms=0 1550ms=0 1600ms=0 1650ms=0 1700ms=0 1750ms=0 1800ms=0 1850ms=0 1900ms=0 1950ms=0 2000ms=0 2050ms=0 2100ms=0 2150ms=0 2200ms=0 2250ms=0 2300ms=0 2350ms=0 2400ms=0 2450ms=0 2500ms=0 2550ms=0 2600ms=0 2650ms=0 2700ms=0 2750ms=0 2800ms=0 2850ms=0 2900ms=0 2950ms=0 3000ms=0 3050ms=0 3100ms=0 3150ms=0 3200ms=0 3250ms=0 3300ms=0 3350ms=0 3400ms=0 3450ms=0 3500ms=0 3550ms=0 3600ms=0 3650ms=0 3700ms=0 3750ms=0 3800ms=0 3850ms=0 3900ms=0 3950ms=0 4000ms=0 4050ms=0 4100ms=0 4150ms=0 4200ms=0 4250ms=0 4300ms=0 4350ms=0 4400ms=0 4450ms=0 4500ms=0 4550ms=0 4600ms=0 4650ms=0 4700ms=0 4750ms=0 4800ms=0 4850ms=0 4900ms=0 4950ms=0
+50th gpu percentile: 7ms
+90th gpu percentile: 25ms
+95th gpu percentile: 4950ms
+99th gpu percentile: 4950ms
+GPU HISTOGRAM: 1ms=97 2ms=24 3ms=2 4ms=2 5ms=6 6ms=14 7ms=34 8ms=37 9ms=22 10ms=5 11ms=0 12ms=0 13ms=0 14ms=0 15ms=0 16ms=0 17ms=0 18ms=0 19ms=0 20ms=0 21ms=1 22ms=2 23ms=10 24ms=20 25ms=29 4950ms=20
+
+Pipeline=Skia (OpenGL)
+Memory policy:
+  Max surface area: 3655680
+  Max resource usage: 175.47MB (x48)
+  Background retention: 50% (altUiHidden = true)
+  GPU Context timeout: 10
+Contexts: 1 (stopped = 0)
+CPU Caches:
+  Glyph Cache: 2.40 MB (1 entry)
+  Glyph Count: 121 
+Total CPU memory usage:
+  2520849 bytes, 2.40 MB (0.00 bytes is purgeable)
+GPU Caches:
+  Other:
+    Other: 12.80 KB (1 entry)
+  Image:
+    Texture: 42.90 MB (12 entries)
+  Scratch:
+    Texture: 36.06 MB (5 entries)
+    Buffer Object: 142.00 KB (4 entries)
+Layer Info:
+    GlLayer size 1280x2325
+  Layers Total         11625.00 KB (numLayers = 1)
+Total GPU memory usage:
+  82954768 bytes, 79.11 MB (42.97 MB is purgeable)
+Pipeline Cache: inactiveTextureView: 1280x2325
+
+GraphicBufferAllocator buffers:
+            Handle |         Size |     W (Stride) x H | Layers |   Format |      Usage | Requestor
+    0x78b7bb242320 |      unknown | 1280 (   0) x 2856 |      1 |        1 | 0x     b00 | VRI[MainActivity]#1(BLAST Consumer)1
+    0x78b7bb2d9990 |      unknown | 1280 (   0) x 2325 |      1 |        1 | 0x     300 | SurfaceTexture-0-3342-15
+    0x78b7bb2df8f0 |      unknown | 1280 (   0) x 2325 |      1 |        1 | 0x     300 | SurfaceTexture-0-3342-15
+    0x78b7bb2ea4e0 |      unknown | 1280 (   0) x 2325 |      1 |        1 | 0x     300 | SurfaceTexture-0-3342-15
+    0x78b7bb305910 |      unknown | 1280 (   0) x 2856 |      1 |        1 | 0x     b00 | VRI[MainActivity]#1(BLAST Consumer)1
+    0x78b7bb315200 |      unknown | 1280 (   0) x 2856 |      1 |        1 | 0x     b00 | VRI[MainActivity]#1(BLAST Consumer)1
+Total allocated by GraphicBufferAllocator (estimate): 0.00 KB
+Imported gralloc buffers:
++ name:SurfaceTexture-0-3342-15, id:1488, size:11635.31KiB, w/h:1280x2325, usage: 0x300, req fmt:1, fourcc/mod:875708993/0, dataspace: 0x0, compressed: false
++ name:SurfaceTexture-0-3342-15, id:1490, size:11635.31KiB, w/h:1280x2325, usage: 0x300, req fmt:1, fourcc/mod:875708993/0, dataspace: 0x0, compressed: false
++ name:VRI[MainActivity]#1(BLAST Consumer)1, id:1375, size:14290.31KiB, w/h:1280x2856, usage: 0xb00, req fmt:1, fourcc/mod:875708993/0, dataspace: 0x8810000, compressed: false
++ name:SurfaceTexture-0-3342-15, id:1489, size:11635.31KiB, w/h:1280x2325, usage: 0x300, req fmt:1, fourcc/mod:875708993/0, dataspace: 0x0, compressed: false
++ name:VRI[MainActivity]#1(BLAST Consumer)1, id:1374, size:14290.31KiB, w/h:1280x2856, usage: 0xb00, req fmt:1, fourcc/mod:875708993/0, dataspace: 0x0, compressed: false
++ name:VRI[MainActivity]#1(BLAST Consumer)1, id:1373, size:14290.31KiB, w/h:1280x2856, usage: 0xb00, req fmt:1, fourcc/mod:875708993/0, dataspace: 0x8810000, compressed: false
+Total imported by gralloc: 77776.88KiB
+
+Profile data in ms:
+
+	com.bwales.orbit.labb/com.bwales.orbit.labb.MainActivity/android.view.ViewRootImpl@af5919d (visibility=0)
+View hierarchy:
+
+  com.bwales.orbit.labb/com.bwales.orbit.labb.MainActivity/android.view.ViewRootImpl@af5919d
+  120 views, 258.45 kB of render nodes
+
+
+Total ViewRootImpl   : 1
+Total attached Views : 120
+Total RenderNode     : 258.45 kB (used) / 870.52 kB (capacity)
+

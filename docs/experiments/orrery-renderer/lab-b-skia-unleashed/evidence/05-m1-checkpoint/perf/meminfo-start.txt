@@ -1,0 +1,30 @@
+Applications Memory Usage (in Kilobytes):
+Uptime: 16171000 Realtime: 16171000
+
+** MEMINFO in pid 3342 [com.bwales.orbit.labb] **
+                   Pss  Private  Private  SwapPss      Rss     Heap     Heap     Heap
+                 Total    Dirty    Clean    Dirty    Total     Size    Alloc     Free
+                ------   ------   ------   ------   ------   ------   ------   ------
+  Native Heap   400529   400520        0       16   401288   520528   307069   200741
+  Dalvik Heap    30767    30736        8       30    31880    27978    13989    13989
+ Dalvik Other     5376     4624        0        0     6196                           
+        Stack     1432     1432        0        0     1440                           
+    Other dev      157        0      156        0      316                           
+     .so mmap     4525      604     1244       12    44792                           
+    .jar mmap     1524        0       84        0    41912                           
+    .apk mmap    39931     1792    37516        0    43116                           
+    .ttf mmap     5122        0     4996        0     5520                           
+    .dex mmap      385        0      376        0      768                           
+    .oat mmap      993        0      276        0    13008                           
+    .art mmap     1842     1380      104       77    18604                           
+   Other mmap     2462        4     2108        0     4372                           
+        Memfd        0        0        0        0        4                           
+      Unknown   618292   618288        0        9   618716                           
+        TOTAL  1113481  1059380    46868      144  1231932   548506   321058   214730
+ 
+ App Summary
+                       Pss(KB)                        Rss(KB)
+                        ------                         ------
+           Java Heap:    32220                          50484
+         Native Heap:   400520                         401288
+                Code:    46900                         150632
