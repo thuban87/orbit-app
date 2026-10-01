@@ -212,3 +212,49 @@ desktop emulator.
 12 Dense → Lab Inner Circle mid-transition · 13 Lab Inner Circle settled ·
 14 overview All Contacts (light) · 15 cold-start "Unavailable System" label (light) ·
 16 focus Ada Park with satellite list (light) · 17 gfxinfo (debug, focused idle, 10 s).
+
+## (i) Production-mode JS on the DEBUG APK (no native rebuild) — pass 2
+
+**This is NOT a release build.** It is the debug APK (debuggable, debug native
+libs, RN dev-support code present) fetching a `dev=false&minify=true` bundle
+from Metro. It removes dev-mode JS overhead (LogBox, strict-mode warnings,
+`__DEV__` paths, unminified bundle) and nothing else. The Lab DEV marker is
+hidden in this mode (`__DEV__` is false).
+
+The Lab APK has **no expo-dev-client** (`node_modules/expo-dev-launcher` is
+absent): it is a plain RN debug app whose `DevSupportManager` builds the bundle
+URL itself from its dev settings. So Metro's `--no-dev` flag (it only changes
+the expo manifest) has no effect; the switch is the app's own shared prefs:
+
+```bash
+P=com.bwales.orbit.laba
+$ADB -s $S shell am force-stop $P
+printf '%s\n' "<?xml version='1.0' encoding='utf-8' standalone='yes' ?>" "<map>" \
+  '    <boolean name="js_dev_mode_debug" value="false" />' \
+  '    <boolean name="js_minify_debug" value="true" />' "</map>" \
+  | $ADB -s $S shell "run-as $P sh -c 'cat > shared_prefs/${P}_preferences.xml'"
+# relaunch (d): Metro logs "Android Bundled … index.ts (2803 modules)" (dev = 2926),
+# ~26 s first bundle; no LogBox toast appears.
+# Back to dev JS: run-as $P rm shared_prefs/${P}_preferences.xml  (and relaunch)
+```
+
+Metro was restarted for pass 2 as
+`npx expo start --port 8083 --dev-client --no-dev --minify` (tmux `orbit-lab-a`,
+log `$SP/metro-8083-prod.log`) — harmless, but not what makes the difference.
+No fast refresh in this mode: force-stop + relaunch after every JS edit.
+
+**Finding: the 4–5 s System-switch freeze is NOT dev mode.** It reproduces in
+production-mode JS, and with `DEEP_FIELD_ENABLED = false` (legacy renderer):
+one 3.4–4.6 s main-thread block ("Skipped ~400–480 frames", Davey) right after
+the switch starts, then ~600 ms frames for a few seconds. It scales with body
+count: Family(2)↔Friends(2) / Family↔Lab Inner Circle(3) animate continuously
+(~16–20 fps, progress samples every 50–60 ms); All(40)↔Lab Dense(32) freezes
+then jumps. simpleperf: the block is mostly `libworklets` (shareable
+(de)serialisation) + Hermes on the main thread. A focus tap shows the same
+pattern (≈2.4 s to respond, then discrete jumps). See `_notes/PASS-2.md`.
+
+Recording helpers used in pass 2 (scratchpad, not committed): `pick.py`
+(open the selector, expand a group, scroll until a System row is visible),
+`sw.sh "<System>" "<group header>" out.mp4 [secs]` (screenrecord + tap),
+`vidan.py` (frame diff + contact sheet), `idle.sh` (relaunch + 5 s idle
+gfxinfo).
