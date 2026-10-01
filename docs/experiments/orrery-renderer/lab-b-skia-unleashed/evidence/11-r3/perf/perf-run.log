@@ -1,0 +1,37 @@
+== best 120 15:08:50
+best-120	idle	207	96	24	34	36	77	12	22	0
+best-120	pan	326	219	23	36	53	65	9	21	0
+best-120	focus	193	113	26	40	65	97	11	23	0
+best-120	switch_out	161	132	34	53	69	101	21	25	0
+best-120	switch_in	166	94	25	42	65	117	11	22	0
+== shipsafe 120 15:11:11
+shipsafe-120	idle	177	67	18	34	36	61	8	4950	0
+shipsafe-120	pan	388	291	20	40	48	73	8	24	0
+shipsafe-120	focus	185	93	18	34	36	250	8	22	0
+shipsafe-120	switch_out	232	146	18	36	48	69	7	23	0
+shipsafe-120	switch_in	178	84	18	40	53	69	9	4950	0
+== everything 120 15:13:32
+everything-120	idle	188	112	25	34	36	77	12	23	0
+everything-120	pan	326	255	25	40	57	69	9	22	0
+everything-120	focus	199	142	28	48	69	101	10	23	0
+everything-120	switch_out	160	71	19	48	81	101	6	24	0
+everything-120	switch_in	168	84	20	53	69	105	6	21	0
+== legacy 120 15:15:53
+legacy-120	idle	31	31	200	200	200	750	11	16	36
+legacy-120	pan	40	40	200	900	1200	1750	12	14	64
+legacy-120	focus	21	21	200	350	950	1500	11	20	45
+legacy-120	switch_out	64	53	19	200	850	1500	7	17	58
+legacy-120	switch_in	29	17	38	300	950	1250	7	20	48
+== bloom 120 15:18:22
+bloom-120	idle	175	74	27	36	36	85	16	24	0
+bloom-120	pan	332	246	23	38	61	77	10	20	0
+bloom-120	focus	214	131	26	46	48	65	11	22	0
+bloom-120	switch_out	180	86	19	42	65	129	6	24	0
+bloom-120	switch_in	167	92	26	53	69	117	10	24	0
+== nostage 120 15:20:44
+nostage-120	idle	196	102	24	34	44	109	13	24	0
+nostage-120	pan	329	246	24	38	53	65	10	23	0
+nostage-120	focus	169	85	24	36	57	81	11	23	0
+nostage-120	switch_out	182	82	16	46	65	97	4	21	0
+nostage-120	switch_in	168	76	24	61	77	117	11	23	0
+== done 15:23:08

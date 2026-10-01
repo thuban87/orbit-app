@@ -403,3 +403,29 @@ Relative only — this emulator's TextureView path presents ~28 fps whatever the
 No config is separable from run-to-run noise (±5 ms p50); 0 skipped frames everywhere. GPU p50
 hints at +2–5 ms for bloom. UI-thread probe (bodies/rings/labels pictures) unchanged within
 noise. The full-screen stage shader and bloom are the phone-pass items.
+
+## 2026-10-01 — R3 presets (RELEASE `r3e`, emulator; Dense 120)
+
+`tools/r1-matrix.sh` on presets (`SYSTEMS=120`, `idleClock:0`, `opaqueCanvas:0` so gfxinfo sees
+the frames). Raw: `evidence/11-r3/perf/summary.tsv`. **Emulator, relative only.** gfx ms:
+
+| Config | idle p50/p90 | pan p50/p90 | focus p50/p90 | switch in p50/p90 | GPU p50 idle/pan | skipped |
+|---|---|---|---|---|---|---|
+| Lab B best | 24 / 34 | 23 / 36 | 26 / 40 | 25 / 42 | 12 / 9 | 0 |
+| Ship-safe | **18 / 34** | **20 / 40** | **18 / 34** | **18 / 40** | 8 / 8 | 0 |
+| Everything | 25 / 34 | 25 / 40 | 28 / 48 | 20 / 53 | 12 / 9 | 0 |
+| best + bloom | 27 / 36 | 23 / 38 | 26 / 46 | 26 / 53 | 16 / 10 | 0 |
+| best − stage plane | 24 / 34 | 24 / 38 | 24 / 36 | 24 / 61 | 13 / 10 | 0 |
+| Legacy | 200 / 200 | 200 / 900 | 200 / 350 | 38 / 300 | 11 / 12 | 36–64 |
+
+- **Ship-safe is the only config separable from noise** (p50 −6…−8 ms idle / focus / switch vs
+  best). The UI probe shows why: the rings picture re-records on EVERY clock tick while
+  `ringFlow` is on (best: 659 runs in the pan window, 2.2 ms mean; ship-safe: 100 runs, only on
+  frame changes). Wakes (off in ship-safe) are 1.3–13 ms mean per frame change, p95 15–200 ms
+  (pan window; includes a first-record outlier).
+- Bloom: GPU p50 +4 ms idle (12 → 16) — same hint as R2; the stage plane: no separable cost.
+- Near-size clamp: `frame` probe 0.8 ms mean (pan) / 1.0 ms (focus), inside R1's range for
+  Dense — no measurable cost. Immersive chrome: static RN views, no per-frame work.
+- "Everything" crashed the app before the R3 fix (`moonShader` + layer pictures); after it,
+  0 crashes over the matrix, the captures and the paths script (crash buffer empty).
+- Shipsafe idle/switch_in GPU p90 rows read 4950 ms: a single gfxinfo outlier bucket, ignored.

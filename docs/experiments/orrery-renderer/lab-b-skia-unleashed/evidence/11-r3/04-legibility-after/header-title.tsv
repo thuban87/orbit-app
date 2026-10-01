@@ -1,0 +1,5 @@
+theme	title_box	model(textPrimary vs background@0.84 over raw canvas extreme)	measured(title vs p98 backdrop)	measured(vs p98, under-header region raw extreme)
+galaxy:dark	(48, 193, 1232, 274)	10.15	12.56
+galaxy:light	(48, 193, 1232, 274)	10.43	15.75
+standard:dark	(48, 193, 1232, 274)	9.93	14.41
+standard:light	(48, 193, 1232, 274)	10.90	14.61

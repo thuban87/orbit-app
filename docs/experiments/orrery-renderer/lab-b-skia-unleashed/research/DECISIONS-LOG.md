@@ -603,3 +603,54 @@ Commit `ff90df99` (code + tooling); report `research/R2-REPORT.md`; evidence `ev
    plane grid / gravity well = simplify (texture). Experiments stay committed, flag-off.
 8. **Not changed:** switch choreography constants, focus lock, labels/allocation, reorder, theme
    tokens (all new colours are uniforms from existing tokens), reduced motion.
+
+## 2026-10-01 — R3 integration polish (emulator, release `r3a`…`r3e`)
+
+Commits `13c706ad` (presets, near-size clamp, immersive chrome, rail, comment fixes, harness on
+presets), `1c339064` (moonShader crash fix), `23bedb9c` (Home tilt lab-only), plus the R3 docs commit.
+Report: `research/R3-REPORT.md`. Evidence: `evidence/11-r3/`.
+
+1. **Legibility re-measured first** (R1 method; `tools/r3-legibility.sh` adds a Recentre so the
+   Home tilt + stage plane are in frame). No regression from R2's stage: label model ratios
+   10.96–15.27, defocused labels vs median ≥ 5.14, overlay glass model unchanged (Standard Dark
+   `textSecondary` 4.42–4.47, the R1 owner item C-02). Nothing retuned.
+2. **Near bodies** are clamped on the FRAME, not in the bodies picture: a drawn-only clamp would
+   leave hit radii, label gaps, the reticle and the card keep-out on the old size. Positions keep
+   full perspective (the plane still recedes); size growth from perspective is knee'd at +6 %
+   and the radius soft-caps at 8 % of the short side (iteration 1 had 9.5 %). C-71. Framing /
+   preset changes were not used: the "detail" preset is a debug path (C-25) and a real pinch
+   zooms around the fingers.
+3. **Immersive chrome is route-local.** The Orrery screen renders its own `ShellAppBar`, so it may
+   float that bar over a full-route canvas; the status band, tab bar and "+" FAB belong to the
+   shared shell and were left alone (C-72). The bar registers as an obstacle, so the camera's
+   usable rect, Home framing and card placement are unchanged in window terms; the pills get a
+   `topInset` instead of being wrapped (a wrapper broke their zIndex/elevation ordering against
+   the controls when the selector opens). The controls become ONE HUD rail (hud + immersive).
+4. **Presets** (`LAB_PRESETS`, `labPresetFlags`, `applyPreset`, deep link `preset=`): presets
+   set the renderer and every non-debug flag; debug instrumentation keeps its value except
+   `forceFallback` / `freezeClock` (off); `ringsPathRebuild` (an A/B baseline that replaces the
+   rings) is never on. "Lab B best" = the registry defaults (so Reset = best); "Ship-safe" drops
+   the costly / owner-glance / failed effects (C-73); "Everything" turns on every effect and the
+   experiments; "Legacy" = legacy renderer.
+5. **Final defaults ("Lab B best")**: every R2 art flag ON, R3 `nearSizeClamp` + `immersiveChrome`
+   ON, experiments (`bloom`, `lensFlare`, `tiltShift`, `fxShockFilter`, `nebulaLive`,
+   `moonShader`) OFF — R2 verdicts unchanged on the emulator.
+6. **Found and fixed while exercising "Everything":** `moonShader` + layer pictures crashed the
+   app (`makeShaderWithChildren` without a children array; the moon effect has no children →
+   `makeShader`). The Skia test mock silently defaulted the array; it now throws like native.
+7. **Home tilt is lab-renderer only** now: the Legacy preset showed a tilted legacy map
+   (`labHomePose` ignored the renderer), which made Legacy a non-baseline.
+8. **Less-tested paths** (`tools/r3-paths.sh`): cluster tap on the tilted plane opens the group
+   panel with a reticle per member; far-zoom (0.4) focus flies in and locks; reorder hold/drag
+   on the tilted plane shows the elliptical held-ring glow and commits (RB moved a slot);
+   background 1 s into a big switch → foreground lands settled on the destination; reduced
+   motion with "Everything" (bloom + flare + tilt-shift on) = 0 changed pixels over 3 s; the
+   Polaris flare fires on a Polaris tap. **Open:** a Polaris tap fires the flare (so
+   `hitPolaris` passed and `camera.recover(northTarget)` ran) but no visible north recovery on the
+   emulator, flat or tilted; the rail's Reset north works. Not diagnosed (model-half gesture /
+   recovery path, shared with legacy; legacy comparison inconclusive).
+9. **Stale comments corrected** (coordinator audit): `LabEnvironment` (768² @ 0.45 texel/dp, far
+   stars in the nebula shader), `LabRings` (wake = shaded circle per ring, pictures), `LabBRenderer`
+   (actual layer order incl. stage / bloom / tilt-shift / flare), `labb-effects` (what warm-up
+   really compiles). PHONE-PASS-SCRIPT + `r1-matrix.sh` now run the presets plus `bloom` /
+   `nostage` rows into `evidence/12-phone/`.
