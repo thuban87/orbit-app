@@ -105,7 +105,7 @@ function resolve(node: ReactNode): Node[] {
 function all(nodes: Node[]): Node[] {
   return nodes.flatMap((node) => [node, ...all(node.children)]);
 }
-function controls(measured = true, blocked = false) {
+function controls(measured = true, blocked = false, rail = false) {
   const onContacts = vi.fn(),
     onRecenter = vi.fn(),
     onResetNorth = vi.fn();
@@ -118,6 +118,8 @@ function controls(measured = true, blocked = false) {
     onContacts,
     onRecenter,
     onResetNorth,
+    hud: rail,
+    rail,
   });
   const nodes = all(resolve(tree));
   return {
@@ -131,6 +133,24 @@ function controls(measured = true, blocked = false) {
   };
 }
 describe("actual Orrery controls and detail sheet", () => {
+  it("ORRERY LAB B R3 rail: one HUD plate keeps the same three 55px named controls", () => {
+    const ui = controls(true, false, true);
+    expect(ui.buttons.map((node) => node.props.accessibilityLabel)).toEqual([
+      "Contacts in this System",
+      "Recenter Orrery",
+      "Reset north",
+    ]);
+    for (const node of ui.buttons)
+      expect(node.props.style).toMatchObject({ minWidth: 55, minHeight: 55 });
+    const group = ui.tree.props.children as ReactElement<{
+      children?: ReactNode;
+    }>;
+    const surface = group.props.children as ReactElement<{
+      treatment?: string;
+    }>;
+    expect(Array.isArray(surface)).toBe(false);
+    expect(surface.props.treatment).toBe("orrery-overlay");
+  });
   it("uses three square overlay controls with icon-only 55px targets and a 4px gap", () => {
     const ui = controls(false);
     expect(ui.buttons.map((node) => node.props.accessibilityLabel)).toEqual([

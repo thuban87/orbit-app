@@ -16,6 +16,7 @@ import { Icon } from "@/components/icons/Icon";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import type { CameraPose, CameraViewport } from "@/logic/orrery-camera-logic";
 import { useWindowObstacle } from "@/navigation/use-window-measurement";
+import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 import {
@@ -39,6 +40,10 @@ export interface OrreryControlsProps {
   onResetNorth: () => void;
   /** ORRERY LAB B (WP-2.2, flag `hudChrome`): instrument HUD plates. */
   hud?: boolean;
+  /** ORRERY LAB B (R3, `hudChrome` + `immersiveChrome`): one HUD rail plate
+   * holding the three controls (hairline separators) instead of three
+   * separate boxes. Same buttons, names, states and 55 dp targets. */
+  rail?: boolean;
 }
 export function OrreryControls({
   viewport,
@@ -49,7 +54,9 @@ export function OrreryControls({
   onRecenter,
   onResetNorth,
   hud = false,
+  rail = false,
 }: OrreryControlsProps) {
+  const { colors } = useTheme();
   const surface = hud
     ? [styles.controlSurface, HUD_PLATE]
     : styles.controlSurface;
@@ -97,65 +104,124 @@ export function OrreryControls({
         style={region ? { maxHeight: region.height - 2 } : undefined}
         contentContainerStyle={styles.stack}
       >
-        <GlassSurface
-          density="dense"
-          treatment="orrery-overlay"
-          style={surface}
-        >
-          {hud ? <OrreryHudCorners /> : null}
-          <Pressable
-            ref={trigger}
-            style={styles.control}
-            accessibilityRole="button"
-            accessibilityLabel="Contacts in this System"
-            disabled={inputBlocked || state.contactsDisabled}
-            accessibilityState={{
-              disabled: inputBlocked || state.contactsDisabled,
-            }}
-            onPress={() => onContacts(restore)}
+        {hud && rail ? (
+          <GlassSurface
+            density="dense"
+            treatment="orrery-overlay"
+            style={[styles.rail, HUD_PLATE]}
           >
-            <Icon name="list" size="md" />
-          </Pressable>
-        </GlassSurface>
-        <GlassSurface
-          density="dense"
-          treatment="orrery-overlay"
-          style={surface}
-        >
-          {hud ? <OrreryHudCorners /> : null}
-          <Pressable
-            style={styles.control}
-            accessibilityRole="button"
-            accessibilityLabel="Recenter Orrery"
-            disabled={inputBlocked || state.recenterDisabled}
-            accessibilityState={{
-              disabled: inputBlocked || state.recenterDisabled,
-            }}
-            onPress={onRecenter}
-          >
-            <Icon name="recenter" size="md" />
-          </Pressable>
-        </GlassSurface>
-        <GlassSurface
-          density="dense"
-          treatment="orrery-overlay"
-          style={surface}
-        >
-          {hud ? <OrreryHudCorners /> : null}
-          <AnimatedPressable
-            style={styles.control}
-            accessibilityRole="button"
-            accessibilityLabel="Reset north"
-            disabled={inputBlocked || state.northDisabled}
-            accessibilityState={{
-              disabled: inputBlocked || state.northDisabled,
-            }}
-            animatedProps={orientationProps}
-            onPress={onResetNorth}
-          >
-            <Icon name="north" size="md" />
-          </AnimatedPressable>
-        </GlassSurface>
+            <OrreryHudCorners />
+            <Pressable
+              ref={trigger}
+              style={styles.control}
+              accessibilityRole="button"
+              accessibilityLabel="Contacts in this System"
+              disabled={inputBlocked || state.contactsDisabled}
+              accessibilityState={{
+                disabled: inputBlocked || state.contactsDisabled,
+              }}
+              onPress={() => onContacts(restore)}
+            >
+              <Icon name="list" size="md" />
+            </Pressable>
+            <View
+              style={[styles.railRule, { backgroundColor: colors.border }]}
+            />
+            <Pressable
+              style={styles.control}
+              accessibilityRole="button"
+              accessibilityLabel="Recenter Orrery"
+              disabled={inputBlocked || state.recenterDisabled}
+              accessibilityState={{
+                disabled: inputBlocked || state.recenterDisabled,
+              }}
+              onPress={onRecenter}
+            >
+              <Icon name="recenter" size="md" />
+            </Pressable>
+            <View
+              style={[styles.railRule, { backgroundColor: colors.border }]}
+            />
+            <AnimatedPressable
+              style={styles.control}
+              accessibilityRole="button"
+              accessibilityLabel="Reset north"
+              disabled={inputBlocked || state.northDisabled}
+              accessibilityState={{
+                disabled: inputBlocked || state.northDisabled,
+              }}
+              animatedProps={orientationProps}
+              onPress={onResetNorth}
+            >
+              <Icon name="north" size="md" />
+            </AnimatedPressable>
+          </GlassSurface>
+        ) : (
+          [
+            <GlassSurface
+              key="contacts"
+              density="dense"
+              treatment="orrery-overlay"
+              style={surface}
+            >
+              {hud ? <OrreryHudCorners /> : null}
+              <Pressable
+                ref={trigger}
+                style={styles.control}
+                accessibilityRole="button"
+                accessibilityLabel="Contacts in this System"
+                disabled={inputBlocked || state.contactsDisabled}
+                accessibilityState={{
+                  disabled: inputBlocked || state.contactsDisabled,
+                }}
+                onPress={() => onContacts(restore)}
+              >
+                <Icon name="list" size="md" />
+              </Pressable>
+            </GlassSurface>,
+            <GlassSurface
+              key="recenter"
+              density="dense"
+              treatment="orrery-overlay"
+              style={surface}
+            >
+              {hud ? <OrreryHudCorners /> : null}
+              <Pressable
+                style={styles.control}
+                accessibilityRole="button"
+                accessibilityLabel="Recenter Orrery"
+                disabled={inputBlocked || state.recenterDisabled}
+                accessibilityState={{
+                  disabled: inputBlocked || state.recenterDisabled,
+                }}
+                onPress={onRecenter}
+              >
+                <Icon name="recenter" size="md" />
+              </Pressable>
+            </GlassSurface>,
+            <GlassSurface
+              key="north"
+              density="dense"
+              treatment="orrery-overlay"
+              style={surface}
+            >
+              {hud ? <OrreryHudCorners /> : null}
+              <AnimatedPressable
+                style={styles.control}
+                accessibilityRole="button"
+                accessibilityLabel="Reset north"
+                disabled={inputBlocked || state.northDisabled}
+                accessibilityState={{
+                  disabled: inputBlocked || state.northDisabled,
+                }}
+                animatedProps={orientationProps}
+                onPress={onResetNorth}
+              >
+                <Icon name="north" size="md" />
+              </AnimatedPressable>
+            </GlassSurface>,
+          ]
+        )}
       </ScrollView>
     </View>
   );
@@ -167,6 +233,11 @@ const styles = StyleSheet.create({
   // obstacles. Pin the 55px controls to its right edge, directly above the FAB.
   stack: { gap: SPACING.xs, alignItems: "flex-end" },
   controlSurface: { width: CONTROL_SIZE, height: CONTROL_SIZE },
+  rail: { width: CONTROL_SIZE },
+  railRule: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: SPACING.sm,
+  },
   control: {
     minWidth: CONTROL_SIZE,
     minHeight: CONTROL_SIZE,

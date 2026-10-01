@@ -1,7 +1,11 @@
 # Lab B — phone pass script (Pixel 6 Pro, ~20 min)
 
 **Do not start until the owner says Lab A is done with the Pixel.** Lab A owns the phone and the
-local adb server (port 5037) until then. This pass uses that local server, **not** Lab B's
+local adb server (port 5037) until then. **R3 update (2026-10-01):** configurations are now the
+panel PRESETS ("Lab B best", "Ship-safe", "Everything", "Legacy"; deep link `preset=`), plus a
+`bloom` row (best + the R2 bloom experiment) and a `nostage` row (best − the R2 stage plane), so
+the costs R2/R3 could not resolve on the emulator get a phone number. Evidence goes to
+`evidence/12-phone/` (10-r2 / 11-r3 are the emulator rounds). This pass uses that local server, **not** Lab B's
 5039 tunnel. Prepared in R1 (2026-10-01) from the emulator envelope (`research/R1-REPORT.md`);
 every number from the emulator is relative only — this pass produces the first absolute ones.
 
@@ -10,7 +14,7 @@ every number from the emulator is relative only — this pass produces the first
 ```bash
 LB=/home/bwales/projects/orbit-orrery-lab-b
 T=$LB/docs/experiments/orrery-renderer/lab-b-skia-unleashed/tools
-EV=$LB/docs/experiments/orrery-renderer/lab-b-skia-unleashed/evidence/10-phone
+EV=$LB/docs/experiments/orrery-renderer/lab-b-skia-unleashed/evidence/12-phone
 PKG=com.bwales.orbit.labb
 emu-connect status                       # read only — never `emu-connect device` without the owner
 ~/Android/Sdk/platform-tools/adb devices -l   # local server 5037; exactly ONE device (the 6 Pro)
@@ -51,9 +55,11 @@ export ADB PKG
 # ($ADB exec-out screencap -p) and pass them (the emulator values are for 1280x2856):
 export ORRERY_TAB="<x y of the Orrery tab icon>" RECENTRE="<x y of the recentre control>"
 export SWIPE="<x1 y1 x2 y2 inside the canvas, never within 150 px of the left edge>"
-CONFIGS="laball labmin legacy" SYSTEMS="120 400 800" $T/r1-matrix.sh $EV/perf
-# then the R1 defaults (idle clock ON) for the idle rows only:
-LABALL_FLAGS="idleClock:1" CONFIGS=laball SYSTEMS="120 800" $T/r1-matrix.sh $EV/perf-idleclock
+CONFIGS="best shipsafe everything legacy bloom nostage" SYSTEMS="120 400 800" $T/r1-matrix.sh $EV/perf
+# the floor (every lab effect off, incl. R2/R3) for the 800 row only:
+CONFIGS=labmin SYSTEMS=800 $T/r1-matrix.sh $EV/perf
+# then the shipped default (idle clock ON) for the idle rows only:
+EXTRA_FLAGS="idleClock:1" CONFIGS=best SYSTEMS="120 800" $T/r1-matrix.sh $EV/perf-idleclock
 ```
 
 Output: `$EV/perf/summary.tsv` (one row per scenario: gfx frames, janky, p50/p90/p95/p99, GPU
@@ -100,7 +106,8 @@ $ADB shell "am start -a android.intent.action.VIEW -d 'orbit://labb?flags=idleCl
 $ADB shell dumpsys gfxinfo $PKG reset; sleep 15; $ADB shell dumpsys gfxinfo $PKG framestats > $EV/framestats-800-idle-clockon.txt
 # Memory (PSS, Graphics, Native heap) on Stress 800 after a switch round trip:
 $ADB shell dumpsys meminfo $PKG > $EV/meminfo-800.txt
-# Thermal + battery: 10 min continuous on Dense (all flags on), screen on:
+# Thermal + battery: 10 min continuous on Dense, "Lab B best" (orbit://labb?preset=best), screen on.
+# If time allows, repeat with preset=everything (bloom + lens flare + tilt-shift) for the worst case:
 $ADB shell dumpsys battery reset; $ADB shell dumpsys batterystats --reset
 $ADB shell dumpsys thermalservice | grep -A12 "Current temperatures" > $EV/thermal-t0.txt
 sleep 600
@@ -134,15 +141,25 @@ look right over the SurfaceView.
 
 | Bodies | Config | idle frames/10 s | idle p50/p90 | pan p50/p95 | focus p90/p99 | switch p90/p99 | skipped max | crash |
 |---|---|---|---|---|---|---|---|---|
-| 120 | lab all-on | | | | | | | |
-| 120 | lab minimal | | | | | | | |
-| 120 | legacy | | | | | | | |
-| 400 | lab all-on | | | | | | | |
-| 400 | lab minimal | | | | | | | |
-| 400 | legacy | | | | | | | |
-| 800 | lab all-on | | | | | | | |
-| 800 | lab minimal | | | | | | | |
-| 800 | legacy | | | | | | | |
+| 120 | Lab B best | | | | | | | |
+| 120 | Ship-safe | | | | | | | |
+| 120 | Everything | | | | | | | |
+| 120 | best + bloom | | | | | | | |
+| 120 | best − stage plane | | | | | | | |
+| 120 | Legacy | | | | | | | |
+| 400 | Lab B best | | | | | | | |
+| 400 | Ship-safe | | | | | | | |
+| 400 | Everything | | | | | | | |
+| 400 | best + bloom | | | | | | | |
+| 400 | best − stage plane | | | | | | | |
+| 400 | Legacy | | | | | | | |
+| 800 | Lab B best | | | | | | | |
+| 800 | Ship-safe | | | | | | | |
+| 800 | Everything | | | | | | | |
+| 800 | best + bloom | | | | | | | |
+| 800 | best − stage plane | | | | | | | |
+| 800 | Legacy | | | | | | | |
+| 800 | lab minimal (all off) | | | | | | | |
 
 ### 5.2 Per-worklet UI-thread cost at 800 (probe, ms mean / p95)
 
@@ -183,7 +200,10 @@ look right over the SurfaceView.
 1. Does the 800-body Hermes crash stay fixed on ARM (R1 fix: cached label paragraphs)?
 2. Absolute frame cadence at 120/400/800 — is 400 inside a 60 fps budget with all effects?
 3. Is the emulator's GPU-cheap verdict true on Mali (nebula sample, ring shader, body shaders,
-   corona)? Compare lab all-on vs minimal GPU p90.
+   corona)? Compare Lab B best vs lab minimal GPU p90.
+3b. R2/R3: what do the stage plane (best vs nostage) and bloom (bloom vs best) cost in GPU p90
+   on Mali? Bloom is the suspected Android GPU cliff (R2-REPORT §3a); "Everything" is the
+   worst case. Is "Ship-safe" measurably cheaper than "Lab B best"?
 4. The frame projection (model half) scales linearly (~48 µs/body on the emulator UI thread):
    what is it on the 6 Pro's big core?
 5. Opaque canvas (`flags=opaqueCanvas:1`): any RenderThread win, and do the glass overlays /

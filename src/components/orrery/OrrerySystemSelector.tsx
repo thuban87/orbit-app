@@ -41,6 +41,7 @@ export function OrrerySystemSelector({
   needsAttention,
   onOpenChange,
   hud = false,
+  topInset = 0,
 }: {
   state: OrrerySystemState;
   availableHeight: number;
@@ -51,6 +52,9 @@ export function OrrerySystemSelector({
   onOpenChange: (open: boolean, requestId: number) => void;
   /** ORRERY LAB B (WP-2.2, flag `hudChrome`): instrument HUD plate. */
   hud?: boolean;
+  /** ORRERY LAB B (R3, flag `immersiveChrome`): the floating app bar's
+   * height; the trigger and panel sit below it (0 = unchanged layout). */
+  topInset?: number;
 }) {
   const { colors } = useTheme();
   const navigation =
@@ -119,7 +123,7 @@ export function OrrerySystemSelector({
     });
     return () => subscription.remove();
   }, [dismiss]);
-  const top = SPACING.base + height + SPACING.sm;
+  const top = topInset + SPACING.base + height + SPACING.sm;
   return (
     <View
       pointerEvents={blocked ? "none" : "box-none"}
@@ -140,7 +144,11 @@ export function OrrerySystemSelector({
       ) : null}
       <OrreryObstacle
         obstacleId="orrery-system-trigger"
-        style={styles.trigger}
+        style={
+          topInset > 0
+            ? [styles.trigger, { top: topInset + SPACING.base }]
+            : styles.trigger
+        }
         onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
       >
         <GlassSurface

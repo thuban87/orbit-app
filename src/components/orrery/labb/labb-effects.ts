@@ -14,9 +14,15 @@
  * - `forceFallback` (panel toggle) makes every getter return null so the
  *   fallback path can be compared on device.
  *
- * Adding an effect (WP-1.1+): add its source to `LAB_EFFECT_SOURCES`; if it is
- * transition-only, also list it in `WARMUP_EFFECTS` so `LabCanvas` compiles it
- * at Orrery entry instead of at the first System switch.
+ * Adding an effect (WP-1.1+): add its source to `LAB_EFFECT_SOURCES`. Warm-up
+ * as built (R3 correction): `LabCanvas` draws only `WARMUP_EFFECTS` (today just
+ * the `probe` shader) and `WARMUP_FILTERS` (the `shockFilter` image filter)
+ * for `WARMUP_MS` after mount. The switch-FX layers do NOT go through these
+ * lists: during the same window the context's `warm` gate makes each of them
+ * draw one near-invisible probe instance of its real primitives (streak Atlas,
+ * trim sweeps, shockwave, comet / flare shaders), which is what compiles them
+ * at entry. A new transition-only SHADER either gets the same `warm` probe in
+ * its layer or is added to `WARMUP_EFFECTS` (zero-filled uniforms).
  */
 import { Skia, type SkRuntimeEffect } from "@shopify/react-native-skia";
 

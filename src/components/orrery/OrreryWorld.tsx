@@ -60,6 +60,7 @@ import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import { useLabFxStore } from "@/stores/orrery-labb-fx-store";
 import type { ThemePalette } from "@/theme/theme-types";
 import { LabBRenderer, type LabTapStamp } from "./labb/LabBRenderer";
+import { labClampNearSizes } from "./labb/labb-near-size";
 import { probeEnd, probeStart } from "./labb/labb-perf-probe";
 import { OrbitBody } from "./OrbitBody";
 import { OrreryCanvas } from "./OrreryCanvas";
@@ -259,6 +260,16 @@ export function OrreryWorld({
   useEffect(() => {
     ringPathMode.value = labRenderer === "lab" && !ringPathsRebuild ? 0 : -1;
   }, [ringPathMode, labRenderer, ringPathsRebuild]);
+  // ORRERY LAB B R3 (flag `nearSizeClamp`, lab renderer only): soft-limit the
+  // projected size of near / very large bodies on the frame itself, so hits,
+  // labels, reticle and card keep-out agree with what is drawn (C-71).
+  const nearSizeFlag = useLabFxStore(
+    (s) => s.renderer === "lab" && !!s.flags?.nearSizeClamp,
+  );
+  const labNearSizeMode = useSharedValue(0);
+  useEffect(() => {
+    labNearSizeMode.value = nearSizeFlag ? 1 : 0;
+  }, [labNearSizeMode, nearSizeFlag]);
   // Capture only the producer's input; the controller also contains its published output.
   const reorder = camera.reorder;
   // ORRERY LAB B (switch-stall fix, docs/…/research/SWITCH-STALL-INVESTIGATION.md):
@@ -320,7 +331,7 @@ export function OrreryWorld({
       ringPathMode.value < 0 ? true : held?.active ? held.id : false,
     );
     probeEnd("frame", probe);
-    return projected;
+    return labClampNearSizes(projected, labNearSizeMode.value > 0);
   });
   // Conventional focus positioning consumes this same interpolated frame.
   useAnimatedReaction(

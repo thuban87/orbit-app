@@ -419,6 +419,21 @@ export const LAB_FLAG_REGISTRY = [
     default: false,
     heavy: true,
   },
+  // R3 integration polish.
+  {
+    id: "nearSizeClamp",
+    label: "R3 Near-body size clamp (perspective knee + viewport cap)",
+    section: "effects",
+    default: true,
+    note: "frame-level: hits, labels, reticle follow the drawn size (C-71)",
+  },
+  {
+    id: "immersiveChrome",
+    label: "R3 Immersive chrome (map under a translucent header, HUD FAB rail)",
+    section: "effects",
+    default: true,
+    note: "Orrery screen only; shared shell untouched (C-72)",
+  },
   // Debug instrumentation (research 03 §4).
   {
     id: "layerPictures",
@@ -486,6 +501,109 @@ export function defaultLabFlags(): LabFlags {
   ) as LabFlags;
 }
 
+// --- R3 presets (one-tap configurations for the phone pass / owner review) ---
+export type LabPresetId = "best" | "shipSafe" | "everything" | "legacy";
+
+/** Effects the R2/R3 verdicts judged NOT worth shipping as built (costly,
+ * failed, owner-glance clutter or a legibility trade). Off in "Ship-safe". */
+const NOT_SHIP_SAFE: readonly LabFlagId[] = [
+  "nebulaLive", // A/B cost probe (full-res fbm per frame)
+  "ringWake", // C-17 owner glance; one shader per ring, LOD'd away at 160+
+  "ringFlow", // C-04 owner glance; re-records the ring picture per tick
+  "fxShockFilter", // R2 failed: invisible at speed, full-screen saveLayer
+  "fxFocusDim", // C-52 dims every other face while focused (legibility)
+  "planeGrid", // R2 "simplify": decorative non-data texture (C-67)
+  "bloom", // R2 costly: full-screen offscreen + blur per frame
+  "lensFlare", // R2 "simplify": full-screen additive shader
+  "tiltShift", // R2 failed: 4 backdrop blurs, blurs faces
+  "moonShader", // WP-1.2: per-moon runtime shader, cheap moon looks the same
+];
+/** Too-costly / failed experiments: ON only in "Everything". */
+const EXPERIMENTS: readonly LabFlagId[] = [
+  "nebulaLive",
+  "fxShockFilter",
+  "bloom",
+  "lensFlare",
+  "tiltShift",
+  "moonShader",
+];
+/** A/B baselines that REPLACE a layer with an older path: never in a preset. */
+const AB_BASELINES: readonly LabFlagId[] = ["ringsPathRebuild"];
+/** Debug-section flags keep their current value across presets, except these. */
+const PRESET_DEBUG: Partial<Record<LabFlagId, boolean>> = {
+  forceFallback: false,
+  freezeClock: false,
+};
+
+export interface LabPresetSpec {
+  id: LabPresetId;
+  label: string;
+  renderer: LabRenderer;
+  note: string;
+}
+
+export const LAB_PRESETS: readonly LabPresetSpec[] = [
+  {
+    id: "best",
+    label: "Lab B best",
+    renderer: "lab",
+    note: "the R3 defaults: everything judged good, no costly experiments",
+  },
+  {
+    id: "shipSafe",
+    label: "Ship-safe",
+    renderer: "lab",
+    note: "only effects judged worth shipping (no owner-glance clutter)",
+  },
+  {
+    id: "everything",
+    label: "Everything",
+    renderer: "lab",
+    note: "incl. bloom, lens flare, tilt-shift, shock filter, live nebula",
+  },
+  {
+    id: "legacy",
+    label: "Legacy",
+    renderer: "legacy",
+    note: "the production renderer (lab flags at defaults, unused)",
+  },
+];
+
+/** Flag set of a preset; debug flags other than PRESET_DEBUG come from `current`. */
+export function labPresetFlags(id: LabPresetId, current: LabFlags): LabFlags {
+  const flags = defaultLabFlags();
+  for (const spec of LAB_FLAG_REGISTRY as readonly LabFlagSpec[]) {
+    const key = spec.id as LabFlagId;
+    if (spec.section === "debug") flags[key] = current[key];
+  }
+  for (const [key, value] of Object.entries(PRESET_DEBUG))
+    flags[key as LabFlagId] = value as boolean;
+  if (id === "shipSafe") for (const key of NOT_SHIP_SAFE) flags[key] = false;
+  if (id === "everything") {
+    for (const spec of LAB_FLAG_REGISTRY as readonly LabFlagSpec[])
+      if (spec.section !== "debug") flags[spec.id as LabFlagId] = true;
+    for (const key of EXPERIMENTS) flags[key] = true;
+  }
+  for (const key of AB_BASELINES) flags[key] = false;
+  return flags;
+}
+
+/** Which preset (if any) the current renderer + flags match exactly. */
+export function matchLabPreset(
+  renderer: LabRenderer,
+  flags: LabFlags,
+): LabPresetId | null {
+  for (const preset of LAB_PRESETS) {
+    if (preset.renderer !== renderer) continue;
+    const want = labPresetFlags(preset.id, flags);
+    const same = (LAB_FLAG_REGISTRY as readonly LabFlagSpec[]).every(
+      (spec) => want[spec.id as LabFlagId] === flags[spec.id as LabFlagId],
+    );
+    if (same) return preset.id;
+  }
+  return null;
+}
+
 /** The plain snapshot mirrored into the renderer's `fxFlags` SharedValue. */
 export interface LabFxSnapshot {
   renderer: LabRenderer;
@@ -503,6 +621,8 @@ interface LabFxState extends LabFxSnapshot {
   setFlag: (id: LabFlagId, value: boolean) => void;
   setIntensity: (value: number) => void;
   setReducedMotion: (mode: LabReducedMotionMode) => void;
+  /** R3: one-tap preset (renderer + flags; intensity back to 1). */
+  applyPreset: (id: LabPresetId) => void;
   reset: () => void;
 }
 
@@ -535,6 +655,16 @@ export const useLabFxStore = create<LabFxState>((set) => ({
     setReducedMotionOverride(mode === "os" ? null : mode === "on");
     set({ reducedMotion: mode });
   },
+  applyPreset: (id) =>
+    set((state) => {
+      const spec = LAB_PRESETS.find((p) => p.id === id);
+      if (!spec) return state;
+      return {
+        renderer: spec.renderer,
+        flags: labPresetFlags(id, state.flags),
+        intensity: 1,
+      };
+    }),
   reset: () => {
     setReducedMotionOverride(null);
     set({

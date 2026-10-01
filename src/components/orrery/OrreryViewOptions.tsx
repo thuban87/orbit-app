@@ -35,10 +35,14 @@ const TRANSIENT_ID = "orrery-view-options";
 export function OrreryViewOptions({
   availableHeight,
   hud = false,
+  topInset = 0,
 }: {
   availableHeight: number;
   /** ORRERY LAB B (WP-2.2, flag `hudChrome`): instrument HUD plate. */
   hud?: boolean;
+  /** ORRERY LAB B (R3, flag `immersiveChrome`): the floating app bar's
+   * height; the trigger and panel sit below it (0 = unchanged layout). */
+  topInset?: number;
 }) {
   const preferences = useOrreryPreferencesStore();
   const { colors } = useTheme();
@@ -84,7 +88,7 @@ export function OrreryViewOptions({
   }, [dismiss]);
   const busy = preferences.hydration === "loading" || preferences.saving;
   const disabled = busy || !preferences.hydrated;
-  const panelTop = SPACING.base + triggerHeight + SPACING.sm;
+  const panelTop = topInset + SPACING.base + triggerHeight + SPACING.sm;
   return (
     <View
       pointerEvents={blocked ? "none" : "box-none"}
@@ -102,7 +106,11 @@ export function OrreryViewOptions({
       ) : null}
       <OrreryObstacle
         obstacleId="orrery-view-trigger"
-        style={styles.trigger}
+        style={
+          topInset > 0
+            ? [styles.trigger, { top: topInset + SPACING.base }]
+            : styles.trigger
+        }
         onLayout={(event) => setTriggerHeight(event.nativeEvent.layout.height)}
       >
         <GlassSurface

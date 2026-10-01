@@ -7,24 +7,28 @@
  * component one render contract (`LabRenderContract`). Only one renderer — and
  * so one canvas and one `useClock` — is mounted at a time.
  *
- * LAYER SLOTS (fixed back-to-front order; research 03 §1.3). Each slot is one
- * component; later work packages replace the slot's body, not this order:
+ * LAYER SLOTS (actual back-to-front draw order, R3; research 03 §1.3):
  *
- *   L0  environment   <LabEnvironment>     baked nebula + 3-depth Atlas starfield (WP-1.1)
- *   L1  rings         <LabRings>           WP-1.3 instrument orbits under one plane homography
- *   L5  polaris       <LabPolaris>         glow + spikes (flag polarisLab; legacy fallback)
- *   --  reorder ghost  (slot from OrreryWorld; accent contract row stays there)
- *   L2–L4 bodies      ONE contiguous Group: sun + contacts (+ moons)
- *                     WP-1.2 lit surfaces, atmospheres, corona, lit moons
- *                     (one shader draw per body; flag bodyLighting)
- *   L6  labels        <LabHudLabel> HUD tags (per-label layer: C-09; flag labelHud)
- *   L1' chart        <LabChart>           WP-2.2 Standard-package chart graticule (flag stdChart)
- *   L6' focus        <LabFocusPicture>    WP-2.2 target-lock reticles (between bodies and labels)
+ *   L0  environment   <LabEnvironment>     baked nebula (far stars in its shader) +
+ *                                          MID/NEAR star Atlas + switch streaks
+ *   --  clip Group over the viewport; optional R2 `bloom` saveLayer and the
+ *       WP-2.1 `fxShockFilter` saveLayer wrap the world layers below
+ *   L1  stage + rings <LabStagePlane>      R2 sun light pool + gravity-well grid
+ *                     <LabChart>           WP-2.2 Standard chart graticule (flag stdChart)
+ *                     <LabRings>           WP-1.3 instrument orbits (pictures, C-51)
+ *                     <LabSwitchUnder>     WP-2.1 shockwave, comets, smears
+ *   L5  polaris       <LabPolaris>         glow + spikes (flag polarisLab)
+ *   --  reorder ghost  (slot from OrreryWorld; hidden while fxReorder is on)
+ *   L2–L4 bodies      <LabBodiesPictures>  ONE contiguous Group: sun + contacts +
+ *                                          moons as one UI-thread picture (flag
+ *                                          layerPictures; per-body components = A/B)
+ *   --  <LabTiltShift> R2 experiment (backdrop blur bands), off by default
+ *   L6' focus        <LabFocusPicture>    WP-2.2 target-lock reticles
+ *   --  <LabLensFlare> R2 experiment (dark themes), off by default
+ *   L6  labels        <LabLabelsPicture>   HUD tags as one picture (per-label
+ *                                          components = A/B; flag labelHud)
  *   L7  fx            <LabSwitchOver>      WP-2.1 particles + capture flares
- *                     <LabFeedbackPicture> WP-2.2 tap pings / ripples / north flare / reorder hold
- *   (WP-2.1 also draws <LabSwitchUnder> — shockwave, comets, smears — inside L1
- *   under the bodies, ring unwind/draw-on in LabRings, streaks in L0; the
- *   fxShockFilter experiment wraps L0–L5 in one runtime-filter saveLayer.)
+ *                     <LabFeedbackPicture> WP-2.2 pings / ripples / north flare / reorder hold
  *   dbg fps HUD       <LabFpsOverlay>      (flag `fpsHud`)
  *
  * The bodies Group must stay a CONTIGUOUS run of body root Groups: RNRecorder

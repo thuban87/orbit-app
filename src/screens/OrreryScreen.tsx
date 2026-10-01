@@ -22,6 +22,7 @@ import {
   useSharedValue,
 } from "react-native-reanimated";
 import { LabBMarkerHost } from "@/components/orrery/labb/debug/LabFxPanel";
+import { LabImmersiveHeader } from "@/components/orrery/labb/LabImmersiveHeader";
 import { labHomePose } from "@/components/orrery/labb/labb-home-tilt";
 import {
   CLUSTER_OBSTACLE,
@@ -292,6 +293,14 @@ export function OrreryScreen() {
     (s) => s.renderer === "lab" && !!s.flags?.hudChrome,
   );
   const labAnchor = useLabFxStore((s) => !!s.flags?.focusCardAnchor);
+  // ORRERY LAB B (R3, flag `immersiveChrome`): the canvas fills the route and
+  // the route's app bar floats over it on a fading token scrim (C-72).
+  const labImmersive = useLabFxStore(
+    (s) => s.renderer === "lab" && !!s.flags?.immersiveChrome,
+  );
+  const labRail = labHud && labImmersive;
+  const [labBarHeight, setLabBarHeight] = useState(0);
+  const labTopInset = labImmersive ? labBarHeight : 0;
   const labTimeScale = useSharedValue(1);
   useEffect(() => {
     labTimeScale.value = labSwitchTimeScale;
@@ -1058,12 +1067,12 @@ export function OrreryScreen() {
       testID="orrery-root"
       style={[styles.root, { backgroundColor: colors.background }]}
     >
-      <ShellAppBar variant="root" title="Orrery" />
+      {labImmersive ? null : <ShellAppBar variant="root" title="Orrery" />}
       <View
         testID="orrery-canvas-container"
         ref={canvasMeasurement.ref}
         collapsable={false}
-        style={styles.canvasArea}
+        style={labImmersive ? styles.canvasFill : styles.canvasArea}
         onLayout={canvasMeasurement.onLayout}
       >
         {visible && sessionReady && scene ? (
@@ -1097,8 +1106,13 @@ export function OrreryScreen() {
           needsAttention={systemNeedsAttention}
           onOpenChange={onSystemSelectorOpenChange}
           hud={labHud}
+          topInset={labTopInset}
         />
-        <OrreryViewOptions availableHeight={viewport.height} hud={labHud} />
+        <OrreryViewOptions
+          availableHeight={viewport.height}
+          hud={labHud}
+          topInset={labTopInset}
+        />
         <OrreryControls
           viewport={controlsViewport}
           measured={measured}
@@ -1108,6 +1122,7 @@ export function OrreryScreen() {
           onRecenter={recenter}
           onResetNorth={resetNorth}
           hud={labHud}
+          rail={labRail}
         />
         {satelliteRow && focusedSatellite && scene ? (
           <OrreryFocusContext
@@ -1336,6 +1351,15 @@ export function OrreryScreen() {
           </OrreryFeedback>
         ) : null}
       </View>
+      {labImmersive ? (
+        <LabImmersiveHeader
+          colors={colors}
+          barHeight={labBarHeight}
+          onBarHeight={setLabBarHeight}
+        >
+          <ShellAppBar variant="root" title="Orrery" />
+        </LabImmersiveHeader>
+      ) : null}
       {/* ORRERY LAB B marker — long-press opens the lab panel (lab build only). */}
       <LabBMarkerHost
         colors={colors}
@@ -1386,6 +1410,15 @@ export function OrreryScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   canvasArea: { flex: 1, alignItems: "center", justifyContent: "center" },
+  canvasFill: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   feedback: {
     position: "absolute",
     top: "25%",

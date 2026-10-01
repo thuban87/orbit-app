@@ -11,6 +11,9 @@
  * - a forced reduced-motion override (OS / On / Off), app-wide and live;
  * - camera presets (adb cannot pinch): zoom far / overview / identity / detail
  *   / near, tilt and yaw — applied through the camera's normal `recover` path;
+ * - R3: one-tap presets ("Lab B best", "Ship-safe", "Everything", "Legacy")
+ *   that set the renderer and every non-debug flag at once (deep link
+ *   `preset=`); the active preset is highlighted while the flags match it;
  * - quick System switching through the screen's normal store `select`, plus
  *   "replay last switch" (re-selects the previous System). WP-2.1: with
  *   "close on switch" (default ON) the panel closes and the switch fires
@@ -34,9 +37,12 @@ import {
 import type { OrrerySystemRef } from "@/logic/orrery-system-logic";
 import {
   LAB_FLAG_REGISTRY,
+  LAB_PRESETS,
   type LabFlagId,
   type LabFlagSpec,
+  type LabPresetId,
   type LabReducedMotionMode,
+  matchLabPreset,
   useLabFxStore,
 } from "@/stores/orrery-labb-fx-store";
 import { useThemeStore } from "@/stores/theme-store";
@@ -161,6 +167,7 @@ export function LabFxPanel({
   const intensity = useLabFxStore((s) => s.intensity);
   const reducedMotion = useLabFxStore((s) => s.reducedMotion);
   const store = useLabFxStore.getState;
+  const activePreset = matchLabPreset(renderer, flags);
   const applyPose = useCallback(
     (patch: Partial<CameraPose>) => {
       runOnUI((p: Partial<CameraPose>) => {
@@ -224,6 +231,23 @@ export function LabFxPanel({
         </View>
       </View>
       <ScrollView contentContainerStyle={styles.content}>
+        <Section
+          title={`Preset (one tap) · ${
+            LAB_PRESETS.find((p) => p.id === activePreset)?.note ?? "custom"
+          }`}
+          colors={colors}
+        >
+          {LAB_PRESETS.map((preset) => (
+            <Chip
+              key={preset.id}
+              testID={`labb-preset-${preset.id}`}
+              label={preset.label}
+              active={preset.id === activePreset}
+              colors={colors}
+              onPress={() => store().applyPreset(preset.id)}
+            />
+          ))}
+        </Section>
         <Section title="Systems (quick switch)" colors={colors}>
           {catalog
             .filter((entry) => !entry.hidden)
@@ -356,6 +380,8 @@ export function LabFxPanel({
 /** A parsed `orbit://labb?...` command (lab build only; see LabBMarkerHost). */
 export interface LabCommand {
   reset: boolean;
+  /** R3: one-tap preset (`best` / `shipSafe` / `everything` / `legacy`). */
+  preset?: LabPresetId;
   renderer?: "lab" | "legacy";
   rm?: LabReducedMotionMode;
   intensity?: number;
@@ -410,8 +436,12 @@ export function parseLabCommand(url: string): LabCommand | null {
   const rm = q.get("rm");
   const renderer = q.get("renderer");
   const panel = q.get("panel");
+  const preset = q.get("preset");
   return {
     reset: q.get("reset") === "1",
+    preset: LAB_PRESETS.some((p) => p.id === preset)
+      ? (preset as LabPresetId)
+      : undefined,
     renderer:
       renderer === "lab" || renderer === "legacy" ? renderer : undefined,
     rm: rm === "on" || rm === "off" || rm === "os" ? rm : undefined,
@@ -489,6 +519,7 @@ export function LabBMarkerHost({
       const l = latest.current;
       const store = useLabFxStore.getState();
       if (cmd.reset) store.reset();
+      if (cmd.preset) store.applyPreset(cmd.preset);
       if (cmd.theme) {
         // Session-only (the store is hydrated from app_settings at boot).
         const theme = useThemeStore.getState();

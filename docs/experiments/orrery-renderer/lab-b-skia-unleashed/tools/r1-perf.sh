@@ -8,7 +8,8 @@
 #   other-system the switch partner (switch S -> other, then other -> S)
 #   scenarios    default "idle pan focus switch"
 #
-# Env: ADB (default: the Lab B tunnel, `adb -P 5039 -s emulator-5554`), PKG.
+# Env: ADB (default: the Lab B tunnel, `adb -P 5039 -s emulator-5554`), PKG,
+#      PRESET (R3 one-tap preset applied before <flags>).
 # On the PHONE pass set ADB="$HOME/Android/Sdk/platform-tools/adb -s <serial>"
 # (local server 5037) and SWIPE (see research/PHONE-PASS-SCRIPT.md).
 #
@@ -63,7 +64,9 @@ print("\t".join(row[:11]))
 PY
 }
 S=$(enc "$SYSTEM"); O=$(enc "$OTHER"); F=$(enc "$FOCUS")
-BASE="orbit://labb?reset=1&renderer=$RENDERER&flags=$FLAGS,fpsHud:0,perfProbe:1,opaqueCanvas:${OPAQUE:-0}&panel=0"
+# R3: PRESET (best | shipSafe | everything | legacy) is applied right after the
+# reset, before renderer/flags, so <flags> are deltas on top of the preset.
+BASE="orbit://labb?reset=1${PRESET:+&preset=$PRESET}&renderer=$RENDERER&flags=$FLAGS,fpsHud:0,perfProbe:1,opaqueCanvas:${OPAQUE:-0}&panel=0"
 # Setup: flags + renderer + the System under test, then recentre.
 # Make sure the Orrery tab is in front (a crash/relaunch lands on Digest).
 $ADB shell input tap ${ORRERY_TAB:-896 2690}; sleep 3

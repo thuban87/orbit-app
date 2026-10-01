@@ -1,19 +1,24 @@
 /**
  * ORRERY LAB B — L1 instrument orbits (WP-1.3).
  *
- * Everything in this layer is STATIC WORLD-SPACE geometry drawn inside ONE
- * Group whose `matrix` is the per-frame plane homography (`planeHomography`):
- *   - ring  = `<Circle cx=0 cy=0 r=R>` (R = world ring radius, from the frame so
- *     switch/reorder interpolation still applies), one per contact, grouped by
- *     instrument class (status) under ONE `ringInstrument` stroke shader per
- *     class: hairline in the status hue, far-side depth fade, shader dashes
- *     (no CPU DashPathEffect), optional uniform energy flow;
- *   - progress wake = 3 nested sub-arcs per ring, merged per class into 3 paths
- *     (stacked alpha brightens toward the body); built in React from the world
- *     bodies, hidden while a switch or reorder moves the bodies;
+ * Everything in this layer is STATIC WORLD-SPACE geometry drawn under the
+ * per-frame plane homography (`planeHomography`):
+ *   - ring  = a world circle of radius R (from the frame, so switch/reorder
+ *     interpolation still applies), one per contact, grouped by instrument
+ *     class (status) under ONE `ringInstrument` stroke shader per class:
+ *     hairline in the status hue, far-side depth fade, shader dashes (no CPU
+ *     DashPathEffect), optional uniform energy flow, R2 rim light near the sun;
+ *   - progress wake = one stroked world CIRCLE per ring shaded by the
+ *     `ringWake` shader (arc + brightening toward the body are in the shader;
+ *     the earlier stroked sub-arc paths, eb860615, were reverted for their CPU
+ *     re-tessellation cost), hidden while a switch / reorder moves bodies and
+ *     while the camera recovers (C-60), off above 160 rings;
  *   - drift tethers (decay / rogue) = rail point → body limb, radial dashes;
  *   - ticks: north ticks on every ring at `detail`, a 30° tick scale on the
  *     focused ring, and the compass chevron on the world rim.
+ * With `layerPictures` (default) the class rings and the wakes are each ONE
+ * UI-thread SkPicture (`RingClassesPicture`, `WakesPicture`); the declarative
+ * `RingClassGroup` / `WakeClassGroup` path is the A/B baseline (C-51).
  * Per frame nothing is rebuilt: the matrix, a few float4 uniform sets and one
  * radius/opacity pair per ring (only when the frame changes).
  *

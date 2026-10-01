@@ -3,16 +3,18 @@
  *
  * Back to front:
  * 1. Sky + NEBULA. Default: a seamlessly tiling DENSITY texture (lobe A, lobe
- *    B, dust) is baked ONCE at Orrery entry (`nebulaBake`, 512² at ~0.3
- *    texel/dp) and sampled every frame by `nebulaSample` (one texture fetch per
- *    pixel + token colouring + parallax + drift/breathing warp + vignette +
- *    dither). A/B flag `nebulaLive` swaps in the same nebula computed LIVE at
+ *    B, dust) is baked ONCE at Orrery entry (`nebulaBake`, `NEB_TEX` = 768² at
+ *    `NEB_TEXELS_PER_DP` = 0.45 texel/dp) and sampled every frame by
+ *    `nebulaSample` (one texture fetch per pixel + token colouring + parallax +
+ *    drift/breathing warp + vignette + dither). The FAR star layer is drawn
+ *    analytically inside the same nebula shader (`farInShader`). A/B flag `nebulaLive` swaps in the same nebula computed LIVE at
  *    full resolution (`nebulaLive`) to measure what the bake saves.
  *    Colours are uniforms from palette tokens (profile `env`), so a theme change
  *    never rebakes.
- * 2. STARFIELD: three depth layers in two Atlas draws — FAR (static colours, one
- *    crisp dot sprite) and MID+NEAR (twinkling via the colour buffer; soft glow
- *    and diffraction-spike sprites on dark themes). The sprite atlas is an
+ * 2. STARFIELD: MID+NEAR in one Atlas draw (twinkling via the colour buffer;
+ *    soft glow and diffraction-spike sprites on dark themes). The FAR layer
+ *    (static colours, one crisp dot) lives in the nebula shader; it falls back
+ *    to its own Atlas only when the nebula is off or its effect is null. The sprite atlas is an
  *    alpha MASK tinted per star from tokens (`modulate`).
  *
  * Parallax reads ONLY the animated frame (`labSkyPose(frame.value)`), never
