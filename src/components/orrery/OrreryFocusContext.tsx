@@ -1,5 +1,5 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText uses typography roles.
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated, {
   type SharedValue,
@@ -18,6 +18,11 @@ import { bodyKey } from "@/logic/orrery-frame";
 import { SPACING } from "@/theme/tokens/spacing";
 import { OrreryNotice } from "./OrreryFeedback";
 import { HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
+import {
+  labCardChannel,
+  NO_CARD,
+  writeCardRect,
+} from "./labb/labb-card-channel";
 import { focusCardPlacement } from "./orrery-focus-placement";
 
 /** Lightweight identity follows the authoritative frame on the UI thread.
@@ -56,6 +61,15 @@ export function OrreryFocusContext({
   // docked, capped card can grow back when room returns).
   const [contentHeight, setContentHeight] = useState(0);
   const { fontScale } = useWindowDimensions();
+  // ORRERY LAB B R1: publish the card's rect for the canvas occlusion
+  // (labb-card-channel.ts); cleared when the card goes away.
+  const card = labCardChannel();
+  useEffect(
+    () => () => {
+      if (card) card.value = NO_CARD;
+    },
+    [card],
+  );
   const position = useAnimatedStyle(() => {
     const current = frame.value;
     const region = current ? usableCameraRect(current.viewport) : null;
@@ -65,7 +79,10 @@ export function OrreryFocusContext({
           bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
         : item.kind !== "satellite" && item.id === target.id,
     );
-    if (!region || !body) return { opacity: 0 };
+    if (!region || !body) {
+      if (card && card.value[4] === 1) card.value = NO_CARD;
+      return { opacity: 0 };
+    }
     const width = Math.min(280, region.width);
     if (anchor) {
       const natural = Math.min(
@@ -78,6 +95,13 @@ export function OrreryFocusContext({
         { width, height: natural },
         fontScale,
       );
+      writeCardRect(
+        card,
+        place.left,
+        place.top,
+        width,
+        Math.min(natural, region.height / 2, place.maxHeight),
+      );
       return {
         opacity: 1,
         width,
@@ -87,21 +111,24 @@ export function OrreryFocusContext({
       };
     }
     const limit = Math.min(height, region.height / 2);
+    const left = Math.max(
+      region.x,
+      Math.min(region.x + region.width - width, body.x - width / 2),
+    );
+    const top = Math.max(
+      region.y,
+      Math.min(
+        region.y + region.height - limit,
+        body.y + body.radius + SPACING.sm,
+      ),
+    );
+    writeCardRect(card, left, top, width, limit);
     return {
       opacity: 1,
       width,
       maxHeight: region.height / 2,
-      left: Math.max(
-        region.x,
-        Math.min(region.x + region.width - width, body.x - width / 2),
-      ),
-      top: Math.max(
-        region.y,
-        Math.min(
-          region.y + region.height - limit,
-          body.y + body.radius + SPACING.sm,
-        ),
-      ),
+      left,
+      top,
     };
   });
   const scrollBounds = useAnimatedStyle(() => {

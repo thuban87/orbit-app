@@ -330,6 +330,21 @@ export const LAB_FLAG_REGISTRY = [
     default: true,
   },
   {
+    id: "bodyPointLod",
+    label: "L3 Density LOD: tiny far bodies draw as status-hued points",
+    section: "effects",
+    default: true,
+    note: "R1: below 6 dp projected radius",
+  },
+  {
+    id: "focusCardOcclusion",
+    label:
+      "FO Focus card occludes the world detail under it (bodies dim, labels drop)",
+    section: "effects",
+    default: true,
+    note: "R1: glass tint untouched (ADR-149); fixes the ghost text bleed",
+  },
+  {
     id: "hudChrome",
     label: "HUD Instrument chrome (selector, view options, controls, card)",
     section: "effects",

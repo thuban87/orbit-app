@@ -1093,7 +1093,7 @@ export function LabRings({
   // R1: wakes hide while the camera recovers (fly-in / recentre / north) and
   // fade back in after (Group opacity: no re-record during the fade).
   const moving = useDerivedValue<number>(() =>
-    cameraActive && cameraActive.value ? 1 : 0,
+    cameraActive?.value ? 1 : 0,
   );
   const wakeGate = useSharedValue(1);
   useAnimatedReaction(

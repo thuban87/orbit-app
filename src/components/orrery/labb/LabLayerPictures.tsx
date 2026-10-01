@@ -111,6 +111,7 @@ import {
   planLabelDraws,
   uniformOrder,
 } from "./labb-layer-plan";
+import { labCardChannel, underCard } from "./labb-card-channel";
 import { probeEnd, probeStart } from "./labb-perf-probe";
 import { bodySwitchFx, switchFxLive } from "./labb-switch-logic";
 import { tokenToVec4 } from "./labb-uniforms";
@@ -171,6 +172,40 @@ export interface LabBodySpec {
 function vecColor(c: readonly number[], alpha: number): Float32Array {
   "worklet";
   return Float32Array.of(c[0], c[1], c[2], c[3] * alpha);
+}
+
+/** R1 focus-card occlusion: bodies under the card draw at this alpha. */
+const OCCLUDED_ALPHA = 0.12;
+/** Padding (dp) around the card for the occlusion test. */
+const OCCLUDE_PAD = 4;
+
+/**
+ * R1 density LOD (flag `bodyPointLod`): a contact body whose projected radius
+ * is below this (dp) draws as a star-like POINT in its status hue (core + soft
+ * halo) instead of a lit photo / initials disc — at 400–800 bodies the discs
+ * are unreadable specks and each one cost a runtime shader per frame-change.
+ */
+export const BODY_POINT_LOD_DP = 6;
+const POINT_CORE = 0.62;
+const POINT_CORE_MIN = 1.3;
+const POINT_HALO = 1.6;
+const POINT_HALO_ALPHA = 0.28;
+
+/** The point-LOD body (local units: canvas already at the body, scale s). */
+function drawBodyPoint(
+  canvas: SkCanvas,
+  spec: LabBodySpec,
+  alpha: number,
+  scale: number,
+): void {
+  "worklet";
+  const paint = Skia.Paint();
+  paint.setAntiAlias(true);
+  const core = Math.max(POINT_CORE_MIN / scale, spec.radius * POINT_CORE);
+  paint.setColor(vecColor(spec.fill, alpha * POINT_HALO_ALPHA));
+  canvas.drawCircle(0, 0, core * POINT_HALO, paint);
+  paint.setColor(vecColor(spec.fill, alpha));
+  canvas.drawCircle(0, 0, core, paint);
 }
 
 /** Flat / moon fallback defocus: alpha × (1 − FLAT_DEFOCUS × defocus). */
@@ -415,6 +450,7 @@ export function LabBodiesPictures({
   const shaderCache = useRef(
     new Map<string, { image: SkImage; r: number; shader: SkShader }>(),
   );
+  const cardRect = labCardChannel();
   const fontCache = useRef<{
     provider: SkTypefaceFontProvider | null;
     fonts: Map<number, SkFont | null>;
@@ -607,6 +643,10 @@ export function LabBodiesPictures({
     const fmix = fon && focus ? focus.mix.value : 0;
     const fkeys = fon && focus ? focus.keys.value : NO_KEYS;
     const focusRing = !(fx?.flags.fx && fx.flags.fxFocus);
+    // R1: the focus card occludes the world detail under it.
+    const card =
+      cardRect && fx?.flags.focusCardOcclusion ? cardRect.value : null;
+    const pointLod = !!fx?.flags.bodyPointLod;
     let sunDepth: number | null = null;
     for (let s = 0; s < sunKeys.length && sunDepth === null; s++) {
       const b = bodyAt(f, index, sunKeys[s]);
@@ -625,8 +665,19 @@ export function LabBodiesPictures({
         ),
       );
       for (let n = 0; n < items.length; n++) {
-        const item = items[n];
-        const spec = specs[item.i];
+        const planned = items[n];
+        const spec = specs[planned.i];
+        const reach = planned.s * spec.radius * BODY_REACH;
+        const item = underCard(
+          card,
+          planned.x - reach,
+          planned.y - reach,
+          planned.x + reach,
+          planned.y + reach,
+          OCCLUDE_PAD,
+        )
+          ? { ...planned, alpha: planned.alpha * OCCLUDED_ALPHA }
+          : planned;
         const pose = {
           x: item.x,
           y: item.y,
@@ -656,6 +707,13 @@ export function LabBodiesPictures({
             focusBodyValue(fkeys, spec.key, fmix),
             focusRing,
           );
+        } else if (
+          pointLod &&
+          !spec.focus &&
+          item.s * spec.radius < BODY_POINT_LOD_DP &&
+          focusBodyValue(fkeys, spec.key, fmix) <= 0
+        ) {
+          drawBodyPoint(canvas, spec, item.alpha, item.s);
         } else {
           let sfx: number[] | undefined;
           if (roleMap && fx) {
@@ -772,6 +830,7 @@ export function LabLabelsPicture({
   const ctx = useLabStillContext();
   const focus = ctx?.focus ?? null;
   const fxFlags = ctx?.fxFlags;
+  const cardRect = labCardChannel();
   const picture = useDerivedValue(() => {
     const probe = probeStart();
     const f = frame.value;
@@ -781,6 +840,9 @@ export function LabLabelsPicture({
     const fon = !!focus && !!fx?.flags.fx && !!fx.flags.fxFocusDim;
     const fmix = fon && focus ? focus.mix.value : 0;
     const fkeys = fon && focus ? focus.keys.value : NO_KEYS;
+    // R1: labels under the focus card are dropped (they ghosted through it).
+    const card =
+      cardRect && fx?.flags.focusCardOcclusion ? cardRect.value : null;
     const plan = planLabelDraws(
       allocations.value,
       (id: string) => {
@@ -807,7 +869,10 @@ export function LabLabelsPicture({
       const spec = specs[item.i];
       const tag = item.tag;
       const dim = focusDimFactor(fkeys, spec.id, fmix, 1 - LABEL_DEFOCUS);
-      if (tag) {
+      if (
+        tag &&
+        !underCard(card, tag.x, tag.y, tag.x + spec.w, tag.y + spec.h, 0)
+      ) {
         layerPaint.setAlphaf(tag.opacity * dim);
         canvas.saveLayer(layerPaint);
         const x = tag.x;
@@ -859,7 +924,11 @@ export function LabLabelsPicture({
       }
       const cap = item.caption;
       const c = captions[item.i];
-      if (cap && c) {
+      if (
+        cap &&
+        c &&
+        !underCard(card, cap.x, cap.y, cap.x + c.w, cap.y + c.h, 0)
+      ) {
         layerPaint.setAlphaf(cap.opacity * dim);
         canvas.saveLayer(layerPaint);
         fill.setColor(vecColor(surface, 1));

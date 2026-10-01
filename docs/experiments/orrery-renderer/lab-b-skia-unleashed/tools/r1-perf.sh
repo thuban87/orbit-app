@@ -32,7 +32,7 @@ link() { $ADB shell "am start -a android.intent.action.VIEW -d '$1' $PKG" >/dev/
 gfx_reset() { $ADB shell dumpsys gfxinfo $PKG reset >/dev/null; $ADB logcat -c; }
 collect() { # scenario
   $ADB shell dumpsys gfxinfo $PKG > "$OUT/${LABEL}__$1.gfx"
-  $ADB logcat -d -s ReactNativeJS:I Choreographer:I | grep -E "labb-probe|Skipped" > "$OUT/${LABEL}__$1.log"
+  $ADB logcat -d -s ReactNativeJS:I Choreographer:I libc:F | grep -E "labb-probe|Skipped|Fatal signal" > "$OUT/${LABEL}__$1.log"
   python3 - "$OUT" "$LABEL" "$1" <<'PY'
 import re,sys,os
 out,label,scen=sys.argv[1:4]
@@ -44,7 +44,7 @@ row=[label,scen,f(r"Total frames rendered: (\d+)"),f(r"Janky frames: (\d+)"),
      f(r"99th percentile: (\d+)ms"),f(r"50th gpu percentile: (\d+)ms"),f(r"90th gpu percentile: (\d+)ms")]
 log=open(f"{out}/{label}__{scen}.log").read()
 skips=[int(x) for x in re.findall(r"Skipped (\d+) frames",log)]
-row.append(str(max(skips) if skips else 0))
+row.append(str(max(skips) if skips else 0) + (" CRASH" if "Fatal signal" in log else ""))
 # probe: mean of per-window means, max of max, total runs, per name
 agg={}
 for line in log.splitlines():
@@ -65,8 +65,11 @@ PY
 S=$(enc "$SYSTEM"); O=$(enc "$OTHER"); F=$(enc "$FOCUS")
 BASE="orbit://labb?reset=1&renderer=$RENDERER&flags=$FLAGS,fpsHud:0,perfProbe:1&panel=0"
 # Setup: flags + renderer + the System under test, then recentre.
+# Make sure the Orrery tab is in front (a crash/relaunch lands on Digest).
+$ADB shell input tap ${ORRERY_TAB:-896 2690}; sleep 3
 link "$BASE&system=$S&delay=0"; sleep "$SETTLE"
-$ADB shell input touchscreen tap 1150 2140; sleep 4
+$ADB shell input tap ${ORRERY_TAB:-896 2690}; sleep 2
+$ADB shell input touchscreen tap ${RECENTRE:-1150 2140}; sleep 4
 for sc in $SCEN; do
   case $sc in
     idle)
@@ -79,12 +82,12 @@ for sc in $SCEN; do
         $ADB shell input swipe $x2 $y2 $x1 $y1 350; sleep 1.2
       done
       sleep 1; collect pan
-      $ADB shell input touchscreen tap 1150 2140; sleep 3 ;;
+      $ADB shell input touchscreen tap ${RECENTRE:-1150 2140}; sleep 3 ;;
     focus)
       link "orbit://labb?focus=$F&delay=$ACT_DELAY"
       sleep $(( ACT_DELAY / 1000 - 1 )); gfx_reset; sleep 7; collect focus
       link "orbit://labb?clear=1&delay=$ACT_DELAY"; sleep $(( ACT_DELAY / 1000 + 3 ))
-      $ADB shell input touchscreen tap 1150 2140; sleep 3 ;;
+      $ADB shell input touchscreen tap ${RECENTRE:-1150 2140}; sleep 3 ;;
     switch)
       link "orbit://labb?system=$O&delay=$ACT_DELAY"
       sleep $(( ACT_DELAY / 1000 - 1 )); gfx_reset; sleep 9; collect switch_out
