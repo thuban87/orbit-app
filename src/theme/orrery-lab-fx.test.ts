@@ -82,3 +82,24 @@ describe("Lab B effect profiles (LAB-ONLY tokens)", () => {
     );
   });
 });
+
+describe("WP-2.2 Standard Dark identity", () => {
+  it("Standard Dark is a quiet chart, not Galaxy Dark's nebula", () => {
+    const sd = resolveLabFxProfile("standard", "dark");
+    const gd = resolveLabFxProfile("galaxy", "dark");
+    expect(sd.env.strengthA).toBeLessThan(gd.env.strengthA * 0.5);
+    expect(sd.env.glow).toBeLessThan(gd.env.glow);
+    expect(sd.env.ember).toBe(0);
+    expect(sd.chart).not.toBeNull();
+    expect(gd.chart).toBeNull();
+    expect(resolveLabFxProfile("galaxy", "light").chart).toBeNull();
+  });
+  it("the stdChart A/B restores the pre-WP-2.2 Standard profile", () => {
+    const off = resolveLabFxProfile("standard", "dark", false);
+    expect(off.chart).toBeNull();
+    expect(off.env).toBe(LAB_FX_PROFILES.galaxy.dark.env);
+    expect(resolveLabFxProfile("galaxy", "dark", false)).toBe(
+      LAB_FX_PROFILES.galaxy.dark,
+    );
+  });
+});

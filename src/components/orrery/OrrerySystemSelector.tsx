@@ -21,6 +21,7 @@ import type { OrrerySystemState } from "@/stores/orrery-system-store";
 import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
+import { HUD_NAME, HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 import { OrreryObstacle } from "./OrreryObstacle";
 import {
   buildSystemChoiceGroups,
@@ -39,6 +40,7 @@ export function OrrerySystemSelector({
   counts,
   needsAttention,
   onOpenChange,
+  hud = false,
 }: {
   state: OrrerySystemState;
   availableHeight: number;
@@ -47,6 +49,8 @@ export function OrrerySystemSelector({
   counts: ReadonlyMap<string, number>;
   needsAttention: ReadonlyMap<string, boolean>;
   onOpenChange: (open: boolean, requestId: number) => void;
+  /** ORRERY LAB B (WP-2.2, flag `hudChrome`): instrument HUD plate. */
+  hud?: boolean;
 }) {
   const { colors } = useTheme();
   const navigation =
@@ -139,7 +143,12 @@ export function OrrerySystemSelector({
         style={styles.trigger}
         onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
       >
-        <GlassSurface density="dense" treatment="orrery-overlay">
+        <GlassSurface
+          density="dense"
+          treatment="orrery-overlay"
+          style={hud ? HUD_PLATE : undefined}
+        >
+          {hud ? <OrreryHudCorners /> : null}
           <Pressable
             ref={trigger}
             style={styles.triggerRow}
@@ -153,7 +162,7 @@ export function OrrerySystemSelector({
               role="label"
               numberOfLines={1}
               ellipsizeMode="tail"
-              style={styles.name}
+              style={hud ? [styles.name, HUD_NAME] : styles.name}
             >
               {state.requested.name}
             </AppText>

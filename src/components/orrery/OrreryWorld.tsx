@@ -518,6 +518,14 @@ export function OrreryWorld({
           "worklet";
           if (!hitPolaris(frame.value, sceneExtent, x, y)) return false;
           camera.recover(northTarget(pose.value));
+          // ORRERY LAB B (C-20, WP-2.2): side-stamp the north tap for the
+          // Polaris flare; the recovery above is unchanged.
+          fxTap.value = {
+            x,
+            y,
+            seq: (fxTap.value?.seq ?? 0) + 1,
+            kind: "north",
+          };
           return true;
         },
       }),
@@ -595,6 +603,7 @@ export function OrreryWorld({
         pose={pose}
         switchRuntime={switchRuntime}
         fxTap={fxTap}
+        cameraActive={camera.active}
         scene={scene}
         resources={resources}
         colors={colors}

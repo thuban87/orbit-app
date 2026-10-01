@@ -266,6 +266,15 @@ half4 lbBody(float2 xy, float3 surf) {
     c = mix(c, uSky, uHaze);
     // WP-2.1 capture flare: a brief bright limb as an arriving world locks on.
     c = mix(c, mix(uStatus, uHi, 0.55), uK.y * (0.2 + 0.8 * l * l * l) * 0.75);
+    // WP-2.2 defocus (uK.w < 0): other worlds desaturate, dim and sink a
+    // little toward the sky (depth emphasis); the face stays legible.
+    float dfc = max(-uK.w, 0.0);
+    if (dfc > 0.0) {
+      float dl = dot(c, float3(0.299, 0.587, 0.114));
+      c = mix(mix(c, float3(dl), 0.3 * dfc), uSky, 0.22 * dfc) * (1.0 - 0.32 * dfc);
+    }
+    // WP-2.2 focus (uK.w > 0): a slightly brighter status limb on the locked world.
+    c = mix(c, uStatus, max(uK.w, 0.0) * 0.18 * smoothstep(0.82, 1.0, l));
   }
   // WP-2.1 dissolve (departing worlds): a noise threshold eats the disc with a
   // glowing status-hue edge; the atmosphere thins with it.
@@ -281,6 +290,11 @@ half4 lbBody(float2 xy, float3 surf) {
   float g = 1.0 - t;
   g = g * g * g * uAtmo * mix(1.0, 0.4 + 0.6 * max(0.0, facing), uLit) * (1.0 - uHaze);
   g = g * (1.0 - uK.x) + (1.0 - t) * (1.0 - t) * uK.y * 0.9;
+  // WP-2.2: the focused world's atmosphere intensifies (and appears, softly,
+  // on worlds that have none); defocused worlds' atmospheres recede.
+  float fo = max(uK.w, 0.0);
+  g = g * (1.0 + 0.8 * fo) + (1.0 - t) * (1.0 - t) * (1.0 - t) * 0.28 * fo;
+  g *= 1.0 - 0.55 * max(-uK.w, 0.0);
   float sh = (1.0 - smoothstep(0.9, 1.26, length(d + uLight * 0.14))) * uShadowStr;
   float ga = g * (1.0 - 0.75 * uAtmoAdd);
   float oa = ga + sh * (1.0 - ga);

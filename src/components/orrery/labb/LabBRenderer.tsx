@@ -18,7 +18,10 @@
  *                     WP-1.2 lit surfaces, atmospheres, corona, lit moons
  *                     (one shader draw per body; flag bodyLighting)
  *   L6  labels        <LabHudLabel> HUD tags (per-label layer: C-09; flag labelHud)
- *   L7  fx            <LabSwitchOver>      WP-2.1 particles + capture flares (WP-2.2 focus/feedback)
+ *   L1' chart        <LabChart>           WP-2.2 Standard-package chart graticule (flag stdChart)
+ *   L6' focus        <LabFocusPicture>    WP-2.2 target-lock reticles (between bodies and labels)
+ *   L7  fx            <LabSwitchOver>      WP-2.1 particles + capture flares
+ *                     <LabFeedbackPicture> WP-2.2 tap pings / ripples / north flare / reorder hold
  *   (WP-2.1 also draws <LabSwitchUnder> — shockwave, comets, smears — inside L1
  *   under the bodies, ring unwind/draw-on in LabRings, streaks in L0; the
  *   fxShockFilter experiment wraps L0–L5 in one runtime-filter saveLayer.)
@@ -30,7 +33,8 @@
  * Per-renderer derived values owned here: `frameIndex` (O(1) key lookups),
  * `fxFlags` (the store snapshot mirrored for worklets) and, WP-2.1, the switch
  * showcase inputs (`switchSignal`, `roles`, `skyHue`) handed to every layer
- * through `LabRenderContext.sw`. WP-2.2 adds `focusMix`.
+ * through `LabRenderContext.sw`. WP-2.2 adds the focus state (`mix`, `keys`,
+ * `lock`; `LabRenderContext.focus`) and the feedback timers (LabFocusFx.tsx).
  *
  * Heavy layers are UNMOUNTED when their flag is off, so a measured marginal
  * cost is real (research 03 §4).
@@ -76,6 +80,7 @@ import {
   orreryInitials,
   type SemanticLevel,
 } from "@/logic/orrery-label-logic";
+import type { MotionRequest } from "@/logic/orrery-recovery-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import { sampleSwitchSignal } from "@/logic/orrery-switch-choreography";
@@ -88,6 +93,7 @@ import {
 } from "@/stores/orrery-labb-fx-store";
 import { labColor, resolveLabFxProfile } from "@/theme/orrery-lab-fx";
 import type { ThemePalette } from "@/theme/theme-types";
+import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { OrreryLabel, type PreparedOrreryText } from "../OrreryLabel";
 import { Polaris } from "../Polaris";
 import type {
@@ -102,7 +108,13 @@ import {
   type LabWorldLook,
 } from "./LabBodies";
 import { LabCanvas } from "./LabCanvas";
+import { LabChart } from "./LabChart";
 import { LabEnvironment } from "./LabEnvironment";
+import {
+  LabFeedbackPicture,
+  LabFocusPicture,
+  useLabFocusState,
+} from "./LabFocusFx";
 import { LabHudLabel } from "./LabLabels";
 import {
   LabBodiesPictures,
@@ -156,6 +168,8 @@ export interface LabRenderContract {
   pose: SharedValue<CameraPose>;
   switchRuntime: OrrerySwitchRuntime;
   fxTap: SharedValue<LabTapStamp | null>;
+  /** WP-2.2: the camera's running recovery / coast (null = settled). */
+  cameraActive?: SharedValue<MotionRequest | null>;
   // React data
   scene: OrrerySceneSnapshot;
   resources: readonly OrreryBodyResource[];
@@ -316,8 +330,13 @@ function LabBRendererImpl(contract: LabRenderContract) {
   }, [fxFlags, renderer, flags, intensity]);
   const frameIndex = useDerivedValue(() => indexFrame(frame.value));
   const profile = useMemo(
-    () => resolveLabFxProfile(contract.themePackage, contract.themeMode),
-    [contract.themePackage, contract.themeMode],
+    () =>
+      resolveLabFxProfile(
+        contract.themePackage,
+        contract.themeMode,
+        flags.stdChart,
+      ),
+    [contract.themePackage, contract.themeMode, flags.stdChart],
   );
   const sky = labColor(colors, profile.roles.sky);
   const look = useMemo<LabWorldLook>(
@@ -452,6 +471,39 @@ function LabBRendererImpl(contract: LabRenderContract) {
     () => ({ signal: switchSignal, roles, skyHue, transition }),
     [switchSignal, roles, skyHue, transition],
   );
+
+  // --- WP-2.2 focus state + feedback ------------------------------------------
+  // Focused body keys (contacts / sun by id, or the focused satellite). The
+  // joined key string is the focus IDENTITY that keys the world-response
+  // effect (the only writer of `mix` / `keys`).
+  const focusKeys = useMemo(() => {
+    const out: string[] = [];
+    if (focusedSatellite)
+      out.push(
+        bodyKey({
+          kind: "satellite",
+          id: -1,
+          satelliteTarget: focusedSatellite,
+        }),
+      );
+    for (const r of resources)
+      if (r.body.kind !== "satellite" && focusedIds.includes(r.body.id))
+        out.push(r.key);
+    return out;
+  }, [resources, focusedIds, focusedSatellite]);
+  const focusSig = focusKeys.join("|");
+  const reducedMotion = useReducedMotionShared();
+  const { focus, feedback } = useLabFocusState({
+    focusKeys,
+    focusSig,
+    cameraActive: contract.cameraActive ?? null,
+    reducedMotion,
+    frame,
+    fxTap: contract.fxTap,
+    reorder: contract.reorder,
+  });
+  const focusFx = flags.fx && flags.fxFocus;
+  const accent = useMemo(() => tokenToVec4(colors.accent), [colors.accent]);
   // Trim-ring candidates (React side): keys not in the destination (leaving)
   // or new since the previous scene (entering). The UI-thread role map still
   // decides what draws, so a stale candidate only costs a hidden circle.
@@ -534,6 +586,14 @@ function LabBRendererImpl(contract: LabRenderContract) {
     <>
       {/* L1 */}
       <Group>
+        {flags.stdChart && profile.chart ? (
+          <LabChart
+            frame={frame}
+            extent={scene.extent}
+            colors={colors}
+            chart={profile.chart}
+          />
+        ) : null}
         {flags.rings ? (
           flags.ringsPathRebuild ? (
             <LabRingsPathRebuild
@@ -578,8 +638,9 @@ function LabBRendererImpl(contract: LabRenderContract) {
           )
         ) : null}
       </Group>
-      {/* reorder ghost (model-owned element) */}
-      {ghost}
+      {/* reorder ghost (model-owned element); WP-2.2 draws the hold in the
+          instrument language instead (LabFeedbackPicture) while fxReorder. */}
+      <Group>{flags.fx && flags.fxReorder ? null : ghost}</Group>
       {/* L2–L4: keep this run of body root Groups contiguous. */}
       <Group>
         {flags.bodies && pictures ? (
@@ -605,7 +666,7 @@ function LabBRendererImpl(contract: LabRenderContract) {
                   frameIndex={frameIndex}
                   colors={colors}
                   fontProvider={fontProvider}
-                  focused={focusedIds.includes(resource.body.id)}
+                  focused={!focusFx && focusedIds.includes(resource.body.id)}
                   look={look}
                 />
               ))}
@@ -667,6 +728,7 @@ function LabBRendererImpl(contract: LabRenderContract) {
       warmup={flags.warmup}
       warmupColor={warmupColor}
       sw={sw}
+      focus={focus}
     >
       {/* L0 (inside the filter layer instead while the experiment is on) */}
       {shockFilter ? null : envLayer}
@@ -689,6 +751,15 @@ function LabBRendererImpl(contract: LabRenderContract) {
         ) : (
           worldLayers
         )}
+        {/* WP-2.2 target-lock reticles: over the bodies, under the labels. */}
+        {flags.fx ? (
+          <LabFocusPicture
+            frame={frame}
+            frameIndex={frameIndex}
+            accent={accent}
+            additive={profile.blend === "additive"}
+          />
+        ) : null}
         {/* L6 — labels stay outside any future effect/filter layer. */}
         <Group>
           {flags.labels && pictures ? (
@@ -739,7 +810,20 @@ function LabBRendererImpl(contract: LabRenderContract) {
             : null}
         </Group>
         {/* L7 — switch FX over the bodies (WP-2.1); focus / feedback WP-2.2. */}
-        <Group>{flags.fx ? <LabSwitchOver {...switchFxProps} /> : null}</Group>
+        <Group>
+          {flags.fx ? <LabSwitchOver {...switchFxProps} /> : null}
+          {flags.fx ? (
+            <LabFeedbackPicture
+              frame={frame}
+              frameIndex={frameIndex}
+              feedback={feedback}
+              reorder={contract.reorder}
+              extent={scene.extent}
+              accent={accent}
+              additive={profile.blend === "additive"}
+            />
+          ) : null}
+        </Group>
       </Group>
       {flags.fpsHud ? (
         <LabFpsOverlay

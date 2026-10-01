@@ -33,6 +33,18 @@ export interface LabSwitchContext {
   transition: SharedValue<SwitchChoreography>;
 }
 
+/**
+ * WP-2.2 focus state (UI-thread values owned by `LabBRenderer`): `mix` = world
+ * response 0..1 (a `withTiming` started in an effect keyed on focus identity),
+ * `keys` = the focused body keys (RETAINED after a clear so the release fades
+ * with `mix`), `lock` = the target-lock reticle 0 (seeking) .. 1 (locked).
+ */
+export interface LabFocusContext {
+  mix: SharedValue<number>;
+  keys: SharedValue<string[]>;
+  lock: SharedValue<number>;
+}
+
 export interface LabRenderContextValue {
   clock: SharedValue<number>;
   ambient: SharedValue<number>;
@@ -42,6 +54,8 @@ export interface LabRenderContextValue {
    * near-invisible probe instance so its GPU pipeline compiles at entry. */
   warm: SharedValue<boolean>;
   sw: LabSwitchContext | null;
+  /** WP-2.2 focus state (null in the unit harness). */
+  focus: LabFocusContext | null;
 }
 
 export const LabRenderContext = createContext<LabRenderContextValue | null>(

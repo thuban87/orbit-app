@@ -337,6 +337,9 @@ async function renderLab(pose: { value: typeof HOME_CAMERA }) {
 
 describe("Lab B renderer tree contract", () => {
   it("draws the layer slots in fixed order with a contiguous, layer-free body batch", async () => {
+    // The legacy accent ghost path is pinned with the WP-2.2 reorder language
+    // off (it replaces the ghost while on — see the WP-2.2 test below).
+    lab.flags = { fpsHud: false, fxReorder: false };
     const pose = { value: { ...HOME_CAMERA, tilt: 0.5 } };
     const { tree } = await renderLab(pose);
     const [environment, world] = tree;
@@ -349,7 +352,11 @@ describe("Lab B renderer tree contract", () => {
       "atlas",
       "atlas",
     ]);
-    const [rings, polaris, ghost, bodies, labels, fx] = world.children;
+    const [rings, polaris, ghostSlot, bodies, focus, labels, fx] =
+      world.children;
+    const ghost = ghostSlot.children[0];
+    // WP-2.2: the focus reticle picture sits over the bodies, under labels.
+    expect(focus.type).toBe("picture");
     // L1 (WP-1.3): ONE homography Group; rings are static world circles
     // grouped by instrument class — no per-ring path rebuilt per frame.
     const orbit = rings.children[0];
@@ -370,6 +377,8 @@ describe("Lab B renderer tree contract", () => {
       "atlas",
       "atlas",
     ]);
+    // WP-2.2 feedback picture follows the switch FX in L7.
+    expect(fx.children[1].type).toBe("picture");
     // No per-body saveLayer: alpha is Group opacity.
     for (const body of bodies.children) {
       expect(body.props.layer).toBeUndefined();
@@ -401,7 +410,7 @@ describe("Lab B renderer tree contract", () => {
       5,
     );
     pose.value = { ...pose.value, zoom: 1 };
-    const nameLayer = world.children[4].children[0].children[0];
+    const nameLayer = world.children[5].children[0].children[0];
     const alpha = nameLayer.children[0].props.opacity as { value: number };
     expect(alpha.value).toBe(0);
     pose.value = { ...pose.value, zoom: 2 };
@@ -438,7 +447,7 @@ describe("Lab B renderer tree contract", () => {
   it("HUD tag: plate geometry equals the prepared text measurement", async () => {
     const pose = { value: { ...HOME_CAMERA, zoom: 2 } };
     const { tree } = await renderLab(pose);
-    const tag = tree[1].children[4].children[0].children[0].children[1];
+    const tag = tree[1].children[5].children[0].children[0].children[1];
     const plates = tag.children.filter(
       (c) => c.type === "roundRect" && c.props.style === undefined,
     );
@@ -455,7 +464,7 @@ describe("Lab B renderer tree contract", () => {
   it("labelHud off keeps the legacy plate", async () => {
     lab.flags = { fpsHud: false, labelHud: false };
     const { tree } = await renderLab({ value: { ...HOME_CAMERA, zoom: 2 } });
-    const tag = tree[1].children[4].children[0].children[0].children[1];
+    const tag = tree[1].children[5].children[0].children[0].children[1];
     expect(tag.children.some((c) => c.type === "line")).toBe(false);
   });
 
@@ -479,6 +488,7 @@ describe("Lab B renderer tree contract", () => {
     const { tree } = await renderLab({ value: { ...HOME_CAMERA } });
     expect(tree).toHaveLength(1);
     const [rings, polaris, , bodies, labels, fx] = tree[0].children;
+    // (fx off: no WP-2.2 focus slot either)
     expect(rings.children).toEqual([]);
     expect(polaris.children).toEqual([]);
     expect(bodies.children).toEqual([]);
@@ -501,7 +511,7 @@ describe("Lab B renderer tree contract", () => {
       "atlas",
       "atlas",
     ]);
-    const [rings, , , , , fx] = world.children;
+    const [rings, , , , , , fx] = world.children;
     expect(rings.children[1].children).toEqual([]);
     expect(fx.children[0].children).toEqual([]);
   });
@@ -513,13 +523,15 @@ describe("Lab B renderer tree contract", () => {
     // The sky moves INTO the filtered layer (no top-level L0 any more).
     expect(tree).toHaveLength(1);
     const filtered = tree[0];
-    const [wrapped, labels, over] = filtered.children;
+    const [wrapped, focus, labels, over] = filtered.children;
+    // WP-2.2 reticles stay outside the filter layer, under the labels.
+    expect(focus.type).toBe("picture");
     // RN Skia's Group turns an element `layer` into skLayer(paint, skGroup).
     expect(wrapped.type).toBe("skLayer");
     const [paint, group] = wrapped.children;
     expect(paint.type).toBe("paint");
     expect(paint.children[0].type).toBe("runtimeShader");
-    // env (L0) + rings, Polaris, ghost, bodies.
+    // env (L0) + rings, Polaris, ghost slot, bodies.
     expect(group.children).toHaveLength(5);
     expect(labels.children.length).toBe(1);
     expect(over.children[0].children.map((c) => c.type)).toEqual([
@@ -590,7 +602,7 @@ describe("Lab B renderer tree contract", () => {
   it("layerPictures: bodies, labels and rings are ONE picture each; the sun stays a component between the body halves", async () => {
     lab.flags = { fpsHud: false, layerPictures: true };
     const { tree } = await renderLab({ value: { ...HOME_CAMERA } });
-    const [rings, , , bodies, labels] = tree[1].children;
+    const [rings, , , bodies, , labels] = tree[1].children;
     expect(bodies.children.map((c) => c.type)).toEqual([
       "picture",
       "skGroup",
@@ -656,7 +668,7 @@ describe("Lab B renderer tree contract", () => {
     lab.flags = { fpsHud: false, layerPictures: true };
     const pose = { value: { ...HOME_CAMERA } };
     const { tree } = await renderLab(pose);
-    const labels = tree[1].children[4].children[0];
+    const labels = tree[1].children[5].children[0];
     expect(opsOf(labels)).toEqual([]);
     pose.value = { ...pose.value, zoom: 2 };
     const ops = opsOf(labels);

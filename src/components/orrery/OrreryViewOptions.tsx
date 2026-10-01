@@ -21,6 +21,7 @@ import { shellTransientStore } from "@/stores/shell-transient-store";
 import { useTheme } from "@/theme";
 import { SPACING } from "@/theme/tokens/spacing";
 import { OrreryNotice } from "./OrreryFeedback";
+import { HUD_LABEL, HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 import { OrreryObstacle } from "./OrreryObstacle";
 
 const LABELS = {
@@ -33,8 +34,11 @@ const TRANSIENT_ID = "orrery-view-options";
 /** Orrery-specific top-right panel; its scroll height follows the measured canvas. */
 export function OrreryViewOptions({
   availableHeight,
+  hud = false,
 }: {
   availableHeight: number;
+  /** ORRERY LAB B (WP-2.2, flag `hudChrome`): instrument HUD plate. */
+  hud?: boolean;
 }) {
   const preferences = useOrreryPreferencesStore();
   const { colors } = useTheme();
@@ -101,7 +105,12 @@ export function OrreryViewOptions({
         style={styles.trigger}
         onLayout={(event) => setTriggerHeight(event.nativeEvent.layout.height)}
       >
-        <GlassSurface density="dense" treatment="orrery-overlay">
+        <GlassSurface
+          density="dense"
+          treatment="orrery-overlay"
+          style={hud ? HUD_PLATE : undefined}
+        >
+          {hud ? <OrreryHudCorners /> : null}
           <Pressable
             ref={trigger}
             onPress={() => setOpen((value) => !value)}
@@ -110,7 +119,9 @@ export function OrreryViewOptions({
             accessibilityState={{ expanded: open }}
             style={styles.row}
           >
-            <AppText role="label">View options</AppText>
+            <AppText role="label" style={hud ? HUD_LABEL : undefined}>
+              View options
+            </AppText>
           </Pressable>
         </GlassSurface>
       </OrreryObstacle>

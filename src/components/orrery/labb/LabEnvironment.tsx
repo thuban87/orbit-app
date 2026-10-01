@@ -71,6 +71,7 @@ import {
   useLabRenderContext,
 } from "./labb-context";
 import { getLabEffect } from "./labb-effects";
+import { VIGNETTE_FOCUS } from "./labb-focus-logic";
 import {
   buildStarField,
   type LabStarLayerSpec,
@@ -350,7 +351,18 @@ function useNebulaUniforms(
       uGlow: st.glow * k,
       uEmberStr: st.ember * k,
       uDust: Math.min(1, st.dust * k),
-      uVig: vignette ? Math.min(1, st.vig * Math.max(0.6, k)) : 0,
+      // WP-2.2: the vignette deepens while something is focused.
+      uVig: vignette
+        ? Math.min(
+            1,
+            st.vig *
+              Math.max(0.6, k) *
+              (1 +
+                (ctx?.focus && flags?.fx && flags.fxFocusDim
+                  ? VIGNETTE_FOCUS * ctx.focus.mix.value
+                  : 0)),
+          )
+        : 0,
       uStarA: st.uStarA,
       uStarB: st.uStarB,
       uStarC: st.uStarC,

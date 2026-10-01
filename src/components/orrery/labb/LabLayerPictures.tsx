@@ -97,6 +97,11 @@ import {
 } from "./labb-bodies-logic";
 import { useLabRenderContext } from "./labb-context";
 import { getLabEffect, LAB_EFFECT_SOURCES } from "./labb-effects";
+import {
+  focusBodyValue,
+  focusDimFactor,
+  LABEL_DEFOCUS,
+} from "./labb-focus-logic";
 import { bodyAt, type FrameIndex } from "./labb-frame-index";
 import {
   flattenUniforms,
@@ -120,6 +125,9 @@ const MOON_FOCUS_R = 1.5;
 const MOON_FOCUS_STROKE = 0.3;
 const LABEL_PAD_X = SPACING.sm;
 const LABEL_PAD_Y = SPACING.xs;
+
+/** Stable empty focus-key list (worklet capture must not change identity). */
+const NO_KEYS: string[] = [];
 
 /** Effect slots of the bodies layer (index into the captured arrays). */
 const FX_PHOTO = 0;
@@ -164,6 +172,9 @@ function vecColor(c: readonly number[], alpha: number): Float32Array {
   return Float32Array.of(c[0], c[1], c[2], c[3] * alpha);
 }
 
+/** Flat / moon fallback defocus: alpha × (1 − FLAT_DEFOCUS × defocus). */
+const FLAT_DEFOCUS = 0.4;
+
 function drawContact(
   canvas: SkCanvas,
   spec: LabBodySpec,
@@ -173,10 +184,14 @@ function drawContact(
   orders: readonly (readonly string[])[],
   shaders: readonly SkShader[],
   fonts: readonly SkFont[],
+  focusValue: number,
+  focusRing: boolean,
 ): void {
   "worklet";
-  const a = item.alpha;
-  if (spec.focus) {
+  const lit = spec.fx >= 0 && !!effects[spec.fx] && !!uniforms;
+  const a =
+    item.alpha * (!lit && focusValue < 0 ? 1 - FLAT_DEFOCUS * -focusValue : 1);
+  if (spec.focus && focusRing) {
     const ring = Skia.Paint();
     ring.setAntiAlias(true);
     ring.setStyle(STROKE);
@@ -247,9 +262,11 @@ function drawMoon(
   light: [number, number],
   effects: readonly (SkRuntimeEffect | null)[],
   orders: readonly (readonly string[])[],
+  focusValue: number,
+  focusRing: boolean,
 ): void {
   "worklet";
-  const a = item.alpha;
+  const a = item.alpha * (focusValue < 0 ? 1 - FLAT_DEFOCUS * -focusValue : 1);
   const paint = Skia.Paint();
   paint.setAntiAlias(true);
   const effect = spec.fx === FX_MOON ? effects[FX_MOON] : null;
@@ -280,7 +297,7 @@ function drawMoon(
     paint.setColor(vecColor(spec.fill, a));
     canvas.drawCircle(0, 0, 1, paint);
   }
-  if (spec.focus) {
+  if (spec.focus && focusRing) {
     const ring = Skia.Paint();
     ring.setAntiAlias(true);
     ring.setStyle(STROKE);
@@ -393,6 +410,7 @@ export function LabBodiesPictures({
   const reducedMotion = ctx?.reducedMotion;
   const signal = ctx?.sw?.signal;
   const roles = ctx?.sw?.roles;
+  const focus = ctx?.focus ?? null;
   const shaderCache = useRef(
     new Map<string, { image: SkImage; r: number; shader: SkShader }>(),
   );
@@ -581,6 +599,12 @@ export function LabBodiesPictures({
     const sig = signal ? signal.value : null;
     const live = !!fx?.flags.fx && !!roles && switchFxLive(sig, reduced);
     const roleMap = live && roles ? roles.value : null;
+    // WP-2.2: world response to focus (defocus / focused atmosphere) and the
+    // legacy accent focus ring, replaced by the reticle while `fxFocus` is on.
+    const fon = !!focus && !!fx?.flags.fx && !!fx.flags.fxFocusDim;
+    const fmix = fon && focus ? focus.mix.value : 0;
+    const fkeys = fon && focus ? focus.keys.value : NO_KEYS;
+    const focusRing = !(fx?.flags.fx && fx.flags.fxFocus);
     let sunDepth: number | null = null;
     for (let s = 0; s < sunKeys.length && sunDepth === null; s++) {
       const b = bodyAt(f, index, sunKeys[s]);
@@ -627,6 +651,8 @@ export function LabBodiesPictures({
             labLightDir(item.x, item.y, f.center.x, f.center.y),
             effects,
             orders,
+            focusBodyValue(fkeys, spec.key, fmix),
+            focusRing,
           );
         } else {
           let sfx: number[] | undefined;
@@ -637,6 +663,7 @@ export function LabBodiesPictures({
               fx.flags.fxFlares ? v[1] : 0,
             ];
           }
+          const fv = focusBodyValue(fkeys, spec.key, fmix);
           drawContact(
             canvas,
             spec,
@@ -649,12 +676,15 @@ export function LabBodiesPictures({
                   spec.st,
                   fx,
                   sfx,
+                  fv,
                 )
               : null,
             effects,
             orders,
             shaders,
             fonts,
+            fv,
+            focusRing,
           );
         }
         canvas.restore();
@@ -735,9 +765,17 @@ export function LabLabelsPicture({
     leaderDp: profile.leaderDp,
   };
   const r = RADII.sm;
+  const ctx = useLabRenderContext();
+  const focus = ctx?.focus ?? null;
+  const fxFlags = ctx?.fxFlags;
   const picture = useDerivedValue(() => {
     const f = frame.value;
     const index = frameIndex.value;
+    // WP-2.2: other bodies' tags recede while something is focused.
+    const fx = fxFlags ? fxFlags.value : null;
+    const fon = !!focus && !!fx?.flags.fx && !!fx.flags.fxFocusDim;
+    const fmix = fon && focus ? focus.mix.value : 0;
+    const fkeys = fon && focus ? focus.keys.value : NO_KEYS;
     const plan = planLabelDraws(
       allocations.value,
       (id: string) => {
@@ -763,8 +801,9 @@ export function LabLabelsPicture({
       const item = plan[n];
       const spec = specs[item.i];
       const tag = item.tag;
+      const dim = focusDimFactor(fkeys, spec.id, fmix, 1 - LABEL_DEFOCUS);
       if (tag) {
-        layerPaint.setAlphaf(tag.opacity);
+        layerPaint.setAlphaf(tag.opacity * dim);
         canvas.saveLayer(layerPaint);
         const x = tag.x;
         const y = tag.y;
@@ -816,7 +855,7 @@ export function LabLabelsPicture({
       const cap = item.caption;
       const c = captions[item.i];
       if (cap && c) {
-        layerPaint.setAlphaf(cap.opacity);
+        layerPaint.setAlphaf(cap.opacity * dim);
         canvas.saveLayer(layerPaint);
         fill.setColor(vecColor(surface, 1));
         canvas.drawRRect(

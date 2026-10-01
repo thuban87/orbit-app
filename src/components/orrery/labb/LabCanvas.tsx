@@ -45,7 +45,11 @@ import {
 import type { LabFxSnapshot } from "@/stores/orrery-labb-fx-store";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { OrreryClockContext } from "../orrery-clock-context";
-import { LabRenderContext, type LabSwitchContext } from "./labb-context";
+import {
+  type LabFocusContext,
+  LabRenderContext,
+  type LabSwitchContext,
+} from "./labb-context";
 import {
   getLabEffect,
   LAB_EFFECT_SOURCES,
@@ -107,6 +111,7 @@ export function LabCanvas({
   warmup,
   warmupColor,
   sw = null,
+  focus = null,
   children,
 }: {
   width: number;
@@ -119,6 +124,8 @@ export function LabCanvas({
   warmupColor: number[];
   /** WP-2.1 switch showcase inputs (null in the unit harness). */
   sw?: LabSwitchContext | null;
+  /** WP-2.2 focus state (null in the unit harness). */
+  focus?: LabFocusContext | null;
   children: ReactNode;
 }) {
   // The ONE clock of the lab path.
@@ -142,8 +149,8 @@ export function LabCanvas({
     },
   );
   const context = useMemo(
-    () => ({ clock, ambient, fxFlags, reducedMotion, warm, sw }),
-    [clock, ambient, fxFlags, reducedMotion, warm, sw],
+    () => ({ clock, ambient, fxFlags, reducedMotion, warm, sw, focus }),
+    [clock, ambient, fxFlags, reducedMotion, warm, sw, focus],
   );
   return (
     <GestureDetector gesture={gesture}>

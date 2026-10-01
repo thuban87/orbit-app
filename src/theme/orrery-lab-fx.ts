@@ -44,6 +44,11 @@ export interface LabFxProfile {
   rings: LabRingProfile;
   /** L6 HUD-tag labels (WP-1.3). */
   labels: LabLabelProfile;
+  /**
+   * WP-2.2 Standard-package identity: a faint navigational chart graticule on
+   * the world plane (null = none; Galaxy keeps its nebula drama instead).
+   */
+  chart: LabChartProfile | null;
   /** Roles reserved for WP-1.1+ layers (environment / bodies / rings). */
   roles: {
     sky: LabColorToken;
@@ -202,6 +207,23 @@ export interface LabLabelProfile {
   /** Status hairline + leader tick. */
   hairlineDp: number;
   leaderDp: number;
+}
+
+/**
+ * WP-2.2 chart graticule (Standard package identity): range rings at a "nice"
+ * world step, radial bearing spokes and a degree scale on the outer ring, all
+ * hairlines in a quiet token under the plane homography.
+ */
+export interface LabChartProfile {
+  tone: LabColorToken;
+  /** Range-ring / spoke alpha (before the density fade). */
+  alpha: number;
+  /** Outer degree-scale alpha. */
+  scaleAlpha: number;
+  /** Bearing spokes every N degrees. */
+  spokeDeg: number;
+  /** Target number of range rings across the scene extent. */
+  rings: number;
 }
 
 /**
@@ -379,6 +401,43 @@ const LIGHT_LABELS: LabLabelProfile = {
   leaderDp: 6,
 };
 
+/**
+ * WP-2.2 Standard Dark identity: the Standard package promises "flatter and
+ * calmer", so its sky is a quiet graphite chart, not a nebula — barely-there
+ * clouds, no ember, crisp sparse stars with almost no twinkle, a softer
+ * vignette; the chart graticule (below) carries the identity instead.
+ */
+const STANDARD_DARK_ENV: LabEnvProfile = {
+  ...DARK_ENV,
+  strengthA: 0.09,
+  strengthB: 0.07,
+  glow: 0.02,
+  ember: 0,
+  dust: 0.1,
+  vignette: 0.5,
+  starDensity: 0.55,
+  starSoft: false,
+  starAlpha: 0.7,
+  starTint: 0.1,
+  twinkle: 0.06,
+};
+/** Standard Dark rings: calmer flow (C-04 stays on, at half strength). */
+const STANDARD_DARK_RINGS: LabRingProfile = { ...DARK_RINGS, flow: 0.45 };
+const STANDARD_DARK_CHART: LabChartProfile = {
+  tone: "textSecondary",
+  alpha: 0.13,
+  scaleAlpha: 0.3,
+  spokeDeg: 30,
+  rings: 6,
+};
+const STANDARD_LIGHT_CHART: LabChartProfile = {
+  tone: "textSecondary",
+  alpha: 0.12,
+  scaleAlpha: 0.26,
+  spokeDeg: 30,
+  rings: 6,
+};
+
 const HUD: LabFxProfile["hud"] = {
   plate: "surface",
   plateOpacity: HUD_PLATE_OPACITY,
@@ -406,6 +465,7 @@ export const LAB_FX_PROFILES: Readonly<
       bodies: DARK_BODIES,
       rings: DARK_RINGS,
       labels: DARK_LABELS,
+      chart: null,
       blend: "additive",
       hud: HUD,
       roles: ROLES,
@@ -416,6 +476,7 @@ export const LAB_FX_PROFILES: Readonly<
       bodies: LIGHT_BODIES,
       rings: LIGHT_RINGS,
       labels: LIGHT_LABELS,
+      chart: null,
       blend: "multiply",
       hud: HUD,
       roles: ROLES,
@@ -424,10 +485,11 @@ export const LAB_FX_PROFILES: Readonly<
   standard: {
     dark: {
       intensity: STANDARD_DARK_INTENSITY,
-      env: DARK_ENV,
+      env: STANDARD_DARK_ENV,
       bodies: DARK_BODIES,
-      rings: DARK_RINGS,
+      rings: STANDARD_DARK_RINGS,
       labels: DARK_LABELS,
+      chart: STANDARD_DARK_CHART,
       blend: "additive",
       hud: HUD,
       roles: ROLES,
@@ -438,6 +500,7 @@ export const LAB_FX_PROFILES: Readonly<
       bodies: LIGHT_BODIES,
       rings: LIGHT_RINGS,
       labels: LIGHT_LABELS,
+      chart: STANDARD_LIGHT_CHART,
       blend: "multiply",
       hud: HUD,
       roles: ROLES,
@@ -445,15 +508,25 @@ export const LAB_FX_PROFILES: Readonly<
   },
 };
 
-/** Resolve the lab profile; unknown inputs fall back to Galaxy Dark. */
+/**
+ * Resolve the lab profile; unknown inputs fall back to Galaxy Dark.
+ * `standardIdentity` false (panel flag `stdChart` off) restores the pre-WP-2.2
+ * Standard profiles (Galaxy's sky / rings at Standard intensity, no chart) for
+ * the A/B.
+ */
 export function resolveLabFxProfile(
   themePackage: string | undefined,
   mode: string | undefined,
+  standardIdentity = true,
 ): LabFxProfile {
   const byPackage =
     LAB_FX_PROFILES[(themePackage as ThemePackage) ?? "galaxy"] ??
     LAB_FX_PROFILES.galaxy;
-  return byPackage[mode === "light" ? "light" : "dark"];
+  const profile = byPackage[mode === "light" ? "light" : "dark"];
+  if (standardIdentity || themePackage !== "standard") return profile;
+  return mode === "light"
+    ? { ...profile, chart: null }
+    : { ...profile, env: DARK_ENV, rings: DARK_RINGS, chart: null };
 }
 
 /** Read a lab role's token value from the live palette. */

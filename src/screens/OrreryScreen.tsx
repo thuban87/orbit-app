@@ -286,6 +286,11 @@ export function OrreryScreen() {
   const state = useSystemStore();
   // ORRERY LAB B (WP-2.1): debug slow-motion for the switch showcase.
   const labSwitchTimeScale = useLabFxStore((s) => s.switchTimeScale);
+  // ORRERY LAB B (WP-2.2): instrument HUD chrome + focus-card anchoring flags.
+  const labHud = useLabFxStore(
+    (s) => s.renderer === "lab" && !!s.flags?.hudChrome,
+  );
+  const labAnchor = useLabFxStore((s) => !!s.flags?.focusCardAnchor);
   const labTimeScale = useSharedValue(1);
   useEffect(() => {
     labTimeScale.value = labSwitchTimeScale;
@@ -1087,8 +1092,9 @@ export function OrreryScreen() {
           counts={systemCounts}
           needsAttention={systemNeedsAttention}
           onOpenChange={onSystemSelectorOpenChange}
+          hud={labHud}
         />
-        <OrreryViewOptions availableHeight={viewport.height} />
+        <OrreryViewOptions availableHeight={viewport.height} hud={labHud} />
         <OrreryControls
           viewport={controlsViewport}
           measured={measured}
@@ -1097,6 +1103,7 @@ export function OrreryScreen() {
           onContacts={openContacts}
           onRecenter={recenter}
           onResetNorth={resetNorth}
+          hud={labHud}
         />
         {satelliteRow && focusedSatellite && scene ? (
           <OrreryFocusContext
@@ -1105,6 +1112,8 @@ export function OrreryScreen() {
             frame={camera.frame}
             blocked={overlaysOpen}
             onClear={clearFocus}
+            anchor={labAnchor}
+            hud={labHud}
             relationshipContext={
               <AppText>
                 {
@@ -1127,6 +1136,8 @@ export function OrreryScreen() {
             blocked={overlaysOpen}
             onClear={clearFocus}
             contextState={focusedMember ? satellites?.status : undefined}
+            anchor={labAnchor}
+            hud={labHud}
             onReloadContext={reloadSatellites}
             relationshipContext={
               focusedMember

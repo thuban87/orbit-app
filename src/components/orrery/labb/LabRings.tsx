@@ -53,6 +53,7 @@ import type { ThemePalette } from "@/theme/theme-types";
 import type { OrreryBodyResource } from "../use-orrery-switch-runtime";
 import { useLabRenderContext } from "./labb-context";
 import { getLabEffect, LAB_EFFECT_SOURCES } from "./labb-effects";
+import { focusDimFactor } from "./labb-focus-logic";
 import { bodyAt, type FrameIndex } from "./labb-frame-index";
 import { flattenUniforms, uniformOrder } from "./labb-layer-plan";
 import {
@@ -84,6 +85,8 @@ import { tokenToVec4 } from "./labb-uniforms";
 
 const IDENTITY_3X3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const EMPTY_KEYS: ReadonlySet<string> = new Set();
+/** Stable empty focus-key list (worklet capture must not change identity). */
+const NO_FOCUS_KEYS: string[] = [];
 /** Shader modes (see `ringInstrument`). */
 const MODE_RING = 0;
 const MODE_RADIAL = 2;
@@ -718,6 +721,8 @@ function RingClassesPicture({
   const reducedMotion = ctx?.reducedMotion;
   const signal = ctx?.sw?.signal;
   const roles = ctx?.sw?.roles;
+  const focus = ctx?.focus ?? null;
+  const focusDim = profile.focusDim;
   const effect = shader ? getLabEffect("ringInstrument") : null;
   const specs = useMemo<RingClassSpec[]>(
     () =>
@@ -754,6 +759,12 @@ function RingClassesPicture({
       fx.flags.fxRingTrim &&
       switchFxLive(sig, reducedMotion ? reducedMotion.value : false);
     const roleMap = roles ? roles.value : null;
+    // WP-2.2: with the world response on, focus dimming follows the animated
+    // `mix` and the retained focus keys (fades out on release) instead of the
+    // static React dims.
+    const fon = !!focus && !!fx && fx.flags.fx && fx.flags.fxFocusDim;
+    const fmix = fon && focus ? focus.mix.value : 0;
+    const fkeys = fon && focus ? focus.keys.value : NO_FOCUS_KEYS;
     const recorder = Skia.PictureRecorder();
     const canvas = recorder.beginRecording(
       Skia.XYWHRect(
@@ -794,7 +805,11 @@ function RingClassesPicture({
         const b = bodyAt(f, index, spec.keys[i]);
         if (!b) continue;
         const r = b.ringRadius / zoom;
-        let op = b.opacity * spec.dims[i];
+        let op =
+          b.opacity *
+          (fon
+            ? focusDimFactor(fkeys, spec.keys[i], fmix, focusDim)
+            : spec.dims[i]);
         if (spec.trimmed[i] && signal)
           op *= classRingSwitchFade(roleMap, spec.keys[i], sig, live);
         if (!(r > 0) || !(op > 0)) continue;
@@ -1027,6 +1042,13 @@ export function LabRings({
   const focusLine = useDerivedValue(
     () => (focusWidth * 1.2) / frame.value.pose.zoom,
   );
+  // WP-2.2: the focused ring's glow + lock line fade in with the world
+  // response (`mix`); 1 when the response flag is off.
+  const focusOpacity = useDerivedValue(() => {
+    const fx = ctx?.fxFlags.value;
+    const focus = ctx?.focus;
+    return focus && fx?.flags.fx && fx.flags.fxFocusDim ? focus.mix.value : 1;
+  });
   const commonFor = (cls: RingInstrumentClass): ClassCommon => ({
     cls,
     frame,
@@ -1060,9 +1082,15 @@ export function LabRings({
               />
             ))
         : null}
-      {/* Focused ring: soft glow strokes beneath its hairline. */}
+      {/* Focused ring: soft glow strokes beneath its hairline (WP-2.2: they
+          fade in with the world response). */}
       {focused.map((e) => (
-        <Group key={`glow-${e.key}`} style="stroke" color={e.cls.color}>
+        <Group
+          key={`glow-${e.key}`}
+          style="stroke"
+          color={e.cls.color}
+          opacity={focusOpacity}
+        >
           <Group opacity={profile.glowWide}>
             <RingCircle
               identity={e.key}
@@ -1119,13 +1147,14 @@ export function LabRings({
       ) : null}
       {/* Focused ring at full opacity (instrument lock), above its class. */}
       {focused.map((e) => (
-        <FocusLock
-          key={`lock-${e.key}`}
-          common={commonFor(e.cls)}
-          entry={e}
-          frameIndex={frameIndex}
-          strokeWidth={focusLine}
-        />
+        <Group key={`lock-${e.key}`} opacity={focusOpacity}>
+          <FocusLock
+            common={commonFor(e.cls)}
+            entry={e}
+            frameIndex={frameIndex}
+            strokeWidth={focusLine}
+          />
+        </Group>
       ))}
       {flags.ringTethers
         ? classes

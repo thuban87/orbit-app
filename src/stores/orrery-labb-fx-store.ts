@@ -227,7 +227,7 @@ export const LAB_FLAG_REGISTRY = [
     section: "layers",
     default: true,
     heavy: true,
-    note: "WP-2.1 switch FX master (WP-2.2 focus/feedback)",
+    note: "master for WP-2.1 switch FX and WP-2.2 focus / feedback",
   },
   // WP-2.1 System-switch showcase (L0/L1/L2/L7; master = `fx`).
   {
@@ -296,6 +296,51 @@ export const LAB_FLAG_REGISTRY = [
     default: false,
     heavy: true,
     note: "wraps the world layer in a saveLayer + runtime filter",
+  },
+  // WP-2.2 focus state + interaction feedback (L7; master = `fx`).
+  {
+    id: "fxFocus",
+    label: "FO Target-lock reticle (replaces the accent focus ring)",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "fxFocusDim",
+    label: "FO World response (defocus others, focused atmosphere, vignette)",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "fxFeedback",
+    label: "FB Tap pings / empty-space ripples / Polaris flare",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "fxReorder",
+    label:
+      "FB Reorder hold charge, held-ring glow, slot flash (replaces ghost)",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "focusCardAnchor",
+    label: "FO Focus card keeps clear of the locked body + its label",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "hudChrome",
+    label: "HUD Instrument chrome (selector, view options, controls, card)",
+    section: "effects",
+    default: true,
+  },
+  {
+    id: "stdChart",
+    label: "STD Standard package chart graticule + quiet sky profile",
+    section: "effects",
+    default: true,
+    heavy: true,
   },
   // Debug instrumentation (research 03 §4).
   {

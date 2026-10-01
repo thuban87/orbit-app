@@ -17,6 +17,7 @@ import { GlassSurface } from "@/components/ui/GlassSurface";
 import type { CameraPose, CameraViewport } from "@/logic/orrery-camera-logic";
 import { useWindowObstacle } from "@/navigation/use-window-measurement";
 import { SPACING } from "@/theme/tokens/spacing";
+import { HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 import {
   cameraControlState,
   controlsRegion,
@@ -36,6 +37,8 @@ export interface OrreryControlsProps {
   onContacts: (restoreFocus: () => void) => void;
   onRecenter: () => void;
   onResetNorth: () => void;
+  /** ORRERY LAB B (WP-2.2, flag `hudChrome`): instrument HUD plates. */
+  hud?: boolean;
 }
 export function OrreryControls({
   viewport,
@@ -45,7 +48,11 @@ export function OrreryControls({
   onContacts,
   onRecenter,
   onResetNorth,
+  hud = false,
 }: OrreryControlsProps) {
+  const surface = hud
+    ? [styles.controlSurface, HUD_PLATE]
+    : styles.controlSurface;
   const orientationProps = useAnimatedProps(() => ({
     accessibilityValue: {
       text: northOrientation(pose.value.yaw ?? 0, measured) ?? "",
@@ -93,8 +100,9 @@ export function OrreryControls({
         <GlassSurface
           density="dense"
           treatment="orrery-overlay"
-          style={styles.controlSurface}
+          style={surface}
         >
+          {hud ? <OrreryHudCorners /> : null}
           <Pressable
             ref={trigger}
             style={styles.control}
@@ -112,8 +120,9 @@ export function OrreryControls({
         <GlassSurface
           density="dense"
           treatment="orrery-overlay"
-          style={styles.controlSurface}
+          style={surface}
         >
+          {hud ? <OrreryHudCorners /> : null}
           <Pressable
             style={styles.control}
             accessibilityRole="button"
@@ -130,8 +139,9 @@ export function OrreryControls({
         <GlassSurface
           density="dense"
           treatment="orrery-overlay"
-          style={styles.controlSurface}
+          style={surface}
         >
+          {hud ? <OrreryHudCorners /> : null}
           <AnimatedPressable
             style={styles.control}
             accessibilityRole="button"

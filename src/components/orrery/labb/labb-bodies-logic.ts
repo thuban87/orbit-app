@@ -134,6 +134,8 @@ export interface LabBodyPose {
 /**
  * Per-frame uniforms for the lit contact-body shaders. `switchFx` (WP-2.1) =
  * [dissolve 0..1, capture flare 0..1] from `bodySwitchFx` (zeros at rest).
+ * `focus` (WP-2.2, `uK.w`) = `focusBodyValue`: +mix on the focused world
+ * (atmosphere intensifies), −mix on every other world (defocus), 0 at rest.
  */
 export function labBodyFrameUniforms(
   body: LabBodyPose | undefined,
@@ -142,6 +144,7 @@ export function labBodyFrameUniforms(
   st: LabBodyStatic,
   fx: LabFxSnapshot | null,
   switchFx?: readonly number[],
+  focus?: number,
 ) {
   "worklet";
   const flags = fx ? fx.flags : null;
@@ -170,7 +173,12 @@ export function labBodyFrameUniforms(
     uH: [st.fresnel * Math.min(1.5, k), st.desat, pattern, st.uSeed],
     uI: [st.uBase[0], st.uBase[1], st.uBase[2], 0],
     uJ: [st.uBand[0], st.uBand[1], st.uBand[2], 0],
-    uK: [switchFx ? switchFx[0] : 0, switchFx ? switchFx[1] : 0, st.uSeed, 0],
+    uK: [
+      switchFx ? switchFx[0] : 0,
+      switchFx ? switchFx[1] : 0,
+      st.uSeed,
+      focus ?? 0,
+    ],
   };
 }
 
