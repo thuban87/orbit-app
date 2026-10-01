@@ -66,7 +66,7 @@ SQLite stores only relative filenames; the photo bytes live in the app document 
 
 1. On an edit-only photo surface, `PhotoSourcePicker` opens the system library with no camera path or permission prompt, or accepts a user-pasted HTTPS image URL.
 2. A selected or downloaded source is cache-resident and opens `CropPhotoScreen` with a serializable target descriptor.
-3. The screen drives pan and pinch with Reanimated shared values, derives a clamped source-pixel square, and gives it to `persistCroppedMaster()`.
+3. The screen drives pan and pinch with Reanimated shared values, derives a clamped source-pixel square, and gives it to `persistCroppedMaster()`. The canvas sits in a shrinkable slot (`crop-photo-layout.ts`): with room to spare it is the original full-width square with 96 dp dim bands, and when the in-flow assist banner or a short screen takes height, the bands shrink (to 16 dp) and then the square, so Cancel and Use photo stay on screen. A square resized after framing scales the pan with it, keeping the same crop.
 4. The pipeline crops the original source, resizes it to a 512×512 JPEG at approximately 0.75 quality, and returns the persisted relative filename.
 
 ### Persisting and rendering the master
@@ -215,3 +215,4 @@ The path lock is process-local. Crash safety comes from settling old journal row
 | 2026-09-24 | 38.2 | Re-homed merged photos to survivor-derived masters and journaled purge/definition deletion for all derived paths. |
 | 2026-09-24 | 38.2 | Corrected the widget thumbnail description against installed native ImageManipulator behavior and added guarded derivative/picker-copy retirement with a cold-start orphan sweep (`data-privacy/AUD-DPI-011`, RG-013). |
 | 2026-09-26 | 38.5 | In Galaxy Dark, the Photo source picker "Remove photo" string sits on an opaque backing over the art (D-50; ADR-179). |
+| 2026-09-30 | 38.6 | Review WR5-02: Crop Photo sizes its canvas to the measured space left under the in-flow assist banner (D-38) so the Cancel / Use photo footer is never pushed off-screen; bands shrink before the square, and a resize keeps the framed crop. The banner stays app-global. |

@@ -25,11 +25,18 @@
  *
  * GEOMETRY INIT (once, when the decoded image + measured viewport are both ready):
  * read the decoded image's intrinsic dims (`image.width()/height()` → srcW/srcH),
- * take the fixed square viewport side (screen width minus padding), compute
+ * take the square viewport side (`cropLayout`), compute
  * `baseScale = viewport / min(srcW, srcH)` (cover scale at scale=1) and seed
  * `scale=1 / tx=0 / ty=0`. These inputs are handed verbatim to
  * `cropRectFromTransform` at confirm with the LIVE shared-value reads — the exact
  * contract `crop-geometry.ts` documents (addresses [codex/HIGH 05-04+05-05]).
+ *
+ * MEASURED SPACE (38.6 review WR5-02): the canvas sits in a shrinkable slot
+ * whose measured height caps it, so the Cancel / Use photo footer stays on
+ * screen when the in-flow assist banner (D-38) or a short phone takes height
+ * away. If the square's side changes after init (the banner came or went), the
+ * pan is scaled by the same ratio: every screen-space quantity scales with the
+ * viewport, so the crop rect in source pixels is unchanged.
  *
  * A very large source that never decodes is downscaled ONCE via the manipulator
  * (05-RESEARCH A4); the SAME (possibly-downscaled) URI feeds BOTH the preview
@@ -79,13 +86,10 @@ import { notifyWidgetDataChanged } from "@/services/widget/widget-refresh";
 import { publishCropResult } from "@/stores/photo-result-store";
 import { useTheme } from "@/theme";
 import { Logger } from "@/utils/logger";
+import { cropLayout, cropNaturalHeight } from "./crop-photo-layout";
 
 const LOG_SCOPE = "crop-photo";
 
-/** Horizontal screen padding either side of the square viewport. */
-const SCREEN_PADDING = 16;
-/** Vertical dim band above/below the square (shows the rest of the photo). */
-const DIM_BAND = 96;
 /** Max pinch zoom (scale=1 is cover; the image always covers the square). */
 const MAX_SCALE = 8;
 /** Dim opacity over the region outside the crop square (surface-derived). */
@@ -113,13 +117,18 @@ export function CropPhotoScreen({
   const { rawUri, target } = route.params;
   const { width: screenW } = useWindowDimensions();
 
-  // The fixed square viewport side + its placement in the canvas. Deterministic
-  // from the screen width, so it is available before the image decodes.
-  const viewport = Math.max(1, screenW - SCREEN_PADDING * 2);
-  const squareX = SCREEN_PADDING;
-  const squareY = DIM_BAND;
-  const canvasW = screenW;
-  const canvasH = viewport + DIM_BAND * 2;
+  // The square viewport side + its placement in the canvas. Before the canvas
+  // slot is measured it is the natural layout from the screen width; after,
+  // the measured slot caps the canvas height (review WR5-02).
+  const [canvasSlot, setCanvasSlot] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+  const { viewport, squareX, squareY, canvasW, canvasH } = cropLayout(
+    canvasSlot?.width ?? screenW,
+    canvasSlot?.height ?? null,
+  );
+  const naturalCanvasH = cropNaturalHeight(canvasSlot?.width ?? screenW);
 
   // The image URI actually decoded + cropped. Starts as the raw source; swapped
   // for a downscaled copy ONLY if the raw source fails to decode (A4). Keeping
@@ -163,7 +172,21 @@ export function CropPhotoScreen({
   // ready. React state/effects for one-time init is allowed (CLAUDE.md); only
   // per-frame gesture updates must stay on shared values.
   useEffect(() => {
-    if (!image || initedRef.current || viewport <= 1) {
+    if (initedRef.current) {
+      // Review WR5-02: the measured space changed the square after init. Scale
+      // the pan with it so the same part of the photo stays framed.
+      const previous = geomRef.current;
+      if (!previous || viewport <= 1 || previous.viewport === viewport) return;
+      const ratio = viewport / previous.viewport;
+      const baseScale = viewport / Math.min(previous.srcW, previous.srcH);
+      geomRef.current = { ...previous, viewport, baseScale };
+      svViewport.value = viewport;
+      svBaseScale.value = baseScale;
+      tx.value = tx.value * ratio;
+      ty.value = ty.value * ratio;
+      return;
+    }
+    if (!image || viewport <= 1) {
       return;
     }
     const srcW = image.width();
@@ -266,6 +289,15 @@ export function CropPhotoScreen({
     });
 
   const gesture = Gesture.Simultaneous(pan, pinch);
+
+  // The cover-scaled image size for THIS render's viewport (not the ref's
+  // last value), so a re-measured square draws at its new size at once.
+  const drawGeom = geomRef.current;
+  const drawScale = drawGeom
+    ? viewport / Math.min(drawGeom.srcW, drawGeom.srcH)
+    : 0;
+  const drawW = drawGeom ? drawGeom.srcW * drawScale : 0;
+  const drawH = drawGeom ? drawGeom.srcH * drawScale : 0;
 
   const onCancel = useCallback(() => {
     navigation.goBack();
@@ -370,82 +402,89 @@ export function CropPhotoScreen({
         </Text>
       </View>
 
-      <GestureDetector gesture={gesture}>
-        <Canvas
-          testID="crop-photo-canvas"
-          style={{ width: canvasW, height: canvasH }}
-        >
-          <Fill color={colors.background} />
+      {/* Shrinkable slot (review WR5-02): its natural size is the original
+          fixed canvas, and it gives up height before the footer does. */}
+      <View
+        testID="crop-photo-canvas-slot"
+        style={[styles.canvasSlot, { flexBasis: naturalCanvasH }]}
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setCanvasSlot((previous) =>
+            previous?.width === width && previous.height === height
+              ? previous
+              : { width, height },
+          );
+        }}
+      >
+        <GestureDetector gesture={gesture}>
+          <Canvas
+            testID="crop-photo-canvas"
+            style={{ width: canvasW, height: canvasH }}
+          >
+            <Fill color={colors.background} />
 
-          {ready && image && geomRef.current ? (
-            <Group
-              transform={[{ translateX: squareX }, { translateY: squareY }]}
-            >
-              <Group transform={transform}>
-                <SkiaImage
-                  image={image}
-                  x={
-                    (viewport -
-                      geomRef.current.srcW * geomRef.current.baseScale) /
-                    2
-                  }
-                  y={
-                    (viewport -
-                      geomRef.current.srcH * geomRef.current.baseScale) /
-                    2
-                  }
-                  width={geomRef.current.srcW * geomRef.current.baseScale}
-                  height={geomRef.current.srcH * geomRef.current.baseScale}
-                  fit="fill"
-                />
+            {ready && image && drawGeom ? (
+              <Group
+                transform={[{ translateX: squareX }, { translateY: squareY }]}
+              >
+                <Group transform={transform}>
+                  <SkiaImage
+                    image={image}
+                    x={(viewport - drawW) / 2}
+                    y={(viewport - drawH) / 2}
+                    width={drawW}
+                    height={drawH}
+                    fit="fill"
+                  />
+                </Group>
               </Group>
+            ) : null}
+
+            {/* Dim mask over the region OUTSIDE the crop square (surface-derived). */}
+            <Group opacity={MASK_OPACITY}>
+              <Rect
+                x={0}
+                y={0}
+                width={canvasW}
+                height={squareY}
+                color={colors.surface}
+              />
+              <Rect
+                x={0}
+                y={squareY + viewport}
+                width={canvasW}
+                height={canvasH - (squareY + viewport)}
+                color={colors.surface}
+              />
+              <Rect
+                x={0}
+                y={squareY}
+                width={squareX}
+                height={viewport}
+                color={colors.surface}
+              />
+              <Rect
+                x={squareX + viewport}
+                y={squareY}
+                width={canvasW - (squareX + viewport)}
+                height={viewport}
+                color={colors.surface}
+              />
             </Group>
-          ) : null}
 
-          {/* Dim mask over the region OUTSIDE the crop square (surface-derived). */}
-          <Group opacity={MASK_OPACITY}>
+            {/* Fixed centred square crop frame. */}
             <Rect
-              x={0}
-              y={0}
-              width={canvasW}
-              height={squareY}
-              color={colors.surface}
-            />
-            <Rect
-              x={0}
-              y={squareY + viewport}
-              width={canvasW}
-              height={canvasH - (squareY + viewport)}
-              color={colors.surface}
-            />
-            <Rect
-              x={0}
+              x={squareX}
               y={squareY}
-              width={squareX}
+              width={viewport}
               height={viewport}
-              color={colors.surface}
+              style="stroke"
+              strokeWidth={FRAME_STROKE}
+              color={colors.borderStrong}
             />
-            <Rect
-              x={squareX + viewport}
-              y={squareY}
-              width={canvasW - (squareX + viewport)}
-              height={viewport}
-              color={colors.surface}
-            />
-          </Group>
-
-          {/* Fixed centred square crop frame. */}
-          <Rect
-            x={squareX}
-            y={squareY}
-            width={viewport}
-            height={viewport}
-            style="stroke"
-            strokeWidth={FRAME_STROKE}
-            color={colors.borderStrong}
-          />
-        </Canvas>
-      </GestureDetector>
+          </Canvas>
+        </GestureDetector>
+      </View>
 
       {!image && downscaleTried ? (
         // Neither the source nor its one-time downscale decoded: say so instead
@@ -506,6 +545,12 @@ export function CropPhotoScreen({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
+  },
+  canvasSlot: {
+    flexGrow: 0,
+    flexShrink: 1,
+    minHeight: 0,
+    overflow: "hidden",
   },
   header: {
     padding: 16,
