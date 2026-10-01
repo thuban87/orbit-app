@@ -224,7 +224,7 @@ export async function seedLabBFixtureIfAbsent(): Promise<void> {
             uid: newUid(),
             occurredAt: daysAgo(
               nowDate,
-              Math.floor(rand() * Math.min(firstAgo, 400)),
+              1 + Math.floor(rand() * Math.min(firstAgo, 400)),
               9 + (k % 10),
             ),
             now,
