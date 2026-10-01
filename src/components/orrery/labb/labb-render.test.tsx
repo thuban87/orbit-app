@@ -245,6 +245,12 @@ function resolve(node: ReactNode): Node[] {
   if (!node || typeof node !== "object") return [];
   if (Array.isArray(node)) return node.flatMap(resolve);
   const element = node as ReactElement<{ children?: ReactNode }>;
+  const memoType = element.type as unknown as {
+    $$typeof?: symbol;
+    type?: (props: unknown) => ReactNode;
+  };
+  if (memoType?.$$typeof === Symbol.for("react.memo") && memoType.type)
+    return resolve(memoType.type(element.props));
   if (typeof element.type === "function")
     return resolve(
       (element.type as (props: unknown) => ReactNode)(element.props),

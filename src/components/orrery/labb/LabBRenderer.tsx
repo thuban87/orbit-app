@@ -43,6 +43,8 @@ import {
   type SkTypefaceFontProvider,
 } from "@shopify/react-native-skia";
 import {
+  isValidElement,
+  memo,
   type ReactNode,
   useCallback,
   useEffect,
@@ -232,7 +234,56 @@ function LabBody({
   );
 }
 
-export function LabBRenderer(contract: LabRenderContract) {
+/** Shallow prop equality of two React elements (same type, same props). */
+function sameElement(a: ReactNode, b: ReactNode): boolean {
+  if (a === b) return true;
+  if (!isValidElement(a) || !isValidElement(b) || a.type !== b.type)
+    return false;
+  const pa = a.props as Record<string, unknown>;
+  const pb = b.props as Record<string, unknown>;
+  const keys = Object.keys(pa);
+  return (
+    keys.length === Object.keys(pb).length && keys.every((k) => pa[k] === pb[k])
+  );
+}
+
+/**
+ * Switch-stall fix: every React render of this component re-renders the
+ * canvas children, and EVERY canvas commit makes RN Skia re-record the whole
+ * tree and re-read each bound SharedValue synchronously from the UI thread
+ * (≈0.4 s per commit during a switch on the emulator). OrreryScreen re-renders
+ * many times per switch for reasons the canvas does not consume, and hands
+ * down a fresh `switchRuntime` object and `ghost` element each time; compare
+ * those by their parts so an unchanged contract skips the canvas commit.
+ */
+function sameContract(a: LabRenderContract, b: LabRenderContract): boolean {
+  const keys = Object.keys(a) as (keyof LabRenderContract)[];
+  if (keys.length !== Object.keys(b).length) return false;
+  for (const k of keys) {
+    if (a[k] === b[k]) continue;
+    if (k === "switchRuntime") {
+      const x = a.switchRuntime;
+      const y = b.switchRuntime;
+      if (
+        x.transition === y.transition &&
+        x.progress === y.progress &&
+        x.cameraFrom === y.cameraFrom &&
+        x.cameraTo === y.cameraTo &&
+        x.running === y.running &&
+        x.resources === y.resources
+      )
+        continue;
+      return false;
+    }
+    if (k === "ghost" && sameElement(a.ghost, b.ghost)) continue;
+    return false;
+  }
+  return true;
+}
+
+export const LabBRenderer = memo(LabBRendererImpl, sameContract);
+
+function LabBRendererImpl(contract: LabRenderContract) {
   const {
     frame,
     allocations,
