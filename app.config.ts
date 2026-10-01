@@ -58,9 +58,18 @@ const widgetConfig: WithAndroidWidgetsParams = {
 // Functional config form: MERGES the template's app.json (preserving its
 // icon/splash/adaptive-icon references) and layers Orbit's fields on top.
 // Expo loads this TypeScript config natively (no `tsx/cjs` hook needed).
+// ORRERY LAB A (experiment-only): own applicationId + launcher name so this
+// build installs side-by-side with com.bwales.orbit and the other labs. Every
+// provider authority in the merged manifest is `${applicationId}`-relative and
+// the boot-receiver plugin derives its Kotlin package from android.package, so
+// no other native key needs changing. In-app APP_NAME (app-name.json) is untouched.
+const LAB_A_PACKAGE = "com.bwales.orbit.laba";
+const LAB_A_LAUNCHER_NAME = "Orbit Lab A";
+void appName;
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: appName.APP_NAME,
+  name: LAB_A_LAUNCHER_NAME, // ORRERY LAB A (experiment-only) — was appName.APP_NAME
   slug: "orbit",
   // The expo-share-intent config plugin REQUIRES a scheme (Phase 10, CAP-01).
   // None was previously set; "orbit" is the app's deep-link scheme.
@@ -72,7 +81,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // Owner-confirmed Android application id (FND-01 checkpoint, plan 01-05).
     // Install-locked and STABLE: it does NOT track the display name (APP_NAME).
     // Changing it after the first install requires uninstall/reinstall.
-    package: "com.bwales.orbit",
+    package: LAB_A_PACKAGE, // ORRERY LAB A (experiment-only) — was "com.bwales.orbit"
     predictiveBackGestureEnabled: false,
     // PII-at-rest mitigation (T-02-13, dossier cluster G — [DECIDED]). The
     // app-private SQLite file holds third-party notes; allowBackup=false keeps
