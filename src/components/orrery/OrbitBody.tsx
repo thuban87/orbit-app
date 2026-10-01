@@ -16,9 +16,15 @@ import {
   type SkTypefaceFontProvider,
   TextAlign,
 } from "@shopify/react-native-skia";
-import { useMemo } from "react";
-import { type SharedValue, useDerivedValue } from "react-native-reanimated";
+import { useEffect, useMemo } from "react";
+import {
+  type SharedValue,
+  useDerivedValue,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import type { BillboardPose } from "@/logic/orrery-frame";
+import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import {
   BodyLightOverlay,
   type DeepFieldBodyContext,
@@ -56,6 +62,8 @@ export interface OrbitBodyProps {
 
 /** Status-outline stroke width around the planet disc. */
 const OUTLINE_WIDTH = 3;
+/** ORRERY LAB A: photo fade-in on resolve (ms). */
+const PHOTO_FADE_MS = 260;
 
 export function OrbitBody({
   cx,
@@ -103,6 +111,19 @@ export function OrbitBody({
   // C2-1: unconditional hook, null-guarded source (photo may be null). D-11:
   // useOrreryPhoto caps the texture at 512 px and owns SkImage disposal.
   const image = useOrreryPhoto(photo);
+  // ORRERY LAB A (pass 2): the photo cross-fades over the initials when it
+  // resolves (remounts re-load photos asynchronously — D-41 keeps no SkImage
+  // cache, see _notes/PASS-2.md). Instant under reduced motion. The hook's
+  // ownership/disposal contract is untouched: this only animates opacity.
+  const reducedMotion = useReducedMotionShared();
+  const photoOpacity = useSharedValue(1);
+  useEffect(() => {
+    if (!lab || !image) return;
+    photoOpacity.value = 0;
+    photoOpacity.value = reducedMotion.value
+      ? 1
+      : withTiming(1, { duration: PHOTO_FADE_MS });
+  }, [image, lab, photoOpacity, reducedMotion]);
 
   // Inner disc sits inside the status outline ring.
   const innerR = Math.max(1, radius - OUTLINE_WIDTH / 2);
@@ -154,7 +175,30 @@ export function OrbitBody({
       ) : null}
       {/* Canonical status outline; rogue retains its cold body treatment. */}
       <Circle cx={cx} cy={cy} r={radius} color={bodyFill} />
-      {image ? (
+      {image && lab ? (
+        // Lab: initials stay underneath while the photo fades in over them.
+        <>
+          <Circle cx={cx} cy={cy} r={innerR} color={swatch} />
+          {paragraph ? (
+            <Paragraph
+              paragraph={paragraph}
+              x={cx - innerR}
+              y={cy - fontSize * 0.72}
+              width={innerR * 2}
+            />
+          ) : null}
+          <Group clip={circleClip} opacity={photoOpacity}>
+            <SkiaImage
+              image={image}
+              x={cx - innerR}
+              y={cy - innerR}
+              width={innerR * 2}
+              height={innerR * 2}
+              fit="cover"
+            />
+          </Group>
+        </>
+      ) : image ? (
         // Photo disc, clipped to a circle, cover-fit.
         <Group clip={circleClip}>
           <SkiaImage
