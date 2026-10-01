@@ -92,8 +92,20 @@ export const IDENTITY_ZOOM = 2;
  * max half-width of the system at the pivot depth, in viewport widths. */
 export const LAB_HOME_TOP_MARGIN = 24;
 export const LAB_HOME_MAX_HALF_SPAN = 0.6;
+/**
+ * Lab C (Checkpoint C.5): Systems with more contacts than this get a WHOLE-DISC
+ * Home — lower tilt and a dolly-out until every rim point projects inside the
+ * usable rect (between the header controls and the tab bar). Smaller Systems
+ * keep the strategy-map composition (far rim at the top, near rim may run off).
+ * This deliberately lets Home go below the production readability floor
+ * (MIN_READABLE_RADIUS) for large Systems — lab-only, flagged for the owner.
+ */
+export const LAB_FIT_ALL_MIN_CONTACTS = 24;
+export const LAB_FIT_ALL_TILT = 0.9;
+export const LAB_FIT_ALL_MARGIN = 12;
 export const FOCUS_MS = 300;
-export const MIN_ZOOM = 0.25;
+// Lab C: lowered from 0.25 so a large System (Dense, 120) can dolly out to a whole-disc Home.
+export const MIN_ZOOM = 0.08;
 export const MAX_ZOOM = 4;
 export const MAX_TILT = 1.32;
 export const MIN_READABLE_RADIUS = 10;
@@ -354,6 +366,43 @@ export function deriveHomePose(
       side.x - cx <= viewport.width * LAB_HOME_MAX_HALF_SPAN
     );
   };
+  const contacts = world.filter((b) => b.kind === "contact").length;
+  if (contacts > LAB_FIT_ALL_MIN_CONTACTS) {
+    const wholeDisc = (zoom: number) => {
+      "worklet";
+      const pose = clampCameraPose(
+        { ...HOME_CAMERA, tilt: LAB_FIT_ALL_TILT, zoom },
+        extent,
+      );
+      for (let k = 0; k < 24; k++) {
+        const a = (k / 24) * Math.PI * 2;
+        const p = projectWorldPoint(
+          { x: Math.cos(a) * extent, y: Math.sin(a) * extent },
+          pose,
+          viewport,
+        );
+        if (
+          p.x < usable.x + LAB_FIT_ALL_MARGIN ||
+          p.x > usable.x + usable.width - LAB_FIT_ALL_MARGIN ||
+          p.y < usable.y + LAB_FIT_ALL_MARGIN ||
+          p.y > usable.y + usable.height - LAB_FIT_ALL_MARGIN
+        )
+          return false;
+      }
+      return true;
+    };
+    let lo = MIN_ZOOM,
+      hi = Math.max(MIN_ZOOM, base.zoom * 4);
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (wholeDisc(mid)) lo = mid;
+      else hi = mid;
+    }
+    return clampCameraPose(
+      { ...HOME_CAMERA, tilt: LAB_FIT_ALL_TILT, zoom: lo },
+      extent,
+    );
+  }
   if (!fits(base.zoom)) return base;
   let lo = base.zoom,
     hi = MAX_ZOOM;

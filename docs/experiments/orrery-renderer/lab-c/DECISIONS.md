@@ -178,3 +178,30 @@ See `PERFORMANCE.md`. Plane pattern + star granulation baked into textures, coro
 sphere/ring geometry, and the render DPR cap lowered 2.5 → 2.0 (visible softening is small at 411 dp width;
 it is the change that actually moved fps — the frame was fill-bound). The phone hit thermal SEVERE during the
 session; close-range targets were not met under that condition.
+
+## 2026-10-01 — Checkpoint C.5: Dense System (121 bodies) + whole-disc Home for large Systems
+
+- Seed unchanged: "Lab C Dense" already has 120 contacts (renderer log `bodies=121` incl. the sun;
+  `bodies=152` once satellites appear at the identity tier).
+- **Before** (production readability floor + B.3 strategy composition): Home dollied in to the readability
+  floor; ~30 of 121 bodies on screen, the far half compressed under the selector row and the rest off-screen
+  (`07-dense-overview.png`). Near/close tiers read well, CJK and emoji labels render (`08`, `09`).
+- **After (lab-only, orchestrator request):** Systems with > 24 contacts get a whole-disc Home —
+  tilt 0.9 and the largest zoom at which 24 sampled rim points all project inside the usable rect (between
+  the header controls and the tab bar). `MIN_ZOOM` lowered 0.25 → 0.08 so Dense can dolly out that far.
+  Result: whole disc visible, 120 of 121 bodies drawn (`drawnSpheres=120`, `10-dense-overview-whole-disc-fit.png`).
+  **Honest judgment: the bodies become specks** — the disc reads as a ring pattern, not as people. This is
+  exactly what the production readability floor (`zoom ≥ 10/minRadius`, research §7) prevents, so this
+  deliberately overrides a recorded product rule on the lab branch and must be an owner decision before it
+  goes anywhere. Smaller Systems (Inner 17) are unchanged.
+- **Ring density fade** (renderer): when orbits pack tighter than 10 px apart on screen, ring alpha and
+  stroke width scale down (floor 30%) so 120 concentric rings stop forming a moiré (visible in `10` vs the
+  first un-faded attempt). Bodies still need a minimum on-screen size / impostor to read at this distance —
+  not done.
+- Labels: at the fitted overview no names are shown (overview tier = focused/cluster only); at near (`11`)
+  initials on faces only, names appear at the identity tier as before.
+- fps at the fitted overview (one reading, thermal status SEVERE): 43.3 fps, present 2.6 ms. Overdraw at
+  overview is now low; near/close is fill-bound (see PERFORMANCE.md).
+- Tests: `orrery-camera-logic.test.ts` still fails the same 2 cases as at HEAD before this change (old
+  readability-floor / extremes contract); the new count branch would additionally contradict the
+  "no count branch" assertion once that test is rewritten.

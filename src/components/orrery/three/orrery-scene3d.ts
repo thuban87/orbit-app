@@ -131,6 +131,9 @@ const FLARE_HALO_SCALE = 5;
 const FLARE_RING_WIDTH_GAIN = 2;
 const FLARE_RING_ALPHA_GAIN = 1.4;
 const FLARE_POOL = 24;
+/** Ring density fade: full strength at ≥ this on-screen orbit spacing (px). */
+const RING_MIN_SPACING_PX = 10;
+const RING_DENSITY_FLOOR = 0.3;
 export const KIND_CONTACT = 0;
 export const KIND_SUN = 1;
 export const KIND_SATELLITE = 2;
@@ -904,6 +907,17 @@ export class OrreryScene3D {
     let flareUsed = 0;
     let sunSeen = false;
     const tileUv = 1 / ATLAS_COLS;
+    // Ring density fade (C.5): when orbits pack tighter than ~RING_MIN_SPACING_PX
+    // on screen (large System dolly-out), thin and dim the rings so the bodies,
+    // not a moiré of strokes, carry the overview.
+    let ringN = 0;
+    for (let i = 0; i < n; i++)
+      if (bodies[i * BODY_STRIDE + 5] === KIND_CONTACT) ringN++;
+    const spacingPx = (Math.max(1, packet.extent) / Math.max(1, ringN)) * zoom;
+    const ringDensity = Math.max(
+      RING_DENSITY_FLOOR,
+      Math.min(1, spacingPx / RING_MIN_SPACING_PX),
+    );
     for (let i = 0; i < n; i++) {
       const o = i * BODY_STRIDE;
       const wx = bodies[o];
@@ -980,7 +994,10 @@ export class OrreryScene3D {
           c.b,
           Math.min(
             1,
-            styleOpacity * opacity * (1 + FLARE_RING_ALPHA_GAIN * flare),
+            styleOpacity *
+              opacity *
+              ringDensity *
+              (1 + FLARE_RING_ALPHA_GAIN * flare),
           ),
         );
         this.ringStyle.setXY(
@@ -988,7 +1005,8 @@ export class OrreryScene3D {
           style.strokeStyle === "dashed" || style.strokeStyle === "faintTrace"
             ? 1
             : 0,
-          Math.max(1, style.width) * (1 + FLARE_RING_WIDTH_GAIN * flare),
+          Math.max(1, style.width * ringDensity) *
+            (1 + FLARE_RING_WIDTH_GAIN * flare),
         );
         ringCount++;
       }
