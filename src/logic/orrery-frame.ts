@@ -21,12 +21,20 @@ export interface WorldTransition {
   from: AnimatedWorldBody[];
   to: AnimatedWorldBody[];
 }
+export type AnimatedFrameBody = ProjectedFrame["bodies"][number] & {
+  opacity: number;
+  interactive: boolean;
+  visible: boolean;
+};
 export type AnimatedFrame = Omit<ProjectedFrame, "bodies"> & {
-  bodies: (ProjectedFrame["bodies"][number] & {
-    opacity: number;
-    interactive: boolean;
-    visible: boolean;
-  })[];
+  bodies: AnimatedFrameBody[];
+  /**
+   * Perf pass: bodyKey → first index into `bodies`, built once per frame so
+   * per-body consumers stop scanning N bodies (and building N key strings)
+   * each. A hit is verified against the body's own key, so a derived frame
+   * (`{...frame, bodies: filtered}`) can never return the wrong body.
+   */
+  keyIndex?: Record<string, number>;
 };
 export function bodyKey(
   body: Pick<WorldBody, "id" | "kind" | "satelliteTarget">,
@@ -37,6 +45,30 @@ export function bodyKey(
     return `satellite:${JSON.stringify([target.parentId, target.parentUid, target.uid])}`;
   }
   return `${body.kind}:${body.id}`;
+}
+/** First body with `key`, as `bodies.find(b => bodyKey(b) === key)` — O(1) when indexed. */
+export function frameBody(
+  frame: AnimatedFrame,
+  key: string,
+): AnimatedFrameBody | undefined {
+  "worklet";
+  const index = frame.keyIndex?.[key];
+  if (index !== undefined) {
+    const body = frame.bodies[index];
+    if (body && bodyKey(body) === key) return body;
+  }
+  return frame.bodies.find((body) => bodyKey(body) === key);
+}
+function indexFrameKeys(
+  bodies: readonly AnimatedFrameBody[],
+): Record<string, number> {
+  "worklet";
+  const index: Record<string, number> = {};
+  for (let i = 0; i < bodies.length; i++) {
+    const key = bodyKey(bodies[i]);
+    if (index[key] === undefined) index[key] = i;
+  }
+  return index;
 }
 /** Retained keys keep their source order (native stable equal-depth ties).
  * Departures remain decorative; new entries begin at their resolved position.
@@ -135,25 +167,23 @@ export function projectAnimatedFrame(
   "worklet";
   const world = sampleWorldTransition(transition, fraction);
   const frame = projectFrame(world, pose, viewport, transition.generation);
-  return {
-    ...frame,
-    bodies: frame.bodies.map((body, index) => {
-      const opacity = world[index].opacity;
-      // Halo-aware media culling only. The full frame remains the hit authority.
-      const reach = body.radius * (body.kind === "sun" ? 2 : 1.3);
-      return {
-        ...body,
-        opacity,
-        interactive: world[index].interactive && opacity > 0,
-        visible:
-          opacity > 0 &&
-          body.x + reach >= 0 &&
-          body.y + reach >= 0 &&
-          body.x - reach <= viewport.width &&
-          body.y - reach <= viewport.height,
-      };
-    }),
-  };
+  const bodies = frame.bodies.map((body, index) => {
+    const opacity = world[index].opacity;
+    // Halo-aware media culling only. The full frame remains the hit authority.
+    const reach = body.radius * (body.kind === "sun" ? 2 : 1.3);
+    return {
+      ...body,
+      opacity,
+      interactive: world[index].interactive && opacity > 0,
+      visible:
+        opacity > 0 &&
+        body.x + reach >= 0 &&
+        body.y + reach >= 0 &&
+        body.x - reach <= viewport.width &&
+        body.y - reach <= viewport.height,
+    };
+  });
+  return { ...frame, bodies, keyIndex: indexFrameKeys(bodies) };
 }
 
 /** One choreography sample is the sole world for projection, rings and hits. */
@@ -206,7 +236,7 @@ export function billboardPose(
   radius: number,
 ): BillboardPose {
   "worklet";
-  const b = frame.bodies.find((body) => bodyKey(body) === key);
+  const b = frameBody(frame, key);
   return b
     ? {
         x: b.x,
@@ -214,6 +244,57 @@ export function billboardPose(
         scale: b.radius / radius,
         depth: b.depth,
         opacity: b.visible ? b.opacity : 0,
+      }
+    : { x: 0, y: 0, scale: 1, depth: 0, opacity: 0 };
+}
+
+/** Per-key billboard inputs, built once per frame (perf pass). */
+export interface BillboardSample {
+  x: number;
+  y: number;
+  radius: number;
+  depth: number;
+  /** Already culled: `visible ? opacity : 0`, as billboardPose. */
+  opacity: number;
+}
+export type BillboardMap = Record<string, BillboardSample>;
+/**
+ * The frame's billboard data keyed by bodyKey (first body per key, like
+ * `frameBody`). Body/moon mappers read this small map instead of the whole
+ * frame: a mapper created on the JS thread runs its first sample there, and a
+ * frame read clones every body's 128-point ring path back to JS.
+ */
+export function billboardMap(frame: AnimatedFrame): BillboardMap {
+  "worklet";
+  const out: BillboardMap = {};
+  for (const b of frame.bodies) {
+    const key = bodyKey(b);
+    if (out[key] !== undefined) continue;
+    out[key] = {
+      x: b.x,
+      y: b.y,
+      radius: b.radius,
+      depth: b.depth,
+      opacity: b.visible ? b.opacity : 0,
+    };
+  }
+  return out;
+}
+/** Exactly `billboardPose(frame, key, radius)`, read from `billboardMap(frame)`. */
+export function billboardFromMap(
+  map: BillboardMap,
+  key: string,
+  radius: number,
+): BillboardPose {
+  "worklet";
+  const b = map[key];
+  return b
+    ? {
+        x: b.x,
+        y: b.y,
+        scale: b.radius / radius,
+        depth: b.depth,
+        opacity: b.opacity,
       }
     : { x: 0, y: 0, scale: 1, depth: 0, opacity: 0 };
 }

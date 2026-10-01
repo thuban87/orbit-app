@@ -48,10 +48,14 @@ export function OrreryFocusContext({
   const position = useAnimatedStyle(() => {
     const current = frame.value;
     const region = current ? usableCameraRect(current.viewport) : null;
+    // Perf pass: the target key is built once, not once per body per frame.
+    const targetKey =
+      target.kind === "satellite"
+        ? bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
+        : "";
     const body = current?.bodies.find((item) =>
       target.kind === "satellite"
-        ? bodyKey(item) ===
-          bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
+        ? bodyKey(item) === targetKey
         : item.kind !== "satellite" && item.id === target.id,
     );
     if (!region || !body) return { opacity: 0 };
@@ -88,10 +92,14 @@ export function OrreryFocusContext({
     if (!region) return { maxHeight: 180 };
     if (!DEEP_FIELD_ENABLED) return { maxHeight: region.height / 2 };
     // ORRERY LAB A: the same placement as the card (scroll inside the room).
+    // Perf pass: the target key is built once, not once per body per frame.
+    const targetKey =
+      target.kind === "satellite"
+        ? bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
+        : "";
     const body = current?.bodies.find((item) =>
       target.kind === "satellite"
-        ? bodyKey(item) ===
-          bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
+        ? bodyKey(item) === targetKey
         : item.kind !== "satellite" && item.id === target.id,
     );
     if (!body) return { maxHeight: region.height / 2 };

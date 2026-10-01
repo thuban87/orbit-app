@@ -100,19 +100,23 @@ it("the emitted projection closure settles after publication under the installed
   const cameraFrom = cell({ ...HOME_CAMERA, x: 12, zoom: 1.4 });
   const cameraTo = cell({ ...HOME_CAMERA });
   const pose = cell({ ...HOME_CAMERA });
+  // Perf pass: the frame worklet may capture only shared values, worklet
+  // helpers and SMALL plain data. `switchRuntime` (keyed resources, each with a
+  // whole scene snapshot) and `scene` are deliberately absent: capturing either
+  // again fails here as an unhandled capture, because the UI runtime
+  // re-materialises every captured object per reference on each mapper start.
   const available: Record<string, unknown> = {
-    switchRuntime: {
-      transition,
-      progress,
-      cameraFrom,
-      cameraTo,
-    },
+    switchTransition: transition,
+    switchProgress: progress,
+    switchCameraFrom: cameraFrom,
+    switchCameraTo: cameraTo,
     sampleSwitchChoreography,
     sampleOrrerySwitchCamera,
     pose,
     level: cell("overview"),
     viewport: { width: 400, height: 700 },
-    scene: { generation: 7, systemSnapshot: { members: [] } },
+    sceneGeneration: 7,
+    memberIdentities: [],
     satellites: [],
     camera: { reorder, frame: published },
     reorder,
@@ -198,6 +202,8 @@ it("the emitted projection closure settles after publication under the installed
   expect(publish).toHaveBeenCalledTimes(1);
   expect(published.value).toBe(projected.value);
   expect(names).not.toContain("camera");
+  for (const heavy of ["switchRuntime", "scene", "resources"])
+    expect(names).not.toContain(heavy);
   for (const phaseProgress of [0.1, 0.3, 0.55, 0.85, 1]) {
     progress.value = phaseProgress;
     for (let i = 0; i < 5; i++) tick();

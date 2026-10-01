@@ -28,8 +28,11 @@ import {
 } from "@/logic/orrery-focus-logic";
 import {
   type AnimatedFrame,
-  billboardPose,
+  type BillboardMap,
+  billboardFromMap,
+  billboardMap,
   bodyKey,
+  frameBody,
   projectAnimatedFrame,
 } from "@/logic/orrery-frame";
 import {
@@ -93,6 +96,10 @@ import {
 } from "./use-orrery-camera";
 
 const LABEL_MAX_WIDTH = 200;
+/** Stable default: a fresh `[]` per render would restart every mapper that captures it. */
+const NO_SATELLITES: readonly OrrerySatellite[] = [];
+const NO_IDS: number[] = [];
+const NO_RELATIONS: Readonly<Record<number, string>> = {};
 const LABEL_BODY_GAP = 8;
 
 function ReorderGhost({
@@ -122,7 +129,7 @@ function ReorderGhost({
 }
 function ProjectedBody({
   resource,
-  frame,
+  billboards,
   colors,
   fontProvider,
   focused,
@@ -130,7 +137,8 @@ function ProjectedBody({
   flare,
 }: {
   resource: OrreryBodyResource;
-  frame: SharedValue<AnimatedFrame>;
+  /** Per-frame billboard map (perf pass), not the whole frame. */
+  billboards: SharedValue<BillboardMap>;
   colors: ThemePalette;
   fontProvider: SkTypefaceFontProvider | null;
   focused: boolean;
@@ -141,7 +149,7 @@ function ProjectedBody({
 }) {
   const { body, scene, key } = resource;
   const projection = useDerivedValue(() =>
-    billboardPose(frame.value, key, body.radius),
+    billboardFromMap(billboards.value, key, body.radius),
   );
   const resolved = resolveSunOccupant({
     ...scene.sun,
@@ -203,14 +211,14 @@ export function OrreryWorld({
   fontProvider,
   onIntent,
   focusedIds,
-  clusterIds = focusedIds.length > 1 ? focusedIds : [],
-  focusedRelationById = {},
+  clusterIds: clusterIdsProp = focusedIds.length > 1 ? focusedIds : NO_IDS,
+  focusedRelationById: focusedRelationProp = NO_RELATIONS,
   interactive = true,
   camera,
   onFocusLost,
   onReorder,
   onReorderActivated,
-  satellites = [],
+  satellites: satelliteRows = NO_SATELLITES,
   focusedSatellite,
   switchRuntime,
 }: {
@@ -235,6 +243,35 @@ export function OrreryWorld({
   switchRuntime: OrrerySwitchRuntime;
 }) {
   const { fontScale } = useWindowDimensions();
+  // An empty row list is the same as none: keep one identity so the satellite
+  // flip during a System load does not re-record the Skia scene.
+  const satellites = satelliteRows.length > 0 ? satelliteRows : NO_SATELLITES;
+  // Moon COMPONENTS stay mounted while the same scene briefly withholds its
+  // rows (a System load hides moons until the new scene is ready). The frame
+  // still uses `satellites`, so withheld moons are absent from the frame:
+  // their billboards draw nothing and they cannot be hit. Unmounting them
+  // instead re-recorded the whole Skia scene mid-load (seconds of JS that
+  // delayed the scene read itself on large Systems).
+  const drawnSatellitesRef = useRef<{
+    generation: number;
+    rows: readonly OrrerySatellite[];
+  }>({ generation: scene.generation, rows: NO_SATELLITES });
+  if (
+    satellites.length > 0 ||
+    drawnSatellitesRef.current.generation !== scene.generation
+  )
+    drawnSatellitesRef.current = {
+      generation: scene.generation,
+      rows: satellites,
+    };
+  const drawnSatellites = drawnSatellitesRef.current.rows;
+  // Same for the label inputs: callers pass fresh `[]`/`{}` per render, which
+  // rebuilt every label paragraph and re-recorded the Skia scene each render.
+  const clusterIds = clusterIdsProp.length > 0 ? clusterIdsProp : NO_IDS;
+  const focusedRelationById =
+    Object.keys(focusedRelationProp).length > 0
+      ? focusedRelationProp
+      : NO_RELATIONS;
   const resources = switchRuntime.resources;
   const mounted = useRef(true);
   const focusKey = JSON.stringify([
@@ -250,35 +287,53 @@ export function OrreryWorld({
   const level = useSharedValue<SemanticLevel>("overview");
   // Capture only the producer's input; the controller also contains its published output.
   const reorder = camera.reorder;
+  // Perf pass: the frame worklet captures ONLY shared values and small plain
+  // data. Capturing `switchRuntime`/`scene` shipped every keyed resource (each
+  // holding a whole scene snapshot) to the UI runtime on every mapper (re)start
+  // (~240k materialised nodes per restart on 40 bodies, restarted on every
+  // screen render) — see lab-a _notes/PERF-PASS.md and orrery-frame-mapper.test.
+  const switchTransition = switchRuntime.transition;
+  const switchProgress = switchRuntime.progress;
+  const switchCameraFrom = switchRuntime.cameraFrom;
+  const switchCameraTo = switchRuntime.cameraTo;
+  const sceneGeneration = scene.generation;
+  const memberIdentities = useMemo(
+    () =>
+      scene.systemSnapshot.members.map((member) => ({
+        id: member.id,
+        uid: member.uid,
+      })),
+    [scene.systemSnapshot.members],
+  );
   const frame = useDerivedValue(() => {
     const sampled = sampleSwitchChoreography(
-      switchRuntime.transition.value,
-      switchRuntime.progress.value,
+      switchTransition.value,
+      switchProgress.value,
     ).world;
     const sampledCamera =
-      switchRuntime.progress.value >= 1
+      switchProgress.value >= 1
         ? pose.value
         : sampleOrrerySwitchCamera(
-            switchRuntime.cameraFrom.value,
-            switchRuntime.cameraTo.value,
-            switchRuntime.progress.value,
+            switchCameraFrom.value,
+            switchCameraTo.value,
+            switchProgress.value,
           );
     const held = reorder.value;
     const world = previewReorder(
       sampled,
-      held?.generation === scene.generation ? held : null,
+      held?.generation === sceneGeneration ? held : null,
     );
     const moons = deriveSatelliteBodies(
       world,
       satellites,
-      scene.systemSnapshot.members,
+      memberIdentities,
       true,
       semanticLevel(sampledCamera.zoom, level.value),
     );
     const completeWorld = [...world, ...moons];
     return projectAnimatedFrame(
       {
-        generation: switchRuntime.transition.value.generation,
+        generation: switchTransition.value.generation,
         from: completeWorld,
         to: completeWorld,
       },
@@ -287,6 +342,8 @@ export function OrreryWorld({
       viewport,
     );
   });
+  // Body/moon billboards read one small per-frame map (perf pass).
+  const billboards = useDerivedValue(() => billboardMap(frame.value));
   // Conventional focus positioning consumes this same interpolated frame.
   useAnimatedReaction(
     () => frame.value,
@@ -296,11 +353,10 @@ export function OrreryWorld({
   );
   // ── ORRERY LAB A: read-only presentation values derived FROM the frame and
   // the switch runtime (separate mappers: the frame worklet's closure is
-  // untouched — see orrery-frame-mapper.test).
+  // not widened — see orrery-frame-mapper.test).
   const deepInk = useMemo(() => resolveDeepFieldInk(colors), [colors]);
+  const deepFieldOn = DEEP_FIELD_ENABLED;
   const reducedMotion = useReducedMotionShared();
-  const switchTransition = switchRuntime.transition;
-  const switchProgress = switchRuntime.progress;
   const switchFx = useDerivedValue(() =>
     computeSwitchFx(
       switchTransition.value,
@@ -314,8 +370,8 @@ export function OrreryWorld({
     computeBodyLight(frame.value, lightExtent),
   );
   const deepField = useMemo<DeepFieldBodyContext | undefined>(
-    () => (DEEP_FIELD_ENABLED ? { ink: deepInk, light: bodyLight } : undefined),
-    [deepInk, bodyLight],
+    () => (deepFieldOn ? { ink: deepInk, light: bodyLight } : undefined),
+    [deepFieldOn, deepInk, bodyLight],
   );
   const planeRings = useMemo<PlaneRing[]>(
     () =>
@@ -448,7 +504,7 @@ export function OrreryWorld({
   const allocations = useDerivedValue(() => {
     const current = frame.value;
     const candidates = measured.flatMap((label) => {
-      const body = current.bodies.find((b) => bodyKey(b) === label.id);
+      const body = frameBody(current, label.id);
       return body?.visible && body.interactive
         ? [
             {
@@ -494,7 +550,8 @@ export function OrreryWorld({
     ],
     [scene],
   );
-  const members = scene.systemSnapshot.members;
+  const members = memberIdentities;
+  const sceneExtent = scene.extent;
   const reorderExpectation = useMemo(
     () => ({
       system: scene.system,
@@ -512,7 +569,7 @@ export function OrreryWorld({
         pose,
         frame,
         camera,
-        extent: cameraExtent(scene.extent),
+        extent: cameraExtent(sceneExtent),
         send: onIntent,
         enabled: interactive,
         stop: camera.stop,
@@ -537,7 +594,7 @@ export function OrreryWorld({
         },
         onNorth: (x, y) => {
           "worklet";
-          if (!hitPolaris(frame.value, scene.extent, x, y)) return false;
+          if (!hitPolaris(frame.value, sceneExtent, x, y)) return false;
           camera.recover(northTarget(pose.value));
           return true;
         },
@@ -546,7 +603,7 @@ export function OrreryWorld({
       pose,
       frame,
       camera,
-      scene.extent,
+      sceneExtent,
       onIntent,
       interactive,
       identities,
@@ -577,9 +634,12 @@ export function OrreryWorld({
         satelliteTarget: focusedSatellite,
       });
       const current = frame.value;
-      const body = current.bodies.find(
-        (b) => bodyKey(b) === key && b.interactive,
-      );
+      // First body with the key, and only if interactive (as the former
+      // `find(key && interactive)`: keys are unique per frame).
+      const keyed = frameBody(current, key);
+      const body = keyed?.interactive
+        ? keyed
+        : current.bodies.find((b) => bodyKey(b) === key && b.interactive);
       if (!body) return true;
       const reach = body.hitRadius + 44;
       const rect = current.viewport.usable ?? {
@@ -599,58 +659,82 @@ export function OrreryWorld({
       if (lost && previous !== true && onFocusLost) runOnJS(reportFocusLost)();
     },
   );
-  return (
-    <OrreryCanvas
-      width={viewport.width}
-      height={viewport.height}
-      background={colors.background}
-      starColors={starColors}
-      gesture={gesture}
-      backdrop={
-        DEEP_FIELD_ENABLED ? (
-          <DeepFieldBackdrop
-            width={viewport.width}
-            height={viewport.height}
-            ink={deepInk}
-            starColors={starColors}
+  // Perf pass: every Skia layer element is memoised on what it draws, so a
+  // render that only changes the gesture/interactivity (or nothing drawn)
+  // never makes RN-Skia re-record the scene (see OrreryCanvas).
+  const backdrop = useMemo(
+    () =>
+      deepFieldOn ? (
+        <DeepFieldBackdrop
+          width={viewport.width}
+          height={viewport.height}
+          ink={deepInk}
+          starColors={starColors}
+          frame={frame}
+          switchFx={switchFx}
+        />
+      ) : undefined,
+    [
+      deepFieldOn,
+      viewport.width,
+      viewport.height,
+      deepInk,
+      starColors,
+      frame,
+      switchFx,
+    ],
+  );
+  const hudViewport = useMemo(
+    () => ({ width: viewport.width, height: viewport.height }),
+    [viewport.width, viewport.height],
+  );
+  const overlay = useMemo(
+    () =>
+      deepFieldOn ? (
+        <Group>
+          <BodyStackLayer
             frame={frame}
+            light={bodyLight}
             switchFx={switchFx}
+            colors={ringInks}
+            ink={deepInk}
           />
-        ) : undefined
-      }
-      overlay={
-        DEEP_FIELD_ENABLED ? (
-          <Group>
-            <BodyStackLayer
-              frame={frame}
-              light={bodyLight}
-              switchFx={switchFx}
-              colors={ringInks}
+          {labMarkerVisible() ? (
+            <LabHud
+              viewport={hudViewport}
+              fontProvider={fontProvider}
               ink={deepInk}
+              textColor={colors.textSecondary}
             />
-            {labMarkerVisible() ? (
-              <LabHud
-                viewport={viewport}
-                fontProvider={fontProvider}
-                ink={deepInk}
-                textColor={colors.textSecondary}
-              />
-            ) : null}
-          </Group>
-        ) : undefined
-      }
-    >
+          ) : null}
+        </Group>
+      ) : undefined,
+    [
+      deepFieldOn,
+      frame,
+      bodyLight,
+      switchFx,
+      ringInks,
+      deepInk,
+      hudViewport,
+      fontProvider,
+      colors,
+    ],
+  );
+  const reorderDrag = camera.reorder;
+  const world = useMemo(
+    () => (
       <Group
         clip={{ x: 0, y: 0, width: viewport.width, height: viewport.height }}
       >
         <Group>
-          {DEEP_FIELD_ENABLED ? (
+          {deepFieldOn ? (
             <WorldPlaneLayer
               frame={frame}
               switchFx={switchFx}
               rings={planeRings}
               ink={deepInk}
-              extent={scene.extent}
+              extent={sceneExtent}
             />
           ) : (
             resources
@@ -670,19 +754,15 @@ export function OrreryWorld({
               ))
           )}
         </Group>
-        <Polaris frame={frame} extent={scene.extent} colors={colors} />
-        <ReorderGhost
-          frame={frame}
-          drag={camera.reorder}
-          color={colors.accent}
-        />
+        <Polaris frame={frame} extent={sceneExtent} colors={colors} />
+        <ReorderGhost frame={frame} drag={reorderDrag} color={colors.accent} />
         {/* RNRecorder flushes sorting at every non-Group command. Keep this run contiguous. */}
         <Group>
           {resources.map((resource) => (
             <ProjectedBody
               key={resource.key}
               resource={resource}
-              frame={frame}
+              billboards={billboards}
               colors={colors}
               fontProvider={fontProvider}
               focused={focusedIds.includes(resource.body.id)}
@@ -690,7 +770,7 @@ export function OrreryWorld({
               flare={sunFlare}
             />
           ))}
-          {satellites.map((row) => {
+          {drawnSatellites.map((row) => {
             const target = {
               kind: "satellite" as const,
               uid: row.uid,
@@ -706,7 +786,7 @@ export function OrreryWorld({
               <SatelliteBody
                 key={identity}
                 identity={identity}
-                frame={frame}
+                billboards={billboards}
                 colors={colors}
                 deepField={deepField}
                 focused={
@@ -745,6 +825,41 @@ export function OrreryWorld({
           ))}
         </Group>
       </Group>
+    ),
+    [
+      viewport.width,
+      viewport.height,
+      deepFieldOn,
+      frame,
+      billboards,
+      switchFx,
+      planeRings,
+      deepInk,
+      sceneExtent,
+      resources,
+      colors,
+      reorderDrag,
+      fontProvider,
+      focusedIds,
+      deepField,
+      sunFlare,
+      drawnSatellites,
+      focusedSatellite,
+      labels,
+      allocations,
+    ],
+  );
+  return (
+    <OrreryCanvas
+      width={viewport.width}
+      height={viewport.height}
+      background={colors.background}
+      starColors={starColors}
+      gesture={gesture}
+      backdrop={backdrop}
+      overlay={overlay}
+    >
+      {world}
     </OrreryCanvas>
   );
 }

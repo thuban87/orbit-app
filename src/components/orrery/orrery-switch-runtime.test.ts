@@ -18,6 +18,7 @@ const harness = vi.hoisted(() => ({
 vi.mock("react", () => ({
   useCallback: (fn: unknown) => fn,
   useEffect: () => {},
+  useMemo: (factory: () => unknown) => factory(),
   useRef: (current: unknown) => ({ current }),
   useState: (initial: unknown) => {
     harness.state.value = initial;

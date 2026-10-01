@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   cancelAnimation,
   ReduceMotion,
@@ -289,17 +289,20 @@ export function useOrrerySwitchRuntime(
     ) => {
       latestScene.current = scene;
       setResources((current) => nextOrreryResources(current, scene, isSwitch));
+      // Perf pass: ship only the geometry the UI needs. Capturing `scene` sent
+      // the whole snapshot (contacts, System snapshot, gravity map) to the UI
+      // runtime on every publication.
+      const world = scene.world;
+      const generation = scene.generation;
       runOnUI(() => {
         "worklet";
         cancelAnimation(progress);
         const reduced = reducedMotion.value;
         if (!isSwitch || transition.value.generation === 0) {
-          transition.value = beginSwitchChoreography(
-            scene.world,
-            scene.world,
-            scene.generation,
-            { intensity: 0, reducedMotion: reduced },
-          );
+          transition.value = beginSwitchChoreography(world, world, generation, {
+            intensity: 0,
+            reducedMotion: reduced,
+          });
           cameraFrom.value = { ...destinationHome };
           cameraTo.value = { ...destinationHome };
           progress.value = 1;
@@ -317,14 +320,14 @@ export function useOrrerySwitchRuntime(
         );
         transition.value = beginSwitchChoreography(
           displayed,
-          scene.world,
-          scene.generation,
+          world,
+          generation,
           { intensity, reducedMotion: reduced },
         );
         cameraFrom.value = displayedCamera;
         cameraTo.value = { ...destinationHome };
         progress.value = 0;
-        startDriver(1, reduced, scene.generation);
+        startDriver(1, reduced, generation);
       })();
     },
     [
@@ -398,17 +401,32 @@ export function useOrrerySwitchRuntime(
     [progress],
   );
 
-  return {
-    transition,
-    progress,
-    cameraFrom,
-    cameraTo,
-    running,
-    resources,
-    publish,
-    pause,
-    resume,
-  };
+  // Perf pass: a stable identity, so consumers that depend on the runtime do
+  // not rebuild (and re-serialise) on every unrelated screen render.
+  return useMemo(
+    () => ({
+      transition,
+      progress,
+      cameraFrom,
+      cameraTo,
+      running,
+      resources,
+      publish,
+      pause,
+      resume,
+    }),
+    [
+      transition,
+      progress,
+      cameraFrom,
+      cameraTo,
+      running,
+      resources,
+      publish,
+      pause,
+      resume,
+    ],
+  );
 }
 
 export function sampleOrrerySwitchCamera(

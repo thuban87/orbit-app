@@ -12,7 +12,7 @@ import {
   TextAlign,
 } from "@shopify/react-native-skia";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
-import { type AnimatedFrame, bodyKey } from "@/logic/orrery-frame";
+import { type AnimatedFrame, frameBody } from "@/logic/orrery-frame";
 import type { LabelAllocation } from "@/logic/orrery-label-logic";
 import type { ThemePalette } from "@/theme/theme-types";
 import { RADII } from "@/theme/tokens/radii";
@@ -130,7 +130,7 @@ export function OrreryLabel({
   const leader = useDerivedValue(() => {
     const path = Skia.Path.Make();
     if (!frame || context || placement.value.opacity <= 0) return path;
-    const body = frame.value.bodies.find((b) => bodyKey(b) === identity);
+    const body = frameBody(frame.value, identity);
     if (!body) return path;
     const px = placement.value.x + plateW / 2;
     const below = placement.value.y >= body.y;

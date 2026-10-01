@@ -1,6 +1,6 @@
 import { Circle, Group, Skia } from "@shopify/react-native-skia";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
-import { type AnimatedFrame, billboardPose } from "@/logic/orrery-frame";
+import { type BillboardMap, billboardFromMap } from "@/logic/orrery-frame";
 import type { ThemePalette } from "@/theme/theme-types";
 import {
   BodyLightOverlay,
@@ -25,13 +25,14 @@ function moonVisualScale(projected: number): number {
 /** One comparable depth Group in the world's contiguous native body batch. */
 export function SatelliteBody({
   identity,
-  frame,
+  billboards,
   colors,
   focused,
   deepField,
 }: {
   identity: string;
-  frame: SharedValue<AnimatedFrame>;
+  /** Per-frame billboard map (OrreryWorld), not the whole frame. */
+  billboards: SharedValue<BillboardMap>;
   colors: ThemePalette;
   focused: boolean;
   /** ORRERY LAB A: lit-moon rendering (absent → legacy flat dot). */
@@ -39,7 +40,7 @@ export function SatelliteBody({
 }) {
   const lab = !!deepField;
   const projected = useDerivedValue(() =>
-    billboardPose(frame.value, identity, 1),
+    billboardFromMap(billboards.value, identity, 1),
   );
   const transform = useDerivedValue(() => [
     { translateX: projected.value.x },

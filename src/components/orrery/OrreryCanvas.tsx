@@ -151,9 +151,14 @@ export function OrreryCanvas({
     return out;
   }, [legacyStars, width, height, starColors]);
 
-  return (
-    <GestureDetector gesture={gesture}>
-      <Canvas testID="orrery-canvas" style={{ width, height }}>
+  // Perf pass: RN-Skia re-records the WHOLE scene whenever the Canvas
+  // `children` identity changes (twice: commit + explicit redraw), reading every
+  // animated prop synchronously from the UI runtime on the JS thread. A fresh
+  // children array per render (e.g. only `gesture` changed) therefore cost
+  // seconds of JS on large Systems. Memoised on the drawn inputs only.
+  const content = useMemo(
+    () => (
+      <>
         <Fill color={background} />
         {/* Layer 2: ambient starfield (twinkles via the shared clock). */}
         <Group opacity={twinkle}>
@@ -175,6 +180,15 @@ export function OrreryCanvas({
           {children}
           {overlay ?? null}
         </OrreryClockContext.Provider>
+      </>
+    ),
+    [background, twinkle, stars, clock, backdrop, children, overlay],
+  );
+
+  return (
+    <GestureDetector gesture={gesture}>
+      <Canvas testID="orrery-canvas" style={{ width, height }}>
+        {content}
       </Canvas>
     </GestureDetector>
   );

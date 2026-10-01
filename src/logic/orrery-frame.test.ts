@@ -7,7 +7,11 @@ import {
 } from "./orrery-camera-logic";
 import {
   beginWorldTransition,
+  billboardFromMap,
+  billboardMap,
+  billboardPose,
   bodyKey,
+  frameBody,
   projectAnimatedFrame,
   projectSwitchChoreographyFrame,
   sampleWorldTransition,
@@ -199,5 +203,101 @@ describe("one animated Orrery frame", () => {
     expect(spun[0].y).not.toBe(world[0].y);
     expect(spinSwitchWorld(world, 1, 0)).toEqual(world);
     expect(spinSwitchWorld(world, 1, 1)).toEqual(world);
+  });
+});
+
+describe("frame key index (perf pass)", () => {
+  const viewport = { width: 400, height: 700 };
+  const world = [
+    { id: 0, kind: "sun" as const, x: 0, y: 0, radius: 30, ringRadius: 0 },
+    ...Array.from({ length: 30 }, (_, i) => ({
+      id: i + 1,
+      kind: "contact" as const,
+      x: (60 + i * 20) * Math.sin(i),
+      y: -(60 + i * 20) * Math.cos(i),
+      radius: 15,
+      ringRadius: 60 + i * 20,
+    })),
+    {
+      id: -1,
+      kind: "satellite" as const,
+      satelliteTarget: {
+        kind: "satellite" as const,
+        uid: "m",
+        parentId: 3,
+        parentUid: "p",
+      },
+      x: 5,
+      y: 5,
+      radius: 3,
+      ringRadius: 0,
+    },
+  ].map((body) => ({ ...body, opacity: 1, interactive: true }));
+  const frame = projectAnimatedFrame(
+    { generation: 1, from: world, to: world },
+    1,
+    { x: 0, y: 0, zoom: 0.5, tilt: 0.4, yaw: 0.3 },
+    viewport,
+  );
+
+  it("frameBody returns exactly what the former bodies.find(bodyKey) returned", () => {
+    for (const key of [...frame.bodies.map(bodyKey), "contact:999", "sun:0"])
+      expect(frameBody(frame, key)).toBe(
+        frame.bodies.find((body) => bodyKey(body) === key),
+      );
+  });
+
+  it("a derived frame with filtered bodies never reads a stale index", () => {
+    const filtered = {
+      ...frame,
+      bodies: frame.bodies.filter((body) => body.id % 2 === 0),
+    };
+    for (const key of frame.bodies.map(bodyKey))
+      expect(frameBody(filtered, key)).toBe(
+        filtered.bodies.find((body) => bodyKey(body) === key),
+      );
+  });
+
+  it("per-body lookups are O(1): billboardPose touches one body, not N", () => {
+    let reads = 0;
+    const counted = new Proxy(frame.bodies, {
+      get(target, property, receiver) {
+        if (typeof property === "string" && /^\d+$/.test(property)) reads++;
+        return Reflect.get(target, property, receiver);
+      },
+    });
+    const indexed = { ...frame, bodies: counted };
+    for (const body of frame.bodies) {
+      reads = 0;
+      billboardPose(indexed, bodyKey(body), 15);
+      expect(reads).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe("billboard map (perf pass)", () => {
+  it("billboardFromMap(billboardMap(frame)) is exactly billboardPose(frame)", () => {
+    const world = [0, 1, 2, 3].map((id) => ({
+      id,
+      kind: id === 0 ? ("sun" as const) : ("contact" as const),
+      x: id * 120 - 200,
+      y: id * 40,
+      radius: 12 + id,
+      ringRadius: id === 0 ? 0 : 80 + id * 30,
+      opacity: id === 2 ? 0 : 0.7,
+      interactive: true,
+    }));
+    const frame = projectAnimatedFrame(
+      { generation: 2, from: world, to: world },
+      1,
+      { x: 10, y: -5, zoom: 0.8, tilt: 0.5, yaw: 1.1 },
+      { width: 300, height: 500 },
+    );
+    const map = billboardMap(frame);
+    for (const key of [...frame.bodies.map(bodyKey), "contact:42"])
+      for (const radius of [1, 13])
+        expect(billboardFromMap(map, key, radius)).toEqual(
+          billboardPose(frame, key, radius),
+        );
   });
 });
