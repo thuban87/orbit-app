@@ -4,7 +4,7 @@
 # Home tilt (R2 `homeTilt`) and the stage plane apply, an overview scene with
 # the focus on a body next to the sun, and extra flags via env FLAGS.
 # Usage: r3-legibility.sh <out-dir> <palette.json> [focus-name]
-# Env: PY (python with numpy+PIL), FLAGS (extra flag pairs), THEMES.
+# Env: PY (python with numpy+PIL), FLAGS (extra flag pairs), THEMES, PRESET.
 set -u
 OUT=$1; PAL=$2; FOCUS=${3:-Cleo%20Okafor}
 PY=${PY:-python3}
@@ -18,7 +18,7 @@ link() { $ADB shell "am start -a android.intent.action.VIEW -d '$1' $PKG" >/dev/
 shot() { $ADB exec-out screencap -p > "$1"; }
 for theme in $THEMES; do
   tag="focus-${theme/:/-}"
-  link "orbit://labb?reset=1&rm=on&theme=$theme&flags=fpsHud:0,labels:1${FLAGS:+,$FLAGS}&system=Lab%20B%20Dense&panel=0"; sleep 12
+  link "orbit://labb?reset=1${PRESET:+&preset=$PRESET}&rm=on&theme=$theme&flags=fpsHud:0,labels:1${FLAGS:+,$FLAGS}&system=Lab%20B%20Dense&panel=0"; sleep 12
   $ADB shell input touchscreen tap 1150 2140; sleep 4
   link "orbit://labb?focus=$FOCUS&delay=3000"; sleep 12
   shot "$OUT/$tag-labels.png"

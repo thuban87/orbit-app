@@ -3,6 +3,7 @@
 # Usage: r2-shots.sh <out-dir> [scene ...]
 # Scenes: inner dense identity detail focus switch themes  (default: all)
 # Env: FLAGS="homeTilt:1,bloom:0"  extra flag pairs applied after reset.
+#      PRESET=best|shipSafe|everything|legacy  (R3) one-tap preset applied before FLAGS.
 #      THEME=galaxy:dark  (themes scene loops all four regardless)
 #      WAIT=12  seconds after a remounting deep link.
 # Shots are saved as JPEG (q85) via r2-snap.sh.
@@ -19,7 +20,7 @@ mkdir -p "$OUT"
 link() { $ADB shell "am start -a android.intent.action.VIEW -d '$1' $PKG" >/dev/null 2>&1; }
 shot() { "$(dirname "$0")/r2-snap.sh" "$OUT/$1.jpg"; }
 base() { # $1 theme  $2 system (url-encoded)
-  link "orbit://labb?reset=1&clear=1&theme=$1&flags=$BASEF&system=$2&panel=0"; sleep "$WAIT"
+  link "orbit://labb?reset=1${PRESET:+&preset=$PRESET}&clear=1&theme=$1&flags=$BASEF&system=$2&panel=0"; sleep "$WAIT"
   # Recentre = Home on every axis (a remount restores the previous pose instead).
   $ADB shell input touchscreen tap 1150 2140; sleep 5
 }

@@ -188,13 +188,16 @@ vi.mock("@shopify/react-native-skia", async () => {
           lab.effects
             ? {
                 source,
+                // Native RN Skia requires the children array (R3: a call
+                // without it crashed the app on device; mirror that here).
                 makeShaderWithChildren: (
                   uniforms: number[],
-                  children = [],
-                ) => ({
-                  uniforms,
-                  children,
-                }),
+                  children?: unknown[],
+                ) => {
+                  if (!Array.isArray(children))
+                    throw new Error("Value is undefined, expected an Object");
+                  return { uniforms, children };
+                },
                 makeShader: (uniforms: number[]) => ({ uniforms }),
               }
             : null,

@@ -323,8 +323,12 @@ function drawMoon(
   paint.setAntiAlias(true);
   const effect = spec.fx === FX_MOON ? effects[FX_MOON] : null;
   if (effect && uniforms) {
+    // R3 fix: the moon effect has no child shaders, so it is `makeShader`.
+    // `makeShaderWithChildren` without a children array threw on device
+    // ("Value is undefined, expected an Object") and crashed the app as soon
+    // as `moonShader` (default off) was on with layer pictures (R3 "Everything").
     paint.setShader(
-      effect.makeShaderWithChildren(flattenUniforms(uniforms, orders[FX_MOON])),
+      effect.makeShader(flattenUniforms(uniforms, orders[FX_MOON])),
     );
     paint.setAlphaf(a);
     canvas.drawCircle(0, 0, 1, paint);
