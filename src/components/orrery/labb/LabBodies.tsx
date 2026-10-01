@@ -54,6 +54,7 @@ import {
   labMoonFrameUniforms,
   labSeed,
   labSunFrameUniforms,
+  SUN_GLOW_CAP_DARK,
   SUN_REACH,
 } from "./labb-bodies-logic";
 import { useLabRenderContext, useLabStillContext } from "./labb-context";
@@ -456,6 +457,8 @@ export function LabSunBody({
       uDeep: mixVec(glow, tokenToVec3(look.sky), 0.45),
       uBase: tokenToVec3(swatch),
       plasma: self ? 1 : 0,
+      // R1 glow cap (dark themes only; light themes judge the darkest pixel).
+      cap: look.profile.blend === "additive" ? SUN_GLOW_CAP_DARK : 0,
       corona: b.corona,
       coronaAdd: b.coronaAdditive,
       intensity: look.profile.intensity,

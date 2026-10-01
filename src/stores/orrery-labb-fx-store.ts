@@ -337,6 +337,13 @@ export const LAB_FLAG_REGISTRY = [
     note: "R1: below 6 dp projected radius",
   },
   {
+    id: "labelTextDim",
+    label: "FO Defocused labels dim their TEXT only (plates keep their scrim)",
+    section: "effects",
+    default: true,
+    note: "R1 legibility; off = whole tag dims (WP-2.2)",
+  },
+  {
     id: "focusCardOcclusion",
     label:
       "FO Focus card occludes the world detail under it (bodies dim, labels drop)",
@@ -378,9 +385,9 @@ export const LAB_FLAG_REGISTRY = [
     id: "opaqueCanvas",
     label: "R1 Opaque canvas (SurfaceView instead of TextureView)",
     section: "debug",
-    default: false,
+    default: true,
     heavy: true,
-    note: "C-07: RN overlays must still composite over it",
+    note: "C-07: R1 default ON (emulator 60 vs 28 fps presented); gfxinfo cannot see SurfaceView frames",
   },
   {
     id: "perfProbe",

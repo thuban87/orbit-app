@@ -16,13 +16,13 @@ import {
 import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
 import { bodyKey } from "@/logic/orrery-frame";
 import { SPACING } from "@/theme/tokens/spacing";
-import { OrreryNotice } from "./OrreryFeedback";
-import { HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 import {
   labCardChannel,
   NO_CARD,
   writeCardRect,
 } from "./labb/labb-card-channel";
+import { OrreryNotice } from "./OrreryFeedback";
+import { HUD_PLATE, OrreryHudCorners } from "./OrreryHudCorners";
 import { focusCardPlacement } from "./orrery-focus-placement";
 
 /** Lightweight identity follows the authoritative frame on the UI thread.

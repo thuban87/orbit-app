@@ -225,7 +225,19 @@ export interface LabSunStatic {
   corona: number;
   coronaAdd: number;
   intensity: number;
+  /** R1 glow cap: max channel value of the sun's output (0 = uncapped). */
+  cap?: number;
 }
+
+/**
+ * R1 legibility: on DARK themes the sun's surface and corona never exceed this
+ * channel value. Pure-white sun pixels (L = 1.0) under a glass overlay broke
+ * the ADR-149 AA bound for Standard Dark `textSecondary` (4.42:1 at L 1.0;
+ * AA needs raw L ≤ 0.913 ≈ 0.96 encoded). 0.94 keeps the bound with margin
+ * and sits at the palette's brightest star (#E9ECF1 ≈ 0.945), the very pixel
+ * ADR-149 proved against.
+ */
+export const SUN_GLOW_CAP_DARK = 0.94;
 
 /** Per-frame sun uniforms: ambient time (frozen under reduced motion), pulse. */
 export function labSunFrameUniforms(
@@ -258,7 +270,7 @@ export function labSunFrameUniforms(
     uS1: [st.uGlow[0], st.uGlow[1], st.uGlow[2], plasma],
     uS2: [st.uHi[0], st.uHi[1], st.uHi[2], corona],
     uS3: [st.uDeep[0], st.uDeep[1], st.uDeep[2], st.coronaAdd],
-    uS4: [st.uBase[0], st.uBase[1], st.uBase[2], 0],
+    uS4: [st.uBase[0], st.uBase[1], st.uBase[2], st.cap ?? 0],
   };
 }
 

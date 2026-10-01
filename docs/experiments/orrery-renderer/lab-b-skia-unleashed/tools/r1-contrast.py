@@ -79,19 +79,70 @@ def text_mask(px, fg, tol=60.0):
     return np.linalg.norm(px - fg, axis=-1) < tol
 
 
-def measured(img, box, fg, dark):
+def dilate(mask, r):
+    out = mask.copy()
+    for dy in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            out |= np.roll(np.roll(mask, dy, axis=0), dx, axis=1)
+    return out
+
+
+def measured(img, box, fg, dark, inset=0):
+    """Extreme BACKDROP pixel inside a text box (rendered composite). Glyph
+    pixels = luminance on the text side of the midpoint between the text and
+    the box median; they are DILATED by 4 px so glyph antialiasing never counts
+    as backdrop. `inset` trims decorative edges (plate outline, status hairline,
+    corner brackets). The 98th (light text) / 2nd (dark text) percentile of
+    the remaining backdrop decides."""
     x0, y0, x1, y1 = box
-    reg = img[y0:y1, x0:x1].reshape(-1, 3)
-    keep = ~text_mask(reg, fg, 90.0)
-    reg = reg[keep]
-    if len(reg) == 0:
+    x0, y0, x1, y1 = x0 + inset, y0 + inset, x1 - inset, y1 - inset
+    if x1 - x0 < 4 or y1 - y0 < 4:
         return None
+    reg = img[y0:y1, x0:x1]
     L = lum(reg)
-    # Extreme backdrop at the 99.5th / 0.5th percentile (one hot JPEG/AA pixel
-    # must not decide the verdict).
-    q = np.percentile(L, 99.5 if dark else 0.5)
-    pick = reg[int(np.argmin(np.abs(L - q)))]
-    return pick
+    Lf = float(lum(fg))
+    med = float(np.median(L))
+    mid = (med + Lf) / 2
+    glyph = L > mid if Lf > med else L < mid
+    keep = ~dilate(glyph, 4)
+    back = reg[keep]
+    if len(back) < 20:
+        return None
+    Lb = lum(back)
+    q = np.percentile(Lb, 98 if Lf > med else 2)
+    return back[int(np.argmin(np.abs(Lb - q)))]
+
+
+def measured_rendered(img, box, fg, inset=0):
+    """(rendered text colour, median backdrop, p98-extreme backdrop) inside a
+    box: the text colour is taken from the glyph pixels themselves (95th
+    percentile toward the text side), so dimmed / defocused labels are judged
+    by what is actually drawn."""
+    x0, y0, x1, y1 = box
+    x0, y0, x1, y1 = x0 + inset, y0 + inset, x1 - inset, y1 - inset
+    if x1 - x0 < 4 or y1 - y0 < 4:
+        return None
+    reg = img[y0:y1, x0:x1]
+    L = lum(reg)
+    Lf = float(lum(fg))
+    med = float(np.median(L))
+    mid = (med + Lf) / 2
+    light = Lf > med
+    glyph = L > mid if light else L < mid
+    if glyph.sum() < 10:
+        return None
+    gp = reg[glyph]
+    gl = lum(gp)
+    tq = np.percentile(gl, 95 if light else 5)
+    text = gp[int(np.argmin(np.abs(gl - tq)))]
+    back = reg[~dilate(glyph, 4)]
+    if len(back) < 20:
+        return None
+    bl = lum(back)
+    bmed = back[int(np.argmin(np.abs(bl - np.median(bl))))]
+    bq = np.percentile(bl, 98 if light else 2)
+    b98 = back[int(np.argmin(np.abs(bl - bq)))]
+    return text, bmed, b98
 
 
 def label_boxes(w, wo, y0, y1, thresh=14, min_area=600):
@@ -150,14 +201,17 @@ def cmd_labels(args):
         hi, lo = extremes(raw)
         ext = hi if dark else lo
         model = ratio(fg, comp(plate, ext, a))
-        m = measured(W, box, fg, dark)
-        meas = ratio(fg, m) if m is not None else float("nan")
-        rows.append((box, float(lum(ext)), model, meas))
-    print("theme\telement\tbox\traw_extreme_L\tmodel_ratio\tmeasured_ratio")
-    for box, L, mo, me in rows:
-        print(f"{theme}\tlabel\t{box}\t{L:.3f}\t{mo:.2f}\t{me:.2f}")
+        # inset: halo spread + outline + status hairline (≈ 8 dp ≈ 22 px)
+        m = measured_rendered(W, box, fg, inset=22)
+        if m is None:
+            continue
+        text, bmed, b98 = m
+        rows.append((box, float(lum(ext)), model, ratio(text, bmed), ratio(text, b98)))
+    print("theme\telement\tbox\traw_extreme_L\tmodel_ratio\tmeasured_vs_median\tmeasured_vs_p98")
+    for box, L, mo, me, m98 in rows:
+        print(f"{theme}\tlabel\t{box}\t{L:.3f}\t{mo:.2f}\t{me:.2f}\t{m98:.2f}")
     if rows:
-        print(f"{theme}\tLABELS-WORST\t-\t-\t{min(r[2] for r in rows):.2f}\t{min(r[3] for r in rows):.2f}\tAA={'PASS' if min(r[2] for r in rows) >= AA else 'FAIL'}")
+        print(f"{theme}\tLABELS-WORST\t-\t-\t{min(r[2] for r in rows):.2f}\t{min(r[3] for r in rows):.2f}\t{min(r[4] for r in rows):.2f}\tAA(model)={'PASS' if min(r[2] for r in rows) >= AA else 'FAIL'}")
     else:
         print(f"{theme}\tLABELS\tnone found")
 
@@ -195,8 +249,8 @@ def cmd_overlay(args):
         worst_m = min(worst_m, r)
     fg = hexrgb(pal["textPrimary"])
     for text, box in ui_text_boxes(xml_path):
-        if box[1] < y0 or box[3] > y1:
-            continue
+        if box[1] < y0 or box[3] > y1 or text in ("LAB B", "+"):
+            continue  # lab marker / shell FAB: not Orrery overlay text
         m = measured(S, box, fg, dark)
         if m is None:
             continue

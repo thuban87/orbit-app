@@ -63,7 +63,7 @@ print("\t".join(row[:11]))
 PY
 }
 S=$(enc "$SYSTEM"); O=$(enc "$OTHER"); F=$(enc "$FOCUS")
-BASE="orbit://labb?reset=1&renderer=$RENDERER&flags=$FLAGS,fpsHud:0,perfProbe:1&panel=0"
+BASE="orbit://labb?reset=1&renderer=$RENDERER&flags=$FLAGS,fpsHud:0,perfProbe:1,opaqueCanvas:${OPAQUE:-0}&panel=0"
 # Setup: flags + renderer + the System under test, then recentre.
 # Make sure the Orrery tab is in front (a crash/relaunch lands on Digest).
 $ADB shell input tap ${ORRERY_TAB:-896 2690}; sleep 3

@@ -17,8 +17,9 @@
  *
  * Value: [x, y, width, height, on] in screen dp; on = 0 → no card.
  */
-import * as Reanimated from "react-native-reanimated";
+
 import type { SharedValue } from "react-native-reanimated";
+import * as Reanimated from "react-native-reanimated";
 
 export const NO_CARD: number[] = [0, 0, 0, 0, 0];
 

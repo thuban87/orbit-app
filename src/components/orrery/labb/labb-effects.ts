@@ -331,7 +331,10 @@ half4 lbSun(float2 xy, float3 surf) {
   float3 gc = mix(uS1.rgb, uS2.rgb, clamp(inner * 0.55 + limb * 0.6, 0.0, 1.0) * (0.25 + 0.75 * uS3.a));
   float ga = clamp(g, 0.0, 1.0) * (1.0 - 0.7 * uS3.a);
   float3 oc = gc * clamp(g, 0.0, 1.4);
-  return half4(half3(surf * inside + oc * (1.0 - inside)), half(inside + ga * (1.0 - inside)));
+  float3 outc = surf * inside + oc * (1.0 - inside);
+  // R1 glow cap (uS4.a > 0): no channel above the cap (labb-bodies-logic.ts).
+  if (uS4.a > 0.0) { outc = min(outc, float3(uS4.a)); }
+  return half4(half3(outc), half(inside + ga * (1.0 - inside)));
 }
 `;
 

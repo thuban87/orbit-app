@@ -95,6 +95,7 @@ import {
   labLightDir,
   labMoonFrameUniforms,
 } from "./labb-bodies-logic";
+import { labCardChannel, underCard } from "./labb-card-channel";
 import { useLabStillContext } from "./labb-context";
 import { getLabEffect, LAB_EFFECT_SOURCES } from "./labb-effects";
 import {
@@ -111,7 +112,6 @@ import {
   planLabelDraws,
   uniformOrder,
 } from "./labb-layer-plan";
-import { labCardChannel, underCard } from "./labb-card-channel";
 import { probeEnd, probeStart } from "./labb-perf-probe";
 import { bodySwitchFx, switchFxLive } from "./labb-switch-logic";
 import { tokenToVec4 } from "./labb-uniforms";
@@ -864,6 +864,9 @@ export function LabLabelsPicture({
     const fill = Skia.Paint();
     fill.setAntiAlias(true);
     const layerPaint = Skia.Paint();
+    const textPaint = Skia.Paint();
+    // Flag off = the WP-2.2 behaviour (whole tag dims) for the A/B.
+    const labelPlateDim = !fx?.flags.labelTextDim;
     for (let n = 0; n < plan.length; n++) {
       const item = plan[n];
       const spec = specs[item.i];
@@ -873,7 +876,10 @@ export function LabLabelsPicture({
         tag &&
         !underCard(card, tag.x, tag.y, tag.x + spec.w, tag.y + spec.h, 0)
       ) {
-        layerPaint.setAlphaf(tag.opacity * dim);
+        // R1 legibility: the focus defocus dims the TEXT only. Dimming the
+        // whole tag let the plate go to 0.56 alpha, and a bright backdrop (the
+        // sun, a glow) then pushed defocused names to ~2.2:1 (model, dark).
+        layerPaint.setAlphaf(tag.opacity * (labelPlateDim ? dim : 1));
         canvas.saveLayer(layerPaint);
         const x = tag.x;
         const y = tag.y;
@@ -919,7 +925,13 @@ export function LabLabelsPicture({
           fill.setColor(vecColor(surface, 1));
           canvas.drawRRect(Skia.RRectXY(Skia.XYWHRect(x, y, w, h), r, r), fill);
         }
-        paragraphs[item.i].paint(canvas, x + LABEL_PAD_X, y + LABEL_PAD_Y);
+        if (dim < 1 && !labelPlateDim) {
+          textPaint.setAlphaf(dim);
+          canvas.saveLayer(textPaint);
+          paragraphs[item.i].paint(canvas, x + LABEL_PAD_X, y + LABEL_PAD_Y);
+          canvas.restore();
+        } else
+          paragraphs[item.i].paint(canvas, x + LABEL_PAD_X, y + LABEL_PAD_Y);
         canvas.restore();
       }
       const cap = item.caption;
@@ -929,7 +941,7 @@ export function LabLabelsPicture({
         c &&
         !underCard(card, cap.x, cap.y, cap.x + c.w, cap.y + c.h, 0)
       ) {
-        layerPaint.setAlphaf(cap.opacity * dim);
+        layerPaint.setAlphaf(cap.opacity * (labelPlateDim ? dim : 1));
         canvas.saveLayer(layerPaint);
         fill.setColor(vecColor(surface, 1));
         canvas.drawRRect(

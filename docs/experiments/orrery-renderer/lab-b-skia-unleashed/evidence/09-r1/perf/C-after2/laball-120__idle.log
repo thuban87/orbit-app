@@ -1,0 +1,4 @@
+10-01 12:01:59.943  9699  9727 I ReactNativeJS: [labb-probe] win=3022ms nebula=125/0.1/0.2/0.3 rings=125/2/3.9/15.7
+10-01 12:02:02.942  9699  9727 I ReactNativeJS: [labb-probe] win=3001ms nebula=90/0.1/0.1/0.4 rings=91/1.5/2.7/3.4
+10-01 12:02:05.941  9699  9727 I ReactNativeJS: [labb-probe] win=3000ms nebula=107/0.1/0.2/0.3 rings=107/1.5/2.5/3.1
+10-01 12:02:08.972  9699  9727 I ReactNativeJS: [labb-probe] win=3031ms nebula=152/0.1/0.3/0.6 rings=151/2.1/4.4/19
