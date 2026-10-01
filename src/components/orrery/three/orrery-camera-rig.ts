@@ -25,7 +25,7 @@
 import {
   type CameraPose,
   type CameraViewport,
-  usableCameraRect,
+  cameraCenterRect,
 } from "@/logic/orrery-camera-logic";
 
 /** Fallback when a pose carries no focal distance (orrery-camera-logic MIN). */
@@ -76,7 +76,7 @@ export function orreryCameraRig(
   ];
   const W = viewport.width;
   const H = viewport.height;
-  const rect = usableCameraRect(viewport) ?? {
+  const rect = cameraCenterRect(viewport) ?? {
     x: 0,
     y: 0,
     width: W,

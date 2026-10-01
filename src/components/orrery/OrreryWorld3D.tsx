@@ -112,16 +112,60 @@ import {
 } from "./use-orrery-switch-runtime";
 
 const LABEL_MAX_WIDTH = 200;
-const LABEL_BODY_GAP = 8;
+const LABEL_BODY_GAP = 4;
+/**
+ * Lab C hero scale: contacts are drawn (and hit-tested — same world radius
+ * feeds frame + GPU packet) this much larger than the 2.5D world radius so
+ * people, not rings, are the heroes of the map. Sun/satellites unchanged.
+ */
+const CONTACT_HERO_SCALE = 1.9;
+/** Approximate OrreryFocusContext footprint (width 280; ~2 buttons + title). */
+const FOCUS_CARD_WIDTH = 290;
+const FOCUS_CARD_HEIGHT = 230;
+
+/**
+ * Lab C label tiers re-derived for the perspective camera. The product rule
+ * (semanticLevel thresholds IDENTITY 2 / DETAIL 3) was defined on the old
+ * near-orthographic camera, where "zoom" == on-screen magnification of a body.
+ * With a real dolly camera that equivalence breaks (bodies off the pivot
+ * shrink with depth), so the tier input is now the MEDIAN on-screen
+ * magnification of the visible contacts, measured against the un-heroed
+ * world radius: names appear when bodies are as large on screen as they were
+ * when the old camera crossed the same tier.
+ */
+function effectiveLabelZoom(
+  bodies: readonly {
+    kind: string;
+    radius: number;
+    visible?: boolean;
+    interactive?: boolean;
+  }[],
+  worldRadii: readonly number[],
+  fallback: number,
+): number {
+  "worklet";
+  const ratios: number[] = [];
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i];
+    const r = worldRadii[i];
+    if (b.kind !== "contact" || !b.visible || !b.interactive || !(r > 0))
+      continue;
+    ratios.push((b.radius / r) * CONTACT_HERO_SCALE);
+  }
+  if (!ratios.length) return fallback;
+  ratios.sort((a, b) => a - b);
+  return ratios[Math.floor(ratios.length / 2)];
+}
 /** GPU fill tunables (Pixel 6 Pro native dpr is 3.5 → 1439×2538 buffer). */
 const RENDER_MAX_PIXEL_RATIO = 2.5;
 const RENDER_ANTIALIAS = true;
-/** Lab-only badge tap: [tilt, yaw] presets swinging the 3D camera around the sun. */
-const LAB_TILT_PRESETS: readonly [number, number][] = [
-  [1.08, 0],
-  [1.28, 0.7],
-  [0.75, 2.2],
-  [1.2, 3.8],
+/** Lab-only badge tap: [tilt, yaw, zoom multiplier] presets (adb cannot pinch);
+ * the zoom steps reach the identity/detail label tiers for evidence. */
+const LAB_TILT_PRESETS: readonly [number, number, number][] = [
+  [1.08, 0, 1],
+  [1.0, 0.7, 2.2],
+  [0.9, 2.2, 3.4],
+  [1.2, 3.8, 1],
 ];
 /** Frame-time log cadence (ms). */
 const STATS_INTERVAL = 5000;
@@ -244,13 +288,17 @@ export function OrreryWorld3D({
     const world = previewReorder(
       sampled,
       held?.generation === sceneGeneration ? held : null,
+    ).map((b) =>
+      b.kind === "contact"
+        ? { ...b, radius: b.radius * CONTACT_HERO_SCALE }
+        : b,
     );
     const moons = deriveSatelliteBodies(
       world,
       satellites,
       sceneMembers,
       true,
-      semanticLevel(sampledCamera.zoom, level.value),
+      level.value,
     );
     return {
       world: [...world, ...moons],
@@ -361,11 +409,19 @@ export function OrreryWorld3D({
     [labels],
   );
   useAnimatedReaction(
-    () => frame.value.pose.zoom,
+    () => {
+      const f = frame.value;
+      const w = sample.value.world;
+      const radii: number[] = [];
+      for (let i = 0; i < w.length; i++) radii.push(w[i].radius);
+      return effectiveLabelZoom(f.bodies, radii, f.pose.zoom);
+    },
     (zoom) => {
       level.value = semanticLevel(zoom, level.value);
     },
   );
+  const focusCardId =
+    focusedIds.length === 1 && !focusedSatellite ? focusedIds[0] : null;
   const allocations = useDerivedValue(() => {
     const current = frame.value;
     // O(N) key index instead of a find() per label (O(N²) at 200 bodies).
@@ -383,6 +439,7 @@ export function OrreryWorld3D({
               y: body.y + body.radius + LABEL_BODY_GAP,
               alternateY: body.y - body.radius - LABEL_BODY_GAP - label.height,
               opacity: body.opacity,
+              depth: body.depth,
             },
           ]
         : [];
@@ -395,9 +452,25 @@ export function OrreryWorld3D({
         width: b.radius * 2,
         height: b.radius * 2,
       }));
+    // Lab C: the focus card (OrreryFocusContext) is NOT a shell obstacle — it
+    // follows the focused body, sitting just below it. Reserve that rect so no
+    // label (incl. the focused name) renders underneath the translucent card.
+    if (focusCardId !== null) {
+      const at =
+        byKey.get(bodyKey({ id: focusCardId, kind: "contact" })) ??
+        byKey.get(bodyKey({ id: focusCardId, kind: "sun" }));
+      const fb = at === undefined ? undefined : current.bodies[at];
+      if (fb?.visible)
+        exclusions.push({
+          x: fb.x - FOCUS_CARD_WIDTH / 2,
+          y: fb.y + fb.radius,
+          width: FOCUS_CARD_WIDTH,
+          height: FOCUS_CARD_HEIGHT,
+        });
+    }
     return allocateLabels(
       candidates,
-      semanticLevel(current.pose.zoom, level.value),
+      level.value,
       current.viewport,
       exclusions,
     );
@@ -785,17 +858,20 @@ export function OrreryWorld3D({
     scene.generation,
   ]);
   const tiltStep = useRef(0);
+  const homeZoom = useSharedValue<number | null>(null);
   const cycleTilt = useCallback(() => {
     tiltStep.current = (tiltStep.current + 1) % LAB_TILT_PRESETS.length;
-    const [tilt, yaw] = LAB_TILT_PRESETS[tiltStep.current];
+    const [tilt, yaw, zoomBy] = LAB_TILT_PRESETS[tiltStep.current];
     runOnUI(() => {
       "worklet";
-      camera.recover({ ...pose.value, tilt, yaw });
+      const home = homeZoom.value ?? pose.value.zoom;
+      if (homeZoom.value === null) homeZoom.value = pose.value.zoom;
+      camera.recover({ ...pose.value, tilt, yaw, zoom: home * zoomBy });
     })();
     console.log(
       `[lab-c] tilt preset ${tiltStep.current}: tilt=${tilt} yaw=${yaw}`,
     );
-  }, [camera, pose]);
+  }, [camera, pose, homeZoom]);
   const singleFocus = focusedIds.length === 1 ? focusedIds[0] : null;
   useAnimatedReaction(
     () =>

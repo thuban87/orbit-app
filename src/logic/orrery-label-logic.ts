@@ -58,6 +58,8 @@ export interface LabelCandidate {
   focused?: boolean;
   cluster?: boolean;
   favorite?: boolean;
+  /** Lab C: camera depth (larger = nearer). Nearer labels claim space first. */
+  depth?: number;
   context?: string;
   contextWidth?: number;
   contextHeight?: number;
@@ -133,6 +135,7 @@ export function allocateLabels(
     .sort(
       (a, b) =>
         a.priority - b.priority ||
+        (b.c.depth ?? 0) - (a.c.depth ?? 0) ||
         (a.c.id < b.c.id ? -1 : a.c.id > b.c.id ? 1 : 0),
     );
   const result: LabelAllocation[] = [];

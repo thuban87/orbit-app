@@ -20,7 +20,7 @@ import {
   MAX_TILT,
   MIN_HIT_RADIUS,
   perspectiveScale,
-  usableCameraRect,
+  cameraCenterRect,
   type WorldBody,
   worldExtent,
 } from "@/logic/orrery-camera-logic";
@@ -46,7 +46,7 @@ export function projectAnimatedFrameLite(
         ((1 + Math.SQRT2) * Math.sin(MAX_TILT)),
     ),
   );
-  const rect = usableCameraRect(viewport);
+  const rect = cameraCenterRect(viewport);
   if (!rect) throw new Error("Invalid Orrery usable camera measurement");
   const cx = rect.x + rect.width / 2;
   const cy = rect.y + rect.height / 2;

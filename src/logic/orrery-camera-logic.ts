@@ -34,6 +34,13 @@ export interface CameraViewport {
   height: number;
   usable?: CameraRect;
   obstacles?: readonly CameraRect[];
+  /**
+   * Lab C: the rect whose centre is the PROJECTION centre (where the camera
+   * pivot lands on screen). Lets the 3D camera centre the system in the whole
+   * canvas between the header and tab bar while side controls and cards still
+   * remain label/framing obstacles. Defaults to the usable rect.
+   */
+  camera?: CameraRect;
 }
 export interface WorldBody extends WorldPoint {
   /** 0 identifies self, which has no Profile action. */
@@ -195,9 +202,24 @@ export function usableCameraRect(viewport: CameraViewport): CameraRect | null {
       .sort((a, b) => b.width * b.height - a.width * a.height)[0] ?? null
   );
 }
+/** Lab C: projection-centre rect (explicit `camera` rect, else usable rect). */
+export function cameraCenterRect(viewport: CameraViewport): CameraRect | null {
+  "worklet";
+  const usable = usableCameraRect(viewport);
+  const camera = viewport.camera;
+  if (
+    !usable ||
+    !camera ||
+    ![camera.x, camera.y, camera.width, camera.height].every(Number.isFinite) ||
+    camera.width <= 0 ||
+    camera.height <= 0
+  )
+    return usable;
+  return camera;
+}
 function projectionCenter(viewport: CameraViewport): WorldPoint {
   "worklet";
-  const rect = usableCameraRect(viewport);
+  const rect = cameraCenterRect(viewport);
   if (!rect) throw new Error("Invalid Orrery usable camera measurement");
   return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
 }
@@ -483,7 +505,7 @@ export function tryUnprojectToWorldPlane(
   viewport: CameraViewport,
 ): WorldPoint | null {
   "worklet";
-  const rect = usableCameraRect(viewport);
+  const rect = cameraCenterRect(viewport);
   const focal = pose.focalDistance ?? MIN_FOCAL_DISTANCE;
   if (
     !rect ||

@@ -79,6 +79,8 @@ import {
   IDENTITY_ZOOM,
   type OrreryIntent,
   type OrrerySatelliteTarget,
+  projectWorldPoint,
+  unprojectToWorldPlane,
   usableCameraRect,
 } from "@/logic/orrery-camera-logic";
 import {
@@ -205,10 +207,26 @@ export function OrreryScreen() {
     true,
     obstacles["shell-tabs"],
   );
-  const viewport = useMemo(
-    () => canvasViewport(canvasRect, Object.values(obstacles)),
-    [canvasRect, obstacles],
-  );
+  const viewport = useMemo(() => {
+    const base = canvasViewport(canvasRect, Object.values(obstacles));
+    // Lab C: centre the 3D camera pivot in the canvas minus full-width bars
+    // (System selector row, tab bar) — side controls and cards stay obstacles
+    // for labels/framing but no longer push the whole system up the screen.
+    const camera = usableCameraRect(
+      canvasViewport(
+        canvasRect,
+        Object.entries(obstacles)
+          .filter(
+            ([key]) =>
+              key !== ORRERY_CONTROLS_OBSTACLE &&
+              key !== CLUSTER_OBSTACLE &&
+              key !== "orrery-focus-context",
+          )
+          .map(([, rect]) => rect),
+      ),
+    );
+    return camera ? { ...base, camera } : base;
+  }, [canvasRect, obstacles]);
   const controlsViewport = useMemo(
     () =>
       canvasViewport(
@@ -713,13 +731,46 @@ export function OrreryScreen() {
       }
       const framing = frameBodies(bodies, viewport, scene.extent, pose.value);
       if (!framing) return;
-      runOnUI(camera.recover)({
+      let target: CameraPose = {
         ...framing.pose,
         zoom:
           ids.length === 1
             ? Math.min(IDENTITY_ZOOM, framing.pose.zoom)
             : framing.pose.zoom,
-      });
+      };
+      // Lab C: the projection centre (viewport.camera) is lower than the
+      // usable-rect centre once side controls are ignored, so re-capping the
+      // zoom above would slide the body off the usable centre (under the
+      // focus card). Shift the pivot so the body lands on the usable centre
+      // at the FINAL zoom (3 fixed-point steps; perspective is near-linear).
+      const usable = usableCameraRect(viewport);
+      if (usable && ids.length === 1) {
+        const want = {
+          x: usable.x + usable.width / 2,
+          y: usable.y + usable.height / 2,
+        };
+        target = clampCameraPose(
+          { ...target, x: bodies[0].x, y: bodies[0].y },
+          cameraExtent(scene.extent),
+        );
+        for (let i = 0; i < 3; i++) {
+          const at = projectWorldPoint(bodies[0], target, viewport);
+          const pivot = projectWorldPoint(target, target, viewport);
+          const shifted = unprojectToWorldPlane(
+            {
+              x: pivot.x - (want.x - at.x),
+              y: pivot.y - (want.y - at.y),
+            },
+            target,
+            viewport,
+          );
+          target = clampCameraPose(
+            { ...target, x: shifted.x, y: shifted.y },
+            cameraExtent(scene.extent),
+          );
+        }
+      }
+      runOnUI(camera.recover)(target);
     },
     [useSystemStore, pose, camera.recover, camera.stop, viewport],
   );
