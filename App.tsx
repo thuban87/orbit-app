@@ -264,8 +264,9 @@ function AppShell() {
       registerDerivativeCacheSweep();
       derivativeCacheSweepRegistered = true;
     }
-    // 38.6 D-41: bounded once-per-process sweep of the Orrery's cache-dir photo
-    // derivatives (masters gone, stale signatures, crash leftovers).
+    // 38.6 D-41: once-per-process sweep of the Orrery's cache-dir photo
+    // derivatives (masters gone, stale signatures, crash leftovers). WR6-01: the
+    // hook starts a chunked walk of the whole namespace and returns at once.
     if (!orreryDerivativeSweepRegistered) {
       registerOrreryDerivativeSweep();
       orreryDerivativeSweepRegistered = true;

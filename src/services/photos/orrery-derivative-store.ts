@@ -31,9 +31,10 @@
  *   - `installOrreryDerivative` re-reads the master's signature AFTER the
  *     atomic rename and deletes its own file if the master changed or vanished
  *     meanwhile, so a derivation racing a delete cannot leave a copy behind.
- *   - A launch sweep (once per process, bounded) deletes sub-directories whose
- *     master is gone, files whose signature no longer matches, and anything
- *     else in the namespace (crash leftovers).
+ *   - A launch sweep (once per process) walks the WHOLE namespace in chunks,
+ *     yielding between them, off the launch-sweep critical path, and deletes
+ *     sub-directories whose master is gone, files whose signature no longer
+ *     matches, and anything else in the namespace (crash leftovers).
  *
  * Every path is built from a validated canonical basename and a numeric
  * signature, and every delete is confined to the namespace. Nothing here reads
@@ -53,11 +54,13 @@ import { Logger } from "@/utils/logger";
 export const ORRERY_DERIVATIVE_DIR = "orrery-photo";
 
 /**
- * Upper bound on namespace entries (photo sub-directories plus stray files)
- * one launch sweep inspects. Each costs a stat of its master and a listing of
- * one or two files; the rest wait for the next launch.
+ * Namespace entries (photo sub-directories plus stray files) the launch sweep
+ * inspects before it yields a macrotask (WR6-01). Each costs a stat of its
+ * master and a listing of one or two files on the JS thread, so a chunk stays
+ * well under a frame's worth of work. There is NO per-launch cap: the sweep
+ * walks the whole namespace, so an orphan is never starved behind live entries.
  */
-export const ORRERY_DERIVATIVE_SWEEP_MAX_ENTRIES = 2000;
+export const ORRERY_DERIVATIVE_SWEEP_CHUNK = 50;
 
 const LOG_SCOPE = "orrery-derivative-store";
 
@@ -318,19 +321,59 @@ export function discardOrreryDerivatives(
 
 let swept = false;
 
+/** Yield one macrotask (a cooperative pause, not a scheduler or a timer). */
+function nextMacrotask(): Promise<void> {
+  return new Promise<void>((resolve) => setTimeout(resolve, 0));
+}
+
+/** Inspect one namespace entry; returns how many things it removed. */
+function sweepEntry(
+  boundary: OrreryDerivativeFs,
+  entry: OrreryDerivativeEntry,
+): number {
+  const relative = `avatars/${entry.name}`;
+  if (!entry.isDirectory || !basenameOf(relative)) {
+    if (entry.isDirectory) boundary.deleteDir(entry.uri);
+    else boundary.deleteFile(entry.uri);
+    return 1;
+  }
+  // Discarded since the listing (a byte change between chunks): nothing left.
+  if (!boundary.dirExists(entry.uri)) return 0;
+  const signature = orreryMasterSignature(relative, boundary);
+  if (signature === null) {
+    boundary.deleteDir(entry.uri);
+    return 1;
+  }
+  let removed = 0;
+  for (const file of boundary.list(entry.uri)) {
+    if (!file.isDirectory && file.name === `${signature}.jpg`) continue;
+    if (file.isDirectory) boundary.deleteDir(file.uri);
+    else boundary.deleteFile(file.uri);
+    removed += 1;
+  }
+  return removed;
+}
+
 /**
- * Bounded orphan sweep (once per process): remove photo sub-directories whose
- * master is gone, derivative files whose signature no longer matches the
- * master, and anything else in the namespace. Never throws.
+ * Orphan sweep (once per process): remove photo sub-directories whose master
+ * is gone, derivative files whose signature no longer matches the master, and
+ * anything else in the namespace. WR6-01: walks EVERY entry of the listing (no
+ * head-of-list cap, so an orphan listed after any number of live entries is
+ * still reached), `ORRERY_DERIVATIVE_SWEEP_CHUNK` at a time, yielding a
+ * macrotask between chunks so the JS thread is never held for the whole walk.
+ * Each entry is inspected synchronously (no yield inside one entry), so a
+ * concurrent install or discard always sees a consistent directory. Never
+ * rejects.
  */
-export function sweepOrreryDerivativesOncePerProcess(fs?: OrreryDerivativeFs): {
-  removed: number;
-  inspected: number;
-} {
+export async function sweepOrreryDerivativesOncePerProcess(
+  fs?: OrreryDerivativeFs,
+  yieldTick: () => Promise<void> = nextMacrotask,
+): Promise<{ removed: number; inspected: number }> {
   const summary = { removed: 0, inspected: 0 };
   if (swept) return summary;
   swept = true;
   let boundary: OrreryDerivativeFs;
+  let entries: OrreryDerivativeEntry[];
   try {
     boundary = fs ?? productionFs();
     if (!boundary.dirExists(namespaceUri(boundary))) return summary;
@@ -338,35 +381,23 @@ export function sweepOrreryDerivativesOncePerProcess(fs?: OrreryDerivativeFs): {
     Logger.warn(LOG_SCOPE, "derivative sweep unavailable");
     return summary;
   }
-  let entries: OrreryDerivativeEntry[];
   try {
     entries = boundary.list(namespaceUri(boundary));
   } catch {
     Logger.warn(LOG_SCOPE, "derivative sweep listing failed");
     return summary;
   }
-  for (const entry of entries.slice(0, ORRERY_DERIVATIVE_SWEEP_MAX_ENTRIES)) {
+  for (let index = 0; index < entries.length; index++) {
+    if (index > 0 && index % ORRERY_DERIVATIVE_SWEEP_CHUNK === 0) {
+      try {
+        await yieldTick();
+      } catch {
+        // A failed yield only costs responsiveness; keep walking.
+      }
+    }
     summary.inspected += 1;
     try {
-      const relative = `avatars/${entry.name}`;
-      if (!entry.isDirectory || !basenameOf(relative)) {
-        if (entry.isDirectory) boundary.deleteDir(entry.uri);
-        else boundary.deleteFile(entry.uri);
-        summary.removed += 1;
-        continue;
-      }
-      const signature = orreryMasterSignature(relative, boundary);
-      if (signature === null) {
-        boundary.deleteDir(entry.uri);
-        summary.removed += 1;
-        continue;
-      }
-      for (const file of boundary.list(entry.uri)) {
-        if (!file.isDirectory && file.name === `${signature}.jpg`) continue;
-        if (file.isDirectory) boundary.deleteDir(file.uri);
-        else boundary.deleteFile(file.uri);
-        summary.removed += 1;
-      }
+      summary.removed += sweepEntry(boundary, entries[index]);
     } catch {
       Logger.warn(LOG_SCOPE, "derivative sweep entry failed");
     }
@@ -374,11 +405,18 @@ export function sweepOrreryDerivativesOncePerProcess(fs?: OrreryDerivativeFs): {
   return summary;
 }
 
-/** Register the orphan sweep on the launch-sweep registry (App.tsx, once). */
+/**
+ * Register the orphan sweep on the launch-sweep registry (App.tsx, once). The
+ * hook STARTS the chunked walk and resolves at once, so later launch hooks
+ * (photo finalize, backup) and the settled tick never wait on a cache cleanup
+ * (WR6-01). The walk is once per process and never rejects.
+ */
 export function registerOrreryDerivativeSweep(): void {
   registerSweepHook(
     async () => {
-      sweepOrreryDerivativesOncePerProcess();
+      void sweepOrreryDerivativesOncePerProcess().catch(() => {
+        Logger.warn(LOG_SCOPE, "derivative sweep failed");
+      });
     },
     { id: "orrery-derivative" },
   );

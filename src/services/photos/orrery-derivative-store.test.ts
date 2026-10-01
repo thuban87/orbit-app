@@ -4,8 +4,8 @@
  * hit / miss / stale-signature / empty lookups, the atomic install (older
  * signatures removed, temp retired on failure, nothing left behind when the
  * master changes or is deleted mid-install), namespace-confined drops, the
- * per-photo discard the ownership layer calls, and the bounded once-per-process
- * launch orphan sweep.
+ * per-photo discard the ownership layer calls, and the chunked once-per-process
+ * launch orphan sweep (whole namespace, no head-of-list cap — WR6-01).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -32,7 +32,7 @@ import {
   formatOrrerySignature,
   installOrreryDerivative,
   ORRERY_DERIVATIVE_DIR,
-  ORRERY_DERIVATIVE_SWEEP_MAX_ENTRIES,
+  ORRERY_DERIVATIVE_SWEEP_CHUNK,
   type OrreryDerivativeEntry,
   type OrreryDerivativeFs,
   orreryDerivativeUri,
@@ -318,8 +318,16 @@ describe("discardOrreryDerivatives — the ownership layer's per-photo delete", 
   });
 });
 
-describe("sweepOrreryDerivativesOncePerProcess — bounded launch orphan sweep", () => {
-  it("keeps only current derivatives of masters that still exist", () => {
+describe("sweepOrreryDerivativesOncePerProcess — chunked launch orphan sweep", () => {
+  /** A live photo: master present and its current-signature derivative on disk. */
+  function addLive(name: string): void {
+    const relative = `avatars/${name}`;
+    fs.masters.set(relative, { size: 1000, modificationTime: 5 });
+    fs.ensureDir(`${NS}/${name}`);
+    fs.files.set(`${NS}/${name}/1000-5.jpg`, 41_000);
+  }
+
+  it("keeps only current derivatives of masters that still exist", async () => {
     // Current + stale + stray for a live master.
     fs.ensureDir(PHOTO_DIR);
     fs.files.set(FINAL, 41_000);
@@ -333,7 +341,7 @@ describe("sweepOrreryDerivativesOncePerProcess — bounded launch orphan sweep",
     fs.files.set(`${NS}/junk.txt`, 1);
     fs.ensureDir(`${NS}/not-a-photo`);
 
-    const summary = sweepOrreryDerivativesOncePerProcess(fs);
+    const summary = await sweepOrreryDerivativesOncePerProcess(fs);
     expect([...fs.files.keys()]).toEqual([FINAL]);
     expect([...fs.dirs].filter((d) => d.startsWith(NS)).sort()).toEqual([
       NS,
@@ -342,40 +350,97 @@ describe("sweepOrreryDerivativesOncePerProcess — bounded launch orphan sweep",
     expect(summary).toEqual({ removed: 6, inspected: 4 });
   });
 
-  it("runs once per process", () => {
+  it("runs once per process", async () => {
     fs.ensureDir(`${NS}/contact-13.jpg`);
-    sweepOrreryDerivativesOncePerProcess(fs);
+    await sweepOrreryDerivativesOncePerProcess(fs);
     fs.ensureDir(`${NS}/contact-14.jpg`);
-    expect(sweepOrreryDerivativesOncePerProcess(fs)).toEqual({
+    await expect(sweepOrreryDerivativesOncePerProcess(fs)).resolves.toEqual({
       removed: 0,
       inspected: 0,
     });
     expect(fs.dirExists(`${NS}/contact-14.jpg`)).toBe(true);
   });
 
-  it("inspects at most ORRERY_DERIVATIVE_SWEEP_MAX_ENTRIES entries per launch", () => {
-    for (let i = 0; i < ORRERY_DERIVATIVE_SWEEP_MAX_ENTRIES + 5; i++)
-      fs.ensureDir(`${NS}/contact-${1000 + i}.jpg`);
-    const summary = sweepOrreryDerivativesOncePerProcess(fs);
-    expect(summary.inspected).toBe(ORRERY_DERIVATIVE_SWEEP_MAX_ENTRIES);
-    expect(summary.removed).toBe(ORRERY_DERIVATIVE_SWEEP_MAX_ENTRIES);
-    expect(fs.list(NS)).toHaveLength(5);
+  it("WR6-01 repro: an orphan listed after 2,000+ live entries is removed", async () => {
+    const LIVE = 2_050;
+    for (let i = 0; i < LIVE; i++) addLive(`contact-${1000 + i}.jpg`);
+    // Listed last (insertion order): its master is gone.
+    const orphan = `${NS}/contact-99999.jpg`;
+    fs.ensureDir(orphan);
+    fs.files.set(`${orphan}/7-7.jpg`, 7);
+
+    const summary = await sweepOrreryDerivativesOncePerProcess(fs, () =>
+      Promise.resolve(),
+    );
+    expect(summary).toEqual({ removed: 1, inspected: LIVE + 1 });
+    expect(fs.dirExists(orphan)).toBe(false);
+    expect(fs.fileSize(`${orphan}/7-7.jpg`)).toBeNull();
+    // Every live derivative survives.
+    expect(fs.files.size).toBe(LIVE);
+    expect(fs.list(NS)).toHaveLength(LIVE);
   });
 
-  it("is a no-op without a namespace and never throws", () => {
-    expect(sweepOrreryDerivativesOncePerProcess(fs)).toEqual({
+  it("yields a tick between chunks, never inside one, and walks every entry", async () => {
+    const total = ORRERY_DERIVATIVE_SWEEP_CHUNK * 2 + 1;
+    for (let i = 0; i < total; i++)
+      fs.ensureDir(`${NS}/contact-${1000 + i}.jpg`); // all orphans
+    const remainingAtYield: number[] = [];
+    const summary = await sweepOrreryDerivativesOncePerProcess(fs, async () => {
+      remainingAtYield.push(fs.list(NS).length);
+    });
+    // Two full chunks → two yields, each after exactly one more chunk.
+    expect(remainingAtYield).toEqual([
+      total - ORRERY_DERIVATIVE_SWEEP_CHUNK,
+      total - ORRERY_DERIVATIVE_SWEEP_CHUNK * 2,
+    ]);
+    expect(summary).toEqual({ removed: total, inspected: total });
+    expect(fs.list(NS)).toHaveLength(0);
+  });
+
+  it("the default yield is a real macrotask: other work runs mid-walk", async () => {
+    for (let i = 0; i < ORRERY_DERIVATIVE_SWEEP_CHUNK + 1; i++)
+      fs.ensureDir(`${NS}/contact-${1000 + i}.jpg`);
+    let remainingWhenTimerRan: number | null = null;
+    setTimeout(() => {
+      remainingWhenTimerRan = fs.list(NS).length;
+    }, 0);
+    await sweepOrreryDerivativesOncePerProcess(fs);
+    expect(remainingWhenTimerRan).toBe(1);
+    expect(fs.list(NS)).toHaveLength(0);
+  });
+
+  it("an entry discarded between chunks is skipped quietly", async () => {
+    const total = ORRERY_DERIVATIVE_SWEEP_CHUNK + 1;
+    for (let i = 0; i < total; i++) addLive(`contact-${1000 + i}.jpg`);
+    const last = `contact-${1000 + total - 1}.jpg`;
+    const summary = await sweepOrreryDerivativesOncePerProcess(fs, async () => {
+      // The ownership layer discards a photo while the sweep is paused.
+      discardOrreryDerivatives(`avatars/${last}`, fs);
+    });
+    expect(summary).toEqual({ removed: 0, inspected: total });
+    expect(fs.list(NS)).toHaveLength(total - 1);
+  });
+
+  it("is a no-op without a namespace and never rejects", async () => {
+    await expect(sweepOrreryDerivativesOncePerProcess(fs)).resolves.toEqual({
       removed: 0,
       inspected: 0,
     });
     __resetOrreryDerivativeSweepForTest();
     fs.throwEverywhere = true;
-    expect(() => sweepOrreryDerivativesOncePerProcess(fs)).not.toThrow();
+    await expect(sweepOrreryDerivativesOncePerProcess(fs)).resolves.toEqual({
+      removed: 0,
+      inspected: 0,
+    });
   });
 
-  it("registers on the launch-sweep registry", () => {
+  it("registers on the launch-sweep registry, and the hook does not wait for the walk", async () => {
     registerOrreryDerivativeSweep();
     expect(registerSweepHook).toHaveBeenCalledWith(expect.any(Function), {
       id: "orrery-derivative",
     });
+    const hook = vi.mocked(registerSweepHook).mock.calls.at(-1)?.[0];
+    // Production fs is unavailable in node: the detached walk logs and settles.
+    await expect(hook?.()).resolves.toBeUndefined();
   });
 });
