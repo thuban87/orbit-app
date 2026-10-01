@@ -1,5 +1,5 @@
 /**
- * ORRERY LAB A (pass 2) — focus card placement, presentation only.
+ * ORRERY LAB A (pass 2, pass 3) — focus card placement, presentation only.
  *
  * The card (`OrreryFocusContext`) follows the focused body on the UI thread.
  * Focus framing (`frameBodies` in OrreryScreen) centres the body in the
@@ -8,17 +8,79 @@
  * a tall card used to be clamped UP over the body and its reticle. Here the
  * card clears the drawn body + reticle and flips ABOVE the body when it
  * cannot fit below; only if neither side fits does it clamp (overlap).
+ *
+ * Pass 3: it also clears the focused body's own label plate (+ context line
+ * at detail zoom). The plate's side mirrors `allocateLabels`: below the body
+ * when it fits in the usable rect, else the fixed alternate above. Its size
+ * mirrors `prepareOrreryText` (line height × font scale + vertical padding).
  */
-import { RETICLE_ARM, RETICLE_GAP } from "./deep-field-config";
-import { bodyVisualScale } from "./deep-field-math";
+import {
+  RETICLE_RING_DP,
+  RETICLE_STROKE_DP,
+  RETICLE_TICK_DP,
+} from "./deep-field-config";
+import { bodyVisualScale, reticleGeometry } from "./deep-field-math";
 
-/** Screen clearance below/above a focused body's centre (dp). */
+/** Mirrors OrreryWorld LABEL_BODY_GAP / orrery-label-logic CONTEXT_GAP. */
+export const FOCUS_LABEL_GAP = 8;
+export const FOCUS_CONTEXT_GAP = 4;
+
+/** Screen clearance below/above a focused body's centre (dp): reticle box. */
 export function focusClearance(projectedRadius: number): number {
   "worklet";
   const drawn = projectedRadius * bodyVisualScale(projectedRadius);
-  // Reticle = (r + gap) local units at scale ≈ drawn / r_world; brackets add
-  // ~RETICLE_ARM of the radius. Approximated in screen space.
-  return drawn * (1 + RETICLE_ARM * 0.5) + RETICLE_GAP * 1.6;
+  const { half } = reticleGeometry(drawn);
+  const ticks = drawn + RETICLE_RING_DP + 1.5 + RETICLE_TICK_DP;
+  return Math.max(half + RETICLE_STROKE_DP, ticks);
+}
+
+/**
+ * Pass 3: the vertical room the card may use, given its horizontal span. The
+ * camera's usable rect is the largest obstacle-free rectangle, so it excludes
+ * the whole band beside the controls column even where the (narrower) card
+ * would not touch it. Here only obstacles that overlap the card's own x-span
+ * bound it; the result never shrinks below the usable rect.
+ */
+export function focusCardRoom(
+  viewport: {
+    width: number;
+    height: number;
+    usable?: { x: number; y: number; width: number; height: number };
+    obstacles?: readonly {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    }[];
+  },
+  region: { y: number; height: number },
+  left: number,
+  width: number,
+  bodyY: number,
+  margin: number,
+): { y: number; height: number } {
+  "worklet";
+  const limitTop = Math.max(0, viewport.usable?.y ?? 0);
+  const limitBottom = Math.min(
+    viewport.height,
+    viewport.usable
+      ? viewport.usable.y + viewport.usable.height
+      : viewport.height,
+  );
+  let top = limitTop;
+  let bottom = limitBottom;
+  const obstacles = viewport.obstacles ?? [];
+  for (let i = 0; i < obstacles.length; i++) {
+    const o = obstacles[i];
+    if (!(o.width > 0 && o.height > 0)) continue;
+    if (o.x >= left + width || o.x + o.width <= left) continue;
+    if (o.y >= bodyY) bottom = Math.min(bottom, o.y - margin);
+    else if (o.y + o.height <= bodyY)
+      top = Math.max(top, o.y + o.height + margin);
+  }
+  const y = Math.min(top, region.y);
+  const end = Math.max(bottom, region.y + region.height);
+  return { y, height: Math.max(0, end - y) };
 }
 
 /** Smallest card height we will shrink to (the card scrolls inside). */
@@ -30,10 +92,36 @@ export interface FocusCardPlacement {
 }
 
 /**
+ * The focused body's label stack, in dp from the body EDGE (frame radius):
+ * `name` = gap + name plate (decides the side, as the allocator does);
+ * `block` = the whole stack incl. the context line when it can show.
+ */
+export interface FocusLabelBlock {
+  name: number;
+  block: number;
+}
+
+export function focusLabelBlock(
+  fontScale: number,
+  lineHeight: number,
+  verticalPadding: number,
+  withContext: boolean,
+): FocusLabelBlock {
+  "worklet";
+  const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
+  const plate = lineHeight * scale + verticalPadding * 2;
+  const name = FOCUS_LABEL_GAP + plate;
+  return {
+    name,
+    block: withContext ? name + FOCUS_CONTEXT_GAP + plate : name,
+  };
+}
+
+/**
  * Below the body if the card fits, else above it, else the roomier side with
  * the card's height capped to that room (its content scrolls) so it never
- * covers the focused body or its reticle. Only when even the minimum height
- * does not fit does it clamp into the region (overlap, last resort).
+ * covers the focused body, its reticle or its label plate. Only when even the
+ * minimum height does not fit does it clamp into the region (overlap).
  */
 export function focusCardPlacement(
   region: { y: number; height: number },
@@ -41,12 +129,19 @@ export function focusCardPlacement(
   projectedRadius: number,
   cardHeight: number,
   gap: number,
+  label?: FocusLabelBlock,
 ): FocusCardPlacement {
   "worklet";
-  const clear = focusClearance(projectedRadius) + gap;
+  const reticle = focusClearance(projectedRadius);
   const bottom = region.y + region.height;
-  const below = bodyY + clear;
-  const aboveEdge = bodyY - clear;
+  // Allocator order: the plate goes below when it fits, else above.
+  const labelBelow = !!label && bodyY + projectedRadius + label.name <= bottom;
+  const labelReach = label ? projectedRadius + label.block : 0;
+  const clearBelow = Math.max(reticle, labelBelow ? labelReach : 0) + gap;
+  const clearAbove =
+    Math.max(reticle, label && !labelBelow ? labelReach : 0) + gap;
+  const below = bodyY + clearBelow;
+  const aboveEdge = bodyY - clearAbove;
   if (below + cardHeight <= bottom)
     return { top: below, maxHeight: cardHeight };
   if (aboveEdge - cardHeight >= region.y)

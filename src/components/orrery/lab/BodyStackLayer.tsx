@@ -55,6 +55,9 @@ export function BodyStackLayer({
         for (let s = 0; s < stacks.length; s++) {
           const st = stacks[s];
           const front = current.bodies[st.front];
+          // Pass 3: only stacks whose front body is mounted (ring inks are
+          // built from the same resource commit as the body components).
+          if (!colors[bodyKey(front)]) continue;
           const shown = Math.min(st.hidden.length, STACK_PIP_MAX);
           for (let k = 0; k < shown; k++) {
             const a = STACK_PIP_ANGLE - k * STACK_PIP_STEP;

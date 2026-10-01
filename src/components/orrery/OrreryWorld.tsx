@@ -13,6 +13,7 @@ import {
   useAnimatedReaction,
   useDerivedValue,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { swatchIndex } from "@/components/avatar-initials";
 import type { OrrerySatellite } from "@/db/orrery-satellites-read";
@@ -65,13 +66,17 @@ import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import type { DeepFieldBodyContext } from "./lab/BodyOverlays";
 import { BodyStackLayer } from "./lab/BodyStackLayer";
 import { DeepFieldBackdrop } from "./lab/DeepFieldBackdrop";
+import { FOCUS_FADE_MS } from "./lab/deep-field-config";
 import { resolveDeepFieldInk, tokenInk } from "./lab/deep-field-ink";
 import {
   type BodyLightMap,
   computeBodyLight,
   computeSwitchFx,
+  FOCUS_NONE,
+  type FocusState,
 } from "./lab/deep-field-math";
 import { useDeepFieldEnabled } from "./lab/deep-field-mode";
+import { FocusReticleLayer } from "./lab/FocusReticleLayer";
 import { LabHud, labMarkerVisible } from "./lab/LabHud";
 import { WorldPlaneLayer } from "./lab/WorldPlaneLayer";
 import type { PlaneRing } from "./lab/world-plane";
@@ -370,9 +375,56 @@ export function OrreryWorld({
   const bodyLight = useDerivedValue<BodyLightMap>(() =>
     computeBodyLight(frame.value, lightExtent),
   );
+  // ORRERY LAB A (pass 3): focus as UI-thread data. Written in THIS render
+  // (a shared-value write is an async hand-off, never a sync read), so the
+  // reticle, ring emphasis and body dim land with the focus instead of after
+  // the focus commit's full Skia re-record (seconds in debug native). The
+  // emphasis fades on the UI thread (instant under reduced motion).
+  const focusState = useSharedValue<FocusState>(FOCUS_NONE);
+  const focusMix = useSharedValue(0);
+  const focusWritten = useRef<{ signature: string; generation: number }>({
+    signature: "[[],null]",
+    generation: 0,
+  });
+  const focusSignature = JSON.stringify([focusedIds, focusedSatellite ?? null]);
+  if (focusWritten.current.signature !== focusSignature) {
+    const generation = focusWritten.current.generation + 1;
+    focusWritten.current = { signature: focusSignature, generation };
+    const keys: Record<string, boolean> = {};
+    const targets: string[] = [];
+    for (const id of focusedIds) {
+      keys[`contact:${id}`] = true;
+      keys[`sun:${id}`] = true;
+      targets.push(`contact:${id}`, `sun:${id}`);
+    }
+    if (focusedSatellite)
+      targets.push(
+        bodyKey({
+          id: -1,
+          kind: "satellite",
+          satelliteTarget: focusedSatellite,
+        }),
+      );
+    focusState.value = { keys, targets, generation };
+  }
+  useAnimatedReaction(
+    () => focusState.value,
+    (state, previous) => {
+      if (previous !== null && state.generation === previous.generation) return;
+      const target = Object.keys(state.keys).length > 0 ? 1 : 0;
+      focusMix.value =
+        previous === null || reducedMotion.value
+          ? target
+          : withTiming(target, { duration: FOCUS_FADE_MS });
+    },
+  );
+  const accentInk = useMemo(() => tokenInk(colors.accent), [colors.accent]);
   const deepField = useMemo<DeepFieldBodyContext | undefined>(
-    () => (deepFieldOn ? { ink: deepInk, light: bodyLight } : undefined),
-    [deepFieldOn, deepInk, bodyLight],
+    () =>
+      deepFieldOn
+        ? { ink: deepInk, light: bodyLight, focusMix, focus: focusState }
+        : undefined,
+    [deepFieldOn, deepInk, bodyLight, focusMix, focusState],
   );
   const planeRings = useMemo<PlaneRing[]>(
     () =>
@@ -736,6 +788,8 @@ export function OrreryWorld({
               rings={planeRings}
               ink={deepInk}
               extent={sceneExtent}
+              focus={focusState}
+              focusMix={focusMix}
             />
           ) : (
             resources
@@ -799,6 +853,15 @@ export function OrreryWorld({
             );
           })}
         </Group>
+        {/* ORRERY LAB A (pass 3): always-mounted focus reticle HUD. */}
+        {deepFieldOn ? (
+          <FocusReticleLayer
+            frame={frame}
+            light={bodyLight}
+            focus={focusState}
+            accent={accentInk}
+          />
+        ) : null}
         {/* Labels/backplates are screen-space and never interrupt the body batch. */}
         <Group>
           {labels.map((label) => (
@@ -844,10 +907,14 @@ export function OrreryWorld({
       focusedIds,
       deepField,
       sunFlare,
+      focusState,
+      focusMix,
+      accentInk,
       drawnSatellites,
       focusedSatellite,
       labels,
       allocations,
+      bodyLight,
     ],
   );
   return (

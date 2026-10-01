@@ -274,7 +274,10 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    const [rings, polaris, ghost, bodies, labels] = tree[0].children;
+    // ORRERY LAB A (pass 3): an always-mounted focus-reticle picture sits
+    // between the body batch and the labels (outside the body batch).
+    const [rings, polaris, ghost, bodies, reticle, labels] = tree[0].children;
+    expect(reticle.type).toBe("picture");
     expect(ghost.props.color).toBe(THEME_PRESETS.galaxy.dark.accent);
     expect(polaris.children.map((child) => child.type)).toEqual([
       "circle",

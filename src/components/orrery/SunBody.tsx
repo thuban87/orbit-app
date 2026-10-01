@@ -31,7 +31,7 @@ import { useMemo } from "react";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 import type { BillboardPose } from "@/logic/orrery-frame";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
-import { FocusReticle, SunCorona, SunDisc } from "./lab/BodyOverlays";
+import { SunCorona, SunDisc } from "./lab/BodyOverlays";
 import type { DeepFieldInk } from "./lab/deep-field-ink";
 import { useOrreryClock } from "./orrery-clock-context";
 import { useOrreryPhoto } from "./use-orrery-photo";
@@ -194,9 +194,8 @@ export function SunBody({
           opacity={pulseGlowOpacity}
         />
       )}
-      {focusColor && deepInk ? (
-        <FocusReticle radius={radius} reticleColor={focusColor} gap={9} />
-      ) : focusColor ? (
+      {/* ORRERY LAB A: the focus reticle is FocusReticleLayer (pass 3). */}
+      {focusColor && deepInk ? null : focusColor ? (
         <Circle
           cx={cx}
           cy={cy}

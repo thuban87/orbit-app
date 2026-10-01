@@ -28,8 +28,8 @@ import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import {
   BodyLightOverlay,
   type DeepFieldBodyContext,
-  FocusReticle,
 } from "./lab/BodyOverlays";
+import { BODY_ENTER_FADE_MS, FOCUS_BODY_DIM } from "./lab/deep-field-config";
 import { bodyDepthScale, bodyVisualScale } from "./lab/deep-field-math";
 import { useOrreryPhoto } from "./use-orrery-photo";
 
@@ -103,9 +103,29 @@ export function OrbitBody({
       : [],
   );
   const depth = useDerivedValue(() => projection?.value.depth ?? 0);
+  // ORRERY LAB A (pass 3): presentation-only alpha — a body fades in when it
+  // mounts (entering bodies whose components land after the switch has
+  // started no longer pop), and unfocused bodies dim slightly while another
+  // body is focused. Instant / off under reduced motion. Hit/labels untouched.
+  const reducedMotion = useReducedMotionShared();
+  const enter = useSharedValue(lab ? 0 : 1);
+  useEffect(() => {
+    if (!lab) return;
+    enter.value = reducedMotion.value
+      ? 1
+      : withTiming(1, { duration: BODY_ENTER_FADE_MS });
+  }, [enter, lab, reducedMotion]);
+  // Focus state is a UI-thread shared value (pass 3): the dim lands with the
+  // focus, not after the seconds-long Skia re-record of the focus commit.
+  const focusMix = deepField?.focusMix;
+  const focusState = deepField?.focus;
   const layer = useDerivedValue(() => {
     const paint = Skia.Paint();
-    paint.setAlphaf(projection?.value.opacity ?? 1);
+    const dim =
+      focusMix && focusState && lightKey && !focusState.value.keys[lightKey]
+        ? 1 - FOCUS_BODY_DIM * focusMix.value
+        : 1;
+    paint.setAlphaf((projection?.value.opacity ?? 1) * enter.value * dim);
     return paint;
   });
   // C2-1: unconditional hook, null-guarded source (photo may be null). D-11:
@@ -115,7 +135,6 @@ export function OrbitBody({
   // resolves (remounts re-load photos asynchronously — D-41 keeps no SkImage
   // cache, see _notes/PASS-2.md). Instant under reduced motion. The hook's
   // ownership/disposal contract is untouched: this only animates opacity.
-  const reducedMotion = useReducedMotionShared();
   const photoOpacity = useSharedValue(1);
   useEffect(() => {
     if (!lab || !image) return;
@@ -161,9 +180,8 @@ export function OrbitBody({
 
   return (
     <Group transform={transform} zIndex={depth} layer={layer}>
-      {focusColor && deepField ? (
-        <FocusReticle radius={radius} reticleColor={focusColor} />
-      ) : focusColor ? (
+      {/* ORRERY LAB A: the focus reticle is FocusReticleLayer (pass 3). */}
+      {focusColor && deepField ? null : focusColor ? (
         <Circle
           cx={cx}
           cy={cy}

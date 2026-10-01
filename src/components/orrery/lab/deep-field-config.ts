@@ -188,16 +188,48 @@ export const CORONA_ALPHA_LIGHT = 0.85;
 export const SUN_GRANULE_SPEED = 0.00035;
 
 // ── 6. HUD ──────────────────────────────────────────────────────────────────
-/** Reticle bracket gap outside the body (px, local) and arm length (radius ×). */
-export const RETICLE_GAP = 7;
-export const RETICLE_ARM = 0.42;
-/** Reticle spin (rad/ms) → one turn ≈ 21 s. Static under reduced motion. */
-export const RETICLE_SPEED = 0.0003;
-/** Pass 2 lock-on: duration (ms) of converge + ping, bracket start spread
- *  (× scale), ping reach (radius ×). Static under reduced motion. */
-export const RETICLE_LOCK_MS = 720;
-export const RETICLE_LOCK_SPREAD = 0.85;
+/**
+ * PASS 3 reticle — authored in SCREEN dp around the DRAWN disc (projected
+ * radius × visual × depth scale), so it is tight and the same weight at every
+ * zoom; billboarded (the body Group has no tilt skew). Brackets are
+ * axis-aligned once locked (a spinning square read as stray chevrons).
+ *  - bracket box half-size = drawn + max(RETICLE_GAP_DP, drawn × RETICLE_GAP_FRAC)
+ *  - arm = clamp(half × RETICLE_ARM_FRAC, RETICLE_ARM_MIN, RETICLE_ARM_MAX)
+ */
+export const RETICLE_GAP_DP = 5;
+export const RETICLE_GAP_FRAC = 0.16;
+export const RETICLE_ARM_FRAC = 0.34;
+export const RETICLE_ARM_MIN = 6;
+export const RETICLE_ARM_MAX = 15;
+/** Bracket stroke (dp), inner lock ring offset outside the disc (dp) + alpha. */
+export const RETICLE_STROKE_DP = 2;
+export const RETICLE_RING_DP = 3.5;
+export const RETICLE_RING_ALPHA = 0.55;
+/** Cardinal instrument ticks just outside the lock ring (dp length). */
+export const RETICLE_TICK_DP = 4;
+/** Ambient "scan" arc on the lock ring: span (rad) + speed (rad/ms ≈ 9 s/turn).
+ *  Static under reduced motion. */
+export const RETICLE_SCAN_ARC = 0.8;
+export const RETICLE_SCAN_SPEED = 0.0007;
+/** Lock-on: total ms; converge occupies the first half (outBack overshoot),
+ *  then a flash on the brackets + one ping ring. Start spread (× box) and
+ *  rotation; ping reach (× drawn radius). Static under reduced motion. */
+export const RETICLE_LOCK_MS = 760;
+export const RETICLE_LOCK_SPREAD = 0.9;
+export const RETICLE_LOCK_ROTATE = Math.PI / 4;
+export const RETICLE_LOCK_OVERSHOOT = 1.6;
+export const RETICLE_FLASH_ALPHA = 0.45;
 export const RETICLE_PING_REACH = 0.9;
+/** Focus emphasis (pass 3): fade (ms), other rings' hairline/segment dim,
+ *  focused ring hairline → full status ink at this alpha + width (× status
+ *  width), other bodies' alpha dim. Instant under reduced motion. */
+export const FOCUS_FADE_MS = 320;
+export const FOCUS_RING_DIM = 0.55;
+export const FOCUS_RING_ALPHA = 0.85;
+export const FOCUS_RING_WIDTH = 0.6;
+export const FOCUS_BODY_DIM = 0.22;
+/** Bodies fade in on mount (late-mounting entering bodies; ms). */
+export const BODY_ENTER_FADE_MS = 280;
 /** Label plate alpha + hairline border alpha + status tick width (px). */
 export const PLATE_ALPHA = 0.9;
 export const PLATE_BORDER_ALPHA = 0.55;
@@ -268,6 +300,10 @@ export const TRAIL_MS = 160;
 export const TRAIL_LEAVING_MS = 340;
 /** Trail width as a multiple of the drawn body radius; peak alpha. */
 export const TRAIL_WIDTH = 1.15;
+/** Pass 3: trails thin + fade for inner rings (screen ring radius below
+ *  TRAIL_INNER_REF × drawn body radius), floor TRAIL_INNER_FLOOR. */
+export const TRAIL_INNER_REF = 9;
+export const TRAIL_INNER_FLOOR = 0.3;
 export const TRAIL_ALPHA_DARK = 0.42;
 export const TRAIL_ALPHA_LIGHT = 0.26;
 /** Longest trail arc about the sun (rad; < π keeps the stroke convex). */

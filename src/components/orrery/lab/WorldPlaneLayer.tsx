@@ -18,7 +18,7 @@ import {
 } from "react-native-reanimated";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
 import type { DeepFieldInk } from "./deep-field-ink";
-import type { SwitchFx } from "./deep-field-math";
+import type { FocusState, SwitchFx } from "./deep-field-math";
 import { labEffect } from "./deep-field-shaders";
 import { drawWorldPlane, type PlaneRing, type TrailState } from "./world-plane";
 
@@ -28,12 +28,17 @@ export function WorldPlaneLayer({
   rings,
   ink,
   extent,
+  focus,
+  focusMix,
 }: {
   frame: SharedValue<AnimatedFrame>;
   switchFx: SharedValue<SwitchFx>;
   rings: readonly PlaneRing[];
   ink: DeepFieldInk;
   extent: number;
+  /** Pass 3: UI-thread focus state + 0..1 emphasis mix. */
+  focus?: SharedValue<FocusState>;
+  focusMix?: SharedValue<number>;
 }) {
   // Pass 2: this layer's own motion-blur history (UI-thread scratch, mutated
   // in place — never reassigned, so it never re-triggers this mapper).
@@ -44,6 +49,8 @@ export function WorldPlaneLayer({
     const fx = switchFx.value;
     const history = trails.value;
     const now = Date.now();
+    const mix = focusMix?.value ?? 0;
+    const focusKeys = focus?.value.keys;
     return createPicture(
       (canvas) => {
         drawWorldPlane(canvas, {
@@ -55,6 +62,7 @@ export function WorldPlaneLayer({
           trails: history,
           now,
           ringEffect,
+          focus: focusKeys && mix > 0 ? { keys: focusKeys, mix } : undefined,
         });
       },
       {

@@ -6,21 +6,7 @@ import {
   BodyLightOverlay,
   type DeepFieldBodyContext,
 } from "./lab/BodyOverlays";
-import {
-  MOON_VISUAL_MAX,
-  MOON_VISUAL_MIN_RADIUS,
-} from "./lab/deep-field-config";
-
-/** ORRERY LAB A (pass 2): presentation-only moon scale toward a legible
- *  minimum drawn radius (hit radius stays the frame's ≥ 22 dp). */
-function moonVisualScale(projected: number): number {
-  "worklet";
-  if (!(projected > 0)) return 1;
-  return Math.max(
-    1,
-    Math.min(MOON_VISUAL_MAX, MOON_VISUAL_MIN_RADIUS / projected),
-  );
-}
+import { moonVisualScale } from "./lab/deep-field-math";
 
 /** One comparable depth Group in the world's contiguous native body batch. */
 export function SatelliteBody({
@@ -72,7 +58,8 @@ export function SatelliteBody({
           context={deepField}
         />
       ) : null}
-      {focused ? (
+      {/* ORRERY LAB A: the focus reticle is FocusReticleLayer (pass 3). */}
+      {focused && deepField ? null : focused ? (
         <Circle
           cx={0}
           cy={0}

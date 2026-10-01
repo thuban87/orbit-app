@@ -28,6 +28,13 @@ import {
   BODY_FAR_TINT,
   BODY_VISUAL_MAX,
   BODY_VISUAL_MIN_RADIUS,
+  MOON_VISUAL_MAX,
+  MOON_VISUAL_MIN_RADIUS,
+  RETICLE_ARM_FRAC,
+  RETICLE_ARM_MAX,
+  RETICLE_ARM_MIN,
+  RETICLE_GAP_DP,
+  RETICLE_GAP_FRAC,
 } from "./deep-field-config";
 
 /** Role codes in `SwitchFx.roles` (index-aligned with `frame.bodies`). */
@@ -86,6 +93,70 @@ export function bodyDepthScale(far: number): number {
   "worklet";
   if (!(far > 0)) return 1;
   return 1 - BODY_FAR_SHRINK * Math.min(1, far / BODY_FAR_TINT);
+}
+
+/**
+ * PASS 3: the contact body's total local→screen scale, exactly as its root
+ * Group draws it (projection scale × visual scale × depth scale). `far` is
+ * the light map's far factor (absent → 1).
+ */
+export function orbitBodyScale(
+  projectionScale: number,
+  radius: number,
+  far: number,
+): number {
+  "worklet";
+  return (
+    projectionScale *
+    bodyVisualScale(radius * projectionScale) *
+    bodyDepthScale(far)
+  );
+}
+
+/** ORRERY LAB A (pass 2): presentation-only moon scale toward a legible
+ *  minimum drawn radius (hit radius stays the frame's ≥ 22 dp). */
+export function moonVisualScale(projected: number): number {
+  "worklet";
+  if (!(projected > 0)) return 1;
+  return Math.max(
+    1,
+    Math.min(MOON_VISUAL_MAX, MOON_VISUAL_MIN_RADIUS / projected),
+  );
+}
+
+/**
+ * PASS 3: which bodies are focused, as UI-thread data. Written from the JS
+ * render that receives the focus (not after the Canvas re-record), so the
+ * reticle, ring emphasis and body dim land with the focus itself.
+ *  - `keys`: focused contact/sun body keys (emphasis + dim exemption);
+ *  - `targets`: every key that gets a reticle (incl. a focused moon);
+ *  - `generation`: bumps on every change (restarts the lock-on).
+ */
+export interface FocusState {
+  keys: Record<string, boolean>;
+  targets: string[];
+  generation: number;
+}
+
+export const FOCUS_NONE: FocusState = { keys: {}, targets: [], generation: 0 };
+
+/** PASS 3 reticle box (screen dp) around a drawn disc of radius `drawn`. */
+export function reticleGeometry(drawn: number): { half: number; arm: number } {
+  "worklet";
+  const r = drawn > 0 ? drawn : 0;
+  const half = r + Math.max(RETICLE_GAP_DP, r * RETICLE_GAP_FRAC);
+  const arm = Math.max(
+    RETICLE_ARM_MIN,
+    Math.min(RETICLE_ARM_MAX, half * RETICLE_ARM_FRAC),
+  );
+  return { half, arm };
+}
+
+/** easeOutBack (overshoot k) on 0..1 — the reticle's "snap" onto the body. */
+export function easeOutBack(x: number, k: number): number {
+  "worklet";
+  const t = Math.max(0, Math.min(1, x)) - 1;
+  return 1 + (k + 1) * t * t * t + k * t * t;
 }
 
 function clampUnit(value: number): number {

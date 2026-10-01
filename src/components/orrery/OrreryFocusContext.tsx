@@ -1,6 +1,6 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText uses typography roles.
 import { type ReactNode, useState } from "react";
-import { StyleSheet } from "react-native";
+import { StyleSheet, useWindowDimensions } from "react-native";
 import Animated, {
   type SharedValue,
   useAnimatedStyle,
@@ -15,9 +15,20 @@ import {
 } from "@/logic/orrery-camera-logic";
 import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
 import { bodyKey } from "@/logic/orrery-frame";
+import { DETAIL_EXIT } from "@/logic/orrery-label-logic";
 import { SPACING } from "@/theme/tokens/spacing";
+import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { useDeepFieldEnabled } from "./lab/deep-field-mode";
-import { focusCardPlacement } from "./lab/focus-card";
+import {
+  focusCardPlacement,
+  focusCardRoom,
+  focusLabelBlock,
+} from "./lab/focus-card";
+
+/** ORRERY LAB A (pass 3): plate metrics mirrored from OrreryLabel (plain numbers). */
+const PLATE_LINE_HEIGHT = TYPOGRAPHY.label.lineHeight;
+const PLATE_PADDING = SPACING.xs;
+
 import { OrreryNotice } from "./OrreryFeedback";
 
 /** Lightweight identity follows the authoritative frame on the UI thread.
@@ -46,6 +57,10 @@ export function OrreryFocusContext({
 }) {
   const [height, setHeight] = useState(180);
   const deepFieldOn = useDeepFieldEnabled();
+  // ORRERY LAB A (pass 3): the card also clears the focused body's label
+  // plate (moons have none). Font scale is the same one the labels use.
+  const { fontScale } = useWindowDimensions();
+  const hasLabel = target.kind !== "satellite";
   const position = useAnimatedStyle(() => {
     const current = frame.value;
     const region = current ? usableCameraRect(current.viewport) : null;
@@ -59,23 +74,47 @@ export function OrreryFocusContext({
         ? bodyKey(item) === targetKey
         : item.kind !== "satellite" && item.id === target.id,
     );
-    if (!region || !body) return { opacity: 0 };
+    if (!current || !region || !body) return { opacity: 0 };
     const width = Math.min(280, region.width);
     const limit = Math.min(height, region.height / 2);
-    // ORRERY LAB A (pass 2): clear the drawn body + reticle; flip above the
-    // body, or cap the card height to the free room (it scrolls), instead of
-    // clamping it up over the focused body. Framing/usable rect untouched.
+    const left = Math.max(
+      region.x,
+      Math.min(region.x + region.width - width, body.x - width / 2),
+    );
+    // ORRERY LAB A (pass 2/3): clear the drawn body, reticle and label plate;
+    // flip above the body, or cap the card height to the free room (it
+    // scrolls), instead of clamping it up over the focused body. The room is
+    // bounded only by obstacles under the card's own x-span (pass 3).
+    // Framing/usable rect untouched.
     const placed = deepFieldOn
-      ? focusCardPlacement(region, body.y, body.radius, limit, SPACING.sm)
+      ? focusCardPlacement(
+          focusCardRoom(
+            current.viewport,
+            region,
+            left,
+            width,
+            body.y,
+            SPACING.sm,
+          ),
+          body.y,
+          body.radius,
+          limit,
+          SPACING.sm,
+          hasLabel
+            ? focusLabelBlock(
+                fontScale,
+                PLATE_LINE_HEIGHT,
+                PLATE_PADDING,
+                (current?.pose.zoom ?? 1) >= DETAIL_EXIT,
+              )
+            : undefined,
+        )
       : null;
     return {
       opacity: 1,
       width,
       maxHeight: placed ? placed.maxHeight : region.height / 2,
-      left: Math.max(
-        region.x,
-        Math.min(region.x + region.width - width, body.x - width / 2),
-      ),
+      left,
       top: placed
         ? placed.top
         : Math.max(
@@ -103,15 +142,35 @@ export function OrreryFocusContext({
         ? bodyKey(item) === targetKey
         : item.kind !== "satellite" && item.id === target.id,
     );
-    if (!body) return { maxHeight: region.height / 2 };
+    if (!current || !body) return { maxHeight: region.height / 2 };
     const limit = Math.min(height, region.height / 2);
+    const width = Math.min(280, region.width);
+    const left = Math.max(
+      region.x,
+      Math.min(region.x + region.width - width, body.x - width / 2),
+    );
     return {
       maxHeight: focusCardPlacement(
-        region,
+        focusCardRoom(
+          current.viewport,
+          region,
+          left,
+          width,
+          body.y,
+          SPACING.sm,
+        ),
         body.y,
         body.radius,
         limit,
         SPACING.sm,
+        hasLabel
+          ? focusLabelBlock(
+              fontScale,
+              PLATE_LINE_HEIGHT,
+              PLATE_PADDING,
+              (current?.pose.zoom ?? 1) >= DETAIL_EXIT,
+            )
+          : undefined,
       ).maxHeight,
     };
   });

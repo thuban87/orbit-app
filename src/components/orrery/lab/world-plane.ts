@@ -47,6 +47,9 @@ import { type AnimatedFrame, bodyKey } from "@/logic/orrery-frame";
 import type { StrokeStyle } from "@/logic/orrery-ring-logic";
 import {
   BEZEL_SPIN,
+  FOCUS_RING_ALPHA,
+  FOCUS_RING_DIM,
+  FOCUS_RING_WIDTH,
   GRID_ALPHA_INNER_DARK,
   GRID_ALPHA_INNER_LIGHT,
   GRID_ALPHA_OUTER_DARK,
@@ -100,6 +103,8 @@ import {
   SHADOW_WIDTH,
   TRAIL_ALPHA_DARK,
   TRAIL_ALPHA_LIGHT,
+  TRAIL_INNER_FLOOR,
+  TRAIL_INNER_REF,
   TRAIL_LEAVING_MS,
   TRAIL_MAX_ARC,
   TRAIL_MS,
@@ -157,6 +162,14 @@ export interface PlaneInput {
   now?: number;
   /** Pass 2: compiled RING_SKSL (null → plain-ink fallback, no ramps). */
   ringEffect?: SkRuntimeEffect | null;
+  /** Pass 3: focused body keys + 0..1 emphasis (focused ring lit along its
+   *  whole length, other rings dim). Absent → no emphasis. */
+  focus?: PlaneFocus;
+}
+
+export interface PlaneFocus {
+  keys: Readonly<Record<string, boolean>>;
+  mix: number;
 }
 
 /** Canonical status alpha factor (mirrors the pre-Lab ProjectedOrbitRing). */
@@ -425,11 +438,14 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
 
   // Index the frame once: key → body index (avoids O(N²) finds).
   const index: Record<string, number> = {};
+  const keys: string[] = [];
   let sunX = 0;
   let sunY = 0;
   for (let i = 0; i < frame.bodies.length; i++) {
     const b = frame.bodies[i];
-    index[bodyKey(b)] = i;
+    const k = bodyKey(b);
+    keys.push(k);
+    index[k] = i;
     if (b.kind === "sun" && b.opacity > 0) {
       const w = mapHomography(Hi, b.x, b.y);
       sunX = w.x;
@@ -437,6 +453,17 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
     }
   }
   const origin = mapHomography(H, 0, 0);
+  // Pass 3: bodies whose React components are mounted = the ring specs (built
+  // from the same resource commit as the body components). Entering bodies'
+  // frame geometry runs ahead of that commit on a large switch; drawing their
+  // shadows (or anything else) before their discs read as "shadow first".
+  const mounted: Record<string, boolean> = {};
+  let focusHit = false;
+  for (let r = 0; r < rings.length; r++) {
+    mounted[rings[r].key] = true;
+    if (input.focus?.keys[rings[r].key]) focusHit = true;
+  }
+  const focusMix = focusHit ? clamp01(input.focus?.mix ?? 0) : 0;
 
   // 1 · Sun-lit pool on the plane (additive glow / multiply ink wash): the
   // exact projected circle, gradient in the local affine frame at the sun.
@@ -497,6 +524,7 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
   for (let i = 0; shadowAlpha > 0.004 && i < frame.bodies.length; i++) {
     const b = frame.bodies[i];
     if (b.kind !== "contact" || b.opacity <= 0 || !b.visible) continue;
+    if (!mounted[keys[i]]) continue;
     const w = mapHomography(Hi, b.x, b.y);
     const dx = w.x - sunX;
     const dy = w.y - sunY;
@@ -566,7 +594,16 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
     if (drawOn <= 0) continue;
     const alpha = body.opacity * ringStatusAlpha(ring);
     const dashed = ringIsDashed(ring);
-    const hairColor = mixInk(ink.grid, ring.color, tint);
+    // Pass 3 focus emphasis: the focused ring's hairline moves to its full
+    // status ink (whole ring, same dash/width channel); the rest recede.
+    const lit = focusMix > 0 && !!input.focus?.keys[ring.key];
+    const litMix = lit ? focusMix : 0;
+    const dim = lit ? 1 : 1 - FOCUS_RING_DIM * focusMix;
+    const hairColor = mixInk(
+      mixInk(ink.grid, ring.color, tint),
+      ring.color,
+      litMix,
+    );
     const nearColor = mixInk(hairColor, ring.color, RING_NEAR_TINT);
     const far = mapHomography(H, -nearX * ringR, -nearY * ringR);
     const nearP = mapHomography(H, nearX * ringR, nearY * ringR);
@@ -609,8 +646,16 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
       );
     } else hair.setColor(withAlpha(hairColor, 1));
     // Width channel kept proportional (2/3/4 → 1 : 1.5 : 2), screen px.
-    hair.setStrokeWidth(ring.width * RING_HAIR_SCALE);
-    hair.setAlphaf(alpha * hairAlpha);
+    hair.setStrokeWidth(
+      ring.width *
+        (RING_HAIR_SCALE + (FOCUS_RING_WIDTH - RING_HAIR_SCALE) * litMix),
+    );
+    hair.setAlphaf(
+      Math.min(
+        1,
+        alpha * (hairAlpha + (FOCUS_RING_ALPHA - hairAlpha) * litMix) * dim,
+      ),
+    );
     canvas.drawPath(ringPoly, hair);
 
     // Body world position → its angle (0 = north, clockwise).
@@ -673,7 +718,7 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
           ),
         );
         segment.setStrokeWidth(ring.width * SEGMENT_SCALE);
-        segment.setAlphaf(alpha * segAlpha * depthA);
+        segment.setAlphaf(alpha * segAlpha * depthA * (1 - (1 - dim) * 0.6));
         canvas.drawPath(ringPoly, segment);
       }
     }
@@ -805,11 +850,22 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
       for (let k = pts.length - 2; k >= 0; k--) path.lineTo(pts[k].x, pts[k].y);
       path.setIsVolatile(true);
       const drawn = body.radius * bodyVisualScale(body.radius);
+      // Pass 3: inner rings are tightly packed around the sun; a full-width
+      // trail there smeared into a solid band. Thin + soften by ring size.
+      const inner = Math.max(
+        TRAIL_INNER_FLOOR,
+        Math.min(
+          1,
+          Math.hypot(body.x - origin.x, body.y - origin.y) /
+            Math.max(1, drawn * TRAIL_INNER_REF),
+        ),
+      );
       const amp =
         peak *
         body.opacity *
         Math.min(1, velocity * 1.4) *
-        (leaving ? 1.25 : 1);
+        (leaving ? 1.25 : 1) *
+        (0.45 + 0.55 * inner);
       trailPaint.setShader(
         Skia.Shader.MakeLinearGradient(
           { x: tail.x, y: tail.y },
@@ -823,7 +879,7 @@ export function drawWorldPlane(canvas: SkCanvas, input: PlaneInput): void {
           TILE_CLAMP,
         ),
       );
-      trailPaint.setStrokeWidth(drawn * TRAIL_WIDTH);
+      trailPaint.setStrokeWidth(drawn * TRAIL_WIDTH * inner);
       canvas.drawPath(path.build(), trailPaint);
     }
     trails.pts = next;

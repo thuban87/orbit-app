@@ -8,18 +8,11 @@
  *  - `BodyLightOverlay` (item 4): sun-facing terminator, limb darkening, rim
  *    light + atmosphere halo in the status hue, far-depth tint.
  *  - `SunCorona` (item 5 + switch flare of item 7): animated corona + bloom.
- *  - `FocusReticle` (item 6): accent targeting brackets, slowly rotating;
- *    static under live reduced motion.
+ *  (The focus reticle moved to `FocusReticleLayer` in pass 3.)
  */
-import { Circle, Group, Path, Rect, Shader } from "@shopify/react-native-skia";
-import { useEffect, useMemo } from "react";
-import {
-  Easing,
-  type SharedValue,
-  useDerivedValue,
-  useSharedValue,
-  withTiming,
-} from "react-native-reanimated";
+import { Circle, Rect, Shader } from "@shopify/react-native-skia";
+import { useMemo } from "react";
+import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 import type { BillboardPose } from "@/logic/orrery-frame";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { useOrreryClock } from "../orrery-clock-context";
@@ -43,16 +36,14 @@ import {
   CORONA_EXTENT,
   CORONA_SPEED,
   FLARE_GAIN,
-  RETICLE_ARM,
-  RETICLE_GAP,
-  RETICLE_LOCK_MS,
-  RETICLE_LOCK_SPREAD,
-  RETICLE_PING_REACH,
-  RETICLE_SPEED,
   SUN_GRANULE_SPEED,
 } from "./deep-field-config";
 import { type DeepFieldInk, tokenInk } from "./deep-field-ink";
-import { type BodyLightMap, bodyVisualScale } from "./deep-field-math";
+import {
+  type BodyLightMap,
+  bodyVisualScale,
+  type FocusState,
+} from "./deep-field-math";
 import { labEffect } from "./deep-field-shaders";
 
 /** Up-left key light when a body has no entry (e.g. unit harness). */
@@ -63,6 +54,10 @@ const AA_DP = 0.6;
 export interface DeepFieldBodyContext {
   ink: DeepFieldInk;
   light: SharedValue<BodyLightMap>;
+  /** Pass 3: 0..1 focus emphasis (unfocused bodies dim slightly). */
+  focusMix?: SharedValue<number>;
+  /** Pass 3: UI-thread focus state (which keys are focused). */
+  focus?: SharedValue<FocusState>;
 }
 
 export function BodyLightOverlay({
@@ -242,109 +237,5 @@ export function SunDisc({
     <Circle cx={0} cy={0} r={radius}>
       <Shader source={effect} uniforms={uniforms} />
     </Circle>
-  );
-}
-
-/** Four corner brackets around a square of half-size `h`, arm length `arm`. */
-function bracketPath(h: number, arm: number): string {
-  const corners = [
-    [-1, -1],
-    [1, -1],
-    [1, 1],
-    [-1, 1],
-  ];
-  return corners
-    .map(
-      ([sx, sy]) =>
-        `M ${sx * h} ${sy * (h - arm)} L ${sx * h} ${sy * h} L ${sx * (h - arm)} ${sy * h}`,
-    )
-    .join(" ");
-}
-
-/** Lock-on timeline: 0 → 1 brackets converge, 1 → LOCK_END the ping. */
-const LOCK_END = 1.7;
-
-export function FocusReticle({
-  radius,
-  reticleColor,
-  gap = RETICLE_GAP,
-}: {
-  radius: number;
-  /** The focus accent (passed through `focusColor`, never a status hue). */
-  reticleColor: string;
-  gap?: number;
-}) {
-  const clock = useOrreryClock();
-  const reducedMotion = useReducedMotionShared();
-  const h = radius + gap;
-  const path = useMemo(
-    () => bracketPath(h, Math.max(4, radius * RETICLE_ARM + 3)),
-    [h, radius],
-  );
-  // PASS 2 lock-on: when focus lands the brackets converge from wide and
-  // rotated onto the body, then a single ping ring leaves the body. Mount =
-  // focus landing (the reticle only exists while focused). Static (already
-  // locked, no ping) under live reduced motion. Single UI-thread timing — no
-  // React state per frame.
-  const lock = useSharedValue(0);
-  useEffect(() => {
-    lock.value = reducedMotion.value
-      ? LOCK_END
-      : withTiming(LOCK_END, {
-          duration: RETICLE_LOCK_MS,
-          easing: Easing.out(Easing.cubic),
-        });
-  }, [lock, reducedMotion]);
-  const transform = useDerivedValue(() => {
-    const still = !clock || reducedMotion.value;
-    const e = still ? 1 : Math.min(1, lock.value);
-    const spin = still ? 0 : (clock?.value ?? 0) * RETICLE_SPEED;
-    return [
-      { rotate: spin + (1 - e) * (Math.PI / 4) },
-      { scale: 1 + (1 - e) * RETICLE_LOCK_SPREAD },
-    ];
-  });
-  const bracketOpacity = useDerivedValue(() =>
-    reducedMotion.value ? 1 : 0.25 + 0.75 * Math.min(1, lock.value),
-  );
-  const pingR = useDerivedValue(() => {
-    const t = Math.max(0, Math.min(1, (lock.value - 1) / (LOCK_END - 1)));
-    return radius + 3 + t * radius * RETICLE_PING_REACH;
-  });
-  const pingOpacity = useDerivedValue(() => {
-    if (reducedMotion.value) return 0;
-    const t = (lock.value - 1) / (LOCK_END - 1);
-    return t <= 0 || t >= 1 ? 0 : (1 - t) * (1 - t) * 0.8;
-  });
-  return (
-    <Group>
-      <Group transform={transform} opacity={bracketOpacity}>
-        <Path
-          path={path}
-          color={reticleColor}
-          style="stroke"
-          strokeWidth={1.6}
-          strokeCap="round"
-        />
-      </Group>
-      <Circle
-        cx={0}
-        cy={0}
-        r={radius + 3}
-        color={reticleColor}
-        style="stroke"
-        strokeWidth={0.8}
-        opacity={0.55}
-      />
-      <Circle
-        cx={0}
-        cy={0}
-        r={pingR}
-        color={reticleColor}
-        style="stroke"
-        strokeWidth={1.4}
-        opacity={pingOpacity}
-      />
-    </Group>
   );
 }
