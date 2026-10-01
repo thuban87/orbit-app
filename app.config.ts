@@ -64,7 +64,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "orbit",
   // The expo-share-intent config plugin REQUIRES a scheme (Phase 10, CAP-01).
   // None was previously set; "orbit" is the app's deep-link scheme.
-  scheme: "orbit",
+  scheme: "orbitlabc",
   // Config-layer portrait lock (CLAUDE.md — the app is portrait-locked).
   orientation: "portrait",
   android: {
@@ -72,7 +72,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // Owner-confirmed Android application id (FND-01 checkpoint, plan 01-05).
     // Install-locked and STABLE: it does NOT track the display name (APP_NAME).
     // Changing it after the first install requires uninstall/reinstall.
-    package: "com.bwales.orbit",
+    package: "com.bwales.orbit.labc",
     predictiveBackGestureEnabled: false,
     // PII-at-rest mitigation (T-02-13, dossier cluster G — [DECIDED]). The
     // app-private SQLite file holds third-party notes; allowBackup=false keeps
@@ -90,7 +90,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       {
         action: "VIEW",
         category: ["BROWSABLE", "DEFAULT"],
-        data: { scheme: "orbit", host: "openrouter-auth" },
+        data: { scheme: "orbitlabc", host: "openrouter-auth" },
       },
     ],
   },
@@ -149,6 +149,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         // PBKDF2 and AES-256-GCM implementation. No sodium option is enabled:
         // the backup envelope uses RNQC's standard native primitives only.
         "react-native-quick-crypto",
+        // ORRERY LAB C: WebGPU (Dawn) canvas for the true-3D Orrery. The
+        // plugin only edits the iOS Xcode scheme; a no-op on Android.
+        "react-native-webgpu",
       ]),
     ];
 
