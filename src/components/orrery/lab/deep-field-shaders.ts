@@ -319,9 +319,6 @@ half4 main(float2 u) {
   float2 p = u * uR;
   float r = length(p);
   if (r < 0.0001) return half4(0.0);
-  float an = mod(atan(p.x, -p.y) + TAU, TAU);
-  if (uN > 0.5 && fract(an / TAU * uN) >= 0.5) return half4(0.0);
-  if (uReveal < TAU && an > uReveal) return half4(0.0);
   float3 q = float3(p, 1.0);
   float w = dot(uH2, q);
   float sx = dot(uH0, q) / w;
@@ -330,6 +327,12 @@ half4 main(float2 u) {
   float2 j = float2(dot(uH0.xy, d) - sx * dot(uH2.xy, d),
                     dot(uH1.xy, d) - sy * dot(uH2.xy, d)) / w;
   float dist = abs(r - uR) * length(j);
+  // Early out: most of the (conservatively wide) strip is outside both
+  // strokes — no trig there.
+  if (dist > max(uHairW, uSegW) + uAA) return half4(0.0);
+  float an = mod(atan(p.x, -p.y) + TAU, TAU);
+  if (uN > 0.5 && fract(an / TAU * uN) >= 0.5) return half4(0.0);
+  if (uReveal < TAU && an > uReveal) return half4(0.0);
   float hc = clamp((uHairW - dist) / uAA + 0.5, 0.0, 1.0);
   float t = clamp((dot(p, uNearDir) / uR + 1.0) * 0.5, 0.0, 1.0);
   half4 hair = mix(uInkFar, uInkNear, half(t)) * half(mix(uFarA, 1.0, t) * uHairA * hc);

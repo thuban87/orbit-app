@@ -187,7 +187,18 @@ export function OrreryCanvas({
 
   return (
     <GestureDetector gesture={gesture}>
-      <Canvas testID="orrery-canvas" style={{ width, height }}>
+      {/* ORRERY LAB A (camera perf pass): the Lab renderer draws an opaque
+          full-bleed sky, so its Canvas is `opaque` → RN-Skia uses a
+          SurfaceView instead of a TextureView. A TextureView frame must be
+          re-composited by HWUI on the main/render threads every present; on
+          the Pixel that capped camera motion at ~26 presents/s even when the
+          scene itself was cheap (SurfaceView: display rate). The legacy
+          renderer keeps the TextureView (unchanged A/B baseline). */}
+      <Canvas
+        testID="orrery-canvas"
+        opaque={!!backdrop}
+        style={{ width, height }}
+      >
         {content}
       </Canvas>
     </GestureDetector>
