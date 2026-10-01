@@ -159,8 +159,8 @@ const TOP_INSET_FADE_PX = 28;
 const MOON_INCLINATION = 0.5;
 /** Revolution speed of the focused parent's moons (rad/ms ≈ one turn / 21 s). */
 const MOON_SPEED = 0.0003;
-/** Moons read as bodies next to a hero-scaled parent (world radius ×, hits follow). */
-const MOON_HERO_SCALE = 1.7;
+/** Moon world radius as a fraction of its (hero-scaled) parent's; hits follow. */
+const MOON_PARENT_FRACTION = 0.4;
 /** Approximate OrreryFocusContext footprint (width 280; ~2 buttons + title). */
 const FOCUS_CARD_WIDTH = 290;
 const FOCUS_CARD_HEIGHT = 230;
@@ -459,7 +459,7 @@ export function OrreryWorld3D({
         (parentId === orbitParent.value ? moonClock.value * MOON_SPEED : 0);
       all.push({
         ...m,
-        radius: m.radius * MOON_HERO_SCALE,
+        radius: parent.radius * MOON_PARENT_FRACTION,
         x: parent.x + Math.cos(a) * off,
         y: parent.y + Math.sin(a) * off * Math.cos(MOON_INCLINATION),
         lift: Math.sin(a) * off * Math.sin(MOON_INCLINATION),

@@ -46,3 +46,29 @@ Targets: ≥45 overview — **met** (Inner 45.2, Dense 47.0). ≥40 close — **
 (Inner close 35.4, Dense near 33.6) with the phone at thermal status SEVERE; re-measure cool.
 
 Not done: dynamic resolution, label-mesh batching (one mesh per label), bloom (still none).
+
+## Checkpoint D.5 — lifecycle / memory (one pass, debug, thermal status 2)
+
+Sequence on Lab C Dense: launch → Orrery, then leave the tab (Digest) and return ×3, then Home/relaunch
+(background/foreground) ×3. Renderer log (`[lab-c] mount #N … external=`):
+
+| mount | trigger | Hermes `external` | heap |
+|---|---|---|---|
+| #1 | first open (after ~2 min of use in the previous process this was 881 MB at first mount, too) | 860 MB | 34 MB |
+| #2 | return to tab (after ~2 min viewing, incl. moon orbit) | 2243 MB | 168 MB |
+| #3 | return to tab | 2847 MB | 168 MB |
+| #4 | return to tab | 3258 MB | 168 MB |
+| #5 | foreground | 3696 MB | 159 MB |
+
+Every mount logged `renderer ready` (~2.0 s) and every unmount `loop stopped, GPU resources disposed`;
+no device-lost, no JS error. **`external` climbs ~400–600 MB per mount and also grows while the Orrery
+stays open** (#1→#2 spans 2 minutes of rendering). Not investigated in this checkpoint (time box spent on
+D.1/D.2). Hypotheses to test first, in order: (1) per-flush `ArrayBuffer`s from the body atlas / label
+rasterisation (`orrery-textures3d.ts` readPixels-style copies) that Hermes counts as external until a full
+GC — check whether `external` drops after a forced `gc()`; (2) DataTexture backing arrays retained by
+three's WebGPU backend after `dispose()` (renderer-side texture cache keyed per renderer instance);
+(3) the per-mount GPUDevice (`acquireOrreryDevice`) and its buffers if `releaseOrreryDevice` does not
+`destroy()`. 860 MB at the very first mount already suggests most of it is allocated before/at module load
+(prewarm device, star/plane/noise textures) or comes from photo decoding (40 SkImages) — needs a
+per-stage `external` log. **Open: real risk of OOM after many tab visits; must be resolved before any
+production decision.**

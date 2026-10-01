@@ -1,0 +1,13 @@
+10-01 18:55:17.523  5148  5242 I ReactNativeJS: [lab-c] mount #1 hermes heap=34MB allocated=27MB external=860MB gcs=423
+10-01 18:55:19.559  5148  5242 I ReactNativeJS: [lab-c] renderer ready #1 in 2037ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 18:57:08.308  5148  5242 I ReactNativeJS: [lab-c] unmount #1: loop stopped, GPU resources disposed
+10-01 18:57:15.229  5148  5242 I ReactNativeJS: [lab-c] mount #2 hermes heap=168MB allocated=34MB external=2243MB gcs=2257
+10-01 18:57:17.255  5148  5242 I ReactNativeJS: [lab-c] renderer ready #2 in 2028ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 18:57:17.550  5148  5242 I ReactNativeJS: [lab-c] unmount #2: loop stopped, GPU resources disposed
+10-01 18:57:23.413  5148  5242 I ReactNativeJS: [lab-c] mount #3 hermes heap=168MB allocated=39MB external=2847MB gcs=2744
+10-01 18:57:25.432  5148  5242 I ReactNativeJS: [lab-c] renderer ready #3 in 2023ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 18:57:26.768  5148  5242 I ReactNativeJS: [lab-c] unmount #3: loop stopped, GPU resources disposed
+10-01 18:57:32.657  5148  5242 I ReactNativeJS: [lab-c] mount #4 hermes heap=168MB allocated=42MB external=3258MB gcs=3251
+10-01 18:57:34.739  5148  5242 I ReactNativeJS: [lab-c] renderer ready #4 in 2107ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 18:57:45.018  5148  5242 I ReactNativeJS: [lab-c] unmount #4: loop stopped, GPU resources disposed
+10-01 18:57:52.126  5148  5242 I ReactNativeJS: [lab-c] mount #5 hermes heap=159MB allocated=44MB external=3696MB gcs=3933
