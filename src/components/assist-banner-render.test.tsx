@@ -255,7 +255,11 @@ describe("AssistBanner shell offset (38.6 review WR5-01)", () => {
     const root = render(NEWEST)[0];
     // Showing the banner does not reset the height its layout publishes.
     runEffects();
-    (root?.props.onLayout as (event: unknown) => void)({
+    const onLayout = root?.props.onLayout as
+      | ((event: unknown) => void)
+      | undefined;
+    expect(onLayout).toBeTypeOf("function");
+    onLayout?.({
       nativeEvent: { layout: { x: 0, y: 0, width: 393, height: 184 } },
     });
     expect(offset()).toBe(184);
