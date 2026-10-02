@@ -308,3 +308,30 @@ presets. Release `r3e`, Dense 120, `tools/r1-matrix.sh` on presets, `idleClock:0
   have no measurable cost. Bloom adds +4 ms GPU p50 at idle, the same hint as R2.
 - The final validation (release from HEAD, preset best) found no new cost signals and an
   empty crash buffer. Its frame counts are lifecycle evidence (§8), not timing.
+
+## 11. Tilt fix on the phone (2026-10-02)
+
+Full tables: `research/PHONE-PASS-RESULTS.md` §10. Pixel 6 Pro, release, 120 Hz pinned.
+Before = `ringPlaneDraw:0`. Figures are idle / pan fps.
+
+| Scene | Before | After |
+|---|---|---|
+| Dense 120, Home tilt | ≤ 3.4 | **67.7 / 58.4** |
+| Dense 120, max tilt | 2.4 / 2.6 | **66.4 / 57.9** |
+| Stress 400, Home tilt | 12.6 / 10.8 | **66.8 / 60.5** |
+| Stress 400, max tilt (pan) | 15.6 | **65.7** |
+| Big switch 400 ↔ Dense, Home tilt (out / in) | – / 6.9 | **58.1 / 63.1** |
+
+**How it is drawn:**
+- **Tilted plane:** one full-screen analytic ring field (`ringField`) draws every ring, wake
+  and trim. It needs an inverse homography, a radius LUT and a ring table, with analytic AA
+  from the Jacobian.
+- **Untilted plane:** the pre-fix circle-op pictures draw (hybrid).
+
+**Perfetto, best Dense idle:**
+- `eglSwapBuffers` 147 → 3.4 ms;
+- frames 66/12 s → 672/10 s;
+- main is now CPU-bound (~11 ms per frame of draw and worklets), no longer GPU-blocked.
+
+**Measurement note:** pin `min_refresh_rate` to 120 for perf runs (restore it afterwards).
+Adaptive 60/120 Hz flips the same scene between ~65 and ~105 fps.

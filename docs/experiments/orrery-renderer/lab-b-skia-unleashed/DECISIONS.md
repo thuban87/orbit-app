@@ -142,3 +142,14 @@ top still reads as a productivity app. The ugliest elements, in order:
 | **The tilted-ring cliff is not patched in the lab**; it is handed to V2 as a must-fix (analytic ovals or one ring shader) | It is a draw-strategy rewrite of the ring, wake and trim layers, not a phone-only bug. A one-line plain-saveLayer workaround was tried and did not help (DEAD-ENDS) | — (reverted A/B build) |
 | The 10-min soak was cut to 5 min, and the Everything soak was skipped | The phone battery fell from 30 % to 7 % on USB during the pass | — |
 | Perfetto analysis runs `trace_processor` on droid | This box's CPU (no AVX2) crashes the prebuilt | — |
+
+## Tilt fix (2026-10-02)
+
+| Decision | Why | Commit |
+|---|---|---|
+| Fix the tilted-ring cliff in the lab (owner-approved direction) | Phone P-1: 3–9 fps tilted | `b22b6ae4`, `19dae74b`, `7350b643`, `9aa7e725` |
+| The orbit layer draws while tilted as ONE full-screen analytic ring field; the per-ring screen-space ellipse routes are the fallback | Field: 58–68 fps tilted on Dense 120 and Stress 400. Per-ring routes: 16–31 fps (DEAD-ENDS) | `19dae74b` |
+| **Hybrid:** untilted, the pre-fix circle-op pictures draw | The field shades the whole disk area; the circle op is faster untilted | `9aa7e725` |
+| `homeTilt` stays ON | Tilted ≈ untilted on Dense 120 and Stress 400 (PHONE-PASS-RESULTS §10.5) | — |
+| Look deltas accepted as C-74 (cleaner dashes, comet = pre-fix mean, ≤ 2 rings composited per pixel, slightly stronger near-side rings at max tilt) | Visual A/B on phone and emulator | — |
+| Perf runs pin `min_refresh_rate` 120 | Adaptive refresh made untilted A/B rows unreliable | — |

@@ -66,6 +66,7 @@ harvests from it (see `HARVEST.md`).
 | R3 integration polish | `13c706ad` (presets, near-size clamp, immersive chrome, HUD rail), `1c339064` (crash fix: `moonShader` + layer pictures), `23bedb9c` (Home tilt lab-only), `883b84ed` (R3 report + evidence) |
 | Final validation | `adeb4576` (FINAL-VALIDATION + `evidence/13-final`), plus the doc-sync commit that follows it |
 | Phone pass (Pixel 6 Pro) | `25f82cdf` (evidence `12-phone` + SurfaceFlinger tooling), plus the results/doc commit that follows it |
+| Tilt fix (phone P-1) | `b22b6ae4` (per-ring screen-space ellipses, now the fallback), `19dae74b` (full-screen ring field), `7350b643` (field stroke width), `9aa7e725` (untilted hybrid + harness), docs `71a3d43f` + the results commit after it. Dense 120 tilted 3–9 → 58–68 fps (`research/PHONE-PASS-RESULTS.md` §10) |
 
 ## Run / build / test
 

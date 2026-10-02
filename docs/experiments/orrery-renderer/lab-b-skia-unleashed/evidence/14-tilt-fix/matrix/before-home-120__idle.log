@@ -1,0 +1,30 @@
+10-02 03:54:56.257  7419  7419 I Choreographer: Skipped 50 frames!  The application may be doing too much work on its main thread.
+10-02 03:54:56.686  7419  7419 I Choreographer: Skipped 50 frames!  The application may be doing too much work on its main thread.
+10-02 03:54:57.116  7419  7419 I Choreographer: Skipped 50 frames!  The application may be doing too much work on its main thread.
+10-02 03:54:57.547  7419  7419 I Choreographer: Skipped 51 frames!  The application may be doing too much work on its main thread.
+10-02 03:54:57.977  7419  7419 I Choreographer: Skipped 51 frames!  The application may be doing too much work on its main thread.
+10-02 03:54:58.447  7419  7500 I ReactNativeJS: [labb-probe] win=3100ms alloc=7/0.4/0.6/0.6 bodies=7/3.3/4.3/4.3 f.moons=7/0.4/0.7/0.7 f.sample=7/0.3/0.6/0.6 frame=7/2.2/3.8/3.8 labels=7/0.2/0.6/0.6 nebula=36/0.1/0.2/0.2 rings=36/1.9/4.6/5 trim=7/0.6/3.5/3.5 wakes=7/1.6/11.2/11.2
+10-02 03:54:58.525  7419  7500 I ReactNativeJS: [labb-probe] win=3013ms nebula=7/0.2/0.3/0.3 rings=7/5.6/12.3/12.3
+10-02 03:54:58.994  7419  7419 I Choreographer: Skipped 121 frames!  The application may be doing too much work on its main thread.
+10-02 03:54:59.363  7419  7419 I Choreographer: Skipped 43 frames!  The application may be doing too much work on its main thread.
+10-02 03:54:59.791  7419  7419 I Choreographer: Skipped 50 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:00.222  7419  7419 I Choreographer: Skipped 51 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:00.225  7419  7500 I ReactNativeJS: [labb-probe] win=3103ms bodies=1/6.7/6.7/6.7 labels=1/0.1/0.1/0.1 nebula=6/0.2/0.3/0.3 rings=6/3.6/5.6/5.6 trim=1/0.1/0.1/0.1 wakes=1/8.6/8.6/8.6
+10-02 03:55:00.653  7419  7419 I Choreographer: Skipped 51 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:01.082  7419  7419 I Choreographer: Skipped 50 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:01.513  7419  7419 I Choreographer: Skipped 51 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:01.941  7419  7419 I Choreographer: Skipped 50 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:02.372  7419  7419 I Choreographer: Skipped 51 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:02.802  7419  7419 I Choreographer: Skipped 51 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:03.232  7419  7419 I Choreographer: Skipped 50 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:03.234  7419  7500 I ReactNativeJS: [labb-probe] win=3010ms nebula=7/0.2/0.4/0.4 rings=7/3.7/5.6/5.6
+10-02 03:55:03.662  7419  7419 I Choreographer: Skipped 50 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:04.091  7419  7419 I Choreographer: Skipped 51 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:04.523  7419  7419 I Choreographer: Skipped 51 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:04.953  7419  7419 I Choreographer: Skipped 50 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:05.383  7419  7419 I Choreographer: Skipped 50 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:05.813  7419  7419 I Choreographer: Skipped 51 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:06.242  7419  7419 I Choreographer: Skipped 50 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:06.242  7419  7500 I ReactNativeJS: [labb-probe] win=3009ms nebula=7/0.2/0.3/0.3 rings=7/3.7/5.7/5.7
+10-02 03:55:06.674  7419  7419 I Choreographer: Skipped 51 frames!  The application may be doing too much work on its main thread.
+10-02 03:55:07.109  7419  7419 I Choreographer: Skipped 52 frames!  The application may be doing too much work on its main thread.

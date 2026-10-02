@@ -412,3 +412,34 @@ Mali-G78, 120 Hz.
 | **H-A3 / H-A4** projection | ≈ 11–13 µs per body on the phone's UI thread (about 3× the emulator), so ~30 ms of worklets per changed frame at 800. Typed arrays are now justified for 400+ |
 | **H-B2** idle clock | **Confirmed**: 0 presents and 0 changed pixels under reduced motion. It is the key power feature (a GPU-bound Orrery drains the battery even on USB) |
 | Legacy (production) | 3–5 fps at Dense 120 and an **ANR** at 400 (pre-existing; strengthens PORT and V2) |
+
+## Tilt fix (Pixel 6 Pro, 2026-10-02)
+
+**Rule for V2: never stroke geometry under a perspective matrix on mobile GPUs.**
+
+- **What fails:** a stroked circle, oval or path under a 3×3 perspective CTM falls off
+  Ganesh's analytic ops onto a generic path renderer. On Mali-G78 that took Dense 120 from
+  ~65 to 3–9 fps.
+- **Per-ring screen-space ellipses are not enough either** (31 fps):
+  - the circle op shades an octagon band about 8 % of the radius thick;
+  - the ellipse op shades the whole bounding box;
+  - path strokers cost CPU per ring per frame;
+  - a shader local matrix multiplies all of the above.
+- **What works:** draw a ring family as **one full-screen analytic shader**:
+  1. inverse homography per pixel;
+  2. radius LUT, then the nearest ring and its neighbour from a ring table (data textures);
+  3. coverage from the homography's Jacobian;
+  4. the same style maths per ring.
+
+  The cost is one screen of fragments whatever the ring count (`labb-ring-field.ts`,
+  `ringField`). Keep the circle-op draw for the untilted plane (hybrid).
+- **Planar circles map to exact ellipses** (conic from the adjugate,
+  `labb-plane-ellipse.ts`). Use them for single overlays (focus glow/lock, ripples, held ring,
+  shockwave) and for culling.
+- **Measure with the refresh rate pinned** (`min_refresh_rate` 120). Adaptive 60/120 Hz makes
+  untilted A/B rows swing ±30 %.
+
+| Item | Verdict |
+|---|---|
+| **H-C17** Home tilt | **Now viable**: Dense 120 tilted 58–68 fps vs untilted 58–68 fps; Stress 400 60–67 vs 68–74 |
+| **H-B3** homography geometry | Keep the world-space maths; replace the draw with the ring field |

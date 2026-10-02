@@ -1,0 +1,10 @@
+10-02 03:38:18.798 32372 32429 I ReactNativeJS: [labb-probe] win=3048ms alloc=1/0.5/0.5/0.5 bodies=1/2.5/2.5/2.5 f.moons=1/0.5/0.5/0.5 f.sample=1/0.4/0.4/0.4 frame=1/2/2/2 labels=1/0.5/0.5/0.5 nebula=15/0.1/0.2/0.2 rings=15/2.8/5.7/5.7 trim=1/0/0/0 wakes=1/10.4/10.4/10.4
+10-02 03:38:19.196 32372 32372 I Choreographer: Skipped 47 frames!  The application may be doing too much work on its main thread.
+10-02 03:38:21.652 32372 32372 I Choreographer: Skipped 52 frames!  The application may be doing too much work on its main thread.
+10-02 03:38:21.916 32372 32429 I ReactNativeJS: [labb-probe] win=3117ms alloc=5/0.4/0.6/0.6 bodies=5/4.5/6/6 f.moons=5/0.4/0.6/0.6 f.sample=5/0.4/0.5/0.5 frame=5/2.1/2.7/2.7 labels=5/0.4/1.1/1.1 nebula=16/0.1/0.2/0.2 rings=16/2.3/4.2/4.2 trim=5/0.2/0.8/0.8 wakes=5/4.4/11/11
+10-02 03:38:24.123 32372 32372 I Choreographer: Skipped 53 frames!  The application may be doing too much work on its main thread.
+10-02 03:38:25.067 32372 32429 I ReactNativeJS: [labb-probe] win=3152ms alloc=3/0.5/0.6/0.6 bodies=3/4/4.9/4.9 f.moons=3/0.5/0.6/0.6 f.sample=3/0.5/0.6/0.6 frame=3/2.1/2.4/2.4 labels=3/0.3/0.4/0.4 nebula=15/0.2/0.4/0.4 rings=15/3.9/14/14 trim=3/0.3/0.5/0.5 wakes=3/4.7/7.3/7.3
+10-02 03:38:26.199 32372 32372 I Choreographer: Skipped 54 frames!  The application may be doing too much work on its main thread.
+10-02 03:38:28.226 32372 32429 I ReactNativeJS: [labb-probe] win=3159ms alloc=3/1/2.5/2.5 bodies=3/3.2/4.2/4.2 f.moons=3/0.4/0.5/0.5 f.sample=3/0.4/0.5/0.5 frame=3/1.7/1.9/1.9 labels=3/0.1/0.1/0.1 nebula=14/0.1/0.3/0.3 rings=14/2.6/6/6 trim=3/0.2/0.4/0.4 wakes=3/7.3/8.8/8.8
+10-02 03:38:28.685 32372 32372 I Choreographer: Skipped 54 frames!  The application may be doing too much work on its main thread.
+10-02 03:38:31.260 32372 32429 I ReactNativeJS: [labb-probe] win=3033ms alloc=2/0.5/0.5/0.5 bodies=2/4.1/5.6/5.6 f.moons=2/0.4/0.4/0.4 f.sample=2/0.3/0.3/0.3 frame=2/2/2.4/2.4 labels=2/0.2/0.3/0.3 nebula=14/0.2/0.4/0.4 rings=14/3.2/8.1/8.1 trim=2/0.3/0.6/0.6 wakes=2/5.6/11.1/11.1

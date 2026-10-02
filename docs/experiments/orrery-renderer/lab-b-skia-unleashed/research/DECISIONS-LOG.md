@@ -696,4 +696,10 @@ Report: `research/R3-REPORT.md`. Evidence: `evidence/11-r3/`.
 - The orbit layer draws as ONE full-screen analytic ring field (`ringField`, default ON). The per-ring screen-space ellipse routes are kept as the fallback when that effect is unavailable (`ringField:0`), not as the default. Phone numbers are in PHONE-PASS-RESULTS §10, and the losing routes are in DEAD-ENDS (tilt fix).
 - The untilted per-ring fallback draws exactly as before the fix: an affine CTM plus the circle op, with no shader local matrix.
 - Stroke widths in the field are the pre-fix world widths, seen through the analytic radial screen scale. The comet is drawn as the pre-fix effective mean (C-74).
-- `homeTilt` default: **kept ON provisionally**. Dense 120 tilted 64.8 vs untilted 66.1 fps, same session. Stress 400 is still to be measured; if it fails the rule, flip the flag OFF.
+- `homeTilt` default: **kept ON**. Final matrix (PHONE-PASS-RESULTS §10, 120 Hz pinned), idle / pan fps:
+  - Dense 120: Home tilt 67.7 / 58.4 vs tilt 0 67.8 / 58.2.
+  - Stress 400: Home tilt 66.8 / 60.5 vs tilt 0 74.1 / 68.3.
+
+  Both are within the run-to-run noise of the refresh-rate cadence.
+- Hybrid (`9aa7e725`): when the plane is untilted, the pre-fix circle-op pictures draw, and the field draws only while the plane is tilted. Untilted, the field was slower (64.5 vs 97.8 fps in one same-session pair) because it shades every pixel inside the outermost ring.
+- Phone measurements now pin `min_refresh_rate` = 120 (and restore it afterwards). The adaptive 60/120 Hz switching made untilted rows swing ±30 %.

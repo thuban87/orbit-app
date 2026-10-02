@@ -228,7 +228,7 @@ trace_processor on droid; this box's CPU lacks AVX2, so the prebuilt crashes her
 
 | # | What | Scope | Status |
 |---|---|---|---|
-| P-1 | **Tilted-plane ring geometry is a Mali GPU cliff** (§1). It costs 100–350 ms GPU per frame at Dense and blocks the UI thread in `eglSwapBuffers` | Lab renderer (R2 Home tilt × WP-1.3 rings and wakes) | **Not fixed.** It is architectural and needs a different ring draw (§8). A one-line plain-saveLayer workaround was tried and did not help (DEAD-ENDS) |
+| P-1 | **Tilted-plane ring geometry is a Mali GPU cliff** (§1). It costs 100–350 ms GPU per frame at Dense and blocks the UI thread in `eglSwapBuffers` | Lab renderer (R2 Home tilt × WP-1.3 rings and wakes) | **Fixed 2026-10-02** (§10): the orbit layer draws as one full-screen analytic ring field while tilted. Dense 120 tilted runs at 58–68 fps (was 3–9) |
 | P-2 | **Legacy (production) renderer ANRs at 400+ bodies**: "Input dispatching timed out … Waited 5005ms for MotionEvent" during a pan at Stress 400. Main thread in deep native recursion inside Hermes (`anr-labb-summary.txt`). A second ANR came at 21:37 during the legacy-800 → lab changeover. At 120 it presents 3–5 fps | **Production** renderer (shared path; same class as the emulator's "unusable from ~120") | Not fixed here (production code, owner/PORT) |
 | P-3 | The **Stress 800 remount** after a deep link took > 30 s once, with a 101-s gap in the UI-thread probe (under thermal 2, swap, 7 % battery) | Lab harness path (VIEW intent → remount); the real app does not remount like this | Lead only |
 | P-4 | Harness: `sf-sampler` could read a dead canvas layer, and Choreographer "Skipped" lines from other processes polluted `skipped_max` | Tooling | **Fixed** (`25f82cdf` + the layer-id sort) |
@@ -305,68 +305,109 @@ trace_processor on droid; this box's CPU lacks AVX2, so the prebuilt crashes her
 | `shots/legacy-dense-idle-2fps.mp4` | The legacy renderer idling on Dense at ~2.3 fps |
 | `anr-labb-summary.txt` | The two ANR records + the main-thread stack head |
 
-## 10. Tilt fix (2026-10-02, P-1) — INTERIM: phone measurements incomplete
+## 10. Tilt fix (2026-10-02, P-1 fixed)
 
-Commits: `b22b6ae4` (per-ring screen-space ellipses), `19dae74b` (ring field), `7350b643`
-(field stroke width = pre-fix foreshortening). Evidence: `evidence/14-tilt-fix/`. Release
-arm64 on the Pixel 6 Pro, preset best, Dense 120, `idleClock:0`, SurfaceFlinger presents
-per 10 s idle window (`probe/summary.tsv`).
+**Commits:**
+- `b22b6ae4`: per-ring screen-space ellipses (now the fallback).
+- `19dae74b`: ring field.
+- `7350b643`: field stroke width uses the pre-fix foreshortening.
+- `9aa7e725`: hybrid (the untilted plane keeps the pre-fix draw).
 
-**Conditions were poor and are not comparable with §1–§2.** Battery was 30 → 20 % on
-500 mA USB and the phone was at thermal 1–2 for most of the session. Only same-session
-A/B rows are compared. The run stopped at 20 % battery. The owner then took the phone to a
-wall charger, and it had not come back when this section was written. So pan, Stress 400,
-max manual tilt and the big switch are **not yet measured on the phone**.
+**Docs:** `71a3d43f` and this section's commit.
 
-### 10.1 What fixed it
+**Evidence:** `evidence/14-tilt-fix/`:
+- `matrix/`: the final before/after matrix;
+- `switch/`, `perfetto/`, `phone/`: shots and the switch clip;
+- `probe/`: the exploration runs;
+- `emu/`: emulator look A/B;
+- `matrix-v6`, `matrix-v7-adaptive-hz`: superseded runs, kept for the refresh-rate finding below.
 
-| Route | Tilted (Home 32°) | Untilted | Verdict |
+**Conditions:**
+- release arm64, preset best, `idleClock:0`, opaque canvas;
+- SurfaceFlinger presents per window (`tools/tf-matrix.sh`);
+- thermal 1, battery 74 → 68 % after a wall charge;
+- **`min_refresh_rate` pinned to 120** for the final matrix (restored to `null` afterwards).
+
+Before = the same APK with `ringPlaneDraw:0`, which is the pre-fix draw. Max tilt is the pose
+deep link `tilt=1.0472` (60°), re-applied after every recentre.
+
+### 10.1 Before / after (presented fps, idle / pan)
+
+| System | Camera | Before (pre-fix) | **After** |
 |---|---|---|---|
-| Pre-fix (`ringPlaneDraw:0`): stroked world circles under the perspective CTM | **8.9** | 97.6 (thermal 0) / 67.2 (thermal 1) | cliff |
-| Per-ring projected ellipse paths, shader local matrix | 31.1 (thermal 0); 16.8 at thermal 1 | 35–44 | not enough (DEAD-ENDS) |
-| Per-ring analytic ovals (`ringOvalOp`) | 31.5 | — | not enough |
-| Per-ring, in-shader inverse (`ringShaderInv`) | 16.2 | 19.6 | worse |
-| **Ring field** (`ringField`, default): one full-screen analytic shader | **64.8** (thermal 2, 20 %) | **66.1** (same session) | **tilted ≈ untilted** |
+| Dense 120 | Home tilt 32° (Lab B best) | 3.4 pan (idle not captured: 47 frames) | **67.7 / 58.4** |
+| Dense 120 | Max manual tilt 60° | **2.4 / 2.6** | **66.4 / 57.9** |
+| Dense 120 | Tilt 0 | 77.8 / 65.2 | 67.8 / 58.2 (noise, see 10.3) |
+| Stress 400 | Home tilt | **12.6 / 10.8** | **66.8 / 60.5** |
+| Stress 400 | Max manual tilt | – / 15.6 | – / **65.7** (idle window not captured) |
+| Stress 400 | Tilt 0 | 104.8 / 75.9 | 74.1 / 68.3 (noise, see 10.3) |
+| Big switch, Stress 400 ↔ Dense, Home tilt (`switch/`) | out / in | not captured / **6.9** | **58.1 / 63.1** |
 
-- Same-session reference for the field rows: the pre-fix untilted draw ran at 67.2 at
-  thermal 1 (`v3-prefix-nt`). So the field holds untilted-level performance with the tilt on.
-- **Why untilted v4 (66) is below last night's 92–99:** it is device state, not a code
-  regression. The pre-fix untilted draw itself fell from 97.6 (thermal 0, battery 27 %) to
-  67.2 (thermal 1, battery 22 %) within this session (`prefixnotilt` vs `v3-prefix-nt`).
-  The field rows were taken at thermal 2 and 20 %.
-- **Still needed:** a back-to-back field-flat vs prefix-flat run on a cool, charged phone
-  (`tools/tf-matrix.sh`, `flat` rows).
-- **Perfetto, tilted, per-ring path route** (`perfetto/v2-fix-tilt-dense-idle.*`):
-  - GPU 99.4 %;
-  - ~34 ms of main-thread CPU per frame;
-  - `eglSwapBuffers` 24 ms.
+**Target met:** tilted is roughly equal to untilted, and at least 55–60 fps on Dense 120 and
+Stress 400 for idle, pan and switch.
 
-  That trace showed the per-ring routes are both fragment-bound and CPU-bound: the circle
-  op's octagon band, the ellipse op's bounding box, and path stroking per ring. A Perfetto
-  trace of the field is still to do.
+### 10.2 Perfetto, Lab B best, Dense idle (`perfetto/field-best-dense-idle.*`, 10 s)
 
-### 10.2 Correctness (emulator `-P 5039`, same scene, `freezeClock:1`, release x86_64)
+| | Pre-fix (§3) | After (ring field) |
+|---|---|---|
+| Canvas frames | 66 / 12 s | **672 / 10 s** |
+| `eglSwapBuffers` avg / max | 147 / 170 ms | **3.4 / 6.1 ms** |
+| `animation` (main draw) avg | 175 ms | 14.6 ms |
+| main Running | 16 % | 79 % (CPU-bound now, not GPU-blocked) |
+| GPU util | 99.7 % | 98.6 % |
 
-`evidence/14-tilt-fix/emu/`:
-- **Home tilt and max tilt** (`maxtilt-field-vs-prefix.jpg`): ring geometry, colours, far-side
-  fade, wakes and tethers match the pre-fix draw.
-- **Comets:** the flow comets match after the comet-mean fix (`19dae74b`; the pre-fix comet
-  phase was smeared across the stroke, C-74).
-- **Dashes:** now one clean tick each (C-74).
-- **Near side at max tilt:** rings read slightly stronger (C-74).
-- **Focus** (`focus-field-vs-prefix.jpg`): the glow and lock line look the same.
-- **Switch** (`switch-field-vs-prefix.jpg`): the field draws the trims and the shockwave
-  mid-switch. The prefix frames in this sheet were captured after settle (timing), so it is
-  not a side-by-side.
-- **Reduced motion:** 0 changed pixels over 3 s (`rm-static-a/b.png`).
-- **Tests:** ellipse parameters vs `projectWorldPoint` give < 1e-3 px error over 1 500
-  pose × radius cases (`labb-plane-ellipse.test.ts`). The ring-field encoding and LUT are in
-  `labb-ring-field.test.ts`.
-- **Phone shots:** the on-phone JPEGs taken so far are the Dense 120 untilted state
-  (`s4`, under thermal 2).
+The main thread no longer sleeps in `eglSwapBuffers`. The remaining frame cost is CPU on
+main (worklets plus Skia recording and replay), the same budget as the untilted lab.
 
-### 10.3 Default Home tilt (decision rule)
+### 10.3 Why "untilted" read 66 fps instead of last night's 92–99
 
-Dense 120 meets the rule on the measured row: tilted 64.8 ≈ untilted 66.1. **`homeTilt`
-stays ON provisionally.** Stress 400 is not measured yet. If Stress 400 tilted falls well
-below untilted, the rule says set `homeTilt` OFF.
+**This is not a code regression.** It comes from the phone's adaptive refresh rate and its
+power state:
+
+- **The display switches between 60 and 120 Hz.** Rows with SurfaceFlinger interval p50 =
+  16.6 ms were presented at 60 Hz. Rows at p50 8.3 ms ran at 120 Hz. Without the pin, the
+  same configuration flipped between them run to run:
+  - the field at Home tilt went 105 → 64.5 fps between two builds (`matrix-v6` vs
+    `matrix-v7-adaptive-hz`);
+  - a back-to-back isolation pair at Stress 400 untilted gave after 86.9 vs before 74.2
+    (`iso/`), the opposite way round from the matrix.
+
+  Even with `min_refresh_rate` = 120, cadence flips stay in the data (±30 % run to run).
+- **The 66-fps measurement from the first tilt-fix session (`probe/`)** was taken at thermal 2
+  and 20 % battery. In that session the pre-fix untilted draw itself fell from 97.6 to 67.2.
+- **By construction:** since `9aa7e725` the untilted plane draws exactly the pre-fix
+  pictures (circle op under the affine homography; the field draws nothing). The untilted
+  path is therefore the pre-fix code.
+
+The earlier non-hybrid field (v4–v6) was slower untilted (64.5 vs 97.8 fps in one same-session
+pair). That is why the hybrid exists.
+
+### 10.4 Correctness
+
+- **Phone shots** (`phone/sheet-after-vs-before.jpg`, `freezeClock:1`): Home tilt, max tilt
+  and focus on Ada match the pre-fix draw. At max tilt the near-side rings read stronger;
+  the pre-fix Ganesh perspective stroke rendered them dimmer (C-74).
+- **Reduced motion on the phone:** 0 changed pixels in 3 s (`phone/rm-static-a/b.png`).
+- **Switch clip** (`phone/switch-best-inner-to-dense-tilted.mp4`, `switch-frames.jpg`): a
+  deep-link remount into Dense on the tilted plane, not the choreographed switch. Rings,
+  dashes and colours are correct. The choreographed switch was measured by the harness
+  (10.1) and checked visually on the emulator (`emu/switch-field-vs-prefix.jpg`).
+- **Emulator A/B** (`emu/`):
+  - **Dashes, wakes, tethers, depth fade and focus glow/lock** match.
+  - **Flow comets** match after the comet-mean fix.
+  - **Dashes** are cleaner (one tick).
+- **Tests:**
+  - ellipse parameters vs `projectWorldPoint`: < 1e-3 px over 1 500 cases;
+  - the ring-field encoding and LUT;
+  - the tree contract (field rect, homography uniforms, hybrid).
+
+### 10.5 Default Home tilt (decision rule)
+
+Tilted holds untilted-level performance on Dense 120 and Stress 400:
+
+| | Home tilt (idle / pan) | Tilt 0 (idle / pan) |
+|---|---|---|
+| Dense 120 | 67.7 / 58.4 | 67.8 / 58.2 |
+| Stress 400 | 66.8 / 60.5 | 74.1 / 68.3 |
+
+**`homeTilt` stays ON** (DECISIONS-LOG).
