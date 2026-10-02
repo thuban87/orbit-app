@@ -1,0 +1,42 @@
+10-01 20:11:32.346 18308 18340 I ReactNativeJS: [lab-c] adapter vendor=arm arch=valhall device=Mali-G78 desc=Mali-G78: v1.r54p2-01eac0.fb6fbead05afc1c718b19a8978ff5bfe 54.2.0 fallback=false in 22ms
+10-01 20:11:32.361 18308 18340 I ReactNativeJS: [lab-c] device created in 15ms
+10-01 20:11:38.506 18308 18340 I ReactNativeJS: [lab-c] render #1
+10-01 20:11:38.547 18308 18340 I ReactNativeJS: [lab-c] gesture rebuilt #1
+10-01 20:11:38.560 18308 18340 I ReactNativeJS: [lab-c] reducedMotion=false
+10-01 20:11:38.603 18308 18340 I ReactNativeJS: [lab-c] mount #1 hermes heap=21MB allocated=17MB external=140MB gcs=44
+10-01 20:11:38.603 18308 18340 I ReactNativeJS: [lab-c] stage context=ok cancelled=false
+10-01 20:11:38.603 18308 18340 I ReactNativeJS: [lab-c] stage canvas 411x725 -> 822x1450
+10-01 20:11:38.603 18308 18340 I ReactNativeJS: [lab-c] stage renderer constructed
+10-01 20:11:39.194 18308 18340 I ReactNativeJS: [lab-c] renderer ready #1 in 591ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 20:11:39.796 18308 18340 I ReactNativeJS: [lab-c] bitmap-probe OK 256x256 read=12.8ms decode=578.0ms upload=11.6ms
+10-01 20:11:39.849 18308 18340 I ReactNativeJS: [lab-c] gesture rebuilt #2
+10-01 20:11:44.107 18308 18340 I ReactNativeJS: [lab-c] gesture rebuilt #3
+10-01 20:11:44.117 18308 18340 I ReactNativeJS: [lab-c] gesture rebuilt #4
+10-01 20:11:44.158 18308 18340 I ReactNativeJS: [lab-c] render #11
+10-01 20:11:44.212 18308 18340 I ReactNativeJS: [lab-c] frames=257 avgDt=19.4ms fps=51.4 p95Dt=17.7 maxDt=590.2 jsRenderAvg=12.18ms p95=12.49 calls=14 tris=101271 photos=40 photoAvg=56.2ms packets=6 bodies=121 visibleContacts=46 drawnSpheres=82 presentAvg=0.40ms drawAvg=10.26ms
+10-01 20:11:44.212 18308 18340 I ReactNativeJS: [lab-c] mem #1 external=297MB heap=21MB gcs=121 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=15.4 paragraphs=132 created=132 disposed=0
+10-01 20:11:45.643 18308 18340 I ReactNativeJS: [lab-c] gesture rebuilt #5
+10-01 20:11:45.655 18308 18340 I ReactNativeJS: [lab-c] gesture rebuilt #6
+10-01 20:11:45.683 18308 18340 I ReactNativeJS: [lab-c] gesture rebuilt #7
+10-01 20:11:45.743 18308 18340 I ReactNativeJS: [lab-c] gesture rebuilt #8
+10-01 20:11:45.799 18308 18340 I ReactNativeJS: [lab-c] switch gen=4 retained=10 leaving=110 entering=7 intensity=0.85 reduced=false
+10-01 20:11:45.848 18308 18340 I ReactNativeJS: [lab-c] render #21
+10-01 20:11:49.234 18308 18340 I ReactNativeJS: [lab-c] frames=290 avgDt=17.3ms fps=57.8 p95Dt=20.6 maxDt=103.7 jsRenderAvg=8.72ms p95=12.46 calls=14 tris=25741 photos=47 photoAvg=53.8ms packets=259 bodies=18 visibleContacts=8 drawnSpheres=17 presentAvg=0.41ms drawAvg=7.79ms
+10-01 20:11:49.234 18308 18340 I ReactNativeJS: [lab-c] mem #1 external=184MB heap=25MB gcs=137 texs=9 geos=6 labelsLive=1 labelRasters=1 atlasFlushes=4 gcPerS=3.2 paragraphs=24 created=139 disposed=115
+10-01 20:11:53.711 18308 18340 I ReactNativeJS: [lab-c] tilt preset 1: tilt=1 yaw=0.7
+10-01 20:11:54.253 18308 18340 I ReactNativeJS: [lab-c] frames=289 avgDt=17.4ms fps=57.6 p95Dt=24.4 maxDt=48.1 jsRenderAvg=10.47ms p95=13.17 calls=17 tris=21099 photos=47 photoAvg=53.8ms packets=64 bodies=18 visibleContacts=5 drawnSpheres=13 presentAvg=0.41ms drawAvg=9.76ms
+10-01 20:11:54.253 18308 18340 I ReactNativeJS: [lab-c] mem #1 external=185MB heap=25MB gcs=144 texs=13 geos=6 labelsLive=5 labelRasters=5 atlasFlushes=4 gcPerS=1.4 paragraphs=24 created=139 disposed=115
+10-01 20:11:59.278 18308 18340 I ReactNativeJS: [lab-c] frames=300 avgDt=16.7ms fps=59.7 p95Dt=17.4 maxDt=25.5 jsRenderAvg=10.37ms p95=12.64 calls=17 tris=21099 photos=47 photoAvg=53.8ms packets=12 bodies=18 visibleContacts=5 drawnSpheres=13 presentAvg=0.35ms drawAvg=9.69ms
+10-01 20:11:59.278 18308 18340 I ReactNativeJS: [lab-c] mem #1 external=184MB heap=25MB gcs=151 texs=13 geos=6 labelsLive=5 labelRasters=5 atlasFlushes=4 gcPerS=1.4 paragraphs=24 created=139 disposed=115
+10-01 20:12:04.275 18308 18340 I ReactNativeJS: [lab-c] frames=299 avgDt=16.7ms fps=59.8 p95Dt=17.3 maxDt=24.9 jsRenderAvg=10.41ms p95=12.79 calls=17 tris=21099 photos=47 photoAvg=53.8ms packets=0 bodies=18 visibleContacts=5 drawnSpheres=13 presentAvg=0.35ms drawAvg=9.71ms
+10-01 20:12:04.275 18308 18340 I ReactNativeJS: [lab-c] mem #1 external=185MB heap=25MB gcs=157 texs=13 geos=6 labelsLive=5 labelRasters=5 atlasFlushes=4 gcPerS=1.2 paragraphs=24 created=139 disposed=115
+10-01 20:12:05.583 18308 18340 I ReactNativeJS: [lab-c] tilt preset 2: tilt=0.9 yaw=2.2
+10-01 20:12:09.279 18308 18340 I ReactNativeJS: [lab-c] frames=296 avgDt=16.9ms fps=59.2 p95Dt=19.3 maxDt=31.6 jsRenderAvg=9.99ms p95=12.86 calls=14 tris=22255 photos=47 photoAvg=53.8ms packets=86 bodies=18 visibleContacts=4 drawnSpheres=14 presentAvg=0.69ms drawAvg=9.33ms
+10-01 20:12:09.279 18308 18340 I ReactNativeJS: [lab-c] mem #1 external=185MB heap=25MB gcs=164 texs=14 geos=6 labelsLive=6 labelRasters=6 atlasFlushes=4 gcPerS=1.4 paragraphs=24 created=139 disposed=115
+10-01 20:12:14.289 18308 18340 I ReactNativeJS: [lab-c] frames=297 avgDt=16.9ms fps=59.3 p95Dt=17.4 maxDt=32.8 jsRenderAvg=10.49ms p95=13.51 calls=14 tris=22255 photos=47 photoAvg=53.8ms packets=0 bodies=18 visibleContacts=4 drawnSpheres=14 presentAvg=0.37ms drawAvg=9.77ms
+10-01 20:12:14.289 18308 18340 I ReactNativeJS: [lab-c] mem #1 external=185MB heap=25MB gcs=171 texs=14 geos=6 labelsLive=6 labelRasters=6 atlasFlushes=4 gcPerS=1.4 paragraphs=24 created=139 disposed=115
+10-01 20:12:17.577 18308 18340 I ReactNativeJS: [lab-c] tilt preset 3: tilt=1.2 yaw=3.8
+10-01 20:12:18.631 18308 18340 I ReactNativeJS: [lab-c] tilt preset 0: tilt=1.08 yaw=0
+10-01 20:12:19.312 18308 18340 I ReactNativeJS: [lab-c] frames=284 avgDt=17.7ms fps=56.6 p95Dt=24.6 maxDt=33.9 jsRenderAvg=10.32ms p95=13.50 calls=14 tris=25741 photos=47 photoAvg=53.8ms packets=173 bodies=18 visibleContacts=8 drawnSpheres=17 presentAvg=0.42ms drawAvg=9.65ms
+10-01 20:12:19.312 18308 18340 I ReactNativeJS: [lab-c] mem #1 external=186MB heap=25MB gcs=178 texs=18 geos=6 labelsLive=10 labelRasters=10 atlasFlushes=4 gcPerS=1.4 paragraphs=24 created=139 disposed=115
+10-01 20:12:19.727 18308 18340 I ReactNativeJS: [lab-c] unmount #1: loop stopped, GPU resources disposed external=134MB

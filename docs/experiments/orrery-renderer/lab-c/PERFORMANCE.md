@@ -179,8 +179,17 @@ source. Logs: `evidence/08-final/f2-release-perf-session-log.txt`, `f2-release-g
 | Dense orbit-swung (preset 3) | 56.7 | 17.6 / 25.3 ms | 10.4 ms (14.1) | 8.7 ms | 0.79 ms | 145k |
 | **System switch** Dense → Inner (110 leaving, 7 entering, 10 retained) | 56.3, then 54.8 | 17.8–18.2 / 24.6–26.0 ms, max 54 ms | 10.8–10.9 ms (13.5–14.3) | 9.2–9.9 ms | 0.39–0.42 ms | 65k → 26k |
 | Inner (17 + star) overview | 59.5–59.8 | 16.7–16.8 / 17.4 ms | 10.0–10.6 ms (12.5–12.8) | 9.4–9.8 ms | 0.41–0.42 ms | 26k |
-| Inner near (preset 1) | 59.1–59.2 | 16.9 / 17.6–20.3 ms | 10.3–11.0 ms (12.6–13.4) | 9.7–10.4 ms | 0.47–0.49 ms | 26k |
-| Inner close (preset 2) | 58.6–59.7 | 16.8–17.1 / 17.4–23.0 ms | 10.7 ms (12.9–13.4) | 10.0 ms | 0.43–0.44 ms | 26k |
+| Inner near (preset 1, ×2.2) — re-measured, see note | 57.6–59.8 | 16.7–17.4 / 17.3–24.4 ms | 10.4–10.5 ms (12.6–13.2) | 9.7–9.8 ms | 0.35–0.41 ms | 21k |
+| Inner close (preset 2, ×3.4) — re-measured | 59.2–59.3 | 16.9 / 17.4–19.3 ms | 10.0–10.5 ms (12.9–13.5) | 9.3–9.8 ms | 0.37–0.69 ms | 22k |
+
+**Inner near/close re-measure (lab-tool bug found during evidence review).** In the first session the Inner
+"near/close" presets actually zoomed **out**: the lab badge captured its home zoom once (on Dense) and kept
+multiplying that stale value after the switch (`evidence/08-final/03b-*`, `04b-*` first versions showed a tiny
+system). Fixed in 4a82ae85 (re-capture on leaving preset 0), release rebuilt and re-installed, and the two Inner
+rows above re-measured in a second short session (20:11–20:12, thermal status 1 → 1, log
+`evidence/08-final/f2b-release-inner-presets-session-log.txt`); screenshots replaced. The Dense rows were not
+affected (home captured on Dense). Earlier checkpoints' near/close rows taken after a System switch within the
+same mount may carry the same stale base; not re-checked.
 
 **gfxinfo** (`dumpsys gfxinfo com.bwales.orbit.labc`, reset before each state) covers **only the UI/RenderThread
 (HWUI)**, not the WebGPU canvas: the 3D frames are presented by Dawn straight to their own surface from the JS
