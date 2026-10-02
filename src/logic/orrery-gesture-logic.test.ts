@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createOrreryGestures } from "@/components/orrery/use-orrery-camera";
 import {
   clampCameraPose,
+  MAX_TILT,
   projectWorldPoint,
   unprojectToWorldPlane,
 } from "./orrery-camera-logic";
@@ -211,7 +212,8 @@ describe("camera input ownership", () => {
       viewport,
       extent,
     );
-    expect(tilted.tilt).toBeCloseTo(Math.PI / 3);
+    // Lab C: the tilt ceiling is MAX_TILT (~76°, near-horizon 3D views), not π/3.
+    expect(tilted.tilt).toBeCloseTo(MAX_TILT);
     expect(
       cameraGestureStep(
         tilted,

@@ -2,10 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   anchorCameraPose,
   clampCameraPose,
+  coreRadius,
   deriveFocalDistance,
   deriveHomePose,
   frameBodies,
   HOME_CAMERA,
+  LAB_CORE_FRACTION,
+  LAB_CORE_TILT,
+  LAB_HOME_TILT,
   MAX_TILT,
   MAX_ZOOM,
   MIN_READABLE_RADIUS,
@@ -89,7 +93,12 @@ describe("bounded invertible inspection camera", () => {
     );
     expect(Object.values(invalid).every(Number.isFinite)).toBe(true);
   });
-  it("keeps a positive perspective denominator and round trips all legal extremes within 1e-6 world units", () => {
+  // Lab C true-3D camera: zoom is a DOLLY (focal = LAB_FOCAL_PX / zoom), so at
+  // close dolly + steep tilt some far points sit at/behind the near plane. The
+  // contract is now: the scale stays positive and finite (clamped at 1/0.02,
+  // never NaN/negative), and every point in front of the renderer's near-cull
+  // plane (orrery-frame-lite NEAR_CULL_FRACTION = 0.12) round-trips exactly.
+  it("keeps a positive, bounded perspective scale and round trips every point in front of the near plane", () => {
     for (const extent of [30, 300, 5000])
       for (const tilt of [0, MAX_TILT / 2, MAX_TILT])
         for (const yaw of [0, Math.PI / 2, Math.PI, Math.PI * 2 - 1e-8])
@@ -107,14 +116,22 @@ describe("bounded invertible inspection camera", () => {
               ]) {
                 const scale = perspectiveScale(point, pose);
                 expect(scale).toBeGreaterThan(0);
-                expect(scale).toBeLessThanOrEqual(1 / 0.55 + 1e-9);
-                const recovered = unprojectToWorldPlane(
-                  projectWorldPoint(point, pose, viewport),
-                  pose,
-                  viewport,
-                );
+                expect(Number.isFinite(scale)).toBe(true);
+                expect(scale).toBeLessThanOrEqual(1 / 0.02 + 1e-9);
+                if (scale >= 1 / 0.12) continue; // culled by the renderer
+                const screen = projectWorldPoint(point, pose, viewport);
+                // Near-horizon band: unprojection deliberately clamps sky /
+                // grazing rays to a far plane point (no throw), so only rays
+                // clear of that guard (denominator ≥ 5% focal) must round trip.
+                const focal = pose.focalDistance ?? 1;
+                const sy = (screen.y - viewport.height / 2) / pose.zoom;
+                const tilt = pose.tilt ?? 0;
+                if (focal * Math.cos(tilt) + sy * Math.sin(tilt) < focal * 0.05)
+                  continue;
+                const recovered = unprojectToWorldPlane(screen, pose, viewport);
                 expect(
                   Math.hypot(recovered.x - point.x, recovered.y - point.y),
+                  JSON.stringify({ extent, tilt, yaw, zoom, pan, point }),
                 ).toBeLessThanOrEqual(1e-6);
               }
             }
@@ -132,29 +149,53 @@ describe("bounded invertible inspection camera", () => {
     );
     expect(deriveFocalDistance(5000)).toBeGreaterThan(deriveFocalDistance(300));
   });
-  it("Home fits complete rings until exact readability floor, with zero/one/many finite and no count branch", () => {
-    expect(deriveHomePose([], viewport)).toMatchObject({
-      x: 0,
-      y: 0,
-      zoom: 1,
-      tilt: 0,
-      yaw: 0,
-    });
-    for (const count of [1, 6, 10, 100]) {
+  // Lab C Home: a tilted strategy-map pose (LAB_HOME_TILT) that never drops
+  // below the readability floor for normal Systems; Systems with more than
+  // LAB_CORE_MIN_CONTACTS frame their populated core at LAB_CORE_TILT instead
+  // (Checkpoint D.1 — the one deliberate count branch, legibility then comes
+  // from the renderer's minimum on-screen body size).
+  it("Home is a tilted strategy map above the readability floor; dense Systems frame their core", () => {
+    const empty = deriveHomePose([], viewport)!;
+    expect(empty).toMatchObject({ x: 0, y: 0, tilt: LAB_HOME_TILT, yaw: 0 });
+    expect(Number.isFinite(empty.zoom)).toBe(true);
+    for (const count of [1, 6, 10, 24]) {
       const world = Array.from({ length: count }, (_, i) =>
         body(0, -58 - i * 34, 16, i + 1),
       );
       const pose = deriveHomePose(world, viewport)!;
       expect(pose.zoom * 16).toBeGreaterThanOrEqual(MIN_READABLE_RADIUS);
-      expect(pose).toMatchObject({ x: 0, y: 0, tilt: 0, yaw: 0 });
+      expect(pose).toMatchObject({ x: 0, y: 0, tilt: LAB_HOME_TILT, yaw: 0 });
+    }
+    const dense = Array.from({ length: 100 }, (_, i) =>
+      body(0, -58 - i * 34, 16, i + 1),
+    );
+    const densePose = deriveHomePose(dense, viewport)!;
+    expect(densePose).toMatchObject({
+      x: 0,
+      y: 0,
+      tilt: LAB_CORE_TILT,
+      yaw: 0,
+    });
+    const core = coreRadius(dense, LAB_CORE_FRACTION);
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      const p = projectWorldPoint(
+        { x: Math.cos(a) * core, y: Math.sin(a) * core },
+        densePose,
+        viewport,
+      );
+      expect(p.x).toBeGreaterThanOrEqual(0);
+      expect(p.x).toBeLessThanOrEqual(viewport.width);
+      expect(p.y).toBeGreaterThanOrEqual(0);
+      expect(p.y).toBeLessThanOrEqual(viewport.height);
     }
     const floor = MIN_READABLE_RADIUS / 16;
     const radius = 200 / floor - 16;
     for (const delta of [-1e-6, 0, 1e-6]) {
       const pose = deriveHomePose([body(0, -radius - delta)], viewport)!;
-      expect(pose.zoom).toBeCloseTo(
-        Math.max(floor, 200 / (radius + delta + 16)),
-        10,
+      // The top-down fit is the floor; the tilted Home may only dolly IN.
+      expect(pose.zoom).toBeGreaterThanOrEqual(
+        Math.max(floor, 200 / (radius + delta + 16)) - 1e-9,
       );
     }
   });

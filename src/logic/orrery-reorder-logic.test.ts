@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createOrreryGestures } from "@/components/orrery/use-orrery-camera";
-import { clampCameraPose, projectFrame } from "./orrery-camera-logic";
+import { clampCameraPose, MAX_TILT, projectFrame } from "./orrery-camera-logic";
 import { HOLD_MS, initialInput } from "./orrery-gesture-logic";
 import type { ReorderDrag } from "./orrery-reorder-logic";
 import {
@@ -204,7 +204,9 @@ describe("registered hold recognizer", () => {
     const tilted = projectFrame(
       world,
       clampCameraPose(
-        { x: 0, y: 0, zoom: 0.25, tilt: Math.PI / 3, yaw: 0 },
+        // Lab C: the dolly camera puts the horizon far higher than the old
+        // telephoto pinhole; at MAX_TILT the top of the canvas (y = 0) is sky.
+        { x: 0, y: 0, zoom: 0.25, tilt: MAX_TILT, yaw: 0 },
         300,
       ),
       { width: 400, height: 700 },

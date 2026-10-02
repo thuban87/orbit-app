@@ -97,14 +97,12 @@ describe("bounded camera recovery", () => {
     }
   });
   it("north follows the shortest wrap and preserves every other axis", () => {
-    const start = {
-      ...home,
-      x: 30,
-      y: 20,
-      zoom: 2,
-      tilt: 0.5,
-      yaw: 2 * Math.PI - 0.2,
-    };
+    // Lab C: focalDistance is a function of zoom (dolly camera), so build the
+    // start pose through the clamp instead of spreading home's zoom-1 focal.
+    const start = clampCameraPose(
+      { ...home, x: 30, y: 20, zoom: 2, tilt: 0.5, yaw: 2 * Math.PI - 0.2 },
+      extent,
+    );
     const target = northTarget(start);
     expect(target).toEqual({ ...start, yaw: 0 });
     const plan = planRecovery(start, target, extent, false);
@@ -128,6 +126,18 @@ describe("bounded camera recovery", () => {
         true,
       ),
     ).toEqual(home);
+    // Lab C orbit (one-finger yaw+tilt) coast is also off under Reduced Motion.
+    expect(
+      inertiaTarget(
+        home,
+        "orbit",
+        99999,
+        -99999,
+        extent,
+        { width: 400, height: 600 },
+        true,
+      ),
+    ).toEqual(home);
     for (const kind of ["pan", "yaw"] as const) {
       const next = inertiaTarget(
         home,
@@ -138,8 +148,14 @@ describe("bounded camera recovery", () => {
         { width: 400, height: 600 },
         false,
       );
-      expect(Math.abs(next.x)).toBeLessThanOrEqual(18);
-      expect(Math.abs(next.y)).toBeLessThanOrEqual(18);
+      // Lab C: with the tilted perspective Home a screen point is not a world
+      // unit, so the bound is ON SCREEN: the world point under the old pivot
+      // moves at most PAN_COAST_POINTS (18 px) per axis.
+      const vp = { width: 400, height: 600 };
+      const before = projectWorldPoint({ x: home.x, y: home.y }, home, vp);
+      const after = projectWorldPoint({ x: home.x, y: home.y }, next, vp);
+      expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(18 + 1e-6);
+      expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(18 + 1e-6);
       expect(
         Math.min(next.yaw ?? 0, 2 * Math.PI - (next.yaw ?? 0)),
       ).toBeLessThanOrEqual(0.08 + 1e-12);
