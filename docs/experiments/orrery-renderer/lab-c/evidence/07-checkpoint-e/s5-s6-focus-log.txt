@@ -1,0 +1,6 @@
+ LOG  [lab-c] reducedMotion=false
+ LOG  [lab-c] mount #1 hermes heap=29MB allocated=23MB external=26MB gcs=62
+ LOG  [lab-c] focus ids=145 zoom=3.367 tilt=1.08 usable={"x":0,"y":64,"width":411.4285583496094,"height":408.2857360839844} room={"x":0,"y":64,"width":411.4285583496094,"height":365.2685687255859}
+ LOG  [lab-c] reducedMotion=false
+ LOG  [lab-c] mount #1 hermes heap=29MB allocated=24MB external=26MB gcs=56
+ LOG  [lab-c] focus ids=3 zoom=1.778 tilt=0.85 usable={"x":0,"y":64,"width":411.4285583496094,"height":408.2857360839844} room={"x":0,"y":64,"width":411.4285583496094,"height":365.2685687255859}

@@ -9,7 +9,6 @@ import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import {
-  cameraCenterRect,
   type OrrerySatelliteTarget,
   type ProjectedFrame,
   usableCameraRect,
@@ -18,6 +17,7 @@ import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
 import { bodyKey } from "@/logic/orrery-frame";
 import { SPACING } from "@/theme/tokens/spacing";
 import { OrreryNotice } from "./OrreryFeedback";
+import { focusCardPlacement } from "./orrery-focus-card-layout";
 
 /** Lightweight identity follows the authoritative frame on the UI thread.
  * Optional relationship content belongs to the qualified parent (D-11).
@@ -53,35 +53,14 @@ export function OrreryFocusContext({
           bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
         : item.kind !== "satellite" && item.id === target.id,
     );
-    if (!region || !body) return { opacity: 0 };
-    const room = current ? cameraCenterRect(current.viewport) : null;
-    const roomBottom = room ? room.y + room.height : 0;
-    const width = Math.min(280, region.width);
-    const limit = Math.min(height, region.height / 2);
-    return {
-      opacity: 1,
-      width,
-      maxHeight: region.height / 2,
-      left: Math.max(
-        region.x,
-        Math.min(region.x + region.width - width, body.x - width / 2),
-      ),
-      top: Math.max(
-        region.y,
-        Math.min(
-          // Lab C: the card may hang down to the canvas bottom (camera rect);
-          // equals the usable bottom when no camera rect is measured.
-          Math.max(region.y + region.height, roomBottom) - limit,
-          // Lab C: below a parent's whole moon system when it has one.
-          body.y +
-            Math.max(
-              body.radius,
-              (body as { systemRadius?: number }).systemRadius ?? 0,
-            ) +
-            SPACING.sm,
-        ),
-      ),
-    };
+    if (!region || !body || !current) return { opacity: 0 };
+    const placed = focusCardPlacement(
+      current.viewport,
+      body as typeof body & { systemRadius?: number },
+      height,
+    );
+    if (!placed) return { opacity: 0 };
+    return { opacity: 1, ...placed };
   });
   const scrollBounds = useAnimatedStyle(() => {
     const current = frame.value;

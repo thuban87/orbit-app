@@ -98,6 +98,7 @@ import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
+import { focusCardPlacement } from "./orrery-focus-card-layout";
 import { projectAnimatedFrameLite } from "./orrery-frame-lite";
 import { OrreryTextCache } from "./orrery-text-cache";
 import {
@@ -752,27 +753,19 @@ export function OrreryWorld3D({
       const fb = at === undefined ? undefined : current.bodies[at];
       if (fb?.visible)
         exclusions.push({
-          x: fb.x - FOCUS_CARD_WIDTH / 2,
-          // Same placement rule as OrreryFocusContext (incl. its clamp to the
-          // usable rect), so the reserved rect is where the card really is.
-          y: (() => {
-            const region = usableCameraRect(current.viewport);
-            const want =
-              fb.y +
-              Math.max(
-                fb.radius,
-                (fb as { systemRadius?: number }).systemRadius ?? 0,
-              ) +
-              8;
-            if (!region) return want;
-            const limit = Math.min(FOCUS_CARD_HEIGHT, region.height / 2);
-            const room = cameraCenterRect(current.viewport);
-            const bottom = Math.max(
-              region.y + region.height,
-              room ? room.y + room.height : 0,
-            );
-            return Math.max(region.y, Math.min(bottom - limit, want));
-          })(),
+          x:
+            focusCardPlacement(
+              current.viewport,
+              fb as typeof fb & { systemRadius?: number },
+              FOCUS_CARD_HEIGHT,
+            )?.left ?? fb.x - FOCUS_CARD_WIDTH / 2,
+          // Same placement as OrreryFocusContext (docked in Lab C).
+          y:
+            focusCardPlacement(
+              current.viewport,
+              fb as typeof fb & { systemRadius?: number },
+              FOCUS_CARD_HEIGHT,
+            )?.top ?? fb.y + fb.radius,
           width: FOCUS_CARD_WIDTH,
           height: FOCUS_CARD_HEIGHT,
         });

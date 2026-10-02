@@ -294,3 +294,21 @@ session; close-range targets were not met under that condition.
 - Camera flights: focus recovery uses the shared camera motion's reduced path (100 ms linear); pan/yaw coast
   is disabled by the same shared value. Not separately measured on device (adb cannot fling reliably).
 - Switch screenshots `s4-reduced-switch-mid.png` / `-after.png` (Dense → Lab C Inner).
+
+## 2026-10-01 — Checkpoint E.2b: focus framing after orchestrator review (docked card)
+
+- Diagnosis from the focus log (`s5-s6-focus-log.txt`): the usable rect ends at the top of the side-controls
+  column (`usable.height ≈ 408` of a ~720 px canvas), and the camera rect is even shorter, so "system above
+  the card inside the usable rect" could only ever be small. (The canvas-width bound landed already in
+  97d94229; the E.2 note calling it "next commit" is wrong.)
+- **Lab C focus card docks at the canvas bottom**, left of the controls column
+  (`orrery-focus-card-layout.ts`, shared by `OrreryFocusContext` and the label exclusion in `OrreryWorld3D`).
+  The product rule (card hangs under the body, clamped to the usable rect) still applies when no camera rect
+  is measured, i.e. outside Lab C. Trade-off: if the user pans the focused body down, the docked card can
+  cover it (focus-lost still fires off-screen only).
+- **Focus dolly backed off**: the system is centred between the selector row and the docked card, radius =
+  min(0.7 × half that height, 0.30 × canvas width with moons / 0.15 without). Result
+  (`s6-dense-focus-moon-docked-card.png`): Chloé + both moons large and centred, neighbours, the star and
+  orbit arcs stay in view, no empty void under the card. Over-zoomed s5 (Oskar, before) kept as contrast.
+- Still open: moons read slightly faded next to the parent (small 10–14 px disc, face shading toward the
+  terminator); not tuned further in the time box.

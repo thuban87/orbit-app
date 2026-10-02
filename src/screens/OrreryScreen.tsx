@@ -44,6 +44,7 @@ import {
 } from "@/components/orrery/OrreryWorld3D";
 import { companionAction } from "@/components/orrery/orrery-companion-logic";
 import { systemEmptyCopy } from "@/components/orrery/orrery-controls-logic";
+import { FOCUS_CARD_BOTTOM_GAP } from "@/components/orrery/orrery-focus-card-layout";
 import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
 import {
   closeBeforeAction,
@@ -132,7 +133,10 @@ const LAB_C_TRUE_3D = true;
  */
 const FOCUS_CARD_RESERVE = 215;
 const FOCUS_STACK_MARGIN = 12;
-const FOCUS_SYSTEM_FILL = 0.9;
+const FOCUS_SYSTEM_FILL = 0.7;
+/** Max focused-system radius as a fraction of canvas width (moons / no moons). */
+const FOCUS_MOON_SYSTEM_WIDTH = 0.3;
+const FOCUS_BODY_WIDTH = 0.15;
 const World = LAB_C_TRUE_3D ? OrreryWorld3D : OrreryWorld;
 
 const acknowledgeReorder = () => {
@@ -788,22 +792,29 @@ export function OrreryScreen() {
         const systemWorld = LAB_C_TRUE_3D
           ? orreryFocusSystemRadius(bodies[0].radius, hasMoons)
           : bodies[0].radius;
-        // Vertical room: below the selector row (usable top) down to the
-        // canvas bottom (camera rect, above the tab bar) — the side controls
-        // column only blocks the right edge, not the centred stack (E.2).
-        const room = cameraCenterRect(viewport) ?? usable;
-        const stackHeight = room.y + room.height - usable.y;
-        const card = Math.min(FOCUS_CARD_RESERVE, stackHeight / 2);
-        const free = stackHeight - card - FOCUS_STACK_MARGIN * 2;
+        // The card docks at the canvas bottom in Lab C (orrery-focus-card-
+        // layout); centre the system in the region between the selector row
+        // and the card, sized so it reads large but neighbours/orbit arcs stay
+        // in view (orchestrator review E.2b: no over-zoom, no void).
+        const cardTop =
+          viewport.height -
+          FOCUS_CARD_BOTTOM_GAP -
+          Math.min(FOCUS_CARD_RESERVE, usable.height / 2);
+        const regionTop = usable.y + FOCUS_STACK_MARGIN;
+        const regionBottom = cardTop - FOCUS_STACK_MARGIN;
         const systemPx = Math.max(
           12,
-          Math.min(free / 2, room.width * 0.42) * FOCUS_SYSTEM_FILL,
+          Math.min(
+            ((regionBottom - regionTop) / 2) * FOCUS_SYSTEM_FILL,
+            viewport.width *
+              (hasMoons ? FOCUS_MOON_SYSTEM_WIDTH : FOCUS_BODY_WIDTH),
+          ),
         );
-        const stackTop =
-          usable.y + (stackHeight - (2 * systemPx + SPACING.sm + card)) / 2;
         const want = {
           x: usable.x + usable.width / 2,
-          y: LAB_C_TRUE_3D ? stackTop + systemPx : usable.y + usable.height / 2,
+          y: LAB_C_TRUE_3D
+            ? (regionTop + regionBottom) / 2
+            : usable.y + usable.height / 2,
         };
         target = clampCameraPose(
           { ...target, x: bodies[0].x, y: bodies[0].y },
