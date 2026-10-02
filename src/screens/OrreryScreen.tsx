@@ -558,7 +558,7 @@ export function OrreryScreen() {
   // falls back to "Unavailable System". Resolve it from the loaded catalog.
   useEffect(() => {
     const live = useSystemStore.getState();
-    if (live.requested.ref.kind !== "custom") return;
+    if (live.requested.ref?.kind !== "custom") return;
     const entry = systemCatalog.find((row) => row.id === live.requested.id);
     if (entry && entry.name !== live.requested.name)
       useSystemStore.setState({
