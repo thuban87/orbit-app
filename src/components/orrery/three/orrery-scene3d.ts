@@ -141,6 +141,21 @@ const FLARE_POOL = 24;
 /** Ring density fade: full strength at ≥ this on-screen orbit spacing (px). */
 const RING_MIN_SPACING_PX = 20;
 const RING_DENSITY_FLOOR = 0.05;
+/**
+ * Checkpoint E.4 — light theme profiles. The 3D cues (additive glow, fog to the
+ * background, dim ambient) were tuned for dark space; on a light background
+ * they vanish or wash out. Light mode is detected from the background token's
+ * luminance and only changes how the same tokens are used:
+ */
+/** Ring floor in light mode (rings are thin status-token strokes on a pale ground). */
+const LIGHT_RING_DENSITY_FLOOR = 0.35;
+/** Fog: reaches far later, and fades toward a slightly darker tint, not white. */
+const LIGHT_FOG_FAR_SCALE = 2.6;
+const LIGHT_FOG_TINT = 0.12;
+/** Ambient in light mode (bodies otherwise read as dark smudges). */
+const LIGHT_AMBIENT_INTENSITY = 0.75;
+/** Plane grid opacity in light mode (normal blending, textSecondary ink). */
+const LIGHT_PLANE_OPACITY = 0.35;
 export const KIND_CONTACT = 0;
 export const KIND_SUN = 1;
 export const KIND_SATELLITE = 2;
@@ -305,6 +320,7 @@ export class OrreryScene3D {
   private sun: THREE.Mesh;
   private keyLight: THREE.PointLight;
   private ambient: THREE.AmbientLight;
+  private lightMode = false;
 
   // faces (atlas discs)
   private atlas = new BodyAtlas();
@@ -370,6 +386,7 @@ export class OrreryScene3D {
   });
   private corona: THREE.Sprite;
   private ringFadeNear = uniform(1);
+  private planeOpacity = uniform(0.25);
   private ringFadeFar = uniform(2);
   private polarisMat = new THREE.SpriteNodeMaterial({
     transparent: true,
@@ -708,7 +725,7 @@ export class OrreryScene3D {
     this.scene.add(this.stars);
     // Pattern baked once into a texture (was atan + fract per fragment).
     this.planeMat.colorNode = materialColor;
-    this.planeMat.opacityNode = texture(this.planeTex).a.mul(0.25);
+    this.planeMat.opacityNode = texture(this.planeTex).a.mul(this.planeOpacity);
     this.planeMat.blending = THREE.AdditiveBlending;
     this.planeMat.fog = false;
     this.plane = new THREE.Mesh(
@@ -795,7 +812,37 @@ export class OrreryScene3D {
       .multiplyScalar(MOON_EMISSIVE);
     // autoClear is off (two passes), so the background is the clear colour.
     this.renderer.setClearColor(color(colors.background), 1);
-    this.fog.color.copy(color(colors.background));
+    const bg = color(colors.background);
+    const light = 0.2126 * bg.r + 0.7152 * bg.g + 0.0722 * bg.b > 0.5;
+    this.lightMode = light;
+    this.fog.color
+      .copy(bg)
+      .lerp(color(colors.textSecondary), light ? LIGHT_FOG_TINT : 0);
+    this.ambient.intensity = light
+      ? LIGHT_AMBIENT_INTENSITY
+      : AMBIENT_INTENSITY;
+    // Additive light disappears on a pale ground: glow/corona/flare/plane
+    // switch to normal alpha blending in light mode (same tokens).
+    const blend = light ? THREE.NormalBlending : THREE.AdditiveBlending;
+    for (const m of [
+      this.glowMat,
+      this.coronaMat,
+      this.flareMat,
+      this.planeMat,
+    ]) {
+      if (m.blending !== blend) {
+        m.blending = blend;
+        m.needsUpdate = true;
+      }
+    }
+    // Faces are identity: never fogged in light mode (fog there = white-out).
+    const faceMat = this.faces?.material as
+      | (THREE.Material & { fog: boolean })
+      | undefined;
+    if (faceMat && faceMat.fog !== !light) {
+      faceMat.fog = !light;
+      faceMat.needsUpdate = true;
+    }
     this.keyLight.color.copy(
       color(colors.starPalette[0] ?? colors.textPrimary),
     );
@@ -803,7 +850,10 @@ export class OrreryScene3D {
     this.polarisMat.color.copy(color(colors.textPrimary));
     this.focusMat.color.copy(color(colors.accent));
     this.flareMat.color.copy(color(colors.accent));
-    this.planeMat.color.copy(color(colors.accent));
+    this.planeMat.color.copy(
+      color(light ? colors.textSecondary : colors.accent),
+    );
+    this.planeOpacity.value = light ? LIGHT_PLANE_OPACITY : 0.25;
   }
 
   setFontProvider(fontProvider: SkTypefaceFontProvider | null) {
@@ -932,7 +982,11 @@ export class OrreryScene3D {
     this.starTime.value = reducedMotion ? 0 : timeMs;
     // Depth haze toward the background token: the far rim reads hazier.
     this.fog.near = dolly * FOG_NEAR_FRACTION;
-    this.fog.far = dolly + FOG_FAR_EXTENTS * Math.max(1, packet.extent);
+    this.fog.far =
+      dolly +
+      FOG_FAR_EXTENTS *
+        Math.max(1, packet.extent) *
+        (this.lightMode ? LIGHT_FOG_FAR_SCALE : 1);
     this.ringFadeNear.value = dolly;
     this.ringFadeFar.value = dolly + 1.2 * Math.max(1, packet.extent);
     this.plane.scale.setScalar(PLANE_DISC_EXTENTS * Math.max(1, packet.extent));
@@ -969,7 +1023,10 @@ export class OrreryScene3D {
     // D.1: squared ramp — packed orbits (3 px apart at Dense Home) drop to a
     // faint texture so the bodies, not the strokes, carry the overview.
     const ringRamp = Math.min(1, spacingPx / RING_MIN_SPACING_PX);
-    const ringDensity = Math.max(RING_DENSITY_FLOOR, ringRamp * ringRamp);
+    const ringDensity = Math.max(
+      this.lightMode ? LIGHT_RING_DENSITY_FLOOR : RING_DENSITY_FLOOR,
+      ringRamp * ringRamp,
+    );
     for (let i = 0; i < n; i++) {
       const o = i * BODY_STRIDE;
       const wx = bodies[o];

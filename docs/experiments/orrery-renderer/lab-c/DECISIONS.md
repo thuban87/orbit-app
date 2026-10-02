@@ -312,3 +312,19 @@ session; close-range targets were not met under that condition.
   orbit arcs stay in view, no empty void under the card. Over-zoomed s5 (Oskar, before) kept as contrast.
 - Still open: moons read slightly faded next to the parent (small 10–14 px disc, face shading toward the
   terminator); not tuned further in the time box.
+
+## 2026-10-01 — Checkpoint E.4: light theme profiles
+
+- Before (`s7-galaxy-light-overview.png`, `s7-galaxy-light-focus.png`, `s7-standard-light-*.png`): rings and
+  plane grid invisible at overview, fog lerped far bodies to grey ghosts, sun glow (additive) vanished, near
+  bodies dark smudges. The focus view was already readable (rings, faces, card, labels).
+- Fix (`OrreryScene3D.applyColors`, all via existing tokens; light mode = background luminance > 0.5):
+  fog tint = background lerped 12% toward `textSecondary` and reaching 2.6× farther; ambient 0.22 → 0.75;
+  glow / corona / capture flare / plane switch from additive to normal blending; plane grid ink
+  `textSecondary` at 0.35 instead of `accent` 0.25; ring density floor 0.05 → 0.35; faces never fogged.
+- After (`s8-galaxy-light-overview-after.png`, `s8-galaxy-light-focus-after.png`): ring field and plane read,
+  far bodies keep colour, the star has a visible warm core + halo, focus view unchanged-good.
+- **Compromises / still weak:** at the Dense overview the body spheres still read dark (their fill tokens are
+  status colours lit from one side; faces are ~10 px there); a thin outline instead of glow was not tried.
+  Standard-light was only shot before the fix (same code path as galaxy-light; not re-shot in the time box).
+  Theme restored to Galaxy / Dark after both sessions.
