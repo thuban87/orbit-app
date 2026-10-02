@@ -153,3 +153,10 @@ the time box; suspects unchanged: three's renderer-side WeakMaps/backends keyed 
 Reanimated-held JS callbacks). Mitigation in the same commit: `OrreryScene3D.dispose()` now drops the
 atlas pixels, every DataTexture's `image`, label texts, infos and the last packet, so a retained scene
 costs bytes. Re-measured in E.2's session (see below).
+
+**E.1 re-measure (session 2, `evidence/07-checkpoint-e/s2-focus-moon-mount-log.txt`), with the dispose-time
+buffer release:** post-unmount forced-gc floor 73 → 145 MB (+72 per mount), i.e. unchanged. So the
+remaining per-mount growth is **not** the scene's CPU buffers; the mitigation stays (harmless) but the
+retainer is still unidentified. At idle the GC rate settles to ~2.6–3.0 /s after ~40 s open (7 /s in the
+first half-minute while photos/atlas settle). fps at Dense overview 52–56 steady, 31–41 in the first 5 s after
+a mount (debug build, JS-thread rAF, thermal status 0 throughout).
