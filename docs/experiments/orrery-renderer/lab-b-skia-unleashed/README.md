@@ -8,13 +8,23 @@ discovery came first. Every effect is sorted into one of four buckets: worth shi
 simplifying, beautiful but too costly, or failed. Every production compromise is written
 down.
 
-**Status (2026-10-01).** M1, M2, R1 (performance and legibility), R2 (art direction and
-hero experiments), R3 (integration polish, presets) and a final validation run on a release
-build are complete, all on the **desktop emulator only**. One thing is still open:
+**Status (2026-10-01).** Everything is complete:
 
-- **Physical Pixel phone pass — pending, the Pixel is in use by Lab A.** Lab A held the phone
-  for the whole lab, so every performance number in this package is *emulator-relative*. The
-  script is ready: `research/PHONE-PASS-SCRIPT.md`.
+- M1 and M2;
+- R1 (performance and legibility);
+- R2 (art direction and hero experiments);
+- R3 (integration polish, presets);
+- a final validation run on a release build (emulator);
+- the **Pixel 6 Pro phone pass** (release, arm64; `research/PHONE-PASS-RESULTS.md`).
+
+**The phone pass overturns the main performance verdict.** Lab B best runs at **3–9 fps** at
+Dense 120 on the Pixel. The cause is the R2 tilted Home: the orbit rings and wakes are
+stroked under a perspective matrix, which costs 100–350 ms of GPU per frame on Mali-G78 and
+blocks the UI thread. With the tilt off, the same effects run at **92–99 fps**.
+
+The tilt idea is still worth keeping, but V2 must draw the rings differently (analytic
+ellipses or one ring shader). Every other number in this package before §9 of
+`PERFORMANCE.md` is emulator-relative.
 
 **Branch.** `experiment/orrery-skia-unleashed`. Worktree:
 `/home/bwales/projects/orbit-orrery-lab-b`. Base: `34920925`. Package:
@@ -28,13 +38,13 @@ harvests from it (see `HARVEST.md`).
 | `OWNER-REVIEW.md` | **Every owner decision**, in plain language, with a recommendation, a short code and the image to look at. |
 | `RECOMMENDATIONS.md` | Best and worst experiments, what V2 should steal, the carry-forward/reject list, and "one more day". |
 | `HARVEST.md` | Every successful idea: verdict, value, readiness, location, commit, cost, evidence, what to preserve. It includes **shared-code fixes that help the current production Orrery today**. |
-| `PERFORMANCE.md` | The envelope (12 → 940 bodies), bottlenecks and risks. Emulator-relative only. |
+| `PERFORMANCE.md` | The envelope (12 → 940 bodies), bottlenecks and risks. Emulator-relative, except §9 (the Pixel phone pass). |
 | `ARCHITECTURE.md` / `IMPLEMENTATION.md` | How the renderer is built and where everything lives. |
 | `VISUAL-DESIGN.md` / `INTERACTIONS.md` | The look and the motion/camera/focus/switch behaviour. |
 | `DECISIONS.md` / `DEAD-ENDS.md` | The chronological story and the rejected ideas. |
 | `PRODUCTIONIZATION.md` | What shipping any of this would take. |
 | `ASSET-MANIFEST.md` | Every added asset (16 test portraits, all procedural otherwise). |
-| `research/` | Raw working logs: 01–03 research, DECISIONS-LOG, COMPROMISES-LOG (C-01…C-73), DEAD-ENDS-LOG, PERF-LOG, M1-CRITIQUE, SWITCH-STALL-INVESTIGATION, R1-REPORT, R2-REPORT, R3-REPORT, FINAL-VALIDATION, PHONE-PASS-SCRIPT. These are the source of truth the package summarises. |
+| `research/` | Raw working logs: 01–03 research, DECISIONS-LOG, COMPROMISES-LOG (C-01…C-73), DEAD-ENDS-LOG, PERF-LOG, M1-CRITIQUE, SWITCH-STALL-INVESTIGATION, R1-REPORT, R2-REPORT, R3-REPORT, FINAL-VALIDATION, PHONE-PASS-SCRIPT, PHONE-PASS-RESULTS. These are the source of truth the package summarises. |
 | `RUNBOOK-LAB-B.md`, `AGENT-RULES.md` | How to build, run and test. Rules for every agent. |
 
 ## Key commits (chronological)
@@ -55,6 +65,7 @@ harvests from it (see `HARVEST.md`).
 | Research package | `cc30d7fc` |
 | R3 integration polish | `13c706ad` (presets, near-size clamp, immersive chrome, HUD rail), `1c339064` (crash fix: `moonShader` + layer pictures), `23bedb9c` (Home tilt lab-only), `883b84ed` (R3 report + evidence) |
 | Final validation | `adeb4576` (FINAL-VALIDATION + `evidence/13-final`), plus the doc-sync commit that follows it |
+| Phone pass (Pixel 6 Pro) | `25f82cdf` (evidence `12-phone` + SurfaceFlinger tooling), plus the results/doc commit that follows it |
 
 ## Run / build / test
 
@@ -97,8 +108,8 @@ Follow `RUNBOOK-LAB-B.md` **exactly**, and read `AGENT-RULES.md` first. In short
 ## Evidence
 
 The evidence lives in `evidence/00-baseline` … `evidence/11-r3` and `evidence/13-final`,
-about 323 MB, mostly emulator captures at 1280×2856 (`evidence/12-phone/` is reserved for
-the phone pass).
+about 323 MB, mostly emulator captures at 1280×2856. `evidence/12-phone/` (47 MB) holds the
+Pixel 6 Pro pass: the matrix, Perfetto traces (gzipped), the soak and phone screenshots.
 
 - **Best single images:**
   - `evidence/10-r2/before-after-overview.jpg` and `evidence/10-r2/06-final/02-overview-dense.jpg` (the look);
@@ -158,13 +169,47 @@ were driven through the `recover` path.
 - **New bug, pre-existing on `main`, not fixed here:** after a cold start, the System
   selector reads "Unavailable System" when the last System is a custom one.
 
-## PLACEHOLDER — Pixel phone pass (pending — Pixel in use by Lab A)
+## Pixel phone pass (2026-10-01)
 
-> **Status: PENDING — the Pixel is in use by Lab A.** Script: `research/PHONE-PASS-SCRIPT.md`.
-> It needs arm64 builds, the local adb server (5037) **only after Lab A is done**, Perfetto,
-> framestats, SurfaceFlinger latency, meminfo and a 10-min thermal/battery soak.
->
-> Results go in `evidence/12-phone/` and in `PERFORMANCE.md` §9. Since R3 the script runs the
-> presets (best / ship-safe / everything / legacy) plus `bloom` and `nostage` rows, so the
-> R2 stage flags and bloom are covered. It also needs a real multi-touch check of pinch,
-> twist and two-finger tilt, which adb cannot inject.
+Done on the owner's Pixel 6 Pro (Mali-G78, 120 Hz). The build was release arm64 from HEAD,
+with the opaque canvas, and frames were counted from SurfaceFlinger presents.
+
+- Full report: `research/PHONE-PASS-RESULTS.md`.
+- Tables: `PERFORMANCE.md` §9.
+- Evidence: `evidence/12-phone/`.
+
+Presented fps at Dense 120, idle / pan:
+
+| Configuration | Idle | Pan |
+|---|---|---|
+| Lab B best | 3.2 | 8.4 |
+| Ship-safe | 26 | 20 |
+| Everything | 23 | 24 |
+| **best − Home tilt** | **99** | **81** |
+| Legacy (production renderer) | 5.0 | 3.5 |
+
+At 400 bodies: best 18 fps, untilted 95 fps, and Legacy **ANRs**.
+
+**The cause.** The orbit rings and progress wakes are stroked as world circles under the
+tilted plane's perspective matrix. The GPU sits at 99.7 %, and the UI thread waits about
+150 ms per frame in `eglSwapBuffers`.
+
+**What still held:**
+
+- every RuntimeEffect compiled on Mali;
+- no shader artefacts;
+- the opaque canvas composites correctly and beats TextureView;
+- reduced motion gives 0 presents and 0 changed pixels;
+- lifecycle gives 0 frames on another tab or in the background;
+- no native crash at 800;
+- the Hermes `Intl.Segmenter` initials gap reproduces (legacy "El…").
+
+**Thermal and power** (5 min, best, Dense):
+
+- thermal status 1, skin 40.9 → 42.3 °C;
+- net battery drain even on USB;
+- about 36 mAh / 5 min (estimate, almost all GPU);
+- PSS 1.44 GB.
+
+**Not covered:** real multi-touch (adb is single-pointer) and the physical OLED look (owner
+glance).

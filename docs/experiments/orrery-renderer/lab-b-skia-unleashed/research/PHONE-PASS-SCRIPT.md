@@ -1,5 +1,22 @@
 # Lab B — phone pass script (Pixel 6 Pro, ~20 min)
 
+> **Executed 2026-10-01** → `research/PHONE-PASS-RESULTS.md`, `evidence/12-phone/`.
+> Gotchas learned on the run:
+> - **120 Hz panel:** the budget is 8.33 ms.
+> - **Opaque canvas:** run the matrix with `SF=1 OPAQUE=1`. gfxinfo sees only the static
+>   overlays.
+> - **Taps (1440×3120):** `ORRERY_TAB="1008 2930"`, `RECENTRE="1290 2290"`,
+>   `SWIPE="1000 1700 500 1400"`, LAB B marker long-press `125 2795`.
+> - **Tab after a VIEW intent:** a VIEW intent after a reinstall can land on another tab, so
+>   always tap the Orrery tab before measuring. Five traces and a soak were lost to this
+>   once.
+> - **Perfetto:** `perfetto -c <file>` cannot read `/data/local/tmp`; pipe the config via
+>   stdin (`cat cfg | perfetto --txt -c - -o …`). Analyse with `trace_processor` on droid
+>   (this box lacks AVX2).
+> - **Remount timing:** Stress 800 remounts can exceed the harness's 12-s windows on the
+>   phone.
+> - **Battery:** the pass drains the battery even on USB, so start above 60 %.
+
 **Do not start until the owner says Lab A is done with the Pixel.** Lab A owns the phone and the
 local adb server (port 5037) until then. **R3 update (2026-10-01):** configurations are now the
 panel PRESETS ("Lab B best", "Ship-safe", "Everything", "Legacy"; deep link `preset=`), plus a

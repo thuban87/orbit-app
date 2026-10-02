@@ -1,8 +1,9 @@
 # Lab B — Harvest
 
 This lists every idea that worked, in a form a V2 phase can lift. State is `883b84ed` (R3
-rows added: H-C26–H-C28, H-E7; H-D5 updated by the final validation). The **Pixel phone pass
-is pending (the Pixel is in use by Lab A)** and may change a verdict or a cost.
+rows added: H-C26–H-C28, H-E7; H-D5 updated by the final validation). The **Pixel 6 Pro
+phone pass is done** (`research/PHONE-PASS-RESULTS.md`), and it changed one verdict: **H-B3
+under the tilted Home (H-C17) is a Mali GPU cliff.** See "Phone updates" at the end.
 
 ## How to read this
 
@@ -214,8 +215,14 @@ These live in the shared model half (`OrreryWorld.tsx`, `src/logic/*`). They app
   geometry** (circles and rects). They are exact under any tilt and yaw.
 - **Where.** `labb/labb-rings-logic.ts` `planeHomography` / `applyHomography`.
 - **Commit.** `ff7ddbdd`
-- **Perf.** 120 instrument rings cost the **same as rings off** (48 ms p50, 213 vs 212
-  frames). The legacy per-frame 128-pt Path cost 4–5× the frames.
+- **Perf.** On the emulator, 120 instrument rings cost the **same as rings off** (48 ms p50,
+  213 vs 212 frames); the legacy per-frame 128-pt Path cost 4–5× the frames.
+  - **Pixel 6 Pro:** true only on an **untilted** plane. Under the R2 tilt the stroked world
+    circles (ring classes plus full-circle wakes) cost **100–350 ms of GPU per frame** at
+    Dense 120: 3–9 fps, against 120 fps with the rings layer off and 92–99 fps with the tilt
+    off. **V2: draw each projected ring as an affine-mapped oval (analytic ellipse), or as
+    one full-screen ring shader. Never stroke a circle under a perspective matrix on
+    Android** (PHONE-PASS-RESULTS §1, §8).
 - **Evidence.**
   - `evidence/04-wp1.3/08-pass2-overview-dense-final.png`;
   - `05-tilt-max-depth-fade-dense.png`;
@@ -278,8 +285,10 @@ These live in the shared model half (`OrreryWorld.tsx`, `src/logic/*`). They app
   focus card, tab switches and screenshots still composite.
 - **Flag / commits.** `opaqueCanvas` (default ON since `80852701`; flag `bba4cf5b`).
 - **Evidence.** `evidence/09-r1/shots/02`, `03`.
-- **Preserve.** Measure with SurfaceFlinger, not gfxinfo. **This needs the phone** (C-07): if
-  the TextureView halving is an emulator artefact, the win may vanish.
+- **Preserve.** Measure with SurfaceFlinger, not gfxinfo.
+- **Phone (confirmed):** in a GPU-bound sample, SurfaceView presented 5.9 fps against 1.5 fps
+  for the TextureView window path. The overlays, focus card, header scrim, FX panel and
+  screencap all composite correctly over it. **SHIP.**
 
 ### H-B10 Shader warm-up at mount — **SHIP, R1**
 
@@ -304,14 +313,14 @@ These live in the shared model half (`OrreryWorld.tsx`, `src/logic/*`). They app
 | H-C7 | **Composite-aware sun glow cap (dark themes)** | SHIP | R1 | `SUN_GLOW_CAP_DARK` 0.94; `80852701`, `7c3ec0e6` | — | `09-r1/shots/05-sun-glow-cap-standard-dark-before-after.jpg` | The sun is never the brightest pixel under glass |
 | H-C8 | Cheap lit moons (3 circles) | SHIP | R0 | `LabLayerPictures.tsx` `drawMoon`, `LabMoon`; `0f888524` | Saved ≈14 ms p50 vs shader moons | `05-m1-checkpoint/18`, `20` | — |
 | H-C9 | Lab Polaris (halo + diffraction spikes) | SHIP | R0 | `LabPolaris.tsx`; `469440db` | — | `03-wp1.2/*` | Same hit semantics |
-| H-C10 | **Hairline instrument rings with status classes + shader dashes + far-side fade** | SHIP (OWNER C-35: lower absolute ring contrast) | R1 | `ringInstrument`, `ringInstrumentClass`; `ff7ddbdd`, `387b20c8` | Free (rings-off floor) | `04-wp1.3/08`, `05`, `10e` | Keep the **weight order** (CVD channel); integer dash count per circumference (no seam) |
+| H-C10 | **Hairline instrument rings with status classes + shader dashes + far-side fade** | SHIP (OWNER C-35: lower absolute ring contrast) | R1 | `ringInstrument`, `ringInstrumentClass`; `ff7ddbdd`, `387b20c8` | Free on the emulator (rings-off floor); **phone: free untilted, a GPU cliff under the tilted Home** (see H-B3) | `04-wp1.3/08`, `05`, `10e` | Keep the **weight order** (CVD channel); integer dash count per circumference (no seam) |
 | H-C11 | Ring density fade | SHIP | R1 | `ringDensityFade`; `387b20c8` | — | `04-wp1.3/07a` vs `07b` | Floor 0.35 (C-36; maybe per-status floors) |
 | H-C12 | Progress wake | OWNER (C-17) | R2 | `ringWake`, `WakesPicture` | 6.8 ms per 120 pan frame after R1; LOD'd off above 160 | `04-wp1.3/02`, `08` | If kept: one shader for all wakes (C-60) |
 | H-C13 | Drift tethers (decay/rogue) | OWNER (C-17); the M1 critique liked them | R1 | `tetherRect`, `TetherClassGroup` | Free as rects | `05-m1-checkpoint/14`, `18` | They encode only what the drift already means |
 | H-C14 | Ring energy flow (uniform comets) | OWNER (C-04) | R1 | `ringInstrument` flow; LOD 160 | Forces the ambient clock on | `04-wp1.3/09-flow-comets-overview-dense.mp4` | Same speed for every status; off under reduced motion |
 | H-C15 | **HUD-tag labels** (exact plate geometry, scrim halo, status hairline, leader) | SHIP | R1 | `LabLabelsPicture`, `LabHudLabel`; `ff7ddbdd` | ≤0.6 ms recording | `04-wp1.3/10e-hud-tags-4-themes-gd-gl-sd-sl.png` | Positioned only from `allocations` (the tap contract) |
 | H-C16 | **Text-only label defocus with a 0.66 floor** | SHIP | R0 | `LABEL_TEXT_DIM_MIN`; `80852701`, `7c3ec0e6` | — | `09-r1/shots/04-legibility-*`; `legibility/after/contrast-results.tsv` | ≥4.95:1 model contrast in all 4 themes |
-| H-C17 | **Home tilt ≈32°** | SHIP the look (OWNER C-66: changes Home) | R1 | `labb-home-tilt.ts`; `ff90df99` | Not separable | `10-r2/before-after-overview.jpg`, `01-tilt-probe/sheet.jpg` | 0.56 rad (0.7+ crowds the far side under the pills). If kept: a product `HOME_CAMERA.tilt` + an ADR, and re-check the `deriveHomePose` fit. |
+| H-C17 | **Home tilt ≈32°** | SHIP the look (OWNER C-66: changes Home) **only with a new ring draw** (phone: the tilt makes H-B3's stroked rings a GPU cliff, Dense 3–9 fps vs 92–99 untilted) | R1 | `labb-home-tilt.ts`; `ff90df99` | **Phone: the dominant cost** (via the rings) | `10-r2/before-after-overview.jpg`, `01-tilt-probe/sheet.jpg` | 0.56 rad (0.7+ crowds the far side under the pills). If kept: a product `HOME_CAMERA.tilt` + an ADR, and re-check the `deriveHomePose` fit. |
 | H-C18 | **Sun light pool on the orbital plane** | SHIP (OWNER C-67 taste) | R1 | `stagePlane` in `LabStage.tsx`; `ff90df99` | Not separable on the emulator; a full-screen shader, so **phone** | `10-r2/04-iter3/art/`, `before-after-*.jpg` | Pool 0.32·extent with a tight core (0.55 turned the sky brown) |
 | H-C19 | Gravity-well plane grid | SIMPLIFY (bake as texture or fold into the pool pass; maybe polar) | R2 | `stagePlane` grid; `ff90df99` | Shares the pool pass | `10-r2/04-iter3/art/02*` | Half-cell offset (no crosshair on the sun); alpha ≈0.05; Galaxy only |
 | H-C20 | Rim-lit rings near the sun | SHIP (OWNER a11y C-68) | R1 | `ringInstrument` `uSpin.zw`; `ff90df99` | Two uniform floats | `10-r2/before-after-overview.jpg` | Status hue, weight and style untouched |
@@ -384,9 +393,22 @@ These live in the shared model half (`OrreryWorld.tsx`, `src/logic/*`). They app
 - No earlier verdict moved. Legibility with the R2 stage was re-measured with no regression.
   Standard Dark glass is 4.42 (model), still the OWNER C-02 gate for H-C1.
 
-## PLACEHOLDER — phone updates (pending — Pixel in use by Lab A)
+## Phone updates (Pixel 6 Pro, 2026-10-01)
 
-> _TBD: the phone pass must confirm or overturn H-B9 (opaque canvas), H-C18/C19 (full-screen
-> stage shader on Mali), H-D1 switch p99, H-A2 (crash fixed on ARM), H-A5 (Segmenter absent on
-> the Pixel's Hermes), the face-legibility glance for H-C4, and the Ship-safe vs best gap
-> (H-C28)._
+Source: `research/PHONE-PASS-RESULTS.md`; evidence `evidence/12-phone/`. Release arm64,
+Mali-G78, 120 Hz.
+
+| Item | Phone verdict |
+|---|---|
+| **H-B3** homography geometry | **Overturned under tilt.** Rings and wakes stroked under a perspective matrix are a Mali GPU cliff (100–350 ms GPU per frame at Dense). The idea stays; the draw must change (affine ovals or one ring shader). Untilted, it is cheap |
+| **H-C17** Home tilt | Keep only with the new ring draw. Without the tilt, Lab B best runs at 92–99 fps (Dense) and 93–95 fps (400) |
+| **H-B9** opaque canvas | **Confirmed.** It beats TextureView (5.9 vs 1.5 fps in a GPU-bound sample) and overlays composite. SHIP |
+| **H-C18 / H-C19** stage plane | **Not separable** while the ring cliff dominates (best − stage ≈ best at 120 and 400). Re-measure after the ring fix |
+| **H-D1** switch | Untilted: 58–64 fps through the switch at 120 and 400. Tilted: it inherits the cliff (Dense switch-in 20 fps). The p99 question waits for the ring fix |
+| **H-A2** paragraph cache | **Holds on ARM**: no native crash in ~2.5 h, including dozens of Stress 800 mounts and switches |
+| **H-A5** Segmenter | **Reproduces on the Pixel**: legacy draws "El…" / "C…" (`12-phone/shots/02-dense-legacy.jpg`). Ship the fix |
+| **H-C4** lit faces (FACES) | Ada (dark skin, rogue, shadow side) is recognisable at overview size in the framebuffer (`12-phone/shots/02-dense-best-ada-overview-crop-2x.jpg`). The OLED glance is still the owner's |
+| **H-C28** Ship-safe vs best | Separable on the phone at Dense: 20–32 vs 3–13 fps, because Ship-safe has no wakes. At 400 they are equal, because the wakes are LOD'd away |
+| **H-A3 / H-A4** projection | ≈ 11–13 µs per body on the phone's UI thread (about 3× the emulator), so ~30 ms of worklets per changed frame at 800. Typed arrays are now justified for 400+ |
+| **H-B2** idle clock | **Confirmed**: 0 presents and 0 changed pixels under reduced motion. It is the key power feature (a GPU-bound Orrery drains the battery even on USB) |
+| Legacy (production) | 3–5 fps at Dense 120 and an **ANR** at 400 (pre-existing; strengthens PORT and V2) |

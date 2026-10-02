@@ -359,3 +359,24 @@ Rough emulator gfxinfo over that whole session (launch + seeding + switching, NO
   `tools/r2-sheet.py <out> <cols> <img…>` (contact sheets), `tools/r2-perf.sh <out>` (R2 A/B).
 - Shockwave beats need `slowmo=5` and `screenrecord` with the switch fired from the same shell
   (`delay=7000` covers the remount).
+
+## 14. Phone pass (Pixel 6 Pro, local adb 5037; only when the owner hands the phone over)
+
+- Use `ADB="$HOME/Android/Sdk/platform-tools/adb -s <serial from adb devices -l>"`.
+- **Before you start, check the reverse:** the owner's normal mapping is
+  `adb reverse tcp:8081 tcp:8082`.
+  - For debug seeding, switch it to `tcp:8081 tcp:8084` (Lab B Metro). The USB dev client
+    uses `localhost:8081`, so no `debug_http_host` is needed.
+  - **Restore `tcp:8081 tcp:8082`** as soon as the release APK is installed.
+- **Builds:** arm64 only, `-PreactNativeArchitectures=arm64-v8a`. Debug ≈ 108 MB, release
+  ≈ 81 MB. `install -r` release over the seeded debug build keeps the data.
+- **Satellites:** after a fresh install, turn on Settings → Orrery → Relationship Satellites
+  (≈ `input tap 1256 1507` on the toggle).
+- **Harness:** `SF=1 OPAQUE=1 ORRERY_TAB="1008 2930" RECENTRE="1290 2290"
+  SWIPE="1000 1700 500 1400" tools/r1-matrix.sh evidence/12-phone/perf`; tables via
+  `tools/phone-table.py <summary.tsv> [--probe]`.
+- **Perfetto:** pipe the config through stdin, then analyse with `trace_processor_shell.exe`
+  in `C:\Users\bwales\projects\orbit-lab-b\.labb-perfetto\` on droid (the local prebuilt
+  crashes without AVX2).
+- **Leave behind:** `com.bwales.orbit.labb` installed, the reverse restored, other packages
+  untouched.

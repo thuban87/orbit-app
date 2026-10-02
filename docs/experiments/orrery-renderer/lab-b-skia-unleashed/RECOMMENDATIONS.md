@@ -1,8 +1,11 @@
 # Lab B — Recommendations
 
-My judgement after M1, M2, R1, R2, R3 and the final validation. All evidence is from the
-**emulator**. The **Pixel phone pass is pending (the Pixel is in use by Lab A)** and could
-move a verdict; its placeholder below must be filled.
+My judgement after M1, M2, R1, R2, R3, the final validation and the **Pixel 6 Pro phone
+pass**. §1–§9 were written from the emulator.
+
+**The phone pass moved one central verdict.** The tilted Home makes the orbit rings a Mali
+GPU cliff: Lab B best runs at 3–9 fps at Dense 120, against 92–99 fps untilted. See the last
+section.
 
 ## 1. Where is the practical visual ceiling of RN Skia for the Orrery?
 
@@ -44,7 +47,9 @@ the flare streak.
    target to star-system map, for almost no cost. The depth stack (far-side ring fade, haze,
    perspective) was already built, and the tilt finally showed it (`evidence/10-r2/before-after-overview.jpg`).
 3. **Plane homography for instrument geometry.** 120 orbits cost the same as zero, and they
-   are exact in any tilt.
+   are exact in any tilt, **on the emulator and on an untilted phone**. On the Pixel, the
+   stroked circles under the tilted plane are the GPU cliff. The math stays; the ring draw
+   must become analytic ovals or one shader (phone section).
 4. **The System-switch showcase.** Streaks, dissolve, comets, flares and a projected
    shockwave, all as pure functions of the choreography. It reads as a game beat and stays
    correct under pause, remount and retarget.
@@ -68,7 +73,7 @@ the flare streak.
 6. **Ring energy flow.** It works technically, but it is mood motion on the data lines
    (HANDOFF §7 "Motion encodes data, not mood"), and it forces the clock on.
 
-## 4. Performance envelope (emulator-relative; phone PENDING)
+## 4. Performance envelope (emulator-relative; the phone numbers are in the last section)
 
 | Bodies | Result |
 |---|---|
@@ -79,7 +84,7 @@ the flare streak.
 - **Under reduced motion or when nothing ambient animates**, an idle Orrery draws 0 frames.
 - **The presented rate** is 60 fps with the opaque canvas vs ~28 fps with TextureView, on
   this emulator.
-- **Unknown until the phone pass:**
+- **Unknown until the phone pass** (all answered now; see the last section):
   - absolute frame times;
   - Mali fill for the full-screen shaders;
   - thermal and battery;
@@ -114,7 +119,8 @@ the flare streak.
   1. Worklets capture only SharedValues and small stable data (with capture tests).
   2. No per-entity bound SharedValues; keep the bound-value count in the tens.
   3. Instrument geometry = circles, rects and shaders under one homography; never stroked
-     paths per replay.
+     paths per replay. **Phone pass: never stroke circles under a *perspective* matrix
+     either.** Map each ring to an affine oval, or shade all rings in one pass.
   4. Runtime effects are lazy, memoised and null-safe, with packed `float4` uniforms and a
      uniform-contract test.
   5. Sky and instrument layers read `frame.pose`, never `pose`.
@@ -138,8 +144,8 @@ the flare streak.
 | Lit photo worlds, stellar sun + glow cap, cheap moons | HUD chrome (light touch) | Live fbm nebula |
 | Hairline instrument rings, density fade, tethers | Particles/comets if phone p99 demands | Per-moon shaders by default |
 | HUD-tag labels, text-only defocus | Wakes (only if the owner wants progress visible; single-shader version) | Ring energy flow (owner FLOW) |
-| Home tilt, sun light pool, rim light, size floor | — | Declarative per-entity components |
-| Switch showcase, sky hue (stable hash) | — | Stroked paths for static instrument geometry |
+| Home tilt (**only with an analytic ring draw**, phone), sun light pool, rim light, size floor | — | Declarative per-entity components |
+| Switch showcase, sky hue (stable hash) | — | Stroked paths for static instrument geometry; **stroked circles under a perspective matrix** (phone) |
 | Reticle + world response, feedback, reorder language, anchored card + occlusion | — | Raising card opacity to fix ghosting (ADR-149 reversal) |
 | Standard chart identity, per-theme profiles | — | — |
 
@@ -150,7 +156,10 @@ the flare streak.
    everything at ~28 fps. The switch-stall's "obvious" Skia stack sample was a red herring.
 2. **The expensive part is how often and how much the JS/UI bridge touches Skia, not what
    the GPU draws.** Shaders were nearly free on this target; object graphs, bound values and
-   re-records were not.
+   re-records were not. **The phone corrected half of this:** on Mali the GPU *does* matter.
+   How geometry reaches the GPU (stroked circles under a perspective matrix) cost 30× more
+   than every shader in the scene. Validate on the phone from the first week of V2, not at
+   the end.
 3. **The biggest visual win was a camera decision, not an effect.** Tilt revealed depth that
    was already there.
 4. **Pure-function effects pay for themselves.** Remount, retarget and reduced motion came
@@ -164,10 +173,13 @@ the flare streak.
 
 In priority order:
 
-1. **Run the Pixel phone pass** (once the owner frees the phone). R3 closed the script gaps:
-   the script now runs the presets plus `bloom` / `nostage` rows, and `labmin` turns off the
-   R2/R3 flags. Add a real multi-touch check (pinch, twist, two-finger tilt). Then fill
-   PERFORMANCE §9. Everything below depends on it.
+1. **Prototype the analytic ring draw on the Pixel** (the phone pass is done):
+   - draw the tilted rings as affine-mapped ovals, with the dashes and the depth fade from
+     the inverse homography in the shader;
+   - re-run `tools/r1-matrix.sh` with `SF=1 OPAQUE=1`;
+   - target: Dense within a few fps of `homeTilt:0` (92–99 fps);
+   - then re-measure bloom, stage and nebula, which the cliff hid;
+   - also do the multi-touch check by hand.
 2. **Fix Standard Dark glass canvas-side** (GLASS, 4.42:1 model at R3). Legibility was
    re-measured in R3: the only < 4.5 case is the initials glyph ink under the glass. Dim the
    avatar swatch text under overlay rects, as the focus card already does.
@@ -207,8 +219,54 @@ In priority order:
   - `13-final/04-switching/switch-inner-to-stress400.mp4` (switch into 400);
   - `13-final/01-polaris/best-polaris-tap-sequence.jpg`.
 
-## PLACEHOLDER — Phone pass outcome (pending — Pixel in use by Lab A)
+## Phone pass outcome (Pixel 6 Pro, 2026-10-01)
 
-> _TBD: which "unknown until the phone pass" items resolved, and how; whether the opaque
-> canvas, the stage plane and the switch FX stay default; and the final envelope for V2
-> planning._
+Release arm64, Mali-G78, 120 Hz, opaque canvas. Report: `research/PHONE-PASS-RESULTS.md`.
+
+### Resolved "unknowns"
+
+- **Absolute frame times**, Dense 120 presented fps, idle / pan:
+
+  | Configuration | Idle | Pan |
+  |---|---|---|
+  | best | 3.2 | 8.4 |
+  | ship-safe | 26 | 20 |
+  | everything | 23 | 24 |
+  | **best − tilt** | **99** | **81** |
+  | legacy | 5.0 | 3.5 |
+
+  - At 400: best 18, untilted 95, legacy ANR.
+  - At 800: best 36 / 38 (wakes LOD'd, rings culled).
+- **Mali fill:**
+  - the stroked rings and wakes under tilt are the cliff (GPU 99.7 %, `eglSwapBuffers`
+    147 ms per frame);
+  - untilted, GPU 80 % and main 11 ms per frame;
+  - the nebula, stage and sun could not be separated under the cliff.
+- **Thermal and battery:**
+  - thermal status 1 after 5 min (skin 42.3 °C), 2 after ~20 min of the matrix;
+  - net battery drain even on USB (~36 mAh / 5 min estimate, almost all GPU).
+- **Texture memory:** PSS 1.44 GB, Graphics 421 MB.
+- **Opaque canvas:** real on hardware (5.9 vs 1.5 fps in a GPU-bound sample), and the
+  overlays composite.
+
+### Stay default?
+
+| Item | Verdict |
+|---|---|
+| Opaque canvas | **Yes** |
+| Idle clock | **Yes**: 0 presents under reduced motion; it matters more on the phone (power) |
+| Stage plane | Keep provisionally; not separable; re-measure after the ring fix |
+| Switch FX | Keep: 58–64 fps through a switch untilted. With tilt they inherit the cliff |
+| Home tilt | **Only with the analytic ring draw.** As built, it is the reason Lab B best is unusable on the phone |
+| Wakes | Stay off |
+| Bloom / flare / tilt-shift | Keep the "drop / optional" verdicts; nothing on the phone argued for them |
+
+### Envelope for V2 planning
+
+- **Untilted Lab B best:** ~90–99 fps at Dense and 400, and ~50–58 at 800 (all on a 120 Hz
+  panel).
+- **UI-thread worklets:** ~11–13 µs per body for the projection, so plan typed arrays for
+  400+.
+- **Target:** design for 60 fps at 400 with the tilt, measured on the Pixel.
+- **Legacy (today):** 3–5 fps at 120 and an ANR at 400. Any V2 is a large improvement, but
+  only once the tilted rings are fixed.

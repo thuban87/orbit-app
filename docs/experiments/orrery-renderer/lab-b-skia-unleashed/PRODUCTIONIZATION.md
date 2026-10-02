@@ -3,7 +3,8 @@
 What it would take to ship Lab B's ideas in a clean Orrery V2. The lab branch itself is
 **never merged**: V2 re-implements from `HARVEST.md`. This file is about cleanup, tests,
 accessibility, performance, dependencies and edge cases. R3 and the final validation are
-folded in. **The phone pass is pending (the Pixel is in use by Lab A) and may add rows.**
+folded in. The **Pixel 6 Pro phone pass** is done; it adds a must-fix (§ "Phone additions" at
+the end: the tilted-ring GPU cliff).
 
 ## 0. Order of work
 
@@ -18,7 +19,9 @@ folded in. **The phone pass is pending (the Pixel is in use by Lab A) and may ad
 2. **Owner decisions** (`OWNER-REVIEW.md`). The ⚠ items need superseding ADRs before any V2
    plan depends on them: TILT (Home camera), SKY (ADR-114/179), FLOW (HANDOFF §7 principle),
    CARD (ADR-149 in practice), GLASS (ADR-149 proof).
-3. **Phone pass** (`research/PHONE-PASS-SCRIPT.md`, plus the gaps noted in PERFORMANCE §9).
+3. **Phone pass**: done (`research/PHONE-PASS-RESULTS.md`, PERFORMANCE §9). It adds the
+   ring-draw rewrite as a prerequisite for TILT (see "Phone additions"). Re-run the same
+   matrix on the V2 build, plus real multi-touch by hand.
 4. **V2 renderer phase**, built on the HARVEST §B architecture.
 
 ## 1. Delete (lab-only scaffolding)
@@ -116,8 +119,11 @@ folded in. **The phone pass is pending (the Pixel is in use by Lab A) and may ad
 
 ## 5. Performance work before shipping
 
-- **The phone pass.** Absolute frame times at 120/400/800 and Perfetto on main, RenderThread
-  and JS. Answer five questions:
+- **The phone pass (done, PHONE-PASS-RESULTS).** The answers: the stroked rings under tilt
+  are the cliff; opaque beats TextureView; thermal status 1 after 5 min but the battery
+  drains even on USB; PSS 1.44 GB; no crash on ARM. Mali fill for the nebula, stage and sun
+  could **not** be separated while the ring cliff dominated, so re-measure after the ring
+  fix. The original questions were:
   - Mali fill for the nebula sample, the R2 stage plane and the sun;
   - opaque vs TextureView;
   - thermal and battery after 10 minutes;
@@ -198,6 +204,31 @@ shader-compile and fill characteristics.
   custom System's name on load success and add a cold-restore test. It is independent of V2
   and belongs with the PORT fixes.
 
-## PLACEHOLDER — phone additions (pending — Pixel in use by Lab A)
+## Phone additions (Pixel 6 Pro, 2026-10-01)
 
-> _TBD: any phone-pass finding that adds a must-fix._
+1. **Must-fix before TILT ships: redraw the orbit geometry.**
+   - **The problem.** Stroked world circles under the plane's perspective matrix (ring
+     classes, full-circle wakes, trims) cost 100–350 ms of GPU per frame on Mali-G78 at
+     Dense 120. That is 3–9 fps, and the UI thread is blocked in `eglSwapBuffers`.
+   - **Option 1:** draw each projected ring as an **affine-mapped oval**. A circle under a
+     homography is an exact ellipse, and Ganesh has an analytic ellipse op. Compute the
+     dashes and the depth fade in the shader via the inverse homography of `sk_FragCoord`.
+   - **Option 2:** use one full-screen ring shader, like the stage plane.
+   - **Acceptance:** the Pixel matrix at Dense and 400 within a few fps of `homeTilt:0`
+     (92–99 / 93–95 fps).
+2. **Wakes stay off** (WAKE "not now") unless they are rebuilt in the same analytic form.
+   They were the single largest cost at ≤ 160 rings.
+3. **Frame-rate policy for 120 Hz panels.** Untilted, Lab B best is about 11 ms per frame on
+   the UI thread at Dense (88–99 fps). Either accept that, or request 60 Hz for the Orrery
+   surface (`setFrameRate`), which also cuts power. Decide with the owner (it is a
+   power-vs-smoothness trade).
+4. **Power.** A GPU-bound Orrery pinned the GPU at 99 % and drained the battery on 500 mA USB
+   (batterystats estimate ~36 mAh / 5 min). Ship the idle clock (0 presents at rest under
+   reduced motion, confirmed on the phone), and add a power check to the V2 acceptance.
+5. **Typed-array projection** for 400+. The `frame` worklet is about 9–10 ms at 800 on the
+   phone (≈ 11–13 µs per body, ~3× the emulator).
+6. **Production legacy renderer:** 3–5 fps at Dense 120 and an **ANR** at Stress 400
+   (input timeout, main thread in deep Hermes recursion). It strengthens the case for PORT
+   and V2; it does not change the PORT list itself.
+7. **Re-measure after (1):** bloom, the stage plane, nebula resolution and body lighting.
+   None of them could be separated on the phone while the ring cliff dominated.

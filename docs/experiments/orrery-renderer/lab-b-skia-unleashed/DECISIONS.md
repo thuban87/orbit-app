@@ -132,8 +132,13 @@ top still reads as a productivity app. The ugliest elements, in order:
 | The "Unavailable System" selector label after a cold start is listed, not fixed | Pre-existing on `main` in the shared store/screen; production code, not this experiment |
 | Contract exercise list validated on release + preset best; pinch, twist and tilt are delegated to the phone pass | adb injects a single pointer only |
 
-## Phone pass (pending — Pixel in use by Lab A)
+## Phone pass (Pixel 6 Pro, 2026-10-01)
 
-> _Placeholder. Record here any decision the Pixel numbers force: for example, opaque canvas
-> kept or rejected, R2 stage plane kept or simplified, bloom confirmed rejected, LOD
-> thresholds retuned._
+| Decision | Why | Commit |
+|---|---|---|
+| Measure the opaque canvas by **SurfaceFlinger presents** (`tools/sf-sampler.py`, union of `--latency` polls; highest layer id), with `SF=1 OPAQUE=1` in `r1-perf.sh` | gfxinfo cannot see the SurfaceView; `--latency` keeps only ~1 s at 120 Hz | `25f82cdf` |
+| Add a `notilt` row to the matrix | Isolation showed the Home tilt as the switch between 3–9 and 92–99 fps at Dense | `25f82cdf` |
+| **Opaque canvas stays default** | It beats TextureView on the phone (5.9 vs 1.5 fps in a GPU-bound sample); the overlays composite | — |
+| **The tilted-ring cliff is not patched in the lab**; it is handed to V2 as a must-fix (analytic ovals or one ring shader) | It is a draw-strategy rewrite of the ring, wake and trim layers, not a phone-only bug. A one-line plain-saveLayer workaround was tried and did not help (DEAD-ENDS) | — (reverted A/B build) |
+| The 10-min soak was cut to 5 min, and the Everything soak was skipped | The phone battery fell from 30 % to 7 % on USB during the pass | — |
+| Perfetto analysis runs `trace_processor` on droid | This box's CPU (no AVX2) crashes the prebuilt | — |

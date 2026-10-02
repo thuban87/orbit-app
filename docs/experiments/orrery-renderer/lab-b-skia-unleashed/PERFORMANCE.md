@@ -1,11 +1,12 @@
 # Lab B — Performance
 
-> **Every number in this file is EMULATOR-RELATIVE.** It comes from the desktop emulator
+> **§1–§8 and §10 are EMULATOR-RELATIVE.** They come from the desktop emulator
 > (`emulator-5554`: sdk_gphone16k_x86_64, API 37, GLES translator over an Intel Arc B580, 4
-> vCPU, 1280×2856). Each number is valid only as an A/B **on that target in that session**.
-> None of them is a phone claim. The emulator cannot answer GPU-fill, thermal, battery or
-> absolute frame-time questions. The **Pixel phone pass is pending — the Pixel is in use by
-> Lab A** (§9).
+> vCPU, 1280×2856). Each of those numbers is valid only as an A/B **on that target in that
+> session**. **§9 holds the Pixel 6 Pro phone pass (2026-10-01), the only absolute numbers in
+> this package.** It overturns the emulator's "GPU-cheap" verdict for the tilted rings:
+> Lab B best runs at **3–9 fps** at Dense 120 on Mali-G78, against 92–99 fps with the Home
+> tilt off (`research/PHONE-PASS-RESULTS.md`).
 >
 > The raw logs are in `research/PERF-LOG.md` (the per-run tables), `research/R1-REPORT.md`,
 > `research/R2-REPORT.md`, `research/R3-REPORT.md`, `research/FINAL-VALIDATION.md` and
@@ -15,7 +16,7 @@
 
 | Target | Status |
 |---|---|
-| Hold 60 fps at Dense 120 on the Pixel 6 Pro with all defaults (research 03) | **Unknown.** Phone pass pending. |
+| Hold 60 fps at Dense 120 on the Pixel 6 Pro with all defaults (research 03) | **Missed badly: 3–9 fps** (tilted rings are a Mali GPU cliff). With `homeTilt:0` the same defaults reach 92–99 fps (§9) |
 | No break, no crash up to the largest real System (940 = All Contacts in the stress seed) | **Met on the emulator** after R1 |
 | Zero redraw while untouched under reduced motion | **Met** (0 frames / 10 s) |
 | No first-switch shader-compile hitch | **Met on the emulator** (cold first switch = warm switches) |
@@ -114,6 +115,11 @@ evidence available):
 
 ## 6. Remaining bottlenecks (ranked by expected phone risk)
 
+> **Phone pass result (§9):** the ranking below was the emulator-era guess. On the Pixel the
+> real cliff was item 7, the tilted plane: rings and wakes stroked under the perspective
+> homography cost 100–350 ms of GPU per frame. Items 1–6 could not be separated while it
+> dominated.
+
 1. **Full-screen fragment work** on a fill-rate-bound Mali GPU:
    - the nebula sample, which runs every frame while ambient is on;
    - the R2 stage plane (≈25 ALU ops plus an inverse homography per pixel);
@@ -144,7 +150,8 @@ evidence available):
 ## 7. Risks
 
 - **The GPU and driver matrix (C-11).** Shaders were verified only on the emulator's GLES
-  translator. A non-null miscompile on Mali or Adreno would not be caught; the null-effect
+  translator. **Phone pass:** every runtime effect compiled (`ok`) on Mali-G78 and there were no
+  visible artefacts (§9). Adreno is still unverified. A non-null miscompile on Mali or Adreno would not be caught; the null-effect
   fallbacks only cover compile failure.
 - **The crash root cause is inferred, not proven.** The 800-body Hermes SIGSEGV (RN Skia
   `JsiHostObject::get` → `createFromHostFunction`) disappeared with the paragraph cache. The
@@ -166,26 +173,119 @@ evidence available):
 | Final validation, release, preset best, 6 s windows (`opaqueCanvas:0`, `perfProbe:1`): Orrery → Digest tab → Orrery → HOME → relaunch | 118 → **0** → 122 → **0** → 115 frames; UI-worklet probe lines 3 → 0 → 2 → 0 → 2 (`evidence/13-final/06-lifecycle/lifecycle-gfxinfo.txt`) |
 | 5-min idle, all on (M1, TextureView) | 23.5 frames/s steady, PSS stable |
 
-## 9. PLACEHOLDER — Pixel phone pass results (pending — Pixel in use by Lab A)
+## 9. Pixel 6 Pro phone pass (2026-10-01) — absolute numbers
 
-> **Not run.** Lab A owned the phone for the whole lab. Run `research/PHONE-PASS-SCRIPT.md`
-> once the owner releases it (arm64 builds, local adb 5037, never touch Lab A's package).
-> Fill in the script's §5 tables here:
->
-> - 5.1 Envelope at 120/400/800 × lab all-on / lab minimal / legacy: _TBD_
-> - 5.2 Per-worklet UI cost at 800 (probe): _TBD_
-> - 5.3 Perfetto (main busy %, longest main/JS slice, RenderThread p90, jank split): _TBD_
-> - 5.4 Idle clock on the phone: _TBD_
-> - 5.5 Thermal / battery / memory after 10 min: _TBD_
-> - Opaque vs TextureView presented rate, and overlay composition: _TBD_
-> - Does the 800-body crash stay fixed on ARM? _TBD_
->
-> **Script gaps, closed in R3:** the script and `tools/r1-matrix.sh` now run the presets
-> (best / ship-safe / everything / legacy) plus `bloom` and `nostage` rows; `labmin` also
-> switches off the R2/R3 flags; the output folder is `evidence/12-phone/`.
-> **Still to add on the phone:** real multi-touch (pinch / twist / two-finger tilt), which
-> adb cannot inject, and the Stress 400 switch latency (~2 s from label to choreography on
-> the emulator, FINAL-VALIDATION §2 #13).
+Full report: `research/PHONE-PASS-RESULTS.md`. Evidence: `evidence/12-phone/`.
+
+The run conditions:
+
+- **Build:** release, arm64, HEAD `35390263`.
+- **Device and display:** Mali-G78, 120 Hz display (8.33 ms budget).
+- **Scene:** opaque canvas, Galaxy Dark, satellites on, harness `idleClock:0`.
+- **Metric:** canvas presents counted from SurfaceFlinger, because gfxinfo cannot see the
+  SurfaceView.
+- **Device state:** thermal status 1 → 2, battery 30 → 7 % on 500 mA USB, swap pressure.
+- **Sampling:** one run per cell. Read the orders of magnitude, not the decimals.
+
+### 9.1 Envelope — presented fps (idle / pan / focus / switch-in)
+
+| Bodies | Lab B best | Ship-safe | Everything | best − Home tilt | Legacy (production) |
+|---|---|---|---|---|---|
+| 12 | 67 / 71 / 34 / – | 60 / 72 / 37 / 48 | 41 / 41 / 32 / 30 | – | 28 / 27 / 30 / 4 |
+| 120 | **3.2 / 8.4 / 12.6 / 19.6** | 26 / 20 / 32 / 29 | 23 / 24 / 25 / 25 | **99 / 81 / 74 / 58** | **5.0 / 3.5 / 2.9 / 4.3** |
+| 400 | 18 / 19 / 27 / 24 | 18 / 20 / 30 / 35 | 31 / 34 / 39 / 40 | **95 / 93 / 85 / 64** | **ANR** |
+| 800 (rerun) | 36 / 38 / n/c / 31 | 19 / n/c / n/c / 50 | 15 / n/c / n/c / 45 | 58 / 52 / n/c / n/c | ANR at the changeover |
+
+Other rows:
+
+- **best + bloom:** Dense 4.9 / 8.6 / 6.3 / 39; 400: 25 / 23 / 28 / 18.
+- **best − stage plane:** Dense 5.9 / 12.2 / 12.0 / 30; 400: 19 / 20 / 36 / 24.
+- **lab minimal (every lab effect off), 800:** switch 90–120 fps.
+
+Bloom and the stage plane are **not separable** while the ring cliff dominates.
+
+**Cause, isolated at Dense:**
+
+- rings layer off → 120 fps;
+- wake off → 18;
+- wake + ring shader off → 36;
+- tilt off → 92–105;
+- sky, bodies, stage, grid, flow, focus dim, lens flare, tilt-shift, moon shader → no change.
+
+The cliff is **stroked world circles drawn under the perspective homography**: the ring
+classes, and above all the full-circle wakes.
+
+### 9.2 Per-worklet UI cost at 800 (probe, ms mean / p95, best, thermal 2)
+
+- **frame:** 9.0 / 11.9 idle, 9.1 / 17.2 pan. That is ≈ 11–13 µs per body, about 3× the
+  emulator.
+- **alloc:** 2.0–2.5.
+- **bodies:** 6.9–9.5.
+- **rings:** 7.1–7.3.
+- **labels:** ≤ 1.
+- **trim / nebula:** ≤ 0.5.
+
+At Dense, the total is 2–9 ms per changed frame.
+
+### 9.3 Perfetto (12 s per trace; Dense 120 unless noted)
+
+| Trace | Canvas frames | main Running | Skia draw avg / max | eglSwapBuffers avg | GPU util | JS |
+|---|---|---|---|---|---|---|
+| best, idle | 66 | 16 % | 175 / 186 ms (blocked) | **147 ms** | 99.7 % | ~0 |
+| Everything, idle | 244 | 54 % | 48 / 83 ms (CPU) | 0.9 ms | 97.7 % | ~0 |
+| best + fxShockFilter, idle | 528 | 62 % | 22.5 / 80 ms | 8 ms | 98.4 % | ~0 |
+| best − tilt, idle | 1 053 | 87 % | 11.2 / 66.5 ms | 1.0 ms | 80.6 % | ~0 |
+| best, Dense → Stress 400 switch | 48 | 23 % | 15.8 / 187 ms | 130 ms | 99.5 % | 57 % busy |
+
+- **Longest main slice:** 187 ms.
+- **RenderThread:** idle; max 17.6 ms in the switch.
+- **FrameTimeline:** it has no rows for RN Skia's own EGL surface, so there is no jank split.
+
+### 9.4 Idle clock, reduced motion, lifecycle (phone)
+
+- **Reduced motion, Dense, preset best:** **0 presents in 10 s, 0 changed pixels**.
+- **Lifecycle:**
+  - Orrery: 351 presents / 7 s;
+  - Digest tab: 0 (no canvas layer, 0 probe lines);
+  - back: 347;
+  - HOME: 0;
+  - relaunch: 341.
+
+### 9.5 Thermal, battery, memory (5-min soak, best, Dense)
+
+- **Thermal status:** 1 throughout. Skin 40.9 → 42.3 °C; G3D 66 → 70 °C.
+- **Presented rate:** 4.8–5.2 fps steady.
+- **Battery current:** net −0.19…−0.63 A, even on 0.5 A USB.
+- **Power (batterystats estimate):** 36 mAh / 5 min, 35 of it GPU.
+- **Memory:** PSS 1.44 GB, Graphics 421 MB, Native heap 530 MB.
+- **The full matrix** reached thermal status 2 after about 20 minutes.
+- **Not run:** the 10-min and Everything soaks were cut to protect the battery.
+
+### 9.6 Opaque canvas on the phone
+
+- **Presented rate:** in one GPU-bound sample the SurfaceView presented 5.9 fps against
+  1.5 fps for the TextureView window path.
+- **Composition:** the header scrim, HUD rail, focus card, FX panel and screenshots all
+  composite correctly.
+- **Verdict:** keep the opaque default (H-B9).
+
+### 9.7 Script questions
+
+1. **800 crash on ARM:** no native crash in ~2.5 h.
+   - **Legacy** ANRs at 400 and around 800 (input timeout; main thread in deep Hermes
+     recursion).
+2. **400 inside 60 fps with all effects?** No: 18 fps for best. Untilted, 93–95 fps.
+3. **Is the emulator's "GPU-cheap" verdict true on Mali?** **No, for the tilted rings.**
+   - Untilted, the GPU sits at 80 %.
+   - The stage, bloom and nebula are not separable until the rings are fixed.
+4. **Projection per body:** about 11–13 µs on the phone's UI thread (thermal 2).
+5. **Opaque canvas:** yes, as §9.6.
+6. **Thermal and battery:** above.
+   - The GPU-bound Orrery pins the GPU at 99 % while delivering about 5 fps.
+   - The idle clock is the key power feature.
+
+**Still not measured:** real multi-touch (pinch, twist, two-finger tilt), and the physical
+OLED look.
 
 ## 10. R3 polish perf delta (emulator, relative)
 

@@ -75,7 +75,10 @@ recovered. The raw log is `research/DEAD-ENDS-LOG.md`. Costs are **emulator-rela
 | Screenrecord at native 1280×2856 | Fails with `err=-22`; always pass `--size 720x1606` | tooling |
 | Judging a Polaris / Reset-north recovery from a screenrecord started *after* the tap | The recovery (≤ 850 ms) finishes before the recorder starts, so it looked like "no rotation". Start the recorder first (FINAL-VALIDATION §1) | `11-r3/03-paths/north-*`, `np-*` vs `13-final/01-polaris/` |
 
-## PLACEHOLDER — phone-pass dead ends (pending — Pixel in use by Lab A)
+## Phone-pass dead ends (Pixel 6 Pro)
 
-> _TBD: anything the Pixel pass rejects (e.g. if the opaque canvas or the stage plane fails on
-> Mali)._
+| Tried | Result | Evidence |
+|---|---|---|
+| **Plain saveLayer around the world layers** (flag `worldLayer`, an A/B build). The idea came from "Everything" and `fxShockFilter` (a world-wrapping saveLayer with a runtime image filter), which ran the tilted Dense at 24–49 fps against best's 5 | **No effect**: 4.6 vs 4.7 fps. The filter layer's speed-up is not the offscreen itself; with the filter, the GPU cost moves to 20–50 ms of CPU per frame on main (Perfetto). Unexplained (Ganesh path-renderer choice?). Reverted, never committed | `12-phone/isolation-dense-sf.txt` (iso3 rows), PHONE-PASS-RESULTS §3 |
+| **Stroked world circles under the tilted plane's perspective matrix** (rings, wakes) | 100–350 ms of GPU per frame on Mali-G78 at Dense; 3–9 fps. The emulator showed them as free. Not a dead end for the *idea* (tilt + world-space orbits), but the draw strategy is rejected for Android | `12-phone/perf/summary.tsv`, `perfetto/best-dense-idle.pftrace.gz` |
+| Trusting an emulator "GPU-cheap" verdict for any geometry under perspective | The desktop GPU behind the emulator's GLES translator hid a 30× cost | — |

@@ -429,3 +429,70 @@ the frames). Raw: `evidence/11-r3/perf/summary.tsv`. **Emulator, relative only.*
 - "Everything" crashed the app before the R3 fix (`moonShader` + layer pictures); after it,
   0 crashes over the matrix, the captures and the paths script (crash buffer empty).
 - Shipsafe idle/switch_in GPU p90 rows read 4950 ms: a single gfxinfo outlier bucket, ignored.
+
+## 2026-10-01 — Pixel 6 Pro phone pass (RELEASE arm64 from `35390263`; ABSOLUTE numbers)
+
+Mali-G78, 120 Hz, opaque canvas, `idleClock:0`. The metric is canvas presents from
+SurfaceFlinger (`tools/sf-sampler.py`). Thermal status 1 → 2; battery 30 → 7 % on 500 mA USB.
+Raw: `evidence/12-phone/perf/summary.tsv` (first pass), `perf-800-rerun*/` and
+`isolation-dense-sf.txt`. Full write-up: `research/PHONE-PASS-RESULTS.md`.
+
+- **Dense 120, presented fps idle / pan / focus / switch-in:**
+
+  | Configuration | Idle | Pan | Focus | Switch-in |
+  |---|---|---|---|---|
+  | best | 3.2 | 8.4 | 12.6 | 19.6 |
+  | ship-safe | 26 | 20 | 32 | 29 |
+  | everything | 23 | 24 | 25 | 25 |
+  | bloom | 4.9 | 8.6 | 6.3 | 39 |
+  | nostage | 5.9 | 12.2 | 12.0 | 30 |
+  | **notilt** | **99** | **81** | **74** | **58** |
+  | legacy | 5.0 | 3.5 | 2.9 | 4.3 |
+
+- **400:**
+
+  | Configuration | Idle | Pan | Focus | Switch-in |
+  |---|---|---|---|---|
+  | best | 18 | 19 | 27 | 24 |
+  | ship-safe | 18 | 20 | 30 | 35 |
+  | everything | 31 | 34 | 39 | 40 |
+  | notilt | 95 | 93 | 85 | 64 |
+
+  - legacy: ANR.
+- **800 (rerun):**
+  - best 36 / 38 / – / 31;
+  - notilt 58 / 52;
+  - labmin switch 90–120.
+- **12:**
+  - best 67 / 71 / 34;
+  - ship-safe 60 / 72 / 37;
+  - everything 41 / 41 / 32;
+  - legacy 28 / 27 / 30.
+- **Isolation at Dense, best:**
+  - rings off → 120;
+  - ringWake off → 18;
+  - ringWake + ringShader off → 36;
+  - homeTilt off → 92–105;
+  - environment, bodies, planeGrid, planeLight, ringFlow, fxFocusDim, tiltShift, lensFlare
+    or moonShader → no change (4–8 fps);
+  - fxShockFilter on → 49;
+  - plain world saveLayer (A/B build) → no change.
+- **Perfetto, best Dense idle:**
+  - 66 frames / 12 s;
+  - `eglSwapBuffers` 147 ms avg;
+  - GPU util 99.7 %;
+  - main Running 16 %.
+- **Perfetto, notilt:**
+  - 1 053 frames;
+  - main 11.2 ms per frame, Running 87 %;
+  - GPU 80.6 %.
+- **Probe at 800 (best):** frame 9.0–10.3 ms mean (≈ 11–13 µs per body), bodies 5.6–9.5,
+  rings 3.4–7.3.
+- **Soak (5 min, best, Dense):**
+  - 4.8–5.2 fps;
+  - skin 40.9 → 42.3 °C, status 1;
+  - battery net −0.19…−0.63 A on USB;
+  - batterystats ~36 mAh / 5 min (35 GPU);
+  - PSS 1.44 GB, Graphics 421 MB, Native heap 530 MB.
+- **Reduced motion:** 0 presents / 10 s, 0 changed pixels.
+- **Lifecycle:** 0 presents on another tab and in the background.

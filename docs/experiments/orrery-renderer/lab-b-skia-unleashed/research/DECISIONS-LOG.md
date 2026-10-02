@@ -671,3 +671,22 @@ Report: `research/R3-REPORT.md`. Evidence: `evidence/11-r3/`.
    main (`OrreryScreen` restore passes no name; the store resolves names only for built-ins
    and categories). Listed for main, not fixed in the lab.
 
+
+## 2026-10-01 — Pixel 6 Pro phone pass (release arm64)
+
+- **Measurement.** Opaque canvas ON, the shipping default. Frames counted from
+  SurfaceFlinger presents: a new `tools/sf-sampler.py` polls `--latency`, takes the union,
+  and uses the highest canvas layer id. `r1-perf.sh` gained `SF=1` and pid-filtered
+  Choreographer skips; `r1-matrix.sh` gained a `notilt` config and per-cell thermal status
+  (`25f82cdf`).
+- **Finding.** The tilted Home turns the WP-1.3 stroked world-circle rings and wakes into a
+  Mali GPU cliff (Dense 3–9 fps, GPU 99.7 %, UI thread blocked about 150 ms per frame in
+  `eglSwapBuffers`). Untilted: 92–99 fps.
+- **Not patched in the lab.** It is a draw-strategy rewrite (affine ovals or one ring
+  shader); handed to V2 as a must-fix (PRODUCTIONIZATION "Phone additions").
+- **Workaround tried.** A plain world saveLayer, built and measured on the phone: no effect.
+  Reverted, never committed.
+- **Opaque canvas stays default.** Every RuntimeEffect compiled on Mali; no visible
+  artefacts.
+- **Cuts for battery.** The soak was cut to 5 min and the Everything soak skipped (battery
+  7 % at the end of the pass).

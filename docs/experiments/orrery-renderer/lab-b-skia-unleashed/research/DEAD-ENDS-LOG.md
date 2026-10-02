@@ -33,3 +33,16 @@ Ideas tried and dropped (or demoted to a toggle), with the commit that holds the
 | 2026-10-01 | R3 | **Immersive header scrim as abutting stepped bands** (17 bands each covering its own slice, +0.5 dp overlap against gaps) | The overlaps drew visible dark hairlines across the map at every band edge (`evidence/11-r3/01-iter1/02-overview-dense.jpg`, under the title). Replaced by NESTED bands all anchored at the top (each edge is one small alpha step, no overlaps), solved so the composite matches the target profile (`labb-header-scrim.ts`, tested). | `13c706ad` (final), iteration 1 build `r3a` |
 | 2026-10-01 | R3 | **Near-body viewport cap at 9.5 % of the short side** | At detail zoom the near body still read as a disc under the FAB column (`01-iter1/04-detail-dense.jpg`); perspective alone is only ≤ 13–30 % of the size (focal ≈ 4.65 × extent), the rest is the zoom. Cap lowered to 8 % (`02-iter2/04-detail-dense.jpg`). | iteration 1 → 2 |
 | 2026-10-01 | R3 | **Exempting the immersive bar from the canvas (keep the canvas below it, only fade a strip)** | Not built: a strip under an opaque bar still reads as an app header over a picture; the point is that the map continues under the title. | — (rejected on analysis) |
+
+## 2026-10-01 — Phone pass
+
+- **`worldLayer`: one plain saveLayer (`<Group layer={<Paint/>}>`) around the world layers.**
+  - Motivation: on the Pixel, "Everything" and `fxShockFilter` (world inside a saveLayer
+    with a runtime image filter) ran the tilted Dense at 24–49 fps, against best's 5.
+  - Result: the plain layer gave 4.6 vs 4.7 fps, no effect.
+  - The filter path trades GPU for 20–50 ms of CPU per frame on main (Perfetto), so it is
+    not a fix either.
+  - Reverted before commit; the release A/B build was replaced by the HEAD build.
+- **Stroked world circles under a perspective matrix** (rings, wakes, trims).
+  - Free on the emulator; 100–350 ms of GPU per frame on Mali-G78.
+  - Rejected as an Android draw strategy (the idea of exact world orbits stays).
