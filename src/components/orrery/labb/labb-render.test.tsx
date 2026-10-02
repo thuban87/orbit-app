@@ -31,7 +31,9 @@ const fakeSkia = vi.hoisted(() => {
   const snapshot = (v: unknown) =>
     v && typeof v === "object" && "__paint" in (v as object)
       ? { ...(v as { __paint: Record<string, unknown> }).__paint }
-      : v;
+      : v && typeof v === "object" && "__path" in (v as object)
+        ? { ...(v as { __path: Record<string, unknown> }).__path }
+        : v;
   const recorder = () => {
     const ops: Op[] = [];
     const canvas: Record<string, unknown> = new Proxy(
@@ -198,7 +200,10 @@ vi.mock("@shopify/react-native-skia", async () => {
                     throw new Error("Value is undefined, expected an Object");
                   return { uniforms, children };
                 },
-                makeShader: (uniforms: number[]) => ({ uniforms }),
+                makeShader: (uniforms: number[], localMatrix?: unknown) => ({
+                  uniforms,
+                  localMatrix,
+                }),
               }
             : null,
       },
@@ -213,8 +218,34 @@ vi.mock("@shopify/react-native-skia", async () => {
       RRectXY: (r: object, rx: number) => ({ ...r, rx }),
       MaskFilter: { MakeBlur: (...args: unknown[]) => ({ blur: args }) },
       PathEffect: { MakeDash: (...args: unknown[]) => ({ dash: args }) },
+      Matrix: (m?: readonly number[]) => ({ matrix: m ? [...m] : null }),
       Path: {
-        Make: () => ({ moveTo() {}, lineTo() {}, close() {}, addArc() {} }),
+        // Tilt fix: the screen-space ring pictures reuse one scratch path
+        // (reset → addCircle → transform); the recorder snapshots its state.
+        Make: () => {
+          const state: Record<string, unknown> = {};
+          const path = {
+            __path: state,
+            moveTo() {},
+            lineTo() {},
+            close() {},
+            addArc() {},
+            reset() {
+              state.circle = undefined;
+              state.matrix = undefined;
+              return path;
+            },
+            addCircle(x: number, y: number, r: number) {
+              state.circle = [x, y, r];
+              return path;
+            },
+            transform(m: readonly number[]) {
+              state.matrix = [...m];
+              return path;
+            },
+          };
+          return path;
+        },
       },
       ParagraphBuilder: {
         Make: () => {
@@ -613,18 +644,88 @@ describe("Lab B renderer tree contract", () => {
       "picture",
     ]);
     expect(labels.children.map((c) => c.type)).toEqual(["picture"]);
-    // Under the homography: the class-ring picture + the trim picture (the
-    // wake picture needs its runtime effect: null here; R1 wraps it in its
-    // fade-gate Group, which is then empty).
+    // Tilt fix (ringPlaneDraw, default ON): the orbit layer records in
+    // SCREEN space — no plane-homography Group around it. Wake gate Group
+    // (empty: the wake picture needs its runtime effect, null here), the
+    // class-ring picture, the trim picture, the drift tethers (FILLED rects:
+    // the only element that keeps the plane matrix) and the tick picture.
     const orbit = rings.children[0];
-    expect(orbit.props.matrix).toHaveProperty("value");
+    expect(orbit.props.matrix).toBeUndefined();
     expect(orbit.children[0].type).toBe("skGroup");
     expect(orbit.children[0].children ?? []).toEqual([]);
-    expect(orbit.children.slice(1, 3).map((c) => c.type)).toEqual([
+    expect(orbit.children.slice(1).map((c) => c.type)).toEqual([
       "picture",
+      "picture",
+      "skGroup",
       "picture",
     ]);
+    expect(orbit.children[3].props.matrix).toHaveProperty("value");
     expect(orbit.children.some((c) => c.type === "circle")).toBe(false);
+  });
+
+  it("tilt fix: tilted rings are the circle path mapped through the homography, screen-width stroke, shader in world coords via its LOCAL matrix — never a perspective CTM", async () => {
+    lab.flags = { fpsHud: false, layerPictures: true };
+    lab.effects = true;
+    const pose = { value: { ...HOME_CAMERA, zoom: 1.3, tilt: 0.56, yaw: 0.4 } };
+    const { tree, scene } = await renderLab(pose);
+    // L1 = [stage plane (its effect compiles here), orbit layer, switch FX].
+    const orbit = tree[1].children[0].children[1];
+    const pictures = orbit.children.filter((c) => c.type === "picture");
+    const ops = pictures.flatMap(opsOf);
+    // Nothing in the orbit layer concatenates a matrix (perspective CTM).
+    expect(ops.some((o) => o[0] === "concat" || o[0] === "setMatrix")).toBe(
+      false,
+    );
+    // pictures[0] = the class rings (wakes need a status; this contact's
+    // wake gate Group holds the wake picture, not a direct child).
+    const ring = opsOf(pictures[0]).find((o) => o[0] === "drawPath");
+    expect(ring).toBeDefined();
+    const path = (ring ?? [])[1] as { circle: number[]; matrix: number[] };
+    const world = scene.world.find((b) => b.kind === "contact");
+    expect(path.circle[0]).toBe(0);
+    expect(path.circle[1]).toBe(0);
+    expect(path.circle[2]).toBeCloseTo(world?.ringRadius ?? -1, 6);
+    // The path's homography maps the world ring onto the frame's projected
+    // ring (projectFrame's ringPath[0] = north), so hit-testing and the draw
+    // agree.
+    const m = path.matrix;
+    expect(m).toHaveLength(9);
+    expect(Math.abs(m[6]) + Math.abs(m[7])).toBeGreaterThan(0);
+    const { applyHomography } = await import("./labb-rings-logic");
+    const { projectFrame } = await import("@/logic/orrery-camera-logic");
+    const projected = projectFrame(
+      scene.world,
+      pose.value,
+      { width: 500, height: 700 },
+      0,
+    ).bodies.find((b) => b.kind === "contact");
+    const north = applyHomography(m, 0, -(world?.ringRadius ?? 0));
+    expect(north.x).toBeCloseTo(projected?.ringPath[0].x ?? Number.NaN, 4);
+    expect(north.y).toBeCloseTo(projected?.ringPath[0].y ?? Number.NaN, 4);
+    const paint = (ring ?? [])[2] as {
+      setStrokeWidth: number;
+      setShader: { localMatrix: { matrix: number[] } };
+    };
+    // Screen-dp stroke (not world / zoom).
+    expect(paint.setStrokeWidth).toBeGreaterThan(0.5);
+    expect(paint.setStrokeWidth).toBeLessThan(3);
+    for (let i = 0; i < 9; i++)
+      expect(paint.setShader.localMatrix.matrix[i]).toBeCloseTo(m[i], 9);
+    // Untilted: Ganesh's circle op at the projected centre (as before the fix).
+    pose.value = { ...pose.value, tilt: 0 };
+    const flat = opsOf(pictures[0]);
+    expect(flat.some((o) => o[0] === "drawPath")).toBe(false);
+    const circle = flat.find((o) => o[0] === "drawCircle");
+    expect(circle?.[1]).toBeCloseTo(250, 6);
+    expect(circle?.[2]).toBeCloseTo(350, 6);
+    expect(circle?.[3]).toBeCloseTo((world?.ringRadius ?? 0) * 1.3, 6);
+  });
+
+  it("tilt fix A/B: ringPlaneDraw off restores the pre-fix homography Group", async () => {
+    lab.flags = { fpsHud: false, layerPictures: true, ringPlaneDraw: false };
+    const { tree } = await renderLab({ value: { ...HOME_CAMERA, tilt: 0.5 } });
+    const orbit = tree[1].children[0].children[0];
+    expect(orbit.props.matrix).toHaveProperty("value");
   });
 
   it("layerPictures lit body: one shader circle at r·reach, flattened uniforms (disc = world radius), billboard transform", async () => {

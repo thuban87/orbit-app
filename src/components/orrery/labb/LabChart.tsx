@@ -6,9 +6,9 @@
  * Dark looked identical to Galaxy Dark (M1-CRITIQUE). Instead of a nebula it
  * gets a quiet graphite sky (`STANDARD_DARK_ENV`) plus this chart: range rings
  * at a "nice" world step, bearing spokes and a degree scale on the outer ring —
- * hairlines in a quiet token (`textSecondary`), static world geometry drawn
- * as ONE picture under the plane homography (so it tilts, yaws and zooms with
- * the plane). It encodes NOTHING about contacts (no status, no data); it is
+ * hairlines in a quiet token (`textSecondary`), static world geometry
+ * projected through the plane homography into ONE screen-space picture (so it
+ * tilts, yaws and zooms with the plane; tilt fix: no perspective CTM). It encodes NOTHING about contacts (no status, no data); it is
  * pure chart texture. Re-recorded only when the frame changes (camera moves).
  *
  * Hermes rule: worklet helpers are declared ABOVE their callers.
@@ -19,7 +19,8 @@ import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
 import { type LabChartProfile, labColor } from "@/theme/orrery-lab-fx";
 import type { ThemePalette } from "@/theme/theme-types";
-import { planeHomography } from "./labb-rings-logic";
+import { strokePlaneCircleAuto } from "./labb-plane-draw";
+import { applyHomography, planeHomography } from "./labb-rings-logic";
 import { tokenToVec4 } from "./labb-uniforms";
 
 // --- Tunables -----------------------------------------------------------------
@@ -86,29 +87,36 @@ export function LabChart({
     const zoom = f.pose.zoom > 0 ? f.pose.zoom : 1;
     const gap = radii[0];
     const fade = Math.min(1, Math.max(0.3, (gap * zoom) / CHART_FADE_DP));
+    // Tilt fix: everything in SCREEN space (no perspective CTM — stroked
+    // geometry under the homography is a Mali GPU cliff, PHONE-PASS P-1):
+    // range rings as projected ellipses, spokes / ticks as projected lines
+    // (a line maps to a line under a homography). 1-dp hairlines, as before.
+    const w = f.viewport.width;
+    const h = f.viewport.height;
     const paint = Skia.Paint();
     paint.setAntiAlias(true);
     paint.setStyle(1);
-    paint.setStrokeWidth(1 / zoom);
+    paint.setStrokeWidth(1);
     paint.setColor(
       Float32Array.of(tone[0], tone[1], tone[2], tone[3] * alpha * fade),
     );
-    canvas.save();
-    canvas.concat(m);
+    const path = Skia.Path.Make();
     for (let i = 0; i < radii.length; i++)
-      canvas.drawCircle(0, 0, radii[i], paint);
+      strokePlaneCircleAuto(canvas, path, m, 0, 0, radii[i], 1, paint, w, h);
     const inner = radii[0] * 0.5;
     const outer = radii[radii.length - 1];
     for (let a = 0; a < Math.PI * 2 - 1e-6; a += spokeStep) {
       const s = Math.sin(a);
       const c = -Math.cos(a);
-      canvas.drawLine(inner * s, inner * c, outer * s, outer * c, paint);
+      const p0 = applyHomography(m, inner * s, inner * c);
+      const p1 = applyHomography(m, outer * s, outer * c);
+      canvas.drawLine(p0.x, p0.y, p1.x, p1.y, paint);
     }
     // Degree scale on the outer ring (every 10°, longer every 30°).
     const ticks = Skia.Paint();
     ticks.setAntiAlias(true);
     ticks.setStyle(1);
-    ticks.setStrokeWidth(1 / zoom);
+    ticks.setStrokeWidth(1);
     ticks.setColor(
       Float32Array.of(tone[0], tone[1], tone[2], tone[3] * scaleAlpha),
     );
@@ -117,15 +125,10 @@ export function LabChart({
       const len = (d % 30 === 0 ? TICK_MAJOR_DP : TICK_MINOR_DP) / zoom;
       const s = Math.sin(a);
       const c = -Math.cos(a);
-      canvas.drawLine(
-        outer * s,
-        outer * c,
-        (outer + len) * s,
-        (outer + len) * c,
-        ticks,
-      );
+      const p0 = applyHomography(m, outer * s, outer * c);
+      const p1 = applyHomography(m, (outer + len) * s, (outer + len) * c);
+      canvas.drawLine(p0.x, p0.y, p1.x, p1.y, ticks);
     }
-    canvas.restore();
     return recorder.finishRecordingAsPicture();
   });
   return <Picture picture={picture} />;

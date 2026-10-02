@@ -78,6 +78,7 @@ import {
   slotFlash,
 } from "./labb-focus-logic";
 import { bodyAt, type FrameIndex } from "./labb-frame-index";
+import { strokePlaneCircleAuto } from "./labb-plane-draw";
 import { planeHomography } from "./labb-rings-logic";
 
 // --- Tunables -----------------------------------------------------------------
@@ -498,16 +499,22 @@ export function LabFeedbackPicture({
         const rings = rippleRings(u, reduced);
         const m = t.world ? planeHomography(f.pose, f.viewport) : null;
         if (m) {
-          canvas.save();
-          canvas.concat(m);
+          // Tilt fix: projected ellipses in screen space, 1.2-dp screen
+          // stroke (no stroked circle under the perspective CTM).
+          const path = Skia.Path.Make();
           for (let i = 0; i < rings.length; i++)
-            canvas.drawCircle(
+            strokePlaneCircleAuto(
+              canvas,
+              path,
+              m,
               t.wx,
               t.wy,
               rings[i].grow / zoom,
-              strokePaint(accent, rings[i].alpha, 1.2 / zoom, additive),
+              1.2,
+              strokePaint(accent, rings[i].alpha, 1.2, additive),
+              f.viewport.width,
+              f.viewport.height,
             );
-          canvas.restore();
         } else
           for (let i = 0; i < rings.length; i++)
             canvas.drawCircle(
@@ -546,39 +553,48 @@ export function LabFeedbackPicture({
           const m = planeHomography(f.pose, f.viewport);
           const rw = b.ringRadius / zoom;
           if (m && rw > 0) {
-            canvas.save();
-            canvas.concat(m);
-            canvas.drawCircle(
+            // Tilt fix: screen-space projected ring (wide glow = oval op).
+            const path = Skia.Path.Make();
+            const vw = f.viewport.width;
+            const vh = f.viewport.height;
+            strokePlaneCircleAuto(
+              canvas,
+              path,
+              m,
               0,
               0,
               rw,
-              strokePaint(
-                accent,
-                HELD_GLOW_ALPHA,
-                HELD_GLOW_DP / zoom,
-                additive,
-              ),
+              HELD_GLOW_DP,
+              strokePaint(accent, HELD_GLOW_ALPHA, HELD_GLOW_DP, additive),
+              vw,
+              vh,
             );
-            canvas.drawCircle(
+            strokePlaneCircleAuto(
+              canvas,
+              path,
+              m,
               0,
               0,
               rw,
-              strokePaint(accent, HELD_LINE_ALPHA, HELD_LINE_DP / zoom, false),
+              HELD_LINE_DP,
+              strokePaint(accent, HELD_LINE_ALPHA, HELD_LINE_DP, false),
+              vw,
+              vh,
             );
             const flash = slotFlash(slotT.value, reduced);
             if (flash)
-              canvas.drawCircle(
+              strokePlaneCircleAuto(
+                canvas,
+                path,
+                m,
                 0,
                 0,
                 rw,
-                strokePaint(
-                  accent,
-                  flash.alpha,
-                  flash.widthDp / zoom,
-                  additive,
-                ),
+                flash.widthDp,
+                strokePaint(accent, flash.alpha, flash.widthDp, additive),
+                vw,
+                vh,
               );
-            canvas.restore();
           }
           drawReticle(canvas, b.x, b.y, R, 0, 1, accent, additive, 0);
         }

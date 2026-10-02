@@ -28,6 +28,15 @@
  *
  * `LabRingsPathRebuild` keeps the WP-1.0 parity rings (128-point Path rebuilt
  * per ring) as the A/B baseline behind the `ringsPathRebuild` flag.
+ *
+ * TILT FIX (phone pass P-1, flag `ringPlaneDraw`, default ON with
+ * `layerPictures`): stroking world circles under the PERSPECTIVE homography is
+ * a Mali GPU cliff, so the picture path now renders `LabRingsPlane.tsx`
+ * instead — the same layers recorded in SCREEN space as exact projected
+ * ellipses, shaders in world coordinates through their local matrix. Only the
+ * drift tethers (filled rects, an analytic perspective quad) keep the plane
+ * matrix. Everything below the plane branch in `LabRings` is the pre-fix A/B
+ * baseline (`ringPlaneDraw:0`) and the declarative path (`layerPictures:0`).
  */
 import {
   Circle,
@@ -64,6 +73,13 @@ import type { LabFlags } from "@/stores/orrery-labb-fx-store";
 import { type LabRingProfile, labColor } from "@/theme/orrery-lab-fx";
 import type { ThemePalette } from "@/theme/theme-types";
 import type { OrreryBodyResource } from "../use-orrery-switch-runtime";
+import {
+  PlaneFocusRingPicture,
+  PlaneRingClassesPicture,
+  PlaneTicksPicture,
+  PlaneTrimRingPicture,
+  PlaneWakesPicture,
+} from "./LabRingsPlane";
 import { useLabRenderContext, useLabStillContext } from "./labb-context";
 import { getLabEffect, LAB_EFFECT_SOURCES } from "./labb-effects";
 import { focusDimFactor } from "./labb-focus-logic";
@@ -240,6 +256,13 @@ export function labRingEntries(
         focused: focusedIds.includes(r.body.id),
       };
     });
+}
+
+/** World segments → flat [x0, y0, x1, y1, …] (tilt-fix tick picture). */
+function flatSegments(segments: readonly (Segment | null)[]): number[] {
+  const out: number[] = [];
+  for (const s of segments) if (s) out.push(s.x0, s.y0, s.x1, s.y1);
+  return out;
 }
 
 function segmentsPath(segments: readonly (Segment | null)[]): SkPath {
@@ -1227,6 +1250,121 @@ export function LabRings({
     shader,
     ringGap,
   });
+  // Tilt fix (flag `ringPlaneDraw`, picture path only): flat world segments
+  // for the screen-space tick picture.
+  const tickSegs = useMemo(
+    () => ({
+      north: flatSegments(entries.map((e) => northTick(e.ringRadius))),
+      focus: flatSegments(
+        entries
+          .filter((e) => e.focused)
+          .flatMap((e) => scaleTicks(e.ringRadius)),
+      ),
+      compass: flatSegments(
+        compassChevron(entries.reduce((m, e) => Math.max(m, e.ringRadius), 0)),
+      ),
+    }),
+    [entries],
+  );
+  const tickTone = tokenToVec4(labColor(colors, profile.tick));
+  const compassTone = tokenToVec4(labColor(colors, profile.compass));
+  if (picture && flags.ringPlaneDraw) {
+    const oval = flags.ringOvalOp;
+    return (
+      <Group>
+        {flags.ringWake && wakeLod ? (
+          <Group opacity={wakeGate}>
+            <PlaneWakesPicture
+              classes={classes}
+              frame={frame}
+              cam={cam}
+              profile={profile}
+              settled={settled}
+              moving={moving}
+              oval={oval}
+            />
+          </Group>
+        ) : null}
+        {focused.length ? (
+          <PlaneFocusRingPicture
+            layer="glow"
+            focused={focused}
+            frame={frame}
+            frameIndex={frameIndex}
+            cam={cam}
+            flow={flow}
+            profile={profile}
+            highlight={highlight}
+            shader={shader}
+          />
+        ) : null}
+        <PlaneRingClassesPicture
+          classes={classes}
+          frame={frame}
+          frameIndex={frameIndex}
+          cam={cam}
+          flow={flow}
+          profile={profile}
+          highlight={highlight}
+          shader={shader}
+          ringGap={ringGap}
+          anyFocus={anyFocus}
+          trimKeys={trimKeys}
+          sunLight={sunLight}
+          oval={oval}
+        />
+        {flags.fx && flags.fxRingTrim ? (
+          <PlaneTrimRingPicture
+            entries={trimEntries}
+            frame={frame}
+            profile={profile}
+          />
+        ) : null}
+        {focused.length ? (
+          <PlaneFocusRingPicture
+            layer="lock"
+            focused={focused}
+            frame={frame}
+            frameIndex={frameIndex}
+            cam={cam}
+            flow={flow}
+            profile={profile}
+            highlight={highlight}
+            shader={shader}
+          />
+        ) : null}
+        {/* Tethers are FILLED rects (a perspective quad is an analytic rect
+            op, not a stroked oval): they keep the plane matrix. */}
+        {flags.ringTethers ? (
+          <Group matrix={matrix}>
+            {classes
+              .filter((group) => group[0].cls.tether)
+              .map((group) => (
+                <TetherClassGroup
+                  key={`tether-${group[0].cls.id}`}
+                  common={commonFor(group[0].cls)}
+                  entries={group}
+                  settled={settled}
+                />
+              ))}
+          </Group>
+        ) : null}
+        {flags.ringTicks ? (
+          <PlaneTicksPicture
+            north={tickSegs.north}
+            focusTicks={tickSegs.focus}
+            compass={tickSegs.compass}
+            frame={frame}
+            level={level}
+            tick={tickTone}
+            tickAlpha={profile.tickAlpha}
+            compassColor={compassTone}
+            compassAlpha={profile.compassAlpha}
+          />
+        ) : null}
+      </Group>
+    );
+  }
   return (
     <Group matrix={matrix}>
       {flags.ringWake && picture && wakeLod ? (

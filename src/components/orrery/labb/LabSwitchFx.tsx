@@ -30,15 +30,18 @@
  */
 import {
   Atlas,
+  BlendMode,
   BlurMask,
   Circle,
   Group,
   LinearGradient,
+  Picture,
   RadialGradient,
   Rect,
   RoundedRect,
   rect,
-  Shader,
+  Skia,
+  type SkPicture,
   type SkRSXform,
   useColorBuffer,
   useRectBuffer,
@@ -62,6 +65,7 @@ import {
 import { useLabStillContext } from "./labb-context";
 import { getLabEffect } from "./labb-effects";
 import { bodyAt, type FrameIndex } from "./labb-frame-index";
+import { fillPlaneDisc } from "./labb-plane-draw";
 import { applyHomography, planeHomography } from "./labb-rings-logic";
 import {
   COMET_LOOKBACK,
@@ -249,6 +253,18 @@ function projectWorld(
 
 // --- UNDER the bodies: shockwave + trails -----------------------------------------
 
+/** One shared empty picture (identical value → no canvas notification). */
+function emptyShockPicture(): SkPicture {
+  "worklet";
+  const g = globalThis as unknown as { __labbEmptyPicture?: SkPicture };
+  if (!g.__labbEmptyPicture) {
+    const recorder = Skia.PictureRecorder();
+    recorder.beginRecording(Skia.XYWHRect(0, 0, 1, 1));
+    g.__labbEmptyPicture = recorder.finishRecordingAsPicture();
+  }
+  return g.__labbEmptyPicture;
+}
+
 function Shockwave({
   frame,
   extent,
@@ -262,13 +278,11 @@ function Shockwave({
 }) {
   const ctx = useLabStillContext();
   const effect = getLabEffect("switchShock");
-  const matrix = useDerivedValue(
-    () =>
-      planeHomography(frame.value.pose, frame.value.viewport) ?? [
-        1, 0, 0, 0, 1, 0, 0, 0, 1,
-      ],
-  );
-  const state = useDerivedValue(() => {
+  // Tilt fix: ONE screen-space picture — the shockwave disc is filled as its
+  // projected ellipse (no perspective CTM on the geometry); the shader still
+  // works in world plane coordinates through the homography as its LOCAL
+  // matrix. Idle (no switch) it returns one shared empty picture.
+  const picture = useDerivedValue<SkPicture>(() => {
     const sw = ctx?.sw;
     const warm = ctx ? ctx.warm.value : false;
     const fx = ctx ? ctx.fxFlags.value : null;
@@ -280,32 +294,44 @@ function Shockwave({
       switchFxLive(signal, ctx ? ctx.reducedMotion.value : false);
     const [u, s] = live ? shockwaveState(signal) : [0, 0];
     const strength = warm ? 0.01 : s * (fx ? fx.intensity : 1);
+    if (!effect || !(strength > 0)) return emptyShockPicture();
+    const f = frame.value;
+    const m = planeHomography(f.pose, f.viewport);
+    if (!m) return emptyShockPicture();
     const reach = extent > 0 ? extent : 200;
     const front = reach * (0.06 + SHOCK_REACH * (1 - (1 - u) ** 2.2));
     const band = reach * SHOCK_BAND * (0.6 + u);
-    const zoom = frame.value.pose.zoom > 0 ? frame.value.pose.zoom : 1;
+    const zoom = f.pose.zoom > 0 ? f.pose.zoom : 1;
     const hue = sw ? sw.skyHue.value : highlight;
-    return { front, band, strength, zoom, hue };
-  });
-  const r = useDerivedValue(() =>
-    state.value.strength > 0 ? state.value.front + state.value.band * 0.2 : 0,
-  );
-  const uniforms = useDerivedValue(() => {
-    const s = state.value;
-    return {
-      uShk: [s.front, s.band, s.strength, SHOCK_LINE_DP / s.zoom],
-      uShkC: [s.hue[0], s.hue[1], s.hue[2], additive ? 1 : 0],
-      uShkH: [highlight[0], highlight[1], highlight[2], 0],
-    };
+    const recorder = Skia.PictureRecorder();
+    const canvas = recorder.beginRecording(Skia.XYWHRect(-1e5, -1e5, 2e5, 2e5));
+    const paint = Skia.Paint();
+    paint.setAntiAlias(true);
+    if (additive) paint.setBlendMode(BlendMode.Plus);
+    paint.setShader(
+      effect.makeShader(
+        [
+          front,
+          band,
+          strength,
+          SHOCK_LINE_DP / zoom,
+          hue[0],
+          hue[1],
+          hue[2],
+          additive ? 1 : 0,
+          highlight[0],
+          highlight[1],
+          highlight[2],
+          0,
+        ],
+        Skia.Matrix(m),
+      ),
+    );
+    fillPlaneDisc(canvas, Skia.Path.Make(), m, 0, 0, front + band * 0.2, paint);
+    return recorder.finishRecordingAsPicture();
   });
   if (!effect) return null;
-  return (
-    <Group matrix={matrix}>
-      <Circle cx={0} cy={0} r={r} blendMode={additive ? "plus" : "srcOver"}>
-        <Shader source={effect} uniforms={uniforms} />
-      </Circle>
-    </Group>
-  );
+  return <Picture picture={picture} />;
 }
 
 function Trails({

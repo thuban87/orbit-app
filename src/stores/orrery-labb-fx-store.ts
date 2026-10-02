@@ -436,6 +436,23 @@ export const LAB_FLAG_REGISTRY = [
   },
   // Debug instrumentation (research 03 §4).
   {
+    id: "ringPlaneDraw",
+    label:
+      "Tilt fix: rings drawn as projected ellipses (no perspective matrix)",
+    section: "debug",
+    default: true,
+    heavy: true,
+    note: "off = the pre-fix stroked world circles under the plane homography (Mali GPU cliff, phone pass P-1)",
+  },
+  {
+    id: "ringOvalOp",
+    label:
+      "Tilt fix A/B: rings as analytic ovals (ellipse op) instead of projected paths",
+    section: "debug",
+    default: false,
+    heavy: true,
+  },
+  {
     id: "layerPictures",
     label: "Bodies + labels as ONE picture per layer (switch-stall fix)",
     section: "debug",
