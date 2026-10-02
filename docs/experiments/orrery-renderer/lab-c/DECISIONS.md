@@ -396,3 +396,7 @@ ceiling, on-screen pan-coast bound, dolly-consistent north, sky at MAX_TILT. Whe
 - F.4: final release screenshots and recordings. The README does not claim debug parity for the focus being
   cleared on tab return (not compared).
 
+
+## 2026-10-01 — Test fix after the research package
+
+- df8479b6: the lab-only System-name restore now guards `requested.ref?.kind`; the 2 `orrery-screen-framing.test.ts` failures are gone. Orrery suites + framing test: 733/733, tsc clean.

@@ -90,9 +90,8 @@ Everything is in [RUNBOOK-LAB-C.md](RUNBOOK-LAB-C.md). Do not improvise. In shor
 5. **Release:** `assembleRelease` with the same signer, installed over the seeded debug app with `install -r` (§8).
    Release arm64 APK: 102.9 MB.
 6. **Tests:** `npx vitest run src/logic src/components/orrery src/screens/orrery-screen-framing.test.ts` and
-   `npx tsc --noEmit`. When this package was written: tsc clean, 731/733 pass. The 2 failures are in
-   `orrery-screen-framing.test.ts`: the lab-only "Unavailable System" effect reads
-   `requested.ref.kind`, and the test's store mock has no `ref`. See PRODUCTIONIZATION.md.
+   `npx tsc --noEmit`. At df8479b6: tsc clean, 733/733 pass (the 2 framing-test failures from the
+   lab-only "Unavailable System" effect reading `requested.ref.kind` were fixed with a `ref?.kind` guard).
 
 ## Evidence index (best shot or recording per aspect)
 

@@ -60,8 +60,9 @@ recorded decision).
 - Fix stale comments (ring stroke "world units", "2k star slab").
 
 ### Tests
-- Fix the 2 failing `orrery-screen-framing.test.ts` cases. The lab-only "Unavailable System" effect reads
-  `requested.ref.kind`, and the test store mock has no `ref`. Fix either the guard (`ref?.kind`) or the mock.
+- (Done in df8479b6) The 2 `orrery-screen-framing.test.ts` failures caused by the lab-only "Unavailable System"
+  effect reading `requested.ref.kind` are fixed with a `ref?.kind` guard. A production fix of that bug should
+  come with its own test.
 - Keep and extend the parity tests (camera rig, frame-lite, lifted moons) and the strategy-camera tests.
 - Add tests for `switchDepth` (zero at p = 0 and 1, reduced-motion still), `effectiveLabelZoom`, the ring
   density fade, minimum on-screen size, and `focusCardPlacement`.
