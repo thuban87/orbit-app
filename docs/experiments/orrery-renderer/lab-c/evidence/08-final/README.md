@@ -23,4 +23,4 @@ revolution / twinkle / sun pulse stop (two frames 5 s apart pixel-identical), sw
 hook (`src/theme/use-reduced-motion.ts`) is not `__DEV__`-gated. Animation scales were left at 1 throughout F.
 
 **Seen only in release vs debug:** nothing broken. `uiautomator dump` now succeeds while the Orrery animates.
-Focus is cleared on leaving the Orrery tab and returning (same as debug, by design of the remount).
+Focus was cleared after leaving the Orrery tab (to Settings) and returning; not compared against debug.
