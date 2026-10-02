@@ -42,8 +42,8 @@ import {
   materialColor,
   normalLocal,
   normalView,
-  positionView,
   positionGeometry,
+  positionView,
   select,
   smoothstep,
   texture,
@@ -677,25 +677,20 @@ export class OrreryScene3D {
     this.stars.frustumCulled = false;
     this.stars.renderOrder = -10;
     this.scene.add(this.stars);
-
-    // Orbital plane: faint dust disc + polar grid so the plane reads as a
-    // surface in space (one draw, additive, theme-token tinted).
-    {
-      // Pattern baked once into a texture (was atan + fract per fragment).
-      this.planeMat.colorNode = materialColor;
-      this.planeMat.opacityNode = texture(this.planeTex).a.mul(0.25);
-      this.planeMat.blending = THREE.AdditiveBlending;
-      this.planeMat.fog = false;
-      this.plane = new THREE.Mesh(
-        new THREE.CircleGeometry(1, 128),
-        this.planeMat,
-      );
-      this.plane.rotation.x = -Math.PI / 2;
-      this.plane.position.y = -0.5;
-      this.plane.renderOrder = -2;
-      this.plane.frustumCulled = false;
-      this.scene.add(this.plane);
-    }
+    // Pattern baked once into a texture (was atan + fract per fragment).
+    this.planeMat.colorNode = materialColor;
+    this.planeMat.opacityNode = texture(this.planeTex).a.mul(0.25);
+    this.planeMat.blending = THREE.AdditiveBlending;
+    this.planeMat.fog = false;
+    this.plane = new THREE.Mesh(
+      new THREE.CircleGeometry(1, 128),
+      this.planeMat,
+    );
+    this.plane.rotation.x = -Math.PI / 2;
+    this.plane.position.y = -0.5;
+    this.plane.renderOrder = -2;
+    this.plane.frustumCulled = false;
+    this.scene.add(this.plane);
 
     // Sun glow, Polaris, focus rings ------------------------------------------
     this.glowMat.fog = false;
@@ -762,6 +757,9 @@ export class OrreryScene3D {
   }
 
   applyColors(colors: ThemePalette) {
+    // Label rasters bake the surface backplate: re-raster on a theme change.
+    if (this.colors && this.colors.surface !== colors.surface)
+      for (const [id, entry] of this.labels) this.dropLabel(id, entry);
     this.colors = colors;
     // autoClear is off (two passes), so the background is the clear colour.
     this.renderer.setClearColor(color(colors.background), 1);
@@ -847,8 +845,21 @@ export class OrreryScene3D {
   }
 
   setLabelTexts(texts: Map<string, LabelText>) {
+    const previous = this.labelTexts;
     this.labelTexts = texts;
-    for (const [id, entry] of this.labels) this.dropLabel(id, entry);
+    // Paragraphs are cached upstream (orrery-text-cache): an unchanged label
+    // keeps the same PreparedOrreryText object, so keep its raster (D.6 — a
+    // focus change used to re-rasterize every label).
+    for (const [cacheId, entry] of this.labels) {
+      const isContext = cacheId.endsWith("#ctx");
+      const id = isContext ? cacheId.slice(0, -4) : cacheId;
+      const before = previous.get(id);
+      const after = texts.get(id);
+      const same = isContext
+        ? before?.context != null && before.context === after?.context
+        : before?.text != null && before.text === after?.text;
+      if (!same) this.dropLabel(cacheId, entry);
+    }
   }
 
   setPacket(packet: OrreryPacket) {
@@ -1239,6 +1250,23 @@ export class OrreryScene3D {
     this.planeTex.dispose();
     this.noiseTex.dispose();
     this.atlas.dispose();
+    // D.6 follow-up: the post-gc() external floor still rose ~70 MB per mount,
+    // i.e. something keeps this scene reachable after unmount (retainer not
+    // identified in the time box). Drop the large CPU-side buffers so a
+    // retained scene costs bytes, not the 26 MB atlas + texture copies.
+    for (const tex of [
+      this.atlasTex,
+      this.glowTex,
+      this.starTex,
+      this.ringTex,
+      this.planeTex,
+      this.noiseTex,
+    ])
+      (tex as { image: unknown }).image = null;
+    this.atlas.releasePixels();
+    this.labelTexts = new Map();
+    this.infos = new Map();
+    this.packet = null;
   }
 }
 

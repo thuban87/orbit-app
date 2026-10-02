@@ -1,0 +1,34 @@
+ LOG  [lab-c] mount #1 hermes heap=34MB allocated=27MB external=140MB gcs=97
+ LOG  [lab-c] renderer ready #1 in 1023ms buffer=822x1450 dpr=2 TextDecoder=function
+ LOG  [lab-c] bitmap-probe OK 256x256 read=977.9ms decode=5.0ms upload=26.8ms
+ LOG  [lab-c] frames=194 avgDt=25.7ms fps=38.8 p95Dt=25.9 maxDt=995.7 jsRenderAvg=18.13ms p95=18.12 calls=14 tris=145427 photos=40 photoAvg=88.9ms packets=2 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.46ms drawAvg=15.49ms
+ LOG  [lab-c] mem #1 external=297MB heap=38MB gcs=213 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1 gcPerS=23.1 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] frames=275 avgDt=18.2ms fps=54.9 p95Dt=24.9 maxDt=26.4 jsRenderAvg=12.40ms p95=15.55 calls=14 tris=145427 photos=40 photoAvg=88.9ms packets=0 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.37ms drawAvg=10.16ms
+ LOG  [lab-c] mem #1 external=297MB heap=38MB gcs=250 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1 gcPerS=7.4 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] frames=283 avgDt=17.7ms fps=56.5 p95Dt=24.5 maxDt=26.3 jsRenderAvg=11.22ms p95=14.64 calls=14 tris=145427 photos=40 photoAvg=88.9ms packets=0 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.34ms drawAvg=9.23ms
+ LOG  [lab-c] mem #1 external=297MB heap=38MB gcs=287 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1 gcPerS=7.4 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] frames=262 avgDt=19.1ms fps=52.4 p95Dt=25.3 maxDt=26.2 jsRenderAvg=12.95ms p95=16.75 calls=14 tris=145427 photos=40 photoAvg=88.9ms packets=0 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.37ms drawAvg=10.62ms
+ LOG  [lab-c] mem #1 external=297MB heap=38MB gcs=322 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1 gcPerS=7.0 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] frames=241 avgDt=20.8ms fps=48.0 p95Dt=37.7 maxDt=277.9 jsRenderAvg=12.33ms p95=17.24 calls=12 tris=16443 photos=40 photoAvg=88.9ms packets=57 bodies=152 visibleContacts=1 drawnSpheres=10 presentAvg=0.35ms drawAvg=10.66ms
+ LOG  [lab-c] mem #1 external=298MB heap=38MB gcs=352 texs=10 geos=6 labelsLive=1 labelRasters=1 atlasFlushes=1 gcPerS=6.0 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] unmount #1: loop stopped, GPU resources disposed external=133MB
+ LOG  [lab-c] device created in 15ms
+ LOG  [lab-c] post-unmount #1 external=133MB -> 102MB after gc()
+ LOG  [lab-c] mount #2 hermes heap=46MB allocated=40MB external=240MB gcs=439
+ LOG  [lab-c] renderer ready #2 in 985ms buffer=822x1450 dpr=2 TextDecoder=function
+ LOG  [lab-c] frames=228 avgDt=21.9ms fps=45.6 p95Dt=25.3 maxDt=669.1 jsRenderAvg=15.13ms p95=15.90 calls=14 tris=145427 photos=80 photoAvg=90.8ms packets=3 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.67ms drawAvg=12.82ms
+ LOG  [lab-c] mem #2 external=369MB heap=46MB gcs=559 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1 gcPerS=23.9 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] unmount #2: loop stopped, GPU resources disposed external=205MB
+ LOG  [lab-c] device created in 13ms
+ LOG  [lab-c] post-unmount #2 external=205MB -> 173MB after gc()
+ LOG  [lab-c] mount #3 hermes heap=50MB allocated=46MB external=312MB gcs=639
+ LOG  [lab-c] renderer ready #3 in 980ms buffer=822x1450 dpr=2 TextDecoder=function
+ LOG  [lab-c] frames=207 avgDt=24.1ms fps=41.5 p95Dt=26.0 maxDt=734.4 jsRenderAvg=16.73ms p95=18.36 calls=14 tris=145427 photos=120 photoAvg=92.3ms packets=2 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.61ms drawAvg=14.26ms
+ LOG  [lab-c] mem #3 external=469MB heap=50MB gcs=757 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1 gcPerS=23.6 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] unmount #3: loop stopped, GPU resources disposed external=304MB
+ LOG  [lab-c] device created in 12ms
+ LOG  [lab-c] post-unmount #3 external=304MB -> 245MB after gc()
+ LOG  [lab-c] mount #4 hermes heap=55MB allocated=49MB external=383MB gcs=839
+ LOG  [lab-c] renderer ready #4 in 976ms buffer=822x1450 dpr=2 TextDecoder=function
+ LOG  [lab-c] frames=224 avgDt=22.3ms fps=44.9 p95Dt=25.5 maxDt=599.2 jsRenderAvg=15.33ms p95=17.35 calls=14 tris=145427 photos=160 photoAvg=93.5ms packets=3 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.55ms drawAvg=12.81ms
+ LOG  [lab-c] mem #4 external=511MB heap=55MB gcs=959 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1 gcPerS=24.0 paragraphs=132 created=132 disposed=0

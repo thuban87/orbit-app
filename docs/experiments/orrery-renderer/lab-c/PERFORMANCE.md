@@ -108,3 +108,48 @@ counter to schedule GCs (about 6–100 GC/s here). Next steps: dispose the old l
 the memo is replaced or the Orrery unmounts, and find what keeps the old wrappers reachable
 (suspects: closures captured by worklets or Reanimated, and three's WeakMaps keyed on the destroyed
 device). OOM risk is lower than D.5 suggested, because PSS grows only about 20 MB per remount.
+
+### E.1 — Paragraph churn fixed (Checkpoint E, one device session, debug, thermal status 0)
+
+Log: `evidence/07-checkpoint-e/s1-paragraph-cache-mount-log.txt` (Dense System, 121 bodies; launch →
+Digest → Orrery, one focus tap, then Digest↔Orrery ×3).
+
+**Root cause, refined:** RN Skia charges a flat 1 MB of Hermes external pressure per **ParagraphBuilder**
+as well as per Paragraph (`JsiSkParagraphBuilder.h:119`), and a builder has **no `dispose()`** — it only
+goes away when collected. `prepareOrreryText` and `BodyAtlas.drawInitials` built a fresh builder per
+text, so every label was ~2 MB of pressure, and every memo rerun repeated it. A Paragraph's `dispose()`
+does reset its pressure to 256 B (`JsiSkHostObjects.h`, `dispose` host function).
+
+**Fix:**
+- `orreryParagraphBuilder(fontProvider)` (`OrreryLabel.tsx`): one builder per font provider, `reset()`
+  before each use. Used by `prepareOrreryText` and the atlas initials.
+- `OrreryTextCache` (`orrery-text-cache.ts`): Paragraphs keyed by (provider, role, font scale, width, ink
+  colour, text). The labels memo reuses them; after `setLabelTexts` commits, entries the committed set no
+  longer references are disposed; everything is disposed on unmount. Unit tests in
+  `orrery-text-cache.test.ts`.
+- `OrreryScene3D.setLabelTexts` keeps a label's raster when its Paragraph object is unchanged (a focus
+  change used to re-rasterize every label). Rasters are dropped on a backplate (`surface`) colour change.
+- Renderer log adds `gcPerS`, `paragraphs`, `created`, `disposed`.
+
+| | before (D.6) | after (E.1) |
+|---|---|---|
+| Hermes `external` at mount #1 → +5 s | 881 → 1569 MB | 140 → 297 MB |
+| Paragraphs alive / created per mount | ~240 + ~240 builders, never disposed | 132 alive, 132 created, 0 recreated on focus |
+| post-unmount forced-gc floor, #1/#2/#3 | 1359 / 1682 / 2257 MB (+300–575 per mount) | 102 / 173 / 245 MB (+~70 per mount) |
+| GC rate, Orrery idle at overview | ~6.6 /s | 6.0–7.4 /s |
+| GC rate, first 5 s after a mount | ~50–100 /s | ~23–24 /s |
+| fps at Dense overview (debug, JS rAF) | 43.3 (thermal SEVERE, C.5) | 52–56 steady (mount #1); 41–46 in the first 5 s of remounts |
+| `dumpsys meminfo` after mount #4 | Native 793 MB, Graphics 283 MB | Native 743 MB, Graphics 269 MB |
+
+**Honest reading:** the counter is now ~5× lower and the post-gc floor grows ~70 MB per mount instead of
+300–575 MB. The idle GC rate did not drop: ~6–7 GC/s at idle is driven by per-frame JS allocation
+(packets, frame objects), not by external pressure. The first-5-s fps after a remount is lower than steady
+state because of the atlas/photos/label build.
+
+**Remaining floor (~70 MB/mount, 20-min cap):** its size matches one scene's CPU-side buffers (the 26 MB
+atlas `Uint8Array` + the atlas's Skia surface + texture copies), which suggests the disposed
+`OrreryScene3D` stays reachable. The retainer was **not identified** (no heap snapshot tooling on device in
+the time box; suspects unchanged: three's renderer-side WeakMaps/backends keyed on the destroyed device,
+Reanimated-held JS callbacks). Mitigation in the same commit: `OrreryScene3D.dispose()` now drops the
+atlas pixels, every DataTexture's `image`, label texts, infos and the last packet, so a retained scene
+costs bytes. Re-measured in E.2's session (see below).

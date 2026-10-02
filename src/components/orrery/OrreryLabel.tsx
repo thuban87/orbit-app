@@ -6,6 +6,7 @@ import {
   RoundedRect,
   Skia,
   type SkParagraph,
+  type SkParagraphBuilder,
   type SkTypefaceFontProvider,
   TextAlign,
 } from "@shopify/react-native-skia";
@@ -25,6 +26,29 @@ export interface PreparedOrreryText {
   width: number;
   height: number;
 }
+/**
+ * Lab C (PERFORMANCE.md D.6): RN Skia charges a flat 1 MB of Hermes external
+ * memory pressure per ParagraphBuilder AND per Paragraph host object, and a
+ * ParagraphBuilder has no dispose(). Building one per text made every label
+ * rebuild cost ~2 MB of GC pressure per text (constant GCs). One builder per
+ * font provider, reset between uses, removes the builder half for good.
+ * All callers share the same paragraph style (centered, one line, ellipsis).
+ */
+const BUILDERS = new WeakMap<SkTypefaceFontProvider, SkParagraphBuilder>();
+export function orreryParagraphBuilder(
+  fontProvider: SkTypefaceFontProvider,
+): SkParagraphBuilder {
+  let builder = BUILDERS.get(fontProvider);
+  if (!builder) {
+    builder = Skia.ParagraphBuilder.Make(
+      { textAlign: TextAlign.Center, maxLines: 1, ellipsis: "…" },
+      fontProvider,
+    );
+    BUILDERS.set(fontProvider, builder);
+  }
+  return builder;
+}
+
 /** Called on the React resource path only, never inside a frame worklet.
  * Native shaping/one-line ellipsis owns Unicode boundaries; no JS name slicing.
  */
@@ -39,10 +63,9 @@ export function prepareOrreryText(
   if (!fontProvider || maxWidth <= HORIZONTAL_PADDING * 2) return null;
   const typography = TYPOGRAPHY[role];
   const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
-  const paragraph = Skia.ParagraphBuilder.Make(
-    { textAlign: TextAlign.Center, maxLines: 1, ellipsis: "…" },
-    fontProvider,
-  )
+  const builder = orreryParagraphBuilder(fontProvider);
+  builder.reset?.();
+  const paragraph = builder
     .pushStyle({
       color: Skia.Color(colors[typography.colorToken]),
       fontFamilies: [typography.family],

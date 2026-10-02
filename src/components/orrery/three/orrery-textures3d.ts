@@ -16,12 +16,14 @@ import {
   Skia,
   type SkSurface,
   type SkTypefaceFontProvider,
-  TextAlign,
   TileMode,
 } from "@shopify/react-native-skia";
 import { RADII } from "@/theme/tokens/radii";
 import { SPACING } from "@/theme/tokens/spacing";
-import type { PreparedOrreryText } from "../OrreryLabel";
+import {
+  orreryParagraphBuilder,
+  type PreparedOrreryText,
+} from "../OrreryLabel";
 
 /** Body atlas tile edge in px (tunable: sharpness vs memory). */
 export const ATLAS_TILE = 160;
@@ -54,7 +56,12 @@ function readSurfacePixels(surface: SkSurface, width: number, height: number) {
 export class BodyAtlas {
   private surface: SkSurface | null;
   /** The persistent RGBA buffer the GPU texture wraps (never reallocated). */
-  readonly pixels = new Uint8Array(ATLAS_SIZE * ATLAS_SIZE * 4);
+  pixels = new Uint8Array(ATLAS_SIZE * ATLAS_SIZE * 4);
+  /** Unmount: drop the 26 MB CPU copy (the GPU texture is already disposed). */
+  releasePixels() {
+    this.pixels = new Uint8Array(0);
+    this.dirty.clear();
+  }
   private dirty = new Set<number>();
   constructor() {
     this.surface = Skia.Surface.Make(ATLAS_SIZE, ATLAS_SIZE);
@@ -185,10 +192,11 @@ export class BodyAtlas {
       canvas.restore();
     }
     if (fontProvider && initials) {
-      const paragraph = Skia.ParagraphBuilder.Make(
-        { textAlign: TextAlign.Center, maxLines: 1, ellipsis: "…" },
-        fontProvider,
-      )
+      // Shared builder (no 1 MB builder host object per tile, D.6); the
+      // Paragraph is disposed right after painting into the tile.
+      const builder = orreryParagraphBuilder(fontProvider);
+      builder.reset?.();
+      const paragraph = builder
         .pushStyle({
           color: Skia.Color(ink),
           fontFamilies: ["Inter"],

@@ -55,6 +55,10 @@ import type {
   OrrerySatelliteTarget,
 } from "@/logic/orrery-camera-logic";
 import {
+  labFocalDistance,
+  perspectiveScale,
+} from "@/logic/orrery-camera-logic";
+import {
   focusEffectivelyOffscreen,
   type OrreryContactTarget,
 } from "@/logic/orrery-focus-logic";
@@ -88,16 +92,12 @@ import {
   type SwitchChoreography,
   sampleSwitchChoreography,
 } from "@/logic/orrery-switch-choreography";
-import {
-  labFocalDistance,
-  perspectiveScale,
-} from "@/logic/orrery-camera-logic";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
 import { useReducedMotion } from "@/theme/use-reduced-motion";
-import { prepareOrreryText } from "./OrreryLabel";
 import { projectAnimatedFrameLite } from "./orrery-frame-lite";
+import { OrreryTextCache } from "./orrery-text-cache";
 import {
   acquireOrreryDevice,
   prewarmOrreryDevice,
@@ -454,7 +454,7 @@ export function OrreryWorld3D({
       true,
       level.value,
     );
-    const all: (typeof world[number] & { lift?: number })[] = [...world];
+    const all: ((typeof world)[number] & { lift?: number })[] = [...world];
     for (let i = 0; i < moons.length; i++) {
       const m = moons[i];
       const parentId = m.satelliteTarget?.parentId;
@@ -564,6 +564,11 @@ export function OrreryWorld3D({
   }, []);
 
   // --- Labels (JS: native-measured text; UI: allocation) ----------------------
+  // Paragraphs are cached + reused across memo runs and disposed once the
+  // committed label set drops them (D.6: 1 MB Hermes pressure per Paragraph).
+  const textCache = useRef<OrreryTextCache | null>(null);
+  if (!textCache.current) textCache.current = new OrreryTextCache();
+  const texts = textCache.current;
   const labels = useMemo(
     () =>
       scene.world.flatMap((body) => {
@@ -586,7 +591,7 @@ export function OrreryWorld3D({
           focused && member ? focusedRelationById[body.id] : undefined,
         );
         const width = Math.min(LABEL_MAX_WIDTH * fontScale, viewport.width);
-        const text = prepareOrreryText(
+        const text = texts.get(
           name,
           "label",
           fontScale,
@@ -601,7 +606,7 @@ export function OrreryWorld3D({
             name,
             text,
             context: context
-              ? prepareOrreryText(
+              ? texts.get(
                   context,
                   "caption",
                   fontScale,
@@ -625,6 +630,7 @@ export function OrreryWorld3D({
       focusedIds,
       clusterIds,
       focusedRelationById,
+      texts,
     ],
   );
   const measured = useMemo(
@@ -869,7 +875,12 @@ export function OrreryWorld3D({
   }, [bodyInfos, loadPhoto]);
   useEffect(() => {
     sceneRef.current?.setLabelTexts(labelTexts);
-  }, [labelTexts]);
+    // The scene now references only the committed set: release the rest.
+    const live: (LabelText["text"] | null)[] = [];
+    for (const t of labelTexts.values()) live.push(t.text, t.context);
+    texts.sweep(live);
+  }, [labelTexts, texts]);
+  useEffect(() => () => texts.clear(), [texts]);
   useEffect(() => {
     sceneRef.current?.setFocused(focusedIds);
   }, [focusedIds]);
@@ -991,6 +1002,7 @@ export function OrreryWorld3D({
       void runBitmapProbe(renderer, latestInputs.current.bodyInfos);
       let last = 0;
       let statsAt = performance.now();
+      let lastGcs = hs?.js_numGCs ?? 0;
       const tick = (t: number) => {
         if (cancelled || !s) return;
         const ms = s.frame(t, reducedRef.current);
@@ -1019,8 +1031,9 @@ export function OrreryWorld3D({
             | { textures?: number; geometries?: number }
             | undefined;
           console.log(
-            `[lab-c] mem #${serial} external=${Math.round((hm?.js_externalBytes ?? 0) / 1e6)}MB heap=${Math.round((hm?.js_heapSize ?? 0) / 1e6)}MB gcs=${hm?.js_numGCs ?? "?"} texs=${mem?.textures ?? "?"} geos=${mem?.geometries ?? "?"} labelsLive=${s.stats.labelsLive} labelRasters=${s.stats.labelRasters} atlasFlushes=${s.stats.atlasFlushes}`,
+            `[lab-c] mem #${serial} external=${Math.round((hm?.js_externalBytes ?? 0) / 1e6)}MB heap=${Math.round((hm?.js_heapSize ?? 0) / 1e6)}MB gcs=${hm?.js_numGCs ?? "?"} texs=${mem?.textures ?? "?"} geos=${mem?.geometries ?? "?"} labelsLive=${s.stats.labelsLive} labelRasters=${s.stats.labelRasters} atlasFlushes=${s.stats.atlasFlushes} gcPerS=${(((hm?.js_numGCs ?? 0) - lastGcs) / ((t - statsAt) / 1000)).toFixed(1)} paragraphs=${texts.size} created=${texts.created} disposed=${texts.disposed}`,
           );
+          lastGcs = hm?.js_numGCs ?? 0;
           packetCount = 0;
           presentMs = 0;
           s.stats.drawMs = 0;
@@ -1052,7 +1065,7 @@ export function OrreryWorld3D({
         1000,
       );
     };
-  }, [loadPhoto, device]);
+  }, [loadPhoto, device, texts]);
 
   // --- Gestures / hits (identical wiring to OrreryWorld) ------------------------
   const identities = useMemo<OrreryContactTarget[]>(
