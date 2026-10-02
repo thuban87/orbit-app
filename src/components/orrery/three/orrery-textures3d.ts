@@ -69,17 +69,22 @@ export class BodyAtlas {
   flush(): boolean {
     if (!this.surface || this.dirty.size === 0) return false;
     this.surface.flush();
-    const image = this.surface.makeImageSnapshot();
     const rowBytes = ATLAS_SIZE * 4;
     const tileRow = ATLAS_TILE * 4;
     for (const slot of this.dirty) {
       const { x, y } = tileOrigin(slot);
-      const tile = image.readPixels(x, y, {
+      // Snapshot ONLY the tile (06-leak): a whole-surface snapshot is a
+      // 2560² image (~26 MB of Hermes external pressure per flush until GC).
+      const image = this.surface.makeImageSnapshot(
+        Skia.XYWHRect(x, y, ATLAS_TILE, ATLAS_TILE),
+      );
+      const tile = image.readPixels(0, 0, {
         width: ATLAS_TILE,
         height: ATLAS_TILE,
         colorType: ColorType.RGBA_8888,
         alphaType: AlphaType.Unpremul,
       });
+      image.dispose();
       if (!(tile instanceof Uint8Array)) continue;
       for (let r = 0; r < ATLAS_TILE; r++)
         this.pixels.set(
@@ -87,7 +92,6 @@ export class BodyAtlas {
           (y + r) * rowBytes + x * 4,
         );
     }
-    image.dispose();
     this.dirty.clear();
     return true;
   }

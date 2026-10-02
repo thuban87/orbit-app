@@ -186,6 +186,10 @@ export interface SceneStats {
   drawMs: number;
   /** Lit body spheres drawn in the last frame (instances). */
   spheres: number;
+  /** Lifetime counters (leak diagnosis): label rasters, atlas uploads. */
+  labelRasters: number;
+  atlasFlushes: number;
+  labelsLive: number;
 }
 
 const tmpMatrix = new THREE.Matrix4();
@@ -406,6 +410,9 @@ export class OrreryScene3D {
     calls: 0,
     triangles: 0,
     spheres: 0,
+    labelRasters: 0,
+    atlasFlushes: 0,
+    labelsLive: 0,
   };
 
   constructor(
@@ -1104,7 +1111,10 @@ export class OrreryScene3D {
       this.atlasDirty &&
       timeMs - this.atlasUploadedAt >= ATLAS_UPLOAD_INTERVAL
     ) {
-      if (this.atlas.flush()) this.atlasTex.needsUpdate = true;
+      if (this.atlas.flush()) {
+        this.atlasTex.needsUpdate = true;
+        this.stats.atlasFlushes++;
+      }
       this.atlasDirty = false;
       this.atlasUploadedAt = timeMs;
     }
@@ -1125,6 +1135,7 @@ export class OrreryScene3D {
       if (!live.has(id)) entry.mesh.visible = false;
     }
     this.trimLabels();
+    this.stats.labelsLive = this.labels.size;
 
     // Draw -----------------------------------------------------------------------
     const tDraw = performance.now();
@@ -1155,6 +1166,7 @@ export class OrreryScene3D {
       if (!prepared) return;
       const img = rasterizeLabel(prepared, this.colors.surface, this.dpr);
       if (!img) return;
+      this.stats.labelRasters++;
       const tex = dataTexture(img);
       const material = new THREE.MeshBasicNodeMaterial({
         transparent: true,

@@ -311,6 +311,23 @@ function disposeRenderer(renderer: THREE.WebGPURenderer) {
   }
 }
 
+/** Leak diagnosis (06-leak): Hermes external MB, optionally after a forced GC. */
+function externalMb(forceGc: boolean): string {
+  const g = globalThis as {
+    gc?: () => void;
+    HermesInternal?: { getInstrumentedStats?: () => Record<string, number> };
+  };
+  const read = () =>
+    Math.round(
+      (g.HermesInternal?.getInstrumentedStats?.().js_externalBytes ?? 0) / 1e6,
+    );
+  const before = read();
+  if (!forceGc) return `${before}MB`;
+  if (typeof g.gc !== "function") return `${before}MB (gc n/a)`;
+  g.gc();
+  return `${before}MB -> ${read()}MB after gc()`;
+}
+
 function percentile(values: number[], p: number) {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -991,6 +1008,19 @@ export function OrreryWorld3D({
           console.log(
             `[lab-c] frames=${d.length} avgDt=${avg.toFixed(1)}ms fps=${(1000 / Math.max(1, avg)).toFixed(1)} p95Dt=${percentile(d, 0.95).toFixed(1)} maxDt=${percentile(d, 1).toFixed(1)} jsRenderAvg=${(r.reduce((a, b) => a + b, 0) / Math.max(1, r.length)).toFixed(2)}ms p95=${percentile(r, 0.95).toFixed(2)} calls=${s.stats.calls} tris=${s.stats.triangles} photos=${photoTimings.length} photoAvg=${(photoTimings.reduce((a, b) => a + b, 0) / Math.max(1, photoTimings.length)).toFixed(1)}ms packets=${packetCount} bodies=${pendingPacket.current?.keys.length ?? 0} visibleContacts=${pendingPacket.current?.visibleContacts ?? 0} drawnSpheres=${s.stats.spheres} presentAvg=${(presentMs / Math.max(1, d.length)).toFixed(2)}ms drawAvg=${(s.stats.drawMs / Math.max(1, d.length)).toFixed(2)}ms`,
           );
+          const hm = (
+            globalThis as {
+              HermesInternal?: {
+                getInstrumentedStats?: () => Record<string, number>;
+              };
+            }
+          ).HermesInternal?.getInstrumentedStats?.();
+          const mem = renderer?.info.memory as
+            | { textures?: number; geometries?: number }
+            | undefined;
+          console.log(
+            `[lab-c] mem #${serial} external=${Math.round((hm?.js_externalBytes ?? 0) / 1e6)}MB heap=${Math.round((hm?.js_heapSize ?? 0) / 1e6)}MB gcs=${hm?.js_numGCs ?? "?"} texs=${mem?.textures ?? "?"} geos=${mem?.geometries ?? "?"} labelsLive=${s.stats.labelsLive} labelRasters=${s.stats.labelRasters} atlasFlushes=${s.stats.atlasFlushes}`,
+          );
           packetCount = 0;
           presentMs = 0;
           s.stats.drawMs = 0;
@@ -1012,7 +1042,14 @@ export function OrreryWorld3D({
       s?.dispose();
       if (renderer) disposeRenderer(renderer);
       console.log(
-        `[lab-c] unmount #${serial}: loop stopped, GPU resources disposed`,
+        `[lab-c] unmount #${serial}: loop stopped, GPU resources disposed external=${externalMb(false)}`,
+      );
+      setTimeout(
+        () =>
+          console.log(
+            `[lab-c] post-unmount #${serial} external=${externalMb(true)}`,
+          ),
+        1000,
       );
     };
   }, [loadPhoto, device]);

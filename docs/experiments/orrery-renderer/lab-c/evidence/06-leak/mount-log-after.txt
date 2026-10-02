@@ -1,0 +1,37 @@
+10-01 19:06:22.186  7219  7291 I ReactNativeJS: [lab-c] mount #1 hermes heap=34MB allocated=29MB external=881MB gcs=426
+10-01 19:06:23.425  7219  7291 I ReactNativeJS: [lab-c] renderer ready #1 in 1242ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 19:06:28.469  7219  7291 I ReactNativeJS: [lab-c] mem #1 external=1569MB heap=38MB gcs=936 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:06:33.481  7219  7291 I ReactNativeJS: [lab-c] mem #1 external=1570MB heap=38MB gcs=969 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:06:38.487  7219  7291 I ReactNativeJS: [lab-c] mem #1 external=1570MB heap=38MB gcs=996 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:06:43.487  7219  7291 I ReactNativeJS: [lab-c] mem #1 external=1570MB heap=38MB gcs=1028 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:06:48.495  7219  7291 I ReactNativeJS: [lab-c] mem #1 external=1570MB heap=38MB gcs=1061 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:06:53.509  7219  7291 I ReactNativeJS: [lab-c] mem #1 external=1570MB heap=42MB gcs=1091 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:06:58.525  7219  7291 I ReactNativeJS: [lab-c] mem #1 external=1570MB heap=42MB gcs=1125 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:07:03.547  7219  7291 I ReactNativeJS: [lab-c] mem #1 external=1415MB heap=42MB gcs=1156 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:07:08.543  7219  7291 I ReactNativeJS: [lab-c] mem #1 external=1415MB heap=42MB gcs=1190 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:07:13.545  7219  7291 I ReactNativeJS: [lab-c] mem #1 external=1415MB heap=42MB gcs=1222 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:07:18.545  7219  7291 I ReactNativeJS: [lab-c] mem #1 external=1416MB heap=42MB gcs=1255 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:07:23.565  7219  7291 I ReactNativeJS: [lab-c] mem #1 external=1416MB heap=42MB gcs=1286 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:07:25.612  7219  7291 I ReactNativeJS: [lab-c] unmount #1: loop stopped, GPU resources disposed external=1389MB
+10-01 19:07:26.700  7219  7291 I ReactNativeJS: [lab-c] post-unmount #1 external=1389MB -> 1359MB after gc()
+10-01 19:07:31.977  7219  7291 I ReactNativeJS: [lab-c] mount #2 hermes heap=46MB allocated=40MB external=2491MB gcs=1691
+10-01 19:07:33.074  7219  7291 I ReactNativeJS: [lab-c] renderer ready #2 in 1121ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 19:07:38.097  7219  7291 I ReactNativeJS: [lab-c] mem #2 external=2251MB heap=46MB gcs=1957 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:07:39.753  7219  7291 I ReactNativeJS: [lab-c] unmount #2: loop stopped, GPU resources disposed external=2225MB
+10-01 19:07:40.861  7219  7291 I ReactNativeJS: [lab-c] post-unmount #2 external=2225MB -> 1682MB after gc()
+10-01 19:07:46.040  7219  7291 I ReactNativeJS: [lab-c] mount #3 hermes heap=50MB allocated=44MB external=2815MB gcs=2361
+10-01 19:07:47.107  7219  7291 I ReactNativeJS: [lab-c] renderer ready #3 in 1068ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 19:07:52.135  7219  7291 I ReactNativeJS: [lab-c] mem #3 external=2785MB heap=50MB gcs=2628 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:07:53.840  7219  7291 I ReactNativeJS: [lab-c] unmount #3: loop stopped, GPU resources disposed external=2759MB
+10-01 19:07:54.946  7219  7291 I ReactNativeJS: [lab-c] post-unmount #3 external=2759MB -> 2257MB after gc()
+10-01 19:08:00.342  7219  7291 I ReactNativeJS: [lab-c] mount #4 hermes heap=55MB allocated=40MB external=2898MB gcs=3035
+10-01 19:08:01.391  7219  7291 I ReactNativeJS: [lab-c] renderer ready #4 in 1050ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 19:08:06.424  7219  7291 I ReactNativeJS: [lab-c] mem #4 external=2985MB heap=55MB gcs=3305 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:08:11.450  7219  7291 I ReactNativeJS: [lab-c] mem #4 external=2986MB heap=55MB gcs=3339 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+10-01 19:08:16.448  7219  7291 I ReactNativeJS: [lab-c] mem #4 external=2986MB heap=55MB gcs=3366 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1
+
+# dumpsys meminfo com.bwales.orbit.labc (same session, real process memory, KB)
+# before Orrery (Digest, app idle):          Native Heap 483496  Graphics 112196  TOTAL PSS  789852
+# Orrery open +8 s (mount #1):               Native Heap 739956  Graphics 271144  TOTAL PSS 1238643
+# Orrery open +50 s (mount #1):              Native Heap 767272  Graphics 279340  TOTAL PSS 1270792
+# after 3x leave/return (mount #4, +8 s):    Native Heap 793076  Graphics 283004  TOTAL PSS 1328115

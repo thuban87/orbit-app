@@ -72,3 +72,39 @@ three's WebGPU backend after `dispose()` (renderer-side texture cache keyed per 
 (prewarm device, star/plane/noise textures) or comes from photo decoding (40 SkImages) — needs a
 per-stage `external` log. **Open: real risk of OOM after many tab visits; must be resolved before any
 production decision.**
+
+### D.6 — leak pass (one device session, debug, thermal status 1)
+
+Log: `evidence/06-leak/mount-log-after.txt` (renderer `mem` line every 5 s, `post-unmount` line with a
+forced `gc()`, plus `dumpsys meminfo` snapshots from the same session).
+
+| | Hermes `external` | real process memory (`dumpsys meminfo`) |
+|---|---|---|
+| before Orrery (Digest) | 881 MB at mount #1 | Native Heap 484 MB, Graphics 112 MB, PSS 790 MB |
+| mount #1, +5 s | 1569 MB | Native 740 MB, Graphics 271 MB, PSS 1239 MB |
+| mount #1, +50 s open (idle) | 1415 MB (flat / falling) | Native 767 MB, Graphics 279 MB, PSS 1271 MB |
+| unmount #1 / #2 / #3 → forced `gc()` | 1389→1359 / 2225→1682 / 2759→2257 MB | — |
+| mount #2 / #3 / #4 | 2491 / 2815 / 2898 MB | after #4: Native 793 MB, Graphics 283 MB, PSS 1328 MB |
+
+**Finding: the `external` counter mostly isn't real memory.** It still climbs about 300–1100 MB per
+mount, but over the same three remounts the real native heap grew only about 26 MB (767→793 MB) and
+Graphics about 4 MB. The three counters stay flat (`texs=8 geos=5`, `labelsLive=0`). A forced `gc()`
+drops 500 MB or more after each unmount. So most of the counter is **GC-pending host-object memory
+pressure that the libraries report**, not retained buffers:
+
+- RN Skia's `JsiSkParagraph.getMemoryPressure()` returns a **flat 1 MB per Paragraph**
+  (`node_modules/@shopify/react-native-skia/cpp/api/JsiSkParagraph.h:174`), even after it is disposed.
+  The `labels` memo (`OrreryWorld3D.tsx`, `prepareOrreryText` ×2 per body) builds about 240 Paragraphs.
+  It rebuilds them on every focus, viewport or scene change and never disposes them. That is about
+  240 MB of `external` per rebuild. `BodyAtlas.drawInitials` adds 1 MB per body per `setBodies`.
+  The "grows while open" seen in D.5 lines up with focus and moon-orbit changes, not with frames:
+  with the Orrery idle in D.6, `external` stayed flat.
+- `BodyAtlas.flush` took a full 2560² snapshot (about 26 MB of image pressure) per flush.
+  Fixed: it now snapshots only each dirty tile.
+
+**Open:** after a forced `gc()`, the floor still rises about 300–575 MB per mount, so some
+pressure-carrying wrappers survive a full GC. Their real cost (a few MB) is small, but Hermes uses this
+counter to schedule GCs (about 6–100 GC/s here). Next steps: dispose the old label Paragraphs when
+the memo is replaced or the Orrery unmounts, and find what keeps the old wrappers reachable
+(suspects: closures captured by worklets or Reanimated, and three's WeakMaps keyed on the destroyed
+device). OOM risk is lower than D.5 suggested, because PSS grows only about 20 MB per remount.
