@@ -21,6 +21,12 @@
  * trivially complete; do not reuse this seed on a DB that has definitions.
  *
  * Idempotent: skipped when the "Lab C Dense" System already exists.
+ *
+ * Size comparison Systems (`seedLabCSizesIfAbsent`, 2026-10-02): a dedicated
+ * 120-contact cast with the same spec as Lab A (`seed-lab-a.py`) and Lab B
+ * (`lab-b-seed.ts`), and the Systems "Size 32" / "Size 120" (first N cast
+ * members; Lab A/B also carry Size 5/10/20). Idempotent by "Size 32", so an
+ * already-seeded install gains them on its next debug launch.
  * Procedural portrait pixels are fixture IMAGE content, so their colours are
  * computed numerically (Float32Array), never UI colour tokens.
  */
@@ -224,6 +230,7 @@ export async function seedLabCFixtureIfAbsent(): Promise<void> {
     const systems = await listCustomSystems(exec);
     if (systems.some((s) => s.name === DENSE_NAME)) {
       console.log("[lab-c-seed] already seeded; skipping");
+      await seedLabCSizesIfAbsent();
       return;
     }
     const nowDate = new Date();
@@ -320,6 +327,7 @@ export async function seedLabCFixtureIfAbsent(): Promise<void> {
     await system(DENSE_NAME, ids.slice(0, DENSE_SIZE));
     await updateAppSettings(exec, { orrerySatellitesEnabled: 1 }, now);
     bumpShellRefresh();
+    await seedLabCSizesIfAbsent();
     console.log(
       `[lab-c-seed] seeded contacts=${ids.length} touchpoints=${touchpoints} photos=${photos} satellites=${moons} in ${Date.now() - t0}ms`,
     );
@@ -328,4 +336,211 @@ export async function seedLabCFixtureIfAbsent(): Promise<void> {
   } finally {
     running = false;
   }
+}
+
+// --- Size comparison Systems (shared spec with Lab A / Lab B) -----------------
+// Integer-only hashing so the Python (Lab A) and TS implementations agree.
+const SIZE_SYSTEMS = [32, 120] as const;
+const SIZE_CAST = 120;
+const SIZE_FIRST = [
+  "Aiden",
+  "Bianca",
+  "Callum",
+  "Daria",
+  "Emeka",
+  "Freya",
+  "Gideon",
+  "Helena",
+  "Ines",
+  "Jonah",
+  "Keira",
+  "Luca",
+  "Maren",
+  "Nolan",
+  "Odette",
+  "Pavel",
+  "Rania",
+  "Silas",
+  "Talia",
+  "Ulrich",
+  "Vesna",
+  "Wade",
+  "Ximena",
+  "Yusuf",
+];
+const SIZE_LAST = [
+  "Ashworth",
+  "Bellamy",
+  "Carver",
+  "Delacroix",
+  "Esposito",
+  "Fairbanks",
+  "Gallagher",
+  "Hargrove",
+  "Iwasaki",
+  "Jaramillo",
+  "Kessler",
+  "Lombardi",
+  "Mercer",
+  "Nakamura",
+  "Oduya",
+];
+const SIZE_INTERVALS = [7, 14, 21, 30, 45, 60, 90];
+/** per-10: S stable, W wobble, D decay, R rogue (rarely responds), N never, O rogue (overdue). */
+const SIZE_PATTERN = "SWDRNSSWDO";
+const SIZE_MOONS: Record<number, [string, string][]> = {
+  11: [
+    ["Mara", "Partner"],
+    ["Theo", "Child"],
+  ],
+  17: [["Ilse", "Sibling"]],
+  26: [["Ruth", "Parent"]],
+  70: [
+    ["Owen", "Friend"],
+    ["Lia", "Partner"],
+  ],
+};
+
+function sizeH(i: number, salt: number): number {
+  return (((i + 1) * 7919 + salt * 104729) % 1000) / 1000;
+}
+
+function sizeBand(days: number, interval: number, rarely: number): string {
+  const p = days / interval;
+  if (rarely && p >= 1) return "R";
+  if (p >= 3) return "O";
+  if (p >= 1) return "D";
+  if (p >= 0.8) return "W";
+  return "S";
+}
+
+function sizeSpec(i: number) {
+  const kind = SIZE_PATTERN[i % 10];
+  const interval = SIZE_INTERVALS[(i * 3 + Math.floor(i / 10)) % 7];
+  const name = `${SIZE_FIRST[i % 24]} ${SIZE_LAST[(i + 3 * Math.floor(i / 24)) % 15]}`;
+  const photo = i % 3 === 1;
+  const moons = SIZE_MOONS[i] ?? [];
+  if (kind === "N")
+    return { name, interval, days: null, rarely: 0, history: 0, photo, moons };
+  const h = sizeH(i, 1);
+  const rarely = kind === "R" ? 1 : 0;
+  const p = {
+    S: 0.1 + 0.6 * h,
+    W: 0.82 + 0.15 * h,
+    D: 1.1 + 1.7 * h,
+    R: 1.2 + 1.2 * h,
+    O: 3.3 + 1.5 * h,
+  }[kind] as number;
+  let days = Math.max(1, Math.floor(p * interval + 0.5));
+  const order = "SWDO";
+  for (let n = 0; n < 400; n += 1) {
+    const got = sizeBand(days, interval, rarely);
+    if (got === kind) break;
+    if (kind === "R" || order.indexOf(got) < order.indexOf(kind)) days += 1;
+    else days = Math.max(1, days - 1);
+  }
+  return {
+    name,
+    interval,
+    days,
+    rarely,
+    history: Math.floor(sizeH(i, 3) * 6),
+    photo,
+    moons,
+  };
+}
+
+async function seedLabCSizesIfAbsent(): Promise<void> {
+  const exec = getExecutor();
+  const systems = await listCustomSystems(exec);
+  if (systems.some((s) => s.name === `Size ${SIZE_SYSTEMS[0]}`)) {
+    console.log("[lab-c-seed] size systems already present");
+    return;
+  }
+  const t0 = Date.now();
+  const nowDate = new Date();
+  const now = localDateTime(nowDate);
+  const channels = ["Message", "Call", "In Person"];
+  const ids: number[] = [];
+  let photos = 0;
+  let moons = 0;
+  for (let i = 0; i < SIZE_CAST; i++) {
+    const spec = sizeSpec(i);
+    const created = await createContactWithInteraction(exec, {
+      uid: newUid(),
+      name: spec.name,
+      intervalDays: spec.interval,
+      now,
+      rarelyResponds: spec.rarely,
+      firstInteraction:
+        spec.days === null
+          ? undefined
+          : {
+              uid: newUid(),
+              occurredAt: daysAgo(nowDate, spec.days, 9),
+              channel: channels[i % 3],
+              direction: "outbound",
+              connected: 1,
+            },
+    });
+    const contactId = created.contactId;
+    ids.push(contactId);
+    if (spec.days !== null)
+      for (let k = 1; k <= spec.history; k++)
+        await recordTouchpoint(exec, {
+          contactId,
+          uid: newUid(),
+          occurredAt: daysAgo(
+            nowDate,
+            spec.days + k * spec.interval,
+            9 + (k % 8),
+          ),
+          now,
+          channel: channels[(i + k) % 3],
+          direction: "outbound",
+          connected: 1,
+        });
+    if (spec.photo) {
+      const bytes = portraitBytes(10_000 + i);
+      if (bytes) {
+        const relative = `avatars/contact-${contactId}.jpg`;
+        new Directory(Paths.document, "avatars").create({
+          idempotent: true,
+          intermediates: true,
+        });
+        const file = new File(Paths.document, relative);
+        if (file.exists) file.delete();
+        file.create();
+        file.write(bytes);
+        await setContactPhoto(exec, contactId, relative, now);
+        photos++;
+      }
+    }
+    for (const [personName, relationType] of spec.moons) {
+      await addRelationship(exec, {
+        contactId,
+        personName,
+        relationType,
+        createdAt: now,
+        now,
+      });
+      moons++;
+    }
+  }
+  for (const size of SIZE_SYSTEMS)
+    await saveSystemDefinition(exec, {
+      systemRef: null,
+      name: `Size ${size}`,
+      rules: [],
+      overrideIntent: ids.slice(0, size).map((contactId) => ({
+        contactId,
+        mode: "include" as const,
+      })),
+      prunableExclusionContactIds: [],
+      now,
+    });
+  bumpShellRefresh();
+  console.log(
+    `[lab-c-seed] size systems seeded contacts=${ids.length} photos=${photos} satellites=${moons} in ${Date.now() - t0}ms`,
+  );
 }

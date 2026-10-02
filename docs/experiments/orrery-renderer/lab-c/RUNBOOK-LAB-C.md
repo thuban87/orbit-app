@@ -93,6 +93,14 @@ Automatic on a debug launch (`src/__dev__/lab-c-seed.ts`, gated on `__DEV__` + a
 by the "Lab C Dense" System). Logs `[lab-c-seed] seeded contacts=… photos=… satellites=…`.
 Reset: `$ADB shell pm clear $PKG` then relaunch.
 
+**Size comparison Systems (2026-10-02).** The same debug launch also adds (if "Size 32" is absent) a
+dedicated 120-contact cast and the Systems **Size 32** and **Size 120** (first N cast members; log
+`[lab-c-seed] size systems seeded …`, ~11 s). The cast spec is identical to Lab A's `seed-lab-a.py`
+and Lab B's `lab-b-seed.ts` (they also carry Size 5/10/20), so the Size Systems compare 1:1 across
+labs. All Contacts becomes 320. Seeding a phone that runs the release build: Metro + reverse (§1) →
+`install -r` the debug APK → launch, wait for the log → `install -r` the release APK (§8) →
+`adb reverse tcp:8081 tcp:8082`.
+
 ## 6. Logs, screenshots, perf
 
 ```bash
