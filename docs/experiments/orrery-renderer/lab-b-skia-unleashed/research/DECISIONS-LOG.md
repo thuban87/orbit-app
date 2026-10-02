@@ -690,3 +690,10 @@ Report: `research/R3-REPORT.md`. Evidence: `evidence/11-r3/`.
   artefacts.
 - **Cuts for battery.** The soak was cut to 5 min and the Everything soak skipped (battery
   7 % at the end of the pass).
+
+## 2026-10-02 — Tilt fix (phone pass P-1)
+
+- The orbit layer draws as ONE full-screen analytic ring field (`ringField`, default ON). The per-ring screen-space ellipse routes are kept as the fallback when that effect is unavailable (`ringField:0`), not as the default. Phone numbers are in PHONE-PASS-RESULTS §10, and the losing routes are in DEAD-ENDS (tilt fix).
+- The untilted per-ring fallback draws exactly as before the fix: an affine CTM plus the circle op, with no shader local matrix.
+- Stroke widths in the field are the pre-fix world widths, seen through the analytic radial screen scale. The comet is drawn as the pre-fix effective mean (C-74).
+- `homeTilt` default: **kept ON provisionally**. Dense 120 tilted 64.8 vs untilted 66.1 fps, same session. Stress 400 is still to be measured; if it fails the rule, flip the flag OFF.

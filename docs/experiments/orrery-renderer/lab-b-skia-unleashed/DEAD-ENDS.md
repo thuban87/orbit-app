@@ -82,3 +82,16 @@ recovered. The raw log is `research/DEAD-ENDS-LOG.md`. Costs are **emulator-rela
 | **Plain saveLayer around the world layers** (flag `worldLayer`, an A/B build). The idea came from "Everything" and `fxShockFilter` (a world-wrapping saveLayer with a runtime image filter), which ran the tilted Dense at 24–49 fps against best's 5 | **No effect**: 4.6 vs 4.7 fps. The filter layer's speed-up is not the offscreen itself; with the filter, the GPU cost moves to 20–50 ms of CPU per frame on main (Perfetto). Unexplained (Ganesh path-renderer choice?). Reverted, never committed | `12-phone/isolation-dense-sf.txt` (iso3 rows), PHONE-PASS-RESULTS §3 |
 | **Stroked world circles under the tilted plane's perspective matrix** (rings, wakes) | 100–350 ms of GPU per frame on Mali-G78 at Dense; 3–9 fps. The emulator showed them as free. Not a dead end for the *idea* (tilt + world-space orbits), but the draw strategy is rejected for Android | `12-phone/perf/summary.tsv`, `perfetto/best-dense-idle.pftrace.gz` |
 | Trusting an emulator "GPU-cheap" verdict for any geometry under perspective | The desktop GPU behind the emulator's GLES translator hid a 30× cost | — |
+
+## Tilt-fix dead ends (Pixel 6 Pro, 2026-10-02)
+
+All numbers: Dense 120, preset best, `idleClock:0`, release arm64, SurfaceFlinger presents per 10 s
+idle window (`evidence/14-tilt-fix/probe/summary.tsv`). Same-session baselines in brackets.
+
+| Tried | Result | Evidence |
+|---|---|---|
+| **Per-ring screen-space ellipses, projected path** (`b22b6ae4`): each ring = the circle path mapped through the homography (`SkPath.transform`, exact conics), stroked under an affine CTM; shaders in world coordinates via a perspective **local matrix** | Tilted **31 fps** (pre-fix 9). Perfetto (thermal 1): GPU 99.4 %, main ~34 ms CPU per frame, `eglSwapBuffers` 24 ms — path stroking/tessellation per ring per frame plus large shaded areas. Not enough. **Kept as the fallback** when the field effect is unavailable (`ringField:0`). | `probe/summary.tsv` rows `fix-120`, `perfetto/v2-fix-tilt-dense-idle.*` |
+| **Same, analytic ovals** (`ringOvalOp`: translate·rotate + `drawOval`, Ganesh's ellipse op) | Tilted **31.5 fps**, ring recording 5.6 ms (per-ring shader with its own local matrix). The ellipse op shades the whole bounding box of every ring. | row `oval-120` |
+| **In-shader inverse homography instead of a local matrix** (`ringShaderInv`, `…Inv` shader variants) | **Worse**: 16 fps tilted, 20 fps untilted — the extra per-fragment maths over ~100 large per-ring draws. Confirms the per-ring routes are fragment-bound. | rows `v2-inv*`, `v2-nt-inv-120` |
+| **Shader local matrix on untilted circles** (the first cut drew untilted rings as screen circles + local matrix) | 35–44 fps vs 67–97 for the pre-fix untilted draw in the same session: the circle op's octagon band (≈ 8 % of the radius thick, not the hairline) × an extra per-fragment transform. Fixed: untilted per-ring fallback draws exactly as before (affine CTM, no local matrix). | rows `notilt*`, `nt-only-*`, `v3-*` |
+| **Bevel joins to coax Ganesh's convex-path stroker** | No change (16.8 fps tilted, thermal 1) | row `v3-tilt-120` |

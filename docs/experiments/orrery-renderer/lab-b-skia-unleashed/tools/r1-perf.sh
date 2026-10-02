@@ -8,6 +8,7 @@
 #   other-system the switch partner (switch S -> other, then other -> S)
 #   scenarios    default "idle pan focus switch"
 #
+# Env: POSE (tilt fix): deep-link pose query applied after every recentre.
 # Env: ADB (default: the Lab B tunnel, `adb -P 5039 -s emulator-5554`), PKG,
 #      PRESET (R3 one-tap preset applied before <flags>),
 #      SF=1 (phone pass): also sample the OPAQUE canvas's presented frames from
@@ -83,6 +84,9 @@ $ADB shell input tap ${ORRERY_TAB:-896 2690}; sleep 3
 link "$BASE&system=$S&delay=0"; sleep "$SETTLE"
 $ADB shell input tap ${ORRERY_TAB:-896 2690}; sleep 2
 $ADB shell input touchscreen tap ${RECENTRE:-1150 2140}; sleep 4
+# Tilt fix: POSE (e.g. "tilt=1.0472") applies a camera pose after the recentre.
+pose() { [ -n "${POSE:-}" ] && { link "orbit://labb?$POSE&delay=1500"; sleep 5; }; return 0; }
+pose
 for sc in $SCEN; do
   case $sc in
     idle)
@@ -95,7 +99,7 @@ for sc in $SCEN; do
         $ADB shell input swipe $x2 $y2 $x1 $y1 350; sleep 1.2
       done
       sleep 1; collect pan
-      $ADB shell input touchscreen tap ${RECENTRE:-1150 2140}; sleep 3 ;;
+      $ADB shell input touchscreen tap ${RECENTRE:-1150 2140}; sleep 3; pose ;;
     focus)
       link "orbit://labb?focus=$F&delay=$ACT_DELAY"
       sleep $(( ACT_DELAY / 1000 - 1 )); gfx_reset; sleep 7; collect focus

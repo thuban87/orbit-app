@@ -1,0 +1,4 @@
+10-02 01:31:12.721  7569  7637 I ReactNativeJS: [labb-probe] win=3134ms bodies=1/2.8/2.8/2.8 labels=1/0.5/0.5/0.5 nebula=25/0.2/0.3/0.3 rings=25/2.9/5.3/5.7 trim=1/0.2/0.2/0.2 wakes=1/10/10/10
+10-02 01:31:15.793  7569  7637 I ReactNativeJS: [labb-probe] win=3072ms nebula=27/0.2/0.2/0.2 rings=27/3.2/4.9/5.3
+10-02 01:31:18.857  7569  7637 I ReactNativeJS: [labb-probe] win=3064ms nebula=27/0.2/0.3/0.6 rings=27/3.2/4.8/5.6
+10-02 01:31:21.903  7569  7637 I ReactNativeJS: [labb-probe] win=3047ms nebula=26/0.2/0.2/0.3 rings=26/3.2/5.2/6.5

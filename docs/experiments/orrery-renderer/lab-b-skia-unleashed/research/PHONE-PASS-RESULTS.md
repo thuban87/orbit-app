@@ -304,3 +304,69 @@ trace_processor on droid; this box's CPU lacks AVX2, so the prebuilt crashes her
 | `shots/switch-best-inner-to-dense.mp4` + `-frames.jpg` | Best-preset switch recording (screenrecord adds GPU load; the recording runs ~35 fps on Inner Circle) |
 | `shots/legacy-dense-idle-2fps.mp4` | The legacy renderer idling on Dense at ~2.3 fps |
 | `anr-labb-summary.txt` | The two ANR records + the main-thread stack head |
+
+## 10. Tilt fix (2026-10-02, P-1) — INTERIM: phone measurements incomplete
+
+Commits: `b22b6ae4` (per-ring screen-space ellipses), `19dae74b` (ring field), `7350b643`
+(field stroke width = pre-fix foreshortening). Evidence: `evidence/14-tilt-fix/`. Release
+arm64 on the Pixel 6 Pro, preset best, Dense 120, `idleClock:0`, SurfaceFlinger presents
+per 10 s idle window (`probe/summary.tsv`).
+
+**Conditions were poor and are not comparable with §1–§2.** Battery was 30 → 20 % on
+500 mA USB and the phone was at thermal 1–2 for most of the session. Only same-session
+A/B rows are compared. The run stopped at 20 % battery. The owner then took the phone to a
+wall charger, and it had not come back when this section was written. So pan, Stress 400,
+max manual tilt and the big switch are **not yet measured on the phone**.
+
+### 10.1 What fixed it
+
+| Route | Tilted (Home 32°) | Untilted | Verdict |
+|---|---|---|---|
+| Pre-fix (`ringPlaneDraw:0`): stroked world circles under the perspective CTM | **8.9** | 97.6 (thermal 0) / 67.2 (thermal 1) | cliff |
+| Per-ring projected ellipse paths, shader local matrix | 31.1 (thermal 0); 16.8 at thermal 1 | 35–44 | not enough (DEAD-ENDS) |
+| Per-ring analytic ovals (`ringOvalOp`) | 31.5 | — | not enough |
+| Per-ring, in-shader inverse (`ringShaderInv`) | 16.2 | 19.6 | worse |
+| **Ring field** (`ringField`, default): one full-screen analytic shader | **64.8** (thermal 2, 20 %) | **66.1** (same session) | **tilted ≈ untilted** |
+
+- Same-session reference for the field rows: the pre-fix untilted draw ran at 67.2 at
+  thermal 1 (`v3-prefix-nt`). So the field holds untilted-level performance with the tilt on.
+- **Why untilted v4 (66) is below last night's 92–99:** it is device state, not a code
+  regression. The pre-fix untilted draw itself fell from 97.6 (thermal 0, battery 27 %) to
+  67.2 (thermal 1, battery 22 %) within this session (`prefixnotilt` vs `v3-prefix-nt`).
+  The field rows were taken at thermal 2 and 20 %.
+- **Still needed:** a back-to-back field-flat vs prefix-flat run on a cool, charged phone
+  (`tools/tf-matrix.sh`, `flat` rows).
+- **Perfetto, tilted, per-ring path route** (`perfetto/v2-fix-tilt-dense-idle.*`):
+  - GPU 99.4 %;
+  - ~34 ms of main-thread CPU per frame;
+  - `eglSwapBuffers` 24 ms.
+
+  That trace showed the per-ring routes are both fragment-bound and CPU-bound: the circle
+  op's octagon band, the ellipse op's bounding box, and path stroking per ring. A Perfetto
+  trace of the field is still to do.
+
+### 10.2 Correctness (emulator `-P 5039`, same scene, `freezeClock:1`, release x86_64)
+
+`evidence/14-tilt-fix/emu/`:
+- **Home tilt and max tilt** (`maxtilt-field-vs-prefix.jpg`): ring geometry, colours, far-side
+  fade, wakes and tethers match the pre-fix draw.
+- **Comets:** the flow comets match after the comet-mean fix (`19dae74b`; the pre-fix comet
+  phase was smeared across the stroke, C-74).
+- **Dashes:** now one clean tick each (C-74).
+- **Near side at max tilt:** rings read slightly stronger (C-74).
+- **Focus** (`focus-field-vs-prefix.jpg`): the glow and lock line look the same.
+- **Switch** (`switch-field-vs-prefix.jpg`): the field draws the trims and the shockwave
+  mid-switch. The prefix frames in this sheet were captured after settle (timing), so it is
+  not a side-by-side.
+- **Reduced motion:** 0 changed pixels over 3 s (`rm-static-a/b.png`).
+- **Tests:** ellipse parameters vs `projectWorldPoint` give < 1e-3 px error over 1 500
+  pose × radius cases (`labb-plane-ellipse.test.ts`). The ring-field encoding and LUT are in
+  `labb-ring-field.test.ts`.
+- **Phone shots:** the on-phone JPEGs taken so far are the Dense 120 untilted state
+  (`s4`, under thermal 2).
+
+### 10.3 Default Home tilt (decision rule)
+
+Dense 120 meets the rule on the measured row: tilted 64.8 ≈ untilted 66.1. **`homeTilt`
+stays ON provisionally.** Stress 400 is not measured yet. If Stress 400 tilted falls well
+below untilted, the rule says set `homeTilt` OFF.
