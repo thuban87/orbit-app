@@ -73,6 +73,127 @@ DENSE_FIRST = ["Ari", "Bea", "Cal", "Dina", "Eli", "Fay", "Gus", "Hana", "Ivo", 
 DENSE_LAST = ["Adams", "Baker", "Chen", "Diaz", "Evans", "Fox", "Gray", "Hill"]
 
 
+# ---- "Size" comparison Systems (shared spec with Lab B / Lab C seeds) ----
+# A dedicated 120-contact cast, identical (names, cadences, status mix, photo
+# slots, moons) in every Orrery lab; "Size N" = the first N cast members, so the
+# Systems are directly comparable between labs. Integer-only hashing so the
+# Python and TypeScript implementations produce identical choices.
+SIZE_SYSTEMS = (5, 10, 20, 32, 120)
+SIZE_CAST = 120
+SIZE_FIRST = ["Aiden", "Bianca", "Callum", "Daria", "Emeka", "Freya", "Gideon", "Helena",
+              "Ines", "Jonah", "Keira", "Luca", "Maren", "Nolan", "Odette", "Pavel",
+              "Rania", "Silas", "Talia", "Ulrich", "Vesna", "Wade", "Ximena", "Yusuf"]
+SIZE_LAST = ["Ashworth", "Bellamy", "Carver", "Delacroix", "Esposito", "Fairbanks", "Gallagher",
+             "Hargrove", "Iwasaki", "Jaramillo", "Kessler", "Lombardi", "Mercer", "Nakamura", "Oduya"]
+SIZE_INTERVALS = [7, 14, 21, 30, 45, 60, 90]
+# per-10 status pattern: S=stable W=wobble D=decay R=rogue(rarely-responds) O=rogue(overdue) N=never
+SIZE_PATTERN = "SWDRNSSWDO"
+SIZE_MOONS = {11: [("Mara", "Partner"), ("Theo", "Child")], 17: [("Ilse", "Sibling")],
+              26: [("Ruth", "Parent")], 70: [("Owen", "Friend"), ("Lia", "Partner")]}
+
+
+def size_h(i: int, salt: int) -> float:
+    return (((i + 1) * 7919 + salt * 104729) % 1000) / 1000
+
+
+def size_name(i: int) -> str:
+    return f"{SIZE_FIRST[i % 24]} {SIZE_LAST[(i + 3 * (i // 24)) % 15]}"
+
+
+def size_band(days: int, interval: int, rarely: int) -> str:
+    p = days / interval
+    if rarely and p >= 1.0:
+        return "R"
+    if p >= 3.0:
+        return "O"
+    if p >= 1.0:
+        return "D"
+    if p >= 0.8:
+        return "W"
+    return "S"
+
+
+def size_spec(i: int):
+    """-> (name, interval, days_since or None, rarely, history_count, photo, moons)"""
+    kind = SIZE_PATTERN[i % 10]
+    interval = SIZE_INTERVALS[(i * 3 + i // 10) % 7]
+    photo = i % 3 == 1
+    moons = SIZE_MOONS.get(i, [])
+    if kind == "N":
+        return size_name(i), interval, None, 0, 0, photo, moons
+    h = size_h(i, 1)
+    rarely = 1 if kind == "R" else 0
+    p = {"S": 0.1 + 0.6 * h, "W": 0.82 + 0.15 * h, "D": 1.1 + 1.7 * h,
+         "R": 1.2 + 1.2 * h, "O": 3.3 + 1.5 * h}[kind]
+    days = max(1, int(p * interval + 0.5))
+    order = "SWDO"
+    for _ in range(400):
+        got = size_band(days, interval, rarely)
+        if got == kind:
+            break
+        if kind == "R" or order.index(got) < order.index(kind):
+            days += 1
+        else:
+            days = max(1, days - 1)
+    history = int(size_h(i, 3) * 6)
+    return size_name(i), interval, days, rarely, history, photo, moons
+
+
+def add_size_systems(c, now, sizes=SIZE_SYSTEMS):
+    """Additive + idempotent (skips when "Size <first>" exists). Returns [(contact_id, key)] photos."""
+    n = ts(now)
+    first = f"Size {sizes[0]}"
+    if c.execute("SELECT COUNT(*) FROM systems WHERE name=?", (first,)).fetchone()[0]:
+        print(f"size systems already present ({first}); skipping")
+        return []
+    photos, ids = [], []
+    for i in range(SIZE_CAST):
+        name, interval, days, rarely, history, photo, moons = size_spec(i)
+        key = f"size:{i}"
+        c.execute(
+            "INSERT INTO contacts (uid,name,category_id,interval_days,tracking_enabled,favourite_rank,"
+            "rarely_responds,created_at,modified_at) VALUES (?,?,NULL,?,1,NULL,?,?,?)",
+            (uid(key), name, interval, rarely, ts(now - dt.timedelta(days=500)), n))
+        cid = c.lastrowid
+        ids.append(cid)
+        if photo:
+            c.execute("UPDATE contacts SET photo=? WHERE id=?", (f"avatars/contact-{cid}.jpg", cid))
+            photos.append((cid, key))
+        if days is not None:
+            for k in range(history + 1):
+                occ = (now - dt.timedelta(days=days + k * interval)).replace(
+                    hour=9 + k % 8, minute=0, second=0, microsecond=0)
+                c.execute(
+                    "INSERT INTO interactions (uid,contact_id,occurred_at,recorded_at,channel,direction,"
+                    "connected,quality,note,source,modified_at,allow_ai) VALUES (?,?,?,?,?,?,1,NULL,NULL,'manual',?,0)",
+                    (uid(f"{key}:int:{k}"), cid, ts(occ), ts(occ),
+                     ["Message", "Call", "In Person"][(i + k) % 3], "outbound", n))
+        for j, (pname, rel) in enumerate(moons):
+            c.execute(
+                "INSERT INTO relationships (uid,contact_id,person_name,relation_type,linked_contact_id,note,"
+                "pinned,hidden,created_at,modified_at) VALUES (?,?,?,?,NULL,NULL,0,NULL,?,?)",
+                (uid(f"{key}:rel:{j}"), cid, pname, rel, n, n))
+        # exact recency recompute statement from src/db/recency-dao.ts
+        c.execute(
+            """UPDATE contacts
+                  SET last_contact = (
+                        SELECT MAX(i.occurred_at)
+                          FROM interactions i
+                         WHERE i.contact_id = contacts.id
+                           AND (contacts.rarely_responds = 0 OR i.connected = 1)
+                      ),
+                      modified_at = ?
+                WHERE id = ?""", (n, cid))
+    for size in sizes:
+        skey = f"sys:size:{size}"
+        c.execute("INSERT INTO systems (uid,name,created_at,modified_at) VALUES (?,?,?,?)",
+                  (uid(skey), f"Size {size}", n, n))
+        for cid in ids[:size]:
+            c.execute("INSERT INTO system_overrides (uid,system_ref,contact_id,mode,created_at) VALUES (?,?,?,?,?)",
+                      (uid(f"{skey}:ovr:{cid}"), f"custom:{uid(skey)}", cid, "include", n))
+    return photos
+
+
 def uid(key: str) -> str:
     u = uuid.uuid5(NS, key).hex
     # force RFC-4122 v4 shape (version nibble 4, variant 8-b) like src/db/uid.ts
@@ -212,8 +333,24 @@ def seed(conn, now, with_photos, satellites_flag):
     c.execute("INSERT INTO system_overrides (uid,system_ref,contact_id,mode,created_at) VALUES (?,?,?,?,?)",
               (uid("sys:inner:ovr:clara"), f"custom:{uid('sys:inner')}", core_ids["Clara Ruiz"], "include", n))
 
+    photos += add_size_systems(c, now)
+
     if satellites_flag is not None:
         c.execute("UPDATE app_settings SET orrery_satellites_enabled=?", (int(satellites_flag),))
+    conn.commit()
+    return photos
+
+
+def seed_sizes_only(conn, now):
+    """Additive: keep every existing row, add only the Size cast + Size Systems."""
+    c = conn.cursor()
+    uv = c.execute("PRAGMA user_version").fetchone()[0]
+    if uv < EXPECTED_MIN_USER_VERSION:
+        sys.exit(f"DB user_version {uv} < {EXPECTED_MIN_USER_VERSION}; launch the app once first")
+    if c.execute("SELECT COUNT(*) FROM custom_field_defs").fetchone()[0]:
+        sys.exit("DB has custom-field definitions; this seed writes no custom_field_values pairs")
+    c.execute("PRAGMA foreign_keys=ON")
+    photos = add_size_systems(c, now)
     conn.commit()
     return photos
 
@@ -223,6 +360,8 @@ def main():
     ap.add_argument("--serial")
     ap.add_argument("--no-photos", action="store_true")
     ap.add_argument("--satellites", type=int, choices=[0, 1])
+    ap.add_argument("--sizes-only", action="store_true",
+                    help="additive: no wipe; only add the Size 5/10/20/32/120 cast + Systems")
     args = ap.parse_args()
     s = resolve_serial(args.serial)
     work = tempfile.mkdtemp(prefix="laba-seed-")
@@ -236,7 +375,10 @@ def main():
         if not os.path.exists(dbp):
             sys.exit("no orbit.db in Lab A package — launch the app once first")
         conn = sqlite3.connect(dbp)
-        photos = seed(conn, dt.datetime.now(), not args.no_photos, args.satellites)
+        if args.sizes_only:
+            photos = seed_sizes_only(conn, dt.datetime.now())
+        else:
+            photos = seed(conn, dt.datetime.now(), not args.no_photos, args.satellites)
         conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
         conn.execute("PRAGMA journal_mode=DELETE")  # fold WAL into the main file
         conn.close()
@@ -247,7 +389,8 @@ def main():
         r = adb(s, "shell", f"run-as {PKG} ls -l {DB_DIR}")
         print(r.stdout.decode().strip())
         if not args.no_photos:
-            adb(s, "shell", f"run-as {PKG} sh -c 'rm -rf files/avatars; mkdir -p files/avatars'")
+            reset = "" if args.sizes_only else "rm -rf files/avatars; "
+            adb(s, "shell", f"run-as {PKG} sh -c '{reset}mkdir -p files/avatars'")
             for cid, key in photos:
                 p = os.path.join(work, f"contact-{cid}.jpg")
                 make_avatar(p, key)
@@ -262,6 +405,10 @@ def main():
               "satellites", q("select count(*) from relationships"),
               "categories", q("select count(*) from categories"),
               "custom_systems", q("select count(*) from systems"))
+        for name, cnt in v.execute(
+                "select s.name, count(o.id) from systems s left join system_overrides o"
+                " on o.system_ref = 'custom:' || s.uid and o.mode='include' group by s.id order by s.id"):
+            print(f"  system {name!r}: {cnt} include overrides")
         v.close()
     finally:
         shutil.rmtree(work, ignore_errors=True)

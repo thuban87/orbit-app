@@ -138,6 +138,24 @@ Seeded content (statuses relative to the day you run it):
 - Custom System **Lab Inner Circle** (rule favorite=on + include override for Clara Ruiz) → 3 members.
 - Totals: 40 contacts, 39 orbiting, ~174 interactions, 5 satellites, 15 avatars.
 
+- **Size comparison Systems** (shared spec with Lab B / Lab C, 2026-10-02): a dedicated 120-contact
+  cast (no category, no favourites; per-10 status pattern stable/wobble/decay/rogue(rarely-responds)/
+  never/stable/stable/wobble/decay/rogue(overdue); photo on every `i % 3 == 1`; moons on cast #11 (2),
+  #17, #26, #70 (2)) and custom Systems **Size 5 / 10 / 20 / 32 / 120** = the first N cast members
+  (include overrides). A full seed now yields 160 contacts.
+
+Additive mode (keeps every existing row, adds only the Size cast + Systems; idempotent by "Size 5"):
+
+```bash
+python3 $TOOLS/seed-lab-a.py --sizes-only
+```
+
+It does not need Metro or a debug launch: the DB only has to exist. Pattern used 2026-10-02 on a
+phone running the release build: `install -r` the debug APK (same `debug.keystore` signer) →
+`seed-lab-a.py --sizes-only` → `install -r` the release APK back. On a fresh phone: install the
+release APK, launch once (creates the DB), then the same three steps (use the full seed instead
+of `--sizes-only` to get the base fixture too).
+
 Relaunch after seeding (d). Orrery photo derivatives build lazily — bodies show
 initials for a second or two on first view, then photos.
 
