@@ -5,7 +5,8 @@ This covers camera, gestures, focus, zoom, System switching and reduced motion a
 `research/FINAL-VALIDATION.md`). Every observation below comes from the **emulator**. Pinch,
 twist and two-finger tilt cannot be injected with `adb input`, so zoom levels and yaw were
 reached through focus fly-ins, panel camera presets and pose deep links. No physical-touch
-session on a phone has happened yet (**phone pass pending — Pixel in use by Lab A**).
+session on a phone has happened yet. The Pixel 6 Pro pass (`research/PHONE-PASS-RESULTS.md`) was
+adb-driven too, so pinch, twist and two-finger tilt still need a physical check by hand.
 
 R3 interaction changes:
 - `nearSizeClamp` (C-71) limits the drawn size of near bodies at detail zoom with the Home

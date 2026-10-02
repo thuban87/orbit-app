@@ -4,8 +4,8 @@
 Build: droid busy-probe IDLE → `tools/r2-release.sh final` → `assembleRelease` x86_64
 (BUILD SUCCESSFUL, 31 tasks executed) → `install -r` over the seeded app
 (`flags` without `DEBUGGABLE`). Target: the desktop **emulator** (`emulator-5554`, 1280×2856,
-port 5039). Nothing here is a phone or absolute-performance claim. The **Pixel phone pass is
-still pending: the Pixel is in use by Lab A.**
+port 5039). Nothing here is a phone or absolute-performance claim. The **Pixel phone pass
+followed later the same day:** `research/PHONE-PASS-RESULTS.md`.
 
 Preset everywhere unless a row says otherwise: `preset=best` (= registry defaults). Theme
 Galaxy Dark unless noted. Evidence root: `evidence/13-final/`. Screenshots are JPEG (q85).
