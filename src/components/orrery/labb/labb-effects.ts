@@ -696,7 +696,10 @@ half4 lbEntry(float k, float2 p, float r, float ang, float sr, float depthV) {
   float4 C = lbClassC(cls);
   float4 S = lbClassS(cls);
   float zoom = max(uCam.w, 0.0001);
-  float halfW = 0.5 * S.x * (trim > 0.5 ? uTrim.x : 1.0);
+  // Stroke width as before the fix: a WORLD width (dp / zoom) seen through
+  // the local radial screen scale sr, so near-side rings foreshorten and
+  // thin exactly like the stroked world circles did.
+  float halfW = 0.5 * S.x * (trim > 0.5 ? uTrim.x : 1.0) * sr / zoom;
   float wakeHalf = 0.5 * uWake.y / zoom;
   float dw = abs(r - R);
   float d = dw * sr;
