@@ -279,3 +279,18 @@ session; close-range targets were not met under that condition.
 - **Open at this commit:** on device (s3/s4) the focused system is still framed small under the header —
   the target size was bounded by the usable-rect width (narrowed by the side controls). Next commit bounds it
   by the canvas width and logs the rects; re-shot in E.2b.
+
+## 2026-10-01 — Checkpoint E.3: reduced motion verified (no code change beyond a log line)
+
+- Source: the app's live OS signal (`useReducedMotion` / `useReducedMotionShared`, ADR-085), driven on the
+  Pixel by Android "Remove animations" (`animator_duration_scale`, `transition_animation_scale`,
+  `window_animation_scale` = 0 for one session; all three restored to 1 afterwards and re-read as 1).
+- Renderer log (`evidence/07-checkpoint-e/s4-reduced-motion-log.txt`): `reducedMotion=true` reached the world;
+  the System switch logged `reduced=true` (180 ms direct reposition + crossfade path; the 3D fall/rise lift,
+  capture flare and camera breath are gated on `!reducedMotion` in `switchDepth` / the sampled camera).
+- Focused parent with a moon, two screenshots 5 s apart (`s4-reduced-focus-moon-t0.png`, `-t5s.png`):
+  **pixel-identical** (diff bbox none) — moon revolution stopped (frame callback inactive under reduced
+  motion), star twinkle and sun pulse constant, no idle drift.
+- Camera flights: focus recovery uses the shared camera motion's reduced path (100 ms linear); pan/yaw coast
+  is disabled by the same shared value. Not separately measured on device (adb cannot fling reliably).
+- Switch screenshots `s4-reduced-switch-mid.png` / `-after.png` (Dense → Lab C Inner).

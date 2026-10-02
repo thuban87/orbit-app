@@ -1,0 +1,25 @@
+ LOG  [lab-c] adapter vendor=arm arch=valhall device=Mali-G78 desc=Mali-G78: v1.r54p2-01eac0.fb6fbead05afc1c718b19a8978ff5bfe 54.2.0 fallback=false in 331ms
+ LOG  [lab-c] device created in 8ms
+ LOG  [lab-c] reducedMotion=false
+ LOG  [lab-c] reducedMotion=true
+ LOG  [lab-c] mount #1 hermes heap=34MB allocated=27MB external=139MB gcs=91
+ LOG  [lab-c] renderer ready #1 in 995ms buffer=822x1450 dpr=2 TextDecoder=function
+ LOG  [lab-c] bitmap-probe OK 256x256 read=21.2ms decode=1118.4ms upload=32.0ms
+ LOG  [lab-c] frames=180 avgDt=27.7ms fps=36.1 p95Dt=26.3 maxDt=1159.5 jsRenderAvg=18.22ms p95=17.38 calls=14 tris=145427 photos=40 photoAvg=89.9ms packets=4 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.43ms drawAvg=15.87ms
+ LOG  [lab-c] mem #1 external=297MB heap=42MB gcs=223 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=26.4 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] frames=156 avgDt=32.1ms fps=31.2 p95Dt=26.1 maxDt=1546.2 jsRenderAvg=11.79ms p95=16.90 calls=14 tris=145427 photos=40 photoAvg=89.9ms packets=1 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.35ms drawAvg=9.96ms
+ LOG  [lab-c] mem #1 external=297MB heap=55MB gcs=270 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=9.4 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] frames=271 avgDt=18.5ms fps=54.1 p95Dt=25.0 maxDt=54.3 jsRenderAvg=12.05ms p95=16.08 calls=14 tris=145427 photos=40 photoAvg=89.9ms packets=0 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.37ms drawAvg=10.06ms
+ LOG  [lab-c] mem #1 external=298MB heap=55MB gcs=306 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=7.2 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] focus ids=3 zoom=1.281 tilt=0.85
+ LOG  [lab-c] frames=242 avgDt=20.7ms fps=48.3 p95Dt=25.7 maxDt=206.1 jsRenderAvg=12.20ms p95=16.49 calls=17 tris=38055 photos=40 photoAvg=89.9ms packets=11 bodies=152 visibleContacts=3 drawnSpheres=24 presentAvg=0.33ms drawAvg=10.84ms
+ LOG  [lab-c] mem #1 external=298MB heap=59MB gcs=340 texs=11 geos=6 labelsLive=2 labelRasters=2 atlasFlushes=2 gcPerS=6.8 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] frames=255 avgDt=19.6ms fps=51.0 p95Dt=25.4 maxDt=32.6 jsRenderAvg=12.96ms p95=17.80 calls=17 tris=38055 photos=40 photoAvg=89.9ms packets=0 bodies=152 visibleContacts=3 drawnSpheres=24 presentAvg=0.35ms drawAvg=11.67ms
+ LOG  [lab-c] mem #1 external=298MB heap=59MB gcs=367 texs=11 geos=6 labelsLive=2 labelRasters=2 atlasFlushes=2 gcPerS=5.4 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] frames=245 avgDt=20.6ms fps=48.5 p95Dt=25.2 maxDt=410.5 jsRenderAvg=12.61ms p95=15.54 calls=16 tris=30037 photos=40 photoAvg=89.9ms packets=1 bodies=152 visibleContacts=0 drawnSpheres=18 presentAvg=0.34ms drawAvg=11.33ms
+ LOG  [lab-c] mem #1 external=298MB heap=67MB gcs=400 texs=11 geos=6 labelsLive=2 labelRasters=2 atlasFlushes=2 gcPerS=6.5 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] frames=251 avgDt=19.9ms fps=50.2 p95Dt=26.2 maxDt=163.1 jsRenderAvg=11.38ms p95=16.05 calls=14 tris=26903 photos=40 photoAvg=89.9ms packets=5 bodies=121 visibleContacts=0 drawnSpheres=18 presentAvg=0.37ms drawAvg=10.31ms
+ LOG  [lab-c] mem #1 external=299MB heap=75MB gcs=432 texs=11 geos=6 labelsLive=2 labelRasters=2 atlasFlushes=2 gcPerS=6.4 paragraphs=132 created=132 disposed=0
+ LOG  [lab-c] switch gen=4 retained=10 leaving=110 entering=7 intensity=0.85 reduced=true
+ LOG  [lab-c] frames=247 avgDt=20.3ms fps=49.4 p95Dt=24.8 maxDt=272.6 jsRenderAvg=11.25ms p95=14.32 calls=14 tris=25741 photos=47 photoAvg=85.6ms packets=22 bodies=18 visibleContacts=8 drawnSpheres=17 presentAvg=0.37ms drawAvg=10.18ms
+ LOG  [lab-c] mem #1 external=186MB heap=88MB gcs=473 texs=9 geos=6 labelsLive=0 labelRasters=2 atlasFlushes=4 gcPerS=8.2 paragraphs=24 created=139 disposed=115
