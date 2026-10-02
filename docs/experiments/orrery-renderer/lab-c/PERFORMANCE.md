@@ -1,4 +1,71 @@
-# Orrery Lab C — performance log
+# Orrery Lab C — performance
+
+Device for every number: **Pixel 6 Pro** (Mali-G78, Vulkan via Dawn), 120 Hz panel, USB power. All fps
+values are the renderer's own JS-thread rAF cadence (`[lab-c] frames=…` every 5 s). `dumpsys gfxinfo` cannot
+see this loop (see "Release (final)"). Scenes: **Inner** = 17 contacts + star (~26k triangles); **Dense** =
+120 contacts + star (121 bodies, 152 with moons; ~114k–145k triangles); the seed has 200 contacts.
+
+## Targets
+
+- Contract: honest Android numbers and no invented precision.
+- Lab targets (C.4): ≥ 45 fps at overview and ≥ 40 fps close, in debug. Release goal: steady 60.
+
+## Summary (read this first)
+
+| Build | Thermal state | Scene / state | fps (JS rAF) | Frame cost | Notes |
+|---|---|---|---|---|---|
+| Debug, B.3 | not recorded | overview / close (System not recorded) | 42 / 31–34 | present 4.9 → 10.6 ms | Before the C.4 perf pass (noise star + plane fill-bound) |
+| Debug, C.4 | **SEVERE (3)** during the session | Inner overview | 45.2 | present 3.8 ms | after DPR cap 2.0 + baked textures |
+| Debug, C.4 | SEVERE | Inner close / Dense near | 35.4 / 33.6 | present 8.7 / 8.4 ms | close-range target **not met** while throttled |
+| Debug, C.4 | SEVERE | Dense overview | 47.0 | present 2.0 ms, jsRender 11–13 ms | JS-bound from here on |
+| Debug, E.1 | 0 | Dense overview steady / first 5 s after mount | 52–56 / 31–46 | — | after the Paragraph fix |
+| **Release, F.2** | **0 → 0** | Dense overview steady | **59.6–60.6** | jsRender 9.8–10.5 ms (p95 ≤ 13 ms), draw 8.0–8.6, present 0.38–0.78 ms | pinned at the 60 Hz rAF cadence |
+| Release, F.2 | 0 | Dense near / close / swung | 58.0–60.2 / 58.7–59.4 / 56.7 | present ≤ 1.12 ms | |
+| Release, F.2 | 0 | **System switch** Dense → Inner | **56.3, 54.8** | p95 24.6–26.0 ms, **worst frame 54 ms** | 110 leaving, 7 entering, 10 retained |
+| Release, F.2 | 0 | Dense, **first 5 s after mount** | **53.8** | **worst frame 465 ms** | photos, atlas, labels build |
+| Release, F.2 | 0 | Inner overview | 59.5–59.8 | jsRender 10.0–10.6 ms | |
+| Release, F.2b | 1 → 1 | Inner near / close (after preset fix 4a82ae85) | 57.6–59.8 / 59.2–59.3 | | re-measured |
+| Release, F.2 | 0 | Memory: 3 leave/return cycles | — | TOTAL PSS 677 → 612 MB, Graphics 276 → 276 MB | **PSS flat**; Hermes `external` post-gc floor +~52 MB/mount (unexplained) |
+
+**What the numbers say**
+
+- **Release is pinned at about 60 fps in every steady state**, Dense included. The panel is 120 Hz but this
+  loop's rAF runs at 60 Hz (cause not investigated). With **~10–11 ms of JS per frame** (p95 ≤ 14.3 ms),
+  **120 Hz would not fit on the JS thread** as built.
+- **The GPU is not the bottleneck** at DPR 2.0: `presentAvg` ≤ 1.1 ms everywhere in release (call it
+  "GPU < 1.1 ms"; `presentAvg` is the time blocked in `context.present()`, a back-pressure proxy rather
+  than a GPU timer). Before the DPR cap (2.5) the frame was fill-bound.
+- **The bottleneck is the JS thread.** three's CPU render and WebGPU encode (`drawAvg` 8–10 ms for 13–16 draw
+  calls) share the thread with Reanimated packet handling and React. Gestures and SQLite reads during a switch
+  compete with it.
+- **Thermal.** The phone reached `Thermal Status: 3` (SEVERE) in the debug Checkpoint C session (about 25 min
+  of rendering plus screen recording while charging). The ~22.7 fps plateaus that session were throttling.
+  Release numbers are from a cool phone (status 0–1), on one session, in 5 s windows. There is **no long-soak or
+  hot-phone release data**.
+- **Memory.** Real memory (PSS, Native Heap, Graphics) is flat across remounts in release. The Hermes `external`
+  counter's post-GC floor still rises about 52 MB per mount (debug about 70–72). The retainer is **unidentified**,
+  and freeing the scene's CPU buffers at dispose did not move it (E.1 re-measure).
+- **Lesson: the Paragraph / ParagraphBuilder 1 MB JSI pressure.** RN Skia reports a flat 1 MB of Hermes external
+  memory pressure per `Paragraph` **and** per `ParagraphBuilder` (`JsiSkParagraph.h:174`,
+  `JsiSkParagraphBuilder.h:119`), and a builder has no `dispose()`. Building a builder and paragraph per label,
+  per rebuild, drove `external` to GBs and GC storms (50–100 GC/s after a mount). The fix: one shared builder
+  per font provider, a Paragraph cache with disposal, and per-tile atlas snapshots. Mount `external` went from
+  1569 to 297 MB.
+
+## Bottlenecks and risks
+
+1. JS-thread render loop: a 60 Hz ceiling, contention with gestures, and stalls during JS work (switch scene
+   read 1.4–2.5 s). Moving rendering to a worklet runtime or a UI-thread renderer is the structural fix
+   (RENDERER-DECISION.md §3, options 2–3). It was not tried.
+2. First-seconds hitch after mount (worst frame 465 ms) from photo decode, atlas and label rasterization.
+3. Unidentified Hermes `external` floor growth (~52 MB/mount). PSS is flat, but GC scheduling responds to
+   that counter.
+4. Thermals are unmeasured in release under sustained use.
+5. Fill cost returns if DPR is raised or if large additive layers (corona, plane) grow.
+
+---
+
+# Detailed log (chronological, all measurements kept)
 
 **Build: DEBUG** (dev client + Metro, JS not minified, Hermes debug). Release-build numbers come later and
 will differ (usually better on the JS side). Device: Pixel 6 Pro (Mali-G78), 120 Hz panel, on USB power.

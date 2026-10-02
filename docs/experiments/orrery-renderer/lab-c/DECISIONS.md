@@ -1,5 +1,36 @@
 # Orrery Lab C — decisions log
 
+Chronological, oldest first. Each heading names its checkpoint, and the commits are listed in README.md.
+Performance and memory decisions (C.4, D.5, D.6, E.1, F.2) are written up in full in PERFORMANCE.md; the
+entries here point to them. Entries added when the research package was assembled are marked *(package)*.
+
+## 2026-10-01 — M0: renderer choice *(package; commits 167bbcaa, 38616b7c)*
+
+Imperative three.js `WebGPURenderer` on `react-native-webgpu 0.10.4` (Dawn/Vulkan), with Skia kept for text
+and photo decode and the existing UI-thread pose and projection kept as the source of truth. The fallback was
+expo-gl + three WebGLRenderer. Skia "real projection", Filament, Babylon and Unity were rejected. R3F was
+rejected for the prototype: the reconciler invites React-driven animation and has an open double-renderer bug.
+Full survey: RENDERER-DECISION.md. The app identity was changed to `com.bwales.orbit.labc` so the lab
+installs beside the real app.
+
+## 2026-10-01 — M1: first true-3D world *(package; commit 205c1462)*
+
+`OrreryWorld3D` drops in at the `OrreryScreen` seam. It packs data UI→JS per changed frame and runs its own
+rAF loop. It uses instanced lit spheres, atlas face billboards, one-draw TSL rings, a star slab, sun glow and
+a label overlay. Spike lessons recorded in code comments (`three/orrery-gpu.ts`; the referenced
+`_notes/M1-BUILD.md` was never committed):
+- `requestDevice()` during SurfaceView creation blocked JS and main for about 32 s → prewarm a device at module
+  load and after each unmount, and mount the `<Canvas>` only once a device is held.
+- A process-wide shared device leaked every renderer (three's per-renderer `device.lost` reaction): about
+  +200 MB external per remount and a JS SIGSEGV on the 3rd–4th remount → one device per mount, destroyed on
+  unmount.
+- `device.queue` creates a new native wrapper per read in 0.10.4 → pin one.
+- The CMake build fails at minSdk 24 (`AHardwareBuffer_*`) → `plugins/withLabCMinSdk.js` (minSdk 26).
+- `projectFrame`'s 128-point `ringPath` per body dominated the UI thread at 200 bodies →
+  `projectAnimatedFrameLite` (same math, no ring paths, parity test).
+The camera in this commit reproduced the 2.5D pinhole exactly. That became the dead end in the next entry.
+
+
 ## 2026-10-01 — Parity camera abandoned; real perspective camera adopted
 
 **Dead end (commit 205c1462).** The first true-3D build drew a three.js WebGPU scene but
@@ -255,6 +286,19 @@ session; close-range targets were not met under that condition.
 - Seen while testing: at Dense, focus framing (`IDENTITY_ZOOM` cap) dollies very close — the focused body is
   ~170 px and its lower half sits under the focus card. Pre-existing focus framing, not changed here.
 
+## 2026-10-01 — Checkpoints D.5, D.6, E.1: lifecycle and memory *(package; cc2ec75e, f1d9b310, e4d9e842, 1d052ca2)*
+
+Details and tables: PERFORMANCE.md. Decisions in order:
+- D.5: the Hermes `external` counter climbs 400–600 MB per mount. Recorded, not fixed (time box).
+- D.6: `dumpsys meminfo` shows real memory about flat. The counter is mostly GC-pending RN Skia host-object
+  pressure (a flat 1 MB per Paragraph). `BodyAtlas.flush` was changed to snapshot only dirty tiles (it was
+  ~26 MB per flush).
+- E.1: a ParagraphBuilder also carries 1 MB and has no `dispose()` → one shared builder per font provider
+  (`orreryParagraphBuilder`), `OrreryTextCache` with disposal, and label rasters kept while the Paragraph is
+  unchanged. Mount external 1569 → 297 MB; the post-gc floor went from +300–575 to about +70 MB per mount.
+- E.1 re-measure: releasing CPU buffers at `dispose()` did not move the floor (+72 MB). The mitigation was kept
+  because it is harmless; the retainer remains unidentified.
+
 ## 2026-10-01 — Checkpoint E.2: satellite focus framing, lit moons, label/disc overlap
 
 - **Focus frames the focused contact's whole system above the focus card** (`OrreryScreen.focus`, single
@@ -328,3 +372,27 @@ session; close-range targets were not met under that condition.
   status colours lit from one side; faces are ~10 px there); a thin outline instead of glow was not tried.
   Standard-light was only shot before the fix (same code path as galaxy-light; not re-shot in the time box).
   Theme restored to Galaxy / Dark after both sessions.
+
+## 2026-10-01 — Tests rewritten for the 3D camera *(package; commit 467b973b)*
+
+The 7 old 2.5D-contract cases (tilt-0 Home, 60° max, throw-on-horizon, …) were rewritten for the dolly
+camera: bounded scale and near-plane/horizon round trip, tilted and core Home, top-down flat depth, MAX_TILT
+ceiling, on-screen pan-coast bound, dolly-consistent north, sky at MAX_TILT. When this package was written,
+`npx tsc --noEmit` was clean and the orrery suites were at 731/733. The 2 failures are in
+`orrery-screen-framing.test.ts` and come from the lab-only "Unavailable System" effect (f608d35d) reading
+`requested.ref.kind` against a store mock without `ref`. Not fixed (docs-only package).
+
+## 2026-10-01 — Checkpoint F: release build, performance, accessibility, final evidence *(package; c7fcbe80, 334a561e, 567c120d, 4a82ae85, 5abe6016, 6c1d3c68)*
+
+- F.1: `assembleRelease` arm64 with the same debug keystore, installed with `install -r` over the seeded
+  debug app so the data is kept. APK 102.9 MB; WebGPU libs 17.5 + 3.1 MB (RUNBOOK §8).
+- F.2: release holds about 60 fps in every steady state, and the GPU is not the bottleneck
+  (PERFORMANCE.md "Release (final)").
+- F.3: the canvas is not the accessible path (no per-body nodes, the same as production). The companion
+  controls are labelled. TalkBack swipe-nav could not be driven by adb (`_notes/A11Y.md`).
+- 4a82ae85: a lab-tool bug was found during the evidence review. The badge presets kept a stale home zoom
+  after a System switch, so Inner "near/close" actually zoomed out. Fixed (re-capture on leaving preset 0) and
+  the Inner rows were re-measured.
+- F.4: final release screenshots and recordings. The README does not claim debug parity for the focus being
+  cleared on tab return (not compared).
+
