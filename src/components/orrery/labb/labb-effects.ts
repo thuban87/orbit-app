@@ -347,6 +347,96 @@ half4 lbSun(float2 xy, float3 surf) {
 }
 `;
 
+// --- Tilt fix (phone pass P-1) ---------------------------------------------------
+// The ring shaders work in WORLD plane coordinates. The tilt fix records ring
+// geometry in SCREEN space; the default hands the shader world coordinates
+// through a perspective LOCAL matrix. The `…Inv` variants (A/B, flag
+// `ringShaderInv`) instead take screen dp and map them back to the plane
+// in-shader through the inverse homography rows (like `stagePlane`), so no
+// local matrix is attached to the paint. Same body, appended uniforms.
+const RINGINSTRUMENT_SRC = `
+uniform float4 uColor;
+uniform float4 uHi;
+uniform float4 uCam;
+uniform float4 uStyle;
+uniform float4 uFlow;
+uniform float4 uSpin;
+half4 main(float2 p) {
+  float tau = 6.2831853;
+  float r = max(length(p), 0.0001);
+  float v = (uCam.y * p.x + uCam.x * p.y) / r;
+  float depth = mix(1.0, uStyle.w, uCam.z * (0.5 - 0.5 * v));
+  float a = uColor.a * depth;
+  float3 col = uColor.rgb;
+  float ang = atan(p.x, -p.y);
+  if (ang < 0.0) { ang += tau; }
+  float zoom = max(uCam.w, 0.0001);
+  float mask = 1.0;
+  if (uStyle.y > 0.0) {
+    float d = 0.0;
+    float per = uStyle.y;
+    if (uStyle.x < 0.5) {
+      float circ = tau * r * zoom;
+      float n = max(4.0, floor(circ / uStyle.y));
+      per = circ / n;
+      d = mod(ang * r * zoom, per);
+    } else {
+      d = mod(r * zoom, per);
+    }
+    float on = per * uStyle.z;
+    mask = smoothstep(0.0, 0.7, d) * (1.0 - smoothstep(on - 0.7, on, d));
+    a *= mask;
+  }
+  if (uStyle.x < 0.5 && uFlow.y > 0.5) {
+    float seg = tau * r / 3.0;
+    float u = fract((ang * r - uFlow.x * uFlow.w - uSpin.x * r) / seg + fract(r * 0.618034));
+    float k = seg / max(uFlow.z, 1.0);
+    float head = 1.0 - smoothstep(1.0 - 1.2 / (zoom * seg), 1.0, u);
+    float comet = exp(-(1.0 - u) * k) * head * uHi.a * depth * mask * (1.0 + uSpin.y);
+    col = mix(col, uHi.rgb, clamp(comet * 1.4, 0.0, 1.0));
+    a = clamp(a + comet, 0.0, 1.0);
+  }
+  if (uSpin.w > 0.0) {
+    float lit = uSpin.w * exp(-r / max(uSpin.z, 1.0));
+    col = mix(col, uHi.rgb, clamp(lit * 0.35, 0.0, 0.5));
+    a = clamp(a * (1.0 + lit), 0.0, 1.0);
+  }
+  return half4(half3(col * a), half(a));
+}
+`;
+const RINGWAKE_SRC = `
+uniform float4 uColor;
+uniform float4 uWake;
+uniform float4 uCam;
+half4 main(float2 p) {
+  float tau = 6.2831853;
+  float r = max(length(p), 0.0001);
+  float ang = atan(p.x, -p.y);
+  if (ang < 0.0) { ang += tau; }
+  float th = max(uWake.x, 0.0001);
+  float t = clamp(ang / th, 0.0, 1.0);
+  float inside = 1.0 - smoothstep(th - 0.004, th, ang);
+  float across = 1.0 - smoothstep(0.0, max(uWake.z, 0.0001), abs(r - uWake.y));
+  float v = (uCam.y * p.x + uCam.x * p.y) / r;
+  float depth = mix(1.0, uWake.w, uCam.z * (0.5 - 0.5 * v));
+  float a = uColor.a * (0.12 + 0.88 * t * t) * inside * across * depth;
+  return half4(half3(uColor.rgb * a), half(a));
+}
+`;
+/** Wrap a world-coordinate ring shader so it takes SCREEN dp: uInv0..2 =
+ * inverse plane homography rows (screen dp → plane, homogeneous). */
+function planeInverse(src: string): string {
+  return src.replace(
+    "half4 main(float2 p) {",
+    `uniform float3 uInv0;
+uniform float3 uInv1;
+uniform float3 uInv2;
+half4 main(float2 xy) {
+  float3 sh = float3(xy, 1.0);
+  float2 p = float2(dot(uInv0, sh), dot(uInv1, sh)) / dot(uInv2, sh);`,
+  );
+}
+
 export const LAB_EFFECT_SOURCES = {
   /**
    * Pipeline probe: a flat uniform colour. Proves the compile / uniform /
@@ -517,56 +607,8 @@ half4 main(float2 xy) {
    * there is no seam at north. Flow = 3 comets per ring, same LINEAR speed for
    * every status (never encodes status, C-04), clockwise.
    */
-  ringInstrument: `
-uniform float4 uColor;
-uniform float4 uHi;
-uniform float4 uCam;
-uniform float4 uStyle;
-uniform float4 uFlow;
-uniform float4 uSpin;
-half4 main(float2 p) {
-  float tau = 6.2831853;
-  float r = max(length(p), 0.0001);
-  float v = (uCam.y * p.x + uCam.x * p.y) / r;
-  float depth = mix(1.0, uStyle.w, uCam.z * (0.5 - 0.5 * v));
-  float a = uColor.a * depth;
-  float3 col = uColor.rgb;
-  float ang = atan(p.x, -p.y);
-  if (ang < 0.0) { ang += tau; }
-  float zoom = max(uCam.w, 0.0001);
-  float mask = 1.0;
-  if (uStyle.y > 0.0) {
-    float d = 0.0;
-    float per = uStyle.y;
-    if (uStyle.x < 0.5) {
-      float circ = tau * r * zoom;
-      float n = max(4.0, floor(circ / uStyle.y));
-      per = circ / n;
-      d = mod(ang * r * zoom, per);
-    } else {
-      d = mod(r * zoom, per);
-    }
-    float on = per * uStyle.z;
-    mask = smoothstep(0.0, 0.7, d) * (1.0 - smoothstep(on - 0.7, on, d));
-    a *= mask;
-  }
-  if (uStyle.x < 0.5 && uFlow.y > 0.5) {
-    float seg = tau * r / 3.0;
-    float u = fract((ang * r - uFlow.x * uFlow.w - uSpin.x * r) / seg + fract(r * 0.618034));
-    float k = seg / max(uFlow.z, 1.0);
-    float head = 1.0 - smoothstep(1.0 - 1.2 / (zoom * seg), 1.0, u);
-    float comet = exp(-(1.0 - u) * k) * head * uHi.a * depth * mask * (1.0 + uSpin.y);
-    col = mix(col, uHi.rgb, clamp(comet * 1.4, 0.0, 1.0));
-    a = clamp(a + comet, 0.0, 1.0);
-  }
-  if (uSpin.w > 0.0) {
-    float lit = uSpin.w * exp(-r / max(uSpin.z, 1.0));
-    col = mix(col, uHi.rgb, clamp(lit * 0.35, 0.0, 0.5));
-    a = clamp(a * (1.0 + lit), 0.0, 1.0);
-  }
-  return half4(half3(col * a), half(a));
-}
-`,
+  ringInstrument: RINGINSTRUMENT_SRC,
+  ringInstrumentInv: planeInverse(RINGINSTRUMENT_SRC),
   /**
    * WP-1.3 progress WAKE for one ring, painted on a stroked world circle (the
    * stroke is wider than the visible wake; the cross profile is soft).
@@ -577,25 +619,185 @@ half4 main(float2 p) {
    * Alpha rises from north to the body (a comet tail drawn backward along the
    * rail), ends crisply at the body, zero past it.
    */
-  ringWake: `
-uniform float4 uColor;
-uniform float4 uWake;
+  ringWake: RINGWAKE_SRC,
+  /**
+   * TILT FIX — the RING FIELD (flag `ringField`, `labb-ring-field.ts`): every
+   * class ring, progress wake and switch trim of the orbit layer in ONE
+   * full-screen pass over SCREEN dp (no geometry under any matrix).
+   *   uInv0..2 = inverse plane homography rows (screen dp → plane)
+   *   uH0..2   = plane homography rows (plane → screen dp), for the Jacobian
+   *   uCam     = cos yaw, sin yaw, tilt depth 0..1, zoom
+   *   uFlow    = time s, flow on, comet length (world), comet speed
+   *   uHi      = flow highlight rgb, flow strength
+   *   uSpin    = spool angle, spool boost, sun-light radius (world), gain
+   *   uView    = rmax (world), table width, LUT width, device px per dp
+   *   uWake    = wake opacity (settle × gate), wake width dp, far alpha, on
+   *   uTrim    = trim width scale, trim tail alpha, unused, unused
+   *   uC0..4   = per class: status rgb, ring alpha (× density fade)
+   *   uS0..4   = per class: width dp, dash period dp, dash duty, wake alpha
+   *   uTable / uLut = data textures (nearest sampling, texel centres)
+   * Per pixel: world point → radius → LUT → the nearest entry and its
+   * neighbour on the pixel's side; each contributes its wake (under) and its
+   * stroke (over), the stroke's coverage from the screen distance
+   * |r − R| · |J·n̂| (J = d screen / d plane at the pixel). Same style maths
+   * as `ringInstrument` / `ringWake` / the trim sweep, with the ring radius R
+   * in place of the pixel radius.
+   */
+  ringField: `
+uniform shader uTable;
+uniform shader uLut;
+uniform float3 uInv0;
+uniform float3 uInv1;
+uniform float3 uInv2;
+uniform float3 uH0;
+uniform float3 uH1;
+uniform float3 uH2;
 uniform float4 uCam;
-half4 main(float2 p) {
+uniform float4 uFlow;
+uniform float4 uHi;
+uniform float4 uSpin;
+uniform float4 uView;
+uniform float4 uWake;
+uniform float4 uTrim;
+uniform float4 uC0;
+uniform float4 uC1;
+uniform float4 uC2;
+uniform float4 uC3;
+uniform float4 uC4;
+uniform float4 uS0;
+uniform float4 uS1;
+uniform float4 uS2;
+uniform float4 uS3;
+uniform float4 uS4;
+float lbB(half v) { return floor(float(v) * 255.0 + 0.5); }
+float4 lbClassC(float c) {
+  if (c < 0.5) { return uC0; }
+  if (c < 1.5) { return uC1; }
+  if (c < 2.5) { return uC2; }
+  if (c < 3.5) { return uC3; }
+  return uC4;
+}
+float4 lbClassS(float c) {
+  if (c < 0.5) { return uS0; }
+  if (c < 1.5) { return uS1; }
+  if (c < 2.5) { return uS2; }
+  if (c < 3.5) { return uS3; }
+  return uS4;
+}
+half4 lbEntry(float k, float2 p, float r, float ang, float sr, float depthV) {
   float tau = 6.2831853;
-  float r = max(length(p), 0.0001);
+  float x = k + 0.5;
+  half4 t0 = uTable.eval(float2(x, 0.5));
+  half4 t1 = uTable.eval(float2(x, 1.5));
+  float R = (lbB(t0.r) * 256.0 + lbB(t0.g)) / 65535.0 * uView.x;
+  float code = lbB(t0.b);
+  float trim = code >= 8.0 ? 1.0 : 0.0;
+  float cls = code - 8.0 * trim;
+  float4 C = lbClassC(cls);
+  float4 S = lbClassS(cls);
+  float zoom = max(uCam.w, 0.0001);
+  float halfW = 0.5 * S.x * (trim > 0.5 ? uTrim.x : 1.0);
+  float wakeHalf = 0.5 * uWake.y / zoom;
+  float dw = abs(r - R);
+  float d = dw * sr;
+  float wakeA = (lbB(t1.g) * 256.0 + lbB(t1.b)) / 65535.0 * tau;
+  bool wakeOn = trim < 0.5 && wakeA > 0.0005 && uWake.w > 0.5 && dw < wakeHalf;
+  float aa = 1.0 / max(uView.w, 0.5);
+  if (d > halfW + aa && !wakeOn) { return half4(0.0); }
+  float alpha = lbB(t1.r) / 255.0;
+  float depth = mix(1.0, uWake.z, uCam.z * (0.5 - 0.5 * depthV));
+  float cov = clamp((halfW - d) * uView.w + 0.5, 0.0, 1.0);
+  float3 col = C.rgb;
+  float a = 0.0;
+  if (trim > 0.5) {
+    half4 t2 = uTable.eval(float2(x, 2.5));
+    float len = lbB(t2.r) / 255.0;
+    float head = (lbB(t2.g) * 256.0 + lbB(t2.b)) / 65535.0 * tau;
+    float u = fract((ang - head) / tau);
+    float cut = clamp(1.0 - len, 0.0, 0.998);
+    float m = u < cut ? 0.0 : mix(uTrim.y, 1.0, (u - cut) / max(1.0 - cut, 0.0001));
+    a = alpha * m * cov;
+    return half4(half3(col * a), half(a));
+  }
+  if (cov > 0.0) {
+    a = C.a * depth;
+    float mask = 1.0;
+    if (S.y > 0.0) {
+      float circ = tau * R * zoom;
+      float n = max(4.0, floor(circ / S.y));
+      float per = circ / n;
+      float dd = mod(ang * R * zoom, per);
+      float on = per * S.z;
+      mask = smoothstep(0.0, 0.7, dd) * (1.0 - smoothstep(on - 0.7, on, dd));
+      a *= mask;
+    }
+    if (uFlow.y > 0.5) {
+      float seg = tau * R / 3.0;
+      float u = fract((ang * R - uFlow.x * uFlow.w - uSpin.x * R) / seg + fract(R * 0.618034));
+      float kk = seg / max(uFlow.z, 1.0);
+      float head = 1.0 - smoothstep(1.0 - 1.2 / (zoom * seg), 1.0, u);
+      // Look parity: the per-ring shader phased each comet by the PIXEL
+      // radius (fract(r·0.618)), so across a stroke ~1 world unit wide the
+      // phase spread over most of a segment and the comet read as its mean
+      // along the rail, not a sharp streak. Reproduce that mean (spread s).
+      float peak = exp(-(1.0 - u) * kk) * head;
+      float mean = (1.0 - exp(-kk)) / max(kk, 0.0001);
+      float spread = clamp(0.618 * S.x / zoom, 0.0, 1.0);
+      float comet = mix(peak, mean, spread) * uHi.a * depth * mask * (1.0 + uSpin.y);
+      col = mix(col, uHi.rgb, clamp(comet * 1.4, 0.0, 1.0));
+      a = clamp(a + comet, 0.0, 1.0);
+    }
+    if (uSpin.w > 0.0) {
+      float lit = uSpin.w * exp(-R / max(uSpin.z, 1.0));
+      col = mix(col, uHi.rgb, clamp(lit * 0.35, 0.0, 0.5));
+      a = clamp(a * (1.0 + lit), 0.0, 1.0);
+    }
+    a *= cov * alpha;
+  }
+  float3 outc = col * a;
+  if (wakeOn) {
+    float th = max(wakeA, 0.0001);
+    float t = clamp(ang / th, 0.0, 1.0);
+    float inside = 1.0 - smoothstep(th - 0.004, th, ang);
+    float across = 1.0 - smoothstep(0.0, max(wakeHalf, 0.0001), dw);
+    float wdepth = mix(1.0, uWake.z, uCam.z * (0.5 - 0.5 * depthV));
+    float wa = S.w * (0.12 + 0.88 * t * t) * inside * across * wdepth * uWake.x;
+    outc += C.rgb * wa * (1.0 - a);
+    a += wa * (1.0 - a);
+  }
+  return half4(half3(outc), half(a));
+}
+half4 main(float2 xy) {
+  float3 s = float3(xy, 1.0);
+  float hz = dot(uInv2, s);
+  if (hz <= 0.0001) { return half4(0.0); }
+  float2 p = float2(dot(uInv0, s), dot(uInv1, s)) / hz;
+  float r = length(p);
+  if (r > uView.x * 1.2 || uView.y < 0.5) { return half4(0.0); }
+  float rr = max(r, 0.0001);
+  float2 nr = p / rr;
+  float W = dot(uH2, float3(p, 1.0));
+  float dh = uH2.x * nr.x + uH2.y * nr.y;
+  float2 J = float2(uH0.x * nr.x + uH0.y * nr.y - xy.x * dh,
+                    uH1.x * nr.x + uH1.y * nr.y - xy.y * dh) / W;
+  float sr = length(J);
+  float bin = clamp(floor(r / uView.x * uView.z), 0.0, uView.z - 1.0);
+  half4 L = uLut.eval(float2(bin + 0.5, 0.5));
+  float k = lbB(L.r) * 256.0 + lbB(L.g);
+  half4 t0 = uTable.eval(float2(k + 0.5, 0.5));
+  float Rk = (lbB(t0.r) * 256.0 + lbB(t0.g)) / 65535.0 * uView.x;
+  float k2 = r > Rk ? min(k + 1.0, uView.y - 1.0) : max(k - 1.0, 0.0);
+  float tau = 6.2831853;
   float ang = atan(p.x, -p.y);
   if (ang < 0.0) { ang += tau; }
-  float th = max(uWake.x, 0.0001);
-  float t = clamp(ang / th, 0.0, 1.0);
-  float inside = 1.0 - smoothstep(th - 0.004, th, ang);
-  float across = 1.0 - smoothstep(0.0, max(uWake.z, 0.0001), abs(r - uWake.y));
-  float v = (uCam.y * p.x + uCam.x * p.y) / r;
-  float depth = mix(1.0, uWake.w, uCam.z * (0.5 - 0.5 * v));
-  float a = uColor.a * (0.12 + 0.88 * t * t) * inside * across * depth;
-  return half4(half3(uColor.rgb * a), half(a));
+  float depthV = (uCam.y * p.x + uCam.x * p.y) / rr;
+  half4 c1 = lbEntry(k, p, r, ang, sr, depthV);
+  half4 c2 = k2 != k ? lbEntry(k2, p, r, ang, sr, depthV) : half4(0.0);
+  return c1 + c2 * (1.0 - c1.a);
 }
 `,
+
+  ringWakeInv: planeInverse(RINGWAKE_SRC),
   /**
    * WP-2.1 system-lock SHOCKWAVE on the world plane: painted on a world-space
    * circle under the plane homography (a projected ellipse in tilt). A crisp

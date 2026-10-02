@@ -191,3 +191,42 @@ export function ovalLocalMatrix(
   const inv = [c, s, -(c * e.x + s * e.y), -s, c, s * e.x - c * e.y, 0, 0, 1];
   return mul3(inv, m);
 }
+
+/**
+ * Inverse plane homography rows for the `…Inv` ring shaders (screen dp →
+ * plane, homogeneous): the adjugate of `m` (= det · m⁻¹; the scale cancels in
+ * the perspective divide), normalised to a max |entry| of 1 for float
+ * precision on the GPU. Flat [row0, row1, row2]. When `ctm` (row-major 3×3,
+ * local → screen) is given, returns adj(m) · ctm so a draw under that CTM
+ * still maps its local coordinates onto the plane.
+ */
+export function planeInverseRows(
+  m: readonly number[],
+  ctm?: readonly number[],
+): number[] {
+  "worklet";
+  const adj = [
+    m[4] * m[8] - m[5] * m[7],
+    m[2] * m[7] - m[1] * m[8],
+    m[1] * m[5] - m[2] * m[4],
+    m[5] * m[6] - m[3] * m[8],
+    m[0] * m[8] - m[2] * m[6],
+    m[2] * m[3] - m[0] * m[5],
+    m[3] * m[7] - m[4] * m[6],
+    m[1] * m[6] - m[0] * m[7],
+    m[0] * m[4] - m[1] * m[3],
+  ];
+  const out = ctm ? mul3(adj, ctm) : adj;
+  let k = 0;
+  for (let i = 0; i < 9; i++) k = Math.max(k, Math.abs(out[i]));
+  if (k > 0) for (let i = 0; i < 9; i++) out[i] /= k;
+  return out;
+}
+
+/** Oval-variant CTM (local → screen): translate(e.x, e.y) · rotate(e.theta). */
+export function ovalCtm(e: PlaneEllipse): number[] {
+  "worklet";
+  const c = Math.cos(e.theta);
+  const s = Math.sin(e.theta);
+  return [c, -s, e.x, s, c, e.y, 0, 0, 1];
+}

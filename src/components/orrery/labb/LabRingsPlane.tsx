@@ -54,7 +54,9 @@ import {
 import {
   ellipseOnScreen,
   hasPerspective,
+  ovalCtm,
   ovalLocalMatrix,
+  planeInverseRows,
   projectedCircleEllipse,
 } from "./labb-plane-ellipse";
 import {
@@ -146,6 +148,7 @@ export function PlaneRingClassesPicture({
   trimKeys,
   sunLight,
   oval,
+  inv,
 }: {
   classes: readonly (readonly LabRingEntry[])[];
   frame: SharedValue<AnimatedFrame>;
@@ -161,6 +164,9 @@ export function PlaneRingClassesPicture({
   sunLight: readonly number[];
   /** A/B (flag `ringOvalOp`): analytic ovals instead of projected paths. */
   oval: boolean;
+  /** A/B (flag `ringShaderInv`): `…Inv` shader (in-shader inverse
+   * homography on screen coords) instead of a perspective local matrix. */
+  inv: boolean;
 }) {
   const ctx = useLabStillContext();
   const fxFlags = ctx?.fxFlags;
@@ -169,7 +175,9 @@ export function PlaneRingClassesPicture({
   const roles = ctx?.sw?.roles;
   const focus = ctx?.focus ?? null;
   const focusDim = profile.focusDim;
-  const effect = shader ? getLabEffect("ringInstrument") : null;
+  const effect = shader
+    ? getLabEffect(inv ? "ringInstrumentInv" : "ringInstrument")
+    : null;
   const specs = useMemo<PlaneRingClassSpec[]>(
     () =>
       classes.map((group) => {
@@ -220,12 +228,21 @@ export function PlaneRingClassesPicture({
     const fkeys = fon && focus ? focus.keys.value : NO_FOCUS_KEYS;
     const { recorder, canvas } = beginScreenPicture();
     const path = Skia.Path.Make();
+    if (!persp) {
+      canvas.save();
+      canvas.concat(m as number[]);
+    }
     for (let k = 0; k < specs.length; k++) {
       const spec = specs[k];
       const paint = Skia.Paint();
       paint.setAntiAlias(true);
       paint.setStyle(1);
-      paint.setStrokeWidth(spec.widthDp);
+      // Untilted: the pre-fix draw exactly (world circle under the AFFINE
+      // homography, world stroke, no shader local matrix — Ganesh's circle op).
+      paint.setStrokeWidth(persp ? spec.widthDp : spec.widthDp / zoom);
+      // Bevel joins: the convex-path stroker refuses round joins, and a smooth
+      // closed curve has no visible joins.
+      paint.setStrokeJoin(2);
       paint.setColor(
         Float32Array.of(spec.color[0], spec.color[1], spec.color[2], 1),
       );
@@ -244,7 +261,11 @@ export function PlaneRingClassesPicture({
           sunLight: fx?.flags.ringSunLight ? sunLight : undefined,
         });
         flat = flattenUniforms(u, RING_ORDER);
-        paint.setShader(effect.makeShader(flat, lm));
+        if (!persp) paint.setShader(effect.makeShader(flat));
+        else if (inv) {
+          flat = flat.concat(planeInverseRows(m));
+          paint.setShader(effect.makeShader(flat));
+        } else paint.setShader(effect.makeShader(flat, lm));
       } else {
         base *= spec.alpha;
         if (spec.dashPeriod > 0)
@@ -270,12 +291,20 @@ export function PlaneRingClassesPicture({
         if (oval && persp) {
           if (effect && flat)
             paint.setShader(
-              effect.makeShader(flat, Skia.Matrix(ovalLocalMatrix(e, m))),
+              inv
+                ? effect.makeShader(
+                    flat
+                      .slice(0, flat.length - 9)
+                      .concat(planeInverseRows(m, ovalCtm(e))),
+                  )
+                : effect.makeShader(flat, Skia.Matrix(ovalLocalMatrix(e, m))),
             );
           strokeOval(canvas, e, paint);
-        } else strokePlaneCircle(canvas, path, m, e, 0, 0, r, paint);
+        } else if (!persp) canvas.drawCircle(0, 0, r, paint);
+        else strokePlaneCircle(canvas, path, m, e, 0, 0, r, paint);
       }
     }
+    if (!persp) canvas.restore();
     const ringsPicture = recorder.finishRecordingAsPicture();
     probeEnd("rings", probe);
     return ringsPicture;
@@ -300,6 +329,7 @@ export function PlaneWakesPicture({
   settled,
   moving,
   oval,
+  inv,
 }: {
   classes: readonly (readonly LabRingEntry[])[];
   frame: SharedValue<AnimatedFrame>;
@@ -308,8 +338,9 @@ export function PlaneWakesPicture({
   settled: SharedValue<number>;
   moving: SharedValue<number>;
   oval: boolean;
+  inv: boolean;
 }) {
-  const effect = getLabEffect("ringWake");
+  const effect = getLabEffect(inv ? "ringWakeInv" : "ringWake");
   const block = useMemo(() => {
     const out: number[] = [];
     let n = 0;
@@ -369,7 +400,11 @@ export function PlaneWakesPicture({
     paint.setStrokeWidth(stroke);
     paint.setAlphaf(Math.min(1, op));
     const path = Skia.Path.Make();
-    const u: number[] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    // ringWakeInv appends the 9 inverse-homography floats (uInv0..2).
+    const u: number[] = inv
+      ? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+      : [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    const rows = inv ? planeInverseRows(m) : null;
     for (let i = 0; i < count; i++) {
       const o = i * WAKE_FLOATS;
       const R = floats[o + 5];
@@ -380,15 +415,18 @@ export function PlaneWakesPicture({
       u[8] = c[0];
       u[9] = c[1];
       u[10] = c[2];
-      if (oval && persp) {
+      if (inv) {
+        const r9 = oval && persp ? planeInverseRows(m, ovalCtm(e)) : rows;
+        if (r9) for (let k = 0; k < 9; k++) u[WAKE_FLOATS + k] = r9[k];
+        paint.setShader(effect.makeShader(u));
+      } else
         paint.setShader(
-          effect.makeShader(u, Skia.Matrix(ovalLocalMatrix(e, m))),
+          oval && persp
+            ? effect.makeShader(u, Skia.Matrix(ovalLocalMatrix(e, m)))
+            : effect.makeShader(u, lm),
         );
-        strokeOval(canvas, e, paint);
-      } else {
-        paint.setShader(effect.makeShader(u, lm));
-        strokePlaneCircle(canvas, path, m, e, 0, 0, R, paint);
-      }
+      if (oval && persp) strokeOval(canvas, e, paint);
+      else strokePlaneCircle(canvas, path, m, e, 0, 0, R, paint);
     }
     const wakesPicture = recorder.finishRecordingAsPicture();
     probeEnd("wakes", probe);

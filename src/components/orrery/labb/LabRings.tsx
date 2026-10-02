@@ -52,6 +52,7 @@ import {
   type SkRuntimeEffect,
 } from "@shopify/react-native-skia";
 import { useMemo } from "react";
+import { PixelRatio } from "react-native";
 import {
   type SharedValue,
   useAnimatedReaction,
@@ -73,6 +74,7 @@ import type { LabFlags } from "@/stores/orrery-labb-fx-store";
 import { type LabRingProfile, labColor } from "@/theme/orrery-lab-fx";
 import type { ThemePalette } from "@/theme/theme-types";
 import type { OrreryBodyResource } from "../use-orrery-switch-runtime";
+import { RingFieldPicture } from "./LabRingField";
 import {
   PlaneFocusRingPicture,
   PlaneRingClassesPicture,
@@ -1192,6 +1194,10 @@ export function LabRings({
     },
   );
   const wakeLod = entries.length <= WAKE_LOD_MAX_RINGS;
+  // Ring field: the wake gates as one opacity (settle × recovery fade).
+  const wakeOpacity = useDerivedValue(() =>
+    moving.value > 0 ? 0 : settled.value * wakeGate.value,
+  );
   const trimEntries = useMemo(
     () => entries.filter((e) => trimKeys.has(e.key)),
     [entries, trimKeys],
@@ -1270,9 +1276,34 @@ export function LabRings({
   const compassTone = tokenToVec4(labColor(colors, profile.compass));
   if (picture && flags.ringPlaneDraw) {
     const oval = flags.ringOvalOp;
+    // Tilt fix, final form: class rings + wakes + switch trims as ONE
+    // full-screen analytic field (flag `ringField`; falls back to the
+    // per-ring screen-space pictures without its runtime effect).
+    const field =
+      flags.ringField && shader && getLabEffect("ringField") !== null;
     return (
       <Group>
-        {flags.ringWake && wakeLod ? (
+        {field ? (
+          <RingFieldPicture
+            classes={classes}
+            frame={frame}
+            frameIndex={frameIndex}
+            cam={cam}
+            flow={flow}
+            profile={profile}
+            highlight={highlight}
+            ringGap={ringGap}
+            anyFocus={anyFocus}
+            trimKeys={trimKeys}
+            sunLight={sunLight}
+            wakeOn={flags.ringWake && wakeLod}
+            wakeOpacity={wakeOpacity}
+            trimOn={flags.fx && flags.fxRingTrim}
+            trimEntries={trimEntries}
+            pixelRatio={PixelRatio.get()}
+          />
+        ) : null}
+        {!field && flags.ringWake && wakeLod ? (
           <Group opacity={wakeGate}>
             <PlaneWakesPicture
               classes={classes}
@@ -1282,6 +1313,7 @@ export function LabRings({
               settled={settled}
               moving={moving}
               oval={oval}
+              inv={flags.ringShaderInv}
             />
           </Group>
         ) : null}
@@ -1298,22 +1330,25 @@ export function LabRings({
             shader={shader}
           />
         ) : null}
-        <PlaneRingClassesPicture
-          classes={classes}
-          frame={frame}
-          frameIndex={frameIndex}
-          cam={cam}
-          flow={flow}
-          profile={profile}
-          highlight={highlight}
-          shader={shader}
-          ringGap={ringGap}
-          anyFocus={anyFocus}
-          trimKeys={trimKeys}
-          sunLight={sunLight}
-          oval={oval}
-        />
-        {flags.fx && flags.fxRingTrim ? (
+        {field ? null : (
+          <PlaneRingClassesPicture
+            classes={classes}
+            frame={frame}
+            frameIndex={frameIndex}
+            cam={cam}
+            flow={flow}
+            profile={profile}
+            highlight={highlight}
+            shader={shader}
+            ringGap={ringGap}
+            anyFocus={anyFocus}
+            trimKeys={trimKeys}
+            sunLight={sunLight}
+            oval={oval}
+            inv={flags.ringShaderInv}
+          />
+        )}
+        {!field && flags.fx && flags.fxRingTrim ? (
           <PlaneTrimRingPicture
             entries={trimEntries}
             frame={frame}

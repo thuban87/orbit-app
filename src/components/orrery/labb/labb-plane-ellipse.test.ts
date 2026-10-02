@@ -16,7 +16,9 @@ import {
   ellipsePoint,
   hasPerspective,
   mul3,
+  ovalCtm,
   ovalLocalMatrix,
+  planeInverseRows,
   projectedCircleEllipse,
 } from "./labb-plane-ellipse";
 import { applyHomography, planeHomography } from "./labb-rings-logic";
@@ -215,5 +217,43 @@ describe("oval draw variant: shader local matrix keeps WORLD coordinates", () =>
     const ctm = [c, -s, e.x, s, c, e.y, 0, 0, 1];
     const back = mul3(ctm, ovalLocalMatrix(e, m));
     for (let i = 0; i < 9; i++) expect(back[i]).toBeCloseTo(m[i], 6);
+  });
+});
+
+describe("planeInverseRows (the …Inv ring shaders' screen → plane map)", () => {
+  it("maps screen points back onto the plane, also through an oval CTM", () => {
+    const m = planeHomography(
+      clampCameraPose(
+        { x: -60, y: 90, zoom: 0.8, tilt: 0.9, yaw: 3.3 },
+        EXTENT,
+      ),
+      viewports[1],
+    );
+    if (!m) throw new Error("no matrix");
+    const back = (rows: number[], x: number, y: number) => {
+      const w = rows[6] * x + rows[7] * y + rows[8];
+      return {
+        x: (rows[0] * x + rows[1] * y + rows[2]) / w,
+        y: (rows[3] * x + rows[4] * y + rows[5]) / w,
+      };
+    };
+    const rows = planeInverseRows(m);
+    expect(Math.max(...rows.map(Math.abs))).toBeCloseTo(1, 12);
+    for (const [x, y] of [
+      [0, 0],
+      [150, -320],
+      [-410, 77],
+    ]) {
+      const s = applyHomography(m, x, y);
+      const p = back(rows, s.x, s.y);
+      expect(p.x).toBeCloseTo(x, 6);
+      expect(p.y).toBeCloseTo(y, 6);
+    }
+    const e = projectedCircleEllipse(m, 0, 0, 200);
+    if (!e) throw new Error("no ellipse");
+    const viaOval = planeInverseRows(m, ovalCtm(e));
+    // Local oval point (a, 0) is on the world circle of radius 200.
+    const p = back(viaOval, e.a, 0);
+    expect(Math.hypot(p.x, p.y)).toBeCloseTo(200, 6);
   });
 });

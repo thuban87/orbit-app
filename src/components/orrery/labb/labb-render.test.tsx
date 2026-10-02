@@ -219,6 +219,14 @@ vi.mock("@shopify/react-native-skia", async () => {
       MaskFilter: { MakeBlur: (...args: unknown[]) => ({ blur: args }) },
       PathEffect: { MakeDash: (...args: unknown[]) => ({ dash: args }) },
       Matrix: (m?: readonly number[]) => ({ matrix: m ? [...m] : null }),
+      Data: { fromBytes: (bytes: Uint8Array) => ({ bytes }) },
+      Image: {
+        MakeImage: (info: unknown, data: unknown) => ({
+          info,
+          data,
+          makeShaderOptions: () => ({ image: info }),
+        }),
+      },
       Path: {
         // Tilt fix: the screen-space ring pictures reuse one scratch path
         // (reset → addCircle → transform); the recorder snapshots its state.
@@ -663,8 +671,8 @@ describe("Lab B renderer tree contract", () => {
     expect(orbit.children.some((c) => c.type === "circle")).toBe(false);
   });
 
-  it("tilt fix: tilted rings are the circle path mapped through the homography, screen-width stroke, shader in world coords via its LOCAL matrix — never a perspective CTM", async () => {
-    lab.flags = { fpsHud: false, layerPictures: true };
+  it("tilt fix (per-ring fallback, ringField off): tilted rings are the circle path mapped through the homography, screen-width stroke, shader in world coords via its LOCAL matrix — never a perspective CTM", async () => {
+    lab.flags = { fpsHud: false, layerPictures: true, ringField: false };
     lab.effects = true;
     const pose = { value: { ...HOME_CAMERA, zoom: 1.3, tilt: 0.56, yaw: 0.4 } };
     const { tree, scene } = await renderLab(pose);
@@ -711,14 +719,54 @@ describe("Lab B renderer tree contract", () => {
     expect(paint.setStrokeWidth).toBeLessThan(3);
     for (let i = 0; i < 9; i++)
       expect(paint.setShader.localMatrix.matrix[i]).toBeCloseTo(m[i], 9);
-    // Untilted: Ganesh's circle op at the projected centre (as before the fix).
+    // Untilted: the pre-fix draw exactly — the AFFINE homography as the CTM
+    // and a world circle (Ganesh's circle op), no shader local matrix.
     pose.value = { ...pose.value, tilt: 0 };
     const flat = opsOf(pictures[0]);
     expect(flat.some((o) => o[0] === "drawPath")).toBe(false);
+    expect(flat[0][0]).toBe("save");
+    expect(flat[1][0]).toBe("concat");
     const circle = flat.find((o) => o[0] === "drawCircle");
-    expect(circle?.[1]).toBeCloseTo(250, 6);
-    expect(circle?.[2]).toBeCloseTo(350, 6);
-    expect(circle?.[3]).toBeCloseTo((world?.ringRadius ?? 0) * 1.3, 6);
+    expect(circle?.[1]).toBe(0);
+    expect(circle?.[2]).toBe(0);
+    expect(circle?.[3]).toBeCloseTo(world?.ringRadius ?? 0, 6);
+  });
+
+  it("tilt fix (ring field, default): ONE full-screen rect, field shader with the data textures as children and the plane homography as uniforms", async () => {
+    lab.flags = { fpsHud: false, layerPictures: true };
+    lab.effects = true;
+    const pose = { value: { ...HOME_CAMERA, zoom: 1.3, tilt: 0.56, yaw: 0.4 } };
+    const { tree, scene } = await renderLab(pose);
+    const orbit = tree[1].children[0].children[1];
+    const field = orbit.children[0];
+    expect(field.type).toBe("picture");
+    const ops = opsOf(field);
+    expect(ops.map((o) => o[0])).toEqual(["drawRect"]);
+    expect(ops[0][1]).toEqual({ x: 0, y: 0, width: 500, height: 700 });
+    const shader = (
+      ops[0][2] as {
+        setShader: { uniforms: number[]; children: { image: unknown }[] };
+      }
+    ).setShader;
+    expect(shader.children).toHaveLength(2);
+    const order = uniformOrder(LAB_EFFECT_SOURCES.ringField);
+    expect(shader.uniforms).toHaveLength(order.length * 4 - 6 * 1);
+    // uH0..2 (offset 9) = the homography; projecting north of the contact's
+    // ring with it lands on projectFrame's ringPath[0].
+    const m = shader.uniforms.slice(9, 18);
+    expect(Math.abs(m[6]) + Math.abs(m[7])).toBeGreaterThan(0);
+    const { applyHomography } = await import("./labb-rings-logic");
+    const { projectFrame } = await import("@/logic/orrery-camera-logic");
+    const world = scene.world.find((b) => b.kind === "contact");
+    const projected = projectFrame(
+      scene.world,
+      pose.value,
+      { width: 500, height: 700 },
+      0,
+    ).bodies.find((b) => b.kind === "contact");
+    const north = applyHomography(m, 0, -(world?.ringRadius ?? 0));
+    expect(north.x).toBeCloseTo(projected?.ringPath[0].x ?? Number.NaN, 4);
+    expect(north.y).toBeCloseTo(projected?.ringPath[0].y ?? Number.NaN, 4);
   });
 
   it("tilt fix A/B: ringPlaneDraw off restores the pre-fix homography Group", async () => {
