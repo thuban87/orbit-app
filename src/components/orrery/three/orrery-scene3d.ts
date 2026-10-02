@@ -119,7 +119,10 @@ const KEY_LIGHT_INTENSITY = 3.2;
 /** Moons per frame (focused parent's moons + identity-tier moons). */
 const MAX_MOONS = 64;
 /** Moon emissive floor (fraction of the theme's textSecondary token). */
-const MOON_EMISSIVE = 0.28;
+const MOON_EMISSIVE = 0.4;
+/** Moons are small (10–20 px): the initials disc covers most of the sphere so
+ * a moon reads as a solid person-token, not a pale swatch-on-swatch ghost. */
+const MOON_FACE_FRACTION = 0.84;
 const AMBIENT_INTENSITY = 0.22;
 /** Photo billboard shading: ambient floor + lambert gain toward the sun. */
 const FACE_AMBIENT = 0.3;
@@ -1089,7 +1092,11 @@ export class OrreryScene3D {
           faceCount,
           visibleRadius *
             2 *
-            (kind === KIND_SUN ? SUN_FACE_FRACTION : FACE_FRACTION),
+            (kind === KIND_SUN
+              ? SUN_FACE_FRACTION
+              : kind === KIND_SATELLITE
+                ? MOON_FACE_FRACTION
+                : FACE_FRACTION),
         );
         this.faceUv.setXY(
           faceCount,

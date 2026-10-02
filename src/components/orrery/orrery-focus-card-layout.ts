@@ -14,8 +14,8 @@ import {
 } from "@/logic/orrery-camera-logic";
 import { SPACING } from "@/theme/tokens/spacing";
 
-/** Right-hand controls column (55 px buttons + margins) the docked card avoids. */
-export const FOCUS_CARD_SIDE_RESERVE = 76;
+/** Right-hand controls + FAB column (≈56 px FAB + margins) the docked card clears. */
+export const FOCUS_CARD_SIDE_RESERVE = 92;
 /** Gap between the docked card and the canvas bottom. */
 export const FOCUS_CARD_BOTTOM_GAP = 8;
 export const FOCUS_CARD_MAX_WIDTH = 280;
