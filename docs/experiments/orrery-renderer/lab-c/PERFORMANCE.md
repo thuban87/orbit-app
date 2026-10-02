@@ -160,3 +160,58 @@ remaining per-mount growth is **not** the scene's CPU buffers; the mitigation st
 retainer is still unidentified. At idle the GC rate settles to ~2.6–3.0 /s after ~40 s open (7 /s in the
 first half-minute while photos/atlas settle). fps at Dense overview 52–56 steady, 31–41 in the first 5 s after
 a mount (debug build, JS-thread rAF, thermal status 0 throughout).
+
+## Release (final) — Checkpoint F.2 (one device session 19:58–20:02, RELEASE build, thermal status 0 → 0)
+
+Build: `assembleRelease`, arm64-v8a, Hermes bytecode, minified, `__DEV__=false`, installed over the seeded
+debug app (`flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ]`, no DEBUGGABLE). Pixel 6 Pro on USB power, battery 37%,
+`dumpsys thermalservice` status **0 at start and 0 at end**. No screen recording during the measured run.
+The `[lab-c] frames=…` renderer log is **not** stripped in release (no remove-console plugin) and is the main
+source. Logs: `evidence/08-final/f2-release-perf-session-log.txt`, `f2-release-gfxinfo-meminfo.txt`
+(timing marks, gfxinfo, full meminfo). Each row = the 5 s windows fully inside that camera state.
+
+| System / camera | fps (JS rAF) | avg / p95 frame dt | jsRenderAvg (p95) | drawAvg | presentAvg | tris |
+|---|---|---|---|---|---|---|
+| Dense (121 bodies) overview, steady (5 windows) | 59.6–60.6 | 16.5–16.8 / 17.2–17.5 ms | 9.8–10.5 ms (12.5–13.0) | 8.0–8.6 ms | 0.38–0.78 ms | 145k |
+| Dense, first 5 s after mount (photos/atlas build) | 53.8 | 18.6 / 17.5 ms, max 465 ms | 12.6 ms (13.4) | 10.5 ms | 0.46 ms | 145k |
+| Dense near (preset 1, ×2.2) | 58.0–60.2 | 16.6–17.2 / 17.4–22.6 ms | 9.4–11.1 ms (12.8–13.7) | 7.7–9.1 ms | 0.40–1.10 ms | 138–141k |
+| Dense close (preset 2, ×3.4) | 58.7–59.4 | 16.8–17.0 / 17.3–22.7 ms | 9.4–11.2 ms (12.9–13.6) | 7.8–9.3 ms | 0.40–1.12 ms | 114k |
+| Dense orbit-swung (preset 3) | 56.7 | 17.6 / 25.3 ms | 10.4 ms (14.1) | 8.7 ms | 0.79 ms | 145k |
+| **System switch** Dense → Inner (110 leaving, 7 entering, 10 retained) | 56.3, then 54.8 | 17.8–18.2 / 24.6–26.0 ms, max 54 ms | 10.8–10.9 ms (13.5–14.3) | 9.2–9.9 ms | 0.39–0.42 ms | 65k → 26k |
+| Inner (17 + star) overview | 59.5–59.8 | 16.7–16.8 / 17.4 ms | 10.0–10.6 ms (12.5–12.8) | 9.4–9.8 ms | 0.41–0.42 ms | 26k |
+| Inner near (preset 1) | 59.1–59.2 | 16.9 / 17.6–20.3 ms | 10.3–11.0 ms (12.6–13.4) | 9.7–10.4 ms | 0.47–0.49 ms | 26k |
+| Inner close (preset 2) | 58.6–59.7 | 16.8–17.1 / 17.4–23.0 ms | 10.7 ms (12.9–13.4) | 10.0 ms | 0.43–0.44 ms | 26k |
+
+**gfxinfo** (`dumpsys gfxinfo com.bwales.orbit.labc`, reset before each state) covers **only the UI/RenderThread
+(HWUI)**, not the WebGPU canvas: the 3D frames are presented by Dawn straight to their own surface from the JS
+thread. Dense overview window (includes the tab change + mount): 136 HWUI frames, 0.74% janky, p50 6 / p90 8 /
+p95 10 / p99 42 ms. Dense near and close: **0 HWUI frames** in 12 s each (nothing on the UI thread changed —
+proof the 3D loop does not touch HWUI, and also that gfxinfo says nothing about the 3D frame rate). Switch window:
+2 HWUI frames (selector close).
+
+**Memory, 3 Orrery leave/return cycles** (Orrery → Digest → Orrery ×3, single pass; mounts #2–#4 on Inner, since
+the switch persisted):
+
+| | before cycles (mount #1 open, ~3 min) | after 3 cycles (mount #4 open, +10 s) |
+|---|---|---|
+| TOTAL PSS | 677 MB | 612 MB |
+| Native Heap PSS | 251 MB | 188 MB |
+| Graphics (EGL + GL mtrack) | 276 MB | 276 MB |
+| Hermes `external` post-unmount forced-gc floor | — | 54 → 106 → 159 MB (#1/#2/#3, +~52 per mount) |
+
+`renderer ready` 486–567 ms per mount (debug: ~2.0 s at D.5). Every unmount logged `loop stopped, GPU resources
+disposed`. PSS did not grow over the cycles; the `external` gc floor still climbs ~50 MB per mount (same
+unidentified retainer as E.1, now ~52 instead of ~72 MB).
+
+**Honest reading / caveats.**
+- The loop is **pinned at ~60 fps** (avg dt 16.5–17 ms) in every steady state, Dense included. The panel runs at
+  120 Hz (`SurfaceFlinger activeMode vsyncRate=120`), but the JS rAF cadence of this loop is 60 Hz; the 60 fps
+  cap is a cadence ceiling, not the scene cost. Headroom: jsRenderAvg ~10–11 ms (p95 ≤14.3 ms) of the 16.7 ms
+  budget, so a 120 Hz target would **not** fit on the JS thread as built. Not investigated why rAF is 60 Hz.
+- GPU is not the bottleneck at DPR 2.0 (presentAvg ≤1.1 ms everywhere). Debug→release mostly removed the
+  extra JS cost: Dense overview 47.0 (C.4) / 52–56 (E.1) debug → 59.6–60.6 release.
+- The "near/close" lab presets are bounded by the 3D dolly camera (467b973b); on Dense they read only a little
+  closer than overview (see `evidence/08-final/03-*`, `04-*`; same as the Checkpoint D debug shot). The truly close
+  view is the focus fly-in (`05-*`), not measured separately in this session.
+- Switch dips to 54.8–56.3 fps with p95 ~25 ms and one 54 ms frame — visible but small.
+- One session, one phone, cool, on USB power; 5 s windows; no long-soak or hot-phone numbers in release.

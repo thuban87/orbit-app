@@ -1,0 +1,137 @@
+10-01 19:58:28.262 15635 15707 I ReactNativeJS: [lab-c] adapter vendor=arm arch=valhall device=Mali-G78 desc=Mali-G78: v1.r54p2-01eac0.fb6fbead05afc1c718b19a8978ff5bfe 54.2.0 fallback=false in 21ms
+10-01 19:58:28.274 15635 15707 I ReactNativeJS: [lab-c] device created in 12ms
+10-01 19:58:42.357 15635 15707 I ReactNativeJS: [lab-c] render #1
+10-01 19:58:42.399 15635 15707 I ReactNativeJS: [lab-c] gesture rebuilt #1
+10-01 19:58:42.408 15635 15707 I ReactNativeJS: [lab-c] reducedMotion=false
+10-01 19:58:42.452 15635 15707 I ReactNativeJS: [lab-c] mount #1 hermes heap=17MB allocated=15MB external=139MB gcs=45
+10-01 19:58:42.453 15635 15707 I ReactNativeJS: [lab-c] stage context=ok cancelled=false
+10-01 19:58:42.453 15635 15707 I ReactNativeJS: [lab-c] stage canvas 411x725 -> 822x1450
+10-01 19:58:42.453 15635 15707 I ReactNativeJS: [lab-c] stage renderer constructed
+10-01 19:58:43.020 15635 15707 I ReactNativeJS: [lab-c] renderer ready #1 in 567ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 19:58:43.024 15635 15707 I ReactNativeJS: [lab-c] gesture rebuilt #2
+10-01 19:58:43.509 15635 15707 I ReactNativeJS: [lab-c] bitmap-probe OK 256x256 read=25.0ms decode=452.5ms upload=11.8ms
+10-01 19:58:48.036 15635 15707 I ReactNativeJS: [lab-c] frames=268 avgDt=18.6ms fps=53.8 p95Dt=17.5 maxDt=464.7 jsRenderAvg=12.56ms p95=13.39 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=3 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.46ms drawAvg=10.45ms
+10-01 19:58:48.036 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=297MB heap=21MB gcs=122 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=15.4 paragraphs=132 created=132 disposed=0
+10-01 19:58:53.051 15635 15707 I ReactNativeJS: [lab-c] frames=304 avgDt=16.5ms fps=60.6 p95Dt=17.2 maxDt=24.5 jsRenderAvg=9.80ms p95=12.87 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.78ms drawAvg=8.03ms
+10-01 19:58:53.051 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=297MB heap=21MB gcs=131 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=1.8 paragraphs=132 created=132 disposed=0
+10-01 19:58:58.060 15635 15707 I ReactNativeJS: [lab-c] frames=300 avgDt=16.7ms fps=59.9 p95Dt=17.3 maxDt=25.0 jsRenderAvg=10.16ms p95=12.49 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.40ms drawAvg=8.24ms
+10-01 19:58:58.060 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=297MB heap=21MB gcs=141 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=2.0 paragraphs=132 created=132 disposed=0
+10-01 19:59:03.069 15635 15707 I ReactNativeJS: [lab-c] frames=299 avgDt=16.8ms fps=59.6 p95Dt=17.5 maxDt=25.3 jsRenderAvg=10.50ms p95=12.74 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.38ms drawAvg=8.55ms
+10-01 19:59:03.069 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=21MB gcs=150 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=1.8 paragraphs=132 created=132 disposed=0
+10-01 19:59:08.075 15635 15707 I ReactNativeJS: [lab-c] frames=299 avgDt=16.7ms fps=59.7 p95Dt=17.4 maxDt=25.9 jsRenderAvg=10.23ms p95=12.96 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.38ms drawAvg=8.31ms
+10-01 19:59:08.075 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=297MB heap=21MB gcs=160 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=2.0 paragraphs=132 created=132 disposed=0
+10-01 19:59:13.086 15635 15707 I ReactNativeJS: [lab-c] frames=299 avgDt=16.8ms fps=59.6 p95Dt=17.4 maxDt=25.1 jsRenderAvg=10.32ms p95=12.59 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=100 drawnSpheres=120 presentAvg=0.39ms drawAvg=8.42ms
+10-01 19:59:13.086 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=21MB gcs=169 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=1.8 paragraphs=132 created=132 disposed=0
+10-01 19:59:17.966 15635 15707 I ReactNativeJS: [lab-c] tilt preset 1: tilt=1 yaw=0.7
+10-01 19:59:18.091 15635 15707 I ReactNativeJS: [lab-c] frames=301 avgDt=16.6ms fps=60.2 p95Dt=17.4 maxDt=32.5 jsRenderAvg=9.37ms p95=12.83 calls=14 tris=140779 photos=40 photoAvg=72.3ms packets=13 bodies=121 visibleContacts=67 drawnSpheres=116 presentAvg=1.10ms drawAvg=7.70ms
+10-01 19:59:18.091 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=297MB heap=21MB gcs=179 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=2.0 paragraphs=132 created=132 disposed=0
+10-01 19:59:23.107 15635 15707 I ReactNativeJS: [lab-c] frames=291 avgDt=17.2ms fps=58.0 p95Dt=22.6 maxDt=30.7 jsRenderAvg=10.65ms p95=13.13 calls=13 tris=138453 photos=40 photoAvg=72.3ms packets=62 bodies=121 visibleContacts=51 drawnSpheres=114 presentAvg=0.40ms drawAvg=8.76ms
+10-01 19:59:23.107 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=297MB heap=21MB gcs=189 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=2.0 paragraphs=132 created=132 disposed=0
+10-01 19:59:28.113 15635 15707 I ReactNativeJS: [lab-c] frames=297 avgDt=16.8ms fps=59.4 p95Dt=17.4 maxDt=25.2 jsRenderAvg=11.12ms p95=13.66 calls=13 tris=138453 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=51 drawnSpheres=114 presentAvg=0.41ms drawAvg=9.11ms
+10-01 19:59:28.113 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=21MB gcs=198 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=1.8 paragraphs=132 created=132 disposed=0
+10-01 19:59:31.567 15635 15707 I ReactNativeJS: [lab-c] tilt preset 2: tilt=0.9 yaw=2.2
+10-01 19:59:33.117 15635 15707 I ReactNativeJS: [lab-c] frames=294 avgDt=17.0ms fps=58.7 p95Dt=22.7 maxDt=30.3 jsRenderAvg=9.39ms p95=13.05 calls=13 tris=114051 photos=40 photoAvg=72.3ms packets=87 bodies=121 visibleContacts=29 drawnSpheres=93 presentAvg=1.12ms drawAvg=7.82ms
+10-01 19:59:33.117 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=297MB heap=21MB gcs=208 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=2.0 paragraphs=132 created=132 disposed=0
+10-01 19:59:38.119 15635 15707 I ReactNativeJS: [lab-c] frames=295 avgDt=17.0ms fps=59.0 p95Dt=17.5 maxDt=25.2 jsRenderAvg=11.17ms p95=13.57 calls=13 tris=114051 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=29 drawnSpheres=93 presentAvg=0.41ms drawAvg=9.32ms
+10-01 19:59:38.120 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=21MB gcs=216 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=1.6 paragraphs=132 created=132 disposed=0
+10-01 19:59:43.134 15635 15707 I ReactNativeJS: [lab-c] frames=298 avgDt=16.8ms fps=59.4 p95Dt=17.3 maxDt=24.9 jsRenderAvg=10.83ms p95=12.88 calls=13 tris=114051 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=29 drawnSpheres=93 presentAvg=0.40ms drawAvg=9.02ms
+10-01 19:59:43.134 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=21MB gcs=225 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=1.8 paragraphs=132 created=132 disposed=0
+10-01 19:59:44.772 15635 15707 I ReactNativeJS: [lab-c] tilt preset 3: tilt=1.2 yaw=3.8
+10-01 19:59:48.147 15635 15707 I ReactNativeJS: [lab-c] frames=284 avgDt=17.6ms fps=56.7 p95Dt=25.3 maxDt=29.4 jsRenderAvg=10.44ms p95=14.12 calls=13 tris=145425 photos=40 photoAvg=72.3ms packets=92 bodies=121 visibleContacts=98 drawnSpheres=120 presentAvg=0.79ms drawAvg=8.68ms
+10-01 19:59:48.147 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=21MB gcs=234 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=1.8 paragraphs=132 created=132 disposed=0
+10-01 19:59:52.004 15635 15707 I ReactNativeJS: [lab-c] tilt preset 0: tilt=1.08 yaw=0
+10-01 19:59:53.159 15635 15707 I ReactNativeJS: [lab-c] frames=285 avgDt=17.6ms fps=56.9 p95Dt=25.2 maxDt=33.5 jsRenderAvg=10.43ms p95=14.12 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=94 bodies=121 visibleContacts=101 drawnSpheres=120 presentAvg=0.50ms drawAvg=8.60ms
+10-01 19:59:53.159 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=21MB gcs=244 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=2.0 paragraphs=132 created=132 disposed=0
+10-01 19:59:58.162 15635 15707 I ReactNativeJS: [lab-c] frames=296 avgDt=16.9ms fps=59.2 p95Dt=17.6 maxDt=33.3 jsRenderAvg=10.82ms p95=13.42 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=101 drawnSpheres=120 presentAvg=0.39ms drawAvg=8.87ms
+10-01 19:59:58.162 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=297MB heap=21MB gcs=254 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=2.0 paragraphs=132 created=132 disposed=0
+10-01 20:00:03.167 15635 15707 I ReactNativeJS: [lab-c] frames=293 avgDt=17.1ms fps=58.6 p95Dt=18.8 maxDt=41.2 jsRenderAvg=10.77ms p95=13.93 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=101 drawnSpheres=120 presentAvg=0.44ms drawAvg=8.89ms
+10-01 20:00:03.167 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=21MB gcs=263 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=1.8 paragraphs=132 created=132 disposed=0
+10-01 20:00:08.171 15635 15707 I ReactNativeJS: [lab-c] frames=298 avgDt=16.8ms fps=59.5 p95Dt=17.4 maxDt=25.4 jsRenderAvg=10.55ms p95=13.13 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=101 drawnSpheres=120 presentAvg=0.39ms drawAvg=8.67ms
+10-01 20:00:08.171 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=21MB gcs=272 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=1.8 paragraphs=132 created=132 disposed=0
+10-01 20:00:13.174 15635 15707 I ReactNativeJS: [lab-c] frames=297 avgDt=16.8ms fps=59.4 p95Dt=17.5 maxDt=25.0 jsRenderAvg=10.71ms p95=13.28 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=101 drawnSpheres=120 presentAvg=0.38ms drawAvg=8.77ms
+10-01 20:00:13.174 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=21MB gcs=282 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=2.0 paragraphs=132 created=132 disposed=0
+10-01 20:00:18.187 15635 15707 I ReactNativeJS: [lab-c] frames=300 avgDt=16.7ms fps=59.8 p95Dt=17.4 maxDt=25.1 jsRenderAvg=10.41ms p95=12.93 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=101 drawnSpheres=120 presentAvg=0.38ms drawAvg=8.54ms
+10-01 20:00:18.187 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=21MB gcs=291 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=1.8 paragraphs=132 created=132 disposed=0
+10-01 20:00:23.188 15635 15707 I ReactNativeJS: [lab-c] frames=300 avgDt=16.7ms fps=60.0 p95Dt=17.4 maxDt=25.0 jsRenderAvg=10.30ms p95=13.08 calls=14 tris=145427 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=101 drawnSpheres=120 presentAvg=0.37ms drawAvg=8.42ms
+10-01 20:00:23.188 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=21MB gcs=301 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=2.0 paragraphs=132 created=132 disposed=0
+10-01 20:00:24.991 15635 15707 I ReactNativeJS: [lab-c] gesture rebuilt #3
+10-01 20:00:25.003 15635 15707 I ReactNativeJS: [lab-c] gesture rebuilt #4
+10-01 20:00:25.061 15635 15707 I ReactNativeJS: [lab-c] render #11
+10-01 20:00:28.195 15635 15707 I ReactNativeJS: [lab-c] frames=295 avgDt=17.0ms fps=59.0 p95Dt=17.6 maxDt=78.1 jsRenderAvg=10.41ms p95=13.26 calls=14 tris=108243 photos=40 photoAvg=72.3ms packets=4 bodies=121 visibleContacts=57 drawnSpheres=88 presentAvg=0.43ms drawAvg=8.72ms
+10-01 20:00:28.195 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=25MB gcs=312 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=2.2 paragraphs=132 created=132 disposed=0
+10-01 20:00:33.209 15635 15707 I ReactNativeJS: [lab-c] frames=297 avgDt=16.9ms fps=59.3 p95Dt=17.4 maxDt=24.7 jsRenderAvg=10.95ms p95=13.53 calls=14 tris=108243 photos=40 photoAvg=72.3ms packets=0 bodies=121 visibleContacts=57 drawnSpheres=88 presentAvg=0.40ms drawAvg=9.24ms
+10-01 20:00:33.209 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=298MB heap=25MB gcs=321 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=2 gcPerS=1.8 paragraphs=132 created=132 disposed=0
+10-01 20:00:37.170 15635 15707 I ReactNativeJS: [lab-c] gesture rebuilt #5
+10-01 20:00:37.177 15635 15707 I ReactNativeJS: [lab-c] gesture rebuilt #6
+10-01 20:00:37.205 15635 15707 I ReactNativeJS: [lab-c] gesture rebuilt #7
+10-01 20:00:37.273 15635 15707 I ReactNativeJS: [lab-c] gesture rebuilt #8
+10-01 20:00:37.333 15635 15707 I ReactNativeJS: [lab-c] switch gen=4 retained=10 leaving=110 entering=7 intensity=0.85 reduced=false
+10-01 20:00:37.424 15635 15707 I ReactNativeJS: [lab-c] render #21
+10-01 20:00:38.219 15635 15707 I ReactNativeJS: [lab-c] frames=282 avgDt=17.8ms fps=56.3 p95Dt=24.6 maxDt=54.1 jsRenderAvg=10.90ms p95=14.28 calls=14 tris=65249 photos=47 photoAvg=67.5ms packets=109 bodies=128 visibleContacts=3 drawnSpheres=51 presentAvg=0.39ms drawAvg=9.22ms
+10-01 20:00:38.219 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=185MB heap=25MB gcs=336 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=4 gcPerS=3.0 paragraphs=24 created=139 disposed=115
+10-01 20:00:43.226 15635 15707 I ReactNativeJS: [lab-c] frames=275 avgDt=18.2ms fps=54.8 p95Dt=26.0 maxDt=32.4 jsRenderAvg=10.75ms p95=13.51 calls=14 tris=25741 photos=47 photoAvg=67.5ms packets=148 bodies=18 visibleContacts=8 drawnSpheres=17 presentAvg=0.42ms drawAvg=9.94ms
+10-01 20:00:43.226 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=185MB heap=25MB gcs=343 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=4 gcPerS=1.4 paragraphs=24 created=139 disposed=115
+10-01 20:00:48.232 15635 15707 I ReactNativeJS: [lab-c] frames=298 avgDt=16.8ms fps=59.5 p95Dt=17.4 maxDt=24.7 jsRenderAvg=10.56ms p95=12.82 calls=14 tris=25741 photos=47 photoAvg=67.5ms packets=0 bodies=18 visibleContacts=8 drawnSpheres=17 presentAvg=0.42ms drawAvg=9.83ms
+10-01 20:00:48.232 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=185MB heap=25MB gcs=349 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=4 gcPerS=1.2 paragraphs=24 created=139 disposed=115
+10-01 20:00:53.231 15635 15707 I ReactNativeJS: [lab-c] frames=299 avgDt=16.7ms fps=59.8 p95Dt=17.4 maxDt=25.2 jsRenderAvg=10.03ms p95=12.47 calls=14 tris=25741 photos=47 photoAvg=67.5ms packets=0 bodies=18 visibleContacts=8 drawnSpheres=17 presentAvg=0.41ms drawAvg=9.37ms
+10-01 20:00:53.231 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=185MB heap=25MB gcs=355 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=4 gcPerS=1.2 paragraphs=24 created=139 disposed=115
+10-01 20:00:54.090 15635 15707 I ReactNativeJS: [lab-c] tilt preset 1: tilt=1 yaw=0.7
+10-01 20:00:58.239 15635 15707 I ReactNativeJS: [lab-c] frames=296 avgDt=16.9ms fps=59.2 p95Dt=20.3 maxDt=30.2 jsRenderAvg=10.32ms p95=12.60 calls=14 tris=25741 photos=47 photoAvg=67.5ms packets=85 bodies=18 visibleContacts=17 drawnSpheres=17 presentAvg=0.49ms drawAvg=9.69ms
+10-01 20:00:58.240 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=186MB heap=25MB gcs=361 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=4 gcPerS=1.2 paragraphs=24 created=139 disposed=115
+10-01 20:01:03.250 15635 15707 I ReactNativeJS: [lab-c] frames=296 avgDt=16.9ms fps=59.1 p95Dt=17.6 maxDt=25.8 jsRenderAvg=11.04ms p95=13.41 calls=14 tris=25741 photos=47 photoAvg=67.5ms packets=0 bodies=18 visibleContacts=17 drawnSpheres=17 presentAvg=0.47ms drawAvg=10.38ms
+10-01 20:01:03.250 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=185MB heap=25MB gcs=368 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=4 gcPerS=1.4 paragraphs=24 created=139 disposed=115
+10-01 20:01:05.688 15635 15707 I ReactNativeJS: [lab-c] tilt preset 2: tilt=0.9 yaw=2.2
+10-01 20:01:08.253 15635 15707 I ReactNativeJS: [lab-c] frames=293 avgDt=17.1ms fps=58.6 p95Dt=23.0 maxDt=25.5 jsRenderAvg=10.65ms p95=13.41 calls=14 tris=25741 photos=47 photoAvg=67.5ms packets=87 bodies=18 visibleContacts=17 drawnSpheres=17 presentAvg=0.43ms drawAvg=10.02ms
+10-01 20:01:08.253 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=186MB heap=25MB gcs=374 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=4 gcPerS=1.2 paragraphs=24 created=139 disposed=115
+10-01 20:01:13.260 15635 15707 I ReactNativeJS: [lab-c] frames=299 avgDt=16.8ms fps=59.7 p95Dt=17.4 maxDt=25.4 jsRenderAvg=10.69ms p95=12.87 calls=14 tris=25741 photos=47 photoAvg=67.5ms packets=0 bodies=18 visibleContacts=17 drawnSpheres=17 presentAvg=0.44ms drawAvg=9.98ms
+10-01 20:01:13.260 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=185MB heap=25MB gcs=381 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=4 gcPerS=1.4 paragraphs=24 created=139 disposed=115
+10-01 20:01:17.455 15635 15707 I ReactNativeJS: [lab-c] tilt preset 3: tilt=1.2 yaw=3.8
+10-01 20:01:18.275 15635 15707 I ReactNativeJS: [lab-c] frames=303 avgDt=16.5ms fps=60.5 p95Dt=20.5 maxDt=26.4 jsRenderAvg=9.99ms p95=12.82 calls=14 tris=25741 photos=47 photoAvg=67.5ms packets=92 bodies=18 visibleContacts=17 drawnSpheres=17 presentAvg=0.61ms drawAvg=9.35ms
+10-01 20:01:18.275 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=186MB heap=25MB gcs=387 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=4 gcPerS=1.2 paragraphs=24 created=139 disposed=115
+10-01 20:01:18.489 15635 15707 I ReactNativeJS: [lab-c] tilt preset 0: tilt=1.08 yaw=0
+10-01 20:01:23.286 15635 15707 I ReactNativeJS: [lab-c] frames=290 avgDt=17.3ms fps=57.9 p95Dt=24.2 maxDt=30.0 jsRenderAvg=10.89ms p95=13.14 calls=14 tris=25741 photos=47 photoAvg=67.5ms packets=96 bodies=18 visibleContacts=17 drawnSpheres=17 presentAvg=0.45ms drawAvg=10.22ms
+10-01 20:01:23.286 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=186MB heap=25MB gcs=393 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=4 gcPerS=1.2 paragraphs=24 created=139 disposed=115
+10-01 20:01:28.293 15635 15707 I ReactNativeJS: [lab-c] frames=297 avgDt=16.8ms fps=59.4 p95Dt=17.4 maxDt=25.8 jsRenderAvg=11.06ms p95=13.30 calls=14 tris=25741 photos=47 photoAvg=67.5ms packets=0 bodies=18 visibleContacts=17 drawnSpheres=17 presentAvg=0.45ms drawAvg=10.36ms
+10-01 20:01:28.293 15635 15707 I ReactNativeJS: [lab-c] mem #1 external=185MB heap=25MB gcs=400 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=4 gcPerS=1.4 paragraphs=24 created=139 disposed=115
+10-01 20:01:33.108 15635 15707 I ReactNativeJS: [lab-c] unmount #1: loop stopped, GPU resources disposed external=134MB
+10-01 20:01:33.235 15635 15707 I ReactNativeJS: [lab-c] device created in 8ms
+10-01 20:01:34.171 15635 15707 I ReactNativeJS: [lab-c] post-unmount #1 external=134MB -> 54MB after gc()
+10-01 20:01:37.263 15635 15707 I ReactNativeJS: [lab-c] gesture rebuilt #9
+10-01 20:01:37.271 15635 15707 I ReactNativeJS: [lab-c] reducedMotion=false
+10-01 20:01:37.282 15635 15707 I ReactNativeJS: [lab-c] mount #2 hermes heap=25MB allocated=13MB external=79MB gcs=417
+10-01 20:01:37.283 15635 15707 I ReactNativeJS: [lab-c] stage context=ok cancelled=false
+10-01 20:01:37.283 15635 15707 I ReactNativeJS: [lab-c] stage canvas 411x725 -> 822x1450
+10-01 20:01:37.283 15635 15707 I ReactNativeJS: [lab-c] stage renderer constructed
+10-01 20:01:37.779 15635 15707 I ReactNativeJS: [lab-c] renderer ready #2 in 496ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 20:01:42.806 15635 15707 I ReactNativeJS: [lab-c] frames=270 avgDt=18.5ms fps=54.0 p95Dt=17.4 maxDt=499.2 jsRenderAvg=12.32ms p95=12.90 calls=14 tris=25741 photos=64 photoAvg=55.7ms packets=3 bodies=18 visibleContacts=8 drawnSpheres=17 presentAvg=0.95ms drawAvg=11.61ms
+10-01 20:01:42.806 15635 15707 I ReactNativeJS: [lab-c] mem #2 external=237MB heap=25MB gcs=440 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1 gcPerS=4.6 paragraphs=24 created=24 disposed=0
+10-01 20:01:45.249 15635 15707 I ReactNativeJS: [lab-c] unmount #2: loop stopped, GPU resources disposed external=185MB
+10-01 20:01:45.362 15635 15707 I ReactNativeJS: [lab-c] device created in 7ms
+10-01 20:01:46.325 15635 15707 I ReactNativeJS: [lab-c] post-unmount #2 external=185MB -> 106MB after gc()
+10-01 20:01:49.420 15635 15707 I ReactNativeJS: [lab-c] gesture rebuilt #10
+10-01 20:01:49.427 15635 15707 I ReactNativeJS: [lab-c] reducedMotion=false
+10-01 20:01:49.436 15635 15707 I ReactNativeJS: [lab-c] mount #3 hermes heap=21MB allocated=14MB external=132MB gcs=454
+10-01 20:01:49.439 15635 15707 I ReactNativeJS: [lab-c] stage context=ok cancelled=false
+10-01 20:01:49.439 15635 15707 I ReactNativeJS: [lab-c] stage canvas 411x725 -> 822x1450
+10-01 20:01:49.439 15635 15707 I ReactNativeJS: [lab-c] stage renderer constructed
+10-01 20:01:49.928 15635 15707 I ReactNativeJS: [lab-c] renderer ready #3 in 492ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 20:01:54.945 15635 15707 I ReactNativeJS: [lab-c] frames=266 avgDt=18.8ms fps=53.2 p95Dt=17.4 maxDt=577.9 jsRenderAvg=12.16ms p95=12.62 calls=14 tris=25741 photos=81 photoAvg=48.5ms packets=2 bodies=18 visibleContacts=8 drawnSpheres=17 presentAvg=0.67ms drawAvg=11.51ms
+10-01 20:01:54.945 15635 15707 I ReactNativeJS: [lab-c] mem #3 external=288MB heap=21MB gcs=478 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1 gcPerS=4.8 paragraphs=24 created=24 disposed=0
+10-01 20:01:57.358 15635 15707 I ReactNativeJS: [lab-c] unmount #3: loop stopped, GPU resources disposed external=237MB
+10-01 20:01:57.480 15635 15707 I ReactNativeJS: [lab-c] device created in 8ms
+10-01 20:01:58.430 15635 15707 I ReactNativeJS: [lab-c] post-unmount #3 external=236MB -> 159MB after gc()
+10-01 20:02:01.527 15635 15707 I ReactNativeJS: [lab-c] render #31
+10-01 20:02:01.545 15635 15707 I ReactNativeJS: [lab-c] gesture rebuilt #11
+10-01 20:02:01.552 15635 15707 I ReactNativeJS: [lab-c] reducedMotion=false
+10-01 20:02:01.562 15635 15707 I ReactNativeJS: [lab-c] mount #4 hermes heap=21MB allocated=14MB external=184MB gcs=492
+10-01 20:02:01.564 15635 15707 I ReactNativeJS: [lab-c] stage context=ok cancelled=false
+10-01 20:02:01.564 15635 15707 I ReactNativeJS: [lab-c] stage canvas 411x725 -> 822x1450
+10-01 20:02:01.565 15635 15707 I ReactNativeJS: [lab-c] stage renderer constructed
+10-01 20:02:02.048 15635 15707 I ReactNativeJS: [lab-c] renderer ready #4 in 486ms buffer=822x1450 dpr=2 TextDecoder=function
+10-01 20:02:07.071 15635 15707 I ReactNativeJS: [lab-c] frames=263 avgDt=19.0ms fps=52.6 p95Dt=17.5 maxDt=582.1 jsRenderAvg=12.31ms p95=12.59 calls=14 tris=25741 photos=98 photoAvg=43.9ms packets=2 bodies=18 visibleContacts=8 drawnSpheres=17 presentAvg=0.70ms drawAvg=11.67ms
+10-01 20:02:07.071 15635 15707 I ReactNativeJS: [lab-c] mem #4 external=341MB heap=21MB gcs=515 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1 gcPerS=4.6 paragraphs=24 created=24 disposed=0
+10-01 20:02:12.074 15635 15707 I ReactNativeJS: [lab-c] frames=300 avgDt=16.7ms fps=60.0 p95Dt=17.3 maxDt=25.1 jsRenderAvg=10.01ms p95=12.52 calls=14 tris=25741 photos=98 photoAvg=43.9ms packets=0 bodies=18 visibleContacts=8 drawnSpheres=17 presentAvg=0.40ms drawAvg=9.33ms
+10-01 20:02:12.074 15635 15707 I ReactNativeJS: [lab-c] mem #4 external=342MB heap=21MB gcs=521 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1 gcPerS=1.2 paragraphs=24 created=24 disposed=0
+10-01 20:02:17.088 15635 15707 I ReactNativeJS: [lab-c] frames=298 avgDt=16.8ms fps=59.5 p95Dt=17.3 maxDt=32.6 jsRenderAvg=10.48ms p95=12.38 calls=14 tris=25741 photos=98 photoAvg=43.9ms packets=0 bodies=18 visibleContacts=8 drawnSpheres=17 presentAvg=0.42ms drawAvg=9.79ms
+10-01 20:02:17.088 15635 15707 I ReactNativeJS: [lab-c] mem #4 external=342MB heap=21MB gcs=527 texs=8 geos=5 labelsLive=0 labelRasters=0 atlasFlushes=1 gcPerS=1.2 paragraphs=24 created=24 disposed=0
+10-01 20:02:20.959 15635 15707 I ReactNativeJS: [lab-c] unmount #4: loop stopped, GPU resources disposed external=290MB

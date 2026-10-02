@@ -1,0 +1,169 @@
+MARK 19:59:03 dense-overview
+MARK 19:59:16 dense-near
+MARK 19:59:29 dense-close
+MARK 19:59:42 dense-swung
+MARK 19:59:50 end
+MARK 20:00:35 switch-to-inner
+MARK 20:00:41 inner-overview
+MARK 20:00:52 inner-near
+MARK 20:01:03 inner-close
+MARK 20:01:16 inner-end
+
+== gfxinfo dense-overview
+Total frames rendered: 136
+Janky frames: 1 (0.74%)
+Janky frames (legacy): 4 (2.94%)
+50th percentile: 6ms
+90th percentile: 8ms
+95th percentile: 10ms
+99th percentile: 42ms
+50th gpu percentile: 2ms
+== gfxinfo dense-near
+Total frames rendered: 0
+Janky frames: 0 (0.00%)
+Janky frames (legacy): 0 (0.00%)
+50th percentile: 4950ms
+90th percentile: 4950ms
+95th percentile: 4950ms
+99th percentile: 4950ms
+50th gpu percentile: 4950ms
+== gfxinfo dense-close
+Total frames rendered: 0
+Janky frames: 0 (0.00%)
+Janky frames (legacy): 0 (0.00%)
+50th percentile: 4950ms
+90th percentile: 4950ms
+95th percentile: 4950ms
+99th percentile: 4950ms
+50th gpu percentile: 4950ms
+== gfxinfo switch
+Total frames rendered: 2
+Janky frames: 1 (50.00%)
+Janky frames (legacy): 1 (50.00%)
+50th percentile: 21ms
+90th percentile: 21ms
+95th percentile: 21ms
+99th percentile: 21ms
+50th gpu percentile: 1ms
+== meminfo before-cycles
+Applications Memory Usage (in Kilobytes):
+Uptime: 417596406 Realtime: 650584421
+
+** MEMINFO in pid 15635 [com.bwales.orbit.labc] **
+                   Pss  Private  Private  SwapPss      Rss     Heap     Heap     Heap
+                 Total    Dirty    Clean    Dirty    Total     Size    Alloc     Free
+                ------   ------   ------   ------   ------   ------   ------   ------
+  Native Heap   250549   250544        0        5   253404   424028   323499    93965
+  Dalvik Heap    10275    10240        0        7    17040   262144     8914   253230
+ Dalvik Other     4032     3776        0        0     4984                           
+        Stack     1900     1900        0        0     1908                           
+       Ashmem       10        0        0        0     1308                           
+    Other dev      144        0      144        0      424                           
+     .so mmap     3934      168      624        2    63816                           
+    .jar mmap      566        0       28        0    41552                           
+    .apk mmap    55172     2084    52664        0    58256                           
+    .ttf mmap     2348        0     1608        0     5120                           
+    .dex mmap    23446        0    23444        0    24212                           
+    .oat mmap      142        0        0        0    12516                           
+    .art mmap      567      452        0        2    22300                           
+   Other mmap     1135        4      300        0     4320                           
+   EGL mtrack   113180   113180        0        0   113180                           
+    GL mtrack   162444   162444        0        0   162444                           
+      Unknown    47344    47152      192        2    48572                           
+        TOTAL   677206   591944    79004       18   835356   686172   332413   347195
+ 
+ App Summary
+                       Pss(KB)                        Rss(KB)
+                        ------                         ------
+           Java Heap:    10692                          39340
+         Native Heap:   250544                         253404
+                Code:    80640                         206004
+               Stack:     1900                           1908
+            Graphics:   275624                         275624
+       Private Other:    51548
+              System:     6258
+             Unknown:                                   59076
+ 
+           TOTAL PSS:   677206            TOTAL RSS:   835356       TOTAL SWAP PSS:       18
+ 
+ Objects
+               Views:      252         ViewRootImpl:        1
+         AppContexts:        5           Activities:        1
+              Assets:       30        AssetManagers:        0
+       Local Binders:       29        Proxy Binders:       63
+       Parcel memory:       11         Parcel count:       47
+    Death Recipients:        1             WebViews:        0
+ 
+ Native Allocations
+                         Count                       Total(kB)
+                        ------                         ------
+    Other (malloced):     1551                            146
+ Other (nonmalloced):      102                             71
+   Bitmap (malloced):        8                           6392
+ 
+ Mapped Bitmaps
+                         Count                       Size(KB)
+                        ------                         ------
+              Mapped:        0                              0
+              Unique:        0                              0
+== meminfo after-3-cycles
+Applications Memory Usage (in Kilobytes):
+Uptime: 417635784 Realtime: 650623798
+
+** MEMINFO in pid 15635 [com.bwales.orbit.labc] **
+                   Pss  Private  Private  SwapPss      Rss     Heap     Heap     Heap
+                 Total    Dirty    Clean    Dirty    Total     Size    Alloc     Free
+                ------   ------   ------   ------   ------   ------   ------   ------
+  Native Heap   188377   188372        0        5   191228   423844   239111   178978
+  Dalvik Heap     9887     9800       52        6    16652   262144     8486   253658
+ Dalvik Other     4116     3772        4        0     5152                           
+        Stack     2012     2012        0        0     2020                           
+       Ashmem       10        0        0        0     1308                           
+    Other dev      144        0      144        0      424                           
+     .so mmap     3934      168      624        2    63816                           
+    .jar mmap      575        0       28        0    41744                           
+    .apk mmap    55172     2084    52664        0    58256                           
+    .ttf mmap     2348        0     1608        0     5120                           
+    .dex mmap    23446        0    23444        0    24212                           
+    .oat mmap      153        0        0        0    12708                           
+    .art mmap      829      452      244        0    22640                           
+   Other mmap     1135        4      300        0     4320                           
+   EGL mtrack   113180   113180        0        0   113180                           
+    GL mtrack   162364   162364        0        0   162364                           
+      Unknown    44152    43920      232        2    45380                           
+        TOTAL   611849   526128    79344       15   770524   685988   247597   432636
+ 
+ App Summary
+                       Pss(KB)                        Rss(KB)
+                        ------                         ------
+           Java Heap:    10496                          39292
+         Native Heap:   188372                         191228
+                Code:    80636                         206552
+               Stack:     2012                           2020
+            Graphics:   275544                         275544
+       Private Other:    48412
+              System:     6377
+             Unknown:                                   55888
+ 
+           TOTAL PSS:   611849            TOTAL RSS:   770524       TOTAL SWAP PSS:       15
+ 
+ Objects
+               Views:      252         ViewRootImpl:        1
+         AppContexts:        5           Activities:        1
+              Assets:       30        AssetManagers:        0
+       Local Binders:       29        Proxy Binders:       63
+       Parcel memory:       11         Parcel count:       47
+    Death Recipients:        1             WebViews:        0
+ 
+ Native Allocations
+                         Count                       Total(kB)
+                        ------                         ------
+    Other (malloced):     1433                            135
+ Other (nonmalloced):      102                             71
+   Bitmap (malloced):        8                           6392
+ 
+ Mapped Bitmaps
+                         Count                       Size(KB)
+                        ------                         ------
+              Mapped:        0                              0
+              Unique:        0                              0
