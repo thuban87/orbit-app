@@ -1,0 +1,5 @@
+label	scenario	frames	janky	p50	p90	p95	p99	gpu50	gpu90	skipped_max	probe(name:runs x mean ms/p95/max)	sf_frames	sf_fps	sf_p50	sf_p90	sf_p99	sf_max
+best-800	focus	0	0	4950	4950	4950	4950	4950	4950	0		0	0	-	-	-	-
+notilt-800	focus	387	2	8	9	9	10	2	3	72	bodies:2x4.9/p95 5.4/max 5.4 labels:3x1.1/p95 2.4/max 2.4 rings:1x2.1/p95 2.1/max 2.1 sample:1x1.4/p95 1.4/max 1.4	0	0	-	-	-	-
+notilt-800	switch_out	0	0	4950	4950	4950	4950	4950	4950	0		0	0	-	-	-	-
+notilt-800	switch_in	0	0	4950	4950	4950	4950	4950	4950	0		0	0	-	-	-	-

@@ -1,0 +1,6 @@
+10-01 21:23:24.700 14640 14640 I Choreographer: Skipped 55 frames!  The application may be doing too much work on its main thread.
+10-01 21:23:24.766 14640 14675 I ReactNativeJS: [labb-probe] win=3238ms f.sample=1/0.9/0.9/0.9 nebula=26/0.2/0.3/0.3
+10-01 21:23:25.016 14640 14640 I Choreographer: Skipped 37 frames!  The application may be doing too much work on its main thread.
+10-01 21:23:25.599 14640 14640 I Choreographer: Skipped 68 frames!  The application may be doing too much work on its main thread.
+10-01 21:23:28.429 14640 14675 I ReactNativeJS: [labb-probe] win=3026ms alloc=25/0.7/1.3/3.7 bodies=25/2.9/4.2/4.5 f.moons=25/2.2/5.1/6.4 f.sample=24/2.1/4.1/6.3 frame=25/4.8/9.1/9.7 labels=25/0.1/0.2/0.2 nebula=44/0.1/0.3/1 rings=25/1.3/2.2/2.9 trim=25/2.8/5.5/9
+10-01 21:23:30.768 14640 14675 I ReactNativeJS: [labb-probe] win=3040ms bodies=2/4.4/6.1/6.1 labels=2/0.3/0.6/0.6 nebula=68/0.1/0.2/0.3 rings=33/1.9/3/3.1 trim=1/0.1/0.1/0.1 wakes=1/1.5/1.5/1.5

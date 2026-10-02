@@ -1,0 +1,5 @@
+min1 22:34:40 -31250 uA Thermal Status: 1 sf_frames=47 sf_span=17.43s sf_fps=2.6 gpu=251000
+min2 22:35:38 -190937 uA Thermal Status: 1 sf_frames=81 sf_span=15.35s sf_fps=5.2 gpu=400000
+min3 22:36:37 -486250 uA Thermal Status: 1 sf_frames=77 sf_span=15.18s sf_fps=5.0 gpu=400000
+min4 22:37:35 -633125 uA Thermal Status: 1 sf_frames=75 sf_span=15.39s sf_fps=4.8 gpu=400000
+min5 22:38:34 -263437 uA Thermal Status: 1 sf_frames=81 sf_span=15.93s sf_fps=5.0 gpu=400000

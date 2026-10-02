@@ -1,0 +1,5 @@
+Orrery (Inner Circle, best) | canvas SV layers=3 | sf_frames=351 sf_span=7.05s sf_fps=49.7 | probe lines=2 | gfx Total frames rendered: 0
+Digest tab | canvas SV layers=0 | sf_frames=0 sf_fps=0 sf_p50=- | probe lines=0 | gfx Total frames rendered: 0
+back on Orrery | canvas SV layers=3 | sf_frames=347 sf_span=7.60s sf_fps=45.5 | probe lines=2 | gfx Total frames rendered: 0
+HOME (backgrounded) | canvas SV layers=0 | sf_frames=0 sf_fps=0 sf_p50=- | probe lines=0 | gfx Total frames rendered: 0
+relaunched | canvas SV layers=3 | sf_frames=341 sf_span=7.81s sf_fps=43.5 | probe lines=3 | gfx Total frames rendered: 0

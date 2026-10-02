@@ -1,0 +1,10 @@
+best +fpsHud:0 | canvas(SV): 20 frames over 4.13s = 4.6 fps; interval p50 216.2 p90 224.6 p99 232.9 max 232.9 ms | window: frames 0
+best +fpsHud:0,planeGrid:0 | canvas(SV): 20 frames over 3.51s = 5.4 fps; interval p50 183.0 p90 199.5 p99 199.6 max 199.6 ms | window: frames 0
+best +fpsHud:0,ringWake:0 | canvas(SV): 63 frames over 3.34s = 18.5 fps; interval p50 50.3 p90 58.3 p99 58.4 max 58.4 ms | window: frames 0
+best +fpsHud:0,ringFlow:0 | canvas(SV): 22 frames over 4.24s = 5.0 fps; interval p50 216.2 p90 216.2 p99 216.2 max 216.2 ms | window: frames 0
+best +fpsHud:0,fxFocusDim:0 | canvas(SV): 21 frames over 4.37s = 4.6 fps; interval p50 216.2 p90 232.9 p99 233.1 max 233.1 ms | window: frames 0
+best +fpsHud:0,planeGrid:0,planeLight:0 | canvas(SV): 20 frames over 4.72s = 4.0 fps; interval p50 249.5 p90 249.5 p99 249.5 max 249.5 ms | window: frames 0
+labmin | canvas(SV): 63 frames over 0.52s = 120.2 fps; interval p50 8.3 p90 8.3 p99 8.4 max 8.4 ms | window: frames 0
+best homeTilt0 | canvas(SV): 63 frames over 0.64s = 96.7 fps; interval p50 8.3 p90 16.7 p99 41.6 max 41.6 ms | window: frames 0
+best again | canvas(SV): 20 frames over 3.53s = 5.4 fps; interval p50 183.0 p90 199.6 p99 199.6 max 199.6 ms | window: frames 0
+best homeTilt0 | canvas(SV): 63 frames over 0.67s = 92.0 fps; interval p50 8.3 p90 16.6 p99 33.3 max 33.3 ms | window: frames 0

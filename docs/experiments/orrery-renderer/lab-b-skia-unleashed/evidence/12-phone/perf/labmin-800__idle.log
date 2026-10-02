@@ -1,0 +1,2 @@
+10-01 21:43:56.196 31404 31404 I Choreographer: Skipped 34 frames!  The application may be doing too much work on its main thread.
+10-01 21:44:00.610 31404 31447 I ReactNativeJS: [labb-probe] win=3134ms alloc=1/1.6/1.6/1.6 bodies=1/2.7/2.7/2.7 f.moons=1/1.4/1.4/1.4 f.sample=2/1.4/1.5/1.5 frame=1/8.2/8.2/8.2 labels=1/0.3/0.3/0.3 rings=1/2.8/2.8/2.8

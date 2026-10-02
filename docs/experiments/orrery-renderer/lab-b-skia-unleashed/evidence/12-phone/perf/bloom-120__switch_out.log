@@ -1,0 +1,3 @@
+10-01 21:07:51.705 21087 21134 I ReactNativeJS: [labb-probe] win=3009ms nebula=7/0.2/0.2/0.2 rings=7/4.2/6.2/6.2
+10-01 21:07:57.404 21087 21087 I Choreographer: Skipped 205 frames!  The application may be doing too much work on its main thread.
+10-01 21:07:57.408 21087 21134 I ReactNativeJS: [labb-probe] win=5704ms f.sample=1/1/1/1 nebula=6/0.2/0.3/0.3 rings=7/3.5/5.3/5.3

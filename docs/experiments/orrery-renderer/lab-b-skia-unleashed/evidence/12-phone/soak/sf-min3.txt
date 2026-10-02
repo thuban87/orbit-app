@@ -1,0 +1,1 @@
+sf_frames=77 sf_span=15.18s sf_fps=5.0 sf_p50=199.4 sf_p90=216.4 sf_p99=233.0 sf_max=233.0 layer=f01020a SurfaceView[com.bwales.orbit.labb/com.bwales.orbit.labb.MainActivity](BLAST)#44297

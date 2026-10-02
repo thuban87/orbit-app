@@ -9,7 +9,9 @@
 #   scenarios    default "idle pan focus switch"
 #
 # Env: ADB (default: the Lab B tunnel, `adb -P 5039 -s emulator-5554`), PKG,
-#      PRESET (R3 one-tap preset applied before <flags>).
+#      PRESET (R3 one-tap preset applied before <flags>),
+#      SF=1 (phone pass): also sample the OPAQUE canvas's presented frames from
+#      SurfaceFlinger during every window (tools/sf-sampler.py) -> <scenario>.sf + summary cols.
 # On the PHONE pass set ADB="$HOME/Android/Sdk/platform-tools/adb -s <serial>"
 # (local server 5037) and SWIPE (see research/PHONE-PASS-SCRIPT.md).
 #
@@ -30,10 +32,14 @@ SWIPE=${SWIPE:-"700 1500 300 1300"} # x1 y1 x2 y2 (avoid the left 150 px: system
 mkdir -p "$OUT"
 enc() { python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1]))' "$1"; }
 link() { $ADB shell "am start -a android.intent.action.VIEW -d '$1' $PKG" >/dev/null 2>&1; }
-gfx_reset() { $ADB shell dumpsys gfxinfo $PKG reset >/dev/null; $ADB logcat -c; }
+SFS=$(dirname "$0")/sf-sampler.py; SFSTOP="$OUT/.sf-stop"
+gfx_reset() { $ADB shell dumpsys gfxinfo $PKG reset >/dev/null; $ADB logcat -c
+  if [ -n "${SF:-}" ]; then rm -f "$SFSTOP" "$OUT/.sf-cur"; ADB="$ADB" PKG=$PKG SF_STOP="$SFSTOP" python3 "$SFS" 0 "$OUT/.sf-cur" >/dev/null & SFPID=$!; fi; }
 collect() { # scenario
+  if [ -n "${SF:-}" ]; then touch "$SFSTOP"; wait "$SFPID" 2>/dev/null; mv -f "$OUT/.sf-cur" "$OUT/${LABEL}__$1.sf" 2>/dev/null; fi
   $ADB shell dumpsys gfxinfo $PKG > "$OUT/${LABEL}__$1.gfx"
-  $ADB logcat -d -s ReactNativeJS:I Choreographer:I libc:F | grep -E "labb-probe|Skipped|Fatal signal" > "$OUT/${LABEL}__$1.log"
+  APID=$($ADB shell pidof $PKG | tr -d '\r')
+  $ADB logcat -d -s ReactNativeJS:I Choreographer:I libc:F | grep -E "labb-probe|Fatal signal|Skipped" | grep -E "labb-probe|Fatal signal|[ (]${APID:-x} " > "$OUT/${LABEL}__$1.log"
   python3 - "$OUT" "$LABEL" "$1" <<'PY'
 import re,sys,os
 out,label,scen=sys.argv[1:4]
@@ -54,13 +60,17 @@ for line in log.splitlines():
         a=agg.setdefault(name,[0,0.0,0.0,0.0]); n=int(n)
         a[0]+=n; a[1]+=n*float(mean); a[2]=max(a[2],float(p95)); a[3]=max(a[3],float(mx))
 row.append(" ".join(f"{k}:{v[0]}x{v[1]/max(1,v[0]):.1f}/p95 {v[2]:.1f}/max {v[3]:.1f}" for k,v in sorted(agg.items())))
-hdr="label\tscenario\tframes\tjanky\tp50\tp90\tp95\tp99\tgpu50\tgpu90\tskipped_max\tprobe(name:runs x mean ms/p95/max)"
+sf={}
+if os.path.exists(f"{out}/{label}__{scen}.sf"):
+    sf=dict(kv.split("=",1) for kv in open(f"{out}/{label}__{scen}.sf").read().split() if "=" in kv and not kv.startswith("layer"))
+row+= [sf.get(k,"-") for k in ("sf_frames","sf_fps","sf_p50","sf_p90","sf_p99","sf_max")]
+hdr="label\tscenario\tframes\tjanky\tp50\tp90\tp95\tp99\tgpu50\tgpu90\tskipped_max\tprobe(name:runs x mean ms/p95/max)\tsf_frames\tsf_fps\tsf_p50\tsf_p90\tsf_p99\tsf_max"
 path=f"{out}/summary.tsv"
 new=not os.path.exists(path)
 with open(path,"a") as fh:
     if new: fh.write(hdr+"\n")
     fh.write("\t".join(row)+"\n")
-print("\t".join(row[:11]))
+print("\t".join(row[:11]+row[12:]))
 PY
 }
 S=$(enc "$SYSTEM"); O=$(enc "$OTHER"); F=$(enc "$FOCUS")

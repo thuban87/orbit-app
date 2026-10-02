@@ -1,0 +1,2 @@
+10-01 23:00:19.214 16329 16372 I ReactNativeJS: [labb-probe] win=92068ms bodies=2/4.9/5.4/5.4 f.sample=1/1.4/1.4/1.4 labels=3/1.1/2.4/2.4 rings=1/2.1/2.1/2.1
+10-01 23:00:19.256 16329 16329 I Choreographer: Skipped 72 frames!  The application may be doing too much work on its main thread.
