@@ -254,3 +254,28 @@ session; close-range targets were not met under that condition.
   is drawn on a focused moon yet (the 3D focus ring pool keys by contact id only).
 - Seen while testing: at Dense, focus framing (`IDENTITY_ZOOM` cap) dollies very close — the focused body is
   ~170 px and its lower half sits under the focus card. Pre-existing focus framing, not changed here.
+
+## 2026-10-01 — Checkpoint E.2: satellite focus framing, lit moons, label/disc overlap
+
+- **Focus frames the focused contact's whole system above the focus card** (`OrreryScreen.focus`, single
+  target, Lab C only). System radius = hero body, plus moon orbit (parent r + 24) + moon size when the contact
+  has moons (`orreryFocusSystemRadius`). The camera dollies so that radius projects to a target size and
+  places the system centre so system + card stack sit in the canvas. The IDENTITY_ZOOM cap is not applied to
+  this dolly any more (with the perspective dolly it kept the system small); MAX_ZOOM still clamps.
+- **The focus card anchors below the whole moon system**, not the parent's disc: the 3D frame carries
+  `systemRadius` (px) on the parent, and `OrreryFocusContext` + the label exclusion use it. Both now clamp
+  the card to the canvas bottom (camera rect) instead of the usable-rect bottom, so the card may hang beside
+  the side-controls column instead of being pushed up over the body.
+- **Moons**: own instanced mesh with a small emissive floor (theme `textSecondary` × 0.28) so the night side
+  is not a black blot; diffuse lit by the sun key light (terminator kept). Fill = the satellite person's
+  avatar swatch; they now get an atlas **face tile with initials** like every other body (no photo — the
+  satellite read carries none).
+- **Labels never land on another body's disc**: body exclusions and label anchor offsets pad the disc by
+  1.15× (perspective sphere silhouette is larger than r·scale off-axis); the reserved focus-card rect uses the
+  card's own placement + clamp (the "Ava Abara" overlap was the card rect being reserved lower than where the
+  clamped card actually sat).
+- **Moon tap verified on device**: tapping the moving moon focused it — card "Dana · Sibling of Chloé
+  Castellanos" (`evidence/07-checkpoint-e/s2-moon-tap-uiautomator.txt`, `s2-moon-tap-attempt.png`).
+- **Open at this commit:** on device (s3/s4) the focused system is still framed small under the header —
+  the target size was bounded by the usable-rect width (narrowed by the side controls). Next commit bounds it
+  by the canvas width and logs the rects; re-shot in E.2b.

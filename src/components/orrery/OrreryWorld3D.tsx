@@ -55,8 +55,10 @@ import type {
   OrrerySatelliteTarget,
 } from "@/logic/orrery-camera-logic";
 import {
+  cameraCenterRect,
   labFocalDistance,
   perspectiveScale,
+  usableCameraRect,
 } from "@/logic/orrery-camera-logic";
 import {
   focusEffectivelyOffscreen,
@@ -161,6 +163,29 @@ const MOON_INCLINATION = 0.5;
 const MOON_SPEED = 0.0003;
 /** Moon world radius as a fraction of its (hero-scaled) parent's; hits follow. */
 const MOON_PARENT_FRACTION = 0.4;
+/** Must match `PARENT_GAP` in orrery-satellite-logic (moon orbit = parent r + gap). */
+const SATELLITE_PARENT_GAP = 24;
+/**
+ * Checkpoint E: world radius of a focused contact's whole "system" (hero body,
+ * plus its moons' orbit + moon size when it has moons). OrreryScreen frames
+ * this above the focus card; the card and label exclusions anchor below it.
+ */
+export function orreryFocusSystemRadius(
+  worldRadius: number,
+  hasMoons: boolean,
+): number {
+  "worklet";
+  const hero = worldRadius * CONTACT_HERO_SCALE;
+  return hasMoons
+    ? hero + SATELLITE_PARENT_GAP + hero * MOON_PARENT_FRACTION
+    : hero;
+}
+/**
+ * A perspective sphere's silhouette is larger than r·scale (and stretches off
+ * axis); label placement + label exclusions pad body discs by this factor so
+ * a name never lands on another body's drawn disc (Checkpoint E).
+ */
+const SILHOUETTE_PAD = 1.15;
 /** Approximate OrreryFocusContext footprint (width 280; ~2 buttons + title). */
 const FOCUS_CARD_WIDTH = 290;
 const FOCUS_CARD_HEIGHT = 230;
@@ -454,7 +479,10 @@ export function OrreryWorld3D({
       true,
       level.value,
     );
-    const all: ((typeof world)[number] & { lift?: number })[] = [...world];
+    const all: ((typeof world)[number] & {
+      lift?: number;
+      orbitRadius?: number;
+    })[] = [...world];
     for (let i = 0; i < moons.length; i++) {
       const m = moons[i];
       const parentId = m.satelliteTarget?.parentId;
@@ -471,6 +499,14 @@ export function OrreryWorld3D({
       const dx = m.x - parent.x;
       const dy = m.y - parent.y;
       const off = Math.hypot(dx, dy);
+      // Tag the parent with its moon-system reach (world units).
+      const reach = off + parent.radius * MOON_PARENT_FRACTION;
+      for (let j = 0; j < world.length; j++)
+        if (world[j] === parent) {
+          if (!((all[j].orbitRadius ?? 0) >= reach))
+            all[j] = { ...all[j], orbitRadius: reach };
+          break;
+        }
       const a =
         Math.atan2(dy, dx) +
         (parentId === orbitParent.value ? moonClock.value * MOON_SPEED : 0);
@@ -533,6 +569,17 @@ export function OrreryWorld3D({
       viewport,
       current.generation,
     );
+    // Checkpoint E: on-screen reach of a parent's moon system (px), so the
+    // focus card / label exclusion anchor below the whole system.
+    for (let i = 0; i < f.bodies.length; i++) {
+      const orbit = (current.world[i] as { orbitRadius?: number }).orbitRadius;
+      const wr = current.world[i].radius;
+      if (orbit && wr > 0)
+        f.bodies[i] = {
+          ...f.bodies[i],
+          systemRadius: (f.bodies[i].radius / wr) * orbit,
+        } as (typeof f.bodies)[number];
+    }
     // Canvas top inset (D.1): fade + disarm bodies under the header row.
     const top = viewport.camera?.y ?? viewport.usable?.y ?? 0;
     if (top > 0)
@@ -677,8 +724,12 @@ export function OrreryWorld3D({
             {
               ...label,
               x: body.x - label.width / 2,
-              y: body.y + body.radius + LABEL_BODY_GAP,
-              alternateY: body.y - body.radius - LABEL_BODY_GAP - label.height,
+              y: body.y + body.radius * SILHOUETTE_PAD + LABEL_BODY_GAP,
+              alternateY:
+                body.y -
+                body.radius * SILHOUETTE_PAD -
+                LABEL_BODY_GAP -
+                label.height,
               opacity: body.opacity,
               depth: body.depth,
             },
@@ -687,12 +738,10 @@ export function OrreryWorld3D({
     });
     const exclusions = current.bodies
       .filter((b) => b.visible)
-      .map((b) => ({
-        x: b.x - b.radius,
-        y: b.y - b.radius,
-        width: b.radius * 2,
-        height: b.radius * 2,
-      }));
+      .map((b) => {
+        const r = b.radius * SILHOUETTE_PAD;
+        return { x: b.x - r, y: b.y - r, width: r * 2, height: r * 2 };
+      });
     // Lab C: the focus card (OrreryFocusContext) is NOT a shell obstacle — it
     // follows the focused body, sitting just below it. Reserve that rect so no
     // label (incl. the focused name) renders underneath the translucent card.
@@ -704,7 +753,26 @@ export function OrreryWorld3D({
       if (fb?.visible)
         exclusions.push({
           x: fb.x - FOCUS_CARD_WIDTH / 2,
-          y: fb.y + fb.radius,
+          // Same placement rule as OrreryFocusContext (incl. its clamp to the
+          // usable rect), so the reserved rect is where the card really is.
+          y: (() => {
+            const region = usableCameraRect(current.viewport);
+            const want =
+              fb.y +
+              Math.max(
+                fb.radius,
+                (fb as { systemRadius?: number }).systemRadius ?? 0,
+              ) +
+              8;
+            if (!region) return want;
+            const limit = Math.min(FOCUS_CARD_HEIGHT, region.height / 2);
+            const room = cameraCenterRect(current.viewport);
+            const bottom = Math.max(
+              region.y + region.height,
+              room ? room.y + room.height : 0,
+            );
+            return Math.max(region.y, Math.min(bottom - limit, want));
+          })(),
           width: FOCUS_CARD_WIDTH,
           height: FOCUS_CARD_HEIGHT,
         });
@@ -828,8 +896,40 @@ export function OrreryWorld3D({
           ],
       });
     }
+    // Checkpoint E: moons get a face tile too (initials on their swatch), so a
+    // moon reads as a person-sphere like every other body. No photo: the
+    // satellite read never carries one.
+    const seenMoons = new Set<string>();
+    for (const row of satellites) {
+      const key = bodyKey({
+        id: -1,
+        kind: "satellite",
+        satelliteTarget: {
+          kind: "satellite",
+          uid: row.uid,
+          parentId: row.parentId,
+          parentUid: row.parentUid,
+        },
+      });
+      if (seenMoons.has(key)) continue;
+      seenMoons.add(key);
+      const swatch =
+        colors.avatarSwatches[
+          swatchIndex(row.personName, colors.avatarSwatches.length)
+        ];
+      out.push({
+        key,
+        kind: "satellite",
+        id: -1,
+        fill: swatch,
+        ring: null,
+        photo: null,
+        initials: orreryInitials(row.personName),
+        swatch,
+      });
+    }
     return out;
-  }, [resources, colors]);
+  }, [resources, colors, satellites]);
   const labelTexts = useMemo(
     () =>
       new Map<string, LabelText>(
@@ -896,6 +996,9 @@ export function OrreryWorld3D({
   const reducedMotion = useReducedMotion();
   const reducedRef = useRef(reducedMotion);
   reducedRef.current = reducedMotion;
+  useEffect(() => {
+    console.log(`[lab-c] reducedMotion=${reducedMotion}`);
+  }, [reducedMotion]);
   const orbitingId =
     focusedIds.length === 1 &&
     satellites.some((row) => row.parentId === focusedIds[0])

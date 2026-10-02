@@ -116,6 +116,10 @@ const RING_STROKE_SCALE = 0.45;
 const POLARIS_WORLD = 10;
 const FOCUS_RING_GAP_PX = 4;
 const KEY_LIGHT_INTENSITY = 3.2;
+/** Moons per frame (focused parent's moons + identity-tier moons). */
+const MAX_MOONS = 64;
+/** Moon emissive floor (fraction of the theme's textSecondary token). */
+const MOON_EMISSIVE = 0.28;
 const AMBIENT_INTENSITY = 0.22;
 /** Photo billboard shading: ambient floor + lambert gain toward the sun. */
 const FACE_AMBIENT = 0.3;
@@ -275,6 +279,17 @@ export class OrreryScene3D {
     metalness: 0.08,
   });
   private spheres: THREE.InstancedMesh;
+  /**
+   * Checkpoint E: moons get their own instanced mesh so they can carry a
+   * small emissive floor — at focus the camera often sees a moon's night side
+   * (sun behind the parent), and the shared contact material left it a dark
+   * blot. Diffuse is still lit by the sun's key light (terminator visible).
+   */
+  private moonMat = new THREE.MeshStandardNodeMaterial({
+    roughness: 0.55,
+    metalness: 0,
+  });
+  private moons: THREE.InstancedMesh;
   private sunMat = new THREE.MeshBasicNodeMaterial();
   private sunTime = uniform(0);
   private sunRim = uniform(new THREE.Color(1, 1, 1));
@@ -439,6 +454,17 @@ export class OrreryScene3D {
       this.spheres.setColorAt(i, tmpColor.setScalar(1));
     this.spheres.count = 0;
     this.scene.add(this.spheres);
+    this.moons = new THREE.InstancedMesh(
+      this.sphereGeo,
+      this.moonMat,
+      MAX_MOONS,
+    );
+    this.moons.frustumCulled = false;
+    this.moons.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    for (let i = 0; i < MAX_MOONS; i++)
+      this.moons.setColorAt(i, tmpColor.setScalar(1));
+    this.moons.count = 0;
+    this.scene.add(this.moons);
 
     this.sun = new THREE.Mesh(this.sphereGeo, this.sunMat);
     this.sun.visible = false;
@@ -761,6 +787,9 @@ export class OrreryScene3D {
     if (this.colors && this.colors.surface !== colors.surface)
       for (const [id, entry] of this.labels) this.dropLabel(id, entry);
     this.colors = colors;
+    this.moonMat.emissive
+      .copy(color(colors.textSecondary))
+      .multiplyScalar(MOON_EMISSIVE);
     // autoClear is off (two passes), so the background is the clear colour.
     this.renderer.setClearColor(color(colors.background), 1);
     this.fog.color.copy(color(colors.background));
@@ -796,7 +825,6 @@ export class OrreryScene3D {
         this.freeSlots.push(slot);
       }
     for (const info of infos) {
-      if (info.kind === "satellite") continue;
       let slot = this.slotByKey.get(info.key);
       const prevInfo = this.infos.get(info.key);
       const needsDraw =
@@ -921,6 +949,7 @@ export class OrreryScene3D {
     const { keys, bodies } = packet;
     const n = Math.min(keys.length, MAX_BODIES);
     let sphereCount = 0;
+    let moonCount = 0;
     let ringCount = 0;
     let faceCount = 0;
     let focusUsed = 0;
@@ -982,13 +1011,26 @@ export class OrreryScene3D {
           tmpQuat.identity(),
           tmpScale.setScalar(visibleRadius),
         );
-        this.spheres.setMatrixAt(sphereCount, tmpMatrix);
-        const fill =
-          kind === KIND_SATELLITE
-            ? this.colors.textSecondary
-            : (info?.fill ?? this.colors.border);
-        this.spheres.setColorAt(sphereCount, tmpColor.copy(color(fill)));
-        sphereCount++;
+        if (kind === KIND_SATELLITE) {
+          if (moonCount < MAX_MOONS) {
+            this.moons.setMatrixAt(moonCount, tmpMatrix);
+            const swatches = this.colors.avatarSwatches;
+            const fill =
+              info?.fill ??
+              (swatches.length > 0
+                ? swatches[hashKey(key) % swatches.length]
+                : this.colors.textSecondary);
+            this.moons.setColorAt(moonCount, tmpColor.copy(color(fill)));
+            moonCount++;
+          }
+        } else {
+          this.spheres.setMatrixAt(sphereCount, tmpMatrix);
+          this.spheres.setColorAt(
+            sphereCount,
+            tmpColor.copy(color(info?.fill ?? this.colors.border)),
+          );
+          sphereCount++;
+        }
       }
       // Ring (one instance per contact orbit) -----------------------------------
       if (
@@ -1032,7 +1074,7 @@ export class OrreryScene3D {
       }
       // Face disc (sits on the sphere's camera-facing surface) ------------------
       const slot = this.slotByKey.get(key);
-      if (slot !== undefined && kind !== KIND_SATELLITE && opacity > 0.01) {
+      if (slot !== undefined && opacity > 0.01) {
         const dir = tmpScale
           .set(camPos.x - wx, camPos.y - lift, camPos.z - wz)
           .normalize();
@@ -1096,6 +1138,9 @@ export class OrreryScene3D {
     for (let i = focusUsed; i < this.focusPool.length; i++)
       this.focusPool[i].visible = false;
     this.spheres.count = sphereCount;
+    this.moons.count = moonCount;
+    this.moons.instanceMatrix.needsUpdate = true;
+    if (this.moons.instanceColor) this.moons.instanceColor.needsUpdate = true;
     this.stats.spheres = sphereCount;
     this.spheres.instanceMatrix.needsUpdate = true;
     if (this.spheres.instanceColor)
@@ -1235,6 +1280,8 @@ export class OrreryScene3D {
     this.sphereMat.dispose();
     this.sunMat.dispose();
     this.spheres.dispose();
+    this.moonMat.dispose();
+    this.moons.dispose();
     (this.faces.material as THREE.Material).dispose();
     (this.stars.material as THREE.Material).dispose();
     this.glowMat.dispose();
@@ -1282,6 +1329,12 @@ function staticAttr(array: Float32Array, size: number) {
   const attr = new THREE.InstancedBufferAttribute(array, size);
   attr.needsUpdate = true;
   return attr;
+}
+
+function hashKey(key: string): number {
+  let h = 0;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) | 0;
+  return Math.abs(h);
 }
 
 function seeded(n: number): number {

@@ -9,6 +9,7 @@ import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
 import {
+  cameraCenterRect,
   type OrrerySatelliteTarget,
   type ProjectedFrame,
   usableCameraRect,
@@ -53,6 +54,8 @@ export function OrreryFocusContext({
         : item.kind !== "satellite" && item.id === target.id,
     );
     if (!region || !body) return { opacity: 0 };
+    const room = current ? cameraCenterRect(current.viewport) : null;
+    const roomBottom = room ? room.y + room.height : 0;
     const width = Math.min(280, region.width);
     const limit = Math.min(height, region.height / 2);
     return {
@@ -66,8 +69,16 @@ export function OrreryFocusContext({
       top: Math.max(
         region.y,
         Math.min(
-          region.y + region.height - limit,
-          body.y + body.radius + SPACING.sm,
+          // Lab C: the card may hang down to the canvas bottom (camera rect);
+          // equals the usable bottom when no camera rect is measured.
+          Math.max(region.y + region.height, roomBottom) - limit,
+          // Lab C: below a parent's whole moon system when it has one.
+          body.y +
+            Math.max(
+              body.radius,
+              (body as { systemRadius?: number }).systemRadius ?? 0,
+            ) +
+            SPACING.sm,
         ),
       ),
     };

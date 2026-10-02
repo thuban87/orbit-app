@@ -16,11 +16,11 @@
 import {
   type CameraPose,
   type CameraViewport,
+  cameraCenterRect,
   clampCameraPose,
   MAX_TILT,
   MIN_HIT_RADIUS,
   perspectiveScale,
-  cameraCenterRect,
   type WorldBody,
   worldExtent,
 } from "@/logic/orrery-camera-logic";
@@ -80,8 +80,7 @@ export function projectAnimatedFrameLite(
     const scale =
       h === 0
         ? zoom * perspectiveScale(body, current)
-        : (zoom * focal) /
-          Math.max(focal - py * sinT - h * cosT, focal * 0.02);
+        : (zoom * focal) / Math.max(focal - py * sinT - h * cosT, focal * 0.02);
     // Lab C true-3D: bodies at/behind the near plane are culled (not tappable).
     const inFront =
       focal - py * sinT - h * cosT > focal * NEAR_CULL_FRACTION + body.radius;

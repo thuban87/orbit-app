@@ -38,7 +38,10 @@ import { OrreryFocusContext } from "@/components/orrery/OrreryFocusContext";
 import { OrrerySystemSelector } from "@/components/orrery/OrrerySystemSelector";
 import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
 import { OrreryWorld } from "@/components/orrery/OrreryWorld";
-import { OrreryWorld3D } from "@/components/orrery/OrreryWorld3D";
+import {
+  OrreryWorld3D,
+  orreryFocusSystemRadius,
+} from "@/components/orrery/OrreryWorld3D";
 import { companionAction } from "@/components/orrery/orrery-companion-logic";
 import { systemEmptyCopy } from "@/components/orrery/orrery-controls-logic";
 import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
@@ -72,6 +75,7 @@ import {
 import {
   type CameraPose,
   type CameraRect,
+  cameraCenterRect,
   clampCameraPose,
   deriveHomePose,
   frameBodies,
@@ -120,6 +124,15 @@ import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 
 /** ORRERY LAB C: true-3D renderer (three.js WebGPU) instead of the Skia world. */
 const LAB_C_TRUE_3D = true;
+/**
+ * Checkpoint E focus framing (Lab C): vertical space reserved for the focus
+ * card (measured ~205 dp with two buttons + one relation row), the margin
+ * around the system+card stack, and how much of the free space the focused
+ * system's radius may fill.
+ */
+const FOCUS_CARD_RESERVE = 215;
+const FOCUS_STACK_MARGIN = 12;
+const FOCUS_SYSTEM_FILL = 0.9;
 const World = LAB_C_TRUE_3D ? OrreryWorld3D : OrreryWorld;
 
 const acknowledgeReorder = () => {
@@ -630,6 +643,8 @@ export function OrreryScreen() {
     satelliteState.sceneGeneration === scene?.generation
       ? satelliteState
       : undefined;
+  const satelliteRowsRef = useRef(satellites?.rows);
+  satelliteRowsRef.current = satellites?.rows;
   const satelliteRow =
     satellites?.status === "ready" && focusedSatellite
       ? satellites.rows.find(
@@ -762,15 +777,60 @@ export function OrreryScreen() {
       // at the FINAL zoom (3 fixed-point steps; perspective is near-linear).
       const usable = usableCameraRect(viewport);
       if (usable && ids.length === 1) {
+        // Checkpoint E: frame the focused body's whole SYSTEM (hero body +
+        // its moon orbit when it has moons) in the space ABOVE the focus card,
+        // which hangs just below the system (OrreryFocusContext).
+        const hasMoons =
+          LAB_C_TRUE_3D &&
+          (satelliteRowsRef.current ?? []).some(
+            (row) => row.parentId === ids[0],
+          );
+        const systemWorld = LAB_C_TRUE_3D
+          ? orreryFocusSystemRadius(bodies[0].radius, hasMoons)
+          : bodies[0].radius;
+        // Vertical room: below the selector row (usable top) down to the
+        // canvas bottom (camera rect, above the tab bar) — the side controls
+        // column only blocks the right edge, not the centred stack (E.2).
+        const room = cameraCenterRect(viewport) ?? usable;
+        const stackHeight = room.y + room.height - usable.y;
+        const card = Math.min(FOCUS_CARD_RESERVE, stackHeight / 2);
+        const free = stackHeight - card - FOCUS_STACK_MARGIN * 2;
+        const systemPx = Math.max(
+          12,
+          Math.min(free / 2, room.width * 0.42) * FOCUS_SYSTEM_FILL,
+        );
+        const stackTop =
+          usable.y + (stackHeight - (2 * systemPx + SPACING.sm + card)) / 2;
         const want = {
           x: usable.x + usable.width / 2,
-          y: usable.y + usable.height / 2,
+          y: LAB_C_TRUE_3D ? stackTop + systemPx : usable.y + usable.height / 2,
         };
         target = clampCameraPose(
           { ...target, x: bodies[0].x, y: bodies[0].y },
           cameraExtent(scene.extent),
         );
         for (let i = 0; i < 3; i++) {
+          if (LAB_C_TRUE_3D) {
+            // Dolly so the system projects at `systemPx` (never past identity).
+            const at = projectWorldPoint(bodies[0], target, viewport);
+            const edge = projectWorldPoint(
+              { x: bodies[0].x + systemWorld, y: bodies[0].y },
+              target,
+              viewport,
+            );
+            const px = Math.hypot(edge.x - at.x, edge.y - at.y);
+            if (px > 0)
+              target = clampCameraPose(
+                {
+                  ...target,
+                  // No IDENTITY_ZOOM cap here: with the perspective dolly
+                  // that cap left the system a small group under the header
+                  // (orchestrator review, E.2). MAX_ZOOM still clamps.
+                  zoom: target.zoom * (systemPx / px),
+                },
+                cameraExtent(scene.extent),
+              );
+          }
           const at = projectWorldPoint(bodies[0], target, viewport);
           const pivot = projectWorldPoint(target, target, viewport);
           const shifted = unprojectToWorldPlane(
@@ -787,6 +847,9 @@ export function OrreryScreen() {
           );
         }
       }
+      console.log(
+        `[lab-c] focus ids=${ids.join(",")} zoom=${target.zoom.toFixed(3)} tilt=${(target.tilt ?? 0).toFixed(2)} usable=${JSON.stringify(usableCameraRect(viewport))} room=${JSON.stringify(cameraCenterRect(viewport))}`,
+      );
       runOnUI(camera.recover)(target);
     },
     [useSystemStore, pose, camera.recover, camera.stop, viewport],
