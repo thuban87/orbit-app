@@ -31,6 +31,11 @@
  *     Contacts then holds 940. Idempotent by the "Lab B Stress 400" name, so an
  *     already-seeded install gains the stress Systems on its next debug launch
  *     without a `pm clear`.
+ *   - Size comparison Systems (`seedLabBSizesIfAbsent`, 2026-10-02): a
+ *     dedicated 120-contact cast shared byte-for-byte in spec with Lab A
+ *     (`seed-lab-a.py`) and Lab C (`lab-c-seed.ts`), and the Systems
+ *     "Size 5" / "Size 10" / "Size 20" / "Size 32" / "Size 120" = the first N
+ *     cast members. Idempotent by "Size 5"; added on the next debug launch.
  *
  * Idempotent: skipped when the "Lab B Dense" System already exists. No network,
  * no AI, no device Contacts. The procedural photo colours are fixture IMAGE
@@ -324,6 +329,7 @@ export async function seedLabBFixtureIfAbsent(): Promise<void> {
     if (await alreadySeeded(exec)) {
       console.log("[lab-b-seed] fixture already present");
       await seedLabBStressIfAbsent(exec);
+      await seedLabBSizesIfAbsent(exec);
       return;
     }
     const t0 = Date.now();
@@ -441,6 +447,7 @@ export async function seedLabBFixtureIfAbsent(): Promise<void> {
     );
     await system("Lab B Work", ids.slice(CONTACT_COUNT - WORK_SYSTEM_SIZE));
     await seedLabBStressIfAbsent(exec);
+    await seedLabBSizesIfAbsent(exec);
     bumpShellRefresh();
     console.log(
       `[lab-b-seed] seeded contacts=${ids.length} touchpoints=${touchpoints} photos=${photos} portraits=${portraits} satellites=${sats} in ${Date.now() - t0}ms`,
@@ -559,5 +566,239 @@ async function seedLabBStressIfAbsent(exec: SqlExecutor): Promise<void> {
   bumpShellRefresh();
   console.log(
     `[lab-b-seed] stress seeded contacts=${ids.length} photos=${photos} satellites=${sats} in ${Date.now() - t0}ms`,
+  );
+}
+
+// --- Size comparison Systems (shared spec with Lab A / Lab C) -----------------
+// Integer-only hashing so the Python (Lab A) and TS implementations agree.
+const SIZE_SYSTEMS = [5, 10, 20, 32, 120] as const;
+const SIZE_CAST = 120;
+const SIZE_FIRST = [
+  "Aiden",
+  "Bianca",
+  "Callum",
+  "Daria",
+  "Emeka",
+  "Freya",
+  "Gideon",
+  "Helena",
+  "Ines",
+  "Jonah",
+  "Keira",
+  "Luca",
+  "Maren",
+  "Nolan",
+  "Odette",
+  "Pavel",
+  "Rania",
+  "Silas",
+  "Talia",
+  "Ulrich",
+  "Vesna",
+  "Wade",
+  "Ximena",
+  "Yusuf",
+];
+const SIZE_LAST = [
+  "Ashworth",
+  "Bellamy",
+  "Carver",
+  "Delacroix",
+  "Esposito",
+  "Fairbanks",
+  "Gallagher",
+  "Hargrove",
+  "Iwasaki",
+  "Jaramillo",
+  "Kessler",
+  "Lombardi",
+  "Mercer",
+  "Nakamura",
+  "Oduya",
+];
+const SIZE_INTERVALS = [7, 14, 21, 30, 45, 60, 90];
+/** per-10: S stable, W wobble, D decay, R rogue (rarely responds), N never, O rogue (overdue). */
+const SIZE_PATTERN = "SWDRNSSWDO";
+const SIZE_MOONS: Record<number, [string, string][]> = {
+  11: [
+    ["Mara", "Partner"],
+    ["Theo", "Child"],
+  ],
+  17: [["Ilse", "Sibling"]],
+  26: [["Ruth", "Parent"]],
+  70: [
+    ["Owen", "Friend"],
+    ["Lia", "Partner"],
+  ],
+};
+
+function sizeH(i: number, salt: number): number {
+  return (((i + 1) * 7919 + salt * 104729) % 1000) / 1000;
+}
+
+function sizeBand(days: number, interval: number, rarely: number): string {
+  const p = days / interval;
+  if (rarely && p >= 1) return "R";
+  if (p >= 3) return "O";
+  if (p >= 1) return "D";
+  if (p >= 0.8) return "W";
+  return "S";
+}
+
+function sizeSpec(i: number) {
+  const kind = SIZE_PATTERN[i % 10];
+  const interval = SIZE_INTERVALS[(i * 3 + Math.floor(i / 10)) % 7];
+  const name = `${SIZE_FIRST[i % 24]} ${SIZE_LAST[(i + 3 * Math.floor(i / 24)) % 15]}`;
+  const photo = i % 3 === 1;
+  const moons = SIZE_MOONS[i] ?? [];
+  if (kind === "N")
+    return { name, interval, days: null, rarely: 0, history: 0, photo, moons };
+  const h = sizeH(i, 1);
+  const rarely = kind === "R" ? 1 : 0;
+  const p = {
+    S: 0.1 + 0.6 * h,
+    W: 0.82 + 0.15 * h,
+    D: 1.1 + 1.7 * h,
+    R: 1.2 + 1.2 * h,
+    O: 3.3 + 1.5 * h,
+  }[kind] as number;
+  let days = Math.max(1, Math.floor(p * interval + 0.5));
+  const order = "SWDO";
+  for (let n = 0; n < 400; n += 1) {
+    const got = sizeBand(days, interval, rarely);
+    if (got === kind) break;
+    if (kind === "R" || order.indexOf(got) < order.indexOf(kind)) days += 1;
+    else days = Math.max(1, days - 1);
+  }
+  return {
+    name,
+    interval,
+    days,
+    rarely,
+    history: Math.floor(sizeH(i, 3) * 6),
+    photo,
+    moons,
+  };
+}
+
+function calendarDaysAgo(now: Date, days: number, hour: number): string {
+  return localDateTime(
+    new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate() - days,
+      hour,
+      0,
+      0,
+    ),
+  );
+}
+
+async function seedLabBSizesIfAbsent(exec: SqlExecutor): Promise<void> {
+  const row = await exec.getFirstAsync<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM systems WHERE name = ?",
+    ["Size 5"],
+  );
+  if ((row?.n ?? 0) > 0) {
+    console.log("[lab-b-seed] size systems already present");
+    return;
+  }
+  const t0 = Date.now();
+  const rand = rng(0x5_12e);
+  const nowDate = new Date();
+  const now = localDateTime(nowDate);
+  const channels = ["Message", "Call", "In Person"];
+  const ids: number[] = [];
+  let photos = 0;
+  let portraits = 0;
+  let moons = 0;
+  for (let i = 0; i < SIZE_CAST; i += 1) {
+    const spec = sizeSpec(i);
+    const { contactId } = await createContactFull(exec, {
+      uid: newUid(),
+      name: spec.name,
+      intervalDays: spec.interval,
+      rarelyResponds: spec.rarely,
+      now,
+      firstInteraction:
+        spec.days === null
+          ? undefined
+          : {
+              uid: newUid(),
+              occurredAt: calendarDaysAgo(nowDate, spec.days, 9),
+              channel: channels[i % 3],
+              direction: "outbound",
+              connected: 1,
+            },
+    });
+    ids.push(contactId);
+    if (spec.days !== null)
+      for (let k = 1; k <= spec.history; k += 1)
+        await recordTouchpoint(exec, {
+          contactId,
+          uid: newUid(),
+          occurredAt: calendarDaysAgo(
+            nowDate,
+            spec.days + k * spec.interval,
+            9 + (k % 8),
+          ),
+          now,
+          channel: channels[(i + k) % 3],
+          direction: "outbound",
+          connected: 1,
+        });
+    if (spec.photo) {
+      // Photo slots alternate test portrait / procedural avatar.
+      const slot = Math.floor(i / 3);
+      const relative = `avatars/contact-${contactId}.jpg`;
+      new Directory(Paths.document, "avatars").create({
+        intermediates: true,
+        idempotent: true,
+      });
+      let wrote = false;
+      if (slot % 2 === 0) {
+        wrote = await writePortrait((slot / 2) % PORTRAITS.length, relative);
+        if (wrote) portraits += 1;
+      }
+      if (!wrote) {
+        const bytes = renderAvatarJpeg(rand);
+        if (bytes) {
+          const file = new File(Paths.document, relative);
+          if (file.exists) file.delete();
+          file.write(bytes);
+          wrote = true;
+        }
+      }
+      if (wrote) {
+        await setContactPhoto(exec, contactId, relative, now);
+        photos += 1;
+      }
+    }
+    for (const [personName, relationType] of spec.moons) {
+      await addRelationship(exec, {
+        contactId,
+        personName,
+        relationType,
+        createdAt: now,
+        now,
+      });
+      moons += 1;
+    }
+  }
+  for (const size of SIZE_SYSTEMS)
+    await saveSystemDefinition(exec, {
+      systemRef: null,
+      name: `Size ${size}`,
+      rules: [],
+      overrideIntent: ids.slice(0, size).map((contactId) => ({
+        contactId,
+        mode: "include" as const,
+      })),
+      prunableExclusionContactIds: [],
+      now,
+    });
+  bumpShellRefresh();
+  console.log(
+    `[lab-b-seed] size systems seeded contacts=${ids.length} photos=${photos} portraits=${portraits} satellites=${moons} in ${Date.now() - t0}ms`,
   );
 }

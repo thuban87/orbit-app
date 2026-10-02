@@ -164,6 +164,13 @@ procedural Skia-rendered JPEGs — ~75 unlinked relationships on
 **Lab B Work** (30). Idempotent (skips when "Lab B Dense" exists). Logs
 `[lab-b-seed] seeded contacts=… photos=… satellites=… in …ms` to logcat (`ReactNativeJS`).
 
+**Size comparison Systems (2026-10-02).** A debug launch also adds a dedicated 120-contact cast
+and the Systems **Size 5 / 10 / 20 / 32 / 120** (first N cast members) if "Size 5" is absent
+(`[lab-b-seed] size systems seeded …`, ~12 s on the Pixel). The cast spec (names, cadences,
+stable/wobble/decay/rogue/never mix, photo slots, moons on cast #11/#17/#26/#70) is identical to
+Lab A's `seed-lab-a.py` and Lab C's `lab-c-seed.ts`, so the Size Systems compare 1:1 across labs.
+Photo slots here alternate test portraits / procedural avatars. All Contacts becomes 1060.
+
 ```bash
 $ADB logcat -d -s ReactNativeJS | grep lab-b-seed
 # Reset to a fresh seed (then redo §3 prefs before launching!):
