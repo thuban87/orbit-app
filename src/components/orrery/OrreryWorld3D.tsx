@@ -1253,10 +1253,13 @@ export function OrreryWorld3D({
   const cycleTilt = useCallback(() => {
     tiltStep.current = (tiltStep.current + 1) % LAB_TILT_PRESETS.length;
     const [tilt, yaw, zoomBy] = LAB_TILT_PRESETS[tiltStep.current];
+    // Re-capture the home zoom every time the cycle leaves preset 0 (×1), so a
+    // System switch (new home zoom) does not leave a stale multiplier base.
+    const recapture = tiltStep.current === 1;
     runOnUI(() => {
       "worklet";
-      const home = homeZoom.value ?? pose.value.zoom;
-      if (homeZoom.value === null) homeZoom.value = pose.value.zoom;
+      if (recapture || homeZoom.value === null) homeZoom.value = pose.value.zoom;
+      const home = homeZoom.value;
       camera.recover({ ...pose.value, tilt, yaw, zoom: home * zoomBy });
     })();
     console.log(
