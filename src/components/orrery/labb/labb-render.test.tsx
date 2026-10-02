@@ -738,7 +738,9 @@ describe("Lab B renderer tree contract", () => {
     const pose = { value: { ...HOME_CAMERA, zoom: 1.3, tilt: 0.56, yaw: 0.4 } };
     const { tree, scene } = await renderLab(pose);
     const orbit = tree[1].children[0].children[1];
-    const field = orbit.children[0];
+    // [pre-fix pictures under the affine homography (untilted only), field].
+    expect(orbit.children[0].props.matrix).toHaveProperty("value");
+    const field = orbit.children[1];
     expect(field.type).toBe("picture");
     const ops = opsOf(field);
     expect(ops.map((o) => o[0])).toEqual(["drawRect"]);
@@ -767,6 +769,12 @@ describe("Lab B renderer tree contract", () => {
     const north = applyHomography(m, 0, -(world?.ringRadius ?? 0));
     expect(north.x).toBeCloseTo(projected?.ringPath[0].x ?? Number.NaN, 4);
     expect(north.y).toBeCloseTo(projected?.ringPath[0].y ?? Number.NaN, 4);
+    // Hybrid: untilted, the field draws nothing and the pre-fix class-ring
+    // picture (world circle under the affine CTM) draws instead.
+    pose.value = { ...pose.value, tilt: 0 };
+    expect(opsOf(field)).toEqual([]);
+    const flat = orbit.children[0].children.filter((c) => c.type === "picture");
+    expect(opsOf(flat[0]).some((o) => o[0] === "drawCircle")).toBe(true);
   });
 
   it("tilt fix A/B: ringPlaneDraw off restores the pre-fix homography Group", async () => {

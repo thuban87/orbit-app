@@ -35,7 +35,7 @@ import { focusDimFactor } from "./labb-focus-logic";
 import { bodyAt, type FrameIndex } from "./labb-frame-index";
 import { flattenUniforms, uniformOrder } from "./labb-layer-plan";
 import { probeEnd, probeStart } from "./labb-perf-probe";
-import { planeInverseRows } from "./labb-plane-ellipse";
+import { hasPerspective, planeInverseRows } from "./labb-plane-ellipse";
 import {
   buildRingField,
   FIELD_LUT_W,
@@ -297,7 +297,8 @@ export function RingFieldPicture({
     const fb = field.value;
     const f = frame.value;
     const m = fb && effect ? planeHomography(f.pose, f.viewport) : null;
-    if (!fb || !m || !effect) {
+    // Hybrid: untilted, the pre-fix circle-op pictures draw (faster there).
+    if (!fb || !m || !effect || !hasPerspective(m)) {
       probeEnd("rings", probe);
       return emptyFieldPicture();
     }

@@ -136,6 +136,13 @@ const WAKE_STROKE_SCALE = 1.6;
 const RING_PICTURE_BOUNDS = 1e5;
 const RING_ORDER = uniformOrder(LAB_EFFECT_SOURCES.ringInstrument);
 
+/** Tilt fix hybrid: true when the plane is tilted (the ring field draws then;
+ * the pre-fix pictures only draw the untilted plane, their fast case). */
+function planeTilted(frame: AnimatedFrame): boolean {
+  "worklet";
+  return (frame.pose.tilt ?? 0) > 1e-6;
+}
+
 // ---------------------------------------------------------------------------
 // A/B baseline: WP-1.0 parity rings (per-frame 128-point Path per ring).
 
@@ -471,10 +478,13 @@ function TrimRingPicture({
   entries,
   frame,
   profile,
+  flatOnly = false,
 }: {
   entries: readonly LabRingEntry[];
   frame: SharedValue<AnimatedFrame>;
   profile: LabRingProfile;
+  /** Tilt fix hybrid: draw nothing while the plane is tilted. */
+  flatOnly?: boolean;
 }) {
   const ctx = useLabStillContext();
   // key → [r, g, b, alpha, width dp] (React side, per publish).
@@ -542,7 +552,9 @@ function TrimRingPicture({
       paint.setAlphaf(Math.min(1, alpha));
       canvas.drawCircle(0, 0, r, paint);
     };
-    if (ctx?.warm.value) {
+    if (flatOnly && planeTilted(fr)) {
+      // The ring field draws the trims on a tilted plane.
+    } else if (ctx?.warm.value) {
       draw([1, 1, 1, 1, 1], 0.01, 0.5, 0, 40);
     } else if (ctx && sw) {
       const fx = ctx.fxFlags.value;
@@ -792,6 +804,7 @@ function RingClassesPicture({
   anyFocus,
   trimKeys,
   sunLight,
+  flatOnly = false,
 }: {
   classes: readonly (readonly LabRingEntry[])[];
   frame: SharedValue<AnimatedFrame>;
@@ -806,6 +819,8 @@ function RingClassesPicture({
   trimKeys: ReadonlySet<string>;
   /** R2 rim light: [radius (world), gain] (flag `ringSunLight`). */
   sunLight: readonly number[];
+  /** Tilt fix hybrid: draw nothing while the plane is tilted. */
+  flatOnly?: boolean;
 }) {
   const ctx = useLabStillContext();
   const fxFlags = ctx?.fxFlags;
@@ -839,6 +854,12 @@ function RingClassesPicture({
   const picture = useDerivedValue(() => {
     const probe = probeStart();
     const f = frame.value;
+    if (flatOnly && planeTilted(f)) {
+      const r = Skia.PictureRecorder();
+      r.beginRecording(Skia.XYWHRect(0, 0, 1, 1));
+      probeEnd("rings", probe);
+      return r.finishRecordingAsPicture();
+    }
     const index = frameIndex.value;
     const zoom = f.pose.zoom;
     const c = cam.value;
@@ -965,6 +986,7 @@ function WakesPicture({
   profile,
   settled,
   moving,
+  flatOnly = false,
 }: {
   classes: readonly (readonly LabRingEntry[])[];
   frame: SharedValue<AnimatedFrame>;
@@ -973,6 +995,8 @@ function WakesPicture({
   settled: SharedValue<number>;
   /** 1 while the camera recovers (wakes hidden), else 0. */
   moving: SharedValue<number>;
+  /** Tilt fix hybrid: draw nothing while the plane is tilted. */
+  flatOnly?: boolean;
 }) {
   const effect = getLabEffect("ringWake");
   const block = useMemo(() => {
@@ -1010,7 +1034,13 @@ function WakesPicture({
   const picture = useDerivedValue(() => {
     const probe = probeStart();
     const op = settled.value;
-    if (!effect || count === 0 || !(op > 0) || moving.value > 0) {
+    if (
+      !effect ||
+      count === 0 ||
+      !(op > 0) ||
+      moving.value > 0 ||
+      (flatOnly && planeTilted(frame.value))
+    ) {
       probeEnd("wakes", probe);
       return emptyPicture();
     }
@@ -1283,6 +1313,63 @@ export function LabRings({
       flags.ringField && shader && getLabEffect("ringField") !== null;
     return (
       <Group>
+        {field && focused.length ? (
+          <PlaneFocusRingPicture
+            layer="glow"
+            focused={focused}
+            frame={frame}
+            frameIndex={frameIndex}
+            cam={cam}
+            flow={flow}
+            profile={profile}
+            highlight={highlight}
+            shader={shader}
+          />
+        ) : null}
+        {/* Hybrid: on an UNTILTED plane the pre-fix pictures under the affine
+            homography are the fastest draw (Ganesh's circle op; phone:
+            97.8 vs the field's 64.5 fps on Dense 120); they draw nothing
+            while the plane is tilted, when the field draws instead. */}
+        {field ? (
+          <Group matrix={matrix}>
+            {flags.ringWake && wakeLod ? (
+              <Group opacity={wakeGate}>
+                <WakesPicture
+                  classes={classes}
+                  frame={frame}
+                  cam={cam}
+                  profile={profile}
+                  settled={settled}
+                  moving={moving}
+                  flatOnly
+                />
+              </Group>
+            ) : null}
+            <RingClassesPicture
+              classes={classes}
+              frame={frame}
+              frameIndex={frameIndex}
+              cam={cam}
+              flow={flow}
+              profile={profile}
+              highlight={highlight}
+              shader={shader}
+              ringGap={ringGap}
+              anyFocus={anyFocus}
+              trimKeys={trimKeys}
+              sunLight={sunLight}
+              flatOnly
+            />
+            {flags.fx && flags.fxRingTrim ? (
+              <TrimRingPicture
+                entries={trimEntries}
+                frame={frame}
+                profile={profile}
+                flatOnly
+              />
+            ) : null}
+          </Group>
+        ) : null}
         {field ? (
           <RingFieldPicture
             classes={classes}
@@ -1317,7 +1404,7 @@ export function LabRings({
             />
           </Group>
         ) : null}
-        {focused.length ? (
+        {!field && focused.length ? (
           <PlaneFocusRingPicture
             layer="glow"
             focused={focused}
