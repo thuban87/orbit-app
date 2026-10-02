@@ -116,3 +116,34 @@ use a screenshot then). Dismiss the LogBox toast before tapping the tab bar.
 $ADB reverse tcp:8081 tcp:8082     # restore the real Orbit dev mapping the owner had before
 tmux kill-session -t orbit-lab-c   # ours only
 ```
+
+## 8. Release build (Checkpoint F, verified 2026-10-01)
+
+Release = Hermes bytecode, minified, `__DEV__ = false`, no Metro / LogBox. The seed only runs in a
+DEBUG build (`if (__DEV__)` is folded away), so seed on debug first, then install the release APK
+**over** it with `install -r`. `assembleRelease` on the Expo-prebuilt project signs with the same
+`debug.keystore` as `assembleDebug` (`android/app/build.gradle` `signingConfigs.debug` for both
+build types), so it is an in-place update and the seeded DB is kept. Never uninstall / `pm clear`.
+
+```bash
+# sync (§2), then:
+until $BUSY >/dev/null; do sleep 180; done
+ssh -o BatchMode=yes droid "cd /d \"$DEST\\android\" & gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a --console=plain"
+#   (1 m 14 s incremental after a debug build; createBundleReleaseJsAndAssets re-runs on every JS change)
+scp -o BatchMode=yes "droid:C:/Users/bwales/projects/orbit-lab-c/android/app/build/outputs/apk/release/app-release.apk" /tmp/orbit-lab-c-release.apk
+# same signer as the installed debug app? (compare the installed base.apk)
+AS=$(ls -d ~/Android/Sdk/build-tools/*/ | tail -1)apksigner
+$ADB pull "$($ADB shell pm path $PKG | head -1 | sed 's/package://')" /tmp/orbit-lab-c-installed.apk
+$AS verify --print-certs /tmp/orbit-lab-c-installed.apk | grep -m1 SHA-256
+$AS verify --print-certs /tmp/orbit-lab-c-release.apk   | grep -m1 SHA-256   # both fac61745…3b9c
+$ADB shell am force-stop $PKG && $ADB install -r /tmp/orbit-lab-c-release.apk
+$ADB shell dumpsys package $PKG | grep -m1 "flags=\["    # no DEBUGGABLE => release
+$ADB shell monkey -p $PKG -c android.intent.category.LAUNCHER 1
+```
+
+Release APK (arm64-v8a only): **102.9 MB** (debug arm64 139.7 MB). Stored (uncompressed) in it:
+`libwebgpu_dawn.so` 17.5 MB, `libreact-native-webgpu.so` 3.1 MB (≈20.6 MB for the WebGPU stack),
+`assets/index.android.bundle` 8.9 MB (includes three.js). The bundle contains no `lab-c-seed` /
+`Lab C Dense` strings. `console.log` is not stripped in release (no remove-console Babel plugin), so the
+`[lab-c] frames=…` renderer line still reaches `logcat -s ReactNativeJS`. `run-as` does not work on the
+release install; `install -r` the debug APK back for DB peeks (data kept the same way).
