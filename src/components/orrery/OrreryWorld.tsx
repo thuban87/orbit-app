@@ -65,10 +65,8 @@ import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { OrbitBody, orbitBodyInitialsLayout } from "./OrbitBody";
-import { OrreryCanvas } from "./OrreryCanvas";
 import { OrreryLabel } from "./OrreryLabel";
 import { Polaris } from "./Polaris";
-import { ProjectedOrbitRing } from "./ProjectedOrbitRing";
 import {
   createOrreryTextPublisher,
   EMPTY_INITIALS_SPEC,
@@ -91,6 +89,12 @@ import {
   type OrrerySwitchRuntime,
   sampleOrrerySwitchCamera,
 } from "./use-orrery-switch-runtime";
+import { OrreryV2Canvas } from "./v2/OrreryV2Canvas";
+import {
+  buildRingSpecs,
+  EMPTY_RING_SPECS,
+  type RingSpecs,
+} from "./v2/scene-specs";
 
 export { createOrreryGestures } from "./use-orrery-camera";
 
@@ -418,6 +422,12 @@ export function OrreryWorld({
     () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],
     [colors],
   );
+  // D-43/D-44: the V2 ring look, rebuilt on resource or theme change only
+  // (never per frame); the base picture reads it with the shared frame.
+  const ringSpecs = useSharedValue<RingSpecs>(EMPTY_RING_SPECS);
+  useEffect(() => {
+    ringSpecs.value = buildRingSpecs(resources, colors);
+  }, [ringSpecs, resources, colors]);
   // Plain label inputs only (no Paragraphs): one stable label node per
   // labelable body; the publisher decides which ones get text, per tier.
   const labelSources = useMemo<OrreryLabelSource[]>(
@@ -774,32 +784,18 @@ export function OrreryWorld({
     },
   );
   return (
-    <OrreryCanvas
+    <OrreryV2Canvas
       width={viewport.width}
       height={viewport.height}
       background={colors.background}
       starColors={starColors}
       gesture={gesture}
+      frame={frame}
+      ringSpecs={ringSpecs}
     >
       <Group
         clip={{ x: 0, y: 0, width: viewport.width, height: viewport.height }}
       >
-        <Group>
-          {resources
-            .filter((r) => r.body.kind === "contact")
-            .map((resource) => (
-              <ProjectedOrbitRing
-                key={resource.key}
-                identity={resource.key}
-                frame={frame}
-                style={orreryRingStyle(
-                  rowById(resource.scene.contacts, resource.body.id)?.status ??
-                    null,
-                  colors,
-                )}
-              />
-            ))}
-        </Group>
         <Polaris frame={frame} extent={scene.extent} colors={colors} />
         <ReorderGhost
           frame={frame}
@@ -868,6 +864,6 @@ export function OrreryWorld({
           ))}
         </Group>
       </Group>
-    </OrreryCanvas>
+    </OrreryV2Canvas>
   );
 }

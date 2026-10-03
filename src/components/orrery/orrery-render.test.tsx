@@ -92,6 +92,8 @@ vi.mock("react-native", () => ({
     native.renders++;
     return { fontScale: 2 };
   },
+  Platform: { OS: "android" },
+  PixelRatio: { get: () => 2 },
 }));
 vi.mock("@/services/photos/photo-storage", () => ({
   resolvePhotoUri: (path: string) => path,
@@ -148,6 +150,12 @@ vi.mock("@shopify/react-native-skia", async () => {
     Paragraph: "paragraph",
     Paint: "paint",
     Path: "path",
+    Picture: "skPicture",
+    createPicture: (draw: (canvas: unknown) => void) => {
+      const commands: string[] = [];
+      draw(new Proxy({}, { get: (_t, op: string) => () => commands.push(op) }));
+      return { commands };
+    },
     DashPathEffect: "dash",
     RoundedRect: "roundRect",
     Image: "image",
@@ -288,7 +296,8 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    const bodies = tree[0].children[3];
+    // [base rings picture, clip Group [Polaris, ghost, bodies, labels]]
+    const bodies = tree[1].children[2];
     expect(bodies.children.map((n) => n.type)).toEqual([
       "skGroup",
       "skGroup",
@@ -332,7 +341,9 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    const [rings, polaris, ghost, bodies, labels] = tree[0].children;
+    // 38.7-06: the rings are the V2 base picture, outside the legacy slot.
+    expect(tree[0].type).toBe("skPicture");
+    const [polaris, ghost, bodies, labels] = tree[1].children;
     expect(ghost.props.color).toBe(THEME_PRESETS.galaxy.dark.accent);
     expect(polaris.children.map((child) => child.type)).toEqual([
       "circle",
@@ -342,7 +353,6 @@ describe("production Orrery native tree and resource contracts", () => {
     expect(polaris.children[1].props.color).toBe(
       THEME_PRESETS.galaxy.dark.textPrimary,
     );
-    expect(rings.children.every((child) => child.type === "path")).toBe(true);
     expect(bodies.children.map((child) => child.type)).toEqual([
       "skGroup",
       "skGroup",
@@ -411,7 +421,7 @@ describe("production Orrery native tree and resource contracts", () => {
       ...(node.type === type ? [node] : []),
       ...node.children.flatMap((child) => findAll(child, type)),
     ];
-    const labels = tree[0].children[4];
+    const labels = tree[1].children[3];
     const [nameParagraph] = findAll(labels, "paragraph");
     const drawn = () =>
       (nameParagraph.props.paragraph as { value: { text?: string } | null })
