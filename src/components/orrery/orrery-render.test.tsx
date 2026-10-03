@@ -374,12 +374,14 @@ describe("production Orrery native tree and resource contracts", () => {
         scene,
         satellites,
         pose: pose as never,
-        viewport: { width: 500, height: 700 },
+        // Large enough that the moon is on screen wherever today's date puts
+        // its parent on the ring (angles follow the real clock).
+        viewport: { width: 1200, height: 1600 },
         camera: useOrreryCamera({
           pose: pose as never,
           enabled: true,
           extent: scene.extent,
-          viewport: { width: 500, height: 700 },
+          viewport: { width: 1200, height: 1600 },
           reduced: { value: false } as never,
         }),
         colors: THEME_PRESETS.galaxy.dark,
@@ -580,7 +582,7 @@ describe("production Orrery native tree and resource contracts", () => {
   });
 });
 
-describe("38.7-06 D-43: the stable picture tree and the single ambient clock", () => {
+describe("38.7-07 D-43: the stable picture tree (contract) and the single ambient clock", () => {
   type Scene = Awaited<ReturnType<typeof loadOrreryScene>>;
   let inserted = 0;
   /** Adds `count` contacts to the System (calls accumulate within a test). */
@@ -633,58 +635,115 @@ describe("38.7-06 D-43: the stable picture tree and the single ambient clock", (
   const recorded = (picture: Node) =>
     (picture.props.picture as { value: Recorded }).value.commands;
 
-  it("the same Picture layers for a 3-body and a 120-body System; rings are draws, not nodes", async () => {
+  /** The whole node tree as types (the D-43 shape). */
+  const shape = (tree: Node[]) => {
+    const walk = (node: Node): unknown => [node.type, node.children.map(walk)];
+    return tree.map(walk);
+  };
+  const LAYERS = 7; // base, stars, bodiesBehind, sun, bodiesFront, labels, overlay
+
+  it("the same Picture layers for 3, 120 and 1,000 bodies; no per-body node — rings, bodies and labels are draws", async () => {
     const smallScene = await sceneWith(3);
     const small = renderWorld(
       smallScene,
       useOrreryCamera(cameraInput(smallScene)),
     );
-    const smallPictures = findAll(small[0], "skPicture");
-    const largeScene = await sceneWith(117);
+    flushUi(1);
+    const mediumScene = await sceneWith(117);
+    const medium = renderWorld(
+      mediumScene,
+      useOrreryCamera(cameraInput(mediumScene)),
+    );
+    flushUi(1);
+    const largeScene = await sceneWith(880);
     const large = renderWorld(
       largeScene,
       useOrreryCamera(cameraInput(largeScene)),
     );
-    const largePictures = findAll(large[0], "skPicture");
-    expect(smallPictures).toHaveLength(7);
-    expect(largePictures).toHaveLength(smallPictures.length);
-    expect(large[0].children.map((n) => n.type)).toEqual(
-      small[0].children.map((n) => n.type),
-    );
-    // No ring/Polaris/overlay node anywhere outside the pictures.
-    for (const tree of [small, large])
-      expect(findAll(tree[0], "path")).toHaveLength(0);
+    flushUi(1);
+    const trees = [small, medium, large];
+    for (const tree of trees) {
+      expect(tree).toHaveLength(1);
+      expect(tree[0].type).toBe("skCanvas");
+      expect(tree[0].children.map((n) => n.type)).toEqual(
+        Array(LAYERS).fill("skPicture"),
+      );
+      // Nothing else anywhere: no Group, Circle, Paragraph, Path or layer node.
+      expect(findAll(tree[0], "skPicture")).toHaveLength(LAYERS);
+      for (const type of ["skGroup", "circle", "paragraph", "path", "skLayer"])
+        expect(findAll(tree[0], type)).toHaveLength(0);
+    }
+    expect(shape(medium)).toEqual(shape(small));
+    expect(shape(large)).toEqual(shape(small));
     // The base picture: the sky fill, then one world-plane draw per ring.
-    const base = recorded(largePictures[0]);
+    const base = recorded(large[0].children[0]);
     expect(base[0]).toEqual({
       op: "drawPaint",
       color: [...parseInk(THEME_PRESETS.galaxy.dark.background)],
     });
-    expect(base.filter((c) => c.op === "drawVertices")).toHaveLength(120);
+    expect(base.filter((c) => c.op === "drawVertices")).toHaveLength(1000);
     expect(
-      recorded(smallPictures[0]).filter((c) => c.op === "drawVertices"),
+      recorded(small[0].children[0]).filter((c) => c.op === "drawVertices"),
     ).toHaveLength(3);
+    // Bodies are recorded draws inside the two body pictures.
+    const bodyCircles = (tree: Node[]) =>
+      [tree[0].children[2], tree[0].children[4]]
+        .flatMap(recorded)
+        .filter((c) => c.op === "drawCircle").length;
+    expect(bodyCircles(small)).toBe(3 * 2);
+    expect(bodyCircles(large)).toBeGreaterThan(bodyCircles(small));
   });
-  it("a re-render with a new focus keeps the tree; only the overlay's spec changes", async () => {
-    const scene = await sceneWith(3);
-    const before = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
-    const id = scene.contacts[0].id;
-    const after = renderWorld(scene, useOrreryCamera(cameraInput(scene)), [id]);
-    const shape = (tree: Node[]) =>
-      tree[0].children.map((n) => [n.type, n.children.length]);
-    expect(shape(after)).toEqual(shape(before));
-    const overlayBefore = recorded(before[0].children[6]);
-    const overlayAfter = recorded(after[0].children[6]);
-    const accent = [...parseInk(THEME_PRESETS.galaxy.dark.accent)];
-    const accentCircles = (commands: Recorded["commands"]) =>
-      commands.filter(
-        (c) =>
-          c.op === "drawCircle" &&
-          c.color !== undefined &&
-          c.color.slice(0, 3).every((v, i) => v === accent[i]),
-      );
-    expect(accentCircles(overlayBefore)).toHaveLength(0);
-    expect(accentCircles(overlayAfter)).toHaveLength(1);
+
+  it("a focus change, a photo-ready notification and an unrelated parent re-render never change the node tree; a photo only rewrites the body specs", async () => {
+    const exec = nodeSqliteExecutor(db);
+    await sceneWith(3);
+    await exec.runAsync(
+      "UPDATE contacts SET photo = 'avatars/contact-1.jpg' WHERE uid = ?",
+      [`stable-${inserted}`],
+    );
+    const scene = await loadOrreryScene(exec, 1);
+    const camera = useOrreryCamera(cameraInput(scene));
+    const before = renderWorld(scene, camera);
+    flushUi();
+    // The photo was requested from the shared cache (no decode in the tree).
+    expect(
+      (photoCache.requests.at(-1) as { key: string }[]).map((r) => r.key),
+    ).toEqual(["avatars/contact-1.jpg"]);
+    // A focus change: a re-render, same tree.
+    const focused = renderWorld(scene, camera, [scene.contacts[0].id]);
+    expect(shape(focused)).toEqual(shape(before));
+    // An unrelated parent re-render with equal (new) props: same tree.
+    const again = renderWorld(scene, camera, [scene.contacts[0].id]);
+    expect(shape(again)).toEqual(shape(before));
+    flushUi();
+    // A photo arrives: no React render, no state; only the body specs move.
+    const renders = native.renders;
+    const snapshot = (tree: Node[]) =>
+      tree[0].children.map((picture) => JSON.stringify(recorded(picture)));
+    const [base, stars, behind, sun, front, labels, overlay] = snapshot(again);
+    photoCache.drawn.set("avatars/contact-1.jpg", {
+      id: 1,
+      image: { width: () => 512, height: () => 512 },
+    });
+    photoCache.ready?.();
+    flushUi();
+    expect(native.renders).toBe(renders);
+    expect(native.setStateCalls).toBe(0);
+    const after = snapshot(again);
+    expect([after[0], after[1], after[3], after[5], after[6]]).toEqual([
+      base,
+      stars,
+      sun,
+      labels,
+      overlay,
+    ]);
+    const images = [again[0].children[2], again[0].children[4]]
+      .flatMap(recorded)
+      .filter((c) => c.op === "drawImageRectOptions");
+    expect(images).toHaveLength(1);
+    expect([after[2], after[4]]).not.toEqual([behind, front]);
+    expect(shape(again)).toEqual(shape(before));
+    photoCache.drawn.clear();
   });
   it("the stars picture: today's 44 stars; its input holds under reduced motion", async () => {
     const scene = await sceneWith(1);
