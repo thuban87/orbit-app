@@ -61,20 +61,26 @@ touch window.
 ## 2. Preconditions
 
 1. **Gate numbers come from a RELEASE build.** Debug runs are screening only (D-59).
-2. **Seed on the debug build, measure on the release build.** Install the debug APK
+2. **Build arm64-v8a only, debug then release as separate invocations** (owner, 2026-10-03):
+   `gradlew.bat assembleDebug -PreactNativeArchitectures=arm64-v8a --console=plain`, then
+   `gradlew.bat assembleRelease -PreactNativeArchitectures=arm64-v8a --console=plain`
+   (desktop-build-pipeline.md otherwise). Both test phones are arm64; the four-ABI build
+   does not fit droid's disk. The baseline, the spike (Plan 08) and the final pass
+   (Plan 16) all use this flag so their APKs are built identically.
+3. **Seed on the debug build, measure on the release build.** Install the debug APK
    (`adb -s S install -r app-debug.apk`), start Orbit Metro on host `:8082` and
    `adb -s S reverse tcp:8081 tcp:8082` (the dev client asks for :8081, which belongs to
    quest-board). Seed (§3) and record the manifest (§4), then `adb -s S install -r
    app-release.apk`. Data is kept because both APKs are signed with the prebuild debug
    keystore (desktop-build-pipeline.md §1c). **Never uninstall or clear data to resolve a
    signature mismatch** — that destroys the fixture; stop and report instead.
-3. **The phone is a test phone** (synthetic data is fine there). Never touch the phone's
+4. **The phone is a test phone** (synthetic data is fine there). Never touch the phone's
    Contacts app; never trigger a real AI suggestion.
-4. **Sun = the user** (no Orbit Center contact) at seed time. The restore reports a sun
+5. **Sun = the user** (no Orbit Center contact) at seed time. The restore reports a sun
    that differs from the seed-time value and leaves it alone.
-5. Resolve the serial once per session: `emu-connect`, then `adb devices -l`; check the
+6. Resolve the serial once per session: `emu-connect`, then `adb devices -l`; check the
    count of `device` rows. Scripts resolve by `--model` themselves.
-6. Debug builds only: dismiss the LogBox "Open debugger" toast before any tab tap (the
+7. Debug builds only: dismiss the LogBox "Open debugger" toast before any tab tap (the
    scripts do it; it silently eats tab-bar taps).
 
 ## 3. The fixture (dev menu, debug build)
@@ -284,3 +290,7 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
   writes frames only on change and leaves the MP4 duration unset, so tab return takes the
   recording end from the recorder's time limit (15 s, long enough for main's ~5 s scene
   reload plus the 2 s settle window).
+- **2026-10-03** — Before any baseline number (38.7 Plan 02): APKs for every pass are built
+  **arm64-v8a only** (`-PreactNativeArchitectures=arm64-v8a`, debug and release as separate
+  Gradle invocations), owner ruling after the four-ABI build ran droid out of disk. Both
+  test phones are arm64, so the code under measurement is unchanged. §2 item 2.
