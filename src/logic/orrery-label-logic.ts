@@ -22,17 +22,84 @@ export const LABEL_GRID_CELL = 64;
 /** Rects spanning more cells than this are scanned linearly instead. */
 const LABEL_GRID_MAX_CELLS = 1024;
 
-/** Initials are grapheme clusters, never UTF-16 units. Older runtimes without
- * Segmenter hand the whole identity to the native one-line avatar paragraph.
+const ZWJ = 0x200d;
+const COMBINING_MARK = /^\p{M}$/u;
+/** Variation selectors U+FE00–U+FE0F and the keycap U+20E3. */
+const isVariation = (cp: number) =>
+  (cp >= 0xfe00 && cp <= 0xfe0f) || cp === 0x20e3;
+/** Fitzpatrick skin-tone modifiers. */
+const isSkinTone = (cp: number) => cp >= 0x1f3fb && cp <= 0x1f3ff;
+/** Tag characters (subdivision flags such as Scotland). */
+const isTag = (cp: number) => cp >= 0xe0020 && cp <= 0xe007f;
+const isRegionalIndicator = (cp: number) => cp >= 0x1f1e6 && cp <= 0x1f1ff;
+
+/**
+ * D-33: the first user-perceived character of a word without Intl.Segmenter
+ * (absent on Hermes). Iterates code points (never UTF-16 units), keeps a
+ * regional-indicator pair together, then absorbs combining marks, variation
+ * selectors/keycap, skin tones, tag characters and every ZWJ + its next code
+ * point — enough for names, emoji, flags and keycaps. Not a full UAX #29.
+ */
+export function firstGrapheme(word: string): string {
+  const points = Array.from(word);
+  if (points.length === 0) return "";
+  const first = points[0].codePointAt(0) as number;
+  if (
+    isRegionalIndicator(first) &&
+    points.length > 1 &&
+    isRegionalIndicator(points[1].codePointAt(0) as number)
+  )
+    return points[0] + points[1];
+  let out = points[0];
+  let i = 1;
+  while (i < points.length) {
+    const point = points[i];
+    const cp = point.codePointAt(0) as number;
+    if (
+      COMBINING_MARK.test(point) ||
+      isVariation(cp) ||
+      isSkinTone(cp) ||
+      isTag(cp)
+    ) {
+      out += point;
+      i++;
+      continue;
+    }
+    if (cp === ZWJ && i + 1 < points.length) {
+      out += point + points[i + 1];
+      i += 2;
+      continue;
+    }
+    break;
+  }
+  return out;
+}
+
+/**
+ * Initials are grapheme clusters, never UTF-16 units: the first grapheme of up
+ * to two whitespace-separated words, uppercased. Uses Intl.Segmenter when the
+ * runtime has it; otherwise (Hermes) `firstGrapheme`. D-33 (EDGE-14) amends
+ * Phase 29's fallback, which handed the whole name to the one-line avatar
+ * paragraph and so drew "El…" — the full name is never returned now.
  */
 export function orreryInitials(name: string): string {
-  if (typeof Intl.Segmenter !== "function") return name;
-  const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  const words = name.trim().split(/\s+/).filter(Boolean);
   const initials: string[] = [];
-  for (const word of name.trim().split(/\s+/)) {
-    const first = segmenter.segment(word)[Symbol.iterator]().next().value;
-    if (first) initials.push(first.segment);
-    if (initials.length === 2) break;
+  if (typeof Intl.Segmenter === "function") {
+    const segmenter = new Intl.Segmenter(undefined, {
+      granularity: "grapheme",
+    });
+    for (const word of words) {
+      const first = segmenter.segment(word)[Symbol.iterator]().next().value;
+      if (first) initials.push(first.segment);
+      if (initials.length === 2) break;
+    }
+  } else {
+    for (const word of words) {
+      const first = firstGrapheme(word);
+      if (first) initials.push(first);
+      if (initials.length === 2) break;
+    }
   }
   return initials.join("").toUpperCase();
 }
