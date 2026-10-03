@@ -15,8 +15,9 @@ import {
 export const RECOVERY_MIN_MS = 180;
 export const RECOVERY_MAX_MS = 850;
 export const REDUCED_RECOVERY_MS = 100;
-export const COAST_MS = 120;
-export const PAN_COAST_POINTS = 18;
+/** D-05: a small but perceptible pan coast (bounded; off under reduced motion). */
+export const COAST_MS = 260;
+export const PAN_COAST_POINTS = 48;
 export const YAW_COAST_RADIANS = 0.08;
 export const POLARIS_RADIUS = 6;
 export const POLARIS_HIT_RADIUS = 22;
@@ -121,6 +122,8 @@ export function inertiaTarget(
       ? Math.max(-max, Math.min(max, (v * COAST_MS) / 2000))
       : 0;
   };
+  // D-05: the coast drags the pivot itself (anchored pan), so on screen it
+  // travels exactly the capped coast distance at any tilt.
   return kind === "pan"
     ? panCamera(
         pose,
@@ -128,6 +131,8 @@ export function inertiaTarget(
         cap(vy, PAN_COAST_POINTS),
         cameraExtent(extent),
         viewport,
+        tryProjectWorldPoint({ x: pose.x, y: pose.y }, pose, viewport) ??
+          undefined,
       )
     : clampCameraPose(
         { ...pose, yaw: (pose.yaw ?? 0) + cap(vx, YAW_COAST_RADIANS) },

@@ -77,7 +77,8 @@ export function cancelInput(state: CameraInput): CameraInput {
   return { owner: "cancelled", pointers: 0, generation: state.generation + 1 };
 }
 export type CameraStep =
-  | { kind: "pan"; dx: number; dy: number }
+  /** `from`: the finger's screen position before this step (anchored pan). */
+  | { kind: "pan"; dx: number; dy: number; from?: WorldPoint }
   | { kind: "pinch"; delta: number; focal: WorldPoint }
   | { kind: "yaw"; delta: number }
   | { kind: "tilt"; delta: number; travel: number };
@@ -90,7 +91,7 @@ export function cameraGestureStep(
 ): CameraPose {
   "worklet";
   if (step.kind === "pan")
-    return panCamera(pose, step.dx, step.dy, extent, viewport);
+    return panCamera(pose, step.dx, step.dy, extent, viewport, step.from);
   if (step.kind === "pinch") {
     if (
       !Number.isFinite(step.delta) ||

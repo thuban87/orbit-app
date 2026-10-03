@@ -16,7 +16,6 @@ vi.mock("react-native-reanimated", () => ({
 
 import { HOME_CAMERA } from "@/logic/orrery-camera-logic";
 import { projectAnimatedFrame } from "@/logic/orrery-frame";
-import { semanticLevel } from "@/logic/orrery-label-logic";
 import { previewReorder } from "@/logic/orrery-reorder-logic";
 import { deriveSatelliteBodies } from "@/logic/orrery-satellite-logic";
 import {
@@ -122,7 +121,6 @@ it("the emitted projection closure settles after publication under the installed
     reorder,
     previewReorder,
     deriveSatelliteBodies,
-    semanticLevel,
     projectAnimatedFrame: projection,
   };
   for (const heavy of ["switchRuntime", "scene", "resources", "camera"])
@@ -259,12 +257,8 @@ it("38.7-04: the tap worklet captures member identities only, and no OrreryWorld
   );
   expect(tap).toHaveLength(1);
   expect([...tap[0].names].sort()).toEqual(
-    [
-      "allocations",
-      "identities",
-      "memberIdentities",
-      "resolveSatelliteTap",
-    ].sort(),
+    // D-60: labels no longer take part in tap resolution (no allocations).
+    ["identities", "memberIdentities", "resolveSatelliteTap"].sort(),
   );
   // New UI reactions capture only SharedValues, primitives, module functions
   // and runOnJS callbacks — never the scene, resources, runtime, the text

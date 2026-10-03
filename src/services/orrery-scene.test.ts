@@ -223,7 +223,7 @@ describe("canonical SQLite scene tracer", () => {
     expect((await getAppSettings(exec)).dataRevision).toBe(revision);
   });
 
-  it("Home, pan and halfway focus use the same drawn centers for hits and identity-level Profile dispatch", async () => {
+  it("Home, pan and halfway focus use the same drawn centers for hits; body taps focus and Profile needs the card's intent (D-60)", async () => {
     const scene = await loadOrreryScene(exec, 3);
     const body = scene.world.find((b) => b.id === id)!;
     for (const pose of [
@@ -256,11 +256,19 @@ describe("canonical SQLite scene tracer", () => {
       viewport,
       3,
     );
-    await dispatch(tapIntent(inspect, 200, 300, true));
-    await dispatch(tapIntent(inspect, 200, 300, true));
-    expect(openProfile).toHaveBeenCalledExactlyOnceWith(id);
+    const centre = projectWorldPoint(body, inspect.pose, viewport);
+    await dispatch(tapIntent(inspect, centre.x, centre.y, true));
+    await dispatch(tapIntent(inspect, centre.x, centre.y, true));
+    // D-60: repeated body taps at identity zoom keep focusing; never Profile.
+    expect(focus).toHaveBeenCalledTimes(3);
+    expect(focus).toHaveBeenLastCalledWith([id]);
+    expect(openProfile).not.toHaveBeenCalled();
+    // Profile opens only from the card's explicit intent; stale generations
+    // are rejected and the current one opens it once.
     await dispatch({ kind: "profile", ids: [id], generation: 2 });
-    expect(openProfile).toHaveBeenCalledTimes(1);
+    expect(openProfile).not.toHaveBeenCalled();
+    await dispatch({ kind: "profile", ids: [id], generation: 3 });
+    expect(openProfile).toHaveBeenCalledExactlyOnceWith(id);
   });
 
   it("rejects removed and queued stale targets and never chooses an ambiguous hit", async () => {

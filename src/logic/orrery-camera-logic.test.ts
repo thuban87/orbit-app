@@ -19,13 +19,19 @@ import {
   type HomeProfile,
   MAX_USER_TILT,
   MAX_ZOOM,
+  MIN_CONTACT_PX,
   MIN_HIT_RADIUS,
   MIN_READABLE_RADIUS,
+  MIN_SATELLITE_PX,
+  MIN_SUN_PX,
   MIN_ZOOM,
+  NEAR_PERSPECTIVE_KNEE,
+  NEAR_RADIUS_FRACTION,
   type ProjectedBody,
   type ProjectedFrame,
   panCamera,
   perspectiveScale,
+  projectedBodyRadius,
   projectFrame,
   projectionBasis,
   projectWithBasis,
@@ -40,6 +46,7 @@ import {
   worldExtent,
 } from "@/logic/orrery-camera-logic";
 import { projectSwitchChoreographyFrame } from "@/logic/orrery-frame";
+import { semanticLevel } from "@/logic/orrery-label-logic";
 import { hitPolaris, polarisProjection } from "@/logic/orrery-recovery-logic";
 import { previewReorder, type ReorderDrag } from "@/logic/orrery-reorder-logic";
 import { beginSwitchChoreography } from "@/logic/orrery-switch-choreography";
@@ -329,10 +336,14 @@ const legacy = (() => {
     pose: CameraPose,
     viewport: CameraViewport,
     generation: number,
-  ): Omit<ProjectedFrame, "bodies"> & {
+  ): Omit<ProjectedFrame, "bodies" | "labelMagnification"> & {
     bodies: Omit<
       ProjectedBody,
-      "worldRingRadius" | "ringBreaks" | "ringClosed" | "culled"
+      | "worldRingRadius"
+      | "ringBreaks"
+      | "ringClosed"
+      | "culled"
+      | "magnification"
     >[];
   } => {
     const current = clampCameraPose(
@@ -489,18 +500,42 @@ describe("D-52 hoisted projection basis", () => {
         yaw: random() * Math.PI * 2,
       };
       const vp = basisViewports[round % basisViewports.length];
-      // 38.7-05 adds worldRingRadius (the world ring radius, copied unchanged);
-      // everything the frozen copy produced is otherwise identical.
+      // 38.7-05 adds worldRingRadius (copied unchanged), the ring-gap fields,
+      // the magnification and the one size mechanism (D-48); positions, rings
+      // and depth are otherwise identical to the frozen copy.
       const frozen = legacy.frame(world, pose, vp, round);
+      const shortSide = Math.min(vp.width, vp.height);
       const expected: ProjectedFrame = {
         ...frozen,
-        bodies: frozen.bodies.map((projected, index) => ({
-          ...projected,
-          worldRingRadius: world[index].ringRadius,
-          ringBreaks: [],
-          ringClosed: world[index].ringRadius > 0,
-          culled: false,
-        })),
+        bodies: frozen.bodies.map((projected, index) => {
+          const perspective = perspectiveScale(world[index], frozen.pose);
+          const radius = projectedBodyRadius(
+            world[index].kind,
+            world[index].radius,
+            frozen.pose.zoom,
+            perspective,
+            shortSide,
+          );
+          // Where the size mechanism is identity (far side, above the
+          // minimum), the radius is the old radius bit-for-bit.
+          if (
+            perspective <= 1 &&
+            projected.radius >=
+              (world[index].kind === "sun" ? MIN_SUN_PX : MIN_CONTACT_PX) / 2
+          )
+            expect(radius).toBe(projected.radius);
+          return {
+            ...projected,
+            radius,
+            hitRadius: Math.max(MIN_HIT_RADIUS, radius),
+            magnification: frozen.pose.zoom * perspective,
+            worldRingRadius: world[index].ringRadius,
+            ringBreaks: [],
+            ringClosed: world[index].ringRadius > 0,
+            culled: false,
+          };
+        }),
+        labelMagnification: expect.any(Number) as unknown as number,
       };
       const actual = projectFrame(world, pose, vp, round);
       expect(actual).toEqual(expected);
@@ -1054,4 +1089,129 @@ describe("38.7-05 horizon safety on a 1,000-ring System (H2)", () => {
         else expect(body.visible || body.interactive).toBe(false);
     }
   });
+});
+
+// ---------------------------------------------------------------------------
+// 38.7-05 Task 3 (D-48/D-16/D-06, D-47, D-60): one size mechanism in the
+// projection, projected-size semantics and tap-always-focuses.
+// ---------------------------------------------------------------------------
+describe("38.7-05 one size mechanism and projected-size semantics", () => {
+  const short = Math.min(phone.width, phone.height);
+  it.each(TILTS)(
+    "at tilt %s: a far body is at least the minimum size, a near body is capped, hit ≥ drawn",
+    (tilt) => {
+      const world: WorldBody[] = [
+        { id: 0, kind: "sun", x: 0, y: 0, radius: 30, ringRadius: 0 },
+        // Far (north) and near (south) contacts on a large ring.
+        body(0, -3000, 16, 1),
+        body(0, 600, 16, 2),
+        { ...body(40, -2900, 4, 3), kind: "satellite" },
+      ];
+      const pose = clampCameraPose({ ...HOME_CAMERA, tilt, zoom: 0.7 }, 4000);
+      const frame = projectFrame(world, pose, phone, 1, { extent: 4000 });
+      const [sun, far, near, moon] = frame.bodies;
+      expect(far.culled).toBe(false);
+      expect(far.radius).toBeGreaterThanOrEqual(MIN_CONTACT_PX / 2);
+      expect(moon.radius).toBeGreaterThanOrEqual(MIN_SATELLITE_PX / 2);
+      expect(sun.radius).toBeGreaterThanOrEqual(MIN_SUN_PX / 2);
+      for (const b of frame.bodies) {
+        expect(b.hitRadius).toBeGreaterThanOrEqual(b.radius);
+        expect(b.hitRadius).toBe(Math.max(MIN_HIT_RADIUS, b.radius));
+      }
+      // Magnification is the raw zoom × perspective, before the size mechanism.
+      const basis = projectionBasis(frame.pose, phone);
+      expect(far.magnification).toBe(
+        frame.pose.zoom * basisPerspectiveScale(basis, 0, -3000)!,
+      );
+      if (tilt > 0) {
+        expect(far.magnification).toBeLessThan(frame.pose.zoom);
+        expect(far.radius).toBeGreaterThan(16 * far.magnification); // inflated
+        // Near side: perspective growth limited to the knee, then the cap.
+        const perspective = near.magnification / frame.pose.zoom;
+        expect(perspective).toBeGreaterThan(1);
+        const pivot = 16 * frame.pose.zoom;
+        expect(near.radius).toBeLessThanOrEqual(
+          pivot * (1 + NEAR_PERSPECTIVE_KNEE) + 1e-9,
+        );
+        expect(near.radius).toBeLessThanOrEqual(
+          Math.max(pivot, short * NEAR_RADIUS_FRACTION) + 1e-9,
+        );
+        expect(near.radius).toBeLessThan(16 * near.magnification);
+      } else {
+        expect(far.magnification).toBe(frame.pose.zoom);
+        expect(near.radius).toBe(16 * frame.pose.zoom);
+      }
+    },
+  );
+  it("the near cap never shrinks a body below its pivot-depth size (a zoomed-in focus keeps its size)", () => {
+    for (const zoom of [1, 2, MAX_ZOOM]) {
+      const pivot = 16 * zoom;
+      for (const perspective of [1, 1.2, 3, 20])
+        expect(
+          projectedBodyRadius("contact", 16, zoom, perspective, short),
+        ).toBeGreaterThanOrEqual(pivot - 1e-9);
+      expect(projectedBodyRadius("contact", 16, zoom, 1, short)).toBe(pivot);
+    }
+    // The sun is the anchor: exempt from the near cap.
+    expect(projectedBodyRadius("sun", 30, 1, 2, short)).toBe(60);
+  });
+  it("labelMagnification equals pose.zoom for a flat, centred fixture, and is the median magnification under tilt", () => {
+    const world = ringWorld(12);
+    for (const zoom of [0.5, 1, 2, 3.2]) {
+      const flat = projectFrame(
+        world,
+        { ...HOME_CAMERA, tilt: 0, lensShift: 1, zoom },
+        phone,
+        1,
+      );
+      expect(flat.labelMagnification).toBe(flat.pose.zoom);
+      // Tiers at a flat Home are exactly the old zoom-driven tiers.
+      for (const previous of ["overview", "identity", "detail"] as const)
+        expect(semanticLevel(flat.labelMagnification, previous)).toBe(
+          semanticLevel(zoom, previous),
+        );
+    }
+    const tilted = projectFrame(world, { ...HOME_CAMERA, zoom: 1.5 }, phone, 1);
+    const visible = tilted.bodies
+      .filter(
+        (b) =>
+          b.kind === "contact" &&
+          !b.culled &&
+          b.x + b.radius * 1.3 >= 0 &&
+          b.x - b.radius * 1.3 <= phone.width &&
+          b.y + b.radius * 1.3 >= 0 &&
+          b.y - b.radius * 1.3 <= phone.height,
+      )
+      .map((b) => b.magnification)
+      .sort((p, q) => p - q);
+    expect(visible.length).toBeGreaterThan(2);
+    expect(tilted.labelMagnification).toBe(
+      visible[Math.floor(visible.length / 2)],
+    );
+    // No visible contacts: falls back to the zoom.
+    expect(
+      projectFrame([world[0]], { ...HOME_CAMERA, zoom: 1.5 }, phone, 1)
+        .labelMagnification,
+    ).toBe(1.5);
+  });
+  it.each(TILTS)(
+    "at tilt %s: tapIntent never yields Profile for a single hit (D-60)",
+    (tilt) => {
+      const world = [body(0, -40, 16, 1), body(60, 30, 16, 2)];
+      for (const zoom of [1, 2, MAX_ZOOM]) {
+        const frame = projectFrame(
+          world,
+          { ...HOME_CAMERA, tilt, zoom },
+          phone,
+          5,
+        );
+        const target = frame.bodies[0];
+        expect(tapIntent(frame, target.x, target.y, true)).toMatchObject({
+          kind: "focus",
+          ids: [1],
+          generation: 5,
+        });
+      }
+    },
+  );
 });

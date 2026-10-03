@@ -103,17 +103,26 @@ export function orreryInitials(name: string): string {
   }
   return initials.join("").toUpperCase();
 }
+/**
+ * D-47: the tier follows on-screen magnification (the frame's
+ * `labelMagnification`), not raw zoom: under the dolly camera zoom no longer
+ * means magnification. Thresholds are unchanged, and at a flat, centred Home
+ * magnification equals zoom, so the tiers there are exactly as before.
+ */
 export function semanticLevel(
-  zoom: number,
+  magnification: number,
   previous: SemanticLevel,
 ): SemanticLevel {
   "worklet";
-  if (!Number.isFinite(zoom)) return previous;
-  if (zoom >= DETAIL_ENTER || (previous === "detail" && zoom >= DETAIL_EXIT))
+  if (!Number.isFinite(magnification)) return previous;
+  if (
+    magnification >= DETAIL_ENTER ||
+    (previous === "detail" && magnification >= DETAIL_EXIT)
+  )
     return "detail";
   if (
-    zoom >= IDENTITY_ENTER ||
-    (previous !== "overview" && zoom >= IDENTITY_EXIT)
+    magnification >= IDENTITY_ENTER ||
+    (previous !== "overview" && magnification >= IDENTITY_EXIT)
   )
     return "identity";
   return "overview";
@@ -135,6 +144,12 @@ export interface LabelCandidate {
   context?: string;
   contextWidth?: number;
   contextHeight?: number;
+  /**
+   * D-47 nearest-first: nearness to the camera (larger = nearer), e.g. the
+   * projected body's camera-plane depth. Missing depths rank as equal, so
+   * candidates without it allocate exactly as before.
+   */
+  depth?: number;
 }
 export interface LabelAllocation {
   id: string;
@@ -257,14 +272,18 @@ interface RankedLabel {
   priority: number;
 }
 /**
- * The single ranking comparator: priority class, then id. Plan 05 adds D-47's
- * nearest-first key inside each priority class here, without touching the
- * indexed placement below.
+ * The single ranking comparator: priority class, then nearest-to-camera first
+ * (D-47, 38.7-05), then id (deterministic tie-break). The indexed placement
+ * below is unchanged. At tilt 0 every depth is equal, so the order is the
+ * pre-38.7 priority-then-id order.
  */
 function compareRankedLabels(a: RankedLabel, b: RankedLabel): number {
   "worklet";
+  const nearer = (b.c.depth ?? 0) - (a.c.depth ?? 0);
   return (
-    a.priority - b.priority || (a.c.id < b.c.id ? -1 : a.c.id > b.c.id ? 1 : 0)
+    a.priority - b.priority ||
+    (Number.isFinite(nearer) ? nearer : 0) ||
+    (a.c.id < b.c.id ? -1 : a.c.id > b.c.id ? 1 : 0)
   );
 }
 export function allocateLabels(

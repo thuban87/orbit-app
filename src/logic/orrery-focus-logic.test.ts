@@ -10,7 +10,12 @@ import {
   setSystemOverride,
   setSystemRules,
 } from "@/db/systems-dao";
-import { HOME_CAMERA, projectFrame } from "./orrery-camera-logic";
+import {
+  HOME_CAMERA,
+  MAX_ZOOM,
+  projectFrame,
+  tapIntent,
+} from "./orrery-camera-logic";
 import {
   createOrreryFocusController,
   focusEffectivelyOffscreen,
@@ -365,7 +370,7 @@ describe("fresh narrow contact actions", () => {
   });
 });
 
-it("resolves inclusive overlaps without depth winners, deduplicates roles and requires visible names for Profile", () => {
+it("resolves inclusive overlaps without depth winners, deduplicates roles, and a single body tap always focuses (D-60)", () => {
   const a: OrreryContactTarget = { kind: "member", id: 1, uid: "a" };
   const sun: OrreryContactTarget = { kind: "contact-sun", id: 2, uid: "b" };
   const frame = projectFrame(
@@ -378,16 +383,11 @@ it("resolves inclusive overlaps without depth winners, deduplicates roles and re
     { width: 400, height: 600 },
     1,
   );
-  const intent = resolveOrreryTap(frame, 222, 300, [a, sun], [], [a]);
+  const intent = resolveOrreryTap(frame, 222, 300, [a, sun], [a]);
   expect(intent.targets).toEqual([a, sun]);
   expect(intent.kind).toBe("group");
-  expect(resolveOrreryTap(frame, 200, 300, [a, sun], [], [a]).kind).toBe(
-    "focus",
-  );
-  expect(
-    resolveOrreryTap(frame, 200, 300, [a, sun], ["contact:1"], [a]).kind,
-  ).toBe("profile");
-  expect(resolveOrreryTap(frame, 0, 0, [a, sun], [], [a]).kind).toBe("clear");
+  expect(resolveOrreryTap(frame, 200, 300, [a, sun], [a]).kind).toBe("focus");
+  expect(resolveOrreryTap(frame, 0, 0, [a, sun], [a]).kind).toBe("clear");
   expect(reconcileFocus(a, [a], null)).toEqual(a);
   expect(reconcileFocus(a, [{ ...a, uid: "reused" }], null)).toBeNull();
   expect(focusEffectivelyOffscreen(frame, 1)).toBe(false);
@@ -395,4 +395,91 @@ it("resolves inclusive overlaps without depth winners, deduplicates roles and re
   expect(focusEffectivelyOffscreen(frame, 1)).toBe(false);
   frame.bodies[0].x = -66.01;
   expect(focusEffectivelyOffscreen(frame, 1)).toBe(true);
+});
+
+describe("D-60: no body tap ever yields Profile", () => {
+  const a: OrreryContactTarget = { kind: "member", id: 1, uid: "a" };
+  const b: OrreryContactTarget = { kind: "member", id: 2, uid: "b" };
+  const world = [
+    { id: 0, kind: "sun" as const, x: 0, y: 0, radius: 30, ringRadius: 0 },
+    {
+      id: 1,
+      kind: "contact" as const,
+      x: 0,
+      y: -40,
+      radius: 16,
+      ringRadius: 40,
+    },
+    {
+      id: 2,
+      kind: "contact" as const,
+      x: 50,
+      y: 0,
+      radius: 16,
+      ringRadius: 50,
+    },
+  ];
+  const viewport = { width: 412, height: 780 };
+  it.each([
+    [0, 1],
+    [0, 2],
+    [0, MAX_ZOOM],
+    [HOME_CAMERA.tilt ?? 0, 1],
+    [HOME_CAMERA.tilt ?? 0, MAX_ZOOM],
+  ])(
+    "tilt %s, zoom %s: a single target is focus at any magnification",
+    (tilt, zoom) => {
+      const frame = projectFrame(
+        world,
+        { ...HOME_CAMERA, tilt, zoom },
+        viewport,
+        9,
+      );
+      const body = frame.bodies[1];
+      expect(body.culled).toBe(false);
+      const intent = resolveOrreryTap(frame, body.x, body.y, [a, b], [a, b]);
+      expect(intent).toMatchObject({
+        kind: "focus",
+        ids: [1],
+        targets: [a],
+        generation: 9,
+      });
+      // tapIntent (the fallback when no resolver is supplied) agrees.
+      expect(tapIntent(frame, body.x, body.y, true).kind).toBe("focus");
+    },
+  );
+  it("a body with no current identity is never a target; group and clear are unchanged", () => {
+    const frame = projectFrame(
+      world,
+      { ...HOME_CAMERA, tilt: 0, lensShift: 1 },
+      viewport,
+      4,
+    );
+    const body = frame.bodies[1];
+    // The identity list no longer holds the drawn body's id (a removed row);
+    // stale UIDs are rejected by the controller's validation (integration).
+    expect(resolveOrreryTap(frame, body.x, body.y, [b], [a, b])).toMatchObject({
+      kind: "clear",
+      ids: [],
+      generation: 4,
+    });
+    const overlap = {
+      ...frame,
+      bodies: frame.bodies.map((row) => ({ ...row, x: body.x, y: body.y })),
+    };
+    expect(resolveOrreryTap(overlap, body.x, body.y, [a, b], [a, b]).kind).toBe(
+      "group",
+    );
+    expect(resolveOrreryTap(frame, 1, 1, [a, b], [a, b]).kind).toBe("clear");
+    // A culled (beyond the horizon) body is never a target.
+    const culled = {
+      ...frame,
+      bodies: frame.bodies.map((row) =>
+        row.id === 1 ? { ...row, culled: true, interactive: false } : row,
+      ),
+    };
+    expect(resolveOrreryTap(culled, body.x, body.y, [a, b], [a, b]).kind).toBe(
+      "clear",
+    );
+  });
 });

@@ -360,6 +360,22 @@ describe("D-52 indexed label allocator", () => {
     }
   });
 
+  it("D-47: at tilt 0 every depth is equal, so nearest-first allocations deep-equal the pre-change order", () => {
+    for (let seed = 1; seed <= 40; seed++) {
+      const random = prng(seed * 7);
+      const candidates = randomCandidates(random, Math.floor(random() * 300));
+      // A flat camera gives every body the same camera-plane depth (0 or -0).
+      const flat = candidates.map((c, i) => ({
+        ...c,
+        depth: i % 2 ? 0 : -0,
+      }));
+      const exclusions = randomObstacles(random);
+      for (const level of levels)
+        expect(allocateLabels(flat, level, viewport, exclusions)).toEqual(
+          legacyAllocateLabels(candidates, level, viewport, exclusions),
+        );
+    }
+  });
   it("matches on tightly packed edge-touching grids (inclusive edges across cells)", () => {
     const packed = Array.from({ length: 120 }, (_, index) =>
       candidate(`contact:${index}`, {
@@ -498,5 +514,67 @@ describe("D-33 Hermes-safe initials", () => {
     it.each(CASES)("%j → %j", (name, expected) => {
       expect(orreryInitials(name)).toBe(expected);
     });
+  });
+});
+
+describe("D-47 nearest-first labels (38.7-05)", () => {
+  // Two equal-priority labels that overlap: only one can be placed (no
+  // alternate slot), so the ranking decides which name shows.
+  const overlapping = (
+    patchA: Partial<LabelCandidate>,
+    patchB: Partial<LabelCandidate>,
+  ) => [
+    candidate("contact:1", { x: 100, y: 100, ...patchA }),
+    candidate("contact:2", { x: 140, y: 104, ...patchB }),
+  ];
+  const placed = (candidates: LabelCandidate[]) =>
+    allocateLabels(candidates, "identity", viewport).map((a) => a.id);
+  it("allocates the nearer of two overlapping equal-priority candidates (62° fixture depths)", () => {
+    // Camera-plane depth at 62°: positive = near side.
+    const sin62 = Math.sin((62 * Math.PI) / 180);
+    expect(
+      placed(overlapping({ depth: -300 * sin62 }, { depth: 120 * sin62 })),
+    ).toEqual(["contact:2"]);
+    expect(
+      placed(overlapping({ depth: 120 * sin62 }, { depth: -300 * sin62 })),
+    ).toEqual(["contact:1"]);
+  });
+  it("breaks equal depths by id, and an absent depth ranks as equal", () => {
+    expect(placed(overlapping({ depth: 50 }, { depth: 50 }))).toEqual([
+      "contact:1",
+    ]);
+    expect(placed(overlapping({}, {}))).toEqual(["contact:1"]);
+  });
+  it("keeps the priority class first: a focused far label beats a nearer unfocused one", () => {
+    expect(
+      placed(overlapping({ depth: 200 }, { depth: -400, focused: true })),
+    ).toEqual(["contact:2"]);
+    expect(
+      placed(overlapping({ depth: 200 }, { depth: -400, favorite: true })),
+    ).toEqual(["contact:2"]);
+  });
+});
+
+describe("D-47 tiers follow projected size (38.7-05)", () => {
+  it("semanticLevel's thresholds are unchanged when fed a magnification", () => {
+    let level: SemanticLevel = "overview";
+    const trace: SemanticLevel[] = [];
+    for (const magnification of [1, 1.99, 2, 1.9, 1.84, 2.9, 3, 2.85, 2.79]) {
+      level = semanticLevel(magnification, level);
+      trace.push(level);
+    }
+    expect(trace).toEqual([
+      "overview",
+      "overview",
+      "identity",
+      "identity",
+      "overview",
+      "identity",
+      "detail",
+      "detail",
+      "identity",
+    ]);
+    expect(IDENTITY_ENTER).toBe(2);
+    expect(DETAIL_ENTER).toBe(3);
   });
 });

@@ -55,6 +55,9 @@ interface GestureSamples {
   tiltY: number;
   tiltActive: boolean;
   tiltOriginY?: number;
+  /** D-04: where the one-finger pan touched down (anchored pan mapping). */
+  panOriginX?: number;
+  panOriginY?: number;
 }
 const initialSamples = (): GestureSamples => {
   "worklet";
@@ -237,12 +240,18 @@ export function createOrreryGestures({
     .enabled(enabled)
     .minDistance(PAN_DISTANCE)
     .maxPointers(1)
-    .onBegin(() => {
+    .onBegin((event) => {
       "worklet";
       stop();
       if (input.value.owner === "idle" || input.value.owner === "cancelled")
         input.value = beginInput(input.value, 1);
-      samples.value = { ...samples.value, panX: 0, panY: 0 };
+      samples.value = {
+        ...samples.value,
+        panX: 0,
+        panY: 0,
+        panOriginX: event?.x,
+        panOriginY: event?.y,
+      };
       if (panStart) panStart.value = pose.value;
     })
     .onTouchesDown((event) => {
@@ -266,12 +275,21 @@ export function createOrreryGestures({
       };
       if (input.value.owner !== "pan" || previous.owner === "multi") return;
       stop();
+      // D-04: the finger's previous position anchors the drag on the ground.
+      const from =
+        sample.panOriginX !== undefined && sample.panOriginY !== undefined
+          ? {
+              x: sample.panOriginX + sample.panX,
+              y: sample.panOriginY + sample.panY,
+            }
+          : undefined;
       pose.value = cameraGestureStep(
         pose.value,
         {
           kind: "pan",
           dx: event.translationX - sample.panX,
           dy: event.translationY - sample.panY,
+          from,
         },
         frame.value.viewport,
         extent,

@@ -48,7 +48,6 @@ export function resolveOrreryTap(
   x: number,
   y: number,
   identities: readonly OrreryContactTarget[],
-  visibleNames: readonly string[],
   members: readonly ContactIdentity[],
 ): OrreryIntent {
   "worklet";
@@ -74,21 +73,15 @@ export function resolveOrreryTap(
     }),
     members,
   );
-  const named = bodies.some((body) =>
-    visibleNames.includes(`${body.kind}:${body.id}`),
-  );
+  // D-60 (owner): a body tap never opens Profile. One target always focuses
+  // (an unfocused person, a different person, or the already-focused person,
+  // which the screen keeps focused); Profile opens only from the focus card.
   return {
     generation: frame.generation,
     ids: targets.map((target) => target.id),
     targets,
     kind:
-      targets.length === 0
-        ? "clear"
-        : targets.length > 1
-          ? "group"
-          : named
-            ? "profile"
-            : "focus",
+      targets.length === 0 ? "clear" : targets.length > 1 ? "group" : "focus",
   };
 }
 export function validateOrreryContactTarget(

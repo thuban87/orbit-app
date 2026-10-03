@@ -379,12 +379,14 @@ export function OrreryWorld({
       sampled,
       held?.generation === generation ? held : null,
     );
+    // D-47: moons follow the last settled tier (projected size), never a
+    // tier recomputed from raw zoom inside the projection pass.
     const moons = deriveSatelliteBodies(
       world,
       satellites,
       memberIdentities,
       true,
-      semanticLevel(sampledCamera.zoom, level.value),
+      level.value,
     );
     const completeWorld = [...world, ...moons];
     return projectAnimatedFrame(
@@ -536,10 +538,11 @@ export function OrreryWorld({
     },
     [confirmTextEcho],
   );
+  // D-47: the semantic tier follows on-screen magnification, not raw zoom.
   useAnimatedReaction(
-    () => frame.value.pose.zoom,
-    (zoom) => {
-      level.value = semanticLevel(zoom, level.value);
+    () => frame.value.labelMagnification,
+    (magnification) => {
+      level.value = semanticLevel(magnification, level.value);
     },
   );
   // M3: the tier reaches text preparation through runOnJS, only on change.
@@ -615,6 +618,8 @@ export function OrreryWorld({
               y: body.y + body.radius + LABEL_BODY_GAP,
               alternateY: body.y - body.radius - LABEL_BODY_GAP - label.height,
               opacity: body.opacity,
+              // D-47 nearest-first within a priority class.
+              depth: body.depth,
             },
           ]
         : [];
@@ -629,7 +634,7 @@ export function OrreryWorld({
       }));
     return allocateLabels(
       candidates,
-      semanticLevel(current.pose.zoom, level.value),
+      semanticLevel(current.labelMagnification, level.value),
       current.viewport,
       exclusions,
     );
@@ -694,12 +699,13 @@ export function OrreryWorld({
         },
         resolveTap: (current, x, y) => {
           "worklet";
+          // D-60: a single body tap always focuses, so visible labels no
+          // longer take part in tap resolution.
           return resolveSatelliteTap(
             current,
             x,
             y,
             identities,
-            allocations.value.map((label) => label.id),
             memberIdentities,
           );
         },
@@ -718,7 +724,6 @@ export function OrreryWorld({
       onIntent,
       interactive,
       identities,
-      allocations,
       memberIdentities,
       reorderExpectation,
       onReorder,

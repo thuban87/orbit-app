@@ -90,7 +90,6 @@ export function resolveSatelliteTap(
   x: number,
   y: number,
   identities: readonly OrreryContactTarget[],
-  visibleNames: readonly string[],
   members: readonly ContactIdentity[],
 ): OrreryIntent {
   "worklet";
@@ -99,7 +98,6 @@ export function resolveSatelliteTap(
     x,
     y,
     identities,
-    visibleNames,
     members,
   );
   const moons = frame.bodies.filter(

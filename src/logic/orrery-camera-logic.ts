@@ -49,6 +49,36 @@ export const HOME_STRATEGY_TOP_MARGIN = 24;
 export const HOME_STRATEGY_MAX_HALF_SPAN = 0.6;
 /** Strategy Home never dollies in past this zoom (Lab C used MAX_ZOOM). */
 export const HOME_STRATEGY_MAX_ZOOM = 4;
+/**
+ * D-48/D-16: minimum ON-SCREEN body diameters (logical px, Lab C). A body
+ * that would project smaller is inflated in the projection itself, so the
+ * drawn radius, the hit radius and the label gap all agree.
+ */
+export const MIN_CONTACT_PX = 18;
+export const MIN_SATELLITE_PX = 10;
+export const MIN_SUN_PX = 34;
+/**
+ * D-06 near-side cap (Lab B CLAMP), people and moons only (the sun is the
+ * anchor). Perspective may grow a body by at most this fraction above its
+ * pivot-depth size; far-side shrink is untouched.
+ */
+export const NEAR_PERSPECTIVE_KNEE = 0.06;
+/** Near-side drawn radius asymptote, as a fraction of the viewport short side. */
+export const NEAR_RADIUS_FRACTION = 0.08;
+/** Where that cap starts to bend (fraction of the asymptote). */
+export const NEAR_RADIUS_KNEE = 0.7;
+/**
+ * D-04 pan: a drag anchors at the touched ground point only while that point
+ * projects with at least this perspective scale (well below the horizon);
+ * nearer the horizon the drag falls back to the centre-anchored mapping.
+ */
+export const PAN_HORIZON_MIN_PERSPECTIVE = 0.4;
+/**
+ * D-04 pan: one gesture update moves the pivot at most this many screen points
+ * at pivot depth (PAN_MAX_STEP_POINTS / zoom world units), so a drag near the
+ * far rim or the horizon can never fling the map. Real updates are ~5-30 pt.
+ */
+export const PAN_MAX_STEP_POINTS = 160;
 
 export interface WorldPoint {
   x: number;
@@ -112,6 +142,11 @@ export interface ProjectedBody extends WorldBody {
   worldRingRadius: number;
   /** True when the centre is beyond the horizon: radius 0, never tappable. */
   culled: boolean;
+  /**
+   * D-47: on-screen magnification of the body (zoom × perspective), before
+   * the near cap and min-size inflation; 0 when culled. Equals zoom at tilt 0.
+   */
+  magnification: number;
 }
 export interface ProjectedFrame {
   generation: number;
@@ -120,6 +155,12 @@ export interface ProjectedFrame {
   bodies: ProjectedBody[];
   /** The projected world origin; null when it is beyond the horizon. */
   center: WorldPoint | null;
+  /**
+   * D-47: the semantic-tier input — the median magnification of the visible,
+   * interactive contacts (pose.zoom when there are none). At a flat, centred
+   * Home it equals pose.zoom, so tiers behave exactly as before 38.7.
+   */
+  labelMagnification: number;
 }
 export const IDENTITY_ZOOM = 2;
 export const FOCUS_MS = 300;
@@ -170,6 +211,51 @@ function poseFocal(pose: CameraPose): number {
 function poseLensShift(pose: CameraPose): number {
   "worklet";
   return clamp(pose.lensShift ?? 1, MIN_LENS_SHIFT, MAX_LENS_SHIFT, 1);
+}
+/** Soft knee: identity up to `knee`, tanh-compressed toward `cap` above. */
+function softCap(value: number, knee: number, cap: number): number {
+  "worklet";
+  if (!(value > knee) || cap <= knee) return value;
+  const span = cap - knee;
+  return knee + span * Math.tanh((value - knee) / span);
+}
+/**
+ * D-48/D-06/D-16: THE size mechanism — the projected radius of a body with
+ * world radius `worldRadius` at perspective scale `perspective`.
+ * 1. near cap (people and moons): perspective growth above the pivot-depth
+ *    size is limited to NEAR_PERSPECTIVE_KNEE and then soft-capped toward
+ *    NEAR_RADIUS_FRACTION of the short side (never below the pivot size, so a
+ *    zoomed-in focus keeps its magnification);
+ * 2. minimum on-screen size by kind.
+ * projectFrame, its hit radius and frameBodies all use this one function.
+ */
+export function projectedBodyRadius(
+  kind: WorldBody["kind"],
+  worldRadius: number,
+  zoom: number,
+  perspective: number,
+  shortSide: number,
+): number {
+  "worklet";
+  const pivot = worldRadius * zoom;
+  // Same operation order as the pre-38.7 radius (r · (zoom · perspective)).
+  let radius = worldRadius * (zoom * perspective);
+  if (kind !== "sun" && perspective > 1) {
+    const grown =
+      pivot *
+      (1 +
+        NEAR_PERSPECTIVE_KNEE *
+          Math.tanh((perspective - 1) / NEAR_PERSPECTIVE_KNEE));
+    const cap = shortSide * NEAR_RADIUS_FRACTION;
+    radius = Math.max(pivot, softCap(grown, cap * NEAR_RADIUS_KNEE, cap));
+  }
+  const minimum =
+    (kind === "sun"
+      ? MIN_SUN_PX
+      : kind === "satellite"
+        ? MIN_SATELLITE_PX
+        : MIN_CONTACT_PX) / 2;
+  return Math.max(radius, minimum);
 }
 export function worldExtent(world: readonly WorldBody[]): number {
   "worklet";
@@ -729,6 +815,7 @@ export function frameBodies(
     x: usable.x + usable.width / 2,
     y: usable.y + usable.height / 2,
   };
+  const shortSide = Math.min(viewport.width, viewport.height);
   const bounds = (pose: CameraPose) => {
     "worklet";
     const basis = projectionBasis(pose, viewport);
@@ -740,7 +827,16 @@ export function frameBodies(
       const point = tryProjectWithBasis(basis, body.x, body.y);
       const scale = basisPerspectiveScale(basis, body.x, body.y);
       if (!point || scale === null) return null;
-      const radius = Math.max(MIN_HIT_RADIUS, body.radius * pose.zoom * scale);
+      const radius = Math.max(
+        MIN_HIT_RADIUS,
+        projectedBodyRadius(
+          body.kind,
+          body.radius,
+          pose.zoom,
+          scale,
+          shortSide,
+        ),
+      );
       left = Math.min(left, point.x - radius);
       right = Math.max(right, point.x + radius);
       top = Math.min(top, point.y - radius);
@@ -800,7 +896,7 @@ export function frameBodies(
   let low = MIN_ZOOM,
     high = MAX_ZOOM,
     result = candidate(low);
-  if (!result || !result.fits) return result;
+  if (!result?.fits) return result;
   const maximum = candidate(high);
   if (maximum?.fits) return maximum;
   for (let i = 0; i < 36; i++) {
@@ -869,81 +965,111 @@ export function projectFrame(
   );
   // D-52: one basis per frame for the centre, every body and every ring point.
   const basis = projectionBasis(current, viewport);
+  const shortSide = Math.min(viewport.width, viewport.height);
+  const bodies = world.map((body): ProjectedBody => {
+    let ringPath: WorldPoint[] = [];
+    const ringBreaks: number[] = [];
+    let ringClosed = false;
+    if (ringPaths && body.ringRadius > 0) {
+      const samples: (WorldPoint | null)[] = [];
+      let firstGap = -1;
+      for (let i = 0; i < RING_SEGMENTS; i++) {
+        const angle = (i * 2 * Math.PI) / RING_SEGMENTS;
+        const sample = tryProjectWithBasis(
+          basis,
+          body.ringRadius * Math.sin(angle),
+          -body.ringRadius * Math.cos(angle),
+        );
+        samples.push(sample);
+        if (!sample && firstGap < 0) firstGap = i;
+      }
+      if (firstGap < 0) {
+        // Every sample is present: the sample list IS the closed ring.
+        ringPath = samples as WorldPoint[];
+        ringClosed = true;
+      } else {
+        // Start right after a gap so the visible arc is one run in order.
+        let penDown = false;
+        for (let k = 1; k <= RING_SEGMENTS; k++) {
+          const sample = samples[(firstGap + k) % RING_SEGMENTS];
+          if (!sample) {
+            penDown = false;
+            continue;
+          }
+          if (!penDown && ringPath.length) ringBreaks.push(ringPath.length);
+          ringPath.push(sample);
+          penDown = true;
+        }
+      }
+    }
+    const depth = cameraPlane(body, current).y * Math.sin(current.tilt ?? 0);
+    const point = tryProjectWithBasis(basis, body.x, body.y);
+    const perspective = basisPerspectiveScale(basis, body.x, body.y);
+    if (!point || perspective === null)
+      return {
+        ...body,
+        x: CULLED_POSITION,
+        y: CULLED_POSITION,
+        radius: 0,
+        ringRadius: body.ringRadius * current.zoom,
+        worldRingRadius: body.ringRadius,
+        hitRadius: 0,
+        interactive: false,
+        culled: true,
+        ringPath,
+        ringBreaks,
+        ringClosed,
+        depth,
+        magnification: 0,
+      };
+    // D-48: one size mechanism; the hit radius derives from the SAME radius.
+    const radius = projectedBodyRadius(
+      body.kind,
+      body.radius,
+      current.zoom,
+      perspective,
+      shortSide,
+    );
+    return {
+      ...body,
+      ...point,
+      radius,
+      ringRadius: body.ringRadius * current.zoom,
+      worldRingRadius: body.ringRadius,
+      hitRadius: Math.max(MIN_HIT_RADIUS, radius),
+      culled: false,
+      ringPath,
+      ringBreaks,
+      ringClosed,
+      depth,
+      magnification: current.zoom * perspective,
+    };
+  });
+  // D-47: median magnification of the on-screen, interactive contacts.
+  const magnifications: number[] = [];
+  for (const body of bodies) {
+    const reach = body.radius * 1.3;
+    if (
+      body.kind === "contact" &&
+      !body.culled &&
+      body.interactive !== false &&
+      body.x + reach >= 0 &&
+      body.y + reach >= 0 &&
+      body.x - reach <= viewport.width &&
+      body.y - reach <= viewport.height
+    )
+      magnifications.push(body.magnification);
+  }
+  magnifications.sort((a, b) => a - b);
   return {
     generation,
     pose: current,
     viewport,
     center: tryProjectWithBasis(basis, 0, 0),
-    bodies: world.map((body) => {
-      let ringPath: WorldPoint[] = [];
-      const ringBreaks: number[] = [];
-      let ringClosed = false;
-      if (ringPaths && body.ringRadius > 0) {
-        const samples: (WorldPoint | null)[] = [];
-        let firstGap = -1;
-        for (let i = 0; i < RING_SEGMENTS; i++) {
-          const angle = (i * 2 * Math.PI) / RING_SEGMENTS;
-          const sample = tryProjectWithBasis(
-            basis,
-            body.ringRadius * Math.sin(angle),
-            -body.ringRadius * Math.cos(angle),
-          );
-          samples.push(sample);
-          if (!sample && firstGap < 0) firstGap = i;
-        }
-        if (firstGap < 0) {
-          // Every sample is present: the sample list IS the closed ring.
-          ringPath = samples as WorldPoint[];
-          ringClosed = true;
-        } else {
-          // Start right after a gap so the visible arc is one run in order.
-          let penDown = false;
-          for (let k = 1; k <= RING_SEGMENTS; k++) {
-            const sample = samples[(firstGap + k) % RING_SEGMENTS];
-            if (!sample) {
-              penDown = false;
-              continue;
-            }
-            if (!penDown && ringPath.length) ringBreaks.push(ringPath.length);
-            ringPath.push(sample);
-            penDown = true;
-          }
-        }
-      }
-      const depth = cameraPlane(body, current).y * Math.sin(current.tilt ?? 0);
-      const point = tryProjectWithBasis(basis, body.x, body.y);
-      const perspective = basisPerspectiveScale(basis, body.x, body.y);
-      if (!point || perspective === null)
-        return {
-          ...body,
-          x: CULLED_POSITION,
-          y: CULLED_POSITION,
-          radius: 0,
-          ringRadius: body.ringRadius * current.zoom,
-          worldRingRadius: body.ringRadius,
-          hitRadius: 0,
-          interactive: false,
-          culled: true,
-          ringPath,
-          ringBreaks,
-          ringClosed,
-          depth,
-        };
-      const scale = current.zoom * perspective;
-      return {
-        ...body,
-        ...point,
-        radius: body.radius * scale,
-        ringRadius: body.ringRadius * current.zoom,
-        worldRingRadius: body.ringRadius,
-        hitRadius: Math.max(MIN_HIT_RADIUS, body.radius * scale),
-        culled: false,
-        ringPath,
-        ringBreaks,
-        ringClosed,
-        depth,
-      };
-    }),
+    bodies,
+    labelMagnification: magnifications.length
+      ? magnifications[Math.floor(magnifications.length / 2)]
+      : current.zoom,
   };
 }
 export function collectHitCandidates(
@@ -994,9 +1120,8 @@ export function tapIntent(
         ? "clear"
         : ids.length > 1
           ? "group"
-          : frame.pose.zoom >= IDENTITY_ZOOM
-            ? "profile"
-            : "focus",
+          : // D-60: a body tap never opens Profile (only the focus card does).
+            "focus",
   };
 }
 
@@ -1004,37 +1129,91 @@ export function tapIntent(
 export interface CameraCell<T> {
   value: T;
 }
+/**
+ * D-04: one-finger pan. With `from` (the finger's screen position before this
+ * update) the drag is anchored at the touched ground point: that world point
+ * stays under the finger, exactly, while it projects with at least
+ * PAN_HORIZON_MIN_PERSPECTIVE. Near or above the horizon, or without `from`
+ * (coast), it falls back to the pre-38.7 centre-anchored mapping. Either way
+ * one update moves the pivot at most PAN_MAX_STEP_POINTS (pivot-depth points).
+ */
 export function panCamera(
   start: CameraPose,
   dx: number,
   dy: number,
   extent: number,
   viewport?: CameraViewport,
+  from?: WorldPoint,
 ): CameraPose {
   "worklet";
+  if (!Number.isFinite(dx) || !Number.isFinite(dy))
+    return clampCameraPose(start, extent);
   if (viewport) {
-    const center = projectionCenter(viewport, start);
-    const focal = poseFocal(start),
-      tilt = start.tilt ?? 0;
-    const reach = 2 * Math.SQRT2 * Math.max(1, extent);
-    const minY =
-      (-reach * Math.cos(tilt) * focal) / (focal + reach * Math.sin(tilt));
-    // Under the dolly the near reach can lie behind the camera; the near side
-    // of the inverse is then unbounded (it never crosses the horizon).
-    const nearDenominator = focal - reach * Math.sin(tilt);
-    const maxY =
-      nearDenominator > 0
-        ? (reach * Math.cos(tilt) * focal) / nearDenominator
-        : Number.POSITIVE_INFINITY;
-    // Restrict gesture sampling to the reachable plane before inverse math;
-    // projection itself is never patched with a denominator clamp.
-    const sampleY = clamp(-dy / start.zoom, minY, maxY, 0);
-    const anchor = unprojectToWorldPlane(
-      { x: center.x - dx, y: center.y + sampleY * start.zoom },
-      start,
-      viewport,
+    let deltaX = 0,
+      deltaY = 0,
+      anchored = false;
+    if (from && Number.isFinite(from.x) && Number.isFinite(from.y)) {
+      const grabbed = tryUnprojectToWorldPlane(from, start, viewport);
+      const target = tryUnprojectToWorldPlane(
+        { x: from.x + dx, y: from.y + dy },
+        start,
+        viewport,
+      );
+      if (grabbed && target) {
+        const basis = projectionBasis(start, viewport);
+        const grabbedScale = basisPerspectiveScale(basis, grabbed.x, grabbed.y);
+        const targetScale = basisPerspectiveScale(basis, target.x, target.y);
+        if (
+          grabbedScale !== null &&
+          targetScale !== null &&
+          grabbedScale >= PAN_HORIZON_MIN_PERSPECTIVE &&
+          targetScale >= PAN_HORIZON_MIN_PERSPECTIVE
+        ) {
+          // A pivot translation translates every unprojection equally, so
+          // moving the pivot by (grabbed − target) puts `grabbed` under the
+          // finger's new position.
+          deltaX = grabbed.x - target.x;
+          deltaY = grabbed.y - target.y;
+          anchored = true;
+        }
+      }
+    }
+    if (!anchored) {
+      const center = projectionCenter(viewport, start);
+      const focal = poseFocal(start),
+        tilt = start.tilt ?? 0;
+      const reach = 2 * Math.SQRT2 * Math.max(1, extent);
+      const minY =
+        (-reach * Math.cos(tilt) * focal) / (focal + reach * Math.sin(tilt));
+      // Under the dolly the near reach can lie behind the camera; the near side
+      // of the inverse is then unbounded (it never crosses the horizon).
+      const nearDenominator = focal - reach * Math.sin(tilt);
+      const maxY =
+        nearDenominator > 0
+          ? (reach * Math.cos(tilt) * focal) / nearDenominator
+          : Number.POSITIVE_INFINITY;
+      // Restrict gesture sampling to the reachable plane before inverse math;
+      // projection itself is never patched with a denominator clamp.
+      const sampleY = clamp(-dy / start.zoom, minY, maxY, 0);
+      const anchor = tryUnprojectToWorldPlane(
+        { x: center.x - dx, y: center.y + sampleY * start.zoom },
+        start,
+        viewport,
+      );
+      if (!anchor) return clampCameraPose(start, extent);
+      deltaX = anchor.x - start.x;
+      deltaY = anchor.y - start.y;
+    }
+    const step = Math.hypot(deltaX, deltaY);
+    const maxStep = PAN_MAX_STEP_POINTS / start.zoom;
+    if (step > maxStep) {
+      deltaX *= maxStep / step;
+      deltaY *= maxStep / step;
+    }
+    return clampCameraPose(
+      { ...start, x: start.x + deltaX, y: start.y + deltaY },
+      extent,
     );
-    return clampCameraPose({ ...start, x: anchor.x, y: anchor.y }, extent);
   }
   return constrainCamera(
     { ...start, x: start.x - dx / start.zoom, y: start.y - dy / start.zoom },

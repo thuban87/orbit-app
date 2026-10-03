@@ -360,7 +360,10 @@ describe("production Orrery native tree and resource contracts", () => {
     expect(nameLayer.type).toBe("skLayer");
     const alpha = nameLayer.children[0].props.opacity as { value: number };
     expect(alpha.value).toBe(0);
-    pose.value = { ...pose.value, yaw: 0, zoom: 2 };
+    // D-47: the tier follows on-screen magnification. This contact sits on
+    // the far side of a 0.5 rad tilt, so zoom 2.4 is what magnifies it past
+    // IDENTITY_ENTER (zoom 2 leaves it at ≈1.83, still overview).
+    pose.value = { ...pose.value, yaw: 0, zoom: 2.4 };
     // 38.7-04 M3: the identity tier reaches the text publisher through UI
     // reactions; only then does the (unfocused) label get a Paragraph.
     flushUi();

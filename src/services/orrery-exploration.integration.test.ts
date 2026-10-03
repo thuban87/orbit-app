@@ -31,7 +31,14 @@ import {
 import { commitRingReorder, type RingReorderRequest } from "@/db/ring-seq-dao";
 import { snoozeContact } from "@/db/snooze-dao";
 import type { SqlExecutor } from "@/db/types";
-import { HOME_CAMERA, projectFrame } from "@/logic/orrery-camera-logic";
+import {
+  deriveHomePose,
+  frameBodies,
+  HOME_CAMERA,
+  HOME_PROFILES,
+  IDENTITY_ZOOM,
+  projectFrame,
+} from "@/logic/orrery-camera-logic";
 import {
   createOrreryFocusController,
   type OrreryContactTarget,
@@ -286,6 +293,124 @@ describe("Orrery production exploration integration", () => {
     },
   );
 
+  it("D-60 end to end at the tilted Home: taps focus (again, and at identity zoom) and re-focus; Profile only from the card", async () => {
+    const a = await person(exec, "Ada");
+    // A quarter interval later, so B sits a quarter turn from A.
+    const bUid = randomUUID();
+    const { contactId: bId } = await createContactFull(exec, {
+      uid: bUid,
+      name: "Bea",
+      intervalDays: 10,
+      now: NOW,
+      firstInteraction: {
+        uid: randomUUID(),
+        occurredAt: "2026-09-03 00:00:00",
+      },
+    });
+    const phone = { width: 412, height: 780 };
+    let scene = await loadOrreryScene(exec, 1);
+    const io = focusHarness(exec, () => scene);
+    const identitiesOf = (current: OrrerySceneSnapshot) => ({
+      identities: current.systemSnapshot.members.map((row) => ({
+        kind: "member" as const,
+        id: row.id,
+        uid: row.uid,
+      })),
+      // OrreryWorld's tap worklet argument shape: {id, uid} member identities.
+      members: current.systemSnapshot.members.map(({ id, uid }) => ({
+        id,
+        uid,
+      })),
+    });
+    // 1. Tilted Home (62°): tap A → focus.
+    const home = deriveHomePose(scene.world, phone)!;
+    expect(home.tilt).toBeCloseTo(HOME_PROFILES.tilted.tilt, 12);
+    const homeFrame = projectFrame(scene.world, home, phone, scene.generation, {
+      extent: scene.extent,
+    });
+    const atHome = homeFrame.bodies.find((row) => row.id === a.id)!;
+    expect(atHome.culled).toBe(false);
+    let shape = identitiesOf(scene);
+    const first = resolveSatelliteTap(
+      homeFrame,
+      atHome.x,
+      atHome.y,
+      shape.identities,
+      shape.members,
+    );
+    expect(first).toMatchObject({ kind: "focus", ids: [a.id], generation: 1 });
+    await io.controller.dispatch(first);
+    // 2. Zoom in (new generation) until A is magnified past IDENTITY_ZOOM, then
+    // tap A again: still focus, for A's id/uid, stamped with the new frame.
+    scene = await loadOrreryScene(exec, 2);
+    shape = identitiesOf(scene);
+    const pair = scene.world.filter((row) => row.id === a.id || row.id === bId);
+    const framed = frameBodies(pair, phone, scene.extent, home)!;
+    const zoomed = projectFrame(
+      scene.world,
+      framed.pose,
+      phone,
+      scene.generation,
+      { extent: scene.extent },
+    );
+    const bodyA = zoomed.bodies.find((row) => row.id === a.id)!;
+    const bodyB = zoomed.bodies.find((row) => row.id === bId)!;
+    expect(bodyA.magnification).toBeGreaterThanOrEqual(IDENTITY_ZOOM);
+    const again = resolveSatelliteTap(
+      zoomed,
+      bodyA.x,
+      bodyA.y,
+      shape.identities,
+      shape.members,
+    );
+    expect(again).toMatchObject({
+      kind: "focus",
+      ids: [a.id],
+      targets: [{ kind: "member", id: a.id, uid: a.uid }],
+      generation: 2,
+    });
+    await io.controller.dispatch(again);
+    // 3. Tap B in that frame → re-focus on B.
+    const other = resolveSatelliteTap(
+      zoomed,
+      bodyB.x,
+      bodyB.y,
+      shape.identities,
+      shape.members,
+    );
+    expect(other).toMatchObject({ kind: "focus", ids: [bId], generation: 2 });
+    await io.controller.dispatch(other);
+    expect(io.focus.mock.calls.map(([targets]) => targets[0].id)).toEqual([
+      a.id,
+      a.id,
+      bId,
+    ]);
+    expect(io.openProfile).not.toHaveBeenCalled();
+    // 4. The focus card's "Open Profile" intent (OrreryScreen onProfile shape)
+    // is the only way to Profile; stale generation or uid never opens it.
+    const target = { kind: "member" as const, id: bId, uid: bUid };
+    await io.controller.dispatch({
+      kind: "profile",
+      ids: [bId],
+      targets: [target],
+      generation: 1,
+    });
+    await io.controller.dispatch({
+      kind: "profile",
+      ids: [bId],
+      targets: [{ ...target, uid: "stale" }],
+      generation: 2,
+    });
+    expect(io.openProfile).not.toHaveBeenCalled();
+    await io.controller.dispatch({
+      kind: "profile",
+      ids: [bId],
+      targets: [target],
+      generation: 2,
+    });
+    expect(io.openProfile).toHaveBeenCalledExactlyOnceWith(bId);
+  });
+
   it("a coherent scene blocks a queued recency writer until its snapshot releases", async () => {
     const contact = await person(exec, "未連絡", false);
     const entered = deferred(),
@@ -395,22 +520,23 @@ describe("Orrery production exploration integration", () => {
           body.x,
           body.y,
           identities,
-          [],
           scene.systemSnapshot.members,
         ),
       );
       expect(io.focus).toHaveBeenCalledWith([target]);
+      // D-60: tapping the (labelled) sun again keeps focus; never Profile.
       await io.controller.dispatch(
         resolveOrreryTap(
           frame,
           body.x,
           body.y,
           identities,
-          [`sun:${sun.id}`],
           scene.systemSnapshot.members,
         ),
       );
-      expect(io.openProfile).toHaveBeenCalledExactlyOnceWith(sun.id);
+      expect(io.focus).toHaveBeenCalledTimes(2);
+      expect(io.focus).toHaveBeenLastCalledWith([target]);
+      expect(io.openProfile).not.toHaveBeenCalled();
       const overlap = {
         ...frame,
         bodies: frame.bodies.map((row) => ({ ...row, x: body.x, y: body.y })),
@@ -420,7 +546,6 @@ describe("Orrery production exploration integration", () => {
         body.x,
         body.y,
         identities,
-        [],
         scene.systemSnapshot.members,
       );
       expect(ambiguous.ids).toEqual([member.id, sun.id]);
@@ -440,7 +565,6 @@ describe("Orrery production exploration integration", () => {
           moonFrame.bodies[0].x,
           moonFrame.bodies[0].y,
           identities,
-          [],
           scene.systemSnapshot.members,
         ).kind,
       ).toBe("clear");
@@ -473,7 +597,9 @@ describe("Orrery production exploration integration", () => {
         ids: [sun.id],
         targets: [target],
       });
-      expect(io.openProfile).toHaveBeenCalledTimes(1);
+      // The card intent for a sun that is no longer the sun is rejected; no
+      // body tap ever opened Profile before it (D-60).
+      expect(io.openProfile).not.toHaveBeenCalled();
       expect(io.reject).toHaveBeenLastCalledWith("removed");
     },
   );

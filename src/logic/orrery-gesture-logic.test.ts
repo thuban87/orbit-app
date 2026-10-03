@@ -1,10 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { createOrreryGestures } from "@/components/orrery/use-orrery-camera";
 import {
+  type CameraPose,
   clampCameraPose,
+  DOLLY_FOCAL_PX,
+  HOME_CAMERA,
+  HOME_PROFILES,
   MAX_USER_TILT,
+  PAN_MAX_STEP_POINTS,
   projectWorldPoint,
   unprojectToWorldPlane,
+  type WorldPoint,
 } from "./orrery-camera-logic";
 import {
   beginInput,
@@ -65,6 +71,7 @@ describe("camera input ownership", () => {
           viewport,
           bodies: [],
           center: { x: 200, y: 300 },
+          labelMagnification: 1,
         };
       },
     };
@@ -229,5 +236,178 @@ describe("camera input ownership", () => {
         extent,
       ),
     ).toEqual(tilted);
+  });
+});
+
+describe("38.7-05 D-04: one-finger pan mapping at 0°, 45° and 62°", () => {
+  const phone = {
+    width: 412,
+    height: 780,
+    usable: { x: 0, y: 64, width: 412, height: 620 },
+  };
+  const panExtent = 3000;
+  const tilts = [0, Math.PI / 4, HOME_PROFILES.tilted.tilt];
+  /** A drag as the gesture delivers it: small steps, each from the finger. */
+  const drag = (
+    start: CameraPose,
+    from: WorldPoint,
+    dx: number,
+    dy: number,
+    steps = 10,
+  ) => {
+    let pose = start;
+    for (let i = 0; i < steps; i++)
+      pose = cameraGestureStep(
+        pose,
+        {
+          kind: "pan",
+          dx: dx / steps,
+          dy: dy / steps,
+          from: { x: from.x + (dx * i) / steps, y: from.y + (dy * i) / steps },
+        },
+        phone,
+        panExtent,
+      );
+    return pose;
+  };
+  it.each(tilts)(
+    "tilt %s: a 100 px drag starting at the pivot moves the pivot 100 px ± 1",
+    (tilt) => {
+      const pose = clampCameraPose(
+        { ...HOME_CAMERA, tilt, zoom: 0.8, yaw: 0.3, x: 40, y: -60 },
+        panExtent,
+      );
+      const pivot = { x: pose.x, y: pose.y };
+      const at = projectWorldPoint(pivot, pose, phone);
+      for (const [dx, dy] of [
+        [100, 0],
+        [0, 100],
+        [0, -100],
+        [-70.71, 70.71],
+      ]) {
+        const moved = projectWorldPoint(pivot, drag(pose, at, dx, dy), phone);
+        expect(Math.abs(moved.x - (at.x + dx))).toBeLessThanOrEqual(1);
+        expect(Math.abs(moved.y - (at.y + dy))).toBeLessThanOrEqual(1);
+      }
+    },
+  );
+  it.each(tilts)(
+    "tilt %s: a drag starting halfway to the far rim keeps the touched content within ±25 % of the finger",
+    (tilt) => {
+      const rim = 720; // a ~20-ring System at Balanced spacing
+      const pose = clampCameraPose(
+        { ...HOME_CAMERA, tilt, zoom: 0.7 },
+        panExtent,
+      );
+      const pivot = projectWorldPoint({ x: 0, y: 0 }, pose, phone);
+      const far = projectWorldPoint({ x: 0, y: -rim }, pose, phone);
+      const start = { x: pivot.x, y: (pivot.y + far.y) / 2 };
+      const touched = unprojectToWorldPlane(start, pose, phone);
+      for (const [dx, dy] of [
+        [100, 0],
+        [0, 100],
+        [60, -80],
+      ]) {
+        const moved = projectWorldPoint(
+          touched,
+          drag(pose, start, dx, dy),
+          phone,
+        );
+        expect(
+          Math.hypot(moved.x - (start.x + dx), moved.y - (start.y + dy)),
+        ).toBeLessThanOrEqual(0.25 * Math.hypot(dx, dy));
+      }
+    },
+  );
+  it.each(tilts)(
+    "tilt %s: no update moves the pivot more than the capped step, and a drag from above the horizon never throws",
+    (tilt) => {
+      const pose = clampCameraPose(
+        { ...HOME_CAMERA, tilt, zoom: 1.3 },
+        panExtent,
+      );
+      const cap = PAN_MAX_STEP_POINTS / pose.zoom + 1e-9;
+      const step = (from: WorldPoint | undefined, dx: number, dy: number) => {
+        const next = cameraGestureStep(
+          pose,
+          { kind: "pan", dx, dy, from },
+          phone,
+          panExtent,
+        );
+        expect(Object.values(next).every(Number.isFinite)).toBe(true);
+        expect(
+          Math.hypot(next.x - pose.x, next.y - pose.y),
+        ).toBeLessThanOrEqual(cap);
+        return next;
+      };
+      step({ x: 206, y: 300 }, 4000, -3000);
+      step(undefined, 0, 5000);
+      if (tilt > 0) {
+        // The horizon line: DOLLY_FOCAL_PX · cot(tilt) above the pivot.
+        const pivot = projectWorldPoint({ x: 0, y: 0 }, pose, phone);
+        const horizon = pivot.y - DOLLY_FOCAL_PX / Math.tan(tilt);
+        for (const [dx, dy] of [
+          [0, 100],
+          [0, -100],
+          [80, 20],
+        ])
+          step({ x: 206, y: horizon - 30 }, dx, dy);
+        // Just below the horizon (perspective < the anchor minimum): fallback.
+        step({ x: 206, y: horizon + 2 }, 0, 40);
+      }
+    },
+  );
+  it("the registered pan adapter anchors at the touch-down point", () => {
+    const pose = {
+      value: clampCameraPose(
+        { ...HOME_CAMERA, tilt: HOME_PROFILES.tilted.tilt, zoom: 0.9 },
+        panExtent,
+      ),
+    };
+    const frame = {
+      get value() {
+        return {
+          generation: 1,
+          pose: pose.value,
+          viewport: phone,
+          bodies: [],
+          center: null,
+          labelMagnification: 1,
+        };
+      },
+    };
+    const input = { value: initialInput() };
+    const samples = {
+      value: {
+        panX: 0,
+        panY: 0,
+        scale: 1,
+        rotation: 0,
+        tiltY: 0,
+        tiltActive: false,
+      },
+    };
+    type Native = { handlers: Record<string, (...args: unknown[]) => void> };
+    const tree = createOrreryGestures({
+      pose,
+      frame,
+      extent: panExtent,
+      send: vi.fn(),
+      stop: vi.fn(),
+      camera: { input, samples, live: { value: true } },
+    }) as unknown as { gestures: [Native, { gestures: Native[] }] };
+    const pan = tree.gestures[1].gestures[0];
+    const down = { x: 150, y: 330 };
+    const touched = unprojectToWorldPlane(down, pose.value, phone);
+    pan.handlers.onBegin(down);
+    for (let i = 1; i <= 8; i++)
+      pan.handlers.onUpdate({
+        numberOfPointers: 1,
+        translationX: i * 6,
+        translationY: i * 9,
+      });
+    const moved = projectWorldPoint(touched, pose.value, phone);
+    expect(moved.x).toBeCloseTo(down.x + 48, 6);
+    expect(moved.y).toBeCloseTo(down.y + 72, 6);
   });
 });

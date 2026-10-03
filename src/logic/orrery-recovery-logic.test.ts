@@ -3,12 +3,14 @@ import {
   basisPerspectiveScale,
   clampCameraPose,
   HOME_CAMERA,
+  HOME_PROFILES,
   projectionBasis,
   projectWorldPoint,
   tryProjectWorldPoint,
 } from "./orrery-camera-logic";
 import {
   type CameraRecovery,
+  COAST_MS,
   createCameraMotion,
   inertiaTarget,
   type MotionRequest,
@@ -171,6 +173,7 @@ describe("bounded camera recovery", () => {
         viewport,
         bodies: [],
         center: { x: 200, y: 300 },
+        labelMagnification: 1,
       },
       extent,
     );
@@ -182,6 +185,7 @@ describe("bounded camera recovery", () => {
         viewport,
         bodies: [],
         center: { x: 200, y: 300 },
+        labelMagnification: 1,
       },
       extent,
     );
@@ -200,6 +204,7 @@ describe("bounded camera recovery", () => {
           viewport,
           bodies: [],
           center: tryProjectWorldPoint({ x: 0, y: 0 }, pose, viewport),
+          labelMagnification: 1,
         },
         e,
       );
@@ -215,4 +220,49 @@ describe("bounded camera recovery", () => {
         ).toBeNull();
     }
   });
+});
+
+describe("38.7-05 D-05: a small but perceptible pan coast", () => {
+  it.each([0, Math.PI / 4, HOME_PROFILES.tilted.tilt])(
+    "tilt %s: a 2,000 px/s fling coasts more than 0 and at most the bound; reduced motion does not coast",
+    (tilt) => {
+      const viewport = { width: 412, height: 780 };
+      const start = clampCameraPose(
+        { ...HOME_CAMERA, tilt, zoom: 0.9 },
+        extent,
+      );
+      const pivot = { x: start.x, y: start.y };
+      const before = projectWorldPoint(pivot, start, viewport);
+      for (const [vx, vy] of [
+        [2000, 0],
+        [0, 2000],
+        [-1414, 1414],
+      ]) {
+        const next = inertiaTarget(
+          start,
+          "pan",
+          vx,
+          vy,
+          extent,
+          viewport,
+          false,
+        );
+        const after = projectWorldPoint(pivot, next, viewport);
+        const moved = Math.hypot(after.x - before.x, after.y - before.y);
+        expect(moved).toBeGreaterThan(0);
+        expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(
+          PAN_COAST_POINTS + 1e-6,
+        );
+        expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(
+          PAN_COAST_POINTS + 1e-6,
+        );
+        expect(
+          inertiaTarget(start, "pan", vx, vy, extent, viewport, true),
+        ).toEqual(start);
+      }
+      // A typical fling now visibly coasts (pre-38.7: 120 ms / 18 points).
+      expect(COAST_MS).toBeGreaterThan(120);
+      expect(PAN_COAST_POINTS).toBeGreaterThan(18);
+    },
+  );
 });

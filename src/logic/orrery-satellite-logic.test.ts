@@ -101,14 +101,9 @@ describe("subordinate relationship bodies", () => {
       2,
     );
     const moon = current.bodies.find((b) => b.kind === "satellite")!;
-    const intent = resolveSatelliteTap(
-      current,
-      moon.x,
-      moon.y,
-      identities,
-      [],
-      [parent],
-    );
+    const intent = resolveSatelliteTap(current, moon.x, moon.y, identities, [
+      parent,
+    ]);
     expect(intent.kind).toBe("satellite");
     expect(intent.ids).toEqual([]);
     expect(intent.targets).toBeUndefined();
@@ -135,14 +130,9 @@ describe("subordinate relationship bodies", () => {
     const moon = frame.bodies[1];
     moon.x = frame.bodies[0].x;
     moon.y = frame.bodies[0].y;
-    const intent = resolveSatelliteTap(
-      frame,
-      moon.x,
-      moon.y,
-      identities,
-      [],
-      [parent],
-    );
+    const intent = resolveSatelliteTap(frame, moon.x, moon.y, identities, [
+      parent,
+    ]);
     expect(intent.kind).toBe("group");
     expect(intent.ids).toEqual([1]);
     expect(intent.satelliteTarget).toBeUndefined();
@@ -174,8 +164,8 @@ describe("subordinate relationship bodies", () => {
       { ...HOME_CAMERA, zoom: 2 },
       viewport,
     );
-    expect(
-      resolveSatelliteTap(current, 0, 0, identities, [], [parent]).kind,
-    ).toBe("clear");
+    expect(resolveSatelliteTap(current, 0, 0, identities, [parent]).kind).toBe(
+      "clear",
+    );
   });
 });
