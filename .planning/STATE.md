@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.7
 current_phase_name: Orrery V2 — Renderer, Camera & Visual Language
 status: executing
-stopped_at: Completed 38.7-02-PLAN.md
-last_updated: "2026-10-03T12:26:14.531Z"
+stopped_at: Completed 38.7-03-PLAN.md
+last_updated: "2026-10-03T12:48:34.000Z"
 last_activity: 2026-10-03
-last_activity_desc: 38.7-02 complete (Day-1 release baseline on both phones; owner locked D-56 gates G1-G8 + S1-a = CONTEXT D-63); next 38.7-03 and 38.7-04 D-52 fixes
-state_head: 64a69b65ec64ec9211df4e84474433aa110a7e6e
+last_activity_desc: 38.7-03 complete (D-52/D-53 freeze + per-frame cost fixes: narrowed worklet captures, memoised runtime, live-pose switch camera, O(N) setup, O(1) lookups, projection basis, indexed labels; 6173 tests); next 38.7-04
+state_head: f926a60b2d2d9bc7cbf39381afc827a63f19173d
 progress:
   total_phases: 29
   completed_phases: 20
   total_plans: 275
-  completed_plans: 259
+  completed_plans: 260
 carried_forward:
 
   - "38.7 INSERTED (owner 2026-10-02): Orrery V2 — Renderer, Camera & Visual Language, before Phase 39. Built from the Orrery renderer R&D (labs A/B/C; synthesis docs/experiments/orrery-renderer/synthesis/). Dossier docs/dossier/milestone-2/phase-38.7-orrery-v2-dossier.md ACCEPTED after codex review: D-01..D-58, no OPEN items. Day 1 = release baseline of main on both phones, then the owner locks numeric perf gates (D-56). Lab branches experiment/orrery-* are local-only evidence; keep them until V2 ships."
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 ## Current Position
 
 Phase: 38.7 (Orrery V2 — Renderer, Camera & Visual Language) — EXECUTING
-Plan: 3 of 16
+Plan: 4 of 16
 Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
@@ -917,6 +917,9 @@ Foundational decisions affecting current work:
 - [Phase 38.7]: 38.7-01: production dumpsys input has no eventTime on either test phone, so touch-window calibration uses a clock-identity fallback (logcat monotonic mark vs /proc/uptime boottime), proven by the owner's first tap in Plan 02
 - [Phase 38.7]: 38.7-01: on Android 12 (Pixel 3a) main's TextureView presents through the un-prefixed <pkg>/<activity>#0 window layer; tab return records 15 s (main's revisit reload is ~5 s). BASELINE_SHA candidate = 38.7-01's final commit
 - [Phase 38.7]: 38.7-02: D-56 gates locked 2026-10-03 (owner 'approve all'): G1-G8 + memory substitution S1-a; Pixel 3a tested not optimised (All Contacts survival only); recorded as CONTEXT D-63
+- [Phase 38.7]: 38.7-03: the Orrery frame worklet's captures are an exact allowlist pinned by orrery-frame-mapper.test.ts (never switchRuntime/scene/resources/camera); a new capture must be added there deliberately
+- [Phase 38.7]: 38.7-03: settled fast path (SwitchChoreography.settledWorld, shared by reference, __DEV__-frozen) also covers non-switch publications via beginSettledSwitchChoreography
+- [Phase 38.7]: 38.7-03: per-frame body lookups go through frameBodyByKey/frameBodyById (AnimatedFrame keyIndex/idIndex, first-match semantics); projectFrame takes options.ringPaths (default true until Plan 06)
 
 ### Pending Todos
 
@@ -986,8 +989,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-10-03T12:25:56.037Z
-**Stopped at:** Completed 38.7-02-PLAN.md
+**Last session:** 2026-10-03T12:48:34.000Z
+**Stopped at:** Completed 38.7-03-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
