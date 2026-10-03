@@ -348,3 +348,5 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
   became valid). `selftest.py` 28/28 (background stale-snapshot case added).
 - **2026-10-03** — System-sheet wait 90 s (Pixel 3a: 22-33 s to open the sheet on main);
   a timeout only, no measurement change.
+- **2026-10-03** — `touch_windows.py` waits up to 4 h for the owner's calibration tap (was
+  30 min): the samplers are started before the owner checkpoint is presented. Timeout only.

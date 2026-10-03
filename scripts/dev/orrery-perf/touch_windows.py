@@ -70,7 +70,7 @@ ALIGN_MS = 2.0
 CLOCK_SEPARATION_S = 10.0
 MAX_MARK_DELAY_S = 10.0
 CORRECTION_TAPS = 3
-CALIBRATION_WAIT_S = 1800.0
+CALIBRATION_WAIT_S = 14400.0  # the owner session may start hours after the samplers (2026-10-03)
 
 GETEVENT_RE = re.compile(
     r"^\[\s*(\d+)\.(\d+)\]\s+(?:/dev/input/event\d+:\s+)?(\w+)\s+(\w+)\s+(\w+)"
