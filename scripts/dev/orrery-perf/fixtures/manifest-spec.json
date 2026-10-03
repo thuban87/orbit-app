@@ -1,0 +1,11 @@
+{
+  "cast": [
+    {"name": "Aiden Ashworth", "days": 3, "interval": 7, "rarely": 0, "photo": false},
+    {"name": "Bianca Bellamy", "days": 27, "interval": 30, "rarely": 0, "photo": true},
+    {"name": "Emeka Esposito", "days": null, "interval": 60, "rarely": 0, "photo": false}
+  ],
+  "stress": [
+    {"name": "Adele Abbott", "days": 10, "interval": 14, "rarely": 0, "photo": true},
+    {"name": "Bram Abbott", "days": 40, "interval": 21, "rarely": 1, "photo": false}
+  ]
+}

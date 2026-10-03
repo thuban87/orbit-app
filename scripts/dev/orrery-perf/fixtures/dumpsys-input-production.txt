@@ -1,0 +1,12 @@
+  RecentQueue: length=10
+    MotionEvent, age=1010076ms
+    MotionEvent, age=1010069ms
+    MotionEvent, age=1010064ms
+    MotionEvent, age=1010060ms
+    MotionEvent, age=1010052ms
+    DeviceResetEvent(deviceId=4), policyFlags=0x00000000, age=1006259ms
+    KeyEvent, age=854564ms
+    DeviceResetEvent(deviceId=4), policyFlags=0x00000000, age=854511ms
+    FocusEvent(hasFocus=true), age=854450ms
+    KeyEvent, age=854336ms
+  PendingEvent: <none>

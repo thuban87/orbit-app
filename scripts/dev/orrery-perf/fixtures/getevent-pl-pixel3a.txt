@@ -1,0 +1,48 @@
+add device 1: /dev/input/event5
+  name:     "sdm670-intcodec-s4-snd-card Button Jack"
+  events:
+    KEY (0001): KEY_VOLUMEDOWN        KEY_VOLUMEUP          KEY_MEDIA             BTN_4                
+                BTN_5                 KEY_VOICECOMMAND     
+  input props:
+    <none>
+add device 2: /dev/input/event4
+  name:     "sdm670-intcodec-s4-snd-card Headset Jack"
+  events:
+    SW  (0005): SW_HEADPHONE_INSERT   SW_MICROPHONE_INSERT  SW_LINEOUT_INSERT     SW_JACK_PHYSICAL_INS    
+                SW_MACHINE_COVER      0011                  0012                  0013                 
+  input props:
+    <none>
+add device 3: /dev/input/event3
+  name:     "uinput-fpc"
+  events:
+    KEY (0001): KEY_UP                KEY_LEFT              KEY_RIGHT             KEY_DOWN             
+  input props:
+    <none>
+add device 4: /dev/input/event2
+  name:     "synaptics_dsx"
+  events:
+    KEY (0001): KEY_WAKEUP            BTN_TOOL_FINGER       BTN_TOUCH            
+    ABS (0003): ABS_X                 : value 0, min 0, max 1079, fuzz 0, flat 0, resolution 0
+                ABS_Y                 : value 0, min 0, max 2219, fuzz 0, flat 0, resolution 0
+                ABS_MT_SLOT           : value 0, min 0, max 9, fuzz 0, flat 0, resolution 0
+                ABS_MT_TOUCH_MAJOR    : value 0, min 0, max 255, fuzz 0, flat 0, resolution 0
+                ABS_MT_TOUCH_MINOR    : value 0, min 0, max 255, fuzz 0, flat 0, resolution 0
+                ABS_MT_POSITION_X     : value 0, min 0, max 1079, fuzz 0, flat 0, resolution 0
+                ABS_MT_POSITION_Y     : value 0, min 0, max 2219, fuzz 0, flat 0, resolution 0
+                ABS_MT_TRACKING_ID    : value 0, min 0, max 65535, fuzz 0, flat 0, resolution 0
+  input props:
+    INPUT_PROP_DIRECT
+could not get driver version for /dev/input/mouse0, Inappropriate ioctl for device
+add device 5: /dev/input/event0
+  name:     "qpnp_pon"
+  events:
+    KEY (0001): KEY_VOLUMEDOWN        KEY_POWER            
+  input props:
+    <none>
+could not get driver version for /dev/input/mice, Inappropriate ioctl for device
+add device 6: /dev/input/event1
+  name:     "gpio-keys"
+  events:
+    KEY (0001): KEY_VOLUMEUP         
+  input props:
+    <none>

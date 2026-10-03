@@ -1,0 +1,12 @@
+RequestedLayerState{Display Overlays#8551 parentId=8550 !handle z=2147483647}
+RequestedLayerState{DefaultTaskDisplayArea#10 parentId=9}
+RequestedLayerState{Task=301#45001 parentId=10}
+RequestedLayerState{ActivityRecord{b7eb6df u0 com.bwales.orbit/.MainActivity t301}#45002 parentId=45001}
+RequestedLayerState{9a1c2f0 com.bwales.orbit/com.bwales.orbit.MainActivity#45003 parentId=45002}
+RequestedLayerState{VRI-com.bwales.orbit/com.bwales.orbit.MainActivity#45004 parentId=45003}
+RequestedLayerState{Bounds for - 9a1c2f0 com.bwales.orbit/com.bwales.orbit.MainActivity#45120 parentId=45004}
+RequestedLayerState{af4204d SurfaceView[com.bwales.orbit/com.bwales.orbit.MainActivity](BLAST)#45128 parentId=45120}
+RequestedLayerState{SurfaceView[com.bwales.orbit/com.bwales.orbit.MainActivity]#45127 parentId=45120}
+RequestedLayerState{22b7364 SurfaceView[com.bwales.orbit/com.bwales.orbit.MainActivity](BLAST)#44985 parentId=45120}
+RequestedLayerState{VRI-StatusBar#97 parentId=89}
+RequestedLayerState{VRI-com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity#46565 parentId=46340}

@@ -1,0 +1,10 @@
+{
+  "a": {
+    "avatars/contact-2.jpg": {"width": 256, "height": 256, "payload": "bianca"},
+    "avatars/contact-4.jpg": {"width": 256, "height": 256, "payload": "adele"}
+  },
+  "b": {
+    "avatars/contact-2.jpg": {"width": 256, "height": 256, "payload": "bianca"},
+    "avatars/contact-4.jpg": {"width": 256, "height": 256, "payload": "adele-portrait"}
+  }
+}

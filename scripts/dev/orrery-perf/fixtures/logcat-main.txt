@@ -1,0 +1,5 @@
+10-03 12:00:10.000  4321  4321 I Choreographer: Skipped 42 frames!  The application may be doing too much work on its main thread.
+10-03 12:00:12.000  4321  4330 I OpenGLRenderer: Davey! duration=812ms; Flags=0, FrameTimelineVsyncId=1, IntendedVsync=1
+10-03 12:00:13.000  4321  4321 I Choreographer: Skipped 7 frames!  The application may be doing too much work on its main thread.
+10-03 12:00:14.000  9999  9999 I Choreographer: Skipped 99 frames!  Another process.
+10-03 12:00:15.000  9999  9999 I OpenGLRenderer: Davey! duration=900ms; another process

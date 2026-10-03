@@ -1,0 +1,8 @@
+Input Dispatcher State:
+  DispatchEnabled: true
+  RecentQueue: length=4
+    MotionEvent(deviceId=3, eventTime=1000500000000, source=TOUCHSCREEN, displayId=0, action=MOVE, actionButton=0x00000000, flags=0x00000000, metaState=0x00000000, buttonState=0x00000000, classification=NONE, edgeFlags=0x00000000, xPrecision=1.0, yPrecision=1.0, xCursorPosition=nan, yCursorPosition=nan, pointers=[0: (540.0, 1200.0)]), policyFlags=0x62000000, age=930ms
+    MotionEvent(deviceId=3, eventTime=1001000000000, source=TOUCHSCREEN, displayId=0, action=UP, actionButton=0x00000000, flags=0x00000000, metaState=0x00000000, buttonState=0x00000000, classification=NONE, edgeFlags=0x00000000, xPrecision=1.0, yPrecision=1.0, xCursorPosition=nan, yCursorPosition=nan, pointers=[0: (540.0, 1200.0)]), policyFlags=0x62000000, age=430ms
+    MotionEvent(deviceId=3, eventTime=1001250400000, source=TOUCHSCREEN, displayId=0, action=DOWN, actionButton=0x00000000, flags=0x00000000, metaState=0x00000000, buttonState=0x00000000, classification=NONE, edgeFlags=0x00000000, xPrecision=1.0, yPrecision=1.0, xCursorPosition=nan, yCursorPosition=nan, pointers=[0: (300.0, 200.0)]), policyFlags=0x62000000, age=180ms
+    KeyEvent, age=120ms
+  PendingEvent: <none>

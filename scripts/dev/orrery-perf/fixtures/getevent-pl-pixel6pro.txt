@@ -1,0 +1,57 @@
+add device 1: /dev/input/event3
+  name:     "sec_touchscreen"
+  events:
+    KEY (0001): KEY_HOMEPAGE          BTN_TOOL_FINGER       BTN_TOUCH            
+    ABS (0003): ABS_X                 : value 0, min 0, max 1439, fuzz 0, flat 0, resolution 0
+                ABS_Y                 : value 0, min 0, max 3119, fuzz 0, flat 0, resolution 0
+                ABS_PRESSURE          : value 0, min 0, max 63, fuzz 0, flat 0, resolution 0
+                ABS_MT_SLOT           : value 1, min 0, max 9, fuzz 0, flat 0, resolution 0
+                ABS_MT_TOUCH_MAJOR    : value 0, min 0, max 5100, fuzz 0, flat 0, resolution 0
+                ABS_MT_TOUCH_MINOR    : value 0, min 0, max 5100, fuzz 0, flat 0, resolution 0
+                ABS_MT_ORIENTATION    : value 0, min -4096, max 4096, fuzz 0, flat 0, resolution 0
+                ABS_MT_POSITION_X     : value 0, min 0, max 1439, fuzz 0, flat 0, resolution 0
+                ABS_MT_POSITION_Y     : value 0, min 0, max 3119, fuzz 0, flat 0, resolution 0
+                ABS_MT_TOOL_TYPE      : value 0, min 0, max 0, fuzz 0, flat 0, resolution 0
+                ABS_MT_TRACKING_ID    : value 0, min 0, max 65535, fuzz 0, flat 0, resolution 0
+                ABS_MT_PRESSURE       : value 0, min 0, max 63, fuzz 0, flat 0, resolution 0
+  input props:
+    INPUT_PROP_DIRECT
+add device 2: /dev/input/event2
+  name:     "STM VL53L1 proximity sensor"
+  events:
+    ABS (0003): ABS_THROTTLE          : value 0, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_RUDDER            : value 0, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_WHEEL             : value 1024, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_GAS               : value 0, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_BRAKE             : value 352386816, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_HAT0X             : value 1790791083, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_HAT0Y             : value 542958209, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_HAT1X             : value 1048577, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_HAT1Y             : value 1048598, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_HAT2X             : value 0, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_HAT2Y             : value 0, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_HAT3X             : value 2225664, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_HAT3Y             : value 0, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_DISTANCE          : value 0, min 0, max 255, fuzz 0, flat 0, resolution 0
+                ABS_TILT_X            : value 37442, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_TILT_Y            : value 0, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_TOOL_WIDTH        : value 107, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_VOLUME            : value 0, min 0, max -1, fuzz 0, flat 0, resolution 0
+                ABS_MISC              : value 0, min 0, max -1, fuzz 0, flat 0, resolution 0
+  input props:
+    <none>
+add device 3: /dev/input/event0
+  name:     "gpio_keys"
+  events:
+    KEY (0001): KEY_VOLUMEDOWN        KEY_VOLUMEUP          KEY_POWER            
+  input props:
+    <none>
+add device 4: /dev/input/event1
+  name:     "goodix_fingerprint"
+  events:
+    KEY (0001): KEY_HOME              KEY_UP                KEY_LEFT              KEY_RIGHT            
+                KEY_DOWN              KEY_VOLUMEDOWN        KEY_VOLUMEUP          KEY_POWER            
+                KEY_MENU              KEY_BACK              KEY_CAMERA            KEY_CHAT             
+                KEY_SEARCH           
+  input props:
+    <none>

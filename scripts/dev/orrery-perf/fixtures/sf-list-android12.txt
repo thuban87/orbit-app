@@ -1,0 +1,10 @@
+Display Root#0
+DefaultTaskDisplayArea#0
+Task=249#0
+ActivityRecord{b7eb6df u0 com.bwales.orbit/.MainActivity#0
+81befc7 com.bwales.orbit/com.bwales.orbit.MainActivity#0
+com.bwales.orbit/com.bwales.orbit.MainActivity#0
+Task=258#0
+ActivityRecord{e912c3b u0 com.google.android.apps.messaging/.main.MainActivity#0
+2dd23a3 com.google.android.apps.messaging/com.google.android.apps.messaging.main.MainActivity#0
+ImeContainer#0

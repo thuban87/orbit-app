@@ -1,0 +1,43 @@
+{
+  "description": "Two Systems, 3 pan + 3 pinch each; Size 120 presents at 50/s, All Contacts at 40/s.",
+  "getevent": "session-labelled.getevent.txt",
+  "reps": 3,
+  "calibration": {
+    "method": "clock-identity",
+    "status": "aligned",
+    "offset_ms": 0.0
+  },
+  "segments": [
+    {
+      "system": "Size 120",
+      "boundary_ns": 1001000000000,
+      "start_ns": 1004000000000,
+      "end_ns": 1037000000000,
+      "layer_present": true
+    },
+    {
+      "system": "All Contacts",
+      "boundary_ns": 1040000000000,
+      "start_ns": 1043000000000,
+      "end_ns": 1076000000000,
+      "layer_present": true
+    }
+  ],
+  "sf": {
+    "first_poll_ns": 1000500000000,
+    "last_poll_ns": 1079500000000,
+    "holes": [],
+    "present_runs": [
+      [
+        1000000000000,
+        1040000000000,
+        20000000
+      ],
+      [
+        1040000000000,
+        1080000000000,
+        25000000
+      ]
+    ]
+  }
+}
