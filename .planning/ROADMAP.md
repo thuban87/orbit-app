@@ -145,7 +145,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 27: Dashboard List View** - Full-width three-line rows with status border + glyph, swipe logging, and search explanations (closed 2026-09-06 by owner approval; implementation, review, validation, and release build complete. Partial device-UAT coverage is retained in 27-UAT.md.)
 - [ ] **Phase 28: Dashboard Card View** - Avatar-first 3-column grid with long-press menu and multi-select bulk management
 - [x] **Phase 29: Orrery Camera, Scale & Exploration** - One canonical 2.5D world with bounded camera, semantic zoom, density presets, and built-in Systems (completed 2026-09-08 by owner approval; device UAT 8/9 pass on the release build — two blocker crashes on gesture/pinch and long-press reorder were found on-device and fixed inline (f979263, a Reanimated worklet forward-reference class the vitest suite structurally cannot catch). **H6 backup contention BLOCKED** — the SAF backup-folder grant needs reconnecting, and per the native checklist the measured contention/overlap is deferred to Phase 40; not a phase-29 defect. Full record in 29-UAT.md.)
-- [ ] **Phase 30: Orrery Systems** - Named dynamic + manual Systems authored in a floating HUD, with management, switching, and portability
+- [x] **Phase 30: Orrery Systems** - Named dynamic + manual Systems authored in a floating HUD, with management, switching, and portability (completed 2026-09-09 by owner approval: 12/12 plans; checkbox reconciled 2026-10-02)
 - [x] **Phase 31: Profile Experience** - Fixed Hero, modular reorderable sections, layout/background templates, Relationship Overview tile grid (completed 2026-09-10)
 - [x] **Phase 31.1: App-Wide System Backgrounds** (INSERTED) - Select the approved bundled art as a persistent system background across regular app screens, with Orrery excluded and Profile photos taking precedence (completed 2026-09-11; owner-approved. Plans 01–04 + corrective 31.1-05 [visibility: veil decoupled from card opacity + ChromeScrim] + enhancement 31.1-06 [mode-aware glassy cards; Android-elevation fix]. The prior 31.1-04 UAT was a false positive — superseded. Release validated on the owner's personal phone. Parked to future: theme-merge into a single Dark/Light switch, Deep Space/Starfield removal.)
 - [x] **Phase 32: Interaction History & Insights** - Activity heatmap (Cycles lens), intensity, Rolodex History Browser, canonical Interaction Detail/Edit (completed 2026-09-11)
@@ -162,6 +162,7 @@ All v1.0 commits are local on `main` and have NOT been pushed.
 - [x] **Phase 38.4: UI Consistency, Accessibility, Performance & Release Polish** (INSERTED) - Completed 2026-09-28: 23/23 plans + D-37 deep code review (1 critical, 14 warnings, all fixed in two passes) + device-pass fix passes D-72/D-73/D-74; verification passed 32/32 (Pixel 3a device pass + owner checklist). Migrations 031–032 (TARGET_VERSION 32). Final release orbit-38.4-release-2026-09-28-d69a2e3.apk. Owner-routed: text-on-art → 38.5; widget contact tap → widget phase; large-text reflow outside sheets + Light/Dark latency → Phase 40; profile photos → backlog 999.1; remaining minor items → todos (2026-09-28-*).
 - [x] **Phase 38.5: Background Art & Text-on-Art Contrast** (INSERTED) - Completed 2026-09-29: 9/9 plans + 3-pass code review (all fixed); verification passed 14/14 after owner UAT (Pixel 6 Pro + Pixel 3a sign-off). 12 lossless light/dark WebPs, signed v3 treatment table, ADR-177. End-of-phase rulings D-50..D-53: the four persistent Galaxy Dark danger strings get an opaque backing (D25-B) and the picker tiles are fixed (G2); Orrery ANR (G1) and the Your Week wrap (G3) are deferred. D-54: the Events list and detail show the art under full cards. Final release orbit-38.5-release-2026-09-29-b74eed7.apk (owner-approved). No migration, no backup bump.
 - [x] **Phase 38.6: Photo Handling — Sync, Sizes & Lightbox** (INSERTED) - Completed 2026-09-30: 9/9 plans + 6 code-review passes (all blocker/warning findings fixed); verification passed 19/19 + owner UAT (pinch, TalkBack, sizes) on the release build. Display-revision fix (no file renames), WebP ≤1024 masters, bigger Profile/List/Grid photos, lightbox, missing-photo + backup-skip integrity (D-23..D-35), banner in flow (D-38), "too large" backups (D-39), on-disk Orrery derivatives (D-41; D-11 memory +2.9 %/+4.2 %). Owner rulings D-01..D-42. No migration (head 032), backup format 7. Release orbit-phase38.6-release-2026-09-30-c2dc1cb.apk.
+- [ ] **Phase 38.7: Orrery V2 — Renderer, Camera & Visual Language** (INSERTED) - A Skia 2.5D Orrery V2 from the Orrery renderer R&D labs: a tilted strategy-map Home, a new imperative renderer, a painted sky, thin sun-lit orbits with subtle pulses, rim-lit status bodies, Lab A's star sun, moon bumps, reticle focus with a docked card, a star-warp System switch, plus five production Orrery defect fixes. Dossier accepted after codex review (D-01..D-58); ready for planning.
 - [ ] **Phase 39: Onboarding** - DEFERRED PLANNING — first-run setup and teaching against the implemented product
 - [ ] **Phase 40: Responsive & Release Hardening** - DEFERRED PLANNING — device, accessibility, and performance audit pass
 
@@ -1347,6 +1348,53 @@ Plans:
 
 > **Inserted 2026-09-29 (owner).** See `38.6-CONTEXT.md` (shim) and the dossier's OPEN items: O-1 photo resolution (the 512 master looks soft at the new sizes and in a lightbox; changing it reverses `07-photos.md` Cluster B), O-2 coverage scope, O-3 lightbox reach, O-4 lightbox behaviour, and a possible pull-in of the restore-progress photo-library todo.
 
+### Phase 38.7: Orrery V2 — Renderer, Camera & Visual Language (INSERTED)
+
+**Goal**: Opening the Orrery feels like entering a polished game's star-system map:
+- calm, legible star-chart views with a 3D strategy-map feel;
+- cinematic System switches;
+- smooth on the Pixel 6 Pro and the Pixel 3a;
+- no warmer than today.
+
+Contacts and relationships remain the information architecture. It also fixes five production Orrery defects: the switch freeze, O(N²) lookups, Paragraph churn, "El…" initials, and "Unavailable System".
+**Depends on**: Phase 38.6
+**Requirements**: None formal. Owner decisions D-01..D-42 and D-56..D-58 (2026-10-02, from the hands-on review of renderer labs A/B/C on both phones), plus derived D-43..D-55.
+**Success Criteria**:
+- Day-1 release baseline of today's main on both phones, followed by owner-locked numeric gates (D-56).
+- Hard gates:
+  - no ANR at Size 120 or All Contacts;
+  - no switch stall over 100 ms on the 6 Pro or over 150 ms on the 3a;
+  - idle heat and CPU no worse than main (D-40);
+  - card text 4.5:1 in all four themes over the new sky (D-28).
+- Contacts stay on their orbit line (D-12).
+- `tsc`, `check:colors` and vitest green.
+- Owner device sign-off on both phones.
+**Scope source**: docs/dossier/milestone-2/phase-38.7-orrery-v2-dossier.md (authoritative)
+**Evidence**: docs/experiments/orrery-renderer/synthesis/ (synthesis, harvest map, dead ends, owner review, verification audits). The lab branches `experiment/orrery-*` are local only and must be kept until V2 ships.
+**Canonical refs**:
+- docs/dossier/milestone-2/phase-08-orrery-camera-scale-exploration-dossier.md;
+- docs/dossier/milestone-2/phase-09-orrery-systems-dossier.md;
+- docs/dossier/09-orrery.md;
+- docs/systems/orrery.md;
+- ADR-046, ADR-048, ADR-077, ADR-085, ADR-105, ADR-114, ADR-149, ADR-169, ADR-170, ADR-179.
+
+Several of these are superseded in part; see the dossier's "Supersessions to record at KB extraction".
+**Schema**: none expected (migration head 032, backup format 7). Any migration is head+1, verified on disk at plan time.
+**UI hint**: yes
+**Plans**: 0 plans. Ready for plan-phase: the dossier has no OPEN items, and discuss-phase is optional.
+
+> **Inserted 2026-10-02 (owner).** See `38.7-CONTEXT.md` (shim). Decisions that reverse recorded rules, each owner-ruled, each to get a superseding ADR at KB extraction:
+> - tilted Home (D-03);
+> - painted sky (D-07);
+> - subtle ambient orbit pulses (D-10);
+> - no off-orbit drift (D-12);
+> - a far-zoom moon bump (D-31);
+> - a star-warp switch (D-32);
+> - real initials (D-33);
+> - a bounded warm cache across tab blur (D-58, clarifies ADR-170).
+>
+> Owner device checkpoints throughout, and plans stay sized by affected area (CLAUDE.md).
+
 ### Phase 39: Onboarding
 
 **Goal**: First-run setup and teaching designed against the real, implemented product rather than an imagined one.
@@ -1384,7 +1432,7 @@ Plans:
 | 27. Dashboard List View | 8/8 | Complete | 2026-09-06 (owner-approved; UAT partial) |
 | 28. Dashboard Card View | 8/8 | In Progress|  |
 | 29. Orrery Camera, Scale & Exploration | 12/12 | In Progress|  |
-| 30. Orrery Systems | 0/10 | Planned | - |
+| 30. Orrery Systems | 12/12 | Complete | 2026-09-09 |
 | 31. Profile Experience | 15/15 | Complete   | 2026-09-10 |
 | 31.1 App-Wide System Backgrounds | 4/4 | In Progress|  |
 | 32. Interaction History & Insights | 8/8 | In Progress|  |
@@ -1399,6 +1447,7 @@ Plans:
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
 | 38.6 Photo Handling — Sync, Sizes & Lightbox | 9/9 | Complete | 2026-09-30 |
+| 38.7 Orrery V2 — Renderer, Camera & Visual Language | 0/TBD | Not started | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
