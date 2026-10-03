@@ -5,15 +5,15 @@ milestone_name: Release Readiness
 current_phase: 38.7
 current_phase_name: Orrery V2 — Renderer, Camera & Visual Language
 status: planning
-stopped_at: Phase 38.7 inserted (dossier accepted + CONTEXT shim), ready for plan-phase
-last_updated: "2026-10-01T04:37:11.055Z"
+stopped_at: Phase 38.7 planned (16 plans, checker passed), ready to execute
+last_updated: "2026-10-03T02:18:26.062Z"
 last_activity: 2026-10-02
-last_activity_desc: Phase 38.7 Orrery V2 inserted before Phase 39; Phase 30 checkbox reconciled
-state_head: b2a21fe5646a184a2f77abb81cd858e3539be0d4
+last_activity_desc: Phase 38.7 planned — research, pattern map, 16 plans verified
+state_head: 3e10f1d2db0251290c51f56988c9f71573d1e64e
 progress:
   total_phases: 29
   completed_phases: 21
-  total_plans: 259
+  total_plans: 275
   completed_plans: 257
 carried_forward:
 
@@ -44,9 +44,9 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 
 ## Current Position
 
-Phase: 38.7 — Orrery V2 — Renderer, Camera & Visual Language (INSERTED)
+Phase: 38.7 (Orrery V2 — Renderer, Camera & Visual Language) — READY TO EXECUTE
 Plan: Not started
-Status: Ready for plan-phase (dossier accepted; discuss optional)
+Status: Ready to execute — 16 plans in 16 waves; Plan 02 needs both phones + owner (D-56 gate lock)
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
 FYI: Phase 30 (Orrery Systems) checkbox reconciled to [x] on 2026-10-02 (12/12 plans, owner-approved 2026-09-09).

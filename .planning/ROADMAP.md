@@ -1357,6 +1357,7 @@ Plans:
 **Scope source**: docs/dossier/milestone-2/phase-38.7-orrery-v2-dossier.md (authoritative)
 **Evidence**: docs/experiments/orrery-renderer/synthesis/ (synthesis, harvest map, dead ends, owner review, verification audits). The lab branches `experiment/orrery-*` are local only and must be kept until V2 ships.
 **Canonical refs**:
+
 - docs/dossier/milestone-2/phase-08-orrery-camera-scale-exploration-dossier.md;
 - docs/dossier/milestone-2/phase-09-orrery-systems-dossier.md;
 - docs/dossier/09-orrery.md;
@@ -1366,7 +1367,72 @@ Plans:
 Several of these are superseded in part; see the dossier's "Supersessions to record at KB extraction".
 **Schema**: none expected (migration head 032, backup format 7). Any migration is head+1, verified on disk at plan time.
 **UI hint**: yes
-**Plans**: 0 plans. Ready for plan-phase: the dossier has no OPEN items, and discuss-phase is optional.
+**Plans**: 16 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 38.7-01-PLAN.md — Dev seed (shared Size cast + All Contacts stress) and the frozen perf-measurement scripts/runbook (W1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 38.7-02-PLAN.md — Day-1 release baseline of unmodified main on both phones; owner locks the D-56 gates (W2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 38.7-03-PLAN.md — D-52 frame/switch fixes: worklet captures, memoised runtime, stale camera, O(N) setup and lookups, projection hoist, indexed label allocator (W3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 38.7-04-PLAN.md — D-52 OrreryTextService, Hermes-safe initials (D-33), custom System name after cold restore (W4)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
+- [ ] 38.7-05-PLAN.md — World & camera model: drift removal (D-12), Home profiles + dolly focal + horizon culling (D-45), size mechanism, projected-size tiers, pan/coast (W5)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
+- [ ] 38.7-06-PLAN.md — V2 renderer core: render host, stable picture tree, world-plane rings (D-44), Polaris/overlays, single clock (W6)
+
+**Wave 7** *(blocked on Wave 6 completion)*
+
+- [ ] 38.7-07-PLAN.md — V2 bodies, sun, moons and labels as pictures; photo cache; generation-gated disposal; legacy renderer deleted (W7)
+
+**Wave 8** *(blocked on Wave 7 completion)*
+
+- [ ] 38.7-08-PLAN.md — Ambient clock, base bake, SurfaceView host + D-44/D-49 spike on both phones; owner confirms configuration (W8)
+
+**Wave 9** *(blocked on Wave 8 completion)*
+
+- [ ] 38.7-09-PLAN.md — Orrery tokens, painted sky with per-System tint, grid, thin lit rings, subtle pulses; owner rules grid/pulses (W9)
+
+**Wave 10** *(blocked on Wave 9 completion)*
+
+- [ ] 38.7-10-PLAN.md — Lit status bodies, star sun, moon bump/split and stack pips; owner rules faces/desaturation (W10)
+
+**Wave 11** *(blocked on Wave 10 completion)*
+
+- [ ] 38.7-11-PLAN.md — Focus framing with docked card, cluster zoom-in, reticle, dim-the-rest, occlusion dim (W11)
+
+**Wave 12** *(blocked on Wave 11 completion)*
+
+- [ ] 38.7-12-PLAN.md — HUD corner brackets, map under the title, reorder charge arc, loading box removed (W12)
+
+**Wave 13** *(blocked on Wave 12 completion)*
+
+- [ ] 38.7-13-PLAN.md — Star-warp System switch on a budget; owner rules smoothness on the Pixel 3a (W13)
+
+**Wave 14** *(blocked on Wave 13 completion)*
+
+- [ ] 38.7-14-PLAN.md — Four-theme tuning, D-28 contrast proof, flat V2 Preview; owner rules light themes and 62° vs flat (W14)
+
+**Wave 15** *(blocked on Wave 14 completion)*
+
+- [ ] 38.7-15-PLAN.md — Bounded warm cache across tab blur and warm-return mount (D-58) (W15)
+
+**Wave 16** *(blocked on Wave 15 completion)*
+
+- [ ] 38.7-16-PLAN.md — Device pass, one release build vs baseline and locked gates, docs, owner sign-off (W16)
 
 > **Inserted 2026-10-02 (owner).** See `38.7-CONTEXT.md` (shim). Decisions that reverse recorded rules, each owner-ruled, each to get a superseding ADR at KB extraction:
 > - tilted Home (D-03);
@@ -1432,7 +1498,7 @@ Several of these are superseded in part; see the dossier's "Supersessions to rec
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
 | 38.6 Photo Handling — Sync, Sizes & Lightbox | 9/9 | Complete | 2026-09-30 |
-| 38.7 Orrery V2 — Renderer, Camera & Visual Language | 0/TBD | Not started | - |
+| 38.7 Orrery V2 — Renderer, Camera & Visual Language | 0/16 | Planned | - |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
