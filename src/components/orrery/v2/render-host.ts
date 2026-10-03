@@ -114,7 +114,8 @@ export function defaultOrreryRenderHost(
     // D-64: bake the still base on the GPU on Android (−28 % of a core idle at
     // All Contacts on the 6 Pro); web bakes through a raster path; iOS is not
     // built (D-34/D-42), so it stays live until measured.
-    bakePath: resolved === "web" ? "raster" : android ? "gpu-offscreen" : "none",
+    bakePath:
+      resolved === "web" ? "raster" : android ? "gpu-offscreen" : "none",
     // D-64 / D-44: Lab A's world plane (no ring field).
     ringMethod: "world-plane",
     ringFieldMinRings: DEFAULT_RING_FIELD_MIN_RINGS,
