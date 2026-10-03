@@ -1,6 +1,6 @@
 # Phase 38.7 --- Orrery V2: Renderer, Camera & Visual Language Dossier
 
-**Status:** DRAFT 2026-10-02. Authored by Claude from the Prototype D synthesis; **codex review pending**. The phase is not yet on the roadmap. It is inserted by hand after the dossier is accepted (`gsd-tools phase insert` does not work on this roadmap).
+**Status:** ACCEPTED 2026-10-02 after codex review (green light; review items folded in as D-56..D-58). Authored by Claude from the Prototype D synthesis. The phase is not yet on the roadmap. It is inserted by hand after the dossier is accepted (`gsd-tools phase insert` does not work on this roadmap).
 
 **Sources:**
 - Owner decisions: the owner's hands-on review of three renderer labs on a Pixel 6 Pro and a Pixel 3a (release builds, 2026-10-02), plus chat rulings the same day.
@@ -24,7 +24,8 @@ Current-state claims below were verified against `main` @ `34920925` unless labe
 **Numbering.**
 - **D-01..D-30** are the owner's field-sheet decisions D1–D30, renumbered one to one.
 - **D-31..D-42** are the owner's chat rulings of 2026-10-02.
-- **D-43 onward** are [DERIVED] engineering decisions.
+- **D-43..D-55** are [DERIVED] engineering decisions.
+- **D-56..D-58** are owner rulings from the codex review (2026-10-02). They resolve the former O-1..O-3.
 - Carried decisions are written "38.6 D-NN" or cite their dossier or ADR.
 
 ## Objective
@@ -153,12 +154,13 @@ It stays recognisably Orbit: contacts and relationships remain the information a
 -   **[DECIDED · 2026-10-02] D-36 --- The sky barely drifts and shifts slightly with the camera (parallax).** It is fully still under reduced motion.
 -   **[DECIDED · 2026-10-02] D-37 --- Idle motion budget.**
     - Keep today's star twinkle and sun pulse.
-    - The subtle orbit pulses (D-10) are the only new idle motion.
+    - The subtle orbit pulses (D-10) are the only new idle motion in the Orrery's **information layer** (rings, bodies, sun, moons, labels).
+    - D-36's barely perceptible sky drift and parallax is separate **environmental** motion and is also permitted. It runs on the same bounded ambient clock (D-49).
     - No sun churn, reticle scan or idle moon motion. Lab A's corona and granulation are drawn frozen, or move only with the existing sun pulse.
 -   **[DECIDED · 2026-10-02] D-38 --- No progress wake.** The tether is moot under D-12.
 -   **[DECIDED · 2026-10-02] D-39 --- The map runs up under the Orrery title** (Lab B IMMERSE). The status bar, tab bar and "+" button are unchanged.
 -   **[DECIDED · 2026-10-02] D-40 --- Cool idle.**
-    - When nothing is moving, the Orrery stops drawing except for the low-rate ambient (twinkle, sun pulse, pulses).
+    - When nothing is moving, the Orrery stops drawing except for the low-rate ambient (twinkle, sun pulse, orbit pulses, sky drift), all on one bounded ambient clock (D-49).
     - It must not run noticeably warmer than today's Orbit on either phone.
 -   **[DECIDED · 2026-10-02] D-41 --- The five production Orrery defects found by the labs are fixed in this phase,** not in a separate port phase (see D-52).
 -   **[DECIDED · 2026-10-02] D-42 --- Cross-platform portability is an architectural criterion.**
@@ -220,7 +222,7 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
     - Lab A measured idle main-thread time ≈92% → 15–16% and focus response 3.6–10 s → 0.06–0.18 s (release, 6 Pro) with this pattern (`audits/LAB-A-AUDIT.md` §7).
 -   **[DERIVED] D-44 --- Tilted orbit drawing never strokes under a perspective transform.**
     - Default: Lab A's world plane, drawn in world space under the exact homography with analytic screen-dp strokes on cached `SkVertices` (`RING_WORLD_SKSL`).
-    - Fallback: Lab B's full-screen ring field, if an **early spike on both phones** shows the default cannot hold the D-56 targets.
+    - Fallback: Lab B's full-screen ring field, if an **early spike on both phones** shows the default cannot hold the D-56 performance gates.
     - B's thin-line style (D-11), rim (D-11) and pulse term (D-10) are written for whichever method wins.
 -   **[DERIVED] D-45 --- Home profile and camera model.**
     - Home becomes one tunable profile `{tilt, lensShift, fitRule}`, defaulting to 62° with Lab C's strategy-map lens shift.
@@ -295,22 +297,38 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
 -   **[DERIVED] Rogue identity without drift.** Rogue is carried by the cold, desaturated, glow-less body (D-14). A non-colour status cue remains for colour-blind users: the ring dash/fade/trace styles. Decay/rogue photo desaturation (Lab B C-16) is product meaning: confirm it at the device checkpoint.
 -   **[DERIVED] Steep tilt packs rings vertically.** This produces more co-angular stacks (pips), more label conflicts on the near and far sides, and possibly bare sky corners at 60°+ because of parallax (`audits/LAB-A-AUDIT.md` §5). One-finger pan at 62° moves about 2.1× the ground per point at the far rim: tune the pan mapping (D-04 stays one-finger pan).
 -   **[DERIVED] Lab C's focus-radius helper** (`orreryFocusSystemRadius`) is keyed to C's hero scale and moon geometry. Re-key it to V2's moons (D-31).
--   **[DERIVED] Phase 30 Preview canvas.** `SystemPreviewCanvas.tsx` is a separate simplified renderer, and phase-09 `:311` says the Preview does not expose tilt or yaw. See O-2.
+-   **[DERIVED] Phase 30 Preview canvas.** `SystemPreviewCanvas.tsx` is a separate simplified renderer, and phase-09 `:311` says the Preview does not expose tilt or yaw. Resolved by D-57.
 
-## OPEN (owner, for discuss)
+## OPEN (owner, for discuss) --- all RESOLVED 2026-10-02 (codex review, owner-approved)
 
--   **[OPEN] O-1 --- Performance acceptance numbers.** Proposed, to confirm or change. All measured with SurfaceFlinger presents, because gfxinfo cannot see a SurfaceView.
-    - **Pixel 6 Pro, release, Size 120 at Home tilt:**
-      - pan, pinch and Recenter at a median of ≥ 55 presents/s;
-      - a Size 5 ↔ Size 120 switch with no gap > 100 ms;
-      - idle Orrery CPU and 5-minute skin temperature no higher than **today's main** measured the same way on day one.
-    - **Pixel 3a, release, Size 120:**
-      - pan and pinch at a median of ≥ 45 presents/s;
-      - switch with no gap > 150 ms;
-      - no ANR at Size 120 or All Contacts with about 1,000 contacts;
-      - a tab return showing the scene within an agreed time (proposed ≤ 1 s to the first full frame).
--   **[OPEN] O-2 --- Does the Phase 30 System Preview canvas adopt the V2 look and tilt, or stay as it is?** Proposed: adopt the V2 visuals at flat tilt, keeping phase-09 `:311`.
--   **[OPEN] O-3 --- Tab-return speed.** Every lab and today's app rebuild the scene, textures, photos and text on every return to the Orrery tab. Proposed: keep decoded photos, baked sky and text caches alive across a blur, still releasing the canvas and clock, within an agreed memory ceiling. This touches the lifecycle and memory posture ADR-170 governs (settled resource retirement).
+O-1, O-2 and O-3 became D-56, D-57 and D-58 below. No open items remain.
+
+### Review rulings (2026-10-02)
+
+-   **[DECIDED · 2026-10-02] D-56 --- Performance gates: measure the baseline first, then lock the numbers.**
+    - **Day 1 of 38.7** measures a release build of **today's main** on both phones, with the same method V2 will use. Measure with SurfaceFlinger presents, because gfxinfo cannot see a SurfaceView. Use the shared Size cast.
+    - **The owner then approves the exact numeric gates** before visual implementation proceeds. This is an owner checkpoint, not an agent default.
+    - **Starting targets** (not doctrine until locked):
+      - 6 Pro, Size 120 at Home tilt: pan, pinch and Recenter at a median of ≥ 55 presents/s.
+      - 3a, Size 120: pan and pinch at a median of ≥ 45 presents/s.
+      - Tab return to the first full frame: ≤ 1 s.
+    - **Hard gates, in force from the start:**
+      - no ANR at Size 120 or All Contacts (about 1,000 contacts) on either phone;
+      - no switch stall over 100 ms on the 6 Pro or over 150 ms on the 3a;
+      - idle heat and CPU no worse than main (D-40);
+      - the 3a is genuinely usable and the 6 Pro feels smooth (both are owner device checkpoints).
+-   **[DECIDED · 2026-10-02] D-57 --- System Preview gets the V2 visual language, kept flat.**
+    - The Phase 30 Preview canvas (`SystemPreviewCanvas.tsx`) adopts V2's sky, rings, bodies and sun.
+    - It keeps phase-09 `:311`: no tilt or yaw.
+    - It does not need V2's cinematic effects (switch warp, pulses, reticle), because its job is still a membership and scale preview.
+    - It reuses the V2 renderer pieces rather than keeping a second, obsolete look.
+-   **[DECIDED · 2026-10-02] D-58 --- Tab return: keep reusable resources warm, inside a bounded budget.**
+    - **Two lifecycles, kept separate:**
+      - The **active render lifecycle** (canvas, clock, GPU surfaces) still stops and releases on blur and background, as today.
+      - A **reusable resource cache** survives an ordinary tab blur: decoded Orrery photo derivatives, `OrreryTextService` Paragraph entries, and the baked sky/nebula textures.
+    - **The cache is bounded.** It has explicit size caps and eviction (LRU), and is released on background or memory pressure and when the Orrery has not been visited for a while (the timeout is an engineering tunable).
+    - **It must stay within 38.6 D-11's "working memory stays flat" gate**, measured with the 38.6 fixed method (graphics and GL growth limit). "Fix slow tab return" must not become "the Orrery keeps everything forever".
+    - **ADR-170 is clarified, not contradicted.** It retires *settled switch* resources, so memory must not grow with the number of switches. That stays fully in force. It says nothing about reusable caches across a tab blur; record the new cache policy as its own ADR that cites ADR-170 and 38.6 D-11.
 
 ## Scope
 
@@ -386,6 +404,7 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
 | D-33 | Phase 29 full-name initials fallback (`29-05-SUMMARY.md:93`) |
 | D-35 | 38.5 D-12 "full scrim" wording, for the Orrery's cards and controls |
 | D-47 | phase-08 `:225-230` (focus stops at the name-visible level) |
+| D-58 | Clarifies ADR-170, which still retires settled switch resources: adds a bounded reusable-resource cache across tab blur, bounded by 38.6 D-11. Record it as its own ADR citing both. |
 
 ## Verification Expectations
 
@@ -401,7 +420,11 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
 - `OrreryTextService` cache and disposal;
 - switch setup O(N) and no renderer re-render during the switch.
 
-**Day-one baseline:** a release build of **today's main** on both phones, measured exactly as the V2 build will be. No lab ever measured main in release.
+**Day-one baseline (D-56):** a release build of **today's main** on both phones, measured exactly as the V2 build will be. No lab ever measured main in release. It is followed by the owner's gate-lock checkpoint.
+
+**Tab-return cache (D-58):** tab blur and return timing, cache caps and eviction, release on background, and 38.6 D-11 memory measured with its fixed method.
+
+**System Preview (D-57):** it renders the V2 look flat, with no tilt or yaw.
 
 **Device, debug for iteration, then one release build on the Pixel 6 Pro and Pixel 3a.** Use the shared Size 5/10/20/32/120 cast (rebuild the seed as one dev seed). Cover:
 - overview, the zoom tiers and focus;
@@ -416,7 +439,7 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
 - TalkBack through the companion sheet.
 
 **Gates:**
-- O-1 performance numbers, once confirmed;
+- D-56 hard gates from the start, and its numeric gates once the owner locks them after the Day-1 baseline;
 - D-28 contrast at 4.5:1 in all four themes over the sky (ADR-169 method);
 - D-40 heat no worse than main;
 - `tsc`, `check:colors` and vitest green.
@@ -433,3 +456,4 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
 ## Revision Log
 
 -   **2026-10-02** --- Draft authored from the Prototype D synthesis: D-01..D-30 (field sheet), D-31..D-42 (chat rulings), D-43..D-55 (derived), O-1..O-3 open. Awaiting codex review.
+-   **2026-10-02** --- Codex review: green light. O-1..O-3 resolved as D-56 (Day-1 baseline, then the owner locks the numeric gates; hard gates in force from the start), D-57 (Preview adopts the V2 look, flat) and D-58 (bounded warm cache across tab blur; clarifies ADR-170; bounded by 38.6 D-11). The dangling D-56 reference in D-44 now resolves. D-37 and D-40 clarify that the sky drift is permitted environmental motion on the same ambient clock.
