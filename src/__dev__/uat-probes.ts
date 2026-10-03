@@ -1,6 +1,35 @@
 import { DevSettings } from "react-native";
 
 let registered = false;
+/** One Orrery perf-fixture action at a time (seed and restore both write). */
+let orreryFixtureBusy = false;
+
+/**
+ * The re-anchor target the measurement runbook writes with `run-as` to
+ * `<app files dir>/orrery-perf/reanchor.json`: `{"offsetDays": n}` plus an
+ * optional `"sunContactId"` recorded at seed time. Missing file → offset 0.
+ */
+async function readOrreryReanchorTarget(): Promise<{
+  offsetDays: number;
+  expectedSunContactId: number | null;
+}> {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { File, Paths } =
+    require("expo-file-system") as typeof import("expo-file-system");
+  const file = new File(Paths.document, "orrery-perf/reanchor.json");
+  if (!file.exists) return { offsetDays: 0, expectedSunContactId: null };
+  const parsed = JSON.parse(await file.text()) as {
+    offsetDays?: unknown;
+    sunContactId?: unknown;
+  };
+  const offsetDays = parsed.offsetDays ?? 0;
+  if (typeof offsetDays !== "number" || !Number.isInteger(offsetDays))
+    throw new Error(`reanchor.json offsetDays is not a whole number`);
+  const sun = parsed.sunContactId ?? null;
+  if (sun !== null && typeof sun !== "number")
+    throw new Error("reanchor.json sunContactId is not a number or null");
+  return { offsetDays, expectedSunContactId: sun };
+}
 
 /** Shell ticks per "shell-tick fan-out" probe run (38.4 Plan 15, W3/O-1). */
 const UAT_FAN_OUT_TICKS = 20;
@@ -126,6 +155,80 @@ export function registerUatProbes(): void {
       );
     })();
   });
+  // 38.7 Plan 01 (D-56): the Orrery perf fixture — the labs' shared Size cast
+  // plus an All Contacts stress set, written through the real DAOs on a test
+  // phone. Synthetic data only; the seed module never enters a release bundle.
+  DevSettings.addMenuItem(
+    "Orrery: seed perf fixture (Size cast + stress)",
+    () => {
+      if (orreryFixtureBusy) return console.log("orrery-seed busy");
+      orreryFixtureBusy = true;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { defaultOrrerySeedDeps, seedOrreryPerfFixture } =
+        require("./orrery-seed") as typeof import("./orrery-seed");
+      void (async () => {
+        try {
+          const { getExecutor } =
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            require("@/db/database") as typeof import("@/db/database");
+          // seedOrreryPerfFixture logs the `orrery-seed cast=… stress=…` line.
+          await seedOrreryPerfFixture(getExecutor(), defaultOrrerySeedDeps);
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { bumpShellRefresh } =
+            require("@/stores/shell-refresh-store") as typeof import("@/stores/shell-refresh-store");
+          bumpShellRefresh();
+        } catch (error) {
+          console.log("orrery-seed failed", String(error));
+        } finally {
+          orreryFixtureBusy = false;
+        }
+      })();
+    },
+  );
+  DevSettings.addMenuItem(
+    "Orrery: restore perf fixture (photos + re-anchor)",
+    () => {
+      if (orreryFixtureBusy) return console.log("orrery-fixture busy");
+      orreryFixtureBusy = true;
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const seed = require("./orrery-seed") as typeof import("./orrery-seed");
+      void (async () => {
+        try {
+          const { getExecutor } =
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            require("@/db/database") as typeof import("@/db/database");
+          const exec = getExecutor();
+          const deps = seed.defaultOrrerySeedDeps;
+          const target = await readOrreryReanchorTarget();
+          await seed.restoreOrreryPerfFixturePhotos(exec, deps, target);
+          const prefs = await seed.restoreOrreryPerfFixturePreferences(
+            exec,
+            deps,
+            target,
+          );
+          const result = await seed.reanchorOrreryPerfFixture(
+            exec,
+            deps,
+            target,
+          );
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
+          const { bumpShellRefresh } =
+            require("@/stores/shell-refresh-store") as typeof import("@/stores/shell-refresh-store");
+          bumpShellRefresh();
+          const problems = [...prefs.problems, ...result.problems];
+          console.log(
+            `orrery-fixture ok=${result.ok && prefs.problems.length === 0} offsetDays=${result.offsetDays} problems=${problems.length ? problems.join(" | ") : "none"}`,
+          );
+        } catch (error) {
+          console.log(
+            `orrery-fixture ok=false offsetDays=null problems=${String(error)}`,
+          );
+        } finally {
+          orreryFixtureBusy = false;
+        }
+      })();
+    },
+  );
   DevSettings.addMenuItem("Measure backup ingress", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { runIngressMeasure } =
