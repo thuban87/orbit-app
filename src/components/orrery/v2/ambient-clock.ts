@@ -1,8 +1,8 @@
 /**
  * 38.7-08 (D-49/D-40): the Orrery's ONE quantised ambient clock.
  *
- * Every ambient consumer (the star twinkle and the sun pulse today; orbit
- * pulses and sky drift in later plans) reads ONE SharedValue: ambient time in
+ * Every ambient consumer (the star twinkle, the sun pulse and — 38.7-09 — the
+ * sky drift and the orbit pulses) reads ONE SharedValue: ambient time in
  * milliseconds, quantised to `AMBIENT_HZ`, or −1 under reduced motion (every
  * consumer then freezes). The value changes at most `AMBIENT_HZ` times a
  * second, and an unchanged tick writes nothing, so the canvas re-records an
@@ -55,6 +55,10 @@ export function quantiseAmbient(clockMs: number, reduced: boolean): number {
 export interface AmbientConsumers {
   twinkle: boolean;
   sunPulse: boolean;
+  /** 38.7-09 (D-36): the painted sky's barely-there drift. */
+  skyDrift?: boolean;
+  /** 38.7-09 (D-10): the subtle orbit pulses. */
+  orbitPulses?: boolean;
 }
 
 /**
@@ -66,7 +70,12 @@ export function ambientNeeded(
   consumers: AmbientConsumers,
 ): boolean {
   if (reduced) return false;
-  return consumers.twinkle || consumers.sunPulse;
+  return (
+    consumers.twinkle ||
+    consumers.sunPulse ||
+    consumers.skyDrift === true ||
+    consumers.orbitPulses === true
+  );
 }
 
 /** The timer seam of the interval driver (real timers in the app). */

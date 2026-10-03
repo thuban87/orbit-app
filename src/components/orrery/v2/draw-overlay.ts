@@ -35,7 +35,7 @@ import {
   polarisProjection,
 } from "@/logic/orrery-recovery-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
-import { drawPlaneRing, type RingBands } from "./draw-plane";
+import { drawPlaneRing, plainRingLine, type RingBands } from "./draw-plane";
 import type { OrreryInk, OverlaySpec } from "./scene-specs";
 
 /** Today's outline stroke (reorder ghost / focus ring): 2 dp. */
@@ -133,11 +133,7 @@ export function drawReorderOutline(
       canvas,
       planeHomography(frame.pose, frame.viewport),
       body.worldRingRadius,
-      OUTLINE_WIDTH / 2,
-      aaDp,
-      0,
-      1,
-      spec.ink.accent,
+      plainRingLine(OUTLINE_WIDTH / 2, aaDp, spec.ink.accent),
       effect,
       bands,
     );

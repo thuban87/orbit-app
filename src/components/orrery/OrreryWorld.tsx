@@ -100,6 +100,7 @@ import {
   buildFocusOutlines,
   buildOverlayInk,
   buildPhotoRequests,
+  buildPlaneSpec,
   buildRingSpecs,
   buildSatelliteLooks,
   buildSkySpec,
@@ -107,6 +108,7 @@ import {
   EMPTY_BODY_SPECS,
   EMPTY_LABEL_LAYER_SPECS,
   EMPTY_OVERLAY_SPEC,
+  EMPTY_PLANE_SPEC,
   EMPTY_RING_SPECS,
   EMPTY_SKY_IMAGE,
   EMPTY_SKY_SPEC,
@@ -115,6 +117,7 @@ import {
   type OrreryLayerId,
   type OrrerySpecPublisher,
   type OverlaySpec,
+  type PlaneSpec,
   parseLedgerHandle,
   type RingSpecs,
   type SkyImageSpec,
@@ -122,6 +125,14 @@ import {
   tokenInk,
 } from "./v2/scene-specs";
 import {
+  GRID_EXTENT,
+  GRID_HALF_WIDTH_DP,
+  GRID_OPACITY,
+  GRID_RINGS,
+  GRID_SPOKES,
+  PULSE_BUDGET,
+  PULSE_INTENSITY,
+  RING_LOOKS,
   SKY_LOOKS,
   SKY_STAR_SEED,
   SKY_TWINKLE_GROUPS,
@@ -524,12 +535,28 @@ export function OrreryWorld({
       seed: SKY_NEBULA_SEED[themePackage],
     });
   }, [skyOwner, skyKey]);
-  // D-43/D-44: the V2 ring look, rebuilt on resource or theme change only
-  // (never per frame); the base picture reads it with the shared frame.
+  // D-43/D-44/D-11: the V2 ring look (Lab B's thin, sun-lit lines), rebuilt
+  // on resource or theme change only (never per frame); the base picture
+  // reads it with the shared frame.
+  const ringLook = RING_LOOKS[themePackage][themeMode];
   const ringSpecs = useSharedValue<RingSpecs>(EMPTY_RING_SPECS);
   useEffect(() => {
-    ringSpecs.value = buildRingSpecs(resources, colors);
-  }, [ringSpecs, resources, colors]);
+    ringSpecs.value = buildRingSpecs(resources, colors, ringLook);
+  }, [ringSpecs, resources, colors, ringLook]);
+  // 38.7-09 (D-09/D-10): the plane's optional grid and the orbit pulses
+  // (theme only; GRID_OPACITY / PULSE_INTENSITY are owner-ruled tunables).
+  const planeSpec = useSharedValue<PlaneSpec>(EMPTY_PLANE_SPEC);
+  useEffect(() => {
+    planeSpec.value = buildPlaneSpec(colors, themeMode, ringLook, {
+      gridOpacity: GRID_OPACITY,
+      gridRings: GRID_RINGS,
+      gridSpokes: GRID_SPOKES,
+      gridHalfWidthDp: GRID_HALF_WIDTH_DP,
+      gridExtent: GRID_EXTENT,
+      pulseIntensity: PULSE_INTENSITY,
+      pulseBudget: PULSE_BUDGET,
+    });
+  }, [planeSpec, colors, themeMode, ringLook]);
   // The overlay picture's inputs (Polaris, reorder and focus outlines). The
   // focus set is keyed by its ids, so an unrelated render writes nothing.
   const overlaySpec = useSharedValue<OverlaySpec>(EMPTY_OVERLAY_SPEC);
@@ -983,6 +1010,7 @@ export function OrreryWorld({
       skyImage={skyImage}
       coverColor={colors.orrerySkyBase}
       ringSpecs={ringSpecs}
+      plane={planeSpec}
       overlay={overlaySpec}
       reorder={camera.reorder}
       bodies={bodySpecs}

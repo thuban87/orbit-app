@@ -14,6 +14,13 @@
  * 38.7-05 drew from the projected samples. A body that is itself culled keeps
  * its ring's visible arc, exactly as before.
  *
+ * 38.7-09: Lab B's thin, SUN-LIT status lines (D-11: dash duties, sun light,
+ * far-side depth fade), the optional Lab C-style orbital-plane grid under the
+ * rings in the same (baked) base picture (D-09), and the subtle orbit pulses —
+ * ring-shader arcs drawn by their own ambient picture, never baked (D-10).
+ * D-44/D-64 decided world-plane rings only (no ring field), so these terms
+ * exist on this path alone.
+ *
  * Worklet helpers are defined above their callers (Hermes forward-ref rule).
  */
 import {
@@ -37,7 +44,21 @@ import {
   ringScreenPerimeter,
   ringScreenSpacing,
 } from "@/logic/orrery-plane-logic";
-import type { OrreryInk, RingSpecs } from "./scene-specs";
+import type {
+  GridSpec,
+  OrreryInk,
+  PulseSpec,
+  RingSpec,
+  RingSpecs,
+} from "./scene-specs";
+import {
+  PULSE_ARC_HALF,
+  PULSE_CYCLE_MS,
+  PULSE_HALF_WIDTH_DP,
+  PULSE_SPEED,
+  PULSE_TRAVEL_MS,
+  RING_SUN_LIGHT_RADIUS,
+} from "./visual-tunables";
 
 /** Segments of every cached annulus strip. */
 export const RING_BAND_SEGMENTS = 128;
@@ -121,15 +142,59 @@ export function ringMatrix(h: Homography, radius: number): number[] {
   ];
 }
 
-/** RING_PLANE_SKSL uniforms, in declaration order (19 floats). */
+/**
+ * One ring line's look for the ring shader: width, AA, dashes, alpha, ink,
+ * the D-11 sun light and depth fade, and the D-10 pulse arc (half 0 = the
+ * whole ring).
+ */
+export interface RingLine {
+  halfWidthDp: number;
+  aaDp: number;
+  dashes: number;
+  dashDuty: number;
+  alpha: number;
+  ink: OrreryInk;
+  lightGain: number;
+  /** World radius of the sun light's falloff. */
+  lightRadius: number;
+  lightMix: number;
+  farAlpha: number;
+  light: OrreryInk;
+  /** Pulse arc centre (radians, clockwise from north). */
+  arcCentre: number;
+  /** Pulse arc half-length (radians); 0 = the whole ring. */
+  arcHalf: number;
+}
+
+/** A plain line: no sun light, no depth fade, no dashes, the whole ring. */
+export function plainRingLine(
+  halfWidthDp: number,
+  aaDp: number,
+  ink: OrreryInk,
+): RingLine {
+  "worklet";
+  return {
+    halfWidthDp,
+    aaDp,
+    dashes: 0,
+    dashDuty: 1,
+    alpha: 1,
+    ink,
+    lightGain: 0,
+    lightRadius: 1,
+    lightMix: 0,
+    farAlpha: 1,
+    light: ink,
+    arcCentre: 0,
+    arcHalf: 0,
+  };
+}
+
+/** RING_PLANE_SKSL uniforms, in declaration order (32 floats). */
 export function ringPlaneUniforms(
   h: Homography,
   radius: number,
-  halfWidthDp: number,
-  aaDp: number,
-  dashes: number,
-  alpha: number,
-  ink: OrreryInk,
+  line: RingLine,
 ): number[] {
   "worklet";
   return [
@@ -143,15 +208,28 @@ export function ringPlaneUniforms(
     h[7],
     h[8],
     radius,
-    halfWidthDp,
-    aaDp,
-    dashes,
+    line.halfWidthDp,
+    line.aaDp,
+    line.dashes,
     HORIZON_EPSILON,
-    alpha,
-    ink[0],
-    ink[1],
-    ink[2],
-    ink[3],
+    line.alpha,
+    line.ink[0],
+    line.ink[1],
+    line.ink[2],
+    line.ink[3],
+    line.dashDuty,
+    line.lightGain,
+    line.lightRadius,
+    line.lightMix,
+    line.farAlpha,
+    line.light[0],
+    line.light[1],
+    line.light[2],
+    line.light[3],
+    line.arcCentre,
+    line.arcHalf,
+    0,
+    0,
   ];
 }
 
@@ -159,31 +237,26 @@ export function ringPlaneUniforms(
  * Draw one world-plane ring (radius `radius` about the sun) with `effect`.
  * Returns false (nothing drawn) when the ring cannot show: no compiled effect
  * or strips, a non-positive radius, or a disc wholly beyond the horizon.
+ * `blend` (optional) is the paint's blend mode (pulses: additive on dark).
  */
 export function drawPlaneRing(
   canvas: SkCanvas,
   h: Homography,
   radius: number,
-  halfWidthDp: number,
-  aaDp: number,
-  dashes: number,
-  alpha: number,
-  ink: OrreryInk,
+  line: RingLine,
   effect: SkRuntimeEffect | null,
   bands: RingBands | null,
+  blend?: BlendMode,
 ): boolean {
   "worklet";
   if (!effect || !bands || bands.length === 0) return false;
-  const band = ringBandIndex(h, radius, halfWidthDp, aaDp);
+  const band = ringBandIndex(h, radius, line.halfWidthDp, line.aaDp);
   if (band < 0) return false;
   if (discBeyondHorizon(h, radius * (1 + RING_BAND_EPS[band]) * BAND_GROW))
     return false;
   const paint = Skia.Paint();
-  paint.setShader(
-    effect.makeShader(
-      ringPlaneUniforms(h, radius, halfWidthDp, aaDp, dashes, alpha, ink),
-    ),
-  );
+  paint.setShader(effect.makeShader(ringPlaneUniforms(h, radius, line)));
+  if (blend !== undefined) paint.setBlendMode(blend);
   canvas.save();
   canvas.concat(ringMatrix(h, radius));
   canvas.drawVertices(bands[band], BlendMode.Dst, paint);
@@ -201,6 +274,50 @@ export function ringDashCount(
   if (!(periodDp > 0)) return 0;
   const count = Math.round(ringScreenPerimeter(h, radius) / periodDp);
   return Math.max(MIN_DASHES, Math.min(MAX_DASHES, count));
+}
+
+/** The ring line a status spec draws on this frame. */
+export function statusRingLine(
+  spec: RingSpec,
+  alpha: number,
+  dashes: number,
+  aaDp: number,
+  lightRadius: number,
+): RingLine {
+  "worklet";
+  return {
+    halfWidthDp: spec.widthDp / 2,
+    aaDp,
+    dashes,
+    dashDuty: spec.dashDuty,
+    alpha,
+    ink: spec.ink,
+    lightGain: spec.lightGain,
+    lightRadius,
+    lightMix: spec.lightMix,
+    farAlpha: spec.farAlpha,
+    light: spec.light,
+    arcCentre: 0,
+    arcHalf: 0,
+  };
+}
+
+/** The outermost contact orbit and the ring count of a frame. */
+export function frameRingExtent(frame: AnimatedFrame): {
+  rings: number;
+  outer: number;
+} {
+  "worklet";
+  let rings = 0,
+    outer = 0;
+  const bodies = frame.bodies;
+  for (let i = 0; i < bodies.length; i++) {
+    const body = bodies[i];
+    if (body.kind !== "contact" || !(body.worldRingRadius > 0)) continue;
+    rings++;
+    if (body.worldRingRadius > outer) outer = body.worldRingRadius;
+  }
+  return { rings, outer };
 }
 
 /**
@@ -222,19 +339,13 @@ export function drawPlaneRings(
   if (!effect || !bands) return 0;
   const bodies = frame.bodies;
   // Ring density (Lab C): the outer ring over the ring count, at this zoom.
-  let rings = 0,
-    outer = 0;
-  for (let i = 0; i < bodies.length; i++) {
-    const body = bodies[i];
-    if (body.kind !== "contact" || !(body.worldRingRadius > 0)) continue;
-    rings++;
-    if (body.worldRingRadius > outer) outer = body.worldRingRadius;
-  }
+  const { rings, outer } = frameRingExtent(frame);
   if (rings === 0) return 0;
   const fade = ringDensityFade(
     ringScreenSpacing(outer, rings, frame.pose.zoom),
   );
   const h = planeHomography(frame.pose, frame.viewport);
+  const lightRadius = Math.max(1, outer * RING_SUN_LIGHT_RADIUS);
   let drawn = 0;
   for (let i = 0; i < bodies.length; i++) {
     const body = bodies[i];
@@ -249,11 +360,13 @@ export function drawPlaneRings(
         canvas,
         h,
         radius,
-        spec.widthDp / 2,
-        aaDp,
-        ringDashCount(h, radius, spec.dashPeriodDp),
-        alpha,
-        spec.ink,
+        statusRingLine(
+          spec,
+          alpha,
+          ringDashCount(h, radius, spec.dashPeriodDp),
+          aaDp,
+          lightRadius,
+        ),
         effect,
         bands,
       )
@@ -261,6 +374,211 @@ export function drawPlaneRings(
       drawn++;
   }
   return drawn;
+}
+
+// ── Orbit pulses (D-10/D-37/D-49): never baked, ambient clock only ────────
+
+/** Integer hash → 0..1 (Math.imul keeps it exact; no Math.random). */
+export function pulseHash(a: number, b: number): number {
+  "worklet";
+  let h = Math.imul(a | 0, 374761393) ^ Math.imul(b | 0, 668265263);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+/** One pulse at an ambient time: the ring it travels and where it is. */
+export interface PulsePlacement {
+  /** Index into the eligible ring list. */
+  ring: number;
+  /** Arc centre (radians, clockwise from north). */
+  centre: number;
+  /** Fade envelope 0..1 (in and out over the travel). */
+  envelope: number;
+}
+
+/**
+ * Where pulse slot `slot` of `budget` is at ambient time `ambientMs` over
+ * `ringCount` eligible rings, or null while it rests. Slots are staggered over
+ * the cycle; each cycle a slot picks its ring and start angle from a hash of
+ * (cycle, slot) — deterministic from the ring index and the ambient time. The
+ * same for every status (D-10).
+ */
+export function pulsePlacement(
+  slot: number,
+  budget: number,
+  ambientMs: number,
+  ringCount: number,
+): PulsePlacement | null {
+  "worklet";
+  if (!(ambientMs >= 0) || !(ringCount > 0) || !(budget > 0)) return null;
+  const t = ambientMs + (slot * PULSE_CYCLE_MS) / budget;
+  const cycle = Math.floor(t / PULSE_CYCLE_MS);
+  const local = t - cycle * PULSE_CYCLE_MS;
+  if (local >= PULSE_TRAVEL_MS) return null;
+  const ring = Math.min(
+    ringCount - 1,
+    Math.floor(pulseHash(cycle, slot + 1) * ringCount),
+  );
+  const start = pulseHash(cycle + 7919, slot + 31) * Math.PI * 2;
+  return {
+    ring,
+    centre: start + (PULSE_SPEED * local) / 1000,
+    envelope: Math.sin((Math.PI * local) / PULSE_TRAVEL_MS),
+  };
+}
+
+/**
+ * The subtle orbit pulses for `frame` at ambient time `ambientMs`: at most
+ * `pulse.budget` soft arcs in `orreryPulse` at `pulse.intensity`, travelling
+ * along eligible rings (a contact ring with a spec whose alpha clears
+ * RING_SKIP_ALPHA). Nothing under reduced motion (ambient −1), with a zero
+ * budget or intensity. The status of the ring never changes a pulse.
+ * Returns the number drawn.
+ */
+export function drawPlanePulses(
+  canvas: SkCanvas,
+  frame: AnimatedFrame,
+  specs: RingSpecs,
+  pulse: PulseSpec,
+  ambientMs: number,
+  effect: SkRuntimeEffect | null,
+  bands: RingBands | null,
+  aaDp: number,
+): number {
+  "worklet";
+  if (!effect || !bands) return 0;
+  if (!(ambientMs >= 0) || !(pulse.budget > 0) || !(pulse.intensity > 0))
+    return 0;
+  const { rings, outer } = frameRingExtent(frame);
+  if (rings === 0) return 0;
+  const fade = ringDensityFade(
+    ringScreenSpacing(outer, rings, frame.pose.zoom),
+  );
+  const eligible: number[] = [];
+  const bodies = frame.bodies;
+  for (let i = 0; i < bodies.length; i++) {
+    const body = bodies[i];
+    if (body.kind !== "contact" || !(body.worldRingRadius > 0)) continue;
+    const spec = specs[bodyKey(body)];
+    if (!spec || !(body.opacity * spec.alpha * fade >= RING_SKIP_ALPHA))
+      continue;
+    eligible.push(i);
+  }
+  if (eligible.length === 0) return 0;
+  const h = planeHomography(frame.pose, frame.viewport);
+  const blend = pulse.additive ? BlendMode.Plus : BlendMode.SrcOver;
+  let drawn = 0;
+  for (let slot = 0; slot < pulse.budget; slot++) {
+    const place = pulsePlacement(
+      slot,
+      pulse.budget,
+      ambientMs,
+      eligible.length,
+    );
+    if (!place) continue;
+    const body = bodies[eligible[place.ring]];
+    const alpha = pulse.intensity * place.envelope * body.opacity * fade;
+    if (!(alpha >= RING_SKIP_ALPHA)) continue;
+    const line = plainRingLine(PULSE_HALF_WIDTH_DP, aaDp, pulse.ink);
+    line.alpha = alpha;
+    line.farAlpha = pulse.farAlpha;
+    line.arcCentre = place.centre;
+    line.arcHalf = PULSE_ARC_HALF;
+    if (
+      drawPlaneRing(canvas, h, body.worldRingRadius, line, effect, bands, blend)
+    )
+      drawn++;
+  }
+  return drawn;
+}
+
+// ── The orbital-plane grid (D-09): in the baked base, under the rings ─────
+
+/** Segments of the cached unit disc fan the grid is shaded on. */
+export const GRID_DISC_SEGMENTS = 96;
+
+/** JS thread, once: the unit disc fan (null when Skia lacks vertices). */
+export function makeGridDisc(): SkVertices | null {
+  const make = Skia?.MakeVertices;
+  if (typeof make !== "function") return null;
+  const grow = 1 / Math.cos(Math.PI / GRID_DISC_SEGMENTS);
+  const fan: SkPoint[] = [{ x: 0, y: 0 }];
+  for (let i = 0; i <= GRID_DISC_SEGMENTS; i++) {
+    const a = (i * 2 * Math.PI) / GRID_DISC_SEGMENTS;
+    fan.push({ x: Math.sin(a) * grow, y: -Math.cos(a) * grow });
+  }
+  return make(VertexMode.TriangleFan, fan);
+}
+
+let sharedDisc: SkVertices | null | undefined;
+/** The app-wide unit disc (immutable; built lazily on the JS thread). */
+export function gridDisc(): SkVertices | null {
+  if (sharedDisc === undefined) sharedDisc = makeGridDisc();
+  return sharedDisc;
+}
+
+/** GRID_PLANE_SKSL uniforms, in declaration order (21 floats). */
+export function gridPlaneUniforms(
+  h: Homography,
+  reach: number,
+  grid: GridSpec,
+  aaDp: number,
+): number[] {
+  "worklet";
+  return [
+    h[0],
+    h[1],
+    h[2],
+    h[3],
+    h[4],
+    h[5],
+    h[6],
+    h[7],
+    h[8],
+    reach,
+    grid.halfWidthDp,
+    aaDp,
+    HORIZON_EPSILON,
+    grid.rings,
+    grid.spokes,
+    grid.opacity,
+    grid.farAlpha,
+    grid.ink[0],
+    grid.ink[1],
+    grid.ink[2],
+    grid.ink[3],
+  ];
+}
+
+/**
+ * The optional orbital-plane grid (D-09) out to `grid.extent` × the outermost
+ * orbit, under the frame's homography. Opacity 0 → nothing is drawn at all
+ * (not even a transparent draw). Horizon-safe: a disc wholly beyond the
+ * horizon is skipped; the shader discards fragments past the near plane.
+ */
+export function drawPlaneGrid(
+  canvas: SkCanvas,
+  frame: AnimatedFrame,
+  grid: GridSpec,
+  effect: SkRuntimeEffect | null,
+  disc: SkVertices | null,
+  aaDp: number,
+): boolean {
+  "worklet";
+  if (!(grid.opacity > 0) || !effect || !disc) return false;
+  const { outer } = frameRingExtent(frame);
+  if (!(outer > 0)) return false;
+  const reach = outer * grid.extent;
+  const h = planeHomography(frame.pose, frame.viewport);
+  if (discBeyondHorizon(h, reach * 1.05)) return false;
+  const paint = Skia.Paint();
+  paint.setShader(effect.makeShader(gridPlaneUniforms(h, reach, grid, aaDp)));
+  canvas.save();
+  canvas.concat(ringMatrix(h, reach));
+  canvas.drawVertices(disc, BlendMode.Dst, paint);
+  canvas.restore();
+  return true;
 }
 
 let sharedBands: RingBands | null | undefined;

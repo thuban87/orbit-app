@@ -1,9 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@shopify/react-native-skia", () => ({
-  BlendMode: { Dst: 2, SrcOver: 3 },
+  BlendMode: { Dst: 2, SrcOver: 3, Plus: 12 },
   VertexMode: { Triangles: 0, TriangleStrip: 1, TriangleFan: 2 },
   Skia: {
+    // A deterministic stand-in for Skia's token parser: distinct per token.
+    Color: (token: string) => {
+      let hash = 0;
+      for (let i = 0; i < token.length; i++)
+        hash = (hash * 31 + token.charCodeAt(i)) >>> 0;
+      return Float32Array.of(
+        (hash % 251) / 256,
+        ((hash >> 8) % 251) / 256,
+        ((hash >> 16) % 251) / 256,
+        1,
+      );
+    },
     MakeVertices: (mode: number, points: unknown[]) => ({
       mode,
       count: points.length,
@@ -12,6 +24,10 @@ vi.mock("@shopify/react-native-skia", () => ({
       const paint = {
         shader: null as unknown,
         style: "fill",
+        blend: undefined as number | undefined,
+        setBlendMode: (blend: number) => {
+          paint.blend = blend;
+        },
         setShader: (shader: unknown) => {
           paint.shader = shader;
         },
@@ -45,14 +61,35 @@ import {
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import {
+  drawPlaneGrid,
+  drawPlanePulses,
   drawPlaneRings,
+  makeGridDisc,
   makeRingBands,
+  pulsePlacement,
   RING_BAND_EPS,
   RING_BAND_SEGMENTS,
   ringBandIndex,
   ringDashCount,
 } from "./draw-plane";
-import type { OrreryInk, RingSpec, RingSpecs } from "./scene-specs";
+import {
+  buildRingSpecs,
+  type GridSpec,
+  type OrreryInk,
+  type PulseSpec,
+  type RingSpec,
+  type RingSpecs,
+} from "./scene-specs";
+import {
+  PULSE_BUDGET,
+  PULSE_CYCLE_MS,
+  PULSE_HALF_WIDTH_DP,
+  PULSE_TRAVEL_MS,
+  RING_LOOKS,
+  RING_SUN_LIGHT_RADIUS,
+  RING_WIDTH_BASE,
+  RING_WIDTH_SCALE,
+} from "./visual-tunables";
 
 const DEG = Math.PI / 180;
 const viewport: CameraViewport = { width: 412, height: 780 };
@@ -81,11 +118,17 @@ const effect = {
 } as never;
 
 const ink = (seed: number): OrreryInk => [seed / 10, 0.2, 0.3, 1];
+const LIGHT: OrreryInk = [1, 0.9, 0.8, 1];
 const spec = (overrides: Partial<RingSpec> = {}): RingSpec => ({
   ink: ink(1),
   widthDp: 2,
   alpha: 1,
   dashPeriodDp: 0,
+  dashDuty: 1,
+  lightGain: 0,
+  lightMix: 0,
+  farAlpha: 1,
+  light: LIGHT,
   ...overrides,
 });
 
@@ -168,56 +211,83 @@ describe("drawPlaneRings (D-44 world plane)", () => {
     // The uniforms carry the exact homography (drawn == tappable).
     expect(uniformsOf(draws(calls)[0]).slice(0, 9)).toEqual(h);
   });
-  it("per-status uniforms: today's ink, width, alpha and 6-on-6-off dashes", () => {
+  it("D-11 per-status uniforms: Lab B's thin widths (weight still orders status), dash duties, alphas and the sun-lit rim", () => {
     const colors = THEME_PRESETS.galaxy.dark;
     const frame = frameFor(
       [contact(1, 80), contact(2, 120), contact(3, 160), contact(4, 200)],
       { x: 0, y: 0, zoom: 1.5, tilt: 0 },
     );
     const statuses = ["stable", "wobble", "decay", "rogue"] as const;
-    const specs: RingSpecs = Object.fromEntries(
-      statuses.map((status, i) => {
-        const style = orreryRingStyle(status, colors);
-        return [
-          `contact:${i + 1}`,
-          spec({
-            ink: ink(i + 1),
-            widthDp: style.width,
-            alpha:
-              style.strokeStyle === "faded"
-                ? 0.7
-                : style.strokeStyle === "faintTrace"
-                  ? 0.3
-                  : style.opacity,
-            dashPeriodDp:
-              style.strokeStyle === "dashed" ||
-              style.strokeStyle === "faintTrace"
-                ? 12
-                : 0,
-          }),
-        ];
-      }),
+    const built = buildRingSpecs(
+      statuses.map((status, i) => ({
+        key: `contact:${i + 1}`,
+        body: {
+          id: i + 1,
+          kind: "contact" as const,
+          x: 0,
+          y: 0,
+          radius: 16,
+          ringRadius: 80 + i * 40,
+        },
+        scene: { contacts: [{ id: i + 1, status }] } as never,
+      })),
+      colors,
+      RING_LOOKS.galaxy.dark,
     );
     const { canvas, calls } = recordingCanvas();
     const aa = 1 / 3;
-    drawPlaneRings(canvas, frame, specs, effect, bands, aa);
+    drawPlaneRings(canvas, frame, built, effect, bands, aa);
     const u = draws(calls).map(uniformsOf);
     expect(u).toHaveLength(4);
-    // [9 H][R][halfW][AA][dashes][eps][alpha][ink×4]
+    // [9 H][R][halfW][AA][dashes][eps][alpha][ink×4][duty][lit×4][light×4][arc×4]
+    for (const uniforms of u) expect(uniforms).toHaveLength(32);
     const [stable, wobble, decay, rogue] = u;
-    expect(stable.slice(9, 15)).toEqual([80, 1, aa, 0, HORIZON_EPSILON, 1]);
-    expect(stable.slice(15)).toEqual([...ink(1)]);
-    expect(wobble[10]).toBe(1.5);
-    expect(wobble[14]).toBe(1);
-    // Flat at zoom 1.5: perimeter 2π·120·1.5 ≈ 1131 dp → 94 dashes of 12 dp.
-    expect(wobble[12]).toBe(Math.round((2 * Math.PI * 120 * 1.5) / 12));
-    expect(decay[10]).toBe(2);
+    const width = (status: (typeof statuses)[number]) =>
+      orreryRingStyle(status, colors).width * RING_WIDTH_SCALE +
+      RING_WIDTH_BASE;
+    // Thin: every line is under 2 dp wide, and weight still orders status.
+    expect(stable[10]).toBeCloseTo(width("stable") / 2, 12);
+    expect(wobble[10]).toBeCloseTo(width("wobble") / 2, 12);
+    expect(decay[10]).toBeCloseTo(width("decay") / 2, 12);
+    expect(rogue[10]).toBeCloseTo(width("rogue") / 2, 12);
+    expect(stable[10]).toBeLessThan(wobble[10]);
+    expect(wobble[10]).toBeLessThan(decay[10]);
+    for (const uniforms of u) expect(uniforms[10] * 2).toBeLessThan(2);
+    // The ladder: solid / dashed / faded / faint trace.
+    expect(stable.slice(9, 15)).toEqual([
+      80,
+      stable[10],
+      aa,
+      0,
+      HORIZON_EPSILON,
+      1,
+    ]);
+    expect(stable[19]).toBe(1);
+    // Wobble: 11 dp dashes at 0.58 on. Flat at zoom 1.5 → perimeter/11.
+    expect(wobble[12]).toBe(Math.round((2 * Math.PI * 120 * 1.5) / 11));
+    expect(wobble[19]).toBeCloseTo(0.58, 12);
     expect(decay[12]).toBe(0);
     expect(decay[14]).toBeCloseTo(0.7, 12);
-    expect(rogue[10]).toBe(1.5);
-    expect(rogue[14]).toBeCloseTo(0.3, 12);
-    expect(rogue[12]).toBeGreaterThan(0);
-    expect(rogue.slice(15)).toEqual([...ink(4)]);
+    // Rogue: a 6 dp faint trace at 0.3 on, alpha 0.42.
+    expect(rogue[12]).toBe(Math.round((2 * Math.PI * 200 * 1.5) / 6));
+    expect(rogue[19]).toBeCloseTo(0.3, 12);
+    expect(rogue[14]).toBeCloseTo(0.42, 12);
+    // Status colour is the ring ink (the non-colour cues above carry it too).
+    expect(stable.slice(15, 19)).toEqual([...built["contact:1"].ink]);
+    expect(rogue.slice(15, 19)).toEqual([...built["contact:4"].ink]);
+    // The sun-lit rim: Galaxy Dark's gain and mix, the light radius from the
+    // outermost orbit, the far-side alpha, the ring-light ink; no arc.
+    const look = RING_LOOKS.galaxy.dark;
+    for (const uniforms of u) {
+      expect(uniforms.slice(20, 24)).toEqual([
+        look.lightGain,
+        200 * RING_SUN_LIGHT_RADIUS,
+        look.lightMix,
+        look.farAlpha,
+      ]);
+      expect(uniforms.slice(24, 28)).toEqual([...built["contact:1"].light]);
+      expect(uniforms.slice(28, 30)).toEqual([0, 0]);
+    }
   });
   it("skips rings without a spec, departed (faded-out) rings, and rings below the skip alpha", () => {
     const frame = frameFor(
@@ -328,5 +398,221 @@ describe("drawPlaneRings (D-44 world plane)", () => {
       Math.round((2 * Math.PI * 120) / 12),
     );
     expect(ringDashCount(h, 1, 12)).toBe(4);
+  });
+});
+
+describe("drawPlaneGrid (D-09: Lab C-style orbital-plane grid)", () => {
+  const disc = makeGridDisc();
+  const grid = (opacity: number): GridSpec => ({
+    ink: ink(5),
+    opacity,
+    rings: 6,
+    spokes: 12,
+    halfWidthDp: 0.4,
+    extent: 1.12,
+    farAlpha: 0.55,
+  });
+  const pose = { x: 0, y: 0, zoom: 1, tilt: 62 * DEG, lensShift: 0.62 };
+  const world = [contact(1, 60), contact(2, 240, 1)];
+
+  it("builds one cached unit disc fan, once", () => {
+    expect(disc).toMatchObject({ mode: 2 });
+  });
+
+  it("opacity 0 draws nothing at all (not even a transparent draw)", () => {
+    const { canvas, calls } = recordingCanvas();
+    expect(
+      drawPlaneGrid(canvas, frameFor(world, pose), grid(0), effect, disc, 0.4),
+    ).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("draws ONE analytic world-plane draw under H·S(reach) with the grid uniforms", () => {
+    const frame = frameFor(world, pose);
+    const { canvas, calls } = recordingCanvas();
+    expect(drawPlaneGrid(canvas, frame, grid(0.12), effect, disc, 0.4)).toBe(
+      true,
+    );
+    expect(draws(calls)).toHaveLength(1);
+    const u = uniformsOf(draws(calls)[0]);
+    const h = planeHomography(frame.pose, frame.viewport);
+    expect(u).toHaveLength(21);
+    expect(u.slice(0, 9)).toEqual(h);
+    expect(u[9]).toBeCloseTo(240 * 1.12, 9);
+    expect(u.slice(10, 17)).toEqual([
+      0.4,
+      0.4,
+      HORIZON_EPSILON,
+      6,
+      12,
+      0.12,
+      0.55,
+    ]);
+    expect(u.slice(17)).toEqual([...ink(5)]);
+    const concat = calls.find((c) => c.op === "concat")?.args[0] as number[];
+    expect(concat[0]).toBeCloseTo(h[0] * 240 * 1.12, 9);
+  });
+
+  it("horizon-safe: a grid wholly beyond the horizon is skipped; no effect or disc → nothing", () => {
+    const behind = frameFor([contact(1, 100)], {
+      x: 0,
+      y: 3000,
+      zoom: 4,
+      tilt: 62 * DEG,
+      yaw: Math.PI,
+      lensShift: 0.62,
+    });
+    const { canvas, calls } = recordingCanvas();
+    expect(drawPlaneGrid(canvas, behind, grid(0.2), effect, disc, 0.4)).toBe(
+      false,
+    );
+    const ok = frameFor(world, pose);
+    expect(drawPlaneGrid(canvas, ok, grid(0.2), null, disc, 0.4)).toBe(false);
+    expect(drawPlaneGrid(canvas, ok, grid(0.2), effect, null, 0.4)).toBe(false);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("drawPlanePulses (D-10/D-37/D-49: subtle orbit pulses on the ambient clock)", () => {
+  const PULSE_INK: OrreryInk = [0.9, 0.92, 1, 1];
+  const pulse = (overrides: Partial<PulseSpec> = {}): PulseSpec => ({
+    ink: PULSE_INK,
+    intensity: 0.25,
+    budget: PULSE_BUDGET,
+    additive: true,
+    farAlpha: 0.55,
+    ...overrides,
+  });
+  const world = Array.from({ length: 30 }, (_, i) =>
+    contact(i + 1, 80 + i * 30, i),
+  );
+  // Five status looks (stable, wobble, decay, rogue, neutral) on 30 rings.
+  const specs: RingSpecs = Object.fromEntries(
+    world.map((b, i) => [
+      `contact:${b.id}`,
+      spec({
+        ink: ink(i % 5),
+        widthDp: 1 + (i % 5) * 0.2,
+        alpha: [1, 1, 0.7, 0.42, 0.5][i % 5],
+        dashPeriodDp: [0, 11, 0, 6, 0][i % 5],
+      }),
+    ]),
+  );
+  const frame = frameFor(world, { x: 0, y: 0, zoom: 0.6, tilt: 0 });
+
+  it("never more than the budget; none under reduced motion (ambient −1), with budget 0 or intensity 0", () => {
+    for (let ms = 0; ms < PULSE_CYCLE_MS * 3; ms += 333) {
+      const { canvas, calls } = recordingCanvas();
+      const drawn = drawPlanePulses(
+        canvas,
+        frame,
+        specs,
+        pulse(),
+        ms,
+        effect,
+        makeRingBands(),
+        0.4,
+      );
+      expect(drawn).toBeLessThanOrEqual(PULSE_BUDGET);
+      expect(draws(calls)).toHaveLength(drawn);
+    }
+    for (const [ambient, p] of [
+      [-1, pulse()],
+      [5000, pulse({ budget: 0 })],
+      [5000, pulse({ intensity: 0 })],
+    ] as const) {
+      const { canvas, calls } = recordingCanvas();
+      expect(
+        drawPlanePulses(
+          canvas,
+          frame,
+          specs,
+          p,
+          ambient,
+          effect,
+          makeRingBands(),
+          0.4,
+        ),
+      ).toBe(0);
+      expect(calls).toHaveLength(0);
+    }
+  });
+
+  it("identical for every status: same ink, width, no dashes, no sun light; only the ring and arc differ", () => {
+    let seen = 0;
+    for (let ms = 0; ms < PULSE_CYCLE_MS; ms += 250) {
+      const { canvas, calls } = recordingCanvas();
+      drawPlanePulses(
+        canvas,
+        frame,
+        specs,
+        pulse(),
+        ms,
+        effect,
+        makeRingBands(),
+        0.4,
+      );
+      for (const call of draws(calls)) {
+        const u = uniformsOf(call);
+        seen++;
+        expect(u[10]).toBe(PULSE_HALF_WIDTH_DP);
+        expect(u[12]).toBe(0); // never dashed
+        expect(u.slice(15, 19)).toEqual([...PULSE_INK]);
+        expect(u[20]).toBe(0); // no sun light term
+        expect(u[23]).toBe(0.55); // the far-side fade like the rings
+        expect(u[29]).toBeGreaterThan(0); // an arc, not a whole ring
+        expect(u[14]).toBeLessThanOrEqual(0.25); // ≤ the intensity
+        // Additive on dark.
+        expect((call.args[2] as { blend?: number }).blend).toBe(12);
+      }
+    }
+    expect(seen).toBeGreaterThan(0);
+  });
+
+  it("deterministic from the ring index and the ambient time; travels clockwise, fades in and out, then rests", () => {
+    expect(pulsePlacement(0, 8, 1234, 30)).toEqual(
+      pulsePlacement(0, 8, 1234, 30),
+    );
+    const a = pulsePlacement(0, 8, 1000, 30);
+    const b = pulsePlacement(0, 8, 2000, 30);
+    expect(a && b).toBeTruthy();
+    expect(b?.ring).toBe(a?.ring);
+    expect((b?.centre ?? 0) - (a?.centre ?? 0)).toBeCloseTo(0.3, 9);
+    expect(pulsePlacement(0, 8, 0, 30)?.envelope).toBeCloseTo(0, 9);
+    expect(pulsePlacement(0, 8, PULSE_TRAVEL_MS / 2, 30)?.envelope).toBeCloseTo(
+      1,
+      9,
+    );
+    // Slot 0 rests between its travels.
+    expect(pulsePlacement(0, 8, PULSE_TRAVEL_MS + 10, 30)).toBeNull();
+    // Over many cycles the pulses visit many rings (not a fixed few).
+    const rings = new Set<number>();
+    for (let c = 0; c < 60; c++)
+      rings.add(pulsePlacement(0, 8, c * PULSE_CYCLE_MS + 100, 30)?.ring ?? -1);
+    expect(rings.size).toBeGreaterThan(10);
+    expect(pulsePlacement(0, 8, -1, 30)).toBeNull();
+    expect(pulsePlacement(0, 0, 100, 30)).toBeNull();
+  });
+
+  it("light themes: src-over pulses", () => {
+    let blends = 0;
+    for (let ms = 0; ms < PULSE_CYCLE_MS; ms += 500) {
+      const { canvas, calls } = recordingCanvas();
+      drawPlanePulses(
+        canvas,
+        frame,
+        specs,
+        pulse({ additive: false }),
+        ms,
+        effect,
+        makeRingBands(),
+        0.4,
+      );
+      for (const call of draws(calls)) {
+        expect((call.args[2] as { blend?: number }).blend).toBe(3);
+        blends++;
+      }
+    }
+    expect(blends).toBeGreaterThan(0);
   });
 });

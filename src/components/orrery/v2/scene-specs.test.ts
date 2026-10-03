@@ -26,6 +26,7 @@ import {
   buildFocusOutlines,
   buildOverlayInk,
   buildPhotoRequests,
+  buildPlaneSpec,
   buildRingSpecs,
   buildSatelliteLooks,
   buildSkySpec,
@@ -83,29 +84,42 @@ describe("buildRingSpecs (today's status ring look, as numbers)", () => {
     "theme %i: ink, width, alpha and dash per status; no spec for the sun",
     (_i, colors) => {
       const statuses = ["stable", "wobble", "decay", "rogue", null] as const;
-      const specs = buildRingSpecs(resources([...statuses]), colors);
+      const look = { lightGain: 0.6, lightMix: 0.35, farAlpha: 0.55 };
+      const specs = buildRingSpecs(resources([...statuses]), colors, look);
       expect(Object.keys(specs).sort()).toEqual(
         statuses.map((_, i) => `contact:${i + 1}`).sort(),
       );
+      // 38.7-09 (D-11): Lab B's thin lines — the status ladder stays.
       const expected = {
-        stable: { alpha: 1, dash: 0 },
-        wobble: { alpha: 1, dash: RING_DASH_PERIOD_DP },
-        decay: { alpha: 0.7, dash: 0 },
-        rogue: { alpha: 0.3, dash: RING_DASH_PERIOD_DP },
-        null: { alpha: 0.5, dash: 0 },
+        stable: { alpha: 1, dash: 0, duty: 1 },
+        wobble: { alpha: 1, dash: RING_DASH_PERIOD_DP, duty: 0.58 },
+        decay: { alpha: 0.7, dash: 0, duty: 1 },
+        rogue: { alpha: 0.42, dash: 6, duty: 0.3 },
+        null: { alpha: 0.5, dash: 0, duty: 1 },
       } as const;
+      expect(RING_DASH_PERIOD_DP).toBe(11);
       statuses.forEach((status, i) => {
         const style = orreryRingStyle(status, colors);
         const spec = specs[`contact:${i + 1}`];
+        const want = expected[String(status) as keyof typeof expected];
         expect(spec.ink).toEqual(inkOf(style.color));
-        expect(spec.widthDp).toBe(style.width);
-        expect(spec.alpha).toBe(
-          expected[String(status) as keyof typeof expected].alpha,
-        );
-        expect(spec.dashPeriodDp).toBe(
-          expected[String(status) as keyof typeof expected].dash,
-        );
+        expect(spec.widthDp).toBeCloseTo(style.width * 0.42 + 0.2, 12);
+        expect(spec.alpha).toBe(want.alpha);
+        expect(spec.dashPeriodDp).toBe(want.dash);
+        expect(spec.dashDuty).toBe(want.duty);
+        // The sun-lit look is the theme's, the same for every status.
+        expect(spec.lightGain).toBe(0.6);
+        expect(spec.lightMix).toBe(0.35);
+        expect(spec.farAlpha).toBe(0.55);
+        expect(spec.light).toEqual(inkOf(colors.orreryRingLight));
       });
+      // Weight still orders status (thin, but stable < wobble < decay).
+      expect(specs["contact:1"].widthDp).toBeLessThan(
+        specs["contact:2"].widthDp,
+      );
+      expect(specs["contact:2"].widthDp).toBeLessThan(
+        specs["contact:3"].widthDp,
+      );
       // Status colours come from the theme: the four statuses differ.
       expect(
         new Set(
@@ -144,6 +158,64 @@ describe("buildRingSpecs (today's status ring look, as numbers)", () => {
       inkOf(THEME_PRESETS.galaxy.dark.border),
     );
     expect(specs["contact:9"].alpha).toBe(0.5);
+  });
+});
+
+describe("buildPlaneSpec (38.7-09: D-09 grid, D-10 pulses)", () => {
+  const tunables = {
+    gridOpacity: 0.12,
+    gridRings: 6,
+    gridSpokes: 12,
+    gridHalfWidthDp: 0.4,
+    gridExtent: 1.12,
+    pulseIntensity: 0.25,
+    pulseBudget: 8,
+  };
+  const look = { lightGain: 1.1, lightMix: 0.35, farAlpha: 0.55 };
+  it("grid and pulses read only orrery* tokens; the pulse blend follows the mode", () => {
+    const dark = buildPlaneSpec(
+      THEME_PRESETS.galaxy.dark,
+      "dark",
+      look,
+      tunables,
+    );
+    expect(dark.grid).toEqual({
+      ink: inkOf(THEME_PRESETS.galaxy.dark.orreryGrid),
+      opacity: 0.12,
+      rings: 6,
+      spokes: 12,
+      halfWidthDp: 0.4,
+      extent: 1.12,
+      farAlpha: 0.55,
+    });
+    expect(dark.pulse).toEqual({
+      ink: inkOf(THEME_PRESETS.galaxy.dark.orreryPulse),
+      intensity: 0.25,
+      budget: 8,
+      additive: true,
+      farAlpha: 0.55,
+    });
+    const light = buildPlaneSpec(
+      THEME_PRESETS.standard.light,
+      "light",
+      look,
+      tunables,
+    );
+    expect(light.pulse.additive).toBe(false);
+    expect(light.pulse.ink).toEqual(
+      inkOf(THEME_PRESETS.standard.light.orreryPulse),
+    );
+  });
+  it("grid off and no pulses are representable (0), never negative", () => {
+    const off = buildPlaneSpec(THEME_PRESETS.galaxy.dark, "dark", look, {
+      ...tunables,
+      gridOpacity: 0,
+      pulseBudget: 0,
+      pulseIntensity: -1,
+    });
+    expect(off.grid.opacity).toBe(0);
+    expect(off.pulse.budget).toBe(0);
+    expect(off.pulse.intensity).toBe(0);
   });
 });
 

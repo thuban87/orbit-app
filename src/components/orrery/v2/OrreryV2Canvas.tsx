@@ -15,7 +15,10 @@
  * - `sky` (38.7-09): the painted sky — gradient, the baked neutral nebula
  *   tinted per System at draw time, stars; drift and twinkle on the ambient
  *   clock, parallax from the frame (draw-sky.ts);
- * - `base`: the world-plane orbit rings (D-44), baked while still;
+ * - `base`: the optional orbital-plane grid (D-09) and the thin, sun-lit
+ *   world-plane orbit rings (D-11/D-44), baked while still;
+ * - `pulses` (38.7-09, D-10): the subtle orbit light pulses — ring-shader
+ *   arcs on the ambient clock, never baked, none under reduced motion;
  * - `bodiesBehind`: contacts and moons deeper than the sun (38.7-07);
  * - `sun`: the sun, its glow pulsing on the ambient clock;
  * - `bodiesFront`: contacts and moons nearer than the sun;
@@ -105,7 +108,13 @@ import {
 import { drawBodies, drawSun, orderBodies, sunPulse } from "./draw-bodies";
 import { drawLabels } from "./draw-labels";
 import { drawOverlay } from "./draw-overlay";
-import { drawPlaneRings, ringBands } from "./draw-plane";
+import {
+  drawPlaneGrid,
+  drawPlanePulses,
+  drawPlaneRings,
+  gridDisc,
+  ringBands,
+} from "./draw-plane";
 import { drawSky } from "./draw-sky";
 import { watchFirstSurfaceFrame } from "./first-frame";
 import { resolveOrreryRenderHost } from "./render-host";
@@ -115,6 +124,7 @@ import {
   type OrreryLabelLayerSpecs,
   type OrreryLayerId,
   type OverlaySpec,
+  type PlaneSpec,
   type RingSpecs,
   type SkyImageSpec,
   type SkySpec,
@@ -137,6 +147,8 @@ export interface OrreryV2CanvasProps {
   coverColor: string;
   /** Per-body ring look (JS-built, rewritten on resource/theme change only). */
   ringSpecs: SharedValue<RingSpecs>;
+  /** The plane's grid and pulse look (JS-built on theme change only). */
+  plane: SharedValue<PlaneSpec>;
   /** Overlay inks, Polaris extent and focus outlines (JS-built). */
   overlay: SharedValue<OverlaySpec>;
   /** The reorder hold (gesture-owned), for the held-orbit outline. */
@@ -176,6 +188,7 @@ const AMBIENT_CONSUMERS = {
   twinkle: true,
   sunPulse: true,
   skyDrift: true,
+  orbitPulses: true,
 } as const;
 /** The first-frame cover's fade (ms). */
 const COVER_FADE_MS = 160;
@@ -246,6 +259,7 @@ export function OrreryV2Canvas({
   skyImage,
   coverColor,
   ringSpecs,
+  plane,
   overlay,
   reorder,
   bodies,
@@ -268,7 +282,9 @@ export function OrreryV2Canvas({
   );
   // Static, JS-thread resources: the compiled ring effect and the unit strips.
   const ringEffect = useMemo(() => orreryShader("ringPlane"), []);
+  const gridEffect = useMemo(() => orreryShader("gridPlane"), []);
   const bands = useMemo(() => ringBands(), []);
+  const disc = useMemo(() => gridDisc(), []);
   // The AA feather: one device pixel, in dp (a primitive capture).
   const aaDp = 1 / host.devicePixelRatio();
   // 38.7-09: the painted sky (bottom). Re-recorded on an ambient tick (drift,
@@ -293,6 +309,14 @@ export function OrreryV2Canvas({
   const baseLive = useDerivedValue(() =>
     createPicture(
       (canvas) => {
+        drawPlaneGrid(
+          canvas,
+          frame.value,
+          plane.value.grid,
+          gridEffect,
+          disc,
+          aaDp,
+        );
         drawPlaneRings(
           canvas,
           frame.value,
@@ -365,6 +389,30 @@ export function OrreryV2Canvas({
     selectBasePicture(baked.value, baseLive.value),
   );
   useLayerAck(ORRERY_LAYER.base, base, baked, ackRecorded, false);
+  // D-10/D-37: the orbit pulses' clock — the ambient value, or −1 (constant:
+  // no re-recording at all) when the budget or intensity is zero.
+  const pulseClock = useDerivedValue(() =>
+    plane.value.pulse.budget > 0 && plane.value.pulse.intensity > 0
+      ? ambient.value
+      : -1,
+  );
+  const pulsesPicture = useDerivedValue(() =>
+    createPicture(
+      (canvas) => {
+        drawPlanePulses(
+          canvas,
+          frame.value,
+          ringSpecs.value,
+          plane.value.pulse,
+          pulseClock.value,
+          ringEffect,
+          bands,
+          aaDp,
+        );
+      },
+      { width, height },
+    ),
+  );
   // D-43/M14: one depth order per frame, shared by both body layers.
   const bodyOrder = useDerivedValue(() =>
     orderBodies(frame.value, bodies.value.bodies),
@@ -472,6 +520,7 @@ export function OrreryV2Canvas({
         >
           <Picture picture={skyPicture} />
           <Picture picture={base} />
+          <Picture picture={pulsesPicture} />
           <Picture picture={bodiesBehind} />
           <Picture picture={sunPicture} />
           <Picture picture={bodiesFront} />

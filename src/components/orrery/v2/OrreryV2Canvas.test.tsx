@@ -222,7 +222,25 @@ vi.mock("./draw-plane", () => ({
     canvas: { rings(tag: unknown): void },
     frame: { tag: unknown },
   ) => canvas.rings(frame.tag),
+  // 38.7-09: the grid (base) and the pulses (their own ambient picture).
+  drawPlaneGrid: (
+    canvas: { grid(opacity: unknown): void },
+    _frame: unknown,
+    grid: { opacity: number },
+  ) => {
+    if (grid.opacity > 0) canvas.grid(grid.opacity);
+  },
+  drawPlanePulses: (
+    canvas: { pulses(ms: unknown): void },
+    _frame: unknown,
+    _specs: unknown,
+    pulse: { budget: number },
+    ambient: number,
+  ) => {
+    if (ambient >= 0 && pulse.budget > 0) canvas.pulses(ambient);
+  },
   ringBands: () => null,
+  gridDisc: () => null,
 }));
 vi.mock("./draw-bodies", () => ({
   orderBodies: () => [],
@@ -293,6 +311,10 @@ function mount() {
     skyImage: rt.sv({ generation: 0, mountEpoch: 0, image: null, key: "" }),
     coverColor: "sky-base-token",
     ringSpecs: rt.sv({}),
+    plane: rt.sv({
+      grid: { opacity: 0 },
+      pulse: { budget: 8, intensity: 0.25 },
+    }),
     overlay: rt.sv({}),
     reorder: rt.sv(null),
     bodies: rt.sv({ generation: 1, mountEpoch: 1, bodies: [] }),
@@ -314,14 +336,15 @@ function mount() {
 }
 const SKY = 0;
 const BASE = 1;
-const SUN = 3;
+const PULSES = 2;
+const SUN = 4;
 
 describe("OrreryV2Canvas: the quantised ambient value (D-49)", () => {
   it("frame-clock: ONE useClock; an unchanged quantised tick re-records nothing", () => {
     const { tree, layer } = mount();
     expect(rt.clockCalls).toBe(1);
     expect(tree[0].children.map((n) => n.type)).toEqual(
-      Array(7).fill("skPicture"),
+      Array(8).fill("skPicture"),
     );
     flush();
     const first = layer(SKY);
@@ -469,7 +492,7 @@ describe("OrreryV2Canvas: the painted sky layer (38.7-09)", () => {
     expect(layer(BASE)).toBe(base);
   });
 
-  it("an ambient tick re-records the ambient layers (sky, sun) and nothing else", () => {
+  it("an ambient tick re-records the ambient layers (sky, pulses, sun) and nothing else", () => {
     const { tree, layer } = mount();
     flush();
     const before = tree[0].children.map((_, i) => layer(i));
@@ -480,7 +503,8 @@ describe("OrreryV2Canvas: the painted sky layer (38.7-09)", () => {
     const changed = after
       .map((picture, i) => (picture === before[i] ? null : i))
       .filter((i) => i !== null);
-    expect(changed).toEqual([SKY, SUN]);
+    // C3-L4: the sky (drift, twinkle), the orbit pulses and the sun pulse.
+    expect(changed).toEqual([SKY, PULSES, SUN]);
   });
 
   it("opaque canvas: a non-touchable cover in the sky base colour fades once the first frame is up", () => {
@@ -510,5 +534,59 @@ describe("OrreryV2Canvas: the painted sky layer (38.7-09)", () => {
   it("translucent canvas: no cover", () => {
     const { tree } = mount();
     expect(tree).toHaveLength(1);
+  });
+});
+
+describe("OrreryV2Canvas: grid and orbit pulses (38.7-09: D-09, D-10, D-37)", () => {
+  it("the grid draws in the (baked) base only above opacity 0", () => {
+    const { props, layer } = mount();
+    flush();
+    expect(layer(BASE).ops).toEqual([["rings", "frame-1"]]);
+    props.plane.value = {
+      grid: { opacity: 0.12 },
+      pulse: { budget: 8, intensity: 0.25 },
+    };
+    flush();
+    expect(layer(BASE).ops).toEqual([
+      ["grid", 0.12],
+      ["rings", "frame-1"],
+    ]);
+  });
+
+  it("pulses move on ambient ticks, never in the base; reduced motion freezes them", () => {
+    const { layer } = mount();
+    const clock = rt.clock as { value: number };
+    clock.value = AMBIENT_STEP_MS * 2;
+    flush();
+    const base = layer(BASE);
+    expect(layer(PULSES).ops).toEqual([["pulses", AMBIENT_STEP_MS * 2]]);
+    clock.value = AMBIENT_STEP_MS * 5 + 1;
+    flush();
+    const moved = layer(PULSES).ops as [string, number][];
+    expect(moved[0][0]).toBe("pulses");
+    expect(moved[0][1]).toBeCloseTo(AMBIENT_STEP_MS * 5, 6);
+    expect(layer(BASE)).toBe(base);
+    rt.reduced.value = true;
+    flush();
+    const still = layer(PULSES);
+    expect(still.ops).toEqual([]);
+    clock.value = 9000;
+    flush();
+    expect(layer(PULSES)).toBe(still);
+  });
+
+  it("budget 0: the pulses picture holds still (no re-recording on ticks)", () => {
+    const { props, layer } = mount();
+    props.plane.value = {
+      grid: { opacity: 0 },
+      pulse: { budget: 0, intensity: 0.25 },
+    };
+    flush();
+    const first = layer(PULSES);
+    const clock = rt.clock as { value: number };
+    clock.value = AMBIENT_STEP_MS * 9;
+    flush();
+    expect(layer(PULSES)).toBe(first);
+    expect(first.ops).toEqual([]);
   });
 });

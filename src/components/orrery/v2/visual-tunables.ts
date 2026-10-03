@@ -128,9 +128,12 @@ export const SKY_STAR_SEED = 38;
 
 // ── Orbital-plane grid (D-09) ─────────────────────────────────────────────
 
-/** Grid line opacity; 0 = the grid is not drawn at all. Owner: G-GRID. */
+/**
+ * Grid line opacity; 0 = the grid is not drawn at all. Owner: G-GRID (the
+ * owner was unsure about a grid at all, D-09).
+ */
 export const GRID_OPACITY = 0.12;
-/** Concentric guides across the outermost ring. */
+/** Guide circles across the grid's reach (Lab C's polar grid). */
 export const GRID_RINGS = 6;
 /** Radial spokes (every 360 / GRID_SPOKES degrees). */
 export const GRID_SPOKES = 12;
@@ -141,26 +144,62 @@ export const GRID_EXTENT = 1.12;
 
 // ── Orbit pulses (D-10, D-37, D-49) ───────────────────────────────────────
 
-/** Peak pulse alpha ("not very obvious"). Owner: G-PULSE. */
+/** Peak pulse alpha ("not very obvious", D-10). Owner: G-PULSE. */
 export const PULSE_INTENSITY = 0.25;
-/** Most pulses on screen at once; 0 = none. */
+/** Most pulses on screen at once (D-49 budget); 0 = none. */
 export const PULSE_BUDGET = 8;
-/** Pulse travel speed along its ring (screen-independent: radians per second). */
-export const PULSE_SPEED = 0.35;
-/** One pulse's soft arc length (radians of its ring). */
-export const PULSE_ARC = 0.55;
-/** Pulse cycle: travel time plus rest, so each ring pulses now and then (ms). */
+/** Pulse travel speed along its ring (radians per second, clockwise). */
+export const PULSE_SPEED = 0.3;
+/** One pulse slot's cycle: it travels, then rests (ms). */
 export const PULSE_CYCLE_MS = 9000;
-/** Pulse line half-width over the ring's own half-width (a soft halo). */
-export const PULSE_WIDTH_SCALE = 1.8;
+/** The travelling part of each cycle (ms); the pulse fades in and out. */
+export const PULSE_TRAVEL_MS = 4000;
+/** Half the pulse's soft arc (radians of its ring). */
+export const PULSE_ARC_HALF = 0.3;
+/** Pulse line half-width (screen dp): the same for every status (D-10). */
+export const PULSE_HALF_WIDTH_DP = 1.2;
 
-// ── Thin sun-lit rings (D-11) ─────────────────────────────────────────────
+// ── Thin sun-lit rings (D-11; Lab B labb-rings-logic) ─────────────────────
 
-/** Ring line width scale over today's status widths (Lab B thin lines). */
-export const RING_WIDTH_SCALE = 0.5;
-/** Ring line width floor (dp), so weight still orders status. */
-export const RING_WIDTH_BASE = 0.35;
-/** Sun-lit rim: alpha gain on the sun-facing side (dark / light). */
-export const RING_RIM_GAIN = { dark: 0.6, light: 0.35 } as const;
-/** Sun-lit rim: how far the ink moves toward `orreryRingLight` (dark / light). */
-export const RING_RIM_MIX = { dark: 0.35, light: 0.2 } as const;
+/**
+ * Ring line width = today's status width × RING_WIDTH_SCALE + RING_WIDTH_BASE
+ * (Lab B's ratios, so weight still orders status: stable 2 → 1.04 dp,
+ * wobble/rogue 3 → 1.46 dp, decay 4 → 1.88 dp).
+ */
+export const RING_WIDTH_SCALE = 0.42;
+export const RING_WIDTH_BASE = 0.2;
+/** Dashed (wobble): period (screen dp) and on-fraction. */
+export const RING_DASHED_PERIOD_DP = 11;
+export const RING_DASHED_DUTY = 0.58;
+/** Faint trace (rogue): period (screen dp) and on-fraction. */
+export const RING_TRACE_PERIOD_DP = 6;
+export const RING_TRACE_DUTY = 0.3;
+/** Status alphas (Lab B): faded (decay) and faint trace (rogue). */
+export const RING_FADED_ALPHA = 0.7;
+export const RING_TRACE_ALPHA = 0.42;
+/** Sun light reaches this fraction of the outermost orbit (Lab B R2). */
+export const RING_SUN_LIGHT_RADIUS = 0.32;
+
+/** One package × mode's ring lighting. */
+export interface RingLook {
+  /** Sun-light alpha gain at the sun (0 = no sun light). */
+  lightGain: number;
+  /** How far lit rings lean toward `orreryRingLight` (× the light). */
+  lightMix: number;
+  /** Far-side alpha at full perspective (1 = no depth fade). */
+  farAlpha: number;
+}
+
+/** Lab B's R2 sun light (Galaxy Dark the hero, Standard calmer, light softer). */
+export const RING_LOOKS: Readonly<
+  Record<ThemePackage, Readonly<Record<ResolvedMode, RingLook>>>
+> = {
+  galaxy: {
+    dark: { lightGain: 1.1, lightMix: 0.35, farAlpha: 0.55 },
+    light: { lightGain: 0.35, lightMix: 0.35, farAlpha: 0.6 },
+  },
+  standard: {
+    dark: { lightGain: 0.6, lightMix: 0.35, farAlpha: 0.55 },
+    light: { lightGain: 0.35, lightMix: 0.35, farAlpha: 0.6 },
+  },
+};

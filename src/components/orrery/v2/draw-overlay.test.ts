@@ -231,7 +231,10 @@ describe("reorder outline (overlay picture)", () => {
     expect(uniforms[9]).toBe(held.worldRingRadius);
     expect(uniforms[10]).toBe(1); // 2 dp line
     expect(uniforms[12]).toBe(0); // solid
-    expect(uniforms.slice(15)).toEqual([...ACCENT]);
+    expect(uniforms.slice(15, 19)).toEqual([...ACCENT]);
+    // A plain outline: no sun light, no depth fade, the whole ring.
+    expect(uniforms.slice(19, 24)).toEqual([1, 0, 1, 0, 1]);
+    expect(uniforms.slice(28, 30)).toEqual([0, 0]);
     const circle = calls.find((c) => c.op === "drawCircle")!;
     expect(circle.args.slice(0, 3)).toEqual([held.x, held.y, held.radius + 4]);
     expect(paintOf(circle)).toMatchObject({ style: 1, width: 2 });

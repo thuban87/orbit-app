@@ -14,6 +14,7 @@ import { OrreryWorld } from "./OrreryWorld";
 import { prepareOrreryText } from "./resources/orrery-text-service";
 import { useOrreryCamera } from "./use-orrery-camera";
 import { sampleOrrerySwitchCamera } from "./use-orrery-switch-runtime";
+import { GRID_OPACITY } from "./v2/visual-tunables";
 
 const switchRuntime = (
   scene: Awaited<ReturnType<typeof loadOrreryScene>>,
@@ -425,7 +426,7 @@ describe("production Orrery native tree and resource contracts", () => {
     // 38.7-07: moons are drawn by the body pictures (same depth rules).
     const moonInk = [...parseInk(THEME_PRESETS.galaxy.dark.textSecondary)];
     const moonDraws = () =>
-      [tree[0].children[2], tree[0].children[4]]
+      [tree[0].children[3], tree[0].children[5]]
         .flatMap(
           (picture) =>
             (
@@ -476,12 +477,12 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    // 38.7-09: sky, base, bodiesBehind, sun, bodiesFront, labels, overlay.
+    // 38.7-09: sky, base, pulses, bodiesBehind, sun, bodiesFront, labels, overlay.
     expect(tree[0].type).toBe("skCanvas");
     expect(tree[0].children.map((node) => node.type)).toEqual(
-      Array(7).fill("skPicture"),
+      Array(8).fill("skPicture"),
     );
-    const [, , behind, sunLayer, front, labels] = tree[0].children;
+    const [, , , behind, sunLayer, front, labels] = tree[0].children;
     const circles = (picture: Node) =>
       (
         picture.props.picture as {
@@ -549,7 +550,7 @@ describe("production Orrery native tree and resource contracts", () => {
       }),
     );
     flushUi();
-    const labels = tree[0].children[5];
+    const labels = tree[0].children[6];
     const drawn = () => {
       native.painted = [];
       void (labels.props.picture as { value: unknown }).value;
@@ -675,7 +676,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const walk = (node: Node): unknown => [node.type, node.children.map(walk)];
     return tree.map(walk);
   };
-  const LAYERS = 7; // sky, base, bodiesBehind, sun, bodiesFront, labels, overlay
+  const LAYERS = 8; // sky, base, pulses, bodiesBehind, sun, bodiesFront, labels, overlay
 
   it("the same Picture layers for 3, 120 and 1,000 bodies; no per-body node — rings, bodies and labels are draws", async () => {
     const smallScene = await sceneWith(3);
@@ -724,16 +725,20 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
         op: "drawPaint",
         color: [...parseInk(THEME_PRESETS.galaxy.dark.orrerySkyBase)],
       });
-    // The base picture: one world-plane draw per ring (no sky fill any more).
+    // The base picture: the optional plane grid (D-09: one draw, none at
+    // opacity 0), then one world-plane draw per ring (no sky fill any more).
+    const grid = GRID_OPACITY > 0 ? 1 : 0;
     const base = recorded(large[0].children[1]);
     expect(base.filter((c) => c.op === "drawPaint")).toHaveLength(0);
-    expect(base.filter((c) => c.op === "drawVertices")).toHaveLength(1000);
+    expect(base.filter((c) => c.op === "drawVertices")).toHaveLength(
+      1000 + grid,
+    );
     expect(
       recorded(small[0].children[1]).filter((c) => c.op === "drawVertices"),
-    ).toHaveLength(3);
+    ).toHaveLength(3 + grid);
     // Bodies are recorded draws inside the two body pictures.
     const bodyCircles = (tree: Node[]) =>
-      [tree[0].children[2], tree[0].children[4]]
+      [tree[0].children[3], tree[0].children[5]]
         .flatMap(recorded)
         .filter((c) => c.op === "drawCircle").length;
     expect(bodyCircles(small)).toBe(3 * 2);
@@ -766,7 +771,8 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const renders = native.renders;
     const snapshot = (tree: Node[]) =>
       tree[0].children.map((picture) => JSON.stringify(recorded(picture)));
-    const [sky, base, behind, sun, front, labels, overlay] = snapshot(again);
+    const [sky, base, pulses, behind, sun, front, labels, overlay] =
+      snapshot(again);
     photoCache.drawn.set("avatars/contact-1.jpg", {
       id: 1,
       image: { width: () => 512, height: () => 512 },
@@ -776,18 +782,19 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     expect(native.renders).toBe(renders);
     expect(native.setStateCalls).toBe(0);
     const after = snapshot(again);
-    expect([after[0], after[1], after[3], after[5], after[6]]).toEqual([
-      sky,
-      base,
-      sun,
-      labels,
-      overlay,
-    ]);
-    const images = [again[0].children[2], again[0].children[4]]
+    expect([
+      after[0],
+      after[1],
+      after[2],
+      after[4],
+      after[6],
+      after[7],
+    ]).toEqual([sky, base, pulses, sun, labels, overlay]);
+    const images = [again[0].children[3], again[0].children[5]]
       .flatMap(recorded)
       .filter((c) => c.op === "drawImageRectOptions");
     expect(images).toHaveLength(1);
-    expect([after[2], after[4]]).not.toEqual([behind, front]);
+    expect([after[3], after[5]]).not.toEqual([behind, front]);
     expect(shape(again)).toEqual(shape(before));
     photoCache.drawn.clear();
   });
@@ -816,7 +823,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const tree = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
     expect(native.clockCalls).toBe(1);
     flushUi();
-    const sun = tree[0].children[3];
+    const sun = tree[0].children[4];
     const glowAlpha = (ms: number) => {
       native.clock.value = ms;
       flushUi(1);
@@ -842,7 +849,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const scene = await sceneWith(2);
     const tree = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
     expect(native.clockCalls).toBe(0);
-    const sun = tree[0].children[3];
+    const sun = tree[0].children[4];
     const glow = () =>
       recorded(sun).find((c) => c.op === "drawCircle")?.color?.[3];
     const first = glow();
@@ -855,7 +862,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     native.reducedState = true;
     const still = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
     const stillGlow = () =>
-      recorded(still[0].children[3]).find((c) => c.op === "drawCircle")
+      recorded(still[0].children[4]).find((c) => c.op === "drawCircle")
         ?.color?.[3];
     const held = stillGlow();
     vi.advanceTimersByTime(1500);

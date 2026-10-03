@@ -33,6 +33,16 @@ import type {
   PreparedOrreryText,
 } from "../resources/orrery-text-service";
 import type { OrreryBodyResource } from "../use-orrery-switch-runtime";
+import {
+  RING_DASHED_DUTY,
+  RING_DASHED_PERIOD_DP,
+  RING_FADED_ALPHA,
+  RING_TRACE_ALPHA,
+  RING_TRACE_DUTY,
+  RING_TRACE_PERIOD_DP,
+  RING_WIDTH_BASE,
+  RING_WIDTH_SCALE,
+} from "./visual-tunables";
 
 /** Premultiplication-free RGBA floats, 0..1. */
 export type OrreryInk = readonly [number, number, number, number];
@@ -51,34 +61,60 @@ export function tokenInk(token: string): OrreryInk {
   return [value[0], value[1], value[2], value[3]];
 }
 
-/** Today's dashed orbit (a 6-on-6-off dash): one 12 dp period. */
-export const RING_DASH_PERIOD_DP = 12;
-/** Today's ring opacities by line treatment (faded / faint trace). */
-const FADED_ALPHA = 0.7;
-const FAINT_TRACE_ALPHA = 0.3;
+/**
+ * 38.7-09 (D-11): Lab B's thin rings. The status ladder is kept as the
+ * non-colour cue: weight orders status (width × scale + base), wobble is
+ * dashed, rogue a short faint trace, decay faded; colour is the status token.
+ */
+export const RING_DASH_PERIOD_DP = RING_DASHED_PERIOD_DP;
 
-/** One orbit ring's look, per body key: today's status style, as numbers. */
+/** One orbit ring's look, per body key: its status style, as numbers. */
 export interface RingSpec {
   ink: OrreryInk;
-  /** Line width in screen dp (today's stroke width). */
+  /** Line width in screen dp (Lab B's thin status widths). */
   widthDp: number;
   /** Status alpha (multiplied by the body's transition opacity when drawn). */
   alpha: number;
   /** Dash period in screen dp; 0 = solid. */
   dashPeriodDp: number;
+  /** The on-fraction of each dash period. */
+  dashDuty: number;
+  /** D-11 sun light: alpha gain at the sun (0 = off). */
+  lightGain: number;
+  /** How far lit rings lean toward `light`. */
+  lightMix: number;
+  /** Far-side alpha at full perspective (1 = no depth fade). */
+  farAlpha: number;
+  /** The sun-lit ink (`orreryRingLight`). */
+  light: OrreryInk;
 }
 export type RingSpecs = Readonly<Record<string, RingSpec>>;
 export const EMPTY_RING_SPECS: RingSpecs = Object.freeze({});
 
+/** The ring lighting `buildRingSpecs` applies (visual-tunables `RING_LOOKS`). */
+export interface RingSpecLook {
+  lightGain: number;
+  lightMix: number;
+  farAlpha: number;
+}
+/** No sun light, no depth fade (tests, previews). */
+export const PLAIN_RING_LOOK: RingSpecLook = Object.freeze({
+  lightGain: 0,
+  lightMix: 0,
+  farAlpha: 1,
+});
+
 /**
  * Ring specs for every contact resource: `orreryRingStyle` (colour, width,
- * line treatment) with today's alphas — faded 0.7, faint trace 0.3, otherwise
- * the style's own opacity — and today's 6-on-6-off dash for dashed and
- * faint-trace rings.
+ * line treatment) mapped to Lab B's thin, sun-lit instrument lines (D-11):
+ * width × RING_WIDTH_SCALE + RING_WIDTH_BASE, faded 0.7 / faint trace 0.42
+ * (otherwise the style's own opacity, neutral 0.5), dashed 11 dp at 0.58 on,
+ * faint trace 6 dp at 0.3 on.
  */
 export function buildRingSpecs(
   resources: readonly OrreryBodyResource[],
   colors: ThemePalette,
+  look: RingSpecLook = PLAIN_RING_LOOK,
 ): RingSpecs {
   const statusById = new Map<
     OrreryBodyResource["scene"],
@@ -95,26 +131,111 @@ export function buildRingSpecs(
     }
     return index.get(resource.body.id) ?? null;
   };
+  const light = tokenInk(colors.orreryRingLight);
   const specs: Record<string, RingSpec> = {};
   for (const resource of resources) {
     if (resource.body.kind !== "contact") continue;
     const style = orreryRingStyle(statusOf(resource), colors);
+    const dashed = style.strokeStyle === "dashed";
+    const trace = style.strokeStyle === "faintTrace";
     specs[resource.key] = {
       ink: tokenInk(style.color),
-      widthDp: style.width,
+      widthDp: style.width * RING_WIDTH_SCALE + RING_WIDTH_BASE,
       alpha:
         style.strokeStyle === "faded"
-          ? FADED_ALPHA
-          : style.strokeStyle === "faintTrace"
-            ? FAINT_TRACE_ALPHA
+          ? RING_FADED_ALPHA
+          : trace
+            ? RING_TRACE_ALPHA
             : style.opacity,
-      dashPeriodDp:
-        style.strokeStyle === "dashed" || style.strokeStyle === "faintTrace"
-          ? RING_DASH_PERIOD_DP
+      dashPeriodDp: dashed
+        ? RING_DASHED_PERIOD_DP
+        : trace
+          ? RING_TRACE_PERIOD_DP
           : 0,
+      dashDuty: dashed ? RING_DASHED_DUTY : trace ? RING_TRACE_DUTY : 1,
+      lightGain: look.lightGain,
+      lightMix: look.lightMix,
+      farAlpha: look.farAlpha,
+      light,
     };
   }
   return specs;
+}
+
+// ── The orbital plane's grid and pulses (38.7-09: D-09, D-10) ─────────────
+
+/** The optional orbital-plane grid (D-09). opacity 0 = not drawn at all. */
+export interface GridSpec {
+  ink: OrreryInk;
+  opacity: number;
+  rings: number;
+  spokes: number;
+  halfWidthDp: number;
+  /** Reach × the outermost orbit radius. */
+  extent: number;
+  farAlpha: number;
+}
+/** The subtle orbit pulses (D-10): identical for every status. */
+export interface PulseSpec {
+  ink: OrreryInk;
+  /** Peak alpha; 0 = none. */
+  intensity: number;
+  /** Most pulses at once; 0 = none. */
+  budget: number;
+  /** D-51 blend family from the resolved mode: dark additive, light src-over. */
+  additive: boolean;
+  farAlpha: number;
+}
+export interface PlaneSpec {
+  grid: GridSpec;
+  pulse: PulseSpec;
+}
+export const EMPTY_PLANE_SPEC: PlaneSpec = Object.freeze({
+  grid: {
+    ink: NO_INK,
+    opacity: 0,
+    rings: 0,
+    spokes: 0,
+    halfWidthDp: 0,
+    extent: 1,
+    farAlpha: 1,
+  },
+  pulse: { ink: NO_INK, intensity: 0, budget: 0, additive: true, farAlpha: 1 },
+});
+
+/** The plane spec for a theme: `orreryGrid` / `orreryPulse` and the tunables. */
+export function buildPlaneSpec(
+  colors: ThemePalette,
+  mode: ResolvedMode,
+  look: RingSpecLook,
+  tunables: {
+    gridOpacity: number;
+    gridRings: number;
+    gridSpokes: number;
+    gridHalfWidthDp: number;
+    gridExtent: number;
+    pulseIntensity: number;
+    pulseBudget: number;
+  },
+): PlaneSpec {
+  return {
+    grid: {
+      ink: tokenInk(colors.orreryGrid),
+      opacity: Math.max(0, tunables.gridOpacity),
+      rings: tunables.gridRings,
+      spokes: tunables.gridSpokes,
+      halfWidthDp: tunables.gridHalfWidthDp,
+      extent: tunables.gridExtent,
+      farAlpha: look.farAlpha,
+    },
+    pulse: {
+      ink: tokenInk(colors.orreryPulse),
+      intensity: Math.max(0, tunables.pulseIntensity),
+      budget: Math.max(0, Math.floor(tunables.pulseBudget)),
+      additive: mode === "dark",
+      farAlpha: look.farAlpha,
+    },
+  };
 }
 
 // ── The painted sky (38.7-09: D-07, D-08, D-36, D-50, D-51, H9) ───────────

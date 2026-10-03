@@ -53,6 +53,26 @@ describe("quantised ambient value (D-49)", () => {
       false,
     );
     expect(ambientNeeded(true, { twinkle: true, sunPulse: true })).toBe(false);
+    // 38.7-09: the sky drift and the orbit pulses are ambient consumers too
+    // (and still never under reduced motion).
+    expect(
+      ambientNeeded(false, {
+        twinkle: false,
+        sunPulse: false,
+        orbitPulses: true,
+      }),
+    ).toBe(true);
+    expect(
+      ambientNeeded(false, { twinkle: false, sunPulse: false, skyDrift: true }),
+    ).toBe(true);
+    expect(
+      ambientNeeded(true, {
+        twinkle: true,
+        sunPulse: true,
+        skyDrift: true,
+        orbitPulses: true,
+      }),
+    ).toBe(false);
   });
 });
 
