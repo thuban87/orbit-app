@@ -22,9 +22,11 @@ import {
 vi.mock("expo-sqlite", () => ({}));
 vi.mock("react-native", () => ({}));
 vi.mock("@shopify/react-native-skia", () => ({}));
-vi.mock("@/components/orrery/OrbitBody", () => ({}));
-vi.mock("@/components/orrery/SunBody", () => ({}));
 vi.mock("@/components/orrery/v2/OrreryV2Canvas", () => ({}));
+// The photo cache pulls the native photo loader; this suite only needs gestures.
+vi.mock("@/components/orrery/resources/orrery-photo-cache", () => ({
+  orreryPhotoCache: {},
+}));
 vi.mock("@/theme/use-reduced-motion", () => ({}));
 vi.mock("react-native-reanimated", () => ({
   runOnJS: (fn: unknown) => fn,

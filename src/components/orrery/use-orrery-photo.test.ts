@@ -4,8 +4,9 @@
  * or decodes the >512 master, a MISS that generates and installs one, a stale
  * signature and a corrupt / oversized derivative that are ignored and
  * regenerated, cancellation of queued generations (review IN-02), the
- * generation concurrency cap, and SkImage disposal (loader and the pure
- * lifecycle helper the hook drives). Every native boundary is a fake; nothing
+ * generation concurrency cap, and SkImage disposal in the loader (the photo
+ * cache's custody is `resources/orrery-photo-cache.test.ts`). Every native
+ * boundary is a fake; nothing
  * loads Skia, the manipulator or the file system.
  */
 import type { SkData, SkImage } from "@shopify/react-native-skia";
@@ -66,7 +67,6 @@ vi.mock("@/utils/logger", () => ({
 
 import { Logger } from "@/utils/logger";
 import {
-  createOrreryImageSlot,
   defaultOrreryImageDeps,
   loadOrreryImage,
   ORRERY_DERIVATIVE_QUALITY,
@@ -639,85 +639,6 @@ describe("loadOrreryImage — every error path disposes what it created", () => 
       loadOrreryImage("avatars/corrupt.jpg", decodeNull.d),
     ).resolves.toBeNull();
     expect(created).toEqual([]);
-  });
-});
-
-describe("createOrreryImageSlot — the hook's SkImage lifecycle", () => {
-  it("disposes image N only after N+1 is published AND N's post-commit retire runs", () => {
-    const slot = createOrreryImageSlot();
-    const one = fakeImage("1", 512);
-    const two = fakeImage("2", 512);
-    expect(slot.settle(asSk(one), false)).toBe(true);
-    expect(slot.published).toBe(asSk(one));
-    expect(slot.settle(asSk(two), false)).toBe(true);
-    // Published N+1, commit not yet retired N: N is untouched.
-    expect(one.disposeCount).toBe(0);
-    slot.retire(asSk(one));
-    expect(one.disposeCount).toBe(1);
-    expect(two.disposeCount).toBe(0);
-    // Unmount retires the published image.
-    slot.retire(asSk(two));
-    expect(two.disposeCount).toBe(1);
-    expect(slot.published).toBeNull();
-  });
-
-  it("never disposes the published image except through its own retire", () => {
-    const slot = createOrreryImageSlot();
-    const one = fakeImage("1", 512);
-    slot.publish(asSk(one));
-    slot.discard(null);
-    slot.retire(null);
-    expect(one.disposeCount).toBe(0);
-  });
-
-  it("a load resolving after cancellation is disposed and never published", () => {
-    const slot = createOrreryImageSlot();
-    const live = fakeImage("live", 512);
-    const late = fakeImage("late", 512);
-    slot.publish(asSk(live));
-    expect(slot.settle(asSk(late), true)).toBe(false);
-    expect(late.disposeCount).toBe(1);
-    expect(slot.published).toBe(asSk(live));
-    expect(live.disposeCount).toBe(0);
-  });
-
-  it("an error-path result is disposed and never published", () => {
-    const slot = createOrreryImageSlot();
-    const bad = fakeImage("bad", 512);
-    slot.discard(asSk(bad));
-    expect(bad.disposeCount).toBe(1);
-    expect(slot.published).toBeNull();
-  });
-
-  it("disposes nothing twice", () => {
-    const slot = createOrreryImageSlot();
-    const one = fakeImage("1", 512);
-    slot.settle(asSk(one), false);
-    slot.retire(asSk(one));
-    slot.retire(asSk(one));
-    slot.discard(asSk(one));
-    expect(one.disposeCount).toBe(1);
-  });
-
-  it("20 revision changes leave only the published image undisposed", () => {
-    const slot = createOrreryImageSlot();
-    let committed: FakeImage | null = null;
-    for (let i = 0; i < 20; i++) {
-      const next = fakeImage(`rev-${i}`, 512);
-      // Every other revision's load is overtaken (cancelled) before it lands.
-      if (i % 3 === 1) {
-        slot.settle(asSk(next), true);
-        continue;
-      }
-      slot.settle(asSk(next), false);
-      // The post-commit retire of the image this commit replaced.
-      if (committed) slot.retire(asSk(committed));
-      committed = next;
-    }
-    const undisposed = created.filter((image) => image.disposeCount === 0);
-    expect(undisposed).toEqual([committed]);
-    expect(created.every((image) => image.disposeCount <= 1)).toBe(true);
-    expect(slot.published).toBe(asSk(committed!));
   });
 });
 

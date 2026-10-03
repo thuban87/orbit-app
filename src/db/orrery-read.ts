@@ -36,9 +36,10 @@
  * and appended ONLY when non-null; null/undefined excludes nobody.
  *
  * PHOTO (C2-1): `photo` is returned as the RAW relative path (or null) — this read
- * never resolves it. The consumers (OrbitBody/SunBody) pass it straight to
- * `useOrreryPhoto` (38.6 D-11), which null-guards it and resolves the plain file
- * URI itself.
+ * never resolves it. The V2 body specs (`v2/scene-specs.ts`) pass it straight to
+ * the shared Orrery photo cache (`resources/orrery-photo-cache.ts`, 38.7-07),
+ * whose loader (`loadOrreryImage`, 38.6 D-11) null-guards it and resolves the
+ * plain file URI itself; `v2/draw-bodies.ts` draws the result.
  *
  * INJECTION: the query is a static string; the only interpolated values are the
  * closed status fragments. The sole runtime value (`excludeContactId`) is `?`-bound.

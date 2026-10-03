@@ -14,18 +14,32 @@
  * Layers, bottom to top:
  * - `base`: the background fill and the world-plane orbit rings (D-44);
  * - `stars`: today's 44 seeded twinkling stars;
- * - the legacy `children` slot: the remaining body and label components, an
- *   intermediate step that Plan 07 replaces with picture layers;
+ * - `bodiesBehind`: contacts (and moons) deeper than the sun (38.7-07);
+ * - `sun`: the sun, its glow pulsing on the ambient clock;
+ * - `bodiesFront`: contacts (and moons) nearer than the sun;
+ * - the legacy `children` slot: the remaining label and moon components
+ *   (38.7-07 Task 2 replaces them with picture layers);
  * - `overlay`: Polaris, the reorder outline and the focus outlines.
+ *
+ * ── Resource lifetime (H3, the 38.7-07 ledger contract) ─────────────────────
+ * Every layer that draws native objects (photo SkImages, Paragraphs) acks the
+ * spec generation it recorded, separately: a reaction chained on the layer's
+ * own picture value (so it runs only after that picture's `createPicture`
+ * returned) arms a ONE-SHOT UI frame callback, and only that callback calls
+ * `ackRecorded(layerId, generation, mountEpoch)` on JS — one further frame,
+ * because the native `<Picture>` swap may lag the mapper. The JS ledger
+ * disposes an object only after every layer that recorded it acked a newer
+ * generation. There is no shared "recorded generation".
  *
  * ── Ambient clock (ORR-03 / M5 / D-49, ADR-048/ADR-077) ────────────────────
  * The Skia frame clock is created HERE and nowhere else. OrreryScreen mounts
  * this canvas (through OrreryWorld) only once it is measured AND focused and
  * foregrounded, so unmounting it on blur/background stops every ambient
  * worklet (the clock has no pause argument). The clock drives the star
- * twinkle here and — through `OrreryClockContext`, until Plan 07 — the legacy
- * sun pulse. Reduced motion (the live OS signal, read as a SharedValue) holds
- * the twinkle at its band mid-point. Plan 08 quantises the clock (D-49).
+ * twinkle and the sun pulse, both picture inputs here. Reduced motion (the
+ * live OS signal, read as a SharedValue) holds the twinkle at its band
+ * mid-point and the sun glow still, so neither picture re-records on clock
+ * ticks. Plan 08 quantises the clock (D-49).
  *
  * ── Platform seam (D-46) ───────────────────────────────────────────────────
  * Platform/GPU choices come from `resolveOrreryRenderHost()` as values
@@ -35,6 +49,7 @@ import {
   Canvas,
   createPicture,
   Picture,
+  type SkPicture,
   useClock,
 } from "@shopify/react-native-skia";
 import { type ReactNode, useMemo } from "react";
@@ -43,20 +58,30 @@ import {
   GestureDetector,
   type GestureType,
 } from "react-native-gesture-handler";
-import { type SharedValue, useDerivedValue } from "react-native-reanimated";
+import {
+  runOnJS,
+  type SharedValue,
+  useAnimatedReaction,
+  useDerivedValue,
+  useSharedValue,
+} from "react-native-reanimated";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { OrreryClockContext } from "../orrery-clock-context";
+import { drawBodies, drawSun, orderBodies, sunPulse } from "./draw-bodies";
 import { drawOverlay } from "./draw-overlay";
 import { drawPlaneRings, ringBands } from "./draw-plane";
 import { drawSky, drawStars, twinkleOpacity } from "./draw-sky";
 import { resolveOrreryRenderHost } from "./render-host";
-import type {
-  OverlaySpec,
-  RingSpecs,
-  SkySpec,
-  StarFieldSpec,
+import {
+  ORRERY_LAYER,
+  type OrreryBodySpecs,
+  type OrreryLayerId,
+  type OverlaySpec,
+  type RingSpecs,
+  type SkySpec,
+  type StarFieldSpec,
 } from "./scene-specs";
 import { orreryShader } from "./shaders";
 
@@ -78,8 +103,68 @@ export interface OrreryV2CanvasProps {
   overlay: SharedValue<OverlaySpec>;
   /** The reorder hold (gesture-owned), for the held-orbit outline. */
   reorder: SharedValue<ReorderDrag | null>;
-  /** Legacy body/label components (Plan 07 replaces them with pictures). */
+  /** Contacts, the sun and moons (JS-built; photos and initials included). */
+  bodies: SharedValue<OrreryBodySpecs>;
+  /**
+   * H3: `layerId` recorded `generation` of `mountEpoch` one UI frame ago.
+   * Must be a stable function (it is a reaction input).
+   */
+  ackRecorded: (
+    layerId: OrreryLayerId,
+    generation: number,
+    mountEpoch: number,
+  ) => void;
+  /** Legacy label/moon components (38.7-07 Task 2 replaces them with pictures). */
   children?: ReactNode;
+}
+
+/** What a layer's ack reaction compares: its picture and the generation it read. */
+interface LayerRecord {
+  picture: SkPicture;
+  generation: number;
+  epoch: number;
+}
+
+/**
+ * H3 rule 1: one layer's acknowledgement. The reaction is chained on the
+ * layer's picture value, so it runs only after `createPicture` returned; a
+ * new (generation, epoch) arms ONE frame callback (never a running loop), and
+ * that callback forwards the latest recorded generation to JS.
+ */
+function useLayerAck<S extends { generation: number; mountEpoch: number }>(
+  layerId: OrreryLayerId,
+  picture: SharedValue<SkPicture>,
+  specs: SharedValue<S>,
+  ackRecorded: OrreryV2CanvasProps["ackRecorded"],
+): void {
+  const pending = useSharedValue(false);
+  const latest = useSharedValue({ generation: 0, epoch: 0 });
+  useAnimatedReaction(
+    (): LayerRecord => ({
+      picture: picture.value,
+      generation: specs.value.generation,
+      epoch: specs.value.mountEpoch,
+    }),
+    (now, previous) => {
+      // Only a NEW recording speaks for a generation.
+      if (previous && now.picture === previous.picture) return;
+      if (now.generation === 0) return;
+      if (
+        previous &&
+        previous.generation === now.generation &&
+        previous.epoch === now.epoch
+      )
+        return;
+      latest.value = { generation: now.generation, epoch: now.epoch };
+      if (pending.value) return;
+      pending.value = true;
+      requestAnimationFrame(() => {
+        pending.value = false;
+        const recorded = latest.value;
+        runOnJS(ackRecorded)(layerId, recorded.generation, recorded.epoch);
+      });
+    },
+  );
 }
 
 export function OrreryV2Canvas({
@@ -92,6 +177,8 @@ export function OrreryV2Canvas({
   ringSpecs,
   overlay,
   reorder,
+  bodies,
+  ackRecorded,
   children,
 }: OrreryV2CanvasProps) {
   const host = useMemo(() => resolveOrreryRenderHost(), []);
@@ -133,6 +220,60 @@ export function OrreryV2Canvas({
       { width, height },
     ),
   );
+  // D-43/M14: one depth order per frame, shared by both body layers.
+  const bodyOrder = useDerivedValue(() =>
+    orderBodies(frame.value, bodies.value.bodies),
+  );
+  // A primitive: still (0) under reduced motion, so the sun picture does not
+  // re-record on clock ticks.
+  const pulse = useDerivedValue(() =>
+    sunPulse(clock.value, reducedMotion.value),
+  );
+  const bodiesBehind = useDerivedValue(() =>
+    createPicture(
+      (canvas) => {
+        drawBodies(
+          canvas,
+          frame.value,
+          bodies.value.bodies,
+          bodyOrder.value,
+          "behind",
+        );
+      },
+      { width, height },
+    ),
+  );
+  const sunPicture = useDerivedValue(() =>
+    createPicture(
+      (canvas) => {
+        drawSun(
+          canvas,
+          frame.value,
+          bodies.value.bodies,
+          bodyOrder.value,
+          pulse.value,
+        );
+      },
+      { width, height },
+    ),
+  );
+  const bodiesFront = useDerivedValue(() =>
+    createPicture(
+      (canvas) => {
+        drawBodies(
+          canvas,
+          frame.value,
+          bodies.value.bodies,
+          bodyOrder.value,
+          "front",
+        );
+      },
+      { width, height },
+    ),
+  );
+  useLayerAck(ORRERY_LAYER.bodiesBehind, bodiesBehind, bodies, ackRecorded);
+  useLayerAck(ORRERY_LAYER.sun, sunPicture, bodies, ackRecorded);
+  useLayerAck(ORRERY_LAYER.bodiesFront, bodiesFront, bodies, ackRecorded);
   const overlayPicture = useDerivedValue(() =>
     createPicture(
       (canvas) => {
@@ -158,6 +299,9 @@ export function OrreryV2Canvas({
       >
         <Picture picture={base} />
         <Picture picture={starsPicture} />
+        <Picture picture={bodiesBehind} />
+        <Picture picture={sunPicture} />
+        <Picture picture={bodiesFront} />
         <OrreryClockContext.Provider value={clock}>
           {children}
         </OrreryClockContext.Provider>

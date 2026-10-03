@@ -1,10 +1,13 @@
 /**
- * useOrreryPhoto (D-11) — the orrery's photo loader for the Skia bodies
- * (`OrbitBody`, `SunBody`), replacing Skia's `useImage`.
+ * The Orrery photo loader (D-11) — decodes a contact or sun photo for the Skia
+ * bodies, replacing Skia's `useImage`. Since 38.7-07 its only caller is the
+ * shared Orrery photo cache (`resources/orrery-photo-cache.ts`), which owns
+ * every SkImage this returns (one decode per photo, hard caps, ledger-gated
+ * disposal — the per-body photo hook is gone).
  *
  * WHY: expo-image surfaces decode at display size, but Skia decodes a photo at
  * FULL size into a GPU texture. New masters are up to 1024 px (D-10), so a plain
- * `useImage` would quadruple each planet's texture. This hook keeps the orrery at
+ * `useImage` would quadruple each planet's texture. This loader keeps the orrery at
  * today's level: a master ≤ `ORRERY_TEXTURE_MAX` (every legacy 512 JPEG master and
  * every imported thumbnail) is passed through exactly as before; a larger master
  * is drawn from a small on-disk derivative instead.
@@ -26,32 +29,25 @@
  *   - Generation is lazy (first load that needs it), at most
  *     `ORRERY_DOWNSAMPLE_CONCURRENCY` at once (a module-level FIFO), and atomic
  *     (the manipulator's temp file is renamed into place). A queued generation
- *     whose every requester cancelled (unmount, path or revision change) never
+ *     whose every requester cancelled (released, superseded or dropped) never
  *     runs (IN-02). Two bodies showing one photo share one generation.
  *   - The ownership layer deletes a photo's derivatives whenever its bytes
  *     change or are deleted (`notifyPhotoBytesChanged`), and a launch sweep
  *     removes orphans. SkImage objects are never cached.
  *
- * SkImage OWNERSHIP: the hook owns exactly the image it published. Skia re-reads
- * the image prop on every Canvas re-record (`sksg/Recorder/commands/Drawing.ts`
- * calls `image.width()`), and a disposed host object throws — so an image is
- * never disposed while it may still be the rendered prop:
- *   1. the load effect's cleanup only cancels; it never disposes;
- *   2. the load callback publishes with `setState` and never disposes beside it;
- *   3. a separate effect keyed on the published image disposes it in its cleanup,
- *      which React runs only after the commit that replaced it (or on unmount);
- *   4. a load that resolves after cancellation is disposed and never published.
- * (Dev-only caveat: Fast Refresh re-runs every effect of an edited component,
- * which retires the live image until the reload publishes a fresh one.)
+ * SkImage OWNERSHIP: the caller owns the returned image. A load cancelled
+ * through its token makes no image once it notices (or the caller disposes a
+ * late result unpublished); the photo cache disposes an image only under the
+ * 38.7-07 generation-ledger contract (never while a picture layer may still
+ * re-record it).
  *
  * Skia and the manipulator always receive the PLAIN file URI (no `?v=`
- * display query); the display revision only re-runs the load effect. All native
- * access sits behind injectable `OrreryImageDeps`, so the loader and the
- * lifecycle helper are node-testable with fakes.
+ * display query); the display revision only triggers a reload (the photo
+ * cache's `subscribePhotoCacheBust`). All native access sits behind injectable
+ * `OrreryImageDeps`, so the loader is node-testable with fakes.
  */
 import { type SkData, type SkImage, Skia } from "@shopify/react-native-skia";
 import type * as ExpoImageManipulator from "expo-image-manipulator";
-import { useEffect, useRef, useState } from "react";
 import { isStoredPhotoPath } from "@/db/photo-relative-path";
 import {
   dropOrreryDerivative,
@@ -60,10 +56,7 @@ import {
   orreryMasterSignature,
 } from "@/services/photos/orrery-derivative-store";
 import { resolvePhotoUri } from "@/services/photos/photo-storage";
-import {
-  getPhotoCacheBust,
-  usePhotoCacheBust,
-} from "@/stores/photo-cache-bust-store";
+import { getPhotoCacheBust } from "@/stores/photo-cache-bust-store";
 import { Logger } from "@/utils/logger";
 
 // --- Tunable constants (top-of-file per project convention) ------------------
@@ -174,8 +167,9 @@ export const defaultOrreryImageDeps: OrreryImageDeps = {
 };
 
 /**
- * A cancellation token for one load. The hook flips `cancelled` in its effect
- * cleanup (unmount, path change, revision change).
+ * A cancellation token for one load. The photo cache flips `cancelled` when
+ * the load is no longer wanted (released owner, superseded revision, dropped
+ * from the admitted set).
  */
 export interface OrreryLoadToken {
   cancelled: boolean;
@@ -398,105 +392,4 @@ export async function loadOrreryImage(
     Logger.warn(LOG_SCOPE, `orrery photo load failed for ${relative}`, error);
     return null;
   }
-}
-
-// --- SkImage lifecycle (pure; the hook drives it) ------------------------------
-
-export interface OrreryImageSlot {
-  /** The image currently handed to `setState` (the rendered prop once committed). */
-  readonly published: SkImage | null;
-  /** Record `image` as the published image (called beside `setState`; never disposes). */
-  publish(image: SkImage | null): void;
-  /**
-   * A load finished. A cancelled result is disposed and never published
-   * (returns false); otherwise it is published (returns true → `setState`).
-   */
-  settle(image: SkImage | null, cancelled: boolean): boolean;
-  /**
-   * Post-commit retire step: dispose `image`, which the render no longer holds
-   * (replaced by a later publish, or the component unmounted). Idempotent.
-   */
-  retire(image: SkImage | null): void;
-  /** An error-path result: dispose it; never publish. */
-  discard(image: SkImage | null): void;
-}
-
-export function createOrreryImageSlot(): OrreryImageSlot {
-  let published: SkImage | null = null;
-  const disposed = new WeakSet<SkImage>();
-  const disposeOnce = (image: SkImage | null) => {
-    if (!image || disposed.has(image)) return;
-    disposed.add(image);
-    disposeQuietly(image);
-  };
-  return {
-    get published() {
-      return published;
-    },
-    publish(image) {
-      published = image;
-    },
-    settle(image, cancelled) {
-      if (cancelled) {
-        disposeOnce(image);
-        return false;
-      }
-      published = image;
-      return true;
-    },
-    retire(image) {
-      if (!image) return;
-      // Unmount: the published image itself is being retired.
-      if (image === published) published = null;
-      disposeOnce(image);
-    },
-    discard(image) {
-      disposeOnce(image);
-    },
-  };
-}
-
-// --- Hook -------------------------------------------------------------------------
-
-/**
- * The orrery body's photo (C2-1: call unconditionally; a null path → null → the
- * initials swatch). Re-loads when the path or its display revision changes.
- */
-export function useOrreryPhoto(relative: string | null): SkImage | null {
-  const revision = usePhotoCacheBust(relative);
-  const slotRef = useRef<OrreryImageSlot | null>(null);
-  if (slotRef.current === null) slotRef.current = createOrreryImageSlot();
-  const slot = slotRef.current;
-  const [image, setImage] = useState<SkImage | null>(() => null);
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: `revision` is the reload trigger — the ownership layer bumps it when the canonical bytes change (D-19), and the loader re-reads the master's on-disk signature (D-41).
-  useEffect(() => {
-    const token: OrreryLoadToken = { cancelled: false };
-    if (!relative) {
-      slot.publish(null);
-      setImage(null);
-      return;
-    }
-    loadOrreryImage(relative, defaultOrreryImageDeps, token).then(
-      (next) => {
-        if (slot.settle(next, token.cancelled)) setImage(next);
-      },
-      () => {
-        if (token.cancelled) return;
-        slot.publish(null);
-        setImage(null);
-      },
-    );
-    // Cancel only (a queued generation nobody else wants is skipped) — the
-    // published image is retired by the effect below.
-    return () => {
-      token.cancelled = true;
-    };
-  }, [relative, revision, slot]);
-
-  // Runs after the commit that replaced `image` (or on unmount): only then is it
-  // safe to dispose, because no re-record can still read it.
-  useEffect(() => () => slot.retire(image), [image, slot]);
-
-  return image;
 }

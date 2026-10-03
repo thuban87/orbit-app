@@ -59,6 +59,23 @@ export function getPhotoCacheBust(relPath: string | null): number | undefined {
 }
 
 /**
+ * 38.7-07 (M5): non-hook, READ-ONLY subscription to revision changes — the
+ * Orrery photo cache's invalidation input. `listener(relPath, revision)` runs
+ * (synchronously, inside the bump) once for every path whose revision changed.
+ * Grants no bump access, so the writer contract stays with the ownership
+ * layer. Returns the unsubscribe function.
+ */
+export function subscribePhotoCacheBust(
+  listener: (relPath: string, revision: number) => void,
+): () => void {
+  return usePhotoCacheBustStore.subscribe((state, previous) => {
+    if (state.revisions === previous.revisions) return;
+    for (const [relPath, revision] of Object.entries(state.revisions))
+      if (previous.revisions[relPath] !== revision) listener(relPath, revision);
+  });
+}
+
+/**
  * Reactive subscription to a relPath's revision — the `Avatar` binding. Selecting
  * the single key keeps the render tied to just this photo's writes. A null/empty
  * relPath (photo-less) selects `undefined`.

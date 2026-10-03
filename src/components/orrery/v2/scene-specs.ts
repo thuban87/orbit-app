@@ -7,9 +7,20 @@
  * token resolved here to RGBA floats (0..1), so the draw modules and SkSL
  * uniforms never see a colour literal (check:colors).
  */
-import { Skia } from "@shopify/react-native-skia";
+import { type SkImage, Skia } from "@shopify/react-native-skia";
+import { swatchIndex } from "@/components/avatar-initials";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
+import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { ThemePalette } from "@/theme/theme-types";
+import type { OrreryGenerationLedger } from "../resources/orrery-generation-ledger";
+import type {
+  OrreryDrawnPhoto,
+  OrreryPhotoRequest,
+} from "../resources/orrery-photo-cache";
+import type {
+  OrreryTextVisibility,
+  PreparedOrreryText,
+} from "../resources/orrery-text-service";
 import type { OrreryBodyResource } from "../use-orrery-switch-runtime";
 
 /** Premultiplication-free RGBA floats, 0..1. */
@@ -111,7 +122,7 @@ export interface OverlayInk {
   polarisHalo: OrreryInk;
 }
 /**
- * One focused body's accent outline: today's OrbitBody/SunBody focus ring,
+ * One focused body's accent outline: today's contact / sun focus ring,
  * `gap` world units outside the body's world radius (both scale with it).
  */
 export interface OverlayFocus {
@@ -221,4 +232,352 @@ export function buildStarField(
     });
   }
   return { stars };
+}
+
+// ── Bodies (38.7-07, D-43/D-53) ─────────────────────────────────────────────
+
+/** Today's status-outline width around a contact disc (inner disc = r − this / 2). */
+export const BODY_OUTLINE_WIDTH = 3;
+
+/**
+ * The picture layers that draw body specs, and the labels layer. Each acks
+ * `(layerId, generation, mountEpoch)` separately (H3 ledger contract).
+ */
+export const ORRERY_LAYER = {
+  bodiesBehind: "bodiesBehind",
+  sun: "sun",
+  bodiesFront: "bodiesFront",
+  labels: "labels",
+} as const;
+export type OrreryLayerId = (typeof ORRERY_LAYER)[keyof typeof ORRERY_LAYER];
+export const ORRERY_BODY_LAYERS: readonly OrreryLayerId[] = [
+  ORRERY_LAYER.bodiesBehind,
+  ORRERY_LAYER.sun,
+  ORRERY_LAYER.bodiesFront,
+];
+
+/**
+ * The initials glyph metrics the text publisher keys on (the legacy contact
+ * and sun body layout): font size ≈ the radius (cap height fits the disc; device-UAT
+ * tunable, 13-08), quantised to 0.5 px so near-equal radii share one cached
+ * Paragraph; the glyph is centred in the inner disc (contact) or the disc (sun).
+ */
+export function bodyInitialsLayout(
+  kind: "contact" | "sun",
+  radius: number,
+): { fontSize: number; maxWidth: number } {
+  return {
+    fontSize: Math.round(radius * 2) / 2,
+    maxWidth:
+      kind === "sun"
+        ? radius * 2
+        : Math.max(1, radius - BODY_OUTLINE_WIDTH / 2) * 2,
+  };
+}
+
+/**
+ * One body's static look (no native objects): rebuilt on resource, theme or
+ * focus change only, never per frame.
+ */
+export interface OrreryBodyLook {
+  /** Body key (`bodyKey`): the frame body it draws at. */
+  key: string;
+  kind: "contact" | "sun" | "satellite";
+  /** World radius: the frame's projected radius / this = the billboard scale. */
+  worldRadius: number;
+  /** Contact: status body fill (outline). Sun: occupant glow. Moon: its disc. */
+  outlineInk: OrreryInk;
+  /** The fallback swatch behind the initials (contact, sun). */
+  swatchInk: OrreryInk;
+  /** The photo key (relative path) the body shows, or null (initials only). */
+  photoKey: string | null;
+  /** Initials glyph font size (body-local px; `bodyInitialsLayout`). */
+  initialsFontSize: number;
+  /** Moon: the focused moon's accent ring ink; null otherwise. */
+  focusInk: OrreryInk | null;
+}
+
+/** A body's spec: its look plus the native objects its picture draws. */
+export interface OrreryBodySpec extends OrreryBodyLook {
+  /** From OrreryTextService only (D-52); null → the plain swatch disc. */
+  initials: PreparedOrreryText | null;
+  /** From the shared photo cache only (D-53); null → swatch + initials. */
+  photo: SkImage | null;
+}
+
+/** What the body layers (`bodiesBehind`, `sun`, `bodiesFront`) read. */
+export interface OrreryBodySpecs {
+  /** The shared spec generation (0 = nothing published yet). */
+  generation: number;
+  /** The ledger epoch this generation belongs to. */
+  mountEpoch: number;
+  /** Source order: resources (contacts and the sun), then moons. */
+  bodies: readonly OrreryBodySpec[];
+}
+export const EMPTY_BODY_SPECS: OrreryBodySpecs = Object.freeze({
+  generation: 0,
+  mountEpoch: 0,
+  bodies: Object.freeze([]) as readonly OrreryBodySpec[],
+});
+
+type SceneContact = OrreryBodyResource["scene"]["contacts"][number];
+const contactsById = new WeakMap<
+  OrreryBodyResource["scene"],
+  ReadonlyMap<number, SceneContact>
+>();
+/** First row per id (what the legacy `find` returned), indexed once per scene. */
+function contactOf(resource: OrreryBodyResource): SceneContact | undefined {
+  let index = contactsById.get(resource.scene);
+  if (!index) {
+    const built = new Map<number, SceneContact>();
+    for (const row of resource.scene.contacts)
+      if (!built.has(row.id)) built.set(row.id, row);
+    contactsById.set(resource.scene, built);
+    index = built;
+  }
+  return index.get(resource.body.id);
+}
+
+/** The name a body's swatch and initials derive from, and its photo path. */
+export function bodyIdentity(
+  resource: OrreryBodyResource,
+  colors: ThemePalette,
+): { name: string; photo: string | null; glowColor: string | null } {
+  const { body, scene } = resource;
+  if (body.kind === "sun") {
+    const resolved = resolveSunOccupant({
+      ...scene.sun,
+      starPalette: colors.starPalette,
+      colors,
+    });
+    return {
+      name:
+        (resolved.kind === "self"
+          ? scene.sun.selfName
+          : scene.sun.sunContactName) ?? "",
+      photo: resolved.photo,
+      glowColor: resolved.glowColor,
+    };
+  }
+  const contact = contactOf(resource);
+  return {
+    name: contact?.name ?? "",
+    photo: contact?.photo ?? null,
+    glowColor: null,
+  };
+}
+
+/**
+ * Today's body look per resource (the legacy contact and sun bodies): the status body fill
+ * as the outline, `avatarSwatches[swatchIndex(name)]` behind the initials, the
+ * sun's resolved glow. Every colour is a theme token resolved to RGBA here.
+ */
+export function buildBodyLooks(
+  resources: readonly OrreryBodyResource[],
+  colors: ThemePalette,
+): OrreryBodyLook[] {
+  const out: OrreryBodyLook[] = [];
+  const swatchOf = (name: string) =>
+    tokenInk(
+      colors.avatarSwatches[swatchIndex(name, colors.avatarSwatches.length)],
+    );
+  for (const resource of resources) {
+    const { body } = resource;
+    if (body.kind === "satellite") continue;
+    const identity = bodyIdentity(resource, colors);
+    const kind = body.kind === "sun" ? "sun" : "contact";
+    out.push({
+      key: resource.key,
+      kind,
+      worldRadius: body.radius,
+      outlineInk:
+        kind === "sun"
+          ? tokenInk(identity.glowColor ?? colors.border)
+          : tokenInk(
+              orreryRingStyle(contactOf(resource)?.status ?? null, colors)
+                .bodyFill,
+            ),
+      swatchInk: swatchOf(identity.name),
+      photoKey: identity.photo,
+      initialsFontSize: bodyInitialsLayout(kind, body.radius).fontSize,
+      focusInk: null,
+    });
+  }
+  return out;
+}
+
+/**
+ * D-53: the photo cache request for a set of body looks — one entry per photo
+ * key, ranked focused first, then visible bodies largest first, then the rest
+ * in source order. `visibility` null (not reported yet) treats every body as
+ * visible. Bodies that share a photo share one entry (their best rank).
+ */
+export function buildPhotoRequests(
+  looks: readonly OrreryBodyLook[],
+  focusedKeys: ReadonlySet<string>,
+  visibility: OrreryTextVisibility | null,
+): OrreryPhotoRequest[] {
+  const visible = visibility?.visible ? new Set(visibility.visible) : null;
+  const radius = new Map<string, number>();
+  for (const item of visibility?.eligible ?? [])
+    radius.set(item.key, item.radius);
+  const ranked = looks
+    .map((look, order) => ({
+      look,
+      order,
+      focused: focusedKeys.has(look.key),
+      visible: !visible || visible.has(look.key),
+      radius: radius.get(look.key) ?? 0,
+    }))
+    .filter((item) => item.look.photoKey !== null)
+    .sort(
+      (a, b) =>
+        Number(b.focused) - Number(a.focused) ||
+        Number(b.visible) - Number(a.visible) ||
+        (a.visible && b.visible ? b.radius - a.radius : 0) ||
+        a.order - b.order,
+    );
+  const out = new Map<string, OrreryPhotoRequest>();
+  ranked.forEach((item, priority) => {
+    const key = item.look.photoKey as string;
+    if (out.has(key)) return;
+    out.set(key, {
+      key,
+      relativePath: key,
+      priority,
+      focused: item.focused,
+      visible: item.visible,
+    });
+  });
+  return [...out.values()];
+}
+
+/** Ledger handles: a separator that never occurs in a key or number. */
+const HANDLE_SEPARATOR = "\u0001";
+/** The ledger handle of a photo image (its cache epoch travels with it). */
+export function photoHandle(photoEpoch: number, id: number): string {
+  return `p${HANDLE_SEPARATOR}${photoEpoch}${HANDLE_SEPARATOR}${id}`;
+}
+/** The ledger handle of a text-service entry (its owner epoch travels with it). */
+export function textHandle(textEpoch: number, key: string): string {
+  return `t${HANDLE_SEPARATOR}${textEpoch}${HANDLE_SEPARATOR}${key}`;
+}
+export type OrreryLedgerHandle =
+  | { kind: "photo"; epoch: number; id: number }
+  | { kind: "text"; epoch: number; key: string };
+export function parseLedgerHandle(handle: string): OrreryLedgerHandle | null {
+  const first = handle.indexOf(HANDLE_SEPARATOR);
+  const second = handle.indexOf(HANDLE_SEPARATOR, first + 1);
+  if (first !== 1 || second < 0) return null;
+  const epoch = Number(handle.slice(first + 1, second));
+  const rest = handle.slice(second + 1);
+  if (handle[0] === "p") return { kind: "photo", epoch, id: Number(rest) };
+  if (handle[0] === "t") return { kind: "text", epoch, key: rest };
+  return null;
+}
+
+export interface OrrerySpecPublisherOptions {
+  /** The H3 ledger every native object the specs reference is tracked by. */
+  ledger: OrreryGenerationLedger<string>;
+  /** Writes the body specs SharedValue (never React state). */
+  writeBodies: (specs: OrreryBodySpecs) => void;
+}
+
+export interface OrrerySpecPublisher {
+  /** Resource / theme / focus change: the static looks. */
+  setLooks(looks: readonly OrreryBodyLook[]): void;
+  /** The text publisher's initials (body key → Paragraph), keys = its cache keys. */
+  setInitials(
+    initials: Readonly<Record<string, PreparedOrreryText | null>>,
+  ): void;
+  /** The photo cache's drawn photos for this owner, tagged with its epoch. */
+  setPhotos(
+    photos: ReadonlyMap<string, OrreryDrawnPhoto>,
+    photoEpoch: number,
+  ): void;
+  /** Ends the publishing epoch now (unmount); returns it for the later teardown. */
+  detach(): number | null;
+  generation(): number;
+  epoch(): number | null;
+}
+
+/**
+ * 38.7-07 (D-43/H3): the JS-thread spec publisher. It composes the body looks
+ * with the native objects (initials Paragraphs, photo SkImages) into one
+ * immutable spec array, writes it with a monotonically increasing shared
+ * generation, and tells the ledger which native objects that generation
+ * references for which layers. A photo arriving republishes the specs without
+ * any React state change; an unchanged input writes nothing.
+ */
+export function createOrrerySpecPublisher(
+  options: OrrerySpecPublisherOptions,
+): OrrerySpecPublisher {
+  const { ledger, writeBodies } = options;
+  let looks: readonly OrreryBodyLook[] = [];
+  let initials: Readonly<Record<string, PreparedOrreryText | null>> = {};
+  let photos: ReadonlyMap<string, OrreryDrawnPhoto> = new Map();
+  let photoEpoch = 0;
+  let generation = 0;
+  let epoch: number | null = null;
+  let published: readonly OrreryBodySpec[] | null = null;
+  let publishedLooks: readonly OrreryBodyLook[] | null = null;
+
+  function publishBodies(): void {
+    const bodies: OrreryBodySpec[] = [];
+    const handles = new Set<string>();
+    let same =
+      published !== null &&
+      publishedLooks === looks &&
+      published.length === looks.length;
+    for (let i = 0; i < looks.length; i++) {
+      const look = looks[i];
+      const drawn =
+        look.photoKey === null ? undefined : photos.get(look.photoKey);
+      const spec: OrreryBodySpec = {
+        ...look,
+        initials: initials[look.key] ?? null,
+        photo: drawn?.image ?? null,
+      };
+      if (drawn) handles.add(photoHandle(photoEpoch, drawn.id));
+      if (
+        same &&
+        (published?.[i]?.photo !== spec.photo ||
+          published?.[i]?.initials !== spec.initials)
+      )
+        same = false;
+      bodies.push(spec);
+    }
+    if (same) return;
+    if (epoch === null) epoch = ledger.beginEpoch();
+    generation++;
+    published = bodies;
+    publishedLooks = looks;
+    ledger.publish(generation, ORRERY_BODY_LAYERS, handles);
+    writeBodies({ generation, mountEpoch: epoch, bodies });
+  }
+
+  return {
+    setLooks(next) {
+      looks = next;
+      publishBodies();
+    },
+    setInitials(next) {
+      initials = next;
+      publishBodies();
+    },
+    setPhotos(next, nextEpoch) {
+      photos = next;
+      photoEpoch = nextEpoch;
+      publishBodies();
+    },
+    detach() {
+      const ended = epoch;
+      epoch = null;
+      published = null;
+      publishedLooks = null;
+      return ended;
+    },
+    generation: () => generation,
+    epoch: () => epoch,
+  };
 }

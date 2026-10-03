@@ -10,7 +10,6 @@ import {
   useDerivedValue,
   useSharedValue,
 } from "react-native-reanimated";
-import { swatchIndex } from "@/components/avatar-initials";
 import type { OrrerySatellite } from "@/db/orrery-satellites-read";
 import type {
   CameraPose,
@@ -24,7 +23,6 @@ import {
 } from "@/logic/orrery-focus-logic";
 import {
   type AnimatedFrame,
-  billboardPose,
   bodyKey,
   frameBodyByKey,
   projectAnimatedFrame,
@@ -46,18 +44,18 @@ import {
   previewReorder,
   type ReorderIntent,
 } from "@/logic/orrery-reorder-logic";
-import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import {
   deriveSatelliteBodies,
   resolveSatelliteTap,
 } from "@/logic/orrery-satellite-logic";
 import { sampleSwitchChoreography } from "@/logic/orrery-switch-choreography";
-import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
-import { OrbitBody, orbitBodyInitialsLayout } from "./OrbitBody";
 import { OrreryLabel } from "./OrreryLabel";
+import type { OrreryGenerationLedger } from "./resources/orrery-generation-ledger";
+import { createOrreryGenerationLedger } from "./resources/orrery-generation-ledger";
+import { orreryPhotoCache } from "./resources/orrery-photo-cache";
 import {
   createOrreryTextPublisher,
   EMPTY_INITIALS_SPEC,
@@ -74,23 +72,31 @@ import {
   orreryTextService,
 } from "./resources/orrery-text-service";
 import { SatelliteBody } from "./SatelliteBody";
-import { SunBody, sunBodyInitialsLayout } from "./SunBody";
 import {
-  type OrreryBodyResource,
   type OrrerySwitchRuntime,
   sampleOrrerySwitchCamera,
 } from "./use-orrery-switch-runtime";
 import { OrreryV2Canvas } from "./v2/OrreryV2Canvas";
 import {
+  bodyIdentity,
+  bodyInitialsLayout,
+  buildBodyLooks,
   buildFocusOutlines,
   buildOverlayInk,
+  buildPhotoRequests,
   buildRingSpecs,
   buildSkySpec,
   buildStarField,
+  createOrrerySpecPublisher,
+  EMPTY_BODY_SPECS,
   EMPTY_OVERLAY_SPEC,
   EMPTY_RING_SPECS,
   EMPTY_STAR_FIELD,
+  type OrreryBodySpecs,
+  type OrreryLayerId,
+  type OrrerySpecPublisher,
   type OverlaySpec,
+  parseLedgerHandle,
   type RingSpecs,
   type SkySpec,
   type StarFieldSpec,
@@ -167,88 +173,31 @@ function orreryTextEligibility(
 }
 
 let worldSerial = 0;
+type OrreryLedger = OrreryGenerationLedger<string>;
 /** After the post-release UI round trip: the released text entries may go. */
 function finishTextRelease(owner: string, epoch: number): void {
   orreryTextService.confirmReleased(owner, epoch);
   orreryTextService.clearUnheld();
 }
 
-/** The display name a body's swatch and initials derive from. */
-function bodyDisplayName(
-  resource: OrreryBodyResource,
-  colors: ThemePalette,
-): { name: string; photo: string | null } {
-  const { body, scene } = resource;
-  if (body.kind === "sun") {
-    const resolved = resolveSunOccupant({
-      ...scene.sun,
-      starPalette: colors.starPalette,
-      colors,
-    });
-    return {
-      name:
-        resolved.kind === "self"
-          ? scene.sun.selfName
-          : scene.sun.sunContactName,
-      photo: resolved.photo,
-    };
+/**
+ * 38.7-07 (H3): routes the native objects the ledger released back to their
+ * holders. A photo image is confirmed to the shared cache (disposed when
+ * `dispose` or superseded, else it turns warm); text keeps Plan 04's echo
+ * until Task 2 moves it onto the ledger.
+ */
+function routeRetired(
+  owner: string,
+  handles: Iterable<string>,
+  dispose: boolean,
+): void {
+  for (const handle of handles) {
+    const parsed = parseLedgerHandle(handle);
+    if (parsed?.kind === "photo")
+      orreryPhotoCache.confirmRetired(owner, [parsed.id], parsed.epoch, {
+        dispose,
+      });
   }
-  const contact = rowById(scene.contacts, body.id);
-  return { name: contact?.name ?? "", photo: contact?.photo ?? null };
-}
-
-function ProjectedBody({
-  resource,
-  frame,
-  colors,
-  initialsSpec,
-}: {
-  resource: OrreryBodyResource;
-  frame: SharedValue<AnimatedFrame>;
-  colors: ThemePalette;
-  initialsSpec: SharedValue<OrreryInitialsSpec>;
-}) {
-  const { body, scene, key } = resource;
-  const projection = useDerivedValue(() =>
-    billboardPose(frame.value, key, body.radius),
-  );
-  const resolved = resolveSunOccupant({
-    ...scene.sun,
-    starPalette: colors.starPalette,
-    colors,
-  });
-  const contact = rowById(scene.contacts, body.id);
-  const name =
-    body.kind === "sun"
-      ? resolved.kind === "self"
-        ? scene.sun.selfName
-        : scene.sun.sunContactName
-      : (contact?.name ?? "");
-  const common = {
-    cx: 0,
-    cy: 0,
-    radius: body.radius,
-    projection,
-    swatch:
-      colors.avatarSwatches[swatchIndex(name, colors.avatarSwatches.length)],
-    initialsSpec,
-    textKey: key,
-  };
-  // Each branch returns exactly ONE actual body root Group; no parent wrapper.
-  return body.kind === "sun" ? (
-    <SunBody
-      {...common}
-      photo={resolved.photo}
-      glowColor={resolved.glowColor}
-      glowRadius={body.radius * 1.8}
-    />
-  ) : (
-    <OrbitBody
-      {...common}
-      photo={contact?.photo ?? null}
-      bodyFill={orreryRingStyle(contact?.status ?? null, colors).bodyFill}
-    />
-  );
 }
 
 export function OrreryWorld({
@@ -309,6 +258,21 @@ export function OrreryWorld({
   // state, so a tier change commits no render here.
   const labelSpec = useSharedValue<OrreryLabelSpec>(EMPTY_LABEL_SPEC);
   const initialsSpec = useSharedValue<OrreryInitialsSpec>(EMPTY_INITIALS_SPEC);
+  // 38.7-07 (D-43/H3): the body specs every body picture layer reads, the
+  // shared spec generation and the ledger that gates native-object disposal.
+  const bodySpecs = useSharedValue<OrreryBodySpecs>(EMPTY_BODY_SPECS);
+  const ledgerRef = useRef<OrreryLedger | null>(null);
+  if (!ledgerRef.current) ledgerRef.current = createOrreryGenerationLedger();
+  const ledger = ledgerRef.current;
+  const specPublisherRef = useRef<OrrerySpecPublisher | null>(null);
+  if (!specPublisherRef.current)
+    specPublisherRef.current = createOrrerySpecPublisher({
+      ledger,
+      writeBodies: (specs) => {
+        bodySpecs.value = specs;
+      },
+    });
+  const specPublisher = specPublisherRef.current;
   const publisherRef = useRef<OrreryTextPublisher | null>(null);
   if (!publisherRef.current) {
     const owner = `orrery-world:${++worldSerial}`;
@@ -317,7 +281,10 @@ export function OrreryWorld({
         owner,
         write: (labels, initials) => {
           if (labels) labelSpec.value = labels;
-          if (initials) initialsSpec.value = initials;
+          if (initials) {
+            initialsSpec.value = initials;
+            specPublisherRef.current?.setInitials(initials.initials);
+          }
         },
       }),
       { owner },
@@ -462,19 +429,76 @@ export function OrreryWorld({
     () =>
       resources.flatMap((resource) => {
         if (resource.body.kind === "satellite") return [];
-        const { name, photo } = bodyDisplayName(resource, colors);
+        const { name, photo } = bodyIdentity(resource, colors);
         const text = orreryInitials(name);
         if (text.length === 0) return [];
-        const layout = (
-          resource.body.kind === "sun"
-            ? sunBodyInitialsLayout
-            : orbitBodyInitialsLayout
-        )(resource.body.radius);
+        const layout = bodyInitialsLayout(
+          resource.body.kind === "sun" ? "sun" : "contact",
+          resource.body.radius,
+        );
         return [
           { key: resource.key, text, ...layout, hasPhoto: photo !== null },
         ];
       }),
     [resources, colors],
+  );
+  // 38.7-07 (D-43): the static body looks (theme and resources only).
+  const looks = useMemo(
+    () => buildBodyLooks(resources, colors),
+    [resources, colors],
+  );
+  useEffect(() => {
+    specPublisher.setLooks(looks);
+  }, [specPublisher, looks]);
+  // D-53: photos come from the one shared, bounded cache. A photo arriving
+  // calls back synchronously and republishes the body specs (no React state).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by focusSignature (focusedIds' contents), not its identity
+  const focusedKeys = useMemo(
+    () =>
+      new Set(
+        resources
+          .filter(
+            (resource) =>
+              resource.body.kind !== "satellite" &&
+              focusedIds.includes(resource.body.id),
+          )
+          .map((resource) => resource.key),
+      ),
+    [resources, focusSignature],
+  );
+  const photoEpoch = useRef<number | null>(null);
+  const photoInputs = useRef({ looks, focusedKeys });
+  photoInputs.current = { looks, focusedKeys };
+  const visibilityRef = useRef<OrreryTextVisibility | null>(null);
+  const requestPhotos = useCallback(() => {
+    const { owner } = publisher;
+    if (photoEpoch.current === null)
+      photoEpoch.current = orreryPhotoCache.mount(owner, () => {
+        const epoch = photoEpoch.current;
+        if (epoch !== null)
+          specPublisher.setPhotos(orreryPhotoCache.drawn(owner), epoch);
+      });
+    orreryPhotoCache.request(
+      owner,
+      buildPhotoRequests(
+        photoInputs.current.looks,
+        photoInputs.current.focusedKeys,
+        visibilityRef.current,
+      ),
+    );
+  }, [publisher, specPublisher]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-request when the looks (photo paths) or the focus change; requestPhotos reads them from photoInputs
+  useEffect(() => {
+    requestPhotos();
+  }, [requestPhotos, looks, focusedKeys]);
+  // H3: a layer recorded a generation one UI frame ago. Whatever no layer can
+  // still re-record goes back to its holder.
+  const ackRecorded = useCallback(
+    (layer: OrreryLayerId, generation: number, epoch: number) => {
+      if (!ledger.ack(layer, generation, epoch)) return;
+      routeRetired(publisher.owner, ledger.retirable(), false);
+    },
+    [ledger, publisher],
   );
   const textScene = useMemo<OrreryTextScene>(
     () => ({
@@ -501,30 +525,50 @@ export function OrreryWorld({
   }, [publisher, textScene]);
   useEffect(
     () => () => {
-      // Unmount: pins retire now; the entries are disposed only after the
-      // canvas teardown queued by this commit and one UI frame (no pending
-      // redraw can still read them), then everything unheld is cleared.
-      const epoch = publisher.release();
-      if (epoch === null) return;
+      // H3 teardown: pins retire now and the publishing epoch ends; the clock
+      // and the pictures stop with the canvas unmounting in this commit. Only
+      // after that teardown's queued UI jobs and one more UI frame (no mapper
+      // can still record) is every retained object handed back, in reverse
+      // creation order, and everything unheld cleared.
       const { owner } = publisher;
+      const textEpoch = publisher.release();
+      const ledgerEpoch = specPublisher.detach();
+      const photos = photoEpoch.current;
+      photoEpoch.current = null;
+      if (photos !== null) orreryPhotoCache.release(owner);
+      const finish = () => {
+        if (ledgerEpoch !== null)
+          ledger.teardown(
+            (handle) => routeRetired(owner, [handle], true),
+            ledgerEpoch,
+          );
+        if (photos !== null) orreryPhotoCache.confirmReleased(owner, photos);
+        orreryPhotoCache.clearUnheld();
+        if (textEpoch !== null) finishTextRelease(owner, textEpoch);
+      };
       setTimeout(() => {
         runOnUI(() => {
           "worklet";
           requestAnimationFrame(() => {
-            runOnJS(finishTextRelease)(owner, epoch);
+            runOnJS(finish)();
           });
         })();
       }, 0);
     },
-    [publisher],
+    [publisher, specPublisher, ledger],
   );
   const sendTier = useCallback(
     (tier: SemanticLevel) => publisher.setTier(tier),
     [publisher],
   );
   const sendVisibility = useCallback(
-    (visibility: OrreryTextVisibility) => publisher.setVisibility(visibility),
-    [publisher],
+    (visibility: OrreryTextVisibility) => {
+      publisher.setVisibility(visibility);
+      // D-53: visible photos first (the same throttled UI report).
+      visibilityRef.current = visibility;
+      requestPhotos();
+    },
+    [publisher, requestPhotos],
   );
   const confirmTextEcho = useCallback(
     (generation: number, epoch: number) =>
@@ -789,21 +833,13 @@ export function OrreryWorld({
       ringSpecs={ringSpecs}
       overlay={overlaySpec}
       reorder={camera.reorder}
+      bodies={bodySpecs}
+      ackRecorded={ackRecorded}
     >
       <Group
         clip={{ x: 0, y: 0, width: viewport.width, height: viewport.height }}
       >
-        {/* RNRecorder flushes sorting at every non-Group command. Keep this run contiguous. */}
         <Group>
-          {resources.map((resource) => (
-            <ProjectedBody
-              key={resource.key}
-              resource={resource}
-              frame={frame}
-              colors={colors}
-              initialsSpec={initialsSpec}
-            />
-          ))}
           {satellites.map((row) => {
             const target = {
               kind: "satellite" as const,

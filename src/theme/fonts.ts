@@ -19,7 +19,8 @@
  * react-native. Tests inject a fake loader; `getFontMap()` / the default loader
  * run only on device.
  *
- * The Skia Orrery font pipeline (`useFonts` in OrreryScreen/OrbitBody, Pitfall 5)
+ * The Skia Orrery font pipeline (`useFonts` in OrreryScreen; Paragraphs from
+ * the OrreryTextService, drawn by `v2/draw-bodies.ts` / `v2/draw-labels.ts`, Pitfall 5)
  * is a SEPARATE font system and is intentionally untouched here.
  */
 import { Logger } from "@/utils/logger";

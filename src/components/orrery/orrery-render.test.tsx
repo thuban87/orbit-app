@@ -130,8 +130,29 @@ vi.mock("./orrery-clock-context", () => ({
     },
   },
 }));
-// The bodies' photo hook (38.6-04 D-11) — a photo-less render, as `useImage: () => null` was.
-vi.mock("./use-orrery-photo", () => ({ useOrreryPhoto: () => null }));
+// 38.7-07 (D-53): the shared photo cache — a photo-less render unless a test
+// publishes a drawn photo through the owner's onReady callback.
+const photoCache = vi.hoisted(() => ({
+  drawn: new Map<string, { id: number; image: unknown }>(),
+  ready: null as null | (() => void),
+  requests: [] as unknown[][],
+}));
+vi.mock("./resources/orrery-photo-cache", () => ({
+  orreryPhotoCache: {
+    mount: (_owner: string, onReady: () => void) => {
+      photoCache.ready = onReady;
+      return 1;
+    },
+    request: (_owner: string, entries: unknown[]) => {
+      photoCache.requests.push(entries);
+    },
+    drawn: () => photoCache.drawn,
+    confirmRetired: () => 0,
+    release: () => 1,
+    confirmReleased: () => 0,
+    clearUnheld: () => 0,
+  },
+}));
 vi.mock("@/theme/use-reduced-motion", () => ({
   useReducedMotionShared: () => native.reduced,
 }));
@@ -187,6 +208,9 @@ vi.mock("@shopify/react-native-skia", async () => {
     },
     PaintStyle: { Fill: 0, Stroke: 1 },
     BlendMode: { Dst: 2 },
+    ClipOp: { Difference: 0, Intersect: 1 },
+    FilterMode: { Nearest: 0, Linear: 1 },
+    MipmapMode: { None: 0, Nearest: 1, Linear: 2 },
     // A recording canvas: each command with the paint colour it drew with.
     createPicture: (draw: (canvas: unknown) => void) => {
       const commands: { op: string; color?: number[] }[] = [];
@@ -219,6 +243,13 @@ vi.mock("@shopify/react-native-skia", async () => {
     rrect: (rect: unknown) => rect,
     Skia: {
       Color: parseInk,
+      XYWHRect: (x: number, y: number, width: number, height: number) => ({
+        x,
+        y,
+        width,
+        height,
+      }),
+      RRectXY: (rect: unknown, rx: number, ry: number) => ({ rect, rx, ry }),
       Paint: () => {
         const paint = {
           color: [] as number[],
@@ -370,14 +401,11 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    // canvas [base, stars, clip Group [bodies, labels], overlay]
-    const bodies = tree[0].children[2].children[0];
-    expect(bodies.children.map((n) => n.type)).toEqual([
-      "skGroup",
-      "skGroup",
-      "skGroup",
-    ]);
-    const moon = bodies.children[2];
+    // canvas [base, stars, bodiesBehind, sun, bodiesFront,
+    //         clip Group [moons, labels], overlay] (38.7-07 Task 1)
+    const moons = tree[0].children[5].children[0];
+    expect(moons.children.map((n) => n.type)).toEqual(["skGroup"]);
+    const moon = moons.children[0];
     expect(moon.children[0].props.color).toBe(
       THEME_PRESETS.galaxy.dark.textSecondary,
     );
@@ -415,31 +443,36 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    // 38.7-06: the sky and rings are the V2 base picture, the stars their
-    // own picture, and Polaris, the reorder outline and the focus outlines
-    // the overlay picture, around the legacy body/label slot
-    // (v2/draw-overlay.test.ts covers their drawing).
+    // 38.7-07: contacts and the sun are picture layers split around the sun
+    // by projected depth (M14); the legacy slot keeps moons and labels.
     expect(tree[0].type).toBe("skCanvas");
     expect(tree[0].children.map((node) => node.type)).toEqual([
       "skPicture",
       "skPicture",
+      "skPicture",
+      "skPicture",
+      "skPicture",
       "skGroup",
       "skPicture",
     ]);
-    const [bodies, labels] = tree[0].children[2].children;
-    expect(bodies.children.map((child) => child.type)).toEqual([
-      "skGroup",
-      "skGroup",
-    ]);
-    expect(labels.children.length).toBe(1);
-    const [contact, sun] = bodies.children;
-    const depth = (node: Node) =>
-      (node.props.zIndex as { value: number }).value;
-    expect(depth(contact)).toBeLessThan(depth(sun));
+    const [, , behind, sunLayer, front] = tree[0].children;
+    const circles = (picture: Node) =>
+      (
+        picture.props.picture as {
+          value: { commands: { op: string }[] };
+        }
+      ).value.commands.filter((c) => c.op === "drawCircle").length;
+    flushUi();
+    // Tilted: the contact is deeper than the sun → drawn behind it.
+    expect(circles(behind)).toBe(2);
+    expect(circles(front)).toBe(0);
+    expect(circles(sunLayer)).toBe(3);
     pose.value = { ...pose.value, yaw: Math.PI };
-    expect(depth(contact)).toBeGreaterThan(depth(sun));
-    for (const body of bodies.children)
-      expect(body.props.layer).toHaveProperty("value");
+    expect(circles(behind)).toBe(0);
+    expect(circles(front)).toBe(2);
+    pose.value = { ...pose.value, yaw: 0 };
+    const [, labels] = tree[0].children[5].children;
+    expect(labels.children.length).toBe(1);
     const nameLayer = labels.children[0].children[0];
     expect(nameLayer.type).toBe("skLayer");
     const alpha = nameLayer.children[0].props.opacity as { value: number };
@@ -452,9 +485,6 @@ describe("production Orrery native tree and resource contracts", () => {
     // reactions; only then does the (unfocused) label get a Paragraph.
     flushUi();
     expect(alpha.value).toBe(1);
-    expect(
-      (contact.props.transform as { value: unknown[] }).value,
-    ).toHaveLength(3);
   });
   it("M3: a switch whose camera crosses IDENTITY_ENTER publishes label text through UI reactions and commits no OrreryWorld render", async () => {
     const exec = nodeSqliteExecutor(db);
@@ -495,7 +525,7 @@ describe("production Orrery native tree and resource contracts", () => {
       ...(node.type === type ? [node] : []),
       ...node.children.flatMap((child) => findAll(child, type)),
     ];
-    const labels = tree[0].children[2].children[1];
+    const labels = tree[0].children[5].children[1];
     const [nameParagraph] = findAll(labels, "paragraph");
     const drawn = () =>
       (nameParagraph.props.paragraph as { value: { text?: string } | null })
@@ -626,7 +656,7 @@ describe("38.7-06 D-43: the stable picture tree and the single ambient clock", (
       useOrreryCamera(cameraInput(largeScene)),
     );
     const largePictures = findAll(large[0], "skPicture");
-    expect(smallPictures).toHaveLength(3);
+    expect(smallPictures).toHaveLength(6);
     expect(largePictures).toHaveLength(smallPictures.length);
     expect(large[0].children.map((n) => n.type)).toEqual(
       small[0].children.map((n) => n.type),
@@ -653,8 +683,8 @@ describe("38.7-06 D-43: the stable picture tree and the single ambient clock", (
     const shape = (tree: Node[]) =>
       tree[0].children.map((n) => [n.type, n.children.length]);
     expect(shape(after)).toEqual(shape(before));
-    const overlayBefore = recorded(before[0].children[3]);
-    const overlayAfter = recorded(after[0].children[3]);
+    const overlayBefore = recorded(before[0].children[6]);
+    const overlayAfter = recorded(after[0].children[6]);
     const accent = [...parseInk(THEME_PRESETS.galaxy.dark.accent)];
     const accentCircles = (commands: Recorded["commands"]) =>
       commands.filter(
