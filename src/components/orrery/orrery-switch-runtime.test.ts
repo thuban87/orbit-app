@@ -4,25 +4,50 @@ import { bodyKey } from "@/logic/orrery-frame";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 
 /**
- * Single-render hook harness: the repo has no react-test-renderer, so React
- * hooks are identity/record stubs and Reanimated runs worklets synchronously.
- * `withTiming` records its completion callback instead of animating, so a test
- * decides when (and with which generation) a switch driver completes.
+ * Minimal hook harness: the repo has no react-test-renderer, so React and
+ * Reanimated hooks are slot-based stubs (stable across re-renders, deps compared
+ * like React) and Reanimated runs worklets synchronously. `withTiming` records
+ * its completion callback instead of animating, so a test decides when (and
+ * with which generation) a switch driver completes.
  */
-const harness = vi.hoisted(() => ({
-  state: { value: undefined as unknown },
-  timings: [] as ((finished: boolean) => void)[],
-  reactions: [] as ((current: unknown, previous: unknown) => void)[],
-}));
+const harness = vi.hoisted(() => {
+  const state = {
+    state: { value: undefined as unknown },
+    timings: [] as ((finished: boolean) => void)[],
+    reactions: [] as ((current: unknown, previous: unknown) => void)[],
+    slots: [] as unknown[],
+    cursor: 0,
+  };
+  const slot = <T>(init: () => T): { fresh: boolean; value: T } => {
+    const index = state.cursor++;
+    const fresh = index >= state.slots.length;
+    if (fresh) state.slots[index] = init();
+    return { fresh, value: state.slots[index] as T };
+  };
+  const sameDeps = (a: readonly unknown[], b: readonly unknown[]) =>
+    a.length === b.length && a.every((item, i) => Object.is(item, b[i]));
+  const memo = <T>(factory: () => T, deps: readonly unknown[]): T => {
+    const cell = slot(() => ({ value: factory(), deps }));
+    if (!cell.fresh && !sameDeps(cell.value.deps, deps)) {
+      cell.value.value = factory();
+      cell.value.deps = deps;
+    }
+    return cell.value.value;
+  };
+  return Object.assign(state, { slot, memo });
+});
 
 vi.mock("react", () => ({
-  useCallback: (fn: unknown) => fn,
+  useCallback: (fn: unknown, deps: readonly unknown[]) =>
+    harness.memo(() => fn, deps),
+  useMemo: (factory: () => unknown, deps: readonly unknown[]) =>
+    harness.memo(factory, deps),
   useEffect: () => {},
-  useRef: (current: unknown) => ({ current }),
+  useRef: (current: unknown) => harness.slot(() => ({ current })).value,
   useState: (initial: unknown) => {
-    harness.state.value = initial;
+    if (harness.slot(() => true).fresh) harness.state.value = initial;
     return [
-      initial,
+      harness.state.value,
       (next: unknown) => {
         harness.state.value =
           typeof next === "function"
@@ -42,9 +67,9 @@ vi.mock("react-native-reanimated", () => ({
     _prepare: unknown,
     react: (current: unknown, previous: unknown) => void,
   ) => {
-    harness.reactions.push(react);
+    if (harness.slot(() => true).fresh) harness.reactions.push(react);
   },
-  useSharedValue: (value: unknown) => ({ value }),
+  useSharedValue: (value: unknown) => harness.slot(() => ({ value })).value,
   withTiming: (
     _target: unknown,
     _config: unknown,
@@ -58,12 +83,14 @@ vi.mock("react-native-reanimated", () => ({
 import {
   beginOrrerySwitchRuntime,
   createSettledOrrerySwitchRuntime,
+  displayedSwitchCamera,
   nextOrreryResources,
   type OrreryBodyResource,
   pauseOrrerySwitchRuntime,
   pruneOrreryResources,
   useOrrerySwitchRuntime as renderOrrerySwitchRuntimeOnce,
   resumeOrrerySwitchRuntime,
+  sampleOrrerySwitchCamera,
   sampleOrrerySwitchRuntime,
 } from "./use-orrery-switch-runtime";
 
@@ -202,6 +229,8 @@ function mountRuntime() {
   harness.state.value = undefined;
   harness.timings.length = 0;
   harness.reactions.length = 0;
+  harness.slots.length = 0;
+  harness.cursor = 0;
   const pose = { value: { ...sourceCamera } };
   const reducedMotion = { value: false };
   const runtime = renderOrrerySwitchRuntimeOnce(
@@ -212,6 +241,14 @@ function mountRuntime() {
     runtime,
     pose,
     reducedMotion,
+    /** Re-renders the hook with the same inputs (React re-render semantics). */
+    rerender: () => {
+      harness.cursor = 0;
+      return renderOrrerySwitchRuntimeOnce(
+        pose as never,
+        reducedMotion as never,
+      );
+    },
     resources: () => harness.state.value as OrreryBodyResource[],
     entryKeys: () => runtime.transition.value.entries.map(({ key }) => key),
     /** Completes the most recent driver, as `withTiming` would on the UI thread. */
@@ -441,5 +478,84 @@ describe("Orrery resource cardinality (RG-027, performance/AUD-PERF-001)", () =>
     expect(mounted.resources()).toEqual([]);
     mounted.runtime.publish(sceneOf(3, []), false, 0, homeCamera);
     expect(mounted.resources()).toEqual([]);
+  });
+});
+
+describe("D-52 (6): a switch starts from the camera actually on screen", () => {
+  const panned: CameraPose = { ...sourceCamera, x: -140, y: 65, zoom: 2.4 };
+
+  it("displayedSwitchCamera returns the live pose once settled and the drawn sample before", () => {
+    for (const progress of [1, 1.5]) {
+      const shown = displayedSwitchCamera(
+        sourceCamera,
+        homeCamera,
+        progress,
+        panned,
+      );
+      expect(shown).toEqual(panned);
+      expect(shown).not.toBe(panned);
+    }
+    for (const progress of [0, 0.25, 0.5, 0.999]) {
+      expect(
+        displayedSwitchCamera(sourceCamera, homeCamera, progress, panned),
+      ).toEqual(sampleOrrerySwitchCamera(sourceCamera, homeCamera, progress));
+    }
+  });
+
+  it("a publish after a settled publication starts cameraFrom at the live pose, not the stale target", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    expect(mounted.runtime.cameraTo.value).toEqual(sourceCamera);
+    mounted.pose.value = { ...panned };
+    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    expect(mounted.runtime.cameraFrom.value).toEqual(panned);
+    expect(mounted.runtime.cameraTo.value).toEqual(homeCamera);
+  });
+
+  it("a publish after a completed switch starts from the live pose the user moved to", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    mounted.complete();
+    expect(mounted.pose.value).toEqual(homeCamera);
+    mounted.pose.value = { ...panned };
+    mounted.runtime.publish(sceneOf(3, cWorldOf()), true, 1, homeCamera);
+    expect(mounted.runtime.cameraFrom.value).toEqual(panned);
+  });
+
+  it("a mid-switch retarget still starts from the interpolated camera drawn that frame", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    mounted.pose.value = { ...panned };
+    mounted.runtime.publish(sceneOf(2, destinationWorld), true, 1, homeCamera);
+    mounted.runtime.progress.value = 0.4;
+    const drawn = sampleOrrerySwitchCamera(
+      mounted.runtime.cameraFrom.value,
+      mounted.runtime.cameraTo.value,
+      0.4,
+    );
+    mounted.runtime.publish(sceneOf(3, cWorldOf()), true, 1, homeCamera);
+    expect(mounted.runtime.cameraFrom.value).toEqual(drawn);
+  });
+});
+
+describe("D-52 freeze: runtime identity", () => {
+  it("returns the same runtime object across a re-render with unchanged inputs", () => {
+    const mounted = mountRuntime();
+    const again = mounted.rerender();
+    expect(again).toBe(mounted.runtime);
+    expect(again.publish).toBe(mounted.runtime.publish);
+    expect(again.transition).toBe(mounted.runtime.transition);
+  });
+
+  it("changes identity only when something it owns changes (resources)", () => {
+    const mounted = mountRuntime();
+    mounted.runtime.publish(sceneOf(1, sourceWorld), false, 0, sourceCamera);
+    const published = mounted.rerender();
+    expect(published).not.toBe(mounted.runtime);
+    expect(published.resources.map(({ key }) => key)).toEqual(
+      keysOf(sourceWorld),
+    );
+    expect(mounted.rerender()).toBe(published);
   });
 });

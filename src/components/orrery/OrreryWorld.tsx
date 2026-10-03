@@ -80,6 +80,14 @@ import {
 
 const LABEL_MAX_WIDTH = 200;
 const LABEL_BODY_GAP = 8;
+/**
+ * D-52: stable empty defaults. A fresh `[]`/`{}` default per render changes the
+ * frame worklet's closure (restarting the mapper) and the labels memo's deps
+ * (rebuilding every Paragraph) on any unrelated parent render.
+ */
+const EMPTY_IDS: readonly number[] = Object.freeze([]);
+const EMPTY_RELATIONS: Readonly<Record<number, string>> = Object.freeze({});
+const EMPTY_SATELLITES: readonly OrrerySatellite[] = Object.freeze([]);
 
 function ReorderGhost({
   frame,
@@ -172,14 +180,14 @@ export function OrreryWorld({
   fontProvider,
   onIntent,
   focusedIds,
-  clusterIds = focusedIds.length > 1 ? focusedIds : [],
-  focusedRelationById = {},
+  clusterIds = focusedIds.length > 1 ? focusedIds : EMPTY_IDS,
+  focusedRelationById = EMPTY_RELATIONS,
   interactive = true,
   camera,
   onFocusLost,
   onReorder,
   onReorderActivated,
-  satellites = [],
+  satellites = EMPTY_SATELLITES,
   focusedSatellite,
   switchRuntime,
 }: {
@@ -191,7 +199,7 @@ export function OrreryWorld({
   fontProvider: SkTypefaceFontProvider | null;
   onIntent: (intent: OrreryIntent) => void;
   focusedIds: number[];
-  clusterIds?: number[];
+  clusterIds?: readonly number[];
   /** Already-filtered, existing relation context only; supplied by focus/moon owner. */
   focusedRelationById?: Readonly<Record<number, string>>;
   interactive?: boolean;
@@ -219,35 +227,45 @@ export function OrreryWorld({
   const level = useSharedValue<SemanticLevel>("overview");
   // Capture only the producer's input; the controller also contains its published output.
   const reorder = camera.reorder;
+  // D-52 freeze: the frame worklet may capture only SharedValues, primitives,
+  // module functions and memoised plain values. Capturing `switchRuntime` (every
+  // resource holds a full scene) or `scene` re-materialises them on the UI
+  // runtime at each mapper start (orrery-frame-mapper.test.ts guards this).
+  const { transition, progress, cameraFrom, cameraTo } = switchRuntime;
+  const generation = scene.generation;
+  const memberIdentities = useMemo(
+    () => scene.systemSnapshot.members.map(({ id, uid }) => ({ id, uid })),
+    [scene],
+  );
   const frame = useDerivedValue(() => {
     const sampled = sampleSwitchChoreography(
-      switchRuntime.transition.value,
-      switchRuntime.progress.value,
+      transition.value,
+      progress.value,
     ).world;
     const sampledCamera =
-      switchRuntime.progress.value >= 1
+      progress.value >= 1
         ? pose.value
         : sampleOrrerySwitchCamera(
-            switchRuntime.cameraFrom.value,
-            switchRuntime.cameraTo.value,
-            switchRuntime.progress.value,
+            cameraFrom.value,
+            cameraTo.value,
+            progress.value,
           );
     const held = reorder.value;
     const world = previewReorder(
       sampled,
-      held?.generation === scene.generation ? held : null,
+      held?.generation === generation ? held : null,
     );
     const moons = deriveSatelliteBodies(
       world,
       satellites,
-      scene.systemSnapshot.members,
+      memberIdentities,
       true,
       semanticLevel(sampledCamera.zoom, level.value),
     );
     const completeWorld = [...world, ...moons];
     return projectAnimatedFrame(
       {
-        generation: switchRuntime.transition.value.generation,
+        generation: transition.value.generation,
         from: completeWorld,
         to: completeWorld,
       },
@@ -410,6 +428,8 @@ export function OrreryWorld({
     [scene],
   );
   const members = scene.systemSnapshot.members;
+  // A primitive, so the north-tap worklet never captures the whole scene.
+  const sceneExtent = scene.extent;
   const reorderExpectation = useMemo(
     () => ({
       system: scene.system,
@@ -427,7 +447,7 @@ export function OrreryWorld({
         pose,
         frame,
         camera,
-        extent: cameraExtent(scene.extent),
+        extent: cameraExtent(sceneExtent),
         send: onIntent,
         enabled: interactive,
         stop: camera.stop,
@@ -452,7 +472,7 @@ export function OrreryWorld({
         },
         onNorth: (x, y) => {
           "worklet";
-          if (!hitPolaris(frame.value, scene.extent, x, y)) return false;
+          if (!hitPolaris(frame.value, sceneExtent, x, y)) return false;
           camera.recover(northTarget(pose.value));
           return true;
         },
@@ -461,7 +481,7 @@ export function OrreryWorld({
       pose,
       frame,
       camera,
-      scene.extent,
+      sceneExtent,
       onIntent,
       interactive,
       identities,

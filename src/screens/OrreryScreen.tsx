@@ -121,6 +121,8 @@ const acknowledgeReorder = () => {
 
 /** Identifies commits emitted by this screen's otherwise-local System store. */
 const LOCAL_SELECT_ORIGIN = Symbol("orrery-local-select");
+/** D-52: a stable empty cluster, so a closed cluster never churns OrreryWorld's props. */
+const NO_CLUSTER_IDS: readonly number[] = Object.freeze([]);
 const MAX_CUSTOM_SYSTEM_COUNTS_PER_OPEN = 12;
 
 type SystemCountCache = {
@@ -248,6 +250,10 @@ export function OrreryScreen() {
   const focusedIds = useMemo(
     () => focusTargets.map((target) => target.id),
     [focusTargets],
+  );
+  const clusterIds = useMemo(
+    () => (clusterOpen ? focusedIds : NO_CLUSTER_IDS),
+    [clusterOpen, focusedIds],
   );
   const [focusError, setFocusError] = useState<
     "removed" | "missing-category" | "error" | null
@@ -1060,7 +1066,7 @@ export function OrreryScreen() {
             satellites={satellites?.rows}
             focusedSatellite={focusedSatellite}
             switchRuntime={switchRuntime}
-            clusterIds={clusterOpen ? focusedIds : []}
+            clusterIds={clusterIds}
             onFocusLost={clusterOpen ? undefined : clearFocus}
             interactive={!overlaysOpen && state.status === "ready"}
           />

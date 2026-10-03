@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   cancelAnimation,
   ReduceMotion,
@@ -85,6 +85,37 @@ function interpolateCamera(
   };
 }
 
+/**
+ * The one switch camera sampler. Drawing (OrreryWorld), the displayed-camera
+ * snapshot and `sampleOrrerySwitchRuntime` all go through it, so a snapshot is
+ * always the camera drawn that frame. Defined above every worklet that calls it
+ * (Hermes worklet forward-reference hazard).
+ */
+export function sampleOrrerySwitchCamera(
+  from: CameraPose,
+  to: CameraPose,
+  progress: number,
+): CameraPose {
+  "worklet";
+  return interpolateCamera(from, to, progress);
+}
+
+/**
+ * D-52 (6): the camera actually on screen. Once a switch has settled the user
+ * owns the live pose (pan/zoom/focus), so `cameraTo` is stale; a new switch or a
+ * reduced-motion retarget must start from the live pose, not the old target.
+ */
+export function displayedSwitchCamera(
+  from: CameraPose,
+  to: CameraPose,
+  progress: number,
+  live: CameraPose,
+): CameraPose {
+  "worklet";
+  if (progress >= 1) return { ...live };
+  return sampleOrrerySwitchCamera(from, to, progress);
+}
+
 export function createSettledOrrerySwitchRuntime(
   world: readonly WorldBody[],
   generation: number,
@@ -112,7 +143,11 @@ export function sampleOrrerySwitchRuntime(
   const sample = sampleSwitchChoreography(runtime.transition, fraction);
   return {
     world: sample.world,
-    camera: interpolateCamera(runtime.cameraFrom, runtime.cameraTo, fraction),
+    camera: sampleOrrerySwitchCamera(
+      runtime.cameraFrom,
+      runtime.cameraTo,
+      fraction,
+    ),
     sample,
   };
 }
@@ -289,17 +324,20 @@ export function useOrrerySwitchRuntime(
     ) => {
       latestScene.current = scene;
       setResources((current) => nextOrreryResources(current, scene, isSwitch));
+      // D-52: ship only the geometry the UI thread needs. Capturing `scene`
+      // would serialise the whole snapshot (contacts, members, gravity map) to
+      // the UI runtime on every publication.
+      const world = scene.world;
+      const generation = scene.generation;
       runOnUI(() => {
         "worklet";
         cancelAnimation(progress);
         const reduced = reducedMotion.value;
         if (!isSwitch || transition.value.generation === 0) {
-          transition.value = beginSwitchChoreography(
-            scene.world,
-            scene.world,
-            scene.generation,
-            { intensity: 0, reducedMotion: reduced },
-          );
+          transition.value = beginSwitchChoreography(world, world, generation, {
+            intensity: 0,
+            reducedMotion: reduced,
+          });
           cameraFrom.value = { ...destinationHome };
           cameraTo.value = { ...destinationHome };
           progress.value = 1;
@@ -310,26 +348,28 @@ export function useOrrerySwitchRuntime(
           transition.value,
           progress.value,
         ).world;
-        const displayedCamera = interpolateCamera(
+        const displayedCamera = displayedSwitchCamera(
           cameraFrom.value,
           cameraTo.value,
           progress.value,
+          pose.value,
         );
         transition.value = beginSwitchChoreography(
           displayed,
-          scene.world,
-          scene.generation,
+          world,
+          generation,
           { intensity, reducedMotion: reduced },
         );
         cameraFrom.value = displayedCamera;
         cameraTo.value = { ...destinationHome };
         progress.value = 0;
-        startDriver(1, reduced, scene.generation);
+        startDriver(1, reduced, generation);
       })();
     },
     [
       cameraFrom,
       cameraTo,
+      pose,
       progress,
       reducedMotion,
       running,
@@ -368,10 +408,11 @@ export function useOrrerySwitchRuntime(
         transition.value,
         progress.value,
       ).world;
-      const displayedCamera = interpolateCamera(
+      const displayedCamera = displayedSwitchCamera(
         cameraFrom.value,
         cameraTo.value,
         progress.value,
+        pose.value,
       );
       const destination = transition.value.entries.flatMap((entry) =>
         entry.destination ? [entry.destination] : [],
@@ -398,24 +439,30 @@ export function useOrrerySwitchRuntime(
     [progress],
   );
 
-  return {
-    transition,
-    progress,
-    cameraFrom,
-    cameraTo,
-    running,
-    resources,
-    publish,
-    pause,
-    resume,
-  };
-}
-
-export function sampleOrrerySwitchCamera(
-  from: CameraPose,
-  to: CameraPose,
-  progress: number,
-): CameraPose {
-  "worklet";
-  return interpolateCamera(from, to, progress);
+  // D-52: a stable identity, so an unrelated screen render neither restarts
+  // the frame mapper nor rebuilds any consumer keyed on the runtime.
+  return useMemo(
+    () => ({
+      transition,
+      progress,
+      cameraFrom,
+      cameraTo,
+      running,
+      resources,
+      publish,
+      pause,
+      resume,
+    }),
+    [
+      transition,
+      progress,
+      cameraFrom,
+      cameraTo,
+      running,
+      resources,
+      publish,
+      pause,
+      resume,
+    ],
+  );
 }

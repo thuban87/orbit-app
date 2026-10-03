@@ -100,35 +100,35 @@ it("the emitted projection closure settles after publication under the installed
   const cameraFrom = cell({ ...HOME_CAMERA, x: 12, zoom: 1.4 });
   const cameraTo = cell({ ...HOME_CAMERA });
   const pose = cell({ ...HOME_CAMERA });
+  // D-52 freeze: the only values the frame worklet may capture. SharedValues,
+  // primitives, module functions and memoised plain values — never the switch
+  // runtime (its resources hold full scenes), a scene snapshot or resources.
   const available: Record<string, unknown> = {
-    switchRuntime: {
-      transition,
-      progress,
-      cameraFrom,
-      cameraTo,
-    },
+    transition,
+    progress,
+    cameraFrom,
+    cameraTo,
     sampleSwitchChoreography,
     sampleOrrerySwitchCamera,
     pose,
     level: cell("overview"),
     viewport: { width: 400, height: 700 },
-    scene: { generation: 7, systemSnapshot: { members: [] } },
+    generation: 7,
+    memberIdentities: [],
     satellites: [],
-    camera: { reorder, frame: published },
     reorder,
     previewReorder,
     deriveSatelliteBodies,
     semanticLevel,
     projectAnimatedFrame: projection,
   };
+  for (const heavy of ["switchRuntime", "scene", "resources", "camera"])
+    expect(names).not.toContain(heavy);
+  // Exact allowlist: any new capture must be reviewed here (D-52).
+  expect([...names].sort()).toEqual(Object.keys(available).sort());
   const closure = Object.fromEntries(
     names.map((name) => {
-      const key = Object.keys(available)
-        .sort((a, b) => b.length - a.length)
-        .find(
-          (key) =>
-            name === key || name.toLowerCase().endsWith(key.toLowerCase()),
-        );
+      const key = Object.keys(available).find((key) => name === key);
       if (!key) throw new Error(`Unhandled compiled capture ${name}`);
       return [name, available[key]];
     }),
@@ -197,7 +197,6 @@ it("the emitted projection closure settles after publication under the installed
   expect(projection).toHaveBeenCalledTimes(1);
   expect(publish).toHaveBeenCalledTimes(1);
   expect(published.value).toBe(projected.value);
-  expect(names).not.toContain("camera");
   for (const phaseProgress of [0.1, 0.3, 0.55, 0.85, 1]) {
     progress.value = phaseProgress;
     for (let i = 0; i < 5; i++) tick();
