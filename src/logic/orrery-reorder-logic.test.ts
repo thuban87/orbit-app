@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { createOrreryGestures } from "@/components/orrery/use-orrery-camera";
-import { clampCameraPose, projectFrame } from "./orrery-camera-logic";
+import {
+  clampCameraPose,
+  MAX_USER_TILT,
+  projectFrame,
+} from "./orrery-camera-logic";
 import { HOLD_MS, initialInput } from "./orrery-gesture-logic";
 import type { ReorderDrag } from "./orrery-reorder-logic";
 import {
@@ -97,6 +101,7 @@ describe("deliberate ring drag", () => {
       { width: 500, height: 700 },
       7,
     );
+    expect(steep.pose.tilt).toBeCloseTo(1.0821, 10); // not clamped to 60°
     const a = steep.bodies[0],
       c = steep.bodies[2];
     const captured = captureReorder(steep, request, a.x, a.y)!;
@@ -241,7 +246,9 @@ describe("registered hold recognizer", () => {
     const tilted = projectFrame(
       world,
       clampCameraPose(
-        { x: 0, y: 0, zoom: 0.25, tilt: Math.PI / 3, yaw: 0 },
+        // Dolly camera: at the maximum user tilt the horizon is 720·cot(68°)
+        // ≈ 291 px above the centred pivot, so y = 0 is sky.
+        { x: 0, y: 0, zoom: 0.25, tilt: MAX_USER_TILT, yaw: 0 },
         300,
       ),
       { width: 400, height: 700 },

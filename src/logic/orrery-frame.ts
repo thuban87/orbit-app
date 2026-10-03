@@ -167,13 +167,15 @@ function animateProjectedBodies(
     const body = projected[index];
     const opacity = world[index].opacity;
     // Halo-aware media culling only. The full frame remains the hit authority.
+    // H2: a body beyond the horizon is neither drawn nor tappable.
     const reach = body.radius * (body.kind === "sun" ? 2 : 1.3);
     bodies.push({
       ...body,
       opacity,
-      interactive: world[index].interactive && opacity > 0,
+      interactive: world[index].interactive && opacity > 0 && !body.culled,
       visible:
         opacity > 0 &&
+        !body.culled &&
         body.x + reach >= 0 &&
         body.y + reach >= 0 &&
         body.x - reach <= viewport.width &&
@@ -186,15 +188,24 @@ function animateProjectedBodies(
   }
   return { bodies, keyIndex, idIndex };
 }
+/** Forwarded to `projectFrame` (ring paths on/off, the camera pan extent). */
+export type ProjectFrameOptions = Parameters<typeof projectFrame>[4];
 export function projectAnimatedFrame(
   transition: WorldTransition,
   fraction: number,
   pose: CameraPose,
   viewport: CameraViewport,
+  options?: ProjectFrameOptions,
 ): AnimatedFrame {
   "worklet";
   const world = sampleWorldTransition(transition, fraction);
-  const frame = projectFrame(world, pose, viewport, transition.generation);
+  const frame = projectFrame(
+    world,
+    pose,
+    viewport,
+    transition.generation,
+    options,
+  );
   return {
     ...frame,
     ...animateProjectedBodies(frame.bodies, world, viewport),
@@ -207,6 +218,7 @@ export function projectSwitchChoreographyFrame(
   fraction: number,
   pose: CameraPose,
   viewport: CameraViewport,
+  options?: ProjectFrameOptions,
 ): AnimatedFrame & { sample: SwitchChoreographySample } {
   "worklet";
   const sample = sampleSwitchChoreography(transition, fraction);
@@ -215,6 +227,7 @@ export function projectSwitchChoreographyFrame(
     pose,
     viewport,
     transition.generation,
+    options,
   );
   return {
     ...frame,

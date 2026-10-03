@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveHomePose,
   frameBodies,
+  HOME_PROFILES,
   projectWorldPoint,
   usableCameraRect,
 } from "@/logic/orrery-camera-logic";
@@ -105,10 +106,19 @@ describe("measured shell obstacles", () => {
         { x: 0, y: 80, width: 400, height: 600 },
         [{ x: 0, y, width: 400, height: 160 }],
       );
+      // Tilted Home (D-03): the pivot sits at lensShift/2 of the usable height.
       const home = deriveHomePose(world, viewport);
       expect(home).not.toBeNull();
       const origin = projectWorldPoint({ x: 0, y: 0 }, home!, viewport);
-      expect(origin.y).toBe((y - 80) / 2);
+      expect(origin.y).toBeCloseTo(
+        ((y - 80) * HOME_PROFILES.tilted.lensShift) / 2,
+        9,
+      );
+      // Flat Home keeps the pivot at the centre of the translated region.
+      const flat = deriveHomePose(world, viewport, HOME_PROFILES.flat)!;
+      expect(projectWorldPoint({ x: 0, y: 0 }, flat, viewport).y).toBe(
+        (y - 80) / 2,
+      );
       const framed = frameBodies(world, viewport, 100)!;
       expect(framed.fits).toBe(true);
       const point = projectWorldPoint(world[0], framed.pose, viewport);

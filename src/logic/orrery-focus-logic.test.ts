@@ -373,7 +373,8 @@ it("resolves inclusive overlaps without depth winners, deduplicates roles and re
       { id: 1, kind: "contact", x: 0, y: 0, radius: 10, ringRadius: 0 },
       { id: 2, kind: "sun", x: 44, y: 0, radius: 10, ringRadius: 0 },
     ],
-    HOME_CAMERA,
+    // A flat Home fixture: screen coordinates are world + the usable centre.
+    { ...HOME_CAMERA, tilt: 0, lensShift: 1 },
     { width: 400, height: 600 },
     1,
   );

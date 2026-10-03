@@ -17,12 +17,16 @@ export function Polaris({
   extent: number;
   colors: ThemePalette;
 }) {
+  // H2: beyond the horizon the marker hides; the accessible north control stays.
   const transform = useDerivedValue(() => {
     const point = polarisProjection(frame.value, extent);
-    return [{ translateX: point.x }, { translateY: point.y }];
+    return [{ translateX: point?.x ?? 0 }, { translateY: point?.y ?? 0 }];
   });
+  const opacity = useDerivedValue(() =>
+    polarisProjection(frame.value, extent) ? 1 : 0,
+  );
   return (
-    <Group transform={transform}>
+    <Group transform={transform} opacity={opacity}>
       <Circle
         cx={0}
         cy={0}

@@ -22,8 +22,25 @@ type Element = {
   props: Record<string, unknown> & { children?: Element | Element[] };
 };
 type Slot = { value?: unknown; deps?: unknown[]; cleanup?: () => void };
+type HomeProfileName = keyof typeof cameraLogic.HOME_PROFILES;
+/** The camera module the screen sees, with Home switched to `profile` (D-03). */
+function cameraFor(profile: HomeProfileName): typeof cameraLogic {
+  if (profile === cameraLogic.ACTIVE_HOME_PROFILE) return cameraLogic;
+  const chosen = cameraLogic.HOME_PROFILES[profile];
+  return {
+    ...cameraLogic,
+    HOME_CAMERA: {
+      ...cameraLogic.HOME_CAMERA,
+      tilt: chosen.tilt,
+      lensShift: chosen.lensShift,
+    },
+    deriveHomePose: (world, viewport) =>
+      cameraLogic.deriveHomePose(world, viewport, chosen),
+  };
+}
 /** Discrete React effect/cleanup ordering, with delayed native layout and animation completion. */
-function harness() {
+function harness(profile: HomeProfileName = cameraLogic.ACTIVE_HOME_PROFILE) {
+  const camera = cameraFor(profile);
   const slots: Slot[] = [];
   let cursor = 0,
     dirty = false;
@@ -153,7 +170,7 @@ function harness() {
       complete: (success: boolean) => void,
     ) {
       pending.push({ target, complete, cancelled: false });
-      return { ...cameraLogic.HOME_CAMERA };
+      return { ...camera.HOME_CAMERA };
     },
   };
   let cameraModule: Record<string, unknown>;
@@ -186,7 +203,7 @@ function harness() {
           if (modules[id]) return modules[id];
           if (id.startsWith("@babel/runtime/")) return require(id);
           if (id.includes("use-orrery-camera")) return cameraModule;
-          if (id.includes("orrery-camera-logic")) return cameraLogic;
+          if (id.includes("orrery-camera-logic")) return camera;
           if (id.includes("orrery-focus-logic")) return focusLogic;
           if (id.includes("orrery-gesture-logic")) return gestureLogic;
           if (id.includes("orrery-recovery-logic")) return recoveryLogic;
@@ -312,6 +329,7 @@ function harness() {
   );
   return {
     scene,
+    camera,
     attention: screen.systemAttentionFeedback,
     pending,
     render,
@@ -350,10 +368,32 @@ function harness() {
   };
 }
 
-it.each([180, 200])(
-  "frames a group after delayed measurement and font reflow to y=%s; close rejects late measurement",
-  async (top) => {
-    const h = harness();
+it.each(["tilted", "flat"] as const)(
+  "lands on the %s Home profile: every Home axis, including tilt and lens shift",
+  async (profile) => {
+    const h = harness(profile);
+    await h.ready();
+    const frame = h.frame();
+    const chosen = cameraLogic.HOME_PROFILES[profile];
+    expect(frame.pose.tilt).toBeCloseTo(chosen.tilt, 12);
+    expect(frame.pose.lensShift).toBe(chosen.lensShift);
+    expect(frame.pose.yaw).toBe(0);
+    expect(frame.pose).toEqual(
+      h.camera.deriveHomePose(h.scene.world, frame.viewport),
+    );
+    expect(frame.bodies.every((body) => !body.culled)).toBe(true);
+  },
+);
+
+it.each([
+  ["tilted", 180],
+  ["tilted", 200],
+  ["flat", 180],
+  ["flat", 200],
+] as const)(
+  "frames a group from the %s Home after delayed measurement and font reflow to y=%s; close rejects late measurement",
+  async (profile, top) => {
+    const h = harness(profile);
     await h.ready();
     await h.group();
     expect(h.find("Panel")).toBeDefined();

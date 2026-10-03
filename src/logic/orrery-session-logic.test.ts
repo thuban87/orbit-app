@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import { useOrreryCamera } from "../components/orrery/use-orrery-camera";
 import { createOrrerySessionStore } from "../stores/orrery-session-store";
-import { HOME_CAMERA } from "./orrery-camera-logic";
+import {
+  DOLLY_FOCAL_PX,
+  HOME_CAMERA,
+  HOME_PROFILES,
+  MAX_USER_TILT,
+} from "./orrery-camera-logic";
 import { restoreOrrerySession } from "./orrery-session-logic";
 
 const pose = { ...HOME_CAMERA, x: 60, zoom: 1.4, yaw: 0.8, tilt: 0.4 };
@@ -119,5 +124,33 @@ describe("Orrery navigation session", () => {
       })?.focus?.kind,
     ).toBe("contact-sun");
     expect(restored).not.toHaveProperty("cluster");
+  });
+  it("restores a 62° tilted pose clamped, not flattened (D-45)", () => {
+    const steep = {
+      ...HOME_CAMERA,
+      x: 9000,
+      zoom: 2.2,
+      tilt: HOME_PROFILES.tilted.tilt,
+      lensShift: 0.62,
+    };
+    const restored = restoreOrrerySession({
+      saved: { ...saved, pose: steep },
+      systemId: saved.systemId,
+      members: [focus],
+      sun: null,
+      extent: 500,
+    })!;
+    expect(restored.pose.tilt).toBe(HOME_PROFILES.tilted.tilt);
+    expect(restored.pose.lensShift).toBe(0.62);
+    expect(restored.pose.x).toBe(500);
+    expect(restored.pose.focalDistance).toBe(DOLLY_FOCAL_PX / 2.2);
+    const beyondMax = restoreOrrerySession({
+      saved: { ...saved, pose: { ...steep, tilt: 1.5 } },
+      systemId: saved.systemId,
+      members: [focus],
+      sun: null,
+      extent: 500,
+    })!;
+    expect(beyondMax.pose.tilt).toBe(MAX_USER_TILT);
   });
 });

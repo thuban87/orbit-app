@@ -17,11 +17,12 @@ import {
 } from "react-native-reanimated";
 import { swatchIndex } from "@/components/avatar-initials";
 import type { OrrerySatellite } from "@/db/orrery-satellites-read";
-import type {
-  CameraPose,
-  CameraViewport,
-  OrreryIntent,
-  OrrerySatelliteTarget,
+import {
+  type CameraPose,
+  type CameraViewport,
+  type OrreryIntent,
+  type OrrerySatelliteTarget,
+  traceRingPath,
 } from "@/logic/orrery-camera-logic";
 import {
   focusEffectivelyOffscreen,
@@ -182,13 +183,9 @@ function ReorderGhost({
     const held = drag.value;
     if (!held?.active) return result;
     const body = frameBodyById(frame.value, held.id);
-    const points = body?.ringPath ?? [];
-    if (points.length) {
-      result.moveTo(points[0].x, points[0].y);
-      for (const point of points.slice(1)) result.lineTo(point.x, point.y);
-      result.close();
-    }
-    if (body) result.addCircle(body.x, body.y, body.radius + 4);
+    // H2: only the visible ring samples; open at the horizon.
+    if (body) traceRingPath(result, body);
+    if (body && !body.culled) result.addCircle(body.x, body.y, body.radius + 4);
     return result;
   });
   return <Path path={path} color={color} style="stroke" strokeWidth={2} />;
@@ -357,6 +354,9 @@ export function OrreryWorld({
   // runtime at each mapper start (orrery-frame-mapper.test.ts guards this).
   const { transition, progress, cameraFrom, cameraTo } = switchRuntime;
   const generation = scene.generation;
+  // The pan bound the pose was clamped to (gestures, Home, recovery); the
+  // dolly focal no longer encodes it (38.7-05).
+  const frameExtent = cameraExtent(scene.extent);
   const memberIdentities = useMemo(
     () => scene.systemSnapshot.members.map(({ id, uid }) => ({ id, uid })),
     [scene],
@@ -396,6 +396,7 @@ export function OrreryWorld({
       1,
       sampledCamera,
       viewport,
+      { extent: frameExtent },
     );
   });
   // Conventional focus positioning consumes this same interpolated frame.

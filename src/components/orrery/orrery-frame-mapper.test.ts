@@ -114,6 +114,9 @@ it("the emitted projection closure settles after publication under the installed
     level: cell("overview"),
     viewport: { width: 400, height: 700 },
     generation: 7,
+    // 38.7-05: the camera pan extent, a primitive (the dolly focal no longer
+    // encodes it).
+    frameExtent: 32,
     memberIdentities: [],
     satellites: [],
     reorder,

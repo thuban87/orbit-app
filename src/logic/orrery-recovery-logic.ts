@@ -5,9 +5,11 @@ import {
   type CameraPose,
   type CameraViewport,
   clampCameraPose,
+  dollyFocalDistance,
   type ProjectedFrame,
   panCamera,
-  projectWorldPoint,
+  tryProjectWorldPoint,
+  type WorldPoint,
 } from "./orrery-camera-logic";
 
 export const RECOVERY_MIN_MS = 180;
@@ -61,6 +63,7 @@ export function planRecovery(
     (end.y - start.y) / bound,
     Math.log(end.zoom / start.zoom),
     (end.tilt ?? 0) - (start.tilt ?? 0),
+    (end.lensShift ?? 1) - (start.lensShift ?? 1),
     angle,
   );
   return {
@@ -86,13 +89,19 @@ export function sampleRecovery(
     "worklet";
     return a + (b - a) * t;
   };
+  const zoom = mix(plan.from.zoom, plan.animatedTarget.zoom);
   return {
     x: mix(plan.from.x, plan.animatedTarget.x),
     y: mix(plan.from.y, plan.animatedTarget.y),
-    zoom: mix(plan.from.zoom, plan.animatedTarget.zoom),
+    zoom,
     tilt: mix(plan.from.tilt ?? 0, plan.animatedTarget.tilt ?? 0),
     yaw: mix(plan.from.yaw ?? 0, plan.animatedTarget.yaw ?? 0),
-    focalDistance: plan.target.focalDistance,
+    // D-45: the dolly focal always follows the sampled zoom.
+    focalDistance: dollyFocalDistance(zoom),
+    lensShift: mix(
+      plan.from.lensShift ?? 1,
+      plan.animatedTarget.lensShift ?? 1,
+    ),
   };
 }
 export function inertiaTarget(
@@ -125,9 +134,13 @@ export function inertiaTarget(
         cameraExtent(extent),
       );
 }
-export function polarisProjection(frame: ProjectedFrame, extent: number) {
+/** H2: null when world north is beyond the horizon (the marker hides). */
+export function polarisProjection(
+  frame: ProjectedFrame,
+  extent: number,
+): WorldPoint | null {
   "worklet";
-  return projectWorldPoint(
+  return tryProjectWorldPoint(
     polarisWorldPoint(extent),
     frame.pose,
     frame.viewport,
@@ -143,6 +156,7 @@ export function hitPolaris(
   const p = polarisProjection(frame, extent);
   // Never steal an ambiguous body tap; the accessible north control always exists.
   return (
+    !!p &&
     p.x >= 0 &&
     p.y >= 0 &&
     p.x <= frame.viewport.width &&

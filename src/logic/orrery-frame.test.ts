@@ -163,7 +163,12 @@ describe("one animated Orrery frame", () => {
       [body(2, 70), body(1, 120), body(0, 0)],
       1,
     );
-    const flat = projectAnimatedFrame(seed, 1, HOME_CAMERA, viewport);
+    const flat = projectAnimatedFrame(
+      seed,
+      1,
+      { ...HOME_CAMERA, tilt: 0 },
+      viewport,
+    );
     expect(flat.bodies.map((b) => b.id)).toEqual([2, 1, 0]);
     for (const body of flat.bodies) expect(body.depth).toBeCloseTo(0, 8);
     const far = projectAnimatedFrame(

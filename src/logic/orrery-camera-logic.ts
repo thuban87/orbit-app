@@ -2,8 +2,54 @@
  * ADR-077: a finite sun-centered inspection camera is separate from canonical
  * world placement. Pan/zoom never change a person's timestamp angle or rank.
  * Projection is a single invertible tilted plane; billboards stay screen-facing.
+ *
+ * 38.7-05 (D-03/D-45): Home is one tunable profile {tilt, lensShift, fitRule};
+ * the focal distance follows a dolly model (DOLLY_FOCAL_PX / zoom), so a steep
+ * tilt reads as depth, not squash. A point at or behind the camera's near plane
+ * ("beyond the horizon") is CULLED through the non-throwing primitives
+ * `tryProjectWithBasis` / `tryProjectWorldPoint`; no reachable UI-thread path
+ * projects through a throwing call.
  */
 import type { OrreryContactTarget } from "./orrery-focus-logic";
+
+// ── Tunables (single-number edits; owner device checkpoints) ────────────────
+export type HomeFitRule = "strategy" | "whole-disc";
+export interface HomeProfile {
+  /** Look-down angle from vertical, radians. */
+  tilt: number;
+  /** Projection-centre height as a fraction of the usable rect (1 = centred). */
+  lensShift: number;
+  fitRule: HomeFitRule;
+}
+/**
+ * D-03/D-45 Home profiles. "tilted" is Lab C's 62° strategy map (pivot at
+ * ~31 % of the usable rect); "flat" is today's top-down whole-disc Home.
+ */
+export const HOME_PROFILES = {
+  tilted: { tilt: (62 * Math.PI) / 180, lensShift: 0.62, fitRule: "strategy" },
+  flat: { tilt: 0, lensShift: 1, fitRule: "whole-disc" },
+} as const satisfies Record<string, HomeProfile>;
+/** THE single D-03 switch (the owner rules on it at the Plan 14 checkpoint). */
+export const ACTIVE_HOME_PROFILE: keyof typeof HOME_PROFILES = "tilted";
+/** Maximum user (two-finger) tilt; must be ≥ every Home profile tilt. */
+export const MAX_USER_TILT = (68 * Math.PI) / 180;
+/** Dolly focal length in logical px (Lab C): focal distance = this / zoom. */
+export const DOLLY_FOCAL_PX = 720;
+/**
+ * Near-plane guard: a point whose perspective denominator is at most this
+ * fraction of the focal distance (perspective scale ≥ 1 / epsilon) is culled.
+ */
+export const HORIZON_EPSILON = 0.05;
+/** Lens-shift clamp range (1 = centred projection). */
+export const MIN_LENS_SHIFT = 0.3;
+export const MAX_LENS_SHIFT = 1;
+/** Strategy Home: the far rim sits at least this far under the usable top (px). */
+export const HOME_STRATEGY_TOP_MARGIN = 24;
+/** Strategy Home: max half-width of the System at the pivot, in viewport widths. */
+export const HOME_STRATEGY_MAX_HALF_SPAN = 0.6;
+/** Strategy Home never dollies in past this zoom (Lab C used MAX_ZOOM). */
+export const HOME_STRATEGY_MAX_ZOOM = 4;
+
 export interface WorldPoint {
   x: number;
   y: number;
@@ -22,6 +68,8 @@ export type CameraPose = {
   tilt?: number;
   yaw?: number;
   focalDistance?: number;
+  /** Projection-centre height fraction of the usable rect; default 1. */
+  lensShift?: number;
 };
 export interface CameraRect {
   x: number;
@@ -47,7 +95,14 @@ export interface ProjectedBody extends WorldBody {
   /** Decorative transition departures must never produce live actions. */
   interactive?: boolean;
   hitRadius: number;
+  /**
+   * Visible projected ring samples in drawing order. Samples beyond the
+   * horizon are omitted: `ringBreaks` lists the indexes that start a new run
+   * (pen up before them) and `ringClosed` is true only for a complete ring.
+   */
   ringPath: WorldPoint[];
+  ringBreaks: number[];
+  ringClosed: boolean;
   depth: number;
   /**
    * The world body's own `ringRadius`, copied unchanged (38.7-05, M12). The
@@ -55,32 +110,40 @@ export interface ProjectedBody extends WorldBody {
    * reorder outline; never recover it as projected `ringRadius / zoom`.
    */
   worldRingRadius: number;
+  /** True when the centre is beyond the horizon: radius 0, never tappable. */
+  culled: boolean;
 }
 export interface ProjectedFrame {
   generation: number;
   pose: CameraPose;
   viewport: CameraViewport;
   bodies: ProjectedBody[];
-  center: WorldPoint;
+  /** The projected world origin; null when it is beyond the horizon. */
+  center: WorldPoint | null;
 }
-export const HOME_CAMERA: CameraPose = {
-  x: 0,
-  y: 0,
-  zoom: 1,
-  tilt: 0,
-  yaw: 0,
-  focalDistance: 256,
-};
 export const IDENTITY_ZOOM = 2;
 export const FOCUS_MS = 300;
 export const MIN_ZOOM = 0.25;
 export const MAX_ZOOM = 4;
-export const MAX_TILT = Math.PI / 3;
 export const MIN_READABLE_RADIUS = 10;
 export const MIN_HIT_RADIUS = 22;
-const MIN_FOCAL_DISTANCE = 256;
-const MAX_DEPTH_FRACTION = 0.45;
 const RING_SEGMENTS = 128;
+/** Smallest zoom the dolly divides by (zoom is clamped well above it). */
+const DOLLY_MIN_ZOOM = 1e-3;
+/** Where a culled body is parked: finite and far off every screen. */
+const CULLED_POSITION = -1e4;
+
+const ACTIVE_PROFILE: HomeProfile = HOME_PROFILES[ACTIVE_HOME_PROFILE];
+/** Home derived from the active profile (zoom 1; deriveHomePose fits zoom). */
+export const HOME_CAMERA: CameraPose = {
+  x: 0,
+  y: 0,
+  zoom: 1,
+  tilt: ACTIVE_PROFILE.tilt,
+  yaw: 0,
+  focalDistance: DOLLY_FOCAL_PX,
+  lensShift: ACTIVE_PROFILE.lensShift,
+};
 
 function clamp(
   value: number,
@@ -93,16 +156,20 @@ function clamp(
     ? Math.max(min, Math.min(max, value))
     : fallback;
 }
-/** Includes square pan bounds plus radial world extent at maximum legal tilt. */
-export function deriveFocalDistance(extent: number): number {
+/** D-45 dolly: the camera moves toward the pivot as zoom grows. */
+export function dollyFocalDistance(zoom: number): number {
   "worklet";
-  return Math.max(
-    MIN_FOCAL_DISTANCE,
-    ((1 + Math.SQRT2) *
-      Math.max(1, Number.isFinite(extent) ? extent : 1) *
-      Math.sin(MAX_TILT)) /
-      MAX_DEPTH_FRACTION,
+  return (
+    DOLLY_FOCAL_PX / Math.max(Number.isFinite(zoom) ? zoom : 1, DOLLY_MIN_ZOOM)
   );
+}
+function poseFocal(pose: CameraPose): number {
+  "worklet";
+  return pose.focalDistance ?? dollyFocalDistance(pose.zoom);
+}
+function poseLensShift(pose: CameraPose): number {
+  "worklet";
+  return clamp(pose.lensShift ?? 1, MIN_LENS_SHIFT, MAX_LENS_SHIFT, 1);
 }
 export function worldExtent(world: readonly WorldBody[]): number {
   "worklet";
@@ -186,11 +253,22 @@ export function usableCameraRect(viewport: CameraViewport): CameraRect | null {
       .sort((a, b) => b.width * b.height - a.width * a.height)[0] ?? null
   );
 }
-function projectionCenter(viewport: CameraViewport): WorldPoint {
+/** The projection centre: the usable rect's centre, its height scaled by lensShift. */
+function rectProjectionCenter(rect: CameraRect, lensShift: number): WorldPoint {
+  "worklet";
+  return {
+    x: rect.x + rect.width / 2,
+    y: rect.y + (rect.height * lensShift) / 2,
+  };
+}
+function projectionCenter(
+  viewport: CameraViewport,
+  pose: CameraPose,
+): WorldPoint {
   "worklet";
   const rect = usableCameraRect(viewport);
   if (!rect) throw new Error("Invalid Orrery usable camera measurement");
-  return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  return rectProjectionCenter(rect, poseLensShift(pose));
 }
 function cameraPlane(point: WorldPoint, pose: CameraPose): WorldPoint {
   "worklet";
@@ -201,9 +279,11 @@ function cameraPlane(point: WorldPoint, pose: CameraPose): WorldPoint {
     y = point.y - pose.y;
   return { x: x * c - y * s, y: x * s + y * c };
 }
+/** Throws beyond the horizon: only for direct, validated-input use. Reachable
+ * paths use the basis primitives below, which cull instead. */
 export function perspectiveScale(point: WorldPoint, pose: CameraPose): number {
   "worklet";
-  const focal = pose.focalDistance ?? MIN_FOCAL_DISTANCE;
+  const focal = poseFocal(pose);
   const denominator =
     focal - cameraPlane(point, pose).y * Math.sin(pose.tilt ?? 0);
   if (!Number.isFinite(denominator) || denominator <= 0)
@@ -211,14 +291,14 @@ export function perspectiveScale(point: WorldPoint, pose: CameraPose): number {
   return focal / denominator;
 }
 
-function assertProjection(
+function projectionInputValid(
   p: WorldPoint,
   pose: CameraPose,
   viewport: CameraViewport,
-): void {
+): boolean {
   "worklet";
-  if (
-    ![
+  return (
+    [
       p.x,
       p.y,
       pose.x,
@@ -226,64 +306,44 @@ function assertProjection(
       pose.zoom,
       pose.tilt ?? 0,
       pose.yaw ?? 0,
-      pose.focalDistance ?? MIN_FOCAL_DISTANCE,
+      poseFocal(pose),
       viewport.width,
       viewport.height,
-    ].every(Number.isFinite) ||
-    pose.zoom <= 0 ||
-    viewport.width <= 0 ||
-    viewport.height <= 0
-  ) {
+    ].every(Number.isFinite) &&
+    pose.zoom > 0 &&
+    viewport.width > 0 &&
+    viewport.height > 0
+  );
+}
+function assertProjection(
+  p: WorldPoint,
+  pose: CameraPose,
+  viewport: CameraViewport,
+): void {
+  "worklet";
+  if (!projectionInputValid(p, pose, viewport))
     throw new Error("Invalid Orrery projection input");
-  }
 }
 
 export function clampCameraPose(pose: CameraPose, extent: number): CameraPose {
   "worklet";
   const bound = Number.isFinite(extent) ? Math.max(1, extent) : 1;
+  const zoom = Number.isFinite(pose.zoom)
+    ? Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pose.zoom))
+    : 1;
   return {
     x: Number.isFinite(pose.x) ? Math.max(-bound, Math.min(bound, pose.x)) : 0,
     y: Number.isFinite(pose.y) ? Math.max(-bound, Math.min(bound, pose.y)) : 0,
-    zoom: Number.isFinite(pose.zoom)
-      ? Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pose.zoom))
-      : 1,
-    tilt: clamp(pose.tilt ?? 0, 0, MAX_TILT, 0),
+    zoom,
+    tilt: clamp(pose.tilt ?? 0, 0, MAX_USER_TILT, 0),
     yaw: Number.isFinite(pose.yaw ?? 0)
       ? (((pose.yaw ?? 0) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)
       : 0,
-    focalDistance: deriveFocalDistance(bound),
+    focalDistance: dollyFocalDistance(zoom),
+    lensShift: poseLensShift(pose),
   };
 }
 export const constrainCamera = clampCameraPose;
-
-/** Home enforces readability instead of imposing a maximum member count. */
-export function deriveHomePose(
-  world: readonly WorldBody[],
-  viewport: CameraViewport,
-): CameraPose | null {
-  "worklet";
-  const usable = usableCameraRect(viewport);
-  if (
-    !usable ||
-    world.some(
-      (b) =>
-        ![b.x, b.y, b.radius, b.ringRadius].every(Number.isFinite) ||
-        b.radius <= 0 ||
-        b.ringRadius < 0,
-    )
-  )
-    return null;
-  const extent = worldExtent(world);
-  const minRadius = world.length
-    ? Math.min(...world.map((b) => b.radius))
-    : MIN_READABLE_RADIUS;
-  const floor = Math.max(MIN_ZOOM, MIN_READABLE_RADIUS / minRadius);
-  const fit = Math.min(usable.width, usable.height) / (2 * extent);
-  return clampCameraPose(
-    { ...HOME_CAMERA, zoom: Math.min(1, Math.max(floor, fit)) },
-    extent,
-  );
-}
 
 /**
  * D-52: per-frame projection constants. `projectWorldPoint` used to re-derive
@@ -319,12 +379,12 @@ export function projectionBasis(
     x: pose.x,
     y: pose.y,
     zoom: pose.zoom,
-    focal: pose.focalDistance ?? MIN_FOCAL_DISTANCE,
+    focal: poseFocal(pose),
     cosYaw: Math.cos(yaw),
     sinYaw: Math.sin(yaw),
     sinTilt: Math.sin(tilt),
     cosTilt: Math.cos(tilt),
-    center: projectionCenter(viewport),
+    center: projectionCenter(viewport, pose),
   };
 }
 export function projectWithBasis(
@@ -349,6 +409,54 @@ export function projectWithBasis(
     y: basis.center.y + planeY * basis.cosTilt * scale,
   };
 }
+/**
+ * H2: the perspective scale (zoom excluded) of a world point, or null when the
+ * point is at/beyond the horizon (denominator ≤ HORIZON_EPSILON · focal) or not
+ * finite. Same arithmetic as `projectWithBasis`.
+ */
+export function basisPerspectiveScale(
+  basis: ProjectionBasis,
+  px: number,
+  py: number,
+): number | null {
+  "worklet";
+  if (!Number.isFinite(px) || !Number.isFinite(py)) return null;
+  const x = px - basis.x,
+    y = py - basis.y;
+  const planeY = x * basis.sinYaw + y * basis.cosYaw;
+  const denominator = basis.focal - planeY * basis.sinTilt;
+  if (
+    !Number.isFinite(denominator) ||
+    denominator <= HORIZON_EPSILON * basis.focal
+  )
+    return null;
+  return basis.focal / denominator;
+}
+/** H2: the non-throwing twin of `projectWithBasis`; null beyond the horizon. */
+export function tryProjectWithBasis(
+  basis: ProjectionBasis,
+  px: number,
+  py: number,
+): WorldPoint | null {
+  "worklet";
+  if (!Number.isFinite(px) || !Number.isFinite(py)) return null;
+  const x = px - basis.x,
+    y = py - basis.y;
+  const planeX = x * basis.cosYaw - y * basis.sinYaw,
+    planeY = x * basis.sinYaw + y * basis.cosYaw;
+  const denominator = basis.focal - planeY * basis.sinTilt;
+  if (
+    !Number.isFinite(denominator) ||
+    denominator <= HORIZON_EPSILON * basis.focal
+  )
+    return null;
+  const scale = (basis.focal / denominator) * basis.zoom;
+  const result = {
+    x: basis.center.x + planeX * scale,
+    y: basis.center.y + planeY * basis.cosTilt * scale,
+  };
+  return Number.isFinite(result.x) && Number.isFinite(result.y) ? result : null;
+}
 export function projectWorldPoint(
   point: WorldPoint,
   pose: CameraPose,
@@ -358,6 +466,21 @@ export function projectWorldPoint(
   // Point checks first, so error precedence matches the pre-basis version.
   assertProjection(point, pose, viewport);
   return projectWithBasis(projectionBasis(pose, viewport), point.x, point.y);
+}
+/** H2: never throws; null for invalid input, an unusable viewport, or a point
+ * beyond the horizon. */
+export function tryProjectWorldPoint(
+  point: WorldPoint,
+  pose: CameraPose,
+  viewport: CameraViewport,
+): WorldPoint | null {
+  "worklet";
+  if (
+    !projectionInputValid(point, pose, viewport) ||
+    !usableCameraRect(viewport)
+  )
+    return null;
+  return tryProjectWithBasis(projectionBasis(pose, viewport), point.x, point.y);
 }
 // Defined ABOVE its callers on purpose: a Reanimated worklet that references
 // another worklet defined LATER in the same module captures it as `undefined`
@@ -372,8 +495,8 @@ export function unprojectToWorldPlane(
 ): WorldPoint {
   "worklet";
   assertProjection(point, pose, viewport);
-  const center = projectionCenter(viewport),
-    focal = pose.focalDistance ?? MIN_FOCAL_DISTANCE,
+  const center = projectionCenter(viewport, pose),
+    focal = poseFocal(pose),
     tilt = pose.tilt ?? 0,
     yaw = pose.yaw ?? 0;
   const sx = (point.x - center.x) / pose.zoom,
@@ -387,6 +510,39 @@ export function unprojectToWorldPlane(
     x: pose.x + x * Math.cos(yaw) + y * Math.sin(yaw),
     y: pose.y - x * Math.sin(yaw) + y * Math.cos(yaw),
   };
+}
+/** Gesture samples can lie beyond the ground-plane horizon at legal tilt/zoom. */
+export function tryUnprojectToWorldPlane(
+  point: WorldPoint,
+  pose: CameraPose,
+  viewport: CameraViewport,
+): WorldPoint | null {
+  "worklet";
+  const rect = usableCameraRect(viewport);
+  const focal = poseFocal(pose);
+  if (
+    !rect ||
+    ![
+      point.x,
+      point.y,
+      pose.x,
+      pose.y,
+      pose.zoom,
+      pose.tilt ?? 0,
+      pose.yaw ?? 0,
+      focal,
+    ].every(Number.isFinite) ||
+    pose.zoom <= 0 ||
+    focal <= 0
+  )
+    return null;
+  const center = rectProjectionCenter(rect, poseLensShift(pose));
+  const sy = (point.y - center.y) / pose.zoom;
+  const denominator =
+    focal * Math.cos(pose.tilt ?? 0) + sy * Math.sin(pose.tilt ?? 0);
+  if (!Number.isFinite(denominator) || denominator <= 0) return null;
+  const result = unprojectToWorldPlane(point, pose, viewport);
+  return Number.isFinite(result.x) && Number.isFinite(result.y) ? result : null;
 }
 /** Preserve the world point under a screen anchor AFTER zoom/axis clamping.
  * If preserving it would leave legal pan bounds, those bounds take precedence.
@@ -402,18 +558,141 @@ export function anchorCameraPose(
   const next = clampCameraPose(requested, extent);
   // At wide zoom a screen point can be sky, beyond the finite plane's horizon.
   // Such a pinch has no world anchor; zoom about the current camera center.
-  const center = projectionCenter(viewport);
-  for (const pose of [start, next]) {
-    const focal = pose.focalDistance ?? MIN_FOCAL_DISTANCE;
-    const sy = (screen.y - center.y) / pose.zoom;
-    if (focal * Math.cos(pose.tilt ?? 0) + sy * Math.sin(pose.tilt ?? 0) <= 0)
-      return next;
-  }
-  const anchor = unprojectToWorldPlane(screen, start, viewport);
-  const after = unprojectToWorldPlane(screen, next, viewport);
+  const anchor = tryUnprojectToWorldPlane(screen, start, viewport);
+  const after = tryUnprojectToWorldPlane(screen, next, viewport);
+  if (!anchor || !after) return next;
   return clampCameraPose(
     { ...next, x: next.x + anchor.x - after.x, y: next.y + anchor.y - after.y },
     extent,
+  );
+}
+
+/** The highest zoom in [low, high] for which `fits` holds (fits(low) assumed). */
+function bisectZoom(
+  low: number,
+  high: number,
+  fits: (zoom: number) => boolean,
+): number {
+  "worklet";
+  let lo = low,
+    hi = high;
+  for (let i = 0; i < 32; i++) {
+    const mid = (lo + hi) / 2;
+    if (fits(mid)) lo = mid;
+    else hi = mid;
+  }
+  return lo;
+}
+/**
+ * Home enforces readability instead of imposing a maximum member count.
+ * "whole-disc" fits the projected outer ring into the usable rect (at tilt 0
+ * and lensShift 1 this is exactly the pre-38.7 formula). "strategy" is Lab C's
+ * composition: dolly in until the far rim reaches the top margin, without the
+ * System's half-width at the pivot passing HOME_STRATEGY_MAX_HALF_SPAN. Both
+ * keep the readability floor, so large Systems put outer rings off-screen
+ * rather than shrinking bodies to specks.
+ */
+export function deriveHomePose(
+  world: readonly WorldBody[],
+  viewport: CameraViewport,
+  profile: HomeProfile = ACTIVE_PROFILE,
+): CameraPose | null {
+  "worklet";
+  const usable = usableCameraRect(viewport);
+  if (
+    !usable ||
+    world.some(
+      (b) =>
+        ![b.x, b.y, b.radius, b.ringRadius].every(Number.isFinite) ||
+        b.radius <= 0 ||
+        b.ringRadius < 0,
+    )
+  )
+    return null;
+  const extent = worldExtent(world);
+  const minRadius = world.length
+    ? Math.min(...world.map((b) => b.radius))
+    : MIN_READABLE_RADIUS;
+  const floor = Math.max(MIN_ZOOM, MIN_READABLE_RADIUS / minRadius);
+  const home = (zoom: number) => {
+    "worklet";
+    return clampCameraPose(
+      {
+        x: 0,
+        y: 0,
+        zoom,
+        tilt: profile.tilt,
+        yaw: 0,
+        lensShift: profile.lensShift,
+      },
+      extent,
+    );
+  };
+  const flatFit = Math.min(usable.width, usable.height) / (2 * extent);
+  const shape = home(1);
+  if (profile.fitRule === "whole-disc") {
+    let fit = flatFit;
+    if ((shape.tilt ?? 0) !== 0 || shape.lensShift !== 1) {
+      const center = rectProjectionCenter(usable, shape.lensShift ?? 1);
+      const flat =
+        Math.min(
+          center.x - usable.x,
+          usable.x + usable.width - center.x,
+          center.y - usable.y,
+          usable.y + usable.height - center.y,
+        ) / extent;
+      const discFits = (zoom: number) => {
+        "worklet";
+        const pose = home(zoom);
+        const basis = projectionBasis(pose, viewport);
+        for (let i = 0; i < RING_SEGMENTS / 2; i++) {
+          const angle = (i * 4 * Math.PI) / RING_SEGMENTS;
+          const p = tryProjectWithBasis(
+            basis,
+            extent * Math.sin(angle),
+            -extent * Math.cos(angle),
+          );
+          if (
+            !p ||
+            p.x < usable.x - 1e-7 ||
+            p.x > usable.x + usable.width + 1e-7 ||
+            p.y < usable.y - 1e-7 ||
+            p.y > usable.y + usable.height + 1e-7
+          )
+            return false;
+        }
+        return true;
+      };
+      fit =
+        (shape.tilt ?? 0) === 0
+          ? flat
+          : discFits(MIN_ZOOM)
+            ? bisectZoom(MIN_ZOOM, 1, discFits)
+            : MIN_ZOOM;
+    }
+    return home(Math.min(1, Math.max(floor, fit)));
+  }
+  const base = home(Math.min(1, Math.max(floor, flatFit)));
+  const strategyFits = (zoom: number) => {
+    "worklet";
+    const pose = home(zoom);
+    const basis = projectionBasis(pose, viewport);
+    const far = tryProjectWithBasis(basis, 0, -extent);
+    const side = tryProjectWithBasis(basis, extent, 0);
+    return (
+      !!far &&
+      !!side &&
+      far.y >= usable.y + HOME_STRATEGY_TOP_MARGIN &&
+      side.x - basis.center.x <= viewport.width * HOME_STRATEGY_MAX_HALF_SPAN
+    );
+  };
+  if (!strategyFits(base.zoom)) return base;
+  return home(
+    bisectZoom(
+      base.zoom,
+      Math.max(base.zoom, Math.min(MAX_ZOOM, HOME_STRATEGY_MAX_ZOOM)),
+      strategyFits,
+    ),
   );
 }
 
@@ -423,7 +702,9 @@ export interface CameraFraming {
   usable: CameraRect;
 }
 /** Arbitrary sets frame their projected circular media AND minimum touch bounds.
- * Infeasible sets still return a bounded recovery pose, with fits:false.
+ * Infeasible sets still return a bounded recovery pose, with fits:false. A
+ * trial pose that puts any selected body beyond the horizon never fits; when
+ * no trial pose is safe the result is null (callers keep the previous pose).
  */
 export function frameBodies(
   world: readonly WorldBody[],
@@ -450,16 +731,16 @@ export function frameBodies(
   };
   const bounds = (pose: CameraPose) => {
     "worklet";
+    const basis = projectionBasis(pose, viewport);
     let left = Infinity,
       right = -Infinity,
       top = Infinity,
       bottom = -Infinity;
     for (const body of world) {
-      const point = projectWorldPoint(body, pose, viewport);
-      const radius = Math.max(
-        MIN_HIT_RADIUS,
-        body.radius * pose.zoom * perspectiveScale(body, pose),
-      );
+      const point = tryProjectWithBasis(basis, body.x, body.y);
+      const scale = basisPerspectiveScale(basis, body.x, body.y);
+      if (!point || scale === null) return null;
+      const radius = Math.max(MIN_HIT_RADIUS, body.radius * pose.zoom * scale);
       left = Math.min(left, point.x - radius);
       right = Math.max(right, point.x + radius);
       top = Math.min(top, point.y - radius);
@@ -467,7 +748,7 @@ export function frameBodies(
     }
     return { left, right, top, bottom };
   };
-  const candidate = (zoom: number) => {
+  const candidate = (zoom: number): CameraFraming | null => {
     "worklet";
     let pose = clampCameraPose(
       {
@@ -485,14 +766,27 @@ export function frameBodies(
       bound,
     );
     // Correct perspective/asymmetric media bounds, rather than averaging bodies.
+    // The usable centre need not be the (lens-shifted) projection centre, so
+    // the pivot moves by the world offset between the two screen points.
     for (let iteration = 0; iteration < 32; iteration++) {
       const b = bounds(pose);
+      if (!b) return null;
       const mid = { x: (b.left + b.right) / 2, y: (b.top + b.bottom) / 2 };
       if (Math.hypot(mid.x - center.x, mid.y - center.y) < 1e-8) break;
-      const target = unprojectToWorldPlane(mid, pose, viewport);
-      pose = clampCameraPose({ ...pose, x: target.x, y: target.y }, bound);
+      const target = tryUnprojectToWorldPlane(mid, pose, viewport);
+      const here = tryUnprojectToWorldPlane(center, pose, viewport);
+      if (!target || !here) return null;
+      pose = clampCameraPose(
+        {
+          ...pose,
+          x: pose.x + target.x - here.x,
+          y: pose.y + target.y - here.y,
+        },
+        bound,
+      );
     }
     const b = bounds(pose);
+    if (!b) return null;
     return {
       pose,
       fits:
@@ -506,13 +800,13 @@ export function frameBodies(
   let low = MIN_ZOOM,
     high = MAX_ZOOM,
     result = candidate(low);
-  if (!result.fits) return result;
+  if (!result || !result.fits) return result;
   const maximum = candidate(high);
-  if (maximum.fits) return maximum;
+  if (maximum?.fits) return maximum;
   for (let i = 0; i < 36; i++) {
     const mid = (low + high) / 2,
       next = candidate(mid);
-    if (next.fits) {
+    if (next?.fits) {
       low = mid;
       result = next;
     } else high = mid;
@@ -520,58 +814,57 @@ export function frameBodies(
   return result;
 }
 
-/** Gesture samples can lie beyond the ground-plane horizon at legal tilt/zoom. */
-export function tryUnprojectToWorldPlane(
-  point: WorldPoint,
-  pose: CameraPose,
-  viewport: CameraViewport,
-): WorldPoint | null {
+/** Anything with Skia-path-like pen commands (also a Node test sink). */
+export interface RingPathSink {
+  moveTo(x: number, y: number): unknown;
+  lineTo(x: number, y: number): unknown;
+  close(): unknown;
+}
+/**
+ * H2: trace a projected ring's visible samples. A gap (samples beyond the
+ * horizon) lifts the pen and an incomplete ring is never closed, so no segment
+ * is ever drawn across the horizon.
+ */
+export function traceRingPath(
+  sink: RingPathSink,
+  ring: Pick<ProjectedBody, "ringPath" | "ringBreaks" | "ringClosed">,
+): void {
   "worklet";
-  const rect = usableCameraRect(viewport);
-  const focal = pose.focalDistance ?? MIN_FOCAL_DISTANCE;
-  if (
-    !rect ||
-    ![
-      point.x,
-      point.y,
-      pose.x,
-      pose.y,
-      pose.zoom,
-      pose.tilt ?? 0,
-      pose.yaw ?? 0,
-      focal,
-    ].every(Number.isFinite) ||
-    pose.zoom <= 0 ||
-    focal <= 0
-  )
-    return null;
-  const sy = (point.y - rect.y - rect.height / 2) / pose.zoom;
-  const denominator =
-    focal * Math.cos(pose.tilt ?? 0) + sy * Math.sin(pose.tilt ?? 0);
-  if (!Number.isFinite(denominator) || denominator <= 0) return null;
-  const result = unprojectToWorldPlane(point, pose, viewport);
-  return Number.isFinite(result.x) && Number.isFinite(result.y) ? result : null;
+  const points = ring.ringPath;
+  if (!points.length) return;
+  const breaks = ring.ringBreaks ?? [];
+  let next = 0;
+  for (let i = 0; i < points.length; i++) {
+    if (i === 0) sink.moveTo(points[i].x, points[i].y);
+    else if (next < breaks.length && breaks[next] === i) {
+      next++;
+      sink.moveTo(points[i].x, points[i].y);
+    } else sink.lineTo(points[i].x, points[i].y);
+  }
+  if (ring.ringClosed && breaks.length === 0) sink.close();
 }
 /**
  * `options.ringPaths` (default true): when false every `ringPath` is empty and
  * all other body data is identical. Today's renderer keeps the 128-point ring
  * polygons; the V2 renderer (Plan 06) draws rings from world geometry.
+ * `options.extent`: the camera (pan) extent the pose was clamped to; the pan
+ * bound is the larger of it and the world's own extent.
  */
 export function projectFrame(
   world: readonly WorldBody[],
   pose: CameraPose,
   viewport: CameraViewport,
   generation: number,
-  options?: { ringPaths?: boolean },
+  options?: { ringPaths?: boolean; extent?: number },
 ): ProjectedFrame {
   "worklet";
   const ringPaths = options?.ringPaths ?? true;
+  const extent = options?.extent;
   const current = clampCameraPose(
     pose,
     Math.max(
       worldExtent(world),
-      ((pose.focalDistance ?? 0) * MAX_DEPTH_FRACTION) /
-        ((1 + Math.SQRT2) * Math.sin(MAX_TILT)),
+      extent !== undefined && Number.isFinite(extent) ? extent : 0,
     ),
   );
   // D-52: one basis per frame for the centre, every body and every ring point.
@@ -580,30 +873,75 @@ export function projectFrame(
     generation,
     pose: current,
     viewport,
-    center: projectWithBasis(basis, 0, 0),
+    center: tryProjectWithBasis(basis, 0, 0),
     bodies: world.map((body) => {
-      const scale = current.zoom * perspectiveScale(body, current);
-      const ringPath: WorldPoint[] = [];
-      if (ringPaths && body.ringRadius > 0)
+      let ringPath: WorldPoint[] = [];
+      const ringBreaks: number[] = [];
+      let ringClosed = false;
+      if (ringPaths && body.ringRadius > 0) {
+        const samples: (WorldPoint | null)[] = [];
+        let firstGap = -1;
         for (let i = 0; i < RING_SEGMENTS; i++) {
           const angle = (i * 2 * Math.PI) / RING_SEGMENTS;
-          ringPath.push(
-            projectWithBasis(
-              basis,
-              body.ringRadius * Math.sin(angle),
-              -body.ringRadius * Math.cos(angle),
-            ),
+          const sample = tryProjectWithBasis(
+            basis,
+            body.ringRadius * Math.sin(angle),
+            -body.ringRadius * Math.cos(angle),
           );
+          samples.push(sample);
+          if (!sample && firstGap < 0) firstGap = i;
         }
+        if (firstGap < 0) {
+          // Every sample is present: the sample list IS the closed ring.
+          ringPath = samples as WorldPoint[];
+          ringClosed = true;
+        } else {
+          // Start right after a gap so the visible arc is one run in order.
+          let penDown = false;
+          for (let k = 1; k <= RING_SEGMENTS; k++) {
+            const sample = samples[(firstGap + k) % RING_SEGMENTS];
+            if (!sample) {
+              penDown = false;
+              continue;
+            }
+            if (!penDown && ringPath.length) ringBreaks.push(ringPath.length);
+            ringPath.push(sample);
+            penDown = true;
+          }
+        }
+      }
+      const depth = cameraPlane(body, current).y * Math.sin(current.tilt ?? 0);
+      const point = tryProjectWithBasis(basis, body.x, body.y);
+      const perspective = basisPerspectiveScale(basis, body.x, body.y);
+      if (!point || perspective === null)
+        return {
+          ...body,
+          x: CULLED_POSITION,
+          y: CULLED_POSITION,
+          radius: 0,
+          ringRadius: body.ringRadius * current.zoom,
+          worldRingRadius: body.ringRadius,
+          hitRadius: 0,
+          interactive: false,
+          culled: true,
+          ringPath,
+          ringBreaks,
+          ringClosed,
+          depth,
+        };
+      const scale = current.zoom * perspective;
       return {
         ...body,
-        ...projectWithBasis(basis, body.x, body.y),
+        ...point,
         radius: body.radius * scale,
         ringRadius: body.ringRadius * current.zoom,
         worldRingRadius: body.ringRadius,
         hitRadius: Math.max(MIN_HIT_RADIUS, body.radius * scale),
+        culled: false,
         ringPath,
-        depth: cameraPlane(body, current).y * Math.sin(current.tilt ?? 0),
+        ringBreaks,
+        ringClosed,
+        depth,
       };
     }),
   };
@@ -675,14 +1013,19 @@ export function panCamera(
 ): CameraPose {
   "worklet";
   if (viewport) {
-    const center = projectionCenter(viewport);
-    const focal = start.focalDistance ?? deriveFocalDistance(extent),
+    const center = projectionCenter(viewport, start);
+    const focal = poseFocal(start),
       tilt = start.tilt ?? 0;
     const reach = 2 * Math.SQRT2 * Math.max(1, extent);
     const minY =
       (-reach * Math.cos(tilt) * focal) / (focal + reach * Math.sin(tilt));
+    // Under the dolly the near reach can lie behind the camera; the near side
+    // of the inverse is then unbounded (it never crosses the horizon).
+    const nearDenominator = focal - reach * Math.sin(tilt);
     const maxY =
-      (reach * Math.cos(tilt) * focal) / (focal - reach * Math.sin(tilt));
+      nearDenominator > 0
+        ? (reach * Math.cos(tilt) * focal) / nearDenominator
+        : Number.POSITIVE_INFINITY;
     // Restrict gesture sampling to the reachable plane before inverse math;
     // projection itself is never patched with a denominator clamp.
     const sampleY = clamp(-dy / start.zoom, minY, maxY, 0);

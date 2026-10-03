@@ -638,3 +638,23 @@ describe("D-53 keyed resource merge/prune", () => {
     }
   });
 });
+
+describe("38.7-05 (D-45): the switch camera carries the lens shift", () => {
+  it("mixes lensShift with the other axes, falling back to 1 (centred)", () => {
+    const tilted = { ...homeCamera, tilt: 1.0821, lensShift: 0.62 };
+    expect(sampleOrrerySwitchCamera(sourceCamera, tilted, 0)).toEqual(
+      sourceCamera,
+    );
+    expect(sampleOrrerySwitchCamera(sourceCamera, tilted, 0.5).lensShift).toBe(
+      0.81,
+    );
+    expect(sampleOrrerySwitchCamera(sourceCamera, tilted, 1)).toEqual(tilted);
+    expect(
+      sampleOrrerySwitchCamera(
+        { ...sourceCamera, lensShift: 0.4 },
+        homeCamera,
+        0.5,
+      ).lensShift,
+    ).toBeCloseTo(0.7, 12);
+  });
+});

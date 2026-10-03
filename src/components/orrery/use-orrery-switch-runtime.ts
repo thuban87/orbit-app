@@ -83,6 +83,8 @@ function interpolateCamera(
     tilt: mix(from.tilt, to.tilt, 0),
     yaw: mix(from.yaw, to.yaw, 0),
     focalDistance: mix(from.focalDistance, to.focalDistance, 256),
+    // 38.7-05 (D-45): the lens shift travels with the other axes.
+    lensShift: mix(from.lensShift, to.lensShift, 1),
   };
 }
 

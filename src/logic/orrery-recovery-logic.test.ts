@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  basisPerspectiveScale,
   clampCameraPose,
   HOME_CAMERA,
+  projectionBasis,
   projectWorldPoint,
+  tryProjectWorldPoint,
 } from "./orrery-camera-logic";
 import {
   type CameraRecovery,
@@ -10,6 +13,7 @@ import {
   inertiaTarget,
   type MotionRequest,
   northTarget,
+  PAN_COAST_POINTS,
   planRecovery,
   polarisProjection,
   recoveryCurve,
@@ -110,7 +114,9 @@ describe("bounded camera recovery", () => {
     const plan = planRecovery(start, target, extent, false);
     expect(plan.animatedTarget.yaw).toBeCloseTo(2 * Math.PI);
     expect(sampleRecovery(plan, 0.5).x).toBe(start.x);
-    expect(sampleRecovery(plan, 1)).toEqual(target);
+    // The plan clamps its target, so the dolly focal follows the target zoom.
+    expect(sampleRecovery(plan, 1)).toEqual(clampCameraPose(target, extent));
+    expect(sampleRecovery(plan, 1).focalDistance).toBe(360);
   });
   it("Reduced Motion is short/direct and disables pan/yaw continuation; no zoom/tilt coast", () => {
     const target = { ...home, x: 100 };
@@ -138,8 +144,17 @@ describe("bounded camera recovery", () => {
         { width: 400, height: 600 },
         false,
       );
-      expect(Math.abs(next.x)).toBeLessThanOrEqual(18);
-      expect(Math.abs(next.y)).toBeLessThanOrEqual(18);
+      // The coast is bounded on screen: the old pivot moves at most
+      // PAN_COAST_POINTS per axis (world distance grows with depth at a tilt).
+      const viewport = { width: 400, height: 600 };
+      const before = projectWorldPoint(home, home, viewport);
+      const after = projectWorldPoint(home, next, viewport);
+      expect(Math.abs(after.x - before.x)).toBeLessThanOrEqual(
+        PAN_COAST_POINTS + 1e-6,
+      );
+      expect(Math.abs(after.y - before.y)).toBeLessThanOrEqual(
+        PAN_COAST_POINTS + 1e-6,
+      );
       expect(
         Math.min(next.yaw ?? 0, 2 * Math.PI - (next.yaw ?? 0)),
       ).toBeLessThanOrEqual(0.08 + 1e-12);
@@ -159,7 +174,7 @@ describe("bounded camera recovery", () => {
       },
       extent,
     );
-    expect(north.y).toBeLessThan(300);
+    expect(north?.y).toBeLessThan(300);
     const yaw = polarisProjection(
       {
         generation: 1,
@@ -170,7 +185,9 @@ describe("bounded camera recovery", () => {
       },
       extent,
     );
-    expect(yaw.x).toBeGreaterThan(200);
+    expect(yaw?.x).toBeGreaterThan(200);
+    // H2: at a steep, close pose world north can be behind the camera; the
+    // marker is then null (hidden), never a throw.
     for (const e of [1, 20, 500, 10000]) {
       const pose = clampCameraPose(
         { x: e, y: e, zoom: 4, tilt: Math.PI / 3, yaw: Math.PI },
@@ -182,11 +199,20 @@ describe("bounded camera recovery", () => {
           pose,
           viewport,
           bodies: [],
-          center: projectWorldPoint({ x: 0, y: 0 }, pose, viewport),
+          center: tryProjectWorldPoint({ x: 0, y: 0 }, pose, viewport),
         },
         e,
       );
-      expect(Number.isFinite(point.x) && Number.isFinite(point.y)).toBe(true);
+      if (point)
+        expect(Number.isFinite(point.x) && Number.isFinite(point.y)).toBe(true);
+      else
+        expect(
+          basisPerspectiveScale(
+            projectionBasis(pose, viewport),
+            0,
+            -Math.max(32, e * 0.85),
+          ),
+        ).toBeNull();
     }
   });
 });

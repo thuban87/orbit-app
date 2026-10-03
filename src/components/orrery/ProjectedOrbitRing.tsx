@@ -1,6 +1,7 @@
 /** Rails are a separate layer behind the consecutive native body Group batch. */
 import { DashPathEffect, Path, Skia } from "@shopify/react-native-skia";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
+import { traceRingPath } from "@/logic/orrery-camera-logic";
 import { type AnimatedFrame, frameBodyByKey } from "@/logic/orrery-frame";
 import type { OrreryRingStyle } from "@/logic/orrery-ring-logic";
 
@@ -15,15 +16,12 @@ export function ProjectedOrbitRing({
 }) {
   // D-52: O(1) keyed lookups. Two direct lookups are cheaper than a third
   // per-ring mapper feeding both derived values.
+  // H2: samples beyond the horizon are omitted; traceRingPath lifts the pen at
+  // a gap and never closes an incomplete ring.
   const path = useDerivedValue(() => {
-    const points = frameBodyByKey(frame.value, identity)?.ringPath ?? [];
+    const body = frameBodyByKey(frame.value, identity);
     const result = Skia.Path.Make();
-    if (points.length) {
-      result.moveTo(points[0].x, points[0].y);
-      for (let i = 1; i < points.length; i++)
-        result.lineTo(points[i].x, points[i].y);
-      result.close();
-    }
+    if (body) traceRingPath(result, body);
     return result;
   });
   const opacity = useDerivedValue(
