@@ -161,8 +161,8 @@ after the baseline:
 |---|----------|-----------|---------|--------------|
 | 1 | Owner pan window | Size 120, All Contacts | `touch_windows.py --calibrate --session "Size 120,All Contacts" --reps 3 --timeout-per-segment 600` | median presents/s per label (§7) |
 | 2 | Owner pinch window | Size 120, All Contacts | same session | median presents/s per label |
-| 3 | Recenter (adb) | Size 120, All Contacts | pan away with `input swipe`, `sf_sampler.py --seconds 4` started 1 s before a touchscreen tap on the "Recenter Orrery" control's bounds; presents in the 2 s from the tap | median presents/s over [tap, tap + 2 s] |
-| 4 | adb pan (secondary, injection-bound) | Size 120, All Contacts | `sf_sampler.py` while 5 `input swipe` pans run | median presents/s, labelled "adb pan" |
+| 3 | Recenter (adb) | Size 120, All Contacts | `recenter_pan.py --recenter --runs 3`: pan away with `input swipe`, sampler started 1 s before a touchscreen tap on the "Recenter Orrery" control's bounds; presents in the 2 s from the tap | median presents/s over [tap, tap + 2 s] |
+| 4 | adb pan (secondary, injection-bound) | Size 120, All Contacts | `recenter_pan.py --adb-pan --runs 3`: the sampler runs while 5 `input swipe` pans run | median presents/s, labelled "adb pan" |
 | 5 | Switch stall | Size 5 ↔ Size 120; Size 120 ↔ All Contacts | `switch_stall.py --from A --to B --runs 3` (alternates direction) | max inter-present gap (ms) in [tap, tap + 2.6 s] |
 | 6 | Tab return | Size 120, All Contacts | `tab_return.py --runs 3 --out-dir …` | total = tap → first full frame (s) |
 | 7 | Background return | Size 120, All Contacts | `tab_return.py --background --runs 3 --out-dir …` | total (s) |
@@ -334,3 +334,5 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
   UI thread). With these, switching to All Contacts still crashed the 6 Pro (while a
   selector group was expanding), so switch-dependent scenarios at All Contacts / Orrery
   Stress are recorded as not measurable on main (see 38.7-BASELINE.md).
+- **2026-10-03** — Before any baseline number: rows 3-4 are scripted as `recenter_pan.py`
+  (the same procedure, with the tap/swipe instants mapped onto SurfaceFlinger's clock in-process).
