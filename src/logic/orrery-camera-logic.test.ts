@@ -37,7 +37,6 @@ import {
   projectWithBasis,
   projectWorldPoint,
   tapIntent,
-  traceRingPath,
   tryProjectWorldPoint,
   unprojectToWorldPlane,
   usableCameraRect,
@@ -47,6 +46,11 @@ import {
 } from "@/logic/orrery-camera-logic";
 import { projectSwitchChoreographyFrame } from "@/logic/orrery-frame";
 import { semanticLevel } from "@/logic/orrery-label-logic";
+import {
+  applyHomography,
+  discBeyondHorizon,
+  planeHomography,
+} from "@/logic/orrery-plane-logic";
 import { hitPolaris, polarisProjection } from "@/logic/orrery-recovery-logic";
 import { previewReorder, type ReorderDrag } from "@/logic/orrery-reorder-logic";
 import { beginSwitchChoreography } from "@/logic/orrery-switch-choreography";
@@ -170,9 +174,15 @@ describe("bounded invertible inspection camera", () => {
     const pose = clampCameraPose({ ...HOME_CAMERA, tilt: MAX_USER_TILT }, 120);
     const frame = projectFrame(world, pose, viewport, 1);
     expect(frame.bodies[0].radius).toBeGreaterThan(frame.bodies[1].radius);
-    expect(frame.bodies[0].ringPath[0]).toEqual(
-      projectWorldPoint({ x: 0, y: -100 }, frame.pose, viewport),
+    // 38.7-06: the ring is drawn under the frame pose's plane homography.
+    const ringNorth = applyHomography(
+      planeHomography(frame.pose, viewport),
+      0,
+      -frame.bodies[0].worldRingRadius,
     );
+    const exact = projectWorldPoint({ x: 0, y: -100 }, frame.pose, viewport);
+    expect(ringNorth?.x).toBeCloseTo(exact.x, 6);
+    expect(ringNorth?.y).toBeCloseTo(exact.y, 6);
     expect(frame.bodies[0].hitRadius).toBeGreaterThanOrEqual(
       frame.bodies[0].radius,
     );
@@ -337,14 +347,11 @@ const legacy = (() => {
     viewport: CameraViewport,
     generation: number,
   ): Omit<ProjectedFrame, "bodies" | "labelMagnification"> & {
-    bodies: Omit<
+    // The frozen copy still projects its 128-point ring polygon.
+    bodies: (Omit<
       ProjectedBody,
-      | "worldRingRadius"
-      | "ringBreaks"
-      | "ringClosed"
-      | "culled"
-      | "magnification"
-    >[];
+      "worldRingRadius" | "culled" | "magnification"
+    > & { ringPolygon: WorldPoint[] })[];
   } => {
     const current = clampCameraPose(
       pose,
@@ -361,11 +368,11 @@ const legacy = (() => {
       center: projectPoint({ x: 0, y: 0 }, current, viewport),
       bodies: world.map((body) => {
         const scale = current.zoom * perspectiveScale(body, current);
-        const ringPath: WorldPoint[] = [];
+        const ringPolygon: WorldPoint[] = [];
         if (body.ringRadius > 0)
           for (let i = 0; i < RING_SEGMENTS; i++) {
             const angle = (i * 2 * Math.PI) / RING_SEGMENTS;
-            ringPath.push(
+            ringPolygon.push(
               projectPoint(
                 {
                   x: body.ringRadius * Math.sin(angle),
@@ -382,7 +389,7 @@ const legacy = (() => {
           radius: body.radius * scale,
           ringRadius: body.ringRadius * current.zoom,
           hitRadius: Math.max(MIN_HIT_RADIUS, body.radius * scale),
-          ringPath,
+          ringPolygon,
           depth: cameraPlane(body, current).y * Math.sin(current.tilt ?? 0),
         };
       }),
@@ -472,7 +479,7 @@ describe("D-52 hoisted projection basis", () => {
     ).toThrow("Point outside finite Orrery camera plane");
   });
 
-  it("projectFrame equals the frozen old projectFrame wherever nothing is culled; ringPaths:false only empties ring paths", () => {
+  it("projectFrame equals the frozen old projectFrame wherever nothing is culled (ring polygons are no longer projected)", () => {
     const random = seeded(7);
     for (let round = 0; round < 24; round++) {
       const world: WorldBody[] = [
@@ -500,41 +507,42 @@ describe("D-52 hoisted projection basis", () => {
         yaw: random() * Math.PI * 2,
       };
       const vp = basisViewports[round % basisViewports.length];
-      // 38.7-05 adds worldRingRadius (copied unchanged), the ring-gap fields,
-      // the magnification and the one size mechanism (D-48); positions, rings
-      // and depth are otherwise identical to the frozen copy.
+      // 38.7-05 adds worldRingRadius (copied unchanged), the magnification
+      // and the one size mechanism (D-48); 38.7-06 drops the projected ring
+      // polygons (rings are drawn on the world plane). Positions and depth are
+      // otherwise identical to the frozen copy.
       const frozen = legacy.frame(world, pose, vp, round);
       const shortSide = Math.min(vp.width, vp.height);
       const expected: ProjectedFrame = {
         ...frozen,
-        bodies: frozen.bodies.map((projected, index) => {
-          const perspective = perspectiveScale(world[index], frozen.pose);
-          const radius = projectedBodyRadius(
-            world[index].kind,
-            world[index].radius,
-            frozen.pose.zoom,
-            perspective,
-            shortSide,
-          );
-          // Where the size mechanism is identity (far side, above the
-          // minimum), the radius is the old radius bit-for-bit.
-          if (
-            perspective <= 1 &&
-            projected.radius >=
-              (world[index].kind === "sun" ? MIN_SUN_PX : MIN_CONTACT_PX) / 2
-          )
-            expect(radius).toBe(projected.radius);
-          return {
-            ...projected,
-            radius,
-            hitRadius: Math.max(MIN_HIT_RADIUS, radius),
-            magnification: frozen.pose.zoom * perspective,
-            worldRingRadius: world[index].ringRadius,
-            ringBreaks: [],
-            ringClosed: world[index].ringRadius > 0,
-            culled: false,
-          };
-        }),
+        bodies: frozen.bodies.map(
+          ({ ringPolygon: _ringPolygon, ...projected }, index) => {
+            const perspective = perspectiveScale(world[index], frozen.pose);
+            const radius = projectedBodyRadius(
+              world[index].kind,
+              world[index].radius,
+              frozen.pose.zoom,
+              perspective,
+              shortSide,
+            );
+            // Where the size mechanism is identity (far side, above the
+            // minimum), the radius is the old radius bit-for-bit.
+            if (
+              perspective <= 1 &&
+              projected.radius >=
+                (world[index].kind === "sun" ? MIN_SUN_PX : MIN_CONTACT_PX) / 2
+            )
+              expect(radius).toBe(projected.radius);
+            return {
+              ...projected,
+              radius,
+              hitRadius: Math.max(MIN_HIT_RADIUS, radius),
+              magnification: frozen.pose.zoom * perspective,
+              worldRingRadius: world[index].ringRadius,
+              culled: false,
+            };
+          },
+        ),
         labelMagnification: expect.any(Number) as unknown as number,
       };
       const actual = projectFrame(world, pose, vp, round);
@@ -542,23 +550,27 @@ describe("D-52 hoisted projection basis", () => {
       expectBitExact(actual.center!, expected.center!);
       actual.bodies.forEach((projected, index) => {
         expectBitExact(projected, expected.bodies[index]);
-        projected.ringPath.forEach((point, i) => {
-          expectBitExact(point, expected.bodies[index].ringPath[i]);
+      });
+      // 38.7-06: the world-plane ring passes through the old ring polygon's
+      // points (D-44 parity, ≤ 1e-6 px).
+      const h = planeHomography(actual.pose, vp);
+      frozen.bodies.forEach((old, index) => {
+        old.ringPolygon.forEach((point, i) => {
+          if (i % 8 !== 0) return;
+          const angle = (i * 2 * Math.PI) / 128;
+          const ring = actual.bodies[index].worldRingRadius;
+          const drawn = applyHomography(
+            h,
+            ring * Math.sin(angle),
+            -ring * Math.cos(angle),
+          );
+          expect(Math.abs((drawn?.x ?? Number.NaN) - point.x)).toBeLessThan(
+            1e-6,
+          );
+          expect(Math.abs((drawn?.y ?? Number.NaN) - point.y)).toBeLessThan(
+            1e-6,
+          );
         });
-      });
-      expect(projectFrame(world, pose, vp, round, { ringPaths: true })).toEqual(
-        expected,
-      );
-      const ringless = projectFrame(world, pose, vp, round, {
-        ringPaths: false,
-      });
-      expect(ringless).toEqual({
-        ...expected,
-        bodies: expected.bodies.map((projected) => ({
-          ...projected,
-          ringPath: [],
-          ringClosed: false,
-        })),
       });
     }
   });
@@ -871,7 +883,7 @@ describe("38.7-05 horizon safety on a 1,000-ring System (H2)", () => {
       }
     },
   );
-  it("the pan/yaw/tilt/zoom matrix never throws: bodies, centre, ring samples, Polaris, hits and taps", () => {
+  it("the pan/yaw/tilt/zoom matrix never throws: bodies, centre, ring arcs, Polaris, hits and taps", () => {
     let gapped = 0,
       culledSeen = 0,
       polarisHidden = 0;
@@ -905,35 +917,39 @@ describe("38.7-05 horizon safety on a 1,000-ring System (H2)", () => {
               { ...home, x: px, y: py, yaw, zoom },
               extent,
             );
-            const off = projectFrame(world, pose, phone, 1, {
-              extent,
-              ringPaths: false,
-            });
-            expect(off.bodies.every((b) => b.ringPath.length === 0)).toBe(true);
-            // Ring samples (128 per ring) dominate the cost: the whole world
-            // is projected with ring paths at the Home zoom of the axis-aligned
-            // yaws; elsewhere every 97th ring is, which covers the same
-            // near/far range.
-            const full = zoom === home.zoom && (yaw === 0 || yaw === Math.PI);
-            const ringed = full ? world : world.filter((_, i) => i % 97 === 0);
-            const on = projectFrame(ringed, pose, phone, 1, { extent });
-            expect(on.pose).toEqual(off.pose);
-            expect(on.center === null).toBe(beyond(on.pose, { x: 0, y: 0 }));
-            if (on.center)
-              expect(Number.isFinite(on.center.x + on.center.y)).toBe(true);
+            const off = projectFrame(world, pose, phone, 1, { extent });
+            expect(off.center === null).toBe(beyond(off.pose, { x: 0, y: 0 }));
+            if (off.center)
+              expect(Number.isFinite(off.center.x + off.center.y)).toBe(true);
+            // 38.7-06: the drawn ring is the world ring under the frame pose's
+            // homography. Its visible arc is exactly the samples the camera
+            // keeps (same near-plane cull), and a disc wholly beyond the
+            // horizon is skipped.
+            const h = planeHomography(off.pose, phone);
             for (let i = 0; i < world.length; i += 97) {
-              const b = (full ? on.bodies[i] : on.bodies[i / 97])!;
+              const b = off.bodies[i];
               expect(b.id).toBe(world[i].id);
-              expect(b.culled).toBe(off.bodies[i].culled);
               if (b.culled) culledSeen++;
-              if (b.ringRadius === 0) continue;
-              const visible = samplesOf(on.pose, world[i].ringRadius);
-              expect(b.ringPath.length).toBe(visible);
-              expect(b.ringClosed).toBe(visible === 128);
+              if (b.worldRingRadius === 0) continue;
+              const ring = b.worldRingRadius;
+              const visible = samplesOf(off.pose, ring);
+              let mapped = 0,
+                finite = 0;
+              for (let k = 0; k < 128; k++) {
+                const angle = (k * 2 * Math.PI) / 128;
+                const p = applyHomography(
+                  h,
+                  ring * Math.sin(angle),
+                  -ring * Math.cos(angle),
+                );
+                if (!p) continue;
+                mapped++;
+                if (Number.isFinite(p.x + p.y)) finite++;
+              }
+              // Aggregated (one expect per ring, not per sample).
+              expect([mapped, finite]).toEqual([visible, visible]);
+              if (discBeyondHorizon(h, ring)) expect(visible).toBe(0);
               if (!b.culled && visible < 128 && visible > 0) gapped++;
-              expect(
-                b.ringPath.every((point) => Number.isFinite(point.x + point.y)),
-              ).toBe(true);
             }
             const polaris = polarisProjection(off, extent);
             expect(polaris === null).toBe(
@@ -956,7 +972,7 @@ describe("38.7-05 horizon safety on a 1,000-ring System (H2)", () => {
     expect(gapped).toBeGreaterThan(0);
     expect(polarisHidden).toBeGreaterThan(0);
   });
-  it("a body in front of the horizon keeps its visible ring arc while far samples are omitted", () => {
+  it("a body in front of the horizon keeps its visible ring arc while the far side beyond it is cut", () => {
     const pose = clampCameraPose(
       { ...HOME_CAMERA, zoom: 2, tilt: HOME_PROFILES.tilted.tilt },
       extent,
@@ -974,40 +990,22 @@ describe("38.7-05 horizon safety on a 1,000-ring System (H2)", () => {
     const frame = projectFrame(near, pose, phone, 1);
     const b = frame.bodies[0];
     expect(b.culled).toBe(false);
-    expect(b.ringClosed).toBe(false);
-    expect(b.ringPath.length).toBeGreaterThan(0);
-    expect(b.ringPath.length).toBeLessThan(128);
-    const pen: string[] = [];
-    traceRingPath(
-      {
-        moveTo: () => pen.push("M"),
-        lineTo: () => pen.push("L"),
-        close: () => pen.push("Z"),
-      },
-      b,
-    );
-    expect(pen).not.toContain("Z");
-    expect(pen.filter((c) => c === "M")).toHaveLength(b.ringBreaks.length + 1);
-    // A gap in the middle of the samples lifts the pen.
-    const split: string[] = [];
-    traceRingPath(
-      {
-        moveTo: () => split.push("M"),
-        lineTo: () => split.push("L"),
-        close: () => split.push("Z"),
-      },
-      {
-        ringPath: [
-          { x: 0, y: 0 },
-          { x: 1, y: 0 },
-          { x: 5, y: 0 },
-          { x: 6, y: 0 },
-        ],
-        ringBreaks: [2],
-        ringClosed: false,
-      },
-    );
-    expect(split).toEqual(["M", "L", "M", "L"]);
+    const h = planeHomography(frame.pose, phone);
+    expect(discBeyondHorizon(h, b.worldRingRadius)).toBe(false);
+    let visible = 0;
+    for (let k = 0; k < 128; k++) {
+      const angle = (k * 2 * Math.PI) / 128;
+      if (
+        applyHomography(
+          h,
+          b.worldRingRadius * Math.sin(angle),
+          -b.worldRingRadius * Math.cos(angle),
+        )
+      )
+        visible++;
+    }
+    expect(visible).toBeGreaterThan(0);
+    expect(visible).toBeLessThan(128);
   });
   it("frameBodies on a mixed visible/culled selection returns a safe pose or null, never throws", () => {
     const pose = clampCameraPose(

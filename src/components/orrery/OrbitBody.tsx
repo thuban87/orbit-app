@@ -21,7 +21,6 @@ import { useOrreryPhoto } from "./use-orrery-photo";
 
 export interface OrbitBodyProps {
   projection?: SharedValue<BillboardPose>;
-  focusColor?: string;
   /** Body center x in the projected wrapper local space. */
   cx: number;
   /** Body center y in the projected wrapper local space. */
@@ -72,7 +71,6 @@ export function OrbitBody({
   initialsSpec,
   textKey,
   projection,
-  focusColor,
 }: OrbitBodyProps) {
   const transform = useDerivedValue(() =>
     projection
@@ -112,16 +110,6 @@ export function OrbitBody({
 
   return (
     <Group transform={transform} zIndex={depth} layer={layer}>
-      {focusColor ? (
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={radius + 4}
-          color={focusColor}
-          style="stroke"
-          strokeWidth={2}
-        />
-      ) : null}
       {/* Canonical status outline; rogue retains its cold body treatment. */}
       <Circle cx={cx} cy={cy} r={radius} color={bodyFill} />
       {image ? (

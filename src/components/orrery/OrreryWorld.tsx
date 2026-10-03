@@ -1,10 +1,5 @@
 /** ADR-077: keyed resources; one UI-thread world/projection frame for all layers. */
-import {
-  Group,
-  Path,
-  Skia,
-  type SkTypefaceFontProvider,
-} from "@shopify/react-native-skia";
+import { Group, type SkTypefaceFontProvider } from "@shopify/react-native-skia";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useWindowDimensions } from "react-native";
 import {
@@ -17,12 +12,11 @@ import {
 } from "react-native-reanimated";
 import { swatchIndex } from "@/components/avatar-initials";
 import type { OrrerySatellite } from "@/db/orrery-satellites-read";
-import {
-  type CameraPose,
-  type CameraViewport,
-  type OrreryIntent,
-  type OrrerySatelliteTarget,
-  traceRingPath,
+import type {
+  CameraPose,
+  CameraViewport,
+  OrreryIntent,
+  OrrerySatelliteTarget,
 } from "@/logic/orrery-camera-logic";
 import {
   focusEffectivelyOffscreen,
@@ -32,7 +26,6 @@ import {
   type AnimatedFrame,
   billboardPose,
   bodyKey,
-  frameBodyById,
   frameBodyByKey,
   projectAnimatedFrame,
 } from "@/logic/orrery-frame";
@@ -51,7 +44,6 @@ import {
 } from "@/logic/orrery-recovery-logic";
 import {
   previewReorder,
-  type ReorderDrag,
   type ReorderIntent,
 } from "@/logic/orrery-reorder-logic";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
@@ -66,7 +58,6 @@ import type { ThemePalette } from "@/theme/theme-types";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import { OrbitBody, orbitBodyInitialsLayout } from "./OrbitBody";
 import { OrreryLabel } from "./OrreryLabel";
-import { Polaris } from "./Polaris";
 import {
   createOrreryTextPublisher,
   EMPTY_INITIALS_SPEC,
@@ -91,8 +82,12 @@ import {
 } from "./use-orrery-switch-runtime";
 import { OrreryV2Canvas } from "./v2/OrreryV2Canvas";
 import {
+  buildFocusOutlines,
+  buildOverlayInk,
   buildRingSpecs,
+  EMPTY_OVERLAY_SPEC,
   EMPTY_RING_SPECS,
+  type OverlaySpec,
   type RingSpecs,
 } from "./v2/scene-specs";
 
@@ -173,27 +168,6 @@ function finishTextRelease(owner: string, epoch: number): void {
   orreryTextService.clearUnheld();
 }
 
-function ReorderGhost({
-  frame,
-  drag,
-  color,
-}: {
-  frame: SharedValue<AnimatedFrame>;
-  drag: SharedValue<ReorderDrag | null>;
-  color: string;
-}) {
-  const path = useDerivedValue(() => {
-    const result = Skia.Path.Make();
-    const held = drag.value;
-    if (!held?.active) return result;
-    const body = frameBodyById(frame.value, held.id);
-    // H2: only the visible ring samples; open at the horizon.
-    if (body) traceRingPath(result, body);
-    if (body && !body.culled) result.addCircle(body.x, body.y, body.radius + 4);
-    return result;
-  });
-  return <Path path={path} color={color} style="stroke" strokeWidth={2} />;
-}
 /** The display name a body's swatch and initials derive from. */
 function bodyDisplayName(
   resource: OrreryBodyResource,
@@ -223,13 +197,11 @@ function ProjectedBody({
   frame,
   colors,
   initialsSpec,
-  focused,
 }: {
   resource: OrreryBodyResource;
   frame: SharedValue<AnimatedFrame>;
   colors: ThemePalette;
   initialsSpec: SharedValue<OrreryInitialsSpec>;
-  focused: boolean;
 }) {
   const { body, scene, key } = resource;
   const projection = useDerivedValue(() =>
@@ -256,7 +228,6 @@ function ProjectedBody({
       colors.avatarSwatches[swatchIndex(name, colors.avatarSwatches.length)],
     initialsSpec,
     textKey: key,
-    focusColor: focused ? colors.accent : undefined,
   };
   // Each branch returns exactly ONE actual body root Group; no parent wrapper.
   return body.kind === "sun" ? (
@@ -428,6 +399,22 @@ export function OrreryWorld({
   useEffect(() => {
     ringSpecs.value = buildRingSpecs(resources, colors);
   }, [ringSpecs, resources, colors]);
+  // The overlay picture's inputs (Polaris, reorder and focus outlines). The
+  // focus set is keyed by its ids, so an unrelated render writes nothing.
+  const overlaySpec = useSharedValue<OverlaySpec>(EMPTY_OVERLAY_SPEC);
+  const focusSignature = focusedIds.join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by focusSignature (focusedIds' contents), not its identity
+  const overlay = useMemo<OverlaySpec>(
+    () => ({
+      ink: buildOverlayInk(colors),
+      extent: scene.extent,
+      focus: buildFocusOutlines(resources, focusedIds),
+    }),
+    [colors, scene.extent, resources, focusSignature],
+  );
+  useEffect(() => {
+    overlaySpec.value = overlay;
+  }, [overlaySpec, overlay]);
   // Plain label inputs only (no Paragraphs): one stable label node per
   // labelable body; the publisher decides which ones get text, per tier.
   const labelSources = useMemo<OrreryLabelSource[]>(
@@ -792,16 +779,12 @@ export function OrreryWorld({
       gesture={gesture}
       frame={frame}
       ringSpecs={ringSpecs}
+      overlay={overlaySpec}
+      reorder={camera.reorder}
     >
       <Group
         clip={{ x: 0, y: 0, width: viewport.width, height: viewport.height }}
       >
-        <Polaris frame={frame} extent={scene.extent} colors={colors} />
-        <ReorderGhost
-          frame={frame}
-          drag={camera.reorder}
-          color={colors.accent}
-        />
         {/* RNRecorder flushes sorting at every non-Group command. Keep this run contiguous. */}
         <Group>
           {resources.map((resource) => (
@@ -811,7 +794,6 @@ export function OrreryWorld({
               frame={frame}
               colors={colors}
               initialsSpec={initialsSpec}
-              focused={focusedIds.includes(resource.body.id)}
             />
           ))}
           {satellites.map((row) => {

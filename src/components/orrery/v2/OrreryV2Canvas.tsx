@@ -8,9 +8,10 @@
  * Adding or removing contacts, a focus change or any React re-render never
  * adds, removes or restructures a Skia node for rings, Polaris or overlays.
  *
- * Layers (this plan): `base` — the world-plane orbit rings (D-44). Plan 07
- * replaces the `children` slot (the remaining legacy body and label
- * components, an intermediate step) with picture layers.
+ * Layers (this plan): `base` — the world-plane orbit rings (D-44); the
+ * legacy `children` slot — the remaining body and label components, an
+ * intermediate step that Plan 07 replaces with picture layers; `overlay` —
+ * Polaris, the reorder outline and the focus outlines.
  */
 import { createPicture, Picture } from "@shopify/react-native-skia";
 import { type ReactNode, useMemo } from "react";
@@ -20,10 +21,12 @@ import type {
 } from "react-native-gesture-handler";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
+import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
 import { OrreryCanvas } from "../OrreryCanvas";
+import { drawOverlay } from "./draw-overlay";
 import { drawPlaneRings, ringBands } from "./draw-plane";
 import { resolveOrreryRenderHost } from "./render-host";
-import type { RingSpecs } from "./scene-specs";
+import type { OverlaySpec, RingSpecs } from "./scene-specs";
 import { orreryShader } from "./shaders";
 
 export interface OrreryV2CanvasProps {
@@ -40,6 +43,10 @@ export interface OrreryV2CanvasProps {
   frame: SharedValue<AnimatedFrame>;
   /** Per-body ring look (JS-built, rewritten on resource/theme change only). */
   ringSpecs: SharedValue<RingSpecs>;
+  /** Overlay inks, Polaris extent and focus outlines (JS-built). */
+  overlay: SharedValue<OverlaySpec>;
+  /** The reorder hold (gesture-owned), for the held-orbit outline. */
+  reorder: SharedValue<ReorderDrag | null>;
   /** Legacy body/label components (Plan 07 replaces them with pictures). */
   children?: ReactNode;
 }
@@ -52,6 +59,8 @@ export function OrreryV2Canvas({
   gesture,
   frame,
   ringSpecs,
+  overlay,
+  reorder,
   children,
 }: OrreryV2CanvasProps) {
   const host = useMemo(() => resolveOrreryRenderHost(), []);
@@ -75,6 +84,22 @@ export function OrreryV2Canvas({
       { width, height },
     ),
   );
+  const overlayPicture = useDerivedValue(() =>
+    createPicture(
+      (canvas) => {
+        drawOverlay(
+          canvas,
+          frame.value,
+          overlay.value,
+          reorder.value,
+          ringEffect,
+          bands,
+          aaDp,
+        );
+      },
+      { width, height },
+    ),
+  );
   return (
     <OrreryCanvas
       width={width}
@@ -85,6 +110,7 @@ export function OrreryV2Canvas({
     >
       <Picture picture={base} />
       {children}
+      <Picture picture={overlayPicture} />
     </OrreryCanvas>
   );
 }

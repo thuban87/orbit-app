@@ -18,6 +18,7 @@ import {
   sampleWorldTransition,
   spinSwitchWorld,
 } from "./orrery-frame";
+import { applyHomography, planeHomography } from "./orrery-plane-logic";
 import {
   beginSwitchChoreography,
   retargetSwitchChoreography,
@@ -53,13 +54,20 @@ describe("one animated Orrery frame", () => {
     expect(projected).toMatchObject(
       projectWorldPoint(entering, frame.pose, viewport),
     );
-    expect(projected.ringPath[0]).toMatchObject(
-      projectWorldPoint(
-        { x: 0, y: -entering.ringRadius },
-        frame.pose,
-        viewport,
-      ),
+    // 38.7-06: the ring is drawn under the frame pose's plane homography.
+    const north = applyHomography(
+      planeHomography(frame.pose, viewport),
+      0,
+      -projected.worldRingRadius,
     );
+    const exact = projectWorldPoint(
+      { x: 0, y: -entering.ringRadius },
+      frame.pose,
+      viewport,
+    );
+    expect(projected.worldRingRadius).toBe(entering.ringRadius);
+    expect(north?.x).toBeCloseTo(exact.x, 6);
+    expect(north?.y).toBeCloseTo(exact.y, 6);
     expect(collectHitCandidates(frame, projected.x, projected.y)).toEqual([]);
     expect(frame.bodies.map(bodyKey)).toEqual(frame.sample.world.map(bodyKey));
   });
@@ -124,8 +132,13 @@ describe("one animated Orrery frame", () => {
       expect(drawn).toMatchObject(
         projectWorldPoint(current, frame.pose, viewport),
       );
-      expect(drawn.ringPath[0].x).toBeCloseTo(drawn.x, 8);
-      expect(drawn.ringPath[0].y).toBeCloseTo(drawn.y, 8);
+      const north = applyHomography(
+        planeHomography(frame.pose, viewport),
+        0,
+        -drawn.worldRingRadius,
+      );
+      expect(north?.x).toBeCloseTo(drawn.x, 8);
+      expect(north?.y).toBeCloseTo(drawn.y, 8);
       expect(collectHitCandidates(frame, drawn.x, drawn.y)).toContain(1);
       const entering = frame.bodies.find((b) => b.id === 2)!;
       expect(

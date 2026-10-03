@@ -125,19 +125,13 @@ export interface ProjectedBody extends WorldBody {
   /** Decorative transition departures must never produce live actions. */
   interactive?: boolean;
   hitRadius: number;
-  /**
-   * Visible projected ring samples in drawing order. Samples beyond the
-   * horizon are omitted: `ringBreaks` lists the indexes that start a new run
-   * (pen up before them) and `ringClosed` is true only for a complete ring.
-   */
-  ringPath: WorldPoint[];
-  ringBreaks: number[];
-  ringClosed: boolean;
   depth: number;
   /**
    * The world body's own `ringRadius`, copied unchanged (38.7-05, M12). The
-   * single source of world ring radii for reorder, the V2 ring drawing and the
-   * reorder outline; never recover it as projected `ringRadius / zoom`.
+   * single source of world ring radii for reorder, the V2 world-plane ring
+   * drawing and the reorder outline (38.7-06: rings are drawn in world space
+   * under the plane homography, so the frame carries no ring polygons); never
+   * recover it as projected `ringRadius / zoom`.
    */
   worldRingRadius: number;
   /** True when the centre is beyond the horizon: radius 0, never tappable. */
@@ -434,11 +428,11 @@ export const constrainCamera = clampCameraPose;
 /**
  * D-52: per-frame projection constants. `projectWorldPoint` used to re-derive
  * the usable rect (obstacle subdivision + sort) and the pose trig for EVERY
- * point, and a frame projects 128 ring points per body. The basis hoists
- * exactly the values that computation used, once, so `projectWithBasis` is
- * bit-for-bit identical (same operations in the same order — pinned by
- * orrery-camera-logic.test). Defined above every caller (Hermes worklet
- * forward-reference hazard).
+ * point, and a frame projected 128 ring points per body (until 38.7-06).
+ * The basis hoists exactly the values that computation used, once, so
+ * `projectWithBasis` is bit-for-bit identical (same operations in the same
+ * order — pinned by orrery-camera-logic.test). Defined above every caller
+ * (Hermes worklet forward-reference hazard).
  */
 export interface ProjectionBasis {
   /** Pan and zoom of the validated pose. */
@@ -910,51 +904,20 @@ export function frameBodies(
   return result;
 }
 
-/** Anything with Skia-path-like pen commands (also a Node test sink). */
-export interface RingPathSink {
-  moveTo(x: number, y: number): unknown;
-  lineTo(x: number, y: number): unknown;
-  close(): unknown;
-}
 /**
- * H2: trace a projected ring's visible samples. A gap (samples beyond the
- * horizon) lifts the pen and an incomplete ring is never closed, so no segment
- * is ever drawn across the horizon.
- */
-export function traceRingPath(
-  sink: RingPathSink,
-  ring: Pick<ProjectedBody, "ringPath" | "ringBreaks" | "ringClosed">,
-): void {
-  "worklet";
-  const points = ring.ringPath;
-  if (!points.length) return;
-  const breaks = ring.ringBreaks ?? [];
-  let next = 0;
-  for (let i = 0; i < points.length; i++) {
-    if (i === 0) sink.moveTo(points[i].x, points[i].y);
-    else if (next < breaks.length && breaks[next] === i) {
-      next++;
-      sink.moveTo(points[i].x, points[i].y);
-    } else sink.lineTo(points[i].x, points[i].y);
-  }
-  if (ring.ringClosed && breaks.length === 0) sink.close();
-}
-/**
- * `options.ringPaths` (default true): when false every `ringPath` is empty and
- * all other body data is identical. Today's renderer keeps the 128-point ring
- * polygons; the V2 renderer (Plan 06) draws rings from world geometry.
  * `options.extent`: the camera (pan) extent the pose was clamped to; the pan
- * bound is the larger of it and the world's own extent.
+ * bound is the larger of it and the world's own extent. 38.7-06: no ring
+ * polygons are projected; the V2 renderer draws rings from `worldRingRadius`
+ * under the plane homography (`orrery-plane-logic.ts`).
  */
 export function projectFrame(
   world: readonly WorldBody[],
   pose: CameraPose,
   viewport: CameraViewport,
   generation: number,
-  options?: { ringPaths?: boolean; extent?: number },
+  options?: { extent?: number },
 ): ProjectedFrame {
   "worklet";
-  const ringPaths = options?.ringPaths ?? true;
   const extent = options?.extent;
   const current = clampCameraPose(
     pose,
@@ -963,45 +926,10 @@ export function projectFrame(
       extent !== undefined && Number.isFinite(extent) ? extent : 0,
     ),
   );
-  // D-52: one basis per frame for the centre, every body and every ring point.
+  // D-52: one basis per frame for the centre and every body.
   const basis = projectionBasis(current, viewport);
   const shortSide = Math.min(viewport.width, viewport.height);
   const bodies = world.map((body): ProjectedBody => {
-    let ringPath: WorldPoint[] = [];
-    const ringBreaks: number[] = [];
-    let ringClosed = false;
-    if (ringPaths && body.ringRadius > 0) {
-      const samples: (WorldPoint | null)[] = [];
-      let firstGap = -1;
-      for (let i = 0; i < RING_SEGMENTS; i++) {
-        const angle = (i * 2 * Math.PI) / RING_SEGMENTS;
-        const sample = tryProjectWithBasis(
-          basis,
-          body.ringRadius * Math.sin(angle),
-          -body.ringRadius * Math.cos(angle),
-        );
-        samples.push(sample);
-        if (!sample && firstGap < 0) firstGap = i;
-      }
-      if (firstGap < 0) {
-        // Every sample is present: the sample list IS the closed ring.
-        ringPath = samples as WorldPoint[];
-        ringClosed = true;
-      } else {
-        // Start right after a gap so the visible arc is one run in order.
-        let penDown = false;
-        for (let k = 1; k <= RING_SEGMENTS; k++) {
-          const sample = samples[(firstGap + k) % RING_SEGMENTS];
-          if (!sample) {
-            penDown = false;
-            continue;
-          }
-          if (!penDown && ringPath.length) ringBreaks.push(ringPath.length);
-          ringPath.push(sample);
-          penDown = true;
-        }
-      }
-    }
     const depth = cameraPlane(body, current).y * Math.sin(current.tilt ?? 0);
     const point = tryProjectWithBasis(basis, body.x, body.y);
     const perspective = basisPerspectiveScale(basis, body.x, body.y);
@@ -1016,9 +944,6 @@ export function projectFrame(
         hitRadius: 0,
         interactive: false,
         culled: true,
-        ringPath,
-        ringBreaks,
-        ringClosed,
         depth,
         magnification: 0,
       };
@@ -1038,9 +963,6 @@ export function projectFrame(
       worldRingRadius: body.ringRadius,
       hitRadius: Math.max(MIN_HIT_RADIUS, radius),
       culled: false,
-      ringPath,
-      ringBreaks,
-      ringClosed,
       depth,
       magnification: current.zoom * perspective,
     };

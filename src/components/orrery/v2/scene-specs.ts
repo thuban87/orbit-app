@@ -102,3 +102,62 @@ export interface SkySpec {
 export function buildSkySpec(colors: ThemePalette): SkySpec {
   return { background: tokenInk(colors.background) };
 }
+
+/** The overlay's inks (accent for reorder/focus, Polaris star and halo). */
+export interface OverlayInk {
+  accent: OrreryInk;
+  textPrimary: OrreryInk;
+  /** Polaris halo: the first star-palette colour (textPrimary when empty). */
+  polarisHalo: OrreryInk;
+}
+/**
+ * One focused body's accent outline: today's OrbitBody/SunBody focus ring,
+ * `gap` world units outside the body's world radius (both scale with it).
+ */
+export interface OverlayFocus {
+  key: string;
+  worldRadius: number;
+  gap: number;
+}
+export interface OverlaySpec {
+  ink: OverlayInk;
+  /** The world extent Polaris sits beyond (`scene.extent`). */
+  extent: number;
+  focus: readonly OverlayFocus[];
+}
+/** Today's focus-ring gaps outside the disc (contact / sun). */
+export const FOCUS_RING_GAP = { contact: 4, sun: 6 } as const;
+
+export function buildOverlayInk(colors: ThemePalette): OverlayInk {
+  return {
+    accent: tokenInk(colors.accent),
+    textPrimary: tokenInk(colors.textPrimary),
+    polarisHalo: tokenInk(colors.starPalette[0] ?? colors.textPrimary),
+  };
+}
+
+/** The focus outlines for the focused ids (contacts and the sun; not moons). */
+export function buildFocusOutlines(
+  resources: readonly OrreryBodyResource[],
+  focusedIds: readonly number[],
+): OverlayFocus[] {
+  if (focusedIds.length === 0) return [];
+  const focused = new Set(focusedIds);
+  const out: OverlayFocus[] = [];
+  for (const resource of resources) {
+    const { body } = resource;
+    if (body.kind === "satellite" || !focused.has(body.id)) continue;
+    out.push({
+      key: resource.key,
+      worldRadius: body.radius,
+      gap: body.kind === "sun" ? FOCUS_RING_GAP.sun : FOCUS_RING_GAP.contact,
+    });
+  }
+  return out;
+}
+
+export const EMPTY_OVERLAY_SPEC: OverlaySpec = Object.freeze({
+  ink: { accent: NO_INK, textPrimary: NO_INK, polarisHalo: NO_INK },
+  extent: 1,
+  focus: [],
+});

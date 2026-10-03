@@ -188,7 +188,7 @@ function animateProjectedBodies(
   }
   return { bodies, keyIndex, idIndex };
 }
-/** Forwarded to `projectFrame` (ring paths on/off, the camera pan extent). */
+/** Forwarded to `projectFrame` (the camera pan extent). */
 export type ProjectFrameOptions = Parameters<typeof projectFrame>[4];
 export function projectAnimatedFrame(
   transition: WorldTransition,

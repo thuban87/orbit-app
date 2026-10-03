@@ -34,7 +34,6 @@ import { useOrreryPhoto } from "./use-orrery-photo";
 
 export interface SunBodyProps {
   projection?: SharedValue<BillboardPose>;
-  focusColor?: string;
   /** Canvas centre x (`C.cx`). */
   cx: number;
   /** Canvas centre y (`C.cy`). */
@@ -90,7 +89,6 @@ export function SunBody({
   initialsSpec,
   textKey,
   projection,
-  focusColor,
 }: SunBodyProps) {
   const transform = useDerivedValue(() =>
     projection
@@ -157,16 +155,6 @@ export function SunBody({
 
   return (
     <Group transform={transform} zIndex={depth} layer={layer}>
-      {focusColor ? (
-        <Circle
-          cx={cx}
-          cy={cy}
-          r={radius + 6}
-          color={focusColor}
-          style="stroke"
-          strokeWidth={2}
-        />
-      ) : null}
       {/* Glow halo — pulses (radius + opacity) off the ambient clock. */}
       <Circle
         cx={cx}

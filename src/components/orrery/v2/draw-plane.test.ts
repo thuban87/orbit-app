@@ -99,7 +99,7 @@ function frameFor(
     1,
     clampCameraPose(pose, 6000),
     viewport,
-    { ringPaths: false, extent: 6000 },
+    { extent: 6000 },
   );
   if (opacity)
     frame.bodies = frame.bodies.map((b) =>

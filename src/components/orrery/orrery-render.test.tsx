@@ -296,8 +296,8 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    // [base rings picture, clip Group [Polaris, ghost, bodies, labels]]
-    const bodies = tree[1].children[2];
+    // [base rings picture, clip Group [bodies, labels], overlay picture]
+    const bodies = tree[1].children[0];
     expect(bodies.children.map((n) => n.type)).toEqual([
       "skGroup",
       "skGroup",
@@ -341,18 +341,15 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    // 38.7-06: the rings are the V2 base picture, outside the legacy slot.
-    expect(tree[0].type).toBe("skPicture");
-    const [polaris, ghost, bodies, labels] = tree[1].children;
-    expect(ghost.props.color).toBe(THEME_PRESETS.galaxy.dark.accent);
-    expect(polaris.children.map((child) => child.type)).toEqual([
-      "circle",
-      "path",
-      "circle",
+    // 38.7-06: the rings are the V2 base picture and Polaris, the reorder
+    // outline and the focus outlines the overlay picture, around the legacy
+    // body/label slot (v2/draw-overlay.test.ts covers their drawing).
+    expect(tree.map((node) => node.type)).toEqual([
+      "skPicture",
+      "skGroup",
+      "skPicture",
     ]);
-    expect(polaris.children[1].props.color).toBe(
-      THEME_PRESETS.galaxy.dark.textPrimary,
-    );
+    const [bodies, labels] = tree[1].children;
     expect(bodies.children.map((child) => child.type)).toEqual([
       "skGroup",
       "skGroup",
@@ -421,7 +418,7 @@ describe("production Orrery native tree and resource contracts", () => {
       ...(node.type === type ? [node] : []),
       ...node.children.flatMap((child) => findAll(child, type)),
     ];
-    const labels = tree[1].children[3];
+    const labels = tree[1].children[1];
     const [nameParagraph] = findAll(labels, "paragraph");
     const drawn = () =>
       (nameParagraph.props.paragraph as { value: { text?: string } | null })
