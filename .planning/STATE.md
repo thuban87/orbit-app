@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.7
 current_phase_name: Orrery V2 — Renderer, Camera & Visual Language
 status: executing
-stopped_at: Completed 38.7-04-PLAN.md
-last_updated: "2026-10-03T13:20:00.000Z"
+stopped_at: Completed 38.7-05-PLAN.md
+last_updated: "2026-10-03T14:15:49.911Z"
 last_activity: 2026-10-03
-last_activity_desc: 38.7-04 complete (OrreryTextService: cached, hard-capped, echo-gated Paragraphs via SharedValue specs; Hermes-safe initials D-33; custom System name after cold restore; 6230 tests); next 38.7-05. Device re-check of the All Contacts crash recommended before Plan 08
-state_head: 36266833c6de02fa87444270b0791ef918e71da1
+last_activity_desc: "38.7-05 complete (contacts on their orbit lines D-12; tilted 62° dolly Home profiles with one ACTIVE_HOME_PROFILE switch D-03/D-45; horizon-safe projection H2; one size mechanism D-48; projected-size tiers + nearest-first labels D-47; tap never opens Profile D-60; anchored pan + coast D-04/D-05; 6272 tests); next 38.7-06"
+state_head: 4204c8050e2b60180717a3c608271f5a84f07960
 progress:
   total_phases: 29
   completed_phases: 20
   total_plans: 275
-  completed_plans: 261
+  completed_plans: 262
 carried_forward:
 
   - "38.7 INSERTED (owner 2026-10-02): Orrery V2 — Renderer, Camera & Visual Language, before Phase 39. Built from the Orrery renderer R&D (labs A/B/C; synthesis docs/experiments/orrery-renderer/synthesis/). Dossier docs/dossier/milestone-2/phase-38.7-orrery-v2-dossier.md ACCEPTED after codex review: D-01..D-58, no OPEN items. Day 1 = release baseline of main on both phones, then the owner locks numeric perf gates (D-56). Lab branches experiment/orrery-* are local-only evidence; keep them until V2 ships."
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 ## Current Position
 
 Phase: 38.7 (Orrery V2 — Renderer, Camera & Visual Language) — EXECUTING
-Plan: 5 of 16
+Plan: 6 of 16
 Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
@@ -413,6 +413,7 @@ at plan time. All new durable preferences are `app_settings` columns, never Asyn
 | Phase 38.6 P08 | ~23 min | 3 tasks | 29 files |
 | Phase 38.6 P07 | ~10.5h | 5 tasks | 21 files |
 | Phase 38.7 P01 | 42 min | 3 tasks | 49 files |
+| Phase 38.7 P05 | 48 min | 3 tasks | 35 files |
 
 ## Accumulated Context
 
@@ -922,6 +923,10 @@ Foundational decisions affecting current work:
 - [Phase 38.7]: 38.7-03: per-frame body lookups go through frameBodyByKey/frameBodyById (AnimatedFrame keyIndex/idIndex, first-match semantics); projectFrame takes options.ringPaths (default true until Plan 06)
 - [Phase 38.7]: 38.7-04: every Orrery Paragraph goes through orreryTextService (resources/orrery-text-service.ts): hard cap by admission before shaping, priority reserve, fallback-generation replacement, disposal only after the UI echo (+ a UI round trip); labels above overview only for visible bodies
 - [Phase 38.7]: 38.7-04: Paragraphs reach the canvas through SharedValue text specs written by a JS publisher (tier/visibility via UI reactions + runOnJS, never React state); installed Skia verified: the finished SkPicture owns its text blobs, but recorder commands replay the JsiSkParagraph (getObject throws once disposed)
+- [Phase 38.7]: 38.7-05: contacts sit ON their orbit line (D-12): drift push and legacy drift helpers deleted; ProjectedBody.worldRingRadius is the single source of world ring radii (reorder, V2 rings, outline)
+- [Phase 38.7]: 38.7-05: Home = HOME_PROFILES[ACTIVE_HOME_PROFILE] (tilted 62°/lensShift 0.62/strategy default; flat one constant away); dolly focal DOLLY_FOCAL_PX/zoom; MAX_USER_TILT 68°; projectFrame takes options.extent (camera pan bound)
+- [Phase 38.7]: 38.7-05: every reachable projection is horizon-safe via tryProjectWithBasis/tryProjectWorldPoint (culled bodies, nullable frame centre, open ring arcs via traceRingPath, Polaris null/hidden, frameBodies safe-or-null)
+- [Phase 38.7]: 38.7-05: one size mechanism projectedBodyRadius (near cap never below pivot size, min on-screen size); tiers follow frame.labelMagnification (median); D-60 no tap resolver returns profile; anchored pan + 260 ms/48 pt coast
 
 ### Pending Todos
 
@@ -991,8 +996,8 @@ _Also disposed at this close: 05/deferred-items.md (check:colors doc-comment) ma
 
 ## Session
 
-**Last session:** 2026-10-03T13:20:00.000Z
-**Stopped at:** Completed 38.7-04-PLAN.md
+**Last session:** 2026-10-03T14:15:25.579Z
+**Stopped at:** Completed 38.7-05-PLAN.md
 _Prior stop (v1.0):_ Phase 21 UI-SPEC approved; milestone v1.0 closed 2026-09-01.
 _Prior stop (13-04):_ the orrery VISUAL VOCABULARY (theme tokens + two pure resolver modules, node-tested, 29 cases green): (1) five owner-tunable `ThemePalette` tokens seeded in `space-dark.dark` ONLY — `starPalette` (6 colours, gold `#F2C14E` at index 0, then amber/rose-red/violet/cyan/ice-white), `mutedStable/Wobble/Decay` (desaturated same-hue morph endpoints), `rogueExtinguished` (cold blue-grey `#3E4A6B` rogue BODY fill) — with an M6/C2-5 conformance test that IMPORTS the real `SELF_SUN_COLOUR_RE`/`assertSelfSunColour` from app-settings-dao and locks every starPalette entry to the ACTUAL DAO write-path rule (no re-inlined regex). (2) `orrery-ring-logic.ts` `orreryRingStyle(status, colors)` — REUSES `ringVisual` for `{color,opacity,width}` (status→colour mapped once), adds the `strokeStyle` axis (solid→dashed→faded→faintTrace) + `bodyFill` (rogue ring=`colors.rogue`, body=`rogueExtinguished`); `null`→canonical NEUTRAL (`colors.border`), never throws — the single fallback sun-occupant reuses (C2-2). (3) `sun-occupant-logic.ts` `resolveSunOccupant(input)` — NULL/archived/missing→self (A7, glow `selfSunColour ?? starPalette[0]`), live contact→its status glow via `orreryRingStyle(status, colors).color`, never-contacted (status `null`)→the reused neutral border (C2-2); accepts `status: ProfileStatus | null`. 5 commits (1801915 feat tokens+M6; d35d528 RED→4cbfad5 GREEN ring-logic; c923b16 RED→10780dd GREEN sun-occupant); tsc + check:colors clean; no deviations (one in-flight fix: a placeholder hex in the logic test was re-sourced from the palette after check:colors flagged it — C2-3). Committed locally on main (NOT pushed). Next: Wave 2 (13-05 render / 13-06 Settings sun-picker), Wave 3 (13-07 drag-release), Wave 4 (13-08 device UAT, autonomous:false).
 **Resume file:** None
