@@ -138,8 +138,9 @@ def main() -> int:
     skins = [r["skin"]["c"] for r in readings if r.get("skin")]
     batteries = [r["temperature_c"] for r in readings if r.get("temperature_c") is not None]
     sf = sampler.result()
+    t0 = start["host_s"]  # `start` is readings[0]; read it before the loop pops host_s
     for r in readings:
-        r["t_s"] = round(r.pop("host_s") - start["host_s"], 1) if "host_s" in r else None
+        r["t_s"] = round(r.pop("host_s") - t0, 1) if "host_s" in r else None
     adb_device.write_json(args.out, {
         "model": args.model,
         "seconds": args.seconds,
