@@ -402,7 +402,8 @@ def select_system(serial: str, name: str, max_scrolls: int = 4, settle: bool = T
         tap(serial, button, touchscreen=True)
         nodes = wait_for_sheet(serial)
     expanded: set[str] = set()
-    for _ in range(max_scrolls + 1):
+    # Budget: the scrolls plus one pass per group expansion.
+    for _ in range(max_scrolls + 1 + 8):
         row = find_system_row(nodes, name)
         if row:
             a11y_quiet()
@@ -411,13 +412,15 @@ def select_system(serial: str, name: str, max_scrolls: int = 4, settle: bool = T
             if settle:
                 wait_screen_still(serial)
             return host
-        # Expand each collapsed group at most once (a second tap would collapse it).
+        # Expand each collapsed group at most once (a second tap would collapse it),
+        # ONE per fresh dump: expanding a group moves every header below it, so a
+        # second tap from the same dump can land on a System row and select it.
         fresh = [h for h in collapsed_groups(nodes) if h.desc not in expanded]
         if fresh:
-            for header in fresh:
-                expanded.add(header.desc)
-                tap(serial, header)
-                time.sleep(0.6)
+            header = fresh[0]
+            expanded.add(header.desc)
+            tap(serial, header)
+            time.sleep(0.8)
         else:
             heading = find(nodes, desc="Choose System")
             if not heading:

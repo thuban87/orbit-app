@@ -350,3 +350,9 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
   a timeout only, no measurement change.
 - **2026-10-03** — `touch_windows.py` waits up to 4 h for the owner's calibration tap (was
   30 min): the samplers are started before the owner checkpoint is presented. Timeout only.
+- **2026-10-03** — 38.7 Plan 08 (spike, before any spike number): the System sheet now
+  opens with its groups collapsed (Built-in, Categories, Custom Systems), and
+  `select_system` tapped every collapsed header from ONE UI dump; expanding the first
+  moved the others, so the second tap landed on a System row and selected it (the sheet
+  closed mid-search). It now expands one group per fresh dump (loop budget widened by 8
+  passes). Navigation only: no measurement logic changed. `selftest.py` 28/28.
