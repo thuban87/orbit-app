@@ -294,3 +294,11 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
   **arm64-v8a only** (`-PreactNativeArchitectures=arm64-v8a`, debug and release as separate
   Gradle invocations), owner ruling after the four-ABI build ran droid out of disk. Both
   test phones are arm64, so the code under measurement is unchanged. §2 item 2.
+- **2026-10-03** — Before any baseline number (38.7 Plan 02), UI helpers fixed against the
+  release build's real tree: tabs are labelled `"<icon glyph>, <title>"` (not React
+  Navigation's `"<title>, tab, i of n"`), so `find_tab` no longer hits the screen header
+  and `tab_return.py` finds the tab bar; the System selector is awaited before rows are
+  searched and each collapsed group is expanded once; the sheet is closed with its own
+  close button, never the same-labelled full-screen backdrop (whose centre lies over the
+  System rows); `uiautomator dump` misses during an animation are retried. No measurement
+  logic changed. `selftest.py` 25/25 with release-tree fixtures.

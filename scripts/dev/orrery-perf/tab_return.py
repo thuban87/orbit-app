@@ -174,7 +174,7 @@ def screen_size(serial: str) -> tuple[int, int]:
 
 
 def regions_from_ui(nodes, screen: tuple[int, int]) -> dict:
-    tabs = [n for n in nodes if ", tab, " in n.desc]
+    tabs = adb_device.tab_nodes(nodes)
     title = [n for n in nodes if n.text == "Orrery" and n.bounds[1] < screen[1] * 0.25]
     if not tabs or not title:
         raise adb_device.DeviceError("Orrery title or tab bar not found: open the Orrery tab first")

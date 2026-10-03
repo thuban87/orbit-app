@@ -513,6 +513,25 @@ def _():
        {"level": 100, "temperature_c": 30.3, "usb_powered": True})
 
 
+@check("adb_device: release-build UI tree - tabs by '<glyph>, <title>', never the header title; selector row and close button")
+def _():
+    import tab_return
+    orrery = adb_device.parse_ui(read("ui-orrery-release-pixel6pro.xml"))
+    eq(len(adb_device.tab_nodes(orrery)), 5, "tab count")
+    tab = adb_device.find_tab(orrery, "Orrery")
+    eq(tab.bounds, (864, 2866, 1152, 3036), "Orrery tab (not the header title)")
+    eq(adb_device.current_system(orrery), "Size 120", "current System")
+    regions = tab_return.regions_from_ui(orrery, (1440, 3120))
+    eq(regions["tab"], (0, 2866, 1440, 3036), "tab region")
+    eq(regions["canvas"][1] > regions["header"][3] and regions["canvas"][3] < 2866, True, "canvas between header and tabs")
+    sheet = adb_device.parse_ui(read("ui-selector-release-pixel6pro.xml"))
+    eq(adb_device.find(sheet, desc="Choose System") is not None, True, "sheet heading")
+    eq(adb_device.find_system_row(sheet, "Size 120").cls.endswith("RadioButton"), True, "row is the radio")
+    eq(adb_device.find_system_row(sheet, "Size 12"), None, "no prefix match on a different System")
+    close = adb_device.close_selector_button(sheet)
+    eq(close.bounds, (116, 2648, 1117, 2812), "sheet close button, not the full-screen backdrop")
+
+
 def main() -> int:
     if "--regenerate" in sys.argv:
         regenerate()

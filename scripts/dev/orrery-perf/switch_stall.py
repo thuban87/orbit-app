@@ -83,7 +83,10 @@ def open_selector(serial: str, times: int) -> dict:
         nodes = adb_device.ui_dump(serial)
         shown = adb_device.find(nodes, desc="Choose System") is not None
         opened.append({"sheet_shown": shown, "dump_s": round(time.monotonic() - t0, 2)})
-        close = adb_device.find(nodes, desc="Close System selector")
+        # Two nodes carry this label: the full-screen backdrop (its centre lies under the
+        # sheet's System rows, so tapping it would switch Systems) and the sheet's own
+        # close button. Tap the smaller one.
+        close = adb_device.close_selector_button(nodes)
         if close:
             adb_device.tap(serial, close, touchscreen=True)
         time.sleep(2.0)

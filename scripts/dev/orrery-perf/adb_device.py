@@ -223,13 +223,23 @@ def parse_ui(xml_text: str) -> list[Node]:
     return nodes
 
 
-def ui_dump(serial: str) -> list[Node]:
+UI_DUMP_ATTEMPTS = 6
+UI_DUMP_RETRY_S = 0.7
+
+
+def ui_dump(serial: str, attempts: int = UI_DUMP_ATTEMPTS) -> list[Node]:
+    """The UI tree. uiautomator returns nothing while the screen is mid-animation
+    (a System switch, a sheet opening; seen on the release build 2026-10-03), so a
+    miss is retried a few times before it is an error."""
     path = "/sdcard/orbperf-ui.xml"
-    xml_text = shell(serial, f"uiautomator dump {path} >/dev/null 2>&1 && cat {path}; rm -f {path}")
-    start = xml_text.find("<?xml")
-    if start < 0:
-        raise DeviceError("uiautomator dump returned no XML (screen locked or app busy?)")
-    return parse_ui(xml_text[start:])
+    for attempt in range(attempts):
+        xml_text = shell(serial, f"uiautomator dump {path} >/dev/null 2>&1 && cat {path}; rm -f {path}")
+        start = xml_text.find("<?xml")
+        if start >= 0:
+            return parse_ui(xml_text[start:])
+        if attempt + 1 < attempts:
+            time.sleep(UI_DUMP_RETRY_S)
+    raise DeviceError("uiautomator dump returned no XML (screen locked or app busy?)")
 
 
 def find(
@@ -274,9 +284,25 @@ def dismiss_logbox(serial: str, nodes: list[Node] | None = None) -> bool:
     return True
 
 
+TAB_TITLES = ("Contacts", "Events", "Digest", "Orrery", "Settings")
+
+
+def is_tab(node: Node, title: str | None = None) -> bool:
+    """A bottom tab button. Orbit's tab bar labels each tab "<icon glyph>, <title>"
+    (release build, 2026-10-03); React Navigation's default is "<title>, tab, i of n".
+    A screen header's plain "<title>" text is never a tab."""
+    if not node.clickable:
+        return False
+    titles = (title,) if title else TAB_TITLES
+    return any(node.desc.endswith(f", {t}") or node.desc.startswith(f"{t}, tab") for t in titles)
+
+
 def find_tab(nodes: list[Node], title: str) -> Node | None:
-    """Bottom tab button: React Navigation labels it "<title>, tab, i of n"."""
-    return find(nodes, desc_prefix=f"{title}, tab") or find(nodes, desc=title) or find(nodes, text=title)
+    return next((n for n in nodes if is_tab(n, title)), None)
+
+
+def tab_nodes(nodes: list[Node]) -> list[Node]:
+    return [n for n in nodes if is_tab(n)]
 
 
 def tap_tab(serial: str, title: str) -> float:
@@ -330,28 +356,61 @@ def select_system(serial: str, name: str, max_scrolls: int = 4) -> float | None:
     if not button:
         raise DeviceError("System selector button not found (is the Orrery tab open?)")
     tap(serial, button, touchscreen=True)
-    time.sleep(1.0)
-    for attempt in range(max_scrolls + 1):
-        nodes = ui_dump(serial)
-        row = find(nodes, desc=name) or find(nodes, desc_prefix=f"{name}, ")
+    nodes = wait_for_sheet(serial)
+    expanded: set[str] = set()
+    for _ in range(max_scrolls + 1):
+        row = find_system_row(nodes, name)
         if row:
             host = time.monotonic()
             tap(serial, row)
             return host
-        collapsed = collapsed_groups(nodes)
-        expanded_any = False
-        for header in collapsed:
-            tap(serial, header)
-            expanded_any = True
-            time.sleep(0.6)
-        if expanded_any and attempt == 0:
-            continue
-        heading = find(nodes, desc="Choose System")
-        if heading:
+        # Expand each collapsed group at most once (a second tap would collapse it).
+        fresh = [h for h in collapsed_groups(nodes) if h.desc not in expanded]
+        if fresh:
+            for header in fresh:
+                expanded.add(header.desc)
+                tap(serial, header)
+                time.sleep(0.6)
+        else:
+            heading = find(nodes, desc="Choose System")
+            if not heading:
+                raise DeviceError("the System selector closed while searching for a row")
             x, y = heading.center
             shell(serial, f"input swipe {x} {y + 900} {x} {y + 200} 400")
             time.sleep(0.8)
+        nodes = ui_dump(serial)
     raise DeviceError(f"System row {name!r} not found in the selector")
+
+
+def close_selector_button(nodes: list[Node]) -> Node | None:
+    """The sheet's "Close System selector" button, never the full-screen backdrop that
+    carries the same label."""
+    matches = [n for n in nodes if n.desc == "Close System selector" and n.clickable]
+    area = lambda n: (n.bounds[2] - n.bounds[0]) * (n.bounds[3] - n.bounds[1])
+    return min(matches, key=area) if matches else None
+
+
+SHEET_WAIT_S = 4.0
+
+
+def wait_for_sheet(serial: str, timeout_s: float = SHEET_WAIT_S) -> list[Node]:
+    """The UI tree once the "Choose System" sheet is up (it animates in)."""
+    deadline = time.monotonic() + timeout_s
+    while True:
+        time.sleep(0.5)
+        nodes = ui_dump(serial)
+        if find(nodes, desc="Choose System"):
+            return nodes
+        if time.monotonic() >= deadline:
+            raise DeviceError("the System selector did not open")
+
+
+def find_system_row(nodes: list[Node], name: str) -> Node | None:
+    """A selector row: a radio button labelled exactly with the System's name
+    (release build: desc "Size 120", text "Size 120 — 120")."""
+    rows = [n for n in nodes if n.cls.endswith("RadioButton")]
+    return find(rows, desc=name) or find(rows, desc_prefix=f"{name}, ") or \
+        find(nodes, desc=name) or find(nodes, desc_prefix=f"{name}, ")
 
 
 # --- Output -------------------------------------------------------------------
