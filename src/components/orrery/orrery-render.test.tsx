@@ -56,7 +56,24 @@ const native = vi.hoisted(() => ({
     previous: unknown;
   }[],
   frames: [] as (() => void)[],
+  /** 38.7-06: the ambient clock, its owner calls and the reduced-motion flag. */
+  clock: { value: 0 },
+  clockCalls: 0,
+  reduced: { value: false },
+  providedClock: null as unknown,
 }));
+/** A deterministic stand-in for Skia's token parser: distinct per token. */
+const parseInk = vi.hoisted(() => (token: string) => {
+  let hash = 0;
+  for (let i = 0; i < token.length; i++)
+    hash = (hash * 31 + token.charCodeAt(i)) >>> 0;
+  return Float32Array.of(
+    (hash % 251) / 256,
+    ((hash >> 8) % 251) / 256,
+    ((hash >> 16) % 251) / 256,
+    1,
+  );
+});
 /** Runs every recorded UI reaction (prepare → react), then queued UI frames and timers. */
 function flushUi(passes = 4) {
   for (let pass = 0; pass < passes; pass++) {
@@ -98,14 +115,25 @@ vi.mock("react-native", () => ({
 vi.mock("@/services/photos/photo-storage", () => ({
   resolvePhotoUri: (path: string) => path,
 }));
-vi.mock("./orrery-clock-context", () => ({ useOrreryClock: () => null }));
+vi.mock("./orrery-clock-context", () => ({
+  useOrreryClock: () => null,
+  OrreryClockContext: {
+    Provider: ({
+      value,
+      children,
+    }: {
+      value: unknown;
+      children: ReactNode;
+    }) => {
+      native.providedClock = value;
+      return children;
+    },
+  },
+}));
 // The bodies' photo hook (38.6-04 D-11) — a photo-less render, as `useImage: () => null` was.
 vi.mock("./use-orrery-photo", () => ({ useOrreryPhoto: () => null }));
 vi.mock("@/theme/use-reduced-motion", () => ({
-  useReducedMotionShared: () => ({ value: false }),
-}));
-vi.mock("./OrreryCanvas", () => ({
-  OrreryCanvas: ({ children }: { children: ReactNode }) => children,
+  useReducedMotionShared: () => native.reduced,
 }));
 vi.mock("react-native-reanimated", () => ({
   useDerivedValue: (fn: () => unknown) => ({
@@ -129,6 +157,7 @@ vi.mock("react-native-reanimated", () => ({
 vi.mock("react-native-gesture-handler", () => {
   const chain = new Proxy({}, { get: () => () => chain });
   return {
+    GestureDetector: ({ children }: { children: ReactNode }) => children,
     Gesture: {
       Tap: () => chain,
       Pan: () => chain,
@@ -150,13 +179,33 @@ vi.mock("@shopify/react-native-skia", async () => {
     Paragraph: "paragraph",
     Paint: "paint",
     Path: "path",
+    Canvas: "skCanvas",
     Picture: "skPicture",
+    useClock: () => {
+      native.clockCalls++;
+      return native.clock;
+    },
+    PaintStyle: { Fill: 0, Stroke: 1 },
+    BlendMode: { Dst: 2 },
+    // A recording canvas: each command with the paint colour it drew with.
     createPicture: (draw: (canvas: unknown) => void) => {
-      const commands: string[] = [];
-      draw(new Proxy({}, { get: (_t, op: string) => () => commands.push(op) }));
+      const commands: { op: string; color?: number[] }[] = [];
+      draw(
+        new Proxy(
+          {},
+          {
+            get:
+              (_t, op: string) =>
+              (...args: unknown[]) => {
+                const paint = args.at(-1) as { color?: number[] } | undefined;
+                commands.push({ op, color: paint?.color });
+              },
+          },
+        ),
+      );
       return { commands };
     },
-    DashPathEffect: "dash",
+    VertexMode: { Triangles: 0, TriangleStrip: 1, TriangleFan: 2 },
     RoundedRect: "roundRect",
     Image: "image",
     TextAlign: { Center: 2 },
@@ -169,8 +218,29 @@ vi.mock("@shopify/react-native-skia", async () => {
     }),
     rrect: (rect: unknown) => rect,
     Skia: {
-      Color: (c: string) => c,
-      Paint: () => ({ setAlphaf: () => {} }),
+      Color: parseInk,
+      Paint: () => {
+        const paint = {
+          color: [] as number[],
+          setAlphaf: () => {},
+          setAntiAlias: () => {},
+          setStyle: () => {},
+          setStrokeWidth: () => {},
+          setShader: () => {},
+          setColor: (c: Float32Array) => {
+            paint.color = [...c];
+          },
+        };
+        return paint;
+      },
+      Path: {
+        Make: () => ({ moveTo: () => {}, lineTo: () => {}, close: () => {} }),
+      },
+      // The ring effect and strips, so the base picture records ring draws.
+      RuntimeEffect: {
+        Make: () => ({ makeShader: (uniforms: number[]) => ({ uniforms }) }),
+      },
+      MakeVertices: () => ({}),
       ParagraphBuilder: {
         Make: (options: Record<string, unknown>) => {
           native.builders++;
@@ -242,6 +312,10 @@ beforeEach(async () => {
   native.frames = [];
   native.renders = 0;
   native.setStateCalls = 0;
+  native.clock = { value: 0 };
+  native.clockCalls = 0;
+  native.reduced = { value: false };
+  native.providedClock = null;
   db = openTestDb();
   let uid = 0;
   await runMigrations(nodeSqliteExecutor(db), MIGRATIONS, TARGET_VERSION, {
@@ -296,8 +370,8 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    // [base rings picture, clip Group [bodies, labels], overlay picture]
-    const bodies = tree[1].children[0];
+    // canvas [base, stars, clip Group [bodies, labels], overlay]
+    const bodies = tree[0].children[2].children[0];
     expect(bodies.children.map((n) => n.type)).toEqual([
       "skGroup",
       "skGroup",
@@ -341,15 +415,18 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    // 38.7-06: the rings are the V2 base picture and Polaris, the reorder
-    // outline and the focus outlines the overlay picture, around the legacy
-    // body/label slot (v2/draw-overlay.test.ts covers their drawing).
-    expect(tree.map((node) => node.type)).toEqual([
+    // 38.7-06: the sky and rings are the V2 base picture, the stars their
+    // own picture, and Polaris, the reorder outline and the focus outlines
+    // the overlay picture, around the legacy body/label slot
+    // (v2/draw-overlay.test.ts covers their drawing).
+    expect(tree[0].type).toBe("skCanvas");
+    expect(tree[0].children.map((node) => node.type)).toEqual([
+      "skPicture",
       "skPicture",
       "skGroup",
       "skPicture",
     ]);
-    const [bodies, labels] = tree[1].children;
+    const [bodies, labels] = tree[0].children[2].children;
     expect(bodies.children.map((child) => child.type)).toEqual([
       "skGroup",
       "skGroup",
@@ -418,7 +495,7 @@ describe("production Orrery native tree and resource contracts", () => {
       ...(node.type === type ? [node] : []),
       ...node.children.flatMap((child) => findAll(child, type)),
     ];
-    const labels = tree[1].children[1];
+    const labels = tree[0].children[2].children[1];
     const [nameParagraph] = findAll(labels, "paragraph");
     const drawn = () =>
       (nameParagraph.props.paragraph as { value: { text?: string } | null })
@@ -480,5 +557,133 @@ describe("production Orrery native tree and resource contracts", () => {
     expect(
       prepareOrreryText(name, "label", 1, 200, null, THEME_PRESETS.galaxy.dark),
     ).toBeNull();
+  });
+});
+
+describe("38.7-06 D-43: the stable picture tree and the single ambient clock", () => {
+  type Scene = Awaited<ReturnType<typeof loadOrreryScene>>;
+  let inserted = 0;
+  /** Adds `count` contacts to the System (calls accumulate within a test). */
+  async function sceneWith(count: number): Promise<Scene> {
+    const exec = nodeSqliteExecutor(db);
+    for (let i = 0; i < count; i++) {
+      inserted++;
+      await exec.runAsync(
+        "INSERT INTO contacts(uid,name,tracking_enabled,interval_days,created_at,modified_at) VALUES (?,?,1,30,'2026-09-07','2026-09-07')",
+        [`stable-${inserted}`, `Person ${inserted}`],
+      );
+    }
+    return loadOrreryScene(exec, 1);
+  }
+  const pose = { value: { ...HOME_CAMERA } };
+  /** The camera hook's input (the hook itself is called inline per test). */
+  const cameraInput = (scene: Scene) => ({
+    pose: pose as never,
+    enabled: true,
+    extent: scene.extent,
+    viewport: { width: 500, height: 700 },
+    reduced: { value: false } as never,
+  });
+  function renderWorld(
+    scene: Scene,
+    camera: ReturnType<typeof useOrreryCamera>,
+    focusedIds: number[] = [],
+  ) {
+    return resolve(
+      OrreryWorld({
+        camera,
+        scene,
+        pose: pose as never,
+        viewport: { width: 500, height: 700 },
+        colors: THEME_PRESETS.galaxy.dark,
+        fontProvider: {} as never,
+        onIntent: () => {},
+        onReorder: () => {},
+        onReorderActivated: () => {},
+        focusedIds,
+        switchRuntime: switchRuntime(scene, pose as never) as never,
+      }),
+    );
+  }
+  const findAll = (node: Node, type: string): Node[] => [
+    ...(node.type === type ? [node] : []),
+    ...node.children.flatMap((child) => findAll(child, type)),
+  ];
+  type Recorded = { commands: { op: string; color?: number[] }[] };
+  const recorded = (picture: Node) =>
+    (picture.props.picture as { value: Recorded }).value.commands;
+
+  it("the same Picture layers for a 3-body and a 120-body System; rings are draws, not nodes", async () => {
+    const smallScene = await sceneWith(3);
+    const small = renderWorld(
+      smallScene,
+      useOrreryCamera(cameraInput(smallScene)),
+    );
+    const smallPictures = findAll(small[0], "skPicture");
+    const largeScene = await sceneWith(117);
+    const large = renderWorld(
+      largeScene,
+      useOrreryCamera(cameraInput(largeScene)),
+    );
+    const largePictures = findAll(large[0], "skPicture");
+    expect(smallPictures).toHaveLength(3);
+    expect(largePictures).toHaveLength(smallPictures.length);
+    expect(large[0].children.map((n) => n.type)).toEqual(
+      small[0].children.map((n) => n.type),
+    );
+    // No ring/Polaris/overlay node anywhere outside the pictures.
+    for (const tree of [small, large])
+      expect(findAll(tree[0], "path")).toHaveLength(0);
+    // The base picture: the sky fill, then one world-plane draw per ring.
+    const base = recorded(largePictures[0]);
+    expect(base[0]).toEqual({
+      op: "drawPaint",
+      color: [...parseInk(THEME_PRESETS.galaxy.dark.background)],
+    });
+    expect(base.filter((c) => c.op === "drawVertices")).toHaveLength(120);
+    expect(
+      recorded(smallPictures[0]).filter((c) => c.op === "drawVertices"),
+    ).toHaveLength(3);
+  });
+  it("a re-render with a new focus keeps the tree; only the overlay's spec changes", async () => {
+    const scene = await sceneWith(3);
+    const before = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
+    const id = scene.contacts[0].id;
+    const after = renderWorld(scene, useOrreryCamera(cameraInput(scene)), [id]);
+    const shape = (tree: Node[]) =>
+      tree[0].children.map((n) => [n.type, n.children.length]);
+    expect(shape(after)).toEqual(shape(before));
+    const overlayBefore = recorded(before[0].children[3]);
+    const overlayAfter = recorded(after[0].children[3]);
+    const accent = [...parseInk(THEME_PRESETS.galaxy.dark.accent)];
+    const accentCircles = (commands: Recorded["commands"]) =>
+      commands.filter(
+        (c) =>
+          c.op === "drawCircle" &&
+          c.color !== undefined &&
+          c.color.slice(0, 3).every((v, i) => v === accent[i]),
+      );
+    expect(accentCircles(overlayBefore)).toHaveLength(0);
+    expect(accentCircles(overlayAfter)).toHaveLength(1);
+  });
+  it("the stars picture: today's 44 stars; its input holds under reduced motion", async () => {
+    const scene = await sceneWith(1);
+    const tree = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
+    const stars = tree[0].children[1];
+    const at = (ms: number) => {
+      native.clock.value = ms;
+      return recorded(stars).map((c) => c.color?.[3]);
+    };
+    expect(at(0)).toHaveLength(44);
+    expect(at(0)).not.toEqual(at(650));
+    native.reduced.value = true;
+    expect(at(0)).toEqual(at(650));
+    expect(at(1234)).toEqual(at(98765));
+  });
+  it("useClock runs exactly once per canvas mount and reaches the legacy sun pulse", async () => {
+    const scene = await sceneWith(2);
+    renderWorld(scene, useOrreryCamera(cameraInput(scene)));
+    expect(native.clockCalls).toBe(1);
+    expect(native.providedClock).toBe(native.clock);
   });
 });

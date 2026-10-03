@@ -161,3 +161,64 @@ export const EMPTY_OVERLAY_SPEC: OverlaySpec = Object.freeze({
   extent: 1,
   focus: [],
 });
+
+// ── Ambient starfield (today's OrreryCanvas twinkle field, as a spec) ───────
+/** How many ambient star dots to scatter (subtle — device-UAT tunable, 13-08). */
+export const STAR_COUNT = 44;
+/** Star dot radius range (dp). */
+export const STAR_R_MIN = 0.6;
+export const STAR_R_MAX = 1.8;
+
+/** One placed star: screen position, radius, ink and its static opacity. */
+export interface StarSpec {
+  x: number;
+  y: number;
+  r: number;
+  ink: OrreryInk;
+  /** Static per-star opacity for a non-uniform field (× the twinkle). */
+  base: number;
+}
+export interface StarFieldSpec {
+  stars: readonly StarSpec[];
+}
+export const EMPTY_STAR_FIELD: StarFieldSpec = Object.freeze({ stars: [] });
+
+/**
+ * Deterministic 0..1 hash from an integer seed — a tiny LCG-ish mix so the
+ * star field is stable across renders without a PRNG dependency (and without
+ * `crypto`, which Hermes lacks).
+ */
+export function seeded(n: number): number {
+  const x = Math.sin(n * 12.9898) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/**
+ * Today's 44 seeded stars for the measured canvas: the same placement, radii,
+ * per-star base opacity and colour cycle (`textSecondary`, `textPrimary`,
+ * then the star palette) as the pre-38.7-06 OrreryCanvas.
+ */
+export function buildStarField(
+  width: number,
+  height: number,
+  colors: ThemePalette,
+): StarFieldSpec {
+  const tones = [
+    colors.textSecondary,
+    colors.textPrimary,
+    ...colors.starPalette,
+  ];
+  if (width <= 0 || height <= 0) return EMPTY_STAR_FIELD;
+  const inks = tones.map(tokenInk);
+  const stars: StarSpec[] = [];
+  for (let i = 0; i < STAR_COUNT; i++) {
+    stars.push({
+      x: seeded(i + 1) * width,
+      y: seeded(i + 101) * height,
+      r: STAR_R_MIN + seeded(i + 201) * (STAR_R_MAX - STAR_R_MIN),
+      ink: inks[i % inks.length],
+      base: 0.4 + seeded(i + 301) * 0.6,
+    });
+  }
+  return { stars };
+}

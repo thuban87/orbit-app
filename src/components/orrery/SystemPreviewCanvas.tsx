@@ -171,7 +171,7 @@ function ActiveSystemPreviewCanvas({
 }
 
 /**
- * Mirrors OrreryCanvas's lifecycle guarantee: no Skia canvas remains mounted
+ * Mirrors OrreryV2Canvas's lifecycle guarantee: no Skia canvas remains mounted
  * while this builder route is blurred or the app is backgrounded.
  */
 export function SystemPreviewCanvas({

@@ -85,10 +85,15 @@ import {
   buildFocusOutlines,
   buildOverlayInk,
   buildRingSpecs,
+  buildSkySpec,
+  buildStarField,
   EMPTY_OVERLAY_SPEC,
   EMPTY_RING_SPECS,
+  EMPTY_STAR_FIELD,
   type OverlaySpec,
   type RingSpecs,
+  type SkySpec,
+  type StarFieldSpec,
 } from "./v2/scene-specs";
 
 export { createOrreryGestures } from "./use-orrery-camera";
@@ -389,10 +394,13 @@ export function OrreryWorld({
       mounted.current = false;
     };
   }, []);
-  const starColors = useMemo(
-    () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],
-    [colors],
-  );
+  // D-43: the sky and starfield specs (theme and measured size only).
+  const skySpec = useSharedValue<SkySpec>(buildSkySpec(colors));
+  const starField = useSharedValue<StarFieldSpec>(EMPTY_STAR_FIELD);
+  useEffect(() => {
+    skySpec.value = buildSkySpec(colors);
+    starField.value = buildStarField(viewport.width, viewport.height, colors);
+  }, [skySpec, starField, colors, viewport.width, viewport.height]);
   // D-43/D-44: the V2 ring look, rebuilt on resource or theme change only
   // (never per frame); the base picture reads it with the shared frame.
   const ringSpecs = useSharedValue<RingSpecs>(EMPTY_RING_SPECS);
@@ -774,10 +782,10 @@ export function OrreryWorld({
     <OrreryV2Canvas
       width={viewport.width}
       height={viewport.height}
-      background={colors.background}
-      starColors={starColors}
       gesture={gesture}
       frame={frame}
+      sky={skySpec}
+      stars={starField}
       ringSpecs={ringSpecs}
       overlay={overlaySpec}
       reorder={camera.reorder}

@@ -1,6 +1,6 @@
 /**
  * SunBody (ORR-05) — the orrery's centre sun, rendered ONCE (never in a map) as a
- * child of the `OrreryCanvas` `<Canvas>` subtree.
+ * child of the `OrreryV2Canvas` `<Canvas>` subtree.
  *
  * Owns the sun's OWN photo hook, `useOrreryPhoto` (the occupant photo) — kept in
  * its own component for the same Rules-of-Hooks reason as `OrbitBody` (13-07 adds
@@ -108,16 +108,16 @@ export function SunBody({
   // C2-1: unconditional hook, null-guarded source.
   const image = useOrreryPhoto(photo);
 
-  // ORR-03 — slow sun-glow pulse off the ambient clock provided by OrreryCanvas
+  // ORR-03 — slow sun-glow pulse off the ambient clock provided by OrreryV2Canvas
   // (M5 — SunBody never calls useClock itself). When no clock is in scope (unit
   // harness), fall back to the static mid-point (no pulse). Bodies do NOT animate;
   // only the sun's glow halo breathes (~3s) — radius ±10%, opacity ±40%.
   const clock = useOrreryClock();
 
   // THEME-06 / REVIEWS 23-06 HIGH: SunBody is the SECOND ambient clock consumer, so
-  // it MUST gate too — gating only OrreryCanvas would leave the sun pulsing under
+  // it MUST gate too — gating only the canvas would leave the sun pulsing under
   // reduced motion. Read the live signal DIRECTLY as a SharedValue (NOT via prop or
-  // OrreryClockContext — SunBody is built before it is handed to OrreryCanvas, and
+  // OrreryClockContext — SunBody is built before it is handed to the canvas, and
   // the context carries only the clock; the direct hook keeps the fix inside this
   // file, its files_modified scope). The worklet reads `.value` — never a React
   // boolean, no per-frame setState (D-07). Reduced motion ON -> the glow holds at

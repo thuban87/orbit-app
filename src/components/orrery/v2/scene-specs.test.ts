@@ -19,9 +19,14 @@ import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import type { OrreryBodyResource } from "../use-orrery-switch-runtime";
 import {
+  buildFocusOutlines,
+  buildOverlayInk,
   buildRingSpecs,
   buildSkySpec,
+  buildStarField,
   RING_DASH_PERIOD_DP,
+  STAR_COUNT,
+  seeded,
   tokenInk,
 } from "./scene-specs";
 
@@ -132,5 +137,45 @@ describe("tokenInk / buildSkySpec", () => {
     const colors = THEME_PRESETS.galaxy.dark;
     expect(tokenInk(colors.accent)).toEqual(inkOf(colors.accent));
     expect(buildSkySpec(colors).background).toEqual(inkOf(colors.background));
+  });
+});
+
+describe("buildStarField (today's seeded twinkle field)", () => {
+  it("44 stars with the pre-38.7-06 placement, radii, base opacity and colour cycle", () => {
+    const colors = THEME_PRESETS.standard.dark;
+    const field = buildStarField(400, 800, colors);
+    expect(field.stars).toHaveLength(STAR_COUNT);
+    const tones = [
+      colors.textSecondary,
+      colors.textPrimary,
+      ...colors.starPalette,
+    ];
+    field.stars.forEach((star, i) => {
+      expect(star.x).toBe(seeded(i + 1) * 400);
+      expect(star.y).toBe(seeded(i + 101) * 800);
+      expect(star.r).toBe(0.6 + seeded(i + 201) * (1.8 - 0.6));
+      expect(star.base).toBe(0.4 + seeded(i + 301) * 0.6);
+      expect(star.ink).toEqual(inkOf(tones[i % tones.length]));
+    });
+    expect(buildStarField(0, 800, colors).stars).toEqual([]);
+  });
+});
+
+describe("overlay specs", () => {
+  it("inks: accent, textPrimary and the first star colour for the Polaris halo", () => {
+    const colors = THEME_PRESETS.galaxy.light;
+    expect(buildOverlayInk(colors)).toEqual({
+      accent: inkOf(colors.accent),
+      textPrimary: inkOf(colors.textPrimary),
+      polarisHalo: inkOf(colors.starPalette[0] ?? colors.textPrimary),
+    });
+  });
+  it("focus outlines: the focused contacts and sun with today's gaps; none when unfocused", () => {
+    const all = resources(["stable", "wobble", "decay"]);
+    expect(buildFocusOutlines(all, [])).toEqual([]);
+    expect(buildFocusOutlines(all, [2, 0])).toEqual([
+      { key: "sun:0", worldRadius: 30, gap: 6 },
+      { key: "contact:2", worldRadius: 16, gap: 4 },
+    ]);
   });
 });
