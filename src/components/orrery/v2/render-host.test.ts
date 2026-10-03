@@ -28,13 +28,13 @@ beforeEach(() => {
 });
 
 describe("OrreryRenderHost (D-46)", () => {
-  it("Android: today's TextureView, frame clock, live base, world-plane rings, Mali flags", () => {
+  it("Android (D-64): opaque SurfaceView, frame clock, GPU-baked base, world-plane rings, Mali flags", () => {
     const host = resolveOrreryRenderHost();
     expect(host).toMatchObject({
       platform: "android",
-      opaqueCanvas: false,
+      opaqueCanvas: true,
       ambientDriver: "frame-clock",
-      bakePath: "none",
+      bakePath: "gpu-offscreen",
       ringMethod: "world-plane",
       mali: { strokeUnderPerspective: false, cpuBakedNebula: true },
     });
@@ -83,7 +83,7 @@ describe("38.7-08 spike overrides (D-59)", () => {
   it("applies only the known override keys, later wins, platform and Mali untouched", () => {
     const base = defaultOrreryRenderHost("android");
     const next = applyOrreryHostOverride(base, {
-      opaqueCanvas: true,
+      opaqueCanvas: false,
       ambientDriver: "interval",
       bakePath: "gpu-offscreen",
       ringMethod: "hybrid",
@@ -92,18 +92,21 @@ describe("38.7-08 spike overrides (D-59)", () => {
     } as never);
     expect(next).toMatchObject({
       platform: "android",
-      opaqueCanvas: true,
+      opaqueCanvas: false,
       ambientDriver: "interval",
       bakePath: "gpu-offscreen",
       ringMethod: "hybrid",
       ringFieldMinRings: 300,
       mali: { strokeUnderPerspective: false, cpuBakedNebula: true },
     });
-    expect(base.opaqueCanvas).toBe(false); // not mutated
+    expect(base.opaqueCanvas).toBe(true); // not mutated
     expect(applyOrreryHostOverride(base, null)).toBe(base);
   });
   it("describes a host on one log line", () => {
     expect(describeOrreryHost(defaultOrreryRenderHost("android"))).toBe(
+      "opaque=on,driver=frame-clock,bake=on,ring=world-plane,minRings=400",
+    );
+    expect(describeOrreryHost(defaultOrreryRenderHost("ios"))).toBe(
       "opaque=off,driver=frame-clock,bake=off,ring=world-plane,minRings=400",
     );
   });

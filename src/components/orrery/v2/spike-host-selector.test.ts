@@ -181,7 +181,7 @@ describe("spike selector (url events, effective-host log)", () => {
       "mount",
     );
     expect(lines).toEqual([
-      "orrery-spike host=opaque=off,driver=frame-clock,bake=off,ring=ring-field,minRings=400 source=mount",
+      "orrery-spike host=opaque=on,driver=frame-clock,bake=on,ring=ring-field,minRings=400 source=mount",
     ]);
   });
 });

@@ -9,8 +9,8 @@
  * Android is the only built target (D-34/D-42: iOS and web are out of scope),
  * but their values are defined so a later port is a value change, not a
  * rewrite: the opaque flag is a no-op there, and web bakes through a raster
- * path. Plan 08's spike decides the Android `opaqueCanvas`, `ambientDriver`,
- * `bakePath` and `ringMethod` defaults on release numbers (D-59).
+ * path. The Android `opaqueCanvas`, `ambientDriver`, `bakePath` and
+ * `ringMethod` defaults were decided from Plan 08's release spike (D-59, D-64).
  *
  * 38.7-08 spike seams (never in a normal release bundle):
  * - DEBUG: `src/__dev__/orrery-host-override.ts`, flipped from the dev menu,
@@ -101,12 +101,21 @@ export function defaultOrreryRenderHost(
   platform: string | undefined = Platform?.OS,
 ): OrreryRenderHost {
   const resolved = platformOf(platform);
+  const android = resolved === "android";
   return {
     platform: resolved,
-    // Today's TextureView on every platform; the spike decides Android.
-    opaqueCanvas: false,
+    // D-64 (owner, 2026-10-03, from the 38.7-08 release spike): Android draws
+    // the Orrery into an opaque SurfaceView (the TextureView caps presents at
+    // ~22–27/s, below G1). `opaque` is a no-op elsewhere.
+    opaqueCanvas: android,
+    // D-64: frame-clock (equal or lower CPU than the interval driver on
+    // release, and a steady 30/s ambient).
     ambientDriver: "frame-clock",
-    bakePath: resolved === "web" ? "raster" : "none",
+    // D-64: bake the still base on the GPU on Android (−28 % of a core idle at
+    // All Contacts on the 6 Pro); web bakes through a raster path; iOS is not
+    // built (D-34/D-42), so it stays live until measured.
+    bakePath: resolved === "web" ? "raster" : android ? "gpu-offscreen" : "none",
+    // D-64 / D-44: Lab A's world plane (no ring field).
     ringMethod: "world-plane",
     ringFieldMinRings: DEFAULT_RING_FIELD_MIN_RINGS,
     mali: { strokeUnderPerspective: false, cpuBakedNebula: true },

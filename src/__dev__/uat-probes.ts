@@ -290,6 +290,93 @@ export function registerUatProbes(): void {
       `orrery-stats text=${JSON.stringify(orreryTextService.stats())} photo=${JSON.stringify(orreryPhotoCache.stats())}`,
     );
   });
+  // 38.7 Plan 08 carried-in check: the Orrery text path with an accented and
+  // an emoji name (Hermes casing/grapheme behaviour was only Node-proven).
+  // Two synthetic contacts, written and later purged through the real DAOs;
+  // run "remove" before any fixture compare (they change the contact count).
+  const TEXT_PROBE_NAMES = ["Zoë Ångström-Øre", "Mia 🌸 Nguyễn"] as const;
+  const textProbeIds = async (): Promise<number[]> => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getExecutor } =
+      require("@/db/database") as typeof import("@/db/database");
+    const rows = await getExecutor().getAllAsync<{ id: number }>(
+      `SELECT id FROM contacts WHERE name IN (${TEXT_PROBE_NAMES.map(() => "?").join(",")})`,
+      [...TEXT_PROBE_NAMES],
+    );
+    return rows.map((row) => row.id);
+  };
+  DevSettings.addMenuItem("Orrery: add text probe contacts", () => {
+    void (async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { getExecutor, localDateTime } =
+          require("@/db/database") as typeof import("@/db/database");
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { createContactFull } =
+          require("@/db/contacts-dao") as typeof import("@/db/contacts-dao");
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { newUid } = require("@/db/uid") as typeof import("@/db/uid");
+        if ((await textProbeIds()).length > 0)
+          return console.log("orrery-text-probe present");
+        const exec = getExecutor();
+        const now = localDateTime();
+        const ids: number[] = [];
+        for (const name of TEXT_PROBE_NAMES) {
+          const { contactId } = await createContactFull(exec, {
+            uid: newUid(),
+            name,
+            intervalDays: 30,
+            now,
+            firstInteraction: {
+              uid: newUid(),
+              occurredAt: now,
+              channel: "call",
+              direction: "outbound",
+              connected: 1,
+            },
+          });
+          ids.push(contactId);
+        }
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { bumpShellRefresh } =
+          require("@/stores/shell-refresh-store") as typeof import("@/stores/shell-refresh-store");
+        bumpShellRefresh();
+        console.log(`orrery-text-probe added ids=${ids.join(",")}`);
+      } catch (error) {
+        console.log("orrery-text-probe add failed", String(error));
+      }
+    })();
+  });
+  DevSettings.addMenuItem("Orrery: remove text probe contacts", () => {
+    void (async () => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { getExecutor, localDateTime } =
+          require("@/db/database") as typeof import("@/db/database");
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { archiveContact } =
+          require("@/db/contacts-dao") as typeof import("@/db/contacts-dao");
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { purgeContact } =
+          require("@/db/purge-dao") as typeof import("@/db/purge-dao");
+        const exec = getExecutor();
+        const ids = await textProbeIds();
+        for (const id of ids) {
+          await archiveContact(exec, id, localDateTime());
+          await purgeContact(exec, id, { now: localDateTime() });
+        }
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { bumpShellRefresh } =
+          require("@/stores/shell-refresh-store") as typeof import("@/stores/shell-refresh-store");
+        bumpShellRefresh();
+        console.log(
+          `orrery-text-probe removed ids=${ids.join(",")} left=${(await textProbeIds()).length}`,
+        );
+      } catch (error) {
+        console.log("orrery-text-probe remove failed", String(error));
+      }
+    })();
+  });
   DevSettings.addMenuItem("Measure backup ingress", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { runIngressMeasure } =
