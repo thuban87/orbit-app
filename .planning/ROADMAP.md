@@ -1350,25 +1350,10 @@ Plans:
 
 ### Phase 38.7: Orrery V2 — Renderer, Camera & Visual Language (INSERTED)
 
-**Goal**: Opening the Orrery feels like entering a polished game's star-system map:
-- calm, legible star-chart views with a 3D strategy-map feel;
-- cinematic System switches;
-- smooth on the Pixel 6 Pro and the Pixel 3a;
-- no warmer than today.
-
-Contacts and relationships remain the information architecture. It also fixes five production Orrery defects: the switch freeze, O(N²) lookups, Paragraph churn, "El…" initials, and "Unavailable System".
+**Goal**: Opening the Orrery feels like entering a polished game's star-system map: calm, legible star-chart views with a 3D strategy-map feel, cinematic System switches, smooth on the Pixel 6 Pro and Pixel 3a and no warmer than today. Contacts and relationships remain the information architecture. It also fixes five production Orrery defects (the switch freeze, O(N²) lookups, Paragraph churn, "El…" initials, "Unavailable System").
 **Depends on**: Phase 38.6
 **Requirements**: None formal. Owner decisions D-01..D-42 and D-56..D-58 (2026-10-02, from the hands-on review of renderer labs A/B/C on both phones), plus derived D-43..D-55.
-**Success Criteria**:
-- Day-1 release baseline of today's main on both phones, followed by owner-locked numeric gates (D-56).
-- Hard gates:
-  - no ANR at Size 120 or All Contacts;
-  - no switch stall over 100 ms on the 6 Pro or over 150 ms on the 3a;
-  - idle heat and CPU no worse than main (D-40);
-  - card text 4.5:1 in all four themes over the new sky (D-28).
-- Contacts stay on their orbit line (D-12).
-- `tsc`, `check:colors` and vitest green.
-- Owner device sign-off on both phones.
+**Success Criteria**: A Day-1 release baseline of today's main on both phones, then owner-locked numeric gates (D-56); hard gates hold: no ANR at Size 120 or All Contacts, no switch stall over 100 ms (6 Pro) or over 150 ms (3a), idle heat and CPU no worse than main (D-40), card text 4.5:1 in all four themes over the new sky (D-28); contacts stay on their orbit line (D-12); `tsc`, `check:colors` and vitest green; owner device sign-off on both phones
 **Scope source**: docs/dossier/milestone-2/phase-38.7-orrery-v2-dossier.md (authoritative)
 **Evidence**: docs/experiments/orrery-renderer/synthesis/ (synthesis, harvest map, dead ends, owner review, verification audits). The lab branches `experiment/orrery-*` are local only and must be kept until V2 ships.
 **Canonical refs**:
