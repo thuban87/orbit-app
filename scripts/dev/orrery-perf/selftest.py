@@ -152,6 +152,15 @@ def regenerate() -> None:
                    _sf([[1000, 1027.4, 0.020], [1030.8, 1080, 0.020]]),
                    "No presents during pinch r3 (1027.5-1030.5 s); the layer flag decides 0 vs invalid.")
 
+    # Scenario drivers: a 170 ms present gap 0.38 s after a switch tap (integer ns, no float drift).
+    switch = {"tap_ns": 1010 * S, "window_s": 2.6,
+              "present_runs": [[1009 * S, 1010_400_000_000, 20_000_000],
+                               [1010_550_000_000, 1013 * S, 20_000_000]],
+              "expect_max_gap_ms": 170.0}
+    with open(os.path.join(FIX, "switch-gap.json"), "w", encoding="utf-8") as handle:
+        json.dump(switch, handle, indent=2)
+        handle.write("\n")
+
 
 # --- Checks -------------------------------------------------------------------
 def expand(sf: dict) -> dict:
@@ -320,6 +329,7 @@ def _():
     shifted = [{"getevent_ns": 1001250400000 + int(o * 1e6), "dispatcher_ns": 1001250400000} for o in (7.1, 7.9, 8.0)]
     eq(touch_windows.decide_calibration(shifted)["status"], "corrected")
     eq(touch_windows.decide_calibration(shifted)["offset_ms"], 7.9)
+    eq(touch_windows.decide_calibration(shifted[:1])["status"], "unaligned", "one tap cannot prove a correction")
     noisy = [{"getevent_ns": 1001250400000 + int(o * 1e6), "dispatcher_ns": 1001250400000} for o in (3, 9, 15)]
     eq(touch_windows.decide_calibration(noisy)["status"], "unaligned")
     # Clock identity (6 Pro values seen 2026-10-03: boottime ~279,000 s ahead of monotonic).
@@ -422,6 +432,85 @@ def _():
     eq(len(diffs), 4, f"differences {diffs}")
     eq([d.split(":")[0] for d in diffs],
        ["System Size 5", "photo Adele Abbott", "setting orrery_satellites_enabled", "ring_order_sha256"])
+
+
+@check("scenario: switch stall gap extraction over [tap, tap + 2.6 s]")
+def _():
+    import switch_stall
+
+    fx = load("switch-gap.json")
+    presents = expand({"present_runs": fx["present_runs"]})["presents"]
+    out = switch_stall.score_switch(presents, fx["tap_ns"], fx["window_s"])
+    eq(out["max_gap_ms"], fx["expect_max_gap_ms"])
+    eq(out["outcome"], "valid")
+    eq(switch_stall.score_switch([], fx["tap_ns"], fx["window_s"])["outcome"], "no-present")
+
+
+W, H = 20, 40
+REGIONS = {"tab": (0, 36, 20, 40), "header": (0, 0, 20, 4), "canvas": (0, 6, 20, 34), "full": (0, 0, 20, 40)}
+BODY = {(x, y) for y in range(6, 34) for x in range(20) if (x * 7 + y * 3) % 5 < 2}  # 40 % of the canvas
+SPARKS = [(x, y) for y in range(6, 34) for x in range(20) if (x, y) not in BODY][:24]
+
+
+def _frame(t: float) -> bytes:
+    """Digest until 1.0 s (tab), title at 1.3 s, blank canvas until 1.8 s, bodies
+    fill 30 % / 60 % / 100 % by 2.5 s, then ambient twinkle that keeps moving."""
+    px = bytearray(W * H)
+    for y in range(H):
+        for x in range(W):
+            if y >= 36:
+                px[y * W + x] = 30 if t < 1.0 else 200
+            elif y < 4:
+                px[y * W + x] = 30 if t < 1.3 else 200
+            elif 6 <= y < 34:
+                px[y * W + x] = 80 if t < 1.3 else 50
+    if t >= 1.8:
+        share = 0.3 if t < 2.1 else 0.6 if t < 2.5 else 1.0
+        for i, (x, y) in enumerate(sorted(BODY)):
+            if i < share * len(BODY):
+                px[y * W + x] = 200
+    if t >= 2.5:
+        step = int(round(t * 10))
+        for i, (x, y) in enumerate(SPARKS):
+            if (i + step) % 3 == 0:
+                px[y * W + x] = 140
+    return bytes(px)
+
+
+@check("scenario: tab return finds t_tap/t_screen/t_canvas and the first FULL frame despite ongoing ambient change")
+def _():
+    import tab_return
+
+    frames = [(k / 10, _frame(k / 10)) for k in range(60)]
+    out = tab_return.analyse_frames(frames, W, REGIONS, 6.0)
+    eq(out["outcome"], "valid")
+    eq((out["t_tap"], out["t_screen"], out["t_canvas"], out["t_full"]), (1.0, 1.3, 1.8, 2.5))
+    eq((out["screen_s"], out["mount_s"], out["fill_s"], out["total_s"]), (0.3, 0.5, 0.7, 1.5))
+    eq(frames[-1][1] != frames[25][1], True, "the final frame differs from the t_full frame (ambient)")
+
+
+@check("scenario: tab return gives no number when the recording ends too soon or the canvas never changes")
+def _():
+    import tab_return
+
+    short = [(k / 10, _frame(k / 10)) for k in range(30)]
+    out = tab_return.analyse_frames(short, W, REGIONS, 3.0)
+    eq(out["outcome"] in ("truncated", "no-full-frame"), True, out["outcome"])
+    eq("total_s" in out, False)
+    blank = [(k / 10, _frame(min(k / 10, 1.7))) for k in range(60)]
+    eq(tab_return.analyse_frames(blank, W, REGIONS, 6.0)["outcome"], "no-canvas-change")
+
+
+@check("scenario: idle soak reads the skin sensor (TYPE_SKIN) and battery temperature on both phones")
+def _():
+    import idle_soak
+
+    six = idle_soak.parse_thermal(read("thermal-pixel6pro.txt"))
+    eq((six["thermal_status"], six["skin"]["name"], six["skin"]["c"]), (0, "VIRTUAL-SKIN", 33.37))
+    three = idle_soak.parse_thermal(read("thermal-pixel3a.txt"))
+    eq((three["skin"]["name"], three["battery_sensor"]["c"]), ("mb-therm-monitor", 27.8))
+    eq(idle_soak.parse_battery(read("battery-pixel6pro.txt")),
+       {"level": 100, "temperature_c": 30.3, "usb_powered": True})
 
 
 def main() -> int:

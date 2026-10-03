@@ -15,8 +15,8 @@ touches. Script taps go through `input` injection, which never appears on the
 touchscreen device, so a System switch the script makes can never be counted.
 
 Labelled session mode (the ONLY mode used for gate numbers):
-  touch_windows.py --model "Pixel 6 Pro" --calibration cal.json \
-      --session "Size 120,All Contacts" --reps 3 --timeout-per-segment 240 --out s.json
+  touch_windows.py --model "Pixel 6 Pro" --calibrate \
+      --session "Size 120,All Contacts" --reps 3 --timeout-per-segment 600 --out s.json
 For each System the script selects it through adb, waits 3 s after the switch
 tap (no window may start inside that guard), then records one segment while
 the owner does: pan, pause, pinch, pause — three times — then lifts and waits.
@@ -32,18 +32,20 @@ ends after the last, or overlaps a sampler coverage hole) — excluded;
 layer still existed at segment end, otherwise the whole segment is `invalid`.
 
 Clock alignment (H7): getevent timestamps must be on SurfaceFlinger's clock
-(CLOCK_MONOTONIC). `--calibrate` proves it with three physical taps:
+(CLOCK_MONOTONIC). `--calibrate` proves it from one physical tap on empty sky
+(`--calibration-taps 3` when a stable offset has to be measured), and with
+`--session` chains straight into the session:
   1. dispatcher method — if `dumpsys input` RecentQueue prints the touch-down's
      `eventTime=` (debuggable builds of InputDispatcher do), offset_ms =
-     getevent_ts − eventTime; |offset| ≤ 2 ms → aligned; three offsets within
-     2 ms of each other → corrected by their median; else unaligned.
+     getevent_ts − eventTime; |offset| ≤ 2 ms → aligned; three taps whose
+     offsets lie within 2 ms of each other → corrected by their median; else unaligned.
   2. clock-identity method (fallback; production builds print only
      "MotionEvent, age=…ms", seen on the Pixel 6 Pro and Pixel 3a 2026-10-03) —
      right after each touch-down, read CLOCK_MONOTONIC (a `logcat -v monotonic`
      mark) and CLOCK_BOOTTIME (/proc/uptime). On a phone that has ever slept the
      two differ by hours, so the getevent timestamp's magnitude says which clock
-     it is on: monotonic on all three taps → aligned (same clock as
-     SurfaceFlinger, offset 0); anything else → unaligned.
+     it is on: monotonic on every tap → aligned (same clock as SurfaceFlinger,
+     offset 0); anything else → unaligned.
 An `unaligned` calibration makes session mode refuse to label any window.
 """
 from __future__ import annotations
@@ -67,6 +69,8 @@ QUIET_END_S = 5.0
 ALIGN_MS = 2.0
 CLOCK_SEPARATION_S = 10.0
 MAX_MARK_DELAY_S = 10.0
+CORRECTION_TAPS = 3
+CALIBRATION_WAIT_S = 1800.0
 
 GETEVENT_RE = re.compile(
     r"^\[\s*(\d+)\.(\d+)\]\s+(?:/dev/input/event\d+:\s+)?(\w+)\s+(\w+)\s+(\w+)"
@@ -312,7 +316,7 @@ def decide_calibration(taps: list[dict]) -> dict:
         spread = max(offsets) - min(offsets)
         if all(abs(o) <= ALIGN_MS for o in offsets):
             status, offset = "aligned", 0.0
-        elif spread <= ALIGN_MS:
+        elif len(offsets) >= CORRECTION_TAPS and spread <= ALIGN_MS:
             status, offset = "corrected", statistics.median(offsets)
         else:
             status, offset = "unaligned", None
@@ -348,7 +352,7 @@ class GeteventReader:
         self.proc.terminate()
 
 
-def wait_for_touch_down(reader: GeteventReader, after_ns: int, timeout_s: float = 60) -> int | None:
+def wait_for_touch_down(reader: GeteventReader, after_ns: int, timeout_s: float = CALIBRATION_WAIT_S) -> int | None:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         for ts, count in touch_changes(reader.events()):
@@ -358,16 +362,17 @@ def wait_for_touch_down(reader: GeteventReader, after_ns: int, timeout_s: float 
     return None
 
 
-def run_calibration(serial: str, device: str, taps: int = 3) -> dict:
+def run_calibration(serial: str, device: str, taps: int = 1) -> dict:
+    """One tap proves alignment; a correction for a stable offset needs three."""
     reader = GeteventReader(serial, device)
     time.sleep(0.5)
     records, last = [], 0
     try:
         for n in range(taps):
-            print(f"[calibrate] tap {n + 1}/{taps}: tap ONCE on the Orrery title bar, then lift.", flush=True)
+            print(f"[calibrate] tap {n + 1}/{taps}: tap ONCE on empty sky, lift, wait 2 s.", flush=True)
             down = wait_for_touch_down(reader, last)
             if down is None:
-                raise adb_device.DeviceError("no touch-down seen within 60 s")
+                raise adb_device.DeviceError(f"no touch-down seen within {CALIBRATION_WAIT_S:.0f} s")
             clocks = adb_device.device_clocks(serial, extra="dumpsys input")
             records.append({"getevent_ns": down, "dispatcher_ns": parse_dispatcher_down_time(clocks["extra"]),
                             "monotonic_s": clocks["monotonic_s"], "boottime_s": clocks["boottime_s"]})
@@ -420,8 +425,11 @@ def run_session(serial: str, device: str, systems: list[str], reps: int, timeout
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     adb_device.add_model_arg(parser)
-    parser.add_argument("--calibrate", action="store_true")
-    parser.add_argument("--calibration", help="calibration JSON from --calibrate (required for --session)")
+    parser.add_argument("--calibrate", action="store_true",
+                        help="prove the clock alignment first (owner taps once); with --session it chains into it")
+    parser.add_argument("--calibration-taps", type=int, default=1,
+                        help="3 when a stable non-zero offset must be measured and applied")
+    parser.add_argument("--calibration", help="a saved --calibrate JSON (instead of --calibrate)")
     parser.add_argument("--session", help='comma-separated Systems, e.g. "Size 120,All Contacts"')
     parser.add_argument("--reps", type=int, default=3)
     parser.add_argument("--timeout-per-segment", type=float, default=240)
@@ -432,16 +440,20 @@ def main() -> int:
     device = find_touch_device(adb_device.shell(serial, "getevent -pl"))
     if not device:
         raise adb_device.DeviceError("no touchscreen (ABS_MT_POSITION_X) in getevent -pl")
+    calibration = None
     if args.calibrate:
-        result = run_calibration(serial, device)
-        adb_device.write_json(args.out, {"model": args.model, "device": device, **result})
-        return 0 if result["status"] != "unaligned" else 2
+        calibration = run_calibration(serial, device, args.calibration_taps)
+        if not args.session or calibration["status"] == "unaligned":
+            adb_device.write_json(args.out, {"model": args.model, "device": device, "calibration": calibration,
+                                             **({"refused": "calibration unaligned"} if args.session else {})})
+            return 0 if calibration["status"] != "unaligned" else 2
     if args.session:
-        if not args.calibration:
-            parser.error("--session needs --calibration (run --calibrate first)")
-        import json
-        with open(args.calibration, encoding="utf-8") as handle:
-            calibration = json.load(handle)
+        if calibration is None:
+            if not args.calibration:
+                parser.error("--session needs --calibrate or --calibration")
+            import json
+            with open(args.calibration, encoding="utf-8") as handle:
+                calibration = json.load(handle)
         systems = [s.strip() for s in args.session.split(",") if s.strip()]
         result = run_session(serial, device, systems, args.reps, args.timeout_per_segment, calibration)
         adb_device.write_json(args.out, {"model": args.model, "device": device, **result})
