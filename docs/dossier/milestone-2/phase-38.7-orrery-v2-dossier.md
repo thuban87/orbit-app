@@ -414,7 +414,7 @@ O-1, O-2 and O-3 became D-56, D-57 and D-58 below. No open items remain.
 **Unit and logic:**
 - drift removal (bodies on `ringRadius`; reorder without drift);
 - Home profile at 0°, 45° and 62° (fit, lens shift, focal, near clamp, min size), with parity tests between `projectWorldPoint` and every independently projected draw path (plane, grid, rings, sky);
-- projected-size label tiers and the tap-to-Profile threshold;
+- projected-size label tiers; tap always focuses, Profile only from the focus card (D-60);
 - the moon bump/split and pip rules;
 - per-System hue determinism from `systemRefId`;
 - emoji-safe initials without `Intl.Segmenter`;
