@@ -211,9 +211,15 @@ describe("same-file worklet forward references (Hermes hazard)", () => {
         (name) => /^orrery-.*\.ts$/.test(name) && !name.includes(".test."),
       )
       .map((name) => join("src/logic", name));
-    const components = readdirSync("src/components/orrery")
-      .filter((name) => /\.tsx?$/.test(name) && !name.includes(".test."))
+    // Recursive (38.7-04): resources/, v2/ and any later subfolder are scanned.
+    const components = (
+      readdirSync("src/components/orrery", { recursive: true }) as string[]
+    )
+      .filter((name) => /\.tsx?$/.test(name) && !/\.test\./.test(name))
       .map((name) => join("src/components/orrery", name));
+    expect(components).toContain(
+      join("src/components/orrery", "resources", "orrery-text-service.ts"),
+    );
     const others = [...logic, ...components].filter(
       (path) => !TARGETS.includes(path),
     );

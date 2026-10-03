@@ -1,32 +1,35 @@
-/** Native-measured, screen-facing text. Paragraph paint must use a real layer. */
+/**
+ * Native-measured, screen-facing text. Paragraph paint must use a real layer.
+ * 38.7-04 (D-46/D-52): every Paragraph comes from the OrreryTextService; this
+ * legacy reader only draws what the published label spec holds (Plan 07
+ * replaces it with the V2 text layer).
+ */
 import {
   Group,
   Paint,
   Paragraph,
   RoundedRect,
-  Skia,
-  type SkParagraph,
   type SkTypefaceFontProvider,
-  TextAlign,
 } from "@shopify/react-native-skia";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 import type { LabelAllocation } from "@/logic/orrery-label-logic";
 import type { ThemePalette } from "@/theme/theme-types";
 import { RADII } from "@/theme/tokens/radii";
-import { SPACING } from "@/theme/tokens/spacing";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
+import {
+  ORRERY_TEXT_HORIZONTAL_PADDING as HORIZONTAL_PADDING,
+  type OrreryLabelSpec,
+  orreryTextService,
+  type PreparedOrreryText,
+  ORRERY_TEXT_VERTICAL_PADDING as VERTICAL_PADDING,
+} from "./resources/orrery-text-service";
 
-const HORIZONTAL_PADDING = SPACING.sm;
-const VERTICAL_PADDING = SPACING.xs;
-export interface PreparedOrreryText {
-  /** The original identity remains available to companion/accessibility callers. */
-  text: string;
-  paragraph: SkParagraph;
-  width: number;
-  height: number;
-}
-/** Called on the React resource path only, never inside a frame worklet.
+export type { PreparedOrreryText } from "./resources/orrery-text-service";
+
+/** Called on the React/JS resource path only, never inside a frame worklet.
  * Native shaping/one-line ellipsis owns Unicode boundaries; no JS name slicing.
+ * Delegates to the shared, cached OrreryTextService (null when admission is
+ * refused at the cap, as when the font has not loaded).
  */
 export function prepareOrreryText(
   text: string,
@@ -36,47 +39,29 @@ export function prepareOrreryText(
   fontProvider: SkTypefaceFontProvider | null,
   colors: ThemePalette,
 ): PreparedOrreryText | null {
-  if (!fontProvider || maxWidth <= HORIZONTAL_PADDING * 2) return null;
   const typography = TYPOGRAPHY[role];
-  const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
-  const paragraph = Skia.ParagraphBuilder.Make(
-    { textAlign: TextAlign.Center, maxLines: 1, ellipsis: "…" },
-    fontProvider,
-  )
-    .pushStyle({
-      color: Skia.Color(colors[typography.colorToken]),
-      fontFamilies: [typography.family],
-      fontStyle: { weight: typography.weight },
-      fontSize: typography.size * scale,
-    })
-    .addText(text)
-    .pop()
-    .build();
-  paragraph.layout(maxWidth - HORIZONTAL_PADDING * 2);
-  const width = Math.min(
-    maxWidth,
-    Math.max(1, Math.ceil(paragraph.getLongestLine())) + HORIZONTAL_PADDING * 2,
-  );
-  paragraph.layout(width - HORIZONTAL_PADDING * 2);
-  return {
+  return orreryTextService.prepare({
     text,
-    paragraph,
-    width,
-    height:
-      Math.max(paragraph.getHeight(), typography.lineHeight * scale) +
-      VERTICAL_PADDING * 2,
-  };
+    role,
+    fontScale,
+    maxWidth,
+    ink: colors[typography.colorToken],
+    family: typography.family,
+    weight: typography.weight,
+    fontProvider,
+  });
 }
 
 export function OrreryLabel({
   identity,
-  text,
+  spec,
   allocationIndex,
   colors,
   context = false,
 }: {
   identity: string;
-  text: PreparedOrreryText;
+  /** D-52: the published label spec; this label draws nothing without an entry. */
+  spec: SharedValue<OrreryLabelSpec>;
   /** D-52: label id → allocation (first per id), built once per frame. */
   allocationIndex: SharedValue<Readonly<Record<string, LabelAllocation>>>;
   colors: ThemePalette;
@@ -96,22 +81,34 @@ export function OrreryLabel({
   const textX = useDerivedValue(() => placement.value.x + HORIZONTAL_PADDING);
   const textY = useDerivedValue(() => placement.value.y + VERTICAL_PADDING);
   const opacity = useDerivedValue(() => placement.value.opacity);
+  // RN-Skia skips drawParagraph for a null paragraph, so an unadmitted label
+  // draws nothing (and is never an allocation candidate either).
+  const paragraph = useDerivedValue(() => {
+    const entry = spec.value.labels[identity];
+    return (context ? entry?.context : entry?.text)?.paragraph ?? null;
+  });
+  const boxWidth = useDerivedValue(() => {
+    const entry = spec.value.labels[identity];
+    return (context ? entry?.context : entry?.text)?.width ?? 0;
+  });
+  const boxHeight = useDerivedValue(() => {
+    const entry = spec.value.labels[identity];
+    return (context ? entry?.context : entry?.text)?.height ?? 0;
+  });
+  const textWidth = useDerivedValue(() =>
+    Math.max(0, boxWidth.value - HORIZONTAL_PADDING * 2),
+  );
   return (
     <Group layer={<Paint opacity={opacity} />}>
       <RoundedRect
         x={x}
         y={y}
-        width={text.width}
-        height={text.height}
+        width={boxWidth}
+        height={boxHeight}
         r={RADII.sm}
         color={colors.surface}
       />
-      <Paragraph
-        paragraph={text.paragraph}
-        x={textX}
-        y={textY}
-        width={text.width - HORIZONTAL_PADDING * 2}
-      />
+      <Paragraph paragraph={paragraph} x={textX} y={textY} width={textWidth} />
     </Group>
   );
 }

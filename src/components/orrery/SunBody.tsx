@@ -24,14 +24,12 @@ import {
   rrect,
   Skia,
   Image as SkiaImage,
-  type SkTypefaceFontProvider,
-  TextAlign,
 } from "@shopify/react-native-skia";
-import { useMemo } from "react";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 import type { BillboardPose } from "@/logic/orrery-frame";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { useOrreryClock } from "./orrery-clock-context";
+import type { OrreryInitialsSpec } from "./resources/orrery-text-service";
 import { useOrreryPhoto } from "./use-orrery-photo";
 
 export interface SunBodyProps {
@@ -51,12 +49,14 @@ export interface SunBodyProps {
   glowColor: string;
   /** The occupant's fallback swatch (`avatarSwatches[swatchIndex(name)]`). */
   swatch: string;
-  /** The on-swatch initials glyph colour (`avatarSwatchText`). */
-  swatchText: string;
-  /** The occupant's initials (empty → swatch with no glyph). */
-  initials: string;
-  /** The bundled-font provider from `useFonts`; null until the font loads. */
-  fontProvider: SkTypefaceFontProvider | null;
+  /**
+   * 38.7-04 (D-46/D-52): the published initials spec. The glyph Paragraph is
+   * built by the OrreryTextService (ink `avatarSwatchText`); a body without an
+   * admitted entry draws the plain swatch disc.
+   */
+  initialsSpec?: SharedValue<OrreryInitialsSpec>;
+  /** This body's key in the initials spec (`bodyKey`). */
+  textKey?: string;
 }
 
 /** Soft-glow halo opacity mid-point (device-UAT tunable, 13-08). */
@@ -68,6 +68,17 @@ const PULSE_OPACITY_FRAC = 0.4;
 /** Pulse angular speed (rad/ms) → ~3.1s period (UI-SPEC ~2–4s). */
 const PULSE_SPEED = 0.002;
 
+/**
+ * 38.7-04: the sun's initials glyph metrics the text publisher keys on (font
+ * size ~cap height, device-UAT tunable 13-08, quantised to 0.5 px).
+ */
+export function sunBodyInitialsLayout(radius: number): {
+  fontSize: number;
+  maxWidth: number;
+} {
+  return { fontSize: Math.round(radius * 2) / 2, maxWidth: radius * 2 };
+}
+
 export function SunBody({
   cx,
   cy,
@@ -76,9 +87,8 @@ export function SunBody({
   photo,
   glowColor,
   swatch,
-  swatchText,
-  initials,
-  fontProvider,
+  initialsSpec,
+  textKey,
   projection,
   focusColor,
 }: SunBodyProps) {
@@ -130,27 +140,14 @@ export function SunBody({
     return GLOW_OPACITY * (1 + PULSE_OPACITY_FRAC * t);
   });
 
-  const fontSize = radius; // ~cap height fits the disc (device-UAT tunable, 13-08).
-
-  const paragraph = useMemo(() => {
-    if (!fontProvider || initials.length === 0) {
-      return null;
-    }
-    const p = Skia.ParagraphBuilder.Make(
-      { textAlign: TextAlign.Center, maxLines: 1, ellipsis: "…" },
-      fontProvider,
-    )
-      .pushStyle({
-        color: Skia.Color(swatchText),
-        fontFamilies: ["Inter"],
-        fontSize,
-      })
-      .addText(initials)
-      .pop()
-      .build();
-    p.layout(radius * 2);
-    return p;
-  }, [fontProvider, initials, swatchText, fontSize, radius]);
+  const { fontSize } = sunBodyInitialsLayout(radius);
+  // Null until the service admits this body's initials (font loaded, body
+  // visible and large enough) → the plain swatch shows with no glyph.
+  const paragraph = useDerivedValue(() =>
+    textKey === undefined
+      ? null
+      : (initialsSpec?.value.initials[textKey]?.paragraph ?? null),
+  );
 
   const circleClip = rrect(
     rect(cx - radius, cy - radius, radius * 2, radius * 2),
@@ -194,14 +191,12 @@ export function SunBody({
       ) : (
         <>
           <Circle cx={cx} cy={cy} r={radius} color={swatch} />
-          {paragraph ? (
-            <Paragraph
-              paragraph={paragraph}
-              x={cx - radius}
-              y={cy - fontSize * 0.72}
-              width={radius * 2}
-            />
-          ) : null}
+          <Paragraph
+            paragraph={paragraph}
+            x={cx - radius}
+            y={cy - fontSize * 0.72}
+            width={radius * 2}
+          />
         </>
       )}
     </Group>

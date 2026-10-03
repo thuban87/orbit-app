@@ -205,3 +205,79 @@ it("the emitted projection closure settles after publication under the installed
   expect(projection).toHaveBeenCalledTimes(6);
   expect(publish).toHaveBeenCalledTimes(6);
 });
+
+/** Every compiled OrreryWorld worklet: its source and its exact closure names. */
+function compiledWorldWorklets(): { code: string; names: string[] }[] {
+  const result = babel.transformFileSync(
+    "src/components/orrery/OrreryWorld.tsx",
+    { envName: "production", ast: true },
+  );
+  const codes: string[] = [];
+  traverse(result.ast, {
+    ObjectProperty(path: {
+      node: { key: { name: string }; value: { value?: unknown } };
+    }) {
+      const { key, value } = path.node;
+      if (key.name === "code" && typeof value.value === "string")
+        codes.push(value.value);
+    },
+  });
+  return codes.map((code) => {
+    let names: string[] = [];
+    traverse(
+      babel.parseSync(`(${code})`, { configFile: false, babelrc: false }),
+      {
+        VariableDeclarator(path: {
+          node: {
+            id: { type: string; properties?: { key: { name: string } }[] };
+            init?: { property?: { name: string } };
+          };
+        }) {
+          if (
+            path.node.init?.property?.name === "__closure" &&
+            path.node.id.type === "ObjectPattern" &&
+            names.length === 0
+          )
+            names = path.node.id.properties!.map((p) => p.key.name);
+        },
+      },
+    );
+    return { code, names };
+  });
+}
+
+it("38.7-04: the tap worklet captures member identities only, and no OrreryWorld worklet captures a heavy JS object", () => {
+  const worklets = compiledWorldWorklets();
+  expect(worklets.length).toBeGreaterThan(5);
+  // Rebuilt (and re-serialised) whenever the gesture memo changes: {id, uid}
+  // identities, never the full member rows (carried in from 38.7-03).
+  const tap = worklets.filter(({ code }) =>
+    code.includes("resolveSatelliteTap"),
+  );
+  expect(tap).toHaveLength(1);
+  expect([...tap[0].names].sort()).toEqual(
+    [
+      "allocations",
+      "identities",
+      "memberIdentities",
+      "resolveSatelliteTap",
+    ].sort(),
+  );
+  // New UI reactions capture only SharedValues, primitives, module functions
+  // and runOnJS callbacks — never the scene, resources, runtime, the text
+  // publisher (it holds the whole Paragraph cache) or prepared text.
+  for (const { names } of worklets)
+    for (const heavy of [
+      "switchRuntime",
+      "scene",
+      "resources",
+      "members",
+      "publisher",
+      "publisherRef",
+      "textScene",
+      "labelSources",
+      "initialsSources",
+      "orreryTextService",
+    ])
+      expect(names).not.toContain(heavy);
+});

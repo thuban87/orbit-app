@@ -9,6 +9,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useWindowDimensions } from "react-native";
 import {
   runOnJS,
+  runOnUI,
   type SharedValue,
   useAnimatedReaction,
   useDerivedValue,
@@ -61,13 +62,29 @@ import { sampleSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
-import { OrbitBody } from "./OrbitBody";
+import { TYPOGRAPHY } from "@/theme/tokens/typography";
+import { OrbitBody, orbitBodyInitialsLayout } from "./OrbitBody";
 import { OrreryCanvas } from "./OrreryCanvas";
-import { OrreryLabel, prepareOrreryText } from "./OrreryLabel";
+import { OrreryLabel } from "./OrreryLabel";
 import { Polaris } from "./Polaris";
 import { ProjectedOrbitRing } from "./ProjectedOrbitRing";
+import {
+  createOrreryTextPublisher,
+  EMPTY_INITIALS_SPEC,
+  EMPTY_LABEL_SPEC,
+  ORRERY_INITIALS_MIN_RADIUS_PX,
+  ORRERY_TEXT_ELIGIBILITY_INTERVAL_MS,
+  type OrreryInitialsSource,
+  type OrreryInitialsSpec,
+  type OrreryLabelSource,
+  type OrreryLabelSpec,
+  type OrreryTextPublisher,
+  type OrreryTextScene,
+  type OrreryTextVisibility,
+  orreryTextService,
+} from "./resources/orrery-text-service";
 import { SatelliteBody } from "./SatelliteBody";
-import { SunBody } from "./SunBody";
+import { SunBody, sunBodyInitialsLayout } from "./SunBody";
 import {
   type OrreryBodyResource,
   type OrrerySwitchRuntime,
@@ -116,6 +133,41 @@ function rowById(
   return index.get(id);
 }
 
+/**
+ * 38.7-04 (D-52/H4): what the text publisher needs from a frame — the visible
+ * body keys (labels above overview) and the bodies big enough to show initials.
+ * The signature changes only when either key set changes, never on radius alone.
+ * A module-level worklet defined above its only caller (Hermes forward-ref rule).
+ */
+function orreryTextEligibility(
+  frame: AnimatedFrame,
+  minRadius: number,
+): { signature: string; visibility: OrreryTextVisibility } {
+  "worklet";
+  const visible: string[] = [];
+  const eligible: { key: string; radius: number }[] = [];
+  const bodies = frame.bodies;
+  for (let i = 0; i < bodies.length; i++) {
+    const body = bodies[i];
+    if (body.kind === "satellite" || !body.visible) continue;
+    const key = bodyKey(body);
+    visible.push(key);
+    if (body.radius >= minRadius) eligible.push({ key, radius: body.radius });
+  }
+  visible.sort();
+  eligible.sort((a, b) => (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
+  let signature = `${visible.join(",")}|`;
+  for (let i = 0; i < eligible.length; i++) signature += `${eligible[i].key},`;
+  return { signature, visibility: { visible, eligible } };
+}
+
+let worldSerial = 0;
+/** After the post-release UI round trip: the released text entries may go. */
+function finishTextRelease(owner: string, epoch: number): void {
+  orreryTextService.confirmReleased(owner, epoch);
+  orreryTextService.clearUnheld();
+}
+
 function ReorderGhost({
   frame,
   drag,
@@ -141,17 +193,41 @@ function ReorderGhost({
   });
   return <Path path={path} color={color} style="stroke" strokeWidth={2} />;
 }
+/** The display name a body's swatch and initials derive from. */
+function bodyDisplayName(
+  resource: OrreryBodyResource,
+  colors: ThemePalette,
+): { name: string; photo: string | null } {
+  const { body, scene } = resource;
+  if (body.kind === "sun") {
+    const resolved = resolveSunOccupant({
+      ...scene.sun,
+      starPalette: colors.starPalette,
+      colors,
+    });
+    return {
+      name:
+        resolved.kind === "self"
+          ? scene.sun.selfName
+          : scene.sun.sunContactName,
+      photo: resolved.photo,
+    };
+  }
+  const contact = rowById(scene.contacts, body.id);
+  return { name: contact?.name ?? "", photo: contact?.photo ?? null };
+}
+
 function ProjectedBody({
   resource,
   frame,
   colors,
-  fontProvider,
+  initialsSpec,
   focused,
 }: {
   resource: OrreryBodyResource;
   frame: SharedValue<AnimatedFrame>;
   colors: ThemePalette;
-  fontProvider: SkTypefaceFontProvider | null;
+  initialsSpec: SharedValue<OrreryInitialsSpec>;
   focused: boolean;
 }) {
   const { body, scene, key } = resource;
@@ -177,9 +253,8 @@ function ProjectedBody({
     projection,
     swatch:
       colors.avatarSwatches[swatchIndex(name, colors.avatarSwatches.length)],
-    swatchText: colors.avatarSwatchText,
-    initials: orreryInitials(name),
-    fontProvider,
+    initialsSpec,
+    textKey: key,
     focusColor: focused ? colors.accent : undefined,
   };
   // Each branch returns exactly ONE actual body root Group; no parent wrapper.
@@ -252,6 +327,28 @@ export function OrreryWorld({
     if (mounted.current && latestFocus.current === focusKey) onFocusLost?.();
   }, [focusKey, onFocusLost]);
   const level = useSharedValue<SemanticLevel>("overview");
+  // 38.7-04 (D-46/D-52/M3): every label and initials Paragraph reaches the
+  // canvas through these specs, written by the JS text publisher — never React
+  // state, so a tier change commits no render here.
+  const labelSpec = useSharedValue<OrreryLabelSpec>(EMPTY_LABEL_SPEC);
+  const initialsSpec = useSharedValue<OrreryInitialsSpec>(EMPTY_INITIALS_SPEC);
+  const publisherRef = useRef<OrreryTextPublisher | null>(null);
+  if (!publisherRef.current) {
+    const owner = `orrery-world:${++worldSerial}`;
+    publisherRef.current = Object.assign(
+      createOrreryTextPublisher({
+        owner,
+        write: (labels, initials) => {
+          if (labels) labelSpec.value = labels;
+          if (initials) initialsSpec.value = initials;
+        },
+      }),
+      { owner },
+    );
+  }
+  const publisher = publisherRef.current as OrreryTextPublisher & {
+    owner: string;
+  };
   // Capture only the producer's input; the controller also contains its published output.
   const reorder = camera.reorder;
   // D-52 freeze: the frame worklet may capture only SharedValues, primitives,
@@ -318,7 +415,9 @@ export function OrreryWorld({
     () => [colors.textSecondary, colors.textPrimary, ...colors.starPalette],
     [colors],
   );
-  const labels = useMemo(
+  // Plain label inputs only (no Paragraphs): one stable label node per
+  // labelable body; the publisher decides which ones get text, per tier.
+  const labelSources = useMemo<OrreryLabelSource[]>(
     () =>
       scene.world.flatMap((body) => {
         if (body.id === 0) return [];
@@ -338,64 +437,103 @@ export function OrreryWorld({
           scene.gravity.get(body.id),
           focused && member ? focusedRelationById[body.id] : undefined,
         );
-        const width = Math.min(LABEL_MAX_WIDTH * fontScale, viewport.width);
-        const text = prepareOrreryText(
-          name,
-          "label",
-          fontScale,
-          width,
-          fontProvider,
-          colors,
-        );
-        if (!text) return [];
         return [
           {
-            id: bodyKey(body),
+            key: bodyKey(body),
             name,
-            text,
-            context: context
-              ? prepareOrreryText(
-                  context,
-                  "caption",
-                  fontScale,
-                  width,
-                  fontProvider,
-                  colors,
-                )
-              : null,
+            context,
             focused,
             cluster: clusterIds.includes(body.id),
             favorite: member?.favourite_rank != null,
           },
         ];
       }),
-    [
-      scene,
-      colors,
+    [scene, focusedIds, clusterIds, focusedRelationById],
+  );
+  const initialsSources = useMemo<OrreryInitialsSource[]>(
+    () =>
+      resources.flatMap((resource) => {
+        if (resource.body.kind === "satellite") return [];
+        const { name, photo } = bodyDisplayName(resource, colors);
+        const text = orreryInitials(name);
+        if (text.length === 0) return [];
+        const layout = (
+          resource.body.kind === "sun"
+            ? sunBodyInitialsLayout
+            : orbitBodyInitialsLayout
+        )(resource.body.radius);
+        return [
+          { key: resource.key, text, ...layout, hasPhoto: photo !== null },
+        ];
+      }),
+    [resources, colors],
+  );
+  const textScene = useMemo<OrreryTextScene>(
+    () => ({
+      labels: labelSources,
+      initials: initialsSources,
+      labelWidth: Math.min(LABEL_MAX_WIDTH * fontScale, viewport.width),
+      fontScale,
       fontProvider,
+      labelInk: colors[TYPOGRAPHY.label.colorToken],
+      captionInk: colors[TYPOGRAPHY.caption.colorToken],
+      initialsInk: colors.avatarSwatchText,
+    }),
+    [
+      labelSources,
+      initialsSources,
       fontScale,
       viewport.width,
-      focusedIds,
-      clusterIds,
-      focusedRelationById,
+      fontProvider,
+      colors,
     ],
   );
-  // Share only plain measured data; native paragraph/font resources stay off worklets.
-  const measured = useMemo(
-    () =>
-      labels.map((label) => ({
-        id: label.id,
-        name: label.name,
-        width: label.text.width,
-        height: label.text.height,
-        context: label.context?.text,
-        contextWidth: label.context?.width,
-        contextHeight: label.context?.height,
-        focused: label.focused,
-        cluster: label.cluster,
-        favorite: label.favorite,
-      })),
-    [labels],
+  useEffect(() => {
+    publisher.setScene(textScene);
+  }, [publisher, textScene]);
+  useEffect(
+    () => () => {
+      // Unmount: pins retire now; the entries are disposed only after the
+      // canvas teardown queued by this commit and one UI frame (no pending
+      // redraw can still read them), then everything unheld is cleared.
+      const epoch = publisher.release();
+      if (epoch === null) return;
+      const { owner } = publisher;
+      setTimeout(() => {
+        runOnUI(() => {
+          "worklet";
+          requestAnimationFrame(() => {
+            runOnJS(finishTextRelease)(owner, epoch);
+          });
+        })();
+      }, 0);
+    },
+    [publisher],
+  );
+  const sendTier = useCallback(
+    (tier: SemanticLevel) => publisher.setTier(tier),
+    [publisher],
+  );
+  const sendVisibility = useCallback(
+    (visibility: OrreryTextVisibility) => publisher.setVisibility(visibility),
+    [publisher],
+  );
+  const confirmTextEcho = useCallback(
+    (generation: number, epoch: number) =>
+      publisher.confirmEchoed(generation, epoch),
+    [publisher],
+  );
+  // C-H2: the echo is sent one frame after the readers re-ran, then a second
+  // UI round trip orders it behind any first-frame draw a React commit queued
+  // before the echo arrived (that draw may still record the old Paragraphs).
+  const echoText = useCallback(
+    (generation: number, epoch: number) => {
+      runOnUI(() => {
+        "worklet";
+        runOnJS(confirmTextEcho)(generation, epoch);
+      })();
+    },
+    [confirmTextEcho],
   );
   useAnimatedReaction(
     () => frame.value.pose.zoom,
@@ -403,9 +541,70 @@ export function OrreryWorld({
       level.value = semanticLevel(zoom, level.value);
     },
   );
+  // M3: the tier reaches text preparation through runOnJS, only on change.
+  useAnimatedReaction(
+    () => level.value,
+    (tier, previous) => {
+      if (tier !== previous) runOnJS(sendTier)(tier);
+    },
+  );
+  // H4: visibility/initials eligibility, computed at most every
+  // ORRERY_TEXT_ELIGIBILITY_INTERVAL_MS (a trailing timer catches the final
+  // pose) and sent only when a key set changed.
+  const textReport = useSharedValue({ at: -1e12, signature: "", timer: false });
+  useAnimatedReaction(
+    () => frame.value,
+    () => {
+      const state = textReport.value;
+      if (state.timer) return;
+      const run = () => {
+        const latest = orreryTextEligibility(
+          frame.value,
+          ORRERY_INITIALS_MIN_RADIUS_PX,
+        );
+        const previous = textReport.value.signature;
+        textReport.value = {
+          at: Date.now(),
+          signature: latest.signature,
+          timer: false,
+        };
+        if (latest.signature !== previous)
+          runOnJS(sendVisibility)(latest.visibility);
+      };
+      const wait = state.at + ORRERY_TEXT_ELIGIBILITY_INTERVAL_MS - Date.now();
+      if (wait > 0) {
+        textReport.value = { ...state, timer: true };
+        setTimeout(run, wait);
+      } else run();
+    },
+  );
+  // C-H2: a spec change arms a one-shot UI frame callback; one frame later the
+  // declarative readers have re-run, and only then is the generation echoed.
+  useAnimatedReaction(
+    () => {
+      const labels = labelSpec.value;
+      const initials = initialsSpec.value;
+      return labels.generation >= initials.generation
+        ? { generation: labels.generation, epoch: labels.mountEpoch }
+        : { generation: initials.generation, epoch: initials.mountEpoch };
+    },
+    (spec, previous) => {
+      if (spec.generation === 0) return;
+      if (
+        previous &&
+        previous.generation === spec.generation &&
+        previous.epoch === spec.epoch
+      )
+        return;
+      requestAnimationFrame(() => {
+        runOnJS(echoText)(spec.generation, spec.epoch);
+      });
+    },
+  );
   const allocations = useDerivedValue(() => {
     const current = frame.value;
-    const candidates = measured.flatMap((label) => {
+    // Only admitted labels are candidates (the spec carries plain measurements).
+    const candidates = labelSpec.value.measured.flatMap((label) => {
       const body = frameBodyByKey(current, label.id);
       return body?.visible && body.interactive
         ? [
@@ -461,7 +660,6 @@ export function OrreryWorld({
     ],
     [scene],
   );
-  const members = scene.systemSnapshot.members;
   // A primitive, so the north-tap worklet never captures the whole scene.
   const sceneExtent = scene.extent;
   const reorderExpectation = useMemo(
@@ -501,7 +699,7 @@ export function OrreryWorld({
             y,
             identities,
             allocations.value.map((label) => label.id),
-            members,
+            memberIdentities,
           );
         },
         onNorth: (x, y) => {
@@ -520,7 +718,7 @@ export function OrreryWorld({
       interactive,
       identities,
       allocations,
-      members,
+      memberIdentities,
       reorderExpectation,
       onReorder,
       onReorderActivated,
@@ -610,7 +808,7 @@ export function OrreryWorld({
               resource={resource}
               frame={frame}
               colors={colors}
-              fontProvider={fontProvider}
+              initialsSpec={initialsSpec}
               focused={focusedIds.includes(resource.body.id)}
             />
           ))}
@@ -643,18 +841,18 @@ export function OrreryWorld({
         </Group>
         {/* Labels/backplates are screen-space and never interrupt the body batch. */}
         <Group>
-          {labels.map((label) => (
-            <Group key={label.id}>
+          {labelSources.map((label) => (
+            <Group key={label.key}>
               <OrreryLabel
-                identity={label.id}
-                text={label.text}
+                identity={label.key}
+                spec={labelSpec}
                 allocationIndex={allocationIndex}
                 colors={colors}
               />
               {label.context ? (
                 <OrreryLabel
-                  identity={label.id}
-                  text={label.context}
+                  identity={label.key}
+                  spec={labelSpec}
                   allocationIndex={allocationIndex}
                   colors={colors}
                   context

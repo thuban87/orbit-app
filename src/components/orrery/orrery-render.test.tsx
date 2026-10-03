@@ -6,12 +6,14 @@ import { runMigrations } from "@/db/migrations/runner";
 import { readOrrerySatellites } from "@/db/orrery-satellites-read";
 import { addRelationship } from "@/db/relationships-dao";
 import { HOME_CAMERA } from "@/logic/orrery-camera-logic";
+import { IDENTITY_ENTER } from "@/logic/orrery-label-logic";
 import { beginSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import { loadOrreryScene } from "@/services/orrery-scene";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import { prepareOrreryText } from "./OrreryLabel";
 import { OrreryWorld } from "./OrreryWorld";
 import { useOrreryCamera } from "./use-orrery-camera";
+import { sampleOrrerySwitchCamera } from "./use-orrery-switch-runtime";
 
 const switchRuntime = (
   scene: Awaited<ReturnType<typeof loadOrreryScene>>,
@@ -43,18 +45,53 @@ const native = vi.hoisted(() => ({
     style: Record<string, unknown>;
     options: Record<string, unknown>;
   }[],
+  builders: 0,
+  disposed: 0,
+  /** M3 render-count spy: OrreryWorld calls useWindowDimensions once per render. */
+  renders: 0,
+  setStateCalls: 0,
+  reactions: [] as {
+    prepare: () => unknown;
+    react: (value: unknown, previous: unknown) => void;
+    previous: unknown;
+  }[],
+  frames: [] as (() => void)[],
 }));
+/** Runs every recorded UI reaction (prepare → react), then queued UI frames and timers. */
+function flushUi(passes = 4) {
+  for (let pass = 0; pass < passes; pass++) {
+    for (const reaction of native.reactions) {
+      const value = reaction.prepare();
+      reaction.react(value, reaction.previous);
+      reaction.previous = value;
+    }
+    const frames = native.frames.splice(0);
+    for (const frame of frames) frame();
+    vi.advanceTimersByTime(300);
+  }
+}
 vi.mock("expo-sqlite", () => ({}));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
   useMemo: (factory: () => unknown) => factory(),
   useCallback: (callback: unknown) => callback,
   useRef: (value: unknown) => ({ current: value }),
-  useEffect: () => {},
-  useState: (factory: () => unknown) => [factory(), () => {}],
+  // Effects run synchronously (cleanups are not exercised here).
+  useEffect: (effect: () => unknown) => {
+    effect();
+  },
+  useState: (factory: () => unknown) => [
+    factory(),
+    () => {
+      native.setStateCalls++;
+    },
+  ],
 }));
 vi.mock("react-native", () => ({
-  useWindowDimensions: () => ({ fontScale: 2 }),
+  useWindowDimensions: () => {
+    native.renders++;
+    return { fontScale: 2 };
+  },
 }));
 vi.mock("@/services/photos/photo-storage", () => ({
   resolvePhotoUri: (path: string) => path,
@@ -75,7 +112,12 @@ vi.mock("react-native-reanimated", () => ({
     },
   }),
   useSharedValue: (value: unknown) => ({ value }),
-  useAnimatedReaction: () => {},
+  useAnimatedReaction: (
+    prepare: () => unknown,
+    react: (value: unknown, previous: unknown) => void,
+  ) => {
+    native.reactions.push({ prepare, react, previous: null });
+  },
   cancelAnimation: () => {},
   runOnJS: (fn: unknown) => fn,
   runOnUI: (fn: unknown) => fn,
@@ -123,8 +165,12 @@ vi.mock("@shopify/react-native-skia", async () => {
       Paint: () => ({ setAlphaf: () => {} }),
       ParagraphBuilder: {
         Make: (options: Record<string, unknown>) => {
-          const item = { text: "", style: {}, options };
+          native.builders++;
+          let item = { text: "", style: {}, options };
           const builder = {
+            reset: () => {
+              item = { text: "", style: {}, options };
+            },
             pushStyle: (style: Record<string, unknown>) => {
               item.style = style;
               return builder;
@@ -135,11 +181,15 @@ vi.mock("@shopify/react-native-skia", async () => {
             },
             pop: () => builder,
             build: () => {
-              native.paragraphs.push(item);
+              native.paragraphs.push({ ...item });
               return {
+                text: item.text,
                 layout: () => {},
                 getLongestLine: () => 90,
                 getHeight: () => 40,
+                dispose: () => {
+                  native.disposed++;
+                },
               };
             },
           };
@@ -174,7 +224,16 @@ function resolve(node: ReactNode): Node[] {
 }
 let db: ReturnType<typeof openTestDb>;
 beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+  vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
+    native.frames.push(callback);
+    return native.frames.length;
+  });
   native.paragraphs = [];
+  native.reactions = [];
+  native.frames = [];
+  native.renders = 0;
+  native.setStateCalls = 0;
   db = openTestDb();
   let uid = 0;
   await runMigrations(nodeSqliteExecutor(db), MIGRATIONS, TARGET_VERSION, {
@@ -183,7 +242,11 @@ beforeEach(async () => {
     defaultPhoneRegion: "US",
   });
 });
-afterEach(() => db.close());
+afterEach(() => {
+  db.close();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe("production Orrery native tree and resource contracts", () => {
   it("renders tokenized moons in the same actual native depth batch and hides them at overview", async () => {
@@ -298,10 +361,89 @@ describe("production Orrery native tree and resource contracts", () => {
     const alpha = nameLayer.children[0].props.opacity as { value: number };
     expect(alpha.value).toBe(0);
     pose.value = { ...pose.value, yaw: 0, zoom: 2 };
+    // 38.7-04 M3: the identity tier reaches the text publisher through UI
+    // reactions; only then does the (unfocused) label get a Paragraph.
+    flushUi();
     expect(alpha.value).toBe(1);
     expect(
       (contact.props.transform as { value: unknown[] }).value,
     ).toHaveLength(3);
+  });
+  it("M3: a switch whose camera crosses IDENTITY_ENTER publishes label text through UI reactions and commits no OrreryWorld render", async () => {
+    const exec = nodeSqliteExecutor(db);
+    await exec.runAsync(
+      "INSERT INTO contacts(uid,name,tracking_enabled,interval_days,created_at,modified_at) VALUES ('m3','Ada Lovelace',1,30,'2026-09-07','2026-09-07')",
+    );
+    const scene = await loadOrreryScene(exec, 1);
+    const pose = { value: { ...HOME_CAMERA } };
+    const runtime = {
+      ...switchRuntime(scene, pose as never),
+      progress: { value: 0 },
+      cameraFrom: { value: { ...HOME_CAMERA, zoom: 1 } },
+      cameraTo: { value: { ...HOME_CAMERA, zoom: 2.6 } },
+    };
+    const tree = resolve(
+      OrreryWorld({
+        camera: useOrreryCamera({
+          pose: pose as never,
+          enabled: true,
+          extent: scene.extent,
+          viewport: { width: 500, height: 700 },
+          reduced: { value: false } as never,
+        }),
+        scene,
+        pose: pose as never,
+        viewport: { width: 500, height: 700 },
+        colors: THEME_PRESETS.galaxy.dark,
+        fontProvider: {} as never,
+        onIntent: () => {},
+        onReorder: () => {},
+        onReorderActivated: () => {},
+        focusedIds: [],
+        switchRuntime: runtime as never,
+      }),
+    );
+    flushUi();
+    const findAll = (node: Node, type: string): Node[] => [
+      ...(node.type === type ? [node] : []),
+      ...node.children.flatMap((child) => findAll(child, type)),
+    ];
+    const labels = tree[0].children[4];
+    const [nameParagraph] = findAll(labels, "paragraph");
+    const drawn = () =>
+      (nameParagraph.props.paragraph as { value: { text?: string } | null })
+        .value;
+    // Overview: an unfocused body gets no label Paragraph at all.
+    expect(drawn()).toBeNull();
+    const rendersBefore = native.renders;
+    expect(rendersBefore).toBe(1);
+    const zooms: number[] = [];
+    for (const progress of [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]) {
+      runtime.progress.value = progress;
+      zooms.push(
+        sampleOrrerySwitchCamera(
+          runtime.cameraFrom.value,
+          runtime.cameraTo.value,
+          progress,
+        ).zoom,
+      );
+      flushUi();
+    }
+    // The drawn switch camera really crossed into the identity tier mid-switch…
+    expect(zooms[0]).toBeLessThan(IDENTITY_ENTER);
+    expect(zooms[8]).toBeGreaterThanOrEqual(IDENTITY_ENTER);
+    // …the publisher prepared the label (UI reaction → runOnJS → SharedValue)…
+    expect(drawn()?.text).toBe("Ada Lovelace");
+    expect(
+      native.paragraphs.some(
+        (p) =>
+          p.text === "Ada Lovelace" &&
+          (p.style.fontStyle as { weight?: number })?.weight === 600,
+      ),
+    ).toBe(true);
+    // …and no React render or state update was committed for it.
+    expect(native.renders).toBe(rendersBefore);
+    expect(native.setStateCalls).toBe(0);
   });
   it("passes complete Unicode to native ellipsis and derives dimensions/font sizes from native measurement", () => {
     const name = "👨‍👩‍👧‍👦 e\u0301 東京 مرحبا";

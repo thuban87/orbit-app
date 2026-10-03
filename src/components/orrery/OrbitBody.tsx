@@ -13,12 +13,10 @@ import {
   rrect,
   Skia,
   Image as SkiaImage,
-  type SkTypefaceFontProvider,
-  TextAlign,
 } from "@shopify/react-native-skia";
-import { useMemo } from "react";
 import { type SharedValue, useDerivedValue } from "react-native-reanimated";
 import type { BillboardPose } from "@/logic/orrery-frame";
+import type { OrreryInitialsSpec } from "./resources/orrery-text-service";
 import { useOrreryPhoto } from "./use-orrery-photo";
 
 export interface OrbitBodyProps {
@@ -36,16 +34,33 @@ export interface OrbitBodyProps {
   bodyFill: string;
   /** The deterministic fallback swatch (`avatarSwatches[swatchIndex(name)]`). */
   swatch: string;
-  /** The on-swatch initials glyph colour (`avatarSwatchText`). */
-  swatchText: string;
-  /** The contact's initials (empty string → swatch with no glyph). */
-  initials: string;
-  /** The bundled-font provider from `useFonts`; null until the font loads. */
-  fontProvider: SkTypefaceFontProvider | null;
+  /**
+   * 38.7-04 (D-46/D-52): the published initials spec. The glyph Paragraph is
+   * built by the OrreryTextService (ink `avatarSwatchText`); a body without an
+   * admitted entry draws the plain swatch disc.
+   */
+  initialsSpec?: SharedValue<OrreryInitialsSpec>;
+  /** This body's key in the initials spec (`bodyKey`). */
+  textKey?: string;
 }
 
 /** Status-outline stroke width around the planet disc. */
 const OUTLINE_WIDTH = 3;
+
+/**
+ * 38.7-04: the initials glyph metrics the text publisher keys on. The font
+ * size (~cap height fits the disc; device-UAT tunable, 13-08) is quantised to
+ * 0.5 px so near-equal radii share one cached Paragraph.
+ */
+export function orbitBodyInitialsLayout(radius: number): {
+  fontSize: number;
+  maxWidth: number;
+} {
+  return {
+    fontSize: Math.round(radius * 2) / 2,
+    maxWidth: Math.max(1, radius - OUTLINE_WIDTH / 2) * 2,
+  };
+}
 
 export function OrbitBody({
   cx,
@@ -54,9 +69,8 @@ export function OrbitBody({
   photo,
   bodyFill,
   swatch,
-  swatchText,
-  initials,
-  fontProvider,
+  initialsSpec,
+  textKey,
   projection,
   focusColor,
 }: OrbitBodyProps) {
@@ -81,29 +95,14 @@ export function OrbitBody({
 
   // Inner disc sits inside the status outline ring.
   const innerR = Math.max(1, radius - OUTLINE_WIDTH / 2);
-  const fontSize = radius; // ~cap height fits the disc (device-UAT tunable, 13-08).
-
-  // Initials Paragraph (new-to-repo Skia idiom). Null when the font has not loaded
-  // or the name is empty → the plain swatch shows with no glyph.
-  const paragraph = useMemo(() => {
-    if (!fontProvider || initials.length === 0) {
-      return null;
-    }
-    const p = Skia.ParagraphBuilder.Make(
-      { textAlign: TextAlign.Center, maxLines: 1, ellipsis: "…" },
-      fontProvider,
-    )
-      .pushStyle({
-        color: Skia.Color(swatchText),
-        fontFamilies: ["Inter"],
-        fontSize,
-      })
-      .addText(initials)
-      .pop()
-      .build();
-    p.layout(innerR * 2);
-    return p;
-  }, [fontProvider, initials, swatchText, fontSize, innerR]);
+  const { fontSize } = orbitBodyInitialsLayout(radius);
+  // Null until the service admits this body's initials (font loaded, body
+  // visible and large enough) → the plain swatch shows with no glyph.
+  const paragraph = useDerivedValue(() =>
+    textKey === undefined
+      ? null
+      : (initialsSpec?.value.initials[textKey]?.paragraph ?? null),
+  );
 
   const circleClip = rrect(
     rect(cx - innerR, cy - innerR, innerR * 2, innerR * 2),
@@ -141,14 +140,12 @@ export function OrbitBody({
         // Fallback: deterministic swatch + initials.
         <>
           <Circle cx={cx} cy={cy} r={innerR} color={swatch} />
-          {paragraph ? (
-            <Paragraph
-              paragraph={paragraph}
-              x={cx - innerR}
-              y={cy - fontSize * 0.72}
-              width={innerR * 2}
-            />
-          ) : null}
+          <Paragraph
+            paragraph={paragraph}
+            x={cx - innerR}
+            y={cy - fontSize * 0.72}
+            width={innerR * 2}
+          />
         </>
       )}
     </Group>
