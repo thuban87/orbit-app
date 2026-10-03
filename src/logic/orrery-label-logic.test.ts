@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { CameraRect, CameraViewport } from "./orrery-camera-logic";
 import {
   allocateLabels,
   DETAIL_ENTER,
   DETAIL_EXIT,
+  firstGrapheme,
   IDENTITY_ENTER,
   IDENTITY_EXIT,
   LABEL_GRID_CELL,
@@ -386,5 +387,116 @@ describe("D-52 indexed label allocator", () => {
     const started = performance.now();
     allocateLabels(candidates, "identity", viewport, exclusions);
     expect(performance.now() - started).toBeLessThan(50);
+  });
+});
+
+describe("D-33 Hermes-safe initials", () => {
+  // Emoji are written as escapes so no invisible characters sit in source.
+  const FAMILY = "\u{1F468}\u{200D}\u{1F469}\u{200D}\u{1F467}\u{200D}\u{1F466}";
+  const CANADA = "\u{1F1E8}\u{1F1E6}";
+  const TECHNOLOGIST = "\u{1F469}\u{1F3FD}\u{200D}\u{1F4BB}";
+  const SCOTLAND =
+    "\u{1F3F4}\u{E0067}\u{E0062}\u{E0073}\u{E0063}\u{E0074}\u{E007F}";
+  const KEYCAP_ONE = "\u{0031}\u{FE0F}\u{20E3}";
+  const CASES: [string, string][] = [
+    ["Ellie Brown", "EB"],
+    ["\u00E9mile Zola", "\u00C9Z"],
+    [`${FAMILY} \u00E9mile`, `${FAMILY}\u00C9`],
+    [`${FAMILY} e\u0301mile`, `${FAMILY}E\u0301`],
+    [`${CANADA} Canada`, `${CANADA}C`],
+    [`${TECHNOLOGIST} Dev`, `${TECHNOLOGIST}D`],
+    [`${SCOTLAND} Scot`, `${SCOTLAND}S`],
+    [`${KEYCAP_ONE} One`, `${KEYCAP_ONE}O`],
+    ["e\u0301mile", "E\u0301"],
+    ["Cher", "C"],
+    ["Ada Lovelace", "AL"],
+    ["  Ada   King  Lovelace ", "AK"],
+    ["   ", ""],
+    ["", ""],
+  ];
+  const original = Object.getOwnPropertyDescriptor(Intl, "Segmenter");
+  const LONE_SURROGATE =
+    /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+  describe("without Intl.Segmenter (Hermes)", () => {
+    beforeEach(() => {
+      Object.defineProperty(Intl, "Segmenter", {
+        value: undefined,
+        configurable: true,
+        writable: true,
+      });
+    });
+    afterEach(() => {
+      if (original) Object.defineProperty(Intl, "Segmenter", original);
+    });
+
+    it("the stub really removes Segmenter", () => {
+      expect(typeof Intl.Segmenter).not.toBe("function");
+    });
+    it.each(CASES)("%j → %j", (name, expected) => {
+      expect(orreryInitials(name)).toBe(expected);
+    });
+    it("never returns the full name (the Phase 29 fallback is gone)", () => {
+      expect(orreryInitials("Ellie Brown")).not.toBe("Ellie Brown");
+      expect(orreryInitials("Ellie Brown")).not.toContain("l");
+    });
+    it("firstGrapheme keeps whole clusters and splits nothing", () => {
+      expect(firstGrapheme(`${CANADA}${CANADA}`)).toBe(CANADA);
+      expect(firstGrapheme(`${TECHNOLOGIST}x`)).toBe(TECHNOLOGIST);
+      expect(firstGrapheme(`${SCOTLAND}x`)).toBe(SCOTLAND);
+      expect(firstGrapheme(`${KEYCAP_ONE}2`)).toBe(KEYCAP_ONE);
+      expect(firstGrapheme("e\u0301\u0302x")).toBe("e\u0301\u0302");
+      expect(firstGrapheme("\u{1F44D}\u{1F3FF}!")).toBe("\u{1F44D}\u{1F3FF}");
+      expect(firstGrapheme("")).toBe("");
+    });
+    it("fuzz: 500 random mixed strings never yield a lone surrogate", () => {
+      const pieces = [
+        "a",
+        "Z",
+        " ",
+        "  ",
+        "\u00E9",
+        "e\u0301",
+        "\u0301",
+        "\u200D",
+        "\uFE0F",
+        "\u20E3",
+        "\u{1F3FD}",
+        "\u{E0067}",
+        "\u{E007F}",
+        "\u{1F1E8}",
+        "\u{1F1E6}",
+        "\u{1F600}",
+        FAMILY,
+        CANADA,
+        TECHNOLOGIST,
+        SCOTLAND,
+        KEYCAP_ONE,
+        "\u6771",
+        "\u0645",
+      ];
+      let seed = 0x5eed;
+      const next = () => {
+        seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+        return seed;
+      };
+      for (let i = 0; i < 500; i++) {
+        let name = "";
+        const length = 1 + (next() % 8);
+        for (let j = 0; j < length; j++) name += pieces[next() % pieces.length];
+        const initials = orreryInitials(name);
+        expect(LONE_SURROGATE.test(initials), JSON.stringify(name)).toBe(false);
+        expect(initials.length).toBeLessThanOrEqual(name.length * 3);
+      }
+    });
+  });
+
+  describe("with Node's real Segmenter (both paths agree)", () => {
+    it("the real Segmenter is present", () => {
+      expect(typeof Intl.Segmenter).toBe("function");
+    });
+    it.each(CASES)("%j → %j", (name, expected) => {
+      expect(orreryInitials(name)).toBe(expected);
+    });
   });
 });
