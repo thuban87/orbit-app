@@ -71,18 +71,19 @@ export function prepareOrreryText(
 export function OrreryLabel({
   identity,
   text,
-  allocations,
+  allocationIndex,
   colors,
   context = false,
 }: {
   identity: string;
   text: PreparedOrreryText;
-  allocations: SharedValue<LabelAllocation[]>;
+  /** D-52: label id → allocation (first per id), built once per frame. */
+  allocationIndex: SharedValue<Readonly<Record<string, LabelAllocation>>>;
   colors: ThemePalette;
   context?: boolean;
 }) {
   const placement = useDerivedValue(() => {
-    const item = allocations.value.find((label) => label.id === identity);
+    const item = allocationIndex.value[identity];
     const rect = context ? item?.contextRect : item?.rect;
     return {
       x: rect?.x ?? 0,

@@ -6,8 +6,13 @@ import {
   type WorldBody,
 } from "./orrery-camera-logic";
 import {
+  type AnimatedFrame,
+  type AnimatedWorldBody,
   beginWorldTransition,
+  billboardPose,
   bodyKey,
+  frameBodyById,
+  frameBodyByKey,
   projectAnimatedFrame,
   projectSwitchChoreographyFrame,
   sampleWorldTransition,
@@ -199,5 +204,186 @@ describe("one animated Orrery frame", () => {
     expect(spun[0].y).not.toBe(world[0].y);
     expect(spinSwitchWorld(world, 1, 0)).toEqual(world);
     expect(spinSwitchWorld(world, 1, 1)).toEqual(world);
+  });
+});
+
+describe("D-52 per-frame O(1) body indexes", () => {
+  const moon = (parentId: number, uid: string): WorldBody => ({
+    id: -1,
+    kind: "satellite",
+    x: 12,
+    y: -60,
+    radius: 3,
+    ringRadius: 0,
+    satelliteTarget: {
+      kind: "satellite",
+      uid,
+      parentId,
+      parentUid: `p"${parentId}`,
+    },
+  });
+  const world = [
+    body(0, 0),
+    body(1, 70),
+    moon(1, "a"),
+    body(2, 120),
+    moon(1, "b"),
+    body(3, 200),
+  ];
+  const settled = (bodies: readonly WorldBody[]) =>
+    beginWorldTransition([], bodies, 9);
+
+  it("indexes every body by key and every non-satellite body by id, in the projection pass", () => {
+    for (const frame of [
+      projectAnimatedFrame(settled(world), 1, HOME_CAMERA, viewport),
+      projectSwitchChoreographyFrame(
+        beginSwitchChoreography(world, world, 9, {
+          intensity: 0,
+          reducedMotion: false,
+        }),
+        1,
+        HOME_CAMERA,
+        viewport,
+      ),
+    ]) {
+      expect(Object.keys(frame.keyIndex ?? {})).toHaveLength(
+        frame.bodies.length,
+      );
+      frame.bodies.forEach((projected, index) => {
+        expect(frame.keyIndex?.[bodyKey(projected)]).toBe(index);
+        expect(frameBodyByKey(frame, bodyKey(projected))).toBe(projected);
+        if (projected.kind !== "satellite") {
+          expect(frame.idIndex?.[projected.id]).toBe(index);
+          expect(frameBodyById(frame, projected.id)).toBe(projected);
+        }
+      });
+      // Satellites (id -1) are never in the id index.
+      expect(frame.idIndex?.[-1]).toBeUndefined();
+      expect(frameBodyById(frame, -1)).toBeUndefined();
+      expect(frameBodyByKey(frame, "contact:404")).toBeUndefined();
+      expect(frameBodyById(frame, 404)).toBeUndefined();
+    }
+  });
+
+  it("indexed lookups equal the first-match scans they replaced (also on an unindexed frame)", () => {
+    const frame = projectAnimatedFrame(
+      settled(world),
+      1,
+      HOME_CAMERA,
+      viewport,
+    );
+    const { keyIndex: _k, idIndex: _i, ...unindexed } = frame;
+    const keys = [...frame.bodies.map(bodyKey), "contact:99", "sun:5"];
+    for (const key of keys) {
+      const scan = frame.bodies.find((b) => bodyKey(b) === key);
+      expect(frameBodyByKey(frame, key)).toBe(scan);
+      expect(frameBodyByKey(unindexed, key)).toBe(scan);
+    }
+    for (const id of [0, 1, 2, 3, -1, 99]) {
+      const scan = frame.bodies.find(
+        (b) => b.kind !== "satellite" && b.id === id,
+      );
+      expect(frameBodyById(frame, id)).toBe(scan);
+      expect(frameBodyById(unindexed, id)).toBe(scan);
+    }
+  });
+
+  it("billboardPose is unchanged on a fixture", () => {
+    const frame = projectAnimatedFrame(
+      settled(world),
+      1,
+      HOME_CAMERA,
+      viewport,
+    );
+    // FROZEN copy of the pre-38.7 billboardPose (do not edit).
+    const legacyBillboard = (f: AnimatedFrame, key: string, radius: number) => {
+      const b = f.bodies.find((item) => bodyKey(item) === key);
+      return b
+        ? {
+            x: b.x,
+            y: b.y,
+            scale: b.radius / radius,
+            depth: b.depth,
+            opacity: b.visible ? b.opacity : 0,
+          }
+        : { x: 0, y: 0, scale: 1, depth: 0, opacity: 0 };
+    };
+    for (const key of [...frame.bodies.map(bodyKey), "contact:77"])
+      for (const radius of [1, 18])
+        expect(billboardPose(frame, key, radius)).toEqual(
+          legacyBillboard(frame, key, radius),
+        );
+  });
+
+  it("keyed world-transition setup equals the frozen old scan on randomised inputs", () => {
+    // FROZEN copy of the pre-38.7 beginWorldTransition (do not edit).
+    const legacyBegin = (
+      from: readonly AnimatedWorldBody[],
+      next: readonly WorldBody[],
+      generation: number,
+    ) => {
+      const keys = [
+        ...from.map(bodyKey),
+        ...next
+          .map(bodyKey)
+          .filter((key) => !from.some((b) => bodyKey(b) === key)),
+      ];
+      const starts: AnimatedWorldBody[] = [],
+        ends: AnimatedWorldBody[] = [];
+      for (const key of keys) {
+        const previous = from.find((b) => bodyKey(b) === key);
+        const live = next.find((b) => bodyKey(b) === key);
+        const base = live ?? previous;
+        if (!base) continue;
+        starts.push({
+          ...(previous ?? base),
+          radius: previous?.radius ?? base.radius * 0.75,
+          opacity: previous?.opacity ?? 0,
+          interactive: !!live,
+        });
+        ends.push({
+          ...base,
+          radius: live ? base.radius : base.radius * 0.75,
+          opacity: live ? 1 : 0,
+          interactive: !!live,
+        });
+      }
+      return { generation, from: starts, to: ends };
+    };
+    let state = 3;
+    const random = () => {
+      state = (state * 48271) % 2147483647;
+      return state / 2147483647;
+    };
+    const pick = () =>
+      Array.from({ length: 40 }, (_, slot) => slot)
+        .filter(() => random() < 0.55)
+        .map((slot) =>
+          slot === 0
+            ? body(0, 0)
+            : slot % 6 === 0
+              ? moon(slot % 5, `m${slot}`)
+              : body(slot, 40 + slot * 7),
+        )
+        .sort(() => random() - 0.5);
+    for (let round = 0; round < 60; round++) {
+      const from = sampleWorldTransition(
+        beginWorldTransition([], pick(), round),
+        random(),
+      );
+      const next = pick();
+      expect(beginWorldTransition(from, next, round)).toEqual(
+        legacyBegin(from, next, round),
+      );
+    }
+    // Repeated keys keep first-match semantics.
+    const repeated = [body(1, 70), body(1, 90)];
+    const repeatedFrom = sampleWorldTransition(
+      beginWorldTransition([], repeated, 1),
+      1,
+    );
+    expect(beginWorldTransition(repeatedFrom, repeated, 2)).toEqual(
+      legacyBegin(repeatedFrom, repeated, 2),
+    );
   });
 });

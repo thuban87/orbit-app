@@ -50,6 +50,14 @@ export interface SwitchChoreography {
   spinTurns: number;
   maximumRotation: number;
   radialDisplacement: number;
+  /**
+   * D-53 settled fast path: the progress-1 world of a settled choreography,
+   * precomputed once by `settleSwitchChoreography` and returned BY REFERENCE
+   * from every progress >= 1 sample. Consumers must never mutate it (every
+   * current consumer copies: `previewReorder`, satellite derivation, the
+   * projection); it is deep-frozen in `__DEV__` so an accidental write throws.
+   */
+  settledWorld?: ChoreographyWorldBody[];
 }
 
 export interface SwitchChoreographySample {
@@ -358,33 +366,47 @@ export function beginSwitchChoreography(
   "worklet";
   const source = sourceWorld.map(animated);
   const destination = destinationWorld.map(animated);
-  const keys = [
-    ...source.map(keyOf),
-    ...destination
-      .map(keyOf)
-      .filter((key) => !source.some((body) => keyOf(body) === key)),
-  ];
-  const entries = keys.flatMap((key): SwitchChoreographyEntry[] => {
-    const from = source.find((body) => keyOf(body) === key);
-    const to = destination.find((body) => keyOf(body) === key);
+  // D-53: O(N) keyed setup. Each index holds the FIRST body for a key, exactly
+  // what the previous per-key `find` returned; keys are always "kind:..."
+  // prefixed, so a plain object never collides with an Object.prototype name.
+  const sourceKeys: string[] = [];
+  const sourceIndex: Record<string, number> = {};
+  for (let index = 0; index < source.length; index++) {
+    const key = keyOf(source[index]);
+    sourceKeys.push(key);
+    if (sourceIndex[key] === undefined) sourceIndex[key] = index;
+  }
+  const keys = sourceKeys;
+  const destinationIndex: Record<string, number> = {};
+  for (let index = 0; index < destination.length; index++) {
+    const key = keyOf(destination[index]);
+    if (destinationIndex[key] === undefined) destinationIndex[key] = index;
+    // Destination-only keys follow the source keys, in destination order.
+    if (sourceIndex[key] === undefined) keys.push(key);
+  }
+  const entries: SwitchChoreographyEntry[] = [];
+  for (let index = 0; index < keys.length; index++) {
+    const key = keys[index];
+    const fromIndex = sourceIndex[key];
+    const toIndex = destinationIndex[key];
+    const from = fromIndex === undefined ? undefined : source[fromIndex];
+    const to = toIndex === undefined ? undefined : destination[toIndex];
+    if (!from && !to) continue;
     const contact = (from ?? to)?.kind === "contact";
-    if (!from && !to) return [];
-    return [
-      {
-        key,
-        source: from,
-        destination: to,
-        role: !contact
-          ? "anchor"
-          : from && to
-            ? "retained"
-            : from
-              ? "leaving"
-              : "entering",
-        stagger: contact ? stableUnit(key) * STAGGER_WINDOW : 0,
-      },
-    ];
-  });
+    entries.push({
+      key,
+      source: from,
+      destination: to,
+      role: !contact
+        ? "anchor"
+        : from && to
+          ? "retained"
+          : from
+            ? "leaving"
+            : "entering",
+      stagger: contact ? stableUnit(key) * STAGGER_WINDOW : 0,
+    });
+  }
   const intensity = clamp01(options.intensity);
   const spinTurns = options.reducedMotion
     ? 0
@@ -403,6 +425,50 @@ export function beginSwitchChoreography(
   };
 }
 
+/** `__DEV__` only: make the shared settled world throw on any write. */
+function freezeSettledWorld(world: ChoreographyWorldBody[]): void {
+  "worklet";
+  for (let index = 0; index < world.length; index++) {
+    const body = world[index];
+    if (body.satelliteTarget) Object.freeze(body.satelliteTarget);
+    Object.freeze(body);
+  }
+  Object.freeze(world);
+}
+
+/**
+ * A settled (non-switching) choreography of `world`: exactly
+ * `beginSwitchChoreography(world, world, generation, { intensity: 0, reducedMotion })`
+ * plus the D-53 `settledWorld` fast path — precisely what the per-entry
+ * progress-1 sample produced — so a settled frame allocates no world per frame.
+ * Defined above `settleSwitchChoreography` and below its own callees (Hermes
+ * worklet forward-ref hazard).
+ */
+export function beginSettledSwitchChoreography(
+  world: readonly (
+    | WorldBody
+    | (WorldBody &
+        Partial<Pick<ChoreographyWorldBody, "opacity" | "interactive">>)
+  )[],
+  generation: number,
+  reducedMotion: boolean,
+): SwitchChoreography {
+  "worklet";
+  const settled = beginSwitchChoreography(world, world, generation, {
+    intensity: 0,
+    reducedMotion,
+  });
+  const settledWorld: ChoreographyWorldBody[] = [];
+  for (let index = 0; index < settled.entries.length; index++) {
+    const body = settled.entries[index].destination;
+    if (body) settledWorld.push({ ...body, opacity: 1, interactive: true });
+  }
+  // Release builds skip the freeze: no per-settle cost (cycle-1 M6).
+  if (typeof __DEV__ !== "undefined" && __DEV__)
+    freezeSettledWorld(settledWorld);
+  return { ...settled, settledWorld };
+}
+
 /**
  * Settled geometry retirement (RG-027, performance/AUD-PERF-001, D-19): once a
  * switch has completed, rebuild the choreography from its destination bodies
@@ -411,7 +477,10 @@ export function beginSwitchChoreography(
  * generation and reduced motion are preserved and shared keys stay stable.
  * Only call this for a completed switch — a running one still needs its
  * departures for interruption continuity. Defined after
- * `beginSwitchChoreography`, which it calls (Hermes worklet forward-ref hazard).
+ * `beginSettledSwitchChoreography`, which it calls (Hermes worklet forward-ref
+ * hazard).
+ *
+ * D-53: the result carries `settledWorld` (see `beginSettledSwitchChoreography`).
  */
 export function settleSwitchChoreography(
   transition: SwitchChoreography,
@@ -422,11 +491,10 @@ export function settleSwitchChoreography(
     const body = transition.entries[index].destination;
     if (body) destination.push(body);
   }
-  return beginSwitchChoreography(
-    destination,
+  return beginSettledSwitchChoreography(
     destination,
     transition.generation,
-    { intensity: 0, reducedMotion: transition.reducedMotion },
+    transition.reducedMotion,
   );
 }
 
@@ -443,6 +511,16 @@ export function sampleSwitchChoreography(
   const angularVelocity = transition.reducedMotion
     ? 0
     : transition.maximumRotation * normalizedAngularVelocity(progress);
+  // D-53 settled fast path: the shared, never-mutated settled world.
+  if (progress >= 1 && transition.settledWorld)
+    return {
+      generation: transition.generation,
+      progress,
+      phase: phaseAt(progress),
+      accumulatedRotation,
+      angularVelocity,
+      world: transition.settledWorld,
+    };
   return {
     generation: transition.generation,
     progress,

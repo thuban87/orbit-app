@@ -21,13 +21,24 @@ export interface WorldTransition {
   from: AnimatedWorldBody[];
   to: AnimatedWorldBody[];
 }
-export type AnimatedFrame = Omit<ProjectedFrame, "bodies"> & {
-  bodies: (ProjectedFrame["bodies"][number] & {
-    opacity: number;
-    interactive: boolean;
-    visible: boolean;
-  })[];
-};
+/**
+ * D-52: per-frame O(1) body indexes, built in the same pass as the frame's
+ * bodies. `keyIndex`: bodyKey → index of the FIRST body with that key.
+ * `idIndex`: id → index of the FIRST non-satellite body with that id. Read them
+ * through `frameBodyByKey` / `frameBodyById`, never directly.
+ */
+export interface FrameBodyIndex {
+  keyIndex?: Record<string, number>;
+  idIndex?: Record<number, number>;
+}
+export type AnimatedFrame = Omit<ProjectedFrame, "bodies"> &
+  FrameBodyIndex & {
+    bodies: (ProjectedFrame["bodies"][number] & {
+      opacity: number;
+      interactive: boolean;
+      visible: boolean;
+    })[];
+  };
 export function bodyKey(
   body: Pick<WorldBody, "id" | "kind" | "satelliteTarget">,
 ): string {
@@ -47,17 +58,30 @@ export function beginWorldTransition(
   generation: number,
 ): WorldTransition {
   "worklet";
-  const keys = [
-    ...from.map(bodyKey),
-    ...world
-      .map(bodyKey)
-      .filter((key) => !from.some((b) => bodyKey(b) === key)),
-  ];
+  // D-53: O(N) keyed setup; each index holds the FIRST body for a key, exactly
+  // what the previous per-key `find` returned. Keys are "kind:..." prefixed, so
+  // a plain object never collides with an Object.prototype name.
+  const keys: string[] = [];
+  const fromIndex: Record<string, number> = {};
+  for (let index = 0; index < from.length; index++) {
+    const key = bodyKey(from[index]);
+    keys.push(key);
+    if (fromIndex[key] === undefined) fromIndex[key] = index;
+  }
+  const worldIndex: Record<string, number> = {};
+  for (let index = 0; index < world.length; index++) {
+    const key = bodyKey(world[index]);
+    if (worldIndex[key] === undefined) worldIndex[key] = index;
+    if (fromIndex[key] === undefined) keys.push(key);
+  }
   const starts: AnimatedWorldBody[] = [],
     ends: AnimatedWorldBody[] = [];
   for (const key of keys) {
-    const previous = from.find((b) => bodyKey(b) === key);
-    const next = world.find((b) => bodyKey(b) === key);
+    const previousIndex = fromIndex[key];
+    const nextIndex = worldIndex[key];
+    const previous =
+      previousIndex === undefined ? undefined : from[previousIndex];
+    const next = nextIndex === undefined ? undefined : world[nextIndex];
     const live = !!next;
     const base = next ?? previous;
     if (!base) continue;
@@ -126,6 +150,42 @@ export function spinSwitchWorld(
     };
   });
 }
+/**
+ * Decorates projected bodies with opacity/interactivity/visibility from the
+ * sampled world and builds the frame's key and id indexes in the same pass.
+ */
+function animateProjectedBodies(
+  projected: ProjectedFrame["bodies"],
+  world: readonly { opacity: number; interactive: boolean }[],
+  viewport: CameraViewport,
+): Pick<AnimatedFrame, "bodies"> & Required<FrameBodyIndex> {
+  "worklet";
+  const bodies: AnimatedFrame["bodies"] = [];
+  const keyIndex: Record<string, number> = {};
+  const idIndex: Record<number, number> = {};
+  for (let index = 0; index < projected.length; index++) {
+    const body = projected[index];
+    const opacity = world[index].opacity;
+    // Halo-aware media culling only. The full frame remains the hit authority.
+    const reach = body.radius * (body.kind === "sun" ? 2 : 1.3);
+    bodies.push({
+      ...body,
+      opacity,
+      interactive: world[index].interactive && opacity > 0,
+      visible:
+        opacity > 0 &&
+        body.x + reach >= 0 &&
+        body.y + reach >= 0 &&
+        body.x - reach <= viewport.width &&
+        body.y - reach <= viewport.height,
+    });
+    const key = bodyKey(body);
+    if (keyIndex[key] === undefined) keyIndex[key] = index;
+    if (body.kind !== "satellite" && idIndex[body.id] === undefined)
+      idIndex[body.id] = index;
+  }
+  return { bodies, keyIndex, idIndex };
+}
 export function projectAnimatedFrame(
   transition: WorldTransition,
   fraction: number,
@@ -137,22 +197,7 @@ export function projectAnimatedFrame(
   const frame = projectFrame(world, pose, viewport, transition.generation);
   return {
     ...frame,
-    bodies: frame.bodies.map((body, index) => {
-      const opacity = world[index].opacity;
-      // Halo-aware media culling only. The full frame remains the hit authority.
-      const reach = body.radius * (body.kind === "sun" ? 2 : 1.3);
-      return {
-        ...body,
-        opacity,
-        interactive: world[index].interactive && opacity > 0,
-        visible:
-          opacity > 0 &&
-          body.x + reach >= 0 &&
-          body.y + reach >= 0 &&
-          body.x - reach <= viewport.width &&
-          body.y - reach <= viewport.height,
-      };
-    }),
+    ...animateProjectedBodies(frame.bodies, world, viewport),
   };
 }
 
@@ -174,23 +219,38 @@ export function projectSwitchChoreographyFrame(
   return {
     ...frame,
     sample,
-    bodies: frame.bodies.map((body, index) => {
-      const current = sample.world[index];
-      const opacity = current.opacity;
-      const reach = body.radius * (body.kind === "sun" ? 2 : 1.3);
-      return {
-        ...body,
-        opacity,
-        interactive: current.interactive && opacity > 0,
-        visible:
-          opacity > 0 &&
-          body.x + reach >= 0 &&
-          body.y + reach >= 0 &&
-          body.x - reach <= viewport.width &&
-          body.y - reach <= viewport.height,
-      };
-    }),
+    ...animateProjectedBodies(frame.bodies, sample.world, viewport),
   };
+}
+
+type IndexedBodies<B> = { bodies: readonly B[] } & FrameBodyIndex;
+type KeyedBody = Pick<WorldBody, "id" | "kind" | "satelliteTarget">;
+
+/** O(1) when the frame carries its index; otherwise the equivalent first-match scan. */
+export function frameBodyByKey<B extends KeyedBody>(
+  frame: IndexedBodies<B>,
+  key: string,
+): B | undefined {
+  "worklet";
+  const index = frame.keyIndex;
+  if (!index) return frame.bodies.find((body) => bodyKey(body) === key);
+  const found = index[key];
+  return found === undefined ? undefined : frame.bodies[found];
+}
+
+/** The first non-satellite body with `id` (contacts and the sun); O(1) when indexed. */
+export function frameBodyById<B extends KeyedBody>(
+  frame: IndexedBodies<B>,
+  id: number,
+): B | undefined {
+  "worklet";
+  const index = frame.idIndex;
+  if (!index)
+    return frame.bodies.find(
+      (body) => body.kind !== "satellite" && body.id === id,
+    );
+  const found = index[id];
+  return found === undefined ? undefined : frame.bodies[found];
 }
 
 export interface BillboardPose {
@@ -206,7 +266,7 @@ export function billboardPose(
   radius: number,
 ): BillboardPose {
   "worklet";
-  const b = frame.bodies.find((body) => bodyKey(body) === key);
+  const b = frameBodyByKey(frame, key);
   return b
     ? {
         x: b.x,

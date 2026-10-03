@@ -559,3 +559,82 @@ describe("D-52 freeze: runtime identity", () => {
     expect(mounted.rerender()).toBe(published);
   });
 });
+
+describe("D-53 keyed resource merge/prune", () => {
+  /** FROZEN copies of the pre-38.7 implementations (do not edit). */
+  const legacyResourcesFor = (scene: OrrerySceneSnapshot) =>
+    scene.world.map((body) => ({ key: bodyKey(body), body, scene }));
+  const legacyNext = (
+    current: readonly OrreryBodyResource[],
+    scene: OrrerySceneSnapshot,
+    isSwitch: boolean,
+  ): OrreryBodyResource[] => {
+    if (!(isSwitch && current.length > 0)) return legacyResourcesFor(scene);
+    const fresh = legacyResourcesFor(scene);
+    return [
+      ...current.map(
+        (old) => fresh.find((item) => item.key === old.key) ?? old,
+      ),
+      ...fresh.filter((item) => !current.some((old) => old.key === item.key)),
+    ];
+  };
+  const legacyPrune = (
+    current: readonly OrreryBodyResource[],
+    scene: OrrerySceneSnapshot,
+  ) =>
+    current.filter((resource) =>
+      scene.world.some((body) => bodyKey(body) === resource.key),
+    );
+
+  let seed = 17;
+  const random = () => {
+    seed = (seed * 1103515245 + 12345) % 2147483648;
+    return seed / 2147483648;
+  };
+  const randomScene = (generation: number): OrrerySceneSnapshot => {
+    const world: WorldBody[] = [];
+    for (let id = 0; id < 60; id++) {
+      if (random() < 0.5) continue;
+      world.push(
+        id === 0
+          ? { id: 0, kind: "sun", x: 0, y: 0, radius: 18, ringRadius: 0 }
+          : {
+              id,
+              kind: "contact",
+              x: random() * 200,
+              y: random() * 200,
+              radius: 12,
+              ringRadius: 80,
+            },
+      );
+    }
+    for (let i = world.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [world[i], world[j]] = [world[j], world[i]];
+    }
+    return sceneOf(generation, world);
+  };
+
+  it("merge and prune match the frozen old scans on randomised publication chains", () => {
+    for (let chain = 0; chain < 40; chain++) {
+      let current: OrreryBodyResource[] = [];
+      let legacyCurrent: OrreryBodyResource[] = [];
+      for (let step = 1; step <= 8; step++) {
+        const scene = randomScene(step);
+        const isSwitch = random() < 0.7;
+        current = nextOrreryResources(current, scene, isSwitch);
+        legacyCurrent = legacyNext(legacyCurrent, scene, isSwitch);
+        expect(current).toEqual(legacyCurrent);
+        // Same retained objects (keyed media survive), not just equal ones.
+        current.forEach((resource, index) => {
+          expect(resource.scene).toBe(legacyCurrent[index].scene);
+        });
+        if (random() < 0.5) {
+          current = pruneOrreryResources(current, scene);
+          legacyCurrent = legacyPrune(legacyCurrent, scene);
+          expect(current).toEqual(legacyCurrent);
+        }
+      }
+    }
+  });
+});

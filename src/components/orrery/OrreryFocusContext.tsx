@@ -14,7 +14,12 @@ import {
   usableCameraRect,
 } from "@/logic/orrery-camera-logic";
 import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
-import { bodyKey } from "@/logic/orrery-frame";
+import {
+  bodyKey,
+  type FrameBodyIndex,
+  frameBodyById,
+  frameBodyByKey,
+} from "@/logic/orrery-frame";
 import { SPACING } from "@/theme/tokens/spacing";
 import { OrreryNotice } from "./OrreryFeedback";
 
@@ -34,7 +39,7 @@ export function OrreryFocusContext({
 }: {
   target: OrreryContactTarget | OrrerySatelliteTarget;
   name: string;
-  frame: SharedValue<ProjectedFrame | null>;
+  frame: SharedValue<(ProjectedFrame & FrameBodyIndex) | null>;
   blocked: boolean;
   onClear: () => void;
   onProfile?: () => void;
@@ -46,12 +51,15 @@ export function OrreryFocusContext({
   const position = useAnimatedStyle(() => {
     const current = frame.value;
     const region = current ? usableCameraRect(current.viewport) : null;
-    const body = current?.bodies.find((item) =>
-      target.kind === "satellite"
-        ? bodyKey(item) ===
-          bodyKey({ id: -1, kind: "satellite", satelliteTarget: target })
-        : item.kind !== "satellite" && item.id === target.id,
-    );
+    // D-52: O(1) through the frame's index (same first-match semantics).
+    const body = !current
+      ? undefined
+      : target.kind === "satellite"
+        ? frameBodyByKey(
+            current,
+            bodyKey({ id: -1, kind: "satellite", satelliteTarget: target }),
+          )
+        : frameBodyById(current, target.id);
     if (!region || !body) return { opacity: 0 };
     const width = Math.min(280, region.width);
     const limit = Math.min(height, region.height / 2);

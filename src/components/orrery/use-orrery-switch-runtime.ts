@@ -12,6 +12,7 @@ import {
 import type { CameraPose, WorldBody } from "@/logic/orrery-camera-logic";
 import { bodyKey } from "@/logic/orrery-frame";
 import {
+  beginSettledSwitchChoreography,
   beginSwitchChoreography,
   type ChoreographyWorldBody,
   type SwitchChoreography,
@@ -203,16 +204,20 @@ function resourcesFor(scene: OrrerySceneSnapshot): OrreryBodyResource[] {
   return scene.world.map((body) => ({ key: bodyKey(body), body, scene }));
 }
 
+/** D-53: O(N) keyed merge — same output and order as the per-key find/some scan. */
 function mergeResources(
   previous: readonly OrreryBodyResource[],
   scene: OrrerySceneSnapshot,
 ): OrreryBodyResource[] {
   const current = resourcesFor(scene);
+  // First resource per key, exactly what `find` returned.
+  const currentByKey = new Map<string, OrreryBodyResource>();
+  for (const item of current)
+    if (!currentByKey.has(item.key)) currentByKey.set(item.key, item);
+  const previousKeys = new Set(previous.map((old) => old.key));
   return [
-    ...previous.map(
-      (old) => current.find((item) => item.key === old.key) ?? old,
-    ),
-    ...current.filter((item) => !previous.some((old) => old.key === item.key)),
+    ...previous.map((old) => currentByKey.get(old.key) ?? old),
+    ...current.filter((item) => !previousKeys.has(item.key)),
   ];
 }
 
@@ -238,9 +243,8 @@ export function pruneOrreryResources(
   current: readonly OrreryBodyResource[],
   scene: OrrerySceneSnapshot,
 ): OrreryBodyResource[] {
-  return current.filter((resource) =>
-    scene.world.some((body) => bodyKey(body) === resource.key),
-  );
+  const keys = new Set(scene.world.map(bodyKey));
+  return current.filter((resource) => keys.has(resource.key));
 }
 
 export interface OrrerySwitchRuntime {
@@ -334,10 +338,13 @@ export function useOrrerySwitchRuntime(
         cancelAnimation(progress);
         const reduced = reducedMotion.value;
         if (!isSwitch || transition.value.generation === 0) {
-          transition.value = beginSwitchChoreography(world, world, generation, {
-            intensity: 0,
-            reducedMotion: reduced,
-          });
+          // Same choreography as beginSwitchChoreography(world, world, ...)
+          // at intensity 0, plus the settled fast path (D-53).
+          transition.value = beginSettledSwitchChoreography(
+            world,
+            generation,
+            reduced,
+          );
           cameraFrom.value = { ...destinationHome };
           cameraTo.value = { ...destinationHome };
           progress.value = 1;

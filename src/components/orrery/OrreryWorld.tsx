@@ -30,10 +30,13 @@ import {
   type AnimatedFrame,
   billboardPose,
   bodyKey,
+  frameBodyById,
+  frameBodyByKey,
   projectAnimatedFrame,
 } from "@/logic/orrery-frame";
 import {
   allocateLabels,
+  type LabelAllocation,
   labelContext,
   orreryInitials,
   type SemanticLevel,
@@ -89,6 +92,30 @@ const EMPTY_IDS: readonly number[] = Object.freeze([]);
 const EMPTY_RELATIONS: Readonly<Record<number, string>> = Object.freeze({});
 const EMPTY_SATELLITES: readonly OrrerySatellite[] = Object.freeze([]);
 
+type SceneMember = OrrerySceneSnapshot["contacts"][number];
+/**
+ * D-52: id → FIRST row with that id (exactly what `find` returned), built once
+ * per row array instead of a scan per body on every render. Keyed weakly on the
+ * array, so an older scene's map is collected with its scene.
+ */
+const rowsById = new WeakMap<
+  readonly SceneMember[],
+  ReadonlyMap<number, SceneMember>
+>();
+function rowById(
+  rows: readonly SceneMember[],
+  id: number,
+): SceneMember | undefined {
+  let index = rowsById.get(rows);
+  if (!index) {
+    const built = new Map<number, SceneMember>();
+    for (const row of rows) if (!built.has(row.id)) built.set(row.id, row);
+    rowsById.set(rows, built);
+    index = built;
+  }
+  return index.get(id);
+}
+
 function ReorderGhost({
   frame,
   drag,
@@ -102,7 +129,7 @@ function ReorderGhost({
     const result = Skia.Path.Make();
     const held = drag.value;
     if (!held?.active) return result;
-    const body = frame.value.bodies.find((body) => body.id === held.id);
+    const body = frameBodyById(frame.value, held.id);
     const points = body?.ringPath ?? [];
     if (points.length) {
       result.moveTo(points[0].x, points[0].y);
@@ -136,7 +163,7 @@ function ProjectedBody({
     starPalette: colors.starPalette,
     colors,
   });
-  const contact = scene.contacts.find((item) => item.id === body.id);
+  const contact = rowById(scene.contacts, body.id);
   const name =
     body.kind === "sun"
       ? resolved.kind === "self"
@@ -295,9 +322,7 @@ export function OrreryWorld({
     () =>
       scene.world.flatMap((body) => {
         if (body.id === 0) return [];
-        const member = scene.systemSnapshot.members.find(
-          (c) => c.id === body.id,
-        );
+        const member = rowById(scene.systemSnapshot.members, body.id);
         const name =
           member?.name ??
           (body.kind === "sun" ? scene.sun.sunContactName : undefined);
@@ -381,7 +406,7 @@ export function OrreryWorld({
   const allocations = useDerivedValue(() => {
     const current = frame.value;
     const candidates = measured.flatMap((label) => {
-      const body = current.bodies.find((b) => bodyKey(b) === label.id);
+      const body = frameBodyByKey(current, label.id);
       return body?.visible && body.interactive
         ? [
             {
@@ -408,6 +433,15 @@ export function OrreryWorld({
       current.viewport,
       exclusions,
     );
+  });
+  // D-52: label id → allocation (first per id, as `find` returned), once per
+  // frame, so each label reads O(1) instead of scanning every allocation.
+  const allocationIndex = useDerivedValue(() => {
+    const index: Record<string, LabelAllocation> = {};
+    const list = allocations.value;
+    for (let i = 0; i < list.length; i++)
+      if (index[list[i].id] === undefined) index[list[i].id] = list[i];
+    return index;
   });
   const identities = useMemo<OrreryContactTarget[]>(
     () => [
@@ -512,9 +546,10 @@ export function OrreryWorld({
         satelliteTarget: focusedSatellite,
       });
       const current = frame.value;
-      const body = current.bodies.find(
-        (b) => bodyKey(b) === key && b.interactive,
-      );
+      // Keys are unique within a frame, so the indexed body is the one `find`
+      // matched; a non-interactive body is treated as absent, as before.
+      const indexed = frameBodyByKey(current, key);
+      const body = indexed?.interactive ? indexed : undefined;
       if (!body) return true;
       const reach = body.hitRadius + 44;
       const rect = current.viewport.usable ?? {
@@ -554,8 +589,8 @@ export function OrreryWorld({
                 identity={resource.key}
                 frame={frame}
                 style={orreryRingStyle(
-                  resource.scene.contacts.find((c) => c.id === resource.body.id)
-                    ?.status ?? null,
+                  rowById(resource.scene.contacts, resource.body.id)?.status ??
+                    null,
                   colors,
                 )}
               />
@@ -613,14 +648,14 @@ export function OrreryWorld({
               <OrreryLabel
                 identity={label.id}
                 text={label.text}
-                allocations={allocations}
+                allocationIndex={allocationIndex}
                 colors={colors}
               />
               {label.context ? (
                 <OrreryLabel
                   identity={label.id}
                   text={label.context}
-                  allocations={allocations}
+                  allocationIndex={allocationIndex}
                   colors={colors}
                   context
                 />
