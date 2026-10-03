@@ -94,8 +94,11 @@ def cold_start(serial: str) -> None:
 def run(serial: str, pre_steps: str | None, out_dir: str | None) -> dict:
     cold_start(serial)
     steps: list[str] = []
+    # Before T0, every Orrery tab tap is followed by a still-screen wait so that no UI
+    # dump runs while a scene loads (adb_device.A11Y_QUIET_S). T0 sampling is unchanged.
     if pre_steps == "churn":
         adb_device.tap_tab(serial, "Orrery")
+        adb_device.wait_screen_still(serial)
         time.sleep(4)
         for _ in range(CHURN_REPEATS):
             for system in CHURN_CYCLE:
@@ -108,11 +111,13 @@ def run(serial: str, pre_steps: str | None, out_dir: str | None) -> dict:
             if i < CHURN_REPEATS - 1:
                 adb_device.tap_tab(serial, "Orrery")
                 steps.append("tab-return")
+                adb_device.wait_screen_still(serial)
                 time.sleep(4)
         t0 = adb_device.tap_tab(serial, "Orrery")
         steps.append("tab-return (T0)")
     elif pre_steps == "background":
         adb_device.tap_tab(serial, "Orrery")
+        adb_device.wait_screen_still(serial)
         time.sleep(4)
         adb_device.shell(serial, "input keyevent KEYCODE_HOME")
         steps.append("home")

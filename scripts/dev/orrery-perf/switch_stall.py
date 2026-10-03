@@ -46,18 +46,19 @@ def score_switch(presents: list[int], tap_ns: int, window_s: float = WINDOW_S) -
 
 
 def one_switch(serial: str, layer: dict, clock: adb_device.ClockMap, src: str, dst: str) -> dict:
-    adb_device.select_system(serial, src)
+    adb_device.select_system(serial, src)  # waits until the screen is still
     time.sleep(SETTLE_S)
     anr_check.mark(serial)
     sampler = sf_sampler.Sampler(serial, layer, clock).start()
     time.sleep(PRE_TAP_S)
-    tapped = adb_device.select_system(serial, dst)
+    tapped = adb_device.select_system(serial, dst, settle=False)
     if tapped is None:
         sampler.stop()
         raise adb_device.DeviceError(f"{dst} was already current; nothing switched")
     tap_ns = clock.device_ns(tapped)
     time.sleep(WINDOW_S + 0.5)
     sampler.stop()
+    adb_device.wait_screen_still(serial)
     sf = sampler.result()
     covered = sf["first_poll_ns"] is not None and sf["first_poll_ns"] <= tap_ns and \
         sf["last_poll_ns"] >= tap_ns + int(WINDOW_S * 1e9) and \

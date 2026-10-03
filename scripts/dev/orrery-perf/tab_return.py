@@ -254,15 +254,17 @@ def save_strip(mp4: str, indices: list[int], out_dir: str, stem: str) -> list[st
     return paths
 
 
-def record_run(serial: str, regions: dict, background: bool, out_dir: str, stem: str) -> dict:
-    nodes = adb_device.ui_dump(serial)
-    orrery_tab = adb_device.find_tab(nodes, "Orrery")
+def record_run(serial: str, regions: dict, tabs: dict, background: bool, out_dir: str, stem: str) -> dict:
+    orrery_tab, digest_tab = tabs["Orrery"], tabs["Digest"]
     if background:
         adb_device.shell(serial, "input keyevent KEYCODE_HOME")
         time.sleep(BACKGROUND_DWELL_S)
     else:
-        adb_device.tap_tab(serial, "Digest")
+        adb_device.tap(serial, digest_tab, touchscreen=True)
         time.sleep(DIGEST_DWELL_S)
+    # No UI dump near the scene reload (adb_device.A11Y_QUIET_S); tabs were located
+    # once, before the runs.
+    adb_device.a11y_quiet()
     adb_device.shell(serial, f"rm -f {REMOTE_MP4}")
     rec_start = time.monotonic()
     rec = subprocess.Popen([adb_device.ADB, "-s", serial, "shell",
@@ -313,10 +315,12 @@ def main() -> int:
     nodes = adb_device.ui_dump(serial)
     adb_device.dismiss_logbox(serial, nodes)
     regions = regions_from_ui(nodes, screen_size(serial))
+    tabs = {t: adb_device.find_tab(nodes, t) for t in ("Orrery", "Digest")}
     runs = []
     for k in range(args.runs):
-        runs.append(record_run(serial, regions, args.background, args.out_dir,
+        runs.append(record_run(serial, regions, tabs, args.background, args.out_dir,
                                f"{'background' if args.background else 'tab'}-run{k + 1}"))
+        adb_device.wait_screen_still(serial)
         time.sleep(3.0)
     totals = [r["total_s"] for r in runs if r.get("outcome") == "valid"]
     payload = {"model": args.model, "mode": "background" if args.background else "tab", "regions": regions,

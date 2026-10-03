@@ -223,7 +223,41 @@ def parse_ui(xml_text: str) -> list[Node]:
     return nodes
 
 
-UI_DUMP_TIMEOUT_S = 30.0
+# --- Accessibility quiet ---------------------------------------------------------
+# A `uiautomator dump` attaches an accessibility client. On both test phones today's
+# Orbit release build crashed (SIGSEGV on the JS thread) when a large System (All
+# Contacts, Orrery Stress) loaded within seconds of a dump, and loaded fine with no
+# dump (2026-10-03). So any tap that starts a scene load waits A11Y_QUIET_S after the
+# last dump, and after a switch nothing dumps until the screen is still.
+A11Y_QUIET_S = 10.0
+_last_dump = 0.0
+
+
+def a11y_quiet() -> None:
+    """Sleep until A11Y_QUIET_S have passed since the last UI dump."""
+    time.sleep(max(0.0, _last_dump + A11Y_QUIET_S - time.monotonic()))
+
+
+# After a tap that starts a scene load, nothing dumps the UI for a fixed dwell. On
+# main no "loaded" signal is usable without accessibility: the screen of a stalled UI
+# thread is also still, and today's Orrery keeps the UI thread busy at rest (6 Pro
+# ~32 %, Pixel 3a ~98 % of a core, 2026-10-03). Dwell per phone from the observed
+# Size 120 reloads (6 Pro ~7 s, 3a ~22 s) with margin.
+SETTLE_LOAD_S = {"Pixel 6 Pro": 20.0, "Pixel 3a": 60.0}
+SETTLE_LOAD_DEFAULT_S = 60.0
+
+
+def wait_screen_still(serial: str) -> float:
+    """Dwell after a scene-loading tap with no UI dump (see SETTLE_LOAD_S). Returns seconds waited."""
+    model = shell(serial, "getprop ro.product.model").strip()
+    dwell = SETTLE_LOAD_S.get(model, SETTLE_LOAD_DEFAULT_S)
+    time.sleep(dwell)
+    if not app_pid(serial):
+        raise DeviceError("Orbit is not running (crashed or closed) after a scene load")
+    return dwell
+
+
+UI_DUMP_TIMEOUT_S = 90.0
 UI_DUMP_RETRY_S = 0.7
 
 
@@ -232,10 +266,14 @@ def ui_dump(serial: str, timeout_s: float = UI_DUMP_TIMEOUT_S) -> list[Node]:
     the UI thread is busy (6 Pro: a System switch, a sheet opening; Pixel 3a: "null
     root node" for ~10 s after a switch; release builds, 2026-10-03), so misses are
     retried until `timeout_s` before it is an error."""
+    global _last_dump
     path = "/sdcard/orbperf-ui.xml"
     deadline = time.monotonic() + timeout_s
     while True:
-        xml_text = shell(serial, f"uiautomator dump {path} >/dev/null 2>&1 && cat {path}; rm -f {path}")
+        try:
+            xml_text = shell(serial, f"uiautomator dump {path} >/dev/null 2>&1 && cat {path}; rm -f {path}")
+        finally:
+            _last_dump = time.monotonic()
         start = xml_text.find("<?xml")
         if start >= 0:
             return parse_ui(xml_text[start:])
@@ -314,6 +352,7 @@ def tap_tab(serial: str, title: str) -> float:
     node = find_tab(nodes, title)
     if not node:
         raise DeviceError(f"tab {title!r} not found in the UI tree")
+    a11y_quiet()
     host = time.monotonic()
     tap(serial, node, touchscreen=True)
     return host
@@ -342,11 +381,13 @@ def collapsed_groups(nodes: list[Node]) -> list[Node]:
     return out
 
 
-def select_system(serial: str, name: str, max_scrolls: int = 4) -> float | None:
+def select_system(serial: str, name: str, max_scrolls: int = 4, settle: bool = True) -> float | None:
     """Open the System selector and pick `name` by its row label.
 
     Returns the host time of the row tap, or None if `name` was already the
-    current System (nothing tapped). Collapsed groups are expanded and the sheet
+    current System (nothing tapped). The row tap waits A11Y_QUIET_S after the last
+    UI dump; with `settle` it then waits until the screen is still (no UI dumps
+    while the scene loads). Collapsed groups are expanded and the sheet
     is scrolled as needed; rows are found by accessibility label, never by
     coordinates.
     """
@@ -354,17 +395,21 @@ def select_system(serial: str, name: str, max_scrolls: int = 4) -> float | None:
     dismiss_logbox(serial, nodes)
     if current_system(nodes) == name:
         return None
-    button = find(nodes, desc_prefix=SELECTOR_PREFIX)
-    if not button:
-        raise DeviceError("System selector button not found (is the Orrery tab open?)")
-    tap(serial, button, touchscreen=True)
-    nodes = wait_for_sheet(serial)
+    if not find(nodes, desc="Choose System"):
+        button = find(nodes, desc_prefix=SELECTOR_PREFIX)
+        if not button:
+            raise DeviceError("System selector button not found (is the Orrery tab open?)")
+        tap(serial, button, touchscreen=True)
+        nodes = wait_for_sheet(serial)
     expanded: set[str] = set()
     for _ in range(max_scrolls + 1):
         row = find_system_row(nodes, name)
         if row:
+            a11y_quiet()
             host = time.monotonic()
             tap(serial, row)
+            if settle:
+                wait_screen_still(serial)
             return host
         # Expand each collapsed group at most once (a second tap would collapse it).
         fresh = [h for h in collapsed_groups(nodes) if h.desc not in expanded]
@@ -392,7 +437,7 @@ def close_selector_button(nodes: list[Node]) -> Node | None:
     return min(matches, key=area) if matches else None
 
 
-SHEET_WAIT_S = 10.0  # the Pixel 3a stalls ~3 s opening the sheet (2026-10-03)
+SHEET_WAIT_S = 30.0  # the Pixel 3a has taken > 10 s to open the sheet (2026-10-03)
 
 
 def wait_for_sheet(serial: str, timeout_s: float = SHEET_WAIT_S) -> list[Node]:

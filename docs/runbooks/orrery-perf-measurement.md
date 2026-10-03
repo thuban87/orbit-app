@@ -320,3 +320,17 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
   4. Hand-check strips are cut by frame index (a `-ss` seek to a frame's own time can
      land on the next frame).
   `selftest.py` 27/27, including a backdrop-first scene and a variable-rate decode check.
+- **2026-10-03** — Before any baseline number (38.7 Plan 02), scene-load hygiene (owner
+  guardrail: one honest tool fix, then record what main cannot do). Today's release build
+  crashed (SIGSEGV on the JS thread, `mqt_v_js`) on both phones when a large System (All
+  Contacts, Orrery Stress) was switched to through the selector, and once raised `am_anr`
+  in the sheet with no UI dump running. The tools now (a) tap a scene-loading control
+  (System row, tab) only after 10 s with no `uiautomator dump`
+  (`adb_device.A11Y_QUIET_S`), (b) take no UI dump during a fixed post-load dwell (6 Pro
+  20 s, 3a 60 s; `SETTLE_LOAD_S`), because no load-complete signal exists on main without
+  accessibility: a stalled UI thread also leaves the screen still, and today's Orrery keeps
+  the UI thread busy at rest (6 Pro ~32 %, 3a ~98 % of a core); (c) tab return taps tabs
+  from bounds found once before the runs; (d) UI dumps retry for up to 90 s (the 3a's busy
+  UI thread). With these, switching to All Contacts still crashed the 6 Pro (while a
+  selector group was expanding), so switch-dependent scenarios at All Contacts / Orrery
+  Stress are recorded as not measurable on main (see 38.7-BASELINE.md).
