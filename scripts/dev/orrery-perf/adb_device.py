@@ -437,7 +437,7 @@ def close_selector_button(nodes: list[Node]) -> Node | None:
     return min(matches, key=area) if matches else None
 
 
-SHEET_WAIT_S = 30.0  # the Pixel 3a has taken > 10 s to open the sheet (2026-10-03)
+SHEET_WAIT_S = 90.0  # the Pixel 3a has taken 22-33 s to open the sheet (2026-10-03)
 
 
 def wait_for_sheet(serial: str, timeout_s: float = SHEET_WAIT_S) -> list[Node]:

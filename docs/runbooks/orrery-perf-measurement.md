@@ -346,3 +346,5 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
   38.7-BASELINE.md comes from `reanalyse_tab_return.py` over the identical saved
   recordings with this detector (tab-return totals reproduced exactly; background return
   became valid). `selftest.py` 28/28 (background stale-snapshot case added).
+- **2026-10-03** — System-sheet wait 90 s (Pixel 3a: 22-33 s to open the sheet on main);
+  a timeout only, no measurement change.
