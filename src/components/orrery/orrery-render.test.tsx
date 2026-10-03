@@ -60,6 +60,9 @@ const native = vi.hoisted(() => ({
   clock: { value: 0 },
   clockCalls: 0,
   reduced: { value: false },
+  /** 38.7-08: the reduced-motion state twin (interval driver) and host overrides. */
+  reducedState: false,
+  host: {} as Record<string, unknown>,
   /** Paragraph texts painted by the label/body pictures, in order. */
   painted: [] as string[],
 }));
@@ -141,7 +144,20 @@ vi.mock("./resources/orrery-photo-cache", () => ({
 }));
 vi.mock("@/theme/use-reduced-motion", () => ({
   useReducedMotionShared: () => native.reduced,
+  useReducedMotion: () => native.reducedState,
 }));
+// 38.7-08: the render host as the canvas resolves it, plus a per-test override.
+vi.mock("./v2/render-host", async (original) => {
+  const actual = await original<typeof import("./v2/render-host")>();
+  return {
+    ...actual,
+    resolveOrreryRenderHost: (platform?: string) =>
+      actual.applyOrreryHostOverride(
+        actual.resolveOrreryRenderHost(platform),
+        native.host,
+      ),
+  };
+});
 vi.mock("react-native-reanimated", () => ({
   useDerivedValue: (fn: () => unknown) => ({
     get value() {
@@ -335,6 +351,8 @@ beforeEach(async () => {
   native.clock = { value: 0 };
   native.clockCalls = 0;
   native.reduced = { value: false };
+  native.reducedState = false;
+  native.host = {};
   native.painted = [];
   db = openTestDb();
   let uid = 0;
@@ -749,8 +767,11 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const scene = await sceneWith(1);
     const tree = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
     const stars = tree[0].children[1];
+    // 38.7-08: the clock reaches the pictures through the quantised ambient
+    // value the frame-clock driver's reaction writes.
     const at = (ms: number) => {
       native.clock.value = ms;
+      flushUi(1);
       return recorded(stars).map((c) => c.color?.[3]);
     };
     expect(at(0)).toHaveLength(44);
@@ -767,10 +788,47 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const sun = tree[0].children[3];
     const glowAlpha = (ms: number) => {
       native.clock.value = ms;
+      flushUi(1);
       return recorded(sun).find((c) => c.op === "drawCircle")?.color?.[3];
     };
     expect(glowAlpha(0)).not.toEqual(glowAlpha(700));
+    // Inside one ambient step (~33 ms) nothing moves (D-49 quantisation).
+    expect(glowAlpha(700)).toEqual(glowAlpha(710));
     native.reduced.value = true;
     expect(glowAlpha(0)).toEqual(glowAlpha(700));
+  });
+  it("38.7-08: the interval driver ticks the ambient value from a JS timer, never calls useClock, and stops under reduced motion", async () => {
+    native.host = { ambientDriver: "interval" };
+    vi.useFakeTimers({
+      toFake: [
+        "setTimeout",
+        "clearTimeout",
+        "setInterval",
+        "clearInterval",
+        "Date",
+      ],
+    });
+    const scene = await sceneWith(2);
+    const tree = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
+    expect(native.clockCalls).toBe(0);
+    const sun = tree[0].children[3];
+    const glow = () =>
+      recorded(sun).find((c) => c.op === "drawCircle")?.color?.[3];
+    const first = glow();
+    vi.advanceTimersByTime(700);
+    expect(glow()).not.toEqual(first);
+    // Mounted under reduced motion (the OS state twin): no timer runs and
+    // the value stays −1, so the glow holds still. (Stopping a running timer
+    // on a live toggle is covered by ambient-clock.test.ts: this harness
+    // cannot re-render a component with persistent memo/effect state.)
+    native.reducedState = true;
+    const still = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
+    const stillGlow = () =>
+      recorded(still[0].children[3]).find((c) => c.op === "drawCircle")
+        ?.color?.[3];
+    const held = stillGlow();
+    vi.advanceTimersByTime(1500);
+    expect(stillGlow()).toEqual(held);
+    expect(native.clockCalls).toBe(0);
   });
 });

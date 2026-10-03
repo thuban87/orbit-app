@@ -32,14 +32,22 @@
  * generation. There is no shared "recorded generation".
  *
  * ── Ambient clock (ORR-03 / M5 / D-49, ADR-048/ADR-077) ────────────────────
- * The Skia frame clock is created HERE and nowhere else. OrreryScreen mounts
- * this canvas (through OrreryWorld) only once it is measured AND focused and
- * foregrounded, so unmounting it on blur/background stops every ambient
- * worklet (the clock has no pause argument). The clock drives the star
- * twinkle and the sun pulse, both picture inputs here. Reduced motion (the
- * live OS signal, read as a SharedValue) holds the twinkle at its band
- * mid-point and the sun glow still, so neither picture re-records on clock
- * ticks. Plan 08 quantises the clock (D-49).
+ * The ONE ambient value (`useOrreryAmbient`, ambient-clock.ts) is owned HERE:
+ * quantised milliseconds at AMBIENT_HZ, or −1 under reduced motion. Its
+ * driver (Skia's frame clock or a JS interval, per `host.ambientDriver`) is a
+ * child of this canvas. OrreryScreen mounts this canvas (through OrreryWorld)
+ * only once it is measured AND focused and foregrounded, so unmounting it on
+ * blur/background stops the driver and every ambient worklet. The ambient
+ * value drives the star twinkle and the sun pulse; an unchanged tick writes
+ * nothing, and under reduced motion neither picture re-records at all.
+ *
+ * ── Base bake (D-49, 38.7-08) ───────────────────────────────────────────────
+ * When `host.bakePath === "gpu-offscreen"`, once the live base picture has
+ * not changed for BAKE_AFTER_STILL_TICKS ambient ticks (and no switch,
+ * gesture or camera motion is running) it is baked into a device-pixel
+ * texture and the base layer blits it; any change falls back to the live
+ * picture at once. Snapshots are `base`-layer objects in the H3 ledger
+ * (base-bake.ts); the base picture acks like every other layer.
  *
  * ── Platform seam (D-46) ───────────────────────────────────────────────────
  * Platform/GPU choices come from `resolveOrreryRenderHost()` as values
@@ -50,7 +58,6 @@ import {
   createPicture,
   Picture,
   type SkPicture,
-  useClock,
 } from "@shopify/react-native-skia";
 import { useMemo } from "react";
 import {
@@ -69,6 +76,18 @@ import type { AnimatedFrame } from "@/logic/orrery-frame";
 import type { LabelAllocation } from "@/logic/orrery-label-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
+import { ambientNeeded, useOrreryAmbient } from "./ambient-clock";
+import {
+  type BakedBase,
+  type BakeRegistry,
+  type BakeState,
+  bakeBaseSnapshot,
+  bakeUnavailable,
+  INITIAL_BAKE_STATE,
+  LIVE_BASE,
+  nextBakeState,
+  selectBasePicture,
+} from "./base-bake";
 import { drawBodies, drawSun, orderBodies, sunPulse } from "./draw-bodies";
 import { drawLabels } from "./draw-labels";
 import { drawOverlay } from "./draw-overlay";
@@ -120,7 +139,23 @@ export interface OrreryV2CanvasProps {
   labels: SharedValue<OrreryLabelLayerSpecs>;
   /** Label id → its allocation this frame (UI-derived from `frame`). */
   allocationIndex: SharedValue<Readonly<Record<string, LabelAllocation>>>;
+  /** A switch, gesture or camera motion is running (never bake then). */
+  busy: SharedValue<boolean>;
+  /** The UI-thread snapshot registry (owned by the world; torn down there). */
+  bakeRegistry: SharedValue<BakeRegistry>;
+  /**
+   * H3: the base layer's spec became `generation` of `mountEpoch`, drawing
+   * snapshot `id` (null = live). Must be a stable function.
+   */
+  onBaseBaked: (
+    mountEpoch: number,
+    generation: number,
+    id: number | null,
+  ) => void;
 }
+
+/** The ambient consumers on screen today (D-40: twinkle and the sun pulse). */
+const AMBIENT_CONSUMERS = { twinkle: true, sunPulse: true } as const;
 
 /** What a layer's ack reaction compares: its picture and the generation it read. */
 interface LayerRecord {
@@ -134,12 +169,19 @@ interface LayerRecord {
  * layer's picture value, so it runs only after `createPicture` returned; a
  * new (generation, epoch) arms ONE frame callback (never a running loop), and
  * that callback forwards the latest recorded generation to JS.
+ *
+ * `requireNewRecording` (default true): only a NEW picture speaks for a
+ * generation. The base layer passes false: its picture value SELECTS the live
+ * picture or a snapshot by reading its spec (it records nothing itself), so
+ * every run that read generation g shows exactly what g says, even when the
+ * selected picture object is unchanged.
  */
 function useLayerAck<S extends { generation: number; mountEpoch: number }>(
   layerId: OrreryLayerId,
   picture: SharedValue<SkPicture>,
   specs: SharedValue<S>,
   ackRecorded: OrreryV2CanvasProps["ackRecorded"],
+  requireNewRecording = true,
 ): void {
   const pending = useSharedValue(false);
   const latest = useSharedValue({ generation: 0, epoch: 0 });
@@ -151,7 +193,8 @@ function useLayerAck<S extends { generation: number; mountEpoch: number }>(
     }),
     (now, previous) => {
       // Only a NEW recording speaks for a generation.
-      if (previous && now.picture === previous.picture) return;
+      if (requireNewRecording && previous && now.picture === previous.picture)
+        return;
       if (now.generation === 0) return;
       if (
         previous &&
@@ -185,23 +228,32 @@ export function OrreryV2Canvas({
   ackRecorded,
   labels,
   allocationIndex,
+  busy,
+  bakeRegistry,
+  onBaseBaked,
 }: OrreryV2CanvasProps) {
   const host = useMemo(() => resolveOrreryRenderHost(), []);
-  // M5/D-49: the ONE ambient clock (inside this unmountable subtree).
-  const clock = useClock();
   // THEME-06: the live reduced-motion signal as a SharedValue (no setState).
   const reducedMotion = useReducedMotionShared();
+  // M5/D-49: the ONE quantised ambient value (−1 under reduced motion) and
+  // its driver, inside this unmountable subtree.
+  const { ambient, driver } = useOrreryAmbient(
+    host,
+    reducedMotion,
+    ambientNeeded(false, AMBIENT_CONSUMERS),
+  );
   // Static, JS-thread resources: the compiled ring effect and the unit strips.
   const ringEffect = useMemo(() => orreryShader("ringPlane"), []);
   const bands = useMemo(() => ringBands(), []);
   // The AA feather: one device pixel, in dp (a primitive capture).
   const aaDp = 1 / host.devicePixelRatio();
-  // A primitive: under reduced motion it never changes, so the stars picture
-  // is not re-recorded on clock ticks.
+  // A primitive that changes only on an ambient tick; constant under reduced
+  // motion (ambient −1), so the stars picture is not re-recorded then.
   const twinkle = useDerivedValue(() =>
-    twinkleOpacity(clock.value, reducedMotion.value),
+    twinkleOpacity(ambient.value, ambient.value < 0),
   );
-  const base = useDerivedValue(() =>
+  // The LIVE base: re-recorded only when the frame, sky or ring specs change.
+  const baseLive = useDerivedValue(() =>
     createPicture(
       (canvas) => {
         drawSky(canvas, sky.value);
@@ -217,6 +269,66 @@ export function OrreryV2Canvas({
       { width, height },
     ),
   );
+  // D-49 base bake (see the header). Primitives only are captured.
+  const bakeOn = host.bakePath === "gpu-offscreen";
+  const dpr = host.devicePixelRatio();
+  const bakeState = useSharedValue<BakeState>(INITIAL_BAKE_STATE);
+  const baked = useSharedValue<BakedBase>(LIVE_BASE);
+  useAnimatedReaction(
+    () => ({
+      live: baseLive.value,
+      tick: ambient.value,
+      busy: busy.value,
+      mountEpoch: bodies.value.mountEpoch,
+    }),
+    (now, previous) => {
+      if (!bakeOn) return;
+      const step = nextBakeState(bakeState.value, {
+        tick: now.tick,
+        sceneChanged: previous !== null && now.live !== previous.live,
+        busy: now.busy,
+        mountEpoch: now.mountEpoch,
+      });
+      bakeState.value = step.state;
+      if (step.action === "bake") {
+        const shot = bakeBaseSnapshot(
+          bakeRegistry,
+          now.live,
+          width,
+          height,
+          dpr,
+        );
+        if (!shot) {
+          bakeState.value = bakeUnavailable(step.state);
+          return;
+        }
+        const generation = baked.value.generation + 1;
+        baked.value = {
+          generation,
+          mountEpoch: now.mountEpoch,
+          picture: shot.picture,
+          source: now.live,
+          id: shot.id,
+        };
+        runOnJS(onBaseBaked)(now.mountEpoch, generation, shot.id);
+      } else if (step.action === "invalidate") {
+        const generation = baked.value.generation + 1;
+        baked.value = {
+          generation,
+          mountEpoch: now.mountEpoch,
+          picture: null,
+          source: null,
+          id: null,
+        };
+        runOnJS(onBaseBaked)(now.mountEpoch, generation, null);
+      }
+    },
+  );
+  // The base layer: the snapshot while it matches the live picture, else live.
+  const base = useDerivedValue(() =>
+    selectBasePicture(baked.value, baseLive.value),
+  );
+  useLayerAck(ORRERY_LAYER.base, base, baked, ackRecorded, false);
   const starsPicture = useDerivedValue(() =>
     createPicture(
       (canvas) => {
@@ -229,10 +341,10 @@ export function OrreryV2Canvas({
   const bodyOrder = useDerivedValue(() =>
     orderBodies(frame.value, bodies.value.bodies),
   );
-  // A primitive: still (0) under reduced motion, so the sun picture does not
-  // re-record on clock ticks.
+  // A primitive: changes only on an ambient tick; still (0) under reduced
+  // motion, so the sun picture does not re-record then.
   const pulse = useDerivedValue(() =>
-    sunPulse(clock.value, reducedMotion.value),
+    sunPulse(ambient.value, ambient.value < 0),
   );
   const bodiesBehind = useDerivedValue(() =>
     createPicture(
@@ -305,20 +417,23 @@ export function OrreryV2Canvas({
     ),
   );
   return (
-    <GestureDetector gesture={gesture}>
-      <Canvas
-        testID="orrery-canvas"
-        opaque={host.opaqueCanvas}
-        style={{ width, height }}
-      >
-        <Picture picture={base} />
-        <Picture picture={starsPicture} />
-        <Picture picture={bodiesBehind} />
-        <Picture picture={sunPicture} />
-        <Picture picture={bodiesFront} />
-        <Picture picture={labelsPicture} />
-        <Picture picture={overlayPicture} />
-      </Canvas>
-    </GestureDetector>
+    <>
+      {driver}
+      <GestureDetector gesture={gesture}>
+        <Canvas
+          testID="orrery-canvas"
+          opaque={host.opaqueCanvas}
+          style={{ width, height }}
+        >
+          <Picture picture={base} />
+          <Picture picture={starsPicture} />
+          <Picture picture={bodiesBehind} />
+          <Picture picture={sunPicture} />
+          <Picture picture={bodiesFront} />
+          <Picture picture={labelsPicture} />
+          <Picture picture={overlayPicture} />
+        </Canvas>
+      </GestureDetector>
+    </>
   );
 }

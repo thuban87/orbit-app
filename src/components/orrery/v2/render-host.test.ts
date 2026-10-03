@@ -10,7 +10,17 @@ vi.mock("react-native", () => ({
   PixelRatio: { get: () => native.ratio },
 }));
 
-import { resolveOrreryRenderHost } from "./render-host";
+import {
+  clearOrreryHostOverride,
+  orreryHostOverride,
+  setOrreryHostOverride,
+} from "@/__dev__/orrery-host-override";
+import {
+  applyOrreryHostOverride,
+  defaultOrreryRenderHost,
+  describeOrreryHost,
+  resolveOrreryRenderHost,
+} from "./render-host";
 
 beforeEach(() => {
   native.os = "android";
@@ -60,5 +70,54 @@ describe("OrreryRenderHost (D-46)", () => {
     expect(resolveOrreryRenderHost().devicePixelRatio()).toBe(1);
     native.ratio = undefined;
     expect(resolveOrreryRenderHost().devicePixelRatio()).toBe(1);
+  });
+});
+
+describe("38.7-08 spike overrides (D-59)", () => {
+  it("without the dev build or the spike flag, the host is the code defaults", () => {
+    // vitest has no __DEV__ and no EXPO_PUBLIC_ORRERY_SPIKE: neither seam loads.
+    const { devicePixelRatio: _a, ...resolved } = resolveOrreryRenderHost();
+    const { devicePixelRatio: _b, ...defaults } = defaultOrreryRenderHost();
+    expect(resolved).toEqual(defaults);
+  });
+  it("applies only the known override keys, later wins, platform and Mali untouched", () => {
+    const base = defaultOrreryRenderHost("android");
+    const next = applyOrreryHostOverride(base, {
+      opaqueCanvas: true,
+      ambientDriver: "interval",
+      bakePath: "gpu-offscreen",
+      ringMethod: "hybrid",
+      ringFieldMinRings: 300,
+      platform: "ios",
+    } as never);
+    expect(next).toMatchObject({
+      platform: "android",
+      opaqueCanvas: true,
+      ambientDriver: "interval",
+      bakePath: "gpu-offscreen",
+      ringMethod: "hybrid",
+      ringFieldMinRings: 300,
+      mali: { strokeUnderPerspective: false, cpuBakedNebula: true },
+    });
+    expect(base.opaqueCanvas).toBe(false); // not mutated
+    expect(applyOrreryHostOverride(base, null)).toBe(base);
+  });
+  it("describes a host on one log line", () => {
+    expect(describeOrreryHost(defaultOrreryRenderHost("android"))).toBe(
+      "opaque=off,driver=frame-clock,bake=off,ring=world-plane,minRings=400",
+    );
+  });
+  it("the DEBUG dev override merges patches and clears", () => {
+    clearOrreryHostOverride();
+    setOrreryHostOverride({ opaqueCanvas: true });
+    setOrreryHostOverride({ ambientDriver: "interval" });
+    expect(orreryHostOverride()).toEqual({
+      opaqueCanvas: true,
+      ambientDriver: "interval",
+    });
+    setOrreryHostOverride({ opaqueCanvas: undefined });
+    expect(orreryHostOverride()).toEqual({ ambientDriver: "interval" });
+    clearOrreryHostOverride();
+    expect(orreryHostOverride()).toEqual({});
   });
 });

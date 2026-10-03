@@ -11,6 +11,16 @@
  * rewrite: the opaque flag is a no-op there, and web bakes through a raster
  * path. Plan 08's spike decides the Android `opaqueCanvas`, `ambientDriver`,
  * `bakePath` and `ringMethod` defaults on release numbers (D-59).
+ *
+ * 38.7-08 spike seams (never in a normal release bundle):
+ * - DEBUG: `src/__dev__/orrery-host-override.ts`, flipped from the dev menu,
+ *   reached only through `__DEV__ ? require(…) : null` (release guard test).
+ * - RELEASE spike build (D-59): `spike-host-selector.ts`, compiled in only
+ *   when the bundle is built with the spike flag below set to 1 (Expo inlines
+ *   the variable; Metro folds the branch away otherwise). It selects variants
+ *   from a spike deep link (see that module).
+ * The host is read once per canvas mount, so a changed selection applies
+ * when the Orrery canvas remounts (leave and re-enter the tab).
  */
 import { PixelRatio, Platform } from "react-native";
 
@@ -20,9 +30,9 @@ export interface OrreryRenderHost {
   platform: OrreryRenderPlatform;
   /** `<Canvas opaque>`: a SurfaceView on Android (Pitfalls 5, 12); no-op elsewhere. */
   opaqueCanvas: boolean;
-  /** How the ambient tick is driven (Plan 08 adds the interval driver). */
+  /** How the quantised ambient tick is driven (ambient-clock.ts, D-49). */
   ambientDriver: "frame-clock" | "interval";
-  /** How the still base is baked (Plan 08); "none" draws it live. */
+  /** How the still base is baked (base-bake.ts, D-49); "none" draws it live. */
   bakePath: "gpu-offscreen" | "raster" | "none";
   /** D-44: the tilted-ring method (the spike may pick the fallback/hybrid). */
   ringMethod: "world-plane" | "ring-field" | "hybrid";
@@ -37,8 +47,43 @@ export interface OrreryRenderHost {
   devicePixelRatio(): number;
 }
 
+/** The host values a spike or dev override may change. */
+export type OrreryHostOverride = Partial<
+  Pick<
+    OrreryRenderHost,
+    | "opaqueCanvas"
+    | "ambientDriver"
+    | "bakePath"
+    | "ringMethod"
+    | "ringFieldMinRings"
+  >
+>;
+
 /** Hybrid threshold placeholder until Plan 08 measures it. */
 const DEFAULT_RING_FIELD_MIN_RINGS = 400;
+
+interface DevHostOverrideModule {
+  orreryHostOverride(): OrreryHostOverride;
+}
+interface SpikeHostSelectorModule {
+  ensureOrrerySpikeListening(): void;
+  orrerySpikeOverride(): OrreryHostOverride;
+  reportOrrerySpikeHost(host: OrreryRenderHost, source: string): void;
+}
+
+// DEBUG only: Metro folds this to null in a release bundle.
+const devHostOverride: DevHostOverrideModule | null =
+  typeof __DEV__ !== "undefined" && __DEV__
+    ? require("@/__dev__/orrery-host-override")
+    : null;
+
+// D-59 release spike only: Expo inlines the variable at bundle time, so a
+// normal build folds this to null and carries none of the selector.
+const spikeSelector: SpikeHostSelectorModule | null =
+  process.env.EXPO_PUBLIC_ORRERY_SPIKE === "1"
+    ? require("./spike-host-selector")
+    : null;
+spikeSelector?.ensureOrrerySpikeListening();
 
 function deviceRatio(): number {
   const ratio = PixelRatio?.get?.();
@@ -51,8 +96,8 @@ function platformOf(os: string | undefined): OrreryRenderPlatform {
   return os === "android" || os === "ios" || os === "web" ? os : "other";
 }
 
-/** The render host for `platform` (defaults to the running platform). */
-export function resolveOrreryRenderHost(
+/** The code defaults for `platform`, before any spike or dev override. */
+export function defaultOrreryRenderHost(
   platform: string | undefined = Platform?.OS,
 ): OrreryRenderHost {
   const resolved = platformOf(platform);
@@ -67,4 +112,60 @@ export function resolveOrreryRenderHost(
     mali: { strokeUnderPerspective: false, cpuBakedNebula: true },
     devicePixelRatio: deviceRatio,
   };
+}
+
+/** `host` with only the known override keys applied (later wins). */
+export function applyOrreryHostOverride(
+  host: OrreryRenderHost,
+  override: OrreryHostOverride | null | undefined,
+): OrreryRenderHost {
+  if (!override) return host;
+  const next = { ...host };
+  if (override.opaqueCanvas !== undefined)
+    next.opaqueCanvas = override.opaqueCanvas;
+  if (override.ambientDriver !== undefined)
+    next.ambientDriver = override.ambientDriver;
+  if (override.bakePath !== undefined) next.bakePath = override.bakePath;
+  if (override.ringMethod !== undefined) next.ringMethod = override.ringMethod;
+  if (override.ringFieldMinRings !== undefined)
+    next.ringFieldMinRings = override.ringFieldMinRings;
+  return next;
+}
+
+/** One log-friendly line for the measurement tools: `opaque=on,driver=…`. */
+export function describeOrreryHost(
+  host: Pick<
+    OrreryRenderHost,
+    | "opaqueCanvas"
+    | "ambientDriver"
+    | "bakePath"
+    | "ringMethod"
+    | "ringFieldMinRings"
+  >,
+): string {
+  return [
+    `opaque=${host.opaqueCanvas ? "on" : "off"}`,
+    `driver=${host.ambientDriver}`,
+    `bake=${host.bakePath === "gpu-offscreen" ? "on" : host.bakePath === "none" ? "off" : host.bakePath}`,
+    `ring=${host.ringMethod}`,
+    `minRings=${host.ringFieldMinRings}`,
+  ].join(",");
+}
+
+/**
+ * The render host for `platform` (defaults to the running platform): the
+ * code defaults, then (DEBUG) the dev-menu override, then (spike build only)
+ * the URL-selected variant. Called once per canvas mount.
+ */
+export function resolveOrreryRenderHost(
+  platform: string | undefined = Platform?.OS,
+): OrreryRenderHost {
+  let host = defaultOrreryRenderHost(platform);
+  if (devHostOverride)
+    host = applyOrreryHostOverride(host, devHostOverride.orreryHostOverride());
+  if (spikeSelector) {
+    host = applyOrreryHostOverride(host, spikeSelector.orrerySpikeOverride());
+    spikeSelector.reportOrrerySpikeHost(host, "mount");
+  }
+  return host;
 }

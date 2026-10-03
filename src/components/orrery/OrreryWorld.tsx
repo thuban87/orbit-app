@@ -72,6 +72,13 @@ import {
   type OrrerySwitchRuntime,
   sampleOrrerySwitchCamera,
 } from "./use-orrery-switch-runtime";
+import {
+  type BakeRegistry,
+  createBaseBakeOwner,
+  disposeBakedSnapshots,
+  EMPTY_BAKE_REGISTRY,
+  teardownBakeRegistry,
+} from "./v2/base-bake";
 import { OrreryV2Canvas } from "./v2/OrreryV2Canvas";
 import {
   bodyIdentity,
@@ -183,18 +190,21 @@ function finishTextRelease(owner: string, epoch: number): void {
  * holders, in the order given (teardown passes reverse creation order). A
  * photo image is confirmed to the shared cache and a Paragraph to the text
  * service; each is disposed when `dispose` (teardown) or superseded, else it
- * turns warm for reuse.
+ * turns warm for reuse. 38.7-08: a baked base snapshot is never reused; its
+ * ids go to `disposeBase` (UI-thread disposal) in order.
  */
 function routeRetired(
   owner: string,
   text: OrreryTextPublisher,
   handles: Iterable<string>,
   dispose: boolean,
+  disposeBase: (ids: number[]) => void,
 ): void {
   // Batched per holder and epoch: one confirmation frees the whole set, so a
   // queued publish retries once (C3-L3's generation bound), not per object.
   const photos = new Map<number, number[]>();
   const texts = new Map<number, string[]>();
+  const bases: number[] = [];
   for (const handle of handles) {
     const parsed = parseLedgerHandle(handle);
     if (parsed?.kind === "photo")
@@ -204,10 +214,12 @@ function routeRetired(
       ]);
     else if (parsed?.kind === "text")
       texts.set(parsed.epoch, [...(texts.get(parsed.epoch) ?? []), parsed.key]);
+    else if (parsed?.kind === "base") bases.push(parsed.id);
   }
   for (const [epoch, ids] of photos)
     orreryPhotoCache.confirmRetired(owner, ids, epoch, { dispose });
   for (const [epoch, keys] of texts) text.confirmRetired(keys, epoch, dispose);
+  if (bases.length > 0) disposeBase(bases);
 }
 
 export function OrreryWorld({
@@ -304,6 +316,30 @@ export function OrreryWorld({
   const publisher = publisherRef.current as OrreryTextPublisher & {
     owner: string;
   };
+  // 38.7-08 (D-49/H3): the baked-base snapshots live on the UI runtime in this
+  // registry; the ledger tracks their ids under the `base` layer.
+  const bakeRegistry = useSharedValue<BakeRegistry>(EMPTY_BAKE_REGISTRY);
+  const disposeBase = useCallback(
+    (ids: number[]) => {
+      runOnUI(disposeBakedSnapshots)(bakeRegistry, ids);
+    },
+    [bakeRegistry],
+  );
+  const baseOwnerRef = useRef<ReturnType<typeof createBaseBakeOwner> | null>(
+    null,
+  );
+  if (!baseOwnerRef.current)
+    baseOwnerRef.current = createBaseBakeOwner({
+      ledger,
+      dispose: disposeBase,
+    });
+  const baseOwner = baseOwnerRef.current;
+  const onBaseBaked = useCallback(
+    (mountEpoch: number, generation: number, id: number | null) => {
+      baseOwner.published(mountEpoch, generation, id);
+    },
+    [baseOwner],
+  );
   // Capture only the producer's input; the controller also contains its published output.
   const reorder = camera.reorder;
   // D-52 freeze: the frame worklet may capture only SharedValues, primitives,
@@ -311,6 +347,15 @@ export function OrreryWorld({
   // resource holds a full scene) or `scene` re-materialises them on the UI
   // runtime at each mapper start (orrery-frame-mapper.test.ts guards this).
   const { transition, progress, cameraFrom, cameraTo } = switchRuntime;
+  // D-49: the base is never baked during a switch, a gesture or a camera
+  // motion (SharedValues only are captured).
+  const { active: cameraActive, input: cameraInput } = camera;
+  const busy = useDerivedValue(
+    () =>
+      progress.value < 1 ||
+      cameraActive.value !== null ||
+      cameraInput.value.pointers > 0,
+  );
   const generation = scene.generation;
   // The pan bound the pose was clamped to (gestures, Home, recovery); the
   // dolly focal no longer encodes it (38.7-05).
@@ -518,9 +563,15 @@ export function OrreryWorld({
   const ackRecorded = useCallback(
     (layer: OrreryLayerId, generation: number, epoch: number) => {
       if (!ledger.ack(layer, generation, epoch)) return;
-      routeRetired(publisher.owner, publisher, ledger.retirable(), false);
+      routeRetired(
+        publisher.owner,
+        publisher,
+        ledger.retirable(),
+        false,
+        disposeBase,
+      );
     },
-    [ledger, publisher],
+    [ledger, publisher, disposeBase],
   );
   const textScene = useMemo<OrreryTextScene>(
     () => ({
@@ -551,7 +602,8 @@ export function OrreryWorld({
       // and the pictures stop with the canvas unmounting in this commit. Only
       // after that teardown's queued UI jobs and one more UI frame (no mapper
       // can still record) is every retained object handed back, in reverse
-      // creation order, and everything unheld cleared.
+      // creation order, and everything unheld cleared. Baked base snapshots
+      // go back in that order too, then the offscreen surface (UI thread).
       const { owner } = publisher;
       const textEpoch = publisher.release();
       const ledgerEpoch = specPublisher.detach();
@@ -559,11 +611,17 @@ export function OrreryWorld({
       photoEpoch.current = null;
       if (photos !== null) orreryPhotoCache.release(owner);
       const finish = () => {
+        const baseIds: number[] = [];
+        const collectBase = (ids: number[]) => {
+          baseIds.push(...ids);
+        };
         if (ledgerEpoch !== null)
           ledger.teardown(
-            (handle) => routeRetired(owner, publisher, [handle], true),
+            (handle) =>
+              routeRetired(owner, publisher, [handle], true, collectBase),
             ledgerEpoch,
           );
+        runOnUI(teardownBakeRegistry)(bakeRegistry, baseIds);
         if (photos !== null) orreryPhotoCache.confirmReleased(owner, photos);
         orreryPhotoCache.clearUnheld();
         if (textEpoch !== null) finishTextRelease(owner, textEpoch);
@@ -577,7 +635,7 @@ export function OrreryWorld({
         })();
       }, 0);
     },
-    [publisher, specPublisher, ledger],
+    [publisher, specPublisher, ledger, bakeRegistry],
   );
   const sendTier = useCallback(
     (tier: SemanticLevel) => publisher.setTier(tier),
@@ -820,6 +878,9 @@ export function OrreryWorld({
       ackRecorded={ackRecorded}
       labels={labelSpecs}
       allocationIndex={allocationIndex}
+      busy={busy}
+      bakeRegistry={bakeRegistry}
+      onBaseBaked={onBaseBaked}
     />
   );
 }

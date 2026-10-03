@@ -1,0 +1,427 @@
+/**
+ * 38.7-08 (D-49): the canvas wiring of the quantised ambient value and the
+ * base bake. Unlike orrery-render.test.tsx, this harness MEMOISES derived
+ * values by their tracked inputs (as Reanimated does), so it can prove that an
+ * unchanged ambient tick re-records nothing and that the base swaps to a
+ * snapshot and back by picture identity. The draw modules are stubs that
+ * record which inputs each picture read.
+ */
+import type { ReactElement, ReactNode } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const rt = vi.hoisted(() => {
+  type Dep = { version: number; read(): unknown };
+  let tracking: Set<Dep> | null = null;
+  const reactions: {
+    prepare: () => unknown;
+    react: (value: unknown, previous: unknown) => void;
+    previous: unknown;
+  }[] = [];
+  const frames: (() => void)[] = [];
+  function sv<T>(initial: T) {
+    let value = initial;
+    const dep: Dep = { version: 0, read: () => value };
+    return {
+      dep,
+      get value(): T {
+        tracking?.add(dep);
+        return value;
+      },
+      set value(next: T) {
+        value = next;
+        dep.version++;
+      },
+    };
+  }
+  function derived<T>(fn: () => T) {
+    let cached: T | undefined;
+    let deps: Map<Dep, number> | null = null;
+    const dep: Dep = { version: 0, read: () => get() };
+    function stale(): boolean {
+      if (!deps) return true;
+      for (const [d, version] of deps) {
+        d.read();
+        if (d.version !== version) return true;
+      }
+      return false;
+    }
+    function get(): T {
+      if (stale()) {
+        const outer = tracking;
+        const seen = new Set<Dep>();
+        tracking = seen;
+        let out: T;
+        try {
+          out = fn();
+        } finally {
+          tracking = outer;
+        }
+        deps = new Map([...seen].map((d) => [d, d.version]));
+        if (out !== cached) dep.version++;
+        cached = out;
+      }
+      return cached as T;
+    }
+    return {
+      dep,
+      get value(): T {
+        tracking?.add(dep);
+        return get();
+      },
+    };
+  }
+  return {
+    sv,
+    derived,
+    reactions,
+    frames,
+    clock: null as null | { value: number },
+    reduced: null as unknown as { value: boolean },
+    clockCalls: 0,
+    reducedState: false,
+    host: {} as Record<string, unknown>,
+    surfaces: 0,
+    log: [] as string[],
+    pictures: 0,
+  };
+});
+
+/** Runs every reaction (prepare → react), then the queued UI frames. */
+function flush(passes = 1) {
+  for (let pass = 0; pass < passes; pass++) {
+    for (const reaction of rt.reactions) {
+      const value = reaction.prepare();
+      reaction.react(value, reaction.previous);
+      reaction.previous = value;
+    }
+    for (const frame of rt.frames.splice(0)) frame();
+  }
+}
+
+vi.mock("react", async (original) => ({
+  ...(await original<typeof import("react")>()),
+  useMemo: (factory: () => unknown) => factory(),
+  useCallback: (callback: unknown) => callback,
+  useEffect: (effect: () => unknown) => {
+    effect();
+  },
+}));
+vi.mock("react-native-reanimated", () => ({
+  useSharedValue: (value: unknown) => rt.sv(value),
+  useDerivedValue: (fn: () => unknown) => rt.derived(fn),
+  useAnimatedReaction: (
+    prepare: () => unknown,
+    react: (value: unknown, previous: unknown) => void,
+  ) => {
+    rt.reactions.push({ prepare, react, previous: null });
+  },
+  runOnJS: (fn: unknown) => fn,
+  runOnUI: (fn: unknown) => fn,
+}));
+vi.mock("react-native-gesture-handler", () => ({
+  GestureDetector: ({ children }: { children: ReactNode }) => children,
+}));
+vi.mock("@/theme/use-reduced-motion", () => ({
+  useReducedMotionShared: () => rt.reduced,
+  useReducedMotion: () => rt.reducedState,
+}));
+vi.mock("@shopify/react-native-skia", () => {
+  const recorder = (ops: unknown[][]) =>
+    new Proxy(
+      {},
+      {
+        get:
+          (_t, op: string) =>
+          (...args: unknown[]) => {
+            ops.push([op, ...args]);
+          },
+      },
+    );
+  return {
+    Canvas: "skCanvas",
+    Picture: "skPicture",
+    FilterMode: { Nearest: 0 },
+    MipmapMode: { None: 0 },
+    useClock: () => {
+      rt.clockCalls++;
+      rt.clock = rt.sv(0);
+      return rt.clock;
+    },
+    createPicture: (draw: (canvas: unknown) => void) => {
+      const ops: unknown[][] = [];
+      draw(recorder(ops));
+      return { id: ++rt.pictures, ops, dispose: () => {} };
+    },
+    Skia: {
+      XYWHRect: (x: number, y: number, width: number, height: number) => ({
+        x,
+        y,
+        width,
+        height,
+      }),
+      Surface: {
+        MakeOffscreen: (w: number, h: number) => {
+          rt.surfaces++;
+          const ops: unknown[][] = [];
+          return {
+            ops,
+            getCanvas: () => recorder(ops),
+            flush: () => {},
+            makeImageSnapshot: () => ({
+              label: `snapshot ${w}x${h}`,
+              dispose: () => rt.log.push("dispose image"),
+            }),
+            dispose: () => rt.log.push("dispose surface"),
+          };
+        },
+      },
+    },
+  };
+});
+vi.mock("./render-host", () => ({
+  resolveOrreryRenderHost: () => ({
+    platform: "android",
+    opaqueCanvas: false,
+    ambientDriver: "frame-clock",
+    bakePath: "none",
+    ringMethod: "world-plane",
+    ringFieldMinRings: 400,
+    devicePixelRatio: () => 2,
+    ...rt.host,
+  }),
+}));
+vi.mock("./scene-specs", () => ({
+  ORRERY_LAYER: {
+    base: "base",
+    bodiesBehind: "bodiesBehind",
+    sun: "sun",
+    bodiesFront: "bodiesFront",
+    labels: "labels",
+  },
+  baseHandle: (epoch: number, id: number) => `b|${epoch}|${id}`,
+}));
+// Draw stubs: each records the inputs its picture read.
+vi.mock("./draw-sky", () => ({
+  drawSky: (canvas: { sky(tag: unknown): void }, sky: { tag: unknown }) =>
+    canvas.sky(sky.tag),
+  drawStars: (canvas: { stars(t: unknown): void }, _f: unknown, t: unknown) =>
+    canvas.stars(t),
+  twinkleOpacity: (ms: number, reduced: boolean) => (reduced ? "still" : ms),
+}));
+vi.mock("./draw-plane", () => ({
+  drawPlaneRings: (
+    canvas: { rings(tag: unknown): void },
+    frame: { tag: unknown },
+  ) => canvas.rings(frame.tag),
+  ringBands: () => null,
+}));
+vi.mock("./draw-bodies", () => ({
+  orderBodies: () => [],
+  drawBodies: () => {},
+  drawSun: (
+    canvas: { sun(p: unknown): void },
+    _f: unknown,
+    _b: unknown,
+    _o: unknown,
+    pulse: unknown,
+  ) => canvas.sun(pulse),
+  sunPulse: (ms: number, reduced: boolean) => (reduced ? 0 : ms),
+}));
+vi.mock("./draw-labels", () => ({ drawLabels: () => {} }));
+vi.mock("./draw-overlay", () => ({ drawOverlay: () => {} }));
+vi.mock("./shaders", () => ({ orreryShader: () => null }));
+
+import { AMBIENT_STEP_MS } from "./ambient-clock";
+import { BAKE_AFTER_STILL_TICKS, EMPTY_BAKE_REGISTRY } from "./base-bake";
+import { OrreryV2Canvas } from "./OrreryV2Canvas";
+
+interface Node {
+  type: string;
+  props: Record<string, unknown>;
+  children: Node[];
+}
+function resolve(node: ReactNode): Node[] {
+  if (!node || typeof node !== "object") return [];
+  if (Array.isArray(node)) return node.flatMap(resolve);
+  const element = node as ReactElement<{ children?: ReactNode }>;
+  if (typeof element.type === "function")
+    return resolve(
+      (element.type as (props: unknown) => ReactNode)(element.props),
+    );
+  if (typeof element.type !== "string") return resolve(element.props.children);
+  return [
+    {
+      type: element.type,
+      props: element.props,
+      children: resolve(element.props.children),
+    },
+  ];
+}
+
+beforeEach(() => {
+  rt.reactions.length = 0;
+  rt.frames.length = 0;
+  rt.clock = null;
+  rt.reduced = rt.sv(false);
+  rt.clockCalls = 0;
+  rt.reducedState = false;
+  rt.host = {};
+  rt.surfaces = 0;
+  rt.log = [];
+  vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
+    rt.frames.push(callback);
+    return rt.frames.length;
+  });
+});
+
+function mount() {
+  const props = {
+    width: 400,
+    height: 800,
+    gesture: {} as never,
+    frame: rt.sv({ tag: "frame-1" }),
+    sky: rt.sv({ tag: "sky-1" }),
+    stars: rt.sv({}),
+    ringSpecs: rt.sv({}),
+    overlay: rt.sv({}),
+    reorder: rt.sv(null),
+    bodies: rt.sv({ generation: 1, mountEpoch: 1, bodies: [] }),
+    ackRecorded: vi.fn(),
+    labels: rt.sv({ generation: 1, mountEpoch: 1 }),
+    allocationIndex: rt.sv({}),
+    busy: rt.sv(false),
+    bakeRegistry: rt.sv(EMPTY_BAKE_REGISTRY),
+    onBaseBaked: vi.fn(),
+  };
+  const tree = resolve(OrreryV2Canvas(props as never));
+  const layer = (i: number) =>
+    (
+      tree[0].children[i].props.picture as {
+        value: { id: number; ops: unknown[][] };
+      }
+    ).value;
+  return { props, tree, layer };
+}
+const STARS = 1;
+const SUN = 3;
+
+describe("OrreryV2Canvas: the quantised ambient value (D-49)", () => {
+  it("frame-clock: ONE useClock; an unchanged quantised tick re-records nothing", () => {
+    const { tree, layer } = mount();
+    expect(rt.clockCalls).toBe(1);
+    expect(tree[0].children.map((n) => n.type)).toEqual(
+      Array(7).fill("skPicture"),
+    );
+    flush();
+    const first = layer(STARS);
+    expect(first.ops).toEqual([["stars", 0]]);
+    const clock = rt.clock as { value: number };
+    clock.value = 20; // inside the first step
+    flush();
+    expect(layer(STARS)).toBe(first);
+    expect(layer(SUN).ops).toEqual([["sun", 0]]);
+    clock.value = 40; // the next step
+    flush();
+    expect(layer(STARS)).not.toBe(first);
+    expect(layer(STARS).ops).toEqual([["stars", AMBIENT_STEP_MS]]);
+  });
+  it("reduced motion freezes every ambient consumer at −1 and stops re-recording", () => {
+    const { layer } = mount();
+    const clock = rt.clock as { value: number };
+    clock.value = 40;
+    flush();
+    expect(layer(STARS).ops).toEqual([["stars", AMBIENT_STEP_MS]]);
+    rt.reduced.value = true;
+    flush();
+    const still = layer(STARS);
+    expect(still.ops).toEqual([["stars", "still"]]);
+    expect(layer(SUN).ops).toEqual([["sun", 0]]);
+    clock.value = 5000;
+    flush();
+    expect(layer(STARS)).toBe(still);
+  });
+  it("interval: no useClock; JS ticks write the value", () => {
+    vi.useFakeTimers({
+      toFake: ["setInterval", "clearInterval", "Date"],
+    });
+    rt.host = { ambientDriver: "interval" };
+    const { layer } = mount();
+    expect(rt.clockCalls).toBe(0);
+    const first = layer(STARS);
+    vi.advanceTimersByTime(AMBIENT_STEP_MS * 3 + 1);
+    expect(layer(STARS)).not.toBe(first);
+    vi.useRealTimers();
+  });
+});
+
+describe("OrreryV2Canvas: the base bake (D-49, H3)", () => {
+  /** Advances the clock one ambient step per pass. */
+  function settle(steps: number) {
+    const clock = rt.clock as { value: number };
+    for (let i = 0; i < steps; i++) {
+      clock.value += AMBIENT_STEP_MS + 1;
+      flush();
+    }
+  }
+  it("bakes once still, blits the snapshot, acks it, and falls back to live the moment the scene moves", () => {
+    rt.host = { bakePath: "gpu-offscreen" };
+    const { props, layer } = mount();
+    flush();
+    expect(layer(0).ops).toEqual([
+      ["sky", "sky-1"],
+      ["rings", "frame-1"],
+    ]);
+    settle(BAKE_AFTER_STILL_TICKS + 2);
+    expect(rt.surfaces).toBe(1);
+    expect(props.onBaseBaked).toHaveBeenCalledTimes(1);
+    expect(props.onBaseBaked).toHaveBeenLastCalledWith(1, 1, 1);
+    const baked = layer(0);
+    expect(baked.ops[0][0]).toBe("drawImageRectOptions");
+    expect(baked.ops[0][2]).toEqual({ x: 0, y: 0, width: 800, height: 1600 });
+    expect(props.ackRecorded).toHaveBeenCalledWith("base", 1, 1);
+    // Ambient keeps ticking: the snapshot stays, no re-bake.
+    settle(5);
+    expect(layer(0)).toBe(baked);
+    expect(rt.surfaces).toBe(1);
+    // The scene moves: the base is live AT ONCE (before any reaction ran)…
+    props.frame.value = { tag: "frame-2" };
+    expect(layer(0).ops).toEqual([
+      ["sky", "sky-1"],
+      ["rings", "frame-2"],
+    ]);
+    // …and the reaction publishes the live generation, which the base acks.
+    flush(2);
+    expect(props.onBaseBaked).toHaveBeenLastCalledWith(1, 2, null);
+    expect(props.ackRecorded).toHaveBeenLastCalledWith("base", 2, 1);
+    // Still again: a second snapshot, from the same surface.
+    settle(BAKE_AFTER_STILL_TICKS + 1);
+    expect(props.onBaseBaked).toHaveBeenLastCalledWith(1, 3, 2);
+    expect(rt.surfaces).toBe(1);
+    expect(Object.keys(props.bakeRegistry.value.snapshots)).toEqual(["1", "2"]);
+  });
+  it("never bakes while busy (switch, gesture or camera motion)", () => {
+    rt.host = { bakePath: "gpu-offscreen" };
+    const { props } = mount();
+    props.busy.value = true;
+    flush();
+    settle(BAKE_AFTER_STILL_TICKS * 3);
+    expect(props.onBaseBaked).not.toHaveBeenCalled();
+    expect(rt.surfaces).toBe(0);
+    props.busy.value = false;
+    settle(BAKE_AFTER_STILL_TICKS + 1);
+    expect(props.onBaseBaked).toHaveBeenCalledTimes(1);
+  });
+  it("bake off (the host default today): the base is always live and nothing is published", () => {
+    const { props, layer } = mount();
+    flush();
+    settle(BAKE_AFTER_STILL_TICKS * 3);
+    expect(props.onBaseBaked).not.toHaveBeenCalled();
+    expect(rt.surfaces).toBe(0);
+    expect(layer(0).ops[1]).toEqual(["rings", "frame-1"]);
+    expect(props.ackRecorded).not.toHaveBeenCalledWith(
+      "base",
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+});

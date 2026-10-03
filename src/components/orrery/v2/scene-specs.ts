@@ -246,10 +246,12 @@ export function buildStarField(
 export const BODY_OUTLINE_WIDTH = 3;
 
 /**
- * The picture layers that draw body specs, and the labels layer. Each acks
+ * The picture layers that draw native objects: the body layers, the labels
+ * layer and (38.7-08) the base layer when it draws a baked snapshot. Each acks
  * `(layerId, generation, mountEpoch)` separately (H3 ledger contract).
  */
 export const ORRERY_LAYER = {
+  base: "base",
   bodiesBehind: "bodiesBehind",
   sun: "sun",
   bodiesFront: "bodiesFront",
@@ -526,9 +528,14 @@ export function photoHandle(photoEpoch: number, id: number): string {
 export function textHandle(textEpoch: number, key: string): string {
   return `t${HANDLE_SEPARATOR}${textEpoch}${HANDLE_SEPARATOR}${key}`;
 }
+/** 38.7-08: the ledger handle of a baked base snapshot (its mount epoch travels with it). */
+export function baseHandle(mountEpoch: number, id: number): string {
+  return `b${HANDLE_SEPARATOR}${mountEpoch}${HANDLE_SEPARATOR}${id}`;
+}
 export type OrreryLedgerHandle =
   | { kind: "photo"; epoch: number; id: number }
-  | { kind: "text"; epoch: number; key: string };
+  | { kind: "text"; epoch: number; key: string }
+  | { kind: "base"; epoch: number; id: number };
 export function parseLedgerHandle(handle: string): OrreryLedgerHandle | null {
   const first = handle.indexOf(HANDLE_SEPARATOR);
   const second = handle.indexOf(HANDLE_SEPARATOR, first + 1);
@@ -537,6 +544,7 @@ export function parseLedgerHandle(handle: string): OrreryLedgerHandle | null {
   const rest = handle.slice(second + 1);
   if (handle[0] === "p") return { kind: "photo", epoch, id: Number(rest) };
   if (handle[0] === "t") return { kind: "text", epoch, key: rest };
+  if (handle[0] === "b") return { kind: "base", epoch, id: Number(rest) };
   return null;
 }
 

@@ -229,6 +229,67 @@ export function registerUatProbes(): void {
       })();
     },
   );
+  // 38.7 Plan 08 (D-44/D-49, DEBUG screening only — D-59): flip the render
+  // host's spike variants. The canvas reads the host at mount, so leave and
+  // re-enter the Orrery tab after a flip. Each logs the effective host.
+  const orreryHost = () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const override =
+      require("./orrery-host-override") as typeof import("./orrery-host-override");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const host =
+      require("@/components/orrery/v2/render-host") as typeof import("@/components/orrery/v2/render-host");
+    return { override, host };
+  };
+  const logOrreryHost = () => {
+    const { host } = orreryHost();
+    console.log(
+      `orrery-dev-host host=${host.describeOrreryHost(host.resolveOrreryRenderHost())}`,
+    );
+  };
+  DevSettings.addMenuItem("Orrery spike: opaque canvas on/off", () => {
+    const { override, host } = orreryHost();
+    const current = host.resolveOrreryRenderHost();
+    override.setOrreryHostOverride({ opaqueCanvas: !current.opaqueCanvas });
+    logOrreryHost();
+  });
+  DevSettings.addMenuItem(
+    "Orrery spike: ambient driver frame-clock/interval",
+    () => {
+      const { override, host } = orreryHost();
+      const current = host.resolveOrreryRenderHost();
+      override.setOrreryHostOverride({
+        ambientDriver:
+          current.ambientDriver === "interval" ? "frame-clock" : "interval",
+      });
+      logOrreryHost();
+    },
+  );
+  DevSettings.addMenuItem("Orrery spike: bake on/off", () => {
+    const { override, host } = orreryHost();
+    const current = host.resolveOrreryRenderHost();
+    override.setOrreryHostOverride({
+      bakePath: current.bakePath === "gpu-offscreen" ? "none" : "gpu-offscreen",
+    });
+    logOrreryHost();
+  });
+  DevSettings.addMenuItem("Orrery spike: reset host overrides", () => {
+    orreryHost().override.clearOrreryHostOverride();
+    logOrreryHost();
+  });
+  // Counts only (no names): the shared text and photo caches, for tuning
+  // their caps against the D-11 memory gate (38.7-08 carried-in items).
+  DevSettings.addMenuItem("Orrery: log text + photo cache stats", () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { orreryTextService } =
+      require("@/components/orrery/resources/orrery-text-service") as typeof import("@/components/orrery/resources/orrery-text-service");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { orreryPhotoCache } =
+      require("@/components/orrery/resources/orrery-photo-cache") as typeof import("@/components/orrery/resources/orrery-photo-cache");
+    console.log(
+      `orrery-stats text=${JSON.stringify(orreryTextService.stats())} photo=${JSON.stringify(orreryPhotoCache.stats())}`,
+    );
+  });
   DevSettings.addMenuItem("Measure backup ingress", () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { runIngressMeasure } =
