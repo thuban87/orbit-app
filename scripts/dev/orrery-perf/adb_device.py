@@ -223,23 +223,25 @@ def parse_ui(xml_text: str) -> list[Node]:
     return nodes
 
 
-UI_DUMP_ATTEMPTS = 6
+UI_DUMP_TIMEOUT_S = 30.0
 UI_DUMP_RETRY_S = 0.7
 
 
-def ui_dump(serial: str, attempts: int = UI_DUMP_ATTEMPTS) -> list[Node]:
-    """The UI tree. uiautomator returns nothing while the screen is mid-animation
-    (a System switch, a sheet opening; seen on the release build 2026-10-03), so a
-    miss is retried a few times before it is an error."""
+def ui_dump(serial: str, timeout_s: float = UI_DUMP_TIMEOUT_S) -> list[Node]:
+    """The UI tree. uiautomator returns nothing while the screen is mid-animation or
+    the UI thread is busy (6 Pro: a System switch, a sheet opening; Pixel 3a: "null
+    root node" for ~10 s after a switch; release builds, 2026-10-03), so misses are
+    retried until `timeout_s` before it is an error."""
     path = "/sdcard/orbperf-ui.xml"
-    for attempt in range(attempts):
+    deadline = time.monotonic() + timeout_s
+    while True:
         xml_text = shell(serial, f"uiautomator dump {path} >/dev/null 2>&1 && cat {path}; rm -f {path}")
         start = xml_text.find("<?xml")
         if start >= 0:
             return parse_ui(xml_text[start:])
-        if attempt + 1 < attempts:
-            time.sleep(UI_DUMP_RETRY_S)
-    raise DeviceError("uiautomator dump returned no XML (screen locked or app busy?)")
+        if time.monotonic() >= deadline:
+            raise DeviceError("uiautomator dump returned no XML (screen locked or app busy?)")
+        time.sleep(UI_DUMP_RETRY_S)
 
 
 def find(
@@ -390,7 +392,7 @@ def close_selector_button(nodes: list[Node]) -> Node | None:
     return min(matches, key=area) if matches else None
 
 
-SHEET_WAIT_S = 4.0
+SHEET_WAIT_S = 10.0  # the Pixel 3a stalls ~3 s opening the sheet (2026-10-03)
 
 
 def wait_for_sheet(serial: str, timeout_s: float = SHEET_WAIT_S) -> list[Node]:

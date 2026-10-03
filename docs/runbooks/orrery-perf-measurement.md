@@ -302,3 +302,7 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
   close button, never the same-labelled full-screen backdrop (whose centre lies over the
   System rows); `uiautomator dump` misses during an animation are retried. No measurement
   logic changed. `selftest.py` 25/25 with release-tree fixtures.
+- **2026-10-03** — Before any baseline number (38.7 Plan 02), Pixel 3a timeouts: opening the
+  System sheet stalls its UI thread ~3 s (`Skipped 168 frames`), and `uiautomator dump`
+  answers "null root node" for ~10 s after a switch. The sheet wait is 10 s and UI dumps
+  retry for up to 30 s. Tap timestamps are taken at the tap itself, so no timing changed.
