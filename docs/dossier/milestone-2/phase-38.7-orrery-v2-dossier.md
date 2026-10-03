@@ -224,6 +224,7 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
     - Default: Lab A's world plane, drawn in world space under the exact homography with analytic screen-dp strokes on cached `SkVertices` (`RING_WORLD_SKSL`).
     - Fallback: Lab B's full-screen ring field, if an **early spike on both phones** shows the default cannot hold the D-56 performance gates.
     - B's thin-line style (D-11), rim (D-11) and pulse term (D-10) are written for whichever method wins.
+    - **[DECIDED 2026-10-02, owner]** The Plan 08 spike is measured on one release build by default (debug = screening only). If the owner picks the ring-field or hybrid fallback at the spike checkpoint, ONE further release build verifies that fallback before visual work builds on it. Mirrored as CONTEXT D-59 and D-61.
 -   **[DERIVED] D-45 --- Home profile and camera model.**
     - Home becomes one tunable profile `{tilt, lensShift, fitRule}`, defaulting to 62° with Lab C's strategy-map lens shift.
     - The max user tilt becomes a separate constant. 62° cannot exist under today's `MAX_TILT` of 60°.
@@ -245,6 +246,7 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
     - Under a dolly, `zoom` stops meaning magnification. Semantic label tiers use projected body size (Lab C `effectiveLabelZoom`).
     - Labels are allocated nearest-first, with body exclusions.
     - The "tap the focused person again → Profile" threshold is re-keyed from raw zoom to projected size, so its behaviour is preserved.
+    - **[DECIDED 2026-10-02, owner — supersedes the bullet above and phase-08's "tap opens Profile where names are visible" rule]** A tap on a body never opens Profile. Tapping any person focuses them (tapping a different person while focused re-focuses on that person; tapping the already-focused person keeps focus). Profile opens only from the focus card's "Open Profile" action. Reason: focus-then-tap-elsewhere jumping straight to Profile is confusing; always focusing first is consistent. Mirrored as CONTEXT D-60.
     - The focus zoom may exceed today's `IDENTITY_ZOOM` cap to achieve D-19 framing. This amends phase-08 `:225-230` ("stops at the name-visible level"). Recorded here, and the owner sees it at the device checkpoint.
 -   **[DERIVED] D-48 --- One size mechanism, in the projection.**
     - Minimum on-screen size inflates the projected radius (Lab C), so the drawn body, hit target and label gap agree.
@@ -285,6 +287,7 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
     - ADR-105 limits are enforced: unlinked-only, and a non-member sun gets no moons.
     - Stack detection must be indexed, not O(n²) per re-record (it is unmeasured at 800 bodies).
 -   **[DERIVED] D-55 --- Contrast fix lever.** For D-28, dim what the Orrery draws **under** the card region (Lab B's occlusion lever); never change card opacity. Re-prove with the ADR-169 both-extrema method over the brightest sky, nebula, star, initials and photo pixel in all four themes. Lab B measured 4.42:1 in Standard Dark, and the worst pixel was a white initials glyph.
+    - **[DECIDED 2026-10-02, owner]** The occlusion dim is capped at 0.7 (D-20: don't hide the map behind the card). If any theme needs more than 0.7 to pass 4.5:1, stop and bring the owner the trade-off with screenshots. Mirrored as CONTEXT D-62.
 
 ## Derived Constraints
 
@@ -457,3 +460,4 @@ O-1, O-2 and O-3 became D-56, D-57 and D-58 below. No open items remain.
 
 -   **2026-10-02** --- Draft authored from the Prototype D synthesis: D-01..D-30 (field sheet), D-31..D-42 (chat rulings), D-43..D-55 (derived), O-1..O-3 open. Awaiting codex review.
 -   **2026-10-02** --- Codex review: green light. O-1..O-3 resolved as D-56 (Day-1 baseline, then the owner locks the numeric gates; hard gates in force from the start), D-57 (Preview adopts the V2 look, flat) and D-58 (bounded warm cache across tab blur; clarifies ADR-170; bounded by 38.6 D-11). The dangling D-56 reference in D-44 now resolves. D-37 and D-40 clarify that the sky drift is permitted environmental motion on the same ambient clock.
+-   **2026-10-02** --- Plan-review convergence rulings: D-44 release spike by default + second release build only if the fallback is chosen (CONTEXT D-59, D-61); D-47 amended: a tap never opens Profile, Profile only from the focus card (CONTEXT D-60, supersedes phase-08 `:225-230` tap-to-Profile); D-55 occlusion dim capped at 0.7, escalate above (CONTEXT D-62).
