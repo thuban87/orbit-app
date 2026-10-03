@@ -9,6 +9,9 @@
  */
 import { type SkImage, Skia } from "@shopify/react-native-skia";
 import { swatchIndex } from "@/components/avatar-initials";
+import type { OrrerySatellite } from "@/db/orrery-satellites-read";
+import type { OrrerySatelliteTarget } from "@/logic/orrery-camera-logic";
+import { bodyKey } from "@/logic/orrery-frame";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
 import type { ThemePalette } from "@/theme/theme-types";
@@ -18,6 +21,9 @@ import type {
   OrreryPhotoRequest,
 } from "../resources/orrery-photo-cache";
 import type {
+  OrreryInitialsSpec,
+  OrreryLabelSpec,
+  OrreryMeasuredLabel,
   OrreryTextVisibility,
   PreparedOrreryText,
 } from "../resources/orrery-text-service";
@@ -452,6 +458,64 @@ export function buildPhotoRequests(
   return [...out.values()];
 }
 
+/**
+ * Today's moons (the legacy satellite body): a unit disc in `textSecondary`,
+ * and the focused moon's accent ring. One look per drawn satellite row, keyed
+ * like the frame's moon bodies.
+ */
+export function buildSatelliteLooks(
+  satellites: readonly OrrerySatellite[],
+  colors: ThemePalette,
+  focused: OrrerySatelliteTarget | null | undefined,
+): OrreryBodyLook[] {
+  const ink = tokenInk(colors.textSecondary);
+  const focusInk = tokenInk(colors.accent);
+  return satellites.map((row) => {
+    const target = {
+      kind: "satellite" as const,
+      uid: row.uid,
+      parentId: row.parentId,
+      parentUid: row.parentUid,
+    };
+    const isFocused =
+      focused?.uid === row.uid &&
+      focused.parentId === row.parentId &&
+      focused.parentUid === row.parentUid;
+    return {
+      key: bodyKey({ kind: "satellite", id: -1, satelliteTarget: target }),
+      kind: "satellite" as const,
+      worldRadius: 1,
+      outlineInk: ink,
+      swatchInk: ink,
+      photoKey: null,
+      initialsFontSize: 0,
+      focusInk: isFocused ? focusInk : null,
+    };
+  });
+}
+
+// ── Labels (38.7-07 Task 2) ──────────────────────────────────────────────────
+
+/** What the `labels` picture reads: Paragraphs from OrreryTextService only. */
+export interface OrreryLabelLayerSpecs {
+  /** The shared spec generation (0 = nothing published yet). */
+  generation: number;
+  mountEpoch: number;
+  /** Body key → the prepared label and its context caption (detail tier). */
+  labels: OrreryLabelSpec["labels"];
+  /** The allocation input, in draw order (only admitted labels). */
+  measured: readonly OrreryMeasuredLabel[];
+  /** The backplate (today's `colors.surface`). */
+  plateInk: OrreryInk;
+}
+export const EMPTY_LABEL_LAYER_SPECS: OrreryLabelLayerSpecs = Object.freeze({
+  generation: 0,
+  mountEpoch: 0,
+  labels: Object.freeze({}),
+  measured: Object.freeze([]) as readonly OrreryMeasuredLabel[],
+  plateInk: NO_INK,
+});
+
 /** Ledger handles: a separator that never occurs in a key or number. */
 const HANDLE_SEPARATOR = "\u0001";
 /** The ledger handle of a photo image (its cache epoch travels with it). */
@@ -481,15 +545,19 @@ export interface OrrerySpecPublisherOptions {
   ledger: OrreryGenerationLedger<string>;
   /** Writes the body specs SharedValue (never React state). */
   writeBodies: (specs: OrreryBodySpecs) => void;
+  /** Writes the label specs SharedValue (never React state). */
+  writeLabels?: (specs: OrreryLabelLayerSpecs) => void;
 }
 
 export interface OrrerySpecPublisher {
   /** Resource / theme / focus change: the static looks. */
   setLooks(looks: readonly OrreryBodyLook[]): void;
-  /** The text publisher's initials (body key → Paragraph), keys = its cache keys. */
-  setInitials(
-    initials: Readonly<Record<string, PreparedOrreryText | null>>,
-  ): void;
+  /** The text publisher's initials spec (body key → Paragraph, its cache keys). */
+  setInitials(spec: OrreryInitialsSpec): void;
+  /** The text publisher's label spec (labels, captions and their measurements). */
+  setLabels(spec: OrreryLabelSpec): void;
+  /** Theme change: the label backplate ink. */
+  setLabelPlate(ink: OrreryInk): void;
   /** The photo cache's drawn photos for this owner, tagged with its epoch. */
   setPhotos(
     photos: ReadonlyMap<string, OrreryDrawnPhoto>,
@@ -512,9 +580,12 @@ export interface OrrerySpecPublisher {
 export function createOrrerySpecPublisher(
   options: OrrerySpecPublisherOptions,
 ): OrrerySpecPublisher {
-  const { ledger, writeBodies } = options;
+  const { ledger, writeBodies, writeLabels } = options;
   let looks: readonly OrreryBodyLook[] = [];
   let initials: Readonly<Record<string, PreparedOrreryText | null>> = {};
+  let initialsHandles: readonly string[] = [];
+  let labelSpec: OrreryLabelSpec | null = null;
+  let plateInk: OrreryInk = NO_INK;
   let photos: ReadonlyMap<string, OrreryDrawnPhoto> = new Map();
   let photoEpoch = 0;
   let generation = 0;
@@ -529,6 +600,7 @@ export function createOrrerySpecPublisher(
       published !== null &&
       publishedLooks === looks &&
       published.length === looks.length;
+    for (const handle of initialsHandles) handles.add(handle);
     for (let i = 0; i < looks.length; i++) {
       const look = looks[i];
       const drawn =
@@ -556,14 +628,54 @@ export function createOrrerySpecPublisher(
     writeBodies({ generation, mountEpoch: epoch, bodies });
   }
 
+  function publishLabels(): void {
+    if (!writeLabels || !labelSpec) return;
+    if (epoch === null) epoch = ledger.beginEpoch();
+    generation++;
+    const textEpoch = labelSpec.mountEpoch;
+    ledger.publish(
+      generation,
+      [ORRERY_LAYER.labels],
+      labelSpec.keys.map((key) => textHandle(textEpoch, key)),
+    );
+    writeLabels({
+      generation,
+      mountEpoch: epoch,
+      labels: labelSpec.labels,
+      measured: labelSpec.measured,
+      plateInk,
+    });
+  }
+
   return {
     setLooks(next) {
       looks = next;
       publishBodies();
     },
     setInitials(next) {
-      initials = next;
+      initials = next.initials;
+      initialsHandles = next.keys.map((key) =>
+        textHandle(next.mountEpoch, key),
+      );
+      // Always a new generation: the text epoch in the handles may change
+      // even when every Paragraph is reused from the cache (a remount).
+      publishedLooks = null;
       publishBodies();
+    },
+    setLabels(next) {
+      labelSpec = next;
+      publishLabels();
+    },
+    setLabelPlate(ink) {
+      if (
+        ink[0] === plateInk[0] &&
+        ink[1] === plateInk[1] &&
+        ink[2] === plateInk[2] &&
+        ink[3] === plateInk[3]
+      )
+        return;
+      plateInk = ink;
+      publishLabels();
     },
     setPhotos(next, nextEpoch) {
       photos = next;
@@ -575,6 +687,9 @@ export function createOrrerySpecPublisher(
       epoch = null;
       published = null;
       publishedLooks = null;
+      labelSpec = null;
+      initials = {};
+      initialsHandles = [];
       return ended;
     },
     generation: () => generation,

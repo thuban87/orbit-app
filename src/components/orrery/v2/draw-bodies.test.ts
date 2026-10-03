@@ -296,3 +296,42 @@ describe("sun drawing (today's glow, rim and pulse)", () => {
     expect(calls).toEqual([]);
   });
 });
+
+describe("moon drawing (today's look, same depth rules)", () => {
+  it("a unit disc scaled by the projected radius; the focused moon adds the accent ring; moons sort with contacts", () => {
+    const ACCENT: OrreryInk = [0.125, 0.25, 0.875, 1];
+    const specs = [
+      spec("contact:1"),
+      spec("sun:0", "sun"),
+      spec("satellite:a", "satellite"),
+      spec("satellite:b", "satellite", { focusInk: ACCENT }),
+    ];
+    const f = frame([
+      { key: "contact:1", depth: -1, x: 1 },
+      { key: "sun:0", depth: 0, x: 0 },
+      { key: "satellite:a", depth: -2, x: 7, radius: 4 },
+      { key: "satellite:b", depth: 3, x: 8, radius: 5 },
+    ]);
+    const order = orderBodies(f, specs);
+    const behind = recordingCanvas();
+    drawBodies(behind.canvas, f, specs, order, "behind");
+    expect(drawnXs(behind.calls)).toEqual([7, 1]);
+    expect(behind.calls[2].args).toEqual([4, 4]);
+    const front = recordingCanvas();
+    drawBodies(front.canvas, f, specs, order, "front");
+    const circles = front.calls.filter((c) => c.op === "drawCircle");
+    expect(circles.map((c) => c.args.slice(0, 3))).toEqual([
+      [0, 0, 1],
+      [0, 0, 1.5],
+    ]);
+    const ring = circles[1].args[3] as {
+      color: number[];
+      style: number;
+      width: number;
+    };
+    expect(ring).toMatchObject({ color: [...ACCENT], style: 1, width: 0.3 });
+    expect((circles[0].args[3] as { color: number[] }).color).toEqual([
+      ...MOON,
+    ]);
+  });
+});

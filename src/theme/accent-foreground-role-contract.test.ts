@@ -85,12 +85,6 @@ const ACCENT_FOREGROUND_ALLOWLIST: readonly AllowEntry[] = [
     reason: `${SKIA_FILL} Builder backdrop canvas <Fill>.`,
   },
   {
-    file: "src/components/orrery/SatelliteBody.tsx",
-    rule: "accent-as-text",
-    text: "color={colors.accent}",
-    reason: `${SKIA_FILL} Orrery focus ring stroke (Table C E-5 Orrery canvas).`,
-  },
-  {
     file: "src/components/orrery/SystemPreviewCanvas.tsx",
     rule: "accent-as-text",
     text: "color={ marker.id === focusedId ? colors.accent : colors.textSecondary }",

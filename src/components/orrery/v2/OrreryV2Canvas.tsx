@@ -14,12 +14,12 @@
  * Layers, bottom to top:
  * - `base`: the background fill and the world-plane orbit rings (D-44);
  * - `stars`: today's 44 seeded twinkling stars;
- * - `bodiesBehind`: contacts (and moons) deeper than the sun (38.7-07);
+ * - `bodiesBehind`: contacts and moons deeper than the sun (38.7-07);
  * - `sun`: the sun, its glow pulsing on the ambient clock;
- * - `bodiesFront`: contacts (and moons) nearer than the sun;
- * - the legacy `children` slot: the remaining label and moon components
- *   (38.7-07 Task 2 replaces them with picture layers);
+ * - `bodiesFront`: contacts and moons nearer than the sun;
+ * - `labels`: the label backplates and Paragraphs at their allocations;
  * - `overlay`: Polaris, the reorder outline and the focus outlines.
+ * The node count is identical for a 3-body and a 1,000-body System.
  *
  * ── Resource lifetime (H3, the 38.7-07 ledger contract) ─────────────────────
  * Every layer that draws native objects (photo SkImages, Paragraphs) acks the
@@ -52,7 +52,7 @@ import {
   type SkPicture,
   useClock,
 } from "@shopify/react-native-skia";
-import { type ReactNode, useMemo } from "react";
+import { useMemo } from "react";
 import {
   type ComposedGesture,
   GestureDetector,
@@ -66,10 +66,11 @@ import {
   useSharedValue,
 } from "react-native-reanimated";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
+import type { LabelAllocation } from "@/logic/orrery-label-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
-import { OrreryClockContext } from "../orrery-clock-context";
 import { drawBodies, drawSun, orderBodies, sunPulse } from "./draw-bodies";
+import { drawLabels } from "./draw-labels";
 import { drawOverlay } from "./draw-overlay";
 import { drawPlaneRings, ringBands } from "./draw-plane";
 import { drawSky, drawStars, twinkleOpacity } from "./draw-sky";
@@ -77,6 +78,7 @@ import { resolveOrreryRenderHost } from "./render-host";
 import {
   ORRERY_LAYER,
   type OrreryBodySpecs,
+  type OrreryLabelLayerSpecs,
   type OrreryLayerId,
   type OverlaySpec,
   type RingSpecs,
@@ -114,8 +116,10 @@ export interface OrreryV2CanvasProps {
     generation: number,
     mountEpoch: number,
   ) => void;
-  /** Legacy label/moon components (38.7-07 Task 2 replaces them with pictures). */
-  children?: ReactNode;
+  /** Label and caption Paragraphs with their backplate ink (JS-built). */
+  labels: SharedValue<OrreryLabelLayerSpecs>;
+  /** Label id → its allocation this frame (UI-derived from `frame`). */
+  allocationIndex: SharedValue<Readonly<Record<string, LabelAllocation>>>;
 }
 
 /** What a layer's ack reaction compares: its picture and the generation it read. */
@@ -179,7 +183,8 @@ export function OrreryV2Canvas({
   reorder,
   bodies,
   ackRecorded,
-  children,
+  labels,
+  allocationIndex,
 }: OrreryV2CanvasProps) {
   const host = useMemo(() => resolveOrreryRenderHost(), []);
   // M5/D-49: the ONE ambient clock (inside this unmountable subtree).
@@ -274,6 +279,15 @@ export function OrreryV2Canvas({
   useLayerAck(ORRERY_LAYER.bodiesBehind, bodiesBehind, bodies, ackRecorded);
   useLayerAck(ORRERY_LAYER.sun, sunPicture, bodies, ackRecorded);
   useLayerAck(ORRERY_LAYER.bodiesFront, bodiesFront, bodies, ackRecorded);
+  const labelsPicture = useDerivedValue(() =>
+    createPicture(
+      (canvas) => {
+        drawLabels(canvas, labels.value, allocationIndex.value);
+      },
+      { width, height },
+    ),
+  );
+  useLayerAck(ORRERY_LAYER.labels, labelsPicture, labels, ackRecorded);
   const overlayPicture = useDerivedValue(() =>
     createPicture(
       (canvas) => {
@@ -302,9 +316,7 @@ export function OrreryV2Canvas({
         <Picture picture={bodiesBehind} />
         <Picture picture={sunPicture} />
         <Picture picture={bodiesFront} />
-        <OrreryClockContext.Provider value={clock}>
-          {children}
-        </OrreryClockContext.Provider>
+        <Picture picture={labelsPicture} />
         <Picture picture={overlayPicture} />
       </Canvas>
     </GestureDetector>

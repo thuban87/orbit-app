@@ -227,7 +227,7 @@ export function drawContactBody(
   return true;
 }
 
-/** One moon (today's SatelliteBody). Returns true when it drew. */
+/** One moon (today's moon body). Returns true when it drew. */
 export function drawMoonBody(
   canvas: SkCanvas,
   frame: AnimatedFrame,

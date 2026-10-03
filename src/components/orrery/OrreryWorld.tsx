@@ -1,5 +1,5 @@
 /** ADR-077: keyed resources; one UI-thread world/projection frame for all layers. */
-import { Group, type SkTypefaceFontProvider } from "@shopify/react-native-skia";
+import type { SkTypefaceFontProvider } from "@shopify/react-native-skia";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useWindowDimensions } from "react-native";
 import {
@@ -52,26 +52,22 @@ import { sampleSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type { ThemePalette } from "@/theme/theme-types";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
-import { OrreryLabel } from "./OrreryLabel";
 import type { OrreryGenerationLedger } from "./resources/orrery-generation-ledger";
 import { createOrreryGenerationLedger } from "./resources/orrery-generation-ledger";
 import { orreryPhotoCache } from "./resources/orrery-photo-cache";
 import {
   createOrreryTextPublisher,
-  EMPTY_INITIALS_SPEC,
-  EMPTY_LABEL_SPEC,
   ORRERY_INITIALS_MIN_RADIUS_PX,
+  ORRERY_LABEL_BODY_GAP,
+  ORRERY_LABEL_MAX_WIDTH,
   ORRERY_TEXT_ELIGIBILITY_INTERVAL_MS,
   type OrreryInitialsSource,
-  type OrreryInitialsSpec,
   type OrreryLabelSource,
-  type OrreryLabelSpec,
   type OrreryTextPublisher,
   type OrreryTextScene,
   type OrreryTextVisibility,
   orreryTextService,
 } from "./resources/orrery-text-service";
-import { SatelliteBody } from "./SatelliteBody";
 import {
   type OrrerySwitchRuntime,
   sampleOrrerySwitchCamera,
@@ -85,14 +81,17 @@ import {
   buildOverlayInk,
   buildPhotoRequests,
   buildRingSpecs,
+  buildSatelliteLooks,
   buildSkySpec,
   buildStarField,
   createOrrerySpecPublisher,
   EMPTY_BODY_SPECS,
+  EMPTY_LABEL_LAYER_SPECS,
   EMPTY_OVERLAY_SPEC,
   EMPTY_RING_SPECS,
   EMPTY_STAR_FIELD,
   type OrreryBodySpecs,
+  type OrreryLabelLayerSpecs,
   type OrreryLayerId,
   type OrrerySpecPublisher,
   type OverlaySpec,
@@ -100,6 +99,7 @@ import {
   type RingSpecs,
   type SkySpec,
   type StarFieldSpec,
+  tokenInk,
 } from "./v2/scene-specs";
 
 export { createOrreryGestures } from "./use-orrery-camera";
@@ -109,8 +109,6 @@ import {
   type OrreryCameraController,
 } from "./use-orrery-camera";
 
-const LABEL_MAX_WIDTH = 200;
-const LABEL_BODY_GAP = 8;
 /**
  * D-52: stable empty defaults. A fresh `[]`/`{}` default per render changes the
  * frame worklet's closure (restarting the mapper) and the labels memo's deps
@@ -182,22 +180,34 @@ function finishTextRelease(owner: string, epoch: number): void {
 
 /**
  * 38.7-07 (H3): routes the native objects the ledger released back to their
- * holders. A photo image is confirmed to the shared cache (disposed when
- * `dispose` or superseded, else it turns warm); text keeps Plan 04's echo
- * until Task 2 moves it onto the ledger.
+ * holders, in the order given (teardown passes reverse creation order). A
+ * photo image is confirmed to the shared cache and a Paragraph to the text
+ * service; each is disposed when `dispose` (teardown) or superseded, else it
+ * turns warm for reuse.
  */
 function routeRetired(
   owner: string,
+  text: OrreryTextPublisher,
   handles: Iterable<string>,
   dispose: boolean,
 ): void {
+  // Batched per holder and epoch: one confirmation frees the whole set, so a
+  // queued publish retries once (C3-L3's generation bound), not per object.
+  const photos = new Map<number, number[]>();
+  const texts = new Map<number, string[]>();
   for (const handle of handles) {
     const parsed = parseLedgerHandle(handle);
     if (parsed?.kind === "photo")
-      orreryPhotoCache.confirmRetired(owner, [parsed.id], parsed.epoch, {
-        dispose,
-      });
+      photos.set(parsed.epoch, [
+        ...(photos.get(parsed.epoch) ?? []),
+        parsed.id,
+      ]);
+    else if (parsed?.kind === "text")
+      texts.set(parsed.epoch, [...(texts.get(parsed.epoch) ?? []), parsed.key]);
   }
+  for (const [epoch, ids] of photos)
+    orreryPhotoCache.confirmRetired(owner, ids, epoch, { dispose });
+  for (const [epoch, keys] of texts) text.confirmRetired(keys, epoch, dispose);
 }
 
 export function OrreryWorld({
@@ -253,11 +263,12 @@ export function OrreryWorld({
     if (mounted.current && latestFocus.current === focusKey) onFocusLost?.();
   }, [focusKey, onFocusLost]);
   const level = useSharedValue<SemanticLevel>("overview");
-  // 38.7-04 (D-46/D-52/M3): every label and initials Paragraph reaches the
-  // canvas through these specs, written by the JS text publisher — never React
+  // 38.7-04/07 (D-46/D-52/M3): every label and initials Paragraph reaches the
+  // pictures through these specs, written by the JS publishers — never React
   // state, so a tier change commits no render here.
-  const labelSpec = useSharedValue<OrreryLabelSpec>(EMPTY_LABEL_SPEC);
-  const initialsSpec = useSharedValue<OrreryInitialsSpec>(EMPTY_INITIALS_SPEC);
+  const labelSpecs = useSharedValue<OrreryLabelLayerSpecs>(
+    EMPTY_LABEL_LAYER_SPECS,
+  );
   // 38.7-07 (D-43/H3): the body specs every body picture layer reads, the
   // shared spec generation and the ledger that gates native-object disposal.
   const bodySpecs = useSharedValue<OrreryBodySpecs>(EMPTY_BODY_SPECS);
@@ -271,6 +282,9 @@ export function OrreryWorld({
       writeBodies: (specs) => {
         bodySpecs.value = specs;
       },
+      writeLabels: (specs) => {
+        labelSpecs.value = specs;
+      },
     });
   const specPublisher = specPublisherRef.current;
   const publisherRef = useRef<OrreryTextPublisher | null>(null);
@@ -280,11 +294,8 @@ export function OrreryWorld({
       createOrreryTextPublisher({
         owner,
         write: (labels, initials) => {
-          if (labels) labelSpec.value = labels;
-          if (initials) {
-            initialsSpec.value = initials;
-            specPublisherRef.current?.setInitials(initials.initials);
-          }
+          if (labels) specPublisherRef.current?.setLabels(labels);
+          if (initials) specPublisherRef.current?.setInitials(initials);
         },
       }),
       { owner },
@@ -442,14 +453,25 @@ export function OrreryWorld({
       }),
     [resources, colors],
   );
-  // 38.7-07 (D-43): the static body looks (theme and resources only).
+  // 38.7-07 (D-43): the static body looks — contacts and the sun, then the
+  // moons (theme, resources, moons and the focused moon only).
+  const satelliteFocusKey = focusedSatellite
+    ? `${focusedSatellite.parentId}|${focusedSatellite.parentUid}|${focusedSatellite.uid}`
+    : "";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by satelliteFocusKey (the focused moon's identity), not the target object
   const looks = useMemo(
-    () => buildBodyLooks(resources, colors),
-    [resources, colors],
+    () => [
+      ...buildBodyLooks(resources, colors),
+      ...buildSatelliteLooks(satellites, colors, focusedSatellite),
+    ],
+    [resources, colors, satellites, satelliteFocusKey],
   );
   useEffect(() => {
     specPublisher.setLooks(looks);
   }, [specPublisher, looks]);
+  useEffect(() => {
+    specPublisher.setLabelPlate(tokenInk(colors.surface));
+  }, [specPublisher, colors]);
   // D-53: photos come from the one shared, bounded cache. A photo arriving
   // calls back synchronously and republishes the body specs (no React state).
   // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by focusSignature (focusedIds' contents), not its identity
@@ -496,7 +518,7 @@ export function OrreryWorld({
   const ackRecorded = useCallback(
     (layer: OrreryLayerId, generation: number, epoch: number) => {
       if (!ledger.ack(layer, generation, epoch)) return;
-      routeRetired(publisher.owner, ledger.retirable(), false);
+      routeRetired(publisher.owner, publisher, ledger.retirable(), false);
     },
     [ledger, publisher],
   );
@@ -504,7 +526,7 @@ export function OrreryWorld({
     () => ({
       labels: labelSources,
       initials: initialsSources,
-      labelWidth: Math.min(LABEL_MAX_WIDTH * fontScale, viewport.width),
+      labelWidth: Math.min(ORRERY_LABEL_MAX_WIDTH * fontScale, viewport.width),
       fontScale,
       fontProvider,
       labelInk: colors[TYPOGRAPHY.label.colorToken],
@@ -539,7 +561,7 @@ export function OrreryWorld({
       const finish = () => {
         if (ledgerEpoch !== null)
           ledger.teardown(
-            (handle) => routeRetired(owner, [handle], true),
+            (handle) => routeRetired(owner, publisher, [handle], true),
             ledgerEpoch,
           );
         if (photos !== null) orreryPhotoCache.confirmReleased(owner, photos);
@@ -569,23 +591,6 @@ export function OrreryWorld({
       requestPhotos();
     },
     [publisher, requestPhotos],
-  );
-  const confirmTextEcho = useCallback(
-    (generation: number, epoch: number) =>
-      publisher.confirmEchoed(generation, epoch),
-    [publisher],
-  );
-  // C-H2: the echo is sent one frame after the readers re-ran, then a second
-  // UI round trip orders it behind any first-frame draw a React commit queued
-  // before the echo arrived (that draw may still record the old Paragraphs).
-  const echoText = useCallback(
-    (generation: number, epoch: number) => {
-      runOnUI(() => {
-        "worklet";
-        runOnJS(confirmTextEcho)(generation, epoch);
-      })();
-    },
-    [confirmTextEcho],
   );
   // D-47: the semantic tier follows on-screen magnification, not raw zoom.
   useAnimatedReaction(
@@ -631,41 +636,19 @@ export function OrreryWorld({
       } else run();
     },
   );
-  // C-H2: a spec change arms a one-shot UI frame callback; one frame later the
-  // declarative readers have re-run, and only then is the generation echoed.
-  useAnimatedReaction(
-    () => {
-      const labels = labelSpec.value;
-      const initials = initialsSpec.value;
-      return labels.generation >= initials.generation
-        ? { generation: labels.generation, epoch: labels.mountEpoch }
-        : { generation: initials.generation, epoch: initials.mountEpoch };
-    },
-    (spec, previous) => {
-      if (spec.generation === 0) return;
-      if (
-        previous &&
-        previous.generation === spec.generation &&
-        previous.epoch === spec.epoch
-      )
-        return;
-      requestAnimationFrame(() => {
-        runOnJS(echoText)(spec.generation, spec.epoch);
-      });
-    },
-  );
   const allocations = useDerivedValue(() => {
     const current = frame.value;
     // Only admitted labels are candidates (the spec carries plain measurements).
-    const candidates = labelSpec.value.measured.flatMap((label) => {
+    const candidates = labelSpecs.value.measured.flatMap((label) => {
       const body = frameBodyByKey(current, label.id);
       return body?.visible && body.interactive
         ? [
             {
               ...label,
               x: body.x - label.width / 2,
-              y: body.y + body.radius + LABEL_BODY_GAP,
-              alternateY: body.y - body.radius - LABEL_BODY_GAP - label.height,
+              y: body.y + body.radius + ORRERY_LABEL_BODY_GAP,
+              alternateY:
+                body.y - body.radius - ORRERY_LABEL_BODY_GAP - label.height,
               opacity: body.opacity,
               // D-47 nearest-first within a priority class.
               depth: body.depth,
@@ -835,61 +818,8 @@ export function OrreryWorld({
       reorder={camera.reorder}
       bodies={bodySpecs}
       ackRecorded={ackRecorded}
-    >
-      <Group
-        clip={{ x: 0, y: 0, width: viewport.width, height: viewport.height }}
-      >
-        <Group>
-          {satellites.map((row) => {
-            const target = {
-              kind: "satellite" as const,
-              uid: row.uid,
-              parentId: row.parentId,
-              parentUid: row.parentUid,
-            };
-            const identity = bodyKey({
-              kind: "satellite",
-              id: -1,
-              satelliteTarget: target,
-            });
-            return (
-              <SatelliteBody
-                key={identity}
-                identity={identity}
-                frame={frame}
-                colors={colors}
-                focused={
-                  focusedSatellite?.uid === row.uid &&
-                  focusedSatellite.parentId === row.parentId &&
-                  focusedSatellite.parentUid === row.parentUid
-                }
-              />
-            );
-          })}
-        </Group>
-        {/* Labels/backplates are screen-space and never interrupt the body batch. */}
-        <Group>
-          {labelSources.map((label) => (
-            <Group key={label.key}>
-              <OrreryLabel
-                identity={label.key}
-                spec={labelSpec}
-                allocationIndex={allocationIndex}
-                colors={colors}
-              />
-              {label.context ? (
-                <OrreryLabel
-                  identity={label.key}
-                  spec={labelSpec}
-                  allocationIndex={allocationIndex}
-                  colors={colors}
-                  context
-                />
-              ) : null}
-            </Group>
-          ))}
-        </Group>
-      </Group>
-    </OrreryV2Canvas>
+      labels={labelSpecs}
+      allocationIndex={allocationIndex}
+    />
   );
 }

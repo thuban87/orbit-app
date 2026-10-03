@@ -27,12 +27,15 @@ import {
   buildOverlayInk,
   buildPhotoRequests,
   buildRingSpecs,
+  buildSatelliteLooks,
   buildSkySpec,
   buildStarField,
   createOrrerySpecPublisher,
   ORRERY_BODY_LAYERS,
+  ORRERY_LAYER,
   type OrreryBodyLook,
   type OrreryBodySpecs,
+  type OrreryLabelLayerSpecs,
   parseLedgerHandle,
   photoHandle,
   RING_DASH_PERIOD_DP,
@@ -431,13 +434,19 @@ describe("createOrrerySpecPublisher (D-43/H3)", () => {
       width: 29,
       height: 20,
     } as never;
-    publisher.setInitials({ "contact:2": initials });
+    publisher.setInitials({
+      generation: 1,
+      mountEpoch: 8,
+      keys: ["key-bo"],
+      initials: { "contact:2": initials },
+    });
     expect(writes.map((w) => w.generation)).toEqual([1, 2, 3]);
     const latest = writes[2];
     expect(latest.bodies[1].photo).toBe(ada);
     expect(latest.bodies[2].initials).toBe(initials);
-    // The ledger tracks the drawn photo for every body layer.
+    // The ledger tracks the drawn photo and initials for every body layer.
     expect(ledger.holds(photoHandle(3, 5))).toBe(true);
+    expect(ledger.holds(textHandle(8, "key-bo"))).toBe(true);
     for (const layer of ORRERY_BODY_LAYERS)
       expect(ledger.stats().acked[layer]).toBeUndefined();
   });
@@ -446,7 +455,6 @@ describe("createOrrerySpecPublisher (D-43/H3)", () => {
     publisher.setLooks(looks);
     publisher.setLooks(looks);
     publisher.setPhotos(new Map(), 1);
-    publisher.setInitials({});
     expect(writes).toHaveLength(1);
   });
   it("a photo replaced or dropped retires the old one only after every body layer acked", () => {
@@ -489,5 +497,80 @@ describe("createOrrerySpecPublisher (D-43/H3)", () => {
       key: "a\u0001b",
     });
     expect(parseLedgerHandle("junk")).toBeNull();
+  });
+});
+
+describe("38.7-07 Task 2: moons and labels", () => {
+  const colors = THEME_PRESETS.standard.dark;
+  const moon = (uid: string, parentId: number) =>
+    ({ uid, parentId, parentUid: `p${parentId}` }) as never;
+  it("moon looks: a unit textSecondary disc keyed like the frame's moons; the focused moon carries the accent ring", () => {
+    const looks = buildSatelliteLooks([moon("m1", 1), moon("m2", 1)], colors, {
+      kind: "satellite",
+      uid: "m2",
+      parentId: 1,
+      parentUid: "p1",
+    });
+    expect(looks.map((l) => l.key)).toEqual([
+      `satellite:${JSON.stringify([1, "p1", "m1"])}`,
+      `satellite:${JSON.stringify([1, "p1", "m2"])}`,
+    ]);
+    expect(looks[0]).toMatchObject({
+      kind: "satellite",
+      worldRadius: 1,
+      photoKey: null,
+      focusInk: null,
+    });
+    expect(looks[0].outlineInk).toEqual(inkOf(colors.textSecondary));
+    expect(looks[1].focusInk).toEqual(inkOf(colors.accent));
+  });
+  it("labels publish to the labels layer only, with the shared generation, and track their keys there", () => {
+    const ledger = createOrreryGenerationLedger<string>();
+    const labelWrites: OrreryLabelLayerSpecs[] = [];
+    const bodyWrites: OrreryBodySpecs[] = [];
+    const publisher = createOrrerySpecPublisher({
+      ledger,
+      writeBodies: (specs) => bodyWrites.push(specs),
+      writeLabels: (specs) => labelWrites.push(specs),
+    });
+    publisher.setLooks([]);
+    const text = { text: "Ada", paragraph: {}, width: 50, height: 28 } as never;
+    publisher.setLabelPlate(inkOf(colors.surface) as never);
+    publisher.setLabels({
+      generation: 4,
+      mountEpoch: 2,
+      keys: ["label-ada"],
+      labels: { "contact:1": { text, context: null } },
+      measured: [
+        {
+          id: "contact:1",
+          name: "Ada",
+          width: 50,
+          height: 28,
+          focused: true,
+          cluster: false,
+          favorite: false,
+        },
+      ],
+    });
+    expect(bodyWrites).toHaveLength(1);
+    const latest = labelWrites.at(-1) as OrreryLabelLayerSpecs;
+    expect(latest.generation).toBe(2);
+    expect(latest.labels["contact:1"].text).toBe(text);
+    expect(latest.plateInk).toEqual(inkOf(colors.surface));
+    expect(ledger.holds(textHandle(2, "label-ada"))).toBe(true);
+    // The plate ink republishes the labels; an identical ink does not.
+    publisher.setLabelPlate(inkOf(colors.surface) as never);
+    expect(labelWrites).toHaveLength(1);
+    // Only the labels layer recorded the label: its ack alone retires it.
+    publisher.setLabels({
+      generation: 5,
+      mountEpoch: 2,
+      keys: [],
+      labels: {},
+      measured: [],
+    });
+    ledger.ack(ORRERY_LAYER.labels, 3, latest.mountEpoch);
+    expect(ledger.retirable()).toEqual([textHandle(2, "label-ada")]);
   });
 });

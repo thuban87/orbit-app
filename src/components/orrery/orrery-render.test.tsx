@@ -10,8 +10,8 @@ import { IDENTITY_ENTER } from "@/logic/orrery-label-logic";
 import { beginSwitchChoreography } from "@/logic/orrery-switch-choreography";
 import { loadOrreryScene } from "@/services/orrery-scene";
 import { THEME_PRESETS } from "@/theme/theme-presets";
-import { prepareOrreryText } from "./OrreryLabel";
 import { OrreryWorld } from "./OrreryWorld";
+import { prepareOrreryText } from "./resources/orrery-text-service";
 import { useOrreryCamera } from "./use-orrery-camera";
 import { sampleOrrerySwitchCamera } from "./use-orrery-switch-runtime";
 
@@ -60,7 +60,8 @@ const native = vi.hoisted(() => ({
   clock: { value: 0 },
   clockCalls: 0,
   reduced: { value: false },
-  providedClock: null as unknown,
+  /** Paragraph texts painted by the label/body pictures, in order. */
+  painted: [] as string[],
 }));
 /** A deterministic stand-in for Skia's token parser: distinct per token. */
 const parseInk = vi.hoisted(() => (token: string) => {
@@ -114,21 +115,6 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("@/services/photos/photo-storage", () => ({
   resolvePhotoUri: (path: string) => path,
-}));
-vi.mock("./orrery-clock-context", () => ({
-  useOrreryClock: () => null,
-  OrreryClockContext: {
-    Provider: ({
-      value,
-      children,
-    }: {
-      value: unknown;
-      children: ReactNode;
-    }) => {
-      native.providedClock = value;
-      return children;
-    },
-  },
 }));
 // 38.7-07 (D-53): the shared photo cache — a photo-less render unless a test
 // publishes a drawn photo through the owner's onReady callback.
@@ -296,6 +282,9 @@ vi.mock("@shopify/react-native-skia", async () => {
                 layout: () => {},
                 getLongestLine: () => 90,
                 getHeight: () => 40,
+                paint: () => {
+                  native.painted.push(item.text);
+                },
                 dispose: () => {
                   native.disposed++;
                 },
@@ -346,7 +335,7 @@ beforeEach(async () => {
   native.clock = { value: 0 };
   native.clockCalls = 0;
   native.reduced = { value: false };
-  native.providedClock = null;
+  native.painted = [];
   db = openTestDb();
   let uid = 0;
   await runMigrations(nodeSqliteExecutor(db), MIGRATIONS, TARGET_VERSION, {
@@ -378,7 +367,8 @@ describe("production Orrery native tree and resource contracts", () => {
       exec,
       scene.systemSnapshot.members,
     );
-    const pose = { value: { ...HOME_CAMERA, zoom: 2 } };
+    // Flat, so the parent's on-screen magnification is the zoom (identity tier).
+    const pose = { value: { ...HOME_CAMERA, tilt: 0, zoom: 2.4 } };
     const tree = resolve(
       OrreryWorld({
         scene,
@@ -401,21 +391,31 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    // canvas [base, stars, bodiesBehind, sun, bodiesFront,
-    //         clip Group [moons, labels], overlay] (38.7-07 Task 1)
-    const moons = tree[0].children[5].children[0];
-    expect(moons.children.map((n) => n.type)).toEqual(["skGroup"]);
-    const moon = moons.children[0];
-    expect(moon.children[0].props.color).toBe(
-      THEME_PRESETS.galaxy.dark.textSecondary,
-    );
-    const transform = moon.props.transform as { value: { scale?: number }[] };
-    expect(transform.value[2].scale).toBeGreaterThan(0);
-    expect(transform.value[2].scale).toBeLessThanOrEqual(8);
+    // 38.7-07: moons are drawn by the body pictures (same depth rules).
+    const moonInk = [...parseInk(THEME_PRESETS.galaxy.dark.textSecondary)];
+    const moonDraws = () =>
+      [tree[0].children[2], tree[0].children[4]]
+        .flatMap(
+          (picture) =>
+            (
+              picture.props.picture as {
+                value: { commands: { op: string; color?: number[] }[] };
+              }
+            ).value.commands,
+        )
+        .filter(
+          (c) =>
+            c.op === "drawCircle" &&
+            c.color !== undefined &&
+            c.color.every((v, i) => v === moonInk[i]),
+        ).length;
+    flushUi();
+    expect(moonDraws()).toBe(1);
     pose.value = { ...pose.value, zoom: 1 };
-    expect(transform.value[2].scale).toBe(1); // absent frame -> hidden billboard, not a hit target
+    flushUi();
+    expect(moonDraws()).toBe(0); // overview: no moon body in the frame, nothing drawn or hit
   });
-  it("keeps actual sun/contact root Groups in one consecutive batch with shared native paint layers", async () => {
+  it("draws contacts behind or in front of the sun by projected depth, and labels in their own picture", async () => {
     const exec = nodeSqliteExecutor(db);
     await exec.runAsync(
       "INSERT INTO contacts(uid,name,tracking_enabled,interval_days,created_at,modified_at) VALUES ('name','Zoë',1,30,'2026-09-07','2026-09-07')",
@@ -443,19 +443,12 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    // 38.7-07: contacts and the sun are picture layers split around the sun
-    // by projected depth (M14); the legacy slot keeps moons and labels.
+    // 38.7-07: base, stars, bodiesBehind, sun, bodiesFront, labels, overlay.
     expect(tree[0].type).toBe("skCanvas");
-    expect(tree[0].children.map((node) => node.type)).toEqual([
-      "skPicture",
-      "skPicture",
-      "skPicture",
-      "skPicture",
-      "skPicture",
-      "skGroup",
-      "skPicture",
-    ]);
-    const [, , behind, sunLayer, front] = tree[0].children;
+    expect(tree[0].children.map((node) => node.type)).toEqual(
+      Array(7).fill("skPicture"),
+    );
+    const [, , behind, sunLayer, front, labels] = tree[0].children;
     const circles = (picture: Node) =>
       (
         picture.props.picture as {
@@ -471,12 +464,11 @@ describe("production Orrery native tree and resource contracts", () => {
     expect(circles(behind)).toBe(0);
     expect(circles(front)).toBe(2);
     pose.value = { ...pose.value, yaw: 0 };
-    const [, labels] = tree[0].children[5].children;
-    expect(labels.children.length).toBe(1);
-    const nameLayer = labels.children[0].children[0];
-    expect(nameLayer.type).toBe("skLayer");
-    const alpha = nameLayer.children[0].props.opacity as { value: number };
-    expect(alpha.value).toBe(0);
+    const plates = () =>
+      (
+        labels.props.picture as { value: { commands: { op: string }[] } }
+      ).value.commands.filter((c) => c.op === "drawRRect").length;
+    expect(plates()).toBe(0);
     // D-47: the tier follows on-screen magnification. This contact sits on
     // the far side of a 0.5 rad tilt, so zoom 2.4 is what magnifies it past
     // IDENTITY_ENTER (zoom 2 leaves it at ≈1.83, still overview).
@@ -484,7 +476,8 @@ describe("production Orrery native tree and resource contracts", () => {
     // 38.7-04 M3: the identity tier reaches the text publisher through UI
     // reactions; only then does the (unfocused) label get a Paragraph.
     flushUi();
-    expect(alpha.value).toBe(1);
+    expect(plates()).toBe(1);
+    expect(native.painted).toContain("Zoë");
   });
   it("M3: a switch whose camera crosses IDENTITY_ENTER publishes label text through UI reactions and commits no OrreryWorld render", async () => {
     const exec = nodeSqliteExecutor(db);
@@ -521,17 +514,14 @@ describe("production Orrery native tree and resource contracts", () => {
       }),
     );
     flushUi();
-    const findAll = (node: Node, type: string): Node[] => [
-      ...(node.type === type ? [node] : []),
-      ...node.children.flatMap((child) => findAll(child, type)),
-    ];
-    const labels = tree[0].children[5].children[1];
-    const [nameParagraph] = findAll(labels, "paragraph");
-    const drawn = () =>
-      (nameParagraph.props.paragraph as { value: { text?: string } | null })
-        .value;
+    const labels = tree[0].children[5];
+    const drawn = () => {
+      native.painted = [];
+      void (labels.props.picture as { value: unknown }).value;
+      return native.painted;
+    };
     // Overview: an unfocused body gets no label Paragraph at all.
-    expect(drawn()).toBeNull();
+    expect(drawn()).toEqual([]);
     const rendersBefore = native.renders;
     expect(rendersBefore).toBe(1);
     const zooms: number[] = [];
@@ -550,7 +540,7 @@ describe("production Orrery native tree and resource contracts", () => {
     expect(zooms[0]).toBeLessThan(IDENTITY_ENTER);
     expect(zooms[8]).toBeGreaterThanOrEqual(IDENTITY_ENTER);
     // …the publisher prepared the label (UI reaction → runOnJS → SharedValue)…
-    expect(drawn()?.text).toBe("Ada Lovelace");
+    expect(drawn()).toContain("Ada Lovelace");
     expect(
       native.paragraphs.some(
         (p) =>
@@ -656,7 +646,7 @@ describe("38.7-06 D-43: the stable picture tree and the single ambient clock", (
       useOrreryCamera(cameraInput(largeScene)),
     );
     const largePictures = findAll(large[0], "skPicture");
-    expect(smallPictures).toHaveLength(6);
+    expect(smallPictures).toHaveLength(7);
     expect(largePictures).toHaveLength(smallPictures.length);
     expect(large[0].children.map((n) => n.type)).toEqual(
       small[0].children.map((n) => n.type),
@@ -710,10 +700,18 @@ describe("38.7-06 D-43: the stable picture tree and the single ambient clock", (
     expect(at(0)).toEqual(at(650));
     expect(at(1234)).toEqual(at(98765));
   });
-  it("useClock runs exactly once per canvas mount and reaches the legacy sun pulse", async () => {
+  it("useClock runs exactly once per canvas mount and drives the sun picture's pulse (still under reduced motion)", async () => {
     const scene = await sceneWith(2);
-    renderWorld(scene, useOrreryCamera(cameraInput(scene)));
+    const tree = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
     expect(native.clockCalls).toBe(1);
-    expect(native.providedClock).toBe(native.clock);
+    flushUi();
+    const sun = tree[0].children[3];
+    const glowAlpha = (ms: number) => {
+      native.clock.value = ms;
+      return recorded(sun).find((c) => c.op === "drawCircle")?.color?.[3];
+    };
+    expect(glowAlpha(0)).not.toEqual(glowAlpha(700));
+    native.reduced.value = true;
+    expect(glowAlpha(0)).toEqual(glowAlpha(700));
   });
 });

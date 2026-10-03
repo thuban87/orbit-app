@@ -12,20 +12,22 @@
  *   - One ParagraphBuilder per font provider, `reset()` before each build.
  *   - A keyed LRU cache: an unchanged request returns the same Paragraph, so a
  *     re-render with unchanged inputs builds nothing and disposes nothing.
- *   - A HARD cap: pinned + warm + retired-awaiting-echo entries never exceed
+ *   - A HARD cap: pinned + warm + retired-awaiting-ledger entries never exceed
  *     `ORRERY_TEXT_CACHE_MAX_ENTRIES`, because admission is checked BEFORE
  *     shaping. A request that cannot fit builds nothing and returns null; the
  *     caller draws its fallback (no label; a plain swatch disc with no glyph).
- *   - Use-after-free safety. An entry is disposed only when no owner pins it AND
- *     every owner that un-pinned it has confirmed (UI echo, same mount epoch)
- *     that its consumers re-recorded with a text-spec generation that no longer
- *     references it. In-flight native draws are protected separately: a
- *     recorded SkPicture owns the text blobs `drawParagraph` painted into it
- *     (see the 38.7-04 SUMMARY for the installed-Skia file:line evidence).
+ *   - Use-after-free safety (38.7-07, the H3 generation-ledger contract). An
+ *     entry is disposed only when no owner pins it AND every owner that
+ *     un-pinned it has confirmed it through its generation ledger: every
+ *     picture layer that recorded a generation drawing it (the body layers for
+ *     initials, the labels layer for labels and captions) acked a newer
+ *     generation in the same mount epoch (`confirmRetired`). In-flight native
+ *     draws are protected separately: a recorded SkPicture owns the text blobs
+ *     `drawParagraph` painted into it (38.7-04 / 38.7-07 SUMMARY evidence).
  *
  * ENTRY STATES (all counted against the cap)
  *   - pinned: some owner's currently published spec draws it;
- *   - retired: an owner un-pinned it and has not yet echoed a later generation;
+ *   - retired: an owner un-pinned it and its ledger has not yet confirmed it;
  *   - warm: neither — an evictable cache entry (LRU order, disposed on eviction).
  *
  * THE PUBLISHER (`createOrreryTextPublisher`) turns scene inputs, the semantic
@@ -43,10 +45,16 @@ import {
   TextAlign,
 } from "@shopify/react-native-skia";
 import type { SemanticLevel } from "@/logic/orrery-label-logic";
+import type { ThemePalette } from "@/theme/theme-types";
 import { SPACING } from "@/theme/tokens/spacing";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
 
 // --- Tunable constants (top-of-file per project convention) ------------------
+
+/** Labels are at most this wide (dp, × the font scale, ≤ the viewport). */
+export const ORRERY_LABEL_MAX_WIDTH = 200;
+/** The gap between a body's disc and its label backplate (dp). */
+export const ORRERY_LABEL_BODY_GAP = 8;
 
 /**
  * Hard bound on built-but-undisposed Orrery Paragraphs (pinned + warm + retired).
@@ -65,7 +73,7 @@ export const ORRERY_TEXT_PRIORITY_RESERVE = 32;
 /**
  * C3-L3: a whole-set re-key (theme, accent, font scale or font provider change)
  * whose new set fits within the cap reaches full publication within this many
- * published text-spec generations (fallback → echo → admission).
+ * published text-spec generations (fallback → per-layer acks → admission).
  */
 export const ORRERY_TEXT_REKEY_MAX_GENERATIONS = 3;
 /**
@@ -77,7 +85,7 @@ export const ORRERY_INITIALS_MIN_RADIUS_PX = 7;
 /** The UI thread reports visibility/eligibility changes at most this often. */
 export const ORRERY_TEXT_ELIGIBILITY_INTERVAL_MS = 250;
 /**
- * Unpinned, echo-cleared (warm) entries kept for reuse (tier churn, panning
+ * Unpinned, ledger-cleared (warm) entries kept for reuse (tier churn, panning
  * back). `trim()` disposes the least recently used warm entries above this.
  */
 export const ORRERY_TEXT_WARM_MAX_ENTRIES = 256;
@@ -126,9 +134,9 @@ export interface PrepareOptions {
 export interface OrreryTextStats {
   /** Entries currently pinned by at least one owner. */
   pinned: number;
-  /** Unpinned, echo-cleared entries (evictable). */
+  /** Unpinned, ledger-cleared entries (evictable). */
   warm: number;
-  /** Unpinned entries still awaiting an owner's echo. */
+  /** Unpinned entries still awaiting an owner's ledger confirmation. */
   retired: number;
   /** Lifetime Paragraph builds. */
   built: number;
@@ -157,7 +165,7 @@ export interface OrreryTextService {
     request: OrreryTextRequest,
     options?: PrepareOptions,
   ): PreparedOrreryText | null;
-  /** Starts a new mount epoch for `owner`; echoes from older epochs are ignored. */
+  /** Starts a new mount epoch for `owner`; confirmations of older epochs only clear their own marks. */
   mount(owner: string): number;
   /** Replaces `owner`'s pinned set with `keys` (the keys `generation` draws). */
   acquire(
@@ -166,21 +174,32 @@ export interface OrreryTextService {
     generation: number,
     epoch: number,
   ): void;
-  /** The UI echoed `generation` of `epoch`: entries it no longer draws turn warm. */
-  confirmEchoed(owner: string, generation: number, epoch: number): number;
+  /**
+   * H3: `owner`'s generation ledger released `keys` of `epoch` (every layer
+   * that recorded them acked a newer generation). Their retirement marks clear;
+   * an entry nothing holds turns warm, or is disposed with `dispose`. Returns
+   * how many entries became unheld.
+   */
+  confirmRetired(
+    owner: string,
+    keys: Iterable<string>,
+    epoch: number,
+    options?: { dispose?: boolean },
+  ): number;
   /** Drops `owner`'s pins (they retire) and ends its epoch; returns that epoch. */
   release(owner: string): number;
-  /** After the post-release UI round trip: the released entries turn warm. */
+  /** After the post-release teardown: the released entries turn warm. */
   confirmReleased(owner: string, epoch: number): number;
   /** Disposes LRU warm entries while over the cap or the warm budget. */
   trim(): number;
-  /** Disposes every entry that is neither pinned nor awaiting an echo. */
+  /** Disposes every entry that is neither pinned nor awaiting confirmation. */
   clearUnheld(): number;
   stats(): OrreryTextStats;
   /**
-   * Called (synchronously) whenever capacity frees: entries turn warm after an
-   * echo or a released mount, or are disposed by trim/clearUnheld. Queued
-   * prepares retry from here. Returns the unsubscribe function.
+   * Called (synchronously) whenever capacity frees: entries turn warm after a
+   * ledger confirmation or a released mount, or are disposed by
+   * trim/clearUnheld. Queued prepares retry from here. Returns the unsubscribe
+   * function.
    */
   onCapacityFreed(listener: () => void): () => void;
 }
@@ -195,7 +214,7 @@ interface Entry {
   prepared: PreparedOrreryText;
   /** Owners whose published spec draws this entry. */
   pins: Set<string>;
-  /** Owners that un-pinned it and have not yet echoed past the retirement. */
+  /** Owners that un-pinned it and whose ledger has not yet confirmed it. */
   retired: Map<string, RetireMark>;
 }
 interface OwnerState {
@@ -411,16 +430,16 @@ export function createOrreryTextService(
       state.pinned = next;
       state.generation = generation;
     },
-    confirmEchoed(owner, generation, epoch) {
-      const state = owners.get(owner);
-      if (!state || epoch !== state.epoch) return 0;
+    confirmRetired(owner, keys, epoch, confirmOptions = {}) {
       let cleared = 0;
-      for (const entry of entries.values()) {
-        const mark = entry.retired.get(owner);
-        if (!mark || mark.epoch !== epoch || mark.generation > generation)
-          continue;
+      for (const key of keys) {
+        const entry = entries.get(key);
+        const mark = entry?.retired.get(owner);
+        if (!entry || !mark || mark.epoch !== epoch) continue;
         entry.retired.delete(owner);
-        if (isWarm(entry)) cleared++;
+        if (!isWarm(entry)) continue;
+        cleared++;
+        if (confirmOptions.dispose) dispose(entry);
       }
       return freed(cleared);
     },
@@ -434,7 +453,7 @@ export function createOrreryTextService(
         entry.retired.set(owner, { epoch, generation: Infinity });
       }
       state.pinned = new Set();
-      // End the epoch: echoes tagged with it are now stale.
+      // End the epoch: confirmations now clear only this epoch's own marks.
       state.epoch = ++epochSerial;
       return epoch;
     },
@@ -493,6 +512,33 @@ export function createOrreryTextService(
 /** The app-wide instance: today's renderer, the V2 renderer and the warm cache share it. */
 export const orreryTextService = createOrreryTextService();
 
+/**
+ * One label or caption Paragraph through the shared service (JS thread only,
+ * never inside a frame worklet). Native shaping and its one-line ellipsis own
+ * Unicode boundaries; no JS name slicing. Null when admission is refused at
+ * the cap or the font has not loaded.
+ */
+export function prepareOrreryText(
+  text: string,
+  role: "label" | "caption",
+  fontScale: number,
+  maxWidth: number,
+  fontProvider: SkTypefaceFontProvider | null,
+  colors: ThemePalette,
+): PreparedOrreryText | null {
+  const typography = TYPOGRAPHY[role];
+  return orreryTextService.prepare({
+    text,
+    role,
+    fontScale,
+    maxWidth,
+    ink: colors[typography.colorToken],
+    family: typography.family,
+    weight: typography.weight,
+    fontProvider,
+  });
+}
+
 // --- The text-spec publisher --------------------------------------------------
 
 /** One labelable body, as the React side knows it (plain data, no Paragraphs). */
@@ -550,6 +596,8 @@ export interface OrreryMeasuredLabel {
 export interface OrreryLabelSpec {
   generation: number;
   mountEpoch: number;
+  /** Every cache key this spec draws (labels and captions): its ledger handles. */
+  keys: readonly string[];
   labels: Readonly<
     Record<
       string,
@@ -561,17 +609,21 @@ export interface OrreryLabelSpec {
 export interface OrreryInitialsSpec {
   generation: number;
   mountEpoch: number;
+  /** Every cache key this spec draws: its ledger handles. */
+  keys: readonly string[];
   initials: Readonly<Record<string, PreparedOrreryText | null>>;
 }
 export const EMPTY_LABEL_SPEC: OrreryLabelSpec = Object.freeze({
   generation: 0,
   mountEpoch: 0,
+  keys: Object.freeze([]) as readonly string[],
   labels: Object.freeze({}),
   measured: Object.freeze([]) as readonly OrreryMeasuredLabel[],
 });
 export const EMPTY_INITIALS_SPEC: OrreryInitialsSpec = Object.freeze({
   generation: 0,
   mountEpoch: 0,
+  keys: Object.freeze([]) as readonly string[],
   initials: Object.freeze({}),
 });
 
@@ -590,8 +642,15 @@ export interface OrreryTextPublisher {
   /** Tier and visibility only publish while mounted. */
   setTier(tier: SemanticLevel): void;
   setVisibility(visibility: OrreryTextVisibility): void;
-  /** The UI echoed `generation` (after its consumers re-recorded). */
-  confirmEchoed(generation: number, epoch: number): void;
+  /**
+   * H3: the generation ledger released `keys` of `epoch` (every layer that
+   * recorded them acked a newer generation); `dispose` at teardown.
+   */
+  confirmRetired(
+    keys: Iterable<string>,
+    epoch: number,
+    dispose?: boolean,
+  ): void;
   /** Unmount: pins retire; returns the epoch the post-round-trip confirm needs. */
   release(): number | null;
   /** Published generations so far. */
@@ -769,8 +828,8 @@ export function createOrreryTextPublisher(
   function publishPass(current: OrreryTextScene): void {
     if (epoch === null) {
       epoch = service.mount(owner);
-      // Queued work retries whenever capacity actually frees (an echo, a
-      // released mount, a trim), never on a timer.
+      // Queued work retries whenever capacity actually frees (a ledger
+      // confirmation, a released mount, a trim), never on a timer.
       unsubscribe = service.onCapacityFreed(() => {
         if (waiting && !publishing) publish();
       });
@@ -846,6 +905,8 @@ export function createOrreryTextPublisher(
     const initials: Record<string, PreparedOrreryText | null> = {};
     const labelParts: string[] = [];
     const initialsParts: string[] = [];
+    const labelKeys: string[] = [];
+    const initialsKeys: string[] = [];
     const sourceByKey = new Map(current.labels.map((s) => [s.key, s]));
     for (const source of current.labels) {
       const textKey = drawn.get(slotOf("label", source.key));
@@ -857,6 +918,8 @@ export function createOrreryTextPublisher(
         contextKey === undefined ? null : (service.peek(contextKey) ?? null);
       labels[source.key] = { text, context };
       labelParts.push(source.key, textKey, contextKey ?? "");
+      labelKeys.push(textKey);
+      if (context && contextKey !== undefined) labelKeys.push(contextKey);
     }
     for (const [key, entry] of Object.entries(labels)) {
       const source = sourceByKey.get(key) as OrreryLabelSource;
@@ -885,6 +948,7 @@ export function createOrreryTextPublisher(
       const bodyKey = slot.slice(`initials${KEY_SEPARATOR}`.length);
       initials[bodyKey] = service.peek(key) ?? null;
       initialsParts.push(bodyKey, key);
+      initialsKeys.push(key);
     }
     initialsParts.sort();
     const nextLabelSignature = labelParts.join(KEY_SEPARATOR);
@@ -903,10 +967,10 @@ export function createOrreryTextPublisher(
     initialsSignature = nextInitialsSignature;
     write(
       labelsChanged || firstSinceMount
-        ? { generation, mountEpoch, labels, measured }
+        ? { generation, mountEpoch, keys: labelKeys, labels, measured }
         : undefined,
       initialsChanged || firstSinceMount
-        ? { generation, mountEpoch, initials }
+        ? { generation, mountEpoch, keys: initialsKeys, initials }
         : undefined,
     );
     firstSinceMount = false;
@@ -928,10 +992,11 @@ export function createOrreryTextPublisher(
       visibility = next;
       if (epoch !== null) publish();
     },
-    confirmEchoed(echoed, echoedEpoch) {
-      if (epoch === null || echoedEpoch !== epoch) return;
-      // Freed capacity re-runs a waiting publish via onCapacityFreed.
-      service.confirmEchoed(owner, echoed, echoedEpoch);
+    confirmRetired(keys, keysEpoch, dispose = false) {
+      // Freed capacity re-runs a waiting publish via onCapacityFreed. A
+      // released epoch's keys are confirmed too (the teardown); its marks
+      // carry that epoch, so a newer mount's pins are never touched.
+      service.confirmRetired(owner, keys, keysEpoch, { dispose });
       service.trim();
     },
     release() {

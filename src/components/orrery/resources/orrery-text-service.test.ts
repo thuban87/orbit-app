@@ -67,6 +67,14 @@ vi.mock("@shopify/react-native-skia", () => ({
 
 import type { SemanticLevel } from "@/logic/orrery-label-logic";
 import {
+  createOrrerySpecPublisher,
+  ORRERY_BODY_LAYERS,
+  ORRERY_LAYER,
+  type OrreryBodyLook,
+  parseLedgerHandle,
+} from "../v2/scene-specs";
+import { createOrreryGenerationLedger } from "./orrery-generation-ledger";
+import {
   createOrreryTextPublisher,
   createOrreryTextService,
   ORRERY_INITIALS_MIN_RADIUS_PX,
@@ -167,7 +175,7 @@ describe("OrreryTextService cache", () => {
     ).toBe(false);
   });
 
-  it("keeps retired entries until an echo of a later generation in the same mount epoch", () => {
+  it("keeps retired entries until the owner's ledger confirms them in the same mount epoch", () => {
     const service = createOrreryTextService({ warmMaxEntries: 0 });
     const owner = "w";
     const epoch = service.mount(owner);
@@ -180,18 +188,18 @@ describe("OrreryTextService cache", () => {
     service.trim();
     expect(fake.disposes).toBe(0);
     expect(service.stats()).toMatchObject({ pinned: 1, retired: 1, warm: 0 });
-    // An echo of generation 1 (still drew B) and a stale-epoch echo free nothing.
-    service.confirmEchoed(owner, 1, epoch);
-    service.confirmEchoed(owner, 9, epoch - 1);
+    // A pinned key, an unknown key and a stale-epoch confirmation free nothing.
+    service.confirmRetired(owner, [keys[0], "unknown"], epoch);
+    service.confirmRetired(owner, [keys[1]], epoch - 1);
     service.trim();
     expect(fake.disposes).toBe(0);
-    service.confirmEchoed(owner, 2, epoch);
+    service.confirmRetired(owner, [keys[1]], epoch);
     service.trim();
     expect(fake.disposes).toBe(1);
     expect(service.peek(keys[1])).toBeUndefined();
   });
 
-  it("release + round trip + clearUnheld disposes exactly the unpinned, echo-cleared entries", () => {
+  it("release + teardown + clearUnheld disposes exactly the unpinned, ledger-cleared entries", () => {
     const service = createOrreryTextService();
     const epochA = service.mount("a");
     const epochB = service.mount("b");
@@ -202,8 +210,8 @@ describe("OrreryTextService cache", () => {
     const released = service.release("a");
     expect(service.clearUnheld()).toBe(1); // only the never-pinned warm entry
     expect(service.peek(key("A1"))).toBeDefined();
-    // A late echo from the released mount cannot free its entries.
-    service.confirmEchoed("a", 99, released);
+    // A confirmation tagged with another epoch cannot free them.
+    service.confirmRetired("a", [key("A1"), key("A2")], released + 1);
     expect(service.clearUnheld()).toBe(0);
     service.confirmReleased("a", released);
     expect(service.clearUnheld()).toBe(2);
@@ -221,7 +229,6 @@ describe("OrreryTextService cache", () => {
         return service.keyOf(request(t)) as string;
       });
       service.acquire("w", keys, generation, epoch);
-      service.confirmEchoed("w", generation, epoch);
       service.trim();
     };
     render(1);
@@ -229,6 +236,26 @@ describe("OrreryTextService cache", () => {
     for (let g = 2; g < 10; g++) render(g);
     expect(fake.builds).toBe(built);
     expect(fake.disposes).toBe(0);
+  });
+
+  it("confirmRetired with dispose (the H3 teardown) disposes an unheld entry at once, never a pinned one", () => {
+    const service = createOrreryTextService();
+    const epochA = service.mount("a");
+    const epochB = service.mount("b");
+    const key = (t: string) => {
+      service.prepare(request(t));
+      return service.keyOf(request(t)) as string;
+    };
+    const [shared, own] = [key("shared"), key("own")];
+    service.acquire("a", [shared, own], 1, epochA);
+    service.acquire("b", [shared], 1, epochB);
+    const released = service.release("a");
+    expect(
+      service.confirmRetired("a", [own, shared], released, { dispose: true }),
+    ).toBe(1);
+    expect(fake.disposes).toBe(1);
+    expect(service.peek(shared)).toBeDefined();
+    expect(service.peek(own)).toBeUndefined();
   });
 
   it("H4: refuses admission before shaping, so built − disposed never exceeds the cap", () => {
@@ -257,25 +284,37 @@ describe("OrreryTextService cache", () => {
 
 // --- Publisher harness --------------------------------------------------------
 
+const LAYERS = [...ORRERY_BODY_LAYERS, ORRERY_LAYER.labels];
+
 interface Harness {
   service: OrreryTextService;
   publisher: ReturnType<typeof createOrreryTextPublisher>;
+  /** Mounts the body looks for the scene's bodies, then publishes the scene. */
+  setScene: (scene: OrreryTextScene) => void;
   labels: () => OrreryLabelSpec;
   initials: () => OrreryInitialsSpec;
   writes: () => number;
-  /** The UI consumer re-recorded the latest written generation. */
+  /**
+   * Every picture layer recorded its latest spec generation; acks arrive in a
+   * shuffled order, each forwarded to the ledger and routed back to the text
+   * publisher (38.7-07 H3), exactly as OrreryWorld routes them.
+   */
   echo: () => void;
+  /** Only `layers` ack their latest generation (others stay behind). */
+  ack: (layers: readonly string[]) => void;
 }
 
 /**
- * The UI may draw any spec written at or after the last echoed generation; a
- * disposal of a Paragraph in that window is a use-after-free and throws.
+ * A disposal of a Paragraph that a layer may still re-record — any generation
+ * published to that layer that drew it and that the layer has not acked past —
+ * is a use-after-free and throws.
  */
 function harness(
   options: {
     maxEntries?: number;
     priorityReserve?: number;
     warm?: number;
+    seed?: number;
   } = {},
 ): Harness {
   const service = createOrreryTextService({
@@ -285,49 +324,120 @@ function harness(
   });
   let labels: OrreryLabelSpec | null = null;
   let initials: OrreryInitialsSpec | null = null;
-  const history: { generation: number; paragraphs: Set<object> }[] = [];
-  let echoed = 0;
   let writes = 0;
+  let seed = options.seed ?? 3;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 2 ** 32;
+  };
+  const ledger = createOrreryGenerationLedger<string>();
+  /** layer → [generation, the Paragraphs it drew]. */
+  const history = new Map<string, { generation: number; drew: Set<object> }[]>(
+    LAYERS.map((layer) => [layer, []]),
+  );
+  const latest = new Map<string, { generation: number; epoch: number }>();
+  const delivered = new Map<string, number>();
+  const record = (
+    layers: readonly string[],
+    generation: number,
+    epoch: number,
+    drew: Set<object>,
+  ) => {
+    for (const layer of layers) {
+      history.get(layer)?.push({ generation, drew });
+      latest.set(layer, { generation, epoch });
+    }
+  };
+  const specs = createOrrerySpecPublisher({
+    ledger,
+    writeBodies: (bodies) => {
+      const drew = new Set<object>();
+      for (const body of bodies.bodies)
+        if (body.initials) drew.add(body.initials.paragraph);
+      record(ORRERY_BODY_LAYERS, bodies.generation, bodies.mountEpoch, drew);
+    },
+    writeLabels: (layer) => {
+      const drew = new Set<object>();
+      for (const entry of Object.values(layer.labels)) {
+        if (entry.text) drew.add(entry.text.paragraph);
+        if (entry.context) drew.add(entry.context.paragraph);
+      }
+      record([ORRERY_LAYER.labels], layer.generation, layer.mountEpoch, drew);
+    },
+  });
   const publisher = createOrreryTextPublisher({
     service,
     owner: "world",
     write: (nextLabels, nextInitials) => {
       writes++;
-      if (nextLabels) labels = nextLabels;
-      if (nextInitials) initials = nextInitials;
-      const paragraphs = new Set<object>();
-      for (const entry of Object.values(labels?.labels ?? {})) {
-        if (entry.text) paragraphs.add(entry.text.paragraph);
-        if (entry.context) paragraphs.add(entry.context.paragraph);
+      if (nextLabels) {
+        labels = nextLabels;
+        specs.setLabels(nextLabels);
       }
-      for (const entry of Object.values(initials?.initials ?? {}))
-        if (entry) paragraphs.add(entry.paragraph);
-      history.push({
-        generation: Math.max(
-          labels?.generation ?? 0,
-          initials?.generation ?? 0,
-        ),
-        paragraphs,
-      });
+      if (nextInitials) {
+        initials = nextInitials;
+        specs.setInitials(nextInitials);
+      }
     },
   });
   fake.guard = (paragraph) => {
-    for (const item of history)
-      if (item.generation >= echoed && item.paragraphs.has(paragraph))
-        throw new Error(`use-after-free: generation ${item.generation}`);
+    for (const [layer, items] of history)
+      for (const item of items)
+        if (
+          item.drew.has(paragraph) &&
+          !((delivered.get(layer) ?? 0) > item.generation)
+        )
+          throw new Error(
+            `use-after-free: ${layer} may still record generation ${item.generation}`,
+          );
   };
+  const ack = (layers: readonly string[]) => {
+    const order = [...layers];
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+    for (const layer of order) {
+      const at = latest.get(layer);
+      if (!at || !ledger.ack(layer, at.generation, at.epoch)) continue;
+      delivered.set(layer, at.generation);
+      // Batched per epoch, as OrreryWorld's router does.
+      const byEpoch = new Map<number, string[]>();
+      for (const handle of ledger.retirable()) {
+        const parsed = parseLedgerHandle(handle);
+        if (parsed?.kind === "text")
+          byEpoch.set(parsed.epoch, [
+            ...(byEpoch.get(parsed.epoch) ?? []),
+            parsed.key,
+          ]);
+      }
+      for (const [epoch, keys] of byEpoch)
+        publisher.confirmRetired(keys, epoch);
+    }
+  };
+  const looksFor = (scene: OrreryTextScene): OrreryBodyLook[] =>
+    scene.initials.map((source) => ({
+      key: source.key,
+      kind: "contact",
+      worldRadius: 16,
+      outlineInk: [1, 1, 1, 1],
+      swatchInk: [1, 1, 1, 1],
+      photoKey: null,
+      initialsFontSize: source.fontSize,
+      focusInk: null,
+    }));
   return {
     service,
     publisher,
+    setScene: (scene) => {
+      specs.setLooks(looksFor(scene));
+      publisher.setScene(scene);
+    },
     labels: () => labels as OrreryLabelSpec,
     initials: () => initials as OrreryInitialsSpec,
     writes: () => writes,
-    echo: () => {
-      const latest = history[history.length - 1];
-      if (!latest) return;
-      echoed = latest.generation;
-      publisher.confirmEchoed(latest.generation, publisher.epoch() as number);
-    },
+    echo: () => ack(LAYERS),
+    ack,
   };
 }
 
@@ -379,7 +489,7 @@ const labelled = (h: Harness) =>
 describe("OrreryTextPublisher", () => {
   it("prepares labels per tier: focused/cluster at overview, captions only at detail", () => {
     const h = harness();
-    h.publisher.setScene(textScene(5, { focused: [1], cluster: [] }));
+    h.setScene(textScene(5, { focused: [1], cluster: [] }));
     h.publisher.setVisibility(visibleAll(5));
     expect(labelled(h)).toEqual(["contact:1"]);
     expect(h.labels().labels["contact:1"].context).toBeNull();
@@ -399,7 +509,7 @@ describe("OrreryTextPublisher", () => {
 
   it("an unchanged scene re-publish builds, writes and disposes nothing", () => {
     const h = harness();
-    h.publisher.setScene(textScene(6, { focused: [0] }));
+    h.setScene(textScene(6, { focused: [0] }));
     h.publisher.setTier("identity");
     h.publisher.setVisibility(visibleAll(6, [0, 1, 2]));
     h.echo();
@@ -407,7 +517,7 @@ describe("OrreryTextPublisher", () => {
     const writes = h.writes();
     const generation = h.publisher.generation();
     for (let i = 0; i < 5; i++) {
-      h.publisher.setScene(textScene(6, { focused: [0] })); // new, equal object
+      h.setScene(textScene(6, { focused: [0] })); // new, equal object
       h.publisher.setVisibility(visibleAll(6, [0, 1, 2]));
       h.echo();
     }
@@ -419,14 +529,14 @@ describe("OrreryTextPublisher", () => {
 
   it("C-H2: a withheld echo disposes nothing; a replacement disposes the old entries once, after its echo", () => {
     const h = harness();
-    h.publisher.setScene(textScene(4));
+    h.setScene(textScene(4));
     h.publisher.setTier("identity");
     h.publisher.setVisibility(visibleAll(4, [0, 1, 2, 3]));
     h.echo();
     expect(fake.disposes).toBe(0);
     // A theme change re-keys everything; the consumer has not echoed yet, and
     // tier churn (captions in, captions out) lands on top of it.
-    h.publisher.setScene(textScene(4, { ink: "new-ink" }));
+    h.setScene(textScene(4, { ink: "new-ink" }));
     h.publisher.setTier("detail");
     h.publisher.setTier("identity");
     expect(fake.disposes).toBe(0);
@@ -444,7 +554,7 @@ describe("OrreryTextPublisher", () => {
 
   it("C-H2: unmount disposes only after the release round trip", () => {
     const h = harness({ warm: 100 });
-    h.publisher.setScene(textScene(3, { focused: [0] }));
+    h.setScene(textScene(3, { focused: [0] }));
     h.publisher.setTier("identity");
     h.echo();
     const epoch = h.publisher.release() as number;
@@ -461,7 +571,7 @@ describe("OrreryTextPublisher", () => {
   it("H4: a 1,000-body All Contacts overview builds a bounded, prioritised set", () => {
     const h = harness({ maxEntries: ORRERY_TEXT_CACHE_MAX_ENTRIES });
     const photo = (i: number) => i % 5 < 2; // 40 % with a stored photo path
-    h.publisher.setScene(textScene(1000, { focused: [500], photo }));
+    h.setScene(textScene(1000, { focused: [500], photo }));
     // Most bodies are below the initials threshold; 60 are big enough.
     const eligible = Array.from({ length: 60 }, (_, i) => i * 7);
     h.publisher.setVisibility({
@@ -483,7 +593,7 @@ describe("OrreryTextPublisher", () => {
     // Normal budget 12 − 2 = 10: the focused label + 9 initials.
     const h = harness({ maxEntries: 12, priorityReserve: 2 });
     const photo = (i: number) => i < 10;
-    h.publisher.setScene(textScene(20, { focused: [19], photo }));
+    h.setScene(textScene(20, { focused: [19], photo }));
     h.publisher.setVisibility({
       visible: null,
       eligible: Array.from({ length: 20 }, (_, i) => ({
@@ -512,11 +622,11 @@ describe("OrreryTextPublisher", () => {
       held.push(h.service.keyOf(r) as string);
     }
     h.service.acquire("other", held, 1, other);
-    h.publisher.setScene(textScene(5, { focused: [3] }));
+    h.setScene(textScene(5, { focused: [3] }));
     expect(labelled(h)).toEqual([]);
     expect(h.publisher.pending()).toBe(true);
     // A superseded request (focus moved before capacity freed) never builds.
-    h.publisher.setScene(textScene(5, { focused: [4] }));
+    h.setScene(textScene(5, { focused: [4] }));
     expect(fake.texts).not.toContain("Name 3");
     // The other owner lets go; its round trip completes → capacity frees.
     const released = h.service.release("other");
@@ -533,7 +643,7 @@ describe("OrreryTextPublisher", () => {
     // visible others (6..17): 18 pins, the whole normal budget.
     const scene = (ink: string) =>
       textScene(18, { cluster: [0, 1, 2, 3, 4, 5], ink });
-    h.publisher.setScene(scene("ink-old"));
+    h.setScene(scene("ink-old"));
     h.publisher.setTier("identity");
     h.publisher.setVisibility({
       visible: Array.from({ length: 12 }, (_, i) => `contact:${i + 6}`),
@@ -546,7 +656,7 @@ describe("OrreryTextPublisher", () => {
       (h.labels().labels[key]?.text?.paragraph as unknown as { ink: string })
         ?.ink;
     // Theme change: every pinned key is superseded at once.
-    h.publisher.setScene(scene("ink-new"));
+    h.setScene(scene("ink-new"));
     // Fallback generation, one step: the 2 free slots admit the top-priority
     // replacements; 14 superseded pins are dropped — all 4 remaining
     // off-screen ones before any visible one — and the 2 highest-priority
@@ -583,7 +693,7 @@ describe("OrreryTextPublisher", () => {
   it("C-M1: repeated tier churn at a saturated cap converges, bounded at every step", () => {
     const cap = 16;
     const h = harness({ maxEntries: cap, priorityReserve: 2, warm: 4 });
-    h.publisher.setScene(textScene(30, { focused: [7] }));
+    h.setScene(textScene(30, { focused: [7] }));
     h.publisher.setVisibility(visibleAll(30, [0, 1, 2, 3, 4, 5, 6, 7]));
     const tiers: SemanticLevel[] = ["identity", "overview", "detail"];
     for (let round = 0; round < 12; round++) {
@@ -601,6 +711,71 @@ describe("OrreryTextPublisher", () => {
   });
 });
 
+describe("38.7-07 H3: text disposal under the per-layer ledger", () => {
+  it("initials pinned by the body layers survive a labels-only ack", () => {
+    const h = harness();
+    const scene = (initialsInk: string) => ({
+      ...textScene(3, { focused: [0] }),
+      initialsInk,
+    });
+    h.setScene(scene("swatch-old"));
+    h.publisher.setVisibility(visibleAll(3, [0, 1, 2]));
+    h.echo();
+    const disposedBefore = fake.disposes;
+    // Re-key every initials glyph (and nothing the labels layer draws).
+    h.setScene(scene("swatch-new"));
+    h.ack([ORRERY_LAYER.labels]);
+    expect(fake.disposes).toBe(disposedBefore);
+    // Two of the three body layers: still nothing.
+    h.ack([ORRERY_LAYER.bodiesBehind, ORRERY_LAYER.sun]);
+    expect(fake.disposes).toBe(disposedBefore);
+    h.ack([ORRERY_LAYER.bodiesFront]);
+    expect(fake.disposes).toBe(disposedBefore + 3);
+  });
+
+  it("C3-L3: a whole-set re-key (labels and initials) at a saturated cap fully publishes within the bound with out-of-order and late layer acks", () => {
+    const cap = 24;
+    const h = harness({ maxEntries: cap, priorityReserve: 2, seed: 11 });
+    const scene = (ink: string) => ({
+      ...textScene(11, { cluster: [0, 1, 2], ink }),
+      initialsInk: `swatch-${ink}`,
+    });
+    h.setScene(scene("old"));
+    h.publisher.setTier("identity");
+    h.publisher.setVisibility(
+      visibleAll(11, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]),
+    );
+    h.echo();
+    // 11 labels + 11 initials = 22 pins: the whole normal budget.
+    expect(fake.live).toBe(22);
+    const before = h.publisher.generation();
+    h.setScene(scene("new"));
+    // The labels layer acks late; the body layers ack one at a time.
+    for (const layer of ORRERY_BODY_LAYERS) {
+      h.ack([layer]);
+      expect(fake.builds - fake.disposes).toBeLessThanOrEqual(cap);
+    }
+    h.ack([ORRERY_LAYER.labels]);
+    for (let i = 0; i < 4 && h.publisher.pending(); i++) h.echo();
+    expect(h.publisher.pending()).toBe(false);
+    const inks = Object.values(h.labels().labels).map(
+      (entry) =>
+        (entry.text as unknown as { paragraph: { ink: string } }).paragraph.ink,
+    );
+    expect(inks).toHaveLength(11);
+    expect(new Set(inks)).toEqual(new Set(["new"]));
+    const glyphs = Object.values(h.initials().initials).map(
+      (entry) =>
+        (entry as unknown as { paragraph: { ink: string } }).paragraph.ink,
+    );
+    expect(new Set(glyphs)).toEqual(new Set(["swatch-new"]));
+    expect(h.publisher.generation() - before).toBeLessThanOrEqual(
+      ORRERY_TEXT_REKEY_MAX_GENERATIONS,
+    );
+    expect(fake.maxLive).toBeLessThanOrEqual(cap);
+  });
+});
+
 it("a UI report arriving after release never re-pins entries for the unmounted consumer", () => {
   const service = createOrreryTextService();
   const publisher = createOrreryTextPublisher({
@@ -612,7 +787,7 @@ it("a UI report arriving after release never re-pins entries for the unmounted c
   const epoch = publisher.release() as number;
   publisher.setTier("identity");
   publisher.setVisibility(visibleAll(3, [0, 1, 2]));
-  publisher.confirmEchoed(5, epoch);
+  publisher.confirmRetired([], epoch);
   expect(service.stats().pinned).toBe(0);
   service.confirmReleased("late", epoch);
   expect(service.clearUnheld()).toBe(1);
