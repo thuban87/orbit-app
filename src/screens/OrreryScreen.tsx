@@ -284,6 +284,12 @@ export function OrreryScreen() {
             latest.committed.lastSystem === systemRefId(system)
           );
         },
+        // 38.7-04 (D-52): a cold restore selects a custom System with no
+        // name; read it through the existing Systems catalog (no new SQL).
+        resolveName: async (system) =>
+          (await readSystemsCatalog(getExecutor())).find(
+            (entry) => entry.id === systemRefId(system),
+          )?.name,
       }),
     [],
   );

@@ -48,6 +48,12 @@ export interface OrrerySystemAdapters {
     system: OrrerySystemRef,
     userInitiated?: boolean,
   ) => Promise<boolean>;
+  /**
+   * 38.7-04 (D-52): a custom System's display name, read after its scene
+   * loads. A cold restore selects with no name, so without this the selector
+   * showed "Unavailable System". Undefined/throw → the existing fallback.
+   */
+  resolveName?: (system: OrrerySystemRef) => Promise<string | undefined>;
 }
 
 /** Request generations, not selected names or revisions, own async publication. */
@@ -76,6 +82,22 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
       if (active && generation === get().generation)
         set({ persistence: saved ? "saved" : "error" });
       if (savingGeneration === generation) savingGeneration = null;
+    };
+    const resolveCustomName = async (
+      system: OrrerySystemRef,
+      generation: number,
+    ) => {
+      let name: string | undefined;
+      try {
+        name = await io.resolveName?.(system);
+      } catch {
+        /* The scene is ready; keep the fallback name. */
+      }
+      // A newer select owns `requested`; never apply a stale name.
+      if (!name || !active || generation !== get().generation) return;
+      const current = get().requested;
+      if (current.id === systemRefId(system) && current.name !== name)
+        set({ requested: { ...current, name } });
     };
     const select = async (
       system: OrrerySystemRef,
@@ -130,7 +152,11 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
           catalogLoaded: true,
           requested: { ...requested, name: currentName ?? requested.name },
         });
-        await save(system, generation, userInitiated);
+        const naming =
+          system.kind === "custom" && io.resolveName
+            ? resolveCustomName(system, generation)
+            : null;
+        await Promise.all([save(system, generation, userInitiated), naming]);
       } catch (error) {
         if (!active || generation !== get().generation) return;
         if (error instanceof MissingOrreryCategoryError) {
