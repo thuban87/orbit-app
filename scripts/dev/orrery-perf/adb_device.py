@@ -381,6 +381,9 @@ def collapsed_groups(nodes: list[Node]) -> list[Node]:
     return out
 
 
+MIN_HEADER_TAP_PX = 60  # a selector group header shorter than this is clipped
+
+
 def select_system(serial: str, name: str, max_scrolls: int = 4, settle: bool = True) -> float | None:
     """Open the System selector and pick `name` by its row label.
 
@@ -415,7 +418,11 @@ def select_system(serial: str, name: str, max_scrolls: int = 4, settle: bool = T
         # Expand each collapsed group at most once (a second tap would collapse it),
         # ONE per fresh dump: expanding a group moves every header below it, so a
         # second tap from the same dump can land on a System row and select it.
-        fresh = [h for h in collapsed_groups(nodes) if h.desc not in expanded]
+        # Only a header that is fully on screen is tapped: one clipped at the
+        # sheet's edge (the Pixel 3a's "Custom Systems") is scrolled into view
+        # first, or the tap lands on whatever lies under its clipped centre.
+        fresh = [h for h in collapsed_groups(nodes) if h.desc not in expanded
+                 and h.bounds[3] - h.bounds[1] >= MIN_HEADER_TAP_PX]
         if fresh:
             header = fresh[0]
             expanded.add(header.desc)

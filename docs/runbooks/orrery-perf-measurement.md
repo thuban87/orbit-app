@@ -356,3 +356,8 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
   moved the others, so the second tap landed on a System row and selected it (the sheet
   closed mid-search). It now expands one group per fresh dump (loop budget widened by 8
   passes). Navigation only: no measurement logic changed. `selftest.py` 28/28.
+- **2026-10-03** — 38.7 Plan 08 (spike): on the Pixel 3a with All Contacts current, the expanded
+  Built-in group pushes "Custom Systems" to the clipped bottom edge of the sheet and a tap on its
+  clipped centre missed. `select_system` now taps only fully visible group headers (≥ 60 px tall,
+  `MIN_HEADER_TAP_PX`) and scrolls otherwise. Navigation only; `selftest.py` 28/28. Known limit: the 3a
+  could still not be driven back from All Contacts by the helper (done by hand); see 38.7-SPIKE.md.
