@@ -525,8 +525,16 @@ describe("OrreryV2Canvas: the painted sky layer (38.7-09)", () => {
       height: 800,
     });
     expect(animated.value.opacity).toBe(1);
-    // No native view API in node: the bounded fallback hides it.
+    // The layers are recorded, but the native surface has not reported yet:
+    // the cover stays.
+    flush(2);
+    expect(animated.value.opacity).toBe(1);
+    // No native view API in node: the bounded fallback reports the surface;
+    // the reaction then waits two UI frames before lifting the cover.
     vi.advanceTimersByTime(1000);
+    flush(1);
+    expect(animated.value.opacity).toBe(1);
+    flush(2);
     expect(animated.value.opacity).toBe(0);
     vi.useRealTimers();
   });

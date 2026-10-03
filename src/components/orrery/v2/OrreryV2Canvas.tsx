@@ -492,19 +492,38 @@ export function OrreryV2Canvas({
       { width, height },
     ),
   );
-  // First-frame cover (opaque canvas only; see the header).
+  // First-frame cover (opaque canvas only; see the header). It lifts only
+  // when BOTH the native surface exists (JS poll) AND the first UI mapper
+  // pass has recorded the layers (a reaction on the last, non-ambient
+  // pictures), then two frames later: a surface can exist seconds before the
+  // first content frame on a heavy System (DEBUG All Contacts, 38.7-09).
   const canvasRef = useRef<CanvasRef | null>(null);
   const cover = useSharedValue(host.opaqueCanvas ? 1 : 0);
+  const surfaceReady = useSharedValue(false);
   // biome-ignore lint/correctness/useExhaustiveDependencies: once per canvas mount (the cover belongs to this native view)
   useEffect(() => {
     if (!host.opaqueCanvas) return;
     return watchFirstSurfaceFrame(
       () => canvasRef.current?.getNativeId?.() ?? null,
       () => {
-        cover.value = 0;
+        surfaceReady.value = true;
       },
     );
   }, []);
+  useAnimatedReaction(
+    () =>
+      surfaceReady.value &&
+      labelsPicture.value !== null &&
+      overlayPicture.value !== null,
+    (ready, previous) => {
+      if (!ready || previous === true || cover.value === 0) return;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          cover.value = 0;
+        });
+      });
+    },
+  );
   const coverStyle = useAnimatedStyle(() => ({
     opacity: withTiming(cover.value, { duration: COVER_FADE_MS }),
   }));
