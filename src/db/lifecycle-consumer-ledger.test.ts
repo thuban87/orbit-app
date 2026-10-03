@@ -127,6 +127,10 @@ const CADENCE_OWNERS: Record<string, LedgerEntry> = {
     owner: "AUDITED",
     note: "Perf fixture writer; supplies a POSITIVE cadence on insert, so its STATUS_SCAN use inherits the updated fragment precondition and cannot observe a null-cadence row.",
   },
+  "src/__dev__/orrery-seed.ts": {
+    owner: "38.7-01",
+    note: "Dev-only Orrery perf fixture (debug dev menu, never in a release bundle): writes a POSITIVE spec cadence through createContactFullCore and reads interval_days only to compare it with the spec value in verification; no cadence arithmetic.",
+  },
   "src/db/reserved-columns.ts": {
     owner: "AUDITED",
     note: "Reserved fixed-column name list; the `interval_days` literal is a custom-field shadowing guard, not a cadence read.",
