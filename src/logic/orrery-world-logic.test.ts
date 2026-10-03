@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { OrrerySystemMember } from "@/db/orrery-system-read";
 import { progressToAngle } from "@/logic/orrery-geometry-logic";
 import {
+  collidingReferenceIndexes,
   DENSITY_PRESETS,
   deriveOrreryWorld,
   gravityMassModifier,
@@ -141,5 +142,156 @@ describe("density-aware canonical world", () => {
       sun,
     );
     expect(result.bodies[0].radius).toBeLessThan(result.bodies[1].radius);
+  });
+});
+
+function seeded(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+/** The pre-38.7 all-pairs collision scan, kept verbatim as the oracle. */
+function bruteForceColliding(
+  base: readonly {
+    member: { id: number };
+    radius: number;
+    x: number;
+    y: number;
+  }[],
+): Set<number> {
+  const result = new Set<number>();
+  base.forEach((entry, index) => {
+    if (
+      base.some(
+        (other) =>
+          other.member.id !== entry.member.id &&
+          Math.hypot(entry.x - other.x, entry.y - other.y) <
+            entry.radius + other.radius + 8,
+      )
+    )
+      result.add(index);
+  });
+  return result;
+}
+
+describe("D-12: contacts sit on their orbit line", () => {
+  const statuses = [
+    { status: "stable" as const, progress: 0.3 },
+    { status: "wobble" as const, progress: 1.1 },
+    { status: "decay" as const, progress: 1.9 },
+    { status: "decay" as const, progress: 2.6 },
+    { status: "rogue" as const, progress: 3.4 },
+    { status: "rogue" as const, progress: 9 },
+    { status: null, progress: null },
+  ];
+  it("places every status exactly on ringRadius at every density", () => {
+    const members = statuses.map((entry, index) =>
+      member(index + 1, {
+        status: entry.status,
+        progress: entry.progress,
+        last_contact: entry.progress === null ? null : "2026-09-07",
+      }),
+    );
+    for (const density of ["spacious", "balanced", "compact"] as const) {
+      const result = deriveOrreryWorld(members, density, new Map(), sun);
+      for (const body of result.bodies.slice(0, -1))
+        expect(
+          Math.abs(Math.hypot(body.x, body.y) - body.ringRadius),
+        ).toBeLessThanOrEqual(1e-9);
+    }
+  });
+  it("extent is the outermost ring plus its body radius (and never less than the sun)", () => {
+    const members = Array.from({ length: 12 }, (_, i) =>
+      member(i + 1, {
+        status: i % 2 ? "rogue" : "decay",
+        progress: i % 2 ? 5 : 2.5,
+      }),
+    );
+    const result = deriveOrreryWorld(members, "balanced", new Map(), sun);
+    const outer = result.bodies[result.bodies.length - 2];
+    expect(result.extent).toBe(outer.ringRadius + outer.radius);
+    expect(result.extent).toBe(
+      DENSITY_PRESETS.balanced.ringInner +
+        11 * DENSITY_PRESETS.balanced.ringGap +
+        16,
+    );
+    expect(deriveOrreryWorld([], "balanced", new Map(), sun).extent).toBe(30);
+  });
+  it("re-pins nudges to the on-ring geometry: same-angle neighbours nudge by min(1°, 4 / widest ring)", () => {
+    // Six members at one angle on adjacent balanced rings (34 apart < 16+16+8)
+    // all touch a neighbour. Before D-12 a rogue push moved them off this grid.
+    const members = Array.from({ length: 6 }, (_, i) =>
+      member(i + 1, { progress: 0, status: i === 2 ? "rogue" : "stable" }),
+    );
+    const result = deriveOrreryWorld(members, "balanced", new Map(), sun);
+    const magnitudes = result.bodies
+      .slice(0, -1)
+      .map((body) => Math.abs(body.nudgeAngle ?? 0));
+    expect(magnitudes).toEqual([
+      MAX_NUDGE_ANGLE,
+      MAX_NUDGE_ANGLE,
+      MAX_NUDGE_ANGLE,
+      MAX_NUDGE_ANGLE,
+      MAX_NUDGE_WORLD / (68 + 4 * 44),
+      MAX_NUDGE_WORLD / (68 + 5 * 44),
+    ]);
+    for (const body of result.bodies.slice(0, -1)) {
+      expect(Math.abs(body.nudgeAngle ?? 0)).toBeLessThanOrEqual(
+        MAX_NUDGE_ANGLE,
+      );
+      expect(
+        Math.abs(body.nudgeAngle ?? 0) * body.ringRadius,
+      ).toBeLessThanOrEqual(MAX_NUDGE_WORLD + 1e-9);
+    }
+    // A rogue that used to be pushed 80 units out now sits on its own ring at
+    // its timestamp angle (plus its bounded nudge).
+    expect(result.bodies[2].ringRadius).toBe(58 + 2 * 34);
+    expect(Math.hypot(result.bodies[2].x, result.bodies[2].y)).toBeCloseTo(
+      58 + 2 * 34,
+      9,
+    );
+  });
+  it("grid collision detection equals the all-pairs scan on 1,000 random members", () => {
+    const random = seeded(12);
+    for (let round = 0; round < 4; round++) {
+      // A dense cloud (many touches) and a realistic on-ring System.
+      const cloud = Array.from({ length: 1000 }, (_, i) => ({
+        member: { id: i % 997 },
+        radius: 14.4 + random() * 3.2,
+        x: (random() - 0.5) * (round % 2 ? 900 : 4000),
+        y: (random() - 0.5) * (round % 2 ? 900 : 4000),
+      }));
+      expect(
+        [...collidingReferenceIndexes(cloud)].sort((a, b) => a - b),
+      ).toEqual([...bruteForceColliding(cloud)].sort((a, b) => a - b));
+    }
+    const members = Array.from({ length: 1000 }, (_, i) =>
+      member(i + 1, {
+        progress: i % 50 === 0 ? null : random() * 4,
+        status: i % 50 === 0 ? null : "stable",
+      }),
+    );
+    const result = deriveOrreryWorld(members, "balanced", new Map(), sun);
+    const reference = result.bodies.slice(0, -1).map((body, index) => {
+      const progress = members[index].progress;
+      const angle =
+        progress === null ? NEUTRAL_RESTING_ANGLE : progressToAngle(progress);
+      const r = 58 + index * 34;
+      return {
+        member: { id: body.id },
+        radius: 16,
+        x: r * Math.sin(angle),
+        y: -r * Math.cos(angle),
+      };
+    });
+    const expected = bruteForceColliding(reference);
+    result.bodies.slice(0, -1).forEach((body, index) => {
+      const neutral = members[index].progress === null;
+      expect((body.nudgeAngle ?? 0) !== 0).toBe(
+        !neutral && expected.has(index),
+      );
+    });
   });
 });

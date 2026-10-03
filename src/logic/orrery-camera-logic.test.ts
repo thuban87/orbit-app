@@ -13,6 +13,7 @@ import {
   MIN_HIT_RADIUS,
   MIN_READABLE_RADIUS,
   MIN_ZOOM,
+  type ProjectedBody,
   type ProjectedFrame,
   panCamera,
   perspectiveScale,
@@ -26,6 +27,7 @@ import {
   type WorldPoint,
   worldExtent,
 } from "@/logic/orrery-camera-logic";
+import { previewReorder, type ReorderDrag } from "@/logic/orrery-reorder-logic";
 
 const viewport = { width: 400, height: 600 };
 const body = (x: number, y: number, radius = 16, id = 1): WorldBody => ({
@@ -293,7 +295,9 @@ const legacy = (() => {
     pose: CameraPose,
     viewport: CameraViewport,
     generation: number,
-  ): ProjectedFrame => {
+  ): Omit<ProjectedFrame, "bodies"> & {
+    bodies: Omit<ProjectedBody, "worldRingRadius">[];
+  } => {
     const current = clampCameraPose(
       pose,
       Math.max(
@@ -446,7 +450,16 @@ describe("D-52 hoisted projection basis", () => {
         focalDistance: deriveFocalDistance(worldExtent(world)),
       };
       const vp = basisViewports[round % basisViewports.length];
-      const expected = legacy.frame(world, pose, vp, round);
+      // 38.7-05 adds worldRingRadius (the world ring radius, copied unchanged);
+      // everything the frozen copy produced is otherwise identical.
+      const frozen = legacy.frame(world, pose, vp, round);
+      const expected: ProjectedFrame = {
+        ...frozen,
+        bodies: frozen.bodies.map((projected, index) => ({
+          ...projected,
+          worldRingRadius: world[index].ringRadius,
+        })),
+      };
       const actual = projectFrame(world, pose, vp, round);
       expect(actual).toEqual(expected);
       expectBitExact(actual.center, expected.center);
@@ -470,5 +483,67 @@ describe("D-52 hoisted projection basis", () => {
         })),
       });
     }
+  });
+});
+
+describe("38.7-05 worldRingRadius (single source of world ring radii, M12)", () => {
+  const world: WorldBody[] = [
+    { id: 0, kind: "sun", x: 0, y: 0, radius: 30, ringRadius: 0 },
+    ...[1, 2, 3, 4].map(
+      (id): WorldBody => ({
+        id,
+        kind: "contact",
+        x: (40 + id * 34) * Math.sin(id),
+        y: -(40 + id * 34) * Math.cos(id),
+        radius: 16,
+        ringRadius: 40 + id * 34,
+      }),
+    ),
+  ];
+  it("copies the world ring radius unchanged at any zoom, tilt and yaw", () => {
+    for (const zoom of [MIN_ZOOM, 1, 2, MAX_ZOOM])
+      for (const tilt of [0, Math.PI / 4, 1.0821])
+        for (const yaw of [0, 2.1]) {
+          const frame = projectFrame(
+            world,
+            { ...HOME_CAMERA, zoom, tilt, yaw },
+            viewport,
+            1,
+          );
+          frame.bodies.forEach((projected, index) => {
+            expect(projected.worldRingRadius).toBe(world[index].ringRadius);
+          });
+        }
+  });
+  it("previewReorder → projectFrame gives the dragged body its new world ring radius (C-L3)", () => {
+    const drag: ReorderDrag = {
+      generation: 1,
+      id: 1,
+      request: {} as ReorderDrag["request"],
+      radii: [74, 108, 142, 176],
+      offset: { x: 0, y: 0 },
+      reorderedVisibleIds: [2, 3, 1, 4],
+      active: true,
+      origin: { x: 0, y: 0 },
+    };
+    const preview = previewReorder(world, drag);
+    const frame = projectFrame(
+      preview,
+      { ...HOME_CAMERA, zoom: 1.5, tilt: 1.0821, yaw: 0.4 },
+      viewport,
+      1,
+    );
+    const moved = frame.bodies.find((b) => b.id === 1)!;
+    expect(moved.worldRingRadius).toBe(142);
+    expect(moved.worldRingRadius).not.toBe(world[1].ringRadius);
+    // A moved body sits on its new ring along its own angle.
+    const movedWorld = preview.find((b) => b.id === 1)!;
+    expect(Math.hypot(movedWorld.x, movedWorld.y)).toBeCloseTo(142, 9);
+    expect(Math.atan2(movedWorld.x, -movedWorld.y)).toBeCloseTo(1, 9);
+    expect(frame.bodies.find((b) => b.id === 2)!.worldRingRadius).toBe(74);
+    expect(frame.bodies.find((b) => b.id === 3)!.worldRingRadius).toBe(108);
+    // Bodies whose slot did not change, and the sun, keep their own.
+    expect(frame.bodies.find((b) => b.id === 4)!.worldRingRadius).toBe(176);
+    expect(frame.bodies.find((b) => b.id === 0)!.worldRingRadius).toBe(0);
   });
 });

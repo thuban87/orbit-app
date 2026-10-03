@@ -699,7 +699,6 @@ describe("D-53 settled world is shared by reference and never mutated (cycle-1 M
       id: contacts[0].id,
       request: {} as ReorderDrag["request"],
       radii: contacts.map((_, index) => 60 + index * 10),
-      drift: 0,
       offset: { x: 0, y: 0 },
       reorderedVisibleIds: [...contacts.map((body) => body.id)].reverse(),
       active,

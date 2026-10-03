@@ -20,11 +20,12 @@ const request = {
     { id: 3, uid: "c" },
   ],
 };
+// D-12: bodies sit ON their rings (no drift), at distinct angles.
 const world = [1, 2, 3].map((id, i) => ({
   id,
   kind: "contact" as const,
-  x: 0,
-  y: -(60 + i * 40 + 30),
+  x: (60 + i * 40) * Math.sin(i * 0.4),
+  y: -(60 + i * 40) * Math.cos(i * 0.4),
   radius: 10,
   ringRadius: 60 + i * 40,
 }));
@@ -67,13 +68,49 @@ vi.mock("react-native-gesture-handler", () => {
   };
 });
 describe("deliberate ring drag", () => {
-  it("stationary release remains same rank for drifted tilted/yawed targets, including off-center touch", () => {
-    const body = frame.bodies[1];
-    const captured = captureReorder(frame, request, body.x + 3, body.y + 2)!;
+  it("stationary release keeps the same rank for tilted/yawed targets, off-centre touch", () => {
+    for (const index of [0, 1, 2]) {
+      const body = frame.bodies[index];
+      const captured = captureReorder(frame, request, body.x + 3, body.y + 2)!;
+      expect(captured).not.toBeNull();
+      expect("drift" in captured).toBe(false);
+      const moved = moveReorder(captured, frame, body.x + 3, body.y + 2);
+      expect(moved?.reorderedVisibleIds).toEqual([1, 2, 3]);
+      expect(releaseReorder(moved, 7, true)).toBeNull();
+    }
+  });
+  it("captures slot radii from the frame's world ring radii, never projected radius / zoom", () => {
+    const zoomed = projectFrame(
+      world,
+      clampCameraPose({ x: 0, y: 0, zoom: 2.5, tilt: 0.9, yaw: 1.3 }, 300),
+      { width: 500, height: 700 },
+      7,
+    );
+    const a = zoomed.bodies[0];
+    const captured = captureReorder(zoomed, request, a.x, a.y)!;
+    expect(captured.radii).toEqual([60, 100, 140]);
+  });
+  it("a drag at 62° (tilt 1.0821) lands on the expected ring", () => {
+    const steep = projectFrame(
+      world,
+      clampCameraPose({ x: 0, y: 0, zoom: 1, tilt: 1.0821, yaw: 0.2 }, 300),
+      { width: 500, height: 700 },
+      7,
+    );
+    const a = steep.bodies[0],
+      c = steep.bodies[2];
+    const captured = captureReorder(steep, request, a.x, a.y)!;
     expect(captured).not.toBeNull();
-    const moved = moveReorder(captured, frame, body.x + 3, body.y + 2);
-    expect(moved?.reorderedVisibleIds).toEqual([1, 2, 3]);
-    expect(releaseReorder(moved, 7, true)).toBeNull();
+    expect(moveReorder(captured, steep, c.x, c.y)?.reorderedVisibleIds).toEqual(
+      [2, 3, 1],
+    );
+    const b = steep.bodies[1];
+    expect(moveReorder(captured, steep, b.x, b.y)?.reorderedVisibleIds).toEqual(
+      [2, 1, 3],
+    );
+    expect(moveReorder(captured, steep, a.x, a.y)?.reorderedVisibleIds).toEqual(
+      [1, 2, 3],
+    );
   });
   it("moves to the nearest eligible slot and emits only success in its captured generation", () => {
     const a = frame.bodies[0],

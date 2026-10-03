@@ -49,6 +49,12 @@ export interface ProjectedBody extends WorldBody {
   hitRadius: number;
   ringPath: WorldPoint[];
   depth: number;
+  /**
+   * The world body's own `ringRadius`, copied unchanged (38.7-05, M12). The
+   * single source of world ring radii for reorder, the V2 ring drawing and the
+   * reorder outline; never recover it as projected `ringRadius / zoom`.
+   */
+  worldRingRadius: number;
 }
 export interface ProjectedFrame {
   generation: number;
@@ -594,6 +600,7 @@ export function projectFrame(
         ...projectWithBasis(basis, body.x, body.y),
         radius: body.radius * scale,
         ringRadius: body.ringRadius * current.zoom,
+        worldRingRadius: body.ringRadius,
         hitRadius: Math.max(MIN_HIT_RADIUS, body.radius * scale),
         ringPath,
         depth: cameraPlane(body, current).y * Math.sin(current.tilt ?? 0),

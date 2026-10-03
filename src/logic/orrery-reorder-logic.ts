@@ -16,8 +16,8 @@ export interface ReorderDrag {
   generation: number;
   id: number;
   request: ReorderExpectation;
+  /** World ring radii of the eligible slots, from the frame's `worldRingRadius`. */
   radii: number[];
-  drift: number;
   offset: { x: number; y: number };
   reorderedVisibleIds: number[];
   active: boolean;
@@ -61,16 +61,18 @@ export function captureReorder(
     frame.viewport,
   );
   if (!center || !pointer) return null;
+  // D-12: bodies sit on their rings, so the frame's world ring radius is the
+  // slot geometry directly (no projected-radius / zoom recovery, no drift).
   const radii = request.expectedEligibleVisibleIds.map(
-    (id) => frame.bodies.find((b) => b.id === id)?.ringRadius,
+    (id) => frame.bodies.find((b) => b.id === id)?.worldRingRadius,
   );
-  if (radii.some((radius) => radius === undefined)) return null;
+  if (radii.some((radius) => radius === undefined || !Number.isFinite(radius)))
+    return null;
   return {
     generation: frame.generation,
     id: body.id,
     request,
-    radii: radii.map((radius) => (radius as number) / frame.pose.zoom),
-    drift: Math.hypot(center.x, center.y) - body.ringRadius / frame.pose.zoom,
+    radii: radii as number[],
     offset: { x: pointer.x - center.x, y: pointer.y - center.y },
     reorderedVisibleIds: [...request.expectedEligibleVisibleIds],
     active: false,
@@ -88,8 +90,8 @@ export function moveReorder(
   // Unreachable samples cancel the entire hold; returning to ground cannot revive it.
   const point = tryUnprojectToWorldPlane({ x, y }, frame.pose, frame.viewport);
   if (!point) return null;
-  const radius =
-    Math.hypot(point.x - drag.offset.x, point.y - drag.offset.y) - drag.drift;
+  // The pointer's world radius, corrected only by the grab offset.
+  const radius = Math.hypot(point.x - drag.offset.x, point.y - drag.offset.y);
   if (!Number.isFinite(radius)) return null;
   let nearest = 0;
   for (let i = 1; i < drag.radii.length; i++)
@@ -123,7 +125,8 @@ export function releaseReorder(
     request: { ...drag.request, reorderedVisibleIds: drag.reorderedVisibleIds },
   };
 }
-/** Keep each body's actual drift/angle; only the selected contacted slots swap. */
+/** Keep each body's angle; only the selected contacted slots swap radii, and a
+ * moved body sits on its new ring along its own angle (D-12). */
 export function previewReorder<T extends WorldBody>(
   world: readonly T[],
   drag: ReorderDrag | null,
@@ -135,12 +138,11 @@ export function previewReorder<T extends WorldBody>(
     if (index < 0 || body.kind !== "contact") return body;
     const radius = drag.radii[index],
       distance = Math.hypot(body.x, body.y);
-    const next = distance - body.ringRadius + radius;
     return {
       ...body,
       ringRadius: radius,
-      x: distance ? (body.x * next) / distance : 0,
-      y: distance ? (body.y * next) / distance : -next,
+      x: distance ? (body.x * radius) / distance : 0,
+      y: distance ? (body.y * radius) / distance : -radius,
     };
   });
 }
