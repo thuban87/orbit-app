@@ -6,10 +6,10 @@ current_phase: 38.7
 current_phase_name: Orrery V2 — Renderer, Camera & Visual Language
 status: executing
 stopped_at: Completed 38.7-02-PLAN.md
-last_updated: "2026-10-03T12:25:58.039Z"
+last_updated: "2026-10-03T12:26:14.531Z"
 last_activity: 2026-10-03
-last_activity_desc: 38.7-01 complete (perf fixture seed, samplers, frozen D-56 runbook); next 38.7-02 Day-1 baseline
-state_head: 25b82fc02f4f7d464de5cfa5b257eaf44dff83c6
+last_activity_desc: 38.7-02 complete (Day-1 release baseline on both phones; owner locked D-56 gates G1-G8 + S1-a = CONTEXT D-63); next 38.7-03 and 38.7-04 D-52 fixes
+state_head: 64a69b65ec64ec9211df4e84474433aa110a7e6e
 progress:
   total_phases: 29
   completed_phases: 20
@@ -916,6 +916,7 @@ Foundational decisions affecting current work:
 - [Phase 38.7]: 38.7-01: perf fixture parts (Size cast, Orrery Stress) are each written in one transaction; a part created later is anchored at the existing part's offset; SEED_SPEC_VERSION 2ded9f40dc01
 - [Phase 38.7]: 38.7-01: production dumpsys input has no eventTime on either test phone, so touch-window calibration uses a clock-identity fallback (logcat monotonic mark vs /proc/uptime boottime), proven by the owner's first tap in Plan 02
 - [Phase 38.7]: 38.7-01: on Android 12 (Pixel 3a) main's TextureView presents through the un-prefixed <pkg>/<activity>#0 window layer; tab return records 15 s (main's revisit reload is ~5 s). BASELINE_SHA candidate = 38.7-01's final commit
+- [Phase 38.7]: 38.7-02: D-56 gates locked 2026-10-03 (owner 'approve all'): G1-G8 + memory substitution S1-a; Pixel 3a tested not optimised (All Contacts survival only); recorded as CONTEXT D-63
 
 ### Pending Todos
 
