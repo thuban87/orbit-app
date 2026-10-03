@@ -224,3 +224,73 @@ describe("System publication ownership", () => {
     expect(openProfile).not.toHaveBeenCalled();
   });
 });
+
+describe("38.7-04 D-52: custom System name after a cold restore", () => {
+  const work = parseSystemRef("custom:work-uid")!;
+  const category = parseSystemRef("category:friends")!;
+  const withCategories = (system: typeof all) =>
+    ({
+      ...scene(system),
+      systemSnapshot: { categories: [{ uid: "friends", name: "Friends" }] },
+    }) as unknown as OrrerySceneSnapshot;
+
+  it("resolves the real name after the load (cold restore passes no name)", async () => {
+    const resolveName = vi.fn().mockResolvedValue("Work");
+    const store = createOrrerySystemStore({
+      load: async (system) => scene(system),
+      persist: async () => true,
+      resolveName,
+    });
+    await store.getState().select(work, undefined, false);
+    expect(store.getState().status).toBe("ready");
+    expect(store.getState().requested.name).toBe("Work");
+    expect(resolveName).toHaveBeenCalledWith(work);
+  });
+
+  it("never applies a stale name after a newer select", async () => {
+    const name = deferred<string | undefined>();
+    const store = createOrrerySystemStore({
+      load: async (system) => scene(system),
+      persist: async () => true,
+      resolveName: () => name.promise,
+    });
+    const first = store.getState().select(work, undefined, false);
+    await Promise.resolve();
+    await Promise.resolve();
+    await store.getState().select(fav, undefined, true);
+    name.resolve("Work");
+    await first;
+    expect(store.getState().requested.id).toBe(systemRefId(fav));
+    expect(store.getState().requested.name).toBe("Favorites");
+  });
+
+  it("falls back exactly as before when the name cannot be resolved", async () => {
+    for (const resolveName of [
+      vi.fn().mockRejectedValue(new Error("catalog read")),
+      vi.fn().mockResolvedValue(undefined),
+    ]) {
+      const store = createOrrerySystemStore({
+        load: async (system) => scene(system),
+        persist: async () => true,
+        resolveName,
+      });
+      await store.getState().select(work, undefined, false);
+      expect(store.getState().status).toBe("ready");
+      expect(store.getState().requested.name).toBe("Unavailable System");
+    }
+  });
+
+  it("leaves category and built-in naming unchanged (no resolveName call)", async () => {
+    const resolveName = vi.fn().mockResolvedValue("Wrong");
+    const store = createOrrerySystemStore({
+      load: async (system) => withCategories(system),
+      persist: async () => true,
+      resolveName,
+    });
+    await store.getState().select(category, undefined, false);
+    expect(store.getState().requested.name).toBe("Friends");
+    await store.getState().select(fav, undefined, false);
+    expect(store.getState().requested.name).toBe("Favorites");
+    expect(resolveName).not.toHaveBeenCalled();
+  });
+});
