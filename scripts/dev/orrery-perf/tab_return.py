@@ -12,19 +12,17 @@ neighbours) and scaled to the decoded frame.
 
 Times (seconds from the recording start; reported as differences):
   t_tap     the tab bar first departs from the pre-tap frame (Orrery tab selected)
-  t_screen  the header first departs from the pre-tap frame (Orrery title shown);
-            the blank pre-mount frame is the first frame whose header change has
-            completed (cross-fade done)
-  t_canvas  the canvas band first departs from that blank pre-mount frame
+  t_screen  the header first departs from the pre-tap frame (Orrery title shown)
   t_full    the FIRST FULL FRAME: every canvas frame is scored by its content —
-            the fraction of pixels whose fine structure (pixel minus its 3x3 mean)
-            departs from the blank pre-mount frame's by more than a noise
-            threshold, so a smooth sky backdrop painted before the scene does not
-            count as content. The settled content level is the
-            median score over the last 2 s; t_full is the first frame scoring
-            >= 95 % of it that never falls below 90 % of it afterwards. The final
-            frame is never used as a similarity target: ambient motion (drift,
-            twinkle, pulses) keeps it changing.
+            the absolute share of pixels with fine structure (pixel minus its 3x3
+            mean beyond a noise threshold), so a smooth sky backdrop never counts.
+            The settled content level is the median score over the last 2 s; t_full
+            is the first frame scoring >= 95 % of it that never falls below 90 % of
+            it afterwards (so a stale snapshot shown on background return, before
+            the canvas blanks and redraws, is never the full frame). The final frame
+            is never used as a similarity target: ambient motion keeps it changing.
+  t_blank   the least-content frame between t_screen and t_full (the blank canvas)
+  t_canvas  the canvas first rises above the blank level after t_blank
 Reported: screen = t_screen - t_tap, mount = t_canvas - t_screen (today: the
 scene reload + canvas mount), fill = t_full - t_canvas, total = t_full - t_tap
 (the G3 value). Outcomes that are never numbers: `truncated` (fewer than 2 s of
@@ -60,7 +58,6 @@ CONTENT_MIN = 0.02
 REACH = 0.95
 HOLD = 0.90
 SETTLE_WINDOW_S = 2.0
-FADE_DONE = 0.9
 RECORD_LIMIT_S = 60  # main's tab return: ~8 s on the 6 Pro, > 15 s on the 3a (2026-10-03)
 DIGEST_DWELL_S = 3.0
 PRE_TAP_S = 1.5
@@ -100,6 +97,16 @@ def highpass(frame: bytes, width: int, region: tuple[int, int, int, int]) -> lis
     return out
 
 
+def structure_level(hp: list[list[int]]) -> float:
+    """Fraction of pixels whose fine structure exceeds NOISE gray levels."""
+    limit = 9 * NOISE
+    total = changed = 0
+    for row in hp:
+        total += len(row)
+        changed += sum(1 for p in row if abs(p) > limit)
+    return changed / total if total else 0.0
+
+
 def structure_departure(hp: list[list[int]], ref: list[list[int]]) -> float:
     """Fraction of pixels whose fine structure (highpass, in 1/9 gray levels) differs
     from the reference's by more than NOISE gray levels."""
@@ -120,7 +127,7 @@ def _first(indices, predicate):
 
 def analyse_frames(frames: list[tuple[float, bytes]], width: int, regions: dict, duration_s: float,
                    tap_region: str = "tab") -> dict:
-    """Detect t_tap/t_screen/t_canvas/t_full over decoded frames (see module doc)."""
+    """Detect t_tap/t_screen/t_blank/t_canvas/t_full over decoded frames (see module doc)."""
     if not frames:
         return {"outcome": "no-frames"}
     times = [t for t, _ in frames]
@@ -133,25 +140,25 @@ def analyse_frames(frames: list[tuple[float, bytes]], width: int, regions: dict,
     k_screen = _first(range(k_tap, n), lambda k: header_dep[k] > CHANGE_FRAC)
     if k_screen is None:
         return {"outcome": "no-screen", "t_tap": times[k_tap]}
-    header_final = header_dep[-1]
-    k_blank = _first(range(k_screen, n), lambda k: header_dep[k] >= FADE_DONE * header_final) or k_screen
-    blank = frames[k_blank][1]
-    # Canvas content is scored on fine STRUCTURE, not raw brightness: main paints a
-    # smooth sky backdrop seconds before the scene, and a brightness score took that
-    # backdrop for the full frame (6 Pro, 2026-10-03 hand check).
-    blank_hp = highpass(blank, width, regions["canvas"])
-    content = [structure_departure(highpass(frames[k][1], width, regions["canvas"]), blank_hp)
-               if k >= k_blank else 0.0 for k in range(n)]
-    tail = [content[k] for k in range(k_blank, n) if times[k] >= duration_s - SETTLE_WINDOW_S]
+    # Canvas content = the ABSOLUTE share of fine-structure pixels in each frame (no
+    # reference frame): a smooth backdrop scores ~0, rings/bodies/labels score high.
+    # On background return main first shows its stale snapshot (full), then blanks the
+    # canvas, then redraws; the hold rule below never takes the stale snapshot.
+    content = [structure_level(highpass(frames[k][1], width, regions["canvas"])) if k >= k_screen else 0.0
+               for k in range(n)]
+    tail = [content[k] for k in range(k_screen, n) if times[k] >= duration_s - SETTLE_WINDOW_S]
     settled = statistics.median(tail) if tail else content[-1]
-    base = {"t_tap": times[k_tap], "t_screen": times[k_screen], "t_blank": times[k_blank],
-            "settled_level": round(settled, 4), "duration_s": duration_s,
-            "content": [round(c, 4) for c in content]}
-    if settled < CONTENT_MIN:
-        return {**base, "outcome": "no-canvas-change"}
-    k_canvas = _first(range(k_blank, n), lambda k: content[k] > CONTENT_MIN)
-    k_full = _first(range(k_canvas, n), lambda k: content[k] >= REACH * settled
+    k_full = _first(range(k_screen, n), lambda k: content[k] >= REACH * settled
                     and all(c >= HOLD * settled for c in content[k:]))
+    span = range(k_screen, (k_full if k_full is not None else n - 1) + 1)
+    k_blank = min(span, key=lambda k: content[k])
+    blank_level = content[k_blank]
+    base = {"t_tap": times[k_tap], "t_screen": times[k_screen], "t_blank": times[k_blank],
+            "blank_level": round(blank_level, 4), "settled_level": round(settled, 4), "duration_s": duration_s,
+            "content": [round(c, 4) for c in content]}
+    if settled - blank_level < CONTENT_MIN:
+        return {**base, "outcome": "no-canvas-change"}
+    k_canvas = _first(range(k_blank, n), lambda k: content[k] > blank_level + CONTENT_MIN)
     if k_full is None:
         return {**base, "outcome": "no-full-frame", "t_canvas": times[k_canvas]}
     t_full = times[k_full]

@@ -336,3 +336,13 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
   Stress are recorded as not measurable on main (see 38.7-BASELINE.md).
 - **2026-10-03** — Before any baseline number: rows 3-4 are scripted as `recenter_pan.py`
   (the same procedure, with the tap/swipe instants mapped onto SurfaceFlinger's clock in-process).
+- **2026-10-03** — Method change AFTER the first baseline number (38.7 Plan 02), so the
+  affected numbers were re-measured: the background-return check showed main first shows
+  its stale scene snapshot, then blanks the canvas, then redraws (6 Pro), and the detector
+  took the stale snapshot as its "blank" reference (`no-canvas-change`). Canvas content is
+  now the ABSOLUTE share of fine-structure pixels per frame (no reference frame); t_blank is
+  the least-content frame before t_full; the 95 % reach / 90 % hold rule is unchanged and
+  excludes a stale snapshot that later blanks. Every tab- and background-return number in
+  38.7-BASELINE.md comes from `reanalyse_tab_return.py` over the identical saved
+  recordings with this detector (tab-return totals reproduced exactly; background return
+  became valid). `selftest.py` 28/28 (background stale-snapshot case added).

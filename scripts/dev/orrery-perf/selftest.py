@@ -542,6 +542,27 @@ def _():
         eq(abs(level - mean) <= 6, True, f"frame level {level} decoded as {mean}")
 
 
+def _frame_background(t: float) -> bytes:
+    """Background return on main: launcher until 1.0 s, then the Orrery's STALE full
+    snapshot, the canvas blanks at 1.8 s, and the scene is redrawn at 3.0 s."""
+    if t < 1.0:
+        return _frame(0.0)
+    if t < 1.8:
+        return _frame(5.9)
+    return _frame_backdrop_first(t)
+
+
+@check("scenario: background return never takes the stale snapshot shown before the canvas blanks and redraws")
+def _():
+    import tab_return
+
+    frames = [(k / 10, _frame_background(k / 10)) for k in range(60)]
+    out = tab_return.analyse_frames(frames, W, REGIONS, 6.0, tap_region="full")
+    eq(out["outcome"], "valid")
+    eq((out["t_tap"], out["t_full"], out["total_s"]), (1.0, 3.0, 2.0), "tap/full/total")
+    eq(out["t_blank"] >= 1.8, True, "blank after the stale snapshot")
+
+
 @check("scenario: tab return gives no number when the recording ends too soon or the canvas never changes")
 def _():
     import tab_return
