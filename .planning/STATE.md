@@ -5,16 +5,16 @@ milestone_name: Release Readiness
 current_phase: 38.7
 current_phase_name: Orrery V2 — Renderer, Camera & Visual Language
 status: executing
-stopped_at: Completed 38.7-07-PLAN.md
-last_updated: "2026-10-03T15:43:00.000Z"
+stopped_at: Completed 38.7-08-PLAN.md
+last_updated: "2026-10-03T20:40:00.000Z"
 last_activity: 2026-10-03
-last_activity_desc: "38.7-07 complete (D-43 renderer foundation: 7 fixed Picture layers base/stars/bodiesBehind/sun/bodiesFront/labels/overlay for any System size; contacts/sun/moons/labels drawn from JS specs in depth order around the sun; shared bounded photo cache with replacement reserve, fallback generations and revision invalidation; canonical H3 generation ledger gating every SkImage/Paragraph disposal on per-layer acks; all legacy declarative Orrery components deleted; 6400 tests; DEBUG smoke on the 6 Pro clean); next 38.7-08 spike"
-state_head: 56ccaffb
+last_activity_desc: "38.7-08 complete (D-49 quantised ~30 Hz ambient clock with frame-clock/interval drivers; ledger-gated GPU base bake; one release spike build on both phones; owner D-64: world-plane, frame-clock, opaque SurfaceView, bake on; G1/G5/G6 6 Pro gaps carried to Plan 16, not waived; D-49 diagnostic (which layer holds 6 Pro 120 Hz idle, decides FR-B) pending as owner-requested follow-up; text cache cap 400; 6464 tests); next 38.7-09"
+state_head: a8f2190b
 progress:
   total_phases: 29
   completed_phases: 20
   total_plans: 275
-  completed_plans: 264
+  completed_plans: 265
 carried_forward:
 
   - "38.7 INSERTED (owner 2026-10-02): Orrery V2 — Renderer, Camera & Visual Language, before Phase 39. Built from the Orrery renderer R&D (labs A/B/C; synthesis docs/experiments/orrery-renderer/synthesis/). Dossier docs/dossier/milestone-2/phase-38.7-orrery-v2-dossier.md ACCEPTED after codex review: D-01..D-58, no OPEN items. Day 1 = release baseline of main on both phones, then the owner locks numeric perf gates (D-56). Lab branches experiment/orrery-* are local-only evidence; keep them until V2 ships."
@@ -45,7 +45,7 @@ See: .planning/PROJECT.md (updated 2026-09-29 after Phase 38.5)
 ## Current Position
 
 Phase: 38.7 (Orrery V2 — Renderer, Camera & Visual Language) — EXECUTING
-Plan: 8 of 16
+Plan: 9 of 16
 Status: Ready to execute
 Prior status: Phase 35 COMPLETE (all 9 plans, waves 1–5). Verifier 5/5 must-haves + all 14 COMP IDs; code review 1 blocker (CR-01 restore-path 'remember'-sentinel — assertRememberedMessageMode added at DAO + backup boundaries) + 3 warnings, all fixed; Wave-1 cross-plan regression (35-05→006 test) fixed. Migration 028 (app_settings.default_message_mode/remembered_message_mode) proven on-device at user_version=28 with correct defaults on the Pixel 3a; full owner test plan passed on the Moto Razr release APK (orbit-phase35-release-2026-09-13.apk in G:\My Drive\IT\Software\Orbit). 3391 tests pass, tsc/colors clean; AiService.ts untouched all phase (AI egress not widened). Commits local on main, NOT pushed.
 Parked (owner, future): theme-merge into one Dark/Light switch; Deep Space/Starfield removal. See memories mode-aware-glassy-cards, android-elevation-opaque-on-translucent, theme-merge-into-mode-parked. CORRECTED 2026-09-26 (38.4 D-39): the theme merge meant backgrounds restricted to their own package (already implemented); both packages keep both modes. Deep Space/Starfield replacement is an OPEN item in Phase 38.5.
