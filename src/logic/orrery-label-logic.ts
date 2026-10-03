@@ -14,6 +14,13 @@ export const DETAIL_ENTER = 3;
 export const DETAIL_EXIT = 2.8;
 const LABEL_NUDGE = 8;
 const CONTEXT_GAP = 4;
+/**
+ * D-52: uniform-grid cell size (canvas px) for the label allocator's spatial
+ * hash. Tunable: it changes only speed, never the allocation.
+ */
+export const LABEL_GRID_CELL = 64;
+/** Rects spanning more cells than this are scanned linearly instead. */
+const LABEL_GRID_MAX_CELLS = 1024;
 
 /** Initials are grapheme clusters, never UTF-16 units. Older runtimes without
  * Segmenter hand the whole identity to the native one-line avatar paragraph.
@@ -79,6 +86,120 @@ export function rectanglesTouch(a: CameraRect, b: CameraRect): boolean {
     a.y + a.height >= b.y
   );
 }
+/**
+ * D-52 spatial hash for "does any stored rect touch this one" queries. Every
+ * answer is decided by the exact `rectanglesTouch` (inclusive edges), so the
+ * grid only skips rects that cannot touch: two touching well-formed rects
+ * always share a cell (floor is monotone and the bounds are the same float
+ * expressions `rectanglesTouch` compares). Rects that are non-finite, negative
+ * or very large live in `wide` and are always tested. Answers are booleans, so
+ * the scan order can never change an allocation.
+ */
+interface RectGrid {
+  rects: CameraRect[];
+  /** Owner id per rect, for the "any OTHER candidate" query. */
+  owners: string[];
+  cells: Map<number, number[]>;
+  wide: number[];
+}
+function createRectGrid(): RectGrid {
+  "worklet";
+  return { rects: [], owners: [], cells: new Map(), wide: [] };
+}
+/** Inclusive cell span of a well-formed rect, or null (non-finite, negative, too large). */
+function gridSpan(
+  r: CameraRect,
+): { x0: number; x1: number; y0: number; y1: number } | null {
+  "worklet";
+  if (
+    !Number.isFinite(r.x) ||
+    !Number.isFinite(r.y) ||
+    !Number.isFinite(r.width) ||
+    !Number.isFinite(r.height) ||
+    r.width < 0 ||
+    r.height < 0
+  )
+    return null;
+  const x0 = Math.floor(r.x / LABEL_GRID_CELL),
+    x1 = Math.floor((r.x + r.width) / LABEL_GRID_CELL),
+    y0 = Math.floor(r.y / LABEL_GRID_CELL),
+    y1 = Math.floor((r.y + r.height) / LABEL_GRID_CELL);
+  if (!Number.isFinite(x1) || !Number.isFinite(y1)) return null;
+  if ((x1 - x0 + 1) * (y1 - y0 + 1) > LABEL_GRID_MAX_CELLS) return null;
+  return { x0, x1, y0, y1 };
+}
+function gridCellKey(cx: number, cy: number): number {
+  "worklet";
+  // Distinct cells may share a key; that only adds candidates to the exact test.
+  return cx * 1048576 + cy;
+}
+function gridInsert(grid: RectGrid, r: CameraRect, owner: string): void {
+  "worklet";
+  const index = grid.rects.length;
+  grid.rects.push(r);
+  grid.owners.push(owner);
+  const span = gridSpan(r);
+  if (!span) {
+    grid.wide.push(index);
+    return;
+  }
+  for (let cx = span.x0; cx <= span.x1; cx++)
+    for (let cy = span.y0; cy <= span.y1; cy++) {
+      const key = gridCellKey(cx, cy);
+      const cell = grid.cells.get(key);
+      if (cell) cell.push(index);
+      else grid.cells.set(key, [index]);
+    }
+}
+/** Whether any stored rect (optionally excluding an owner id) touches `r`. */
+function gridTouches(
+  grid: RectGrid,
+  r: CameraRect,
+  skipOwner?: string,
+): boolean {
+  "worklet";
+  for (let i = 0; i < grid.wide.length; i++) {
+    const index = grid.wide[i];
+    if (skipOwner !== undefined && grid.owners[index] === skipOwner) continue;
+    if (rectanglesTouch(r, grid.rects[index])) return true;
+  }
+  const span = gridSpan(r);
+  if (!span) {
+    // An ill-formed query falls back to the exact full scan.
+    for (let index = 0; index < grid.rects.length; index++) {
+      if (skipOwner !== undefined && grid.owners[index] === skipOwner) continue;
+      if (rectanglesTouch(r, grid.rects[index])) return true;
+    }
+    return false;
+  }
+  for (let cx = span.x0; cx <= span.x1; cx++)
+    for (let cy = span.y0; cy <= span.y1; cy++) {
+      const cell = grid.cells.get(gridCellKey(cx, cy));
+      if (!cell) continue;
+      for (let i = 0; i < cell.length; i++) {
+        const index = cell[i];
+        if (skipOwner !== undefined && grid.owners[index] === skipOwner)
+          continue;
+        if (rectanglesTouch(r, grid.rects[index])) return true;
+      }
+    }
+  return false;
+}
+interface RankedLabel {
+  c: LabelCandidate;
+  priority: number;
+}
+/**
+ * The single ranking comparator: priority class, then id. Plan 05 adds D-47's
+ * nearest-first key inside each priority class here, without touching the
+ * indexed placement below.
+ */
+function compareRankedLabels(a: RankedLabel, b: RankedLabel): number {
+  "worklet";
+  return (
+    a.priority - b.priority || (a.c.id < b.c.id ? -1 : a.c.id > b.c.id ? 1 : 0)
+  );
+}
 export function allocateLabels(
   candidates: readonly LabelCandidate[],
   level: SemanticLevel,
@@ -114,6 +235,14 @@ export function allocateLabels(
       c.height > 0 &&
       (level !== "overview" || c.focused || c.cluster),
   );
+  // D-52: one grid each for obstacles, candidates and placed labels, instead
+  // of scanning every obstacle/candidate/placement per candidate.
+  const obstacleGrid = createRectGrid();
+  for (let i = 0; i < obstacles.length; i++)
+    gridInsert(obstacleGrid, obstacles[i], "");
+  const candidateGrid = createRectGrid();
+  for (let i = 0; i < valid.length; i++)
+    gridInsert(candidateGrid, rect(valid[i]), valid[i].id);
   const priority = (c: LabelCandidate) => {
     "worklet";
     if (c.focused) return 0;
@@ -121,21 +250,18 @@ export function allocateLabels(
     if (c.favorite) return 2;
     const r = rect(c);
     return inside(r) &&
-      !obstacles.some((o) => rectanglesTouch(r, o)) &&
-      !valid.some(
-        (other) => other.id !== c.id && rectanglesTouch(r, rect(other)),
-      )
+      !gridTouches(obstacleGrid, r) &&
+      // Any OTHER candidate: every candidate with this id is excluded, as before.
+      !gridTouches(candidateGrid, r, c.id)
       ? 3
       : 4;
   };
   const ranked = valid
     .map((c) => ({ c, priority: priority(c) }))
-    .sort(
-      (a, b) =>
-        a.priority - b.priority ||
-        (a.c.id < b.c.id ? -1 : a.c.id > b.c.id ? 1 : 0),
-    );
+    .sort(compareRankedLabels);
   const result: LabelAllocation[] = [];
+  // Placed name rects, then (detail) context rects as they are assigned.
+  const placedGrid = createRectGrid();
   for (const { c } of ranked) {
     const placements = [
       c.y,
@@ -150,18 +276,23 @@ export function allocateLabels(
     for (const r of placements) {
       if (
         !inside(r) ||
-        obstacles.some((o) => rectanglesTouch(r, o)) ||
-        result.some((a) => rectanglesTouch(r, a.rect))
+        gridTouches(obstacleGrid, r) ||
+        gridTouches(placedGrid, r)
       )
         continue;
       result.push({ id: c.id, name: c.name, rect: r, opacity: c.opacity });
+      gridInsert(placedGrid, r, c.id);
       break;
     }
   }
   // Names get first refusal. Optional detail never removes a readable identity.
-  if (level === "detail")
+  if (level === "detail") {
+    // First valid candidate per id, exactly what `valid.find` returned.
+    const firstById = new Map<string, LabelCandidate>();
+    for (let i = 0; i < valid.length; i++)
+      if (!firstById.has(valid[i].id)) firstById.set(valid[i].id, valid[i]);
     for (const allocation of result) {
-      const c = valid.find((item) => item.id === allocation.id);
+      const c = firstById.get(allocation.id);
       if (!c?.context || !c.contextWidth || !c.contextHeight) continue;
       const r = {
         x: allocation.rect.x + (allocation.rect.width - c.contextWidth) / 2,
@@ -171,15 +302,14 @@ export function allocateLabels(
       };
       if (
         inside(r) &&
-        !obstacles.some((o) => rectanglesTouch(r, o)) &&
-        !result.some(
-          (a) =>
-            rectanglesTouch(r, a.rect) ||
-            (a.contextRect && rectanglesTouch(r, a.contextRect)),
-        )
-      )
+        !gridTouches(obstacleGrid, r) &&
+        !gridTouches(placedGrid, r)
+      ) {
         allocation.contextRect = r;
+        gridInsert(placedGrid, r, allocation.id);
+      }
     }
+  }
   return result;
 }
 

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   anchorCameraPose,
+  type CameraPose,
+  type CameraViewport,
   clampCameraPose,
   deriveFocalDistance,
   deriveHomePose,
@@ -8,15 +10,21 @@ import {
   HOME_CAMERA,
   MAX_TILT,
   MAX_ZOOM,
+  MIN_HIT_RADIUS,
   MIN_READABLE_RADIUS,
   MIN_ZOOM,
+  type ProjectedFrame,
   panCamera,
   perspectiveScale,
   projectFrame,
+  projectionBasis,
+  projectWithBasis,
   projectWorldPoint,
   unprojectToWorldPlane,
   usableCameraRect,
   type WorldBody,
+  type WorldPoint,
+  worldExtent,
 } from "@/logic/orrery-camera-logic";
 
 const viewport = { width: 400, height: 600 };
@@ -219,6 +227,248 @@ describe("bounded invertible inspection camera", () => {
       expect(Math.hypot(after.x - screen.x, after.y - screen.y)).toBeLessThan(
         1e-6,
       );
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D-52: the hoisted projection basis is bit-exact against FROZEN copies of the
+// pre-38.7 per-point projection and projectFrame (do not edit the copies).
+// ---------------------------------------------------------------------------
+const legacy = (() => {
+  const MIN_FOCAL_DISTANCE = 256;
+  const MAX_DEPTH_FRACTION = 0.45;
+  const RING_SEGMENTS = 128;
+  const cameraPlane = (point: WorldPoint, pose: CameraPose): WorldPoint => {
+    const yaw = pose.yaw ?? 0,
+      c = Math.cos(yaw),
+      s = Math.sin(yaw);
+    const x = point.x - pose.x,
+      y = point.y - pose.y;
+    return { x: x * c - y * s, y: x * s + y * c };
+  };
+  const scaleAt = (point: WorldPoint, pose: CameraPose) => {
+    const focal = pose.focalDistance ?? MIN_FOCAL_DISTANCE;
+    const denominator =
+      focal - cameraPlane(point, pose).y * Math.sin(pose.tilt ?? 0);
+    if (!Number.isFinite(denominator) || denominator <= 0)
+      throw new Error("Point outside finite Orrery camera plane");
+    return focal / denominator;
+  };
+  const projectPoint = (
+    point: WorldPoint,
+    pose: CameraPose,
+    viewport: CameraViewport,
+  ): WorldPoint => {
+    if (
+      ![
+        point.x,
+        point.y,
+        pose.x,
+        pose.y,
+        pose.zoom,
+        pose.tilt ?? 0,
+        pose.yaw ?? 0,
+        pose.focalDistance ?? MIN_FOCAL_DISTANCE,
+        viewport.width,
+        viewport.height,
+      ].every(Number.isFinite) ||
+      pose.zoom <= 0 ||
+      viewport.width <= 0 ||
+      viewport.height <= 0
+    )
+      throw new Error("Invalid Orrery projection input");
+    const rect = usableCameraRect(viewport);
+    if (!rect) throw new Error("Invalid Orrery usable camera measurement");
+    const center = { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+    const plane = cameraPlane(point, pose),
+      scale = scaleAt(point, pose) * pose.zoom;
+    return {
+      x: center.x + plane.x * scale,
+      y: center.y + plane.y * Math.cos(pose.tilt ?? 0) * scale,
+    };
+  };
+  const frame = (
+    world: readonly WorldBody[],
+    pose: CameraPose,
+    viewport: CameraViewport,
+    generation: number,
+  ): ProjectedFrame => {
+    const current = clampCameraPose(
+      pose,
+      Math.max(
+        worldExtent(world),
+        ((pose.focalDistance ?? 0) * MAX_DEPTH_FRACTION) /
+          ((1 + Math.SQRT2) * Math.sin(MAX_TILT)),
+      ),
+    );
+    return {
+      generation,
+      pose: current,
+      viewport,
+      center: projectPoint({ x: 0, y: 0 }, current, viewport),
+      bodies: world.map((body) => {
+        const scale = current.zoom * perspectiveScale(body, current);
+        const ringPath: WorldPoint[] = [];
+        if (body.ringRadius > 0)
+          for (let i = 0; i < RING_SEGMENTS; i++) {
+            const angle = (i * 2 * Math.PI) / RING_SEGMENTS;
+            ringPath.push(
+              projectPoint(
+                {
+                  x: body.ringRadius * Math.sin(angle),
+                  y: -body.ringRadius * Math.cos(angle),
+                },
+                current,
+                viewport,
+              ),
+            );
+          }
+        return {
+          ...body,
+          ...projectPoint(body, current, viewport),
+          radius: body.radius * scale,
+          ringRadius: body.ringRadius * current.zoom,
+          hitRadius: Math.max(MIN_HIT_RADIUS, body.radius * scale),
+          ringPath,
+          depth: cameraPlane(body, current).y * Math.sin(current.tilt ?? 0),
+        };
+      }),
+    };
+  };
+  return { projectPoint, frame };
+})();
+
+function seeded(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+/** Object.is per coordinate: bit-for-bit, including -0. */
+function expectBitExact(actual: WorldPoint, expected: WorldPoint) {
+  expect(Object.is(actual.x, expected.x)).toBe(true);
+  expect(Object.is(actual.y, expected.y)).toBe(true);
+}
+const basisViewports: CameraViewport[] = [
+  { width: 400, height: 600 },
+  { width: 412, height: 780, usable: { x: 0, y: 64, width: 412, height: 640 } },
+  {
+    width: 412,
+    height: 780,
+    obstacles: [
+      { x: 0, y: 700, width: 412, height: 80 },
+      { x: 300, y: 0, width: 112, height: 120 },
+    ],
+  },
+];
+
+describe("D-52 hoisted projection basis", () => {
+  it("projectWithBasis equals projectWorldPoint bit-for-bit at every tilt", () => {
+    const random = seeded(52);
+    for (const tilt of [0, Math.PI / 6, Math.PI / 4, Math.PI / 3]) {
+      for (let round = 0; round < 60; round++) {
+        const pose: CameraPose = {
+          x: (random() - 0.5) * 400,
+          y: (random() - 0.5) * 400,
+          zoom: MIN_ZOOM + random() * (MAX_ZOOM - MIN_ZOOM),
+          tilt,
+          yaw: random() * Math.PI * 2,
+          focalDistance: deriveFocalDistance(300 + random() * 900),
+        };
+        const viewport = basisViewports[round % basisViewports.length];
+        const basis = projectionBasis(pose, viewport);
+        for (let point = 0; point < 25; point++) {
+          const x = (random() - 0.5) * 600;
+          const y = (random() - 0.5) * 600;
+          const expected = legacy.projectPoint({ x, y }, pose, viewport);
+          expectBitExact(projectWithBasis(basis, x, y), expected);
+          expectBitExact(projectWorldPoint({ x, y }, pose, viewport), expected);
+        }
+      }
+    }
+  });
+
+  it("keeps the same throws and their precedence", () => {
+    const pose = { ...HOME_CAMERA };
+    expect(() =>
+      projectWithBasis(projectionBasis(pose, viewport), Number.NaN, 0),
+    ).toThrow("Invalid Orrery projection input");
+    expect(() => projectionBasis({ ...pose, zoom: 0 }, viewport)).toThrow(
+      "Invalid Orrery projection input",
+    );
+    // A NaN point against an unusable viewport reports the point, as before.
+    const unusable = {
+      width: 400,
+      height: 600,
+      usable: { x: 0, y: 0, width: 0, height: 10 },
+    };
+    expect(() =>
+      projectWorldPoint({ x: Number.NaN, y: 0 }, pose, unusable),
+    ).toThrow("Invalid Orrery projection input");
+    expect(() => projectWorldPoint({ x: 0, y: 0 }, pose, unusable)).toThrow(
+      "Invalid Orrery usable camera measurement",
+    );
+    const steep = { ...pose, tilt: MAX_TILT, focalDistance: 10 };
+    expect(() => projectWorldPoint({ x: 0, y: 500 }, steep, viewport)).toThrow(
+      "Point outside finite Orrery camera plane",
+    );
+    expect(() =>
+      projectWithBasis(projectionBasis(steep, viewport), 0, 500),
+    ).toThrow("Point outside finite Orrery camera plane");
+  });
+
+  it("projectFrame equals the frozen old projectFrame; ringPaths:false only empties ring paths", () => {
+    const random = seeded(7);
+    for (let round = 0; round < 24; round++) {
+      const world: WorldBody[] = [
+        { id: 0, kind: "sun", x: 0, y: 0, radius: 20, ringRadius: 0 },
+        ...Array.from({ length: 12 }, (_, index): WorldBody => {
+          const ring = 40 + random() * 500;
+          const angle = random() * Math.PI * 2;
+          return {
+            id: index + 1,
+            kind: "contact",
+            x: ring * Math.sin(angle),
+            y: -ring * Math.cos(angle),
+            radius: 6 + random() * 18,
+            ringRadius: ring,
+          };
+        }),
+      ];
+      const pose: CameraPose = {
+        x: (random() - 0.5) * 300,
+        y: (random() - 0.5) * 300,
+        zoom: MIN_ZOOM + random() * (MAX_ZOOM - MIN_ZOOM),
+        tilt: [0, Math.PI / 6, Math.PI / 4, Math.PI / 3][round % 4],
+        yaw: random() * Math.PI * 2,
+        focalDistance: deriveFocalDistance(worldExtent(world)),
+      };
+      const vp = basisViewports[round % basisViewports.length];
+      const expected = legacy.frame(world, pose, vp, round);
+      const actual = projectFrame(world, pose, vp, round);
+      expect(actual).toEqual(expected);
+      expectBitExact(actual.center, expected.center);
+      actual.bodies.forEach((projected, index) => {
+        expectBitExact(projected, expected.bodies[index]);
+        projected.ringPath.forEach((point, i) => {
+          expectBitExact(point, expected.bodies[index].ringPath[i]);
+        });
+      });
+      expect(projectFrame(world, pose, vp, round, { ringPaths: true })).toEqual(
+        expected,
+      );
+      const ringless = projectFrame(world, pose, vp, round, {
+        ringPaths: false,
+      });
+      expect(ringless).toEqual({
+        ...expected,
+        bodies: expected.bodies.map((projected) => ({
+          ...projected,
+          ringPath: [],
+        })),
+      });
     }
   });
 });

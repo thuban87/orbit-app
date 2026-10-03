@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
+import type { CameraRect, CameraViewport } from "./orrery-camera-logic";
 import {
   allocateLabels,
   DETAIL_ENTER,
   DETAIL_EXIT,
   IDENTITY_ENTER,
   IDENTITY_EXIT,
+  LABEL_GRID_CELL,
+  type LabelAllocation,
   type LabelCandidate,
   labelContext,
   orreryInitials,
   rectanglesTouch,
+  type SemanticLevel,
   semanticLevel,
 } from "./orrery-label-logic";
 
@@ -162,5 +166,225 @@ describe("semantic labels", () => {
     );
     expect(crowded).toHaveLength(2);
     expect(crowded.find((b) => b.id === "name")?.contextRect).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D-52: the indexed allocator equals a FROZEN copy of the pre-38.7 scan
+// (do not edit the copy).
+// ---------------------------------------------------------------------------
+function legacyAllocateLabels(
+  candidates: readonly LabelCandidate[],
+  level: SemanticLevel,
+  viewport: CameraViewport,
+  bodyExclusions: readonly CameraRect[] = [],
+): LabelAllocation[] {
+  const LABEL_NUDGE = 8;
+  const CONTEXT_GAP = 4;
+  const usable = viewport.usable ?? {
+    x: 0,
+    y: 0,
+    width: viewport.width,
+    height: viewport.height,
+  };
+  const obstacles = [...(viewport.obstacles ?? []), ...bodyExclusions];
+  const rect = (c: LabelCandidate): CameraRect => ({
+    x: c.x,
+    y: c.y,
+    width: c.width,
+    height: c.height,
+  });
+  const inside = (r: CameraRect) =>
+    r.x >= Math.max(0, usable.x) &&
+    r.y >= Math.max(0, usable.y) &&
+    r.x + r.width <= Math.min(viewport.width, usable.x + usable.width) &&
+    r.y + r.height <= Math.min(viewport.height, usable.y + usable.height);
+  const valid = candidates.filter(
+    (c) =>
+      c.opacity > 0 &&
+      [c.x, c.y, c.width, c.height].every(Number.isFinite) &&
+      c.width > 0 &&
+      c.height > 0 &&
+      (level !== "overview" || c.focused || c.cluster),
+  );
+  const priority = (c: LabelCandidate) => {
+    if (c.focused) return 0;
+    if (c.cluster) return 1;
+    if (c.favorite) return 2;
+    const r = rect(c);
+    return inside(r) &&
+      !obstacles.some((o) => rectanglesTouch(r, o)) &&
+      !valid.some(
+        (other) => other.id !== c.id && rectanglesTouch(r, rect(other)),
+      )
+      ? 3
+      : 4;
+  };
+  const ranked = valid
+    .map((c) => ({ c, priority: priority(c) }))
+    .sort(
+      (a, b) =>
+        a.priority - b.priority ||
+        (a.c.id < b.c.id ? -1 : a.c.id > b.c.id ? 1 : 0),
+    );
+  const result: LabelAllocation[] = [];
+  for (const { c } of ranked) {
+    const placements = [
+      c.y,
+      ...(c.alternateY === undefined ? [] : [c.alternateY]),
+    ].flatMap((y) =>
+      [0, -LABEL_NUDGE, LABEL_NUDGE].map((dx) => ({
+        ...rect(c),
+        x: c.x + dx,
+        y,
+      })),
+    );
+    for (const r of placements) {
+      if (
+        !inside(r) ||
+        obstacles.some((o) => rectanglesTouch(r, o)) ||
+        result.some((a) => rectanglesTouch(r, a.rect))
+      )
+        continue;
+      result.push({ id: c.id, name: c.name, rect: r, opacity: c.opacity });
+      break;
+    }
+  }
+  if (level === "detail")
+    for (const allocation of result) {
+      const c = valid.find((item) => item.id === allocation.id);
+      if (!c?.context || !c.contextWidth || !c.contextHeight) continue;
+      const r = {
+        x: allocation.rect.x + (allocation.rect.width - c.contextWidth) / 2,
+        y: allocation.rect.y + allocation.rect.height + CONTEXT_GAP,
+        width: c.contextWidth,
+        height: c.contextHeight,
+      };
+      if (
+        inside(r) &&
+        !obstacles.some((o) => rectanglesTouch(r, o)) &&
+        !result.some(
+          (a) =>
+            rectanglesTouch(r, a.rect) ||
+            (a.contextRect && rectanglesTouch(r, a.contextRect)),
+        )
+      )
+        allocation.contextRect = r;
+    }
+  return result;
+}
+
+function prng(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+}
+
+describe("D-52 indexed label allocator", () => {
+  const levels: SemanticLevel[] = ["overview", "identity", "detail"];
+
+  /** Coordinates snap to 8 px half the time, so edges often meet exactly on cell boundaries. */
+  const coordinate = (random: () => number, span: number) =>
+    random() < 0.5
+      ? Math.round((random() * span) / 8) * 8
+      : random() * span - 20;
+
+  const randomCandidates = (random: () => number, count: number) =>
+    Array.from({ length: count }, (_, index): LabelCandidate => {
+      const flag = random();
+      const width = random() < 0.1 ? LABEL_GRID_CELL : 30 + random() * 140;
+      const height = random() < 0.1 ? LABEL_GRID_CELL / 2 : 14 + random() * 20;
+      const withContext = random() < 0.5;
+      return {
+        // Some repeated ids, as a stale frame could produce.
+        id: `contact:${random() < 0.05 ? index - 1 : index}`,
+        name: `Person ${index}`,
+        x: coordinate(random, 820),
+        y: coordinate(random, 620),
+        alternateY: random() < 0.6 ? coordinate(random, 620) : undefined,
+        width: random() < 0.02 ? -width : width,
+        height,
+        opacity: random() < 0.08 ? 0 : random(),
+        focused: flag < 0.03,
+        cluster: flag >= 0.03 && flag < 0.12,
+        favorite: random() < 0.15,
+        context: withContext ? "Stable · Close gravity" : undefined,
+        contextWidth: withContext
+          ? random() < 0.05
+            ? -40
+            : 40 + random() * 120
+          : undefined,
+        contextHeight: withContext ? 12 + random() * 8 : undefined,
+      };
+    });
+
+  const randomObstacles = (random: () => number) =>
+    Array.from({ length: Math.floor(random() * 30) }, (): CameraRect => {
+      const kind = random();
+      if (kind < 0.04) return { x: Number.NaN, y: 10, width: 20, height: 20 };
+      if (kind < 0.08) return { x: 100, y: 100, width: -60, height: 30 };
+      if (kind < 0.12) return { x: -1e9, y: 300, width: 2e9, height: 4 };
+      if (kind < 0.14)
+        return { x: 0, y: 0, width: Number.POSITIVE_INFINITY, height: 2 };
+      return {
+        x: coordinate(random, 800),
+        y: coordinate(random, 600),
+        width: 4 + random() * 60,
+        height: 4 + random() * 60,
+      };
+    });
+
+  it("matches the frozen old allocator on randomised candidate sets", () => {
+    for (let seed = 1; seed <= 90; seed++) {
+      const random = prng(seed);
+      const count = Math.floor(random() * 401);
+      const candidates = randomCandidates(random, count);
+      const exclusions = randomObstacles(random);
+      const vp: CameraViewport =
+        random() < 0.5
+          ? viewport
+          : {
+              ...viewport,
+              usable: { x: 0, y: 56, width: 800, height: 480 },
+              obstacles: randomObstacles(random),
+            };
+      for (const level of levels) {
+        expect(
+          allocateLabels(candidates, level, vp, exclusions),
+          `seed ${seed} ${level}`,
+        ).toEqual(legacyAllocateLabels(candidates, level, vp, exclusions));
+      }
+    }
+  });
+
+  it("matches on tightly packed edge-touching grids (inclusive edges across cells)", () => {
+    const packed = Array.from({ length: 120 }, (_, index) =>
+      candidate(`contact:${index}`, {
+        x: (index % 12) * 64,
+        y: Math.floor(index / 12) * 32,
+        width: 64,
+        height: 32,
+        alternateY: Math.floor(index / 12) * 32 + 16,
+        context: index % 3 ? "ctx" : undefined,
+        contextWidth: 64,
+        contextHeight: 8,
+      }),
+    );
+    for (const level of levels)
+      expect(allocateLabels(packed, level, viewport)).toEqual(
+        legacyAllocateLabels(packed, level, viewport),
+      );
+  });
+
+  it("1,000 candidates allocate inside a generous smoke budget", () => {
+    const random = prng(1000);
+    const candidates = randomCandidates(random, 1000);
+    const exclusions = randomObstacles(random);
+    allocateLabels(candidates, "identity", viewport, exclusions); // warm-up
+    const started = performance.now();
+    allocateLabels(candidates, "identity", viewport, exclusions);
+    expect(performance.now() - started).toBeLessThan(50);
   });
 });

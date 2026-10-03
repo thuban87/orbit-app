@@ -279,20 +279,79 @@ export function deriveHomePose(
   );
 }
 
+/**
+ * D-52: per-frame projection constants. `projectWorldPoint` used to re-derive
+ * the usable rect (obstacle subdivision + sort) and the pose trig for EVERY
+ * point, and a frame projects 128 ring points per body. The basis hoists
+ * exactly the values that computation used, once, so `projectWithBasis` is
+ * bit-for-bit identical (same operations in the same order — pinned by
+ * orrery-camera-logic.test). Defined above every caller (Hermes worklet
+ * forward-reference hazard).
+ */
+export interface ProjectionBasis {
+  /** Pan and zoom of the validated pose. */
+  x: number;
+  y: number;
+  zoom: number;
+  focal: number;
+  cosYaw: number;
+  sinYaw: number;
+  sinTilt: number;
+  cosTilt: number;
+  center: WorldPoint;
+}
+export function projectionBasis(
+  pose: CameraPose,
+  viewport: CameraViewport,
+): ProjectionBasis {
+  "worklet";
+  // The same pose/viewport checks as assertProjection, once per basis.
+  assertProjection({ x: 0, y: 0 }, pose, viewport);
+  const yaw = pose.yaw ?? 0,
+    tilt = pose.tilt ?? 0;
+  return {
+    x: pose.x,
+    y: pose.y,
+    zoom: pose.zoom,
+    focal: pose.focalDistance ?? MIN_FOCAL_DISTANCE,
+    cosYaw: Math.cos(yaw),
+    sinYaw: Math.sin(yaw),
+    sinTilt: Math.sin(tilt),
+    cosTilt: Math.cos(tilt),
+    center: projectionCenter(viewport),
+  };
+}
+export function projectWithBasis(
+  basis: ProjectionBasis,
+  px: number,
+  py: number,
+): WorldPoint {
+  "worklet";
+  if (!Number.isFinite(px) || !Number.isFinite(py))
+    throw new Error("Invalid Orrery projection input");
+  // cameraPlane, then perspectiveScale * zoom, in projectWorldPoint's order.
+  const x = px - basis.x,
+    y = py - basis.y;
+  const planeX = x * basis.cosYaw - y * basis.sinYaw,
+    planeY = x * basis.sinYaw + y * basis.cosYaw;
+  const denominator = basis.focal - planeY * basis.sinTilt;
+  if (!Number.isFinite(denominator) || denominator <= 0)
+    throw new Error("Point outside finite Orrery camera plane");
+  const scale = (basis.focal / denominator) * basis.zoom;
+  return {
+    x: basis.center.x + planeX * scale,
+    y: basis.center.y + planeY * basis.cosTilt * scale,
+  };
+}
 export function projectWorldPoint(
   point: WorldPoint,
   pose: CameraPose,
   viewport: CameraViewport,
 ): WorldPoint {
   "worklet";
+  // Point checks first, so error precedence matches the pre-basis version.
   assertProjection(point, pose, viewport);
-  const center = projectionCenter(viewport),
-    plane = cameraPlane(point, pose),
-    scale = perspectiveScale(point, pose) * pose.zoom;
-  return {
-    x: center.x + plane.x * scale,
-    y: center.y + plane.y * Math.cos(pose.tilt ?? 0) * scale,
-  };
+  return projectWithBasis(projectionBasis(pose, viewport), point.x, point.y);
 }
 // Defined ABOVE its callers on purpose: a Reanimated worklet that references
 // another worklet defined LATER in the same module captures it as `undefined`
@@ -487,13 +546,20 @@ export function tryUnprojectToWorldPlane(
   const result = unprojectToWorldPlane(point, pose, viewport);
   return Number.isFinite(result.x) && Number.isFinite(result.y) ? result : null;
 }
+/**
+ * `options.ringPaths` (default true): when false every `ringPath` is empty and
+ * all other body data is identical. Today's renderer keeps the 128-point ring
+ * polygons; the V2 renderer (Plan 06) draws rings from world geometry.
+ */
 export function projectFrame(
   world: readonly WorldBody[],
   pose: CameraPose,
   viewport: CameraViewport,
   generation: number,
+  options?: { ringPaths?: boolean },
 ): ProjectedFrame {
   "worklet";
+  const ringPaths = options?.ringPaths ?? true;
   const current = clampCameraPose(
     pose,
     Math.max(
@@ -502,31 +568,30 @@ export function projectFrame(
         ((1 + Math.SQRT2) * Math.sin(MAX_TILT)),
     ),
   );
+  // D-52: one basis per frame for the centre, every body and every ring point.
+  const basis = projectionBasis(current, viewport);
   return {
     generation,
     pose: current,
     viewport,
-    center: projectWorldPoint({ x: 0, y: 0 }, current, viewport),
+    center: projectWithBasis(basis, 0, 0),
     bodies: world.map((body) => {
       const scale = current.zoom * perspectiveScale(body, current);
       const ringPath: WorldPoint[] = [];
-      if (body.ringRadius > 0)
+      if (ringPaths && body.ringRadius > 0)
         for (let i = 0; i < RING_SEGMENTS; i++) {
           const angle = (i * 2 * Math.PI) / RING_SEGMENTS;
           ringPath.push(
-            projectWorldPoint(
-              {
-                x: body.ringRadius * Math.sin(angle),
-                y: -body.ringRadius * Math.cos(angle),
-              },
-              current,
-              viewport,
+            projectWithBasis(
+              basis,
+              body.ringRadius * Math.sin(angle),
+              -body.ringRadius * Math.cos(angle),
             ),
           );
         }
       return {
         ...body,
-        ...projectWorldPoint(body, current, viewport),
+        ...projectWithBasis(basis, body.x, body.y),
         radius: body.radius * scale,
         ringRadius: body.ringRadius * current.zoom,
         hitRadius: Math.max(MIN_HIT_RADIUS, body.radius * scale),
