@@ -59,10 +59,13 @@ export const ORRERY_LABEL_BODY_GAP = 8;
 /**
  * Hard bound on built-but-undisposed Orrery Paragraphs (pinned + warm + retired).
  * Each one reports 1 MiB of external memory pressure to Hermes, so this bounds
- * the reported text pressure at ~1.2 GiB in the worst case — still large, which
- * is why the warm budget below keeps unused entries far fewer in practice.
+ * the reported text pressure at ~400 MiB in the worst case.
+ * 38.7-08 (measured on the Pixel 6 Pro, debug): 15 pinned / ≤ 24 warm at the
+ * Size 120 and All Contacts overviews and with a body focused. 400 still fits
+ * a whole Size 120 at the detail tier (120 labels + 120 captions + 120
+ * initials) plus the priority reserve; it was 1,200 (~1.2 GiB worst case).
  */
-export const ORRERY_TEXT_CACHE_MAX_ENTRIES = 1200;
+export const ORRERY_TEXT_CACHE_MAX_ENTRIES = 400;
 /**
  * Slots inside the cap that only focused/cluster labels and same-slot
  * replacements (a re-keyed label or initials for a body that already had one)
