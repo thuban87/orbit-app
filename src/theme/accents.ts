@@ -131,6 +131,9 @@ export function resolveAccent(
  * Overlay a resolved accent tone onto a base palette: `accent`=fill,
  * `onAccent`, `accentText`=text. PURE — returns a NEW palette, mutating nothing.
  * The provider calls this at render so a live accent change restyles the tree.
+ *
+ * 38.7 D-51: the Orrery's focus reticle and HUD instrument chrome follow the
+ * user's accent, so `orreryReticle` and `orreryInstrument` take the fill too.
  */
 export function applyAccent(
   palette: ThemePalette,
@@ -141,5 +144,7 @@ export function applyAccent(
     accent: tone.fill,
     onAccent: tone.onAccent,
     accentText: tone.text,
+    orreryReticle: tone.fill,
+    orreryInstrument: tone.fill,
   };
 }

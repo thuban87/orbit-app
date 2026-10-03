@@ -48,9 +48,15 @@ import {
   deriveSatelliteBodies,
   resolveSatelliteTap,
 } from "@/logic/orrery-satellite-logic";
+import { SKY_UNTINTED, systemSkyHueIndex } from "@/logic/orrery-sky-logic";
 import { sampleSwitchChoreography } from "@/logic/orrery-switch-choreography";
+import { systemRefId } from "@/logic/orrery-system-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
-import type { ThemePalette } from "@/theme/theme-types";
+import type {
+  ResolvedMode,
+  ThemePackage,
+  ThemePalette,
+} from "@/theme/theme-types";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
 import type { OrreryGenerationLedger } from "./resources/orrery-generation-ledger";
 import { createOrreryGenerationLedger } from "./resources/orrery-generation-ledger";
@@ -79,6 +85,13 @@ import {
   EMPTY_BAKE_REGISTRY,
   teardownBakeRegistry,
 } from "./v2/base-bake";
+import {
+  createSkyBakeOwner,
+  type SkyBakeOwner,
+  skyBakeKey,
+  skyBakePixels,
+  skySizeBucket,
+} from "./v2/nebula-bake";
 import { OrreryV2Canvas } from "./v2/OrreryV2Canvas";
 import {
   bodyIdentity,
@@ -90,13 +103,13 @@ import {
   buildRingSpecs,
   buildSatelliteLooks,
   buildSkySpec,
-  buildStarField,
   createOrrerySpecPublisher,
   EMPTY_BODY_SPECS,
   EMPTY_LABEL_LAYER_SPECS,
   EMPTY_OVERLAY_SPEC,
   EMPTY_RING_SPECS,
-  EMPTY_STAR_FIELD,
+  EMPTY_SKY_IMAGE,
+  EMPTY_SKY_SPEC,
   type OrreryBodySpecs,
   type OrreryLabelLayerSpecs,
   type OrreryLayerId,
@@ -104,10 +117,15 @@ import {
   type OverlaySpec,
   parseLedgerHandle,
   type RingSpecs,
+  type SkyImageSpec,
   type SkySpec,
-  type StarFieldSpec,
   tokenInk,
 } from "./v2/scene-specs";
+import {
+  SKY_LOOKS,
+  SKY_STAR_SEED,
+  SKY_TWINKLE_GROUPS,
+} from "./v2/visual-tunables";
 
 export { createOrreryGestures } from "./use-orrery-camera";
 
@@ -191,7 +209,8 @@ function finishTextRelease(owner: string, epoch: number): void {
  * photo image is confirmed to the shared cache and a Paragraph to the text
  * service; each is disposed when `dispose` (teardown) or superseded, else it
  * turns warm for reuse. 38.7-08: a baked base snapshot is never reused; its
- * ids go to `disposeBase` (UI-thread disposal) in order.
+ * ids go to `disposeBase` (UI-thread disposal) in order. 38.7-09: a baked sky
+ * image is never reused either; its ids go to `retireSky` (JS disposal).
  */
 function routeRetired(
   owner: string,
@@ -199,12 +218,14 @@ function routeRetired(
   handles: Iterable<string>,
   dispose: boolean,
   disposeBase: (ids: number[]) => void,
+  retireSky: (ids: number[]) => void,
 ): void {
   // Batched per holder and epoch: one confirmation frees the whole set, so a
   // queued publish retries once (C3-L3's generation bound), not per object.
   const photos = new Map<number, number[]>();
   const texts = new Map<number, string[]>();
   const bases: number[] = [];
+  const skies: number[] = [];
   for (const handle of handles) {
     const parsed = parseLedgerHandle(handle);
     if (parsed?.kind === "photo")
@@ -215,18 +236,25 @@ function routeRetired(
     else if (parsed?.kind === "text")
       texts.set(parsed.epoch, [...(texts.get(parsed.epoch) ?? []), parsed.key]);
     else if (parsed?.kind === "base") bases.push(parsed.id);
+    else if (parsed?.kind === "sky") skies.push(parsed.id);
   }
   for (const [epoch, ids] of photos)
     orreryPhotoCache.confirmRetired(owner, ids, epoch, { dispose });
   for (const [epoch, keys] of texts) text.confirmRetired(keys, epoch, dispose);
   if (bases.length > 0) disposeBase(bases);
+  if (skies.length > 0) retireSky(skies);
 }
+
+/** The per-package noise seed of the baked nebula (stable across visits). */
+const SKY_NEBULA_SEED = { galaxy: 7, standard: 11 } as const;
 
 export function OrreryWorld({
   scene,
   pose,
   viewport,
   colors,
+  themeMode,
+  themePackage,
   fontProvider,
   onIntent,
   focusedIds,
@@ -246,6 +274,10 @@ export function OrreryWorld({
   pose: SharedValue<CameraPose>;
   viewport: CameraViewport;
   colors: ThemePalette;
+  /** 38.7-09 (D-51): the resolved theme mode keys the sky's blend family. */
+  themeMode: ResolvedMode;
+  /** 38.7-09: the active package (the sky bake key and look). */
+  themePackage: ThemePackage;
   fontProvider: SkTypefaceFontProvider | null;
   onIntent: (intent: OrreryIntent) => void;
   focusedIds: number[];
@@ -340,6 +372,25 @@ export function OrreryWorld({
     },
     [baseOwner],
   );
+  // 38.7-09 (H9/C-H2): the sky's baked NEUTRAL nebula — one image per
+  // (package, mode, size bucket), a `sky`-layer object in the ledger.
+  const skyImage = useSharedValue<SkyImageSpec>(EMPTY_SKY_IMAGE);
+  const skyOwnerRef = useRef<SkyBakeOwner | null>(null);
+  if (!skyOwnerRef.current)
+    skyOwnerRef.current = createSkyBakeOwner({
+      ledger,
+      ensureEpoch: () => specPublisher.ensureEpoch(),
+      write: (spec) => {
+        skyImage.value = spec;
+      },
+    });
+  const skyOwner = skyOwnerRef.current;
+  const retireSky = useCallback(
+    (ids: number[]) => {
+      skyOwner.retire(ids);
+    },
+    [skyOwner],
+  );
   // Capture only the producer's input; the controller also contains its published output.
   const reorder = camera.reorder;
   // D-52 freeze: the frame worklet may capture only SharedValues, primitives,
@@ -417,13 +468,62 @@ export function OrreryWorld({
       mounted.current = false;
     };
   }, []);
-  // D-43: the sky and starfield specs (theme and measured size only).
-  const skySpec = useSharedValue<SkySpec>(buildSkySpec(colors));
-  const starField = useSharedValue<StarFieldSpec>(EMPTY_STAR_FIELD);
+  // 38.7-09 (D-07/D-08/D-50/D-51): the painted sky spec — theme, measured
+  // size and the System's tint bucket. A System change rewrites this
+  // SharedValue only; the neutral bake below never sees the hue (H9).
+  const skyBucket = skySizeBucket(viewport.width, viewport.height);
+  const skyLook = SKY_LOOKS[themePackage][themeMode];
+  let hueIndex = SKY_UNTINTED;
+  try {
+    hueIndex = systemSkyHueIndex(
+      systemRefId(scene.system),
+      colors.orrerySystemHues.length,
+    );
+  } catch {
+    hueIndex = SKY_UNTINTED;
+  }
+  const skySpec = useSharedValue<SkySpec>(EMPTY_SKY_SPEC);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by the bucket's numbers, not the object
   useEffect(() => {
-    skySpec.value = buildSkySpec(colors);
-    starField.value = buildStarField(viewport.width, viewport.height, colors);
-  }, [skySpec, starField, colors, viewport.width, viewport.height]);
+    skySpec.value = buildSkySpec({
+      colors,
+      mode: themeMode,
+      themePackage,
+      width: viewport.width,
+      height: viewport.height,
+      cover: skyBucket,
+      hueIndex,
+      look: skyLook,
+      seed: SKY_STAR_SEED,
+      twinkleGroups: SKY_TWINKLE_GROUPS,
+    });
+  }, [
+    skySpec,
+    colors,
+    themeMode,
+    themePackage,
+    viewport.width,
+    viewport.height,
+    skyBucket.width,
+    skyBucket.height,
+    hueIndex,
+    skyLook,
+  ]);
+  // H9: bake on mount and on a theme / size-bucket change only (the key has
+  // no hue component, so a System change never reaches this effect's deps).
+  const skyKey = skyBakeKey(themePackage, themeMode, skyBucket);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by skyKey (package, mode, bucket); the nebula tokens are fixed per package × mode
+  useEffect(() => {
+    const texels = skyBakePixels(skyBucket);
+    skyOwner.request({
+      key: skyKey,
+      nebula: colors.orreryNebula.map(tokenInk),
+      strength: skyLook.nebulaStrength,
+      width: texels.width,
+      height: texels.height,
+      seed: SKY_NEBULA_SEED[themePackage],
+    });
+  }, [skyOwner, skyKey]);
   // D-43/D-44: the V2 ring look, rebuilt on resource or theme change only
   // (never per frame); the base picture reads it with the shared frame.
   const ringSpecs = useSharedValue<RingSpecs>(EMPTY_RING_SPECS);
@@ -569,9 +669,10 @@ export function OrreryWorld({
         ledger.retirable(),
         false,
         disposeBase,
+        retireSky,
       );
     },
-    [ledger, publisher, disposeBase],
+    [ledger, publisher, disposeBase, retireSky],
   );
   const textScene = useMemo<OrreryTextScene>(
     () => ({
@@ -606,6 +707,8 @@ export function OrreryWorld({
       // go back in that order too, then the offscreen surface (UI thread).
       const { owner } = publisher;
       const textEpoch = publisher.release();
+      // 38.7-09: no new sky bake may publish from here on.
+      skyOwner.detach();
       const ledgerEpoch = specPublisher.detach();
       const photos = photoEpoch.current;
       photoEpoch.current = null;
@@ -618,7 +721,14 @@ export function OrreryWorld({
         if (ledgerEpoch !== null)
           ledger.teardown(
             (handle) =>
-              routeRetired(owner, publisher, [handle], true, collectBase),
+              routeRetired(
+                owner,
+                publisher,
+                [handle],
+                true,
+                collectBase,
+                retireSky,
+              ),
             ledgerEpoch,
           );
         runOnUI(teardownBakeRegistry)(bakeRegistry, baseIds);
@@ -635,7 +745,7 @@ export function OrreryWorld({
         })();
       }, 0);
     },
-    [publisher, specPublisher, ledger, bakeRegistry],
+    [publisher, specPublisher, ledger, bakeRegistry, skyOwner, retireSky],
   );
   const sendTier = useCallback(
     (tier: SemanticLevel) => publisher.setTier(tier),
@@ -870,7 +980,8 @@ export function OrreryWorld({
       gesture={gesture}
       frame={frame}
       sky={skySpec}
-      stars={starField}
+      skyImage={skyImage}
+      coverColor={colors.orrerySkyBase}
       ringSpecs={ringSpecs}
       overlay={overlaySpec}
       reorder={camera.reorder}

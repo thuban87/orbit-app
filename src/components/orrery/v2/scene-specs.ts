@@ -13,8 +13,13 @@ import type { OrrerySatellite } from "@/db/orrery-satellites-read";
 import type { OrrerySatelliteTarget } from "@/logic/orrery-camera-logic";
 import { bodyKey } from "@/logic/orrery-frame";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
+import { SKY_UNTINTED, skyStarField } from "@/logic/orrery-sky-logic";
 import { resolveSunOccupant } from "@/logic/sun-occupant-logic";
-import type { ThemePalette } from "@/theme/theme-types";
+import type {
+  ResolvedMode,
+  ThemePackage,
+  ThemePalette,
+} from "@/theme/theme-types";
 import type { OrreryGenerationLedger } from "../resources/orrery-generation-ledger";
 import type {
   OrreryDrawnPhoto,
@@ -112,12 +117,235 @@ export function buildRingSpecs(
   return specs;
 }
 
-/** The canvas background (today's `<Fill color={colors.background}>`). */
-export interface SkySpec {
-  background: OrreryInk;
+// ── The painted sky (38.7-09: D-07, D-08, D-36, D-50, D-51, H9) ───────────
+
+/** One batch of sky stars drawn with one paint (`drawPoints`). */
+export interface SkyStarGroup {
+  /** Star centres in canvas dp (the field spans the canvas + margins). */
+  points: readonly { x: number; y: number }[];
+  ink: OrreryInk;
+  /** Dot diameter (dp). */
+  diameter: number;
+  /** Alpha before the twinkle. */
+  alpha: number;
+  /** Twinkle phase (radians). */
+  phase: number;
 }
-export function buildSkySpec(colors: ThemePalette): SkySpec {
-  return { background: tokenInk(colors.background) };
+
+/**
+ * Everything the sky picture reads besides the baked image and the frame:
+ * the neutral gradient, the per-System tint (applied at DRAW time, H9), the
+ * stars and the motion bounds. Rebuilt on theme, size or System change only.
+ */
+export interface SkySpec {
+  /** Canvas size (dp). */
+  width: number;
+  height: number;
+  /** The covered area (dp): the canvas plus margins, bucketed (nebula-bake). */
+  coverWidth: number;
+  coverHeight: number;
+  /** The neutral gradient: horizon (top) → base (from `horizonStop` down). */
+  base: OrreryInk;
+  horizon: OrreryInk;
+  horizonStop: number;
+  /**
+   * D-51 blend rule, keyed from the RESOLVED THEME MODE (never luminance):
+   * dark → additive / screen; light → src-over with ink tokens.
+   */
+  additive: boolean;
+  /**
+   * The System tint: `tintFrom` → `tintTo` by `tintMix` (1 when settled;
+   * Plan 13 animates it by switch progress). Each ink's alpha is its tint
+   * strength (0 = untinted, the All Contacts rule).
+   */
+  tintFrom: OrreryInk;
+  tintTo: OrreryInk;
+  tintMix: number;
+  /** How far the tint pushes the nebula toward its hue (0..1). */
+  tintStrength: number;
+  /** The faint whole-sky wash of the tint (0..1). */
+  tintWash: number;
+  /** Star batches (empty under a zero size). */
+  stars: readonly SkyStarGroup[];
+  /** The share of a star's alpha the twinkle swings (0 = still). */
+  twinkleDepth: number;
+}
+
+export const EMPTY_SKY_SPEC: SkySpec = Object.freeze({
+  width: 0,
+  height: 0,
+  coverWidth: 0,
+  coverHeight: 0,
+  base: NO_INK,
+  horizon: NO_INK,
+  horizonStop: 1,
+  additive: true,
+  tintFrom: NO_INK,
+  tintTo: NO_INK,
+  tintMix: 1,
+  tintStrength: 0,
+  tintWash: 0,
+  stars: Object.freeze([]) as readonly SkyStarGroup[],
+  twinkleDepth: 0,
+});
+
+/** The sky layer's baked neutral image (null → the plain gradient). */
+export interface SkyImageSpec {
+  /** Strictly increasing per mount (0 = nothing published yet). */
+  generation: number;
+  mountEpoch: number;
+  image: SkImage | null;
+  /** The bake key the image was made for. */
+  key: string;
+}
+export const EMPTY_SKY_IMAGE: SkyImageSpec = Object.freeze({
+  generation: 0,
+  mountEpoch: 0,
+  image: null,
+  key: "",
+});
+
+/** The look numbers `buildSkySpec` needs (visual-tunables `SKY_LOOKS`). */
+export interface SkySpecLook {
+  starCount: number;
+  brightStarCount: number;
+  starRadius: readonly [number, number];
+  brightRadius: readonly [number, number];
+  starAlpha: readonly [number, number];
+  twinkleDepth: number;
+  tintStrength: number;
+  tintWash: number;
+  horizonStop: number;
+}
+
+export interface SkySpecInput {
+  colors: ThemePalette;
+  mode: ResolvedMode;
+  themePackage: ThemePackage;
+  /** Canvas size (dp). */
+  width: number;
+  height: number;
+  /** The bake bucket (dp) — the area the sky and its stars cover. */
+  cover: { width: number; height: number };
+  /** `systemSkyHueIndex(...)` of the System (−1 = untinted). */
+  hueIndex: number;
+  /** The previous System's index (Plan 13 crossfades from it); default = hueIndex. */
+  fromHueIndex?: number;
+  look: SkySpecLook;
+  /** The star-field seed. */
+  seed: number;
+  /** Twinkle phase groups. */
+  twinkleGroups: number;
+}
+
+/** The tint ink for a hue bucket: the token's RGB, alpha = strength (0 untinted). */
+export function skyTintInk(
+  colors: ThemePalette,
+  hueIndex: number,
+  strength: number,
+): OrreryInk {
+  const hues = colors.orrerySystemHues;
+  if (hueIndex === SKY_UNTINTED || hueIndex < 0 || hues.length === 0)
+    return NO_INK;
+  const ink = tokenInk(hues[hueIndex % hues.length]);
+  return [ink[0], ink[1], ink[2], Math.max(0, Math.min(1, strength))];
+}
+
+/**
+ * The painted sky spec (JS thread). Every colour is an `orrery*` token. The
+ * stars are seeded (stable across visits), batched by tone × size × twinkle
+ * phase so the picture draws a handful of `drawPoints`, and spread over the
+ * covered area (canvas + margins) so parallax and drift never reveal an edge.
+ */
+export function buildSkySpec(input: SkySpecInput): SkySpec {
+  const { colors, mode, width, height, cover, look } = input;
+  const additive = mode === "dark";
+  const tintTo = skyTintInk(colors, input.hueIndex, 1);
+  const tintFrom = skyTintInk(colors, input.fromHueIndex ?? input.hueIndex, 1);
+  const base = {
+    width,
+    height,
+    coverWidth: cover.width,
+    coverHeight: cover.height,
+    base: tokenInk(colors.orrerySkyBase),
+    horizon: tokenInk(colors.orrerySkyHorizon),
+    horizonStop: look.horizonStop,
+    additive,
+    tintFrom,
+    tintTo,
+    tintMix: 1,
+    tintStrength: look.tintStrength,
+    tintWash: look.tintWash,
+    twinkleDepth: look.twinkleDepth,
+  };
+  if (!(width > 0) || !(height > 0)) return { ...base, stars: [] };
+  const tones = colors.orrerySkyStars.map(tokenInk);
+  if (tones.length === 0) return { ...base, stars: [] };
+  const groups = Math.max(1, Math.floor(input.twinkleGroups));
+  // The field spans the covered area, centred on the canvas.
+  const ox = (width - cover.width) / 2;
+  const oy = (height - cover.height) / 2;
+  const batches = new Map<
+    string,
+    SkyStarGroup & { points: { x: number; y: number }[] }
+  >();
+  const add = (
+    star: {
+      x: number;
+      y: number;
+      size: number;
+      bright: number;
+      tone: number;
+      phase: number;
+    },
+    bright: boolean,
+  ) => {
+    const range = bright ? look.brightRadius : look.starRadius;
+    // Small stars come in two classes (small + dim, larger + brighter); bright
+    // stars in one. With tone × phase that keeps the batch count ≤ 9 × tones,
+    // so the sky records a few dozen draws per tick at most.
+    const sizeClass = bright ? 1 : star.size < 0.6 ? 0 : 1;
+    const radius =
+      range[0] +
+      (range[1] - range[0]) * (bright ? 0.6 : sizeClass === 0 ? 0.25 : 0.8);
+    const alpha = bright
+      ? look.starAlpha[1]
+      : look.starAlpha[0] +
+        (look.starAlpha[1] - look.starAlpha[0]) * (sizeClass === 0 ? 0.3 : 0.8);
+    const toneIndex = Math.min(
+      tones.length - 1,
+      Math.floor(star.tone * tones.length),
+    );
+    const phaseIndex = Math.min(groups - 1, Math.floor(star.phase * groups));
+    const key = `${bright ? 1 : 0}|${sizeClass}|${toneIndex}|${phaseIndex}`;
+    let batch = batches.get(key);
+    if (!batch) {
+      batch = {
+        points: [],
+        ink: tones[toneIndex],
+        diameter: radius * 2,
+        alpha,
+        phase: (phaseIndex / groups) * Math.PI * 2,
+      };
+      batches.set(key, batch);
+    }
+    batch.points.push({ x: ox + star.x, y: oy + star.y });
+  };
+  for (const star of skyStarField(
+    input.seed,
+    cover.width,
+    cover.height,
+    look.starCount,
+  ))
+    add(star, false);
+  for (const star of skyStarField(
+    input.seed + 1,
+    cover.width,
+    cover.height,
+    look.brightStarCount,
+  ))
+    add(star, true);
+  return { ...base, stars: [...batches.values()] };
 }
 
 /** The overlay's inks (accent for reorder/focus, Polaris star and halo). */
@@ -179,67 +407,6 @@ export const EMPTY_OVERLAY_SPEC: OverlaySpec = Object.freeze({
   focus: [],
 });
 
-// ── Ambient starfield (today's OrreryCanvas twinkle field, as a spec) ───────
-/** How many ambient star dots to scatter (subtle — device-UAT tunable, 13-08). */
-export const STAR_COUNT = 44;
-/** Star dot radius range (dp). */
-export const STAR_R_MIN = 0.6;
-export const STAR_R_MAX = 1.8;
-
-/** One placed star: screen position, radius, ink and its static opacity. */
-export interface StarSpec {
-  x: number;
-  y: number;
-  r: number;
-  ink: OrreryInk;
-  /** Static per-star opacity for a non-uniform field (× the twinkle). */
-  base: number;
-}
-export interface StarFieldSpec {
-  stars: readonly StarSpec[];
-}
-export const EMPTY_STAR_FIELD: StarFieldSpec = Object.freeze({ stars: [] });
-
-/**
- * Deterministic 0..1 hash from an integer seed — a tiny LCG-ish mix so the
- * star field is stable across renders without a PRNG dependency (and without
- * `crypto`, which Hermes lacks).
- */
-export function seeded(n: number): number {
-  const x = Math.sin(n * 12.9898) * 43758.5453;
-  return x - Math.floor(x);
-}
-
-/**
- * Today's 44 seeded stars for the measured canvas: the same placement, radii,
- * per-star base opacity and colour cycle (`textSecondary`, `textPrimary`,
- * then the star palette) as the pre-38.7-06 OrreryCanvas.
- */
-export function buildStarField(
-  width: number,
-  height: number,
-  colors: ThemePalette,
-): StarFieldSpec {
-  const tones = [
-    colors.textSecondary,
-    colors.textPrimary,
-    ...colors.starPalette,
-  ];
-  if (width <= 0 || height <= 0) return EMPTY_STAR_FIELD;
-  const inks = tones.map(tokenInk);
-  const stars: StarSpec[] = [];
-  for (let i = 0; i < STAR_COUNT; i++) {
-    stars.push({
-      x: seeded(i + 1) * width,
-      y: seeded(i + 101) * height,
-      r: STAR_R_MIN + seeded(i + 201) * (STAR_R_MAX - STAR_R_MIN),
-      ink: inks[i % inks.length],
-      base: 0.4 + seeded(i + 301) * 0.6,
-    });
-  }
-  return { stars };
-}
-
 // ── Bodies (38.7-07, D-43/D-53) ─────────────────────────────────────────────
 
 /** Today's status-outline width around a contact disc (inner disc = r − this / 2). */
@@ -247,10 +414,12 @@ export const BODY_OUTLINE_WIDTH = 3;
 
 /**
  * The picture layers that draw native objects: the body layers, the labels
- * layer and (38.7-08) the base layer when it draws a baked snapshot. Each acks
+ * layer, (38.7-08) the base layer when it draws a baked snapshot and
+ * (38.7-09) the sky layer's baked neutral nebula. Each acks
  * `(layerId, generation, mountEpoch)` separately (H3 ledger contract).
  */
 export const ORRERY_LAYER = {
+  sky: "sky",
   base: "base",
   bodiesBehind: "bodiesBehind",
   sun: "sun",
@@ -532,10 +701,15 @@ export function textHandle(textEpoch: number, key: string): string {
 export function baseHandle(mountEpoch: number, id: number): string {
   return `b${HANDLE_SEPARATOR}${mountEpoch}${HANDLE_SEPARATOR}${id}`;
 }
+/** 38.7-09: the ledger handle of a baked sky image (its mount epoch travels with it). */
+export function skyHandle(mountEpoch: number, id: number): string {
+  return `s${HANDLE_SEPARATOR}${mountEpoch}${HANDLE_SEPARATOR}${id}`;
+}
 export type OrreryLedgerHandle =
   | { kind: "photo"; epoch: number; id: number }
   | { kind: "text"; epoch: number; key: string }
-  | { kind: "base"; epoch: number; id: number };
+  | { kind: "base"; epoch: number; id: number }
+  | { kind: "sky"; epoch: number; id: number };
 export function parseLedgerHandle(handle: string): OrreryLedgerHandle | null {
   const first = handle.indexOf(HANDLE_SEPARATOR);
   const second = handle.indexOf(HANDLE_SEPARATOR, first + 1);
@@ -545,6 +719,7 @@ export function parseLedgerHandle(handle: string): OrreryLedgerHandle | null {
   if (handle[0] === "p") return { kind: "photo", epoch, id: Number(rest) };
   if (handle[0] === "t") return { kind: "text", epoch, key: rest };
   if (handle[0] === "b") return { kind: "base", epoch, id: Number(rest) };
+  if (handle[0] === "s") return { kind: "sky", epoch, id: Number(rest) };
   return null;
 }
 
@@ -571,6 +746,11 @@ export interface OrrerySpecPublisher {
     photos: ReadonlyMap<string, OrreryDrawnPhoto>,
     photoEpoch: number,
   ): void;
+  /**
+   * 38.7-09: the current publishing epoch, begun now if none is (the sky bake
+   * owner tags its images with it before any body spec was published).
+   */
+  ensureEpoch(): number;
   /** Ends the publishing epoch now (unmount); returns it for the later teardown. */
   detach(): number | null;
   generation(): number;
@@ -689,6 +869,10 @@ export function createOrrerySpecPublisher(
       photos = next;
       photoEpoch = nextEpoch;
       publishBodies();
+    },
+    ensureEpoch() {
+      if (epoch === null) epoch = ledger.beginEpoch();
+      return epoch;
     },
     detach() {
       const ended = epoch;

@@ -12,8 +12,10 @@
  * or overlays.
  *
  * Layers, bottom to top:
- * - `base`: the background fill and the world-plane orbit rings (D-44);
- * - `stars`: today's 44 seeded twinkling stars;
+ * - `sky` (38.7-09): the painted sky — gradient, the baked neutral nebula
+ *   tinted per System at draw time, stars; drift and twinkle on the ambient
+ *   clock, parallax from the frame (draw-sky.ts);
+ * - `base`: the world-plane orbit rings (D-44), baked while still;
  * - `bodiesBehind`: contacts and moons deeper than the sun (38.7-07);
  * - `sun`: the sun, its glow pulsing on the ambient clock;
  * - `bodiesFront`: contacts and moons nearer than the sun;
@@ -38,8 +40,9 @@
  * child of this canvas. OrreryScreen mounts this canvas (through OrreryWorld)
  * only once it is measured AND focused and foregrounded, so unmounting it on
  * blur/background stops the driver and every ambient worklet. The ambient
- * value drives the star twinkle and the sun pulse; an unchanged tick writes
- * nothing, and under reduced motion neither picture re-records at all.
+ * value drives the sky's star twinkle and drift and the sun pulse; an
+ * unchanged tick writes nothing, and under reduced motion neither picture
+ * re-records at all.
  *
  * ── Base bake (D-49, 38.7-08) ───────────────────────────────────────────────
  * When `host.bakePath === "gpu-offscreen"`, once the live base picture has
@@ -52,25 +55,36 @@
  * ── Platform seam (D-46) ───────────────────────────────────────────────────
  * Platform/GPU choices come from `resolveOrreryRenderHost()` as values
  * (`opaqueCanvas`, the device pixel ratio for the AA feather), never as forks.
+ *
+ * ── First frame (38.7-09, carried from 38.7-08) ────────────────────────────
+ * The opaque canvas is a SurfaceView, which shows solid black until its
+ * surface exists and has presented. While `host.opaqueCanvas`, a non-touchable
+ * cover in the sky's base token sits over the canvas and fades out once the
+ * native surface reports a size (then two frames), so a tab return shows the
+ * themed sky colour instead of a black flash. No React state: an animated
+ * style reads a SharedValue.
  */
 import {
   Canvas,
+  type CanvasRef,
   createPicture,
   Picture,
   type SkPicture,
 } from "@shopify/react-native-skia";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   type ComposedGesture,
   GestureDetector,
   type GestureType,
 } from "react-native-gesture-handler";
-import {
+import Animated, {
   runOnJS,
   type SharedValue,
   useAnimatedReaction,
+  useAnimatedStyle,
   useDerivedValue,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
 import type { LabelAllocation } from "@/logic/orrery-label-logic";
@@ -92,7 +106,8 @@ import { drawBodies, drawSun, orderBodies, sunPulse } from "./draw-bodies";
 import { drawLabels } from "./draw-labels";
 import { drawOverlay } from "./draw-overlay";
 import { drawPlaneRings, ringBands } from "./draw-plane";
-import { drawSky, drawStars, twinkleOpacity } from "./draw-sky";
+import { drawSky } from "./draw-sky";
+import { watchFirstSurfaceFrame } from "./first-frame";
 import { resolveOrreryRenderHost } from "./render-host";
 import {
   ORRERY_LAYER,
@@ -101,8 +116,8 @@ import {
   type OrreryLayerId,
   type OverlaySpec,
   type RingSpecs,
+  type SkyImageSpec,
   type SkySpec,
-  type StarFieldSpec,
 } from "./scene-specs";
 import { orreryShader } from "./shaders";
 
@@ -114,10 +129,12 @@ export interface OrreryV2CanvasProps {
   gesture: ComposedGesture | GestureType;
   /** The ONE UI-thread frame every layer and the hit math consume. */
   frame: SharedValue<AnimatedFrame>;
-  /** Background ink (JS-built from the theme). */
+  /** The painted sky (JS-built from the theme, size and System). */
   sky: SharedValue<SkySpec>;
-  /** Today's seeded starfield (JS-built for the measured size and theme). */
-  stars: SharedValue<StarFieldSpec>;
+  /** The sky's baked neutral nebula (JS-baked; a `sky`-layer ledger object). */
+  skyImage: SharedValue<SkyImageSpec>;
+  /** The opaque canvas's first-frame cover colour (`orrerySkyBase`). */
+  coverColor: string;
   /** Per-body ring look (JS-built, rewritten on resource/theme change only). */
   ringSpecs: SharedValue<RingSpecs>;
   /** Overlay inks, Polaris extent and focus outlines (JS-built). */
@@ -154,8 +171,14 @@ export interface OrreryV2CanvasProps {
   ) => void;
 }
 
-/** The ambient consumers on screen today (D-40: twinkle and the sun pulse). */
-const AMBIENT_CONSUMERS = { twinkle: true, sunPulse: true } as const;
+/** The ambient consumers on screen (D-37/D-40: twinkle, sky drift, sun pulse). */
+const AMBIENT_CONSUMERS = {
+  twinkle: true,
+  sunPulse: true,
+  skyDrift: true,
+} as const;
+/** The first-frame cover's fade (ms). */
+const COVER_FADE_MS = 160;
 
 /** What a layer's ack reaction compares: its picture and the generation it read. */
 interface LayerRecord {
@@ -220,7 +243,8 @@ export function OrreryV2Canvas({
   gesture,
   frame,
   sky,
-  stars,
+  skyImage,
+  coverColor,
   ringSpecs,
   overlay,
   reorder,
@@ -247,16 +271,28 @@ export function OrreryV2Canvas({
   const bands = useMemo(() => ringBands(), []);
   // The AA feather: one device pixel, in dp (a primitive capture).
   const aaDp = 1 / host.devicePixelRatio();
-  // A primitive that changes only on an ambient tick; constant under reduced
-  // motion (ambient −1), so the stars picture is not re-recorded then.
-  const twinkle = useDerivedValue(() =>
-    twinkleOpacity(ambient.value, ambient.value < 0),
+  // 38.7-09: the painted sky (bottom). Re-recorded on an ambient tick (drift,
+  // twinkle), a camera move (parallax) or a spec/image change; under reduced
+  // motion the ambient value holds at −1, so it is still at idle.
+  const skyPicture = useDerivedValue(() =>
+    createPicture(
+      (canvas) => {
+        drawSky(
+          canvas,
+          sky.value,
+          skyImage.value,
+          frame.value.pose,
+          ambient.value,
+        );
+      },
+      { width, height },
+    ),
   );
-  // The LIVE base: re-recorded only when the frame, sky or ring specs change.
+  useLayerAck(ORRERY_LAYER.sky, skyPicture, skyImage, ackRecorded);
+  // The LIVE base: re-recorded only when the frame or ring specs change.
   const baseLive = useDerivedValue(() =>
     createPicture(
       (canvas) => {
-        drawSky(canvas, sky.value);
         drawPlaneRings(
           canvas,
           frame.value,
@@ -329,14 +365,6 @@ export function OrreryV2Canvas({
     selectBasePicture(baked.value, baseLive.value),
   );
   useLayerAck(ORRERY_LAYER.base, base, baked, ackRecorded, false);
-  const starsPicture = useDerivedValue(() =>
-    createPicture(
-      (canvas) => {
-        drawStars(canvas, stars.value, twinkle.value);
-      },
-      { width, height },
-    ),
-  );
   // D-43/M14: one depth order per frame, shared by both body layers.
   const bodyOrder = useDerivedValue(() =>
     orderBodies(frame.value, bodies.value.bodies),
@@ -416,17 +444,34 @@ export function OrreryV2Canvas({
       { width, height },
     ),
   );
+  // First-frame cover (opaque canvas only; see the header).
+  const canvasRef = useRef<CanvasRef | null>(null);
+  const cover = useSharedValue(host.opaqueCanvas ? 1 : 0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once per canvas mount (the cover belongs to this native view)
+  useEffect(() => {
+    if (!host.opaqueCanvas) return;
+    return watchFirstSurfaceFrame(
+      () => canvasRef.current?.getNativeId?.() ?? null,
+      () => {
+        cover.value = 0;
+      },
+    );
+  }, []);
+  const coverStyle = useAnimatedStyle(() => ({
+    opacity: withTiming(cover.value, { duration: COVER_FADE_MS }),
+  }));
   return (
     <>
       {driver}
       <GestureDetector gesture={gesture}>
         <Canvas
           testID="orrery-canvas"
+          ref={canvasRef}
           opaque={host.opaqueCanvas}
           style={{ width, height }}
         >
+          <Picture picture={skyPicture} />
           <Picture picture={base} />
-          <Picture picture={starsPicture} />
           <Picture picture={bodiesBehind} />
           <Picture picture={sunPicture} />
           <Picture picture={bodiesFront} />
@@ -434,6 +479,23 @@ export function OrreryV2Canvas({
           <Picture picture={overlayPicture} />
         </Canvas>
       </GestureDetector>
+      {host.opaqueCanvas ? (
+        <Animated.View
+          testID="orrery-canvas-cover"
+          pointerEvents="none"
+          style={[
+            {
+              position: "absolute",
+              left: 0,
+              top: 0,
+              width,
+              height,
+              backgroundColor: coverColor,
+            },
+            coverStyle,
+          ]}
+        />
+      ) : null}
     </>
   );
 }

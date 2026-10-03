@@ -100,6 +100,7 @@ function flush(passes = 1) {
 
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
+  useRef: (value: unknown) => ({ current: value }),
   useMemo: (factory: () => unknown) => factory(),
   useCallback: (callback: unknown) => callback,
   useEffect: (effect: () => unknown) => {
@@ -107,6 +108,9 @@ vi.mock("react", async (original) => ({
   },
 }));
 vi.mock("react-native-reanimated", () => ({
+  default: { View: "animatedView" },
+  useAnimatedStyle: (fn: () => unknown) => rt.derived(fn),
+  withTiming: (value: unknown) => value,
   useSharedValue: (value: unknown) => rt.sv(value),
   useDerivedValue: (fn: () => unknown) => rt.derived(fn),
   useAnimatedReaction: (
@@ -192,6 +196,7 @@ vi.mock("./render-host", () => ({
 }));
 vi.mock("./scene-specs", () => ({
   ORRERY_LAYER: {
+    sky: "sky",
     base: "base",
     bodiesBehind: "bodiesBehind",
     sun: "sun",
@@ -202,11 +207,15 @@ vi.mock("./scene-specs", () => ({
 }));
 // Draw stubs: each records the inputs its picture read.
 vi.mock("./draw-sky", () => ({
-  drawSky: (canvas: { sky(tag: unknown): void }, sky: { tag: unknown }) =>
-    canvas.sky(sky.tag),
-  drawStars: (canvas: { stars(t: unknown): void }, _f: unknown, t: unknown) =>
-    canvas.stars(t),
-  twinkleOpacity: (ms: number, reduced: boolean) => (reduced ? "still" : ms),
+  // 38.7-09: the sky reads its spec, the baked image, the frame's pose and
+  // the ambient value (−1 = still).
+  drawSky: (
+    canvas: { sky(...tags: unknown[]): void },
+    sky: { tag: unknown },
+    image: { generation: number },
+    pose: { tag?: unknown },
+    ambient: number,
+  ) => canvas.sky(sky.tag, image.generation, pose.tag, ambient),
 }));
 vi.mock("./draw-plane", () => ({
   drawPlaneRings: (
@@ -279,9 +288,10 @@ function mount() {
     width: 400,
     height: 800,
     gesture: {} as never,
-    frame: rt.sv({ tag: "frame-1" }),
+    frame: rt.sv({ tag: "frame-1", pose: { tag: "pose-1" } }),
     sky: rt.sv({ tag: "sky-1" }),
-    stars: rt.sv({}),
+    skyImage: rt.sv({ generation: 0, mountEpoch: 0, image: null, key: "" }),
+    coverColor: "sky-base-token",
     ringSpecs: rt.sv({}),
     overlay: rt.sv({}),
     reorder: rt.sv(null),
@@ -302,7 +312,8 @@ function mount() {
     ).value;
   return { props, tree, layer };
 }
-const STARS = 1;
+const SKY = 0;
+const BASE = 1;
 const SUN = 3;
 
 describe("OrreryV2Canvas: the quantised ambient value (D-49)", () => {
@@ -313,32 +324,36 @@ describe("OrreryV2Canvas: the quantised ambient value (D-49)", () => {
       Array(7).fill("skPicture"),
     );
     flush();
-    const first = layer(STARS);
-    expect(first.ops).toEqual([["stars", 0]]);
+    const first = layer(SKY);
+    expect(first.ops).toEqual([["sky", "sky-1", 0, "pose-1", 0]]);
     const clock = rt.clock as { value: number };
     clock.value = 20; // inside the first step
     flush();
-    expect(layer(STARS)).toBe(first);
+    expect(layer(SKY)).toBe(first);
     expect(layer(SUN).ops).toEqual([["sun", 0]]);
     clock.value = 40; // the next step
     flush();
-    expect(layer(STARS)).not.toBe(first);
-    expect(layer(STARS).ops).toEqual([["stars", AMBIENT_STEP_MS]]);
+    expect(layer(SKY)).not.toBe(first);
+    expect(layer(SKY).ops).toEqual([
+      ["sky", "sky-1", 0, "pose-1", AMBIENT_STEP_MS],
+    ]);
   });
   it("reduced motion freezes every ambient consumer at −1 and stops re-recording", () => {
     const { layer } = mount();
     const clock = rt.clock as { value: number };
     clock.value = 40;
     flush();
-    expect(layer(STARS).ops).toEqual([["stars", AMBIENT_STEP_MS]]);
+    expect(layer(SKY).ops).toEqual([
+      ["sky", "sky-1", 0, "pose-1", AMBIENT_STEP_MS],
+    ]);
     rt.reduced.value = true;
     flush();
-    const still = layer(STARS);
-    expect(still.ops).toEqual([["stars", "still"]]);
+    const still = layer(SKY);
+    expect(still.ops).toEqual([["sky", "sky-1", 0, "pose-1", -1]]);
     expect(layer(SUN).ops).toEqual([["sun", 0]]);
     clock.value = 5000;
     flush();
-    expect(layer(STARS)).toBe(still);
+    expect(layer(SKY)).toBe(still);
   });
   it("interval: no useClock; JS ticks write the value", () => {
     vi.useFakeTimers({
@@ -347,9 +362,9 @@ describe("OrreryV2Canvas: the quantised ambient value (D-49)", () => {
     rt.host = { ambientDriver: "interval" };
     const { layer } = mount();
     expect(rt.clockCalls).toBe(0);
-    const first = layer(STARS);
+    const first = layer(SKY);
     vi.advanceTimersByTime(AMBIENT_STEP_MS * 3 + 1);
-    expect(layer(STARS)).not.toBe(first);
+    expect(layer(SKY)).not.toBe(first);
     vi.useRealTimers();
   });
 });
@@ -367,28 +382,22 @@ describe("OrreryV2Canvas: the base bake (D-49, H3)", () => {
     rt.host = { bakePath: "gpu-offscreen" };
     const { props, layer } = mount();
     flush();
-    expect(layer(0).ops).toEqual([
-      ["sky", "sky-1"],
-      ["rings", "frame-1"],
-    ]);
+    expect(layer(BASE).ops).toEqual([["rings", "frame-1"]]);
     settle(BAKE_AFTER_STILL_TICKS + 2);
     expect(rt.surfaces).toBe(1);
     expect(props.onBaseBaked).toHaveBeenCalledTimes(1);
     expect(props.onBaseBaked).toHaveBeenLastCalledWith(1, 1, 1);
-    const baked = layer(0);
+    const baked = layer(BASE);
     expect(baked.ops[0][0]).toBe("drawImageRectOptions");
     expect(baked.ops[0][2]).toEqual({ x: 0, y: 0, width: 800, height: 1600 });
     expect(props.ackRecorded).toHaveBeenCalledWith("base", 1, 1);
     // Ambient keeps ticking: the snapshot stays, no re-bake.
     settle(5);
-    expect(layer(0)).toBe(baked);
+    expect(layer(BASE)).toBe(baked);
     expect(rt.surfaces).toBe(1);
     // The scene moves: the base is live AT ONCE (before any reaction ran)…
-    props.frame.value = { tag: "frame-2" };
-    expect(layer(0).ops).toEqual([
-      ["sky", "sky-1"],
-      ["rings", "frame-2"],
-    ]);
+    props.frame.value = { tag: "frame-2", pose: { tag: "pose-2" } };
+    expect(layer(BASE).ops).toEqual([["rings", "frame-2"]]);
     // …and the reaction publishes the live generation, which the base acks.
     flush(2);
     expect(props.onBaseBaked).toHaveBeenLastCalledWith(1, 2, null);
@@ -417,11 +426,89 @@ describe("OrreryV2Canvas: the base bake (D-49, H3)", () => {
     settle(BAKE_AFTER_STILL_TICKS * 3);
     expect(props.onBaseBaked).not.toHaveBeenCalled();
     expect(rt.surfaces).toBe(0);
-    expect(layer(0).ops[1]).toEqual(["rings", "frame-1"]);
+    expect(layer(BASE).ops[0]).toEqual(["rings", "frame-1"]);
     expect(props.ackRecorded).not.toHaveBeenCalledWith(
       "base",
       expect.anything(),
       expect.anything(),
     );
+  });
+});
+
+describe("OrreryV2Canvas: the painted sky layer (38.7-09)", () => {
+  it("is the bottom picture; it acks each baked sky image generation (H3/C-H2)", () => {
+    const { props, layer } = mount();
+    flush();
+    expect(layer(SKY).ops[0][0]).toBe("sky");
+    expect(props.ackRecorded).not.toHaveBeenCalledWith(
+      "sky",
+      expect.anything(),
+      expect.anything(),
+    );
+    // The neutral bake lands: generation 1 of epoch 1.
+    props.skyImage.value = {
+      generation: 1,
+      mountEpoch: 1,
+      image: { tag: "image-1" } as never,
+      key: "galaxy/dark/512x896",
+    };
+    flush(2);
+    expect(layer(SKY).ops[0]).toEqual(["sky", "sky-1", 1, "pose-1", 0]);
+    expect(props.ackRecorded).toHaveBeenCalledWith("sky", 1, 1);
+  });
+
+  it("a System change (a new sky spec) re-records only the sky, never the base", () => {
+    const { props, layer } = mount();
+    flush();
+    const base = layer(BASE);
+    const sky = layer(SKY);
+    props.sky.value = { tag: "sky-2" };
+    flush();
+    expect(layer(SKY)).not.toBe(sky);
+    expect(layer(SKY).ops[0][1]).toBe("sky-2");
+    expect(layer(BASE)).toBe(base);
+  });
+
+  it("an ambient tick re-records the ambient layers (sky, sun) and nothing else", () => {
+    const { tree, layer } = mount();
+    flush();
+    const before = tree[0].children.map((_, i) => layer(i));
+    const clock = rt.clock as { value: number };
+    clock.value = AMBIENT_STEP_MS * 4;
+    flush();
+    const after = tree[0].children.map((_, i) => layer(i));
+    const changed = after
+      .map((picture, i) => (picture === before[i] ? null : i))
+      .filter((i) => i !== null);
+    expect(changed).toEqual([SKY, SUN]);
+  });
+
+  it("opaque canvas: a non-touchable cover in the sky base colour fades once the first frame is up", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    rt.host = { opaqueCanvas: true };
+    const { tree } = mount();
+    const cover = tree[1];
+    expect(cover.type).toBe("animatedView");
+    expect(cover.props.pointerEvents).toBe("none");
+    const [box, animated] = cover.props.style as [
+      Record<string, unknown>,
+      { value: { opacity: number } },
+    ];
+    expect(box).toMatchObject({
+      position: "absolute",
+      backgroundColor: "sky-base-token",
+      width: 400,
+      height: 800,
+    });
+    expect(animated.value.opacity).toBe(1);
+    // No native view API in node: the bounded fallback hides it.
+    vi.advanceTimersByTime(1000);
+    expect(animated.value.opacity).toBe(0);
+    vi.useRealTimers();
+  });
+
+  it("translucent canvas: no cover", () => {
+    const { tree } = mount();
+    expect(tree).toHaveLength(1);
   });
 });

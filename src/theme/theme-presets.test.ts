@@ -317,3 +317,80 @@ describe("four authored palettes — light required, all distinct + complete (Pl
     expect(gd.accent).toBe("#6C8CFF");
   });
 });
+
+describe("Orrery V2 sub-palette (38.7 D-51)", () => {
+  const ORRERY_SCALARS = [
+    "orrerySkyBase",
+    "orrerySkyHorizon",
+    "orreryGrid",
+    "orreryRingLight",
+    "orreryPulse",
+    "orreryRim",
+    "orreryGlow",
+    "orreryReticle",
+    "orreryInstrument",
+    "orreryWarp",
+    "orreryOcclusion",
+  ] as const;
+  const ORRERY_ARRAYS = [
+    "orreryNebula",
+    "orrerySkyStars",
+    "orrerySystemHues",
+  ] as const;
+  const combos = [
+    ["galaxy", "dark"],
+    ["galaxy", "light"],
+    ["standard", "dark"],
+    ["standard", "light"],
+  ] as const;
+  const HEX = /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/;
+
+  it("every palette authors every orrery field (hex strings / non-empty hex arrays)", () => {
+    for (const [pkg, mode] of combos) {
+      const palette = resolvePalette(pkg, mode);
+      for (const token of ORRERY_SCALARS) {
+        expect(palette[token], `${pkg}/${mode} ${token}`).toMatch(HEX);
+      }
+      for (const token of ORRERY_ARRAYS) {
+        const list = palette[token];
+        expect(Array.isArray(list), `${pkg}/${mode} ${token}`).toBe(true);
+        expect(list.length, `${pkg}/${mode} ${token}`).toBeGreaterThan(0);
+        for (const entry of list) expect(entry).toMatch(HEX);
+      }
+    }
+  });
+
+  it("the per-System hue list has at least 12 DISTINCT tints in every palette (D-50)", () => {
+    for (const [pkg, mode] of combos) {
+      const hues = resolvePalette(pkg, mode).orrerySystemHues;
+      expect(hues.length).toBeGreaterThanOrEqual(12);
+      expect(new Set(hues.map((h) => h.toUpperCase())).size).toBe(hues.length);
+    }
+  });
+
+  it("the nebula carries 2–3 neutral tints", () => {
+    for (const [pkg, mode] of combos) {
+      const n = resolvePalette(pkg, mode).orreryNebula.length;
+      expect(n).toBeGreaterThanOrEqual(2);
+      expect(n).toBeLessThanOrEqual(3);
+    }
+  });
+
+  it("Standard and Galaxy differ in sky base and nebula in BOTH modes (D-27)", () => {
+    for (const mode of ["dark", "light"] as const) {
+      const g = resolvePalette("galaxy", mode);
+      const s = resolvePalette("standard", mode);
+      expect(g.orrerySkyBase).not.toBe(s.orrerySkyBase);
+      expect(g.orrerySkyHorizon).not.toBe(s.orrerySkyHorizon);
+      expect(g.orreryNebula).not.toEqual(s.orreryNebula);
+    }
+  });
+
+  it("reticle and instrument are seeded with the palette's default accent fill", () => {
+    for (const [pkg, mode] of combos) {
+      const palette = resolvePalette(pkg, mode);
+      expect(palette.orreryReticle).toBe(palette.accent);
+      expect(palette.orreryInstrument).toBe(palette.accent);
+    }
+  });
+});

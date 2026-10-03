@@ -29,7 +29,6 @@ import {
   buildRingSpecs,
   buildSatelliteLooks,
   buildSkySpec,
-  buildStarField,
   createOrrerySpecPublisher,
   ORRERY_BODY_LAYERS,
   ORRERY_LAYER,
@@ -39,8 +38,9 @@ import {
   parseLedgerHandle,
   photoHandle,
   RING_DASH_PERIOD_DP,
-  STAR_COUNT,
-  seeded,
+  type SkySpecLook,
+  skyHandle,
+  skyTintInk,
   textHandle,
   tokenInk,
 } from "./scene-specs";
@@ -147,32 +147,96 @@ describe("buildRingSpecs (today's status ring look, as numbers)", () => {
   });
 });
 
-describe("tokenInk / buildSkySpec", () => {
-  it("resolves a token to RGBA floats and the background to the sky spec", () => {
+describe("tokenInk", () => {
+  it("resolves a token to RGBA floats", () => {
     const colors = THEME_PRESETS.galaxy.dark;
     expect(tokenInk(colors.accent)).toEqual(inkOf(colors.accent));
-    expect(buildSkySpec(colors).background).toEqual(inkOf(colors.background));
   });
 });
 
-describe("buildStarField (today's seeded twinkle field)", () => {
-  it("44 stars with the pre-38.7-06 placement, radii, base opacity and colour cycle", () => {
-    const colors = THEME_PRESETS.standard.dark;
-    const field = buildStarField(400, 800, colors);
-    expect(field.stars).toHaveLength(STAR_COUNT);
-    const tones = [
-      colors.textSecondary,
-      colors.textPrimary,
-      ...colors.starPalette,
-    ];
-    field.stars.forEach((star, i) => {
-      expect(star.x).toBe(seeded(i + 1) * 400);
-      expect(star.y).toBe(seeded(i + 101) * 800);
-      expect(star.r).toBe(0.6 + seeded(i + 201) * (1.8 - 0.6));
-      expect(star.base).toBe(0.4 + seeded(i + 301) * 0.6);
-      expect(star.ink).toEqual(inkOf(tones[i % tones.length]));
+describe("buildSkySpec (38.7-09: D-07/D-08/D-50/D-51)", () => {
+  const look: SkySpecLook = {
+    starCount: 120,
+    brightStarCount: 20,
+    starRadius: [0.5, 1],
+    brightRadius: [1.2, 1.8],
+    starAlpha: [0.3, 0.9],
+    twinkleDepth: 0.4,
+    tintStrength: 0.35,
+    tintWash: 0.05,
+    horizonStop: 0.6,
+  };
+  const input = (
+    overrides: Partial<Parameters<typeof buildSkySpec>[0]> = {},
+  ) => ({
+    colors: THEME_PRESETS.galaxy.dark,
+    mode: "dark" as const,
+    themePackage: "galaxy" as const,
+    width: 400,
+    height: 800,
+    cover: { width: 512, height: 896 },
+    hueIndex: 3,
+    look,
+    seed: 38,
+    twinkleGroups: 3,
+    ...overrides,
+  });
+
+  it("reads only orrery* tokens: base / horizon gradient and the System hue", () => {
+    const colors = THEME_PRESETS.galaxy.dark;
+    const sky = buildSkySpec(input());
+    expect(sky.base).toEqual(inkOf(colors.orrerySkyBase));
+    expect(sky.horizon).toEqual(inkOf(colors.orrerySkyHorizon));
+    const hue = inkOf(colors.orrerySystemHues[3]);
+    expect(sky.tintTo).toEqual([hue[0], hue[1], hue[2], 1]);
+    expect(sky.tintFrom).toEqual(sky.tintTo);
+    expect(sky.tintMix).toBe(1);
+    expect(sky.tintStrength).toBe(0.35);
+    expect(sky.horizonStop).toBe(0.6);
+  });
+
+  it("the untinted rule (−1, All Contacts) has zero tint strength", () => {
+    const sky = buildSkySpec(input({ hueIndex: -1 }));
+    expect(sky.tintTo[3]).toBe(0);
+    expect(skyTintInk(THEME_PRESETS.galaxy.dark, -1, 1)[3]).toBe(0);
+  });
+
+  it("the blend family follows the resolved theme MODE, not luminance", () => {
+    expect(buildSkySpec(input({ mode: "dark" })).additive).toBe(true);
+    expect(
+      buildSkySpec(input({ mode: "light", colors: THEME_PRESETS.galaxy.light }))
+        .additive,
+    ).toBe(false);
+  });
+
+  it("stars: every star placed once, batched by tone × size × phase, deterministic, spread over the cover", () => {
+    const a = buildSkySpec(input());
+    const b = buildSkySpec(input({ hueIndex: 7 }));
+    // The System (hue) does not move a single star.
+    expect(b.stars).toEqual(a.stars);
+    const total = a.stars.reduce((n, g) => n + g.points.length, 0);
+    expect(total).toBe(look.starCount + look.brightStarCount);
+    // A handful of batches, not one draw per star.
+    expect(a.stars.length).toBeLessThan(40);
+    const tones = THEME_PRESETS.galaxy.dark.orrerySkyStars.map(inkOf);
+    for (const group of a.stars) {
+      expect(tones).toContainEqual([...group.ink]);
+      for (const p of group.points) {
+        expect(p.x).toBeGreaterThanOrEqual(-56);
+        expect(p.x).toBeLessThan(456);
+        expect(p.y).toBeGreaterThanOrEqual(-48);
+        expect(p.y).toBeLessThan(848);
+      }
+    }
+    expect(buildSkySpec(input({ width: 0 })).stars).toEqual([]);
+  });
+
+  it("the sky image handle round-trips through the ledger handle parser", () => {
+    expect(parseLedgerHandle(skyHandle(4, 9))).toEqual({
+      kind: "sky",
+      epoch: 4,
+      id: 9,
     });
-    expect(buildStarField(0, 800, colors).stars).toEqual([]);
   });
 });
 

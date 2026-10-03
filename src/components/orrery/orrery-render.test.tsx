@@ -159,6 +159,9 @@ vi.mock("./v2/render-host", async (original) => {
   };
 });
 vi.mock("react-native-reanimated", () => ({
+  // 38.7-09: the first-frame cover (an Animated.View with an animated style).
+  default: { View: "animatedView" },
+  useAnimatedStyle: (fn: () => unknown) => fn(),
   useDerivedValue: (fn: () => unknown) => ({
     get value() {
       return fn();
@@ -209,7 +212,10 @@ vi.mock("@shopify/react-native-skia", async () => {
       return native.clock;
     },
     PaintStyle: { Fill: 0, Stroke: 1 },
-    BlendMode: { Dst: 2 },
+    BlendMode: { Dst: 2, SrcOver: 3, Plus: 12, Screen: 14 },
+    PointMode: { Points: 0 },
+    StrokeCap: { Butt: 0, Round: 1 },
+    TileMode: { Clamp: 0 },
     ClipOp: { Difference: 0, Intersect: 1 },
     FilterMode: { Nearest: 0, Linear: 1 },
     MipmapMode: { None: 0, Nearest: 1, Linear: 2 },
@@ -259,6 +265,9 @@ vi.mock("@shopify/react-native-skia", async () => {
           setAntiAlias: () => {},
           setStyle: () => {},
           setStrokeWidth: () => {},
+          setStrokeCap: () => {},
+          setBlendMode: () => {},
+          setColorFilter: () => {},
           setShader: () => {},
           setColor: (c: Float32Array) => {
             paint.color = [...c];
@@ -403,6 +412,8 @@ describe("production Orrery native tree and resource contracts", () => {
           reduced: { value: false } as never,
         }),
         colors: THEME_PRESETS.galaxy.dark,
+        themeMode: "dark",
+        themePackage: "galaxy",
         fontProvider: {} as never,
         onIntent: vi.fn(),
         onReorder: vi.fn(),
@@ -455,6 +466,8 @@ describe("production Orrery native tree and resource contracts", () => {
         pose: pose as never,
         viewport: { width: 500, height: 700 },
         colors: THEME_PRESETS.galaxy.dark,
+        themeMode: "dark",
+        themePackage: "galaxy",
         fontProvider: {} as never,
         onIntent: () => {},
         onReorder: () => {},
@@ -463,7 +476,7 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    // 38.7-07: base, stars, bodiesBehind, sun, bodiesFront, labels, overlay.
+    // 38.7-09: sky, base, bodiesBehind, sun, bodiesFront, labels, overlay.
     expect(tree[0].type).toBe("skCanvas");
     expect(tree[0].children.map((node) => node.type)).toEqual(
       Array(7).fill("skPicture"),
@@ -525,6 +538,8 @@ describe("production Orrery native tree and resource contracts", () => {
         pose: pose as never,
         viewport: { width: 500, height: 700 },
         colors: THEME_PRESETS.galaxy.dark,
+        themeMode: "dark",
+        themePackage: "galaxy",
         fontProvider: {} as never,
         onIntent: () => {},
         onReorder: () => {},
@@ -636,6 +651,8 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
         pose: pose as never,
         viewport: { width: 500, height: 700 },
         colors: THEME_PRESETS.galaxy.dark,
+        themeMode: "dark",
+        themePackage: "galaxy",
         fontProvider: {} as never,
         onIntent: () => {},
         onReorder: () => {},
@@ -658,7 +675,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const walk = (node: Node): unknown => [node.type, node.children.map(walk)];
     return tree.map(walk);
   };
-  const LAYERS = 7; // base, stars, bodiesBehind, sun, bodiesFront, labels, overlay
+  const LAYERS = 7; // sky, base, bodiesBehind, sun, bodiesFront, labels, overlay
 
   it("the same Picture layers for 3, 120 and 1,000 bodies; no per-body node — rings, bodies and labels are draws", async () => {
     const smallScene = await sceneWith(3);
@@ -681,7 +698,14 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     flushUi(1);
     const trees = [small, medium, large];
     for (const tree of trees) {
-      expect(tree).toHaveLength(1);
+      // The canvas, then (opaque SurfaceView canvas on Android, D-64) the
+      // non-touchable first-frame cover in the sky's base token (38.7-09).
+      expect(tree).toHaveLength(2);
+      expect(tree[1].type).toBe("animatedView");
+      expect(tree[1].props.pointerEvents).toBe("none");
+      expect(JSON.stringify(tree[1].props.style)).toContain(
+        THEME_PRESETS.galaxy.dark.orrerySkyBase,
+      );
       expect(tree[0].type).toBe("skCanvas");
       expect(tree[0].children.map((n) => n.type)).toEqual(
         Array(LAYERS).fill("skPicture"),
@@ -693,15 +717,19 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     }
     expect(shape(medium)).toEqual(shape(small));
     expect(shape(large)).toEqual(shape(small));
-    // The base picture: the sky fill, then one world-plane draw per ring.
-    const base = recorded(large[0].children[0]);
-    expect(base[0]).toEqual({
-      op: "drawPaint",
-      color: [...parseInk(THEME_PRESETS.galaxy.dark.background)],
-    });
+    // 38.7-09: the sky picture opens with the sky's base token (this Skia
+    // mock has no gradient shader, so the plain base fill), whatever the size.
+    for (const tree of trees)
+      expect(recorded(tree[0].children[0])[0]).toEqual({
+        op: "drawPaint",
+        color: [...parseInk(THEME_PRESETS.galaxy.dark.orrerySkyBase)],
+      });
+    // The base picture: one world-plane draw per ring (no sky fill any more).
+    const base = recorded(large[0].children[1]);
+    expect(base.filter((c) => c.op === "drawPaint")).toHaveLength(0);
     expect(base.filter((c) => c.op === "drawVertices")).toHaveLength(1000);
     expect(
-      recorded(small[0].children[0]).filter((c) => c.op === "drawVertices"),
+      recorded(small[0].children[1]).filter((c) => c.op === "drawVertices"),
     ).toHaveLength(3);
     // Bodies are recorded draws inside the two body pictures.
     const bodyCircles = (tree: Node[]) =>
@@ -738,7 +766,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const renders = native.renders;
     const snapshot = (tree: Node[]) =>
       tree[0].children.map((picture) => JSON.stringify(recorded(picture)));
-    const [base, stars, behind, sun, front, labels, overlay] = snapshot(again);
+    const [sky, base, behind, sun, front, labels, overlay] = snapshot(again);
     photoCache.drawn.set("avatars/contact-1.jpg", {
       id: 1,
       image: { width: () => 512, height: () => 512 },
@@ -749,8 +777,8 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     expect(native.setStateCalls).toBe(0);
     const after = snapshot(again);
     expect([after[0], after[1], after[3], after[5], after[6]]).toEqual([
+      sky,
       base,
-      stars,
       sun,
       labels,
       overlay,
@@ -763,18 +791,21 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     expect(shape(again)).toEqual(shape(before));
     photoCache.drawn.clear();
   });
-  it("the stars picture: today's 44 stars; its input holds under reduced motion", async () => {
+  it("38.7-09: the sky picture's stars twinkle on the ambient clock and hold still under reduced motion", async () => {
     const scene = await sceneWith(1);
     const tree = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
-    const stars = tree[0].children[1];
+    const sky = tree[0].children[0];
     // 38.7-08: the clock reaches the pictures through the quantised ambient
     // value the frame-clock driver's reaction writes.
     const at = (ms: number) => {
       native.clock.value = ms;
       flushUi(1);
-      return recorded(stars).map((c) => c.color?.[3]);
+      return recorded(sky)
+        .filter((c) => c.op === "drawPoints")
+        .map((c) => c.color?.[3]);
     };
-    expect(at(0)).toHaveLength(44);
+    // Galaxy Dark draws its star batches (tone × size × twinkle phase).
+    expect(at(0).length).toBeGreaterThan(3);
     expect(at(0)).not.toEqual(at(650));
     native.reduced.value = true;
     expect(at(0)).toEqual(at(650));

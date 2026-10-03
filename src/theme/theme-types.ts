@@ -257,6 +257,57 @@ export interface ThemePalette {
    * Seeded per-palette in `theme-presets`.
    */
   markerLifecycle: string;
+  /**
+   * ── Orrery V2 sub-palette (38.7 D-51) ──────────────────────────────────────
+   * Every colour the Orrery canvas draws beyond the shared status/avatar/star
+   * tokens. Flat `orrery*` fields (strings or readonly string arrays, like
+   * `starPalette`) so palette key iteration keeps working. They reach the Skia
+   * draw code and SkSL only as numeric RGBA (scene-specs `tokenInk`), never as
+   * a literal. The blend family is keyed from the RESOLVED THEME MODE (dark:
+   * additive/screen allowed; light: src-over with ink tokens), never from a
+   * token's luminance.
+   *
+   * The painted sky's darker END (D-07): the colour the sky gradient settles
+   * to (the lower part of the canvas), and the cover shown under the opaque
+   * canvas until its first frame lands.
+   */
+  orrerySkyBase: string;
+  /** The sky gradient's other end (the top band, toward the plane's horizon). */
+  orrerySkyHorizon: string;
+  /**
+   * The NEUTRAL nebula tints (2–3) the sky bake blends between (D-07/D-27).
+   * Never a System hue: the per-System tint is applied at draw time (H9).
+   */
+  orreryNebula: readonly string[];
+  /** Painted-sky star tones (bright stars on dark, ink specks on light). */
+  orrerySkyStars: readonly string[];
+  /**
+   * Per-System sky tints (D-08/D-50): at least 12, indexed by
+   * `systemSkyHueIndex(systemRefId, length)`. ORDER-STABLE — reordering
+   * re-tints every System.
+   */
+  orrerySystemHues: readonly string[];
+  /** The optional orbital-plane grid's line ink (D-09). */
+  orreryGrid: string;
+  /** The sun-lit side of an orbit ring (D-11 rim term). */
+  orreryRingLight: string;
+  /** The subtle light pulses travelling along the orbits (D-10). */
+  orreryPulse: string;
+  /** Body rim light (status rim, 38.7 Plan 10). */
+  orreryRim: string;
+  /** Soft glows (atmosphere / corona accents, 38.7 Plans 10–11). */
+  orreryGlow: string;
+  /**
+   * The focus reticle (D-18). SEEDED with the package default accent fill and
+   * OVERLAID by `applyAccent`, so it follows the user's accent.
+   */
+  orreryReticle: string;
+  /** HUD instrument chrome (D-22). SEEDED and OVERLAID like `orreryReticle`. */
+  orreryInstrument: string;
+  /** The star-warp streaks of the System switch (D-24). */
+  orreryWarp: string;
+  /** The dim drawn under a docked card (D-55 occlusion). */
+  orreryOcclusion: string;
 }
 
 /**

@@ -147,7 +147,7 @@ export function systemAttentionFeedback(
 }
 
 export function OrreryScreen() {
-  const { colors } = useTheme();
+  const { colors, mode: themeMode, package: themePackage } = useTheme();
   const [contactsOpen, setContactsOpen] = useState(false);
   const [clusterOpen, setClusterOpen] = useState(false);
   const [reorderError, setReorderError] = useState(false);
@@ -1064,6 +1064,8 @@ export function OrreryScreen() {
             pose={pose}
             viewport={viewport}
             colors={colors}
+            themeMode={themeMode}
+            themePackage={themePackage}
             fontProvider={fontProvider}
             onIntent={onIntent}
             onReorder={onReorder}

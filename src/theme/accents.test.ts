@@ -293,4 +293,25 @@ describe("applyAccent — provider overlay logic (accent=fill/onAccent/accentTex
     expect(overlaid.danger).toBe(base.danger);
     expect(base.accent).toBe("#6C8CFF");
   });
+
+  it("38.7 D-51: the Orrery reticle and instrument follow the accent fill; the rest of the orrery sub-palette does not", () => {
+    for (const pkg of PACKAGES) {
+      for (const mode of MODES) {
+        const base = resolvePalette(pkg, mode);
+        for (const id of ACCENT_IDS) {
+          const tone = resolveAccent(id, pkg, mode);
+          const overlaid = applyAccent(base, tone);
+          expect(overlaid.orreryReticle).toBe(tone.fill);
+          expect(overlaid.orreryInstrument).toBe(tone.fill);
+          expect(overlaid.orrerySkyBase).toBe(base.orrerySkyBase);
+          expect(overlaid.orrerySystemHues).toBe(base.orrerySystemHues);
+          expect(overlaid.orreryPulse).toBe(base.orreryPulse);
+        }
+        // The default tone reproduces the seeded values (no drift).
+        const seeded = applyAccent(base, resolveAccent(null, pkg, mode));
+        expect(seeded.orreryReticle).toBe(base.orreryReticle);
+        expect(seeded.orreryInstrument).toBe(base.orreryInstrument);
+      }
+    }
+  });
 });
