@@ -306,3 +306,17 @@ Gate summary rows: `| Gate | Phone | Baseline | Proposed / locked | Method ref |
   System sheet stalls its UI thread ~3 s (`Skipped 168 frames`), and `uiautomator dump`
   answers "null root node" for ~10 s after a switch. The sheet wait is 10 s and UI dumps
   retry for up to 30 s. Tap timestamps are taken at the tap itself, so no timing changed.
+- **2026-10-03** — First-recording validation (§10.2) FAILED and the tab-return tool was fixed
+  before any baseline number (38.7 Plan 02):
+  1. `decode()` let ffmpeg's rawvideo output resample to a constant rate (`dup=16 drop=16`
+     on a 6 Pro recording), so pixel data no longer matched its timestamps and `t_full`
+     came out 1.4 s where the hand check shows 8.4 s. Decoding is now `-fps_mode
+     passthrough` and refuses to proceed if raw frames and timestamps disagree.
+  2. Canvas content is scored on fine structure (each pixel minus its 3×3 mean), so a
+     smooth sky backdrop painted before the scene never counts as the full frame. The
+     95 % reach / 90 % hold rule over the last-2-s settled level is unchanged.
+  3. Recordings are 60 s (were 15 s): main's tab return takes ~8 s on the 6 Pro and longer
+     than 15 s on the 3a, where the scene reload stalls the UI thread ~13 s.
+  4. Hand-check strips are cut by frame index (a `-ss` seek to a frame's own time can
+     land on the next frame).
+  `selftest.py` 27/27, including a backdrop-first scene and a variable-rate decode check.

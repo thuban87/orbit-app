@@ -17,8 +17,10 @@ Times (seconds from the recording start; reported as differences):
             completed (cross-fade done)
   t_canvas  the canvas band first departs from that blank pre-mount frame
   t_full    the FIRST FULL FRAME: every canvas frame is scored by its content —
-            the fraction of pixels departing from the blank pre-mount frame by
-            more than a noise threshold. The settled content level is the
+            the fraction of pixels whose fine structure (pixel minus its 3x3 mean)
+            departs from the blank pre-mount frame's by more than a noise
+            threshold, so a smooth sky backdrop painted before the scene does not
+            count as content. The settled content level is the
             median score over the last 2 s; t_full is the first frame scoring
             >= 95 % of it that never falls below 90 % of it afterwards. The final
             frame is never used as a similarity target: ambient motion (drift,
@@ -59,7 +61,7 @@ REACH = 0.95
 HOLD = 0.90
 SETTLE_WINDOW_S = 2.0
 FADE_DONE = 0.9
-RECORD_LIMIT_S = 15
+RECORD_LIMIT_S = 60  # main's tab return: ~8 s on the 6 Pro, > 15 s on the 3a (2026-10-03)
 DIGEST_DWELL_S = 3.0
 PRE_TAP_S = 1.5
 BACKGROUND_DWELL_S = 5.0
@@ -82,6 +84,31 @@ def departure(frame: bytes, ref: bytes, width: int, region: tuple[int, int, int,
     if not a:
         return 0.0
     return sum(1 for p, q in zip(a, b) if abs(p - q) > NOISE) / len(a)
+
+
+def highpass(frame: bytes, width: int, region: tuple[int, int, int, int]) -> list[list[int]]:
+    """Each region pixel minus the mean of its 3x3 neighbourhood (rows of ints; the
+    region's border pixels are dropped). Smooth fills (a sky backdrop, a nebula
+    gradient, a cross-fade) score near zero; edges (rings, bodies, labels) score high."""
+    x0, y0, x1, y1 = region
+    rows = [frame[y * width + x0:y * width + x1] for y in range(y0, y1)]
+    hsum = [[a + b + c for a, b, c in zip(r, r[1:], r[2:])] for r in rows]
+    out = []
+    for k in range(1, len(rows) - 1):
+        centre = rows[k][1:-1]
+        out.append([9 * p - (a + b + c) for p, a, b, c in zip(centre, hsum[k - 1], hsum[k], hsum[k + 1])])
+    return out
+
+
+def structure_departure(hp: list[list[int]], ref: list[list[int]]) -> float:
+    """Fraction of pixels whose fine structure (highpass, in 1/9 gray levels) differs
+    from the reference's by more than NOISE gray levels."""
+    limit = 9 * NOISE
+    total = changed = 0
+    for row, ref_row in zip(hp, ref):
+        total += len(row)
+        changed += sum(1 for p, q in zip(row, ref_row) if abs(p - q) > limit)
+    return changed / total if total else 0.0
 
 
 def _first(indices, predicate):
@@ -109,8 +136,12 @@ def analyse_frames(frames: list[tuple[float, bytes]], width: int, regions: dict,
     header_final = header_dep[-1]
     k_blank = _first(range(k_screen, n), lambda k: header_dep[k] >= FADE_DONE * header_final) or k_screen
     blank = frames[k_blank][1]
-    content = [departure(frames[k][1], blank, width, regions["canvas"]) if k >= k_blank else 0.0
-               for k in range(n)]
+    # Canvas content is scored on fine STRUCTURE, not raw brightness: main paints a
+    # smooth sky backdrop seconds before the scene, and a brightness score took that
+    # backdrop for the full frame (6 Pro, 2026-10-03 hand check).
+    blank_hp = highpass(blank, width, regions["canvas"])
+    content = [structure_departure(highpass(frames[k][1], width, regions["canvas"]), blank_hp)
+               if k >= k_blank else 0.0 for k in range(n)]
     tail = [content[k] for k in range(k_blank, n) if times[k] >= duration_s - SETTLE_WINDOW_S]
     settled = statistics.median(tail) if tail else content[-1]
     base = {"t_tap": times[k_tap], "t_screen": times[k_screen], "t_blank": times[k_blank],
@@ -187,8 +218,11 @@ def regions_from_ui(nodes, screen: tuple[int, int]) -> dict:
 
 def decode(mp4: str) -> tuple[list[tuple[float, bytes]], int, int, float]:
     proc = subprocess.run(
+        # -fps_mode passthrough: one output frame per decoded frame. Without it the
+        # rawvideo muxer resamples to a constant rate (dup/drop), so pixel data no
+        # longer lines up with showinfo's timestamps (found 2026-10-03: dup=16 drop=16).
         ["ffmpeg", "-hide_banner", "-i", mp4, "-vf", f"scale={DECODE_WIDTH}:-2,format=gray,showinfo",
-         "-f", "rawvideo", "-pix_fmt", "gray", "-"],
+         "-fps_mode", "passthrough", "-f", "rawvideo", "-pix_fmt", "gray", "-"],
         capture_output=True, check=True)
     log = proc.stderr.decode(errors="replace")
     infos = re.findall(r"n:\s*\d+.*?pts_time:([\d.]+).*?s:(\d+)x(\d+)", log)
@@ -196,6 +230,8 @@ def decode(mp4: str) -> tuple[list[tuple[float, bytes]], int, int, float]:
     total = int(duration.group(1)) * 3600 + int(duration.group(2)) * 60 + float(duration.group(3)) if duration else 0.0
     width, height = int(infos[0][1]), int(infos[0][2])
     size = width * height
+    if len(proc.stdout) != size * len(infos):
+        raise RuntimeError(f"decode misaligned: {len(proc.stdout) // size} raw frames vs {len(infos)} timestamps")
     frames = [(float(t), proc.stdout[i * size:(i + 1) * size]) for i, (t, _, _) in enumerate(infos)]
     return frames, width, height, max(total, frames[-1][0] if frames else 0.0)
 
@@ -205,12 +241,15 @@ def scale(region: tuple[int, int, int, int], factor: float, width: int, height: 
     return max(0, x0), max(0, y0), min(width, max(x1, x0 + 1)), min(height, max(y1, y0 + 1))
 
 
-def save_strip(mp4: str, times: list[float], out_dir: str, stem: str) -> list[str]:
+def save_strip(mp4: str, indices: list[int], out_dir: str, stem: str) -> list[str]:
+    """The decoded frames at these indices as PNGs. Selected by frame index, not by
+    `-ss` time: a seek to a frame's own timestamp can land on the next frame."""
     paths = []
-    for label, t in zip(("before", "at", "after"), times):
+    for label, k in zip(("before", "at", "after"), indices):
         path = os.path.join(out_dir, f"{stem}-tfull-{label}.png")
-        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{t:.3f}", "-i", mp4,
-                        "-frames:v", "1", path], check=True)
+        subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", mp4,
+                        "-vf", f"select=eq(n\\,{k})", "-fps_mode", "passthrough", "-frames:v", "1", path],
+                       check=True)
         paths.append(path)
     return paths
 
@@ -252,11 +291,12 @@ def record_run(serial: str, regions: dict, background: bool, out_dir: str, stem:
     result = analyse_frames(frames, width, scaled, duration, tap_region="full" if background else "tab")
     if result.get("outcome") == "valid":
         k = result["k_full"]
-        strip = [frames[max(0, k - 1)][0], frames[k][0], frames[min(len(frames) - 1, k + 1)][0]]
+        strip = [max(0, k - 1), k, min(len(frames) - 1, k + 1)]
         result["strip"] = save_strip(mp4, strip, out_dir, stem)
         result["t_photos_context"] = photo_probe_time(frames, width, scaled["canvas"], result["t_canvas"])
     elif result.get("t_screen") is not None:
-        result["strip"] = save_strip(mp4, [result["t_screen"]] * 3, out_dir, stem + "-screen")
+        k_screen = next(i for i, (t, _) in enumerate(frames) if t >= result["t_screen"])
+        result["strip"] = save_strip(mp4, [k_screen, len(frames) // 2, len(frames) - 1], out_dir, stem + "-screen")
     result.pop("content", None)
     return {"mp4": mp4, "frames": len(frames), "decoded": [width, height], **result}
 

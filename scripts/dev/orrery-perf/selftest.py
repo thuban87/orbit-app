@@ -489,6 +489,59 @@ def _():
     eq(frames[-1][1] != frames[25][1], True, "the final frame differs from the t_full frame (ambient)")
 
 
+def _frame_backdrop_first(t: float) -> bytes:
+    """As _frame, but a smooth sky backdrop (a gentle gradient) fills the canvas at
+    1.8 s and the bodies only arrive at 3.0 s (main on the 6 Pro, 2026-10-03)."""
+    px = bytearray(_frame(min(t, 1.7)))
+    if t >= 1.8:
+        for y in range(6, 34):
+            for x in range(W):
+                px[y * W + x] = 50 + 40 * x // W + y // 4
+    if t >= 3.0:
+        for x, y in BODY:
+            px[y * W + x] = 230
+    return bytes(px)
+
+
+@check("scenario: tab return ignores a smooth backdrop that precedes the scene (first full frame = bodies drawn)")
+def _():
+    import tab_return
+
+    frames = [(k / 10, _frame_backdrop_first(k / 10)) for k in range(60)]
+    out = tab_return.analyse_frames(frames, W, REGIONS, 6.0)
+    eq(out["outcome"], "valid")
+    eq(out["t_full"], 3.0, "t_full")
+    eq(out["total_s"], 2.0, "total")
+
+
+@check("scenario: tab return decode keeps each frame's pixels with its own timestamp on a variable-rate recording")
+def _():
+    import subprocess
+    import tab_return
+
+    levels, durations = [20, 90, 160, 230], [0.1, 1.5, 0.05, 2.0]
+    with tempfile.TemporaryDirectory() as tmp:
+        lines = ["ffconcat version 1.0"]
+        for i, (level, duration) in enumerate(zip(levels, durations)):
+            png = os.path.join(tmp, f"f{i}.png")
+            subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                            f"color=c=0x{level:02x}{level:02x}{level:02x}:s=64x128", "-frames:v", "1", png], check=True)
+            lines += [f"file f{i}.png", f"duration {duration}"]
+        lines.append(f"file f{len(levels) - 1}.png")
+        with open(os.path.join(tmp, "list.txt"), "w", encoding="utf-8") as handle:
+            handle.write("\n".join(lines) + "\n")
+        mp4 = os.path.join(tmp, "vfr.mp4")
+        subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i",
+                        os.path.join(tmp, "list.txt"), "-fps_mode", "vfr", "-pix_fmt", "yuv420p", mp4], check=True)
+        frames, width, height, _ = tab_return.decode(mp4)
+    means = [round(sum(f) / len(f)) for _, f in frames]
+    times = [round(t, 2) for t, _ in frames]
+    eq(len(frames) >= 4 and all(abs(a - b) <= 0.03 for a, b in zip(times, [0.0, 0.1, 1.6, 1.65])), True,
+       f"frame timestamps {times} (container time base rounds by a few ms)")
+    for level, mean in zip(levels, means):
+        eq(abs(level - mean) <= 6, True, f"frame level {level} decoded as {mean}")
+
+
 @check("scenario: tab return gives no number when the recording ends too soon or the canvas never changes")
 def _():
     import tab_return
