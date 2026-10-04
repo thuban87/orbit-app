@@ -377,6 +377,13 @@ export function OrreryWorldInner({
   occlusionRects?: SharedValue<readonly CameraRect[]>;
 }) {
   const { fontScale } = useWindowDimensions();
+  // 38.7-15 (DEBUG): this mount's first render began (the tab-return
+  // decomposition: warm-pose → world-render → canvas-mount).
+  const renderMarked = useRef(false);
+  if (!renderMarked.current) {
+    renderMarked.current = true;
+    perf?.mark("world-render");
+  }
   const resources = switchRuntime.resources;
   const mounted = useRef(true);
   const focusKey = JSON.stringify([

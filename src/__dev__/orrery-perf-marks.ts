@@ -4,7 +4,8 @@
  * Two clocks:
  *   - "focus": a tab focus starts it (`beginFocus`); `mark(name)` logs
  *     `orrery-perf <name> <ms since focus>` — the tab-return decomposition
- *     (focus, hydrated, warm-pose, canvas-mount, first-recorded, reloaded,
+ *     (focus, hydrated, warm-pose, world-render, canvas-mount,
+ *     surface-ready, first-frame-end, cover-lift, first-recorded, reloaded,
  *     session-ready);
  *   - "switch": a System tap starts it (`beginSwitch`); `markSwitch(name)`
  *     logs `orrery-perf switch:<name> <ms since tap>` — where the switch wait

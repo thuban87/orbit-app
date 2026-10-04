@@ -253,6 +253,20 @@ export interface OrreryV2CanvasProps {
   ) => void;
 }
 
+/** 38.7-15 (DEBUG): the first-frame/cover timeline marks (orrery-perf-marks). */
+interface OrreryPerfMarks {
+  mark(name: string): void;
+}
+// DEBUG only: Metro folds this to null in a release bundle.
+const perf: OrreryPerfMarks | null =
+  typeof __DEV__ !== "undefined" && __DEV__
+    ? require("@/__dev__/orrery-perf-marks")
+    : null;
+/** A stable JS target for the UI thread's DEBUG marks (a no-op in release). */
+function markPerf(name: string): void {
+  perf?.mark(name);
+}
+
 /** The ambient consumers on screen (D-37/D-40: twinkle, sky drift, sun pulse). */
 const AMBIENT_CONSUMERS = {
   twinkle: true,
@@ -625,6 +639,7 @@ export function OrreryV2Canvas({
     return watchFirstSurfaceFrame(
       () => canvasRef.current?.getNativeId?.() ?? null,
       () => {
+        perf?.mark("surface-ready");
         surfaceReady.value = true;
       },
     );
@@ -638,6 +653,7 @@ export function OrreryV2Canvas({
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           firstFrame.value = false;
+          runOnJS(markPerf)("first-frame-end");
         });
       });
     },
@@ -653,6 +669,7 @@ export function OrreryV2Canvas({
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           cover.value = 0;
+          runOnJS(markPerf)("cover-lift");
         });
       });
     },
