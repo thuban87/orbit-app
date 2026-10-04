@@ -50,9 +50,11 @@ It stays recognisably Orbit: contacts and relationships remain the information a
     - Home is no longer top-down.
     - Recenter still restores all Home axes; Home simply has a tilt.
     - The owner is "not totally sold … may switch back to flat eventually, let's design this so it's easily changeable", so flat must remain a supported Home value.
+    - **[DECIDED 2026-10-04, owner — Plan 14 checkpoint, T-HOME = HOME-A]** The **62° tilted Home stays** (`ACTIVE_HOME_PROFILE` "tilted"), chosen from side-by-side tilted and flat screenshots; flat remains one word away. Mirrored as CONTEXT D-78.
 -   **[DECIDED · 2026-10-02] D-04 --- One-finger drag pans the map** (today's behaviour, enforced). Lab C's one-finger orbit and two-finger pan are rejected.
 -   **[DECIDED · 2026-10-02] D-05 --- A small, perceptible pan coast.** The owner saw none in any lab. Low priority.
 -   **[DECIDED · 2026-10-02] D-06 --- Near-side size cap** (Lab B CLAMP). People on the near side of the tilted map cannot grow into large discs.
+    - **[DECIDED 2026-10-04, owner — Plan 14 checkpoint, T-NEAR = NEAR-C]** The cap is loosened so near-side planets read bigger: perspective growth knee 0.06 → **0.6**, drawn-radius asymptote 0.08 → **0.12** of the short side (bend at 0.7 of it, unchanged). The nearest planet is ~55 % bigger a zoom step in; at Home, Size 120 bodies sit at the minimum size, so Home looks the same. The drawn radius, hit radius, label gap and framing all use the one size function, so taps and labels follow. Still a cap: bodies cannot grow into large discs. Mirrored as CONTEXT D-78.
 
 ### Environment
 
@@ -126,7 +128,9 @@ It stays recognisably Orbit: contacts and relationships remain the information a
 ### Themes
 
 -   **[DECIDED · 2026-10-02] D-26 --- Light themes start from Lab B's light-mode treatment.** Galaxy Light needs more flavour of its own.
+    - **[DECIDED 2026-10-04, owner — Plan 14 checkpoint, T-LIGHT / T-GLIGHT = GB-125]** Standard Light stays **as is** (Lab B's light treatment). Galaxy Light's flavour is **Galaxy Dark's nebula hues** on the light vellum sky (the "dark-hues" candidate, authored because no lab built a Galaxy Light flavour) at **1.25×** the Lab B light nebula strength; 1× was "too plain", 2.5× "too strong". The other candidates stay selectable, unused. Mirrored as CONTEXT D-78.
 -   **[DECIDED · 2026-10-02] D-27 --- Standard and Galaxy look distinct.** The Galaxy nebula is "a little more subdued".
+    - **[DECIDED 2026-10-04, owner — Plan 14 checkpoint, T-DISTINCT = DIST-OK]** The four themes were accepted as distinct, with Galaxy Light on its GB-125 sky. Mirrored as CONTEXT D-78.
 -   **[DECIDED · 2026-10-02] D-28 --- Hard gate on contrast.** Secondary text on the Orrery's see-through cards must pass 4.5:1 in all four themes over the new sky.
 
 ### Risk
@@ -172,6 +176,7 @@ It stays recognisably Orbit: contacts and relationships remain the information a
     - No sun churn, reticle scan or idle moon motion. Lab A's corona and granulation are drawn frozen, or move only with the existing sun pulse.
 -   **[DECIDED · 2026-10-02] D-38 --- No progress wake.** The tether is moot under D-12.
 -   **[DECIDED · 2026-10-02] D-39 --- The map runs up under the Orrery title** (Lab B IMMERSE). The status bar, tab bar and "+" button are unchanged.
+    - **[DECIDED 2026-10-04, owner — Plan 14 checkpoint, T-SCRIM = SCRIM-A / SD-FIX]** Lab B's title scrim stays (0.96 at the top, 0.84 behind the title, fading over 44 dp). The bar's bottom edge fades into the map with no step in both light themes (owner-approved fix, Plan 14) and now in **Standard Dark** too (its opaque bar at luma ~28 sat over a map at ~21–22). Galaxy Dark is unchanged (Lab B's look). The title passes 4.5:1 in all four themes (minimum scrim Galaxy Dark 0.61, Standard Light 0.04, Galaxy Light and Standard Dark 0). Mirrored as CONTEXT D-78.
 -   **[DECIDED · 2026-10-02] D-40 --- Cool idle.**
     - When nothing is moving, the Orrery stops drawing except for the low-rate ambient (twinkle, sun pulse, orbit pulses, sky drift), all on one bounded ambient clock (D-49).
     - It must not run noticeably warmer than today's Orbit on either phone.
@@ -245,6 +250,7 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
     - Adopt Lab C's dolly focal model (focal ∝ 1/zoom), which is what makes a steep tilt read as depth rather than squash. Today's telephoto focal flattens it (`audits/LAB-A-AUDIT.md` §5, `audits/LAB-C-AUDIT.md` §1).
     - Re-derive the depth clamp and the near-plane guards.
     - Flat Home (tilt 0) must remain valid, with lens shift 1.0 and a whole-disc fit, plus min size and ring fade at density.
+    - **[DECIDED 2026-10-04, owner — Plan 14 checkpoint, T-FADE = FADE-80 / T-TINYZOOM = TINY-A]** The ring density fade's floor is **80 %** (`RING_DENSITY_FLOOR` 0.8, was 0.15; the owner had seen 15 % as far too strong); the 20 px spacing where the fade starts is unchanged. Strategy Home keeps zooming in up to **4** for tiny Systems (`HOME_STRATEGY_MAX_ZOOM`), so a 1–3 person System opens with names showing. Mirrored as CONTEXT D-78.
     - Every `frameBodies`/`unproject`/Home-fit caller gets tests at 0°, 45° and 62°.
 -   **[DERIVED] D-46 --- Platform seam.**
     - One `OrreryRenderHost` capability interface owns the Android-only or GPU-specific choices:
@@ -305,6 +311,7 @@ Full inventory and decision crawl: [audits/PROD-GROUNDING.md](../../experiments/
     - Stack detection must be indexed, not O(n²) per re-record (it is unmeasured at 800 bodies).
 -   **[DERIVED] D-55 --- Contrast fix lever.** For D-28, dim what the Orrery draws **under** the card region (Lab B's occlusion lever); never change card opacity. Re-prove with the ADR-169 both-extrema method over the brightest sky, nebula, star, initials and photo pixel in all four themes. Lab B measured 4.42:1 in Standard Dark, and the worst pixel was a white initials glyph.
     - **[DECIDED 2026-10-02, owner]** The occlusion dim is capped at 0.7 (D-20: don't hide the map behind the card). If any theme needs more than 0.7 to pass 4.5:1, stop and bring the owner the trade-off with screenshots. Mirrored as CONTEXT D-62.
+    - **[DECIDED 2026-10-04, owner — Plan 14 checkpoint, T-DIM = DIM-A]** The **full card-area dim** stays (every pixel under a card dimmed toward the sky's occlusion ink at 0.7 in every theme; card opacity unchanged). No theme needed more than 0.7 (proof minimums: Galaxy Dark 0, Galaxy Light 0, Standard Dark 0.04, Standard Light 0), so D-62 did not escalate. The owner saw no difference from Lab B's bodies-only occlusion; that mode stays selectable, unused. Mirrored as CONTEXT D-78.
 
 ## Derived Constraints
 
@@ -353,6 +360,7 @@ O-1, O-2 and O-3 became D-56, D-57 and D-58 below. No open items remain.
     - It keeps phase-09 `:311`: no tilt or yaw.
     - It does not need V2's cinematic effects (switch warp, pulses, reticle), because its job is still a membership and scale preview.
     - It reuses the V2 renderer pieces rather than keeping a second, obsolete look.
+    - **[DECIDED 2026-10-04, owner — Plan 14 checkpoint, T-PREVIEW = PREV-OK]** The flat V2 Preview is approved as built (`1b3c0935`). Mirrored as CONTEXT D-78.
 -   **[DECIDED · 2026-10-02] D-58 --- Tab return: keep reusable resources warm, inside a bounded budget.**
     - **Two lifecycles, kept separate:**
       - The **active render lifecycle** (canvas, clock, GPU surfaces) still stops and releases on blur and background, as today.
@@ -498,3 +506,4 @@ O-1, O-2 and O-3 became D-56, D-57 and D-58 below. No open items remain.
 -   **2026-10-03** --- G-RIM resolved: status rim + glow as in Lab B (CONTEXT D-74). Owner asked for the nebula comparison (NEB-yes) before settling G-SKYTINT.
 -   **2026-10-04** --- D-07/D-27 nebula: Lab B's distant baked nebula ported (Plan 09 rework, 47b1b039); owner chose Galaxy Dark at 35 % of Lab B (CONTEXT D-75). The earlier soft-haze nebula is rejected.
 -   **2026-10-04** --- Plan 13 switch rulings: D-24 star warp at Lab B's numbers, orbit streaks "weaker", the tap-to-motion wait to be fixed in Plan 15 (CONTEXT D-76); S-SWIRL corrected to Lab C's camera and ruled SW-A "as in Lab C" after a side-by-side clip (CONTEXT D-77). The D-53 "shortest-arc yaw plus an authored spin" bullet is superseded by the Lab C copy (raw linear yaw path plus Lab C's breath).
+-   **2026-10-04** --- Plan 14 theme/Home rulings (CONTEXT D-78): D-03 62° tilted Home stays; D-26 Standard Light as is, Galaxy Light = Galaxy Dark's nebula hues at 1.25×; D-27 themes distinct; D-39 Lab B title scrim stays, Standard Dark's bar edge smoothed like the light themes (Galaxy Dark unchanged); D-55/D-62 full card-area dim at 0.7 stays; D-45 ring-fade floor 80 % and tiny-System zoom 4; D-06 near-side cap loosened (knee 0.6, asymptote 0.12); D-57 flat V2 Preview approved. Contrast re-proven in all four themes.
