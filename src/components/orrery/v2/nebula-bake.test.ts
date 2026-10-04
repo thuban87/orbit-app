@@ -4,7 +4,8 @@
  * baked image's lifetime under Plan 07's generation ledger (delayed ack,
  * replacement, unmount teardown, late and stale results).
  */
-import { describe, expect, it, vi } from "vitest";
+import { Skia } from "@shopify/react-native-skia";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@shopify/react-native-skia", () => ({
   AlphaType: { Premul: 2 },
@@ -16,11 +17,11 @@ import { SKY_UNTINTED, systemSkyHueIndex } from "@/logic/orrery-sky-logic";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import { createOrreryGenerationLedger } from "../resources/orrery-generation-ledger";
 import {
-  bakeSkyPixels,
+  bakeSkyImage,
   createSkyBakeOwner,
   type SkyBakeInput,
   skyBakeKey,
-  skyBakePixels,
+  skyBakeUniforms,
   skySizeBucket,
 } from "./nebula-bake";
 import {
@@ -28,17 +29,13 @@ import {
   parseLedgerHandle,
   type SkyImageSpec,
 } from "./scene-specs";
+import { resetOrreryShaderCache } from "./shaders";
 import {
-  SKY_BAKE_MAX_PX,
   SKY_MARGIN_DP,
+  SKY_NEBULA_PERIOD,
+  SKY_NEBULA_TEX,
   SKY_SIZE_BUCKET_DP,
 } from "./visual-tunables";
-
-const NEBULA = [
-  [0.25, 0.3, 0.65, 1],
-  [0.4, 0.3, 0.7, 1],
-  [0.2, 0.45, 0.55, 1],
-] as const;
 
 function input(
   key: string,
@@ -46,11 +43,9 @@ function input(
 ): SkyBakeInput {
   return {
     key,
-    nebula: NEBULA,
-    strength: 0.25,
-    width: 32,
-    height: 64,
-    seed: 7,
+    size: SKY_NEBULA_TEX,
+    period: SKY_NEBULA_PERIOD,
+    seed: 0,
     ...overrides,
   };
 }
@@ -80,43 +75,63 @@ describe("bake keys and sizes", () => {
     // Nearby sizes share a bucket (no re-bake for a few dp of layout change).
     expect(skySizeBucket(410, 798)).toEqual(bucket);
   });
-
-  it("the texture is small and its longest side capped", () => {
-    const px = skyBakePixels(skySizeBucket(1200, 2600));
-    expect(Math.max(px.width, px.height)).toBeLessThanOrEqual(SKY_BAKE_MAX_PX);
-    expect(px.width).toBeGreaterThan(1);
-  });
 });
 
-describe("bakeSkyPixels (neutral nebula)", () => {
-  it("is deterministic, premultiplied and transparent off the clouds", () => {
-    const a = bakeSkyPixels(input("k", { width: 64, height: 128 }));
-    const b = bakeSkyPixels(input("k", { width: 64, height: 128 }));
-    expect(a).toEqual(b);
-    let lit = 0;
-    let clear = 0;
-    for (let i = 0; i < a.length; i += 4) {
-      const alpha = a[i + 3];
-      if (alpha === 0) clear++;
-      else lit++;
-      // Premultiplied: no channel exceeds alpha (± the dither LSB).
-      for (let c = 0; c < 3; c++)
-        expect(a[i + c]).toBeLessThanOrEqual(alpha + 1);
-      // Quiet: never above the strength (0.25 → 64/255, + the dither LSB).
-      expect(alpha).toBeLessThanOrEqual(65);
-    }
-    // A soft band of clouds, not a full-screen wash (D-07: "not everywhere").
-    expect(lit).toBeGreaterThan(0);
-    expect(clear).toBeGreaterThan(lit / 4);
+describe("bakeSkyImage (one-shot GPU density bake)", () => {
+  const skia = Skia as unknown as Record<string, unknown>;
+  afterEach(() => {
+    for (const k of ["RuntimeEffect", "Surface", "Paint"]) delete skia[k];
+    resetOrreryShaderCache();
   });
 
-  it("no tints or zero strength → fully transparent", () => {
-    expect(
-      bakeSkyPixels(input("k", { strength: 0 })).every((v) => v === 0),
-    ).toBe(true);
-    expect(
-      bakeSkyPixels(input("k", { nebula: [] })).every((v) => v === 0),
-    ).toBe(true);
+  it("returns the raster copy and releases the snapshot and the surface", () => {
+    const log: string[] = [];
+    const raster = { name: "raster" };
+    skia.RuntimeEffect = {
+      Make: () => ({
+        makeShader: (u: number[]) => {
+          log.push(`uniforms ${u.join(",")}`);
+          return {};
+        },
+      }),
+    };
+    skia.Paint = () => ({ setShader: () => {} });
+    skia.Surface = {
+      MakeOffscreen: (w: number, h: number) => {
+        log.push(`surface ${w}x${h}`);
+        return {
+          getCanvas: () => ({ drawPaint: () => log.push("draw") }),
+          flush: () => log.push("flush"),
+          makeImageSnapshot: () => ({
+            makeNonTextureImage: () => raster,
+            dispose: () => log.push("snapshot disposed"),
+          }),
+          dispose: () => log.push("surface disposed"),
+        };
+      },
+    };
+    expect(bakeSkyImage(input("k", { seed: 5 }))).toBe(raster);
+    expect(log).toEqual([
+      `surface ${SKY_NEBULA_TEX}x${SKY_NEBULA_TEX}`,
+      `uniforms ${skyBakeUniforms(input("k", { seed: 5 })).join(",")}`,
+      "draw",
+      "flush",
+      "snapshot disposed",
+      "surface disposed",
+    ]);
+  });
+
+  it("no runtime (no effect or no offscreen surface) → null, nothing thrown", () => {
+    expect(bakeSkyImage(input("k"))).toBeNull();
+    skia.RuntimeEffect = { Make: () => ({ makeShader: () => ({}) }) };
+    expect(bakeSkyImage(input("k"))).toBeNull();
+    skia.Surface = { MakeOffscreen: () => null };
+    expect(bakeSkyImage(input("k"))).toBeNull();
+  });
+
+  it("the seed is an integer lattice offset (the tile stays periodic)", () => {
+    const u = skyBakeUniforms(input("k", { seed: 2.4 }));
+    expect(u).toEqual([SKY_NEBULA_TEX, SKY_NEBULA_PERIOD, 2, 6]);
   });
 });
 

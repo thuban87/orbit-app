@@ -108,7 +108,6 @@ import {
   createSkyBakeOwner,
   type SkyBakeOwner,
   skyBakeKey,
-  skyBakePixels,
   skySizeBucket,
 } from "./v2/nebula-bake";
 import { OrreryV2Canvas } from "./v2/OrreryV2Canvas";
@@ -156,6 +155,8 @@ import {
   RETICLE_LOCK_MS,
   RING_LOOKS,
   SKY_LOOKS,
+  SKY_NEBULA_PERIOD,
+  SKY_NEBULA_TEX,
   SKY_STAR_SEED,
   SKY_TWINKLE_GROUPS,
 } from "./v2/visual-tunables";
@@ -284,8 +285,8 @@ function routeRetired(
   if (skies.length > 0) retireSky(skies);
 }
 
-/** The per-package noise seed of the baked nebula (stable across visits). */
-const SKY_NEBULA_SEED = { galaxy: 7, standard: 11 } as const;
+/** The per-package lattice offset of the baked nebula (stable across visits; Galaxy 0 = Lab B's sky). */
+const SKY_NEBULA_SEED = { galaxy: 0, standard: 5 } as const;
 
 export function OrreryWorld({
   scene,
@@ -583,15 +584,12 @@ export function OrreryWorld({
   // H9: bake on mount and on a theme / size-bucket change only (the key has
   // no hue component, so a System change never reaches this effect's deps).
   const skyKey = skyBakeKey(themePackage, themeMode, skyBucket);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by skyKey (package, mode, bucket); the nebula tokens are fixed per package × mode
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by skyKey (package, mode, bucket); the bake holds densities only (no colour, H9)
   useEffect(() => {
-    const texels = skyBakePixels(skyBucket);
     skyOwner.request({
       key: skyKey,
-      nebula: colors.orreryNebula.map(tokenInk),
-      strength: skyLook.nebulaStrength,
-      width: texels.width,
-      height: texels.height,
+      size: SKY_NEBULA_TEX,
+      period: SKY_NEBULA_PERIOD,
       seed: SKY_NEBULA_SEED[themePackage],
     });
   }, [skyOwner, skyKey]);

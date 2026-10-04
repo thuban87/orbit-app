@@ -244,6 +244,12 @@ describe("buildSkySpec (38.7-09: D-07/D-08/D-50/D-51)", () => {
     tintStrength: 0.35,
     tintWash: 0.05,
     horizonStop: 0.6,
+    nebulaStrength: 1,
+    nebula: { lobeA: 0.47, lobeB: 0.42, glow: 0.26, ember: 0.3, dust: 0.38 },
+    vignette: 0.62,
+    vignetteShade: 0.55,
+    farStarAlpha: 0.9,
+    farStarDensity: 0.5,
   };
   const input = (
     overrides: Partial<Parameters<typeof buildSkySpec>[0]> = {},

@@ -11,7 +11,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 
 vi.mock("@shopify/react-native-skia", () => ({
   BlendMode: { Dst: 2, SrcOver: 3, Screen: 14 },
-  TileMode: { Clamp: 0 },
+  TileMode: { Clamp: 0, Repeat: 1 },
   ClipOp: { Difference: 0, Intersect: 1 },
   FilterMode: { Nearest: 0, Linear: 1 },
   MipmapMode: { None: 0, Nearest: 1, Linear: 2 },
@@ -30,12 +30,16 @@ import {
   plainRingLine,
   ringPlaneUniforms,
 } from "./draw-plane";
-import type { BodyLit, SunLook } from "./scene-specs";
+import { skyNebulaUniforms } from "./draw-sky";
+import { skyBakeUniforms } from "./nebula-bake";
+import { type BodyLit, EMPTY_SKY_SPEC, type SunLook } from "./scene-specs";
 import {
   BODY_PHOTO_SKSL,
   BODY_SWATCH_SKSL,
   GRID_PLANE_SKSL,
   RING_PLANE_SKSL,
+  SKY_NEBULA_BAKE_SKSL,
+  SKY_NEBULA_SKSL,
   SUN_CORONA_SKSL,
   SUN_DISC_SKSL,
 } from "./shaders";
@@ -75,6 +79,29 @@ function compile(source: string) {
 const H = [1, 0, 200, 0, 0.5, 400, 0, 0.001, 1];
 
 describe("V2 SkSL", () => {
+  it("the nebula bake compiles and takes exactly skyBakeUniforms' 4 floats", () => {
+    const { effect, error } = compile(SKY_NEBULA_BAKE_SKSL);
+    expect(error).toBe("");
+    expect(effect?.getUniformFloatCount()).toBe(
+      skyBakeUniforms({ key: "k", size: 768, period: 8, seed: 0 }).length,
+    );
+    effect?.delete();
+  });
+
+  it("the sky shader compiles and takes exactly skyNebulaUniforms' 64 floats", () => {
+    const { effect, error } = compile(SKY_NEBULA_SKSL);
+    expect(error).toBe("");
+    expect(effect?.getUniformFloatCount()).toBe(
+      skyNebulaUniforms(
+        EMPTY_SKY_SPEC,
+        [0, 0, 0, 0],
+        { x: 0, y: 0, zoom: 1 },
+        -1,
+      ).length,
+    );
+    effect?.delete();
+  });
+
   it("the ring shader compiles and takes exactly ringPlaneUniforms' 32 floats", () => {
     const { effect, error } = compile(RING_PLANE_SKSL);
     expect(error).toBe("");

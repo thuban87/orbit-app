@@ -14,9 +14,27 @@ import type { ResolvedMode, ThemePackage } from "@/theme/theme-types";
 
 // ── Painted sky (D-07, D-27, D-36) ────────────────────────────────────────
 
+/**
+ * Lab B's nebula strengths for one package × mode (`orrery-lab-fx.ts` env,
+ * re-expressed against the V2 `orreryNebula` inks, which are darker / paler
+ * than Lab B's accent and star-palette lobes, so the same look needs larger
+ * mix fractions). All are scaled by `SkyLook.nebulaStrength`.
+ */
+export interface SkyNebulaLook {
+  /** Max mix of the sky toward lobe A / lobe B at full density (0..1). */
+  lobeA: number;
+  lobeB: number;
+  /** Additive quadratic core glow (dark only; 0 on light). */
+  glow: number;
+  /** The overlap tint where lobe A and lobe B meet. */
+  ember: number;
+  /** How much the dust lanes darken the clouds (0..1). */
+  dust: number;
+}
+
 /** One package × mode's sky look. */
 export interface SkyLook {
-  /** Small background stars. */
+  /** Small background stars (the mid layer; the far layer is in the shader). */
   starCount: number;
   /** Larger, brighter stars on top (part of "more visible stars", D-07). */
   brightStarCount: number;
@@ -28,11 +46,26 @@ export interface SkyLook {
   starAlpha: readonly [number, number];
   /** Twinkle depth: the share of a star's alpha the twinkle swings (0 = still). */
   twinkleDepth: number;
-  /** Peak nebula alpha baked into the neutral sky image (quiet: D-07/D-27). */
-  nebulaStrength: number;
   /**
-   * How far the per-System tint pushes the nebula toward its hue (0..1;
-   * additive on dark, a src-over lerp on light).
+   * The whole nebula's strength: 1 = "as in Lab B" (the per-lobe numbers in
+   * `nebula`), lower = the same clouds, fainter (0 = no clouds).
+   */
+  nebulaStrength: number;
+  /** Lab B's per-lobe strengths (before `nebulaStrength`). */
+  nebula: SkyNebulaLook;
+  /** Corner vignette strength (0..1; Lab B). */
+  vignette: number;
+  /**
+   * Dark: how far the corners sink toward black. Light: unused (the corners
+   * wash toward the first `orrerySkyStars` ink instead).
+   */
+  vignetteShade: number;
+  /** The far star layer (drawn in the sky shader): alpha and cell density. */
+  farStarAlpha: number;
+  farStarDensity: number;
+  /**
+   * How far the per-System tint leans the nebula's lobe B toward the System
+   * hue (0..1; Lab B leant it fully). Applied at draw time (H9).
    */
   tintStrength: number;
   /** A faint whole-sky wash of the System tint (0..1). */
@@ -42,10 +75,11 @@ export interface SkyLook {
 }
 
 /**
- * Per package × mode. Galaxy: deeper, more stars (more than Lab A's 240 + 70),
- * a quieter nebula than Lab A and much quieter than Lab B. Standard: Lab B's
- * calm graphite chart (sparse crisp stars, barely-there clouds). Light: Lab B's
- * light sky (sparse ink specks, no twinkle, low-contrast washes).
+ * Per package × mode. 38.7-09 rework (owner, 2026-10-03): the nebula is Lab
+ * B's distant baked nebula. Galaxy Dark "as in Lab B"; Standard Dark keeps
+ * Lab B's calm graphite chart (barely-there clouds, no ember); light themes
+ * Lab B's low-contrast vellum washes (no glow, src-over). Plan 14 tunes the
+ * non-hero themes.
  */
 export const SKY_LOOKS: Readonly<
   Record<ThemePackage, Readonly<Record<ResolvedMode, SkyLook>>>
@@ -58,7 +92,12 @@ export const SKY_LOOKS: Readonly<
       brightRadius: [1.1, 1.8],
       starAlpha: [0.35, 0.9],
       twinkleDepth: 0.45,
-      nebulaStrength: 0.22,
+      nebulaStrength: 1,
+      nebula: { lobeA: 0.47, lobeB: 0.42, glow: 0.26, ember: 0.3, dust: 0.38 },
+      vignette: 0.62,
+      vignetteShade: 0.55,
+      farStarAlpha: 0.9,
+      farStarDensity: 0.5,
       tintStrength: 0.35,
       tintWash: 0.05,
       horizonStop: 0.6,
@@ -70,7 +109,12 @@ export const SKY_LOOKS: Readonly<
       brightRadius: [0.9, 1.3],
       starAlpha: [0.25, 0.5],
       twinkleDepth: 0,
-      nebulaStrength: 0.3,
+      nebulaStrength: 1,
+      nebula: { lobeA: 0.3, lobeB: 0.24, glow: 0, ember: 0.08, dust: 0.04 },
+      vignette: 0.09,
+      vignetteShade: 0,
+      farStarAlpha: 0.34,
+      farStarDensity: 0.2,
       tintStrength: 0.3,
       tintWash: 0.05,
       horizonStop: 0.6,
@@ -84,7 +128,12 @@ export const SKY_LOOKS: Readonly<
       brightRadius: [1, 1.5],
       starAlpha: [0.3, 0.75],
       twinkleDepth: 0.12,
-      nebulaStrength: 0.1,
+      nebulaStrength: 1,
+      nebula: { lobeA: 0.17, lobeB: 0.13, glow: 0.04, ember: 0, dust: 0.09 },
+      vignette: 0.43,
+      vignetteShade: 0.55,
+      farStarAlpha: 0.64,
+      farStarDensity: 0.28,
       tintStrength: 0.3,
       tintWash: 0.04,
       horizonStop: 0.65,
@@ -96,7 +145,12 @@ export const SKY_LOOKS: Readonly<
       brightRadius: [0.85, 1.2],
       starAlpha: [0.22, 0.42],
       twinkleDepth: 0,
-      nebulaStrength: 0.22,
+      nebulaStrength: 1,
+      nebula: { lobeA: 0.22, lobeB: 0.18, glow: 0, ember: 0.03, dust: 0.02 },
+      vignette: 0.05,
+      vignetteShade: 0,
+      farStarAlpha: 0.26,
+      farStarDensity: 0.2,
       tintStrength: 0.25,
       tintWash: 0.04,
       horizonStop: 0.65,
@@ -112,18 +166,42 @@ export const SKY_TWINKLE_SPEED = 0.0024;
 /** Sky drift: path speed (dp per minute) and the wander's bound (dp). */
 export const SKY_DRIFT_DP_PER_MIN = 6;
 export const SKY_DRIFT_MAX_DP = 10;
-/** Parallax: dp of sky shift per screen-width of pan (nebula / stars). */
-export const SKY_PARALLAX_NEBULA = 4;
+/**
+ * Parallax of the mid/near star batches: dp of shift per screen-width of pan
+ * (the nebula and far stars use Lab B's depth factors below).
+ */
 export const SKY_PARALLAX_STARS = 7;
 /** Parallax bound (dp). */
 export const SKY_PARALLAX_MAX_DP = 22;
 /** The margin the sky covers beyond each canvas edge (covers both offsets). */
 export const SKY_MARGIN_DP = SKY_PARALLAX_MAX_DP + SKY_DRIFT_MAX_DP + 4;
 
-/** Neutral sky bake resolution (texels per dp; the nebula is soft). */
-export const SKY_BAKE_PX_PER_DP = 0.25;
-/** The bake's longest side is capped at this many texels. */
-export const SKY_BAKE_MAX_PX = 256;
+/*
+ * Lab B's baked nebula (labb LabEnvironment / labb-sky): a square, seamlessly
+ * tiling DENSITY texture, baked once per (package, mode, size bucket).
+ */
+/** The baked density texture's side (texels). */
+export const SKY_NEBULA_TEX = 768;
+/** Noise lattice period across the texture (base cloud cells per tile). */
+export const SKY_NEBULA_PERIOD = 8;
+/** Texels per dp: tile = 768 / 0.45 ≈ 1,700 dp, base cloud cell ≈ 213 dp. */
+export const SKY_NEBULA_TEXELS_PER_DP = 0.45;
+/**
+ * Depth factors (Lab B NEBULA_FACTOR / FAR): the nebula moves 6 % of the
+ * world's on-screen motion, the far stars 3 % — far behind the System.
+ */
+export const SKY_NEBULA_DEPTH = 0.06;
+export const SKY_FAR_STAR_DEPTH = 0.03;
+/** Zoom scale exponent per unit depth (nebula: zoom^(0.06 × 1.3)). */
+export const SKY_ZOOM_DEPTH = 1.3;
+/** Vertical sky shift at full tilt (dp), × (SKY_TILT_BASE + depth). */
+export const SKY_TILT_SHIFT = 140;
+export const SKY_TILT_BASE = 0.25;
+/** The nebula's slow breathing warp: amplitude (dp) and period (s). */
+export const SKY_BREATH_DP = 9;
+export const SKY_BREATH_S = 40;
+/** The frozen composition time under reduced motion (s). */
+export const SKY_STILL_S = 23;
 /** Canvas sizes are bucketed to this step (dp) for the bake cache key. */
 export const SKY_SIZE_BUCKET_DP = 64;
 /** The sky's star-field seed (fixed: the sky is the same every visit). */

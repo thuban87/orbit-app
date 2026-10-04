@@ -12,7 +12,7 @@ vi.mock("@shopify/react-native-skia", () => ({
   PaintStyle: { Fill: 0, Stroke: 1 },
   PointMode: { Points: 0 },
   StrokeCap: { Round: 1 },
-  TileMode: { Clamp: 0 },
+  TileMode: { Clamp: 0, Repeat: 1 },
   Skia: {
     XYWHRect: (x: number, y: number, width: number, height: number) => ({
       x,
@@ -70,11 +70,11 @@ vi.mock("@shopify/react-native-skia", () => ({
 import { SKY_UNTINTED } from "@/logic/orrery-sky-logic";
 import {
   drawSky,
-  skyNebulaTintMatrix,
+  skyNebulaUniforms,
   skyStarAlpha,
   skyTintNow,
 } from "./draw-sky";
-import type { SkyImageSpec, SkySpec } from "./scene-specs";
+import type { SkyImageSpec, SkyNebulaSpec, SkySpec } from "./scene-specs";
 import { SKY_TWINKLE_SPEED } from "./visual-tunables";
 
 interface Call {
@@ -149,10 +149,45 @@ function spec(overrides: Partial<SkySpec> = {}): SkySpec {
       },
     ],
     twinkleDepth: 0.4,
+    nebula: NEBULA,
     ...overrides,
   };
 }
-const fakeImage = { width: () => 128, height: () => 224 };
+const NEBULA: SkyNebulaSpec = {
+  lobeA: [0.25, 0.3, 0.65, 1],
+  lobeB: [0.4, 0.3, 0.7, 1],
+  ember: [0.2, 0.45, 0.55, 1],
+  lobeAStrength: 0.47,
+  lobeBStrength: 0.42,
+  glow: 0.26,
+  emberStrength: 0.3,
+  dust: 0.38,
+  vignette: 0.62,
+  vignetteShade: 0.55,
+  vignetteInk: null,
+  farStars: [
+    [1, 1, 1, 1],
+    [0.8, 0.9, 1, 1],
+    [1, 0.9, 0.7, 1],
+  ],
+  farStarAlpha: 0.9,
+  farStarDensity: 0.5,
+};
+/** The lobe-B ink the sky shader receives (uniforms 16..18). */
+const lobeB = (u: number[]) => u.slice(16, 19);
+const fakeImage = {
+  width: () => 768,
+  height: () => 768,
+  makeShaderOptions: (...args: unknown[]) => ({ density: args }),
+};
+/** A sky effect stub: records every shader it makes. */
+const made: { uniforms: number[]; children: unknown[] }[] = [];
+const EFFECT = {
+  makeShaderWithChildren: (uniforms: number[], children: unknown[]) => {
+    made.push({ uniforms, children });
+    return { uniforms };
+  },
+} as never;
 const IMAGE: SkyImageSpec = {
   generation: 1,
   mountEpoch: 1,
@@ -196,96 +231,71 @@ describe("the System tint is a draw-time value (H9)", () => {
     expect(half[3]).toBeCloseTo(0.5, 12);
   });
 
-  it("the nebula colour filter carries the drawn tint: additive on dark, a lerp on light", () => {
-    const dark = skyNebulaTintMatrix(HUE, 0.5, true);
-    expect(dark[0]).toBe(1);
-    expect(dark[4]).toBeCloseTo(HUE[0] * 0.5, 12);
-    expect(dark[9]).toBeCloseTo(HUE[1] * 0.5, 12);
-    expect(dark[14]).toBeCloseTo(HUE[2] * 0.5, 12);
-    expect(dark.slice(15)).toEqual([0, 0, 0, 1, 0]);
-    const light = skyNebulaTintMatrix(HUE, 0.5, false);
-    expect(light[0]).toBeCloseTo(0.5, 12);
-    expect(light[4]).toBeCloseTo(HUE[0] * 0.5, 12);
-    // Untinted (alpha 0): the identity.
-    expect(skyNebulaTintMatrix(UNTINTED, 0.5, true)).toEqual([
-      1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0,
+  it("the System hue leans the nebula's lobe B at draw time; untinted keeps the neutral ink", () => {
+    const tinted = skyNebulaUniforms(spec(), HUE, HOME, -1);
+    const k = 0.35;
+    expect(lobeB(tinted)[0]).toBeCloseTo(0.4 + (HUE[0] - 0.4) * k, 12);
+    expect(lobeB(tinted)[2]).toBeCloseTo(0.7 + (HUE[2] - 0.7) * k, 12);
+    expect(lobeB(skyNebulaUniforms(spec(), UNTINTED, HOME, -1))).toEqual([
+      0.4, 0.3, 0.7,
     ]);
   });
 
-  it("drawSky tints the nebula with the from / to hue at tintMix 0 / 1 (no bake involved)", () => {
+  it("drawSky shades the sky with the from / to hue at tintMix 0 / 1 (no bake involved)", () => {
     for (const [mix, expected] of [
       [0, OTHER],
       [1, HUE],
     ] as const) {
-      fx.matrices = [];
-      const { canvas, calls } = recordingCanvas();
-      drawSky(
-        canvas,
-        spec({ tintFrom: OTHER, tintTo: HUE, tintMix: mix }),
-        IMAGE,
-        HOME,
-        0,
+      made.length = 0;
+      const { canvas } = recordingCanvas();
+      const sky = spec({ tintFrom: OTHER, tintTo: HUE, tintMix: mix });
+      drawSky(canvas, sky, IMAGE, HOME, -1, EFFECT);
+      expect(made).toHaveLength(1);
+      expect(made[0].uniforms).toEqual(
+        skyNebulaUniforms(sky, expected, HOME, -1),
       );
-      const nebula = calls.find((c) => c.op === "drawImageRectOptions");
-      expect(nebula?.paint?.filter?.matrix).toEqual(
-        skyNebulaTintMatrix(expected, 0.35, true),
-      );
-      const wash = calls.filter((c) => c.op === "drawPaint")[1];
-      expect(wash.paint?.color.slice(0, 3)).toEqual([...expected.slice(0, 3)]);
     }
   });
 });
 
 describe("drawSky", () => {
-  it("draws gradient, wash, the neutral image, then one drawPoints per star batch", () => {
+  it("draws the sky shader over the baked densities, the wash, then one drawPoints per star batch", () => {
+    made.length = 0;
     fx.gradients = 0;
     const { canvas, calls } = recordingCanvas();
-    drawSky(canvas, spec(), IMAGE, HOME, 0);
+    drawSky(canvas, spec(), IMAGE, HOME, 0, EFFECT);
     expect(calls.map((c) => c.op)).toEqual([
       "drawPaint",
       "drawPaint",
-      "drawImageRectOptions",
       "save",
       "translate",
       "drawPoints",
       "drawPoints",
       "restore",
     ]);
-    // The gradient: horizon (top) → base.
-    expect(fx.gradients).toBe(1);
-    expect(calls[0].paint?.shader?.colors).toEqual([
-      [0.25, 0.25, 0.5, 1],
-      [0.125, 0.125, 0.25, 1],
-    ]);
-    // Dark (additive): screen wash and nebula.
+    // The shader replaces the analytic gradient; its one child is the
+    // repeat-tiled density image.
+    expect(fx.gradients).toBe(0);
+    expect(made[0].children).toHaveLength(1);
     expect(calls[1].paint?.blend).toBe(14);
-    expect(calls[2].paint?.blend).toBe(14);
-    // The image covers the bucket, centred on the canvas (no offset at Home,
-    // ambient 0).
-    expect(calls[2].args[2]).toEqual({
-      x: -56,
-      y: -48,
-      width: 512,
-      height: 896,
-    });
-    // Star batches: diameter → stroke width; alpha = base × twinkle.
-    expect(calls[5].paint?.width).toBe(1.2);
-    expect(calls[5].paint?.color[3]).toBeCloseTo(
-      skyStarAlpha(0.8, 0.4, 0, 0),
-      6,
-    );
-    expect(calls[6].paint?.width).toBe(2.6);
   });
 
-  it("light themes (spec.additive false) draw src-over ink washes", () => {
-    const { canvas, calls } = recordingCanvas();
-    drawSky(canvas, spec({ additive: false }), IMAGE, HOME, 0);
-    expect(calls[1].paint?.blend).toBe(3);
-    expect(calls[2].paint?.blend).toBe(3);
+  it("before the bake lands, or without the effect: the plain gradient and the stars", () => {
+    for (const [image, effect] of [
+      [NO_IMAGE, EFFECT],
+      [IMAGE, null],
+    ] as const) {
+      made.length = 0;
+      fx.gradients = 0;
+      const { canvas, calls } = recordingCanvas();
+      drawSky(canvas, spec(), image, HOME, 0, effect);
+      expect(made).toHaveLength(0);
+      expect(fx.gradients).toBe(1);
+      expect(calls.filter((c) => c.op === "drawPoints")).toHaveLength(2);
+    }
   });
 
-  it("untinted (All Contacts): no wash and no colour filter", () => {
-    fx.matrices = [];
+  it("untinted (All Contacts): no wash", () => {
     const { canvas, calls } = recordingCanvas();
     drawSky(
       canvas,
@@ -293,39 +303,28 @@ describe("drawSky", () => {
       IMAGE,
       HOME,
       0,
+      EFFECT,
     );
     expect(calls.filter((c) => c.op === "drawPaint")).toHaveLength(1);
-    expect(fx.matrices).toHaveLength(0);
     expect(SKY_UNTINTED).toBe(-1);
   });
 
-  it("before the bake lands: the plain gradient and the stars, no image", () => {
+  it("reduced motion is still; drift, breathing and parallax move the nebula; the star offset stays bounded", () => {
+    const still = skyNebulaUniforms(spec(), HUE, HOME, -1);
+    expect(skyNebulaUniforms(spec(), HUE, HOME, -1)).toEqual(still);
+    const later = skyNebulaUniforms(spec(), HUE, HOME, 60_000);
+    expect(later).not.toEqual(still);
+    // Uniforms stay finite for any pose (tiling texture: no edge to hide).
+    const far = skyNebulaUniforms(
+      spec(),
+      HUE,
+      { x: 1e6, y: -1e6, zoom: 4, tilt: 1, yaw: 0.5 },
+      60_000,
+    );
+    expect(far.every((v) => Number.isFinite(v))).toBe(true);
     const { canvas, calls } = recordingCanvas();
-    drawSky(canvas, spec(), NO_IMAGE, HOME, 0);
-    expect(calls.some((c) => c.op === "drawImageRectOptions")).toBe(false);
-    expect(calls[0].op).toBe("drawPaint");
-    expect(calls.filter((c) => c.op === "drawPoints")).toHaveLength(2);
-  });
-
-  it("drift and parallax move the nebula and stars (bounded); reduced motion is still", () => {
-    const at = (ambient: number, pose = HOME) => {
-      const { canvas, calls } = recordingCanvas();
-      drawSky(canvas, spec(), IMAGE, pose, ambient);
-      const image = calls.find((c) => c.op === "drawImageRectOptions")
-        ?.args[2] as { x: number; y: number };
-      const stars = calls.find((c) => c.op === "translate")?.args as number[];
-      return { image, stars };
-    };
-    const still = at(-1);
-    expect(still.image).toEqual({ x: -56, y: -48, width: 512, height: 896 });
-    expect(still.stars).toEqual([0, 0]);
-    // A minute of ambient time drifts a few dp.
-    const drifted = at(60_000);
-    expect(drifted.image.x).not.toBe(-56);
-    expect(Math.abs(drifted.image.x + 56)).toBeLessThan(12);
-    // A pan shifts the sky slightly (parallax), never by more than the margin.
-    const panned = at(-1, { x: 1e6, y: 1e6, zoom: 4 });
-    expect(Math.abs(panned.image.x + 56)).toBeLessThanOrEqual(22);
-    expect(Math.abs(panned.stars[0])).toBeLessThanOrEqual(22);
+    drawSky(canvas, spec(), IMAGE, { x: 1e6, y: 1e6, zoom: 4 }, -1, EFFECT);
+    const stars = calls.find((c) => c.op === "translate")?.args as number[];
+    expect(Math.abs(stars[0])).toBeLessThanOrEqual(22);
   });
 });

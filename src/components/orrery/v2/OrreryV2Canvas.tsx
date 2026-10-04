@@ -12,9 +12,11 @@
  * or overlays.
  *
  * Layers, bottom to top:
- * - `sky` (38.7-09): the painted sky — gradient, the baked neutral nebula
- *   tinted per System at draw time, stars; drift and twinkle on the ambient
- *   clock, parallax from the frame (draw-sky.ts);
+ * - `sky` (38.7-09): the painted sky — one sky-shader pass (gradient, Lab
+ *   B's distant nebula over the baked densities, lobe B tinted per System at
+ *   draw time, far stars through the clouds, vignette), then mid/near stars;
+ *   drift and twinkle on the ambient clock, parallax from the frame
+ *   (draw-sky.ts);
  * - `base`: the optional orbital-plane grid (D-09) and the thin, sun-lit
  *   world-plane orbit rings (D-11/D-44), baked while still;
  * - `pulses` (38.7-09, D-10): the subtle orbit light pulses — ring-shader
@@ -303,6 +305,9 @@ export function OrreryV2Canvas({
   // Static, JS-thread resources: the compiled ring effect and the unit strips.
   const ringEffect = useMemo(() => orreryShader("ringPlane"), []);
   const gridEffect = useMemo(() => orreryShader("gridPlane"), []);
+  // 38.7-09 rework: the sky shader (Lab B's distant nebula over the baked
+  // densities); null → the plain gradient.
+  const skyEffect = useMemo(() => orreryShader("skyNebula"), []);
   // 38.7-10 (D-13/D-14/D-15): the lit-body and star-sun effects (lazily
   // compiled; a null effect falls back to that body's flat look).
   const bodyEffects = useMemo<OrreryBodyEffects>(
@@ -330,6 +335,7 @@ export function OrreryV2Canvas({
           skyImage.value,
           frame.value.pose,
           ambient.value,
+          skyEffect,
         );
       },
       { width, height },

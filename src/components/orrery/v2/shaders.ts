@@ -362,13 +362,174 @@ half4 main(float2 p) {
 }
 `;
 
+/*
+ * 38.7-09 (rework, owner 2026-10-03): Lab B's DISTANT nebula
+ * (`labb-effects.ts` NEBULA_NOISE / NEBULA_SHADE / NEBULA_FAR_STARS, ported).
+ *
+ * The noise is PERIODIC (the lattice wraps with `mod(i, per)`; every octave
+ * doubles frequency and period), so the baked density tiles seamlessly with
+ * `repeat` and the sky never shows an edge however far the camera pans. It is
+ * evaluated ONCE per bake (never live per frame — DEAD-ENDS), in `float`
+ * (highp), on coordinates of at most a few hundred units.
+ */
+const SKY_NOISE = `
+float nbHash(float2 p) {
+  float3 p3 = fract(float3(p.x, p.y, p.x) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+`;
+
+const SKY_FBM = `
+float nbNoise(float2 p, float per) {
+  float2 i = floor(p);
+  float2 f = fract(p);
+  float2 u = f * f * (3.0 - 2.0 * f);
+  float a = nbHash(mod(i, per));
+  float b = nbHash(mod(i + float2(1.0, 0.0), per));
+  float c = nbHash(mod(i + float2(0.0, 1.0), per));
+  float d = nbHash(mod(i + float2(1.0, 1.0), per));
+  return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+float nbFbm(float2 p, float per) {
+  float v = 0.0;
+  float a = 0.5;
+  for (int k = 0; k < 5; k++) {
+    v += a * nbNoise(p, per);
+    p = p * 2.0;
+    per = per * 2.0;
+    a *= 0.5;
+  }
+  return v / 0.96875;
+}
+`;
+
+/**
+ * The one-shot BAKE: nebula DENSITIES, never colours — r = lobe A, g = lobe B,
+ * b = dust lanes (Lab B `nebulaBake`, unchanged maths). Domain-warped fbm
+ * (q → r → n) gives the sculpted lobes; a half-frequency `region` field splits
+ * the sky between lobe A and lobe B; a finer warped fbm thresholded high gives
+ * the dark dust lanes. Coordinates are texels of a square tiling texture.
+ *   uBake = (texture size, lattice period, seed x, seed y)
+ * The seed is an integer lattice offset (the tile stays periodic).
+ */
+export const SKY_NEBULA_BAKE_SKSL = `${SKY_NOISE}${SKY_FBM}
+uniform float4 uBake;
+half4 main(float2 xy) {
+  float per = uBake.y;
+  float2 p = xy / uBake.x * per + uBake.zw;
+  float2 q = float2(nbFbm(p, per), nbFbm(p + float2(5.2, 1.3), per));
+  float2 r = float2(nbFbm(p + 3.0 * q + float2(1.7, 9.2), per),
+                    nbFbm(p + 3.0 * q + float2(8.3, 2.8), per));
+  float n = nbFbm(p + 3.2 * r, per);
+  float nb = nbFbm(p + 3.2 * r.yx + float2(4.1, 7.7), per);
+  float region = nbNoise(p * 0.5 + float2(0.37, 0.71), per * 0.5);
+  float lobeA = smoothstep(0.42, 0.86, n) * smoothstep(0.28, 0.7, region);
+  float lobeB = smoothstep(0.42, 0.86, nb) * (1.0 - smoothstep(0.3, 0.72, region));
+  float d = nbFbm(p * 2.0 + 4.0 * q, per * 2.0);
+  float dust = smoothstep(0.52, 0.78, d);
+  return half4(half3(clamp(float3(lobeA, lobeB, dust), 0.0, 1.0)), 1.0);
+}
+`;
+
+/**
+ * The per-frame SKY: the whole painted sky in one full-canvas pass (Lab B
+ * `nebulaSample` + `lbShade` + `lbFarStars`). One texture fetch per pixel of
+ * the baked densities (child `uNeb`, texel coordinates, repeat-tiled), then:
+ * the neutral horizon → base gradient; token colouring — the sky mixes toward
+ * lobe A and lobe B by density × strength, an ember tint where they overlap,
+ * a quadratic core glow (dark only), dust lanes that darken the clouds;
+ * the FAR star layer drawn analytically AFTER the clouds so it shines through
+ * them (a hash grid, one candidate star per 22-dp sky cell); the corner
+ * vignette; a 1/255 dither. Colours are uniforms only (theme tokens; H9: the
+ * System hue arrives in uLobeB at draw time, never baked).
+ *   uG = (width, height, horizonStop, texels per dp)
+ *   uHorizon.rgb, uBase.rgb       the neutral gradient ends
+ *   uLobeA / uLobeB / uEmber      (rgb, strength)
+ *   uShade = (glow, dust, vignette, vignette shade toward black)
+ *   uVigTone = (rgb, 1 = wash toward this ink instead of the shaded sky)
+ *   uCam = (viewport cx, cy, yaw, nebula zoom scale)
+ *   uOff = (nebula offset x, y, drift x, y)      (dp)
+ *   uMotion = (breathing warp dp, time s, far-star zoom scale, 0)
+ *   uFar = (far offset x, y, star alpha, star density)
+ *   uStarA = (rgb, 1 = additive), uStarB / uStarC = (rgb, 0)
+ * Uniform order is mirrored by `skyNebulaUniforms` (draw-sky.ts).
+ */
+export const SKY_NEBULA_SKSL = `${SKY_NOISE}
+uniform shader uNeb;
+uniform float4 uG;
+uniform float4 uHorizon;
+uniform float4 uBase;
+uniform float4 uLobeA;
+uniform float4 uLobeB;
+uniform float4 uEmber;
+uniform float4 uShade;
+uniform float4 uVigTone;
+uniform float4 uCam;
+uniform float4 uOff;
+uniform float4 uMotion;
+uniform float4 uFar;
+uniform float4 uStarA;
+uniform float4 uStarB;
+uniform float4 uStarC;
+
+float2 nbSky(float2 xy) {
+  float2 d = xy - uCam.xy - uOff.xy;
+  float c = cos(uCam.z);
+  float s = sin(uCam.z);
+  float2 p = float2(c * d.x + s * d.y, -s * d.x + c * d.y) / uCam.w;
+  p += uOff.zw;
+  p += uMotion.x * float2(sin(p.y * 0.011 + uMotion.y * 0.21),
+                          cos(p.x * 0.013 - uMotion.y * 0.17));
+  return p;
+}
+
+float3 nbFarStars(float2 xy, float3 col) {
+  float c = cos(uCam.z);
+  float s = sin(uCam.z);
+  float2 d = xy - uCam.xy - uFar.xy;
+  float2 p = float2(c * d.x + s * d.y, -s * d.x + c * d.y) / uMotion.z;
+  float2 cell = floor(p / 22.0);
+  if (nbHash(cell + 17.0) > uFar.w) return col;
+  float2 sp = (cell + 0.2 + 0.6 * float2(nbHash(cell + 41.3), nbHash(cell + 7.9))) * 22.0;
+  float dist = length(p - sp) * uMotion.z;
+  float rad = 0.42 + 0.75 * pow(nbHash(cell + 3.1), 3.0);
+  float a = min(1.0, exp(-(dist * dist) / (rad * rad)) * (0.45 + 0.85 * nbHash(cell + 9.7)) * uFar.z);
+  float t = nbHash(cell + 5.5);
+  float3 sc = t < 0.72 ? uStarA.rgb : (t < 0.86 ? uStarB.rgb : uStarC.rgb);
+  return mix(mix(col, sc, a), col + sc * a, uStarA.a);
+}
+
+half4 main(float2 xy) {
+  float g = clamp(xy.y / max(uG.y * uG.z, 1.0), 0.0, 1.0);
+  float3 sky = mix(uHorizon.rgb, uBase.rgb, g);
+  float3 n = float3(uNeb.eval(nbSky(xy) * uG.w).rgb);
+  float a = n.x;
+  float b = n.y;
+  float3 col = mix(sky, uLobeA.rgb, clamp(a * uLobeA.a, 0.0, 1.0));
+  col = mix(col, uLobeB.rgb, clamp(b * uLobeB.a, 0.0, 1.0));
+  col = mix(col, uEmber.rgb, clamp(a * b * 4.0 * uEmber.a, 0.0, 1.0));
+  col += uLobeA.rgb * (a * a * uShade.x) + uLobeB.rgb * (b * b * uShade.x);
+  col *= 1.0 - n.z * clamp(0.25 + a + b, 0.0, 1.0) * uShade.y;
+  col = nbFarStars(xy, col);
+  float2 v = (xy - 0.5 * uG.xy) / (0.5 * uG.xy);
+  float vig = smoothstep(0.45, 1.4, length(v * float2(1.0, 0.85)));
+  float3 tone = mix(sky * (1.0 - uShade.w), uVigTone.rgb, uVigTone.a);
+  col = mix(col, tone, vig * uShade.z);
+  col += (nbHash(xy) - 0.5) / 255.0;
+  return half4(half3(clamp(col, 0.0, 1.0)), 1.0);
+}
+`;
+
 export type OrreryShaderId =
   | "ringPlane"
   | "gridPlane"
   | "bodySwatch"
   | "bodyPhoto"
   | "sunCorona"
-  | "sunDisc";
+  | "sunDisc"
+  | "skyNebulaBake"
+  | "skyNebula";
 
 const SOURCES: Record<OrreryShaderId, string> = {
   ringPlane: RING_PLANE_SKSL,
@@ -377,6 +538,8 @@ const SOURCES: Record<OrreryShaderId, string> = {
   bodyPhoto: BODY_PHOTO_SKSL,
   sunCorona: SUN_CORONA_SKSL,
   sunDisc: SUN_DISC_SKSL,
+  skyNebulaBake: SKY_NEBULA_BAKE_SKSL,
+  skyNebula: SKY_NEBULA_SKSL,
 };
 
 const cache: Partial<Record<OrreryShaderId, SkRuntimeEffect | null>> = {};

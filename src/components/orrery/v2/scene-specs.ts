@@ -300,7 +300,54 @@ export interface SkySpec {
   stars: readonly SkyStarGroup[];
   /** The share of a star's alpha the twinkle swings (0 = still). */
   twinkleDepth: number;
+  /**
+   * 38.7-09 rework: Lab B's nebula colouring (sky shader). Lobe inks are the
+   * NEUTRAL `orreryNebula` tokens; the System hue leans lobe B at draw time
+   * (H9). Strengths are already × `nebulaStrength`.
+   */
+  nebula: SkyNebulaSpec;
 }
+
+/** The sky shader's colouring of the baked densities (all token inks). */
+export interface SkyNebulaSpec {
+  lobeA: OrreryInk;
+  lobeB: OrreryInk;
+  ember: OrreryInk;
+  lobeAStrength: number;
+  lobeBStrength: number;
+  glow: number;
+  emberStrength: number;
+  dust: number;
+  vignette: number;
+  vignetteShade: number;
+  /** Light themes: the ink the corners wash toward (null = shade the sky). */
+  vignetteInk: OrreryInk | null;
+  /** The far star layer's three inks (72 % / 14 % / 14 %, as Lab B). */
+  farStars: readonly [OrreryInk, OrreryInk, OrreryInk];
+  farStarAlpha: number;
+  farStarDensity: number;
+}
+
+const NO_SKY_NEBULA: SkyNebulaSpec = Object.freeze({
+  lobeA: NO_INK,
+  lobeB: NO_INK,
+  ember: NO_INK,
+  lobeAStrength: 0,
+  lobeBStrength: 0,
+  glow: 0,
+  emberStrength: 0,
+  dust: 0,
+  vignette: 0,
+  vignetteShade: 0,
+  vignetteInk: null,
+  farStars: Object.freeze([NO_INK, NO_INK, NO_INK]) as unknown as readonly [
+    OrreryInk,
+    OrreryInk,
+    OrreryInk,
+  ],
+  farStarAlpha: 0,
+  farStarDensity: 0,
+});
 
 export const EMPTY_SKY_SPEC: SkySpec = Object.freeze({
   width: 0,
@@ -318,6 +365,7 @@ export const EMPTY_SKY_SPEC: SkySpec = Object.freeze({
   tintWash: 0,
   stars: Object.freeze([]) as readonly SkyStarGroup[],
   twinkleDepth: 0,
+  nebula: NO_SKY_NEBULA,
 });
 
 /** The sky layer's baked neutral image (null → the plain gradient). */
@@ -347,6 +395,49 @@ export interface SkySpecLook {
   tintStrength: number;
   tintWash: number;
   horizonStop: number;
+  /** 38.7-09 rework: Lab B's nebula (visual-tunables SkyLook). */
+  nebulaStrength: number;
+  nebula: {
+    lobeA: number;
+    lobeB: number;
+    glow: number;
+    ember: number;
+    dust: number;
+  };
+  vignette: number;
+  vignetteShade: number;
+  farStarAlpha: number;
+  farStarDensity: number;
+}
+
+/** The sky shader's nebula colouring for a theme + look (JS thread). */
+export function buildSkyNebula(
+  colors: ThemePalette,
+  mode: ResolvedMode,
+  look: SkySpecLook,
+): SkyNebulaSpec {
+  const inks = colors.orreryNebula.map(tokenInk);
+  const stars = colors.orrerySkyStars.map(tokenInk);
+  if (inks.length === 0) return NO_SKY_NEBULA;
+  const k = Math.max(0, look.nebulaStrength);
+  const n = look.nebula;
+  const starA = stars[0] ?? NO_INK;
+  return {
+    lobeA: inks[0],
+    lobeB: inks[1] ?? inks[0],
+    ember: inks[2] ?? inks[1] ?? inks[0],
+    lobeAStrength: Math.min(1, n.lobeA * k),
+    lobeBStrength: Math.min(1, n.lobeB * k),
+    glow: mode === "dark" ? n.glow * k : 0,
+    emberStrength: n.ember * k,
+    dust: Math.min(1, n.dust * k),
+    vignette: Math.min(1, look.vignette),
+    vignetteShade: look.vignetteShade,
+    vignetteInk: mode === "dark" ? null : starA,
+    farStars: [starA, stars[1] ?? starA, stars[2] ?? stars[1] ?? starA],
+    farStarAlpha: stars.length > 0 ? look.farStarAlpha : 0,
+    farStarDensity: look.farStarDensity,
+  };
 }
 
 export interface SkySpecInput {
@@ -408,6 +499,7 @@ export function buildSkySpec(input: SkySpecInput): SkySpec {
     tintStrength: look.tintStrength,
     tintWash: look.tintWash,
     twinkleDepth: look.twinkleDepth,
+    nebula: buildSkyNebula(colors, mode, look),
   };
   if (!(width > 0) || !(height > 0)) return { ...base, stars: [] };
   const tones = colors.orrerySkyStars.map(tokenInk);
