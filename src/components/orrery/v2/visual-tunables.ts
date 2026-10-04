@@ -250,7 +250,7 @@ export const WARP_STREAK_SEGMENTS = 3;
  * sparser than Lab B's, mostly because V2's tilted plane hides most of the sky
  * that Lab B's flat camera shows. S-WARP picks the final value.
  */
-export const WARP_STRENGTH = 1.6;
+export const WARP_STRENGTH = 1; // owner S-WARP 2026-10-04: Lab B's own numbers (D-76)
 
 /** Lab A TRAIL_MS / TRAIL_LEAVING_MS: the arc a streak covers (ms of motion). */
 export const TRAIL_MS = 160;
@@ -274,7 +274,7 @@ export const TRAIL_RAMP_MID = 0.35;
 /** Most orbit streaks drawn at once (nearest the camera first; D-53). */
 export const TRAIL_BUDGET = 120;
 /** Master streak strength (1 = as in Lab A; the owner option knob; 0 = off). */
-export const TRAIL_STRENGTH = 1;
+export const TRAIL_STRENGTH = 0.5; // owner S-TRAIL 2026-10-04: "weaker" (D-76)
 
 /**
  * The switch camera. SWITCH_SWIRL_TURNS: the authored out-and-back yaw swing
