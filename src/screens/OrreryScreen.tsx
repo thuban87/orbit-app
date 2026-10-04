@@ -20,6 +20,7 @@ import {
   runOnJS,
   runOnUI,
   useAnimatedReaction,
+  useDerivedValue,
   useSharedValue,
 } from "react-native-reanimated";
 import {
@@ -80,19 +81,30 @@ import {
   deriveHomePose,
   frameBodies,
   HOME_CAMERA,
-  IDENTITY_ZOOM,
   type OrreryIntent,
   type OrrerySatelliteTarget,
   usableCameraRect,
+  type WorldBody,
 } from "@/logic/orrery-camera-logic";
+import {
+  expectedFocusCardRect,
+  FOCUS_CARD_ESTIMATED_HEIGHT,
+  FOCUS_CARD_REFIT_PX,
+  type FocusCardRect,
+  focusCardPlacement,
+  focusFramingPose,
+  HIDDEN_FOCUS_CARD,
+} from "@/logic/orrery-focus-card-logic";
 import {
   createOrreryFocusController,
   type OrreryCancellation,
   type OrreryContactTarget,
 } from "@/logic/orrery-focus-logic";
+import { bodyKey, frameBodyById, frameBodyByKey } from "@/logic/orrery-frame";
 import { cameraExtent, northTarget } from "@/logic/orrery-recovery-logic";
 import type { ReorderIntent } from "@/logic/orrery-reorder-logic";
 import {
+  deriveSatelliteBodies,
   EMPTY_SATELLITE_SPEC,
   type OrrerySatelliteSpec,
 } from "@/logic/orrery-satellite-logic";
@@ -133,6 +145,13 @@ const LOCAL_SELECT_ORIGIN = Symbol("orrery-local-select");
 /** D-52: a stable empty cluster, so a closed cluster never churns OrreryWorld's props. */
 const NO_CLUSTER_IDS: readonly number[] = Object.freeze([]);
 const MAX_CUSTOM_SYSTEM_COUNTS_PER_OPEN = 12;
+
+/** 38.7-11 (C3-M1): the identity a focus framing was made for. */
+function focusFramingKey(target: OrreryContactTarget): string {
+  return `${target.kind}:${target.id}:${target.uid}`;
+}
+/** What the docked card follows: a contact/sun by id, or a moon by key. */
+type FocusCardTarget = { id: number } | { key: string } | null;
 
 type SystemCountCache = {
   counts: Map<string, number>;
@@ -320,6 +339,17 @@ export function OrreryScreen() {
   const systemCountCache = useRef(new Map<number, SystemCountCache>());
   const focusTargetsRef = useRef(focusTargets);
   focusTargetsRef.current = focusTargets;
+  // 38.7-11 (C3-M1): the single-focus framing that is still the camera's last
+  // word (its target and the card height it reserved). Cleared when anything
+  // else takes the camera — a System switch publish, Recenter, a session
+  // restore, a Home reframe, a focus change. The UI side also checks the
+  // camera epoch (`framedEpoch`), which every touch, recovery and stop bumps.
+  const focusFraming = useRef<{ key: string; height: number } | null>(null);
+  const lastCardHeight = useRef(FOCUS_CARD_ESTIMATED_HEIGHT);
+  const framedEpoch = useSharedValue(-1);
+  // D-19: the docked card's measured height and what it follows (UI thread).
+  const cardHeight = useSharedValue(FOCUS_CARD_ESTIMATED_HEIGHT);
+  const cardTarget = useSharedValue<FocusCardTarget>(null);
   const hasReadySystem = useRef(false);
   const switchSourceIds = useRef<number[] | null>(null);
   const switchHomeGeneration = useRef<number | null>(null);
@@ -380,6 +410,9 @@ export function OrreryScreen() {
         deriveHomePose(next.snapshot.world, viewport) ?? pose.value;
       // Before the satellite reload this same notification triggers.
       if (sourceIds) satellitePublisher.switchStarted(next.generation);
+      // C4-M3: a switch lands at destination Home, even with a retained focus;
+      // no later card re-measure may re-frame it.
+      if (sourceIds) focusFraming.current = null;
       publishSwitch(
         next.snapshot,
         !!sourceIds,
@@ -669,6 +702,52 @@ export function OrreryScreen() {
     enabled: visible && !overlaysOpen,
     reduced: reducedMotion,
   });
+  // 38.7-11 (D-19/D-47): a single focus framed above the docked card, its
+  // moons (full split, from the satellite publisher's index for this scene)
+  // inside the frame. The card's space is its expected docked rect over the
+  // card-free viewport for `height` (C-M2: never the measured card rect).
+  const frameSingleFocus = useCallback(
+    (
+      body: WorldBody,
+      scene: { generation: number; extent: number },
+      height: number,
+    ): CameraPose | null => {
+      const spec = satellitePublisher.source.current();
+      const moons =
+        spec.sceneGeneration === scene.generation
+          ? deriveSatelliteBodies(
+              [{ ...body, opacity: 1, interactive: true }],
+              spec.index,
+              true,
+              1,
+            ).moons
+          : [];
+      return focusFramingPose(
+        body,
+        moons,
+        viewport,
+        expectedFocusCardRect(viewport, height),
+        pose.value,
+        scene.extent,
+      );
+    },
+    [satellitePublisher, viewport, pose],
+  );
+  // D-19: the docked card's rect, on the UI thread from the shared frame. The
+  // card positions itself from it, and the canvas reads the SAME value for the
+  // focus-card occlusion dim and the label exclusion (H5), so all three move
+  // together through pan, pinch and focus animation.
+  const cameraFrame = camera.frame;
+  const focusCardRect = useDerivedValue<FocusCardRect>(() => {
+    const current = cameraFrame.value;
+    const target = cardTarget.value;
+    if (!current || !target) return HIDDEN_FOCUS_CARD;
+    const body =
+      "key" in target
+        ? frameBodyByKey(current, target.key)
+        : frameBodyById(current, target.id);
+    return focusCardPlacement(current.viewport, body, cardHeight.value);
+  });
   // Stop and sample on the UI thread once per departure, never once per frame.
   captureSession.current = (reason, after) => {
     const ticket = ++captureGeneration.current;
@@ -752,22 +831,80 @@ export function OrreryScreen() {
       if (bodies.length === 0) return;
       setFocusTargets(targets);
       setFocusError(null);
+      focusFraming.current = null;
       if (waitForPanel) {
         // The group's measured obstacle owns its framing, including later reflows.
         runOnUI(camera.stop)();
         return;
       }
+      if (targets.length === 1 && bodies.length === 1) {
+        // D-19/D-47: centred and large above the docked card, zoomed past
+        // the identity tier when that frames the person best. The card's
+        // space comes from its expected docked rect over the card-free
+        // viewport, never its measured rect (C-M2).
+        const target = frameSingleFocus(
+          bodies[0],
+          scene,
+          lastCardHeight.current,
+        );
+        if (!target) return;
+        focusFraming.current = {
+          key: focusFramingKey(targets[0]),
+          height: lastCardHeight.current,
+        };
+        const { recover, epoch } = camera;
+        runOnUI(() => {
+          "worklet";
+          recover(target);
+          framedEpoch.value = epoch.value;
+        })();
+        return;
+      }
       const framing = frameBodies(bodies, viewport, scene.extent, pose.value);
       if (!framing) return;
-      runOnUI(camera.recover)({
-        ...framing.pose,
-        zoom:
-          ids.length === 1
-            ? Math.min(IDENTITY_ZOOM, framing.pose.zoom)
-            : framing.pose.zoom,
-      });
+      runOnUI(camera.recover)(framing.pose);
     },
-    [useSystemStore, pose, camera.recover, camera.stop, viewport],
+    [useSystemStore, pose, camera, viewport, frameSingleFocus, framedEpoch],
+  );
+  // C3-M1: the card's real height arrives after the framing (first layout,
+  // then moons/context loading or a font reflow). While the framing is still
+  // authoritative, a height change beyond FOCUS_CARD_REFIT_PX re-frames once
+  // so the person and moons stay above the real card — never mid-switch and
+  // never after anything else took the camera (UI-side epoch check).
+  const onCardHeight = useCallback(
+    (height: number) => {
+      lastCardHeight.current = height;
+      const authority = focusFraming.current;
+      if (
+        !authority ||
+        Math.abs(height - authority.height) <= FOCUS_CARD_REFIT_PX
+      )
+        return;
+      const targets = focusTargetsRef.current;
+      const scene = useSystemStore.getState().current();
+      if (
+        !scene ||
+        targets.length !== 1 ||
+        focusFramingKey(targets[0]) !== authority.key
+      ) {
+        focusFraming.current = null;
+        return;
+      }
+      authority.height = height;
+      const body = scene.world.find((item) => item.id === targets[0].id);
+      if (!body) return;
+      const target = frameSingleFocus(body, scene, height);
+      if (!target) return;
+      const { recover, epoch } = camera;
+      const progress = switchProgress;
+      runOnUI(() => {
+        "worklet";
+        if (framedEpoch.value !== epoch.value || progress.value < 1) return;
+        recover(target);
+        framedEpoch.value = epoch.value;
+      })();
+    },
+    [useSystemStore, camera, frameSingleFocus, framedEpoch, switchProgress],
   );
   const actionEnvironment = useRef({ focus, active: isFocused && appActive });
   actionEnvironment.current = { focus, active: isFocused && appActive };
@@ -875,6 +1012,7 @@ export function OrreryScreen() {
     actions.cancel(reason);
   };
   const clearFocus = useCallback(() => {
+    focusFraming.current = null;
     satelliteAction.current++;
     setFocusedSatellite(null);
     actions.cancel("clear");
@@ -957,6 +1095,7 @@ export function OrreryScreen() {
       if (restored) {
         lastHomeFrame.current = key;
         lastHomeDomain.current = domain;
+        focusFraming.current = null;
         setFocusTargets(restored.focus ? [restored.focus] : []);
         setClusterOpen(false);
         if (session.saved?.focus && !restored.focus) setFocusError("removed");
@@ -971,6 +1110,8 @@ export function OrreryScreen() {
       }
     }
     if (lastHomeFrame.current === key && sessionResume === "active") return;
+    // C4-M3: any Home reframe below ends a focus framing's authority.
+    focusFraming.current = null;
     if (
       sessionResume === "active" &&
       lastHomeDomain.current === domain &&
@@ -1000,16 +1141,20 @@ export function OrreryScreen() {
       lastHomeDomain.current = domain;
       return;
     }
+    // D-19/D-47: a single focus is framed above the docked card, uncapped.
+    const focusedPose =
+      focusedBodies.length === 1 && !clusterOpen
+        ? (frameSingleFocus(focusedBodies[0], scene, lastCardHeight.current) ??
+          undefined)
+        : focusedBodies.length > 0
+          ? frameBodies(focusedBodies, viewport, scene.extent, pose.value)?.pose
+          : undefined;
     const home = selectSystemFraming(
       false,
-      focusedBodies.length > 0
-        ? frameBodies(focusedBodies, viewport, scene.extent, pose.value)?.pose
-        : undefined,
+      focusedPose,
       deriveHomePose(scene.world, viewport),
     );
     if (!home) return; // Preserve the previous valid pose through zero measurement.
-    if (focusedBodies.length === 1)
-      home.zoom = Math.min(IDENTITY_ZOOM, home.zoom);
     lastHomeFrame.current = key;
     lastHomeDomain.current = domain;
     if (sessionResume !== "active") {
@@ -1039,8 +1184,10 @@ export function OrreryScreen() {
     visible,
     sessionReady,
     sessionResume,
+    frameSingleFocus,
   ]);
   const recenter = () => {
+    focusFraming.current = null;
     satelliteAction.current++;
     setFocusedSatellite(null);
     actions.cancel("recenter");
@@ -1071,6 +1218,19 @@ export function OrreryScreen() {
           member.id === focusedTarget.id && member.uid === focusedTarget.uid,
       )
     : null;
+  const cardTargetKey = focusedSatellite
+    ? bodyKey({ id: -1, kind: "satellite", satelliteTarget: focusedSatellite })
+    : focusedTarget
+      ? `id:${focusedTarget.id}`
+      : "";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by the card target's identity, not the target objects
+  useEffect(() => {
+    cardTarget.value = focusedSatellite
+      ? { key: cardTargetKey }
+      : focusedTarget
+        ? { id: focusedTarget.id }
+        : null;
+  }, [cardTarget, cardTargetKey]);
   const emptyCopy = systemEmptyCopy(
     state.requested.name,
     allContacts,
@@ -1141,7 +1301,9 @@ export function OrreryScreen() {
           <OrreryFocusContext
             target={focusedSatellite}
             name={satelliteRow.personName}
-            frame={camera.frame}
+            placement={focusCardRect}
+            cardHeight={cardHeight}
+            onHeight={onCardHeight}
             blocked={overlaysOpen}
             onClear={clearFocus}
             relationshipContext={
@@ -1162,7 +1324,9 @@ export function OrreryScreen() {
           <OrreryFocusContext
             target={focusedTarget}
             name={focusedMember?.name ?? scene.sun.sunContactName}
-            frame={camera.frame}
+            placement={focusCardRect}
+            cardHeight={cardHeight}
+            onHeight={onCardHeight}
             blocked={overlaysOpen}
             onClear={clearFocus}
             contextState={focusedMember ? satellites?.status : undefined}

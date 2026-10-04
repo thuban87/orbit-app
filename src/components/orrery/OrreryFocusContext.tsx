@@ -1,5 +1,5 @@
 // biome-ignore-all lint/a11y/useValidAriaRole: AppText uses typography roles.
-import { type ReactNode, useState } from "react";
+import type { ReactNode } from "react";
 import { StyleSheet } from "react-native";
 import Animated, {
   type SharedValue,
@@ -8,28 +8,28 @@ import Animated, {
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
 import { GlassSurface } from "@/components/ui/GlassSurface";
-import {
-  type OrrerySatelliteTarget,
-  type ProjectedFrame,
-  usableCameraRect,
-} from "@/logic/orrery-camera-logic";
+import type { OrrerySatelliteTarget } from "@/logic/orrery-camera-logic";
+import type { FocusCardRect } from "@/logic/orrery-focus-card-logic";
 import type { OrreryContactTarget } from "@/logic/orrery-focus-logic";
-import {
-  bodyKey,
-  type FrameBodyIndex,
-  frameBodyById,
-  frameBodyByKey,
-} from "@/logic/orrery-frame";
 import { SPACING } from "@/theme/tokens/spacing";
 import { OrreryNotice } from "./OrreryFeedback";
 
-/** Lightweight identity follows the authoritative frame on the UI thread.
+/**
+ * Lightweight identity, docked at the canvas bottom below the focused body
+ * (38.7-11, D-19). Its position comes from `placement` — the UI-thread
+ * `focusCardRect` (`focusCardPlacement` over the shared frame) that the
+ * Orrery's occlusion dim and label exclusion read too, so card, dim and
+ * labels move together. The card's measured window rect is never published as
+ * a camera obstacle (C-M2): only its height leaves here, through `cardHeight`
+ * (the placement) and `onHeight` (the screen's framing refit).
  * Optional relationship content belongs to the qualified parent (D-11).
  */
 export function OrreryFocusContext({
   target,
   name,
-  frame,
+  placement,
+  cardHeight,
+  onHeight,
   blocked,
   onClear,
   onProfile,
@@ -39,7 +39,12 @@ export function OrreryFocusContext({
 }: {
   target: OrreryContactTarget | OrrerySatelliteTarget;
   name: string;
-  frame: SharedValue<(ProjectedFrame & FrameBodyIndex) | null>;
+  /** The docked rect (canvas coordinates), shared with the canvas. */
+  placement: SharedValue<FocusCardRect>;
+  /** The card's measured height (feeds `placement`). */
+  cardHeight: SharedValue<number>;
+  /** JS notice of a new measured height (the framing refit, C3-M1). */
+  onHeight?: (height: number) => void;
   blocked: boolean;
   onClear: () => void;
   onProfile?: () => void;
@@ -47,50 +52,32 @@ export function OrreryFocusContext({
   contextState?: "loading" | "ready" | "error";
   onReloadContext?: () => void | Promise<void>;
 }) {
-  const [height, setHeight] = useState(180);
   const position = useAnimatedStyle(() => {
-    const current = frame.value;
-    const region = current ? usableCameraRect(current.viewport) : null;
-    // D-52: O(1) through the frame's index (same first-match semantics).
-    const body = !current
-      ? undefined
-      : target.kind === "satellite"
-        ? frameBodyByKey(
-            current,
-            bodyKey({ id: -1, kind: "satellite", satelliteTarget: target }),
-          )
-        : frameBodyById(current, target.id);
-    if (!region || !body) return { opacity: 0 };
-    const width = Math.min(280, region.width);
-    const limit = Math.min(height, region.height / 2);
+    const rect = placement.value;
+    if (!rect.visible) return { opacity: 0 };
     return {
       opacity: 1,
-      width,
-      maxHeight: region.height / 2,
-      left: Math.max(
-        region.x,
-        Math.min(region.x + region.width - width, body.x - width / 2),
-      ),
-      top: Math.max(
-        region.y,
-        Math.min(
-          region.y + region.height - limit,
-          body.y + body.radius + SPACING.sm,
-        ),
-      ),
+      width: rect.width,
+      maxHeight: rect.maxHeight,
+      left: rect.x,
+      top: rect.y,
     };
   });
   const scrollBounds = useAnimatedStyle(() => {
-    const current = frame.value;
-    const region = current ? usableCameraRect(current.viewport) : null;
-    return { maxHeight: region ? region.height / 2 : 180 };
+    const rect = placement.value;
+    return { maxHeight: rect.visible ? rect.maxHeight : 180 };
   });
   return (
     <Animated.View
       style={[styles.root, position]}
       pointerEvents={blocked ? "none" : "auto"}
       importantForAccessibility={blocked ? "no-hide-descendants" : "auto"}
-      onLayout={(event) => setHeight(event.nativeEvent.layout.height)}
+      onLayout={(event) => {
+        const height = event.nativeEvent.layout.height;
+        if (!(height > 0)) return;
+        cardHeight.value = height;
+        onHeight?.(height);
+      }}
     >
       <GlassSurface density="dense" treatment="orrery-overlay">
         <Animated.ScrollView

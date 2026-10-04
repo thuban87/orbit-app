@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { HOME_CAMERA } from "@/logic/orrery-camera-logic";
+import { HIDDEN_FOCUS_CARD } from "@/logic/orrery-focus-card-logic";
 import type { OrrerySystemState } from "@/stores/orrery-system-store";
 import { THEME_PRESETS } from "@/theme/theme-presets";
 import { OrreryClusterPanel } from "./OrreryClusterPanel";
@@ -335,7 +336,8 @@ describe("actual Orrery controls and detail sheet", () => {
           OrreryFocusContext({
             target: { kind: "member", id: 1, uid: "a" },
             name: "Full identity",
-            frame: { value: null } as never,
+            placement: { value: HIDDEN_FOCUS_CARD } as never,
+            cardHeight: { value: 180 } as never,
             blocked: false,
             onClear: vi.fn(),
             onProfile: vi.fn(),
@@ -369,7 +371,8 @@ describe("actual Orrery controls and detail sheet", () => {
         OrreryFocusContext({
           target: { kind: "satellite", uid: "r", parentId: 1, parentUid: "p" },
           name: "👩🏽‍🚀 李",
-          frame: { value: null } as never,
+          placement: { value: HIDDEN_FOCUS_CARD } as never,
+          cardHeight: { value: 180 } as never,
           blocked: false,
           onClear: clear,
           onProfile: profile,

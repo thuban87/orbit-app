@@ -161,9 +161,12 @@ export function useOrreryCamera({
       })();
     };
   }, [enabled, live, input, stop, reorder, frame, samples]);
+  // 38.7-11 (C3-M1): `epoch` bumps on every stop — any touch, recovery,
+  // coast or cancel — so a focus framing can tell whether it is still the
+  // camera's last word.
   return useMemo(
-    () => ({ input, samples, live, active, frame, reorder, ...motion }),
-    [input, samples, live, active, frame, reorder, motion],
+    () => ({ input, samples, live, active, frame, reorder, epoch, ...motion }),
+    [input, samples, live, active, frame, reorder, epoch, motion],
   );
 }
 
