@@ -43,6 +43,12 @@ import { SKY_MARGIN_DP, SKY_SIZE_BUCKET_DP } from "./visual-tunables";
 
 // ── Keys and sizes (pure) ─────────────────────────────────────────────────
 
+/**
+ * The per-package lattice offset of the baked nebula (stable across visits;
+ * Galaxy 0 = Lab B's sky). Shared by the Orrery and the System Preview.
+ */
+export const SKY_NEBULA_SEED = { galaxy: 0, standard: 5 } as const;
+
 /** The sky's covered area in dp: the canvas plus margins, bucketed up. */
 export interface SkyBucket {
   width: number;
@@ -126,6 +132,11 @@ export function bakeSkyImage(input: SkyBakeInput): SkImage | null {
 export interface SkyBakeOwnerOptions {
   /** The H3 ledger (shared with the body/label/base layers). */
   ledger: OrreryGenerationLedger<string>;
+  /**
+   * 38.7-14 (C-H2): the layer that draws the image (default the Orrery's
+   * `sky`; the System Preview passes its own id).
+   */
+  layerId?: string;
   /** The current ledger epoch, begun if none is (the spec publisher's). */
   ensureEpoch: () => number;
   /** Writes the sky image SharedValue (never React state). */
@@ -174,6 +185,7 @@ const devLog =
 
 export function createSkyBakeOwner(options: SkyBakeOwnerOptions): SkyBakeOwner {
   const { ledger, ensureEpoch, write } = options;
+  const layerId = options.layerId ?? ORRERY_LAYER.sky;
   const bake = options.bake ?? bakeSkyImage;
   const schedule = options.schedule ?? defaultSchedule;
   const now = options.now ?? defaultNow;
@@ -230,13 +242,7 @@ export function createSkyBakeOwner(options: SkyBakeOwnerOptions): SkyBakeOwner {
         if (!ledger.admitResult(epoch, image, dispose)) return;
         const id = ++nextId;
         generation++;
-        if (
-          !ledger.publish(
-            generation,
-            [ORRERY_LAYER.sky],
-            [skyHandle(epoch, id)],
-          )
-        ) {
+        if (!ledger.publish(generation, [layerId], [skyHandle(epoch, id)])) {
           dispose(image);
           return;
         }

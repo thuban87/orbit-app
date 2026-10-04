@@ -85,7 +85,6 @@ import {
   type CanvasRef,
   createPicture,
   Picture,
-  type SkPicture,
 } from "@shopify/react-native-skia";
 import { useEffect, useMemo, useRef } from "react";
 import {
@@ -145,6 +144,7 @@ import {
 } from "./draw-switch";
 import { watchFirstSurfaceFrame } from "./first-frame";
 import type { FocusDraw } from "./focus-fx";
+import { useLayerAck } from "./layer-ack";
 import { resolveOrreryRenderHost } from "./render-host";
 import {
   ORRERY_LAYER,
@@ -239,63 +239,6 @@ const AMBIENT_CONSUMERS = {
 const COVER_FADE_MS = 160;
 /** The overlay's occlusion fill under the "lab-b" style: none. */
 const NO_OCCLUSION_FILL: readonly CameraRect[] = Object.freeze([]);
-
-/** What a layer's ack reaction compares: its picture and the generation it read. */
-interface LayerRecord {
-  picture: SkPicture;
-  generation: number;
-  epoch: number;
-}
-
-/**
- * H3 rule 1: one layer's acknowledgement. The reaction is chained on the
- * layer's picture value, so it runs only after `createPicture` returned; a
- * new (generation, epoch) arms ONE frame callback (never a running loop), and
- * that callback forwards the latest recorded generation to JS.
- *
- * `requireNewRecording` (default true): only a NEW picture speaks for a
- * generation. The base layer passes false: its picture value SELECTS the live
- * picture or a snapshot by reading its spec (it records nothing itself), so
- * every run that read generation g shows exactly what g says, even when the
- * selected picture object is unchanged.
- */
-function useLayerAck<S extends { generation: number; mountEpoch: number }>(
-  layerId: OrreryLayerId,
-  picture: SharedValue<SkPicture>,
-  specs: SharedValue<S>,
-  ackRecorded: OrreryV2CanvasProps["ackRecorded"],
-  requireNewRecording = true,
-): void {
-  const pending = useSharedValue(false);
-  const latest = useSharedValue({ generation: 0, epoch: 0 });
-  useAnimatedReaction(
-    (): LayerRecord => ({
-      picture: picture.value,
-      generation: specs.value.generation,
-      epoch: specs.value.mountEpoch,
-    }),
-    (now, previous) => {
-      // Only a NEW recording speaks for a generation.
-      if (requireNewRecording && previous && now.picture === previous.picture)
-        return;
-      if (now.generation === 0) return;
-      if (
-        previous &&
-        previous.generation === now.generation &&
-        previous.epoch === now.epoch
-      )
-        return;
-      latest.value = { generation: now.generation, epoch: now.epoch };
-      if (pending.value) return;
-      pending.value = true;
-      requestAnimationFrame(() => {
-        pending.value = false;
-        const recorded = latest.value;
-        runOnJS(ackRecorded)(layerId, recorded.generation, recorded.epoch);
-      });
-    },
-  );
-}
 
 export function OrreryV2Canvas({
   width,

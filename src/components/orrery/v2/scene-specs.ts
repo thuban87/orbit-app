@@ -54,6 +54,18 @@ import {
   SUN_CORONA_ALPHA,
 } from "./visual-tunables";
 
+/**
+ * 38.7-14 (D-57): what the spec builders read from a body resource — its key,
+ * world body and the scene's contacts and sun. The Orrery's switch-runtime
+ * resources satisfy it, and so does the System Preview over a provisional
+ * (unsaved) scene.
+ */
+export interface OrrerySpecResource {
+  key: string;
+  body: OrreryBodyResource["body"];
+  scene: Pick<OrreryBodyResource["scene"], "contacts" | "sun">;
+}
+
 /** Premultiplication-free RGBA floats, 0..1. */
 export type OrreryInk = readonly [number, number, number, number];
 
@@ -122,15 +134,15 @@ export const PLAIN_RING_LOOK: RingSpecLook = Object.freeze({
  * faint trace 6 dp at 0.3 on.
  */
 export function buildRingSpecs(
-  resources: readonly OrreryBodyResource[],
+  resources: readonly OrrerySpecResource[],
   colors: ThemePalette,
   look: RingSpecLook = PLAIN_RING_LOOK,
 ): RingSpecs {
   const statusById = new Map<
-    OrreryBodyResource["scene"],
-    Map<number, OrreryBodyResource["scene"]["contacts"][number]["status"]>
+    OrrerySpecResource["scene"],
+    Map<number, OrrerySpecResource["scene"]["contacts"][number]["status"]>
   >();
-  const statusOf = (resource: OrreryBodyResource) => {
+  const statusOf = (resource: OrrerySpecResource) => {
     let index = statusById.get(resource.scene);
     if (!index) {
       index = new Map();
@@ -847,13 +859,13 @@ export const EMPTY_BODY_SPECS: OrreryBodySpecs = Object.freeze({
   bodies: Object.freeze([]) as readonly OrreryBodySpec[],
 });
 
-type SceneContact = OrreryBodyResource["scene"]["contacts"][number];
+type SceneContact = OrrerySpecResource["scene"]["contacts"][number];
 const contactsById = new WeakMap<
-  OrreryBodyResource["scene"],
+  OrrerySpecResource["scene"],
   ReadonlyMap<number, SceneContact>
 >();
 /** First row per id (what the legacy `find` returned), indexed once per scene. */
-function contactOf(resource: OrreryBodyResource): SceneContact | undefined {
+function contactOf(resource: OrrerySpecResource): SceneContact | undefined {
   let index = contactsById.get(resource.scene);
   if (!index) {
     const built = new Map<number, SceneContact>();
@@ -867,7 +879,7 @@ function contactOf(resource: OrreryBodyResource): SceneContact | undefined {
 
 /** The name a body's swatch and initials derive from, and its photo path. */
 export function bodyIdentity(
-  resource: OrreryBodyResource,
+  resource: OrrerySpecResource,
   colors: ThemePalette,
 ): { name: string; photo: string | null; glowColor: string | null } {
   const { body, scene } = resource;
@@ -900,7 +912,7 @@ export function bodyIdentity(
  * sun's resolved glow. Every colour is a theme token resolved to RGBA here.
  */
 export function buildBodyLooks(
-  resources: readonly OrreryBodyResource[],
+  resources: readonly OrrerySpecResource[],
   colors: ThemePalette,
   /** 38.7-10: the resolved mode → the V2 lit bodies and star sun; absent → today's look. */
   mode?: ResolvedMode,
@@ -1091,6 +1103,11 @@ export interface OrrerySpecPublisherOptions {
   writeBodies: (specs: OrreryBodySpecs) => void;
   /** Writes the label specs SharedValue (never React state). */
   writeLabels?: (specs: OrreryLabelLayerSpecs) => void;
+  /**
+   * 38.7-14 (C-H2): the layers that draw the body specs (default the
+   * Orrery's ORRERY_BODY_LAYERS; the System Preview passes its own ids).
+   */
+  bodyLayers?: readonly string[];
 }
 
 export interface OrrerySpecPublisher {
@@ -1130,6 +1147,7 @@ export function createOrrerySpecPublisher(
   options: OrrerySpecPublisherOptions,
 ): OrrerySpecPublisher {
   const { ledger, writeBodies, writeLabels } = options;
+  const bodyLayers = options.bodyLayers ?? ORRERY_BODY_LAYERS;
   let looks: readonly OrreryBodyLook[] = [];
   let initials: Readonly<Record<string, PreparedOrreryText | null>> = {};
   let initialsHandles: readonly string[] = [];
@@ -1173,7 +1191,7 @@ export function createOrrerySpecPublisher(
     generation++;
     published = bodies;
     publishedLooks = looks;
-    ledger.publish(generation, ORRERY_BODY_LAYERS, handles);
+    ledger.publish(generation, bodyLayers, handles);
     writeBodies({ generation, mountEpoch: epoch, bodies });
   }
 

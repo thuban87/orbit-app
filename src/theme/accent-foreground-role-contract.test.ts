@@ -85,18 +85,6 @@ const ACCENT_FOREGROUND_ALLOWLIST: readonly AllowEntry[] = [
     reason: `${SKIA_FILL} Builder backdrop canvas <Fill>.`,
   },
   {
-    file: "src/components/orrery/SystemPreviewCanvas.tsx",
-    rule: "accent-as-text",
-    text: "color={ marker.id === focusedId ? colors.accent : colors.textSecondary }",
-    reason: `${SKIA_FILL} System preview focused-marker Circle.`,
-  },
-  {
-    file: "src/components/orrery/SystemPreviewCanvas.tsx",
-    rule: "background-on-accent",
-    text: "color={colors.background}",
-    reason: `${SKIA_FILL} System preview canvas <Fill>.`,
-  },
-  {
     file: "src/screens/CropPhotoScreen.tsx",
     rule: "background-on-accent",
     text: "color={colors.background}",

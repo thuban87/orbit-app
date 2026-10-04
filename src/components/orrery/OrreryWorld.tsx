@@ -111,6 +111,7 @@ import {
 } from "./v2/focus-fx";
 import {
   createSkyBakeOwner,
+  SKY_NEBULA_SEED,
   type SkyBakeOwner,
   skyBakeKey,
   skySizeBucket,
@@ -292,9 +293,6 @@ function routeRetired(
   if (bases.length > 0) disposeBase(bases);
   if (skies.length > 0) retireSky(skies);
 }
-
-/** The per-package lattice offset of the baked nebula (stable across visits; Galaxy 0 = Lab B's sky). */
-const SKY_NEBULA_SEED = { galaxy: 0, standard: 5 } as const;
 
 /**
  * 38.7-13 (D-53, C3-M2): the renderer is memoised, so a screen render that

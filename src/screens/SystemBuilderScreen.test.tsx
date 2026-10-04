@@ -28,6 +28,11 @@ vi.mock("@shopify/react-native-skia", () => ({
   Circle: "Circle",
   Fill: "Fill",
 }));
+// 38.7-14: the V2 Preview canvas (Skia pictures, the shared caches) is not
+// rendered here; its pure logic is tested in system-preview-logic.test.ts.
+vi.mock("@/components/orrery/SystemPreviewCanvas", () => ({
+  SystemPreviewCanvas: "SystemPreviewCanvas",
+}));
 vi.mock("react-native-gesture-handler", () => {
   const chain = new Proxy({}, { get: () => () => chain });
   return {
@@ -107,7 +112,7 @@ const { saveCustomBuilderDraft, saveOverrideBuilderDraft } = await import(
 );
 const { previewSaveAction } = await import("./SystemBuilderScreen");
 const { focusPreviewBody } = await import(
-  "@/components/orrery/SystemPreviewCanvas"
+  "@/components/orrery/system-preview-logic"
 );
 const { buildCategoryRuleView } = await vi.importActual<
   typeof import("@/components/orrery/SystemRuleAccordion")

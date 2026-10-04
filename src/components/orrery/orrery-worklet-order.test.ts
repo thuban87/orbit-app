@@ -27,6 +27,13 @@ const TARGETS = [
   // The Profile photo lightbox's gesture worklets and their math (38.6 D-16).
   "src/components/photo-lightbox-logic.ts",
   "src/components/PhotoLightbox.tsx",
+  // 38.7-14: the flat V2 System Preview and the occlusion helpers it shares.
+  "src/components/orrery/system-preview-logic.ts",
+  "src/components/orrery/SystemPreviewCanvas.tsx",
+  "src/components/orrery/v2/focus-fx.ts",
+  "src/components/orrery/v2/draw-bodies.ts",
+  "src/components/orrery/v2/draw-labels.ts",
+  "src/components/orrery/v2/draw-overlay.ts",
 ];
 
 function isWorkletFunction(node: ts.Node | undefined): boolean {
