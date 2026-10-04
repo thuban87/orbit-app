@@ -4,8 +4,9 @@
  * every ink is an `orrery*` theme token (D-51); these are strengths, counts,
  * sizes and speeds only.
  *
- * Owner checkpoints set GRID_OPACITY (D-09) and PULSE_INTENSITY (D-10); see
- * the phase 38.7 planning record 38.7-VISUAL-TUNING.md for the rulings.
+ * Owner rulings (2026-10-03, 38.7-09): the grid "weaker" (D-09) and the
+ * pulses "as in Lab B" (D-10); see the phase 38.7 planning record
+ * 38.7-VISUAL-TUNING.md `## Rulings`.
  */
 import type { ResolvedMode, ThemePackage } from "@/theme/theme-types";
 
@@ -129,35 +130,42 @@ export const SKY_STAR_SEED = 38;
 // ── Orbital-plane grid (D-09) ─────────────────────────────────────────────
 
 /**
- * Grid line opacity; 0 = the grid is not drawn at all. Owner: G-GRID (the
- * owner was unsure about a grid at all, D-09).
+ * Grid line opacity; 0 = the grid is not drawn at all. Owner G-GRID
+ * (2026-10-03): "weaker" — a step below Lab C's 0.35 / 1.2 dp look.
  */
-export const GRID_OPACITY = 0.12;
-/** Guide circles across the grid's reach (Lab C's polar grid). */
-export const GRID_RINGS = 6;
-/** Radial spokes (every 360 / GRID_SPOKES degrees). */
-export const GRID_SPOKES = 12;
-/** Grid line half-width (screen dp). */
-export const GRID_HALF_WIDTH_DP = 0.4;
+export const GRID_OPACITY = 0.15;
+/** Guide circles across the grid's reach (Lab C's polar grid: 9). */
+export const GRID_RINGS = 9;
+/** Radial spokes (every 360 / GRID_SPOKES degrees; Lab C: 24). */
+export const GRID_SPOKES = 24;
+/** Grid line half-width (screen dp). Owner G-GRID "weaker". */
+export const GRID_HALF_WIDTH_DP = 1.0;
 /** The grid reaches this far past the outermost orbit (× its radius). */
 export const GRID_EXTENT = 1.12;
 
 // ── Orbit pulses (D-10, D-37, D-49) ───────────────────────────────────────
 
-/** Peak pulse alpha ("not very obvious", D-10). Owner: G-PULSE. */
-export const PULSE_INTENSITY = 0.25;
+/*
+ * Owner G-PULSE (2026-10-03): "as in Lab B" — Lab B's full FLOW look, which
+ * supersedes the earlier "not very obvious" wording of D-10.
+ */
+/** Peak pulse alpha. */
+export const PULSE_INTENSITY = 0.55;
 /** Most pulses on screen at once (D-49 budget); 0 = none. */
-export const PULSE_BUDGET = 8;
+export const PULSE_BUDGET = 40;
 /** Pulse travel speed along its ring (radians per second, clockwise). */
-export const PULSE_SPEED = 0.3;
+export const PULSE_SPEED = 0.15;
 /** One pulse slot's cycle: it travels, then rests (ms). */
-export const PULSE_CYCLE_MS = 9000;
-/** The travelling part of each cycle (ms); the pulse fades in and out. */
-export const PULSE_TRAVEL_MS = 4000;
+export const PULSE_CYCLE_MS = 12000;
+/**
+ * The travelling part of each cycle (ms); the pulse fades in and out. Equal
+ * to the cycle: always travelling, as in Lab B (no rest).
+ */
+export const PULSE_TRAVEL_MS = 12000;
 /** Half the pulse's soft arc (radians of its ring). */
-export const PULSE_ARC_HALF = 0.3;
+export const PULSE_ARC_HALF = 0.5;
 /** Pulse line half-width (screen dp): the same for every status (D-10). */
-export const PULSE_HALF_WIDTH_DP = 1.2;
+export const PULSE_HALF_WIDTH_DP = 1.0;
 
 // ── Thin sun-lit rings (D-11; Lab B labb-rings-logic) ─────────────────────
 
