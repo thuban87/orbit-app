@@ -24,6 +24,15 @@
  * canvas mount and on a theme or size-bucket change only, deferred off the
  * effect (no blocking wait: the sky draws its plain gradient until it lands).
  *
+ * WARM (38.7-15, D-58): the bake is a CPU raster image (`makeNonTextureImage`),
+ * so it may outlive the canvas. On a tab blur the Orrery world hands its live
+ * images (`handOff`) to the warm cache's sky store (`orrerySkyWarmStore`,
+ * bounded by ORRERY_WARM_MAX_SKY_IMAGES, cleared on background / idle /
+ * memory); a later `request` for the same key adopts the stored image at once
+ * instead of baking, so the returning sky paints its nebula from the first
+ * frame. Adoption publishes the image as a new `sky` generation of the new
+ * epoch — the ledger contract is unchanged.
+ *
  * LIFETIME (Plan 07's `<resource_lifetime_contract>`, consumed, not
  * redefined): each baked image is an object of the `sky` layer's generation,
  * handle `skyHandle(mountEpoch, id)`; the sky picture acks `(sky, generation,
@@ -129,6 +138,101 @@ export function bakeSkyImage(input: SkyBakeInput): SkImage | null {
 
 // ── JS owner: one neutral image per key, through the ledger ───────────────
 
+/** How a sky image's pixels are held (M15: only "cpu" may be kept warm). */
+export type SkyImageBacking = "cpu" | "texture" | "unknown";
+
+/** One sky image handed to (or adopted from) the warm store. */
+export interface SkyWarmImage {
+  key: string;
+  image: SkImage;
+  backing: SkyImageBacking;
+}
+
+/**
+ * 38.7-15 (D-58): the warm owner's sky images, by bake key (LRU by insertion).
+ * Holds keys and images only — never a picture, never a pin: nothing records
+ * an image while it sits here, so eviction disposes it at once.
+ */
+export interface SkyWarmStore {
+  /** Keeps `image` for `key` (CPU-backed only; anything else is disposed). */
+  put(entry: SkyWarmImage): boolean;
+  /** Takes the image for `key` out of the store (the caller owns it), or null. */
+  take(key: string): SkImage | null;
+  has(key: string): boolean;
+  /** Disposes the least recently stored images beyond `maxImages`. */
+  trim(maxImages: number): number;
+  /** Disposes every stored image. */
+  clear(): number;
+  size(): number;
+  /** Decoded bytes held (width × height × 4 each). */
+  bytes(): number;
+}
+
+function disposeSkyImage(image: SkImage): void {
+  try {
+    image.dispose?.();
+  } catch {
+    // Already released by the runtime.
+  }
+}
+
+function skyImageBytes(image: SkImage): number {
+  try {
+    const bytes = image.width() * image.height() * 4;
+    return Number.isFinite(bytes) && bytes > 0 ? bytes : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function createSkyWarmStore(): SkyWarmStore {
+  const stored = new Map<string, SkImage>();
+  return {
+    put({ key, image, backing }) {
+      if (backing !== "cpu") {
+        disposeSkyImage(image);
+        return false;
+      }
+      const previous = stored.get(key);
+      if (previous && previous !== image) disposeSkyImage(previous);
+      stored.delete(key);
+      stored.set(key, image);
+      return true;
+    },
+    take(key) {
+      const image = stored.get(key) ?? null;
+      stored.delete(key);
+      return image;
+    },
+    has: (key) => stored.has(key),
+    trim(maxImages) {
+      let disposed = 0;
+      for (const [key, image] of [...stored]) {
+        if (stored.size <= Math.max(0, maxImages)) break;
+        stored.delete(key);
+        disposeSkyImage(image);
+        disposed++;
+      }
+      return disposed;
+    },
+    clear() {
+      const all = [...stored.values()];
+      stored.clear();
+      for (const image of all) disposeSkyImage(image);
+      return all.length;
+    },
+    size: () => stored.size,
+    bytes() {
+      let total = 0;
+      for (const image of stored.values()) total += skyImageBytes(image);
+      return total;
+    },
+  };
+}
+
+/** The app-wide warm sky store (the Orrery world hands off to it; Plan 15). */
+export const orrerySkyWarmStore = createSkyWarmStore();
+
 export interface SkyBakeOwnerOptions {
   /** The H3 ledger (shared with the body/label/base layers). */
   ledger: OrreryGenerationLedger<string>;
@@ -149,6 +253,13 @@ export interface SkyBakeOwnerOptions {
   now?: () => number;
   /** Development log line per bake (`orrery-sky-bake ms=<n> bucket=<key>`). */
   log?: ((line: string) => void) | null;
+  /**
+   * 38.7-15 (D-58): the warm store a request adopts a same-key image from
+   * (the Orrery world; the System Preview passes none and always bakes).
+   */
+  warm?: SkyWarmStore | null;
+  /** How a baked image is backed (default "cpu": `bakeSkyImage` copies to raster). */
+  backing?: SkyImageBacking;
 }
 
 export interface SkyBakeOwner {
@@ -162,6 +273,11 @@ export interface SkyBakeOwner {
   retire(ids: readonly number[]): void;
   /** Unmount: cancels a pending bake; a later result is disposed, unpublished. */
   detach(): void;
+  /**
+   * 38.7-15: after the teardown round trip, hands every live image to the
+   * caller (the warm cache) and forgets it; `retire` then no longer sees it.
+   */
+  handOff(): SkyWarmImage[];
   stats(): { bakes: number; live: number; key: string | null };
 }
 
@@ -190,7 +306,9 @@ export function createSkyBakeOwner(options: SkyBakeOwnerOptions): SkyBakeOwner {
   const schedule = options.schedule ?? defaultSchedule;
   const now = options.now ?? defaultNow;
   const log = options.log === undefined ? devLog : options.log;
-  const images = new Map<number, SkImage>();
+  const warm = options.warm ?? null;
+  const backing = options.backing ?? "cpu";
+  const images = new Map<number, { image: SkImage; key: string }>();
   let nextId = 0;
   let generation = 0;
   let liveKey: string | null = null;
@@ -199,12 +317,18 @@ export function createSkyBakeOwner(options: SkyBakeOwnerOptions): SkyBakeOwner {
   let detached = false;
   let bakes = 0;
 
-  function dispose(image: SkImage): void {
-    try {
-      image.dispose?.();
-    } catch {
-      // Already released by the runtime.
-    }
+  const dispose = disposeSkyImage;
+
+  /** Publishes `image` for `key` as the sky layer's next generation. */
+  function publish(epoch: number, key: string, image: SkImage): boolean {
+    const id = ++nextId;
+    generation++;
+    if (!ledger.publish(generation, [layerId], [skyHandle(epoch, id)]))
+      return false;
+    images.set(id, { image, key });
+    liveKey = key;
+    write({ generation, mountEpoch: epoch, image, key });
+    return true;
   }
 
   return {
@@ -219,6 +343,16 @@ export function createSkyBakeOwner(options: SkyBakeOwnerOptions): SkyBakeOwner {
         return;
       }
       cancelPending?.();
+      cancelPending = null;
+      pendingKey = null;
+      // 38.7-15 (D-58): a warm image for this key is adopted at once — no
+      // bake, and the sky paints its nebula from the first recorded frame.
+      const adopted = warm?.take(input.key) ?? null;
+      if (adopted) {
+        if (!publish(ensureEpoch(), input.key, adopted))
+          warm?.put({ key: input.key, image: adopted, backing: "cpu" });
+        return;
+      }
       pendingKey = input.key;
       const epoch = ensureEpoch();
       cancelPending = schedule(() => {
@@ -240,24 +374,23 @@ export function createSkyBakeOwner(options: SkyBakeOwnerOptions): SkyBakeOwner {
           return;
         }
         if (!ledger.admitResult(epoch, image, dispose)) return;
-        const id = ++nextId;
-        generation++;
-        if (!ledger.publish(generation, [layerId], [skyHandle(epoch, id)])) {
-          dispose(image);
-          return;
-        }
-        images.set(id, image);
-        liveKey = input.key;
-        write({ generation, mountEpoch: epoch, image, key: input.key });
+        if (!publish(epoch, input.key, image)) dispose(image);
       });
     },
     retire(ids) {
       for (const id of ids) {
-        const image = images.get(id);
-        if (!image) continue;
+        const entry = images.get(id);
+        if (!entry) continue;
         images.delete(id);
-        dispose(image);
+        dispose(entry.image);
       }
+    },
+    handOff() {
+      const out: SkyWarmImage[] = [];
+      for (const entry of images.values())
+        out.push({ key: entry.key, image: entry.image, backing });
+      images.clear();
+      return out;
     },
     detach() {
       detached = true;

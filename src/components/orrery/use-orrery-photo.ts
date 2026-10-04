@@ -33,7 +33,14 @@
  *     runs (IN-02). Two bodies showing one photo share one generation.
  *   - The ownership layer deletes a photo's derivatives whenever its bytes
  *     change or are deleted (`notifyPhotoBytesChanged`), and a launch sweep
- *     removes orphans. SkImage objects are never cached.
+ *     removes orphans.
+ *   - SkImages (38.7-15, D-58, supersedes "SkImage objects are not cached"):
+ *     decoded images are kept only inside the shared photo cache — while a
+ *     picture draws them, and across an ordinary tab blur inside the BOUNDED
+ *     warm cache (`resources/orrery-warm-cache.ts`: hard byte cap, LRU
+ *     eviction that disposes, released on background / idle / memory), under
+ *     the same ownership and generation-ledger disposal rules below. Only
+ *     these CPU-backed decodes are retained; never a GPU texture.
  *
  * SkImage OWNERSHIP: the caller owns the returned image. A load cancelled
  * through its token makes no image once it notices (or the caller disposes a

@@ -245,6 +245,10 @@ vi.mock("./resources/orrery-photo-cache", () => ({
     release: () => 1,
     confirmReleased: () => 0,
     clearUnheld: () => 0,
+    // 38.7-15 (D-58): the warm owner's hand-off and trim.
+    handOffWarm: () => [],
+    trimWarm: () => 0,
+    stats: () => ({ warm: 0, warmBytes: 0 }),
   },
 }));
 vi.mock("@/theme/use-reduced-motion", () => ({

@@ -41,6 +41,19 @@
  *     An image of a superseded revision is never warm: it is disposed as soon
  *     as nothing holds it.
  *
+ * 38.7-15 (D-58): the bounded WARM CACHE across a tab blur. When the Orrery
+ * world unmounts, `handOffWarm(owner, epoch)` turns its released images into
+ * warm entries marked for the warm owner (`orrery-warm-cache.ts`) instead of
+ * disposing them — only CPU-backed images (M15: decoded photo bytes; the
+ * loader decodes encoded files with `MakeImageFromEncoded`, a lazy raster
+ * image), anything else is disposed. A warm-marked entry is still just warm:
+ * evictable at admission (C-M1), trimmed to the warm byte budget
+ * (`trimWarm`), cleared by `clearUnheld`. The mark only stops ANOTHER owner's
+ * teardown (`dispose` on `confirmRetired` / `confirmReleased`, the System
+ * Preview) from disposing it. A display-revision bump drops every unheld
+ * image of an older revision at once (M5), so a warm return never shows stale
+ * bytes.
+ *
  * JS thread only. Nothing in this module is a worklet.
  */
 import type { SkImage } from "@shopify/react-native-skia";
@@ -84,6 +97,12 @@ export const ORRERY_PHOTO_ESTIMATE_BYTES =
 
 const LOG_SCOPE = "orrery-photo-cache";
 
+/**
+ * How an image's pixels are held (M15). Only "cpu" images may be kept warm
+ * across a blur; a GPU texture belongs to the active render lifecycle.
+ */
+export type OrreryImageBacking = "cpu" | "texture" | "unknown";
+
 // --- Types ---------------------------------------------------------------------
 
 /** One wanted photo (one per photo key; bodies that share a photo share it). */
@@ -121,6 +140,11 @@ export interface OrreryPhotoCacheDeps {
   subscribe: (
     listener: (relativePath: string, revision: number) => void,
   ) => () => void;
+  /**
+   * 38.7-15 (M15): how a decoded image is backed. Default "cpu": `load` decodes
+   * encoded bytes (`MakeImageFromEncoded`), never a GPU snapshot.
+   */
+  backing?: (image: SkImage) => OrreryImageBacking;
 }
 
 export interface OrreryPhotoCacheOptions {
@@ -141,6 +165,8 @@ export interface OrreryPhotoCacheStats {
   inflight: number;
   /** Decoded bytes plus the in-flight decodes' worst-case bytes. */
   bytes: number;
+  /** 38.7-15: decoded bytes of the unheld (warm) images. */
+  warmBytes: number;
   /** Lifetime decodes started. */
   decodes: number;
   /** Lifetime images disposed. */
@@ -176,8 +202,29 @@ export interface OrreryPhotoCache {
   ): number;
   /** Unmount: wants dropped, drawn images retire; returns the ended epoch. */
   release(owner: string): number | null;
-  /** After the post-release UI round trip: the released images are free. */
-  confirmReleased(owner: string, epoch: number): number;
+  /**
+   * After the post-release UI round trip: the released images are free.
+   * `dispose` (38.7-15, the System Preview's teardown) disposes the ones that
+   * become unheld, except warm-owner entries.
+   */
+  confirmReleased(
+    owner: string,
+    epoch: number,
+    options?: { dispose?: boolean },
+  ): number;
+  /**
+   * 38.7-15 (D-58/H3 rule 3): after the post-release UI round trip, hands
+   * `owner`'s released images of `epoch` to the warm owner: each one nothing
+   * else holds becomes a warm entry marked for the warm owner when it is the
+   * current revision and CPU-backed (M15); otherwise it is disposed. Returns
+   * the retained image ids.
+   */
+  handOffWarm(owner: string, epoch: number): number[];
+  /**
+   * 38.7-15: disposes least-recently-used unheld images until their decoded
+   * bytes are at most `maxBytes`. Returns how many it disposed.
+   */
+  trimWarm(maxBytes: number): number;
   /** Disposes every image nothing pins or awaits (today's unmount lifecycle). */
   clearUnheld(): number;
   stats(): OrreryPhotoCacheStats;
@@ -190,6 +237,10 @@ interface ImageEntry {
   revision: number;
   image: SkImage;
   bytes: number;
+  /** 38.7-15 (M15): only "cpu" images may be kept warm across a blur. */
+  backing: OrreryImageBacking;
+  /** 38.7-15: a warm entry the warm owner holds (never a pin). */
+  warm: boolean;
   pins: Set<string>;
   /** owner → the epoch whose ledger must confirm the retirement. */
   retired: Map<string, number>;
@@ -256,6 +307,13 @@ export function createOrreryPhotoCache(
     options.concurrency ?? ORRERY_PHOTO_CACHE_CONCURRENCY,
   );
   const deps = options.deps ?? defaultOrreryPhotoCacheDeps;
+  const backingOf = (image: SkImage): OrreryImageBacking => {
+    try {
+      return deps.backing ? deps.backing(image) : "cpu";
+    } catch {
+      return "unknown";
+    }
+  };
   const full = { images: maxImages, bytes: maxBytes };
   const ordinary = {
     images: Math.max(0, maxImages - reserveImages),
@@ -418,6 +476,8 @@ export function createOrreryPhotoCache(
         revision: flight.revision,
         image,
         bytes: imageBytes(image),
+        backing: backingOf(image),
+        warm: false,
         pins: new Set(),
         retired: new Map(),
         lastUse: ++useClock,
@@ -627,8 +687,21 @@ export function createOrreryPhotoCache(
     reserveImages,
     mount(owner, onReady) {
       if (!unsubscribeStore)
-        unsubscribeStore = deps.subscribe((relativePath) => {
-          if (knows(relativePath)) reconcile();
+        unsubscribeStore = deps.subscribe((relativePath, revision) => {
+          // M5 (38.7-15): an unheld image of an older revision is dropped at
+          // once — nothing records it (no pin, no pending ack), so a warm
+          // return never draws stale bytes; the return re-requests the path.
+          let dropped = 0;
+          for (const entry of [...images.values()])
+            if (
+              entry.relativePath === relativePath &&
+              entry.revision < revision &&
+              unheld(entry)
+            ) {
+              disposeEntry(entry);
+              dropped++;
+            }
+          if (dropped > 0 || knows(relativePath)) reconcile();
         });
       // A new visit retries photos whose last load failed (transient errors).
       failed.clear();
@@ -670,7 +743,8 @@ export function createOrreryPhotoCache(
         const entry = images.get(id);
         if (!entry || entry.retired.get(owner) !== epoch) continue;
         entry.retired.delete(owner);
-        if (settleHold(entry, confirmOptions.dispose)) freed++;
+        // 38.7-15: another owner's teardown never disposes a warm-owner entry.
+        if (settleHold(entry, !!confirmOptions.dispose && !entry.warm)) freed++;
       }
       if (freed > 0) reconcile();
       return freed;
@@ -693,18 +767,54 @@ export function createOrreryPhotoCache(
       reconcile();
       return epoch;
     },
-    confirmReleased(owner, epoch) {
+    confirmReleased(owner, epoch, releaseOptions = {}) {
       let freed = 0;
       for (const entry of [...images.values()]) {
         if (entry.retired.get(owner) !== epoch) continue;
         entry.retired.delete(owner);
-        if (settleHold(entry)) freed++;
+        if (settleHold(entry, !!releaseOptions.dispose && !entry.warm)) freed++;
       }
       const state = owners.get(owner);
       if (state && state.epoch === null && state.drawn.size === 0)
         owners.delete(owner);
       if (freed > 0) reconcile();
       return freed;
+    },
+    handOffWarm(owner, epoch) {
+      const retained: number[] = [];
+      let freed = 0;
+      for (const entry of [...images.values()]) {
+        if (entry.retired.get(owner) !== epoch) continue;
+        entry.retired.delete(owner);
+        if (!unheld(entry)) continue; // another owner still holds it
+        freed++;
+        if (isCurrent(entry) && entry.backing === "cpu") {
+          entry.warm = true;
+          retained.push(entry.id);
+        } else disposeEntry(entry);
+      }
+      const state = owners.get(owner);
+      if (state && state.epoch === null && state.drawn.size === 0)
+        owners.delete(owner);
+      if (freed > 0) reconcile();
+      return retained;
+    },
+    trimWarm(maxBytes) {
+      const limit = Math.max(0, maxBytes);
+      const warm = [...images.values()]
+        .filter((entry) => unheld(entry))
+        .sort((a, b) => a.lastUse - b.lastUse);
+      let bytes = 0;
+      for (const entry of warm) bytes += entry.bytes;
+      let disposed = 0;
+      for (const entry of warm) {
+        if (bytes <= limit) break;
+        bytes -= entry.bytes;
+        disposeEntry(entry);
+        disposed++;
+      }
+      if (disposed > 0) reconcile();
+      return disposed;
     },
     clearUnheld() {
       let disposed = 0;
@@ -720,10 +830,14 @@ export function createOrreryPhotoCache(
       let pinned = 0;
       let warm = 0;
       let retired = 0;
+      let warmBytes = 0;
       for (const entry of images.values()) {
         if (entry.pins.size > 0) pinned++;
         else if (entry.retired.size > 0) retired++;
-        else warm++;
+        else {
+          warm++;
+          warmBytes += entry.bytes;
+        }
       }
       return {
         images: images.size,
@@ -732,6 +846,7 @@ export function createOrreryPhotoCache(
         retired,
         inflight: inflight.size + cancelled.size,
         bytes: usage().bytes,
+        warmBytes,
         ...counters,
       };
     },

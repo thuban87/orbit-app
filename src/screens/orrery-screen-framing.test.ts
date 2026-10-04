@@ -210,6 +210,14 @@ function harness(
   let realPublisher: ReturnType<typeof createOrrerySatellitePublisher> | null =
     null;
   const theme = { colors: {} };
+  /** 38.7-15 (D-58): the warm cache the screen attaches and releases. */
+  const warmCache = {
+    releases: [] as string[],
+    attach: () => () => {},
+    release: (reason: string) => {
+      warmCache.releases.push(reason);
+    },
+  };
   /** 38.7-13: every runtime publication (scene, isSwitch, intensity, Home). */
   const publishes: unknown[][] = [];
   // The screen's useAnimatedReaction callbacks of the latest render.
@@ -467,6 +475,9 @@ function harness(
             OrreryClusterPanel: "Panel",
             CLUSTER_OBSTACLE: "orrery-cluster-panel",
           };
+        // 38.7-15 (D-58): the warm cache (its own suite proves it).
+        if (id.includes("orrery-warm-cache"))
+          return { orreryWarmCache: warmCache };
         if (id.includes("OrreryWorld")) return { OrreryWorld: "World" };
         if (id.includes("OrreryFocusContext"))
           return { OrreryFocusContext: "FocusCard" };

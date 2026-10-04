@@ -30,6 +30,13 @@
  *   - retired: an owner un-pinned it and its ledger has not yet confirmed it;
  *   - warm: neither — an evictable cache entry (LRU order, disposed on eviction).
  *
+ * 38.7-15 (D-58): across a tab blur the Orrery world's released Paragraphs are
+ * handed to the warm owner (`handOffWarm`, `orrery-warm-cache.ts`) instead of
+ * being cleared: they stay warm (evictable, never a pin), trimmed to the warm
+ * cap (`trimWarm`). The warm owner's mark only stops ANOTHER owner's teardown
+ * (`dispose` on `confirmRetired` / `confirmReleased`: the System Preview) from
+ * disposing them; `clearUnheld` (background, idle, memory) still does.
+ *
  * THE PUBLISHER (`createOrreryTextPublisher`) turns scene inputs, the semantic
  * tier and the eligible-initials list into published text specs (written to
  * SharedValues by the caller, never React state), in admission-priority order,
@@ -191,8 +198,24 @@ export interface OrreryTextService {
   ): number;
   /** Drops `owner`'s pins (they retire) and ends its epoch; returns that epoch. */
   release(owner: string): number;
-  /** After the post-release teardown: the released entries turn warm. */
-  confirmReleased(owner: string, epoch: number): number;
+  /**
+   * After the post-release teardown: the released entries turn warm, or with
+   * `dispose` (38.7-15, the System Preview) are disposed — except entries the
+   * warm owner holds.
+   */
+  confirmReleased(
+    owner: string,
+    epoch: number,
+    options?: { dispose?: boolean },
+  ): number;
+  /**
+   * 38.7-15 (D-58/H3 rule 3): after the post-release teardown, `owner`'s
+   * released entries of `epoch` that nothing else holds become warm entries
+   * held by the warm owner. Returns their keys.
+   */
+  handOffWarm(owner: string, epoch: number): string[];
+  /** 38.7-15: disposes LRU warm entries until at most `maxWarm` remain. */
+  trimWarm(maxWarm: number): number;
   /** Disposes LRU warm entries while over the cap or the warm budget. */
   trim(): number;
   /** Disposes every entry that is neither pinned nor awaiting confirmation. */
@@ -219,6 +242,8 @@ interface Entry {
   pins: Set<string>;
   /** Owners that un-pinned it and whose ledger has not yet confirmed it. */
   retired: Map<string, RetireMark>;
+  /** 38.7-15: a warm entry the warm owner holds (never a pin). */
+  warm: boolean;
 }
 interface OwnerState {
   epoch: number;
@@ -404,7 +429,13 @@ export function createOrreryTextService(
         return null;
       }
       const prepared = build(request);
-      entries.set(key, { key, prepared, pins: new Set(), retired: new Map() });
+      entries.set(key, {
+        key,
+        prepared,
+        pins: new Set(),
+        retired: new Map(),
+        warm: false,
+      });
       return prepared;
     },
     mount(owner) {
@@ -442,7 +473,8 @@ export function createOrreryTextService(
         entry.retired.delete(owner);
         if (!isWarm(entry)) continue;
         cleared++;
-        if (confirmOptions.dispose) dispose(entry);
+        // 38.7-15: another owner's teardown never disposes a warm-owner entry.
+        if (confirmOptions.dispose && !entry.warm) dispose(entry);
       }
       return freed(cleared);
     },
@@ -460,15 +492,44 @@ export function createOrreryTextService(
       state.epoch = ++epochSerial;
       return epoch;
     },
-    confirmReleased(owner, epoch) {
+    confirmReleased(owner, epoch, releaseOptions = {}) {
       let cleared = 0;
+      for (const entry of [...entries.values()]) {
+        const mark = entry.retired.get(owner);
+        if (!mark || mark.epoch !== epoch) continue;
+        entry.retired.delete(owner);
+        if (!isWarm(entry)) continue;
+        cleared++;
+        if (releaseOptions.dispose && !entry.warm) dispose(entry);
+      }
+      return freed(cleared);
+    },
+    handOffWarm(owner, epoch) {
+      const kept: string[] = [];
       for (const entry of entries.values()) {
         const mark = entry.retired.get(owner);
         if (!mark || mark.epoch !== epoch) continue;
         entry.retired.delete(owner);
-        if (isWarm(entry)) cleared++;
+        if (!isWarm(entry)) continue; // another owner still holds it
+        entry.warm = true;
+        kept.push(entry.key);
       }
-      return freed(cleared);
+      freed(kept.length);
+      return kept;
+    },
+    trimWarm(maxWarm) {
+      const limit = Math.max(0, maxWarm);
+      let warm = 0;
+      for (const entry of entries.values()) if (isWarm(entry)) warm++;
+      let disposed = 0;
+      for (const entry of [...entries.values()]) {
+        if (warm <= limit) break;
+        if (!isWarm(entry)) continue;
+        dispose(entry);
+        warm--;
+        disposed++;
+      }
+      return freed(disposed);
     },
     trim() {
       let warm = 0;

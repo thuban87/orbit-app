@@ -59,6 +59,7 @@ import {
   selectSystemFraming,
   shouldPublishSwitchScene,
 } from "@/components/orrery/orrery-switch-animation";
+import { orreryWarmCache } from "@/components/orrery/resources/orrery-warm-cache";
 import { useOrreryCamera } from "@/components/orrery/use-orrery-camera";
 import { useOrrerySwitchRuntime } from "@/components/orrery/use-orrery-switch-runtime";
 import { staticOcclusionRects } from "@/components/orrery/v2/occlusion-sources";
@@ -533,9 +534,14 @@ export function OrreryScreen() {
   useEffect(() => {
     if (!isFocused || !appActive) closeContacts(false);
   }, [isFocused, appActive, closeContacts]);
+  // 38.7-15 (D-58): the warm cache tracks AppState itself (background and a
+  // memory warning release it; nothing is retained while not active).
+  useEffect(() => orreryWarmCache.attach(AppState), []);
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (value) => {
       if (value !== "active") {
+        // D-58: nothing reusable survives app background.
+        orreryWarmCache.release("background");
         pauseSwitch();
         if (routeLive.current) captureSession.current("background");
         cancelIntent.current("background");

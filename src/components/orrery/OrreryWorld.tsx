@@ -85,8 +85,8 @@ import {
   type OrreryTextPublisher,
   type OrreryTextScene,
   type OrreryTextVisibility,
-  orreryTextService,
 } from "./resources/orrery-text-service";
+import { orreryWarmCache } from "./resources/orrery-warm-cache";
 import {
   NORMAL_SWITCH_DURATION_MS,
   type OrrerySwitchRuntime,
@@ -111,6 +111,7 @@ import {
 } from "./v2/focus-fx";
 import {
   createSkyBakeOwner,
+  orrerySkyWarmStore,
   SKY_NEBULA_SEED,
   type SkyBakeOwner,
   skyBakeKey,
@@ -246,11 +247,6 @@ function orreryTextEligibility(
 
 let worldSerial = 0;
 type OrreryLedger = OrreryGenerationLedger<string>;
-/** After the post-release UI round trip: the released text entries may go. */
-function finishTextRelease(owner: string, epoch: number): void {
-  orreryTextService.confirmReleased(owner, epoch);
-  orreryTextService.clearUnheld();
-}
 
 /**
  * 38.7-07 (H3): routes the native objects the ledger released back to their
@@ -451,6 +447,8 @@ export function OrreryWorldInner({
       write: (spec) => {
         skyImage.value = spec;
       },
+      // 38.7-15 (D-58): a warm nebula for the same key is adopted at once.
+      warm: orrerySkyWarmStore,
     });
   const skyOwner = skyOwnerRef.current;
   const retireSky = useCallback(
@@ -571,6 +569,8 @@ export function OrreryWorldInner({
   );
   useEffect(() => {
     mounted.current = true;
+    // 38.7-15 (D-58): the warm set is this world's to reuse; no idle release.
+    orreryWarmCache.resumeOnFocus();
     return () => {
       mounted.current = false;
     };
@@ -938,9 +938,13 @@ export function OrreryWorldInner({
       // H3 teardown: pins retire now and the publishing epoch ends; the clock
       // and the pictures stop with the canvas unmounting in this commit. Only
       // after that teardown's queued UI jobs and one more UI frame (no mapper
-      // can still record) is every retained object handed back, in reverse
-      // creation order, and everything unheld cleared. Baked base snapshots
-      // go back in that order too, then the offscreen surface (UI thread).
+      // can still record) does the hand-off run. 38.7-15 (D-58, contract rule
+      // 3): FIRST the world's released photos, Paragraphs and baked sky are
+      // transferred to the warm owner (CPU-backed only, trimmed to the warm
+      // caps; released instead while the app is not active); THEN the ledger
+      // hands back the rest of the epoch in reverse creation order — the
+      // baked base snapshots (GPU textures, never retained), then the
+      // offscreen surface (UI thread).
       const { owner } = publisher;
       const textEpoch = publisher.release();
       // 38.7-09: no new sky bake may publish from here on.
@@ -950,6 +954,11 @@ export function OrreryWorldInner({
       photoEpoch.current = null;
       if (photos !== null) orreryPhotoCache.release(owner);
       const finish = () => {
+        orreryWarmCache.retainOnBlur({
+          photos: photos === null ? null : { owner, epoch: photos },
+          text: textEpoch === null ? null : { owner, epoch: textEpoch },
+          skies: skyOwner.handOff(),
+        });
         const baseIds: number[] = [];
         const collectBase = (ids: number[]) => {
           baseIds.push(...ids);
@@ -968,9 +977,6 @@ export function OrreryWorldInner({
             ledgerEpoch,
           );
         runOnUI(teardownBakeRegistry)(bakeRegistry, baseIds);
-        if (photos !== null) orreryPhotoCache.confirmReleased(owner, photos);
-        orreryPhotoCache.clearUnheld();
-        if (textEpoch !== null) finishTextRelease(owner, textEpoch);
       };
       setTimeout(() => {
         runOnUI(() => {
