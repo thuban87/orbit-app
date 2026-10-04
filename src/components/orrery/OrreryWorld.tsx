@@ -1,6 +1,6 @@
 /** ADR-077: keyed resources; one UI-thread world/projection frame for all layers. */
 import type { SkTypefaceFontProvider } from "@shopify/react-native-skia";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { useWindowDimensions } from "react-native";
 import {
   runOnJS,
@@ -59,6 +59,7 @@ import {
 import { SKY_UNTINTED, systemSkyHueIndex } from "@/logic/orrery-sky-logic";
 import { detectStacks } from "@/logic/orrery-stack-logic";
 import { sampleSwitchChoreography } from "@/logic/orrery-switch-choreography";
+import { sampleSwitchSignal } from "@/logic/orrery-switch-fx-logic";
 import { systemRefId } from "@/logic/orrery-system-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
 import type {
@@ -86,6 +87,7 @@ import {
   orreryTextService,
 } from "./resources/orrery-text-service";
 import {
+  NORMAL_SWITCH_DURATION_MS,
   type OrrerySwitchRuntime,
   sampleOrrerySwitchCamera,
 } from "./use-orrery-switch-runtime";
@@ -97,6 +99,7 @@ import {
   teardownBakeRegistry,
 } from "./v2/base-bake";
 import type { ReorderHoldFx } from "./v2/draw-overlay";
+import { switchTrailRoles, type TrailLook } from "./v2/draw-switch";
 import {
   buildFocusSpec,
   collectOcclusion,
@@ -160,6 +163,9 @@ import {
   SKY_NEBULA_TEX,
   SKY_STAR_SEED,
   SKY_TWINKLE_GROUPS,
+  TRAIL_ALPHA,
+  TRAIL_BUDGET,
+  TRAIL_STRENGTH,
 } from "./v2/visual-tunables";
 
 export { createOrreryGestures } from "./use-orrery-camera";
@@ -289,7 +295,14 @@ function routeRetired(
 /** The per-package lattice offset of the baked nebula (stable across visits; Galaxy 0 = Lab B's sky). */
 const SKY_NEBULA_SEED = { galaxy: 0, standard: 5 } as const;
 
-export function OrreryWorld({
+/**
+ * 38.7-13 (D-53, C3-M2): the renderer is memoised, so a screen render that
+ * changes none of its props (a persistence-only store change, a satellite
+ * state held mid-switch, an obstacle measured mid-switch — the screen holds
+ * the renderer viewport until settle) commits nothing here. The un-memoised
+ * component stays exported for the direct-call render tests.
+ */
+export function OrreryWorldInner({
   scene,
   pose,
   viewport,
@@ -483,6 +496,8 @@ export function OrreryWorld({
       transition.value,
       progress.value,
     ).world;
+    // C3-H1 / C4-L2: the one sampler, with the motion of the transition
+    // being drawn (never the live reduced-motion flag).
     const sampledCamera =
       progress.value >= 1
         ? pose.value
@@ -490,6 +505,7 @@ export function OrreryWorld({
             cameraFrom.value,
             cameraTo.value,
             progress.value,
+            transition.value,
           );
     const held = reorder.value;
     const world = previewReorder(
@@ -528,6 +544,25 @@ export function OrreryWorld({
     projected.stacks = detectStacks(projected.bodies);
     return projected;
   });
+  // 38.7-13 (D-24/D-53): the switch signal of the transition being drawn —
+  // transition/progress SharedValues only (C4-L2: never the live reduced-
+  // motion flag); the streak roles are rebuilt once per transition.
+  const switchFx = useDerivedValue(() =>
+    sampleSwitchSignal(
+      transition.value,
+      progress.value,
+      NORMAL_SWITCH_DURATION_MS,
+    ),
+  );
+  const switchRoles = useDerivedValue(() => switchTrailRoles(transition.value));
+  const trailLook = useMemo<TrailLook>(
+    () => ({
+      peak: TRAIL_ALPHA[themeMode] * TRAIL_STRENGTH,
+      additive: themeMode === "dark",
+      budget: TRAIL_BUDGET,
+    }),
+    [themeMode],
+  );
   // Conventional focus positioning consumes this same interpolated frame.
   useAnimatedReaction(
     () => frame.value,
@@ -556,8 +591,22 @@ export function OrreryWorld({
     hueIndex = SKY_UNTINTED;
   }
   const skySpec = useSharedValue<SkySpec>(EMPTY_SKY_SPEC);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by the bucket's numbers, not the object
+  // 38.7-13 (D-08/H9): a hue change crossfades from the previous System's
+  // hue, tagged with the scene generation whose switch draws the crossfade
+  // (the sky picture mixes at DRAW time from the switch signal; no bake).
+  const skyTint = useRef<{ hue: number; from: number; generation: number }>(
+    null,
+  );
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by the bucket's numbers and the hue, not the object; the generation is read when the hue changes
   useEffect(() => {
+    const last = skyTint.current;
+    const tint =
+      last === null
+        ? { hue: hueIndex, from: hueIndex, generation }
+        : last.hue !== hueIndex
+          ? { hue: hueIndex, from: last.hue, generation }
+          : last;
+    skyTint.current = tint;
     skySpec.value = buildSkySpec({
       colors,
       mode: themeMode,
@@ -566,6 +615,8 @@ export function OrreryWorld({
       height: viewport.height,
       cover: skyBucket,
       hueIndex,
+      fromHueIndex: tint.from,
+      tintGeneration: tint.generation,
       look: skyLook,
       seed: SKY_STAR_SEED,
       twinkleGroups: SKY_TWINKLE_GROUPS,
@@ -1167,6 +1218,9 @@ export function OrreryWorld({
       coverColor={colors.orrerySkyBase}
       ringSpecs={ringSpecs}
       plane={planeSpec}
+      switchFx={switchFx}
+      switchRoles={switchRoles}
+      trailLook={trailLook}
       overlay={overlaySpec}
       reorder={camera.reorder}
       hold={holdFx}
@@ -1182,3 +1236,6 @@ export function OrreryWorld({
     />
   );
 }
+
+/** 38.7-13 (C3-M2): the memoised renderer the screen mounts. */
+export const OrreryWorld = memo(OrreryWorldInner);

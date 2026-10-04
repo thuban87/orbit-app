@@ -209,6 +209,80 @@ export const SKY_SIZE_BUCKET_DP = 64;
 /** The sky's star-field seed (fixed: the sky is the same every visit). */
 export const SKY_STAR_SEED = 38;
 
+// ── The System switch (38.7-13: D-24, D-32, D-53) ─────────────────────────
+
+/*
+ * Every number here is a lab value, ported AS DRAWN (execution policy §6):
+ * Lab B's star warp (`labb-switch-logic.ts`, `LabEnvironment.tsx`
+ * StarStreakAtlas), Lab A's orbit streaks (`deep-field-config.ts` TRAIL_*,
+ * `world-plane.ts` §7a) and Lab C's camera breath (`OrreryWorld3D.tsx`).
+ * The owner's S-WARP / S-TRAIL / S-SWIRL checkpoint picks "as in Lab X /
+ * weaker / stronger / off" around these.
+ */
+/** Lab B STREAK_MAX_DP: streak length (dp) of an edge star at full warp. */
+export const WARP_STREAK_MAX_DP = 190;
+/** Lab B WARP_PUSH: the sky's extra zoom at full warp ("pushing into" it). */
+export const WARP_PUSH = 0.14;
+/** Lab B SKY_PUSH_BASE / SKY_PUSH_DEPTH: push per unit depth factor. */
+export const WARP_PUSH_BASE = 0.6;
+export const WARP_PUSH_DEPTH = 2.5;
+/** Lab B WARP_SWIRL: the streaks' vortex twist at full warp (rad, spin-wise). */
+export const WARP_SWIRL = 0.32;
+/** Lab B STREAK_ALPHA: streak alpha × the star's own alpha. */
+export const WARP_STREAK_ALPHA = 0.95;
+/** Lab B STREAK_THICK: streak thickness × the star's own diameter. */
+export const WARP_STREAK_THICK = 0.85;
+/**
+ * Lab B's parallax depth factors of its MID (0.1) and NEAR (0.22) star
+ * layers: the V2 sky's small stars are the mid layer, its bright stars the
+ * near layer. Streak length × (0.45 + 2.5 × factor); push × (0.6 + 2.5 × factor).
+ */
+export const WARP_LAYER_FACTOR = { mid: 0.1, near: 0.22 } as const;
+/** Lab B's streak sprite: transparent tail → 0.30 halo at 72 % → full head. */
+export const WARP_STREAK_HALO = 0.3;
+export const WARP_STREAK_HALO_AT = 0.72;
+/** Fade segments per streak (the sprite gradient as stepped alphas). */
+export const WARP_STREAK_SEGMENTS = 3;
+/** Master warp strength (1 = as in Lab B; the owner option knob; 0 = off). */
+export const WARP_STRENGTH = 1;
+
+/** Lab A TRAIL_MS / TRAIL_LEAVING_MS: the arc a streak covers (ms of motion). */
+export const TRAIL_MS = 160;
+export const TRAIL_LEAVING_MS = 340;
+/** Lab A TRAIL_MAX_ARC: the longest streak (radians about the sun). */
+export const TRAIL_MAX_ARC = 2.4;
+/** Lab A TRAIL_WIDTH: streak width × the drawn body radius. */
+export const TRAIL_WIDTH = 1.15;
+/** Lab A TRAIL_ALPHA_DARK / _LIGHT: the streak's peak alpha. */
+export const TRAIL_ALPHA = { dark: 0.42, light: 0.26 } as const;
+/** Lab A: a leaving body's streak is this much stronger. */
+export const TRAIL_LEAVING_GAIN = 1.25;
+/** Lab A TRAIL_INNER_REF / _FLOOR: inner rings thin and soften their streaks. */
+export const TRAIL_INNER_REF = 9;
+export const TRAIL_INNER_FLOOR = 0.3;
+/**
+ * Lab A's streak gradient: 0 at the tail, TRAIL_RAMP_MID at 55 % (that stop
+ * lives in the ring shader, RING_PLANE_SKSL `TRAIL_AT`), full at the body.
+ */
+export const TRAIL_RAMP_MID = 0.35;
+/** Most orbit streaks drawn at once (nearest the camera first; D-53). */
+export const TRAIL_BUDGET = 120;
+/** Master streak strength (1 = as in Lab A; the owner option knob; 0 = off). */
+export const TRAIL_STRENGTH = 1;
+
+/**
+ * The switch camera. SWITCH_SWIRL_TURNS: the authored out-and-back yaw swing
+ * (peak turns mid-switch) on top of the shortest-arc return to Home. Lab A's
+ * swirl measured ≈ 0 turns of camera yaw in its pass-3/35 clip (the "whirly"
+ * there is the world's own spin plus the camera's pan/zoom back to Home;
+ * read from a 4 fps tile, low confidence — the device pass confirms side by
+ * side). Lab C breath: SWITCH_PULLBACK 0.24, SWITCH_TILT −0.1 (its 0.38 yaw
+ * swing is NOT added on top of the swirl).
+ */
+export const SWITCH_SWIRL_TURNS = 0;
+export const SWITCH_BREATH_PULLBACK = 0.24;
+export const SWITCH_BREATH_TILT = -0.1;
+
 // ── Orbital-plane grid (D-09) ─────────────────────────────────────────────
 
 /**

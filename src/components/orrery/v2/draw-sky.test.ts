@@ -6,12 +6,12 @@ const fx = vi.hoisted(() => ({
 }));
 
 vi.mock("@shopify/react-native-skia", () => ({
-  BlendMode: { SrcOver: 3, Screen: 14 },
+  BlendMode: { SrcOver: 3, Plus: 12, Screen: 14 },
   FilterMode: { Linear: 1 },
   MipmapMode: { None: 0 },
   PaintStyle: { Fill: 0, Stroke: 1 },
-  PointMode: { Points: 0 },
-  StrokeCap: { Round: 1 },
+  PointMode: { Points: 0, Lines: 1 },
+  StrokeCap: { Butt: 0, Round: 1 },
   TileMode: { Clamp: 0, Repeat: 1 },
   Skia: {
     XYWHRect: (x: number, y: number, width: number, height: number) => ({
@@ -68,6 +68,7 @@ vi.mock("@shopify/react-native-skia", () => ({
 }));
 
 import { SKY_UNTINTED } from "@/logic/orrery-sky-logic";
+import type { SwitchFxSignal } from "@/logic/orrery-switch-fx-logic";
 import {
   drawSky,
   skyNebulaUniforms,
@@ -127,6 +128,7 @@ function spec(overrides: Partial<SkySpec> = {}): SkySpec {
     tintFrom: HUE,
     tintTo: HUE,
     tintMix: 1,
+    tintGeneration: 0,
     tintStrength: 0.35,
     tintWash: 0.05,
     stars: [
@@ -139,6 +141,7 @@ function spec(overrides: Partial<SkySpec> = {}): SkySpec {
         diameter: 1.2,
         alpha: 0.8,
         phase: 0,
+        layer: "mid",
       },
       {
         points: [{ x: 5, y: 6 }],
@@ -146,6 +149,7 @@ function spec(overrides: Partial<SkySpec> = {}): SkySpec {
         diameter: 2.6,
         alpha: 0.9,
         phase: Math.PI,
+        layer: "near",
       },
     ],
     twinkleDepth: 0.4,
@@ -326,5 +330,87 @@ describe("drawSky", () => {
     drawSky(canvas, spec(), IMAGE, { x: 1e6, y: 1e6, zoom: 4 }, -1, EFFECT);
     const stars = calls.find((c) => c.op === "translate")?.args as number[];
     expect(Math.abs(stars[0])).toBeLessThanOrEqual(22);
+  });
+});
+
+describe("38.7-13: the switch on the sky (D-24 warp, D-08 hue crossfade, H9)", () => {
+  /** A switch signal to generation `generation` at `progress`. */
+  const signal = (over: Partial<SwitchFxSignal> = {}): SwitchFxSignal => ({
+    generation: 5,
+    progress: 0.5,
+    running: true,
+    reducedMotion: false,
+    intensity: 1,
+    velocity: 1,
+    angularSpeed: 10,
+    warp: 0,
+    trail: 0,
+    breath: 0,
+    swirl: 0,
+    skyHue: 0,
+    ...over,
+  });
+  const crossfading = spec({
+    tintFrom: OTHER,
+    tintTo: HUE,
+    tintMix: 1,
+    tintGeneration: 5,
+  });
+  const drawnTint = (s: SwitchFxSignal | null) => {
+    made.length = 0;
+    drawSky(recordingCanvas().canvas, crossfading, IMAGE, HOME, -1, EFFECT, s);
+    return made[0].uniforms;
+  };
+
+  it("the drawn tint is the outgoing hue at progress 0 and the incoming hue at 1, by draw-time uniforms only", () => {
+    expect(drawnTint(signal({ progress: 0, skyHue: 0 }))).toEqual(
+      skyNebulaUniforms(crossfading, OTHER, HOME, -1),
+    );
+    expect(
+      drawnTint(signal({ progress: 1, running: false, skyHue: 1 })),
+    ).toEqual(skyNebulaUniforms(crossfading, HUE, HOME, -1));
+    // Arrival order (Lab B): a frame still drawing an OLDER switch shows the
+    // outgoing hue even if the weight says otherwise; a newer one the incoming.
+    expect(drawnTint(signal({ generation: 4, skyHue: 1 }))).toEqual(
+      skyNebulaUniforms(crossfading, OTHER, HOME, -1),
+    );
+    expect(drawnTint(signal({ generation: 6, skyHue: 0 }))).toEqual(
+      skyNebulaUniforms(crossfading, HUE, HOME, -1),
+    );
+    // No signal (rest): the spec's own mix.
+    expect(drawnTint(null)).toEqual(
+      skyNebulaUniforms(crossfading, HUE, HOME, -1),
+    );
+  });
+
+  it("no warp (rest, reduced motion): exactly the resting sky — no streaks, no push", () => {
+    const rest = recordingCanvas();
+    drawSky(rest.canvas, spec(), IMAGE, HOME, 0, EFFECT);
+    const calm = recordingCanvas();
+    drawSky(calm.canvas, spec(), IMAGE, HOME, 0, EFFECT, signal({ warp: 0 }));
+    expect(calm.calls.map((c) => c.op)).toEqual(rest.calls.map((c) => c.op));
+  });
+
+  it("a warp streaks every mid/near star once (the budget is the sky's own stars) and pushes the field", () => {
+    made.length = 0;
+    const { canvas, calls } = recordingCanvas();
+    drawSky(canvas, spec(), IMAGE, HOME, 0, EFFECT, signal({ warp: 0.8 }));
+    const lines = calls.filter((c) => c.op === "drawPoints" && c.args[0] === 1);
+    // One drawPoints(Lines) per star batch per fade segment, 2 points each.
+    const segments = lines.length / spec().stars.length;
+    expect(Number.isInteger(segments)).toBe(true);
+    const streaks = lines.reduce(
+      (n, c) => n + (c.args[1] as unknown[]).length / 2,
+      0,
+    );
+    expect(streaks / segments).toBe(3); // 2 + 1 stars
+    // Each streak's alpha ramps toward its head (Lab B's sprite gradient).
+    const alphas = lines.slice(0, segments).map((c) => c.paint?.color[3] ?? 0);
+    for (let k = 1; k < alphas.length; k++)
+      expect(alphas[k]).toBeGreaterThan(alphas[k - 1]);
+    // The nebula and far stars push outward (uniforms 35 and 42: zoom scale).
+    const still = skyNebulaUniforms(spec(), HUE, HOME, 0);
+    expect(made[0].uniforms[35]).toBeGreaterThan(still[35]);
+    expect(made[0].uniforms[42]).toBeGreaterThan(still[42]);
   });
 });

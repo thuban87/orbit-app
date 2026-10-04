@@ -5,7 +5,11 @@ import { MIGRATIONS, TARGET_VERSION } from "@/db/database";
 import { runMigrations } from "@/db/migrations/runner";
 import { readOrrerySatellites } from "@/db/orrery-satellites-read";
 import { addRelationship } from "@/db/relationships-dao";
-import { HOME_CAMERA } from "@/logic/orrery-camera-logic";
+import {
+  type CameraPose,
+  clampCameraPose,
+  HOME_CAMERA,
+} from "@/logic/orrery-camera-logic";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
 import { IDENTITY_ENTER, IDENTITY_EXIT } from "@/logic/orrery-label-logic";
 import {
@@ -20,11 +24,14 @@ import {
   type OrrerySatelliteState,
 } from "@/services/orrery-scene";
 import { THEME_PRESETS } from "@/theme/theme-presets";
-import { OrreryWorld } from "./OrreryWorld";
+import { OrreryWorldInner as OrreryWorld } from "./OrreryWorld";
 import { createOrrerySatellitePublisher } from "./orrery-satellite-publisher";
 import { prepareOrreryText } from "./resources/orrery-text-service";
 import { useOrreryCamera } from "./use-orrery-camera";
-import { sampleOrrerySwitchCamera } from "./use-orrery-switch-runtime";
+import {
+  sampleOrrerySwitchCamera,
+  useOrrerySwitchRuntime,
+} from "./use-orrery-switch-runtime";
 import { GRID_OPACITY } from "./v2/visual-tunables";
 
 const switchRuntime = (
@@ -77,7 +84,35 @@ const native = vi.hoisted(() => ({
   host: {} as Record<string, unknown>,
   /** Paragraph texts painted by the label/body pictures, in order. */
   painted: [] as string[],
+  /**
+   * 38.7-13: opt-in React-like hook slots (refs, memos and effects persist
+   * across OrreryWorld renders; deps compared), reset at OrreryWorld's first
+   * hook. Null = the stateless default every other test uses.
+   */
+  slots: null as null | {
+    cells: { value?: unknown; deps?: unknown[]; cleanup?: unknown }[];
+    cursor: number;
+  },
+  /** 38.7-13: hold every timing at its start (a switch driver never completes). */
+  holdTimings: false,
+  /** 38.7-13: every sky bake owner OrreryWorld created, with its requests. */
+  skyOwners: [] as { owner: { stats(): { bakes: number } }; keys: string[] }[],
 }));
+/** The next persistent hook cell (slot mode only). */
+function hookCell(): { value?: unknown; deps?: unknown[]; cleanup?: unknown } {
+  const slots = native.slots as NonNullable<typeof native.slots>;
+  const index = slots.cursor++;
+  slots.cells[index] ??= {};
+  return slots.cells[index];
+}
+function depsChanged(cell: { deps?: unknown[] }, deps?: unknown[]): boolean {
+  return (
+    !cell.deps ||
+    !deps ||
+    deps.length !== cell.deps.length ||
+    deps.some((d, i) => !Object.is(d, cell.deps?.[i]))
+  );
+}
 /** A deterministic stand-in for Skia's token parser: distinct per token. */
 const parseInk = vi.hoisted(() => (token: string) => {
   let hash = 0;
@@ -106,23 +141,78 @@ function flushUi(passes = 4) {
 vi.mock("expo-sqlite", () => ({}));
 vi.mock("react", async (original) => ({
   ...(await original<typeof import("react")>()),
-  useMemo: (factory: () => unknown) => factory(),
-  useCallback: (callback: unknown) => callback,
-  useRef: (value: unknown) => ({ current: value }),
-  // Effects run synchronously (cleanups are not exercised here).
-  useEffect: (effect: () => unknown) => {
-    effect();
+  useMemo: (factory: () => unknown, deps?: unknown[]) => {
+    if (!native.slots) return factory();
+    const cell = hookCell();
+    if (depsChanged(cell, deps)) {
+      cell.value = factory();
+      cell.deps = deps;
+    }
+    return cell.value;
   },
-  useState: (factory: () => unknown) => [
-    factory(),
-    () => {
-      native.setStateCalls++;
-    },
-  ],
+  useCallback: (callback: unknown, deps?: unknown[]) => {
+    if (!native.slots) return callback;
+    const cell = hookCell();
+    if (depsChanged(cell, deps)) {
+      cell.value = callback;
+      cell.deps = deps;
+    }
+    return cell.value;
+  },
+  useRef: (value: unknown) => {
+    if (!native.slots) return { current: value };
+    const cell = hookCell();
+    if (!cell.deps) {
+      cell.value = { current: value };
+      cell.deps = [];
+    }
+    return cell.value;
+  },
+  // Effects run synchronously (cleanups are not exercised here, except in
+  // slot mode, where they run like React's on a deps change).
+  useEffect: (effect: () => unknown, deps?: unknown[]) => {
+    if (!native.slots) {
+      effect();
+      return;
+    }
+    const cell = hookCell();
+    if (!depsChanged(cell, deps)) return;
+    cell.deps = deps;
+    if (typeof cell.cleanup === "function") cell.cleanup();
+    cell.cleanup = effect();
+  },
+  useState: (factory: unknown) => {
+    const initial = () =>
+      typeof factory === "function" ? (factory as () => unknown)() : factory;
+    if (!native.slots)
+      return [
+        initial(),
+        () => {
+          native.setStateCalls++;
+        },
+      ];
+    const cell = hookCell();
+    if (!cell.deps) {
+      cell.value = initial();
+      cell.deps = [];
+    }
+    return [
+      cell.value,
+      (next: unknown) => {
+        native.setStateCalls++;
+        cell.value =
+          typeof next === "function"
+            ? (next as (v: unknown) => unknown)(cell.value)
+            : next;
+      },
+    ];
+  },
 }));
 vi.mock("react-native", () => ({
   useWindowDimensions: () => {
     native.renders++;
+    // OrreryWorld's first hook: a new render starts its slot sequence.
+    if (native.slots) native.slots.cursor = 0;
     return { fontScale: 2 };
   },
   Platform: { OS: "android" },
@@ -189,9 +279,30 @@ vi.mock("react-native-reanimated", () => ({
   cancelAnimation: () => {},
   runOnJS: (fn: unknown) => fn,
   runOnUI: (fn: unknown) => fn,
-  withTiming: (v: unknown) => v,
+  withTiming: (v: unknown) => (native.holdTimings ? 0 : v),
   ReduceMotion: { Never: "never" },
 }));
+// 38.7-13 (H9): every sky bake owner, with the keys it was asked to bake.
+vi.mock("./v2/nebula-bake", async (original) => {
+  const actual = await original<typeof import("./v2/nebula-bake")>();
+  return {
+    ...actual,
+    createSkyBakeOwner: (
+      options: Parameters<typeof actual.createSkyBakeOwner>[0],
+    ) => {
+      const owner = actual.createSkyBakeOwner(options);
+      const entry = { owner, keys: [] as string[] };
+      native.skyOwners.push(entry);
+      return {
+        ...owner,
+        request: (input: Parameters<typeof owner.request>[0]) => {
+          entry.keys.push(input.key);
+          owner.request(input);
+        },
+      };
+    },
+  };
+});
 vi.mock("react-native-gesture-handler", () => {
   const chain = new Proxy({}, { get: () => () => chain });
   return {
@@ -393,6 +504,9 @@ beforeEach(async () => {
   native.reducedState = false;
   native.host = {};
   native.painted = [];
+  native.slots = null;
+  native.holdTimings = false;
+  native.skyOwners = [];
   db = openTestDb();
   let uid = 0;
   await runMigrations(nodeSqliteExecutor(db), MIGRATIONS, TARGET_VERSION, {
@@ -477,7 +591,7 @@ describe("production Orrery native tree and resource contracts", () => {
     // 38.7-07: moons are drawn by the body pictures (same depth rules).
     const moonInk = [...parseInk(THEME_PRESETS.galaxy.dark.textSecondary)];
     const moonDraws = () =>
-      [tree[0].children[3], tree[0].children[5]]
+      [tree[0].children[4], tree[0].children[6]]
         .flatMap(
           (picture) =>
             (
@@ -540,7 +654,7 @@ describe("production Orrery native tree and resource contracts", () => {
     );
     const moonInk = [...parseInk(THEME_PRESETS.galaxy.dark.textSecondary)];
     const drawnMoons = () =>
-      [tree[0].children[3], tree[0].children[5]]
+      [tree[0].children[4], tree[0].children[6]]
         .flatMap(
           (picture) =>
             (
@@ -618,6 +732,7 @@ describe("production Orrery native tree and resource contracts", () => {
       runtime.cameraFrom.value,
       runtime.cameraTo.value,
       0.5,
+      runtime.transition.value,
     ).zoom;
     expect(switchZoom).not.toBe(pose.value.zoom);
     const midSwitch = check(switchZoom);
@@ -752,12 +867,13 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: switchRuntime(scene, pose as never) as never,
       }),
     );
-    // 38.7-09: sky, base, pulses, bodiesBehind, sun, bodiesFront, labels, overlay.
+    // 38.7-09/13: sky, base, pulses, switch, bodiesBehind, sun, bodiesFront,
+    // labels, overlay.
     expect(tree[0].type).toBe("skCanvas");
     expect(tree[0].children.map((node) => node.type)).toEqual(
-      Array(8).fill("skPicture"),
+      Array(9).fill("skPicture"),
     );
-    const [, , , behind, sunLayer, front, labels] = tree[0].children;
+    const [, , , , behind, sunLayer, front, labels] = tree[0].children;
     const circles = (picture: Node) =>
       (
         picture.props.picture as {
@@ -827,7 +943,7 @@ describe("production Orrery native tree and resource contracts", () => {
       }),
     );
     flushUi();
-    const labels = tree[0].children[6];
+    const labels = tree[0].children[7];
     const drawn = () => {
       native.painted = [];
       void (labels.props.picture as { value: unknown }).value;
@@ -845,6 +961,7 @@ describe("production Orrery native tree and resource contracts", () => {
           runtime.cameraFrom.value,
           runtime.cameraTo.value,
           progress,
+          runtime.transition.value,
         ).zoom,
       );
       flushUi();
@@ -959,7 +1076,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const walk = (node: Node): unknown => [node.type, node.children.map(walk)];
     return tree.map(walk);
   };
-  const LAYERS = 8; // sky, base, pulses, bodiesBehind, sun, bodiesFront, labels, overlay
+  const LAYERS = 9; // sky, base, pulses, switch, bodiesBehind, sun, bodiesFront, labels, overlay
 
   it("the same Picture layers for 3, 120 and 1,000 bodies; no per-body node — rings, bodies and labels are draws", async () => {
     const smallScene = await sceneWith(3);
@@ -1022,7 +1139,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     // Bodies are recorded draws inside the two body pictures: one lit-body
     // shader draw per contact (38.7-10; pips are plain draws beside them).
     const bodyCircles = (tree: Node[]) =>
-      [tree[0].children[3], tree[0].children[5]]
+      [tree[0].children[4], tree[0].children[6]]
         .flatMap(recorded)
         .filter((c) => c.op === "drawCircle" && c.shader !== undefined).length;
     expect(bodyCircles(small)).toBe(3);
@@ -1055,8 +1172,17 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const renders = native.renders;
     const snapshot = (tree: Node[]) =>
       tree[0].children.map((picture) => JSON.stringify(recorded(picture)));
-    const [sky, base, pulses, behind, sun, front, labels, overlay] =
-      snapshot(again);
+    const [
+      sky,
+      base,
+      pulses,
+      switchLayer,
+      behind,
+      sun,
+      front,
+      labels,
+      overlay,
+    ] = snapshot(again);
     photoCache.drawn.set("avatars/contact-1.jpg", {
       id: 1,
       image: { width: () => 512, height: () => 512 },
@@ -1070,15 +1196,16 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
       after[0],
       after[1],
       after[2],
-      after[4],
-      after[6],
+      after[3],
+      after[5],
       after[7],
-    ]).toEqual([sky, base, pulses, sun, labels, overlay]);
-    const images = [again[0].children[3], again[0].children[5]]
+      after[8],
+    ]).toEqual([sky, base, pulses, switchLayer, sun, labels, overlay]);
+    const images = [again[0].children[4], again[0].children[6]]
       .flatMap(recorded)
       .filter((c) => c.op === "drawImageRectOptions");
     expect(images).toHaveLength(1);
-    expect([after[3], after[5]]).not.toEqual([behind, front]);
+    expect([after[4], after[6]]).not.toEqual([behind, front]);
     expect(shape(again)).toEqual(shape(before));
     photoCache.drawn.clear();
   });
@@ -1107,7 +1234,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const tree = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
     expect(native.clockCalls).toBe(1);
     flushUi();
-    const sun = tree[0].children[4];
+    const sun = tree[0].children[5];
     // 38.7-10 (D-15/D-37): the star's corona time moves only with the pulse.
     const glowAlpha = (ms: number) => {
       native.clock.value = ms;
@@ -1135,7 +1262,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const scene = await sceneWith(2);
     const tree = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
     expect(native.clockCalls).toBe(0);
-    const sun = tree[0].children[4];
+    const sun = tree[0].children[5];
     const glow = () =>
       recorded(sun).find((c) => c.op === "drawRect")?.shader?.uniforms[1];
     const first = glow();
@@ -1148,11 +1275,172 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     native.reducedState = true;
     const still = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
     const stillGlow = () =>
-      recorded(still[0].children[4]).find((c) => c.op === "drawRect")?.shader
+      recorded(still[0].children[5]).find((c) => c.op === "drawRect")?.shader
         ?.uniforms[1];
     const held = stillGlow();
     vi.advanceTimersByTime(1500);
     expect(stillGlow()).toEqual(held);
     expect(native.clockCalls).toBe(0);
+  });
+});
+
+describe("38.7-13: the switch through the real runtime and frame worklet (C3-H1, C4-L2, H9)", () => {
+  /** A scene with `count` contacts (All Contacts: the untinted sky). */
+  async function sceneWith(count: number) {
+    const exec = nodeSqliteExecutor(db);
+    for (let i = 0; i < count; i++)
+      await exec.runAsync(
+        `INSERT INTO contacts(uid,name,tracking_enabled,interval_days,created_at,modified_at) VALUES ('s${i}','Person ${i}',1,30,'2026-09-07','2026-09-07')`,
+      );
+    return loadOrreryScene(exec, 1);
+  }
+  type Scene = Awaited<ReturnType<typeof sceneWith>>;
+  const regenerate = (scene: Scene, generation: number, system?: unknown) =>
+    ({
+      ...scene,
+      generation,
+      ...(system ? { system } : {}),
+    }) as Scene;
+  function useWorldProps(scene: Scene, runtime: unknown, pose: unknown) {
+    return {
+      scene,
+      camera: useOrreryCamera({
+        pose: pose as never,
+        enabled: true,
+        extent: scene.extent,
+        viewport: { width: 500, height: 800 },
+        reduced: native.reduced as never,
+      }),
+      pose: pose as never,
+      viewport: { width: 500, height: 800 },
+      colors: THEME_PRESETS.galaxy.dark,
+      themeMode: "dark" as const,
+      themePackage: "galaxy" as const,
+      fontProvider: {} as never,
+      onIntent: () => {},
+      onReorder: () => {},
+      onReorderActivated: () => {},
+      focusedIds: [],
+      switchRuntime: runtime as never,
+    };
+  }
+  const TAU = Math.PI * 2;
+  /** The same camera on screen: every drawn axis (yaw on the circle). */
+  function expectSameCamera(a: CameraPose, b: CameraPose) {
+    for (const axis of ["x", "y", "zoom", "tilt"] as const)
+      expect(a[axis] ?? 0).toBeCloseTo(b[axis] ?? 0, 9);
+    const d = ((((a.yaw ?? 0) - (b.yaw ?? 0)) % TAU) + TAU) % TAU;
+    expect(Math.min(d, TAU - d)).toBeCloseTo(0, 9);
+  }
+
+  it("an interruption or a reduced-motion switch at 0.2 / 0.5 / 0.8 starts from exactly the camera the frame worklet drew", async () => {
+    const scene = await sceneWith(3);
+    native.holdTimings = true;
+    const pose = {
+      value: { ...HOME_CAMERA, x: 25, y: -15, zoom: 1.7, yaw: 5.6 },
+    };
+    const runtime = useOrrerySwitchRuntime(
+      pose as never,
+      native.reduced as never,
+    );
+    runtime.publish(scene, false, 0, pose.value);
+    const element = OrreryWorld(
+      useWorldProps(scene, runtime, pose),
+    ) as ReactElement<{ frame: { value: AnimatedFrame } }>;
+    const frame = element.props.frame;
+    flushUi(); // reactions learn "not reduced"
+    const homeB = { ...HOME_CAMERA, zoom: 0.8, yaw: 0 };
+    const homeC = { ...HOME_CAMERA, zoom: 1.1, yaw: 0 };
+    let generation = 1;
+    for (const p of [0.2, 0.5, 0.8]) {
+      // A second selection at p (a spinning switch: swirl + breath).
+      runtime.publish(regenerate(scene, ++generation), true, 1, homeB);
+      expect(runtime.transition.value.spinTurns).toBeGreaterThan(0);
+      runtime.progress.value = p;
+      const drawn = frame.value.pose;
+      // The breath is really in the drawn camera (not the plain crossfade).
+      const plain = sampleOrrerySwitchCamera(
+        runtime.cameraFrom.value,
+        runtime.cameraTo.value,
+        p,
+        { reducedMotion: false, intensity: 0, spinTurns: 0 },
+      );
+      expect(drawn.zoom).toBeLessThan(plain.zoom);
+      runtime.publish(regenerate(scene, ++generation), true, 1, homeC);
+      expectSameCamera(clampCameraPose(runtime.cameraFrom.value, 1e6), drawn);
+      expect(runtime.progress.value).toBe(0);
+      expectSameCamera(frame.value.pose, drawn);
+
+      // Reduced motion turning on at p.
+      runtime.publish(regenerate(scene, ++generation), true, 1, homeB);
+      runtime.progress.value = p;
+      const before = frame.value.pose;
+      native.reduced.value = true;
+      // C4-L2: until the runtime reacts, the frame still draws the outgoing
+      // transition (it never reads the live flag).
+      expectSameCamera(frame.value.pose, before);
+      flushUi();
+      expect(runtime.transition.value.reducedMotion).toBe(true);
+      expect(runtime.progress.value).toBe(0);
+      expectSameCamera(clampCameraPose(runtime.cameraFrom.value, 1e6), before);
+      expectSameCamera(frame.value.pose, before);
+      native.reduced.value = false;
+      flushUi();
+    }
+  });
+
+  it("H9: a switch between differently-hued Systems bakes nothing; the tint crossfades at draw time, outgoing → incoming", async () => {
+    const scene = await sceneWith(2);
+    native.holdTimings = true;
+    const pose = { value: { ...HOME_CAMERA } };
+    const runtime = useOrrerySwitchRuntime(
+      pose as never,
+      native.reduced as never,
+    );
+    runtime.publish(scene, false, 0, pose.value);
+    const props = useWorldProps(scene, runtime, pose);
+    // From here OrreryWorld's refs, memos and effects persist like React's.
+    native.slots = { cells: [], cursor: 0 };
+    const first = resolve(OrreryWorld(props));
+    flushUi();
+    expect(native.skyOwners).toHaveLength(1);
+    const owner = native.skyOwners[0];
+    const bakes = owner.owner.stats().bakes;
+    const keys = [...owner.keys];
+    /** The wash paints of the sky picture (drawPaint after the base fill). */
+    const washes = (tree: Node[]) =>
+      (
+        tree[0].children[0].props.picture as {
+          value: { commands: { op: string; color?: number[] }[] };
+        }
+      ).value.commands
+        .filter((c) => c.op === "drawPaint")
+        .slice(1);
+    expect(washes(first)).toEqual([]); // All Contacts: untinted
+    // Publish → render the hued System (one commit), then the whole switch.
+    const hued = regenerate(scene, 2, { kind: "builtin", id: "favorites" });
+    runtime.publish(hued, true, 1, pose.value);
+    const tree = resolve(OrreryWorld({ ...props, scene: hued }));
+    const seen: number[] = [];
+    for (const p of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+      runtime.progress.value = p;
+      flushUi();
+      seen.push(washes(tree).length);
+    }
+    // Before 0.55 the outgoing (untinted) sky; the incoming hue fades in after.
+    expect(seen.slice(0, 3)).toEqual([0, 0, 0]);
+    expect(seen.slice(3)).toEqual([1, 1]);
+    runtime.progress.value = 1;
+    flushUi();
+    const settled = washes(tree);
+    expect(settled).toHaveLength(1);
+    const hue = THEME_PRESETS.galaxy.dark.orrerySystemHues;
+    expect(hue.map((token) => [...parseInk(token)].slice(0, 3))).toContainEqual(
+      settled[0].color?.slice(0, 3),
+    );
+    // Not one bake, nor a request for a new key, across the whole switch.
+    expect(native.skyOwners).toHaveLength(1);
+    expect(owner.owner.stats().bakes).toBe(bakes);
+    expect(new Set(owner.keys)).toEqual(new Set(keys));
   });
 });

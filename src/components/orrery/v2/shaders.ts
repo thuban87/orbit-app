@@ -37,6 +37,12 @@ import { Skia, type SkRuntimeEffect } from "@shopify/react-native-skia";
  * half-length uArc.y radians centred on uArc.x (clockwise from north), so the
  * same shader draws the subtle orbit pulses (never baked).
  *
+ * 38.7-13 (D-24) orbit streak: with uArc.z > 0.5 the window is ONE-SIDED —
+ * the arc of length uArc.y radians BEHIND the head angle uArc.x (against the
+ * clockwise spin), its alpha ramping from 0 at the tail through uArc.w at
+ * TRAIL_RAMP_AT (Lab A's 0.55 stop) to full at the head (Lab A's streak
+ * gradient, `world-plane.ts` §7a).
+ *
  * The output is premultiplied: ink × (ink alpha · alpha · coverage).
  * Uniform order is mirrored by `ringPlaneUniforms` (draw-plane.ts).
  */
@@ -59,6 +65,7 @@ uniform float4 uArc;
 half4 main(float2 u) {
   const float TAU = 6.2831853;
   const float PI = 3.14159265;
+  const float TRAIL_AT = 0.55;
   float2 p = u * uR;
   float r = length(p);
   if (r < 0.0001) return half4(0.0);
@@ -79,9 +86,17 @@ half4 main(float2 u) {
   }
   float a = uAlpha * cover;
   if (uArc.y > 0.0) {
-    float da = abs(mod(an - uArc.x + PI, TAU) - PI);
-    float m = 1.0 - smoothstep(0.0, uArc.y, da);
-    a *= m * m;
+    if (uArc.z > 0.5) {
+      float behind = mod(uArc.x - an + TAU, TAU);
+      if (behind > uArc.y) return half4(0.0);
+      float t = 1.0 - behind / uArc.y;
+      a *= t < TRAIL_AT ? uArc.w * t / TRAIL_AT
+                        : uArc.w + (1.0 - uArc.w) * (t - TRAIL_AT) / (1.0 - TRAIL_AT);
+    } else {
+      float da = abs(mod(an - uArc.x + PI, TAU) - PI);
+      float m = 1.0 - smoothstep(0.0, uArc.y, da);
+      a *= m * m;
+    }
     if (a <= 0.0) return half4(0.0);
   }
   float g = length(uH2.xy);

@@ -21,6 +21,11 @@
  *   world-plane orbit rings (D-11/D-44), baked while still;
  * - `pulses` (38.7-09, D-10): the subtle orbit light pulses — ring-shader
  *   arcs on the ambient clock, never baked, none under reduced motion;
+ * - `switch` (38.7-13, D-24): Lab A's orbit streaks behind the moving
+ *   contacts during a System switch (draw-switch.ts) — one shared empty
+ *   picture at rest and under reduced motion. Lab B's star warp is drawn by
+ *   the sky picture from the same switch signal. Neither creates a native
+ *   object (no streak texture), so this layer has nothing to ack (H3);
  * - `bodiesBehind`: contacts and moons deeper than the sun (38.7-07);
  * - `sun`: the star sun (38.7-10, D-15), its corona and granulation moving
  *   only with the sun pulse on the ambient clock (still under reduced motion);
@@ -101,6 +106,7 @@ import type { CameraRect } from "@/logic/orrery-camera-logic";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
 import type { LabelAllocation } from "@/logic/orrery-label-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
+import type { SwitchFxSignal } from "@/logic/orrery-switch-fx-logic";
 import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import { ambientNeeded, useOrreryAmbient } from "./ambient-clock";
 import {
@@ -132,6 +138,11 @@ import {
   ringBands,
 } from "./draw-plane";
 import { drawSky } from "./draw-sky";
+import {
+  drawOrbitTrails,
+  type SwitchTrailRoles,
+  type TrailLook,
+} from "./draw-switch";
 import { watchFirstSurfaceFrame } from "./first-frame";
 import type { FocusDraw } from "./focus-fx";
 import { resolveOrreryRenderHost } from "./render-host";
@@ -166,6 +177,16 @@ export interface OrreryV2CanvasProps {
   ringSpecs: SharedValue<RingSpecs>;
   /** The plane's grid and pulse look (JS-built on theme change only). */
   plane: SharedValue<PlaneSpec>;
+  /**
+   * 38.7-13 (D-24): the switch signal of the transition being drawn
+   * (UI-derived from transition/progress only) — the sky's warp and tint
+   * crossfade, the orbit streaks.
+   */
+  switchFx: SharedValue<SwitchFxSignal>;
+  /** 38.7-13: per-transition streak roles (UI-derived once per transition). */
+  switchRoles: SharedValue<SwitchTrailRoles>;
+  /** 38.7-13: the streaks' theme-mode look (JS-built on theme change only). */
+  trailLook: TrailLook;
   /** Overlay inks (accent, Polaris, reticle, occlusion) and the Polaris extent (JS-built). */
   overlay: SharedValue<OverlaySpec>;
   /** The reorder hold (gesture-owned), for the charge arc and held orbit. */
@@ -283,6 +304,9 @@ export function OrreryV2Canvas({
   coverColor,
   ringSpecs,
   plane,
+  switchFx,
+  switchRoles,
+  trailLook,
   overlay,
   reorder,
   hold,
@@ -340,6 +364,7 @@ export function OrreryV2Canvas({
           frame.value.pose,
           ambient.value,
           skyEffect,
+          switchFx.value,
         );
       },
       { width, height },
@@ -461,6 +486,33 @@ export function OrreryV2Canvas({
       { width, height },
     ),
   );
+  // 38.7-13 (D-24/D-53): the orbit streaks. At rest (and under reduced
+  // motion) the layer holds one shared empty picture, so a pan re-records
+  // nothing here.
+  const emptyPicture = useMemo(
+    () => createPicture(() => {}, { width: 1, height: 1 }),
+    [],
+  );
+  const switchPicture = useDerivedValue(() => {
+    const signal = switchFx.value;
+    if (!(signal.trail > 0)) return emptyPicture;
+    return createPicture(
+      (canvas) => {
+        drawOrbitTrails(
+          canvas,
+          frame.value,
+          ringSpecs.value,
+          signal,
+          switchRoles.value,
+          ringEffect,
+          bands,
+          aaDp,
+          trailLook,
+        );
+      },
+      { width, height },
+    );
+  });
   // D-43/M14: one depth order per frame, shared by both body layers.
   const bodyOrder = useDerivedValue(() =>
     orderBodies(frame.value, bodies.value.bodies),
@@ -596,6 +648,7 @@ export function OrreryV2Canvas({
           <Picture picture={skyPicture} />
           <Picture picture={base} />
           <Picture picture={pulsesPicture} />
+          <Picture picture={switchPicture} />
           <Picture picture={bodiesBehind} />
           <Picture picture={sunPicture} />
           <Picture picture={bodiesFront} />

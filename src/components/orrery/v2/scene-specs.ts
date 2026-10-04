@@ -261,6 +261,11 @@ export interface SkyStarGroup {
   alpha: number;
   /** Twinkle phase (radians). */
   phase: number;
+  /**
+   * 38.7-13 (D-24): the star layer — small stars are Lab B's MID layer,
+   * bright stars its NEAR layer (the warp's streak length and push depth).
+   */
+  layer: "mid" | "near";
 }
 
 /**
@@ -285,13 +290,18 @@ export interface SkySpec {
    */
   additive: boolean;
   /**
-   * The System tint: `tintFrom` → `tintTo` by `tintMix` (1 when settled;
-   * Plan 13 animates it by switch progress). Each ink's alpha is its tint
-   * strength (0 = untinted, the All Contacts rule).
+   * The System tint: `tintFrom` → `tintTo` by `tintMix` (1 when settled).
+   * 38.7-13 (D-08/H9): the sky picture overrides the mix at DRAW time from
+   * the switch signal (`skyHueMix`): the switch to `tintGeneration`
+   * crossfades from → to over [0.55, 1] (Lab B); an older drawn switch shows
+   * `tintFrom`, a newer one `tintTo`. Each ink's alpha is its tint strength
+   * (0 = untinted, the All Contacts rule). No bake involved (H9).
    */
   tintFrom: OrreryInk;
   tintTo: OrreryInk;
   tintMix: number;
+  /** The scene generation whose switch crossfades `tintFrom` → `tintTo`. */
+  tintGeneration: number;
   /** How far the tint pushes the nebula toward its hue (0..1). */
   tintStrength: number;
   /** The faint whole-sky wash of the tint (0..1). */
@@ -361,6 +371,7 @@ export const EMPTY_SKY_SPEC: SkySpec = Object.freeze({
   tintFrom: NO_INK,
   tintTo: NO_INK,
   tintMix: 1,
+  tintGeneration: 0,
   tintStrength: 0,
   tintWash: 0,
   stars: Object.freeze([]) as readonly SkyStarGroup[],
@@ -453,6 +464,8 @@ export interface SkySpecInput {
   hueIndex: number;
   /** The previous System's index (Plan 13 crossfades from it); default = hueIndex. */
   fromHueIndex?: number;
+  /** 38.7-13: the scene generation the from → to crossfade belongs to (default 0). */
+  tintGeneration?: number;
   look: SkySpecLook;
   /** The star-field seed. */
   seed: number;
@@ -496,6 +509,7 @@ export function buildSkySpec(input: SkySpecInput): SkySpec {
     tintFrom,
     tintTo,
     tintMix: 1,
+    tintGeneration: input.tintGeneration ?? 0,
     tintStrength: look.tintStrength,
     tintWash: look.tintWash,
     twinkleDepth: look.twinkleDepth,
@@ -549,6 +563,7 @@ export function buildSkySpec(input: SkySpecInput): SkySpec {
         diameter: radius * 2,
         alpha,
         phase: (phaseIndex / groups) * Math.PI * 2,
+        layer: bright ? "near" : "mid",
       };
       batches.set(key, batch);
     }

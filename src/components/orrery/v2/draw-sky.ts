@@ -21,6 +21,13 @@
  * nebula's breathing holds a fixed composition and every star holds its mid
  * alpha, so the picture stops re-recording at idle.
  *
+ * 38.7-13 (D-24/D-08): during a System switch the switch signal adds Lab B's
+ * star warp — every layer pushes about the centre and the mid/near stars draw
+ * their own streaks (draw-switch.ts) — and the System tint crossfades from
+ * the outgoing to the incoming hue at draw time (`skyHueMix`, H9: a uniform
+ * blend over the one neutral baked image; nothing bakes). At rest (no signal,
+ * or a settled one) the sky is exactly the 38.7-09 sky.
+ *
  * D-51 blend rule, keyed from the resolved theme MODE (`spec.additive`): dark
  * themes wash and tint additively (screen); light themes use src-over with ink
  * tokens. Never keyed from luminance. No colour literal: every ink is a token
@@ -43,6 +50,13 @@ import {
 } from "@shopify/react-native-skia";
 import type { CameraPose } from "@/logic/orrery-camera-logic";
 import { skyDriftOffset, skyParallaxOffset } from "@/logic/orrery-sky-logic";
+import type { SwitchFxSignal } from "@/logic/orrery-switch-fx-logic";
+import {
+  drawWarpStreaks,
+  skyHueMix,
+  warpLayerFactor,
+  warpPushScale,
+} from "./draw-switch";
 import type { OrreryInk, SkyImageSpec, SkySpec } from "./scene-specs";
 import {
   SKY_BREATH_DP,
@@ -59,6 +73,7 @@ import {
   SKY_TILT_SHIFT,
   SKY_TWINKLE_SPEED,
   SKY_ZOOM_DEPTH,
+  WARP_STRENGTH,
 } from "./visual-tunables";
 
 /**
@@ -83,13 +98,14 @@ export function skyStarAlpha(
 }
 
 /**
- * The System tint now: `tintFrom` → `tintTo` by `tintMix`, mixed by
- * strength so an untinted end (alpha 0) fades the hue's strength rather than
- * darkening its colour. tintMix 0 = exactly `tintFrom`, 1 = exactly `tintTo`.
+ * The System tint now: `tintFrom` → `tintTo` by `tintMix` (or `mix`, the
+ * draw-time switch crossfade), mixed by strength so an untinted end (alpha 0)
+ * fades the hue's strength rather than darkening its colour. Mix 0 = exactly
+ * `tintFrom`, 1 = exactly `tintTo`.
  */
-export function skyTintNow(sky: SkySpec): OrreryInk {
+export function skyTintNow(sky: SkySpec, mix?: number): OrreryInk {
   "worklet";
-  const m = Math.max(0, Math.min(1, sky.tintMix));
+  const m = Math.max(0, Math.min(1, mix ?? sky.tintMix));
   if (m >= 1) return sky.tintTo;
   if (m <= 0) return sky.tintFrom;
   const from = sky.tintFrom;
@@ -136,13 +152,15 @@ export function skyLayerPlace(
 /**
  * The sky shader's 64 uniform floats (order mirrors SKY_NEBULA_SKSL). The
  * System tint leans lobe B toward its hue by tintStrength × the tint's own
- * strength (0 → the neutral ink: All Contacts).
+ * strength (0 → the neutral ink: All Contacts). `switchWarp` (38.7-13) pushes the
+ * nebula and far stars about the centre (Lab B WARP_PUSH; 0 = at rest).
  */
 export function skyNebulaUniforms(
   sky: SkySpec,
   tint: OrreryInk,
   pose: SkyPose,
   ambientMs: number,
+  switchWarp = 0,
 ): number[] {
   "worklet";
   const n = sky.nebula;
@@ -155,6 +173,8 @@ export function skyNebulaUniforms(
   const yaw = Number.isFinite(pose.yaw) ? (pose.yaw as number) : 0;
   const neb = skyLayerPlace(pose, SKY_NEBULA_DEPTH);
   const far = skyLayerPlace(pose, SKY_FAR_STAR_DEPTH);
+  const nebPush = warpPushScale(switchWarp, SKY_NEBULA_DEPTH);
+  const farPush = warpPushScale(switchWarp, SKY_FAR_STAR_DEPTH);
   const drift = skyDriftOffset(
     ambientMs,
     SKY_DRIFT_DP_PER_MIN,
@@ -204,14 +224,14 @@ export function skyNebulaUniforms(
     sky.width / 2,
     sky.height / 2,
     yaw,
-    neb.zs,
+    neb.zs * nebPush,
     neb.ox,
     neb.oy,
     drift.x,
     drift.y,
     warp,
     t,
-    far.zs,
+    far.zs * farPush,
     0,
     far.ox,
     far.oy,
@@ -285,6 +305,7 @@ function drawSkyNebula(
   tint: OrreryInk,
   pose: SkyPose,
   ambientMs: number,
+  warp: number,
 ): void {
   "worklet";
   const density = image.makeShaderOptions(
@@ -296,32 +317,50 @@ function drawSkyNebula(
   const paint = Skia.Paint();
   paint.setShader(
     effect.makeShaderWithChildren(
-      skyNebulaUniforms(sky, tint, pose, ambientMs),
+      skyNebulaUniforms(sky, tint, pose, ambientMs, warp),
       [density],
     ),
   );
   canvas.drawPaint(paint);
 }
 
-/** 3: the mid/near star batches, offset, each with its twinkle alpha. */
+/**
+ * 3: the mid/near star batches, offset, each with its twinkle alpha. Under
+ * a warp (38.7-13) each layer is pushed about the centre (its dots keep
+ * Lab B's √push size growth) and the streaks are drawn under the dots.
+ */
 function drawSkyStars(
   canvas: SkCanvas,
   sky: SkySpec,
   ambientMs: number,
   dx: number,
   dy: number,
+  warp: number,
 ): void {
   "worklet";
   if (sky.stars.length === 0) return;
+  if (warp > 0) drawWarpStreaks(canvas, sky, warp, dx, dy);
   const paint = Skia.Paint();
   paint.setAntiAlias(true);
   paint.setStyle(PaintStyle.Stroke);
   paint.setStrokeCap(StrokeCap.Round);
-  canvas.save();
-  canvas.translate(dx, dy);
+  const cx = sky.width / 2;
+  const cy = sky.height / 2;
+  if (!(warp > 0)) {
+    canvas.save();
+    canvas.translate(dx, dy);
+  }
   for (let i = 0; i < sky.stars.length; i++) {
     const group = sky.stars[i];
-    paint.setStrokeWidth(group.diameter);
+    const push =
+      warp > 0 ? warpPushScale(warp, warpLayerFactor(group.layer)) : 1;
+    if (warp > 0) {
+      canvas.save();
+      canvas.translate(cx, cy);
+      canvas.scale(push, push);
+      canvas.translate(dx - cx, dy - cy);
+    }
+    paint.setStrokeWidth(group.diameter / Math.sqrt(push));
     paint.setColor(
       inkColor(
         group.ink,
@@ -329,15 +368,18 @@ function drawSkyStars(
       ),
     );
     canvas.drawPoints(PointMode.Points, group.points as never, paint);
+    if (warp > 0) canvas.restore();
   }
-  canvas.restore();
+  if (!(warp > 0)) canvas.restore();
 }
 
 /**
  * The whole sky layer. `pose` is the DISPLAYED camera (the frame's own pose,
  * so the parallax follows a switch camera too); `ambientMs` is the quantised
  * ambient value (−1 = still); `effect` the compiled sky shader (null → the
- * plain gradient, as without a baked image).
+ * plain gradient, as without a baked image); `signal` (38.7-13) the switch
+ * signal of the transition being drawn (null = at rest): its warp and the
+ * draw-time tint crossfade.
  */
 export function drawSky(
   canvas: SkCanvas,
@@ -346,11 +388,25 @@ export function drawSky(
   pose: SkyPose,
   ambientMs: number,
   effect: SkRuntimeEffect | null,
+  signal: SwitchFxSignal | null = null,
 ): void {
   "worklet";
-  const tint = skyTintNow(sky);
+  const tint = skyTintNow(
+    sky,
+    signal ? skyHueMix(sky.tintGeneration, signal) : undefined,
+  );
+  const warp = signal ? Math.max(0, signal.warp * WARP_STRENGTH) : 0;
   if (image.image && effect && sky.width > 0 && sky.height > 0)
-    drawSkyNebula(canvas, sky, image.image, effect, tint, pose, ambientMs);
+    drawSkyNebula(
+      canvas,
+      sky,
+      image.image,
+      effect,
+      tint,
+      pose,
+      ambientMs,
+      warp,
+    );
   else drawSkyGradient(canvas, sky);
   drawSkyWash(canvas, sky, tint);
   const drift = skyDriftOffset(
@@ -364,5 +420,5 @@ export function drawSky(
     SKY_PARALLAX_STARS,
     SKY_PARALLAX_MAX_DP,
   );
-  drawSkyStars(canvas, sky, ambientMs, s.x + drift.x, s.y + drift.y);
+  drawSkyStars(canvas, sky, ambientMs, s.x + drift.x, s.y + drift.y, warp);
 }

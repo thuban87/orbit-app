@@ -11,6 +11,7 @@ import {
 } from "react-native-reanimated";
 import type { CameraPose, WorldBody } from "@/logic/orrery-camera-logic";
 import { bodyKey } from "@/logic/orrery-frame";
+import { shortestYaw } from "@/logic/orrery-recovery-logic";
 import {
   beginSettledSwitchChoreography,
   beginSwitchChoreography,
@@ -21,7 +22,22 @@ import {
   sampleSwitchChoreography,
   settleSwitchChoreography,
 } from "@/logic/orrery-switch-choreography";
+import {
+  applySwitchBreath,
+  fxClamp01,
+  type SwitchCameraLook,
+  type SwitchCameraMotion,
+  switchBreath,
+  switchHasSpectacle,
+  switchSwirlEnvelope,
+  switchSwirlYaw,
+} from "@/logic/orrery-switch-fx-logic";
 import type { OrrerySceneSnapshot } from "@/services/orrery-scene";
+import {
+  SWITCH_BREATH_PULLBACK,
+  SWITCH_BREATH_TILT,
+  SWITCH_SWIRL_TURNS,
+} from "./v2/visual-tunables";
 
 export const NORMAL_SWITCH_DURATION_MS = 2100;
 export const REDUCED_SWITCH_DURATION_MS = 180;
@@ -58,6 +74,11 @@ function smoothstep(value: number): number {
   return progress * progress * (3 - 2 * progress);
 }
 
+/**
+ * The plain crossfade camera: every axis smoothstep-mixed; the yaw takes the
+ * SHORTEST arc (38.7-13, D-53 — the old raw linear yaw mix span the long way
+ * round across the 0/2π wrap).
+ */
 function interpolateCamera(
   from: CameraPose,
   to: CameraPose,
@@ -76,47 +97,78 @@ function interpolateCamera(
     const start = a ?? fallback;
     return start + ((b ?? fallback) - start) * t;
   };
+  const fromYaw = from.yaw ?? 0;
   return {
     x: mix(from.x, to.x, 0),
     y: mix(from.y, to.y, 0),
     zoom: mix(from.zoom, to.zoom, 1),
     tilt: mix(from.tilt, to.tilt, 0),
-    yaw: mix(from.yaw, to.yaw, 0),
+    yaw: fromYaw + shortestYaw(fromYaw, to.yaw ?? 0) * t,
     focalDistance: mix(from.focalDistance, to.focalDistance, 256),
     // 38.7-05 (D-45): the lens shift travels with the other axes.
     lensShift: mix(from.lensShift, to.lensShift, 1),
   };
 }
 
+/** The switch camera's authored amounts (visual-tunables; one-number edits). */
+const SWITCH_CAMERA_LOOK: SwitchCameraLook = {
+  swirlTurns: SWITCH_SWIRL_TURNS,
+  breathPullback: SWITCH_BREATH_PULLBACK,
+  breathTilt: SWITCH_BREATH_TILT,
+};
+
 /**
- * The one switch camera sampler. Drawing (OrreryWorld), the displayed-camera
- * snapshot and `sampleOrrerySwitchRuntime` all go through it, so a snapshot is
- * always the camera drawn that frame. Defined above every worklet that calls it
- * (Hermes worklet forward-reference hazard).
+ * The ONE switch camera sampler (C3-H1). Drawing (OrreryWorld's frame
+ * worklet), the displayed-camera snapshot (interrupted publish, reduced-motion
+ * retarget) and `sampleOrrerySwitchRuntime` all go through it, so a snapshot is
+ * always the camera drawn that frame. `motion` is the transition BEING DRAWN
+ * (C4-L2: never the live reduced-motion flag): with its spectacle the
+ * shortest-arc yaw gains the authored swirl and Lab C's breath, composed once
+ * and exactly zero at both ends, so the camera lands exactly on `to` at
+ * progress 1; reduced motion (or a spinless switch) is the plain crossfade.
+ * Defined above every worklet that calls it (Hermes forward-ref hazard).
  */
 export function sampleOrrerySwitchCamera(
   from: CameraPose,
   to: CameraPose,
   progress: number,
+  motion: SwitchCameraMotion,
 ): CameraPose {
   "worklet";
-  return interpolateCamera(from, to, progress);
+  const base = interpolateCamera(from, to, progress);
+  if (!(progress > 0 && progress < 1) || !switchHasSpectacle(motion))
+    return base;
+  const scale = 0.5 + 0.5 * fxClamp01(motion.intensity);
+  const yaw = switchSwirlYaw(
+    from.yaw ?? 0,
+    to.yaw ?? 0,
+    progress,
+    SWITCH_CAMERA_LOOK.swirlTurns,
+    switchSwirlEnvelope(progress) * scale,
+  );
+  return applySwitchBreath(
+    { ...base, yaw },
+    switchBreath(progress) * scale,
+    SWITCH_CAMERA_LOOK,
+  );
 }
 
 /**
  * D-52 (6): the camera actually on screen. Once a switch has settled the user
  * owns the live pose (pan/zoom/focus), so `cameraTo` is stale; a new switch or a
  * reduced-motion retarget must start from the live pose, not the old target.
+ * `motion` is the OUTGOING transition (read before a new one is written).
  */
 export function displayedSwitchCamera(
   from: CameraPose,
   to: CameraPose,
   progress: number,
   live: CameraPose,
+  motion: SwitchCameraMotion,
 ): CameraPose {
   "worklet";
   if (progress >= 1) return { ...live };
-  return sampleOrrerySwitchCamera(from, to, progress);
+  return sampleOrrerySwitchCamera(from, to, progress, motion);
 }
 
 export function createSettledOrrerySwitchRuntime(
@@ -150,6 +202,7 @@ export function sampleOrrerySwitchRuntime(
       runtime.cameraFrom,
       runtime.cameraTo,
       fraction,
+      runtime.transition,
     ),
     sample,
   };
@@ -266,9 +319,20 @@ export interface OrrerySwitchRuntime {
   resume: () => void;
 }
 
+/**
+ * 38.7-13 (D-53, C4-M1): called on JS when a publication or a driven switch
+ * settles at `generation`. A driven switch's settle runs INSIDE the prune's JS
+ * callback, so whatever React state the screen sets here batches into the
+ * settle commit (one commit at settle, never one per notification). A
+ * settled publication notifies synchronously inside `publish`, batching into
+ * the publish commit.
+ */
+export type OrrerySwitchSettled = (generation: number) => void;
+
 export function useOrrerySwitchRuntime(
   pose: SharedValue<CameraPose>,
   reducedMotion: SharedValue<boolean>,
+  onSettled?: OrrerySwitchSettled,
 ): OrrerySwitchRuntime {
   const empty = useRef(
     createSettledOrrerySwitchRuntime([], 0, pose.value),
@@ -280,6 +344,9 @@ export function useOrrerySwitchRuntime(
   const running = useSharedValue(false);
   const latestScene = useRef<OrrerySceneSnapshot | null>(null);
   const [resources, setResources] = useState<OrreryBodyResource[]>([]);
+  // The latest settle listener (a ref, so it never changes the runtime's identity).
+  const settledRef = useRef(onSettled);
+  settledRef.current = onSettled;
 
   const prune = useCallback((generation: number) => {
     setResources((current) => {
@@ -287,6 +354,8 @@ export function useOrrerySwitchRuntime(
       if (!scene || scene.generation !== generation) return current;
       return pruneOrreryResources(current, scene);
     });
+    // Same JS callback as the prune: the screen's settle state joins its commit.
+    settledRef.current?.(generation);
   }, []);
 
   const finish = useCallback(
@@ -335,6 +404,10 @@ export function useOrrerySwitchRuntime(
       // the UI runtime on every publication.
       const world = scene.world;
       const generation = scene.generation;
+      // A settled publication (the branch below) settles now: notify inside
+      // this JS call so the screen's settle state joins the publish commit.
+      if (!isSwitch || transition.value.generation === 0)
+        settledRef.current?.(generation);
       runOnUI(() => {
         "worklet";
         cancelAnimation(progress);
@@ -357,11 +430,14 @@ export function useOrrerySwitchRuntime(
           transition.value,
           progress.value,
         ).world;
+        // C3-H1: the camera drawn this frame, with the OUTGOING transition's
+        // motion (sampled before the new transition is written).
         const displayedCamera = displayedSwitchCamera(
           cameraFrom.value,
           cameraTo.value,
           progress.value,
           pose.value,
+          transition.value,
         );
         transition.value = beginSwitchChoreography(
           displayed,
@@ -417,11 +493,14 @@ export function useOrrerySwitchRuntime(
         transition.value,
         progress.value,
       ).world;
+      // C3-H1 / C4-L2: the camera drawn this frame — the frame worklet still
+      // draws the outgoing (non-reduced) transition, swirl and breath included.
       const displayedCamera = displayedSwitchCamera(
         cameraFrom.value,
         cameraTo.value,
         progress.value,
         pose.value,
+        transition.value,
       );
       const destination = transition.value.entries.flatMap((entry) =>
         entry.destination ? [entry.destination] : [],

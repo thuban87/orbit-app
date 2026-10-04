@@ -165,6 +165,13 @@ export interface RingLine {
   arcCentre: number;
   /** Pulse arc half-length (radians); 0 = the whole ring. */
   arcHalf: number;
+  /**
+   * 38.7-13 (D-24): 1 = a one-sided orbit streak — `arcHalf` radians BEHIND
+   * the head `arcCentre`, alpha ramping 0 → `arcMid` (at 55 %) → 1 at the head.
+   */
+  arcTrail: number;
+  /** The streak ramp's mid-stop alpha (Lab A TRAIL_RAMP_MID). */
+  arcMid: number;
 }
 
 /** A plain line: no sun light, no depth fade, no dashes, the whole ring. */
@@ -188,6 +195,8 @@ export function plainRingLine(
     light: ink,
     arcCentre: 0,
     arcHalf: 0,
+    arcTrail: 0,
+    arcMid: 0,
   };
 }
 
@@ -229,8 +238,8 @@ export function ringPlaneUniforms(
     line.light[3],
     line.arcCentre,
     line.arcHalf,
-    0,
-    0,
+    line.arcTrail,
+    line.arcMid,
   ];
 }
 
@@ -300,6 +309,8 @@ export function statusRingLine(
     light: spec.light,
     arcCentre: 0,
     arcHalf: 0,
+    arcTrail: 0,
+    arcMid: 0,
   };
 }
 

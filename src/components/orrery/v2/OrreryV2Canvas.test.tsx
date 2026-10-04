@@ -261,6 +261,15 @@ vi.mock("./draw-bodies", () => ({
   sunPulse: (ms: number, reduced: boolean) => (reduced ? 0 : ms),
 }));
 vi.mock("./draw-labels", () => ({ drawLabels: () => {} }));
+// 38.7-13: the orbit streaks record the frame and signal they drew.
+vi.mock("./draw-switch", () => ({
+  drawOrbitTrails: (
+    canvas: { trails(frame: unknown, trail: unknown): void },
+    frame: { tag: unknown },
+    _specs: unknown,
+    signal: { trail: number },
+  ) => canvas.trails(frame.tag, signal.trail),
+}));
 vi.mock("./draw-overlay", () => ({ drawOverlay: () => {} }));
 vi.mock("./shaders", () => ({ orreryShader: () => null }));
 
@@ -322,6 +331,9 @@ function mount() {
       grid: { opacity: 0 },
       pulse: { budget: 8, intensity: 0.25 },
     }),
+    switchFx: rt.sv({ generation: 1, trail: 0, warp: 0 }),
+    switchRoles: rt.sv({ generation: 1, byKey: {} }),
+    trailLook: { peak: 0.42, additive: true, budget: 120 },
     overlay: rt.sv({}),
     reorder: rt.sv(null),
     hold: rt.sv({ charge: 0, flash: 1, reduced: false }),
@@ -347,14 +359,15 @@ function mount() {
 const SKY = 0;
 const BASE = 1;
 const PULSES = 2;
-const SUN = 4;
+const SWITCH = 3;
+const SUN = 5;
 
 describe("OrreryV2Canvas: the quantised ambient value (D-49)", () => {
   it("frame-clock: ONE useClock; an unchanged quantised tick re-records nothing", () => {
     const { tree, layer } = mount();
     expect(rt.clockCalls).toBe(1);
     expect(tree[0].children.map((n) => n.type)).toEqual(
-      Array(8).fill("skPicture"),
+      Array(9).fill("skPicture"),
     );
     flush();
     const first = layer(SKY);
@@ -515,6 +528,30 @@ describe("OrreryV2Canvas: the painted sky layer (38.7-09)", () => {
       .filter((i) => i !== null);
     // C3-L4: the sky (drift, twinkle), the orbit pulses and the sun pulse.
     expect(changed).toEqual([SKY, PULSES, SUN]);
+  });
+
+  it("38.7-13: the switch layer is one shared empty picture at rest; streaks record per frame only while the signal trails", () => {
+    const { props, layer } = mount();
+    flush();
+    const rest = layer(SWITCH);
+    expect(rest.ops).toEqual([]);
+    // A pan at rest re-records nothing here (the same empty picture).
+    props.frame.value = { tag: "frame-2", pose: { tag: "pose-2" } };
+    flush();
+    expect(layer(SWITCH)).toBe(rest);
+    // Mid-switch: one recording per frame, of that frame.
+    props.switchFx.value = { generation: 2, trail: 0.8, warp: 0.5 };
+    flush();
+    const mid = layer(SWITCH);
+    expect(mid.ops).toEqual([["trails", "frame-2", 0.8]]);
+    props.frame.value = { tag: "frame-3", pose: { tag: "pose-3" } };
+    flush();
+    expect(layer(SWITCH)).not.toBe(mid);
+    expect(layer(SWITCH).ops).toEqual([["trails", "frame-3", 0.8]]);
+    // Settled (or reduced motion): back to the shared empty picture.
+    props.switchFx.value = { generation: 2, trail: 0, warp: 0 };
+    flush();
+    expect(layer(SWITCH)).toBe(rest);
   });
 
   it("opaque canvas: a non-touchable cover in the sky base colour fades once the first frame is up", () => {

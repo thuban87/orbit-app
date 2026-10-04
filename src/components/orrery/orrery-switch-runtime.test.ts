@@ -121,6 +121,10 @@ const homeCamera: CameraPose = {
   focalDistance: 320,
 };
 
+/** A spinning, non-reduced switch (swirl + breath) and the plain crossfade. */
+const spectacle = { reducedMotion: false, intensity: 1, spinTurns: 3 };
+const plain = { reducedMotion: false, intensity: 0, spinTurns: 0 };
+
 const visibleGeometry = (
   sample: ReturnType<typeof sampleOrrerySwitchRuntime>,
 ) =>
@@ -491,14 +495,23 @@ describe("D-52 (6): a switch starts from the camera actually on screen", () => {
         homeCamera,
         progress,
         panned,
+        spectacle,
       );
       expect(shown).toEqual(panned);
       expect(shown).not.toBe(panned);
     }
     for (const progress of [0, 0.25, 0.5, 0.999]) {
       expect(
-        displayedSwitchCamera(sourceCamera, homeCamera, progress, panned),
-      ).toEqual(sampleOrrerySwitchCamera(sourceCamera, homeCamera, progress));
+        displayedSwitchCamera(
+          sourceCamera,
+          homeCamera,
+          progress,
+          panned,
+          spectacle,
+        ),
+      ).toEqual(
+        sampleOrrerySwitchCamera(sourceCamera, homeCamera, progress, spectacle),
+      );
     }
   });
 
@@ -533,6 +546,7 @@ describe("D-52 (6): a switch starts from the camera actually on screen", () => {
       mounted.runtime.cameraFrom.value,
       mounted.runtime.cameraTo.value,
       0.4,
+      mounted.runtime.transition.value,
     );
     mounted.runtime.publish(sceneOf(3, cWorldOf()), true, 1, homeCamera);
     expect(mounted.runtime.cameraFrom.value).toEqual(drawn);
@@ -642,18 +656,21 @@ describe("D-53 keyed resource merge/prune", () => {
 describe("38.7-05 (D-45): the switch camera carries the lens shift", () => {
   it("mixes lensShift with the other axes, falling back to 1 (centred)", () => {
     const tilted = { ...homeCamera, tilt: 1.0821, lensShift: 0.62 };
-    expect(sampleOrrerySwitchCamera(sourceCamera, tilted, 0)).toEqual(
+    expect(sampleOrrerySwitchCamera(sourceCamera, tilted, 0, plain)).toEqual(
       sourceCamera,
     );
-    expect(sampleOrrerySwitchCamera(sourceCamera, tilted, 0.5).lensShift).toBe(
-      0.81,
+    expect(
+      sampleOrrerySwitchCamera(sourceCamera, tilted, 0.5, plain).lensShift,
+    ).toBe(0.81);
+    expect(sampleOrrerySwitchCamera(sourceCamera, tilted, 1, plain)).toEqual(
+      tilted,
     );
-    expect(sampleOrrerySwitchCamera(sourceCamera, tilted, 1)).toEqual(tilted);
     expect(
       sampleOrrerySwitchCamera(
         { ...sourceCamera, lensShift: 0.4 },
         homeCamera,
         0.5,
+        spectacle,
       ).lensShift,
     ).toBeCloseTo(0.7, 12);
   });
