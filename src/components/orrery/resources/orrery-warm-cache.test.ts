@@ -247,7 +247,7 @@ const recorders = new Set<{
 }>();
 
 let worldSerial = 0;
-function labelRequest(label: string, ink = "#ffffff"): OrreryTextRequest {
+function labelRequest(label: string, ink = "label-ink"): OrreryTextRequest {
   return {
     text: label,
     role: "label",
@@ -274,7 +274,7 @@ function mountWorld(env: Env) {
   recorders.add(recorder);
   let generation = 0;
   let textKeys: string[] = [];
-  let ink = "#ffffff";
+  let ink = "label-ink";
   const photoEpoch = env.photos.mount(owner, () => publish());
   const textEpoch = env.text.mount(owner);
   env.warm.resumeOnFocus();
@@ -800,7 +800,7 @@ describe("full caps still make progress (C-M1)", () => {
     expect(env.warm.stats().photos).toBe(5);
     const next = Array.from({ length: 5 }, (_, i) => unique(`n${i}`));
     const back = mountWorld(env);
-    back.setInk("#000000"); // a theme change: every text key differs
+    back.setInk("label-ink-dark"); // a theme change: every text key differs
     back.show(next, ["a", "b", "c", "d", "e", "f", "g"]);
     await env.resolveLoads();
     back.ack();
