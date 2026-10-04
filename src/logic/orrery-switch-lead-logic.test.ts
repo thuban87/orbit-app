@@ -34,6 +34,7 @@ import {
   NO_SWITCH_LEAD,
   rotateSwitchWorld,
   SWITCH_LEAD_COAST,
+  SWITCH_LEAD_INTENSITY,
   sampleSwitchLead,
   sampleSwitchSignalWithLead,
   sampleSwitchWorld,
@@ -72,7 +73,7 @@ const visible = <B extends { opacity: number }>(world: readonly B[]): B[] =>
 /** The switch that takes over a lead-in at `clockMs` (as `publish` builds it). */
 function handOff(clockMs: number) {
   const settled = beginSettledSwitchChoreography(source, 1, false);
-  const lead = beginSwitchLead();
+  const lead = beginSwitchLead(SWITCH_LEAD_INTENSITY);
   const now = sampleSwitchLead(lead, clockMs, D);
   const drawn = rotateSwitchWorld(
     sampleSwitchChoreography(settled, 1).world,
@@ -100,7 +101,7 @@ describe("the lead-in opens like a switch (D-76)", () => {
   });
 
   it("moves from the first frames after the tap (well inside 100–200 ms)", () => {
-    const lead = beginSwitchLead();
+    const lead = beginSwitchLead(SWITCH_LEAD_INTENSITY);
     const at = (ms: number) => sampleSwitchLead(lead, ms, D);
     expect(at(0).rotation).toBe(0);
     // ~120 ms: the outer contact (r = 90) has visibly moved and the camera breathes.
@@ -115,7 +116,7 @@ describe("the lead-in opens like a switch (D-76)", () => {
   });
 
   it("under reduced motion (still) it holds: no warp, streaks or breath", () => {
-    const still = { ...beginSwitchLead(), still: true };
+    const still = { ...beginSwitchLead(SWITCH_LEAD_INTENSITY), still: true };
     const s = sampleSwitchLead(still, 800, D);
     expect([s.warp, s.trail, s.breath, s.velocity, s.omega]).toEqual([
       0, 0, 0, 0, 0,

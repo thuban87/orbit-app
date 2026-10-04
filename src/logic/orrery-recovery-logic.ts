@@ -221,9 +221,15 @@ export function createCameraMotion({
     active.value = { plan, kind };
     animate(plan, (finished) => {
       "worklet";
-      if (!finished || !live.value || generation !== epoch.value) return;
-      pose.value = plan.target;
+      // A stop or a newer motion bumped the epoch: it owns `active` now.
+      if (generation !== epoch.value) return;
+      // 38.7-15: this motion is over either way. A pose write that cancels
+      // the animation without a stop (the switch's `finish`) used to leave it
+      // marked active, holding the canvas `busy` (no base bake, the FR-B
+      // vote withdrawn) until the next touch.
       active.value = null;
+      if (!finished || !live.value) return;
+      pose.value = plan.target;
     });
   };
   const motionChanged = () => {

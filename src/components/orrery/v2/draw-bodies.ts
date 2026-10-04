@@ -531,12 +531,15 @@ export function drawContactBody(
   frame: AnimatedFrame,
   spec: OrreryBodySpec,
   source: number,
-  effects: OrreryBodyEffects = NO_BODY_EFFECTS,
+  bodyEffects?: OrreryBodyEffects,
   sun: { x: number; y: number } | null = null,
   focus: FocusDraw | null = null,
   occlusion = 1,
 ): boolean {
   "worklet";
+  // No module identifier in a worklet default parameter (it runs before the
+  // captured closure is unpacked: a ReferenceError on the UI runtime).
+  const effects = bodyEffects === undefined ? NO_BODY_EFFECTS : bodyEffects;
   const body = frame.bodies[source];
   const r = spec.worldRadius;
   const lit = spec.lit;
@@ -626,11 +629,14 @@ export function drawBodies(
   specs: readonly OrreryBodySpec[],
   order: OrreryBodyOrder,
   which: "behind" | "front",
-  effects: OrreryBodyEffects = NO_BODY_EFFECTS,
+  bodyEffects?: OrreryBodyEffects,
   focus: FocusDraw | null = null,
   occluded: readonly CameraRect[] | null = null,
 ): number {
   "worklet";
+  // No module identifier in a worklet default parameter (it runs before the
+  // captured closure is unpacked: a ReferenceError on the UI runtime).
+  const effects = bodyEffects === undefined ? NO_BODY_EFFECTS : bodyEffects;
   const from = which === "behind" ? 0 : order.sunAt + 1;
   const to = which === "behind" ? order.sunAt : order.indices.length;
   const sun = sunScreen(frame, specs, order);
@@ -823,10 +829,13 @@ export function drawSun(
   specs: readonly OrreryBodySpec[],
   order: OrreryBodyOrder,
   pulse: number,
-  effects: OrreryBodyEffects = NO_BODY_EFFECTS,
+  bodyEffects?: OrreryBodyEffects,
   occluded: readonly CameraRect[] | null = null,
 ): boolean {
   "worklet";
+  // No module identifier in a worklet default parameter (it runs before the
+  // captured closure is unpacked: a ReferenceError on the UI runtime).
+  const effects = bodyEffects === undefined ? NO_BODY_EFFECTS : bodyEffects;
   const spec = order.sun >= 0 ? specs[order.sun] : undefined;
   if (!spec) return false;
   const source = sourceOf(frame, spec.key);

@@ -688,9 +688,12 @@ function bisectZoom(
 export function deriveHomePose(
   world: readonly WorldBody[],
   viewport: CameraViewport,
-  profile: HomeProfile = ACTIVE_PROFILE,
+  homeProfile?: HomeProfile,
 ): CameraPose | null {
   "worklet";
+  // No module identifier in a worklet default parameter (it runs before the
+  // captured closure is unpacked: a ReferenceError on the UI runtime).
+  const profile = homeProfile === undefined ? ACTIVE_PROFILE : homeProfile;
   const usable = usableCameraRect(viewport);
   if (
     !usable ||
@@ -803,9 +806,13 @@ export function frameBodies(
   world: readonly WorldBody[],
   viewport: CameraViewport,
   extent: number,
-  orientation: CameraPose = HOME_CAMERA,
+  framingOrientation?: CameraPose,
 ): CameraFraming | null {
   "worklet";
+  // No module identifier in a worklet default parameter (it runs before the
+  // captured closure is unpacked: a ReferenceError on the UI runtime).
+  const orientation =
+    framingOrientation === undefined ? HOME_CAMERA : framingOrientation;
   const usable = usableCameraRect(viewport);
   if (
     !usable ||

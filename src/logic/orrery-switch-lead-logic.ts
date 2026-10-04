@@ -82,10 +82,15 @@ export const NO_SWITCH_LEAD: SwitchLeadState = Object.freeze({
   still: false,
 });
 
-/** A lead starting now. */
-export function beginSwitchLead(
-  intensity: number = SWITCH_LEAD_INTENSITY,
-): SwitchLeadState {
+/**
+ * A lead starting now, at `intensity` (callers pass SWITCH_LEAD_INTENSITY).
+ * No default parameter: a worklet's default-parameter initializer runs in the
+ * parameter scope, BEFORE the body unpacks the closure the worklets plugin
+ * captured, so on the UI runtime a module identifier there does not exist
+ * (DEBUG 6 Pro: `ReferenceError: Property 'SWITCH_LEAD_INTENSITY' doesn't
+ * exist` on every System switch). orrery-worklet-default-params.test.ts.
+ */
+export function beginSwitchLead(intensity: number): SwitchLeadState {
   "worklet";
   const i = fxClamp01(intensity);
   return {

@@ -74,6 +74,41 @@ describe("bounded camera recovery", () => {
     scheduled[4].finish(true);
     expect(pose.value).toEqual(home);
   });
+  it("a motion cancelled without a stop is no longer active (busy never sticks)", () => {
+    const pose = { value: home },
+      epoch = { value: 0 },
+      active = { value: null as MotionRequest | null },
+      live = { value: true },
+      reduced = { value: false };
+    const scheduled: ((finished: boolean) => void)[] = [];
+    const camera = createCameraMotion({
+      pose,
+      epoch,
+      active,
+      live,
+      reduced,
+      extent,
+      viewport: { width: 400, height: 600 },
+      cancel: () => {},
+      animate: (_plan, finish) => scheduled.push(finish),
+    });
+    // A coast or recovery, then a direct pose write (a switch's `finish`)
+    // cancels its animation: the completion reports finished=false.
+    camera.coast("pan", 200, 0);
+    expect(active.value?.kind).toBe("coast");
+    const written = { ...home, x: 12 };
+    pose.value = written;
+    scheduled[0](false);
+    expect(active.value).toBeNull();
+    expect(pose.value).toEqual(written);
+    // A superseded completion never clears the newer motion.
+    camera.recover({ ...home, x: 40 });
+    camera.recover({ ...home, x: 80 });
+    scheduled[1](false);
+    expect(active.value?.plan.target.x).toBe(80);
+    scheduled[2](true);
+    expect(active.value).toBeNull();
+  });
   it("zero/small/large recovery is finite, distance-adaptive, continuous and exact", () => {
     const zero = planRecovery(home, home, extent, false);
     const small = planRecovery({ ...home, x: 2 }, home, extent, false);

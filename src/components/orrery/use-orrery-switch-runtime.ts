@@ -34,6 +34,7 @@ import {
   beginSwitchLead,
   NO_SWITCH_LEAD,
   rotateSwitchWorld,
+  SWITCH_LEAD_INTENSITY,
   SWITCH_LEAD_MAX_MS,
   type SwitchLeadState,
   sampleSwitchLead,
@@ -596,9 +597,15 @@ export function useOrrerySwitchRuntime(
       "worklet";
       if (reducedMotion.value || progress.value < 1 || lead.value.active)
         return;
-      lead.value = beginSwitchLead();
+      // The intensity is passed (never a worklet default parameter: those
+      // cannot see the captured closure on the UI runtime). The state is built
+      // before anything is written, and the clock starts before the lead is
+      // marked active, so a throw here can never leave an active lead (the
+      // canvas `busy`, the FR-B vote) with no clock and no owner.
+      const next = beginSwitchLead(SWITCH_LEAD_INTENSITY);
       leadClock.value = 0;
       startLeadClock();
+      lead.value = next;
     })();
   }, [lead, leadClock, progress, reducedMotion, startLeadClock]);
 
