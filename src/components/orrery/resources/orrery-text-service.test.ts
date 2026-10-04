@@ -424,7 +424,6 @@ function harness(
       swatchInk: [1, 1, 1, 1],
       photoKey: null,
       initialsFontSize: source.fontSize,
-      focusInk: null,
       moonInk: [0.5, 0.5, 0.5, 1],
     }));
   return {

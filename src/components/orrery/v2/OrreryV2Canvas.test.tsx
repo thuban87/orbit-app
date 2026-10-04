@@ -324,6 +324,8 @@ function mount() {
     }),
     overlay: rt.sv({}),
     reorder: rt.sv(null),
+    focus: rt.sv({ spec: {}, mix: 0, lock: 2 }),
+    occlusion: rt.sv([]),
     bodies: rt.sv({ generation: 1, mountEpoch: 1, bodies: [] }),
     ackRecorded: vi.fn(),
     labels: rt.sv({ generation: 1, mountEpoch: 1 }),

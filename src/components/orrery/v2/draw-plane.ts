@@ -44,6 +44,7 @@ import {
   ringScreenPerimeter,
   ringScreenSpacing,
 } from "@/logic/orrery-plane-logic";
+import { type FocusDraw, ringFocusFactor } from "./focus-fx";
 import type {
   GridSpec,
   OrreryInk,
@@ -325,6 +326,8 @@ export function frameRingExtent(frame: AnimatedFrame): {
  * A ring is drawn when its body has a spec, a positive world ring radius and a
  * final alpha (transition opacity × status alpha × density fade) of at least
  * RING_SKIP_ALPHA, and some of its disc is in front of the camera.
+ * 38.7-11 (D-21): while someone is focused, every other orbit fades by the
+ * focus ring dim (`ringFocusFactor`).
  * Returns the number of rings drawn.
  */
 export function drawPlaneRings(
@@ -334,6 +337,7 @@ export function drawPlaneRings(
   effect: SkRuntimeEffect | null,
   bands: RingBands | null,
   aaDp: number,
+  focus: FocusDraw | null = null,
 ): number {
   "worklet";
   if (!effect || !bands) return 0;
@@ -350,9 +354,11 @@ export function drawPlaneRings(
   for (let i = 0; i < bodies.length; i++) {
     const body = bodies[i];
     if (body.kind !== "contact") continue;
-    const spec = specs[bodyKey(body)];
+    const key = bodyKey(body);
+    const spec = specs[key];
     if (!spec) continue;
-    const alpha = body.opacity * spec.alpha * fade;
+    const alpha =
+      body.opacity * spec.alpha * fade * ringFocusFactor(focus, key);
     if (!(alpha >= RING_SKIP_ALPHA)) continue;
     const radius = body.worldRingRadius;
     if (
@@ -443,6 +449,8 @@ export interface PulseRings {
   h: Homography | null;
   radius: number[];
   opacity: number[];
+  /** 38.7-11: each eligible ring's body key (the focus dim follows it). */
+  keys: string[];
 }
 
 /** No eligible rings (the initial value; nothing to pulse). */
@@ -451,6 +459,7 @@ export const NO_PULSE_RINGS: PulseRings = {
   h: null,
   radius: [],
   opacity: [],
+  keys: [],
 };
 
 /** The eligible pulse rings of `frame` under `specs` (see PulseRings). */
@@ -463,15 +472,18 @@ export function pulseRings(frame: AnimatedFrame, specs: RingSpecs): PulseRings {
   );
   const radius: number[] = [];
   const opacity: number[] = [];
+  const keys: string[] = [];
   const bodies = frame.bodies;
   for (let i = 0; i < bodies.length; i++) {
     const body = bodies[i];
     if (body.kind !== "contact" || !(body.worldRingRadius > 0)) continue;
-    const spec = specs[bodyKey(body)];
+    const key = bodyKey(body);
+    const spec = specs[key];
     if (!spec || !(body.opacity * spec.alpha * fade >= RING_SKIP_ALPHA))
       continue;
     radius.push(body.worldRingRadius);
     opacity.push(body.opacity * fade);
+    keys.push(key);
   }
   if (radius.length === 0) return NO_PULSE_RINGS;
   return {
@@ -479,6 +491,7 @@ export function pulseRings(frame: AnimatedFrame, specs: RingSpecs): PulseRings {
     h: planeHomography(frame.pose, frame.viewport),
     radius,
     opacity,
+    keys,
   };
 }
 
@@ -487,7 +500,8 @@ export function pulseRings(frame: AnimatedFrame, specs: RingSpecs): PulseRings {
  * soft arcs in `orreryPulse` at `pulse.intensity`, travelling along the
  * eligible `rings` (from `pulseRings`, computed once per frame/spec change).
  * Nothing under reduced motion (ambient −1), with a zero budget or intensity
- * or no eligible ring. The status of the ring never changes a pulse.
+ * or no eligible ring. The status of the ring never changes a pulse; a
+ * pulse on an orbit the focus dims (38.7-11, D-21) dims with it.
  * Returns the number drawn.
  */
 export function drawPlanePulses(
@@ -498,6 +512,7 @@ export function drawPlanePulses(
   effect: SkRuntimeEffect | null,
   bands: RingBands | null,
   aaDp: number,
+  focus: FocusDraw | null = null,
 ): number {
   "worklet";
   if (!effect || !bands) return 0;
@@ -514,7 +529,12 @@ export function drawPlanePulses(
   for (let slot = 0; slot < pulse.budget; slot++) {
     const place = pulsePlacement(slot, pulse.budget, ambientMs, rings.rings);
     if (!place) continue;
-    const alpha = pulse.intensity * place.envelope * rings.opacity[place.ring];
+    const ringKey = rings.keys ? rings.keys[place.ring] : undefined;
+    const alpha =
+      pulse.intensity *
+      place.envelope *
+      rings.opacity[place.ring] *
+      (ringKey === undefined ? 1 : ringFocusFactor(focus, ringKey));
     if (!(alpha >= RING_SKIP_ALPHA)) continue;
     line.alpha = alpha;
     line.arcCentre = place.centre;

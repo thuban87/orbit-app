@@ -9,13 +9,19 @@ import {
   useAnimatedReaction,
   useDerivedValue,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import type {
   CameraPose,
+  CameraRect,
   CameraViewport,
   OrreryIntent,
   OrrerySatelliteTarget,
 } from "@/logic/orrery-camera-logic";
+import {
+  type FocusCardRect,
+  HIDDEN_FOCUS_CARD,
+} from "@/logic/orrery-focus-card-logic";
 import {
   focusEffectivelyOffscreen,
   type OrreryContactTarget,
@@ -61,6 +67,7 @@ import type {
   ThemePalette,
 } from "@/theme/theme-types";
 import { TYPOGRAPHY } from "@/theme/tokens/typography";
+import { useReducedMotionShared } from "@/theme/use-reduced-motion";
 import type { OrrerySatelliteSource } from "./orrery-satellite-publisher";
 import type { OrreryGenerationLedger } from "./resources/orrery-generation-ledger";
 import { createOrreryGenerationLedger } from "./resources/orrery-generation-ledger";
@@ -90,6 +97,14 @@ import {
   teardownBakeRegistry,
 } from "./v2/base-bake";
 import {
+  buildFocusSpec,
+  collectOcclusion,
+  type FocusDraw,
+  type FocusSpec,
+  labelExclusions,
+  NO_FOCUS_SPEC,
+} from "./v2/focus-fx";
+import {
   createSkyBakeOwner,
   type SkyBakeOwner,
   skyBakeKey,
@@ -101,7 +116,6 @@ import {
   bodyIdentity,
   bodyInitialsLayout,
   buildBodyLooks,
-  buildFocusOutlines,
   buildOverlayInk,
   buildPhotoRequests,
   buildPlaneSpec,
@@ -129,6 +143,8 @@ import {
   tokenInk,
 } from "./v2/scene-specs";
 import {
+  FOCUS_MIX_MS,
+  FOCUS_RELEASE_MS,
   GRID_EXTENT,
   GRID_HALF_WIDTH_DP,
   GRID_OPACITY,
@@ -136,6 +152,8 @@ import {
   GRID_SPOKES,
   PULSE_BUDGET,
   PULSE_INTENSITY,
+  RETICLE_LOCK_END,
+  RETICLE_LOCK_MS,
   RING_LOOKS,
   SKY_LOOKS,
   SKY_STAR_SEED,
@@ -156,6 +174,13 @@ import {
  */
 const EMPTY_IDS: readonly number[] = Object.freeze([]);
 const EMPTY_RELATIONS: Readonly<Record<number, string>> = Object.freeze({});
+const NO_RECTS: readonly CameraRect[] = Object.freeze([]);
+
+/** A linear timing curve (the reticle's lock timeline shapes itself, Lab A). */
+function linear(t: number): number {
+  "worklet";
+  return t;
+}
 
 type SceneMember = OrrerySceneSnapshot["contacts"][number];
 /**
@@ -282,6 +307,8 @@ export function OrreryWorld({
   satelliteSource,
   focusedSatellite,
   switchRuntime,
+  focusCardRect,
+  occlusionRects,
 }: {
   scene: OrrerySceneSnapshot;
   camera: OrreryCameraController;
@@ -311,6 +338,14 @@ export function OrreryWorld({
   focusedSatellite?: OrrerySatelliteTarget | null;
   /** Screen-owned runtime survives this canvas consumer being unmounted. */
   switchRuntime: OrrerySwitchRuntime;
+  /**
+   * 38.7-11 (D-19/H5): the docked focus card's UI-thread rect — the same
+   * value that positions the card — for its occlusion dim and the label
+   * exclusion (it is never a viewport obstacle, C-M2).
+   */
+  focusCardRect?: SharedValue<FocusCardRect>;
+  /** 38.7-11 (D-55): the static text panels' canvas rects (measured). */
+  occlusionRects?: SharedValue<readonly CameraRect[]>;
 }) {
   const { fontScale } = useWindowDimensions();
   const resources = switchRuntime.resources;
@@ -582,22 +617,93 @@ export function OrreryWorld({
       pulseBudget: PULSE_BUDGET,
     });
   }, [planeSpec, colors, themeMode, ringLook]);
-  // The overlay picture's inputs (Polaris, reorder and focus outlines). The
-  // focus set is keyed by its ids, so an unrelated render writes nothing.
+  // The overlay picture's inputs (Polaris, the reorder outline, the reticle
+  // and occlusion inks).
   const overlaySpec = useSharedValue<OverlaySpec>(EMPTY_OVERLAY_SPEC);
   const focusSignature = focusedIds.join(",");
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by focusSignature (focusedIds' contents), not its identity
   const overlay = useMemo<OverlaySpec>(
-    () => ({
-      ink: buildOverlayInk(colors),
-      extent: scene.extent,
-      focus: buildFocusOutlines(resources, focusedIds),
-    }),
-    [colors, scene.extent, resources, focusSignature],
+    () => ({ ink: buildOverlayInk(colors), extent: scene.extent }),
+    [colors, scene.extent],
   );
   useEffect(() => {
     overlaySpec.value = overlay;
   }, [overlaySpec, overlay]);
+  // 38.7-11 (D-18/D-21): what focus does to the world. The spec is written
+  // on a focus change only; `focusMix` (Lab B's world response) and
+  // `reticleLock` (Lab A's lock-on) are Reanimated timings — never React
+  // state per frame — and instant under reduced motion. On a clear the last
+  // spec is kept while the mix fades out (Lab B), so the release fades too.
+  const reducedMotion = useReducedMotionShared();
+  const satelliteFocus = focusedSatellite
+    ? bodyKey({ id: -1, kind: "satellite", satelliteTarget: focusedSatellite })
+    : null;
+  const clusterSignature = clusterIds.join(",");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by the focus and cluster ids' contents, not their identity
+  const focusSpec = useMemo(
+    () =>
+      buildFocusSpec(
+        resources,
+        focusedIds,
+        clusterIds,
+        satelliteFocus,
+        themeMode,
+      ),
+    [resources, focusSignature, clusterSignature, satelliteFocus, themeMode],
+  );
+  const focusState = useSharedValue<FocusSpec>(NO_FOCUS_SPEC);
+  const focusMix = useSharedValue(0);
+  const reticleLock = useSharedValue(RETICLE_LOCK_END);
+  const focusReleased = useSharedValue(true);
+  useEffect(() => {
+    const next = focusSpec;
+    runOnUI(() => {
+      "worklet";
+      const reduced = reducedMotion.value;
+      const previous = focusState.value;
+      if (next.active) {
+        if (
+          next.reticle !== null &&
+          (focusReleased.value || next.reticle !== previous.reticle)
+        ) {
+          reticleLock.value = reduced ? RETICLE_LOCK_END : 0;
+          if (!reduced)
+            reticleLock.value = withTiming(RETICLE_LOCK_END, {
+              duration: RETICLE_LOCK_MS,
+              easing: linear,
+            });
+        }
+        focusState.value = next;
+        focusReleased.value = false;
+      } else focusReleased.value = true;
+      const target = next.active ? 1 : 0;
+      focusMix.value = reduced
+        ? target
+        : withTiming(target, {
+            duration: next.active ? FOCUS_MIX_MS : FOCUS_RELEASE_MS,
+          });
+    })();
+  }, [
+    focusSpec,
+    focusState,
+    focusMix,
+    reticleLock,
+    focusReleased,
+    reducedMotion,
+  ]);
+  const focusDraw = useDerivedValue<FocusDraw>(() => ({
+    spec: focusState.value,
+    mix: focusMix.value,
+    lock: reticleLock.value,
+  }));
+  // D-55 (H5): every Orrery text surface's occlusion rect — the static
+  // panels plus the focus card's UI-thread rect (it moves with the card).
+  const ownCardRect = useSharedValue<FocusCardRect>(HIDDEN_FOCUS_CARD);
+  const ownStaticRects = useSharedValue<readonly CameraRect[]>(NO_RECTS);
+  const cardRect = focusCardRect ?? ownCardRect;
+  const staticRects = occlusionRects ?? ownStaticRects;
+  const occlusion = useDerivedValue<readonly CameraRect[]>(() =>
+    collectOcclusion(staticRects.value, cardRect.value),
+  );
   // Plain label inputs only (no Paragraphs): one stable label node per
   // labelable body; the publisher decides which ones get text, per tier.
   const labelSources = useMemo<OrreryLabelSource[]>(
@@ -651,41 +757,32 @@ export function OrreryWorld({
     [resources, colors],
   );
   // 38.7-07 (D-43): the static body looks — contacts and the sun, then the
-  // moons (theme, resources, moons and the focused moon only). 38.7-10
+  // moons (theme, resources and moons only; 38.7-11: a focused moon carries
+  // the overlay reticle, so focus no longer rebuilds looks). 38.7-10
   // (C-M3): the moons come from the satellite publisher's latest spec, read
   // on its JS signal, so a satellite load republishes the looks without a
   // React render.
-  const satelliteFocusKey = focusedSatellite
-    ? `${focusedSatellite.parentId}|${focusedSatellite.parentUid}|${focusedSatellite.uid}`
-    : "";
   // 38.7-10 (D-13/D-14/D-15): the resolved mode selects the lit-body and
   // star-sun looks.
   const bodyLooks = useMemo(
     () => buildBodyLooks(resources, colors, themeMode),
     [resources, colors, themeMode],
   );
-  const lookInputs = useRef({ bodyLooks, colors, focusedSatellite });
-  lookInputs.current = { bodyLooks, colors, focusedSatellite };
+  const lookInputs = useRef({ bodyLooks, colors });
+  lookInputs.current = { bodyLooks, colors };
   const publishLooks = useCallback(() => {
     const latest = lookInputs.current;
     const rows = satelliteSource?.current().index.rows ?? [];
     specPublisher.setLooks(
       rows.length === 0
         ? latest.bodyLooks
-        : [
-            ...latest.bodyLooks,
-            ...buildSatelliteLooks(
-              rows,
-              latest.colors,
-              latest.focusedSatellite,
-            ),
-          ],
+        : [...latest.bodyLooks, ...buildSatelliteLooks(rows, latest.colors)],
     );
   }, [specPublisher, satelliteSource]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed by satelliteFocusKey (the focused moon's identity), not the target object; publishLooks reads lookInputs
+  // biome-ignore lint/correctness/useExhaustiveDependencies: publishLooks reads the latest looks from lookInputs
   useEffect(() => {
     publishLooks();
-  }, [publishLooks, bodyLooks, colors, satelliteFocusKey]);
+  }, [publishLooks, bodyLooks, colors]);
   useEffect(
     () => satelliteSource?.subscribe(publishLooks),
     [satelliteSource, publishLooks],
@@ -901,14 +998,8 @@ export function OrreryWorld({
           ]
         : [];
     });
-    const exclusions = current.bodies
-      .filter((b) => b.visible)
-      .map((b) => ({
-        x: b.x - b.radius,
-        y: b.y - b.radius,
-        width: b.radius * 2,
-        height: b.radius * 2,
-      }));
+    // C-M2: the docked card is no viewport obstacle, so labels avoid it here.
+    const exclusions = labelExclusions(current.bodies, cardRect.value);
     return allocateLabels(
       candidates,
       semanticLevel(current.labelMagnification, level.value),
@@ -1063,6 +1154,8 @@ export function OrreryWorld({
       plane={planeSpec}
       overlay={overlaySpec}
       reorder={camera.reorder}
+      focus={focusDraw}
+      occlusion={occlusion}
       bodies={bodySpecs}
       ackRecorded={ackRecorded}
       labels={labelSpecs}

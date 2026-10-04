@@ -24,7 +24,6 @@ import {
   bodyInitialsLayout,
   bodyLit,
   buildBodyLooks,
-  buildFocusOutlines,
   buildOverlayInk,
   buildPhotoRequests,
   buildPlaneSpec,
@@ -327,15 +326,11 @@ describe("overlay specs", () => {
       accent: inkOf(colors.accent),
       textPrimary: inkOf(colors.textPrimary),
       polarisHalo: inkOf(colors.starPalette[0] ?? colors.textPrimary),
+      // 38.7-11: the reticle (D-18, follows the accent) and occlusion (D-55)
+      // inks come from their Orrery tokens.
+      reticle: inkOf(colors.orreryReticle),
+      occlusion: inkOf(colors.orreryOcclusion),
     });
-  });
-  it("focus outlines: the focused contacts and sun with today's gaps; none when unfocused", () => {
-    const all = resources(["stable", "wobble", "decay"]);
-    expect(buildFocusOutlines(all, [])).toEqual([]);
-    expect(buildFocusOutlines(all, [2, 0])).toEqual([
-      { key: "sun:0", worldRadius: 30, gap: 6 },
-      { key: "contact:2", worldRadius: 16, gap: 4 },
-    ]);
   });
 });
 
@@ -414,7 +409,6 @@ describe("buildBodyLooks (today's contact and sun look, as numbers)", () => {
         expect(look.photoKey).toBe(i % 2 === 0 ? `avatars/c${i}.jpg` : null);
         expect(look.initialsFontSize).toBe(16);
         expect(look.worldRadius).toBe(16);
-        expect(look.focusInk).toBeNull();
       });
     },
   );
@@ -486,7 +480,6 @@ describe("buildPhotoRequests (D-53: visible first)", () => {
     swatchInk: [1, 1, 1, 1],
     photoKey,
     initialsFontSize: 16,
-    focusInk: null,
     moonInk: [0.5, 0.5, 0.5, 1],
   });
   const looks = [
@@ -649,13 +642,8 @@ describe("38.7-07 Task 2: moons and labels", () => {
   const colors = THEME_PRESETS.standard.dark;
   const moon = (uid: string, parentId: number) =>
     ({ uid, parentId, parentUid: `p${parentId}` }) as never;
-  it("moon looks: a unit textSecondary disc keyed like the frame's moons; the focused moon carries the accent ring", () => {
-    const looks = buildSatelliteLooks([moon("m1", 1), moon("m2", 1)], colors, {
-      kind: "satellite",
-      uid: "m2",
-      parentId: 1,
-      parentUid: "p1",
-    });
+  it("moon looks: a unit textSecondary disc keyed like the frame's moons (a focused moon gets the reticle, not a ring)", () => {
+    const looks = buildSatelliteLooks([moon("m1", 1), moon("m2", 1)], colors);
     expect(looks.map((l) => l.key)).toEqual([
       `satellite:${JSON.stringify([1, "p1", "m1"])}`,
       `satellite:${JSON.stringify([1, "p1", "m2"])}`,
@@ -664,10 +652,9 @@ describe("38.7-07 Task 2: moons and labels", () => {
       kind: "satellite",
       worldRadius: 1,
       photoKey: null,
-      focusInk: null,
     });
     expect(looks[0].outlineInk).toEqual(inkOf(colors.textSecondary));
-    expect(looks[1].focusInk).toEqual(inkOf(colors.accent));
+    expect(looks[1].outlineInk).toEqual(inkOf(colors.textSecondary));
   });
   it("labels publish to the labels layer only, with the shared generation, and track their keys there", () => {
     const ledger = createOrreryGenerationLedger<string>();

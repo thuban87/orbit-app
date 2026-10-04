@@ -4,6 +4,7 @@ const record = vi.hoisted(() => ({ paths: [] as string[][] }));
 vi.mock("@shopify/react-native-skia", () => ({
   BlendMode: { Dst: 2 },
   PaintStyle: { Fill: 0, Stroke: 1 },
+  StrokeCap: { Butt: 0, Round: 1 },
   VertexMode: { Triangles: 0, TriangleStrip: 1, TriangleFan: 2 },
   Skia: {
     MakeVertices: (mode: number, points: unknown[]) => ({
@@ -29,9 +30,17 @@ vi.mock("@shopify/react-native-skia", () => ({
         setShader: (shader: unknown) => {
           paint.shader = shader;
         },
+        setStrokeCap: () => {},
       };
       return paint;
     },
+    XYWHRect: (x: number, y: number, width: number, height: number) => ({
+      x,
+      y,
+      width,
+      height,
+    }),
+    RRectXY: (rect: unknown, rx: number, ry: number) => ({ rect, rx, ry }),
     Path: {
       Make: () => {
         const commands: string[] = [];
@@ -39,6 +48,7 @@ vi.mock("@shopify/react-native-skia", () => ({
         return {
           moveTo: (x: number, y: number) => commands.push(`M${x},${y}`),
           lineTo: (x: number, y: number) => commands.push(`L${x},${y}`),
+          addArc: () => commands.push("A"),
           close: () => commands.push("Z"),
         };
       },
@@ -61,6 +71,11 @@ import {
   worldExtent,
 } from "@/logic/orrery-camera-logic";
 import {
+  type FocusCardRect,
+  focusCardPlacement,
+  HIDDEN_FOCUS_CARD,
+} from "@/logic/orrery-focus-card-logic";
+import {
   type AnimatedFrame,
   beginWorldTransition,
   projectAnimatedFrame,
@@ -68,13 +83,23 @@ import {
 import { POLARIS_RADIUS } from "@/logic/orrery-recovery-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
 import {
-  drawFocusOutlines,
+  drawFocusReticle,
+  drawOcclusion,
   drawOverlay,
   drawPolaris,
   drawReorderOutline,
+  reticleGeometry,
+  reticleLockState,
 } from "./draw-overlay";
 import { makeRingBands } from "./draw-plane";
+import { collectOcclusion, type FocusDraw, NO_FOCUS_SPEC } from "./focus-fx";
 import type { OrreryInk, OverlaySpec } from "./scene-specs";
+import {
+  RETICLE_LOCK_END,
+  RETICLE_LOCK_SCALE,
+  RETICLE_RING_ALPHA,
+  RETICLE_SCAN_PARK,
+} from "./visual-tunables";
 
 const DEG = Math.PI / 180;
 const viewport: CameraViewport = {
@@ -86,6 +111,8 @@ const viewport: CameraViewport = {
 const ACCENT: OrreryInk = [0.125, 0.25, 0.875, 1];
 const TEXT: OrreryInk = [0.875, 0.875, 0.9375, 1];
 const HALO: OrreryInk = [0.75, 0.625, 0.25, 1];
+const RETICLE: OrreryInk = [0.375, 0.5, 1, 1];
+const OCCLUSION: OrreryInk = [0.03125, 0.0625, 0.125, 1];
 
 interface Call {
   op: string;
@@ -112,9 +139,14 @@ const paintOf = (call: Call) =>
 
 function spec(overrides: Partial<OverlaySpec> = {}): OverlaySpec {
   return {
-    ink: { accent: ACCENT, textPrimary: TEXT, polarisHalo: HALO },
+    ink: {
+      accent: ACCENT,
+      textPrimary: TEXT,
+      polarisHalo: HALO,
+      reticle: RETICLE,
+      occlusion: OCCLUSION,
+    },
     extent: 400,
-    focus: [],
     ...overrides,
   };
 }
@@ -304,59 +336,169 @@ describe("reorder outline (overlay picture)", () => {
   });
 });
 
-describe("focus outlines (overlay picture)", () => {
-  it("today's accent ring: gap and 2-unit stroke scaled with the body, at its opacity", () => {
-    const frame = frameFor(ringWorld(2), { ...HOME_CAMERA, zoom: 2, tilt: 0 });
-    const contact = frame.bodies.find((b) => b.id === 1)!;
-    const sun = frame.bodies.find((b) => b.kind === "sun")!;
-    const { canvas, calls } = recordingCanvas();
-    const drawn = drawFocusOutlines(
-      canvas,
-      frame,
-      spec({
-        focus: [
-          { key: "contact:1", worldRadius: 16, gap: 4 },
-          { key: "sun:0", worldRadius: 30, gap: 6 },
-        ],
-      }),
-    );
-    expect(drawn).toBe(2);
-    const [a, b] = calls;
-    const scaleA = contact.radius / 16;
-    expect(a.args.slice(0, 3)).toEqual([
-      contact.x,
-      contact.y,
-      contact.radius + 4 * scaleA,
-    ]);
-    expect(paintOf(a)).toMatchObject({ style: 1, width: 2 * scaleA });
-    expect(paintOf(a).color).toEqual([...ACCENT]);
-    const scaleB = sun.radius / 30;
-    expect(b.args[2]).toBe(sun.radius + 6 * scaleB);
+/** A single focus on `key`, fully mixed, at lock-on time `lock`. */
+function focusOn(key: string, lock = RETICLE_LOCK_END, mix = 1): FocusDraw {
+  return {
+    spec: {
+      ...NO_FOCUS_SPEC,
+      keys: { [key]: true },
+      active: true,
+      reticle: key,
+      ringDim: 0.65,
+    },
+    mix,
+    lock,
+  };
+}
+
+describe("38.7-11 (D-18): the reticle's lock-on, then still", () => {
+  it("converges, flashes and pings during the lock-on, then holds still", () => {
+    const start = reticleLockState(0);
+    expect(start.scale).toBeCloseTo(RETICLE_LOCK_SCALE, 12);
+    expect(start.rotation).toBeGreaterThan(0);
+    expect(start.ringAlpha).toBe(0);
+    // The flash and the ping happen inside the timeline only.
+    expect(reticleLockState(1).flashAlpha).toBeGreaterThan(0);
+    expect(reticleLockState(1.5).ping).toBeCloseTo(0.5, 12);
+    const locked = reticleLockState(RETICLE_LOCK_END);
+    expect(locked).toEqual({
+      scale: 1,
+      rotation: 0,
+      bracketAlpha: 1,
+      ringAlpha: RETICLE_RING_ALPHA,
+      flashAlpha: 0,
+      ping: null,
+      scan: RETICLE_SCAN_PARK,
+    });
+    // No idle motion (D-37): anything at or past the end is the same state,
+    // and a bad clock value is treated as locked.
+    expect(reticleLockState(RETICLE_LOCK_END + 5)).toEqual(locked);
+    expect(reticleLockState(Number.NaN)).toEqual(locked);
   });
-  it("H2: a culled focused body draws no outline", () => {
-    const pose = {
-      ...HOME_CAMERA,
-      x: 0,
-      y: 3000,
-      zoom: 4,
-      tilt: 62 * DEG,
-      yaw: Math.PI,
+
+  it("is Lab A's bracket box: drawn radius + gap, arms clamped", () => {
+    expect(reticleGeometry(10)).toEqual({ half: 15, arm: 6 });
+    const big = reticleGeometry(100);
+    expect(big.half).toBeCloseTo(116, 12);
+    expect(big.arm).toBe(15);
+    expect(reticleGeometry(0)).toEqual({ half: 5, arm: 6 });
+  });
+
+  it("only for the single focused body; never for a culled body, a cluster or at mix 0", () => {
+    const frame = frameFor(ringWorld(2), { ...HOME_CAMERA, zoom: 2, tilt: 0 });
+    const overlay = spec();
+    expect(
+      drawFocusReticle(
+        recordingCanvas().canvas,
+        frame,
+        overlay,
+        focusOn("contact:1"),
+      ),
+    ).toBe(true);
+    expect(
+      drawFocusReticle(recordingCanvas().canvas, frame, overlay, null),
+    ).toBe(false);
+    const cluster: FocusDraw = {
+      ...focusOn("contact:1"),
+      spec: { ...focusOn("contact:1").spec, reticle: null },
     };
-    const frame = frameFor(
+    expect(
+      drawFocusReticle(recordingCanvas().canvas, frame, overlay, cluster),
+    ).toBe(false);
+    expect(
+      drawFocusReticle(
+        recordingCanvas().canvas,
+        frame,
+        overlay,
+        focusOn("contact:1", RETICLE_LOCK_END, 0),
+      ),
+    ).toBe(false);
+    const culled = frameFor(
       [{ id: 1, kind: "contact", x: 0, y: -100, radius: 16, ringRadius: 100 }],
-      pose,
+      { ...HOME_CAMERA, x: 0, y: 3000, zoom: 4, tilt: 62 * DEG, yaw: Math.PI },
       6000,
     );
-    expect(frame.bodies[0].culled).toBe(true);
+    expect(culled.bodies[0].culled).toBe(true);
     const { canvas, calls } = recordingCanvas();
     expect(
-      drawFocusOutlines(
-        canvas,
-        frame,
-        spec({ focus: [{ key: "contact:1", worldRadius: 16, gap: 4 }] }),
-      ),
-    ).toBe(0);
+      drawFocusReticle(canvas, culled, overlay, focusOn("contact:1")),
+    ).toBe(false);
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("38.7-11 (D-55/H5): the occlusion dim", () => {
+  it("merges the static panels with the focus card's live rect; a hidden card adds none", () => {
+    const panel = { x: 10, y: 10, width: 100, height: 40 };
+    const card: FocusCardRect = {
+      x: 20,
+      y: 500,
+      width: 280,
+      height: 180,
+      maxHeight: 300,
+      visible: true,
+    };
+    expect(collectOcclusion([panel], card)).toEqual([
+      panel,
+      { x: 20, y: 500, width: 280, height: 180 },
+    ]);
+    expect(collectOcclusion([panel], HIDDEN_FOCUS_CARD)).toEqual([panel]);
+    expect(collectOcclusion([], null)).toEqual([]);
+  });
+
+  it("follows the card through a focus animation (the same placement, every sample) and drops it when the body is culled", () => {
+    const world = ringWorld(3);
+    const from = clampCameraPose({ ...HOME_CAMERA, zoom: 1 }, 400);
+    const to = clampCameraPose(
+      { ...HOME_CAMERA, zoom: 3.2, x: world[1].x, y: world[1].y },
+      400,
+    );
+    for (let i = 0; i <= 8; i++) {
+      const f = i / 8;
+      const pose = clampCameraPose(
+        {
+          ...from,
+          x: from.x + (to.x - from.x) * f,
+          y: from.y + (to.y - from.y) * f,
+          zoom: from.zoom + (to.zoom - from.zoom) * f,
+        },
+        400,
+      );
+      const frame = frameFor(world, pose);
+      const body = frame.bodies.find((b) => b.id === 1)!;
+      const card = focusCardPlacement(frame.viewport, body, 180);
+      const rects = collectOcclusion([], card);
+      expect(rects).toEqual([
+        { x: card.x, y: card.y, width: card.width, height: card.height },
+      ]);
+    }
+    const culled = frameFor(
+      [{ id: 1, kind: "contact", x: 0, y: -100, radius: 16, ringRadius: 100 }],
+      { ...HOME_CAMERA, x: 0, y: 3000, zoom: 4, tilt: 62 * DEG, yaw: Math.PI },
+      6000,
+    );
+    expect(
+      collectOcclusion(
+        [],
+        focusCardPlacement(culled.viewport, culled.bodies[0], 180),
+      ),
+    ).toEqual([]);
+  });
+
+  it("skips a non-finite or empty rect instead of drawing it", () => {
+    const { canvas, calls } = recordingCanvas();
+    expect(
+      drawOcclusion(
+        canvas,
+        [
+          { x: Number.NaN, y: 0, width: 10, height: 10 },
+          { x: 0, y: 0, width: 0, height: 10 },
+          { x: 0, y: 0, width: 10, height: 10 },
+        ],
+        spec(),
+      ),
+    ).toBe(1);
+    expect(calls.filter((c) => c.op === "drawRRect")).toHaveLength(1);
   });
 });
 
@@ -364,13 +506,15 @@ describe("H2: the whole overlay on a 1,000-ring System at the pan/yaw extremes",
   it("records without throwing at 0/45/62°, MIN/Home/MAX zoom, with focus and a hold", () => {
     const world = ringWorld(1000);
     const extent = worldExtent(world);
-    const focus = [1, 250, 999].map((id) => ({
-      key: `contact:${id}`,
-      worldRadius: 16,
-      gap: 4,
-    }));
+    const focusKeys = [1, 250, 999].map((id) => `contact:${id}`);
+    // The reorder hold, the reticle at three points of its lock-on, and the
+    // occlusion over two panels and the docked card.
+    const panels = [
+      { x: 0, y: 0, width: 412, height: 60 },
+      { x: 300, y: 500, width: 100, height: 200 },
+    ];
     let polarisHidden = 0,
-      outlinesSkipped = 0;
+      reticlesSkipped = 0;
     for (const tilt of [0, 45 * DEG, HOME_PROFILES.tilted.tilt]) {
       const home = deriveHomePose(world, viewport, {
         ...HOME_PROFILES.tilted,
@@ -389,31 +533,47 @@ describe("H2: the whole overlay on a 1,000-ring System at the pan/yaw extremes",
               { ...home, x: px, y: py, yaw, zoom },
               extent,
             );
-            const { canvas, calls } = recordingCanvas();
-            const overlay = spec({ extent, focus });
-            expect(() =>
-              drawOverlay(
-                canvas,
-                frame,
-                overlay,
-                drag(500),
-                effect,
-                bands,
-                0.4,
-              ),
-            ).not.toThrow();
-            for (const call of calls)
-              for (const arg of call.args)
-                if (typeof arg === "number")
-                  expect(Number.isFinite(arg)).toBe(true);
+            const overlay = spec({ extent });
+            for (const key of focusKeys)
+              for (const lock of [0, 1.5, RETICLE_LOCK_END]) {
+                const { canvas, calls } = recordingCanvas();
+                const body = frame.bodies.find(
+                  (b) => `contact:${b.id}` === key,
+                )!;
+                const card = focusCardPlacement(frame.viewport, body, 180);
+                expect(() =>
+                  drawOverlay(
+                    canvas,
+                    frame,
+                    overlay,
+                    drag(500),
+                    effect,
+                    bands,
+                    0.4,
+                    focusOn(key, lock),
+                    collectOcclusion(panels, card),
+                  ),
+                ).not.toThrow();
+                for (const call of calls)
+                  for (const arg of call.args)
+                    if (typeof arg === "number")
+                      expect(Number.isFinite(arg)).toBe(true);
+                if (
+                  lock === RETICLE_LOCK_END &&
+                  !drawFocusReticle(
+                    recordingCanvas().canvas,
+                    frame,
+                    overlay,
+                    focusOn(key),
+                  )
+                )
+                  reticlesSkipped++;
+              }
             if (!drawPolaris(recordingCanvas().canvas, frame, overlay))
               polarisHidden++;
-            outlinesSkipped +=
-              focus.length -
-              drawFocusOutlines(recordingCanvas().canvas, frame, overlay);
           }
     }
     expect(polarisHidden).toBeGreaterThan(0);
-    expect(outlinesSkipped).toBeGreaterThan(0);
+    expect(reticlesSkipped).toBeGreaterThan(0);
   });
 });

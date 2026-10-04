@@ -25,8 +25,11 @@
  *   - the sun: the pulsing glow halo (radius × 1.8, ±10 % radius, ±40 %
  *     opacity on the canvas's ambient clock; static under reduced motion), the
  *     rim just outside the disc, then the photo or the swatch + initials;
- *   - a moon (always): the small `textSecondary` disc, plus the accent ring
- *     when focused.
+ *   - a moon (always): the small `textSecondary` disc (a focused moon
+ *     carries the overlay reticle, 38.7-11).
+ * 38.7-11 (D-21): while someone is focused, every other contact is defocused
+ * (the lit shader's defocus term plus a sink toward the sky; a flat body or
+ * moon loses alpha instead) — the sun never, nor a focused parent's moons.
  * Each body is drawn in its billboard space (translate to the projected centre,
  * scale = projected radius / world radius), as the declarative Groups were. A
  * partly transparent body gets a transparency layer BOUNDED to its own extent
@@ -54,6 +57,7 @@ import {
 } from "@shopify/react-native-skia";
 import { type AnimatedFrame, bodyKey } from "@/logic/orrery-frame";
 import { pipAngles } from "@/logic/orrery-stack-logic";
+import { bodyDefocus, type FocusDraw } from "./focus-fx";
 import {
   BODY_OUTLINE_WIDTH,
   type BodyLit,
@@ -62,6 +66,8 @@ import {
   type SunLook,
 } from "./scene-specs";
 import {
+  FLAT_FOCUS_DIM,
+  FOCUS_SINK,
   MOON_BUMP_MAX_DP,
   MOON_BUMP_RADIUS_DP,
   MOON_BUMP_STEP_DP,
@@ -95,9 +101,6 @@ export const SUN_PULSE_SPEED = 0.002;
 const SUN_RIM_GAP = 2;
 /** A moon is a unit disc (scaled by its projected radius). */
 const MOON_RADIUS = 1;
-/** The focused moon's accent ring: radius and stroke (moon-local units). */
-const MOON_FOCUS_RADIUS = 1.5;
-const MOON_FOCUS_STROKE = 0.3;
 /** Initials baseline offset: y = −fontSize × this (today's Paragraph y). */
 const INITIALS_RISE = 0.72;
 /** Below this alpha nothing draws; above 1 − this no layer is needed. */
@@ -429,6 +432,7 @@ function drawLitContact(
   scale: number,
   light: readonly [number, number],
   effects: OrreryBodyEffects,
+  defocus: number,
 ): boolean {
   "worklet";
   const photo = spec.photo;
@@ -436,7 +440,7 @@ function drawLitContact(
   if (!effect) return false;
   let shader: SkShader;
   try {
-    const uniforms = bodyLitUniforms(r, 1 / scale, light, lit, 0);
+    const uniforms = bodyLitUniforms(r, 1 / scale, light, lit, defocus);
     if (photo) {
       const width = photo.width();
       const height = photo.height();
@@ -457,7 +461,10 @@ function drawLitContact(
   } catch {
     return false;
   }
-  canvas.drawCircle(0, 0, r * lit.atmosphereReach, shaderPaint(shader));
+  const paint = shaderPaint(shader);
+  // Lab B's defocused worlds also sink toward the sky behind them.
+  if (defocus > 0) paint.setAlphaf(1 - FOCUS_SINK * defocus);
+  canvas.drawCircle(0, 0, r * lit.atmosphereReach, paint);
   if (!photo)
     drawInitials(canvas, spec, Math.max(1, r - BODY_OUTLINE_WIDTH / 2));
   return true;
@@ -524,14 +531,20 @@ export function drawContactBody(
   source: number,
   effects: OrreryBodyEffects = NO_BODY_EFFECTS,
   sun: { x: number; y: number } | null = null,
+  focus: FocusDraw | null = null,
 ): boolean {
   "worklet";
   const body = frame.bodies[source];
-  const alpha = bodyAlpha(body);
   const r = spec.worldRadius;
+  const lit = spec.lit;
+  const defocus = bodyDefocus(focus, spec.key, spec.kind, null);
+  // The lit shader dims itself (no layer per dimmed body); a flat body
+  // (no shader) dims through its alpha instead.
+  const shaded =
+    lit !== undefined && (spec.photo ? effects.photo : effects.swatch) !== null;
+  const alpha = bodyAlpha(body) * (shaded ? 1 : 1 - FLAT_FOCUS_DIM * defocus);
   if (!(alpha > ALPHA_EPSILON) || !(r > 0)) return false;
   const scale = body.radius / r;
-  const lit = spec.lit;
   canvas.save();
   canvas.translate(body.x, body.y);
   canvas.scale(scale, scale);
@@ -556,6 +569,7 @@ export function drawContactBody(
       scale,
       lightToward(body.x, body.y, sun),
       effects,
+      defocus,
     );
   if (!drewLit) {
     canvas.drawCircle(0, 0, r, inkPaint(spec.outlineInk, 1));
@@ -574,25 +588,21 @@ export function drawMoonBody(
   frame: AnimatedFrame,
   spec: OrreryBodySpec,
   source: number,
+  focus: FocusDraw | null = null,
 ): boolean {
   "worklet";
   const body = frame.bodies[source];
-  const alpha = bodyAlpha(body);
+  const parent = body.satelliteTarget ? body.satelliteTarget.parentId : null;
+  const defocus = bodyDefocus(focus, spec.key, spec.kind, parent);
+  const alpha = bodyAlpha(body) * (1 - FLAT_FOCUS_DIM * defocus);
   if (!(alpha > ALPHA_EPSILON)) return false;
   const scale = body.radius / MOON_RADIUS;
   canvas.save();
   canvas.translate(body.x, body.y);
   canvas.scale(scale, scale);
   const layered = alpha < 1 - ALPHA_EPSILON;
-  const reach = MOON_FOCUS_RADIUS + MOON_FOCUS_STROKE;
-  if (layered) boundedLayer(canvas, alpha, reach);
+  if (layered) boundedLayer(canvas, alpha, MOON_RADIUS);
   canvas.drawCircle(0, 0, MOON_RADIUS, inkPaint(spec.outlineInk, 1));
-  if (spec.focusInk) {
-    const ring = inkPaint(spec.focusInk, 1);
-    ring.setStyle(PaintStyle.Stroke);
-    ring.setStrokeWidth(MOON_FOCUS_STROKE);
-    canvas.drawCircle(0, 0, MOON_FOCUS_RADIUS, ring);
-  }
   if (layered) canvas.restore();
   canvas.restore();
   return true;
@@ -609,6 +619,7 @@ export function drawBodies(
   order: OrreryBodyOrder,
   which: "behind" | "front",
   effects: OrreryBodyEffects = NO_BODY_EFFECTS,
+  focus: FocusDraw | null = null,
 ): number {
   "worklet";
   const from = which === "behind" ? 0 : order.sunAt + 1;
@@ -622,8 +633,8 @@ export function drawBodies(
     if (source < 0) continue;
     const did =
       spec.kind === "satellite"
-        ? drawMoonBody(canvas, frame, spec, source)
-        : drawContactBody(canvas, frame, spec, source, effects, sun);
+        ? drawMoonBody(canvas, frame, spec, source, focus)
+        : drawContactBody(canvas, frame, spec, source, effects, sun, focus);
     if (did) {
       drawn++;
       if (spec.kind === "contact")

@@ -263,7 +263,6 @@ function harness(
       swatchInk: [0.5, 0.5, 0.5, 1] as const,
       photoKey,
       initialsFontSize: 16,
-      focusInk: null,
       moonInk: [0.5, 0.5, 0.5, 1],
     }));
   }

@@ -9,6 +9,10 @@
  * opacity. A partly transparent plate gets a transparency layer BOUNDED to
  * its own box (the legacy reader used one layer per label at all times).
  *
+ * 38.7-11 (D-21): while someone is focused, the other labels' TEXT dims
+ * toward LABEL_DIM_FLOOR (never below it; plates keep their scrim, Lab B R1),
+ * so labels stay readable.
+ *
  * Every Paragraph comes from OrreryTextService through the label spec; this
  * module only paints. Worklet helpers are defined above their callers.
  */
@@ -20,6 +24,7 @@ import {
   ORRERY_TEXT_VERTICAL_PADDING,
   type PreparedOrreryText,
 } from "../resources/orrery-text-service";
+import { type FocusDraw, labelTextAlpha } from "./focus-fx";
 import type { OrreryInk, OrreryLabelLayerSpecs } from "./scene-specs";
 
 /** Below this alpha nothing draws; above 1 − this no layer is needed. */
@@ -33,6 +38,7 @@ function drawPlate(
   text: PreparedOrreryText,
   plateInk: OrreryInk,
   alpha: number,
+  textAlpha: number,
 ): void {
   "worklet";
   const box = Skia.XYWHRect(x, y, text.width, text.height);
@@ -48,6 +54,12 @@ function drawPlate(
     Float32Array.of(plateInk[0], plateInk[1], plateInk[2], plateInk[3]),
   );
   canvas.drawRRect(Skia.RRectXY(box, RADII.sm, RADII.sm), plate);
+  const dimmed = textAlpha < 1 - ALPHA_EPSILON;
+  if (dimmed) {
+    const layer = Skia.Paint();
+    layer.setAlphaf(Math.max(0, Math.min(1, textAlpha)));
+    canvas.saveLayer(layer, box);
+  }
   try {
     text.paragraph.paint(
       canvas,
@@ -57,6 +69,7 @@ function drawPlate(
   } catch {
     // Last guard only: the ledger never disposes a drawn Paragraph.
   }
+  if (dimmed) canvas.restore();
   if (layered) canvas.restore();
 }
 
@@ -68,6 +81,7 @@ export function drawLabels(
   canvas: SkCanvas,
   specs: OrreryLabelLayerSpecs,
   allocationIndex: Readonly<Record<string, LabelAllocation>>,
+  focus: FocusDraw | null = null,
 ): number {
   "worklet";
   let drawn = 0;
@@ -79,6 +93,7 @@ export function drawLabels(
     if (!entry || !item) continue;
     const alpha = Number.isFinite(item.opacity) ? item.opacity : 0;
     if (!(alpha > ALPHA_EPSILON)) continue;
+    const textAlpha = labelTextAlpha(focus, id);
     if (entry.text) {
       drawPlate(
         canvas,
@@ -87,6 +102,7 @@ export function drawLabels(
         entry.text,
         specs.plateInk,
         alpha,
+        textAlpha,
       );
       drawn++;
     }
@@ -98,6 +114,7 @@ export function drawLabels(
         entry.context,
         specs.plateInk,
         alpha,
+        textAlpha,
       );
       drawn++;
     }

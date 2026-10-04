@@ -4,6 +4,7 @@ import { expect, it, vi } from "vitest";
 import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
 import * as overlayLogic from "@/components/orrery/orrery-overlay-logic";
 import * as switchLogic from "@/components/orrery/orrery-switch-animation";
+import * as occlusionSources from "@/components/orrery/v2/occlusion-sources";
 import * as cameraLogic from "@/logic/orrery-camera-logic";
 import * as focusCardLogic from "@/logic/orrery-focus-card-logic";
 import * as focusLogic from "@/logic/orrery-focus-logic";
@@ -284,6 +285,7 @@ function harness(
                 ).current,
             };
           if (id.includes("orrery-overlay-logic")) return overlayLogic;
+          if (id.includes("occlusion-sources")) return occlusionSources;
           if (id.includes("orrery-obstacle-logic")) return { canvasViewport };
           if (id.includes("orrery-system-store"))
             return { createOrrerySystemStore: () => store };

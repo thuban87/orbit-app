@@ -301,7 +301,12 @@ vi.mock("@shopify/react-native-skia", async () => {
         return paint;
       },
       Path: {
-        Make: () => ({ moveTo: () => {}, lineTo: () => {}, close: () => {} }),
+        Make: () => ({
+          moveTo: () => {},
+          lineTo: () => {},
+          close: () => {},
+          addArc: () => {},
+        }),
       },
       // The ring effect and strips, so the base picture records ring draws.
       RuntimeEffect: {

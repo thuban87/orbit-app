@@ -61,6 +61,7 @@ import {
 } from "@/components/orrery/orrery-switch-animation";
 import { useOrreryCamera } from "@/components/orrery/use-orrery-camera";
 import { useOrrerySwitchRuntime } from "@/components/orrery/use-orrery-switch-runtime";
+import { staticOcclusionRects } from "@/components/orrery/v2/occlusion-sources";
 import { ShellAppBar } from "@/components/ShellAppBar";
 import { AppText } from "@/components/ui/AppText";
 import { Button } from "@/components/ui/Button";
@@ -249,6 +250,14 @@ export function OrreryScreen() {
       ),
     [canvasRect, obstacles],
   );
+  // 38.7-11 (D-55): the static Orrery text panels' rects in canvas
+  // coordinates (the focus card's rect is UI-derived, `focusCardRect`).
+  const staticOcclusion = useMemo(
+    () =>
+      canvasViewport(canvasRect, staticOcclusionRects(obstacles)).obstacles ??
+      [],
+    [canvasRect, obstacles],
+  );
   const panelViewport = useMemo(
     () =>
       canvasViewport(
@@ -350,6 +359,10 @@ export function OrreryScreen() {
   // D-19: the docked card's measured height and what it follows (UI thread).
   const cardHeight = useSharedValue(FOCUS_CARD_ESTIMATED_HEIGHT);
   const cardTarget = useSharedValue<FocusCardTarget>(null);
+  const occlusionRects = useSharedValue<readonly CameraRect[]>([]);
+  useEffect(() => {
+    occlusionRects.value = staticOcclusion;
+  }, [occlusionRects, staticOcclusion]);
   const hasReadySystem = useRef(false);
   const switchSourceIds = useRef<number[] | null>(null);
   const switchHomeGeneration = useRef<number | null>(null);
@@ -1274,6 +1287,8 @@ export function OrreryScreen() {
             focusedSatellite={focusedSatellite}
             switchRuntime={switchRuntime}
             clusterIds={clusterIds}
+            focusCardRect={focusCardRect}
+            occlusionRects={occlusionRects}
             onFocusLost={clusterOpen ? undefined : clearFocus}
             interactive={!overlaysOpen && state.status === "ready"}
           />

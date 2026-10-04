@@ -11,7 +11,6 @@ import { type SkImage, Skia } from "@shopify/react-native-skia";
 import { swatchIndex } from "@/components/avatar-initials";
 import type { ProfileStatus } from "@/db/contact-status-read";
 import type { OrrerySatellite } from "@/db/orrery-satellites-read";
-import type { OrrerySatelliteTarget } from "@/logic/orrery-camera-logic";
 import { bodyKey } from "@/logic/orrery-frame";
 import { orreryRingStyle } from "@/logic/orrery-ring-logic";
 import { SKY_UNTINTED, skyStarField } from "@/logic/orrery-sky-logic";
@@ -480,63 +479,44 @@ export function buildSkySpec(input: SkySpecInput): SkySpec {
   return { ...base, stars: [...batches.values()] };
 }
 
-/** The overlay's inks (accent for reorder/focus, Polaris star and halo). */
+/**
+ * The overlay's inks: accent for the reorder outline, Polaris star and halo,
+ * (38.7-11) the reticle (`orreryReticle`, which follows the user's accent,
+ * D-18) and the occlusion dim (`orreryOcclusion`, D-55).
+ */
 export interface OverlayInk {
   accent: OrreryInk;
   textPrimary: OrreryInk;
   /** Polaris halo: the first star-palette colour (textPrimary when empty). */
   polarisHalo: OrreryInk;
-}
-/**
- * One focused body's accent outline: today's contact / sun focus ring,
- * `gap` world units outside the body's world radius (both scale with it).
- */
-export interface OverlayFocus {
-  key: string;
-  worldRadius: number;
-  gap: number;
+  reticle: OrreryInk;
+  occlusion: OrreryInk;
 }
 export interface OverlaySpec {
   ink: OverlayInk;
   /** The world extent Polaris sits beyond (`scene.extent`). */
   extent: number;
-  focus: readonly OverlayFocus[];
 }
-/** Today's focus-ring gaps outside the disc (contact / sun). */
-export const FOCUS_RING_GAP = { contact: 4, sun: 6 } as const;
 
 export function buildOverlayInk(colors: ThemePalette): OverlayInk {
   return {
     accent: tokenInk(colors.accent),
     textPrimary: tokenInk(colors.textPrimary),
     polarisHalo: tokenInk(colors.starPalette[0] ?? colors.textPrimary),
+    reticle: tokenInk(colors.orreryReticle),
+    occlusion: tokenInk(colors.orreryOcclusion),
   };
 }
 
-/** The focus outlines for the focused ids (contacts and the sun; not moons). */
-export function buildFocusOutlines(
-  resources: readonly OrreryBodyResource[],
-  focusedIds: readonly number[],
-): OverlayFocus[] {
-  if (focusedIds.length === 0) return [];
-  const focused = new Set(focusedIds);
-  const out: OverlayFocus[] = [];
-  for (const resource of resources) {
-    const { body } = resource;
-    if (body.kind === "satellite" || !focused.has(body.id)) continue;
-    out.push({
-      key: resource.key,
-      worldRadius: body.radius,
-      gap: body.kind === "sun" ? FOCUS_RING_GAP.sun : FOCUS_RING_GAP.contact,
-    });
-  }
-  return out;
-}
-
 export const EMPTY_OVERLAY_SPEC: OverlaySpec = Object.freeze({
-  ink: { accent: NO_INK, textPrimary: NO_INK, polarisHalo: NO_INK },
+  ink: {
+    accent: NO_INK,
+    textPrimary: NO_INK,
+    polarisHalo: NO_INK,
+    reticle: NO_INK,
+    occlusion: NO_INK,
+  },
   extent: 1,
-  focus: [],
 });
 
 // ── Bodies (38.7-07, D-43/D-53) ─────────────────────────────────────────────
@@ -712,8 +692,6 @@ export interface OrreryBodyLook {
   photoKey: string | null;
   /** Initials glyph font size (body-local px; `bodyInitialsLayout`). */
   initialsFontSize: number;
-  /** Moon: the focused moon's accent ring ink; null otherwise. */
-  focusInk: OrreryInk | null;
   /** 38.7-10 (D-31): the moon ink (`textSecondary`) a parent's bump is drawn in. */
   moonInk: OrreryInk;
   /** 38.7-10 (D-13/D-14): a contact's lit material; absent → today's flat body. */
@@ -837,7 +815,6 @@ export function buildBodyLooks(
       // and lists, which do not read these looks.
       photoKey: kind === "sun" && sun ? null : identity.photo,
       initialsFontSize: bodyInitialsLayout(kind, body.radius).fontSize,
-      focusInk: null,
       moonInk,
       ...(style
         ? {
@@ -900,17 +877,15 @@ export function buildPhotoRequests(
 }
 
 /**
- * Today's moons (the legacy satellite body): a unit disc in `textSecondary`,
- * and the focused moon's accent ring. One look per drawn satellite row, keyed
- * like the frame's moon bodies.
+ * Today's moons (the legacy satellite body): a unit disc in `textSecondary`.
+ * One look per drawn satellite row, keyed like the frame's moon bodies. A
+ * focused moon carries the overlay reticle (38.7-11, D-18), not a ring.
  */
 export function buildSatelliteLooks(
   satellites: readonly OrrerySatellite[],
   colors: ThemePalette,
-  focused: OrrerySatelliteTarget | null | undefined,
 ): OrreryBodyLook[] {
   const ink = tokenInk(colors.textSecondary);
-  const focusInk = tokenInk(colors.accent);
   return satellites.map((row) => {
     const target = {
       kind: "satellite" as const,
@@ -918,10 +893,6 @@ export function buildSatelliteLooks(
       parentId: row.parentId,
       parentUid: row.parentUid,
     };
-    const isFocused =
-      focused?.uid === row.uid &&
-      focused.parentId === row.parentId &&
-      focused.parentUid === row.parentUid;
     return {
       key: bodyKey({ kind: "satellite", id: -1, satelliteTarget: target }),
       kind: "satellite" as const,
@@ -930,7 +901,6 @@ export function buildSatelliteLooks(
       swatchInk: ink,
       photoKey: null,
       initialsFontSize: 0,
-      focusInk: isFocused ? focusInk : null,
       moonInk: ink,
     };
   });

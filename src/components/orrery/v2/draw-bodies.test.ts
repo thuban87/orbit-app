@@ -103,7 +103,6 @@ function spec(
     swatchInk: SWATCH,
     photoKey: null,
     initialsFontSize: kind === "sun" ? 30 : 16,
-    focusInk: null,
     moonInk: MOON,
     initials: null,
     photo: null,
@@ -316,13 +315,12 @@ describe("sun drawing (today's glow, rim and pulse)", () => {
 });
 
 describe("moon drawing (today's look, same depth rules)", () => {
-  it("a unit disc scaled by the projected radius; the focused moon adds the accent ring; moons sort with contacts", () => {
-    const ACCENT: OrreryInk = [0.125, 0.25, 0.875, 1];
+  it("a unit disc scaled by the projected radius (no solid focus ring, 38.7-11); moons sort with contacts", () => {
     const specs = [
       spec("contact:1"),
       spec("sun:0", "sun"),
       spec("satellite:a", "satellite"),
-      spec("satellite:b", "satellite", { focusInk: ACCENT }),
+      spec("satellite:b", "satellite"),
     ];
     const f = frame([
       { key: "contact:1", depth: -1, x: 1 },
@@ -338,16 +336,7 @@ describe("moon drawing (today's look, same depth rules)", () => {
     const front = recordingCanvas();
     drawBodies(front.canvas, f, specs, order, "front");
     const circles = front.calls.filter((c) => c.op === "drawCircle");
-    expect(circles.map((c) => c.args.slice(0, 3))).toEqual([
-      [0, 0, 1],
-      [0, 0, 1.5],
-    ]);
-    const ring = circles[1].args[3] as {
-      color: number[];
-      style: number;
-      width: number;
-    };
-    expect(ring).toMatchObject({ color: [...ACCENT], style: 1, width: 0.3 });
+    expect(circles.map((c) => c.args.slice(0, 3))).toEqual([[0, 0, 1]]);
     expect((circles[0].args[3] as { color: number[] }).color).toEqual([
       ...MOON,
     ]);

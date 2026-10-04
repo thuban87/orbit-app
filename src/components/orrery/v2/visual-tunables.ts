@@ -365,3 +365,85 @@ export const SUN_GRANULE_TIME = 2.3;
 export const SUN_GRANULE_SWING = 0.3;
 /** The fine limb line just outside the disc (world units), Lab A. */
 export const SUN_LIMB_GAP = 1;
+
+// ── Focus: the reticle, dim-the-rest, the card-occlusion dim (38.7-11) ────
+
+/**
+ * D-18 (owner, 2026-10-03: "the reticle that the labs used … not this solid
+ * circle"): Lab A's focus reticle (`reticle-draw.ts`, deep-field-config §6),
+ * the corner-bracket instrument both Labs A and B drew, in the
+ * `orreryReticle` token. Authored in screen dp around the DRAWN disc so it is
+ * the same weight at every zoom.
+ *   - bracket box half-size = drawn + max(RETICLE_GAP, drawn × RETICLE_GAP_FRAC)
+ *   - arm = clamp(half × RETICLE_ARM_FRAC, RETICLE_ARM_MIN, RETICLE_ARM_MAX)
+ */
+export const RETICLE_GAP = 5;
+export const RETICLE_GAP_FRAC = 0.16;
+export const RETICLE_ARM_FRAC = 0.34;
+export const RETICLE_ARM_MIN = 6;
+export const RETICLE_ARM_MAX = 15;
+/** Bracket stroke (dp). */
+export const RETICLE_STROKE_DP = 2;
+/** The thin lock ring just outside the disc (dp) and its alpha. */
+export const RETICLE_RING_DP = 3.5;
+export const RETICLE_RING_ALPHA = 0.55;
+/** The four cardinal instrument ticks outside the lock ring (dp). */
+export const RETICLE_TICK_DP = 4;
+/**
+ * The bright arc on the lock ring (radians of span). Lab A swept it round on
+ * the ambient clock; D-37 allows no idle reticle motion, so it sweeps in
+ * during the lock-on (RETICLE_SCAN_SWEEP) and then parks at RETICLE_SCAN_PARK
+ * (radians clockwise from 12 o'clock).
+ */
+export const RETICLE_SCAN_ARC = 0.8;
+export const RETICLE_SCAN_SWEEP = Math.PI;
+export const RETICLE_SCAN_PARK = Math.PI / 4;
+/**
+ * The lock-on (Lab A): over RETICLE_LOCK_MS the brackets converge from
+ * RETICLE_LOCK_SCALE × the box, rotated RETICLE_LOCK_ROTATE, with an
+ * outBack snap (RETICLE_LOCK_OVERSHOOT); then a bracket flash and one ping
+ * ring that leaves the lock ring (RETICLE_PING_REACH × the drawn radius).
+ * Static afterwards; instant (already locked) under reduced motion.
+ */
+export const RETICLE_LOCK_MS = 760;
+export const RETICLE_LOCK_SCALE = 1.9;
+export const RETICLE_LOCK_ROTATE = Math.PI / 4;
+export const RETICLE_LOCK_OVERSHOOT = 1.6;
+export const RETICLE_FLASH_ALPHA = 0.45;
+export const RETICLE_PING_REACH = 0.9;
+/** The lock timeline's end: 0 → 1 converge, 1 → 2 flash and ping. */
+export const RETICLE_LOCK_END = 2;
+
+/**
+ * D-21: Lab B's world response to focus (`labb-focus-logic`, BODY_LIT
+ * `uK.w`): it fades in over FOCUS_MIX_MS and out over FOCUS_RELEASE_MS.
+ * At full focus every other body is defocused at FOCUS_DIM (Lab B's full
+ * strength: desaturate 30 %, darken 32 %, atmosphere −55 % in the body
+ * shader) and sinks FOCUS_SINK toward the sky behind it; a flat or moon body
+ * (no shader) loses FLAT_FOCUS_DIM of its alpha. The sun is never dimmed, nor
+ * a focused parent's moons.
+ */
+export const FOCUS_MIX_MS = 340;
+export const FOCUS_RELEASE_MS = 260;
+export const FOCUS_DIM = 1;
+export const FOCUS_SINK = 0.22;
+export const FLAT_FOCUS_DIM = 0.4;
+/**
+ * Other orbits at full focus keep 1 − this of their alpha (Lab B ring
+ * `focusDim` floors 0.35 dark / 0.4 light).
+ */
+export const RING_FOCUS_DIM = { dark: 0.65, light: 0.6 } as const;
+/**
+ * Other labels' TEXT never drops below this alpha (Lab B R1
+ * LABEL_TEXT_DIM_MIN: ≥ 4.95:1 over the extreme backdrop in all four themes);
+ * their plates keep full scrim.
+ */
+export const LABEL_DIM_FLOOR = 0.66;
+/**
+ * D-55: what the Orrery draws under every Orrery text surface is dimmed
+ * toward `orreryOcclusion` at this strength (the card glass itself never
+ * changes, D-20/D-35). Lab B's card occlusion drew bodies under the card at
+ * 0.12 alpha (≈ 0.88 dim); D-62 caps this lever at 0.7, so it starts at the
+ * cap. Plan 14 tunes it by the ADR-169 contrast proof.
+ */
+export const OCCLUSION_DIM = 0.7;

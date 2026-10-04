@@ -24,7 +24,11 @@
  *   only with the sun pulse on the ambient clock (still under reduced motion);
  * - `bodiesFront`: contacts and moons nearer than the sun;
  * - `labels`: the label backplates and Paragraphs at their allocations;
- * - `overlay`: Polaris, the reorder outline and the focus outlines.
+ * - `overlay`: Polaris, the reorder outline, the focus reticle and the
+ *   occlusion dim under every Orrery text surface (38.7-11).
+ * 38.7-11 (D-21): the `focus` value (spec + Lab B's mix + Lab A's lock-on)
+ * dims every other body, orbit and label while someone is focused; the base,
+ * body, label and overlay pictures re-record only while it animates.
  * The node count is identical for a 3-body and a 1,000-body System.
  *
  * ── Resource lifetime (H3, the 38.7-07 ledger contract) ─────────────────────
@@ -90,6 +94,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
+import type { CameraRect } from "@/logic/orrery-camera-logic";
 import type { AnimatedFrame } from "@/logic/orrery-frame";
 import type { LabelAllocation } from "@/logic/orrery-label-logic";
 import type { ReorderDrag } from "@/logic/orrery-reorder-logic";
@@ -125,6 +130,7 @@ import {
 } from "./draw-plane";
 import { drawSky } from "./draw-sky";
 import { watchFirstSurfaceFrame } from "./first-frame";
+import type { FocusDraw } from "./focus-fx";
 import { resolveOrreryRenderHost } from "./render-host";
 import {
   ORRERY_LAYER,
@@ -157,10 +163,14 @@ export interface OrreryV2CanvasProps {
   ringSpecs: SharedValue<RingSpecs>;
   /** The plane's grid and pulse look (JS-built on theme change only). */
   plane: SharedValue<PlaneSpec>;
-  /** Overlay inks, Polaris extent and focus outlines (JS-built). */
+  /** Overlay inks (accent, Polaris, reticle, occlusion) and the Polaris extent (JS-built). */
   overlay: SharedValue<OverlaySpec>;
   /** The reorder hold (gesture-owned), for the held-orbit outline. */
   reorder: SharedValue<ReorderDrag | null>;
+  /** 38.7-11: focus emphasis, world response and reticle lock-on (UI-derived). */
+  focus: SharedValue<FocusDraw>;
+  /** 38.7-11 (D-55): canvas rects of every Orrery text surface (UI-derived). */
+  occlusion: SharedValue<readonly CameraRect[]>;
   /** Contacts, the sun and moons (JS-built; photos and initials included). */
   bodies: SharedValue<OrreryBodySpecs>;
   /**
@@ -270,6 +280,8 @@ export function OrreryV2Canvas({
   plane,
   overlay,
   reorder,
+  focus,
+  occlusion,
   bodies,
   ackRecorded,
   labels,
@@ -343,6 +355,7 @@ export function OrreryV2Canvas({
           ringEffect,
           bands,
           aaDp,
+          focus.value,
         );
       },
       { width, height },
@@ -432,6 +445,7 @@ export function OrreryV2Canvas({
           ringEffect,
           bands,
           aaDp,
+          focus.value,
         );
       },
       { width, height },
@@ -456,6 +470,7 @@ export function OrreryV2Canvas({
           bodyOrder.value,
           "behind",
           bodyEffects,
+          focus.value,
         );
       },
       { width, height },
@@ -486,6 +501,7 @@ export function OrreryV2Canvas({
           bodyOrder.value,
           "front",
           bodyEffects,
+          focus.value,
         );
       },
       { width, height },
@@ -497,7 +513,7 @@ export function OrreryV2Canvas({
   const labelsPicture = useDerivedValue(() =>
     createPicture(
       (canvas) => {
-        drawLabels(canvas, labels.value, allocationIndex.value);
+        drawLabels(canvas, labels.value, allocationIndex.value, focus.value);
       },
       { width, height },
     ),
@@ -514,6 +530,8 @@ export function OrreryV2Canvas({
           ringEffect,
           bands,
           aaDp,
+          focus.value,
+          occlusion.value,
         );
       },
       { width, height },
