@@ -356,6 +356,13 @@ function mount() {
     ).value;
   return { props, tree, layer };
 }
+/** A mounted tree's layer `i` (its recorded picture). */
+const mountedLayer = (tree: ReturnType<typeof mount>["tree"], i: number) =>
+  (
+    tree[0].children[i].props.picture as {
+      value: { id: number; ops: unknown[][] };
+    }
+  ).value;
 const SKY = 0;
 const BASE = 1;
 const PULSES = 2;
@@ -576,10 +583,19 @@ describe("OrreryV2Canvas: the painted sky layer (38.7-09)", () => {
     // the cover stays.
     flush(2);
     expect(animated.value.opacity).toBe(1);
+    // 38.7-15: until the surface exists (plus two frames), the first-frame
+    // state draws the sky's plain gradient (no baked nebula) and no other
+    // layer: the first buffer posts at once and is the theme's sky.
+    const sky = mountedLayer(tree, 0);
+    expect(sky.ops[0]).toEqual(["sky", "sky-1", 0, "pose-1", 0]);
+    expect(mountedLayer(tree, 1).ops).toEqual([]);
     // No native view API in node: the bounded fallback reports the surface;
-    // the reaction then waits two UI frames before lifting the cover.
+    // two UI frames later the full scene records; two more lift the cover.
     vi.advanceTimersByTime(1000);
     flush(1);
+    expect(animated.value.opacity).toBe(1);
+    flush(2);
+    expect(mountedLayer(tree, 1).ops).toEqual([["rings", "frame-1"]]);
     expect(animated.value.opacity).toBe(1);
     flush(2);
     expect(animated.value.opacity).toBe(0);

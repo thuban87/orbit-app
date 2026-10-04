@@ -82,13 +82,24 @@
  * Platform/GPU choices come from `resolveOrreryRenderHost()` as values
  * (`opaqueCanvas`, the device pixel ratio for the AA feather), never as forks.
  *
- * ── First frame (38.7-09, carried from 38.7-08) ────────────────────────────
+ * ── First frame (38.7-09, carried from 38.7-08; 38.7-15) ───────────────────
  * The opaque canvas is a SurfaceView, which shows solid black until its
  * surface exists and has presented. While `host.opaqueCanvas`, a non-touchable
  * cover in the sky's base token sits over the canvas and fades out once the
  * native surface reports a size (then two frames), so a tab return shows the
  * themed sky colour instead of a black flash. No React state: an animated
  * style reads a SharedValue.
+ * 38.7-15 (Galaxy Light black canvas, All Contacts black gap): the first
+ * frame the SurfaceView presents must be the theme's sky, and it must present
+ * fast. The heavy first frame (every runtime effect compiling on first use,
+ * a large System) used to post its first buffer long after the cover lifted,
+ * so the SurfaceView's black background showed (DEBUG: ~1–2.5 s in Galaxy
+ * Light, ~3.8 s at All Contacts). Now the canvas starts in a FIRST-FRAME
+ * state: the sky layer draws its plain gradient and stars (no runtime effect)
+ * and every other layer the shared empty picture, so the first buffer posts
+ * at once; two frames after the surface exists the full scene records, while
+ * the sky-only buffer stays on screen through any shader compile, and only
+ * then does the cover fade. Light themes never flash black.
  */
 import {
   Canvas,
@@ -249,6 +260,13 @@ const AMBIENT_CONSUMERS = {
   skyDrift: true,
   orbitPulses: true,
 } as const;
+/** 38.7-15: the first frame's sky has no baked nebula (no runtime effect). */
+const FIRST_FRAME_SKY_IMAGE: SkyImageSpec = Object.freeze({
+  generation: 0,
+  mountEpoch: 0,
+  image: null,
+  key: "",
+});
 /** The first-frame cover's fade (ms). */
 const COVER_FADE_MS = 160;
 /** The overlay's occlusion fill under the "lab-b" style: none. */
@@ -309,6 +327,13 @@ export function OrreryV2Canvas({
   );
   const bands = useMemo(() => ringBands(), []);
   const disc = useMemo(() => gridDisc(), []);
+  // 38.7-15: the first-frame state (opaque canvas only) — see the header.
+  const firstFrame = useSharedValue(host.opaqueCanvas);
+  // One shared empty picture (first frame; the switch layer at rest).
+  const emptyPicture = useMemo(
+    () => createPicture(() => {}, { width: 1, height: 1 }),
+    [],
+  );
   // The AA feather: one device pixel, in dp (a primitive capture).
   const aaDp = 1 / host.devicePixelRatio();
   // 38.7-09: the painted sky (bottom). Re-recorded on an ambient tick (drift,
@@ -320,7 +345,8 @@ export function OrreryV2Canvas({
         drawSky(
           canvas,
           sky.value,
-          skyImage.value,
+          // First frame: the plain gradient (no runtime effect to compile).
+          firstFrame.value ? FIRST_FRAME_SKY_IMAGE : skyImage.value,
           frame.value.pose,
           ambient.value,
           skyEffect,
@@ -333,28 +359,30 @@ export function OrreryV2Canvas({
   useLayerAck(ORRERY_LAYER.sky, skyPicture, skyImage, ackRecorded);
   // The LIVE base: re-recorded only when the frame or ring specs change.
   const baseLive = useDerivedValue(() =>
-    createPicture(
-      (canvas) => {
-        drawPlaneGrid(
-          canvas,
-          frame.value,
-          plane.value.grid,
-          gridEffect,
-          disc,
-          aaDp,
-        );
-        drawPlaneRings(
-          canvas,
-          frame.value,
-          ringSpecs.value,
-          ringEffect,
-          bands,
-          aaDp,
-          focus.value,
-        );
-      },
-      { width, height },
-    ),
+    firstFrame.value
+      ? emptyPicture
+      : createPicture(
+          (canvas) => {
+            drawPlaneGrid(
+              canvas,
+              frame.value,
+              plane.value.grid,
+              gridEffect,
+              disc,
+              aaDp,
+            );
+            drawPlaneRings(
+              canvas,
+              frame.value,
+              ringSpecs.value,
+              ringEffect,
+              bands,
+              aaDp,
+              focus.value,
+            );
+          },
+          { width, height },
+        ),
   );
   // D-49 base bake (see the header). Primitives only are captured.
   const bakeOn = host.bakePath === "gpu-offscreen";
@@ -373,7 +401,8 @@ export function OrreryV2Canvas({
       const step = nextBakeState(bakeState.value, {
         tick: now.tick,
         sceneChanged: previous !== null && now.live !== previous.live,
-        busy: now.busy,
+        // Never bake the first frame's empty base.
+        busy: now.busy || firstFrame.value,
         mountEpoch: now.mountEpoch,
       });
       bakeState.value = step.state;
@@ -430,32 +459,30 @@ export function OrreryV2Canvas({
     pulseRings(frame.value, ringSpecs.value),
   );
   const pulsesPicture = useDerivedValue(() =>
-    createPicture(
-      (canvas) => {
-        drawPlanePulses(
-          canvas,
-          pulseEligible.value,
-          plane.value.pulse,
-          pulseClock.value,
-          ringEffect,
-          bands,
-          aaDp,
-          focus.value,
-        );
-      },
-      { width, height },
-    ),
+    firstFrame.value
+      ? emptyPicture
+      : createPicture(
+          (canvas) => {
+            drawPlanePulses(
+              canvas,
+              pulseEligible.value,
+              plane.value.pulse,
+              pulseClock.value,
+              ringEffect,
+              bands,
+              aaDp,
+              focus.value,
+            );
+          },
+          { width, height },
+        ),
   );
   // 38.7-13 (D-24/D-53): the orbit streaks. At rest (and under reduced
   // motion) the layer holds one shared empty picture, so a pan re-records
   // nothing here.
-  const emptyPicture = useMemo(
-    () => createPicture(() => {}, { width: 1, height: 1 }),
-    [],
-  );
   const switchPicture = useDerivedValue(() => {
     const signal = switchFx.value;
-    if (!(signal.trail > 0)) return emptyPicture;
+    if (firstFrame.value || !(signal.trail > 0)) return emptyPicture;
     return createPicture(
       (canvas) => {
         drawOrbitTrails(
@@ -488,91 +515,101 @@ export function OrreryV2Canvas({
     sunPulse(ambient.value, ambient.value < 0),
   );
   const bodiesBehind = useDerivedValue(() =>
-    createPicture(
-      (canvas) => {
-        drawBodies(
-          canvas,
-          frame.value,
-          bodies.value.bodies,
-          bodyOrder.value,
-          "behind",
-          bodyEffects,
-          focus.value,
-          worldOcclusion ? worldOcclusion.value : null,
-        );
-      },
-      { width, height },
-    ),
+    firstFrame.value
+      ? emptyPicture
+      : createPicture(
+          (canvas) => {
+            drawBodies(
+              canvas,
+              frame.value,
+              bodies.value.bodies,
+              bodyOrder.value,
+              "behind",
+              bodyEffects,
+              focus.value,
+              worldOcclusion ? worldOcclusion.value : null,
+            );
+          },
+          { width, height },
+        ),
   );
   const sunPicture = useDerivedValue(() =>
-    createPicture(
-      (canvas) => {
-        drawSun(
-          canvas,
-          frame.value,
-          bodies.value.bodies,
-          bodyOrder.value,
-          pulse.value,
-          bodyEffects,
-          worldOcclusion ? worldOcclusion.value : null,
-        );
-      },
-      { width, height },
-    ),
+    firstFrame.value
+      ? emptyPicture
+      : createPicture(
+          (canvas) => {
+            drawSun(
+              canvas,
+              frame.value,
+              bodies.value.bodies,
+              bodyOrder.value,
+              pulse.value,
+              bodyEffects,
+              worldOcclusion ? worldOcclusion.value : null,
+            );
+          },
+          { width, height },
+        ),
   );
   const bodiesFront = useDerivedValue(() =>
-    createPicture(
-      (canvas) => {
-        drawBodies(
-          canvas,
-          frame.value,
-          bodies.value.bodies,
-          bodyOrder.value,
-          "front",
-          bodyEffects,
-          focus.value,
-          worldOcclusion ? worldOcclusion.value : null,
-        );
-      },
-      { width, height },
-    ),
+    firstFrame.value
+      ? emptyPicture
+      : createPicture(
+          (canvas) => {
+            drawBodies(
+              canvas,
+              frame.value,
+              bodies.value.bodies,
+              bodyOrder.value,
+              "front",
+              bodyEffects,
+              focus.value,
+              worldOcclusion ? worldOcclusion.value : null,
+            );
+          },
+          { width, height },
+        ),
   );
   useLayerAck(ORRERY_LAYER.bodiesBehind, bodiesBehind, bodies, ackRecorded);
   useLayerAck(ORRERY_LAYER.sun, sunPicture, bodies, ackRecorded);
   useLayerAck(ORRERY_LAYER.bodiesFront, bodiesFront, bodies, ackRecorded);
   const labelsPicture = useDerivedValue(() =>
-    createPicture(
-      (canvas) => {
-        drawLabels(
-          canvas,
-          labels.value,
-          allocationIndex.value,
-          focus.value,
-          worldOcclusion ? worldOcclusion.value : null,
-        );
-      },
-      { width, height },
-    ),
+    firstFrame.value
+      ? emptyPicture
+      : createPicture(
+          (canvas) => {
+            drawLabels(
+              canvas,
+              labels.value,
+              allocationIndex.value,
+              focus.value,
+              worldOcclusion ? worldOcclusion.value : null,
+            );
+          },
+          { width, height },
+        ),
   );
   useLayerAck(ORRERY_LAYER.labels, labelsPicture, labels, ackRecorded);
   const overlayPicture = useDerivedValue(() =>
-    createPicture(
-      (canvas) => {
-        drawOverlay(
-          canvas,
-          frame.value,
-          overlay.value,
-          reorder.value,
-          hold.value,
-          ringEffect,
-          bands,
-          aaDp,
-          focus.value,
-          worldOcclusion ? NO_OCCLUSION_FILL : occlusion.value,
-        );
-      },
-      { width, height },
-    ),
+    firstFrame.value
+      ? emptyPicture
+      : createPicture(
+          (canvas) => {
+            drawOverlay(
+              canvas,
+              frame.value,
+              overlay.value,
+              reorder.value,
+              hold.value,
+              ringEffect,
+              bands,
+              aaDp,
+              focus.value,
+              worldOcclusion ? NO_OCCLUSION_FILL : occlusion.value,
+            );
+          },
+          { width, height },
+        ),
   );
   // First-frame cover (opaque canvas only; see the header). It lifts only
   // when BOTH the native surface exists (JS poll) AND the first UI mapper
@@ -592,9 +629,23 @@ export function OrreryV2Canvas({
       },
     );
   }, []);
+  // 38.7-15: two frames after the surface exists (the sky-only first buffer
+  // posted), the full scene records.
+  useAnimatedReaction(
+    () => surfaceReady.value,
+    (ready, previous) => {
+      if (!ready || previous === true || !firstFrame.value) return;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          firstFrame.value = false;
+        });
+      });
+    },
+  );
   useAnimatedReaction(
     () =>
       surfaceReady.value &&
+      !firstFrame.value &&
       labelsPicture.value !== null &&
       overlayPicture.value !== null,
     (ready, previous) => {

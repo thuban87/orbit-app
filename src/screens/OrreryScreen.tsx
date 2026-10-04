@@ -1504,7 +1504,10 @@ export function OrreryScreen() {
         testID="orrery-canvas-container"
         ref={canvasMeasurement.ref}
         collapsable={false}
-        style={styles.canvasArea}
+        // 38.7-15: the sky's base colour from the first frame — a cold open
+        // (scene still loading) or a canvas not yet mounted shows the theme's
+        // sky, never the app background or black.
+        style={[styles.canvasArea, { backgroundColor: colors.orrerySkyBase }]}
         onLayout={canvasMeasurement.onLayout}
       >
         {visible &&

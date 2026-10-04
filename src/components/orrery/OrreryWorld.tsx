@@ -144,7 +144,6 @@ import {
   EMPTY_PLANE_SPEC,
   EMPTY_RING_SPECS,
   EMPTY_SKY_IMAGE,
-  EMPTY_SKY_SPEC,
   type OrreryBodySpecs,
   type OrreryLabelLayerSpecs,
   type OrreryLayerId,
@@ -632,7 +631,26 @@ export function OrreryWorldInner({
   } catch {
     hueIndex = SKY_UNTINTED;
   }
-  const skySpec = useSharedValue<SkySpec>(EMPTY_SKY_SPEC);
+  // 38.7-15 (first frame): the sky spec exists before the first recording —
+  // an empty spec draws a transparent sky, which an opaque SurfaceView shows
+  // as black (the Galaxy Light black canvas). The effect below keeps it current.
+  const initialSky = useRef<SkySpec | null>(null);
+  if (!initialSky.current)
+    initialSky.current = buildSkySpec({
+      colors,
+      mode: themeMode,
+      themePackage,
+      width: viewport.width,
+      height: viewport.height,
+      cover: skyBucket,
+      hueIndex,
+      fromHueIndex: hueIndex,
+      tintGeneration: generation,
+      look: skyLook,
+      seed: SKY_STAR_SEED,
+      twinkleGroups: SKY_TWINKLE_GROUPS,
+    });
+  const skySpec = useSharedValue<SkySpec>(initialSky.current);
   // 38.7-13 (D-08/H9): a hue change crossfades from the previous System's
   // hue, tagged with the scene generation whose switch draws the crossfade
   // (the sky picture mixes at DRAW time from the switch signal; no bake).

@@ -1123,13 +1123,19 @@ it("the canvas fills the root under the title; the title's rect is a camera obst
   const headerIndex = children.findIndex((child) => child?.type === "Header");
   expect(canvasIndex).toBeGreaterThanOrEqual(0);
   expect(headerIndex).toBeGreaterThan(canvasIndex);
-  expect(children[canvasIndex].props.style).toMatchObject({
+  const canvasStyle = Object.assign(
+    {},
+    ...[children[canvasIndex].props.style].flat(),
+  );
+  expect(canvasStyle).toMatchObject({
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
   });
+  // 38.7-15: the sky's base token paints the area before the canvas mounts.
+  expect(canvasStyle).toHaveProperty("backgroundColor");
   const bars = h.findAll("ShellAppBar");
   expect(bars).toHaveLength(1);
   expect(bars[0].props).toEqual({ variant: "root", title: "Orrery" });

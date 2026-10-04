@@ -296,6 +296,15 @@ vi.mock("react-native-reanimated", () => ({
   withTiming: (v: unknown) => (native.holdTimings ? 0 : v),
   ReduceMotion: { Never: "never" },
 }));
+// 38.7-15: the native surface reports at once (there is no view API in node);
+// the canvas's first-frame state still opens two UI frames later.
+vi.mock("./v2/first-frame", async (original) => ({
+  ...(await original<typeof import("./v2/first-frame")>()),
+  watchFirstSurfaceFrame: (_id: unknown, onReady: () => void) => {
+    onReady();
+    return () => {};
+  },
+}));
 // 38.7-13 (H9): every sky bake owner, with the keys it was asked to bake.
 vi.mock("./v2/nebula-bake", async (original) => {
   const actual = await original<typeof import("./v2/nebula-bake")>();
@@ -666,6 +675,8 @@ describe("production Orrery native tree and resource contracts", () => {
         switchRuntime: runtime as never,
       }),
     );
+    // 38.7-15: the first-frame state opens two UI frames after the surface.
+    flushUi(2);
     const moonInk = [...parseInk(THEME_PRESETS.galaxy.dark.textSecondary)];
     const drawnMoons = () =>
       [tree[0].children[4], tree[0].children[6]]
@@ -742,6 +753,7 @@ describe("production Orrery native tree and resource contracts", () => {
       }),
     );
     tree.splice(0, tree.length, ...rerendered);
+    flushUi(2); // 38.7-15: the new canvas's first-frame state opens
     const switchZoom = sampleOrrerySwitchCamera(
       runtime.cameraFrom.value,
       runtime.cameraTo.value,
@@ -1093,24 +1105,26 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
   const LAYERS = 9; // sky, base, pulses, switch, bodiesBehind, sun, bodiesFront, labels, overlay
 
   it("the same Picture layers for 3, 120 and 1,000 bodies; no per-body node — rings, bodies and labels are draws", async () => {
+    // 38.7-15: each canvas's first-frame state opens two UI frames after
+    // its surface reports, so every layer below is the full scene.
     const smallScene = await sceneWith(3);
     const small = renderWorld(
       smallScene,
       useOrreryCamera(cameraInput(smallScene)),
     );
-    flushUi(1);
+    flushUi(2);
     const mediumScene = await sceneWith(117);
     const medium = renderWorld(
       mediumScene,
       useOrreryCamera(cameraInput(mediumScene)),
     );
-    flushUi(1);
+    flushUi(2);
     const largeScene = await sceneWith(880);
     const large = renderWorld(
       largeScene,
       useOrreryCamera(cameraInput(largeScene)),
     );
-    flushUi(1);
+    flushUi(2);
     const trees = [small, medium, large];
     for (const tree of trees) {
       // The canvas, then (opaque SurfaceView canvas on Android, D-64) the
@@ -1276,6 +1290,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     const scene = await sceneWith(2);
     const tree = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
     expect(native.clockCalls).toBe(0);
+    flushUi(2); // 38.7-15: past the first-frame state
     const sun = tree[0].children[5];
     const glow = () =>
       recorded(sun).find((c) => c.op === "drawRect")?.shader?.uniforms[1];
@@ -1288,6 +1303,7 @@ describe("38.7-07 D-43: the stable picture tree (contract) and the single ambien
     // cannot re-render a component with persistent memo/effect state.)
     native.reducedState = true;
     const still = renderWorld(scene, useOrreryCamera(cameraInput(scene)));
+    flushUi(2);
     const stillGlow = () =>
       recorded(still[0].children[5]).find((c) => c.op === "drawRect")?.shader
         ?.uniforms[1];
