@@ -646,7 +646,22 @@ describe("production Orrery native tree and resource contracts", () => {
     expect(moonDraws()).toBe(1);
   });
   it("M13: the split factor, the drawn moons and the tappable moons all come from one frame's sampled camera zoom — mid-zoom and mid-switch", async () => {
+    // Deterministic inputs: a fixed clock (the scene's "now") and fixed moon
+    // uids. A moon's world angle is its uid hash (moonAngle), and random
+    // uids put the two moons ~15 degrees apart about 1 run in 15, where a
+    // tap at one moon's centre is ambiguous and the tappable check fails.
+    // These two sit at 310 and 110 degrees.
+    vi.setSystemTime(new Date(2026, 8, 8, 12, 0, 0));
+    const uids = vi
+      .spyOn(globalThis.crypto, "randomUUID")
+      .mockReturnValueOnce("0b199878-1411-48ec-aa12-be7e03a49dbd")
+      .mockReturnValueOnce("3168c3e3-6ab4-4e21-94af-1730e6bc6381");
     const { scene, rows } = await moonScene(2);
+    uids.mockRestore();
+    expect(rows.map((row) => row.uid).sort()).toEqual([
+      "0b199878-1411-48ec-aa12-be7e03a49dbd",
+      "3168c3e3-6ab4-4e21-94af-1730e6bc6381",
+    ]);
     const { publisher } = readySatellites(scene, rows);
     const pose = { value: { ...HOME_CAMERA, tilt: 0, zoom: 1 } };
     const runtime = switchRuntime(scene, pose as never);
