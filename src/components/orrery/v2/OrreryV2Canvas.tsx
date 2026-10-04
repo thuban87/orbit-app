@@ -113,6 +113,7 @@ import {
   drawPlanePulses,
   drawPlaneRings,
   gridDisc,
+  pulseRings,
   ringBands,
 } from "./draw-plane";
 import { drawSky } from "./draw-sky";
@@ -396,13 +397,18 @@ export function OrreryV2Canvas({
       ? ambient.value
       : -1,
   );
+  // The rings a pulse may travel: read from the frame and ring specs ONLY,
+  // so this scan (a key string per body) re-runs when either changes and an
+  // ambient tick reuses it (38.7-09, cheaper pulses at budget 40).
+  const pulseEligible = useDerivedValue(() =>
+    pulseRings(frame.value, ringSpecs.value),
+  );
   const pulsesPicture = useDerivedValue(() =>
     createPicture(
       (canvas) => {
         drawPlanePulses(
           canvas,
-          frame.value,
-          ringSpecs.value,
+          pulseEligible.value,
           plane.value.pulse,
           pulseClock.value,
           ringEffect,

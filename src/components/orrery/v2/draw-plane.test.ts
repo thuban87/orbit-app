@@ -67,6 +67,7 @@ import {
   makeGridDisc,
   makeRingBands,
   pulsePlacement,
+  pulseRings,
   RING_BAND_EPS,
   RING_BAND_SEGMENTS,
   ringBandIndex,
@@ -84,6 +85,7 @@ import {
   PULSE_BUDGET,
   PULSE_CYCLE_MS,
   PULSE_HALF_WIDTH_DP,
+  PULSE_SPEED,
   PULSE_TRAVEL_MS,
   RING_LOOKS,
   RING_SUN_LIGHT_RADIUS,
@@ -505,8 +507,7 @@ describe("drawPlanePulses (D-10/D-37/D-49: subtle orbit pulses on the ambient cl
       const { canvas, calls } = recordingCanvas();
       const drawn = drawPlanePulses(
         canvas,
-        frame,
-        specs,
+        pulseRings(frame, specs),
         pulse(),
         ms,
         effect,
@@ -525,8 +526,7 @@ describe("drawPlanePulses (D-10/D-37/D-49: subtle orbit pulses on the ambient cl
       expect(
         drawPlanePulses(
           canvas,
-          frame,
-          specs,
+          pulseRings(frame, specs),
           p,
           ambient,
           effect,
@@ -544,8 +544,7 @@ describe("drawPlanePulses (D-10/D-37/D-49: subtle orbit pulses on the ambient cl
       const { canvas, calls } = recordingCanvas();
       drawPlanePulses(
         canvas,
-        frame,
-        specs,
+        pulseRings(frame, specs),
         pulse(),
         ms,
         effect,
@@ -577,14 +576,21 @@ describe("drawPlanePulses (D-10/D-37/D-49: subtle orbit pulses on the ambient cl
     const b = pulsePlacement(0, 8, 2000, 30);
     expect(a && b).toBeTruthy();
     expect(b?.ring).toBe(a?.ring);
-    expect((b?.centre ?? 0) - (a?.centre ?? 0)).toBeCloseTo(0.3, 9);
+    expect((b?.centre ?? 0) - (a?.centre ?? 0)).toBeCloseTo(PULSE_SPEED, 9);
     expect(pulsePlacement(0, 8, 0, 30)?.envelope).toBeCloseTo(0, 9);
     expect(pulsePlacement(0, 8, PULSE_TRAVEL_MS / 2, 30)?.envelope).toBeCloseTo(
       1,
       9,
     );
-    // Slot 0 rests between its travels.
-    expect(pulsePlacement(0, 8, PULSE_TRAVEL_MS + 10, 30)).toBeNull();
+    // Slot 0 rests between its travels when the travel is shorter than the
+    // cycle; when it fills the cycle (Lab B: always travelling) the envelope
+    // still fades to zero at the hand-over, so no pulse pops.
+    if (PULSE_TRAVEL_MS < PULSE_CYCLE_MS)
+      expect(pulsePlacement(0, 8, PULSE_TRAVEL_MS + 10, 30)).toBeNull();
+    else
+      expect(
+        pulsePlacement(0, 8, PULSE_CYCLE_MS + 1, 30)?.envelope,
+      ).toBeCloseTo(0, 3);
     // Over many cycles the pulses visit many rings (not a fixed few).
     const rings = new Set<number>();
     for (let c = 0; c < 60; c++)
@@ -600,8 +606,7 @@ describe("drawPlanePulses (D-10/D-37/D-49: subtle orbit pulses on the ambient cl
       const { canvas, calls } = recordingCanvas();
       drawPlanePulses(
         canvas,
-        frame,
-        specs,
+        pulseRings(frame, specs),
         pulse({ additive: false }),
         ms,
         effect,

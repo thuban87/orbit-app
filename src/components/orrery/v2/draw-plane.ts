@@ -429,17 +429,70 @@ export function pulsePlacement(
 }
 
 /**
- * The subtle orbit pulses for `frame` at ambient time `ambientMs`: at most
- * `pulse.budget` soft arcs in `orreryPulse` at `pulse.intensity`, travelling
- * along eligible rings (a contact ring with a spec whose alpha clears
- * RING_SKIP_ALPHA). Nothing under reduced motion (ambient −1), with a zero
- * budget or intensity. The status of the ring never changes a pulse.
+ * The rings the orbit pulses may travel for one frame and ring-spec set: the
+ * frame's homography plus, per eligible ring (a contact ring with a spec whose
+ * alpha clears RING_SKIP_ALPHA), its world radius and its body opacity × the
+ * ring density fade. `rings` is the eligible count.
+ *
+ * 38.7-09 (cheaper pulses): this scan (a key string per body) depends only on
+ * the frame and the ring specs, never on the ambient time, so the canvas
+ * derives it from those two values alone and an ambient tick reuses it.
+ */
+export interface PulseRings {
+  rings: number;
+  h: Homography | null;
+  radius: number[];
+  opacity: number[];
+}
+
+/** No eligible rings (the initial value; nothing to pulse). */
+export const NO_PULSE_RINGS: PulseRings = {
+  rings: 0,
+  h: null,
+  radius: [],
+  opacity: [],
+};
+
+/** The eligible pulse rings of `frame` under `specs` (see PulseRings). */
+export function pulseRings(frame: AnimatedFrame, specs: RingSpecs): PulseRings {
+  "worklet";
+  const { rings, outer } = frameRingExtent(frame);
+  if (rings === 0) return NO_PULSE_RINGS;
+  const fade = ringDensityFade(
+    ringScreenSpacing(outer, rings, frame.pose.zoom),
+  );
+  const radius: number[] = [];
+  const opacity: number[] = [];
+  const bodies = frame.bodies;
+  for (let i = 0; i < bodies.length; i++) {
+    const body = bodies[i];
+    if (body.kind !== "contact" || !(body.worldRingRadius > 0)) continue;
+    const spec = specs[bodyKey(body)];
+    if (!spec || !(body.opacity * spec.alpha * fade >= RING_SKIP_ALPHA))
+      continue;
+    radius.push(body.worldRingRadius);
+    opacity.push(body.opacity * fade);
+  }
+  if (radius.length === 0) return NO_PULSE_RINGS;
+  return {
+    rings: radius.length,
+    h: planeHomography(frame.pose, frame.viewport),
+    radius,
+    opacity,
+  };
+}
+
+/**
+ * The subtle orbit pulses at ambient time `ambientMs`: at most `pulse.budget`
+ * soft arcs in `orreryPulse` at `pulse.intensity`, travelling along the
+ * eligible `rings` (from `pulseRings`, computed once per frame/spec change).
+ * Nothing under reduced motion (ambient −1), with a zero budget or intensity
+ * or no eligible ring. The status of the ring never changes a pulse.
  * Returns the number drawn.
  */
 export function drawPlanePulses(
   canvas: SkCanvas,
-  frame: AnimatedFrame,
-  specs: RingSpecs,
+  rings: PulseRings,
   pulse: PulseSpec,
   ambientMs: number,
   effect: SkRuntimeEffect | null,
@@ -450,43 +503,31 @@ export function drawPlanePulses(
   if (!effect || !bands) return 0;
   if (!(ambientMs >= 0) || !(pulse.budget > 0) || !(pulse.intensity > 0))
     return 0;
-  const { rings, outer } = frameRingExtent(frame);
-  if (rings === 0) return 0;
-  const fade = ringDensityFade(
-    ringScreenSpacing(outer, rings, frame.pose.zoom),
-  );
-  const eligible: number[] = [];
-  const bodies = frame.bodies;
-  for (let i = 0; i < bodies.length; i++) {
-    const body = bodies[i];
-    if (body.kind !== "contact" || !(body.worldRingRadius > 0)) continue;
-    const spec = specs[bodyKey(body)];
-    if (!spec || !(body.opacity * spec.alpha * fade >= RING_SKIP_ALPHA))
-      continue;
-    eligible.push(i);
-  }
-  if (eligible.length === 0) return 0;
-  const h = planeHomography(frame.pose, frame.viewport);
+  const h = rings.h;
+  if (!h || !(rings.rings > 0)) return 0;
   const blend = pulse.additive ? BlendMode.Plus : BlendMode.SrcOver;
+  // One line reused for every slot (only alpha and the arc change).
+  const line = plainRingLine(PULSE_HALF_WIDTH_DP, aaDp, pulse.ink);
+  line.farAlpha = pulse.farAlpha;
+  line.arcHalf = PULSE_ARC_HALF;
   let drawn = 0;
   for (let slot = 0; slot < pulse.budget; slot++) {
-    const place = pulsePlacement(
-      slot,
-      pulse.budget,
-      ambientMs,
-      eligible.length,
-    );
+    const place = pulsePlacement(slot, pulse.budget, ambientMs, rings.rings);
     if (!place) continue;
-    const body = bodies[eligible[place.ring]];
-    const alpha = pulse.intensity * place.envelope * body.opacity * fade;
+    const alpha = pulse.intensity * place.envelope * rings.opacity[place.ring];
     if (!(alpha >= RING_SKIP_ALPHA)) continue;
-    const line = plainRingLine(PULSE_HALF_WIDTH_DP, aaDp, pulse.ink);
     line.alpha = alpha;
-    line.farAlpha = pulse.farAlpha;
     line.arcCentre = place.centre;
-    line.arcHalf = PULSE_ARC_HALF;
     if (
-      drawPlaneRing(canvas, h, body.worldRingRadius, line, effect, bands, blend)
+      drawPlaneRing(
+        canvas,
+        h,
+        rings.radius[place.ring],
+        line,
+        effect,
+        bands,
+        blend,
+      )
     )
       drawn++;
   }

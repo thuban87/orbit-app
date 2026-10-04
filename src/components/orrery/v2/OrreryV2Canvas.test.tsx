@@ -83,6 +83,7 @@ const rt = vi.hoisted(() => {
     surfaces: 0,
     log: [] as string[],
     pictures: 0,
+    pulseScans: 0,
   };
 });
 
@@ -230,10 +231,15 @@ vi.mock("./draw-plane", () => ({
   ) => {
     if (grid.opacity > 0) canvas.grid(grid.opacity);
   },
+  // The eligible-ring scan: counted, so a test can prove an ambient tick
+  // reuses it (38.7-09, cheaper pulses).
+  pulseRings: (frame: { tag: unknown }, specs: unknown) => {
+    rt.pulseScans++;
+    return { frame: frame.tag, specs };
+  },
   drawPlanePulses: (
     canvas: { pulses(ms: unknown): void },
-    _frame: unknown,
-    _specs: unknown,
+    _rings: unknown,
     pulse: { budget: number },
     ambient: number,
   ) => {
@@ -295,6 +301,7 @@ beforeEach(() => {
   rt.host = {};
   rt.surfaces = 0;
   rt.log = [];
+  rt.pulseScans = 0;
   vi.stubGlobal("requestAnimationFrame", (callback: () => void) => {
     rt.frames.push(callback);
     return rt.frames.length;
@@ -581,6 +588,35 @@ describe("OrreryV2Canvas: grid and orbit pulses (38.7-09: D-09, D-10, D-37)", ()
     clock.value = 9000;
     flush();
     expect(layer(PULSES)).toBe(still);
+  });
+
+  it("an ambient tick reuses the eligible-ring scan; a frame or ring-spec change re-runs it", () => {
+    const { props, layer } = mount();
+    flush();
+    // Derived values are lazy here: reading the layer records it.
+    layer(PULSES);
+    expect(rt.pulseScans).toBe(1);
+    const clock = rt.clock as { value: number };
+    for (let tick = 1; tick <= 6; tick++) {
+      const before = layer(PULSES);
+      clock.value = AMBIENT_STEP_MS * tick;
+      flush();
+      // The pulses moved, but the scan did not run again.
+      expect(layer(PULSES)).not.toBe(before);
+    }
+    expect(rt.pulseScans).toBe(1);
+    props.frame.value = { tag: "frame-2", pose: { tag: "pose-2" } };
+    flush();
+    layer(PULSES);
+    expect(rt.pulseScans).toBe(2);
+    props.ringSpecs.value = { "contact:1": {} };
+    flush();
+    layer(PULSES);
+    expect(rt.pulseScans).toBe(3);
+    clock.value = AMBIENT_STEP_MS * 9;
+    flush();
+    layer(PULSES);
+    expect(rt.pulseScans).toBe(3);
   });
 
   it("budget 0: the pulses picture holds still (no re-recording on ticks)", () => {
