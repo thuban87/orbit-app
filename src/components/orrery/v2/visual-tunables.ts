@@ -243,8 +243,14 @@ export const WARP_STREAK_HALO = 0.3;
 export const WARP_STREAK_HALO_AT = 0.72;
 /** Fade segments per streak (the sprite gradient as stepped alphas). */
 export const WARP_STREAK_SEGMENTS = 3;
-/** Master warp strength (1 = as in Lab B; the owner option knob; 0 = off). */
-export const WARP_STRENGTH = 1;
+/**
+ * Master warp strength (the owner option knob; 0 = off). 1 = Lab B's numbers;
+ * 1.6 = Lab B's LOOK matched by eye on the Pixel 6 Pro (38.7-13 Task 3,
+ * against Lab B 06-wp2.1-switch/01): at 1 V2's streaks read shorter and
+ * sparser than Lab B's, mostly because V2's tilted plane hides most of the sky
+ * that Lab B's flat camera shows. S-WARP picks the final value.
+ */
+export const WARP_STRENGTH = 1.6;
 
 /** Lab A TRAIL_MS / TRAIL_LEAVING_MS: the arc a streak covers (ms of motion). */
 export const TRAIL_MS = 160;
