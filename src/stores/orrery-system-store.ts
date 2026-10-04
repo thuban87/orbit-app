@@ -23,6 +23,14 @@ export interface OrrerySystemState {
     | "missing-category";
   generation: number;
   requested: SystemDescriptor;
+  /**
+   * 38.7-15: whether `requested.name` is the requested System's own name.
+   * False while it is unknown (the store's initial placeholder request, a
+   * cold restore of a custom System before its name read settles, a
+   * category before the catalog loads); `requested.name` is then "" — never
+   * another System's name. Display through `systemDisplayName`.
+   */
+  nameKnown: boolean;
   snapshot: OrrerySceneSnapshot | null;
   categories: OrreryCategory[];
   catalogLoaded: boolean;
@@ -64,12 +72,6 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
   let active = false;
   let retrying: Promise<void> | null = null;
   let savingGeneration: number | null = null;
-  /**
-   * 38.7-15: the System id whose `requested.name` is still a placeholder
-   * (the previous System's name, shown until the real one is known); a
-   * reload must not adopt it as that System's name.
-   */
-  let placeholderFor: string | null = null;
   return create<OrrerySystemState>()((set, get) => {
     const save = async (
       system: OrrerySystemRef,
@@ -108,10 +110,12 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
       // 38.7-15: a name still pending falls back only now, once unresolvable.
       const resolved = name ?? (pending ? UNAVAILABLE_SYSTEM_NAME : undefined);
       if (!resolved) return;
-      if (placeholderFor === systemRefId(system)) placeholderFor = null;
       const current = get().requested;
-      if (current.id === systemRefId(system) && current.name !== resolved)
-        set({ requested: { ...current, name: resolved } });
+      if (
+        current.id === systemRefId(system) &&
+        (current.name !== resolved || !get().nameKnown)
+      )
+        set({ requested: { ...current, name: resolved }, nameKnown: true });
     };
     const select = async (
       system: OrrerySystemRef,
@@ -132,22 +136,23 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
           ? BUILTIN_SYSTEM_LABELS[system.id]
           : (name ??
             categoryName ??
-            (before.requested.id === id && placeholderFor !== id
+            (before.requested.id === id && before.nameKnown
               ? before.requested.name
               : undefined));
       // 38.7-15: an unknown name (a cold restore, a category before the
-      // catalog loads) keeps the previous System's name until the load or the
-      // name read settles — never a transient "Unavailable System".
+      // catalog loads) is "" and `nameKnown` false until the load or the name
+      // read settles: never another System's name, never a transient
+      // "Unavailable System".
       const requested = {
         ref: system,
         id,
-        name: knownName ?? before.requested.name,
+        name: knownName ?? "",
       };
-      placeholderFor = knownName === undefined ? id : null;
       active = true;
       set({
         generation,
         requested,
+        nameKnown: knownName !== undefined,
         status: "loading",
         // Keep the outgoing generation mounted until the destination is ready.
         // OrreryWorld owns the sampled world transition; clearing here destroys
@@ -165,7 +170,7 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
             ? categories.find((row) => row.uid === system.uid)?.name
             : undefined;
         const resolving = system.kind === "custom" && !!io.resolveName;
-        if (!resolving || currentName !== undefined) placeholderFor = null;
+        const loadedName = currentName ?? knownName;
         set({
           status: "ready",
           snapshot: { ...result, generation },
@@ -174,10 +179,10 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
           requested: {
             ...requested,
             name:
-              currentName ??
-              knownName ??
+              loadedName ??
               (resolving ? requested.name : UNAVAILABLE_SYSTEM_NAME),
           },
+          nameKnown: loadedName !== undefined || !resolving,
         });
         const naming = resolving
           ? resolveCustomName(system, generation, knownName === undefined)
@@ -200,20 +205,25 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
             snapshot: same ? get().snapshot : null,
             // 38.7-15: an unknown name stays unknown when the load fails.
             ...(knownName === undefined
-              ? { requested: { ...requested, name: UNAVAILABLE_SYSTEM_NAME } }
+              ? {
+                  requested: { ...requested, name: UNAVAILABLE_SYSTEM_NAME },
+                  nameKnown: true,
+                }
               : {}),
           });
-        if (placeholderFor === id) placeholderFor = null;
       }
     };
     return {
       status: "initial",
       generation: 0,
+      // 38.7-15: a placeholder request (the real one is read from the
+      // preferences): no name until a select names it.
       requested: {
         ref: ALL_CONTACTS_SYSTEM,
         id: "builtin:all-contacts",
-        name: "All Contacts",
+        name: "",
       },
+      nameKnown: false,
       snapshot: null,
       categories: [],
       catalogLoaded: false,
@@ -222,9 +232,7 @@ export function createOrrerySystemStore(io: OrrerySystemAdapters) {
       reload: () =>
         select(
           get().requested.ref,
-          placeholderFor === get().requested.id
-            ? undefined
-            : get().requested.name,
+          get().nameKnown ? get().requested.name : undefined,
         ),
       retryReload: () => {
         if (retrying) return retrying;

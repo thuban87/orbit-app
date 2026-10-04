@@ -167,8 +167,31 @@ export function initialExpandedSystemGroups(
     custom: selected === "custom",
   };
 }
-export function systemSelectorLabel(name: string): string {
-  return `Choose System. Current System: ${name}`;
+export function systemSelectorLabel(name: string | null): string {
+  return name === null
+    ? "Choose System. Loading the current System"
+    : `Choose System. Current System: ${name}`;
+}
+
+/**
+ * 38.7-15: the requested System's name, or null while it is not known yet
+ * (show a neutral placeholder). Never another System's name: the store's
+ * initial request is a placeholder (null until the preferences name the real
+ * one); an unknown name is looked up in the Systems catalog the screen
+ * already reads (no new storage), else null until the store resolves it.
+ * `nameKnown` absent (older fixtures) counts as known.
+ */
+export function systemDisplayName(
+  state: {
+    status: string;
+    requested: { id: string; name: string };
+    nameKnown?: boolean;
+  },
+  catalog: readonly { id: string; name: string }[] = [],
+): string | null {
+  if (state.status === "initial") return null;
+  if (state.nameKnown !== false) return state.requested.name;
+  return catalog.find((entry) => entry.id === state.requested.id)?.name ?? null;
 }
 export function registerSystemSelectorTransient(
   registry: {

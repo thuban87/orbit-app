@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 // The store's reader types traverse database.ts; node tests use injected readers.
 vi.mock("expo-sqlite", () => ({}));
 
+import { systemDisplayName } from "@/components/orrery/orrery-controls-logic";
 import {
   MissingOrreryCategoryError,
   type OrrerySystemSnapshot,
@@ -247,7 +248,7 @@ describe("38.7-04 D-52: custom System name after a cold restore", () => {
     expect(resolveName).toHaveBeenCalledWith(work);
   });
 
-  it("38.7-15: an unknown name keeps the previous System's name while it loads — no transient 'Unavailable System'", async () => {
+  it("38.7-15: a cold restore of a custom System never shows another System's name", async () => {
     const load = deferred<OrrerySceneSnapshot>();
     const name = deferred<string | undefined>();
     const store = createOrrerySystemStore({
@@ -255,18 +256,49 @@ describe("38.7-04 D-52: custom System name after a cold restore", () => {
       persist: async () => true,
       resolveName: () => name.promise,
     });
-    expect(store.getState().requested.name).toBe("All Contacts");
+    const shown: (string | null)[] = [];
+    const catalog: { id: string; name: string }[] = [];
+    const record = () =>
+      shown.push(systemDisplayName(store.getState(), catalog));
+    const unsubscribe = store.subscribe(record);
+    // The store's initial request is a placeholder, not "All Contacts".
+    record();
+    expect(store.getState().nameKnown).toBe(false);
     const selecting = store.getState().select(work, undefined, false);
     expect(store.getState().status).toBe("loading");
-    expect(store.getState().requested.name).toBe("All Contacts");
+    expect(store.getState().requested.name).toBe("");
     load.resolve(scene(work));
     await Promise.resolve();
     await Promise.resolve();
     expect(store.getState().status).toBe("ready");
-    expect(store.getState().requested.name).not.toBe("Unavailable System");
+    expect(systemDisplayName(store.getState())).toBeNull();
     name.resolve("Work");
     await selecting;
-    expect(store.getState().requested.name).toBe("Work");
+    unsubscribe();
+    expect(store.getState().nameKnown).toBe(true);
+    // Every name ever shown is the requested System's own, or the neutral
+    // placeholder (null) — never "All Contacts", never "Unavailable System".
+    expect(shown.length).toBeGreaterThan(2);
+    expect(new Set(shown)).toEqual(new Set([null, "Work"]));
+    expect(shown.at(-1)).toBe("Work");
+  });
+
+  it("38.7-15: the screen's Systems catalog names a pending System before its own read settles", async () => {
+    const load = deferred<OrrerySceneSnapshot>();
+    const store = createOrrerySystemStore({
+      load: () => load.promise,
+      persist: async () => true,
+      resolveName: () => new Promise<string | undefined>(() => {}),
+    });
+    const catalog = [
+      { id: "builtin:all-contacts", name: "All Contacts" },
+      { id: systemRefId(work), name: "Work" },
+    ];
+    // Initial: the placeholder request is never looked up.
+    expect(systemDisplayName(store.getState(), catalog)).toBeNull();
+    void store.getState().select(work, undefined, false);
+    expect(systemDisplayName(store.getState(), catalog)).toBe("Work");
+    expect(systemDisplayName(store.getState(), [])).toBeNull();
   });
 
   it("38.7-15: a reload while the name is still a placeholder never adopts the previous System's name", async () => {

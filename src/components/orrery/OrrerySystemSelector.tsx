@@ -29,6 +29,7 @@ import {
   type ExpandedSystemGroups,
   initialExpandedSystemGroups,
   registerSystemSelectorTransient,
+  systemDisplayName,
   systemSelectorLabel,
 } from "./orrery-controls-logic";
 
@@ -88,6 +89,9 @@ export function OrrerySystemSelector({
   const latest = useRef(dismiss);
   latest.current = dismiss;
   const busy = state.status === "initial" || state.status === "loading";
+  // 38.7-15: never another System's name — null until the requested one is
+  // known (a cold restore), shown as a fixed-width blank (no misleading text).
+  const name = systemDisplayName(state, catalog);
   const blocked = shellTransientStore((store) =>
     store.entries.some((entry) => entry.id !== "orrery-system-selector"),
   );
@@ -155,7 +159,7 @@ export function OrrerySystemSelector({
             style={styles.triggerRow}
             disabled={!enabled}
             accessibilityRole="button"
-            accessibilityLabel={systemSelectorLabel(state.requested.name)}
+            accessibilityLabel={systemSelectorLabel(name)}
             accessibilityState={{ expanded: open, busy, disabled: !enabled }}
             onPress={() => setSelectorOpen(!open)}
           >
@@ -163,9 +167,9 @@ export function OrrerySystemSelector({
               role="label"
               numberOfLines={1}
               ellipsizeMode="tail"
-              style={styles.name}
+              style={name === null ? styles.namePending : styles.name}
             >
-              {state.requested.name}
+              {name ?? "\u00A0"}
             </AppText>
             <Icon name="chevron-down" size="sm" />
           </Pressable>
@@ -384,6 +388,8 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   name: { flexShrink: 1 },
+  /** A neutral blank while the name is unknown (one line tall, stable width). */
+  namePending: { width: SPACING["2xl"] * 2 },
   panel: {
     position: "absolute",
     left: SPACING.base,

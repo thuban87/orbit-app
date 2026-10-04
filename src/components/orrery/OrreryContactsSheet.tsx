@@ -16,7 +16,7 @@ import type { OrrerySystemState } from "@/stores/orrery-system-store";
 import { SPACING } from "@/theme/tokens/spacing";
 import { OrreryNotice } from "./OrreryFeedback";
 import { companionRows } from "./orrery-companion-logic";
-import { systemEmptyCopy } from "./orrery-controls-logic";
+import { systemDisplayName, systemEmptyCopy } from "./orrery-controls-logic";
 import { satelliteContext } from "./orrery-satellite-context";
 
 /** Complete conventional access to the SAME committed System, including its sun. */
@@ -45,8 +45,10 @@ export function OrreryContactsSheet({
   const qualifyingSun = !!scene?.systemSnapshot.members.some(
     (member) => member.id === scene.systemSnapshot.resolvedSunIdentity?.id,
   );
+  // 38.7-15: never another System's name (null while it is still unknown).
+  const name = systemDisplayName(state);
   const emptyCopy = systemEmptyCopy(
-    state.requested.name,
+    name ?? "this System",
     state.requested.id === "builtin:all-contacts",
     qualifyingSun,
   );
@@ -62,7 +64,7 @@ export function OrreryContactsSheet({
         contentContainerStyle={styles.content}
       >
         <AppText role="heading">Contacts in this System</AppText>
-        <AppText>{state.requested.name}</AppText>
+        <AppText>{name ?? "\u00A0"}</AppText>
         {state.status === "initial" || state.status === "loading" ? (
           <OrreryNotice kind="list-loading" />
         ) : null}

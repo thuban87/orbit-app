@@ -41,7 +41,10 @@ import { OrrerySystemSelector } from "@/components/orrery/OrrerySystemSelector";
 import { OrreryViewOptions } from "@/components/orrery/OrreryViewOptions";
 import { OrreryWorld } from "@/components/orrery/OrreryWorld";
 import { companionAction } from "@/components/orrery/orrery-companion-logic";
-import { systemEmptyCopy } from "@/components/orrery/orrery-controls-logic";
+import {
+  systemDisplayName,
+  systemEmptyCopy,
+} from "@/components/orrery/orrery-controls-logic";
 import { canvasViewport } from "@/components/orrery/orrery-obstacle-logic";
 import {
   closeBeforeAction,
@@ -1481,8 +1484,10 @@ export function OrreryScreen() {
         ? { id: focusedTarget.id }
         : null;
   }, [cardTarget, cardTargetKey]);
+  // 38.7-15: never another System's name (null while it is still unknown).
+  const requestedName = systemDisplayName(state, systemCatalog);
   const emptyCopy = systemEmptyCopy(
-    state.requested.name,
+    requestedName ?? "this System",
     allContacts,
     qualifyingSun,
   );
@@ -1704,7 +1709,7 @@ export function OrreryScreen() {
             style={[styles.feedback, { backgroundColor: colors.surface }]}
             contentContainerStyle={styles.feedbackContent}
           >
-            <AppText role="heading">{state.requested.name}</AppText>
+            <AppText role="heading">{requestedName ?? "\u00A0"}</AppText>
             <OrreryNotice kind="missing" onAction={showAll} />
           </OrreryFeedback>
         ) : null}
