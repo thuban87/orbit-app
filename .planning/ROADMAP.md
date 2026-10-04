@@ -1420,7 +1420,7 @@ Plans:
 
 **Wave 13** *(blocked on Wave 12 completion)*
 
-- [ ] 38.7-13-PLAN.md — Star-warp System switch on a budget; owner rules smoothness on the Pixel 3a (W13)
+- [x] 38.7-13-PLAN.md — Star-warp System switch on a budget; owner rules smoothness on the Pixel 3a (W13)
 
 **Wave 14** *(blocked on Wave 13 completion)*
 
@@ -1498,7 +1498,7 @@ Plans:
 | 38.4 UI Consistency, Accessibility, Performance & Release Polish | 23/23 | In Progress|  |
 | 38.5 Background Art & Text-on-Art Contrast | 9/9 | Complete | 2026-09-29 |
 | 38.6 Photo Handling — Sync, Sizes & Lightbox | 9/9 | Complete | 2026-09-30 |
-| 38.7 Orrery V2 — Renderer, Camera & Visual Language | 12/16 | In Progress|  |
+| 38.7 Orrery V2 — Renderer, Camera & Visual Language | 13/16 | In Progress|  |
 | 39. Onboarding | 0/TBD | Deferred planning | - |
 | 40. Responsive & Release Hardening | 0/TBD | Deferred planning | - |
 
