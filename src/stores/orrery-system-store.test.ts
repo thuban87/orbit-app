@@ -247,6 +247,42 @@ describe("38.7-04 D-52: custom System name after a cold restore", () => {
     expect(resolveName).toHaveBeenCalledWith(work);
   });
 
+  it("38.7-15: an unknown name keeps the previous System's name while it loads — no transient 'Unavailable System'", async () => {
+    const load = deferred<OrrerySceneSnapshot>();
+    const name = deferred<string | undefined>();
+    const store = createOrrerySystemStore({
+      load: () => load.promise,
+      persist: async () => true,
+      resolveName: () => name.promise,
+    });
+    expect(store.getState().requested.name).toBe("All Contacts");
+    const selecting = store.getState().select(work, undefined, false);
+    expect(store.getState().status).toBe("loading");
+    expect(store.getState().requested.name).toBe("All Contacts");
+    load.resolve(scene(work));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(store.getState().status).toBe("ready");
+    expect(store.getState().requested.name).not.toBe("Unavailable System");
+    name.resolve("Work");
+    await selecting;
+    expect(store.getState().requested.name).toBe("Work");
+  });
+
+  it("38.7-15: a reload while the name is still a placeholder never adopts the previous System's name", async () => {
+    const load = deferred<OrrerySceneSnapshot>();
+    const store = createOrrerySystemStore({
+      load: () => load.promise,
+      persist: async () => true,
+    });
+    void store.getState().select(work, undefined, false);
+    const reloading = store.getState().reload();
+    load.resolve(scene(work));
+    await reloading;
+    // No resolver: the unknown name settles on the fallback, not "All Contacts".
+    expect(store.getState().requested.name).toBe("Unavailable System");
+  });
+
   it("never applies a stale name after a newer select", async () => {
     const name = deferred<string | undefined>();
     const store = createOrrerySystemStore({
